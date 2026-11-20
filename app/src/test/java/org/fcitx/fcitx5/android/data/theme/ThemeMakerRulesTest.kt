@@ -5,45 +5,23 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.phoneStorage
-import org.fcitx.fcitx5.android.input.Contrast
-import org.fcitx.fcitx5.android.input.theme.Area
-import org.fcitx.fcitx5.android.input.theme.BoxBlur
-import org.fcitx.fcitx5.android.input.theme.KeyFaceGeometry
-import org.fcitx.fcitx5.android.input.theme.KeyImageBudget
-import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
-import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
-import org.fcitx.fcitx5.android.input.theme.PictureWindow
-import org.fcitx.fcitx5.android.input.theme.ThemeColors
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.scene.look.Box
 import org.fcitx.fcitx5.android.scene.look.Crop
-import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.KeyFill
-import org.fcitx.fcitx5.android.scene.look.KeyKind
 import org.fcitx.fcitx5.android.scene.look.KeyLabel
 import org.fcitx.fcitx5.android.scene.look.KeyOverride
 import org.fcitx.fcitx5.android.scene.look.KeyPressed
-import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.KindStyle
-import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.NineSlice
-import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.Picture
-import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.look.Text
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -60,245 +38,17 @@ import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /**
- * contract: fixtures the page's node test reads (rules.json, the export zips), which mutation cannot see.
- * The rules the theme maker draws its preview by, computed by ime-core's code for a fixed set of
- * cases (web/theme-maker/test/testdata/rules.json), which the page's own test computes again in
- * JavaScript; and the files it reads (theme.json, a 3.0 theme; from-app.theme and from-app-2.1.theme,
- * what this app and one before 3.0 export). Changed here, the page's test fails till it follows.
+ * contract: fixtures the page's node test reads: a 2.1 theme brought to 3.0 (migration.json, redone in JavaScript),
+ * theme.json, and what this app and a pre-3.0 one export. Change them here and the page's test fails till it follows.
  */
 @RunWith(RobolectricTestRunner::class)
-// the real application: the export goes through appContext (where the themes are)
+// the real application: the export goes through appContext
 @Config(application = FcitxApplication::class)
 class ThemeMakerRulesTest {
 
     private val json = Json { prettyPrint = true }
 
-    private fun area(a: Area?): JsonElement =
-        a?.let { buildJsonArray { listOf(it.left, it.top, it.right, it.bottom).forEach { v -> add(JsonPrimitive(v)) } } } ?: JsonNull
-
-    private fun keysJson(keys: Keys) = json.encodeToJsonElement(KeysJson.of(keys))
-
-    private fun JsonObjectBuilder.ints(name: String, values: IntArray) =
-        put(name, JsonArray(values.map { JsonPrimitive(it) }))
-
-    private val looks = mapOf(
-        "default" to LookDefaults.KEYS,
-        "flat" to LookDefaults.KEYS.copy(blocks = false),
-        "bordered" to LookDefaults.KEYS.copy(radiusDp = 12, borderDp = 2, shadowDp = 0, gap = Gap(5, 9, 2, 3)),
-        "tight" to LookDefaults.KEYS.copy(radiusDp = 24, shadowDp = 3, gap = Gap(0, 0, 0, 0)),
-    )
-
-    private fun geometry() = buildJsonArray {
-        val cells = listOf(100f to 160f, 400f to 160f, 400f to 40f, 400f to 60f, 150f to 160f, 50f to 60f, 37.5f to 121.25f)
-        for ((lookName, keys) in looks) for ((w, h) in cells) for (kind in KeyKind.entries) {
-            for (landscape in listOf(false, true)) for (density in listOf(2f, 2.75f)) for (margin in listOf(true, false)) {
-                if (!margin && (landscape || density != 2f)) continue
-                val face = KeyFaceGeometry.of(w, h, kind, keys, landscape, density, margin)
-                add(buildJsonObject {
-                    put("keys", lookName)
-                    put("width", w); put("height", h); put("kind", kind.name.lowercase())
-                    put("landscape", landscape); put("density", density); put("margin", margin)
-                    put("face", area(face.face)); put("shadow", area(face.shadow)); put("pressed", area(face.pressed))
-                    put("border", face.border); put("radius", face.radius); put("oval", face.oval)
-                })
-            }
-        }
-    }
-
-    // a key's own say over its face (KeyFaceGeometry.Border), which the measured layout gives each key as b
-    private fun borders() = buildJsonArray {
-        for (lookName in listOf("default", "flat")) for ((w, h) in listOf(100f to 160f, 400f to 60f)) for (kind in KeyKind.entries) {
-            for (border in KeyFaceGeometry.Border.entries) {
-                val face = KeyFaceGeometry.of(w, h, kind, looks.getValue(lookName), false, 2.75f, true, border)
-                add(buildJsonObject {
-                    put("keys", lookName)
-                    put("width", w); put("height", h); put("kind", kind.name.lowercase()); put("b", border.name.lowercase())
-                    put("face", area(face.face)); put("shadow", area(face.shadow)); put("pressed", area(face.pressed))
-                    put("border", face.border); put("radius", face.radius); put("oval", face.oval)
-                })
-            }
-        }
-    }
-
-    // which palette field each part is drawn in (ThemeColors), read off a palette whose fields all differ
-    private fun colors() = buildJsonObject {
-        val names = listOf(
-            "backgroundColor", "barColor", "keyboardColor", "keyBackgroundColor", "keyTextColor", "candidateTextColor",
-            "candidateLabelColor", "candidateCommentColor", "altKeyBackgroundColor", "altKeyTextColor",
-            "accentKeyBackgroundColor", "accentKeyTextColor", "keyPressHighlightColor", "keyShadowColor",
-            "popupBackgroundColor", "popupTextColor", "spaceBarColor", "dividerColor", "clipboardEntryColor",
-            "genericActiveBackgroundColor", "genericActiveForegroundColor", "keyBorderColor", "keyHintColor", "toolbarIconColor",
-        )
-        val v = IntArray(names.size) { it + 1 }
-        val p = Palette(
-            v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], v[13], v[14], v[15], v[16],
-            v[17], v[18], v[19], v[20], v[21], v[22], v[23],
-        )
-        fun name(c: Int?) = c?.let { JsonPrimitive(names[it - 1]) } ?: JsonNull
-        for (blocks in listOf(true, false)) {
-            val keys = LookDefaults.KEYS.copy(blocks = blocks)
-            put(if (blocks) "blocks" else "flat", buildJsonObject {
-                put("board", name(ThemeColors.board(p, keys)))
-                put("panel", name(ThemeColors.panel(p, keys)))
-                put("faces", buildJsonObject { for (kind in KeyKind.entries) put(kind.name.lowercase(), name(ThemeColors.face(p, kind, blocks))) })
-            })
-        }
-        put("bar", buildJsonObject {
-            for ((n, b) in listOf("transparent" to BarBase.Transparent, "color" to BarBase.Color, "picture" to BarBase.Picture(0, 100))) {
-                put(n, name(ThemeColors.bar(p, b)))
-            }
-        })
-        put("dim", JsonArray(listOf(0, 1, 30, 50, 99, 100).map { JsonPrimitive(ThemeColors.dim(it)) }))
-    }
-
-    private fun nineSlice() = buildJsonArray {
-        val cases = listOf(
-            Triple(90 to 90, NineSlice("f", Insets(30, 30, 30, 30), 3), Area(0f, 0f, 200f, 100f) to 2f),
-            Triple(100 to 10, NineSlice("f", Insets(20, 0, 60, 0), 1), Area(0f, 0f, 40f, 10f) to 1f),
-            Triple(64 to 32, NineSlice("f", Insets(0, 0, 0, 0), 2), Area(5f, 5f, 105f, 55f) to 3f),
-            Triple(48 to 48, NineSlice("f", Insets(12, 8, 12, 16), 2), Area(3.5f, 7f, 96.5f, 153f) to 2.75f),
-            Triple(30 to 30, NineSlice("f", Insets(10, 10, 10, 10), 1), Area(0f, 0f, 15f, 12f) to 2f),
-            // R23 F7525: a fractional target with no left and no bottom inset: those edges stay the target's, the others whole
-            Triple(40 to 40, NineSlice("f", Insets(0, 8, 12, 0), 2), Area(3.5f, 7.25f, 96.5f, 60.75f) to 2.6f),
-            // inner edges on odd halves (2.5, 18.5): ties go to even, where Math.round would go up
-            Triple(20 to 20, NineSlice("f", Insets(4, 4, 4, 4), 2), Area(0.5f, 1.5f, 20.5f, 10.5f) to 1f),
-        )
-        for ((src, slice, target) in cases) {
-            add(buildJsonObject {
-                put("srcWidth", src.first); put("srcHeight", src.second)
-                put("insets", JsonArray(listOf(slice.insets.left, slice.insets.top, slice.insets.right, slice.insets.bottom).map { JsonPrimitive(it) }))
-                put("pxPerDp", slice.pxPerDp); put("target", area(target.first)); put("density", target.second)
-                put("pieces", JsonArray(NineSliceLayout.of(src.first, src.second, slice, target.first, target.second).map {
-                    buildJsonObject { put("src", area(it.src)); put("dst", area(it.dst)) }
-                }))
-            })
-        }
-    }
-
-    private fun pictures() = buildJsonArray {
-        // a picture's width and height, the board's
-        val cases = listOf(
-            (2000 to 1000) to (1000 to 1000), (500 to 2000) to (1000 to 1000), (1080 to 720) to (1080 to 720),
-            (4032 to 3024) to (1080 to 830), (720 to 1280) to (2340 to 600),
-        )
-        for ((pic, board) in cases) {
-            val (pw, ph) = pic
-            val (bw, bh) = board
-            val p = PictureWindow.centerCrop(pw, ph, bw.toFloat(), bh.toFloat())
-            val key = Area(bw * 0.1f, bh * 0.25f, bw * 0.2f, bh * 0.5f)
-            add(buildJsonObject {
-                put("picWidth", pw); put("picHeight", ph); put("boardWidth", bw); put("boardHeight", bh)
-                put("scale", p.scale); put("dx", p.dx); put("dy", p.dy)
-                put("key", area(key)); put("under", area(PictureWindow.under(p, key)))
-            })
-        }
-    }
-
-    private fun blurRadius() = buildJsonArray {
-        // [blurDp, widthPx, bitmapWidth, density, ThemeAssets.blurRadius, why]: the page's test checks each
-        for (r in listOf(
-            Row(10, 1080, 1080, 2.75f, "drawn at its own size: 10 dp × 2.75 / 4"),
-            Row(10, 540, 1080, 2.75f, "drawn at half its width: twice the bitmap pixels"),
-            Row(10, 2160, 1080, 2.75f, "drawn at twice its width: half"),
-            Row(10, 0, 1080, 2.75f, "no width: as wide as the bitmap"),
-            Row(1, 1080, 1080, 1f, "never under 1"),
-        )) add(buildJsonArray { add(r.dp); add(r.w); add(r.bw); add(r.density); add(ThemeAssets.blurRadius(r.dp, r.w, r.bw, r.density)); add(r.why) })
-    }
-
-    private data class Row(val dp: Int, val w: Int, val bw: Int, val density: Float, val why: String)
-
-    private fun blur() = buildJsonArray {
-        // a fixed pseudo-random picture: the same numbers in the page's test
-        var seed = 12345L
-        fun next(): Int {
-            seed = (seed * 1103515245 + 12345) and 0x7fffffff
-            return (seed ushr 8).toInt()
-        }
-        for ((w, h, radius) in listOf(Triple(5, 1, 1), Triple(8, 6, 2), Triple(13, 7, 3), Triple(4, 4, 0))) {
-            val px = IntArray(w * h) { next() or (0xff shl 24) }
-            add(buildJsonObject {
-                put("width", w); put("height", h); put("radius", radius)
-                ints("pixels", px); ints("blurred", BoxBlur.blur(px, w, h, radius))
-            })
-        }
-        for ((w, h, factor) in listOf(Triple(5, 3, 2), Triple(9, 9, 4), Triple(2, 1, 4))) {
-            val px = IntArray(w * h) { next() or (0xff shl 24) }
-            add(buildJsonObject {
-                put("width", w); put("height", h); put("shrink", factor)
-                ints("pixels", px); ints("shrunk", BoxBlur.shrink(px, w, h, factor))
-            })
-        }
-    }
-
-    private fun slice(file: String) = NineSlice(file, Insets(8, 8, 8, 8), 2)
-
-    private val styled = LookDefaults.KEYS.copy(
-        press = PressEffect.Ripple,
-        function = KindStyle(KeyFill.Color, KeyPressed.Image(slice("fn-down.png"))),
-        space = KindStyle(KeyFill.Image(slice("space.png")), KeyPressed.Color(0x40ffffff)),
-        letter = KindStyle(KeyFill.Picture(8, 60), KeyPressed.Darken),
-        overrides = mapOf(
-            "qwerty/q" to KeyOverride(KeyFill.Image(slice("q.png")), null, KeyLabel.Hide),
-            "*/backspace" to KeyOverride(KeyFill.Image(slice("bs.png")), KeyPressed.Color(7), KeyLabel.Hide),
-            "nine/backspace" to KeyOverride(null, KeyPressed.Color(8), KeyLabel.Show),
-            "zhuyin/q" to KeyOverride(KeyFill.Image(slice("zq.png")), null, KeyLabel.Show),
-            "k20/r1c1" to KeyOverride(KeyFill.Image(slice("new.png")), null, KeyLabel.Show),
-            // a letter by every board's name: not a role, so not looked up
-            "*/q" to KeyOverride(KeyFill.Image(slice("all-q.png")), null, KeyLabel.Hide),
-        ),
-    )
-
-    private fun styles() = buildJsonObject {
-        put("keys", keysJson(styled))
-        put("cases", buildJsonArray {
-            val queries = listOf(
-                Triple("qwerty", "q", KeyKind.Letter), Triple("qwerty", "w", KeyKind.Letter),
-                Triple("zhuyin", "q", KeyKind.Letter), Triple("nine", "q", KeyKind.Letter),
-                Triple("qwerty", "backspace", KeyKind.Function), Triple("nine", "backspace", KeyKind.Function),
-                Triple("qwerty", null, KeyKind.Function), Triple(null, "backspace", KeyKind.Function),
-                Triple("qwerty", "space", KeyKind.Space), Triple("qwerty", "enter", KeyKind.Enter),
-                Triple("k20", "r1c1", KeyKind.Letter), Triple("k14", "r1c1", KeyKind.Letter),
-            )
-            for ((board, key, kind) in queries) {
-                val s = KeyStyleResolver.resolve(styled, board, key, kind)
-                add(buildJsonObject {
-                    put("board", board); put("key", key); put("kind", kind.name.lowercase())
-                    put("style", json.encodeToJsonElement(OverrideJson.of(KeyOverride(s.fill, s.pressed, s.label))))
-                })
-            }
-        })
-        put("imagesOn", buildJsonArray {
-            for ((board, names) in listOf("qwerty" to listOf("q", "w", "backspace", "space"), "nine" to listOf("backspace", "2"), "zhuyin" to listOf("q"))) {
-                add(buildJsonObject {
-                    put("board", board); put("names", JsonArray(names.map { JsonPrimitive(it) }))
-                    put("files", JsonArray(KeyStyleResolver.imagesOn(styled, board, names).map { it.file }.sorted().map { JsonPrimitive(it) }))
-                })
-            }
-        })
-    }
-
-    private fun budget() = buildJsonObject {
-        put("limit", KeyImageBudget.LIMIT_BYTES)
-        put("cases", buildJsonArray {
-            val sets = listOf(
-                listOf(100 to 150, 100 to 150),
-                (1..52).map { 300 to 300 },
-                (1..80).map { 1024 to 1024 },
-                listOf(1 to 1, 3 to 5, 999 to 7),
-            )
-            for (sizes in sets) {
-                val images = sizes.mapIndexed { i, (w, h) -> KeyImageBudget.Image("k$i", w, h) }
-                val sample = KeyImageBudget.sampleSize(images)
-                add(buildJsonObject {
-                    put("images", JsonArray(sizes.map { (w, h) -> JsonArray(listOf(JsonPrimitive(w), JsonPrimitive(h))) }))
-                    put("bytes", KeyImageBudget.bytes(images)); put("sampleSize", sample)
-                    put("sampledBytes", KeyImageBudget.bytes(images, sample))
-                })
-            }
-        })
-    }
-
-    // the 2.1 json an app before 3.0 exported (its colours, a picture), and what it is read as
+    // a pre-3.0 app's 2.1 export (colours, a picture), and what it is read as
     private val v21 = """
         {"name":"old","isDark":true,"backgroundImage":{"croppedFilePath":"old-cropped.png","srcFilePath":"old-src",
         "brightness":55,"cropRect":{"bottom":1400,"left":10,"right":1090,"top":20},"cropRotation":90},
@@ -310,7 +60,7 @@ class ThemeMakerRulesTest {
         "genericActiveBackgroundColor":-10577930,"genericActiveForegroundColor":-1,"version":"2.1"}
     """.trimIndent().replace("\n", "")
 
-    // one with what an older 2.1 left out: no brightness (70), no turn (0), a crop's edges missing (-1 each)
+    // what an older 2.1 left out: no brightness (70), no turn (0), crop edges missing (-1 each)
     private val v21Partial = v21
         .replace("\"brightness\":55,", "")
         .replace(",\"cropRotation\":90", "")
@@ -319,44 +69,21 @@ class ThemeMakerRulesTest {
     private fun migrated(from: String) =
         Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, Json.decodeFromString(CustomThemeSerializer, from)))
 
-    private fun migration() = buildJsonObject {
-        check(v21Partial.length < v21.length - 40) { "the partial 2.1 sample left nothing out" }
-        put("from", Json.parseToJsonElement(v21))
-        put("to", migrated(v21))
-        put("partialFrom", Json.parseToJsonElement(v21Partial))
-        put("partialTo", migrated(v21Partial))
-    }
-
-    // Contrast.ratio, which the page's contrast warnings are: opaque and translucent text, light and dark grounds
-    private fun contrast() = buildJsonArray {
-        val colours = listOf(-1, -16777216, -10577930, 0x990d47a1.toInt(), 0x4BFFFFFF, -328966, -13816531, 0x1F000000, -1499549, 0x00123456)
-        for (fg in colours) for (bg in colours.filter { it ushr 24 == 0xFF }) {
-            add(buildJsonArray { add(JsonPrimitive(fg)); add(JsonPrimitive(bg)); add(JsonPrimitive(Contrast.ratio(fg, bg))) })
-        }
-    }
 
     @Test
-    fun rules() {
-        val rules = buildJsonObject {
-            put("keys", buildJsonObject { looks.forEach { (name, keys) -> put(name, keysJson(keys)) } })
-            put("geometry", geometry())
-            put("borders", borders())
-            put("colors", colors())
-            put("nineSlice", nineSlice())
-            put("pictures", pictures())
-            put("blur", blur())
-            put("blurRadius", blurRadius())
-            put("styles", styles())
-            put("budget", budget())
-            put("migration", migration())
-            put("contrast", contrast())
+    fun migration() {
+        val migration = buildJsonObject {
+            check(v21Partial.length < v21.length - 40) { "the partial 2.1 sample left nothing out" }
+            put("from", Json.parseToJsonElement(v21))
+            put("to", migrated(v21))
+            put("partialFrom", Json.parseToJsonElement(v21Partial))
+            put("partialTo", migrated(v21Partial))
         }
-        ThemeMakerTestdata.check("rules.json", json.encodeToString(JsonElement.serializer(), rules) + "\n")
+        ThemeMakerTestdata.check("migration.json", json.encodeToString(JsonElement.serializer(), migration) + "\n")
     }
 
-    // a theme with everything 3.0 has: the picture cut for portrait and (turned) for landscape, blurred,
-    // letters on it blurred, a nine-slice space, an image and a colour pressed, a role's key, a board's
-    // key, a later build's board's key (kept, drawn by none), both fonts
+    // everything 3.0 has: portrait and landscape cuts, blurs, nine-slice space, pressed image and colour, role, board and
+    // later-build keys, both fonts
     private val full = TestThemes.PixelDark.deriveCustomNoBackground("full").let { t ->
         t.copy(
             look = t.look.copy(
@@ -366,7 +93,7 @@ class ThemeMakerRulesTest {
                     Crop("full-landscape.png", Box(0, 900, 1440, 1500), 90),
                     70, 4,
                 ),
-                // the letters show the picture: their colour, laid over it, at 30 % as the page turns it
+                // letters over the picture: their colour at 30 %, as the page turns it
                 palette = t.look.palette.run { copy(keyBackgroundColor = keyBackgroundColor and 0xFFFFFF or (0x4D shl 24)) },
                 base = BoardBase.Picture,
                 bar = BarBase.Picture(12, 60),
@@ -389,11 +116,11 @@ class ThemeMakerRulesTest {
 
     @Test
     fun aFullThemeAsAFile() {
-        // as the app writes a theme's file (its version first), only indented
+        // as the app writes a theme file (version first), only indented
         ThemeMakerTestdata.check("theme.json", json.encodeToString(CustomThemeSerializer, full) + "\n")
     }
 
-    // a w×h PNG of one colour: the zips' images are real ones, for the page to decode
+    // real images, for the page to decode
     private fun png(w: Int, h: Int, argb: Int): ByteArray {
         fun chunk(out: ByteArrayOutputStream, type: String, data: ByteArray) {
             val crc = CRC32()
@@ -420,9 +147,8 @@ class ThemeMakerRulesTest {
         return out.toByteArray()
     }
 
-    // a zip as the app exports one, its times fixed: the same bytes every run, in any time zone
-    // (a time in millis is stored as the local date, so a CI in UTC would write other bytes; and not
-    // 1980-01-01 00:00, which is the DOS time of "before 1980" and gets a zoned timestamp added)
+    // fixed times: the same bytes every run in any zone (millis store as local date; 1980-01-01 00:00 is DOS's "before
+    // 1980" and gets a zoned timestamp added)
     private fun zip(entries: List<Pair<String, ByteArray>>) = ByteArrayOutputStream().also { bytes ->
         ZipOutputStream(bytes).use { zip ->
             for ((name, data) in entries) {
@@ -438,22 +164,22 @@ class ThemeMakerRulesTest {
 
     @Test
     fun whatTheAppExports() {
-        // this app's: the json names its files by name, each in the zip once, the json last
+        // this app's: files named by name, each once, the json last
         val theme = full.copy(name = "from-app", look = full.look.copy(text = full.look.text.copy(keyFont = null, candidateFont = null))).let { t ->
             t.copy(look = t.look.mapFiles { it.replace("full-", "from-app-") })
         }
         val files = theme.look.files().map { it to png(if ("landscape" in it) 24 else 16, if ("landscape" in it) 12 else 24, 0x80336699.toInt()) }
-        // in the theme dir, as the app keeps them (it exports no other file), and out through its own export
+        // through its own export, from the theme dir
         phoneStorage()
         val dir = ThemeFilesManager.themeDir.apply { mkdirs() }
         files.forEach { (name, bytes) -> File(dir, name).writeBytes(bytes) }
         val out = ByteArrayOutputStream()
         ThemeFilesManager.exportJson(theme.copy(look = theme.look.mapFiles { File(dir, it).path }), out).getOrThrow()
-        // its entries as it wrote them, in its order; only their times fixed (it stamps the time of the export)
+        // as it wrote them, only their times fixed
         val exported = zip(entries(out.toByteArray()))
         assertEquals(theme.look.files() + "from-app.json", entries(exported).map { it.first })
         ThemeMakerTestdata.check("from-app.theme", exported)
-        // one before 3.0: its two images and its 2.1 json
+        // pre-3.0: its two images and its 2.1 json
         val old = zip(listOf("old-cropped.png" to png(16, 24, -0x1000000), "old-src" to png(32, 48, -0x1000000), "old.json" to v21.encodeToByteArray()))
         ThemeMakerTestdata.check("from-app-2.1.theme", old)
     }

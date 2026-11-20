@@ -12,20 +12,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.io.BufferedReader
 import java.util.TreeMap
 
-/**
- * Reads libime's dictionary text, one reading per line: `word pinyin [weight]`, fields separated
- * by any whitespace (the files mix tabs and spaces), syllables by `'`. The weight is a log10
- * adjustment for that reading (see [PinyinDataBuilder.entry]), 0 when absent.
- *
- * A reading with a syllable [Syllables] does not know is skipped and counted rather than fatal,
- * so a new dictionary release with one odd entry still builds; [unknownSyllables] says what to
- * add.
- *
- * The curated corrections of `lexicon/` apply as it reads: a word of [removed] is left out, even
- * one the other lists name, and a word of [readings] is read as listed there instead of as the
- * dictionary has it ([corrected] adds those, once all is read); so is a word of [misread], its
- * reading first, the rest misreadings at [Misreadings.WEIGHT].
- */
+/** Reads libime's dictionary text with `lexicon/`'s corrections; an unknown syllable is skipped and counted. */
 class PinyinDictReader(
     private val into: PinyinDataBuilder,
     private val removed: Set<String> = emptySet(),
@@ -43,7 +30,6 @@ class PinyinDictReader(
     /** Unknown syllable to how many readings it made us skip. */
     val unknownSyllables = TreeMap<String, Int>()
 
-    /** Readings skipped for a syllable [Syllables] does not know. */
     var skipped = 0
         private set
 

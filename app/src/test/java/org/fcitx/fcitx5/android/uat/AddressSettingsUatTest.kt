@@ -34,7 +34,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
-/** uat/14-settings.md's 「通用输入 → 网址和邮箱」 (AddressSettingsFragment, AddressSuffixesFragment). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -65,7 +64,7 @@ class AddressSettingsUatTest {
     private fun shown(): List<String> = KeyboardHarness.all(st.activity.window.decorView)
         .filter { it.isShown && it is TextView }.map { (it as TextView).text.toString() }.toList()
 
-    // the list page's + and its dialog, [typed] put in and OK pressed; whether the dialog closed
+    // whether the dialog closed
     private fun add(typed: String): Boolean {
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
         st.idle()
@@ -82,7 +81,7 @@ class AddressSettingsUatTest {
     @Uat("ST-44")
     fun theAddressPageItsListsAndRememberedAddresses() {
         prefs.set(internal.rememberedAddresses, "2\tzhang@qq.com\n1\tli@163.com")
-        // 通用输入's first group's row (its page needs the engine's options: SettingsUatTest's ST-33 opens it)
+        // its page needs the engine's options: SettingsUatTest's ST-33 opens it
         val all = InputMethodSettings.SHARED.first() as InputMethodSettings.Section
         val row = all.items.filterIsInstance<InputMethodSettings.Page>().single { it.key == InputMethodSettings.ADDRESSES }
         assertEquals(R.string.address_suggestions, row.title)
@@ -90,12 +89,10 @@ class AddressSettingsUatTest {
         assertTrue(st.page.javaClass.name, st.page is AddressSettingsFragment)
         assertTrue(st.pref(R.string.email_suffixes).summary.toString().startsWith("@qq.com  @163.com"))
         assertEquals(AddressLists.DEFAULT_URL.joinToString("  "), st.pref(R.string.url_suffixes).summary.toString())
-        // the switch on by default, off kept
         val remember = st.pref(R.string.remember_addresses) as TwoStatePreference
         assertTrue(remember.isChecked)
         remember.performClick()
         assertFalse(keyboard.rememberAddresses.getValue())
-        // the remembered, one forgotten, then all
         assertTrue(st.titles().toString(), st.titles().containsAll(listOf("zhang@qq.com", "li@163.com")))
         st.pref("li@163.com").performClick()
         st.idle()
@@ -109,7 +106,6 @@ class AddressSettingsUatTest {
         assertEquals("", internal.rememberedAddresses.getValue())
         assertTrue(st.titles().toString(), st.s(R.string.remembered_addresses_none) in st.titles())
 
-        // the email list: added as typed, each once, no non-domain; moved; put back as it came
         st.open(SettingsRoute.AddressSuffixes(AddressSuffixesFragment.EMAIL))
         assertTrue(shown().toString(), "@gmail.com" in shown())
         assertTrue(add("@Work.CN"))
@@ -128,7 +124,6 @@ class AddressSettingsUatTest {
         assertEquals(AddressLists.DEFAULT_EMAIL, list())
         assertEquals(AddressLists.DEFAULT_EMAIL, AddressStore.lists().email)
 
-        // the URL list: a dot put before; one taken away
         st.open(SettingsRoute.AddressSuffixes(AddressSuffixesFragment.URL))
         assertTrue(add("IO"))
         assertEquals(AddressLists.DEFAULT_URL + ".io", AddressStore.lists().url)

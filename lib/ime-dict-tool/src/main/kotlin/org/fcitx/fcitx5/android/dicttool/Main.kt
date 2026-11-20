@@ -49,11 +49,7 @@ import java.util.zip.ZipFile
 import kotlin.math.abs
 import kotlin.system.exitProcess
 
-/**
- * A command, all [runCli] knows of it in one place: its [synopsis], whose flags are those it takes
- * (the bracketed ones it can do without; each takes a value), what it does, how many inputs it
- * takes, and what runs it.
- */
+/** A command as [runCli] knows it: its [synopsis] lists the flags it takes (bracketed: optional; each takes a value). */
 private class Command(val synopsis: String, about: String, val inputs: IntRange = 1..Int.MAX_VALUE, val action: (Options, Appendable) -> Unit) {
     val name = synopsis.substringBefore(' ')
     val about = about.trimIndent()
@@ -92,8 +88,7 @@ private val COMMANDS = listOf(
         """,
         inputs = 3..3,
     ) { options, out ->
-        // by position, so the order is checked: another (STCharacters first) would convert character by
-        // character, STPhrases no longer splitting the text into words, and still compile
+        // by position: another order (STCharacters first) would convert character by character and still compile
         val names = options.inputs.map { File(it).nameWithoutExtension }
         require(names == ChineseConverter.S2TW) { "expected ${ChineseConverter.S2TW.joinToString(" ") { "$it.txt" }} in that order, got ${names.joinToString(" ")}" }
         val bytes = OpenCCData.write(options.inputs.map { OpenCCData.parse(File(it).readText()) })
@@ -246,7 +241,6 @@ private val COMMANDS = listOf(
     ),
 )
 
-/** Each command's synopsis, what it does beside it or, where there is no room, under it. */
 val USAGE: String = COMMANDS.withIndex().joinToString("\n") { (i, command) ->
     val head = (if (i == 0) "usage: " else " ".repeat("usage: ".length)) + command.synopsis
     val about = command.about.lines()
@@ -276,15 +270,13 @@ fun runCli(args: Array<String>, out: Appendable, err: Appendable): Int {
         err.appendLine(e.message)
         1
     } catch (e: DataFormatException) {
-        // check reads a compiled file: a stale or foreign one
         err.appendLine(e.message)
         1
     } catch (e: IOException) {
         err.appendLine(e.toString())
         1
     } catch (e: IllegalArgumentException) {
-        // an inconsistency only visible once everything is read (a duplicate n-gram, no <unk> ...),
-        // or a path WebText refuses
+        // an inconsistency only visible once everything is read (a duplicate n-gram, no <unk>), or a path WebText refuses
         err.appendLine(e.message)
         1
     }
@@ -307,19 +299,14 @@ private class Options(
     val minSurprise: Double,
     /** `pack`: a file of the only words that may go in (the first field of each line), if any; `examples`: the words. */
     val only: String?,
-    /** `examples`: sentences a word. */
     val perWord: Int,
-    /** `pack`: a curated list, `word<TAB>reading...` (lexicon/add.tsv): its words and no other, as it reads them; `emoji`: lexicon/emoji.tsv, the edits. */
+    /** `pack`: a curated list, `word<TAB>reading...` (lexicon/add.tsv): its words and no other; `emoji`: lexicon/emoji.tsv. */
     val lexicon: String?,
-    /**
-     * `clean`: the line sketch's width, so twice the lines collide no more than one crawl's did;
-     * `words`: the widest of its run sketches, for the same.
-     */
+    /** `clean`: the line sketch's width; `words`: the widest of its run sketches. */
     val sketchBits: Int,
     /** `pinyin`: lexicon/remove.tsv, words the dictionaries have wrongly, and lexicon/readings.tsv, readings put right. */
     val remove: String?,
     val readings: String?,
-    /** `pinyin`: lexicon/misreadings.tsv, words often read wrongly, typed either way. */
     val misreadings: String?,
     /** `pinyin`: Unihan's readings as mozillazg/pinyin-data lists them, `,` between the files; its phrase list; lexicon/tones.tsv. */
     val charTones: String?,
@@ -329,17 +316,14 @@ private class Options(
     val words: String?,
     /** `table`: compiled pinyin data whose words go in too; `emoji`: that reads the words. */
     val pinyin: String?,
-    /** `emoji`: Unicode's emoji-test.txt. */
     val test: String?,
     /** `charinfo`: Unicode's Unihan.zip and CJKRadicals.txt, kfcd/chaizi's chaizi-jt.txt, rime-stroke's dictionary, and the characters handwriting knows. */
     val unihan: String?,
     val radicals: String?,
     val chaizi: String?,
     val strokes: String?,
-    /** `charinfo`: lexicon/stroke-order.tsv. */
     val orders: String?,
     val cover: String?,
-    /** `english-lm`: how many words, and at most how many of the pages' words to read. */
     val vocabulary: Int,
     val tokens: Long,
     /** `english-lm`: a spell dictionary (fcitx's .fscd) whose words are none of the pages' slips. */
@@ -350,10 +334,8 @@ private class Options(
     val startProb: Double,
     val crawl: Crawl,
 ) {
-    /** `cc`: the crawl, its first WET file and how many, and where CommonCrawl is. */
     class Crawl(val name: String?, val from: Int, val files: Int?, val base: String) {
         companion object {
-            /** @return null for a bad value */
             fun parse(values: Map<String, String>): Crawl? = Crawl(
                 name = values["--crawl"],
                 from = values["--from"]?.let { it.toIntOrNull()?.takeIf { n -> n >= 0 } ?: return null } ?: 0,
@@ -364,17 +346,14 @@ private class Options(
     }
 
     companion object {
-        // what measured best with FineWeb-2's chat-like pages over the written and the chat
-        // evaluation sets together (dev/ENGINE-DESIGN.md)
+        // measured best with FineWeb-2's chat-like pages over the written and chat evaluation sets (dev/ENGINE-DESIGN.md)
         const val WEIGHT = 0.6
         val CUTOFFS = 2 to 2
-        // a word of the last years in 0.4 billion characters of chat-like pages: hundreds of times
         const val MIN_COUNT = 50
         // a run ten times as frequent as its parts predict, with a handful of different neighbours
         const val MIN_PMI = 1.0
         const val MIN_ENTROPY = 1.5
-        // no least surprise: on FineWeb-2 it told the model's domain from the pages' more than
-        // phrases from words (dev/TRAINING-PLAN.md 11.7), but a corpus nearer the model's can ask for one
+        // no least surprise by default: on FineWeb-2 it told the model's domain apart more than phrases from words
         val MIN_SURPRISE = Double.NEGATIVE_INFINITY
 
         const val MAX_SKETCH_BITS = 30
@@ -382,13 +361,11 @@ private class Options(
         // Gboard's own lists are of this order; what the pages have past it is mostly names and slips
         const val VOCABULARY = 200_000
 
-        // how often a word starts its sentence: lib/ime-eval/data/english.txt has 19,669 words in 1,500
+        // how often a word starts its sentence (lib/ime-eval/data/english.txt)
         const val START_PROB = 1.0 / 14
 
-        // every command's flags, each taking a value: a value is none of them
         private val FLAGS = COMMANDS.flatMapTo(HashSet()) { it.flags }
 
-        /** [flag]'s value, [default] without one, null for a bad one. */
         private fun <T : Any> Map<String, String>.read(flag: String, default: T, value: (String) -> T?): T? =
             this[flag]?.let(value) ?: default.takeIf { flag !in this }
 
@@ -401,11 +378,7 @@ private class Options(
             return n.takeIf { it.size == 2 && it[0] in 1..it[1] }?.let { it[0] to it[1] }
         }
 
-        /**
-         * [args] as the values of [command]'s flags and its inputs; null for a flag it does not take
-         * (or none does), one it needs missing, one given twice or without a value, or more or fewer
-         * inputs than it takes.
-         */
+        /** [args] as [command]'s flag values and inputs; null for a flag it does not take, a missing or repeated one, or the wrong number of inputs. */
         private fun split(command: Command, args: List<String>): Pair<Map<String, String>, List<String>>? {
             val values = HashMap<String, String>()
             val inputs = ArrayList<String>()
@@ -428,7 +401,6 @@ private class Options(
             return values to inputs
         }
 
-        /** @return null for what [command] does not take ([split]), or an option with a bad value */
         fun parse(command: Command, args: List<String>): Options? {
             val (values, inputs) = split(command, args) ?: return null
             return Options(
@@ -476,17 +448,11 @@ private class Options(
     }
 }
 
-/** The first field of each line of [file], its comments (`#`) and blank lines left out, in its order. */
 private fun wordList(file: File): LinkedHashSet<String> = file.useLines { lines ->
     lines.map { it.substringBefore('\t').trim() }.filter { it.isNotEmpty() && !it.startsWith('#') }.toCollection(LinkedHashSet())
 }
 
-/**
- * Whether a candidate's numbers pass the thresholds. An entropy not measured (NaN: the run's pmi
- * was too low to gather its neighbours) is no reason to leave it out when the pmi asked for is
- * lower still. A run of two whose entropy was measured is held to that alone: its pmi says little
- * (NewWords.GATHER_PMI).
- */
+/** Whether a candidate passes the thresholds; an unmeasured entropy (NaN) fails it only when the pmi asked for is lower. */
 private fun Options.passes(c: CandidateRow): Boolean {
     if (c.known || c.count < minCount || c.surprise < minSurprise) return false
     val entropy = minOf(c.leftEntropy, c.rightEntropy)
@@ -497,19 +463,11 @@ private fun Options.passes(c: CandidateRow): Boolean {
     }
 }
 
-/**
- * Whether a character of [text] is one the model all but never saw: a traditional one (視頻, 圖片)
- * on a page the page filter let through, or a typo, no word for a simplified typist either way.
- */
+/** Whether a character of [text] is one the model all but never saw (a traditional one, a typo). */
 private fun rare(data: PinyinData, text: String): Boolean =
     text.indices.any { i -> data.wordIndex.find(text, i, i + 1).let { it < 0 || data.model.score(it) < RARE_CHAR } }
 
-/**
- * A curated list's words and readings, `word<TAB>pin'yin[<TAB>...]` a line, `#` comments: each
- * line's to [each], in the list's order.
- * @throws SourceException for a line without a reading, a syllable the engine does not know, or
- * a reading of more or fewer syllables than the word has characters
- */
+/** A curated list, `word<TAB>pin'yin[<TAB>...]` a line, `#` comments; @throws SourceException on a bad reading. */
 private fun curated(file: File, each: (text: String, reading: String) -> Unit) = file.bufferedReader().use { reader ->
     reader.forEachNumberedLine(file.path) { line, n ->
         if (line.isBlank() || line.startsWith('#')) return@forEachNumberedLine
@@ -525,24 +483,19 @@ private fun curated(file: File, each: (text: String, reading: String) -> Unit) =
     }
 }
 
-/** lexicon/add.tsv's words, each as it reads it ([curated]). */
 private fun lexicon(file: File): Map<String, String> = LinkedHashMap<String, String>().apply {
     curated(file) { text, reading -> this[text] = reading }
 }
 
-/** lexicon/readings.tsv's words, each with every reading it lists, a line a reading ([curated]). */
 private fun curatedReadings(file: File): Map<String, List<String>> = LinkedHashMap<String, MutableList<String>>().apply {
     curated(file) { text, reading -> getOrPut(text) { ArrayList() } += reading }
 }
 
-/**
- * lexicon/misreadings.tsv ([Misreadings.parse]), each reading and misreading one the engine can type.
- * @throws SourceException for a line that is no entry, or a syllable the engine does not know
- */
+/** @throws SourceException for a line that is no entry, or a syllable the engine does not know */
 private fun misreadings(file: File): List<Misreadings> {
     val lines = file.readLines()
     val entries = Misreadings.parse(lines.asSequence(), file.path)
-    // parse keeps no line numbers: each line read again alone, which it parsed whole already, for its entry's
+    // parse keeps no line numbers: each line parsed again alone for its entry's
     lines.forEachIndexed { i, line ->
         val entry = Misreadings.parse(sequenceOf(line), file.path).singleOrNull() ?: return@forEachIndexed
         val bad = (listOf(entry.typed) + entry.misread).firstOrNull { r -> r.split('\'').any { Syllables.id(it) < 0 } } ?: return@forEachIndexed
@@ -551,7 +504,7 @@ private fun misreadings(file: File): List<Misreadings> {
     return entries
 }
 
-/** Each chat-like page's texts as a JSON array of strings, a line a page, gzipped: for the eval-set tools. */
+/** Each chat-like page's texts as a JSON array of strings, a line a page, gzipped (for the eval-set tools). */
 private fun text(options: Options, out: Appendable) {
     var pages = 0
     GZIPOutputStream(File(options.output!!).outputStream().buffered()).bufferedWriter().use { w ->
@@ -566,7 +519,6 @@ private fun text(options: Options, out: Appendable) {
     out.appendLine("text: $pages pages")
 }
 
-/** `word<TAB>sentence...`, a line for each word of the list found, in the list's order. */
 private fun examples(options: Options, out: Appendable) {
     val words = wordList(File(options.only!!))
     val examples = Examples(words, options.perWord)
@@ -584,10 +536,7 @@ private fun examples(options: Options, out: Appendable) {
     out.appendLine("examples: ${found.size} of ${words.size} words found in $pages pages")
 }
 
-/**
- * Each shard without its boilerplate and spam, written to the output directory under its name:
- * every shard's lines are counted first, as a menu repeats over pages of more than one shard.
- */
+/** Each shard without boilerplate and spam, into the output directory: all shards' lines are counted first, as a menu repeats across shards. */
 private fun clean(options: Options, out: Appendable) {
     val dir = File(options.output!!)
     val shards = options.inputs.map(::File)
@@ -611,14 +560,10 @@ private fun clean(options: Options, out: Appendable) {
     out.appendLine("clean: $kept of $pages pages kept, $han Han characters")
 }
 
-/**
- * The runs of Han characters the pages use that the data's base layer lacks, with what tells a
- * word from a chance run: `text count year pmi left-entropy right-entropy surprise known`, a
- * line each ([CandidateRow]), in no order ([NewWords], [Surprise]). Lines starting `#` are comments.
- */
+/** The runs of Han characters the pages use that the data's base layer lacks, a [CandidateRow] line each. */
 private fun words(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
-    // the base layer's words: the others are a pack's, the kind a pack is for, scored by true counts
+    // the base layer's words: the others are a pack's, the kind a pack is for
     val known = HashSet<String>(data.vocabulary.size * 2)
     for (id in 0 until data.vocabulary.size) if (data.layers.layer(id) == 0) known += data.vocabulary.word(id)
     val finder = NewWords(known, options.minCount, sketchBits = options.sketchBits)
@@ -654,10 +599,7 @@ private fun words(options: Options, out: Appendable) {
     out.appendLine("words: $all runs of at least ${options.minCount}, $unknown of them not in the data")
 }
 
-/**
- * A line of `words`'s output by its fields' names: what [words] writes and [pack] reads back, and
- * lexicon/tools/batches.py by [HEADER]'s names, so a column moved or added misleads neither.
- */
+/** A line of `words`'s output; lexicon/tools/batches.py reads it by [HEADER]'s names too, so a column moved misleads neither. */
 private class CandidateRow(
     val text: String,
     val count: Int,
@@ -668,7 +610,6 @@ private class CandidateRow(
     val surprise: Double,
     val known: Boolean,
 ) {
-    /** Writes the row, a line, through [formatter]. */
     fun writeTo(formatter: Formatter) {
         formatter.format("%s\t%d\t%d\t%.3f\t%.3f\t%.3f\t%.3f\t%d\n", text, count, year, pmi, leftEntropy, rightEntropy, surprise, if (known) 1 else 0)
     }
@@ -677,7 +618,6 @@ private class CandidateRow(
         const val HEADER = "# text\tcount\tyear\tpmi\tleft_entropy\tright_entropy\tsurprise\tknown"
         private val FIELDS = HEADER.removePrefix("# ").split('\t').size
 
-        /** @throws IllegalArgumentException for a line that is none */
         fun parse(line: String): CandidateRow {
             val f = line.split('\t')
             require(f.size == FIELDS && (f[7] == "0" || f[7] == "1")) { "expected \"${HEADER.removePrefix("# ")}\", got \"$line\"" }
@@ -686,10 +626,7 @@ private class CandidateRow(
     }
 }
 
-/**
- * Each candidate of `words`'s output, its first line [CandidateRow.HEADER], the comment lines skipped.
- * @throws SourceException for a file of another kind or layout, or a line that is no candidate
- */
+/** @throws SourceException for a file of another kind or layout, or a line that is no candidate */
 private fun File.forEachCandidate(row: (CandidateRow) -> Unit) = bufferedReader().use { reader ->
     reader.forEachNumberedLine(path) { line, n ->
         if (n == 1 && line != CandidateRow.HEADER) throw SourceException(path, n, "not the output of words: expected \"${CandidateRow.HEADER}\"")
@@ -697,23 +634,16 @@ private fun File.forEachCandidate(row: (CandidateRow) -> Unit) = bufferedReader(
     }
 }
 
-/**
- * The candidates of `words` that pass the thresholds and are not plainly phrases or fragments
- * ([Phrases]), as a word pack: each read as the dictionary's words in it are ([Readings]), scored on the
- * model's unigram scale by its count ([CountFit] over the candidates the model knows). One with
- * a character no reading is known for is left out. Given a curated list, its words instead ([packCurated]).
- */
+/** The candidates of `words` that pass, as a word pack scored on the model's unigram scale by count ([CountFit]). */
 private fun pack(options: Options, out: Appendable) {
     val data = PinyinData.load(map(options.data!!))
     val input = File(options.inputs.single())
     // what a curator took, as it reads it: no threshold or guess of ours second-guesses that
     val lexicon = options.lexicon?.let { lexicon(File(it)) }
-    // a list that says which runs are words (an encyclopedia's titles): what pmi and entropy only
-    // guess at, and most of what they let through is not (dev/TRAINING-PLAN.md 11.7b)
+    // a list that says which runs are words: pmi and entropy only guess, and most of what they pass is not
     val only = options.only?.let { wordList(File(it)) }
-    // two reads of the candidates rather than all of them in memory: there are millions
+    // two reads of the candidates rather than all in memory: there are millions
     val known = ArrayList<Pair<Long, Float>>()
-    // every word of the dictionary, not the model's alone (data.wordIndex): most are not the model's
     val dictionary = WordIndex(data.vocabulary, data.vocabulary.size)
     val phrases = Phrases { text, from, to -> dictionary.find(text, from, to) >= 0 }
     input.forEachCandidate { c ->
@@ -722,8 +652,7 @@ private fun pack(options: Options, out: Appendable) {
         if (id >= 0 && id < data.model.vocabularySize && data.layers.layer(id) == 0) known += c.count.toLong() to data.model.score(id)
         phrases.saw(c.text, c.count)
     }
-    // the slope fitted too, not held at 1 as frequencies would have it: the pages are not the
-    // model's kind of text, and the flatter line measured better (dev/TRAINING-PLAN.md 11.7)
+    // the slope fitted too, not held at 1: the pages are not the model's kind of text
     val fit = CountFit.of(known)
     out.appendLine("fit: log10 P = %.3f + %.3f log10(count + 1), over ${known.size} words the model has".format(Locale.ROOT, fit.a, fit.b))
     File(options.output!!).bufferedWriter().use { w ->
@@ -734,10 +663,7 @@ private fun pack(options: Options, out: Appendable) {
     }
 }
 
-/**
- * The words of a curated list, as it reads them: those among the candidates scored by their count,
- * in the candidates' order, the rest after.
- */
+/** A curated list's words: those among the candidates scored by count in their order, the rest after. */
 private fun Formatter.packCurated(lexicon: Map<String, String>, input: File, fit: CountFit, minCount: Int, out: Appendable) {
     val unseen = lexicon.keys.toMutableSet()
     var words = 0
@@ -747,8 +673,7 @@ private fun Formatter.packCurated(lexicon: Map<String, String>, input: File, fit
             words++
         }
     }
-    // taken from elsewhere than the pages (a report of a missing word, a failed evaluation):
-    // scored as the least a candidate is counted
+    // words from elsewhere (a reported missing word): scored as the least a candidate is counted
     unseen.forEach { text ->
         packLine(text, lexicon.getValue(text), fit, minCount.toLong())
         words++
@@ -757,7 +682,6 @@ private fun Formatter.packCurated(lexicon: Map<String, String>, input: File, fit
     out.appendLine("pack: $words words")
 }
 
-/** The candidates that pass, of [only] if it is given, less the phrases and those of a character the model hardly has. */
 private fun Formatter.packPassing(options: Options, data: PinyinData, phrases: Phrases, only: Set<String>?, input: File, fit: CountFit, out: Appendable) {
     val readings = Readings(data)
     var words = 0
@@ -781,20 +705,18 @@ private fun Formatter.packPassing(options: Options, data: PinyinData, phrases: P
     out.appendLine("pack: $words words, $rare left out for a character the model hardly has, $unread for want of a reading")
 }
 
-/** A word pack's line: [text] under [reading], scored as [fit] has [count], no likelier than certain. */
 private fun Formatter.packLine(text: String, reading: String, fit: CountFit, count: Long) {
     format("%s\t%s\t%.3f\n", text, reading, minOf(0f, fit.prob(count)))
 }
 
-// log10: a character under this in the model is as good as not in it (the dictionary's rarest are around -6)
+// log10: a character under this in the model is as good as absent
 private const val RARE_CHAR = -6.5f
 
 private fun mix(options: Options, out: Appendable) {
     val lm = options.lm!!
     var base = File(lm).bufferedReader().use { ArpaModel.read(it, lm) }
     out.appendLine("model: ${base.size} / ${base.bigrams.size} / ${base.trigrams.size} n-grams")
-    // a word pack's words join the vocabulary the text is split into, at the pack's scores: only
-    // a unigram the model has gets n-grams, and a curated word would otherwise never have a context
+    // a pack's words join the vocabulary, or a curated word the model lacks would never have a context
     val (packFiles, corpora) = options.inputs.partition { it.endsWith(PACK_SUFFIX) }
     if (packFiles.isNotEmpty()) {
         val words = packFiles.flatMap { path ->
@@ -808,7 +730,7 @@ private fun mix(options: Options, out: Appendable) {
     var documents = 0
     for (corpus in corpora) {
         if (corpus.endsWith(".parquet")) {
-            // a CommonCrawl crawl's shards as FineWeb-2's: the chat-like pages alone, as measured
+            // a CommonCrawl crawl's shards as FineWeb-2's: the chat-like pages alone
             WebText.read(File(corpus)) { page, _ ->
                 page.forEach(counts::add)
                 documents++
@@ -833,17 +755,14 @@ private fun mix(options: Options, out: Appendable) {
 
 private const val PACK_SUFFIX = ".words"
 
-/**
- * The words of fcitx's spell dictionary (`en_dict.fscd`): `FSCD0000`, the count, then per word a
- * little-endian 16-bit weight and the word, 0-ended.
- */
+/** The words of fcitx's spell dictionary (`en_dict.fscd`): `FSCD0000`, the count, then per word a little-endian 16-bit weight and the word, 0-ended. */
 internal fun spellWords(bytes: ByteArray): List<String> {
     val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
     val magic = "FSCD0000"
     require(bytes.size >= magic.length + Int.SIZE_BYTES && String(bytes, 0, magic.length, Charsets.US_ASCII) == magic) { "not a spell dictionary" }
     b.position(magic.length)
     val count = b.int
-    // the file's count, which a broken one has past anything it holds: a word takes three bytes at least
+    // a broken file's count can exceed anything it holds: a word takes three bytes at least
     val words = ArrayList<String>(count.coerceIn(0, bytes.size / MIN_SPELL_ENTRY))
     while (words.size < count && b.remaining() > Short.SIZE_BYTES) {
         b.short
@@ -855,7 +774,6 @@ internal fun spellWords(bytes: ByteArray): List<String> {
     return words
 }
 
-// a word's weight and one char, its 0 left off as the last one's may be
 private const val MIN_SPELL_ENTRY = 3
 
 private fun englishLm(options: Options, out: Appendable) {
@@ -868,12 +786,11 @@ private fun englishLm(options: Options, out: Appendable) {
     }.orEmpty()
     val words = vocabulary.words(options.vocabulary, known)
     out.appendLine("pass one: ${vocabulary.spellings} spellings, ${words.list.size} words, ${words.slips.size} slips, ${words.exempted} under a tenth of their group's commonest")
-    // for a look at what was taken for a slip, and of what
     File(options.output!! + ".slips").printWriter().use { w -> words.slips.toSortedMap().forEach { (slip, of) -> w.println("$slip\t$of") } }
     val counts = EnglishCounts(words, vocabulary.tokens)
     readEnglish(shards, options.tokens, counts::add)
     out.appendLine("pass two: ${counts.tokens} words, ${counts.bigrams.size} bigrams, ${counts.trigrams.size} trigrams")
-    // no model to mix with: Kneser-Ney's alone, its n-grams cut off and the backoff weights worked out
+    // no model to mix with: Kneser-Ney alone, its n-grams cut off and backoff weights worked out
     val n = words.list.size
     val none = ArpaModel(words.list, DoubleArray(n) { NO_PROB }, DoubleArray(n), LongIndex(), DoubleColumn(), DoubleColumn(), LongIndex(), DoubleColumn())
     val (minBigram, minTrigram) = options.cutoffs
@@ -883,11 +800,9 @@ private fun englishLm(options: Options, out: Appendable) {
     out.appendLine("wrote ${options.output}: ${File(options.output).length()} bytes")
 }
 
-// what the model of no n-grams gives every word: 10^-∞ is 0, so the mix at weight 0 is Kneser-Ney's
-// whole, whatever a weight would multiply it by
+// the empty model's log10 for every word: the mix at weight 0 is then Kneser-Ney's whole
 private const val NO_PROB = Double.NEGATIVE_INFINITY
 
-/** Each run of words of [shards]' pages, as [EnglishText] splits them, till [tokens] words are read. */
 private fun readEnglish(shards: List<File>, tokens: Long, run: (List<String>, Boolean) -> Unit) {
     var read = 0L
     try {
@@ -901,7 +816,6 @@ private fun readEnglish(shards: List<File>, tokens: Long, run: (List<String>, Bo
             }
         }
     } catch (_: Enough) {
-        // as many as asked for: the rest of the shard unread
     }
 }
 
@@ -922,8 +836,7 @@ private fun pinyin(options: Options, out: Appendable) {
         }
     }
     out.appendLine("model: ${counts.joinToString(" / ")} n-grams")
-    // lexicon/remove.tsv's first field; lexicon/readings.tsv's first two, a line a reading, each
-    // checked as add.tsv is: a reading the engine cannot type would take its word out of the data
+    // readings.tsv checked as add.tsv is: an untypeable reading would take its word out of the data
     val removed = options.remove?.let { wordList(File(it)) }.orEmpty()
     val readings = options.readings?.let { curatedReadings(File(it)) }.orEmpty()
     val misread = options.misreadings?.let { misreadings(File(it)) }.orEmpty()
@@ -935,8 +848,7 @@ private fun pinyin(options: Options, out: Appendable) {
     texts.forEach { path -> File(path).bufferedReader().use { reader.read(it, path) } }
     reader.corrected()
     if (reader.corrections > 0) out.appendLine("corrected: ${reader.corrections} readings of the dictionaries left out or replaced")
-    // scored as the engine scores a pack the user put in: a word the model lacks as the pack says.
-    // Unlike one put in, a word the dictionary has stays in its layer, and the first pack to list a word holds
+    // scored as a user's pack, but a word the dictionary has stays in its layer; the first pack to list a word holds it
     for ((path, pack) in packFiles.zip(packs)) {
         val layer = layers.indexOf(pack.layer)
         var scored = 0
@@ -955,8 +867,7 @@ private fun pinyin(options: Options, out: Appendable) {
             reader.unknownSyllables.entries.joinToString(" ") { "${it.key}×${it.value}" })
     }
     if (misread.isNotEmpty()) out.appendLine("misread: ${misread.size} words, typed by their misreadings too")
-    // from the least trusted: a later source's reading of a word replaces an earlier one's
-    // File.pathSeparator between them: a path may hold a comma
+    // least trusted first: a later source's reading replaces an earlier one's; File.pathSeparator, as a path may hold a comma
     options.charTones?.split(File.pathSeparator)?.forEach { charTones(it, builder) }
     options.phraseTones?.let { path -> File(path).useLines { ToneSources.phrases(it, path, builder::wordTones) } }
     val curated = { w: String, s: IntArray, t: ByteArray -> builder.wordTones(w, s, t, curated = true); Unit }
@@ -972,7 +883,7 @@ private fun pinyin(options: Options, out: Appendable) {
     out.appendLine("readings: ${data.charReadings.characters} characters' in order")
 }
 
-// each file's field (its name's, as pinyin-data names them) lists readings a character's card shows, in order
+// each file's field lists readings a character's card shows, in order
 private fun charTones(path: String, builder: PinyinDataBuilder) {
     val source = ReadingSource.of(File(path).name)
     File(path).useLines {
@@ -1012,11 +923,7 @@ private fun table(output: String, input: String, words: String?, pinyin: String?
     write(output, reader.builder.build(), out)
 }
 
-/**
- * Words of Han characters, two or more, from [pack] (text and log10 score) and [data]'s
- * vocabulary, the commonest first: by the model's unigram score, or the pack's for a word the
- * model lacks; then the dictionary's words the model has no score for, as listed.
- */
+/** Words of two or more Han characters, commonest first by the model's unigram score, then the dictionary's unscored. */
 internal fun wordsByUse(pack: List<Pair<String, Float>>, data: PinyinData?): List<String> {
     fun han(text: String) = text.length >= 2 && text.all { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }
     val score = HashMap<String, Float>()
@@ -1053,7 +960,6 @@ private fun emoji(options: Options, out: Appendable) {
     out.appendLine("wrote $output: ${output.length()} bytes")
 }
 
-/** The engines of compiled pinyin [data] alone. */
 private fun pinyinEngines(data: String) =
     Engines({ path -> if (path == InputMethodCatalog.PINYIN_DATA) map(data) else throw FileNotFoundException(path) }, null)
 
@@ -1067,7 +973,6 @@ private fun chaizi(options: Options, out: Appendable) {
     val lines = File(options.inputs.single()).readLines()
     val chars = lines.map { it.substringBefore('\t').trim() }.filter { it.codePointCount(0, it.length) == 1 }.distinct()
     val p = engines.logProbs(chars)
-    // the commoner character first, as the lookup lists those of a spelling
     val order = chars.indices.sortedByDescending { p[it] }.map(chars::get)
     val spellings = ChaiziTable.spellings(lines.asSequence(), engines::charReading)
     val found = ChaiziTable.bySpelling(spellings, order)
@@ -1090,7 +995,6 @@ private fun charInfo(options: Options, out: Appendable) {
     }
     File(options.radicals!!).useLines { builder.radicals(it, options.radicals) }
     File(options.chaizi!!).useLines { builder.chaizi(it) }
-    // rime-stroke's `字<TAB>strokes` lines, after the header's `...`
     File(options.strokes!!).useLines { lines ->
         lines.dropWhile { it != "..." }.forEach { line ->
             val f = line.split('\t')
@@ -1099,7 +1003,7 @@ private fun charInfo(options: Options, out: Appendable) {
     }
     File(options.orders!!).useLines { builder.orders(it, options.orders) }
     val output = File(options.output!!)
-    // built and checked first, written last: a failed check leaves the last file
+    // written last: a failed check leaves the last file
     val bytes = ByteArrayOutputStream().also { builder.build().writeTo(it) }.toByteArray()
     val info = CharInfo.load(ByteBuffer.wrap(bytes))
     out.appendLine("charinfo: ${info.size} characters, ${info.taken} of them taken apart")
@@ -1124,7 +1028,7 @@ private fun charLevels(options: Options, out: Appendable) {
     out.appendLine("wrote $output: ${output.length()} bytes")
 }
 
-// of the characters in [cover], the shares that have each part of the record: below its floor fails
+// of the characters in [cover], the share having each part of the record; below its floor fails
 private fun checkCover(cover: String, options: Options, info: CharInfo, out: Appendable) {
     val readings = PinyinData.load(map(options.pinyin!!)).charReadings
     val chars = File(cover).readText().codePoints().filter { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }.distinct().toArray()
@@ -1149,13 +1053,10 @@ private fun checkCover(cover: String, options: Options, info: CharInfo, out: App
     }
 }
 
-// Unihan.zip's file of kRSUnicode and kTotalStrokes
 private const val UNIHAN_RS = "Unihan_IRGSources.txt"
 private const val UNIHAN_OTHER = "Unihan_OtherMappings.txt"
 
-// of the characters handwriting knows, at least this share must be taken apart (about 98% are), and have
-// the mainland's stroke order (about 95% have: lexicon/stroke-order.tsv's are the simplified ones; a traditional one
-// has rime-stroke's); the rest all. The run prints each share
+// of the characters handwriting knows, at least this share must be taken apart and have the mainland's order
 private const val PARTS = "parts"
 private const val MAINLAND_ORDER = "the mainland's stroke order"
 private val FLOORS = mapOf(PARTS to 0.97, MAINLAND_ORDER to 0.94)
@@ -1168,10 +1069,7 @@ private fun strokes(output: String, input: String, out: Appendable) {
     write(output, writer, out)
 }
 
-/**
- * The words of a word pack's [lines] the voice recognizer takes as hotwords, a line each, in the
- * pack's order: [HotwordSpelling.spelled], the rule the app spells the user's words by too.
- */
+/** The words of a word pack's [lines] the voice recognizer takes as hotwords, spelled as the app spells the user's ([HotwordSpelling.spelled]). */
 internal fun hotwords(lines: List<String>): String = lines.asSequence()
     .filterNot { it.startsWith("#") }
     .map { it.substringBefore('\t') }
@@ -1212,15 +1110,11 @@ private fun write(output: String, writer: DataFile.Writer, out: Appendable) {
     out.appendLine("wrote $output: ${File(output).length()} bytes")
 }
 
-/** What the engine does: map the file rather than read it into the heap. */
+/** Mapped, as the engine does, rather than read into the heap. */
 private fun map(path: String): ByteBuffer =
     RandomAccessFile(path, "r").use { it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()) }
 
-/**
- * Scores every n-gram of [lm] through the compiled model and reports how far each order strays
- * from the source, probabilities and backoff weights both; unigrams must match exactly, the
- * rest by the quantisation error.
- */
+/** Scores every n-gram of [lm] through the compiled model and reports each order's deviation; unigrams must match exactly, the rest within quantisation error. */
 private fun check(dataPath: String, lm: String, out: Appendable) {
     val data = PinyinData.load(map(dataPath))
     val ids = HashMap<String, Int>(data.vocabulary.size * 2)

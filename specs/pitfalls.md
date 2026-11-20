@@ -44,9 +44,8 @@ into the APK, delete them"): delete them and build again; they are no longer in 
 `lib/handwriting` or `lib/sherpa-onnx` later: exclude it through `packaging.jniLibs.excludes`.
 
 On the phone, 0.3.x's data sync left fcitx's files in device-protected storage (`usr/`, `learn/`,
-`README.md`, listed in `descriptor.json`; 7.4 MB from 0.3.2). `FcitxApplication.deleteNativeData` removes exactly
-the listed paths at the first start after the upgrade, the descriptor last (no descriptor: nothing
-to do). User data was never there: fcitx's config and data were in the external files dir (now `files/host-config`, `files/host-data`, A4).
+`README.md`, listed in `descriptor.json`; 7.4 MB from 0.3.2). Nothing reads or removes them since 0.6.3
+(the one-time cleanup went, 063-slim RU4); the backup rules exclude them. User data was never there: fcitx's config and data were in the external files dir (now `files/host-config`, `files/host-data`, A4).
 
 ## Android behaviour
 

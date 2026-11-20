@@ -4,28 +4,16 @@
  */
 package org.fcitx.fcitx5.android.input.picker
 
-import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.input.keyboard.ImageLayoutSwitchKey
-import org.fcitx.fcitx5.android.input.keyboard.ImagePickerSwitchKey
-import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.TextPickerSwitchKey
-
 fun symbolPicker(): PickerWindow = PickerWindow(
     key = PickerWindow.Key.Symbol,
     data = { PickerData.Symbol },
     density = PickerGridView.Density.Panel,
-    switchKey = ImageLayoutSwitchKey(
-        R.drawable.ic_number_pad, NumberKeyboard.Name,
-        percentWidth = 0.12f,
-        contentDescription = R.string.a11y_key_number_pad
-    )
 )
 
 fun emojiPicker(): PickerWindow = PickerWindow(
     key = PickerWindow.Key.Emoji,
     data = { PickerData.Emoji },
     density = PickerGridView.Density.Medium,
-    switchKey = TextPickerSwitchKey(":-)", PickerWindow.Key.Emoticon),
     popupPreview = false,
     followKeyBorder = false,
     policy = EmojiPickerPolicy(),
@@ -36,10 +24,6 @@ fun emoticonPicker(): PickerWindow = PickerWindow(
     key = PickerWindow.Key.Emoticon,
     data = { PickerData.Emoticon },
     density = PickerGridView.Density.Low,
-    switchKey = ImagePickerSwitchKey(
-        R.drawable.ic_baseline_tag_faces_24, PickerWindow.Key.Emoji,
-        contentDescription = R.string.a11y_key_emoji
-    ),
     popupPreview = false,
     followKeyBorder = false
 )

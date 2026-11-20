@@ -19,7 +19,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The settings the engine reads of a config file's [text], as the host reads it at start. */
+/** As the host reads it at start. */
 private fun settingsOf(text: String) = EngineOptions().apply { load(text) }.toSettings()
 
 /** What the golden files don't say outright: the settings the engine reads, the default rule, pages. */
@@ -36,7 +36,7 @@ class EngineOptionsTest {
         assertEquals(setOf(Fuzzy.L_N), settings.fuzzy)
         assertFalse(settings.typos)
         assertEquals(TableSettings(autoSelect = true, hint = false, orderByUse = true, keyLabels = KeyLabels.NONE), settings.tables["Wubi"])
-        // every table's settings are pushed, defaults too (native-last:app/src/main/cpp/androidengine/androidengine.cpp:473-491)
+        // every table's settings are pushed, defaults too
         assertEquals(InputMethodCatalog.TABLES.values.map { it.group }.toSet(), settings.tables.keys)
         assertEquals(TableSettings(true, false, false, KeyLabels.NAMES), settings.tables["Cangjie"])
         // a table with no roots has nothing of them to set
@@ -66,7 +66,7 @@ class EngineOptionsTest {
 
     @Test
     fun `a default not written follows a change of default`() {
-        // design §2.1: a default is written commented, so the file says nothing of it
+        // a default is written commented, so the file says nothing of it
         val text = EngineOptions().apply { load("ModelLevel=Medium\n") }.text()
         assertTrue("# PageSize=7" in text.lines())
         assertEquals(listOf("ModelLevel=Medium"), text.lines().filter { it.isNotEmpty() && !it.startsWith("#") })
@@ -75,14 +75,14 @@ class EngineOptionsTest {
 
     @Test
     fun `a bad value falls back to the default, not to the nearest`() {
-        // configuration.cpp:117-123: unmarshall fails → reset()
+        // Configuration: an unmarshall failure resets
         val options = EngineOptions().apply { load("PageSize=11\n") }
         assertEquals("7", options["PageSize"])
     }
 
     @Test
     fun `a table's group missing takes the table's defaults, one there a fresh group's`() {
-        // option.h:435-438: a full load starts a sub-configuration fresh; reset() is engineTable(hint)
+        // a full load starts a sub-configuration fresh; reset() is engineTable(hint)
         assertEquals("False", EngineOptions().apply { load("") }["Cangjie/Hint"])
         assertEquals("True", EngineOptions().apply { load("[Cangjie]\nAutoSelect=False\n") }["Cangjie/Hint"])
     }

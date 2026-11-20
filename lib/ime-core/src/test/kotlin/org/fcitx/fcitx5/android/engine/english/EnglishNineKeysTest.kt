@@ -37,13 +37,10 @@ class EnglishNineKeysTest {
     fun aDigitTappedAtTheEdgeOfTheNextIsReadAsThatOneToo() {
         val session = session()
         session.nine("435")
-        // hell's last 5 slipped onto 6, at its edge by 5
         assertEquals("hell", session.apply(Action.NineKey('6', touch = onSix(-0.45f))).preedit)
         session.apply(Action.Reset)
         session.nine("435")
-        // in 6's middle: no word, each key's first letter
         assertEquals("gdjm", session.apply(Action.NineKey('6', touch = onSix(0f))).preedit)
-        // no place: 6 alone
         session.apply(Action.Reset)
         assertEquals("gdjm", session.nine("4356").preedit)
     }
@@ -73,7 +70,6 @@ class EnglishNineKeysTest {
     fun onTheNineKeysCaseIsAsTyped() {
         assertEquals("The", session().let { s -> s.apply(Action.NineKey('8', upper = true)); s.nine("43") }.preedit)
         assertEquals("THE", session().nine("843", upper = true).preedit)
-        // a name keeps its capital; i is I
         assertEquals("London", session().nine("566366").preedit)
         assertEquals("I", session().nine("4").preedit)
     }
@@ -88,7 +84,6 @@ class EnglishNineKeysTest {
         val none = session()
         assertEquals("d'mmt", none.nine("3'668").preedit)
         assertTrue(none.candidates(0, 10).isEmpty())
-        // a hyphen ends the word, as a digit not the nine keys' does
         val hyphen = session()
         hyphen.nine("43")
         assertEquals("he", hyphen.apply(Action.Key('-')).commit)
@@ -99,7 +94,6 @@ class EnglishNineKeysTest {
         val session = session()
         session.nine("4355")
         assertEquals("hello", session.apply(Action.Backspace).preedit)
-        // a capital's key taken back takes its Shift with it
         val shifted = session()
         shifted.apply(Action.NineKey('4', upper = true))
         assertEquals("He", shifted.nine("3").preedit)
@@ -123,8 +117,7 @@ class EnglishNineKeysTest {
         assertEquals(2f, user.count("zork"))
     }
 
-    // no word fits: each key's first letter, in the case typed, committed for the user to mend; a
-    // guess, so not learned
+    // a guess, so not learned
     @Test
     fun noWordFitsEachKeysFirstLetterAndItIsNotLearned() {
         val user = EnglishUser()
@@ -134,15 +127,12 @@ class EnglishNineKeysTest {
         assertEquals("Wmpj ", session.apply(Action.Key(' ')).commit)
         assertEquals(0f, user.count("Wmpj"))
         assertEquals(0f, user.count("wmpj"))
-        // a letter pinned among the keys stays itself
         val mixed = session()
         mixed.nine("9")
         mixed.apply(Action.NineKey('x'))
         assertEquals("wxm", mixed.nine("6").preedit)
     }
 
-    // a letter a long press pins: itself among the keys; a word all pinned is no slip to correct,
-    // committed as it is and learned, offered by its keys after
     @Test
     fun aPinnedLetterIsItselfAndAWordSoSpelledIsLearned() {
         assertEquals("hell", session().let { s -> s.nine("4"); s.apply(Action.NineKey('e')); s.nine("55") }.preedit)
@@ -162,7 +152,6 @@ class EnglishNineKeysTest {
         assertTrue("hello still offered: $offered", "hello" in offered)
         assertEquals(emptyList<String>(), offered.drop(1).filterNot { it.startsWith("hel") })
         assertEquals("hel", prefix.apply(Action.Key(' ')).commit.trim())
-        // a capital pinned keeps its case
         val capital = session()
         "Zo".forEach { capital.apply(Action.NineKey(it)) }
         assertEquals("Zo ", capital.apply(Action.Key(' ')).commit)

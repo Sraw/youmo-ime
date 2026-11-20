@@ -14,11 +14,7 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * Signed packs made in a test, as the build makes them (PackTask: a zip of stored entries, the
- * manifest, its signature, then the files), signed by a key of the test's own through the JDK's
- * Ed25519 (Java 15+), the one the build signs with.
- */
+/** Signed packs made as the build makes them (PackTask), with a test key through the JDK's Ed25519. */
 class TestPacks(val keys: KeyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()) {
 
     /** The raw 32-byte public key: the X.509 encoding's last 32 bytes. */
@@ -39,7 +35,6 @@ class TestPacks(val keys: KeyPair = KeyPairGenerator.getInstance("Ed25519").gene
         sha: Map<String, String> = emptyMap(),
     ): ByteArray {
         val entries = files.entries.joinToString(",") { (path, bytes) ->
-            // a path's quote or backslash escaped, as JSON has them
             val quoted = path.replace("\\", "\\\\").replace("\"", "\\\"")
             """{"path": "$quoted", "size": ${bytes.size}, "sha256": "${sha[path] ?: sha256(bytes)}"}"""
         }
@@ -47,11 +42,7 @@ class TestPacks(val keys: KeyPair = KeyPairGenerator.getInstance("Ed25519").gene
         return """{"pack": "${kind.id}", "version": $version, "format": $format, "key": "$key", "files": [$entries]}""".toByteArray()
     }
 
-    /**
-     * A pack's bytes: [manifest] (made of [files] if not given), its signature (or [signature]),
-     * then [entries] (the files themselves if not given), their names written in [charset] (a zip's
-     * are UTF-8; ISO 8859-1 writes a name's byte 0xFF as is, which UTF-8 cannot read).
-     */
+    /** A pack's bytes: [manifest], its signature, then [entries], names in [charset] (ISO 8859-1 writes byte 0xFF as is). */
     fun pack(
         kind: PackKind,
         files: Map<String, ByteArray>,

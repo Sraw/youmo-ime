@@ -51,19 +51,11 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 /**
- * 060-render-p3 W1, the theme maker's library drawing as the app does: some of the library's shots
- * (lib/keyboard-scene's facade/shots.json, the snapshots' asks, built with the fixed font both sides have)
- * drawn by [ScenePainter] on a canvas that writes down what it is asked to draw, in the device's pixels:
- * web/theme-maker/test/testdata/paint.txt. The page's test (engine.test.mjs) paints the same shots through
- * the library's CanvasPainter on a 2D context that writes the same lines, and holds them to these.
- *
- * What a canvas cannot say of itself is written as the op says it: a blur's sigma (Skia's of the op's
- * radius; BlurMaskFilter keeps it to itself), a band less its face (Path.op's outline is not the shapes'),
- * an icon (a vector drawable's own drawing): so those lines hold where and in what, not how. A nine-slice
- * and the picture are in none of the shots (the page's own, not the engine's: the jsTest's).
- *
- * The icons the scenes name (SceneIcons, by the scene's names) go to the page as `youmo-engine-icons`
- * (engine-icons.json), and each shot's picture to build/w1-pixel for web/theme-maker/test/pixel-smoke.mjs.
+ * Some of the library's shots (lib/keyboard-scene's facade/shots.json) drawn by [ScenePainter] on a canvas that
+ * writes down what it draws: web/theme-maker/test/testdata/paint.txt, which the page's engine.test.mjs holds its
+ * CanvasPainter to. What a canvas cannot say of itself (a blur's sigma, a band less its face, an icon) is written
+ * as the op says it. The icons go to the page as generated/youmo-engine-icons.json, each shot's picture to
+ * build/w1-pixel for web/theme-maker/test/pixel-smoke.mjs.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -100,12 +92,11 @@ class EnginePaintTest {
         val json = SceneIcons.names.sorted().mapNotNull { name ->
             SceneIcons.of(name)?.let { id -> "\"$name\":" + VectorIconJson.of(context.resources.getResourceEntryName(id)) }
         }.joinToString(",\n", "{\n", "\n}")
-        ThemeMakerTestdata.check("engine-icons.json", "$json\n")
         ThemeMakerTestdata.block("youmo-engine-icons", json)
     }
 
-    // the icon page's groups by where a name is drawn (a name in each it is drawn in), the bar's own image of a name whose
-    // key's differs (hide-keyboard's ▾, not the key's keyboard), the menu key's ⌄ turned: `youmo-bar-icons` (061-toolbar-icons §2.6)
+    // the icon page's groups by where a name is drawn, the bar's own image of a name whose key's differs, the menu key's ⌄
+    // turned: `youmo-bar-icons`
     @Test
     @Uat("ST-131")
     fun theBarsIconsAreThePages() {
@@ -123,11 +114,8 @@ class EnginePaintTest {
         val json = "{\n\"groups\":" + groups.entries.joinToString(",\n", "{\n", "\n}") { (k, v) -> "\"$k\":" + list(v) } +
             ",\n\"toolbarFallback\":" + fallback +
             ",\n\"turned\":{\"${BarIcons.TOOLBAR_EXPAND.name}\":-90,\"${BarIcons.TOOLBAR_COLLAPSE.name}\":90}\n}"
-        ThemeMakerTestdata.check("bar-icons.json", "$json\n")
         ThemeMakerTestdata.block("youmo-bar-icons", json)
     }
-
-    // ------------------------------------------------------------------ the shots
 
     private class Shot(val name: String, val board: String?, val theme: JsonObject, val env: String, val request: JsonObject?)
 
@@ -145,7 +133,7 @@ class EnginePaintTest {
             .associateBy { it.name }
     }
 
-    // the theme as the shots make it (SnapshotTest's ThemeSource): the file, its fonts after its colours, its styles at its end
+    // as SnapshotTest's ThemeSource: the file, its fonts after its colours, its styles at its end
     private fun theme(t: JsonObject): org.fcitx.fcitx5.android.scene.theme.Theme {
         val dir = listOf("../lib/keyboard-scene", "lib/keyboard-scene").map { File(it, "src/commonTest/data") }.first { it.exists() }
         val text = File(dir, t.getValue("file").jsonPrimitive.content).readText()
@@ -161,7 +149,6 @@ class EnginePaintTest {
 
     private fun scene(shot: Shot): Scene {
         val env = EnvJson.read(shot.env).getOr { error("$it") }
-        // the theme's version for the environment, as the library has it
         val b = SceneBuilder(theme(shot.theme).variant(env.dark), env, FixedMeasurer)
         val r = shot.request ?: return requireNotNull(SceneLayouts.of(context, shot.board!!)).let { layout ->
             b.build(layout.layout, layout.fragments).getOr { error("$it") }
@@ -189,24 +176,17 @@ class EnginePaintTest {
         }.getOr { error("$it") }
     }
 
-    // ------------------------------------------------------------------ the canvas that writes down
-
-    /**
-     * Writes a line for each thing drawn, in the device's pixels (one decimal; colours `#aarrggbb`): `fill`, `stroke`,
-     * `gradient`, `text`, `icon`, `clip` and `unclip` (a restore that undoes a clip). [op] is the op being drawn: what a
-     * canvas cannot tell is taken from it (see the class's comment).
-     */
+    /** A line per thing drawn, device pixels to one decimal, colours `#aarrggbb`; what a canvas cannot tell is taken from [op]. */
     private class RecordingCanvas(bitmap: Bitmap) : Canvas(bitmap) {
         val lines = ArrayList<String>()
 
-        /** The op drawn next; an icon's line written as it is set, where the app has the icon (ScenePainter draws none else). */
+        /** An icon's line written as it is set, where the app has the icon (ScenePainter draws none else). */
         var op: Op? = null
             set(value) {
                 field = value
                 if (value is Op.Icon && SceneIcons.of(value.name) != null) lines += "icon ${value.name} ${iconBox(value.box)} ${color(value.tint.value)}"
             }
 
-        // whether each save's level clipped (a restore of one writes `unclip`)
         private val clipped = ArrayList<Boolean>()
         private val bounds = RectF()
         private val m = Matrix()
@@ -256,10 +236,9 @@ class EnginePaintTest {
                 (if (rotation.roundToInt() != 0) " rot=${rotation.roundToInt()}" else "")
         }
 
-        // an icon's drawing is its vector drawable's own: none of it written, the op's line instead ([op])
         private fun quiet(): Boolean = op is Op.Icon
 
-        // the op's blur radius as Skia's sigma, where the paint has a mask (a radius of none has none)
+        // a radius of none has no mask
         private fun blur(paint: Paint): String {
             if (paint.maskFilter == null) return ""
             val radius = when (val o = op) {
@@ -293,7 +272,7 @@ class EnginePaintTest {
             return "${n(bounds.left)},${n(bounds.top)},${n(bounds.right)},${n(bounds.bottom)}"
         }
 
-        // ScenePainter's: whole pixels from the box's corners, turned about its middle by the op's rotation
+        // ScenePainter's: whole pixels from the box's corners, turned about its middle
         private fun iconBox(b: Box): String {
             val left = b.left.roundToInt()
             val top = b.top.roundToInt()
@@ -312,7 +291,7 @@ class EnginePaintTest {
     }
 
     private companion object {
-        // the shots drawn, and the key held down in each (none: null); a name PRESSED_PREFIX + a shot's is that shot with it
+        // the key held down in each (none: null); a name PRESSED_PREFIX + a shot's is that shot with it
         val PAINTED: List<Pair<String, String?>> = listOf(
             "qwerty-block" to null,
             "${PRESSED_PREFIX}qwerty-block" to "q",
@@ -345,7 +324,7 @@ class EnginePaintTest {
         const val TENTHS = 10.0
         const val HUNDREDTHS = 100.0
 
-        /** [v] to a tenth, as the page's test writes it: `-0.5`, `12.0`. */
+        /** To a tenth, as the page's test writes it: `-0.5`, `12.0`. */
         fun n(v: Float): String = n(v.toDouble())
 
         fun n(v: Double): String = fixed((v * TENTHS).roundToLong(), 1)

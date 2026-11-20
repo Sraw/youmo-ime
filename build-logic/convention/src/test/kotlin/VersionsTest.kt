@@ -32,9 +32,7 @@ class VersionsTest {
         assertEquals(names.zip(codes).toString(), codes.sorted().distinct(), codes)
     }
 
-    // F3785: a merge once took an older branch's base back below the published 0.3.3: install -r
-    // over it then fails with INSTALL_FAILED_VERSION_DOWNGRADE. Raise this with each release (a
-    // step of the youmo-release skill)
+    // the base must stay above the published version, or install -r fails with INSTALL_FAILED_VERSION_DOWNGRADE
     @Test
     fun theBaseIsAboveTheLastPublishedRelease() {
         assertTrue(Versions.baseVersionName, Versions.baseVersionCode > Versions.versionCodeOf("0.6.1"))

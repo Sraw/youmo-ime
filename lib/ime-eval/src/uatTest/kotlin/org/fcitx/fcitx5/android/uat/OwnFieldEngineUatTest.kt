@@ -10,18 +10,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-/**
- * This app's own fields (the settings' search box) on the Kotlin host: the service marks them
- * Sensitive (CapabilityFlags.forField), [EngineReplay.Field.NO_LEARNING] here. The app side
- * (OwnFieldUatTest) can only see what the service tells; what the engine makes of the field is here.
- */
+/** This app's own fields on the Kotlin host: the service marks them Sensitive, [EngineReplay.Field.NO_LEARNING] here. */
 class OwnFieldEngineUatTest {
 
     @Test
     @Uat("PR-16")
     fun whatWasDeletedInTheAppsOwnFieldIsNotTheTextBefore() {
-        // zai alone, and after 我 in another app's field: the text before does reorder its page (在 first
-        // both times), or the check below would say nothing. This app's own field, Sensitive, keeps none
+        // the text before reorders zai's page elsewhere, or the check below would say nothing; the Sensitive field keeps none
         val alone = with(HostReplay()) {
             type("zai")
             candidates.take(PAGE)
@@ -33,8 +28,7 @@ class OwnFieldEngineUatTest {
             candidates.take(PAGE)
         }
         assertNotEquals("zai after 我 as alone ($alone): the text before is not used, the check below is vacuous", alone, afterWo)
-        // 我 deleted is not the context (F4277): each row its own replay. Only the TEXT row tests the
-        // deletion as such; the Sensitive field sends no context at all
+        // 我 deleted is not the context: each row its own replay
         assertRows(
             listOf(
                 EngineReplay.Field.NO_LEARNING to "this app's own field: Sensitive, no context sent",

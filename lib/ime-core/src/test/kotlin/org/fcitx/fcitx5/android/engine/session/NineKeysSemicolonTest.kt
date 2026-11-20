@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -19,23 +18,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
 /** 九键双拼's 1 as 微软's `;` (ing) where a final goes, the separator where an initial does. */
 class NineKeysSemicolonTest {
 
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("应", -2f, 0f)
-                .unigram("一", -2f, 0f)
-                .unigram("你", -2f, 0f)
-                .entry("应", syl("ying"))
-                .entry("一", syl("yi"))
-                .entry("你", syl("ni"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("应", "ying", -2f),
+        Triple("一", "yi", -2f),
+        Triple("你", "ni", -2f),
     )
 
     private fun session(scheme: ShuangpinScheme = ShuangpinScheme.MICROSOFT) =
@@ -90,7 +80,6 @@ class NineKeysSemicolonTest {
         assertEquals("y", cut.preedit)
         val typed = s.type("yi")
         assertEquals("一一", typed.candidates.first())
-        // nothing read as ;: y, then yi, committed as typed
         assertEquals("yyi", s.apply(Action.CommitRaw).commit)
     }
 
@@ -122,13 +111,11 @@ class NineKeysSemicolonTest {
     @Test
     fun whereOneIsReadAsIngOrTheSeparator() {
         val sep = '\''
-        // y: ing; y; then 1: the separator (y;')
         assertEquals(NINE_SP_SEMICOLON, read(k("y")))
         assertEquals(sep, read(k("y;")))
         // after what is committed already (from > 0): counted from there
         assertEquals(NINE_SP_SEMICOLON, read(k("yi") + k("y"), from = 2))
         assertEquals(sep, read(k("yi") + k("y"), from = 1))
-        // the cursor inside the input: the keys before it
         assertEquals(NINE_SP_SEMICOLON, read(k("yyi"), cursor = 1))
         assertEquals(sep, read(k("yyi"), cursor = 2))
         // a zero-initial syllable, o h (ang): whole, so 1 after it separates
@@ -137,9 +124,7 @@ class NineKeysSemicolonTest {
         assertEquals(sep, read("ying'"))
         assertEquals(NINE_SP_SEMICOLON, read("y'"))
         assertEquals(sep, read("g'"))
-        // 4 then 1: no syllable, the separator
         assertEquals(sep, read(k("g")))
-        // nothing before it: swallowed
         assertNull(read(""))
         assertNull(read(k("yi"), from = 2))
     }

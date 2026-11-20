@@ -7,15 +7,7 @@ package org.fcitx.fcitx5.android.pack
 import org.fcitx.fcitx5.android.engine.rerank.Json
 import java.security.MessageDigest
 
-/**
- * The two resource packs (060-asset-packs.md): what the main APK does not carry, imported by the
- * user. Each owns the asset paths it holds, the same paths the APK had them under ([owns]); a
- * path neither owns is the APK's.
- *
- * The text pack: pinyin's data, the sentence models, English, the tables and strokes, handwriting's
- * recognizer. Without it the keyboard does not work at all. The voice pack: the speech recognizer,
- * its VAD and hotwords, the polish tagger; without it voice input asks for it.
- */
+/** The two resource packs the APK does not carry; each owns asset paths, the same as the APK had them. Without the text pack the keyboard does not work. */
 enum class PackKind(val id: String, private val owned: List<String>) {
     TEXT(
         "text",
@@ -27,36 +19,28 @@ enum class PackKind(val id: String, private val owned: List<String>) {
     VOICE("voice", listOf("voice/")),
     ;
 
-    /** Whether asset path [path] is this pack's. */
     fun owns(path: String): Boolean = owned.any { path.startsWith(it) }
 
     companion object {
-        /** The pack that holds [path], or null: the APK's own. */
+        /** Null: the APK's own. */
         fun of(path: String): PackKind? = entries.firstOrNull { it.owns(path) }
 
         fun byId(id: String): PackKind? = entries.firstOrNull { it.id == id }
     }
 }
 
-/**
- * What an APK takes of a pack: the data [format] its code reads (one number; a pack of another
- * format is not read at all), and the oldest [minVersion] it accepts, should a later build need
- * data an older pack lacks. Packs are versioned apart from the app: a release that changes no data
- * ships no new pack.
- */
+/** [format]: a pack of another is not read; [minVersion]: the oldest accepted. Packs are versioned apart from the app. */
 data class PackRequirement(val format: Int, val minVersion: Int)
 
 /**
- * A pack's `manifest.json`, the first entry of its zip, signed by `manifest.sig` (Ed25519, the
- * second): which pack ([kind]), its [version] and data [format], and each file with its size and
- * SHA-256. Every file is checked against it as it is copied, so the signature over this covers them all.
+ * A pack's `manifest.json`, its zip's first entry, signed by `manifest.sig` (Ed25519, the second). Every file is
+ * checked against it as copied, so the signature covers them all.
  *
  * ```
  * {"pack": "text", "version": 1, "format": 1, "key": "f780…",
  *  "files": [{"path": "engine/pinyin.data", "size": 163987720, "sha256": "…"}, …]}
  * ```
- * `key` names the signing key (the first 16 hex digits of its SHA-256), for the message when the
- * signature does not check: whether the pack was signed for another build (a test pack in a release).
+ * `key`: the signing key's SHA-256's first 16 hex digits, to say a pack was signed for another build.
  */
 class PackManifest(
     val kind: PackKind,
@@ -69,13 +53,7 @@ class PackManifest(
 
     val size: Long get() = files.sumOf { it.size }
 
-    /**
-     * The content's digest, apart from how the zip was made: `format<TAB>n\n`, then
-     * `path<TAB>size<TAB>sha256\n` a file, by path, SHA-256'd. Two packs with the same content have
-     * the same one; the release listing tells a changed pack by it. The format is in it: a format
-     * changed over the same files is another pack, which needs another version. AssetPacksPlugin's
-     * `contentSha256` computes the same (both tests hold one digest to the same hex).
-     */
+    /** `format<TAB>n\n` then `path<TAB>size<TAB>sha256\n` by path, SHA-256'd; AssetPacksPlugin's `contentSha256` must match (tests hold both). */
     val contentSha256: String by lazy {
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update("format\t$format\n".toByteArray(Charsets.UTF_8))
@@ -83,7 +61,6 @@ class PackManifest(
         hex(digest.digest())
     }
 
-    /** Whether [other] is this very pack: the same one, version, format and files. */
     fun sameAs(other: PackManifest) =
         kind == other.kind && version == other.version && format == other.format && contentSha256 == other.contentSha256
 
@@ -97,7 +74,7 @@ class PackManifest(
         private val PATH = Regex("[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*")
         private val SHA256 = Regex("[0-9a-f]{64}")
 
-        /** [bytes] read as a manifest; an [IllegalArgumentException] says what is wrong. */
+        /** An [IllegalArgumentException] says what is wrong. */
         fun parse(bytes: ByteArray): PackManifest {
             require(bytes.size <= MAX_BYTES) { "manifest too large" }
             val json = requireNotNull(Json.parse(String(bytes, Charsets.UTF_8)) as? Map<*, *>) { "manifest is no object" }
@@ -121,7 +98,7 @@ class PackManifest(
             )
         }
 
-        // a whole number, not negative, exact as a double: JSON's numbers come as doubles
+        // JSON's numbers come as doubles: whole, not negative, exact
         private fun whole(v: Any?, what: String): Long {
             val d = requireNotNull(v as? Double) { "no $what" }
             require(d >= 0 && d == Math.floor(d) && d <= EXACT) { "bad $what" }
@@ -134,13 +111,12 @@ class PackManifest(
         // 2^53
         private const val EXACT = 9.007199254740992E15
 
-        /** A relative path of plain names: no `.`/`..` step, no leading or doubled `/`, nothing a file name could hide. */
+        /** No `.`/`..` step, no leading or doubled `/`, nothing a file name could hide. */
         fun safePath(path: String): Boolean =
             PATH.matches(path) && path.split('/').none { it == "." || it == ".." }
 
         fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it.toInt() and 0xff) }
 
-        /** The name of a key [publicKey] in a manifest's `key`: its SHA-256's first 16 hex digits. */
         fun keyName(publicKey: ByteArray): String = hex(MessageDigest.getInstance("SHA-256").digest(publicKey)).take(16)
     }
 }

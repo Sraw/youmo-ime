@@ -16,26 +16,16 @@ import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
-/**
- * ⋯'s 键盘 (I1 Q1): the keyboards the input method now on offers ([ImKeyboards.choices]) and the layouts of the user's
- * it may be typed on (061-custom-layout §5), the one
- * it is typed on ticked, one picked set as its page sets it (the input view is made anew for it,
- * FcitxInputMethodService). [im] is asked as it opens: the input method as the keyboard last heard.
- * Public for a toolbar button of its own too: [show] beside whatever view opens it.
- */
+/** The input view is made anew for a pick. [im] is asked as it opens: the input method as the keyboard last heard. */
 class KeyboardPicker(private val context: Context, private val im: () -> String) {
 
-    /** One keyboard of the list: a built-in one, or ([layout]) a layout of the user's ([ImKeyboard.CUSTOM]). */
     data class Offered(val keyboard: ImKeyboard, val layout: CustomChoice? = null)
 
-    /**
-     * The keyboards [im] offers, then the layouts of the user's it may be typed on (061-custom-layout §5.1; a table: the
-     * full keyboard and those), the one in use ([ImKeyboards.effective]) second: none where it has no choice.
-     */
+    /** The one in use second; null where it has no choice. */
     fun offered(): Pair<List<Offered>, Offered>? {
         val name = im()
         val scheme = EngineState.shuangpinScheme
-        // as ⋯ opens: listed now, a file or two read where changed
+        // listed now, a file or two read where changed
         val all = CustomKeyboards.all()
         if (ImKeyboards.choices(name, scheme).isEmpty() && !(InputMethodCatalog.hasTableKeys(name) && ImKeyboards.offers(name, scheme, all))) return null
         val customs = ImKeyboards.customs(name, scheme, all)
@@ -49,11 +39,7 @@ class KeyboardPicker(private val context: Context, private val im: () -> String)
         return builtIn.map { Offered(it) } + customs.map { Offered(ImKeyboard.CUSTOM, it) } to current
     }
 
-    /**
-     * Whether [im] has a choice ([offered] not null), asked as the toolbar is arranged on each start: the layouts of the
-     * user's asked only for a table, whose keyboard is otherwise none to choose, as last listed (no file read on the main
-     * thread as an input starts: CustomKeyboards.listed).
-     */
+    /** The user's layouts asked only for a table, as last listed: no file read on the main thread as an input starts. */
     fun offers(): Boolean {
         val name = im()
         val scheme = EngineState.shuangpinScheme
@@ -61,13 +47,13 @@ class KeyboardPicker(private val context: Context, private val im: () -> String)
             (InputMethodCatalog.hasTableKeys(name) && ImKeyboards.offers(name, scheme, CustomKeyboards.listed()))
     }
 
-    /** The list beside [anchor]; null, nothing shown, where the input method has no choice. The caller dismisses it. */
+    /** Null where the input method has no choice. The caller dismisses it. */
     fun show(anchor: View): PopupMenu? {
         val (choices, current) = offered() ?: return null
         val name = im()
         return PopupMenu(context, anchor).apply {
             for ((i, offered) in choices.withIndex()) {
-                // the keyboards' names as each page lists them (全键盘, 18 键, 14 键, 九键); a layout of the user's, 「17 键（自定义）」
+                // as each page lists them; a layout of the user's, 「17 键（自定义）」
                 val label = offered.layout?.let { KeyboardLabels.custom(context, it) }
                     ?: KeyboardLabels.label(context, name, offered.keyboard, context.getString(labelOf(name, offered.keyboard)))
                 menu.add(GROUP, i, i, label).apply {
@@ -92,7 +78,7 @@ class KeyboardPicker(private val context: Context, private val im: () -> String)
     private companion object {
         const val GROUP = 1
 
-        // the name of [keyboard] on [im]'s own page: each input method's preference names its own; a table's full keyboard
+        // each input method's preference names its own
         fun labelOf(im: String, keyboard: ImKeyboard): Int = when (im) {
             InputMethodCatalog.SHUANGPIN -> ShuangpinKeyboard.of(keyboard).stringRes
             InputMethodCatalog.ENGLISH -> EnglishKeyboard.of(keyboard).stringRes

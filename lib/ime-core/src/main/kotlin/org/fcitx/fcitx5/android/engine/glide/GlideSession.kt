@@ -13,25 +13,14 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
-/**
- * A reading of a glide: the [keys] it types, as its input method reads them, its likeliest [word]
- * and the score; [pinyin], the word's syllables apart by spaces, where a pinyin glide read it.
- */
+/** A glide reading: the [keys] it types, its likeliest [word] and score; [pinyin]: the word's syllables space-separated, for a pinyin glide. */
 class GlideReading(val keys: String, val word: String, val score: Float, val pinyin: String = "")
 
 /**
- * A Chinese input method's [session] session, glided on: an [Action.Glide] types the likeliest
- * reading of the glide [offer]ed ([read]: [PinyinGlide]'s for the pinyins, [TableGlide]'s for a
- * table), each key as [typed] has it, after [between] where something is typed already (pinyin's
- * syllable boundary, a table's first candidate picked); what is typed and shows no candidates (a
- * table's 空码, a lone u of 笔画查字 or its parts that match nothing) is taken back instead. A glide that starts the input has the next
- * readings' words offered too, after the first candidate: a path fits more than one reading
- * (ni-h-ao and niao differ by a bend), and the one typed may be the wrong one. Picking such a word
- * types its reading instead and picks it there, so it is learned and followed (联想) as any word
- * picked. None [blocked] is offered; [readings] in all, the one typed among them. Such a word is
- * looked for on the first page only: one the session lists on a later page shows there again.
- * Such a word may be blocked from a long press ([blockOther]: pinyin's by its reading, a table's under
- * its code), and is offered no more.
+ * Glide on a Chinese input method's [session]: types the likeliest reading ([PinyinGlide] or [TableGlide]), or
+ * takes it back if it shows no candidates (a table's 空码). A glide starting the input also offers the other
+ * readings' words after the first candidate (a path fits several: ni-h-ao vs niao); picking one types and picks
+ * its reading so it is learned like any pick. They appear on the first page only.
  */
 class GlideSession(
     private val session: Session,
@@ -39,39 +28,29 @@ class GlideSession(
     private val blocked: (String) -> Boolean = { false },
     private val typed: (Char) -> Action = { Action.Key(it, glided = true) },
     private val readings: Int = READINGS,
-    /** A word of the other readings committed though [session] holds it back, and the first it showed (asked only if wanted): for learning to record. */
     private val heldBack: (GlideReading, first: () -> String) -> Unit = { _, _ -> },
-    /** The block of another reading's word as [session] would block its own; null where it cannot be blocked (not offered), none without. */
     private val blockOther: ((GlideReading) -> (() -> Unit)?)? = null,
     private val read: (Glide, limit: Int) -> List<GlideReading>,
 ) : Session by session {
 
-    // the other readings' words, shown after the first candidate while the input is what the glide typed
     private var others: List<GlideReading> = emptyList()
 
-    // the input the glide typed: once it changes (a key, a candidate picked of part of it), the others are no longer its
+    // the input the glide typed: once it changes the others no longer apply
     private var glided = ""
 
-    // what [session] last showed, before the others were put in
     private var last: Snapshot? = null
 
-    // the text committed through this, as far as a context goes: what a word committed here as told follows
     private var written = ""
 
     private val composing get() = last?.let(::typing) == true
 
-    /**
-     * [g] as the [Action.Glide] sent with it types it: [Glide.path] read now, on the thread the
-     * session is used on, before the key is sent, so that a path the decoders slip on loses the
-     * glide alone, not the key.
-     */
+    /** Reads [g] on the session's thread before the key is sent: a path the decoders fail on loses the glide alone, not the key. */
     fun read(g: Glide): Action.Glide = Action.Glide(g, read(g, readings))
 
     override fun apply(action: Action): Snapshot {
         val s = when (action) {
             is Action.Glide -> glided(action)
             is Action.Pick -> picked(action.index) { action.copy(index = it) }
-            // of the page shown: the others are on the first
             is Action.Select -> if (last?.first != 0) session.apply(action) else picked(action.index) { action.copy(index = it) }
             is Action.Forget -> pressed(action.index) { action.copy(index = it) }
             is Action.Pin -> pressed(action.index) { action.copy(index = it) }
@@ -87,23 +66,20 @@ class GlideSession(
         val before = when (action) {
             Action.Reset -> ""
             is Action.Context -> action.before
-            // in code points, as Snapshot.deleteBefore is (an emoji in place of a word past the BMP)
+            // in code points, as Snapshot.deleteBefore (an emoji past the BMP)
             else -> written.substring(0, written.offsetByCodePoints(written.length, -minOf(s.deleteBefore, written.codePointCount(0, written.length))))
         }
         written = (before + s.commit).takeLast(Action.Context.HOST_CHARS)
     }
 
-    // another reading's word at [index] typed and picked, else [at] its index as [session] has it
     private inline fun picked(index: Int, at: (Int) -> Action) = others(index)?.let(::pickOther) ?: session.apply(at(inner(index)))
 
-    // a long press's offer: nothing to do of another reading's word, else [at] its index as [session] has it
     private inline fun pressed(index: Int, at: (Int) -> Action) = if (others(index) != null) unchanged() else session.apply(at(inner(index)))
 
-    // [s] as [session] shows it, the others kept only while it shows the input the glide typed
     private fun settled(s: Snapshot): Snapshot {
         last = s
         if (s.preedit != glided || s.predicting || s.candidates.isEmpty()) others = emptyList()
-        // the first page, refined or the like, may have one of them now: not offered twice
+        // the first page (refined, say) may now contain one: not offered twice
         if (s.first == 0 && others.isNotEmpty()) others = others.filter { it.word !in s.candidates }
         return s
     }
@@ -113,9 +89,8 @@ class GlideSession(
         others = emptyList()
         val best = readings.firstOrNull() ?: return session.apply(action)
         var commit = ""
-        // after what is typed, a boundary; that may end it (笔画查字 leaves, its character committed).
-        // What shows no candidates is taken back: a table's 空码 would run on into the glide's code, a
-        // lone u of 笔画查字 or its parts that match nothing be committed as typed
+        // what shows no candidates is taken back: a table's 空码 would run on into the glide's code, and a lone u of
+        // 笔画查字 would commit as typed
         val before = when {
             !composing -> null
             last?.candidates.isNullOrEmpty() -> takenBack(last)
@@ -132,10 +107,8 @@ class GlideSession(
         return shown
     }
 
-    // the reading whose word is at [index] (of all), if one is
     private fun others(index: Int) = others.getOrNull(index - 1)?.takeIf { index >= 1 }
 
-    // [index] of all as [session] has it: after the first, the others' places are not its
     private fun inner(index: Int) = if (index > others.size) index - others.size else index
 
     private fun pickOther(reading: GlideReading): Snapshot {
@@ -145,14 +118,11 @@ class GlideSession(
         for (c in reading.keys) session.apply(typed(c))
         val at = session.candidates(0, SEARCHED).indexOfFirst { it.text == reading.word }
         if (at >= 0) return session.apply(Action.Pick(at))
-        // not among its candidates (the session holds it back): the word as shown, the input dropped
-        // and the word told the session as what the next input follows, after what was committed before,
-        // as if committed there; not learned by the user model, but recorded
+        // held back by the session: committed as shown and told to the session as context; not learned, but recorded
         heldBack(reading) { session.candidates(0, 1).firstOrNull()?.text.orEmpty() }
         return session.apply(Action.Context(written + reading.word)).copy(commit = reading.word, handled = true)
     }
 
-    // [s]'s input deleted, a backspace a character: what the session shows then
     private fun takenBack(s: Snapshot?): Snapshot? {
         var shown = s
         var left = MAX_BACKSPACES
@@ -166,16 +136,13 @@ class GlideSession(
         if (!session.learning) return unchanged()
         val block = blockOther?.invoke(reading) ?: return unchanged()
         block()
-        // gone from this glide's others for good: a block taken back (its undo, the settings) shows
-        // the word again from the next glide, not in this one's list
+        // gone for good from this glide's others: undoing the block shows it from the next glide
         others = others - reading
         return unchanged()
     }
 
-    // nothing to forget or pin of another reading's word: the input as it was
     private fun unchanged() = last?.copy(commit = "", deleteBefore = 0, handled = true) ?: session.apply(Action.Refine)
 
-    // [s] with the others after its first candidate, on the first page
     private fun shown(s: Snapshot): Snapshot {
         if (others.isEmpty() || s.candidates.isEmpty()) return s
         val k = others.size
@@ -186,7 +153,7 @@ class GlideSession(
             candidates = s.candidates.take(1) + words + s.candidates.drop(1),
             hints = if (s.hints.isEmpty()) s.hints else s.hints.take(1) + words.map { "" } + s.hints.drop(1),
             total = total,
-            // a table's selection keys pick of [session]'s own: none on the others, each still on its candidate
+            // a table's selection keys pick [session]'s own: none on the others
             labels = if (s.labels.isEmpty()) s.labels else s.labels.take(1) + " ".repeat(k) + s.labels.drop(1),
         )
     }
@@ -195,7 +162,6 @@ class GlideSession(
         if (others.isEmpty()) return session.candidates(from, count)
         val all = ArrayList<Choice>()
         val k = others.size
-        // what is asked of the first and others together, then the rest from where [session] has them
         if (from == 0 && count > 0) all += session.candidates(0, 1)
         for (i in maxOf(from, 1) until minOf(from + count, k + 1)) all += Choice(others[i - 1].word)
         val rest = maxOf(from, k + 1)
@@ -203,16 +169,13 @@ class GlideSession(
         return all
     }
 
-    // another reading's word may be blocked, where [session] learns (not in a password field)
     override fun offers(index: Int): Set<Offer> {
         val other = others(index) ?: return session.offers(inner(index))
         return if (session.learning && blockOther?.invoke(other) != null) setOf(Offer.BLOCK) else emptySet()
     }
 
-    // the others are no candidates [session] ranked; its own a place on for each (review-int-runtime S2)
     override fun why(index: Int): Why? = if (others(index) != null) null else session.why(inner(index))
 
-    // the others are read by their text: their keys are not what [session] read
     override fun readingOf(index: Int): List<WordReading>? = if (others(index) != null) null else session.readingOf(inner(index))
 
     override fun blockScope(index: Int): BlockScope? = if (others(index) != null) null else session.blockScope(inner(index))
@@ -222,19 +185,13 @@ class GlideSession(
     override fun reread(): Snapshot? = session.reread()?.let { shown(settled(it)) }
 
     companion object {
-        /** Readings a glide offers: the one typed and the others. */
         const val READINGS = 3
 
-        /**
-         * The nine keys': a key three or four letters, and a key pressed again not on the path
-         * (ni-h-ao and nian both 6-4-2-6), a path reads far more; 你好 sixth of that one.
-         */
+        /** Nine keys read far more per path (3-4 letters a key); 你好 ranks about sixth. */
         const val NINE_KEYS_READINGS = 7
 
-        // how far down its candidates another reading's word is looked for, once typed
         private const val SEARCHED = 50
 
-        // the input a glide types is at most PinyinGlide.MAX_LETTERS and its boundaries
         private const val MAX_BACKSPACES = 64
     }
 }

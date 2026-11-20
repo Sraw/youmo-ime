@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// LayoutCheck's split-scaled (ScaledRows, L8), and the boards a .theme's layouts are offered of; apart from LayoutCheckTest
+// LayoutCheck's split-scaled (ScaledRows), and the boards a .theme's layouts are offered of; apart from LayoutCheckTest
 // as its size allows (detekt's LargeClass), on the same boards
 class ScaledRowsTest {
     private val boards = listOf(
@@ -22,7 +22,7 @@ class ScaledRowsTest {
 
     private fun check(text: String, strict: Boolean = true) = LayoutCheck.check(text, sources, "0.6.1", strict = strict)
 
-    // L8: a split="halves" row of other than 9 or 10 keys to halve, which the engine scales when split, is told (once,
+    // a split="halves" row of other than 9 or 10 keys to halve, which the engine scales when split, is told (once,
     // with the keys it has and where); a split="after" key is not one to halve, a board not split never is
     @Test
     @Uat("ST-180")
@@ -45,7 +45,7 @@ class ScaledRowsTest {
         assertTrue("table(star)" in star.single().args[1], star.toString())
         assertTrue(check(eight.replace(" on-split=\"split\"", "")).warnings.none { it.key == "split-scaled" }, "a board not split: no row scaled")
         assertTrue(check(eight, strict = false).warnings.any { it.key == "split-scaled" }, "told of a theme pack's board too")
-        // a row in a fragment it includes (eight digits): told at the <include>, not at the fragment's own line (review N1)
+        // a row in a fragment it includes (eight digits): told at the <include>, not at the fragment's own line
         val digits = (1..8).joinToString("") { "<key id=\"d$it\" label=\"$it\" send=\"$it\" shortcut=\"my-qwerty/d$it\"/>" }
         val withDigits = LayoutCheck.Sources(
             sources.layouts,

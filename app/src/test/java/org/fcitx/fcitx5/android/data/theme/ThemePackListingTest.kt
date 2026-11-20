@@ -24,7 +24,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** Theme 4.0 packs listed: the newest most, what an import would refuse left out, a stale check rechecked off its thread, a kill's leftovers cleared. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemePackListingTest : ThemePackFixture() {
@@ -40,7 +39,6 @@ class ThemePackListingTest : ThemePackFixture() {
         assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
         assertEquals(1, queued.size)
         assertFalse(stamp.exists())
-        // the check passes: stamped, and the next listing checks nothing
         queued.removeAt(0).run()
         assertTrue(stamp.isFile)
         ThemeFilesManager.listPacks()
@@ -50,32 +48,30 @@ class ThemePackListingTest : ThemePackFixture() {
     @Test
     fun aPackTheQueuedCheckRefusesIsListedThenLeftOut() {
         placed(sample())
-        // a key one cannot type without hidden, written after the import's check: its stamp stale
+        // a key one cannot type hidden, written after the import's check: the stamp stale
         File(packs, "mine/theme.xml").writeText(xml(styles = """<style select="key.function" hidden="true"/>"""))
         val queued = mutableListOf<Runnable>()
         var told = 0
         ThemePackFiles.recheck = { queued += it }
         ThemePackFiles.onRefused = { told++ }
-        // listed meanwhile, the check queued
         assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
         assertEquals(1, queued.size)
         assertEquals(0, told)
-        // run off the listing's thread: refused, the list told to be read again, which leaves it out
+        // off the listing's thread: refused, the list reread, which leaves it out
         Thread(queued.removeAt(0)).apply { start() }.join()
         assertEquals(1, told)
         assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
     }
 
-    // a listing keeps the packs it read for their draws: one whose file changed since is read from it again
     @Test
     fun aPackChangedSinceItWasListedIsDrawnFromItsNewFile() {
         val dark = placed(sample())[1]
         ThemeFilesManager.listPacks()
         val file = File(packs, "mine/theme.xml")
         val listedAt = file.lastModified()
-        // a style after the icons is no theme 4 reads: the new one goes before them
+        // a style after the icons is not read: the new one goes before them
         file.writeText(sampleXml.replace("<icon ", """<style select="candidate" gap="7dp"/><icon """))
-        // a later time, not the clock's: a file system's may not tell a second's writes apart
+        // a later time, not the clock's: a file system may not tell a second's writes apart
         file.setLastModified(listedAt + 10_000L)
         assertEquals(7.0, SceneBar.of(appContext, dark).gapDp, 0.0)
     }
@@ -84,7 +80,7 @@ class ThemePackListingTest : ThemePackFixture() {
     fun aPackFolderNotListedIsReplacedUnlessALaterBuilds() {
         val kept = appContext.getString(R.string.exception_theme_newer_kept)
         File(packs, "mine").mkdirs()
-        // a later build's not read here (a newer app's, a later format's): kept, said so (one that reads is listed)
+        // a later build's, unread here: kept, said so
         val later = listOf(
             xml(meta = """<meta min-app="99.0.0"/>""", styles = "<later/>"),
             """<theme xmlns="${ThemeReader.NAMESPACE}" name="mine" version="5.0"><sound/></theme>""",
@@ -95,13 +91,12 @@ class ThemePackListingTest : ThemePackFixture() {
             assertEquals(kept, refusal(sample()))
             assertEquals(text, File(packs, "mine/theme.xml").readText())
         }
-        // one past a pack's theme.xml limit is not read whole to tell: replaced
+        // past the theme.xml limit is not read whole to tell: replaced
         val huge = "<!--" + "x".repeat(ThemeAssetLimits.MAX_THEME_XML_BYTES.toInt()) + "--></theme>"
         File(packs, "mine/theme.xml").writeText(later[0].replace("</theme>", huge))
         ThemeManager.refreshThemes()
         opened(sample()).apply { assertTrue(replaces) }.discard()
-        // one cut short (a restore killed half way: a file it names missing), or that no longer reads: not
-        // listed, so not to be deleted; imported again, replaced and listed
+        // cut short (a restore killed midway) or unreadable: not listed; reimporting replaces and lists it
         val cutShort: () -> Unit = { File(packs, "mine/round.ttf").delete() }
         val broken: () -> Unit = { File(packs, "mine/theme.xml").writeText("<theme") }
         for (spoil in listOf(cutShort, broken)) {
@@ -133,7 +128,7 @@ class ThemePackListingTest : ThemePackFixture() {
         (0..ThemeAssetLimits.MAX_PACKS).forEach { i ->
             File(packs, "p$i").mkdirs()
             File(packs, "p$i/theme.xml").writeText(source.replace("name=\"p0\"", "name=\"p$i\""))
-            // newest by its theme.xml's time (the import's), not the folder's
+            // newest by theme.xml's time (the import's), not the folder's
             File(packs, "p$i/theme.xml").setLastModified(1_000_000_000_000L + i * 1000L)
         }
         val listed = ThemeFilesManager.listPacks().map { it.file }.distinct()
@@ -141,7 +136,6 @@ class ThemePackListingTest : ThemePackFixture() {
         assertFalse("p0" in listed)
     }
 
-    // a restored backup's, a later build's: listed as an import would take it, or not at all
     @Test
     fun aPackAnImportWouldRefuseIsNotListed() {
         fun planted(folder: String, text: String) {
@@ -154,7 +148,6 @@ class ThemePackListingTest : ThemePackFixture() {
         planted("hides", xml(name = "hides", styles = """<style select="key.function" hidden="true"/>"""))
         assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
         ThemeManager.refreshThemes()
-        // the built-in theme of that name still the one the settings name
         assertTrue(ThemeManager.getTheme("pixel#dark") is Theme.Builtin)
     }
 
@@ -170,7 +163,6 @@ class ThemePackListingTest : ThemePackFixture() {
     fun aPacksBarAndPanelsAreDrawnFromItsOwnFile() {
         val dark = placed(sample(xml(styles = """<style select="candidate" gap="7dp"/><style select="bar" height="120%"/>""")))[1]
         assertEquals(7.0, SceneBar.of(appContext, dark).gapDp, 0.0)
-        // the bar's height (T6b) its file's too, in use
         ThemeManager.setNormalModeTheme(dark)
         assertEquals(120.0, SceneBar.heightPercent(appContext), 0.0)
     }
@@ -193,7 +185,6 @@ class ThemePackListingTest : ThemePackFixture() {
 
     @Test
     fun aPackIsReadAgainOnlyWhenTheSystemsColoursChange() {
-        // a pack of system() colours, in use
         val monet = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_monet).replace("name=\"monet\"", "name=\"mine\"")
         val dark = placed(zip("theme.xml" to monet))[1]
         ThemeManager.setNormalModeTheme(dark)
@@ -202,12 +193,12 @@ class ThemePackListingTest : ThemePackFixture() {
         ThemeManager.addOnChangedListener(listener)
         val config = appContext.resources.configuration
         try {
-            // turned, say: the same colours, nothing read or drawn anew
+            // turned, say: same colours, nothing reread or redrawn
             val scene = (ThemeManager.activeTheme as Theme.Pack).scene
             ThemeManager.onSystemPlatteChange(config)
             assertEquals(emptyList<Theme>(), told)
             assertSame(scene, (ThemeManager.activeTheme as Theme.Pack).scene)
-            // the wallpaper's colours changed: read again with them, drawn anew
+            // the wallpaper's colours changed: reread with them, redrawn
             val now = ThemePackFiles.systemColors
             try {
                 ThemePackFiles.systemColors = SystemColors(mapOf("primary" to Argb(0xff123456.toInt())), emptyMap())
@@ -223,7 +214,7 @@ class ThemePackListingTest : ThemePackFixture() {
         }
     }
 
-    // 明暗两套 (060-render-p3 §16-1): a pack of both versions follows the system whatever the slot names
+    // a two-version pack follows the system whatever the slot names
     @Test
     fun aPackOfBothVersionsFollowsTheSystemABuiltInPairKeepsItsSlots() {
         val (light, dark) = placed(sample())
@@ -241,12 +232,10 @@ class ThemePackListingTest : ThemePackFixture() {
             ThemeManager.onSystemPlatteChange(night)
             assertEquals("mine#dark", ThemeManager.activeTheme.name)
             assertEquals(ThemeManager.packPair(light), light to dark)
-            // following: the slots as they are (selectTheme fills both with a pack's two), a pack's taking the system's
             ThemeManager.prefs.darkModeTheme.setValue(light)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(true)
             assertEquals("mine#dark", ThemeManager.activeTheme.name)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
-            // a built-in pair: the version named, as before 0.6.0 (pending L189)
             ThemeManager.setNormalModeTheme(ThemeManager.builtin("material#light"))
             assertEquals("material#light", ThemeManager.activeTheme.name)
             assertEquals(null, ThemeManager.packPair(ThemeManager.builtin("material#light")))
@@ -260,13 +249,13 @@ class ThemePackListingTest : ThemePackFixture() {
     fun aKillBetweenAPlacesRenamesLosesNoPack() {
         placed(sample())
         val before = tree(File(packs, "mine"))
-        // failing between them: the pack it replaced put back
+        // failing between them: the replaced pack put back
         ThemePackFiles.beforeInPlace = { throw java.io.IOException("killed") }
         assertTrue(opened(sample(xml(styles = """<style select="candidate" gap="7dp"/>"""))).commit().isFailure)
         ThemePackFiles.beforeInPlace = null
         assertEquals(before, tree(File(packs, "mine")))
         assertEquals(emptyList<String>(), File(packs, ".saving").list().orEmpty().toList())
-        // killed between them: the one aside put back at the next start's listing, the new one half written cleared
+        // killed between them: the aside one put back at the next listing, the half-written new one cleared
         File(packs, "mine").renameTo(File(packs, ".saving/old-1c2d/mine").also { it.parentFile!!.mkdirs() })
         File(packs, ".saving/new-3e4f").mkdirs()
         File(packs, ".saving/new-3e4f/theme.xml").writeText("half")
@@ -275,7 +264,7 @@ class ThemePackListingTest : ThemePackFixture() {
         assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
         assertEquals(before, tree(File(packs, "mine")))
         assertFalse(File(packs, ".saving").exists())
-        // one aside whose place another took: cleared, not put over it
+        // an aside one whose place another took: cleared, not put over it
         File(packs, ".saving/old-5a6b/mine").mkdirs()
         File(packs, ".saving/old-5a6b/mine/theme.xml").writeText("older")
         ThemeFilesManager.forgetSwept()
@@ -291,7 +280,6 @@ class ThemePackListingTest : ThemePackFixture() {
         ThemeFilesManager.listThemes()
         assertEquals(emptyList<Theme.Pack>(), ThemeFilesManager.listPacks())
         assertFalse(File(packs, ".saving").exists())
-        // one whose theme.xml does not read, or is another's name: not listed, left as it is
         File(packs, "broken").mkdirs()
         File(packs, "broken/theme.xml").writeText("<theme")
         File(packs, "other").mkdirs()

@@ -13,17 +13,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.util.Locale
 
-/**
- * Every character of the dictionary typed alone by each of its readings, in full pinyin, with no
- * context: where it shows among the candidates, the decoder's sentences and then its words. Until
- * 2026-10-10 the words were ranked by score alone and cut at [PinyinDecoder.DEFAULT_WORDS]: a
- * character rare under its reading whose reading starts with common ones (觉 jiao, after 几 家 加 of
- * ji and jia) was not listed at all, 39408 of 50974 so. Run on an older :lib:ime-core to compare.
- *
- * The decoder has no coarse words ([org.fcitx.fcitx5.android.engine.lattice.CoarseWords], which an
- * older core lacks): a character of their list (屄) ranks here as if the app did not put it past
- * its first page.
- */
+/** Where each character shows when typed alone by each of its readings, with no context. */
 class CharRanks(private val data: PinyinData) {
 
     /** How many readings of characters show at a rank of at most each of [BOUNDS], and past the last; [missed] the commonest not listed. */
@@ -49,10 +39,7 @@ class CharRanks(private val data: PinyinData) {
         return Ranks(counter.within, counter.past, counter.missed.size, commonest(counter.missed))
     }
 
-    /**
-     * The [MISSED_SHOWN] commonest of [chars], by the model's score of each alone: a character not
-     * listed has no score of the decoder's to go by.
-     */
+    /** The [MISSED_SHOWN] commonest of [chars] by the model's score alone, as an unlisted one has no decoder score. */
     internal fun commonest(chars: Collection<String>): List<String> =
         chars.sortedByDescending { data.model.score(data.wordIndex.find(it)) }.take(MISSED_SHOWN)
 
@@ -76,7 +63,6 @@ class CharRanks(private val data: PinyinData) {
         val BOUNDS = intArrayOf(5, 10, 20, PinyinDecoder.DEFAULT_WORDS)
         const val MISSED_SHOWN = 20
 
-        /** [ranks] as a table. */
         fun report(ranks: Ranks, out: Appendable) {
             out.appendLine("characters by reading typed alone: ${ranks.total}")
             val bounds = BOUNDS.joinToString("  ") { String.format(Locale.ROOT, "%8s", "top$it") }

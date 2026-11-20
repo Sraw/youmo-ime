@@ -8,7 +8,7 @@ package org.fcitx.fcitx5.android.scene.keys
  * The long presses built in by a key's character (upstream's PopupPreset, 060-keys-unify): a letter's
  * (its digit or mark first, its capital, its accented forms), a capital's, a digit's, a mark's. The
  * full keyboard's letters, a group's symbols and a layout's `popup from="preset"` read it; the symbol
- * panel's cells too, which no user setting changes (C1).
+ * panel's cells too, which no user setting changes.
  */
 object PresetLists {
     fun of(label: String): List<String>? = TABLE[label]

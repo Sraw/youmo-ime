@@ -39,9 +39,7 @@ class KeyMarksTest {
         assertEquals(Placed.of(Slot.TopLeft to "全选"), KeyMarks.place(null, "全选", At.BottomRight, At.TopLeft, false))
     }
 
-    // 顶部 (user 2026-11-13): the top edge's middle for either way's mark, the label where it is; on low keys,
-    // the first corner of TopOrder (as 底部 of LowOrder) the other's is not, a 顶部 and a 底部 each its own edge's right corner;
-    // one place in both, the symbol to the top right
+    // 顶部: the top edge's middle, the label where it is; on low keys the first TopOrder corner the other is not, else its edge's right corner
     @Test
     fun theTopIsTheTopEdgesMiddleForEitherWay() {
         assertRows(
@@ -155,8 +153,7 @@ class KeyMarksTest {
         if (c.symbolAt != c.shortcutAt && c.symbolAt == At.Top && !low) assertEquals("$c", Slot.Top, alone)
     }
 
-    // a function key's way at [at] on a low key, the other's at [other]: a corner where set; a 底部 or 顶部 the first
-    // corner the other's setting is not, or, the other's an edge's middle too, its own edge's right corner
+    // a 底部 or 顶部 on a low key: the first corner the other's is not, or its own edge's right corner
     private fun lowSlot(at: At, other: At): Slot? = when {
         !at.middle -> at.corner
         other.middle -> if (at == At.Top) Slot.TopRight else Slot.BottomRight

@@ -8,11 +8,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Resources
 
-/**
- * :app unit tests run without the app's resources (see isIncludeAndroidResources in
- * build.gradle.kts), yet every preference resolves its title eagerly; answer string lookups
- * with "#<id>" ([placeholder]) so titles can still be compared.
- */
+/** :app unit tests run without the app's resources, yet every preference resolves its title eagerly: "#<id>" answers. */
 internal class PlaceholderStrings(base: Context) : ContextWrapper(base) {
     private val res = object : Resources(base.assets, base.resources.displayMetrics, base.resources.configuration) {
         override fun getText(id: Int): CharSequence = placeholder(id)
@@ -24,5 +20,4 @@ internal class PlaceholderStrings(base: Context) : ContextWrapper(base) {
     override fun getResources(): Resources = res
 }
 
-/** What [PlaceholderStrings] answers for the string [id]. */
 internal fun placeholder(id: Int) = "#$id"

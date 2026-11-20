@@ -23,7 +23,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 import java.time.Duration
 
-/** When the microphone's refusal opens the app's settings page: only when the system refused with no dialog. */
+/** The refusal opens the app's settings page only when the system refused with no dialog. */
 @RunWith(RobolectricTestRunner::class)
 class VoicePermissionActivityTest {
 
@@ -31,7 +31,7 @@ class VoicePermissionActivityTest {
 
     @Before
     fun askedBefore() {
-        // asked once before and no rationale (Robolectric's default): a refusal for good, if it comes back at once
+        // asked before and no rationale (Robolectric's default): a refusal for good, if it comes back at once
         app.getSharedPreferences("voice", Context.MODE_PRIVATE).edit().putBoolean("microphone_asked", true).commit()
     }
 
@@ -69,7 +69,6 @@ class VoicePermissionActivityTest {
     @Test
     fun aDialogDismissedAfterAWhileOpensNothing() {
         val c = started()
-        // a dialog shown: the answer comes back after NO_DIALOG_MS
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(600))
         refuse(c.get())
         assertNull(shadowOf(app).nextStartedActivity)
@@ -81,12 +80,11 @@ class VoicePermissionActivityTest {
         // the clock past NO_DIALOG_MS since boot, as a device's always is (a rebuilt one counts from 0)
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
         val c = started()
-        // the request the system holds across the rebuild: asked by the first, answered to the rebuilt (which asks no more)
+        // the system holds the request across the rebuild: asked by the first, answered to the rebuilt
         val first = c.get()
         c.recreate()
         drainStarted()
-        // the answer came at once after the rebuild, but the dialog was up before it: the user's, not the system's;
-        // what was known before the rebuild kept (the prefs already say asked, and are not re-read): no settings page
+        // the dialog was up before the rebuild: the user's answer, not the system's; no settings page
         refuse(c.get(), asked = first)
         assertNull(shadowOf(app).nextStartedActivity)
     }

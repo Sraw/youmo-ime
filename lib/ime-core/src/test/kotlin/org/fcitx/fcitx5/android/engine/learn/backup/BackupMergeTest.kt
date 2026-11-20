@@ -60,7 +60,7 @@ class BackupMergeTest {
         assertEquals("[8:1]", merged.stats.getValue(LearnState.StatKey(ni, "你", "ni")).corrections.toString())
     }
 
-    // U-100: a first, a pin, what was corrected to since: the phone's where both have one
+    // a first, a pin, what was corrected to since: the phone's where both have one
     @Test
     fun whatThePhoneSetWins() {
         val nh = Code(Kinds.FULL, "nh")
@@ -86,11 +86,9 @@ class BackupMergeTest {
         val merged = BackupMerge.merge(phone, backup, from = 1L, sameInstall = true, minute = 2000)
         assertEquals(setOf("拟好", "好星", "你拟"), merged.mine.keys)
         assertEquals(2 to 9, merged.mine.getValue("拟好").let { it.since to it.lastUsedDay })
-        // another reading is another word: the phone's
         assertEquals("hao xing", merged.mine.getValue("好星").reading)
     }
 
-    // PLAN §2.9: another install's days are moved so its last typing day is the phone's
     @Test
     fun anotherInstallsDaysAreTheLastOnesOfThePhone() {
         val phone = state(40, stat(you, 40 to 1))
@@ -99,9 +97,7 @@ class BackupMergeTest {
         assertEquals(40, merged.day)
         assertEquals("[35:2,40:1]", merged.uses(draft))
         assertEquals(39, merged.pairs.values.single().lastDay)
-        // past the window then, past it now
         assertEquals("null", merged.uses(Words.of("呢", "ne")))
-        // the same install's are its own
         assertEquals("[95:2,100:1]", BackupMerge.merge(phone, backup, from = 1L, sameInstall = true, minute = 2000).uses(draft))
     }
 
@@ -132,13 +128,11 @@ class BackupMergeTest {
         assertEquals(mapOf(2L to -60), BackupMerge.origins(twice))
     }
 
-    // review-DE-design D-M1: the offset kept, the same backup restored days later lands on the same days
     @Test
     fun theSameBackupDaysLaterIsOnce() {
         val phone = state(40, stat(you, 40 to 1))
         val backup = state(100, stat(draft, 95 to 2, 100 to 1))
         val once = BackupMerge.merge(phone, backup, from = 2L, sameInstall = false, minute = 2000)
-        // three typing days on
         val later = LearnState().apply {
             once.snapshot(once.cut).forEach { r -> apply(if (r is Head) r.copy(day = 43) else r) }
         }
@@ -164,12 +158,11 @@ class BackupMergeTest {
             sweepTo(41)
         }
         val twice = BackupMerge.merge(later, backup, from = 2L, sameInstall = false, minute = 2100)
-        // the head line (its restore minute) apart
         assertEquals(later.dump().substringAfter('\n'), twice.dump().substringAfter('\n'))
         assertEquals(2, twice.stats.getValue(LearnState.StatKey(ni, "拟", "ni")).older)
     }
 
-    // review-DE-design D-S2: a batch of the same file, day and size is the phone's; another gets a new id, its words with it
+    // a batch of the same file, day and size is the phone's; another gets a new id, its words with it
     @Test
     fun importBatchesAreThePhonesOrNew() {
         val phone = state(10, LearnRecord.BatchRow(1, "a.txt", 20_000, 2), LearnRecord.ImportedRow(1, 0, "你好", "ni hao"))
@@ -195,7 +188,7 @@ class BackupMergeTest {
         assertTrue(LearnRecord.ImportedRow(2, 0, "拟好", "ni hao") in again.imports.rows())
     }
 
-    // review-G S10: a batch both have, another install's numbering: the backup's word the phone lacks goes in the phone's batch
+    // a batch both have, another install's numbering: the backup's word the phone lacks goes in the phone's batch
     @Test
     fun aBatchBothHaveTakesTheBackupsWordsUnderThePhonesId() {
         val phone = state(10, LearnRecord.BatchRow(1, "a.txt", 20_000, 2), LearnRecord.ImportedRow(1, 0, "你好", "ni hao"))
@@ -216,7 +209,7 @@ class BackupMergeTest {
         )
     }
 
-    // review-G S10: a word in the phone's batch and in another of the backup's stays the phone's, and goes with its batch
+    // a word in the phone's batch and in another of the backup's stays the phone's, and goes with its batch
     @Test
     fun aWordInBothBatchesIsThePhonesBatchs() {
         val phone = state(10, LearnRecord.BatchRow(1, "a.txt", 20_000, 1), LearnRecord.ImportedRow(1, 0, "你好", "ni hao"))
@@ -230,7 +223,6 @@ class BackupMergeTest {
         assertFalse(merged.imports.has("你好", "ni hao"))
     }
 
-    // a backup's pin of a text blocked is left out: the block wins
     @Test
     fun aPinOfABlockedTextIsLeftOut() {
         val backup = state(10, PinRow(ni, "拟", "ni"))
@@ -253,7 +245,6 @@ class BackupMergeTest {
         val backup = state(
             10,
             EnWordRow("teh", EnWordRow.NEVER_CORRECT, DayCounts.of(9 to 3, 10 to 1)),
-            // 不再自动改 in an older backup comes back
             EnWordRow("hte", EnWordRow.NEVER_CORRECT, DayCounts()),
             BarRow(take, 5, 6),
             EnPairRow("i", "am", 3, 9),
@@ -266,11 +257,10 @@ class BackupMergeTest {
         assertEquals(EnWordRow.NEVER_CORRECT, merged.enWords.getValue("hte").flags)
         assertEquals(5 to 8, merged.bars.getValue(take).let { it.count to it.lastDay })
         assertEquals(3 to 10, merged.enPairs.getValue("i" to "am").let { it.count to it.lastDay })
-        // a table's word: since the earlier
         assertEquals(3, merged.tableWords[Triple("wbx", "wq", "你")])
     }
 
-    // PLAN §2.9: every row's typing days of another install moved by the offset
+    // every row's typing days of another install moved by the offset
     @Test
     fun anotherInstallsRowsAllMove() {
         val take = Take("t9", "64", "ni")
@@ -292,7 +282,7 @@ class BackupMergeTest {
         assertEquals("[37:1]", merged.wordUses.getValue("拟好").getValue("ni hao").toString())
     }
 
-    // U-73: a whole phrase's count and last day, each the larger; another install's day moved
+    // a whole phrase's count and last day, each the larger; another install's day moved
     @Test
     fun aPhraseMergesByItsTextAndMoves() {
         val phone = state(10, LearnRecord.PhraseRow("你好呀亲爱的", 2, 9), LearnRecord.PhraseRow("我到楼下了", 4, 8))
@@ -307,8 +297,6 @@ class BackupMergeTest {
         assertEquals(1 to 9, once.phrases.getValue("我到家了呀").let { it.count to it.lastDay })
     }
 
-    // U-86 keeps a table's 调频 counts a restore brought, so it keeps the offset they were moved by:
-    // the same backup restored again after it lands on the same days (D-M1)
     @Test
     fun theSameBackupAfterAClearIsOnce() {
         val wbx = Code(Kinds.table("engine-wbx"), "wqiy")
@@ -340,20 +328,17 @@ class BackupMergeTest {
         val c = ListedWord("好词", "hao'ci")
         val d = ListedWord("新词", "xin'ci")
         val (add, block) = BackupMerge.lists(listOf(a), listOf(b), added = listOf(a, b, c, d), blocked = listOf(a, c))
-        // on both of the backup's lists: blocked, the block winning (C9)
         assertEquals(listOf(d), add)
-        // added on the phone, blocked in the backup: added
         assertEquals(listOf(c), block)
     }
 
-    // review-E-engine S11: another install's typing days are moved, the calendar days they were stay; both sides' kept
+    // another install's typing days are moved, the calendar days they were stay; both sides' kept
     @Test
     fun theDatesOfTypingDaysMoveWithThem() {
         val phone = state(40, LearnRecord.DateRow(40, 20400))
         val backup = state(100, LearnRecord.DateRow(100, 20380), LearnRecord.DateRow(95, 20370))
         val merged = BackupMerge.merge(phone, backup, from = 2L, sameInstall = false, minute = 2000)
         assertEquals(20370, merged.dates[35])
-        // the same typing day on both: the phone's
         assertEquals(20400, merged.dates[40])
         assertEquals(mapOf(95 to 20370, 100 to 20380), BackupMerge.merge(LearnState(), backup, from = 1L, sameInstall = true, minute = 2000).dates.filterKeys { it >= 95 })
     }

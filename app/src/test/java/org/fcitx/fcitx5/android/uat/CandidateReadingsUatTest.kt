@@ -33,14 +33,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
 
-/** 候选词注音 on the bar: pinyin above each character, zhuyin to its right, the bar's height as CandidateBarHeight has it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class CandidateReadingsUatTest {
 
-    // the sizes set here, and the style shown the service writes as the last used (FcitxInputMethodService), put
-    // back as the test found them: left at zhuyin, the next test's 注 key would turn zhuyin on
+    // the service writes the style shown as the last used: left at zhuyin, the next test's 注 key would turn zhuyin on
     @get:Rule
     val prefs = PrefsRule()
 
@@ -52,12 +50,12 @@ class CandidateReadingsUatTest {
         EngineState.candidateReadingState.value = ReadingStyle.OFF
     }
 
-    // 东西 in 西's own tone (no 轻声, the user 2026-11-02); 呢 has no other, so its ˙ is still drawn
+    // 呢 has no other tone, so its ˙ is still drawn
     private val words = listOf("你好", "东西", "你", "呢", "泥", "银行")
     private val pinyin = listOf(listOf("nǐ", "hǎo"), listOf("dōng", "xī"), listOf("nǐ"), listOf("ne"), listOf("ní"), listOf("yín", "háng"))
     private val zhuyin = listOf(listOf("ㄋㄧˇ", "ㄏㄠˇ"), listOf("ㄉㄨㄥ", "ㄒㄧ"), listOf("ㄋㄧˇ"), listOf("˙ㄋㄜ"), listOf("ㄋㄧˊ"), listOf("ㄧㄣˊ", "ㄏㄤˊ"))
 
-    // handwriting's characters, each with all its readings (two, then … for more: CandidateReadings.allOf)
+    // all readings: two, then … for more (CandidateReadings.allOf)
     private val written = listOf("行", "衍", "街", "彷", "和")
     private val writtenPinyin = listOf(listOf("xíng/háng…"), listOf("yǎn"), listOf("jiē"), listOf("páng/fǎng"), listOf("hé/hè…"))
     private val writtenZhuyin = listOf(listOf("ㄒㄧㄥˊ/ㄏㄤˊ…"), listOf("ㄧㄢˇ"), listOf("ㄐㄧㄝ"), listOf("ㄆㄤˊ/ㄈㄤˇ"), listOf("ㄏㄜˊ/ㄏㄜˋ…"))
@@ -77,7 +75,6 @@ class CandidateReadingsUatTest {
         h.relayout()
         assertTrue(h.texts().toString(), words[0] in h.texts())
         assertEquals("$style at $sp sp", h.service.dp(CandidateBarHeight.dp(sp, style)), bar.height)
-        // the candidates in place of the toolbar, and the keys below
         val candidates = h.inputView.findViewById<View>(R.id.candidate_view)
         assertTrue(h.shown(candidates))
         assertEquals(bar.height, candidates.height)
@@ -86,7 +83,6 @@ class CandidateReadingsUatTest {
         harness = null
     }
 
-    // PY-110: each word in its characters' own tones (东西 dōng xī), pinyin and zhuyin
     @Test
     @Uat("PY-110")
     fun portrait() {
@@ -95,8 +91,7 @@ class CandidateReadingsUatTest {
         }
     }
 
-    // the keyboard is made anew for each other style, compared with the one it was made with: it was
-    // compared with the style first read, so turned on and back off it stayed made for the one turned on
+    // compared with the style first read, turned on and back off it stayed made for the one turned on
     @Test
     fun theKeyboardIsMadeAnewForEachOtherStyle() {
         val h = KeyboardHarness().also { harness = it }.start()
@@ -110,7 +105,6 @@ class CandidateReadingsUatTest {
         assertTrue("made anew back off", h.inputView !== zhuyin)
     }
 
-    // UAT HW-27: a handwritten character's readings, two and … for more, in the bar's height as for one
     @Test
     @Uat("HW-27")
     fun handwritingPortrait() {
@@ -129,15 +123,12 @@ class CandidateReadingsUatTest {
         }
     }
 
-    // PY-121: a candidate of no reading (a rare character whose tone is not known, in zhuyin; an emoji) on the
-    // same baseline as its neighbours read (the user, 2026-11-14): with pinyin, it once stood centred in the
-    // taller bar, half the reading's line above them
+    // with pinyin, a candidate of no reading once stood centred in the taller bar, half a line above its neighbours
     @Test
     @Uat("PY-121")
     fun aCandidateOfNoReadingStandsOnItsNeighboursBaseline() {
         val words = listOf("你", "纯", "䏝", "😀")
-        // R25r4 F7973: a row a style, each its own style and harness (closed as the row ends), so a pinyin row failing
-        // does not hide zhuyin's
+        // a row a style, each its own harness, so a pinyin row failing does not hide zhuyin's
         fun onOneBaseline(style: ReadingStyle, read: List<List<String>>, capture: String?) {
             EngineState.candidateReadingState.value = style
             try {

@@ -11,54 +11,34 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.toast
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * What the engine says to the user, from any thread: on the keyboard if it is shown (§3: one notice
- * there, and Android 13 drops an input method's toasts), a toast with none. The input method sets
- * [sayer] while it runs: core does not reach into input (F3539).
- */
+/** What the engine says, from any thread: on the keyboard if shown (Android 13 drops an IME's toasts), else a toast. The input method sets [sayer], so core does not reach into input. */
 object EngineNotices {
 
-    /** [message] said on the main thread; [steady], a failure (NoticeState.show). */
     fun interface Sayer {
-        /**
-         * Whether it was said on the keyboard; with none shown nothing, as what is to be seen on the
-         * keyboard waits for it: the toast in its place is [post]'s to say or not.
-         */
+        /** False with no keyboard shown; the toast in its place is [post]'s call. */
         fun say(message: String, steady: Boolean): Boolean
 
-        /** [say] for [ms] (NoticeState.show), null its kind's time: a sayer that times none says it as any. */
+        /** [ms] null is its kind's time: a sayer that times none says it as any. */
         fun say(message: String, steady: Boolean, ms: Long?): Boolean = say(message, steady)
     }
 
     @Volatile
     var sayer: Sayer? = null
 
-    // the notices said but not on the keyboard, to be said there when it next shows (failedUntilSeen,
-    // toldUntilSeen), each of them, with whether it is a failure: several are said as the host starts,
-    // before any keyboard (the config and the data not settled). The main thread's
+    // said before any keyboard showed (several at host start): said there when it next shows. Main thread only.
     private val unseen = LinkedHashMap<Int, Unseen>()
 
-    // a notice's own text as it was said (not joined with the others it was said with), whether it is a
-    // failure, and what is to be done once it is seen
     private class Unseen(val text: String, val steady: Boolean, val seen: () -> Unit, val ms: Long? = null)
 
-    /** A failure, said as a key fails: not put away by the key typed after it, and long (rule 4). */
+    /** Not put away by the next key typed. */
     fun failed(@StringRes id: Int) = post(steady = true) { appContext.getString(id) }
 
-    /**
-     * A failure the user must see though no key is typed (the settings could not be read, A4): said
-     * as [failed] is, and if not on the keyboard (none shown as the host starts), again when it next
-     * shows ([keyboardShown]).
-     */
+    /** A failure seen even if no key is typed: if no keyboard shows at host start, said when one next does. */
     fun failedUntilSeen(@StringRes id: Int) = post(steady = true, unsaid = untilSeen(id, steady = true)) { appContext.getString(id) }
 
     /**
-     * News the user is to see once, no failure (0.4's 九键拼音 merged into pinyin, I1): said on the
-     * keyboard as a [tip] is, and with none shown (as the host starts) when it next shows
-     * ([keyboardShown]); no toast, which would say it before the keyboard it is about. [seen] runs on
-     * the main thread once it is said there: what records it told, so one never seen is told again.
-     * Told again before it is seen (the host reloaded first), nothing more: it is on its way. [ms]: how long it
-     * stays, null a line said's (NoticeState.SAID_MS): news of several lines takes longer to read.
+     * One-time news, not a failure: no toast, which would come before the keyboard it is about. [seen] runs on main
+     * once said, so one never seen is told again; told again while on its way does nothing. [ms] null: NoticeState.SAID_MS.
      */
     fun toldUntilSeen(@StringRes id: Int, vararg args: Any, ms: Long? = null, seen: () -> Unit = {}) {
         if (!telling.add(id)) return
@@ -69,67 +49,49 @@ object EngineNotices {
         post(steady = false, ms = ms, toast = { null }, said = done, unsaid = untilSeen(id, steady = false, done, ms)) { appContext.getString(id, *args) }
     }
 
-    // what toldUntilSeen has on its way and not yet seen
     private val telling: MutableSet<Int> = ConcurrentHashMap.newKeySet()
 
-    // what failedOnce and toldOnce said this process
     private val saidOnce: MutableSet<Int> = ConcurrentHashMap.newKeySet()
 
-    /**
-     * [failedUntilSeen], once a process: what several places may each find (the user's added files not
-     * read, A4), told once till the process restarts.
-     */
+    /** [failedUntilSeen], once a process: for what several places may each find. */
     fun failedOnce(@StringRes id: Int) {
         if (saidOnce.add(id)) failedUntilSeen(id)
     }
 
-    /**
-     * [toldUntilSeen], once a process: news, no failure, what may be found again and again (learning
-     * before the first unlock, kept in memory alone as meant), told once till the process restarts.
-     */
+    /** [toldUntilSeen], once a process: news that may be found again and again. */
     fun toldOnce(@StringRes id: Int) {
         if (saidOnce.add(id)) toldUntilSeen(id)
     }
 
-    // a test's process outlives the run it stands for: what failedOnce said, and what a test with no
-    // keyboard left waiting to be seen (else said with the next test's). On the main thread
+    // a test's process outlives the run it stands for. Main thread.
     internal fun forgetToldOnce() {
         saidOnce.clear()
         telling.clear()
         unseen.clear()
     }
 
-    /** The keyboard's window shown (the service's onWindowShown): a failure not yet seen on it said there. */
     fun keyboardShown() = ContextCompat.getMainExecutor(appContext).execute {
         if (unseen.isEmpty()) return@execute
         val pending = unseen.toMap()
-        // a failure among them makes the notice one
         val steady = pending.values.any { it.steady }
-        // as long as the longest of them asks; none asking, its kind's
         val ms = pending.values.mapNotNull { it.ms }.maxOrNull()
         unseen.clear()
-        // one notice on the keyboard, so one line each in it: said one after another, each would put the last away.
-        // Not said there either (the window not yet on the screen): each waits again as itself, not as the
-        // joined line, which joined again would say each twice
-        // the toast, with no keyboard, the failures alone: news is not toasted (toldUntilSeen)
+        // one notice on the keyboard, so joined: said one after another, each would put the last away. Not said there,
+        // each waits again as itself (joined again it would say each twice); the toast carries failures only.
         val failures = pending.values.filter { it.steady }.joinToString("\n") { it.text }
         post(steady, ms, toast = { failures.ifEmpty { null } }, said = { pending.values.forEach { it.seen() } }, unsaid = { pending.forEach { (id, u) -> unseen.putIfAbsent(id, u) } }) {
             pending.values.joinToString("\n") { it.text }
         }
     }
 
-    /**
-     * A plain tip, what fcitx's own addons say (androidnotification's showTip: punctuation, full
-     * width, a group switched): said for 1 s and typed away, as any line said (rule 5, F3464).
-     */
+    /** fcitx addons' tips (showTip): 1 s, typed away. */
     fun tip(message: String) = post(steady = false) { message }
 
-    // [id] said but not seen: to be said when the keyboard next shows
     private fun untilSeen(@StringRes id: Int, steady: Boolean, seen: () -> Unit = {}, ms: Long? = null): (String) -> Unit = { said ->
         unseen[id] = Unseen(said, unseen[id]?.steady == true || steady, seen, ms)
     }
 
-    // looked up when it is said, on the main thread; on the keyboard [said] told, else [toast] of the text toasted (null none) and [unsaid] told
+    // looked up on the main thread as it is said
     private fun post(
         steady: Boolean,
         ms: Long? = null,

@@ -21,9 +21,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowToast
 import java.time.Duration
 
-/** Toasts are put away sooner than Android's 2 s and 3.5 s: 1 s and 2 s, longer for whoever asked the system for it. */
 @RunWith(RobolectricTestRunner::class)
-// minSdk and the pinned SDK, the two ends of the supported range
+// minSdk and the pinned SDK
 @Config(sdk = [29, 35])
 class ToastTest {
 
@@ -33,8 +32,7 @@ class ToastTest {
 
     private fun latestCancelled() = shadowOf(ShadowToast.getLatestToast()).isCancelled
 
-    // shown, still there a millisecond before its time, put away at it: a text or a string resource, short or long
-    // (R26 F8182: one table, the resource's rows held to the millisecond before too)
+    // still there a millisecond before its time, gone at it
     @Test
     @Uat("MN-26")
     fun aToastGoesAfterItsTime() {
@@ -69,7 +67,7 @@ class ToastTest {
         assertFalse(latestCancelled())
         idle(1)
         assertTrue(latestCancelled())
-        // past the system's own length: as long as asked, as the system itself keeps it
+        // past the system's own length: as long as asked
         a11y.setNonInteractiveUiTimeout(10_000)
         context.toast("没保存", Toast.LENGTH_LONG)
         idle(9_999)
@@ -78,7 +76,7 @@ class ToastTest {
         assertTrue(latestCancelled())
     }
 
-    // the system queues toasts: the second, waiting behind the first, would spend its second in the queue
+    // the system queues toasts: a queued one would spend its time waiting
     @Test
     @Uat("MN-26")
     fun theNewestTakesThePlaceOfOneShown() {
@@ -88,7 +86,7 @@ class ToastTest {
         context.toast("已剪切")
         assertTrue("the first put away at once", shadowOf(first).isCancelled)
         assertEquals("已剪切", ShadowToast.getTextOfLatestToast())
-        // the second its full second from its own show, not cut by the first's time
+        // its full time from its own show
         idle(TOAST_SHORT_MS - 1L)
         assertFalse(latestCancelled())
         idle(1)

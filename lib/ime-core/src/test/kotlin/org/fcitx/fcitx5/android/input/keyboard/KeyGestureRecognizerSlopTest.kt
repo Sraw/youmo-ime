@@ -9,27 +9,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A drag past the slop on a key whose swipe repeats (PY-41): what it cancels, and when the long press may fire. */
+/** A drag past the slop on a key whose swipe repeats: what it cancels, and when the long press may fire. */
 class KeyGestureRecognizerSlopTest {
 
-    /** A key 100x50, slop 8, swipe thresholds 24, swipe enabled. */
-    private fun recognizer(longPress: Boolean = false, repeat: Boolean = false, swipeRepeat: Boolean = false) =
-        KeyGestureRecognizer().apply {
-            touchSlop = 8f
-            viewWidth = 100
-            viewHeight = 50
-            swipeEnabled = true
-            longPressEnabled = longPress
-            repeatEnabled = repeat
-            swipeRepeatEnabled = swipeRepeat
-            swipeThresholdX = 24f
-            swipeThresholdY = 24f
-        }
-
-    private fun KeyGestureRecognizer.move(x: Float, y: Float) =
-        onMove(x, y, longPressTriggered = false, repeatStarted = false)
-
-    // PY-41: a slow drag on the space reached its first step after the long press had taken the touch
+    // a slow drag on the space reached its first step after the long press had taken the touch
     @Test
     fun aSlowDragPastTheSlopOnARepeatingSwipeCancelsTheLongPress() {
         val r = recognizer(longPress = true, swipeRepeat = true)

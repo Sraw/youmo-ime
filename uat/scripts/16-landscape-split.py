@@ -32,9 +32,6 @@ def screen_w(d):
     return int(d.sh("wm size").strip().splitlines()[-1].split()[-1].split("x")[0])
 
 
-# ---------------------------------------------------------------- the split letters
-
-case("LS-01", needs="jvm:LandscapeUatTest.landscapeSplitsTheLetters")(lambda d: None)
 
 
 @case("LS-03", base="B0-横屏", mutates="learn")
@@ -48,67 +45,6 @@ def ls03(d):
     return f"「{t}」"
 
 
-case("LS-04", needs="jvm:LandscapeUatTest.bothGsAndVsTypeTheSame")(lambda d: None)
-
-
-case("LS-05", needs="jvm:LandscapeUatTest.swipeAndLongPressOnTheHalves")(lambda d: None)
-
-
-case("LS-09", needs="jvm:LandscapeUatTest.splitOffTakesAtOnce")(lambda d: None)
-
-
-case("LS-10", needs="jvm:LandscapeUatTest.thePreviewSplitsToo")(lambda d: None)
-
-
-case("LS-13", needs="jvm:LandscapeUatTest.addressFieldSplitBottomRow")(lambda d: None)
-
-
-# ---------------------------------------------------------------- the other panels
-
-case("LS-14", needs="jvm:LandscapeUatTest.numbersAtTheRightWithTheirBar")(lambda d: None)
-
-
-case("LS-15", needs="jvm:LandscapeUatTest.theArrowMovesItAcrossAndItStays")(lambda d: None)
-
-
-case("LS-16", needs="jvm:LandscapeUatTest.lettersAgainFullAndSplit")(lambda d: None)
-
-
-case("LS-17", needs="jvm:LandscapeUatTest.symbolsAtTheSide")(lambda d: None)
-
-
-case("LS-18", needs="jvm:LandscapeUatTest.emojiAtTheSide")(lambda d: None)
-
-
-case("LS-19", needs="jvm:LandscapeUatTest.clipboardAtTheSide")(lambda d: None)
-
-
-case("LS-20", needs="jvm:LandscapeUatTest.nineKeysAtTheSide")(lambda d: None)
-
-
-
-case("LS-22", needs="jvm:LandscapeUatTest.fullWidthTakesTheWholeWidth")(lambda d: None)
-
-
-case("LS-23", needs="jvm:LandscapeUatTest.dockGreyedWhenSplitIsOff")(lambda d: None)
-
-
-case("LS-24", needs="jvm:LandscapeUatTest.portraitPanelsFull")(lambda d: None)
-
-
-case("LS-24a", needs="jvm:LandscapeUatTest.portraitAlwaysSplitPanelsFull")(lambda d: None)
-
-
-case("LS-25", needs="jvm:LandscapeUatTest.numberFieldDocked")(lambda d: None)
-
-
-case("LS-27", needs="jvm:LandscapeUatTest.tallestLeavesTheApp120dp")(lambda d: None)
-
-
-case("LS-28", needs="jvm:LandscapeUatTest.candidatesAcrossTheWidth")(lambda d: None)
-
-
-case("LS-29", needs="jvm:LandscapeUatTest.splitShuangpinHasNoSemicolonKey")(lambda d: None)
 
 
 def size(box):
@@ -116,33 +52,13 @@ def size(box):
     return box[2] - box[0], box[3] - box[1]
 
 
-case("LS-30", needs="jvm:LandscapeUatTest.theFourteenKeysAtTheSideWithTheirCodeRow、LandscapeUatTest.theFourteenKeysOneHandedFloatingAndAsTheThemesPreviewHasThem")(lambda d: None)
-
-
-case("LS-31", needs="jvm:LandscapeUatTest.theEighteenKeysAtTheSideAsTheFourteen")(lambda d: None)
-case("LS-32", needs="jvm:CandidateMenuUatTest.inLandscapeTheWordCardIsTwoColumnsWithLinesUnderIt、CandidateMenuUatTest.onTheFloatingKeyboardTheWordCardIsOneColumn")(lambda d: None)
-
-
-# ---------------------------------------------------------------- a wide screen is landscape (061-wide-as-landscape)
 
 case("LS-33", needs="jvm:WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned、WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh、"
      "WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright")(lambda d: None)
-case("LS-34", needs="jvm:WideScreenUatTest.theOuterScreenIsAPhoneUprightAsBefore、WideScreenUatTest.theOuterScreensExpandedCandidatesTakeTheUprightColumns")(lambda d: None)
 case("LS-35", needs="manual:折叠屏模拟器上 adb emu fold/unfold（或 wm size 在 412 和 673 dp 宽之间换）时键盘马上重排；没写成脚本")(lambda d: None)
-case("LS-36", needs="jvm:WideScreenUatTest.aTabletUprightIsTurnedAndSplits、WideScreenUatTest.justNarrowerIsUpright、WideScreenUatTest.sixHundredWideIsTurned")(lambda d: None)
-case("LS-37", needs="jvm:WideScreenUatTest.theSettingsPreviewInHalfASplitScreenIsTheDisplays、KeyboardScreensTest.eachScreenIsLandscapeAsWideAsItIs")(lambda d: None)
-case("LS-38", needs="jvm:WideScreenUatTest.theLowKeysMarksAndTheCardAsTurned")(lambda d: None)
-case("LS-39", needs="jvm:KeyboardStyleUatTest.notSetTurnedSplits、KeyboardStyleUatTest.notSetUprightIsWhole")(lambda d: None)
-case("LS-40", needs="jvm:KeyboardStyleUatTest.turnedFloatingUprightDockedEachItsOwn、KeyboardStyleUatTest.uprightDockedWhereTurnedFloats、KeyboardStyleUatTest.theOtherShapesStyleMakesNothingAnew")(lambda d: None)
-case("LS-41", needs="jvm:KeyboardStyleUatTest.turnedOneHandedAtTheSideRememberedAndBackToSplit")(lambda d: None)
-case("LS-42", needs="jvm:KeyboardStyleUatTest.floatingFromThePanelIsTheTurnedOnesAndDocksBackToSplit、KeyboardStyleUatTest.afterATurnTheTurnedShapeIsTheOneWrittenAndMadeAnewOnce、KeyboardStyleUatTest.turnedBeforeTheViewIsMadeAnewThePanelWritesTheBuiltShape")(lambda d: None)
-case("LS-43", needs="jvm:KeyboardStyleUatTest.splitToOneHandedAndBackKeepsWhatIsTyped")(lambda d: None)
 case("LS-44", needs="manual:折叠屏模拟器或 wm size 673×841 dp：展开两个方向都用横屏键盘样式，外屏用竖屏的；没写成脚本")(lambda d: None)
-case("LS-45", needs="jvm:KeyboardStyleUatTest.slidingDownAsTheScreenTurnsDocksTheShapeItWasMadeOn")(lambda d: None)
-case("LS-46", needs="jvm:KeyboardStylesTest.notSetTurnedUnder600IsNormal、KeyboardStylesTest.notSetTurnedFrom600Splits")(lambda d: None)
-case("LS-47", needs="jvm:ImeRoomViewTest.theAppKeeps120dpUnderEachBackground、KeyboardHeightCapTest.whereTheFloorBindsTheKeysGiveWay、"
+case("LS-47", needs="jvm:ImeRoomViewTest.theAppKeeps120dpUnderTheBar、KeyboardHeightCapTest.whereTheFloorBindsTheKeysGiveWay、"
      "ImeRoomViewTest.theBarsInsetsComingWorkTheKeysOutAgain")(lambda d: None)
-case("LS-48", needs="jvm:LandscapeUatTest.tallestLeavesTheApp120dp、ImeRoomViewTest.theAppKeeps120dpUnderEachBackground")(lambda d: None)
 case("LS-49", needs="jvm:WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned、WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh、"
      "WideScreenUatTest.aTabletUprightIsTurnedAndSplits、KeyboardAreaTest.aTabletAShortSideOver600IsLargeWhicheverWayHeld、"
      "KeyboardScreensTest.aLargeScreenIsTheDisplaysShortSideNotTheWindows")(lambda d: None)
@@ -150,8 +66,6 @@ case("LS-50", needs="jvm:KeyboardHeightCapTest.theRowsWinOverTheFloor、ImeRoomV
      "ImeRoomTest.flushAndFullScreenAndASideBar、LowLandscapeScreenshotTest.thePanelsAtTheFloor、LowLandscapeScreenshotTest.zhuyinsFiveRowsOf36")(lambda d: None)
 case("LS-51", needs="manual:五档每行的高看截图，转屏 20 次看键盘不先矮后高；2026-11-14 在 API 33/36 模拟器上量过（061-landscape-height-impl-report）")(lambda d: None)
 
-
-case("LS-52", needs="jvm:StrokePageUatTest.inLandscapeThePageDrawsAsWell")(lambda d: None)
 
 case("LS-53", needs="jvm:SettingsCardsLayoutTest.onItsSide、KeyShortcutsPageScreenshotTest.landscape、KeyShortcutsPageScreenshotTest.theLargestFont、"
                "RareCharsCardsUatTest.theCardsAtNight、RareCharsCardsUatTest.theCardsInTheLargestFont、RareCharsCardsUatTest.theCardsOnTheSide")(lambda d: None)

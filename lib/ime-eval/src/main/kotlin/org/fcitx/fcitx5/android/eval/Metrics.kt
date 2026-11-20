@@ -10,10 +10,7 @@ import kotlin.math.ln
 
 /** Of a group's [samples], how many a run has first that its baseline had not ([won]), and the reverse. */
 data class Flips(val group: String, val samples: Int, val won: Int, val lost: Int) {
-    /**
-     * Two-sided exact sign test over the samples that changed: how likely a split at least this
-     * uneven is when either way is as likely, as when the change made no difference.
-     */
+    /** Two-sided exact sign test over the samples that changed: how likely a split this uneven is by chance. */
     val p: Double
         get() {
             val n = won + lost
@@ -49,43 +46,27 @@ object Metrics {
 
     const val ALL = "all"
 
-    /**
-     * One [Score] per tag of the samples of [half] (all of them if null), in the order tags first
-     * appear in [samples], then [ALL]. Results are matched to samples by input, in order: the
-     * second sample typed `jingli` gets the second result for `jingli`, as the context set types
-     * one input after different contexts.
-     */
+    /** One [Score] per tag of the samples of [half], then [ALL]; results matched to samples by input, in order. */
     fun score(samples: List<Sample>, results: List<RunResult>, half: String? = null): List<Score> {
         val matched = matched(samples, results, half)
         val groups = matched.groupBy { it.first.tag }.toList() + (ALL to matched)
         return groups.map { (group, members) -> scoreGroup(group, members) }
     }
 
-    /**
-     * The samples of [half], each with its result. Results of a run over all [samples] are matched
-     * over all of them, then the half taken: matched over the half alone, its first sample typed
-     * `jingli` would get the first result for `jingli`, which may be the other half's. Results of
-     * a run over the half are matched over the half.
-     */
+    /** The samples of [half] with their results: a run over all is matched over all before the half is taken. */
     private fun matched(samples: List<Sample>, results: List<RunResult>, half: String?): List<Pair<Sample, RunResult?>> {
         val selected = Halves.select(samples, half)
         if (half == null || !overAll(samples, selected, results)) return selected.zip(match(selected, results))
         return samples.zip(match(samples, results)).filter { Halves.of(it.first) == half }
     }
 
-    /**
-     * Whether [results] are of a run over all [samples] rather than over [half]: for some input,
-     * more results than [half] has samples typing it. Which inputs they cover cannot tell (the
-     * other half may have no input of its own), and an input the samples no longer have (results
-     * older than the set) tells nothing.
-     */
+    /** Whether [results] are of a run over all [samples]: for some input, more results than [half] has samples typing it. */
     private fun overAll(samples: List<Sample>, half: List<Sample>, results: List<RunResult>): Boolean {
         val inputs = samples.mapTo(HashSet()) { it.input }
         val inHalf = half.groupingBy { it.input }.eachCount()
         return results.groupingBy { it.input }.eachCount().any { (input, n) -> input in inputs && n > inHalf.getOrDefault(input, 0) }
     }
 
-    /** Each sample's result, by input in order. */
     private fun match(samples: List<Sample>, results: List<RunResult>): List<RunResult?> {
         val byInput = results.groupBy { it.input }
         val taken = HashMap<String, Int>()
@@ -95,15 +76,10 @@ object Metrics {
         }
     }
 
-    /**
-     * Two runs of the same samples compared sample by sample, a [Flips] per group as [score]
-     * groups them: on a few hundred samples a point up or down is as often chance as not, while
-     * the samples that changed, and which way, tell (McNemar's test).
-     */
+    /** Two runs compared sample by sample (McNemar's test), a [Flips] per group: on a few hundred samples a point is often chance. */
     fun flips(samples: List<Sample>, results: List<RunResult>, baseline: List<RunResult>, half: String? = null): List<Flips> {
         fun first(result: RunResult, sample: Sample) = result.candidates.firstOrNull() == sample.expected
-        // a sample one run lacks (a set grown since the baseline) is no flip either way: counted
-        // as lost before, it would be won now, and could hide a real loss
+        // a sample one run lacks is no flip either way, or it could hide a real loss
         val changed = matched(samples, results, half).zip(matched(samples, baseline, half)) { (sample, now), (_, before) ->
             if (now == null || before == null) null else Triple(sample.tag, first(now, sample), first(before, sample))
         }.filterNotNull()

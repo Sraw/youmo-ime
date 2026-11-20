@@ -91,7 +91,6 @@ class PhraseBookTest {
         book.remove("sj", "#\$fullhour时\$minute分")
         book.remove("sj", "时间")
         assertEquals(emptyList<String>(), book.offered("sj"))
-        // kept turned off, for the settings to turn on again
         assertEquals(listOf(false, false), book.phrases.all.filter { it.key == "sj" }.map { it.enabled })
     }
 
@@ -120,7 +119,6 @@ class PhraseBookTest {
         assertEquals(emptyList<String>(), book.builtInsOf("时候") { now })
         book.remove("xq", "#周\$weekday_cn")
         assertEquals(listOf("星期六"), book.builtInsOf("星期") { now })
-        // the user's own under the key are no built-in ones
         assertEquals(emptyList<String>(), PhraseBook(CustomPhrases.parse("rq,1=日前")).builtInsOf("日期") { now })
     }
 

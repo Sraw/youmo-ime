@@ -33,10 +33,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowDialog
 import java.time.Duration
 
-/**
- * uat/05-toolbar.md's TB-45: 「无上限」 is the history limit's own button, and a limit that would delete
- * entries asks first, with the count; cancelled, the old limit stays.
- */
+/** 「无上限」 is the limit's own button; a limit that would delete entries asks first, with the count. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class ClipboardLimitUatTest {
@@ -54,7 +51,7 @@ class ClipboardLimitUatTest {
     private fun settle() = runBlocking { ClipboardManager.coroutineContext.job.children.forEach { it.join() } }
 
     private fun copy(text: String) {
-        // each copied at a time of its own, as the limit goes by time
+        // the limit goes by time: each copied at a time of its own
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
         settle()
         ClipboardManager.lastClipTimestamp = -1L
@@ -78,7 +75,6 @@ class ClipboardLimitUatTest {
         val pinned = runBlocking { (0 until 50).firstNotNullOf { ClipboardManager.get(it)?.takeIf { e -> e.text == "今天" } } }
         runBlocking { ClipboardManager.pin(pinned.id) }
         st.open(SettingsRoute.Clipboard)
-        // the dialog's own button, the box empty; the summary says it
         // another test's dialog may still be the latest: wait for this one
         val before = ShadowDialog.getLatestDialog()
         limitPref().performClick()
@@ -87,12 +83,10 @@ class ClipboardLimitUatTest {
             assertEquals(st.s(R.string.clipboard_unlimited), it.text.toString())
             it.performClick()
         }
-        // set once the count to delete is read: none
         until("set", { limit.getValue() }) { st.idle(); limit.getValue() == CLIPBOARD_UNLIMITED }
         assertEquals(st.s(R.string.clipboard_unlimited), limitPref().summary.toString())
         assertTrue(words.all { it in history() })
 
-        // lowered to 10, more than there are: nothing to delete, set without asking
         val shown = ShadowDialog.getLatestDialog()
         limitPref().callChangeListener("10")
         until("set", { limit.getValue() }) { st.idle(); limit.getValue() == 10 }
@@ -101,7 +95,6 @@ class ClipboardLimitUatTest {
         limitPref().text = CLIPBOARD_UNLIMITED.toString()
         st.idle()
 
-        // to 2: two unpinned go, asked first; cancelled, nothing changes
         assertEquals(false, limitPref().callChangeListener("2"))
         until("asked") { st.idle(); ShadowDialog.getLatestDialog()?.isShowing == true && dialog().getButton(AlertDialog.BUTTON_POSITIVE) != null }
         val ask = dialog()
@@ -119,7 +112,6 @@ class ClipboardLimitUatTest {
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         until("set", { limit.getValue() }) { st.idle(); limit.getValue() == 2 }
         until("trimmed", { history() }) { "天气" !in history() }
-        // the pinned kept though older, the two newest unpinned
         assertEquals(listOf("今天", "一起", "散步"), words.filter { it in history() })
     }
 }

@@ -21,7 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** A group card (dev/design/061-settings-cards.md §2.2, §2.8, §3.1): a body to look in, a strip to check, read as two. */
+/** A group card: a body to look in, a strip to check, read as two. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class GroupCardTest {

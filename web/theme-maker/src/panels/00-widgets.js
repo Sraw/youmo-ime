@@ -1,31 +1,21 @@
-// youmo-panels: the editing's tabs (060-render-p3 §5.1, panels 1–11), one file each under src/panels/, put in
-// the page in their files' order (tools/assemble.mjs). Each pushes `{id, label, ops, render(el, api)}` onto
-// YoumoPanels: ops are what it does to a document (`{xml, files, layouts}` in, a new one out; node tests them),
-// render draws its form into el from api's document and environment, again after every change. This file: the
-// small form controls they share (none of them in node: no document there).
+// youmo-panels: the editing's tabs, one file each, put in the page in their files' order (tools/assemble.mjs). This
+// file: the small form controls they share (none of them in node: no document there).
 (function (root) {
   'use strict';
   const panels = root.YoumoPanels || (root.YoumoPanels = []);
 
-  /** A document like [d] with [xml] and [files] (d's own where none). */
   panels.next = (d, xml, files = d.files) => ({ xml, files, layouts: d.layouts });
 
-  /** [d]'s files, a copy to change (own keys only: a file named __proto__ stays a file). */
+  /** Own keys only: a file named __proto__ stays a file. */
   panels.filesOf = (d) => Object.assign(Object.create(null), d.files);
 
-  /** [files] without [names]: a copy. */
   panels.without = (files, names) => {
     const out = Object.create(null);
     for (const k of Object.keys(files)) if (!names.includes(k)) out[k] = files[k];
     return out;
   };
 
-  /**
-   * A form's value as the text theme.xml has for a property of [kind] (panels 5–9, the widgets' rows): null where it
-   * is not set. `dp`/`percent` a number kept to [o].min..[o].max, `signed` too; `flag` true or false; `radius` one
-   * corner or four, `inset` four sides (F's), `twin` portrait and landscape (`[p, l]`, [o].unit); `ms` a duration.
-   * Every other kind (a colour, a word) is its text as it is.
-   */
+  /** A form's value as the text theme.xml has for a property of [kind]; null where it is not set. */
   panels.text = (F, kind, v, o = {}) => {
     if (v == null || v === '') return null;
     const n = (x) => F.clamp(x, o.min ?? 0, o.max ?? 9999, o.digits ?? 1);
@@ -43,23 +33,16 @@
     }
   };
 
-  /** [d] with [select]'s [prop] [v] (a form's value of [kind]; null: not set). */
   panels.setProp = (d, F, select, prop, kind, v, o) => panels.next(d, F.setProp(d.xml, select, prop, panels.text(F, kind, v, o)));
 
-  // [base] (a picked file's name) made a theme file's: `<prefix><base cleaned>.<type>`, a -2, -3 … where another file
-  // has that name already (never overwritten: another style may name it)
+  // never overwritten: another style may name it
   panels.fileName = (files, prefix, base, type) => {
     let name = base.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'image';
     for (let i = 2; (prefix + name + '.' + type) in files; i++) name = name.replace(/-\d+$/, '') + '-' + i;
     return prefix + name + '.' + type;
   };
 
-  /**
-   * A tab of widgets' styles (栏, 弹出, 面板和窗口): [def] `{id, label, parts: [{id, title, select, props, note?}],
-   * scenes?}` (props as ui.propRows takes them). The page chooses a part and a scene (`@…`, [def].scenes of F.SCENES:
-   * where the widget may differ), and edits the style of exactly that select=. Its ops (node tests them): `set(d,
-   * select, prop, kind, v, o)`, `selector(part, scene)`, the parts.
-   */
+  /** A tab of widgets' styles: the page chooses a part and a scene, and edits the style of exactly that select=. */
   panels.widgetTab = (def) => {
     const F = root.YoumoForm;
     const chosen = { part: def.parts[0].id, scene: '' };
@@ -94,20 +77,15 @@
     return e;
   };
 
-  /** A labelled row. */
   const row = (label, ...controls) => h('label', { className: 'row' }, h('span', { className: 'what' }, label), ...controls);
 
-  /** A select of [[value, text]], [value] chosen, [change] its value. */
   const select = (options, value, change) => {
     const s = h('select', { on: { change: () => change(s.value) } }, options.map(([v, t]) => h('option', { value: v, textContent: t })));
     s.value = value;
     return s;
   };
 
-  /**
-   * A number field ([unit] after it); empty means not set (null). What is typed past [min]..[max] is taken as
-   * the bound (min= and max= do not stop typing); what is not a number (`1.2.3`, `-`) is not taken at all.
-   */
+  /** What is typed past [min]..[max] is taken as the bound (min= and max= do not stop typing). */
   const number = (value, change, { min, max, step = 1, unit = '' } = {}) => {
     const i = h('input', { type: 'number', value: value ?? '', on: { change: () => {
       if (i.validity.badInput) return;
@@ -124,10 +102,6 @@
     return h('span', { className: 'num' }, i, unit ? ' ' + unit : '');
   };
 
-  /**
-   * A colour: a picker and its opacity for a literal colour, a text field for anything (`@key`,
-   * `darker(@key, 8%)`, `system(primary, #…)`); [change] the text, null where it was emptied.
-   */
   const color = (value, change, F) => {
     const hex = F.parseHex(value);
     const text = h('input', { type: 'text', className: 'expr', value: value ?? '', placeholder: '#rrggbb、@名字、darker(@key, 8%)…' });
@@ -148,12 +122,7 @@
 
   const clear = (change) => h('button', { type: 'button', className: 'clear', textContent: '×', title: '不设（用别的样式的）', on: { click: () => change(null) } });
 
-  /**
-   * The rows of [props] for the style of exactly [sel] (`[{prop, label, kind, …}]`, kinds as panels.text has them,
-   * `choice` with [options], `flag`), each control writing when used and reading the document then (a tab is left
-   * as it is while a field of it is typed in: ui.js refreshTab). Under them what the engine warns of those styles
-   * (a property the widget does not read, in that state): the theme's own warnings of their lines.
-   */
+  /** A tab is left as it is while a field of it is typed in (ui.js refreshTab). */
   const propRows = (el, api, F, sel, props, quiet = false) => {
     const d = api.doc();
     const val = (p) => F.valueOf(d.xml, sel, p);
@@ -172,7 +141,6 @@
       else if (p.kind === 'radius') {
         const r = F.parseRadius(v);
         const one = r && r.every((c) => c === r[0]);
-        // one corner while they are alike, the four (top left, top right, bottom right, bottom left) once they are not
         const corner = (k) => (x) => {
           if (x == null) { put(p, 'radius')(null); return; }
           const was = F.parseRadius(now(p.prop)) || [0, 0, 0, 0];
@@ -218,7 +186,6 @@
     if (!quiet) warnings(el, api, F, sel);
   };
 
-  /** What the engine warns of the styles of exactly [sel] (their lines), one line each; nothing where none. */
   const warnings = (el, api, F, sel) => {
     const lines = new Set(F.styles(api.doc().xml).filter((s) => F.sameSelect(s.select, sel)).map((s) => s.line));
     const said = api.problems().filter((p) => lines.has(p.line));

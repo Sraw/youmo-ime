@@ -23,12 +23,7 @@ import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import splitties.dimensions.dp
 import splitties.resources.styledDrawable
 
-/**
- * A held candidate's reading, the menu's first line in place of its title (061-word-card.md §3.2): the candidate
- * [text] in [accent], bold, its [reading] after it on one line (… where it does not fit) and › at the end, the
- * whole line tapped open to the card ([open], TalkBack's label [openLabel]); or, [wraps] (more Han characters than
- * a card is made of: Q5), the text on a line, the reading under it wrapped to [MAX_LINES], nothing to tap.
- */
+/** [wraps]: more Han characters than a card is made of; nothing to tap. */
 @SuppressLint("ViewConstructor")
 class CompactLineView(
     context: Context,
@@ -47,7 +42,6 @@ class CompactLineView(
         ellipsize = TextUtils.TruncateAt.END
     }
 
-    /** The text the line shows: the candidate, and its reading where it is on the same line. */
     val shown: TextView = line().apply {
         maxLines = 1
         text = buildSpannedString {
@@ -56,7 +50,6 @@ class CompactLineView(
         }
     }
 
-    /** The reading under it, [wraps]; else null. */
     val wrapped: TextView? = if (wraps) line().apply {
         maxLines = MAX_LINES
         text = reading

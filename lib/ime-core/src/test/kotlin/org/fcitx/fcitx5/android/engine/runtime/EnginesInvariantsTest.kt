@@ -24,14 +24,10 @@ import org.junit.Test
 import java.io.IOException
 import kotlin.concurrent.thread
 
-/**
- * What [Engines] holds only in comments (review B 3.1–3.4, F2 S1): the order its parts are made
- * in, the one thread it runs on, nothing learned in a sensitive field.
- */
+/** What [Engines] otherwise holds only in comments: build order, its one thread, nothing learned in a sensitive field. */
 class EnginesInvariantsTest : EnginesFixture() {
 
-    // init { stashes.takeAll() } runs last: a stash merged as the engines are made opens the record,
-    // its control, backups and habits, all made by then (review B 1.2)
+    // init { stashes.takeAll() } runs last, after everything a merge opens
     @Test
     fun aStashIsMergedAsTheEnginesAreMade() {
         val bytes = Engines(::load, MemoryFiles(), warmUps = inPlace).use { other ->
@@ -64,7 +60,6 @@ class EnginesInvariantsTest : EnginesFixture() {
         assertEquals(emptyList<IOException>(), errors)
     }
 
-    // review B 3.1: checked (the debug build), a call off the thread the engines first ran on is told
     @Test
     fun aCallOffTheHostThreadIsToldWhereChecked() {
         val told = ArrayList<String>()
@@ -72,16 +67,12 @@ class EnginesInvariantsTest : EnginesFixture() {
             engines.type(InputMethodCatalog.PINYIN, "ni")
             thread { engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, 'h'.code) }.join()
             assertEquals(1, told.size)
-            // on its own thread still, as before
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertEquals(1, told.size)
         }
     }
 
-    // every public entry is checked, not those that type alone: one row each, so a missed guard is named
-    // (review F4902, F4972: rows were missing, a guard could go unseen). close is left out: [use]
-    // closes each row's engines again on this thread. Each row has engines of its own, as some
-    // change them (useHabits, settings, reload) (review F4995)
+    // one row per public entry, so a missed guard is named; close is left out ([use] closes again on this thread)
     @Test
     fun everyEntryOffTheHostThreadIsTold() {
         val path = Glide(FloatArray(0), GlideLayout(emptyList()))
@@ -114,8 +105,7 @@ class EnginesInvariantsTest : EnginesFixture() {
         }
     }
 
-    // engine-restructure §9: in a sensitive field (learning off) whatever is done, nothing is recorded;
-    // a long press's acts included, which the host sends with learning on (pressShown)
+    // long-press acts included, which the host sends with learning on (pressShown)
     @Test
     fun nothingIsRecordedInASensitiveField() {
         // a word learned first in an ordinary field, so the acts below have something to act on
@@ -137,7 +127,6 @@ class EnginesInvariantsTest : EnginesFixture() {
             "haoni".forEach(::key)
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.BACKSPACE, 0, learning = false)
             key(' ')
-            // a long press's acts on what is shown, each refused
             "ni".forEach(::key)
             val shown = engines.candidates(InputMethodCatalog.PINYIN, 0, 2).map { it.text }
             val acts = listOf(

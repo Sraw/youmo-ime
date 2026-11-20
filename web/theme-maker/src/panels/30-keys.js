@@ -1,4 +1,4 @@
-// 按键 (060-render-p3 §5.1 panel 3): a range of keys (all, letters, function, space, Return, the picked key, the
+// 按键: a range of keys (all, letters, function, space, Return, the picked key, the
 // board's every key), a scene, a state, then the face's properties; the line on top says which select= the
 // changes go to, the cascade check under it where each of the picked key's values comes from (the engine's own answer).
 // Every control reads the document when it is used, not when it was drawn: the page leaves a tab as it is while a
@@ -9,7 +9,7 @@
   const F = root.YoumoForm;
   const LIM = F.LIMITS;
 
-  // the properties' texts as theme.xml has them (060-render-v2 §5, ThemeReader), kept to what the engine reads
+  // the properties' texts as theme.xml has them (ThemeReader), kept to what the engine reads
   const TEXT = {
     radius: (v) => F.clamp(v, 0, LIM.lengthDp, 1) + 'dp',
     depth: (v) => F.clamp(v, 0, LIM.depthDp, 1) + 'dp',

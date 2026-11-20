@@ -12,23 +12,12 @@ import java.sql.SQLException
 import java.sql.Statement
 import java.util.Properties
 
-/**
- * The pages of a FineWeb-2 shard (HuggingFaceFW/fineweb-2, `cmn_Hani`; ODC-By) worth mixing into
- * the model as chat: in simplified Chinese, not from an encyclopedia, and written the way people
- * talk, by how many sentence particles (吗呢吧 ...) they hold a thousand Han characters; a 哈 of
- * 哈尔滨 counts too, as measured. Among all of a shard's pages these
- * measured better on the written and the chat evaluation sets alike (dev/ENGINE-DESIGN.md).
- */
+/** The pages of a FineWeb-2 shard worth mixing in as chat: simplified, not encyclopedic, rich in sentence particles. */
 object WebText {
 
-    /**
-     * Whether the page at [url] with [text] is taken: not an encyclopedia's, not traditional, and
-     * unless [chatOnly] is off, written the way people write to each other (particles enough).
-     */
+    /** Whether the page at [url] is taken: not an encyclopedia's, not traditional, and unless not [chatOnly], chat-like. */
     fun accepts(url: String, text: String, chatOnly: Boolean = true): Boolean {
-        // Wikipedia's text is CC BY-SA, whose terms over statistics drawn from it are unsettled; so
-        // are its mirrors', Wikimedia's other sites' and the big Chinese wikis' (some NC too), and
-        // 百科's are their sites' own
+        // Wikipedia's and other wikis' text is share-alike or NC, and 百科's are their sites' own
         val host = HOST.find(url)?.groupValues?.get(1).orEmpty().lowercase().removeSuffix(".")
         if (ENCYCLOPEDIA.containsMatchIn(host)) return false
         var han = 0
@@ -47,11 +36,7 @@ object WebText {
         return traditional * TRADITIONAL_SHARE <= simplified && (!chatOnly || particles * PER_MILLE >= MIN_PARTICLES * maxOf(1, han))
     }
 
-    /**
-     * The lines of each page of [shard] that [accepts] takes (with [chatOnly]), and the page's date
-     * (`2023-06-14T...`, or empty), a page at a time, in the shard's order.
-     * @throws IOException if DuckDB cannot read it
-     */
+    /** The lines of each page of [shard] that [accepts] takes, and the page's date, in the shard's order. */
     fun read(shard: File, chatOnly: Boolean = true, page: (List<String>, String) -> Unit) = select(shard) { statement, path ->
         query(statement, path, chatOnly, page)
     }
@@ -59,19 +44,12 @@ object WebText {
     /** A page as a shard holds it: where it was, its text, and when (`2023-06-14T...`, or empty). */
     class Page(val url: String, val text: String, val date: String)
 
-    /**
-     * Every page of [shard] as it is, none left out, in the shard's order.
-     * @throws IOException if DuckDB cannot read it
-     */
+    /** Every page of [shard], in the shard's order. */
     fun pages(shard: File, page: (Page) -> Unit) = select(shard) { statement, path ->
         rows(statement, path) { url, text, date -> page(Page(url, text, date)) }
     }
 
-    /**
-     * Writes [pages] to [shard] as `url, text, date`, what [read] and [pages] take, through a file
-     * beside it: a shard is there whole or not at all.
-     * @throws IOException if DuckDB cannot write it
-     */
+    /** Writes [pages] to [shard] through a file beside it, so a shard is there whole or not at all. */
     fun write(shard: File, pages: List<Page>) {
         val temp = File(shard.path + ".tmp")
         try {
@@ -110,11 +88,9 @@ object WebText {
     }
 
     private fun rows(statement: Statement, path: String, row: (String, String, String) -> Unit) {
-        // in the file's order (DuckDB's default, made explicit): the mixed model must come out the
-        // same every build
+        // in the file's order: the mixed model must come out the same every build
         statement.execute("SET preserve_insertion_order = true")
-        // DuckDB's own memory is off the JVM's heap and by default most of the machine's, on top of
-        // the models mix holds
+        // DuckDB's memory is off the JVM's heap and by default most of the machine's
         statement.execute("SET memory_limit = '1GB'")
         // each thread buffers row groups of its own; mix is single-threaded past the read anyway
         statement.execute("SET threads = 2")

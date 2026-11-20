@@ -48,10 +48,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * uat/14's 编码行 cases (ST-48–ST-50): the code row floating over the app, outside the keyboard's
- * top-left, from the first key till the code goes; its touches; the keyboard's height without it.
- */
+/** The code row floating outside the keyboard's top-left, from the first key till the code goes. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -67,14 +64,14 @@ class FloatingCodeStripUatTest {
     fun close() {
         harness?.close()
         EngineState.syllablesState.value = EngineState.SyllableState()
-        // where a test dragged the keyboard: not the next test's (AppPrefs outlives it)
+        // AppPrefs outlives the test: where it dragged the keyboard is not the next test's
         AppPrefs.getInstance().internal.run {
             floatingKeyboardX.setValue(floatingKeyboardX.defaultValue)
             floatingKeyboardY.setValue(floatingKeyboardY.defaultValue)
         }
     }
 
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
 
     private fun open(
         keyboards: ImKeyboards.Chosen = ImKeyboards.Chosen(),
@@ -83,8 +80,8 @@ class FloatingCodeStripUatTest {
         style: CodeRowStyle = CodeRowStyle.Floating,
     ): KeyboardHarness {
         harness?.close()
-        // set here, put back once at the test's end: a harness's own would flip it back and forth at
-        // each open, every flip rebuilding every keyboard alive (the JVM ran out of memory)
+        // put back once at the test's end: a harness's own flipped it at each open, every flip rebuilding every keyboard
+        // alive (the JVM ran out of memory)
         if (ThemeManager.prefs.codeRow.getValue() != style) prefs.set(ThemeManager.prefs.codeRow, style)
         return KeyboardHarness(theme, im, keyboards = keyboards, codeRow = style).also {
             harness = it
@@ -96,7 +93,6 @@ class FloatingCodeStripUatTest {
 
     private fun strip(): FloatingCodeStrip = KeyboardHarness.find<FloatingCodeStrip>(h.inputView) ?: error("no strip")
 
-    // laid out, then placed as a frame about to be drawn places it, then laid out at its width
     private fun drawn() {
         h.relayout()
         h.inputView.viewTreeObserver.dispatchOnPreDraw()
@@ -105,7 +101,6 @@ class FloatingCodeStripUatTest {
     }
 
     private fun typing(code: String, im: String = InputMethodCatalog.PINYIN, vararg syllables: String) {
-        // the session's code, as the engine flags it (InputPanel.code)
         val panel = HostEvent.InputPanel(FormattedText(arrayOf(code), intArrayOf(0), code.length), FormattedText.Empty, FormattedText.Empty, code = true)
         h.api.inputPanelCached = panel
         h.emit(panel)
@@ -147,7 +142,6 @@ class FloatingCodeStripUatTest {
         assertTrue(shownStrip())
         val box = h.box(strip())
         val keyboard = h.box(h.keyboard)
-        // outside the keyboard's top-left, as wide as its text, 24 dp high
         assertEquals("$box over $keyboard", keyboard.top, box.bottom)
         assertEquals(keyboard.left, box.left)
         assertEquals(CodeRowHeight.FLOAT_DP.toFloat(), box.height() / dp, 1f)
@@ -165,7 +159,6 @@ class FloatingCodeStripUatTest {
         typing("nihao")
         h.api.calls.clear()
         val text = h.inputView.findViewById<View>(R.id.code_row_text)
-        // near the start of the code, through the input view as a finger is
         h.touch(text, KeyboardHarness.Touch(4 * dp, text.height / 2f))
         h.idle()
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("moveCursor(") && it != "moveCursor(5)" })
@@ -209,7 +202,6 @@ class FloatingCodeStripUatTest {
         assertEquals(full.second, embedded.second)
         assertEquals(CodeRowHeight.THIN_DP.toFloat(), (embedded.first - full.first) / dp, 1f)
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), (embedded14.first - fourteen.first) / dp, 1f)
-        // 输入框里 (061-code-in-field §4.5): the row not in the keyboard either, as high as floating
         assertEquals(full, heights(CodeRowStyle.InField, ImKeyboards.Chosen()))
         assertEquals(fourteen, heights(CodeRowStyle.InField, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14)))
     }
@@ -245,7 +237,6 @@ class FloatingCodeStripUatTest {
         h.api.calls.clear()
         h.tap(syllableItems().first())
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
-        // pinyin's nine keys: the column has them, the strip only the code
         open(KeyboardHarness.NINE_KEYS)
         typing("64", InputMethodCatalog.PINYIN, "ni", "mi")
         assertFalse(syllables().isShown)
@@ -281,7 +272,6 @@ class FloatingCodeStripUatTest {
         assertTrue(insets.touchableRegion.contains(box.centerX(), box.centerY()))
         assertTrue(insets.touchableRegion.contains(keyboard.centerX(), keyboard.centerY()))
         h.capture("FloatingCodeStripUatTest/floating", h.inputView)
-        // dragged to the top: no room above, under it
         cleared()
         h.drag(KeyboardHarness.find<FloatingHandle>(h.inputView)!!, 0f, 0f)
         h.after(1000)
@@ -292,7 +282,6 @@ class FloatingCodeStripUatTest {
         h.capture("FloatingCodeStripUatTest/floating_top", h.inputView)
     }
 
-    // light and dark, the full keys, 14, nine, 双拼's 18: for the user to see
     @Test
     @Uat("ST-48")
     fun theStripOnEachKeyboardLightAndDark() {
@@ -322,7 +311,6 @@ class FloatingCodeStripUatTest {
             assertEquals(FloatingCodeStrip.ALPHA, Color.alpha(colour))
             val text = h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text)
             val ink = KeyboardHarness.all(text).filterIsInstance<TextView>().first().currentTextColor
-            // the code readable on it: far apart in lightness
             val gap = kotlin.math.abs(Color.luminance(colour or 0xff000000.toInt()) - Color.luminance(ink))
             assertTrue("$name: strip ${Integer.toHexString(colour)} text ${Integer.toHexString(ink)}", gap > 0.4f)
             h.capture("FloatingCodeStripUatTest/transparent_$name", h.inputView)
@@ -360,14 +348,13 @@ class FloatingCodeStripUatTest {
         assertFalse(inKeyboard(h.inputView.findViewById(R.id.code_row_text)))
     }
 
-    // a notice kept as keys are typed (what the engine says as a key fails): off the strip that comes under it
+    // a notice kept as keys are typed: off the strip that comes under it
     @Test
     @Uat("ST-48")
     fun aSteadyNoticeMakesWayForTheStrip() {
         open()
         drawn()
         h.service.say("词库没装上", steady = true)
-        // well inside its 2 s
         h.advance(500)
         val before = h.noticeBox()
         typing("zhuang bu hao kuo ni hao a ni hao a ni hao")

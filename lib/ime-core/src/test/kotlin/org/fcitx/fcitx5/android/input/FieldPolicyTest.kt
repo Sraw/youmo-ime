@@ -43,7 +43,7 @@ class FieldPolicyTest {
         assertEquals("你好", context(4, ""))
     }
 
-    // U-91: addresses and numbers learn no pairs, a search no 联想; told with the context, gone with the field
+    // addresses and numbers learn no pairs, a search no 联想; told with the context, gone with the field
     @Test
     fun aFieldsKindSaysWhatLearningLeavesOut() {
         assertEquals(Commit.NO_PAIRS, FieldPolicy.learnFlags(EditorTraits(isUri = true)))
@@ -93,7 +93,7 @@ class FieldPolicyTest {
         assertNull(policy.told(5, { "" }, { "" }))
     }
 
-    // HW-23: an editor's own empty answer is said, a null (it would not say) is not, nor a sensitive field's
+    // an editor's own empty answer is said, a null (it would not say) is not, nor a sensitive field's
     @Test
     fun anEmptyFieldIsSaidOnlyWhereTheEditorAnswered() {
         policy.focusAnother("chat", password = false, sensitive = false)
@@ -103,7 +103,7 @@ class FieldPolicyTest {
         assertFalse(policy.told(3, { "" }, { "" })!!.said)
     }
 
-    // U-03: the session of an input method switched to is told the field as started, once, in a field (UAT HW-23)
+    // the session of an input method switched to is told the field as started, once, in a field
     @Test
     fun anInputMethodSwitchedToInAFieldIsToldItStarted() {
         assertFalse(policy.inputMethodChanged("pinyin"))
@@ -115,8 +115,7 @@ class FieldPolicyTest {
         assertFalse(policy.inputMethodChanged("handwriting"))
     }
 
-    // U-03: what the engine checks its commits by. Another field is started; the same again (a WebView's restart,
-    // back from another app) is not (review-1c S3); a selection is told as one (M2); nothing after the cursor of a sensitive field
+    // what the engine checks commits by: another field is started, the same again (a WebView restart) not; a selection as one
     @Test
     fun theFieldStartedTheTextAfterAndASelectionAreTold() {
         assertTrue(policy.focusAnother("chat", password = false, sensitive = false))

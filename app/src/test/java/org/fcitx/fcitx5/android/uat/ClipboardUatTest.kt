@@ -21,10 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * uat/05-toolbar.md's clipboard: what the history keeps of a copy, as the listener the app's start
- * registers takes it (ClipboardManagerReopenTest's way), the panel's list being those entries.
- */
+/** As the listener the app's start registers takes a copy (ClipboardManagerReopenTest's way). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ClipboardUatTest {
@@ -48,7 +45,6 @@ class ClipboardUatTest {
     fun aCopiedLinkLosesItsTrackingParameters() {
         copy("https://example.com/a?id=1&utm_source=x")
         assertEquals("https://example.com/a?id=1", ClipboardManager.lastEntry?.text)
-        // the system's paste: the clip as copied
         assertEquals("https://example.com/a?id=1&utm_source=x", appContext.clipboardManager.primaryClip!!.getItemAt(0).text.toString())
     }
 

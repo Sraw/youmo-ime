@@ -7,17 +7,9 @@ package org.fcitx.fcitx5.android.input.popup
 import org.fcitx.fcitx5.android.host.KeyCodes
 
 /**
- * What the user changed about the characters a key offers on long press.
- *
- * The built-in table maps a key label to its candidates; an override *replaces* the candidates
- * of that one label (a partial edit is not a merge, so what the editor shows is what the popup
- * shows). An override with no candidates switches the popup off for that key. The first
- * candidate is the one under the finger, i.e. what a long press committed without sliding.
- *
- * Stored as text, one line per key: the label, then its candidates, all separated by
- * whitespace (including full-width spaces). So neither can contain whitespace, which no real key
- * label or candidate does. A candidate longer than one character is committed as text.
- * A later line for the same label wins. A keyboard's own code is never offered ([rejects]).
+ * The user's long-press characters: an override *replaces* one label's candidates (no merge, so the editor shows
+ * what the popup shows); none switches it off; the first is the one under the finger. Stored one line per key,
+ * whitespace-separated (full-width too); a later line wins. A keyboard's own code is never offered ([rejects]).
  */
 class PopupOverrides private constructor(private val table: Map<String, List<String>>) {
 
@@ -25,15 +17,12 @@ class PopupOverrides private constructor(private val table: Map<String, List<Str
 
     val isEmpty: Boolean get() = table.isEmpty()
 
-    /** The override for exactly [label], without any fallback. */
+    /** No fallback. */
     operator fun get(label: String): List<String>? = table[label]
 
-    /**
-     * @param preset the built-in candidates for [label]
-     * @return what to show on long press; null when there is nothing to show
-     */
+    /** Null when there is nothing to show. */
     fun resolve(label: String, preset: Array<String>?): Array<String>? {
-        // a code kept by an older build (0.3.x, a backup) is not offered, but stays in the text as written
+        // a code kept by an older build is not offered, but stays in the text as written
         val stored = table[label] ?: shiftedOverride(label) ?: return preset
         val items = stored.filterNot(::rejects)
         // emptied only by codes left out: the user switched nothing off, so the built-in ones show
@@ -41,10 +30,7 @@ class PopupOverrides private constructor(private val table: Map<String, List<Str
         return items.takeIf { it.isNotEmpty() }?.toTypedArray()
     }
 
-    /**
-     * Shift shows the popup of the upper-case label ("Q"); the user edited "q". Carry the edit
-     * over rather than silently falling back to the built-in table.
-     */
+    /** Shift shows "Q"'s popup; the user edited "q": carry it over rather than fall back silently. */
     private fun shiftedOverride(label: String): List<String>? {
         if (label.length != 1 || !label[0].isUpperCase()) return null
         return table[label.lowercase()]?.map(::upperCase)?.distinct()
@@ -77,17 +63,10 @@ class PopupOverrides private constructor(private val table: Map<String, List<Str
         // \p{Z} for the full-width and no-break spaces an IME's own users type by accident
         private val whitespace = Regex("[\\s\\p{Z}]+")
 
-        /** Splits [text] into words the way the stored format does. */
+        /** As the stored format does. */
         fun tokens(text: String): List<String> = text.split(whitespace).filter { it.isNotEmpty() }
 
-        /**
-         * Whether [item] is a keyboard's own code alone, refused ([KeyCodes.isInternal]): the grouped
-         * keyboards' codes (NineKeyLetters.CODES) and any other private use character (Keyboard's SYLLABLES, TAPS, INK…, some past the BMP: one
-         * character, two chars). A popup sends any single code point as a key, read as that key;
-         * text of more characters is committed as text, never read so. Not
-         * kept by [with] (the settings page says why) nor offered by [resolve]; what an older build
-         * stored stays in the text, so a save of another key does not rewrite it.
-         */
+        /** A popup sends a single code point as a key, so a lone private use character would act as one: not kept by [with] nor offered; an older build's stays in the text. */
         fun rejects(item: String): Boolean =
             item.isNotEmpty() && item.codePointCount(0, item.length) == 1 && KeyCodes.isInternal(item.codePointAt(0))
 

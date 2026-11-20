@@ -9,26 +9,19 @@ import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
 
 /**
- * Round trip of a hardware key through fcitx. The key goes to the engine as a (sym, states,
- * timestamp) triple; if the engine hands it back unconsumed, the editor should get the
- * original Android [KeyEvent] rather than one rebuilt from the sym, which loses the device,
+ * Round trip of a hardware key through fcitx. If the engine hands it back unconsumed, the editor should
+ * get the original Android [KeyEvent] rather than one rebuilt from the sym, which loses the device,
  * scan code, flags and repeat count. So each event is [remember]ed under a number that travels
- * to fcitx as the timestamp, and [replay]ed when fcitx returns that number.
- *
- * Main thread only.
+ * to fcitx as the timestamp. Main thread only.
  */
 class KeyEventRelay(private val connection: () -> InputConnection?) {
 
     private val cache = LruCache<Int, KeyEvent>(CAPACITY)
     private var nextId = 0
 
-    /** Meta state of a hardware keyboard with sticky modifiers, to clear them in order. */
     private val stickyMetaState = StickyMetaState()
 
-    /**
-     * @return the number to hand to fcitx as this key's timestamp. A counter rather than
-     * `event.eventTime`: a key's down and up can carry the same time.
-     */
+    /** A counter rather than `event.eventTime`: a key's down and up can carry the same time. */
     fun remember(event: KeyEvent): Int {
         val id = nextId++
         cache.put(id, event)
@@ -36,8 +29,6 @@ class KeyEventRelay(private val connection: () -> InputConnection?) {
     }
 
     /**
-     * Send the event remembered under [id] to the editor.
-     *
      * @return false if there is none (evicted, already replayed, or the key did not come from
      * [remember]); the caller then has to make up an event of its own.
      */
@@ -71,7 +62,7 @@ class KeyEventRelay(private val connection: () -> InputConnection?) {
         return true
     }
 
-    /** Forget every pending event, e.g. when the editor goes away. Ids are not reused. */
+    /** Ids are not reused. */
     fun clear() {
         // ids keep counting: a key still on its way to fcitx would otherwise come back
         // carrying the id of some later key

@@ -69,7 +69,6 @@ class BitPackedTest {
         val random = Random(5)
         // widths whose values straddle two words, and one that never does
         for (width in listOf(7, 16, 19, 23, 31)) {
-            // the widest value of the width among them, so the values are packed at that width
             val top = ((1L shl width) - 1).toInt()
             val values = (IntArray(299) { random.nextInt(top) } + top).sortedArray()
             val packed = read(BitPacked.encode(values))
@@ -146,7 +145,7 @@ class BitPackedTest {
         }
     }
 
-    // the streaming writer's misuse refused as it happens, not a table read wrong later (review F3614)
+    // the streaming writer's misuse refused as it happens, not a table read wrong later
     @Test
     fun theWriterRefusesMoreValuesTooWideOrTooFew() {
         val rows = listOf<Pair<String, (BitPacked.Writer) -> Unit>>(

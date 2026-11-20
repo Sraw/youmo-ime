@@ -33,10 +33,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * UAT cases of uat/14 whose setting changes the keyboard: the setting as its page stores it, then
- * the keyboard it gives.
- */
+/** A setting as its page stores it, then the keyboard it gives. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -45,13 +42,12 @@ class SettingsEffectUatTest {
     private var made: KeyboardHarness? = null
     private val h get() = made ?: fresh()
 
-    // a keyboard made anew, in [theme] if given: one closed is not started again
+    // one closed is not started again
     private fun fresh(theme: Theme? = null): KeyboardHarness {
         made?.close()
         return KeyboardHarness(theme ?: TestThemes.PixelLight).also { made = it }
     }
 
-    // the light preset as the theme edit page's choices [f] make it
     private fun edited(f: (ThemeLook) -> ThemeLook): Theme = Theme.Custom("edited", false, f(TestThemes.PixelLight.look))
 
     @get:Rule
@@ -102,7 +98,6 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-12")
     fun keyBorderSpacingAndCorners() {
-        // a theme the web page made flat: its bar in its colour
         fresh(edited { it.copy(keys = it.keys.copy(blocks = false), bar = BarBase.Color) })
         h.start()
         h.capture("SettingsEffectUatTest/no_border")
@@ -123,7 +118,6 @@ class SettingsEffectUatTest {
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
         h.start()
         assertNull(corner("w"))
-        // the swipe types it all the same
         h.swipe(h.key("w"), 0f, -h.key("w").height * 1.3f)
         assertTrue(sent().toString(), "key=2," in sent().last())
         fresh()
@@ -184,7 +178,7 @@ class SettingsEffectUatTest {
     fun holdingTheSpaceGoesToTheNextInputMethod() {
         prefs.set(keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
         h.start()
-        // two to go between: with one, the prompt to add more (SpaceLongPressNextImTest)
+        // with one, the prompt to add more (SpaceLongPressNextImTest)
         h.api.enabledIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
         h.press(space())
         h.after(1000)
@@ -209,8 +203,7 @@ class SettingsEffectUatTest {
         val shown = h.longPress(h.key("k"), "(")
         assertTrue(shown.toString(), "(" in shown)
         if (h.field.text.isEmpty()) {
-            // sent to the engine: its commit back, as fcitx's punctuation gives it (the fake simulates no input),
-            // is where the service pairs it or not
+            // its commit back, as fcitx's punctuation gives it (the fake simulates no input), is where the service pairs it
             assertEquals(h.api.calls.toString(), 1, sent().count())
             h.emit(HostEvent.Commit("(", -1))
         }
@@ -235,7 +228,6 @@ class SettingsEffectUatTest {
     @Test
     @Uat("ST-21")
     fun aCharacterMadeFirstIsTheCornerAndTheSwipe() {
-        // as 设为首选 stores it: Q first of q's
         prefs.setList("full/q", listOf("Q", "1"), first = "Q")
         h.start()
         assertEquals("Q", corner("q"))

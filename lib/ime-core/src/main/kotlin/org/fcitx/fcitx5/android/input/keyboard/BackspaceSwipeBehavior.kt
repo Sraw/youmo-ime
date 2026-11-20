@@ -5,55 +5,30 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 /**
- * What swiping across the backspace key does.
- *
- * Two readings compete for the same gesture. With nothing being composed, dragging left grows
- * a selection and releasing deletes it. Mid-composition that would be destructive, so the
- * gesture is repurposed: dragging left instead resets the composition, and dragging right
- * does nothing.
- *
- * Which reading applies is decided once, on the first movement of the gesture, and then held
- * until the finger lifts -- otherwise a composition ending mid-swipe would switch the meaning
- * of a gesture already in progress.
- *
- * Every touch starts with [onTouchDown]. A cancelled touch never reaches [onRelease]: the Up
- * CustomGestureView makes of ACTION_CANCEL is marked cancelled, and BaseKeyboard sends no
- * release for it; a scene key's gesture BaseKeyboard cancels directly (its finger taken, the
- * stream lost) gets no Up at all. Without the reset on the next touch, its reading
- * would carry over to it.
- *
- * So a cancel acts the same on both paths: the selection built so far stays selected in the
- * editor, where the next Backspace deletes it as any selection, and a reset gesture resets
- * nothing.
+ * Swiping across backspace: with nothing composed, dragging left grows a selection deleted on release; while
+ * composing, left resets the composition and right does nothing. Decided on the first move and held till the lift.
+ * Every touch starts with [onTouchDown]: a cancelled one gets no [onRelease], and its reading must not carry over.
  */
 class BackspaceSwipeBehavior {
 
     enum class State {
-        /** No swipe in progress. */
         Stopped,
 
-        /** This swipe is growing a selection. */
         Selection,
 
-        /** This swipe was started mid-composition, so it resets rather than selects. */
         Reset,
     }
 
-    /** What the caller should do in response to a movement. */
     enum class MoveEffect {
-        /** Extend the selection by the reported offsets. */
         ExtendSelection,
 
-        /** Nothing: this swipe is a reset gesture, which only acts on release. */
+        /** A reset gesture acts only on release. */
         None,
     }
 
-    /** What the caller should do when the finger lifts. */
     enum class ReleaseEffect {
-        /** Delete the selection this swipe built. */
         DeleteSelection,
 
-        /** Clear the composition instead. */
         ResetComposition,
 
         None,
@@ -62,16 +37,12 @@ class BackspaceSwipeBehavior {
     var state: State = State.Stopped
         private set
 
-    /** A new touch on the key: whatever an earlier, cancelled one left behind no longer applies. */
+    /** Whatever an earlier, cancelled one left behind no longer applies. */
     fun onTouchDown() {
         state = State.Stopped
     }
 
-    /**
-     * @param composing whether something typed is being composed (a preedit) when the gesture
-     * begins; candidates offered with nothing typed, the words that may come next, are not.
-     * Only consulted on the first movement.
-     */
+    /** [composing]: a preedit as the gesture begins (predictions with nothing typed are not); read on the first move only. */
     fun onMove(composing: Boolean): MoveEffect = when (state) {
         State.Stopped -> {
             state = if (composing) State.Reset else State.Selection
@@ -81,10 +52,7 @@ class BackspaceSwipeBehavior {
         State.Reset -> MoveEffect.None
     }
 
-    /**
-     * @param totalCount net swipe distance in steps; negative is leftwards. A reset gesture
-     * only fires when the finger went left, so a rightward swipe cancels harmlessly.
-     */
+    /** [totalCount] negative is leftwards: a reset fires only leftwards. */
     fun onRelease(totalCount: Int): ReleaseEffect {
         val effect = when (state) {
             State.Stopped -> ReleaseEffect.None

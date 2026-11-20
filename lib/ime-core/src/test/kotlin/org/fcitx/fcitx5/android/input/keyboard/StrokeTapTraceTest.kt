@@ -11,7 +11,7 @@ import org.junit.Test
 
 class StrokeTapTraceTest {
 
-    // a line's last field; JUnit's asserts, as Kotlin's assert holds only under -ea (R26 F8302)
+    // a line's last field; JUnit's asserts, as Kotlin's assert holds only under -ea
     private fun res(line: String?) = line!!.substringAfterLast(' ')
 
     // 2 px a dp; a cell 80x128 px (40x64 dp) at 100,200; touch slop 16 px

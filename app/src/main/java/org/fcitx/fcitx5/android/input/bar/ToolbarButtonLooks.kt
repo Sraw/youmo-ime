@@ -8,7 +8,6 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 
-/** A [ToolbarButton]'s icon (a theme's by its name, else the app's: [BarIcons]) and its name, the name on the settings page too. */
 data class ToolbarButtonLooks(val icon: BarIcons.Icon, @param:StringRes val label: Int) {
     companion object {
         fun of(button: ToolbarButton) = ToolbarButtonLooks(BarIcons.of(button), label(button))
@@ -34,7 +33,6 @@ data class ToolbarButtonLooks(val icon: BarIcons.Icon, @param:StringRes val labe
             ToolbarButton.Handwriting -> R.string.handwriting
         }
 
-        /** The app's image of a place of the bar or a panel ([BarIcons.Fallback]): drawn where the theme has none of its name. */
         @Suppress("CyclomaticComplexMethod")
         @DrawableRes
         fun drawable(fallback: BarIcons.Fallback): Int = when (fallback) {

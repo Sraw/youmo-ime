@@ -75,7 +75,6 @@ class CharInfoTest {
             ab	a b
         """.trimIndent()
 
-        // as lexicon/stroke-order.tsv has them
         val ORDERS = """
             # 字  shapes  note
             江	D D T H S H
@@ -101,9 +100,7 @@ class CharInfoTest {
     fun theRadicalAsTheMainlandWritesItWhereThePartsShowIt() {
         assertEquals(CharInfo.Entry("氵", 6, listOf("氵", "工"), shapes("D D T H S H")), of("江"))
         assertEquals(CharInfo.Entry("扌", 5, listOf("扌", "丁")), of("打"))
-        // 草's own name for its top (草 早) is no way apart; 艹 早 is
         assertEquals(CharInfo.Entry("艹", 9, listOf("艹", "早")), of("草"))
-        // 心 at the bottom: as CJKRadicals writes it
         assertEquals(CharInfo.Entry("心", 14, listOf("莫", "心")), of("慕"))
     }
 
@@ -143,14 +140,12 @@ class CharInfoTest {
         assertNull(of("打")!!.order)
         assertNull(info.orderKeys("打".codePointAt(0)))
         assertNull(info.orderKeys("a".codePointAt(0)))
-        // what it reads back is what was written, through the file
         assertEquals("P H S P D S HZ H", of("和")!!.order!!.joinToString(" ") { it.code })
         val e = assertThrows(SourceException::class.java) {
             CharInfoBuilder().orders(sequenceOf("# a comment", "江\tD D T H S H", "行\tP P S H H Z"), "o.tsv")
         }
         assertEquals(3, e.line)
         assertTrue(e.message, "not a stroke's shape (H, SG, HZG…): Z" in e.message!!)
-        // the five kinds' digits are no longer a line's
         assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("江\t441121"), "o.tsv") }
         assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("江河\tD"), "o.tsv") }
         assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("江"), "o.tsv") }
@@ -160,13 +155,10 @@ class CharInfoTest {
 
     @Test
     fun anOrderUnlikeUnihansCountOrRimeStrokesFailsTheBuildUnlessItsLineSaysWhy() {
-        // rime-stroke writes 行 two ways, one of them the mainland's
         builder().strokes('行'.code, "ppshhz").strokes('行'.code, "ppshhs").build()
-        // a slip: 和 none of rime-stroke's orders
         val slip = assertThrows(SourceException::class.java) { builder().strokes('和'.code, "phspnhzh").build() }
         assertEquals("stroke-order.tsv" to 4, slip.source to slip.line)
         assertTrue(slip.message, "和 丿一丨丿丶丨乛一, rime-stroke 丿一丨丿丶一乛一" in slip.message!!)
-        // 皙 without 白's 丿: 12 strokes, Unihan 13
         val short = CharInfoBuilder().unihan(sequenceOf("U+7699\tkRSUnicode\t106.8", "U+7699\tkTotalStrokes\t13"), "u.txt")
             .orders(sequenceOf("皙\tH S P D P P H S S HZ H H"), "o.tsv")
         assertTrue(assertThrows(SourceException::class.java) { short.build() }.message!!.contains("皙 12 strokes, Unihan 13"))
@@ -189,7 +181,6 @@ class CharInfoTest {
         assertTrue(stale.message, "江 a note, but its order is as Unihan counts and rime-stroke writes" in stale.message!!)
         val unknown = assertThrows(SourceException::class.java) { CharInfoBuilder().orders(sequenceOf("江\tD D T H S H\tsome note"), "o.tsv").build() }
         assertTrue(unknown.message, "江 a note, but neither Unihan nor rime-stroke has the character to differ from" in unknown.message!!)
-        // a line ended \r\n, a blank one between
         val crlf = CharInfoBuilder().unihan(UNIHAN.lineSequence(), "u.txt").radicals(RADICALS.lineSequence(), "r.txt")
             .orders(sequenceOf("江\tD D T H S H\r", "", "行\tP P S H H SG\r"), "o.tsv")
         crlf.build()

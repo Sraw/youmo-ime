@@ -8,10 +8,8 @@ import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import java.io.File
 
 /**
- * [CustomKeyboards] back on [dir] after a test that pointed it at a temporary folder: what it read and listed there
- * (layouts whose files go with the folder) forgotten and the folder [dir] gives listed anew, or a later class in the
- * same JVM (PanelActions.keyboardsOffered, KeyboardPicker) is offered layouts that are not there (specs/testing.md,
- * state that outlives a test).
+ * [CustomKeyboards] back on [dir] after a test pointed it at a temporary folder, or a later class in the same JVM is
+ * offered layouts that are not there.
  */
 fun forgetTheTestsLayouts(dir: () -> File) {
     // a listing of the test's folder still on its way would land after the forgetting

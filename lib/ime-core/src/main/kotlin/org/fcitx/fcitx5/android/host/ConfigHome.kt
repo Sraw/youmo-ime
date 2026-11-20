@@ -13,81 +13,44 @@ import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 
 /**
- * Where the user's files fcitx kept on the external storage are: the app's own storage. [CONFIG], the
- * host's config files (the profile, the `.conf` files under `conf/`), in `files/host-config`; [DATA],
- * fcitx's `data/` (custom phrases, imported dictionaries, quick input, edited punctuation), in
- * `files/host-data`; [THEME], the custom themes, in `files/host-theme`. Up to 0.4 the config was
- * fcitx's `config/` on the external storage (`Android/data/<package>/files`), or `files/config` at a
- * start that found no external storage, and was read as nothing there: a phone cleaner emptying
- * `Android/data`, or one start without the external storage, put every 通用输入 setting back to its
- * default, written so at the next change (A4, 2026-10-28).
- *
- * [settle] moves an older build's directory in, once: copied whole to its [Home.staged], each copy
- * read back against the checksum its source had as it was copied (the source read once), then the
- * copy renamed to [Home.name], so a kill leaves no half move and the directory there means moved.
- * The old directory is then deleted (the user's decision, 2026-10-31): a copy left on the external
- * storage is one a cleaner or another app reads, and going back to 0.4 means an uninstall, which
- * takes both. Only a home the move made deletes anything: [MOVED] in it, written into the copy
- * before the rename, says where it came from, so a home made empty never deletes an older build's
- * directory that appears later; it goes once the old is gone, a delete that fails (or a kill
- * before it) tried again at the next start. Files are streamed, never held whole: `data/` holds
- * the imported dictionaries and what is compiled of them.
+ * Where the user's fcitx files live: the app's own storage. Older builds kept them on external storage, where a
+ * phone cleaner or a start without it reset every setting. [settle] moves an old directory in once: copied to
+ * [Home.staged], read back against the source's checksum, then renamed, so a kill leaves no half move. The old
+ * is then deleted (a copy left outside is readable by others), only by a home carrying [MOVED]. Files are streamed.
  */
 object ConfigHome {
-    /**
-     * One directory moved in: [name] under the app's files, [old] where an older build had it (under
-     * the external files directory, or under the app's files when that was away).
-     */
+    /** [old]: where an older build had it (external files, or the app's files when that was away). */
     data class Home(val name: String, val old: String) {
-        /** The copy being made, renamed to [name] once all of it is read back. */
         val staged: String get() = "$name.new"
     }
 
-    /**
-     * In a home the move made, until the directory it came from is deleted: that one's [Use]. A
-     * backup leaves it out (restored into a home, it would have the next start delete what it never moved).
-     */
+    /** Until the source is deleted; a backup leaves it out, or a restore would delete what it never moved. */
     const val MOVED = ".moved-from"
 
     val CONFIG = Home("host-config", "config")
     val DATA = Home("host-data", "data")
     val THEME = Home("host-theme", "theme")
 
-    /** The directory the host reads its config from, this run. */
     enum class Use {
-        /** [Home.name]. */
         HOME,
 
-        /** The external files directory's [Home.old], an older build's. */
         EXTERNAL,
 
-        /** The app's files' [Home.old], where an older build fell back to. */
+        /** Where an older build fell back to. */
         FALLBACK,
 
-        /** None: every setting at its default. */
+        /** Every setting at its default. */
         NONE,
     }
 
     enum class Problem {
-        /**
-         * Not moved yet, and the external storage is not there to say whether an older build's
-         * config is on it: what can be read is read, nothing written, the move tried at the next start.
-         */
+        /** Not moved, and the external storage away: read what can be, write nothing, try again next start. */
         EXTERNAL_AWAY,
 
-        /**
-         * Not in place, the [Place.error] why, the move (or the making) tried at the next start: an
-         * older build's directory that could not be copied in (no room for the copy, say), used where it
-         * is and written there; or none to move and the home that could not be made, so nothing at all
-         * ([Use.NONE], not writable).
-         */
+        /** The move failed ([Place.error]): the old directory used and written where it is, or none at all. */
         NOT_MOVED,
     }
 
-    /**
-     * [use] read this run, written to only if [writable]; [problem] what kept it from [Use.HOME], with
-     * the [error] of a copy that failed; [movedFrom], what this start moved into [Home.name].
-     */
     data class Place(
         val use: Use,
         val writable: Boolean,
@@ -97,28 +60,23 @@ object ConfigHome {
     )
 
     /**
-     * One decision a process for each home: the first to ask [of] it settles it ([settle] with
-     * [external] and [fresh] as they are then), and every reader and writer after, whatever its
-     * thread, gets that same place, a failed move too (tried again by the next process, never midway:
-     * an editor holding the old directory would write where the engine no longer reads). [settled]
-     * hears each decision once, as it is made, before any reader gets it: what it changes there (the app's
-     * punctuation reset) is done before anything is read. One that throws still leaves the place decided:
-     * a move done is not made again, nor every reader after failing on it.
+     * One decision per home per process: the first [of] settles it, everyone after gets the same place, a failed
+     * move too (never retried midway: an editor holding the old directory would write where the engine no longer
+     * reads). [settled] hears each decision before any reader gets it; one that throws still leaves it decided.
      */
     class Settled(
         private val files: UserFiles,
         private val external: () -> UserFiles?,
         private val fresh: () -> Boolean,
-        // bytes free for [files] (the copy is made there, the old directory kept)
+        // the copy is made there, the old directory kept
         private val room: () -> Long = { Long.MAX_VALUE },
         private val settled: (Home, Place) -> Unit = { _, _ -> },
     ) {
         private val places = ConcurrentHashMap<Home, Place>()
 
-        // by the key [places] is keyed by: two equal [Home]s settle one at a time, not each into the same staged copy
+        // two equal [Home]s settle one at a time, not each into the same staged copy
         private val locks = ConcurrentHashMap<Home, Any>()
 
-        /** [which]'s place this process; one move at a time for each, the others asking waiting for it. */
         fun of(which: Home): Place = places[which] ?: synchronized(locks.getOrPut(which) { Any() }) {
             places[which] ?: settle(files, external(), which, fresh(), room()).also {
                 try {
@@ -131,15 +89,9 @@ object ConfigHome {
     }
 
     /**
-     * Where [which] is this run, an older build's moved in first if [files] (the app's files
-     * directory) has no [Home.name] yet. [external] is the external files directory, null when it is not
-     * there (getExternalFilesDir's null, the storage away; one that cannot be listed is taken as
-     * away). Its [Home.old] is taken over the app's files' one, which an older build wrote only at a
-     * start without it. [room]: the bytes free for [files]; a source larger is not copied (a copy that
-     * filled the storage would fail, then be made again at every start). [fresh]: nothing of an older
-     * build's can be anywhere (a new install, its first start), so a start without the external
-     * storage makes the directory rather than wait for it, which on a phone that never has one would
-     * be every start.
+     * [external] null when the storage is away (unlistable counts as away); its [Home.old] wins over the app's
+     * files' one. A source larger than [room] is not copied (it would fail again every start). [fresh] (first
+     * start of an install): make the home rather than wait for a storage a phone may never have.
      */
     fun settle(
         files: UserFiles,
@@ -157,13 +109,11 @@ object ConfigHome {
         val listing = external?.listing()
         if (external == null || listing == null) {
             if (fresh && !fallback.exists()) return made(home)
-            // a fallback may be stale under the external one: read, as an older build read it then, but nothing settled
+            // a fallback may be stale under the external one: read, but nothing settled
             return Place(if (fallback.exists()) Use.FALLBACK else Use.NONE, writable = false, Problem.EXTERNAL_AWAY)
         }
         val old = external.dir(which.old)
-        // by the listing just made, not a second stat: one failing (EIO on the external storage's
-        // FUSE) would read as no older config, and an empty home made would hide it for good. Listed
-        // but of a kind that did not read: there, so away, not none
+        // by this listing, not a second stat: an EIO on the external FUSE would read as none and hide it for good
         if (which.old !in listing.dirs && (which.old in listing.unknown || external.file(which.old).taken())) {
             return Place(if (fallback.exists()) Use.FALLBACK else Use.NONE, writable = false, Problem.EXTERNAL_AWAY)
         }
@@ -192,9 +142,7 @@ object ConfigHome {
         return Place(Use.HOME, writable = true, movedFrom = use)
     }
 
-    // the directory [home] was moved in from, if its [MOVED] says so, deleted, then the marker: never
-    // failing the home, which is in use whatever comes of it; the external one only while the storage
-    // lists, an unlisted one being away, not gone
+    // deletes where [MOVED] says it came from, then the marker; never fails the home; external only while listed
     private fun dropOld(files: UserFiles, external: UserFiles?, which: Home, home: UserFiles) {
         val marker = home.file(MOVED)
         if (!marker.exists()) return
@@ -225,9 +173,7 @@ object ConfigHome {
         Place(Use.NONE, writable = false, Problem.NOT_MOVED, error = IOException("cannot make $home"))
     }
 
-    // [from] into [to], made, every file read back and checked against the checksum and length its
-    // source streamed while it was copied; a directory that cannot be listed, or holds a name whose kind
-    // does not read, fails it, never copied in part and then taken as moved (the source is deleted after)
+    // every file read back against its checksum and length; an unlistable directory fails it, never copied in part
     private fun copy(from: UserFiles, to: UserFiles) {
         // listed once: a second listing could fail where the first did not, and read as empty
         val listing = from.listing() ?: throw IOException("cannot list $from")
@@ -239,8 +185,7 @@ object ConfigHome {
             val sum = CRC32()
             val length = target.create().use { out ->
                 val length = source.input().use { input -> stream(input, out, sum) }
-                // each file, as there is no syncing a directory through the port: the rename after
-                // must not land before the bytes do
+                // each file: a directory cannot be synced through the port, and the rename must not land before the bytes
                 out.sync()
                 length
             }
@@ -252,7 +197,6 @@ object ConfigHome {
         for (name in listing.dirs) copy(from.dir(name), to.dir(name))
     }
 
-    // [input] into [out], [sum] taken as it goes: the bytes streamed
     private fun stream(input: InputStream, out: OutputStream, sum: CRC32): Long {
         val buffer = ByteArray(CHUNK)
         var length = 0L

@@ -17,8 +17,6 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.voice.VoiceSession
@@ -37,12 +35,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.roundToInt
 
-/**
- * 061-landscape-height §10: what fills the keys' area turned where it is lowest, looked at for text cut off and rows
- * crowded. A small phone on its side (640 × 360 dp) under gestures' 48 dp: 很高 is pressed to the floor, four rows of
- * 36 dp (144 dp); a level below the table, 28 dp a row (112 dp); 注音's five rows of 36. The goldens under
- * src/test/screenshots/LowLandscapeScreenshotTest.
- */
+/** A small phone on its side (640 × 360 dp) under gestures' 48 dp, at its lowest: goldens looked at for text cut off and rows crowded. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w640dp-h360dp-land-xhdpi")
@@ -62,7 +55,6 @@ class LowLandscapeScreenshotTest {
 
     private fun dp(v: Int) = (v * RuntimeEnvironment.getApplication().resources.displayMetrics.density).roundToInt()
 
-    // the panels, each opened from the letters
     private val panels: List<Pair<String, KeyboardHarness.() -> Unit>> = listOf(
         "symbols" to { tap(key("符")) },
         "emoji" to { tap(described(service.getString(R.string.a11y_key_emoji))) },
@@ -79,7 +71,6 @@ class LowLandscapeScreenshotTest {
     )
 
     private fun shown(level: Int, name: String, inputType: Int = InputType.TYPE_CLASS_TEXT, keyboards: ImKeyboards.Chosen? = null, open: KeyboardHarness.() -> Unit = {}): Int {
-        prefs.set(ThemeManager.prefs.navbarBackground, NavbarBackground.Full)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, level)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
@@ -87,8 +78,7 @@ class LowLandscapeScreenshotTest {
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.RECORD_AUDIO)
         return KeyboardHarness(keyboards = keyboards).use { h ->
             h.start(inputType)
-            // the clipboard's page empty: a clip another test's copy stored after its harness emptied the database
-            // (the app's object keeps it open) once showed here, its hint gone
+            // a clip another test stored after its harness emptied the database once showed here
             runBlocking {
                 ClipboardManager.coroutineContext.job.children.forEach { it.join() }
                 ClipboardManager.purgeMarked(*ClipboardManager.deleteAll(skipPinned = false))
@@ -113,7 +103,7 @@ class LowLandscapeScreenshotTest {
 
     @Test
     fun thePanelsAtTheLowestRow() {
-        // 20: below 紧凑's 34, half a dp a level lower, down to 28 dp a row (KeyboardHeightLevels)
+        // 20: below 紧凑's 34, half a dp a level lower, down to 28 dp a row
         for ((panel, open) in panels) assertEquals(panel, dp(4 * 28).toFloat(), shown(20, "${panel}_28dp", open = open).toFloat(), 2f)
         assertEquals(dp(4 * 28).toFloat(), shown(20, "number_28dp", InputType.TYPE_CLASS_NUMBER).toFloat(), 2f)
     }

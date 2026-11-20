@@ -8,7 +8,7 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
- * A [Scene] as text, for snapshots (060-render-v2 §9): one line an op, slots then keys in layout
+ * A [Scene] as text, for snapshots: one line an op, slots then keys in layout
  * order, numbers in px to a hundredth, written by this code and not the platform's (a Double prints
  * differently on the JVM and in JS; these lines are the same on both, which the snapshot test holds
  * them to). A key's pressed drawing is written as what it changes of its unpressed one: `+i op` put

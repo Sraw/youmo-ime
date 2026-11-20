@@ -34,10 +34,10 @@ import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.theme.Argb
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -45,27 +45,16 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 060-render-p3 T7b in the app: the clipboard's entries, the picker's categories, the editing panel's
- * buttons, the voice mask and the handwriting pad take what the theme sets (a theme 3.0's file and
- * every T7b property set in it, through SceneThemes' source), and a theme that sets none of it, a
- * theme 3.0's, draws them as the app did before: each default spelt out here as the code of before had it.
- */
+/** The panels take what the theme sets; a theme setting none of it draws them as before, each default spelt out as the old code had it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class)
 class PanelThemeTest {
 
-    private val realSource = SceneThemes.source
+    @get:Rule
+    val themes = SceneThemesRule()
 
-    @After
-    fun tearDown() {
-        SceneThemes.source = realSource
-    }
-
-    private fun everything() {
-        SceneThemes.source = { look, name, dark -> LookTheme.xml(look, name, dark).replace("</theme>", "$STYLES\n</theme>") }
-    }
+    private fun everything() = themes.styled(STYLES)
 
     private val theme: Theme = TestThemes.PixelLight
 
@@ -86,7 +75,7 @@ class PanelThemeTest {
     @Test
     fun theClipboardsEntries() {
         fun entry() = ScenePanels.clipboard(ctx, theme).let { ClipboardEntryUi(ctx, theme, it, ScenePanels.clipboardRadius(ctx, it)) }
-        // before: the entry colour, ThemeColors.entryRadius's half the keys' corners in dp, the keys' text
+        // before: the entry colour, ThemeColors.entryRadius's half the keys' corners in dp
         val plain = entry()
         assertEquals(theme.clipboardEntryColor, fill(plain.root))
         assertEquals(keys.radiusDp / 2f * density, (plain.root.background as GradientDrawable).cornerRadius, 0f)
@@ -100,7 +89,6 @@ class PanelThemeTest {
 
     @Test
     fun aFlatLooksEntriesAreAsRoundAsItsKeysSay() {
-        // 按键圆角 10 dp, the keys flat (square): the entries half of it still, as ThemeColors.entryRadius had them
         val light = TestThemes.PixelLight.look
         val flat = Theme.Custom("flat", false, light.copy(keys = light.keys.copy(radiusDp = 10, blocks = false)))
         val look = ScenePanels.clipboard(ctx, flat)
@@ -109,7 +97,6 @@ class PanelThemeTest {
 
     @Test
     fun theCategoryShownIsTheKeysTextOpaque() {
-        // a key text half seen: the one shown whole, as alpha(1f) had it, whether the engine made the theme or not
         val light = TestThemes.PixelLight.look
         val faint = Theme.Custom("faint", false, light.copy(palette = light.palette.copy(keyTextColor = 0x80212121.toInt())))
         assertEquals(Argb(0xff212121.toInt()), ScenePanels.picker(ctx, faint, side = true).selected.color)
@@ -145,13 +132,11 @@ class PanelThemeTest {
             activateTab(1)
         }
         fun labels(t: PickerTabsUi) = (0 until t.root.childCount).map { ((t.root.getChildAt(it) as ViewGroup).getChildAt(0) as TextView) }
-        // before: the column the bar's colour, the one shown the keyboard's; the text the keys' at 60% and whole
         val s = side()
         assertEquals(theme.barColor, (s.background as ColorDrawable).color)
         val whole = ColorUtils.setAlphaComponent(theme.keyTextColor, 0xFF)
         assertEquals(listOf(ColorUtils.setAlphaComponent(theme.keyTextColor, 153), whole), items(s).map { it.currentTextColor })
         assertEquals(theme.keyboardColor, (items(s)[1].background as ColorDrawable).color)
-        // the tabs on the bar's own, at 50% and whole
         val t = tabs()
         assertNull(t.root.background)
         assertEquals(listOf(ColorUtils.setAlphaComponent(theme.keyTextColor, 128), whole), labels(t).map { it.currentTextColor })
@@ -176,20 +161,19 @@ class PanelThemeTest {
             val b = TextEditingButton(ctx, theme, false, bordered, radius, alt, look.fill?.value).apply { setText(R.string.select) }
             return radius to draw(b, 300, 200).getPixel(30, 30)
         }
-        // before: its corners the keys' dp as as many px (ThemeColors.buttonRadius), the keys' colours as blocks, flat none
+        // before: its corners the keys' dp as as many px (ThemeColors.buttonRadius)
         assertEquals(keys.radiusDp * 2f, button(true, false).first, 0f)
         assertEquals(theme.keyBackgroundColor, button(true, false).second)
         assertEquals(theme.altKeyBackgroundColor, button(true, true).second)
         assertEquals(0, Color.alpha(button(false, false).second))
         everything()
         assertEquals(6 * density, button(false, false).first, 0f)
-        // the theme's fill, a block whatever the keys, the selection's buttons too
         for (bordered in listOf(true, false)) for (alt in listOf(true, false)) assertEquals(0xff666666.toInt(), button(bordered, alt).second)
     }
 
     @Test
     fun theVoiceMask() {
-        // before: the keyboard's colour at 0xE0 of its alpha (VoiceStyle.mask), the pill the accent at 0x29, its bars the accent; the glass of before
+        // before: the keyboard's colour at 0xE0 of its alpha (VoiceStyle.mask), the pill the accent at 0x29
         val plain = VoiceStyle.panel(ctx, theme)
         val kb = theme.keyboardColor
         assertEquals((kb and 0xFFFFFF) or ((kb ushr 24) * 0xE0 / 0xFF shl 24), plain.fill.value)
@@ -199,15 +183,13 @@ class PanelThemeTest {
         everything()
         val themed = VoiceStyle.panel(ctx, theme)
         assertEquals(PanelLooks.Voice(Argb(0x80123456.toInt()), 0.0, Argb(0xff777777.toInt()), Argb(0xff888888.toInt())), themed)
-        // blur 0: none taken, the keys plain under the mask
         assertNull(VoiceStyle.glass(ctx, themed).blur)
         assertEquals(VoiceGlass.Blur.of(12.0 * density), VoiceStyle.glass(ctx, themed.copy(blurDp = 12.0)).blur)
     }
 
     @Test
     fun theBlurOfAThemeIsThreeBoxBlursOfItsRadius() {
-        // as many small pixels as leave 2 of the radius, no more than 8 times smaller: within half a small pixel;
-        // no less than twice smaller, a small blur a little more (never the keys taken whole)
+        // as many small pixels as leave 2 of the radius, at most 8 times smaller and at least twice
         assertEquals(VoiceGlass.Blur(8, 2), VoiceGlass.Blur.of(16.0))
         assertEquals(VoiceGlass.Blur(8, 8), VoiceGlass.Blur.of(25 * 2.625))
         assertEquals(VoiceGlass.Blur(3, 2), VoiceGlass.Blur.of(6.0))
@@ -217,14 +199,13 @@ class PanelThemeTest {
         assertNull(VoiceGlass.Blur.of(0.0))
     }
 
-    // the toolbar's 手写 (061-handwriting-toolbar §7): the pad's ink where it shows on the letter keys, else theirs, 3.5 dp
+    // the toolbar's 手写: the pad's ink where it shows on the letter keys, else theirs, 3.5 dp
     @Test
     @Uat("ST-123")
     fun theInkOverTheLetters() {
         assertEquals(theme.keyTextColor to KeyInk.INK_DP, ScenePanels.ink(ctx, theme))
         everything()
         assertEquals(0xff990000.toInt() to 2f, ScenePanels.ink(ctx, theme))
-        // a pad's white ink, lost on the light keys: the letters' colour, the theme's width
         SceneThemes.source = { look, name, dark ->
             LookTheme.xml(look, name, dark).replace("</theme>", "<style select=\"handwriting/pad\" ink-color=\"#ffffffff\" ink-width=\"2dp\"/>\n</theme>")
         }

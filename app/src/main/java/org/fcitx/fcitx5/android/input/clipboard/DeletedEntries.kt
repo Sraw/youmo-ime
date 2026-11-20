@@ -7,10 +7,8 @@ package org.fcitx.fcitx5.android.input.clipboard
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 
 /**
- * The clipboard's deletes, said in the keyboard's one notice with 撤销 (§3: not a Snackbar of its
- * own). Each entry deleted is only marked till then: 撤销 brings back all deleted while the notice
- * showed ([undoDelete]); the notice going without it, timed out, tapped away, another in its
- * place, purges them ([purge]). A delete while it shows says the new count in its place.
+ * Each entry deleted is only marked till then: 撤销 brings back all deleted while the notice showed; the
+ * notice going without it (timed out, tapped away, another in its place) purges them.
  */
 internal class DeletedEntries(
     private val undoDelete: (IntArray) -> Unit,
@@ -18,11 +16,9 @@ internal class DeletedEntries(
 ) {
     private val pending = arrayListOf<Int>()
 
-    // which notice is the last: one this window's next took the place of lapses with nothing to
-    // purge, its ids the newer one's to undo
+    // one this window's next took the place of lapses with nothing to purge, its ids the newer one's to undo
     private var last = 0
 
-    /** [ids] deleted: how many the notice is to say, and its 撤销. */
     fun deleted(vararg ids: Int): Pair<Int, UndoChip.Undo> {
         ids.forEach { pending.add(it) }
         val notice = ++last

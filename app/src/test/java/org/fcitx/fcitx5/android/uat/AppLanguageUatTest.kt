@@ -25,11 +25,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowToast
 
-/**
- * 界面语言 (uat/14 ST-25), the keyboard's half: on a Chinese phone, English picked for the app, the
- * keyboard's own words English. Below Android 13, where appcompat keeps the pick (Robolectric has
- * no LocaleManager of the app's own languages to set on 13 and later).
- */
+/** 界面语言 English on a Chinese phone. Below Android 13 only: Robolectric has no LocaleManager of the app's own languages. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi", sdk = [29])
@@ -56,7 +52,7 @@ class AppLanguageUatTest {
         }
     }
 
-    // 界面语言 changed while the keyboard's host stayed starting (uat/18 LC-20): said it may not have restarted
+    // changed while the host stayed starting: said it may not have restarted
     @Test
     @Uat("LC-20")
     fun aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted() {

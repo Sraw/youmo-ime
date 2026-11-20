@@ -24,59 +24,37 @@ import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.HostEvent
 
-/**
- * A test class's own fcitx, its events forwarded to [events] for the tests to take one at a time:
- * [start] in the class's @BeforeClass, [stop] in its @AfterClass, [beforeTest] and [afterTest]
- * around each test. HostTest and HostEnglishTest share it, so a fix to how the events are read
- * is made once.
- */
+/** A test class's own fcitx, its events forwarded to [events]; shared by HostTest and HostEnglishTest. */
 class TestHost {
 
     lateinit var fcitx: HostInstance
         private set
 
-    /**
-     * Buffered, not CONFLATED. A conflated channel keeps only the newest event, so a
-     * `HostEvent.Commit` is overwritten by the `HostEvent.Candidates` fcitx emits right
-     * after a commit -- the test then waits forever for an event that was dropped.
-     */
+    // buffered, not CONFLATED: a conflated channel loses the Commit to the Candidates that follows it
     val events = Channel<HostEvent>(capacity = Channel.UNLIMITED)
 
-    /**
-     * The input panel as of the newest event delivered here. `KotlinHost.inputPanelCached` is
-     * written on the fcitx thread without synchronisation, so reading it from the test
-     * thread is a data race; this is written on the collector and read through a volatile.
-     */
+    // written on the collector: KotlinHost.inputPanelCached is written on the fcitx thread unsynchronised
     @Volatile
     var latestInputPanel = HostEvent.InputPanel.EMPTY
         private set
 
-    /** The page of candidates as of the newest event, kept as [latestInputPanel] is. */
     @Volatile
     var latestPaged = HostEvent.Paged.EMPTY
         private set
 
-    /**
-     * Off the main thread: eventFlow drops its oldest event past 15 buffered, so a collector
-     * held up by a main-thread stall could lose a `HostEvent.Commit` before it reaches the channel.
-     */
+    // off the main thread: eventFlow drops its oldest past 15 buffered, so a stalled collector could lose a Commit
     private val scope = CoroutineScope(Dispatchers.Default)
 
-    /** What [setUpEngine] saves over in the app's data, put back by [stop]. */
     private var enabledImeBefore: Array<String>? = null
 
-    /** The input methods enabled as a test started, put back by [afterTest]. */
     private var enabledIme: List<String> = listOf()
 
-    /** Starts fcitx and sets it up for the tests, then runs a test class's own [setUp]. */
     fun start(setUp: suspend HostInstance.() -> Unit = {}) {
         checkThisInputMethodIsNotBound()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         fcitx = KotlinHost(context).apply { showInputMethodInformation = false }
 
-        // Forward to our channel for point to point consuming. UNDISPATCHED subscribes right
-        // here, before `start()`: eventFlow keeps no replay, so a HostEvent.Ready emitted before a
-        // dispatched collector got round to subscribing would be lost and setup would hang.
+        // UNDISPATCHED subscribes before start(): eventFlow has no replay, so Ready would be lost
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             fcitx.eventFlow.collect {
                 if (it is HostEvent.InputPanel) latestInputPanel = it
@@ -86,8 +64,7 @@ class TestHost {
         }
         fcitx.start()
 
-        // The Timeout rule covers tests, not @BeforeClass; bound this separately so a
-        // broken engine fails the run instead of hanging it.
+        // the Timeout rule does not cover @BeforeClass
         runBlocking {
             withTimeout(60_000) {
                 setUpEngine()
@@ -98,23 +75,16 @@ class TestHost {
 
     private suspend fun setUpEngine() {
         receiveFirst<HostEvent.Ready>()
-        // Without an input context fcitx has nowhere to route keys: `sendKey` is
-        // accepted but produces no preedit and no candidates, so every test that waits
-        // for an event hangs. FcitxInputMethodService does this from `onBindInput` /
-        // `onStartInputView`; a bare engine has to do it itself.
+        // without an input context sendKey is accepted but yields nothing; the service does this in onBindInput
         fcitx.activate(TEST_UID, TEST_PKG_NAME)
         fcitx.focus(true)
-        // saved to the app's data at once
         enabledImeBefore = fcitx.enabledIme().map { it.uniqueName }.toTypedArray()
-        // what the tests commit is not learned into the app's data: as in a field that asks
-        // for no personalized learning (CapabilityFlags.fromEditorInfo)
+        // keep what the tests commit out of the app's learned data
         fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive))
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
     }
 
-    /** Runs a test class's own [restore], puts back what [start] saved over, and stops fcitx. */
     fun stop(restore: suspend HostInstance.() -> Unit = {}) {
-        // setup failed before it made one
         if (!::fcitx.isInitialized) return
         try {
             runBlocking {
@@ -130,16 +100,8 @@ class TestHost {
     }
 
     /**
-     * Each test must start from a clean engine AND a clean event queue.
-     *
-     * The channel is buffered (see [events]), so events a previous test did not
-     * consume are still queued, and `receiveFirst*` returns the OLDEST match -- which shows up
-     * as a test asserting on another test's input. Draining here makes the tests independent
-     * of each other and of their declaration order.
-     *
-     * `reset()` returns before the events it causes have come through the collector, so a
-     * single sweep of the channel can finish before they land. Drain until it has been quiet
-     * for a while instead, then forget the last panel too.
+     * Leftover events would be matched by the next test's `receiveFirst*` (oldest first), and `reset()` returns
+     * before its own events arrive: drain until quiet, then forget the last panel.
      */
     fun beforeTest() = runBlocking {
         fcitx.reset()
@@ -156,31 +118,23 @@ class TestHost {
     suspend inline fun <reified T : HostEvent> receiveFirst(): T? =
         events.receiveAsFlow().mapNotNull { it as? T }.firstOrNull()
 
-    /**
-     * Waits until no event has come for [QUIET_MS], dropping those that did: the engine's
-     * refine slices may still reorder a list after it is first shown.
-     */
+    /** Refine slices may still reorder a list after it first shows. */
     suspend fun awaitQuiet() {
         while (withTimeoutOrNull(QUIET_MS) { events.receive() } != null) {
             // discard
         }
     }
 
-    /** As [awaitQuiet], but the events that came, for a test to see what a key did not do. */
     suspend fun eventsTillQuiet(): List<HostEvent> {
         val came = ArrayList<HostEvent>()
         while (true) came += withTimeoutOrNull(QUIET_MS) { events.receive() } ?: return came
     }
 
     private companion object {
-        /**
-         * How long the event channel must stay empty to count as drained. Events reach it through
-         * the collector, which a GC or class loading on a loaded emulator can stall for a few
-         * hundred ms; this leaves headroom over that.
-         */
+        // headroom over a GC or class-loading stall of the collector on a loaded emulator
         const val QUIET_MS = 500L
 
-        /** Any uid works; fcitx only uses it to key its input context table. */
+        /** fcitx only keys its input context table with it. */
         const val TEST_UID = 0
         const val TEST_PKG_NAME = "org.fcitx.fcitx5.android.test"
     }

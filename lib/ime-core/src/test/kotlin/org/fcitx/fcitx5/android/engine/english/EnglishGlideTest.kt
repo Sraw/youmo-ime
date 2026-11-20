@@ -26,7 +26,6 @@ class EnglishGlideTest {
         assertEquals("hello ", shown.commit)
         assertEquals("hello", shown.candidates.first())
         assertEquals("", shown.preedit)
-        // the shift on: a capital
         assertEquals("Hello ", session().glided("helo", shift = true).commit)
     }
 
@@ -41,7 +40,6 @@ class EnglishGlideTest {
         val gone = s.apply(Action.Backspace)
         assertEquals("", gone.commit)
         assertEquals("help ".length, gone.deleteBefore)
-        // that done, a backspace is the app's
         assertEquals(false, s.apply(Action.Backspace).handled)
     }
 
@@ -49,7 +47,6 @@ class EnglishGlideTest {
     fun theGlidesSpaceIsThereAlreadyAndPunctuationTakesItsPlace() {
         val s = session()
         s.glided("helo")
-        // not a full stop, as space twice after a word typed
         assertEquals("", s.apply(Action.Key(' ')).commit)
         val t = session()
         t.glided("helo")
@@ -103,7 +100,6 @@ class EnglishGlideTest {
         assertEquals(" the ", s.glided("the").commit)
         val t = EnglishSession(EnglishDecoderTest.data())
         t.apply(Action.Context("say"))
-        // a path no word fits: nothing, not a lone space
         assertEquals("", t.apply(Action.Glide(Glide(floatArrayOf(0.5f, 0.7f, 0.6f, 0.7f, 0.5f, 3.5f), GlideDecoderTest.glide("the").layout))).commit)
     }
 
@@ -115,10 +111,8 @@ class EnglishGlideTest {
         s.apply(Action.Context(""))
         s.apply(Action.Key('.'))
         assertEquals(" the ", s.glided("the").commit)
-        // the space the glide put before its word goes with it
         val gone = s.apply(Action.Backspace)
         assertEquals(" the ".length, gone.deleteBefore)
-        // and the word tried again has its space again
         assertEquals(" the ", s.glided("the").commit)
         val t = EnglishSession(EnglishDecoderTest.data())
         t.apply(Action.Context("say"))
@@ -161,7 +155,6 @@ class EnglishGlideTest {
         assertEquals(1f, user.count("help"))
         s.apply(Action.Backspace)
         assertEquals(0f, user.count("help"))
-        // not learning: nothing counted
         val off = EnglishSession(EnglishDecoderTest.data(), user = user).apply { learning = false }
         off.apply(Action.Context(""))
         assertEquals("hello ", off.glided("helo").commit)
@@ -174,7 +167,6 @@ class EnglishGlideTest {
         user.commit(null, "kotlin")
         val s = EnglishSession(EnglishDecoderTest.data(), user = user).apply { apply(Action.Context("")) }
         assertTrue("kotlin" in s.glided("kotlin").candidates)
-        // alone on its path it goes in, with the shift a capital
         val shifted = EnglishSession(EnglishDecoderTest.data(), user = user).apply { apply(Action.Context("")) }
         assertEquals("Kotlin ", shifted.glided("kotlin", shift = true).commit)
     }
@@ -223,10 +215,6 @@ class EnglishGlideTest {
         assertEquals("", EnglishSession(null).glided("the").commit)
     }
 
-    /**
-     * A glide gets a capital only where Shift gives one, as a word tapped: the data's sentence-start
-     * "Hello" is "hello" wherever the cursor is (a field that asks for capitals has Shift on there).
-     */
     @Test
     fun aGlideHasACapitalOnlyWhereShiftGivesOne() {
         val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
@@ -236,10 +224,8 @@ class EnglishGlideTest {
         s.learning = false
         s.apply(Action.Context("c"))
         assertEquals(" hello ", s.glided("hello").commit)
-        // a sentence ended before it: still Shift's to give
         s.apply(Action.Context("."))
         assertEquals(" hello ", s.glided("hello").commit)
-        // Shift's capital still the user's
         s.apply(Action.Context("c"))
         assertEquals(" Hello ", s.glided("hello", shift = true).commit)
         // the spaces after the char looked past: a full stop's, then a letter's
@@ -262,7 +248,6 @@ class EnglishGlideTest {
         assertEquals("hello ", s.glided("hello").commit)
         s.apply(Action.Context("Mr. "))
         assertEquals("hello ", s.glided("hello").commit)
-        // the field's capital at a sentence's start comes as Shift
         s.apply(Action.Context(". "))
         assertEquals("Hello ", s.glided("hello", shift = true).commit)
     }
@@ -292,19 +277,13 @@ class EnglishGlideTest {
         val shown = s.glided("im")
         assertEquals("I'm ", shown.commit)
         assertFalse(shown.candidates.any { it == "i'm" || it == "i" })
-        // only i and i'...: in, mid-sentence, stays lower-case (F2472)
         val inWord = s.glided("in")
         assertTrue("in" in inWord.candidates + inWord.commit.orEmpty().trim())
         assertFalse(inWord.candidates.any { it == "In" })
         assertFalse("committed ${inWord.commit}", inWord.commit == "In ")
     }
 
-    /**
-     * The app's Backspace keeps what is known where the code point taken and the char left are
-     * plain; where either may belong to a cluster an editor takes otherwise, nothing is known.
-     * Either way a glide after it has no space before (a space is left) and no capital Shift did
-     * not give: what this holds is that no cut cluster makes the session space or case otherwise.
-     */
+    /** Where the app's Backspace may have cut a cluster, nothing is known: no space before, no capital Shift did not give. */
     @Test
     fun aGlideAfterTheAppsBackspaceIsSpacedAndCasedAlike() {
         val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
@@ -319,8 +298,6 @@ class EnglishGlideTest {
         // plain chars, an accent earlier in the text: inside the sentence still
         assertEquals("hello ", glidedAfter("ab c d"))
         assertEquals("hello ", glidedAfter("ab ce\u0301 d"))
-        // an accent taken, a variation selector left, an emoji taken, a flag left, a ZWJ left:
-        // nothing known, still no capital Shift did not give
         assertEquals("hello ", glidedAfter("ab c e\u0301"))
         assertEquals("hello ", glidedAfter("ab c \u2764\uFE0Fd"))
         assertEquals("hello ", glidedAfter("ab c \uD83D\uDC4B"))
@@ -338,7 +315,6 @@ class EnglishGlideTest {
         // nothing known before: a word's tail perhaps, so only the char counts
         s.typed("c")
         assertEquals(" hello ", s.glided("hello").commit)
-        // anew: the hello just glided is learned
         s = EnglishSession(data)
         s.typed(".")
         s.typed(" ")
@@ -351,7 +327,6 @@ class EnglishGlideTest {
         assertEquals("hello ", s.glided("hello").commit)
     }
 
-    /** With text known before the cursor (a field learned from, told it), what the app typed goes after it: spaces and cases a glide, and leaves no glided word to take back. */
     @Test
     fun whatTheAppTypedAfterTextKnownSpacesAndCasesAGlide() {
         val b = EnglishDataBuilder().unigram("<unk>", -7f, 0f).unigram(EnglishText.START, -9f, -0.5f)
@@ -362,7 +337,6 @@ class EnglishGlideTest {
         s.typed(".")
         s.typed(" ")
         assertEquals("hello ", s.glided("hello").commit)
-        // anew, nothing learned above
         s = EnglishSession(data)
         s.apply(Action.Context("abc"))
         s.typed(" ")

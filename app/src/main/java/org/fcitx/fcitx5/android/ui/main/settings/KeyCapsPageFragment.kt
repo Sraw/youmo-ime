@@ -19,12 +19,7 @@ import splitties.dimensions.dp
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapInScrollView
 
-/**
- * The scrolling page the key-editing settings (九键's letters and symbols, long press) draw their
- * keys on: [rebuild] fills [content] anew after each change. [content] is at most [MAX_WIDTH_DP] wide,
- * centred (keys stretched across a landscape screen were sparse, 061-settings-cards §2.10); [wide], above
- * it and empty unless a page fills it, takes the whole width (the keyboard cards' row of 8).
- */
+/** [content] is at most [MAX_WIDTH_DP] wide and centred (stretched keys looked sparse); [wide] takes the whole width. */
 abstract class KeyCapsPageFragment : Fragment() {
 
     protected lateinit var content: LinearLayout
@@ -37,7 +32,7 @@ abstract class KeyCapsPageFragment : Fragment() {
         val ctx = requireContext()
         val pad = ctx.dp(16)
         wide = ctx.verticalLayout {
-            // a choice card's badge hangs over its corner into this padding (ChoiceCard.cell)
+            // a choice card's badge hangs over its corner into this padding
             setPadding(pad, ctx.dp(ChoiceCard.OVERHANG_DP), pad, 0)
             visibility = View.GONE
             clipChildren = false

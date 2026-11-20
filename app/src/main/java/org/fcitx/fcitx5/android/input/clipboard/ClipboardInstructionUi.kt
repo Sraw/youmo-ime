@@ -71,9 +71,8 @@ sealed class ClipboardInstructionUi(override val ctx: Context, protected val the
             setTextColor(theme.keyTextColor)
         }
 
-        // the icon 90 dp where there is room, smaller where not: turned, the panel can be four rows of 36 dp
-        // high (061-landscape-height), where a 90 dp icon pushed the words out of the bottom. The two a chain, the
-        // gap between them the text's 16 dp alone: a margin on each side of the link adds up (32 dp, R26 F8363)
+        // turned, the panel can be four rows of 36 dp high, where a 90 dp icon pushed the words out of the bottom. The
+        // gap is the text's 16 dp alone: a margin on each side of the link adds up
         override val root = constraintLayout {
             add(icon, lParams(dp(90), matchConstraints) {
                 topOfParent(dp(24))

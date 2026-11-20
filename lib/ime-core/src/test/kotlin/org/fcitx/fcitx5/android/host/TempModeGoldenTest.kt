@@ -11,9 +11,8 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * [CharSelectData] and [QuickPhraseTable] against fcitx's own code: the golden files are what
- * `charselectdata.cpp` and `quickphraseprovider.cpp:29-104`, compiled unchanged from upstream fcitx5
- * at 442edbc9, return for the same input (`lib/ime-core/tools/host-golden`, `gen.py` says how).
+ * [CharSelectData] and [QuickPhraseTable] against goldens from fcitx's `charselectdata.cpp` and
+ * `quickphraseprovider.cpp` compiled unchanged (`tools/host-golden`, see `gen.py`).
  * contract: fcitx's data files and the goldens generated from its code, which mutation cannot see.
  */
 class TempModeGoldenTest {

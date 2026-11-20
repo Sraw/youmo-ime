@@ -26,10 +26,7 @@ import org.fcitx.fcitx5.android.engine.user.UserScorer
 import java.io.File
 import java.nio.ByteBuffer
 
-/**
- * A table of [entries] ("code text") as the table tests build them: 五笔's keys, 码长 4 and its
- * 组词规则 for two, three and four characters or more, with [header] lines added or replaced.
- */
+/** A table of [entries] as the tests build them: 五笔's keys, 码长 4, its 组词规则, [header] lines added or replaced. */
 internal fun dictionary(vararg entries: String, header: Map<String, String> = emptyMap()) = CodeTable.Builder()
     .header("键码", "abcdefghijklmnopqrstuvwxy")
     .header("码长", "4")
@@ -42,11 +39,7 @@ internal fun dictionary(vararg entries: String, header: Map<String, String> = em
     .toByteArray()
     .let { TableDictionary(CodeTable.load(ByteBuffer.wrap(it))) }
 
-/**
- * A language over the fixture's word model learning into [learner], as 五笔's: what pins and blocks
- * under a code need. [habits] in place of the learner's (a test's that records or stands in), and
- * [blockedUnder] as [TableLanguage] has it.
- */
+/** A language over the fixture's model learning into [learner], as 五笔's; [habits] and [blockedUnder] stand in where given. */
 internal fun learning(
     learner: Learner = Learner(handwritingData),
     habits: Habits = learner.habits,
@@ -64,7 +57,7 @@ internal fun learning(
     )
 }
 
-/** A learning record holding what an older build saved in [im]: [phrases] as code and text (自动造词 is gone, U-28 C46). */
+/** A learning record holding what an older build saved in [im]: [phrases] as code and text (自动造词 is gone). */
 internal fun savedLog(vararg phrases: Pair<String, String>, im: String = "engine-wubi") = LearnLog(null).apply {
     absorb(phrases.mapIndexed { i, (code, text) -> LearnRecord.TableWordRow(im, code, text, i + 1) })
 }
@@ -89,11 +82,7 @@ internal fun Session.type(keys: String): Pair<String, Snapshot> {
     return commit to last!!
 }
 
-/**
- * A table of [chars] characters from 一 on, each under a code of four of a…y, and every word of
- * two of them as a dictionary line (`text pin'yin weight`): many words a table codes, for the
- * merged dictionary's index ([CodedIndex]).
- */
+/** A table of [chars] characters and every two-character word as dictionary lines, for [CodedIndex]. */
 internal fun manyWords(chars: Int): Pair<TableDictionary, Sequence<String>> {
     fun code(i: Int) = String(CharArray(4) { k -> 'a' + (i / pow25(k)) % 25 })
     val han = List(chars) { (0x4E00 + it).toChar() }

@@ -8,11 +8,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * [EngineOptions] and [IniFile] against fcitx's own code: `resources/host/ini` is what
- * `tools/fcitx-ini/gen.py` got from fcitx-config built on the host over the option table in
- * `tools/fcitx-ini/options.inc` (native-last's androidengine.h table). Each case: a file as found (`in.ini`), the pages saved on top (`steps.tsv`), then what fcitx
- * saves (`fcitx.ini`, with its description comments; `saved.ini`, without) and shows of each page.
- * gen.py also checked that fcitx reads `saved.ini`, the form Kotlin writes, as the same settings.
+ * [EngineOptions] and [IniFile] against goldens `tools/fcitx-ini/gen.py` made from fcitx-config over
+ * `options.inc`: a found file (`in.ini`), the pages saved on top (`steps.tsv`), fcitx's result
+ * (`fcitx.ini` with comments, `saved.ini` without, which gen.py checked fcitx reads back alike).
  * contract: goldens generated from fcitx-config, which mutation cannot see.
  */
 class EngineOptionsGoldenTest {
@@ -37,7 +35,7 @@ class EngineOptionsGoldenTest {
 
     @Test
     fun `reads a file fcitx wrote, descriptions and all, as fcitx does`() {
-        // the compatibility gate (design §2.1): fcitx's file → Kotlin read → write = fcitx's own rewrite
+        // fcitx's file → Kotlin read → write = fcitx's own rewrite
         for (case in cases) {
             val options = EngineOptions().apply { load(text(case, "fcitx.ini")!!) }
             assertEquals(case, text(case, "saved.ini"), options.text())

@@ -27,8 +27,7 @@ import splitties.views.dsl.core.imageView
 
 class PaginationUi(override val ctx: Context, val theme: Theme) : Ui {
 
-    // a theme's `candidates-prev`, `candidates-next` too (061-toolbar-icons): drawn as the app's is, a square as high as the
-    // arrow's room cropped to its width
+    // a square as high as the arrow's room cropped to its width
     private fun createIcon(icon: BarIcons.Icon, @StringRes description: Int) = imageView {
         scaleType = ImageView.ScaleType.CENTER_CROP
         isClickable = true

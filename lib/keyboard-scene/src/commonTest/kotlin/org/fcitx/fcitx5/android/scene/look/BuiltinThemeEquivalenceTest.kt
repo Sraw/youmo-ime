@@ -22,16 +22,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The built-in themes (src/commonMain/themes, 060-render-p3 T3) draw as the app draws them: each
- * version's colours as a 3.0 palette with [LookDefaults] ([LookTheme], what the app's `Theme.Builtin`
- * is drawn by), every board in every form ([Forms]) and its popups, the scenes' text alike to the
- * character. So the web, which reads the files, shows what the app shows.
- *
- * Until `ThemePreset` went, the app's BuiltinThemesPresetTest (commit bb317aba3) held each version's
- * colours to its preset's (Monet's to `Theme.Monet` of the same roles, its fallbacks to ThemeMonet's
- * colours below Android 12); with this, the files drew as the presets did. Now this holds the files
- * to the app's drawing, and T0's record (ThemeBaselineCompareTest) them to 0.5's pixels. Transparent's
- * two, test data now, are held here too: T0's record draws them.
+ * The built-in themes (src/commonMain/themes) draw as the app draws them: each version's colours as a 3.0
+ * palette with [LookDefaults], every board in each form that changes what a theme's `@` scenes draw ([forms])
+ * and its popups, the text alike to the character. So the web, which reads the files, shows what the app shows.
+ * Transparent's two, test data only, are held here too.
  */
 class BuiltinThemeEquivalenceTest {
 
@@ -87,7 +81,7 @@ class BuiltinThemeEquivalenceTest {
     }
 
     // a cell's face: its fills, the first the face, over [ground] in turn (the cell in focus's overlay among them). Only
-    // plain fills are read (R26 F8305): a gradient, a picture or a nine-slice face, or a depth's band (a fill [Op.Fill.less]
+    // plain fills are read: a gradient, a picture or a nine-slice face, or a depth's band (a fill [Op.Fill.less]
     // the face), would be taken for what it is not, so a theme drawing one fails here until this reads it
     private fun face(ops: List<Op>, ground: Argb): Argb {
         val unread = ops.filter { it is Op.Gradient || it is Op.NineSlice || it is Op.Picture || it is Op.Fill && it.less != null }
@@ -111,9 +105,13 @@ class BuiltinThemeEquivalenceTest {
         return (hi + FLARE) / (lo + FLARE)
     }
 
-    // every board in every form, then its popups in each form, the scene of [expected] and of [actual] alike
+    // the forms a theme's scenes tell apart (flat, compact, landscape, floating, split); one-handed (no built-in
+    // theme nor LookTheme styles @one-handed) and the landscape mixes draw the same styles narrower
+    private val forms = Forms.all.filterKeys { it in setOf("block", "flat", "compact", "landscape", "floating", "split") }
+
+    // every board in each of [forms], then its popups in each, the scene of [expected] and of [actual] alike
     private fun same(expected: Theme, actual: Theme, what: String) {
-        for ((form, env) in Forms.all) {
+        for ((form, env) in forms) {
             val e = env.copy(dark = expected.dark)
             for (board in Forms.boards) {
                 val boardEnv = Forms.env(board, e)

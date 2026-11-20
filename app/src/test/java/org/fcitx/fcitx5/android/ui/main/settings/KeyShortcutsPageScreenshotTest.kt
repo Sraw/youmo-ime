@@ -40,10 +40,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
-/**
- * 按键字符和快捷键 (051-c §1.8): each tab's keys with their marks drawn as the keyboard draws them,
- * and the dialogs a key opens; against the goldens under src/test/screenshots, for the user to look at.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -59,7 +55,6 @@ class KeyShortcutsPageScreenshotTest {
 
     private val decor get() = st.activity.window.decorView
 
-    // q's text shortcut, b's long press turned off (faded, its @ gone); [more] set besides
     private fun open(vararg more: Pair<String, KeyShortcut>) {
         val p = AppPrefs.getInstance().internal
         val set = more.fold(KeyShortcuts.Empty.with("full/q", KeyShortcut.Text("你好"))) { s, (name, shortcut) -> s.with(name, shortcut) }
@@ -69,7 +64,6 @@ class KeyShortcutsPageScreenshotTest {
         st.open(SettingsRoute.PopupOverrides)
     }
 
-    // a keyboard picked: its card's name, the card's body the target
     private fun tab(title: Int) {
         var v: View = KeyboardHarness.all(decor).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
         while (!v.hasOnClickListeners()) v = v.parent as View
@@ -77,12 +71,11 @@ class KeyShortcutsPageScreenshotTest {
         st.idle()
     }
 
-    // the key a screen reader calls [label] first
     private fun key(label: String): View = KeyboardHarness.all(decor)
         .first { it.contentDescription?.toString()?.substringBefore(',') == label && it.hasOnClickListeners() }
 
 
-    // the page's notes made off the main thread (SwipeFates) and put in: waited for, no sleeping
+    // the notes made off the main thread: waited for, no sleeping
     private fun fatesDone() {
         st.idle()
         (st.page as? PopupOverridesFragment)?.awaitFates()
@@ -91,12 +84,11 @@ class KeyShortcutsPageScreenshotTest {
 
     private fun capture(name: String): Unit = fatesDone().let { st.capture("KeyShortcutsPageScreenshotTest/$name") }
 
-    // a dialog over the page: the screen's every window
     @OptIn(ExperimentalRoborazziApi::class)
     private fun captureScreen(name: String) {
         fatesDone()
         if (!comparesScreenshots) {
-            // drawn all the same (see SCREENSHOT_SDK): the page, and the dialog over it
+            // drawn all the same (see SCREENSHOT_SDK)
             st.capture("KeyShortcutsPageScreenshotTest/$name")
             val dialog = ShadowDialog.getLatestDialog().window!!.decorView
             dialog.draw(Canvas(Bitmap.createBitmap(dialog.width.coerceAtLeast(1), dialog.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)))
@@ -111,10 +103,8 @@ class KeyShortcutsPageScreenshotTest {
     @Test
     fun everyTabsKeysWithTheirMarks() {
         open()
-        // a's select all top left and its @ top right (标点位置's default), as on the keyboard; s's * alone top right
         assertEquals(1, sceneIcons(key("a")))
         assertEquals(0, sceneIcons(key("s")))
-        // s's * in its corner, a text the engine draws
         assertTrue(KeyboardHarness.all(key("s")).filterIsInstance<SceneKeyCell>().single().keyNode!!.ops(false).any { it is Op.Text && it.text == "*" })
         capture("full")
         for ((title, name) in listOf(
@@ -129,12 +119,11 @@ class KeyShortcutsPageScreenshotTest {
             tab(title)
             capture(name)
         }
-        // the backspace's clear up and restore down, each its icon, beside its own (the keyboard's very key, S7a): no names cut short
+        // backspace's clear up and restore down, each its icon: no names cut short
         assertEquals(3, sceneIcons(key(st.s(R.string.fn_key_backspace))))
     }
 
-    // 注音九键 mixes keys 14 and 24 wide in a row: each cell weighted by its key's width, every face of a row one
-    // height (the group keys were half-height chips), and the grey ， drawn as the board's r4c4, fitted as the rest
+    // 注音九键 mixes 14- and 24-wide keys: cells weighted by width, every face of a row one height
     @Test
     @Uat("ST-113")
     fun zhuyinNinesCapsAreOneHeightARow() {
@@ -150,8 +139,7 @@ class KeyShortcutsPageScreenshotTest {
         }
     }
 
-    // every cap on every tab the key asked for, found on its board (重输 and 0 on the nine keys', 分词 on 14 键's):
-    // none a stand-in drawn in its stead (S7a: they were qwerty's q)
+    // every cap found on its board: none a stand-in
     @Test
     fun everyCapIsTheKeyItNames() {
         open()
@@ -172,12 +160,10 @@ class KeyShortcutsPageScreenshotTest {
         assertTrue(caps.toString(), caps > 40)
     }
 
-    // the icons drawn on a cap, read from its scene (060-render-p2 S6): a's select all an icon, s none; ⌫'s clear up and restore down
     private fun sceneIcons(v: View) = KeyboardHarness.all(v).filterIsInstance<SceneKeyCell>()
         .sumOf { c -> c.keyNode?.ops(false).orEmpty().count { it is Op.Icon } }
 
-    // the settings at night, the keyboard's theme as it is: the caps' faces, words and the edited one's outline the
-    // keyboard theme's, as light or dark as on the keyboard, whatever the page's own (S6 review); b's words faded alone
+    // at night the caps follow the keyboard theme, not the page's
     @Test
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-night-440dpi")
     fun theEnginesCapsInTheKeyboardsThemeAtNight() {
@@ -186,12 +172,10 @@ class KeyShortcutsPageScreenshotTest {
         val b = KeyboardHarness.all(key("b")).filterIsInstance<SceneKeyCell>().single()
         assertEquals(0.4, b.labelAlpha, 0.0)
         capture("canvas_full_night")
-        // the cards' fill, border, chosen and badge, and the editor's (061-settings-cards §8.1, uat LS-53)
         key("a").performClick()
         captureScreen("dialog_letter_night")
     }
 
-    // the largest font: the keyboards' cards three across, no name cut; the editor's titles (uat LS-53)
     @Test
     @Uat("LS-53")
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi", fontScale = 1.5f)
@@ -202,7 +186,6 @@ class KeyShortcutsPageScreenshotTest {
         captureScreen("dialog_letter_font15")
     }
 
-    // 多选: each card's strip, 全键盘's partly checked
     @Test
     fun multiSelect() {
         open()
@@ -213,12 +196,10 @@ class KeyShortcutsPageScreenshotTest {
         capture("multi_select")
     }
 
-    // 上滑图标位置 底部: the 14 keys' corners under their letters, as the keyboard draws them
     @Test
     fun theFourteenKeysCornersAreDrawnUnderTheirLetters() {
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.Bottom)
         open()
-        // the 14 keys' corners drawn too, under their letters there (the number pad has no page: 060-swipe-slots)
         tab(R.string.shortcut_page_g14)
         val qw = KeyboardHarness.all(key("QW")).filterIsInstance<SceneKeyCell>().single()
         assertTrue("${qw.width}x${qw.height} ${qw.keyNode?.ops(false)}", qw.keyNode?.ops(false).orEmpty().any { it is Op.Text && it.text == "1" })
@@ -233,14 +214,11 @@ class KeyShortcutsPageScreenshotTest {
         capture("full_landscape")
         tab(R.string.shortcut_page_function)
         capture("function_landscape")
-        // all three folded at first, the whole scrolling (§5.1)
         tab(R.string.shortcut_page_full)
         key("a").performClick()
         captureScreen("dialog_letter_landscape")
     }
 
-    // 快捷键图标位置 and 标点位置 as the keyboard has them: each shortcut place's full and function keys,
-    // the symbols top right or, the shortcuts there, bottom right; the symbols left (uat/02 KB-66)
     @Test
     fun theMarksWhereTheirSettingsSay() {
         for (at in KeyMarkPosition.entries.filter { it != KeyMarkPosition.TopLeft }) {
@@ -259,7 +237,6 @@ class KeyShortcutsPageScreenshotTest {
         capture("full_symbols_TopLeft")
     }
 
-    // 标点位置 无: no symbols on the page, as on the keyboard; the shortcuts still there
     @Test
     fun noSymbolsWhereThePunctuationPositionIsNone() {
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
@@ -274,12 +251,10 @@ class KeyShortcutsPageScreenshotTest {
         key("a").performClick()
         st.idle()
         captureScreen("dialog_letter")
-        // 换: the commands to pick from
         val letter = ShadowDialog.getLatestDialog() as AlertDialog
         KeyboardHarness.all(letter.window!!.decorView).filterIsInstance<TextView>()
             .first { it.text.toString() == st.s(R.string.shortcut_change) }.performClick()
         st.idle()
-        // voice input among them; quick input after the clipboard
         val commands = KeyboardHarness.all((ShadowDialog.getLatestDialog() as AlertDialog).window!!.decorView)
             .filterIsInstance<TextView>().map { it.text.toString() }.toList()
         assertTrue(commands.toString(), st.s(R.string.shortcut_paste) in commands)

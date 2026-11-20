@@ -36,12 +36,8 @@ import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
 @Parcelize
 sealed class SettingsRoute : Parcelable {
 
-    /* ========== Index ========== */
-
     @Serializable
     data object Index : SettingsRoute()
-
-    /* ========== Fcitx ========== */
 
     @Serializable
     data object InputMethodList : SettingsRoute()
@@ -49,35 +45,30 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data class InputMethodConfig(val name: String, val uniqueName: String) : SettingsRoute()
 
-    /** What every input method shares (InputMethodSettings.SHARED). */
+    /** InputMethodSettings.SHARED. */
     @Serializable
     data object SharedInput : SettingsRoute()
-
-    /* ========== Android ========== */
 
     @Serializable
     data object Theme : SettingsRoute()
 
-    /** The keys (按键), one of the two pages of AppPrefs.Keyboard. */
+    /** 按键, one of the two pages of AppPrefs.Keyboard. */
     @Serializable
     data object Keys : SettingsRoute()
 
-    /** The sound and vibration, the other. */
+    /** Sound and vibration, the other. */
     @Serializable
     data object SoundAndVibration : SettingsRoute()
 
-    /** The physical keyboard's page: its candidate window, its shortcuts. */
     @Serializable
     data object HardwareKeyboard : SettingsRoute()
 
-    /** The clipboard and the emoji. */
     @Serializable
     data object Clipboard : SettingsRoute()
 
     @Serializable
     data object Backup : SettingsRoute()
 
-    /** The resource packs: what is imported, and the import (PacksFragment). */
     @Serializable
     data object Packs : SettingsRoute()
 
@@ -90,8 +81,6 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object About : SettingsRoute()
 
-    /* ========== External ========== */
-
     @Serializable
     data class PinyinDict(val uri: String? = null) : SettingsRoute() {
         constructor(uri: Uri) : this(uri.toString())
@@ -103,14 +92,10 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object CommonWords : SettingsRoute()
 
-    /** 生僻字屏蔽 (dev/design/061-rare-char-block.md §6). */
     @Serializable
     data object RareChars : SettingsRoute()
 
-    /**
-     * 快速输入's page; [edit]: its editor open at once on [key], [content], [note] and [folder], an
-     * entry the user has when [existing] (else a new one filled in so), as the keyboard opens it.
-     */
+    /** [edit]: opens the editor at once, on an existing entry if [existing], else a new one filled in so. */
     @Serializable
     data class QuickPhrase(
         val edit: Boolean = false,
@@ -120,21 +105,19 @@ sealed class SettingsRoute : Parcelable {
         val note: String = "",
         val folder: String = "",
     ) : SettingsRoute() {
-        /** The entry the editor opens on. */
         val entry get() = QuickPhraseEntry(key, content, note, folder)
     }
 
     @Serializable
     data object UserWords : SettingsRoute()
 
-    /** The learning's backups (LearningBackupsFragment). */
     @Serializable
     data object LearningBackups : SettingsRoute()
 
     @Serializable
     data class UserWordList(val kind: String, val english: Boolean = false) : SettingsRoute()
 
-    /** The pins or the predictions turned off ([LearnedItemsFragment]), [what] a LearningOp.Listed's name. */
+    /** The pins or the turned-off predictions; [what] a LearningOp.Listed's name. */
     @Serializable
     data class LearnedItems(val what: String) : SettingsRoute()
 
@@ -145,11 +128,10 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object T9Letters : SettingsRoute()
 
-    /** 「通用输入 → 网址和邮箱」 (AddressSettingsFragment). */
     @Serializable
     data object Addresses : SettingsRoute()
 
-    /** One of its two lists, [kind] AddressSuffixesFragment's EMAIL or URL. */
+    /** [kind] AddressSuffixesFragment's EMAIL or URL. */
     @Serializable
     data class AddressSuffixes(val kind: String) : SettingsRoute()
 
@@ -159,31 +141,22 @@ sealed class SettingsRoute : Parcelable {
     data object Search : SettingsRoute()
 
     companion object {
-        /**
-         * [route] as it opens now: one to 0.6.0's 手写 page, saved before handwriting went to the toolbar (an older
-         * version's link, a back stack restored), 通用输入's, where its 停笔时间 went (061-handwriting-toolbar §3.9).
-         */
+        /** A saved route to 0.6.0's 手写 page (old link, restored back stack) opens 通用输入, where 停笔时间 went. */
         fun now(route: SettingsRoute): SettingsRoute =
             if (route is InputMethodConfig && route.uniqueName == InputMethodCatalog.HANDWRITING_RETIRED) SharedInput else route
 
         fun createGraph(controller: NavController) = controller.createGraph(Index) {
             val ctx = controller.context
 
-            /* ========== Index ========== */
-
             fragment<MainFragment, Index> {
                 label = ctx.getString(R.string.app_name)
             }
-
-            /* ========== Fcitx ========== */
 
             fragment<InputMethodListFragment, InputMethodList> {
                 label = ctx.getString(R.string.input_methods)
             }
             fragment<InputMethodConfigFragment, InputMethodConfig>()
             fragment<SharedInputFragment, SharedInput>()
-
-            /* ========== Android ========== */
 
             fragment<ThemeFragment, Theme> {
                 label = ctx.getString(R.string.theme_and_size)
@@ -217,8 +190,6 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.about)
             }
 
-            /* ========== External ========== */
-
             wordPages(ctx)
             fragment<QuickPhraseFragment, QuickPhrase> {
                 label = ctx.getString(R.string.quick_phrases)
@@ -241,8 +212,7 @@ sealed class SettingsRoute : Parcelable {
             }
         }
 
-        // the pages of the words and what types with them: 词库, 我的词, what was learned, punctuation, custom
-        // phrases, 常用词 (apart, for createGraph's length)
+        // apart for createGraph's length
         private fun NavGraphBuilder.wordPages(ctx: Context) {
             fragment<PinyinDictionaryFragment, PinyinDict> {
                 label = ctx.getString(R.string.word_packs)

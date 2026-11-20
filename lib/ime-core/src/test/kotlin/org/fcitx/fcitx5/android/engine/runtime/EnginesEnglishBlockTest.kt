@@ -43,20 +43,17 @@ class EnginesEnglishBlockTest : EnginesFixture() {
         val dir = MemoryFiles()
         engines(dir).use { e ->
             assertEquals(listOf("th", "the", "you"), e.typed("th"))
-            // the letters typed are kept as typed: nothing to block
             assertFalse(Offer.BLOCK in e.offers(ENGLISH, 0))
             val menu = e.learning(ENGLISH, LearningOp.Menu(1, "the")) as LearningResult.Menu
             assertEquals(listOf(MenuItem.BLOCK), menu.items)
             val done = e.learning(ENGLISH, LearningOp.Block(1, "the")) as LearningResult.Done
             assertFalse("the" in e.candidates(ENGLISH, 0, 9).map { it.text })
             assertEquals(listOf(the), e.blocked())
-            // taken back on the spot
             e.learning(ENGLISH, LearningOp.Undo(done.undo))
             assertEquals(emptyList<UserWord>(), e.blocked())
             assertTrue("the" in e.typed("th"))
             e.onEvent(ENGLISH, EngineEvent.BLOCK, 1)
             assertFalse("the" in e.typed("th"))
-            // the one word blocked, counted once
             assertEquals(mapOf(UserWord.Kind.ADDED to 0, UserWord.Kind.LEARNED to 0, UserWord.Kind.BLOCKED to 1), e.userWordCounts())
         }
         // kept in the user directory, a file of its own; pinyin's list untouched
@@ -81,10 +78,8 @@ class EnginesEnglishBlockTest : EnginesFixture() {
         }
     }
 
-    // blocked, the corrector goes to the next likeliest word, not to the letters typed (R20 F5935)
     @Test
     fun aWordBlockedTheNextLikeliestIsCorrectedTo() {
-        // thy one letter off thw as the is, less likely
         english = englishWith("thy")
         engines().use { e ->
             val at = e.typed("thw").indexOf("the")
@@ -124,7 +119,6 @@ class EnginesEnglishBlockTest : EnginesFixture() {
         }
     }
 
-    // a word removed as the list does not write it ("The", "the" on it): an undo blocks nothing it did not unblock (R20 F6084)
     @Test
     fun removingAWordNotAsWrittenBlocksNothingOnAnUndo() {
         engines().use { e ->
@@ -138,7 +132,7 @@ class EnginesEnglishBlockTest : EnginesFixture() {
         }
     }
 
-    // review: a restore reverted gives back the phone's English blocks as they were
+    // a restore reverted gives back the phone's English blocks as they were
     @Test
     fun aRevertAfterARestoreKeepsThePhonesBlockedWords() {
         val bytes = engines().use { e ->
@@ -154,7 +148,7 @@ class EnginesEnglishBlockTest : EnginesFixture() {
         }
     }
 
-    // review H2: a zip restored while the engine was stopped (UserDataManager's stash): the phone's and the backup's both kept
+    // a zip restored while the engine was stopped (UserDataManager's stash): the phone's and the backup's both kept
     @Test
     fun aStashedBackupsBlockedWordsAreMergedWithThePhones() {
         val dir = MemoryFiles()
@@ -172,7 +166,7 @@ class EnginesEnglishBlockTest : EnginesFixture() {
         }
     }
 
-    // review R2: the user's text export, imported again, English's blocks in it (`!@en the`)
+    // the user's text export, imported again, English's blocks in it (`!@en the`)
     @Test
     fun aBlockedWordGoesThroughTheTextExportAndBack() {
         val lines = engines().use { e ->
@@ -190,7 +184,6 @@ class EnginesEnglishBlockTest : EnginesFixture() {
 
     private fun Engines.backup(op: BackupOp) = learning(null, op) as BackupResult
 
-    // a backup takes English's blocked words with pinyin's (no pinyin to them), and gives them back
     @Test
     fun aBackupTakesTheBlockedWords() {
         val bytes = engines().use { e ->

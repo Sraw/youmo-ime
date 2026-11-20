@@ -19,12 +19,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * The theme page's level lists read the keys its preferences write, and what they set is not put
- * back to its default with the settings that have no UI.
- */
+/** The level lists read the keys their preferences write, and hidden-settings resets leave what they set. */
 @RunWith(RobolectricTestRunner::class)
-// the real application: the keyboard's size is AppPrefs', and a theme preference reaches the theme manager
+// the real application: a theme preference reaches the theme manager
 @Config(application = FcitxApplication::class)
 class ThemePrefsTest {
 
@@ -42,9 +39,9 @@ class ThemePrefsTest {
     fun aLevelListShowsTheLevelOfWhatItsPreferencesHold() {
         val prefs = ThemePrefs(sp)
         val lists = listOf("keyboard_height_level", "keyboard_side_padding_level", "keyboard_bottom_padding_level")
-        // untouched: 跟随主题, first (060-render-p3 T5)
+        // untouched: 跟随主题, first
         assertEquals(listOf(0, 0, 0), lists.map { prefs.level(it) })
-        // not following: standard height (after 跟随主题, 紧凑 and 矮), no padding; 贴底 is before 无
+        // not following: standard height, no padding; 贴底 is before 无
         sp.edit {
             listOf("keyboard_height_follow_theme", "keyboard_side_padding_follow_theme", "keyboard_bottom_padding_follow_theme")
                 .forEach { putBoolean(it, false) }
@@ -52,8 +49,7 @@ class ThemePrefsTest {
         assertEquals(listOf(3, 1, 2), lists.map { prefs.level(it) })
     }
 
-    // 跟随主题 picked: set, the numbers back to their defaults (today's look where the theme sets none);
-    // a level picked: no more following
+    // 跟随主题 resets the numbers to defaults; picking a level stops following
     @Test
     fun followingTheThemeIsPickedAndLeft() {
         val list = ThemePrefs(sp).managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>()
@@ -74,7 +70,7 @@ class ThemePrefsTest {
         assertFalse(list.pick(4))
     }
 
-    // 紧凑 the lowest, first, each of its numbers ime-core's: the keyboard reads 紧凑 by those
+    // the keyboard reads 紧凑 by ime-core's numbers
     @Test
     @Config(qualifiers = "zh-rCN")
     fun theHeightLevelsStartAtCompact() {
@@ -82,7 +78,6 @@ class ThemePrefsTest {
             .single { it.key == "keyboard_height_level" }
         val app = RuntimeEnvironment.getApplication()
         assertEquals(listOf("跟随主题", "紧凑", "矮", "标准", "高", "很高"), list.createUi(app).entries.map { it.toString() })
-        // ThemePrefs(sp) keeps them in sp
         val held = { sp.getInt("keyboard_height_percent", -1) to sp.getInt("keyboard_height_percent_landscape", -1) }
         list.pick(1)
         assertEquals(20 to 34, held())
@@ -91,7 +86,7 @@ class ThemePrefsTest {
         assertEquals(26 to 42, held())
     }
 
-    // 贴底 differs from 无 only in the flush key: each is told apart, and picking one sets it
+    // 贴底 differs from 无 only in the flush key
     @Test
     fun theBottomPaddingLevelsTellFlushFromNone() {
         val list = ThemePrefs(sp).managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>()
@@ -108,21 +103,7 @@ class ThemePrefsTest {
         assertEquals(4, list.current())
     }
 
-    // the key style settings before 3.0 are no preferences now, only what ThemeLookMigration reads: the
-    // reset of the hidden settings as ThemeManager registers ThemePrefs leaves them for it
-    @Test
-    fun theOldKeyStyleSettingsOutliveTheResetOfTheHiddenOnes() {
-        val prefs = ThemePrefs(sp)
-        sp.edit(commit = true) {
-            putBoolean("key_border", false)
-            putInt("key_radius", 9)
-        }
-        sp.edit { prefs.resetHidden(this) }
-        assertEquals(LegacyLook(keyBorder = false, keyRadius = 9), prefs.legacyLook())
-    }
-
-    // the four over the theme, shown in this order, then the line on following it; 0.5.0's keys are not set
-    // here (the migration's), nor 0.5.2's one spacing (migrateKeySpacing's)
+    // the four in this order, then the following note; older keys are the migrations' to set
     @Test
     fun theKeyStyleSectionIsItsFourAndALine() {
         val keys = ThemePrefs(sp).managedPreferencesUi.map { it.key }

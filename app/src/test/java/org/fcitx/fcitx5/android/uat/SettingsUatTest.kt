@@ -60,7 +60,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
-/** UAT cases of the settings app (uat/13, 14), its pages on a fake engine. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -70,9 +69,8 @@ class SettingsUatTest {
     private val st = SettingsHarness(api)
     private val activity get() = st.activity
 
-    // the packs as a user's phone has them, as the goldens were drawn (the theme preview's space has the
-    // microphone with the voice pack only): PackStore is a singleton the JVM keeps, so the shelf the test
-    // before in this fork left was drawn: one without the voice pack (use(voice = false)) loses the microphone
+    // PackStore is a singleton the JVM keeps: the goldens were drawn with the voice pack (the preview's microphone), so
+    // the shelf a test before left is put back
     @Before
     fun packs() {
         TestShelves.use()
@@ -103,10 +101,8 @@ class SettingsUatTest {
     @Uat("ST-01", "ST-33")
     fun theHomePage() {
         val prefs = preferences((page as PreferenceFragmentCompat).preferenceScreen)
-        // no group titles: eleven rows, each with what is behind it
         assertEquals(MainFragment.HOME.map { s(it.title) } + s(R.string.app_language), prefs.map { it.title.toString() })
         assertTrue(prefs.all { !it.summary.isNullOrEmpty() })
-        // 🔍 and ? on the bar, the rest under ⋮
         val menu = shadowOf(activity).optionsMenu
         assertEquals(
             listOf(s(R.string.search_settings), s(R.string.help), s(R.string.developer), s(R.string.about)),
@@ -121,7 +117,6 @@ class SettingsUatTest {
         activity
         open(SettingsRoute.UserWords)
         val words = preferences((page as PreferenceFragmentCompat).preferenceScreen)
-        // the three switches on top, all on
         val switches = words.filterIsInstance<TwoStatePreference>()
         assertEquals(listOf(s(R.string.learning_use_habits), s(R.string.learning_auto_backup), s(R.string.learning_voice_ask)), switches.map { it.title.toString() })
         assertTrue(switches.all { it.isChecked })
@@ -152,12 +147,11 @@ class SettingsUatTest {
         text.setText("幽默")
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         idle()
-        // read as the dictionary reads it, for the user to check
         assertEquals("you mo", pinyin.text.toString())
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         idle()
         assertTrue(api.calls.toString(), "addUserWord(幽默, you mo)" in api.calls)
-        // the list reloads after a hop off the main thread (生僻字屏蔽's file read): waited for
+        // the list reloads after a hop off the main thread: waited for
         fun list() = KeyboardHarness.all(activity.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
         until("the word listed", state = ::list, step = ::idle) { list().let { l -> "幽默" in l && l.any { "you mo" in it } } }
     }
@@ -165,7 +159,7 @@ class SettingsUatTest {
     @Test
     @Uat("ST-05")
     fun aDarkThemeTurnsPreviewAndKeyboardDark() {
-        // each set back as it was in the finally: the prefs outlive the test (Robolectric keeps the sandbox)
+        // the prefs outlive the test (Robolectric keeps the sandbox)
         val followWas = ThemeManager.prefs.followSystemDayNightTheme.getValue()
         val themeWas = ThemeManager.prefs.normalModeTheme.getValue()
         val codeRowWas = ThemeManager.prefs.codeRow.getValue()
@@ -179,11 +173,9 @@ class SettingsUatTest {
             val list = KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>()
                 .firstOrNull { it.adapter is ThemeListAdapter }
                 ?: error(KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>().map { it.adapter?.javaClass?.name }.toList().toString())
-            // Pixel's card shows its light version, in use: its 深, then the card
             pickTheme(list, TestThemes.PixelDark.name, ::idle)
             assertEquals(TestThemes.PixelDark.name, ThemeManager.activeTheme.name)
             capture("theme_dark")
-            // the keyboard made after it: its background the dark theme's
             KeyboardHarness(theme = null).use { h ->
                 h.start()
                 val bitmap = Bitmap.createBitmap(h.keyboard.width, h.keyboard.height, Bitmap.Config.ARGB_8888)
@@ -209,7 +201,6 @@ class SettingsUatTest {
             st.tab(1)
             val row = listed(R.string.code_row_style)
             val entries = row.entries.map { it.toString() }
-            // 输入框里 picked: its note first, the setting unchanged till OK
             row.callChangeListener(CodeRowStyle.InField.name)
             idle()
             val note = ShadowDialog.getLatestDialog() as AlertDialog
@@ -223,7 +214,6 @@ class SettingsUatTest {
             (ShadowDialog.getLatestDialog() as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             idle()
             val agreed = ThemeManager.prefs.codeRow.getValue() to row.value
-            // another back: no note
             val dialogs = ShadowDialog.getShownDialogs().size
             if (row.callChangeListener(CodeRowStyle.Embedded.name)) row.value = CodeRowStyle.Embedded.name
             idle()
@@ -244,7 +234,7 @@ class SettingsUatTest {
         }
     }
 
-    // the options KotlinHost keeps: each page's save loaded into them as setImOptions does, every page then reading them again
+    // each page's save loaded into them as setImOptions does, every page then reading them again
     private val options = EngineOptions()
 
     private fun pages() = runBlocking {
@@ -253,7 +243,7 @@ class SettingsUatTest {
     }
 
     private fun saved() = runBlocking {
-        // the page saves on the fcitx thread (HostPreferenceFragment.save, a coroutine off the main looper): waited for, not idled
+        // the page saves on the fcitx thread (HostPreferenceFragment.save): waited for, not idled
         until("the page saved", state = { api.calls.toList() }, step = ::idle) { api.calls.toList().any { it.startsWith("setImOptions") } }
         val pinyin = InputMethodCatalog.PINYIN
         options.setPage(pinyin, ConfigTree.of(api.imOptions(pinyin)!!))
@@ -277,14 +267,12 @@ class SettingsUatTest {
         if (size.callChangeListener("5")) size.value = "5"
         saved()
         assertEquals("5", options[es.PAGE_SIZE])
-        // 通用输入 as it reads them now: z ↔ zh still ticked, the tier still low (the typing: PinyinUatTest.fuzzyZZh)
         assertEquals("True", options["${es.FUZZY}/Z_ZH"])
         assertEquals("Low", options[es.MODEL_LEVEL])
         open(SettingsRoute.SharedInput)
         assertEquals("Low", (st.pref(R.string.im_model_level) as ListPreference).value)
     }
 
-    // the line under an option naming the input methods it is no use to
     private fun notFor(vararg ims: String) =
         st.s(R.string.im_not_for, ims.joinToString(s(R.string.list_separator)) { InputMethodNames.of(activity, it, it) })
 
@@ -302,7 +290,6 @@ class SettingsUatTest {
         val c = InputMethodCatalog
         pages()
         activity
-        // 词库与短语, filled in off the main thread: the hint, then its four groups in order
         open(SettingsRoute.PinyinDict())
         val lexicon = listOf(
             R.string.word_packs_hint, R.string.layer_user, R.string.my_words, R.string.layer_base, R.string.builtin_base_title,
@@ -312,22 +299,16 @@ class SettingsUatTest {
         assertEquals(lexicon.distinct(), st.texts().filter { it in lexicon }.distinct())
         open(SettingsRoute.LearningBackups)
         assertEquals(listOf(R.string.learning_restore, R.string.learning_save_copy, R.string.learning_revert).map(::s), st.titles().take(3))
-        // 通用输入: three groups, each option saying where it does not apply
         open(SettingsRoute.SharedInput)
         val groups = listOf(R.string.shared_section_all, R.string.shared_section_chinese, R.string.shared_section_pinyin).map(::s)
         assertEquals(groups, st.titles().filter { it in groups })
-        // no 中文标点 page since 0.6.1 (FB9)
         assertTrue(st.titles().toString(), st.titles().none { "punctuation" in it.lowercase() || "标点" in it })
-        // 在键上划: the choice alone, which input methods each choice reaches the docs say
         assertEquals(s(R.string.swipe_off), summary(R.string.key_drawing))
-        // every keyboard reads a slip, 注音九键 too since the user's 11-16: no 不适用 line (061-neighbour-correction,
-        // 061-neighbour-groups)
+        // every keyboard reads a slip, 注音九键 too: no 不适用 line
         assertEquals(s(R.string.im_typos_summary), summary(R.string.im_typos))
-        // no 不适用 line names English: the Chinese section's title says it for its rows, and every input
-        // method's other rows are English's too
+        // no 不适用 line names English: the Chinese section's title says it for its rows
         val chinese = st.preferences().map { it.summary.toString() }
         assertTrue(chinese.flatMap { it.lines() }.none { c.ENGLISH.let { e -> InputMethodNames.of(activity, e, e) } in it && "Not for" in it })
-        // 模糊音's u ↔ v: no use on the nine keys, still tickable
         st.pref(R.string.im_fuzzy).performClick()
         idle()
         val fuzzy = KeyboardHarness.all(ShadowDialog.getLatestDialog().window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
@@ -335,19 +316,16 @@ class SettingsUatTest {
         ShadowDialog.getLatestDialog().dismiss()
         idle()
         val shared = listOf(R.string.im_page_size, R.string.im_prediction, R.string.im_model_level, R.string.im_typos, R.string.im_fuzzy).map(::s)
-        // 拼音: the shared settings' link first, its own options under it, none of the shared ones
         im(c.PINYIN)
         assertEquals(s(R.string.shared_input_link), st.titles().first())
         assertTrue(s(R.string.im_latin_words) in st.titles())
         assertTrue(st.titles().none { it in shared })
-        // 停笔时间: the shared page's 手写 (061-handwriting-toolbar §3.9), on no input method's
         assertTrue(s(R.string.handwriting_pause) !in st.titles())
         open(SettingsRoute.SharedInput)
         assertTrue(s(R.string.handwriting_pause) in st.titles())
         im(c.SHUANGPIN)
         assertTrue(s(R.string.im_shuangpin_scheme) in st.titles())
         assertTrue(s(R.string.im_latin_words) !in st.titles())
-        // the five tables: their order restorable, never by use at first; the keys left shown but in 二笔 and 仓颉
         for (table in listOf(c.WUBI, c.ERBI, c.CANGJIE, c.ZIRANMA, c.WUBI_PINYIN)) {
             im(table)
             assertEquals(s(R.string.shared_input_link), st.titles().first())
@@ -356,7 +334,6 @@ class SettingsUatTest {
             assertTrue(table, checked(R.string.im_auto_select))
             assertEquals(table, table !in listOf(c.ERBI, c.CANGJIE), checked(R.string.im_hint))
         }
-        // 实体键盘: its last row the page size, for every input method
         open(SettingsRoute.HardwareKeyboard)
         assertTrue(checked(R.string.hardware_switch_shortcuts))
         assertEquals(s(R.string.im_page_size), st.titles().last())
@@ -377,21 +354,17 @@ class SettingsUatTest {
             assertTrue(keyboard.summary.toString().contains(s(R.string.pinyin_keyboard_summary)))
             for (t in listOf(R.string.im_chaizi, R.string.im_latin_words)) assertTrue(summary(t), summary(t).endsWith(notFor(c.T9, c.PINYIN_KEYS18, c.PINYIN_KEYS, c.ZHUYIN_NINE, c.ZHUYIN)))
             open(SettingsRoute.SharedInput)
-            // neither 14 keys named where the slips are not read: pinyin's (061-neighbour-correction) nor 双拼's
-            // (061-neighbour-groups)
             for (k in listOf(c.PINYIN_KEYS, c.SHUANGPIN_KEYS14)) assertFalse(summary(R.string.im_typos), InputMethodNames.of(activity, k, k) in summary(R.string.im_typos))
             im(c.PINYIN)
             val keys14 = PinyinKeyboard.Keys14
             listed(R.string.pinyin_keyboard).let { if (it.callChangeListener(keys14.name)) it.value = keys14.name }
             idle()
-            // what the keyboard reads as a field is focused (its showing it: KeyboardChoiceUatTest)
             assertEquals(keys14, setting.getValue())
         } finally {
             setting.setValue(setting.defaultValue)
         }
     }
 
-    // 双拼 down to three (the user's 2026-11-01): the five dropped are not offered
     @Test
     @Uat("SP-27")
     fun theShuangpinSchemesAreTheThreeKept() {
@@ -433,8 +406,6 @@ class SettingsUatTest {
         }
     }
 
-    // 在键上划: one list, off till chosen, of 滑行输入, 笔画筛选 and off; its summary the choice alone; a
-    // choice stored, the page opened again showing it (键盘手写 is the toolbar's 手写 now)
     @Test
     @Uat("ST-46", "ST-121")
     fun keyDrawingIsOneListOfItsChoices() {
@@ -462,18 +433,15 @@ class SettingsUatTest {
         }
     }
 
-    // the user's 11-01: the nine keys' own settings a section 「九键」 on the page of each input method whose
-    // keyboard they are, there while the nine keys are chosen and at once (no row opening a page of their
-    // own); none on 按键. One pref each, whichever page sets it. English's keyboard on its page, its 九键英文打法
-    // first in that section; 九键双拼's letters its scheme's, so it has none
+    // the nine keys' own settings a section 「九键」 on each input method's page whose keyboard they are, there at once
+    // while chosen; none on 按键. 九键双拼's letters its scheme's, so it has none
     @Test
     @Uat("ST-45", "ST-107")
     fun theNineKeysSettingsAreASectionOfEachKeyboardsPage() {
         val c = InputMethodCatalog
         val keyboard = AppPrefs.getInstance().keyboard
         val nine = listOf(R.string.t9_multi_tap, R.string.t9_letters).map(::s)
-        // the section's title and all that is in it, as the page shows them (none: not there); the whole of
-        // it, so a row come back (按键长按, ST-107) fails
+        // the whole of it, so a row come back fails
         fun section() = st.preferences().firstOrNull { it is PreferenceGroup && it.title.toString() == s(R.string.keyboard_nine) }
             ?.let { g -> (g as PreferenceGroup).let { c -> listOf(c.title.toString()) + (0 until c.preferenceCount).map(c::getPreference).filter { it.isVisible }.map { it.title.toString() } } }
         fun choose(title: Int, value: String) = listed(title).let { if (it.callChangeListener(value)) it.value = value }
@@ -483,14 +451,12 @@ class SettingsUatTest {
             keyboard.englishKeyboard.setValue(EnglishKeyboard.Full)
             keyboard.t9MultiTap.setValue(T9MultiTap.Off)
             pages()
-            // English's page too, which PAGED leaves out
+            // which PAGED leaves out
             runBlocking { api.setImOptions(c.ENGLISH, options.page(c.ENGLISH)!!.leaves()) }
             activity
-            // 按键: none of them, nor a row to them
             open(SettingsRoute.Keys)
             assertTrue(st.titles().toString(), st.titles().none { it in nine })
             capture("keys")
-            // pinyin: none on the 26 keys; the nine keys picked, the section at once, right under the keyboard
             im(c.PINYIN)
             assertEquals(null, section())
             choose(R.string.pinyin_keyboard, PinyinKeyboard.NineKeys.name)
@@ -501,21 +467,17 @@ class SettingsUatTest {
             assertEquals(listOf(s(R.string.keyboard_nine)) + nine, section())
             assertTrue(summary(R.string.t9_multi_tap).contains(s(R.string.t9_multi_tap_summary)))
             capture("pinyin_nine_keys")
-            // set here, the one pref
             choose(R.string.t9_multi_tap, T9MultiTap.entries.last().name)
             idle()
             assertEquals(T9MultiTap.entries.last(), keyboard.t9MultiTap.getValue())
-            // and gone again as the keyboard is
             choose(R.string.pinyin_keyboard, PinyinKeyboard.Full.name)
             idle()
             assertEquals(null, section())
-            // its letters' page opened from it
             choose(R.string.pinyin_keyboard, PinyinKeyboard.NineKeys.name)
             idle()
             st.pref(R.string.t9_letters).performClick()
             idle()
             assertTrue(st.page.javaClass.name, st.page is NineKeyLettersFragment)
-            // English: 全键盘 and 九键, the 26 keys by default (Q3); on the nine keys 九键英文打法 first, then pinyin's
             im(c.ENGLISH)
             val english = listed(R.string.english_keyboard)
             assertEquals(listOf(R.string.pinyin_keyboard_full, R.string.keyboard_nine).map(::s), english.entries.map { it.toString() })
@@ -525,10 +487,8 @@ class SettingsUatTest {
             choose(R.string.english_keyboard, EnglishKeyboard.NineKeys.name)
             idle()
             assertEquals(listOf(R.string.keyboard_nine, R.string.t9_english_typing).map(::s) + nine, section())
-            // what pinyin's page set
             assertEquals(s(T9MultiTap.entries.last().stringRes), listed(R.string.t9_multi_tap).entry.toString())
             capture("english_nine_keys")
-            // 双拼: its nine keys' letters and taps its scheme's, its long press on 按键字符和快捷键: no section
             im(c.SHUANGPIN)
             choose(R.string.shuangpin_keyboard, ShuangpinKeyboard.NineKeys.name)
             idle()

@@ -16,11 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * UAT T9-01, on the JVM: the nine keys in the whole keyboard (bar, background, the space key's
- * input method name), against the golden images under src/test/screenshots. Record them again
- * with `-Proborazzi.test.record=true` when the look changes on purpose.
- */
+/** The nine keys in the whole keyboard; record again with `-Proborazzi.test.record=true` when the look changes on purpose. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -36,15 +32,12 @@ class T9KeyboardScreenshotTest {
 
     private fun check(theme: Theme, name: String) = KeyboardHarness(theme, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).use { h ->
         h.start()
-        // as a user sees it by default: Chinese punctuation on, 1 and the column ，。？！
         h.chinesePunctuation()
         h.relayout()
         val labels = h.texts()
         assertTrue(labels.toString(), "，。？！" in labels && "，" in labels)
-        // left column's punctuation is the column; the keys: 1 to 9 with their letters, 重输, 0, 符, 123
         for (d in '1'..'9') assertTrue("$d in $labels", d.toString() in labels)
         for (l in listOf("ABC", "DEF", "WXYZ", "重输", "0", "符", "123")) assertTrue("$l in $labels", l in labels)
-        // pinyin's own keyboard: its name on the space, no 中/英 (I1)
         assertTrue("space names the input method: $labels", "Pinyin" in labels)
         assertTrue("中/英" !in labels)
         h.captureBoard("T9KeyboardScreenshotTest/$name")

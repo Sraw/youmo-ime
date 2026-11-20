@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.host
 
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
@@ -15,7 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A Chinese input method's punctuation marks (`native-last:app/src/main/cpp/androidengine/androidengine.cpp:266-328,515-548,567-580`). */
+/** A Chinese input method's punctuation marks, as androidengine's. */
 class KeyRouterPunctuationTest {
 
     private val passOn = object : EngineHost {
@@ -48,7 +47,7 @@ class KeyRouterPunctuationTest {
     }
 
     private val punc = Punc()
-    private val core = HostCore(passOn, VirtualHostClock(), Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "D"), firstRun = true,
+    private val core = HostCore(passOn, VirtualHostClock(), testProfile("D"), firstRun = true,
         modules = { HostModules(punctuation = punc) })
     private val log = mutableListOf<HostEvent>().also { l -> core.events += HostEvents { l += it } }
 
@@ -71,7 +70,7 @@ class KeyRouterPunctuationTest {
         assertTrue(core.sendKey(Key('.'.code)))
         assertTrue(commits().isEmpty())
         assertEquals(listOf("。", "．"), log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text })
-        // the marks above them are not a code the app may write into the field (061-code-in-field §4.2)
+        // the marks above them are not a code the app may write into the field
         val panel = log.filterIsInstance<HostEvent.InputPanel>().last()
         assertEquals("。", panel.preedit.toString())
         assertFalse(panel.code)
@@ -81,7 +80,6 @@ class KeyRouterPunctuationTest {
 
     @Test
     fun `a shortcut puts the first mark in before the app has the key`() {
-        // F3814
         core.sendKey(Key('.'.code))
         val keys = log.size
         assertFalse(core.sendKey(Key('V'.code, KeyStates.CTRL)))

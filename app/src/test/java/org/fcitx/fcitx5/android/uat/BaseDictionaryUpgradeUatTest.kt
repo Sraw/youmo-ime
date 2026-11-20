@@ -29,11 +29,7 @@ import java.io.File
 import java.util.Collections
 import java.util.concurrent.TimeUnit
 
-/**
- * uat/13-words.md's base dictionary cases DictionaryUatTest leaves: a .scel converted into the base
- * (WD-14z2) and 0.3.1's text dictionaries upgraded at the start (WD-14h's migration; the device
- * keeps the real upgrade's not crashing).
- */
+/** A .scel converted into the base and 0.3.1's text dictionaries upgraded at the start. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class BaseDictionaryUpgradeUatTest {
@@ -74,8 +70,7 @@ class BaseDictionaryUpgradeUatTest {
         assertTrue(typed("骁骎"))
     }
 
-    // 0.3.1's files: its external storage as the fixture keeps it (no dictionary of its own), then
-    // what the case puts there by hand: frost as text, and a dictionary 0.3.1 turned off
+    // 0.3.1's files as the fixture keeps them, then frost as text and a dictionary 0.3.1 turned off
     private fun v031() {
         for (home in listOf(ConfigHome.CONFIG, ConfigHome.DATA, ConfigHome.THEME)) {
             untar(fixture("upgrade/v0.3.1/external.tar"), HostConfigDir.inUse(home).dir, under = "${home.old}/")

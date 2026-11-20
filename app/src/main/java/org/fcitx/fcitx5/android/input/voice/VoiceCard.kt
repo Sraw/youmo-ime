@@ -18,14 +18,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import splitties.dimensions.dp
 
-/**
- * The parts of the card the two talks show alike (VoiceHoldOverlay, held; VoiceTapOverlay,
- * tapped): its three lines, the bars on their pill, and the card's going. Made in one place so they
- * stay alike: the held card's going once kept its hint under a failure's message (voice-10).
- */
+/** In one place so the held and tapped cards stay alike: the held card's going once kept its hint under a failure. */
 internal object VoiceCard {
 
-    /** what is heard, as it is said */
     fun heard(ctx: Context, theme: Theme) = TextView(ctx).apply {
         textSize = 18f
         gravity = Gravity.CENTER or Gravity.BOTTOM
@@ -33,7 +28,7 @@ internal object VoiceCard {
         setTextColor(theme.keyTextColor)
     }
 
-    /** the status line: 正在听 once the microphone is really on (ready), not as the talk starts */
+    /** 正在听 once the microphone is really on (ready), not as the talk starts */
     fun status(ctx: Context, theme: Theme) = TextView(ctx).apply {
         textSize = 15f
         gravity = Gravity.CENTER
@@ -41,7 +36,6 @@ internal object VoiceCard {
         setText(R.string.voice_hold_preparing)
     }
 
-    /** the line under it: how to end the talk */
     fun hint(ctx: Context, theme: Theme, @StringRes text: Int) = TextView(ctx).apply {
         textSize = 12f
         gravity = Gravity.CENTER
@@ -49,11 +43,13 @@ internal object VoiceCard {
         setText(text)
     }
 
-    /**
-     * The talk over: [card] still shown a moment (the message, the fade) but no longer taking
-     * touches, so the keys under it get the next press (VO-16); [message] in [status], the hint no
-     * longer true under it, taken away.
-     */
+    fun recognizing(status: TextView, hint: TextView, wave: VoiceWaveView) {
+        status.setText(R.string.voice_hold_recognizing)
+        hint.visibility = View.INVISIBLE
+        wave.active = false
+    }
+
+    /** No longer taking touches, so the keys under it get the next press; the hint, no longer true, taken away. */
     fun ended(card: View, status: TextView, hint: TextView, main: Handler, @StringRes message: Int?) {
         card.isClickable = false
         message?.let {
@@ -63,13 +59,11 @@ internal object VoiceCard {
         fadeOut(card, main, message)
     }
 
-    /** the bars, in [color] (the theme's voice look's microphone colour) */
     fun wave(ctx: Context, color: Int) = VoiceWaveView(ctx).apply {
         this.color = color
         active = true
     }
 
-    /** [wave] on a pill of its own, as a bubble the voice is in */
     fun pill(ctx: Context, wave: View, color: Int) = FrameLayout(ctx).apply {
         background = GradientDrawable().apply {
             cornerRadius = ctx.dp(PILL_HEIGHT / 2).toFloat()
@@ -78,10 +72,8 @@ internal object VoiceCard {
         addView(wave, FrameLayout.LayoutParams(ctx.dp(WAVE_WIDTH), ctx.dp(WAVE_HEIGHT), Gravity.CENTER))
     }
 
-    /** the pill's place in the card's column */
     fun pillParams(ctx: Context) = LinearLayout.LayoutParams(ctx.dp(PILL_WIDTH), ctx.dp(PILL_HEIGHT)).apply { topMargin = ctx.dp(PILL_GAP) }
 
-    /** [card] faded out and taken away, after [message] has shown a moment if there is one */
     fun fadeOut(card: View, main: Handler, message: Int?) {
         main.postDelayed({
             card.animate().alpha(0f).setDuration(VoiceStyle.ANIMATE_MS).withEndAction { (card.parent as? ViewGroup)?.removeView(card) }.start()

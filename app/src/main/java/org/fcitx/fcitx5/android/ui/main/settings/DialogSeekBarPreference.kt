@@ -25,15 +25,10 @@ import splitties.views.gravityHorizontalCenter
 import splitties.views.textAppearance
 
 /**
- * Custom preference which represents a seek bar which shows the current value in the summary. The
- * value can be changed by clicking on the preference, which brings up a dialog which a seek bar.
- * This implementation also allows for a min / max step value, while being backwards compatible.
+ * A seek bar in a dialog, its value in the summary, with min / max / step.
  *
- * @property min The minimum value of the seek bar. Must not be greater or equal than [max].
- * @property max The maximum value of the seek bar. Must not be lesser or equal than [min].
- * @property step The step in which the seek bar increases per move. If the provided value is less
- *  than 1, 1 will be used as step.
- * @property unit The unit to show after the value. Set to an empty string to disable this feature.
+ * @property step values below 1 are taken as 1.
+ * @property unit shown after the value; empty for none.
  */
 class DialogSeekBarPreference @JvmOverloads constructor(
     context: Context,
@@ -42,36 +37,20 @@ class DialogSeekBarPreference @JvmOverloads constructor(
 ) : DialogPreference(context, attrs, defStyleAttr) {
 
     private var value = 0
-    var min: Int
-    var max: Int
+    var min: Int = 0
+    var max: Int = 100
     var step: Int = 1
         // a step of 0 would divide by zero in progressForValue
         set(value) {
             field = value.coerceAtLeast(1)
         }
-    var unit: String
+    var unit: String = ""
 
     var default: Int = 0
     var defaultLabel: String? = null
 
-    /** Called with the value where the user lets the slider go (按键音音量 plays a key's sound at it). */
+    /** Called on release (按键音音量 plays a key's sound at it). */
     var onRelease: ((Int) -> Unit)? = null
-
-    init {
-        context.theme.obtainStyledAttributes(attrs, R.styleable.DialogSeekBarPreference, 0, 0).run {
-            try {
-                min = getInteger(R.styleable.DialogSeekBarPreference_min, 0)
-                max = getInteger(R.styleable.DialogSeekBarPreference_max, 100)
-                step = getInteger(R.styleable.DialogSeekBarPreference_step, 1)
-                unit = getString(R.styleable.DialogSeekBarPreference_unit) ?: ""
-                if (getBoolean(R.styleable.DialogSeekBarPreference_useSimpleSummaryProvider, false)) {
-                    summaryProvider = SimpleSummaryProvider
-                }
-            } finally {
-                recycle()
-            }
-        }
-    }
 
     override fun persistInt(value: Int): Boolean {
         return super.persistInt(value).also {
@@ -96,9 +75,6 @@ class DialogSeekBarPreference @JvmOverloads constructor(
         showSeekBarDialog()
     }
 
-    /**
-     * Shows the seek bar dialog.
-     */
     private fun showSeekBarDialog() {
         val textView = context.textView {
             text = textForValue(value)
@@ -156,21 +132,9 @@ class DialogSeekBarPreference @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Converts the actual value to a progress value which the Android SeekBar implementation can
-     * handle. (Android's SeekBar step is fixed at 1 and min at 0)
-     *
-     * @param value The actual value.
-     * @return the internal value which is used to allow different min and step values.
-     */
+    /** Android's SeekBar step is fixed at 1 and min at 0. */
     private fun progressForValue(value: Int) = (value - min) / step
 
-    /**
-     * Converts the Android SeekBar value to the actual value.
-     *
-     * @param progress The progress value of the SeekBar.
-     * @return the actual value which is ready to use.
-     */
     private fun valueForProgress(progress: Int) = (progress * step) + min
 
     private fun textForValue(value: Int = this@DialogSeekBarPreference.value): String =

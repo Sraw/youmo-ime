@@ -50,7 +50,6 @@ class LearnBackupTest {
         assertEquals(state.dump(), read.state.dump())
         assertEquals(added, read.added)
         assertEquals(blocked, read.blocked)
-        // 不再联想 rides in the snapshot
         assertTrue(("你" to "好") in read.state.noPredict)
     }
 
@@ -58,13 +57,11 @@ class LearnBackupTest {
     fun theAddressBarsBookReadsBackAndAnOlderBackupHasNone() {
         val book = AddressData("3\t@qq.com\n1\t.org", "2\tzhang@qq.com")
         assertEquals(book, LearnBackup.read(LearnBackup.bytes(head, learned(), emptyList(), emptyList(), book)).addresses)
-        // empty, still told from none
         assertEquals(AddressData("", ""), LearnBackup.read(LearnBackup.bytes(head, learned(), emptyList(), emptyList(), AddressData("", ""))).addresses)
-        // v0.4.0's, a bare log: none
         assertNull(LearnBackup.read(LearnBackup.bytes(head, learned(), emptyList(), emptyList())).addresses)
         assertNull(LearnBackup.read(logBytes(learned())).addresses)
-        // contract: of this file's range, which v0.4.0 skips as a later build's (ORIGIN aside), so a
-        // 0.5 backup restores on 0.4.0; mutation cannot see it
+        // contract: of this file's range, which older builds skip as a later build's (ORIGIN aside), so a
+        // newer backup restores on them; mutation cannot see it
         for (type in listOf(LearnBackup.ADDRESS_COUNTS, LearnBackup.ADDRESSES)) {
             assertTrue(type in 70..79 && type != BackupMerge.ORIGIN && type != LearnBackup.END)
         }
@@ -74,7 +71,6 @@ class LearnBackupTest {
     fun itsHeadReadsAloneForTheList() {
         val bytes = LearnBackup.bytes(head, learned(), emptyList(), emptyList())
         assertEquals(head, LearnBackup.head(ByteArrayInputStream(bytes)))
-        // a log has no head
         assertNull(LearnBackup.head(ByteArrayInputStream(logBytes(learned()))))
     }
 
@@ -87,15 +83,13 @@ class LearnBackupTest {
         assertEquals(state.dump(), read.state.dump())
     }
 
-    // WD-10d: a copy broken off part-way, at any byte, reads as nothing rather than a part
+    // a copy broken off part-way, at any byte, reads as nothing rather than a part
     @Test
     fun aBackupCutShortDoesNotRead() {
         val bytes = LearnBackup.bytes(head, learned(), listOf(ListedWord("幽默", "you'mo")), emptyList())
-        // between two records too: the END is gone
         for (size in RecordFormat.HEADER_SIZE until bytes.size) {
             assertThrows(IOException::class.java) { LearnBackup.read(bytes.copyOf(size)) }
         }
-        // WD-10d's: a 179-byte export cut to 100
         assertThrows(IOException::class.java) { LearnBackup.read(bytes.copyOf(bytes.size * 100 / 179)) }
     }
 
@@ -113,7 +107,7 @@ class LearnBackupTest {
         assertEquals(listOf(LearnRecord.Unknown(60, byteArrayOf(1, 2, 3))), read.state.kept)
     }
 
-    // user 2026-11-02 (C54): a whole phrase used once stays on the phone, out of a backup; used twice it goes in
+    // a whole phrase used once stays on the phone, out of a backup; used twice it goes in
     @Test
     fun aPhraseUsedOnceIsNotBackedUp() {
         val state = learned()
@@ -126,7 +120,6 @@ class LearnBackupTest {
         assertTrue(LearnRecord.PhraseRow("你好呀亲爱的", 1, 3) in state.snapshot(0))
     }
 
-    // review-int-records M1: the offsets a restore stored come back with the backup, 退回恢复前's copy too
     @Test
     fun theOffsetsARestoreStoredReadBack() {
         val state = BackupMerge.merge(learned(), learned(), 7L, sameInstall = false, minute = 0)
@@ -135,12 +128,11 @@ class LearnBackupTest {
         assertEquals(BackupMerge.origins(state), BackupMerge.origins(read.state))
     }
 
-    // verify-int-E: a later build's type of the file's own range is not the log's, and not kept
+    // a later build's type of the file's own range is not the log's, and not kept
     @Test
     fun aLaterBuildsBackupTypeIsNotKept() {
         val state = learned()
         state.apply(LearnRecord.Unknown(BackupMerge.ORIGIN, byteArrayOf(0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0)))
-        // 75: the first after END, left for the backup file's own
         state.apply(LearnRecord.Unknown(75, byteArrayOf(1)))
         val read = LearnBackup.read(LearnBackup.bytes(head, state, emptyList(), emptyList()))
         assertEquals(listOf(BackupMerge.ORIGIN), read.state.kept.map { (it as LearnRecord.Unknown).type })
@@ -182,7 +174,7 @@ class LearnBackupTest {
         LearnBackup.read(out.toByteArray())
     }
 
-    // the layout of the drafts before END (f9ce4e11): head, snapshot, lists, no end
+    // the layout of early drafts before END: head, snapshot, lists, no end
     @Test(expected = IOException::class)
     fun aBackupMadeBeforeTheEndDoesNotRead() {
         val bytes = LearnBackup.bytes(head, learned(), listOf(ListedWord("幽默", "you'mo")), emptyList())

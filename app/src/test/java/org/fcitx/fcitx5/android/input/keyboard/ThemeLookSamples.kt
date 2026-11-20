@@ -30,15 +30,9 @@ import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import java.io.File
 
-/**
- * The five sample themes of theme file 3.0 (colours, a frosted picture, the picture cut out by the
- * keys, nine-slice images with a font, an image per key), light and dark: ThemeLookScreenshotTest's,
- * and ThemeBaselineCompareTest's look of them kept for 060. Their images are made in [dir]; a font file
- * is none (the font sample's keys are drawn in monospace by the tests' decoder, as a font read would be).
- */
+/** The five sample themes of theme file 3.0, light and dark; a font file is none (drawn in monospace by the tests' decoder). */
 class ThemeLookSamples(private val dir: File) {
 
-    // a file in [dir] of [w]×[h], drawn by [draw]; its path
     private fun png(name: String, w: Int, h: Int, draw: Canvas.() -> Unit): String {
         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         Canvas(b).draw()
@@ -64,7 +58,7 @@ class ThemeLookSamples(private val dir: File) {
         Picture(port, Crop(port, null, 0), Crop(land, null, 0), 85, 0)
     }
 
-    // a key of a thick frame, the corners 24 px (8 dp at 3 px a dp), the middle [fill]
+    // the corners 24 px (8 dp at 3 px a dp)
     private fun frame(name: String, edge: Int, fill: Int): NineSlice {
         val path = png(name, 96, 96) {
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -83,11 +77,9 @@ class ThemeLookSamples(private val dir: File) {
     private fun glassPalette(dark: Boolean) = (if (dark) TestThemes.TransparentDark else TestThemes.TransparentLight).look.palette
 
     val samples = listOf(
-        // 纯色分块: the defaults, blocks, a bigger radius and a border
         Sample("color") { p, _ ->
             LookDefaults.look(p).let { it.copy(keys = it.keys.copy(radiusDp = 10, borderDp = 1, press = PressEffect.Ripple)) }
         },
-        // 主题图 + 毛玻璃: the picture under it all, the letters it shown through blurred under their colour
         Sample("glass") { p, _ ->
             LookDefaults.look(p, picture).let {
                 it.copy(
@@ -101,7 +93,6 @@ class ThemeLookSamples(private val dir: File) {
                 )
             }
         },
-        // 镂空: a coloured base, the keys the picture as it is
         Sample("cutout") { p, _ ->
             LookDefaults.look(p, picture).let {
                 it.copy(
@@ -114,7 +105,6 @@ class ThemeLookSamples(private val dir: File) {
                 )
             }
         },
-        // 九宫格图片 + 自带字体: every kind a framed image stretched to its key, the keys' and candidates' font
         Sample("nine_slice_font") { p, dark ->
             val edge = if (dark) 0xFF26A69A.toInt() else 0xFF00796B.toInt()
             val fill = p.keyBackgroundColor
@@ -129,7 +119,6 @@ class ThemeLookSamples(private val dir: File) {
                 )
             }
         },
-        // 每个键一张图: the 26 letters each its own, ⌫ pressed its own colour, 注音's q its own
         Sample("each_key") { p, dark ->
             val letters = ('a'..'z').associate { c ->
                 val hue = (c - 'a') * 360f / 26
@@ -154,6 +143,5 @@ class ThemeLookSamples(private val dir: File) {
         return Theme.Custom("${s.name}_${if (dark) "dark" else "light"}", dark, s.look(p, dark))
     }
 
-    /** Every sample, light then dark. */
     fun all(): List<Theme.Custom> = samples.flatMap { s -> listOf(false, true).map { theme(s, it) } }
 }

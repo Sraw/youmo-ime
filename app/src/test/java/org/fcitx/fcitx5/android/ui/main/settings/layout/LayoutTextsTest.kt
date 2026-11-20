@@ -19,14 +19,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.util.Locale
 
-/** A check's findings and an import's dialogs in words (061-custom-layout §4.2): every finding the check makes has its string. */
+/** Every finding the check makes has its string. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = org.fcitx.fcitx5.android.FcitxApplication::class)
 class LayoutTextsTest {
 
     private fun zh(): Context = appContext.createConfigurationContext(Configuration(appContext.resources.configuration).apply { setLocale(Locale.SIMPLIFIED_CHINESE) })
 
-    // each finding as the check makes it: its arguments as many as its words take
     private fun sample(key: String) = LayoutCheck.Finding(12, key, listOf("a", "65536"))
 
     @Test
@@ -46,8 +45,7 @@ class LayoutTextsTest {
         assertEquals("左下角通常是 符、返回（和 App 自带的一样）", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "bottom-left", listOf("symbols back"))))
         assertEquals("第 30 行：g18/h 是 18 键的键，这里写的长按、角标、滑动不起作用", LayoutTexts.finding(zh(), LayoutCheck.Finding(30, "held", listOf("g18/h", "k18"))))
         assertEquals("第 4 行：+ 是数字键盘的键，这里写的长按、角标、滑动不起作用", LayoutTexts.finding(zh(), LayoutCheck.Finding(4, "held", listOf("+", "number"))))
-        // every board of the app's by its name, never its id (L6 review N3); a popups= not taken (N2); a space between
-        // 18 键 and the Chinese around it, none beside 数字行 (R26 F8374)
+        // every board of the app's by its name, never its id; a space between 18 键 and the Chinese around it
         assertEquals("第 2 行：fn/x 是数字行的键，这里写的长按、角标、滑动不起作用", LayoutTexts.finding(zh(), LayoutCheck.Finding(2, "held", listOf("fn/x", "number-row"))))
         assertEquals("第 30 行：g18/h 是 18 键的键，长按跟它走，不按这里写的字母；要用这些字母，给它起个自己的键名", LayoutTexts.finding(zh(), LayoutCheck.Finding(30, "held-letters", listOf("g18/h", "k18"))))
         assertEquals("这里写的 popups= 不起作用，跟 18 键一样", LayoutTexts.finding(zh(), LayoutCheck.Finding(0, "held-popups", listOf("k18"))))

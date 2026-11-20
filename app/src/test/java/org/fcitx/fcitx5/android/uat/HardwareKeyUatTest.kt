@@ -56,10 +56,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * UAT cases of a hardware keyboard (uat/17): its key events into the real service, as the system
- * hands them, on a fake engine. The configuration says a keyboard is there (`qwerty-keysexposed`),
- * as the system's own evaluation of the touch keyboard reads it. What the engine makes of the keys
- * it is sent (你好 from n i h a o) is the engine's, not asserted here.
+ * A hardware keyboard's key events into the real service, on a fake engine. The configuration says a keyboard is
+ * there (`qwerty-keysexposed`), as the system's evaluation of the touch keyboard reads it.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -68,7 +66,7 @@ class HardwareKeyUatTest {
 
     private var h: KeyboardHarness? = null
 
-    private fun entry(name: String, label: String = name) = InputMethodEntry(name, name, "", "", label, "zh_CN", "androidengine", false)
+    private fun entry(name: String, label: String = name) = InputMethodEntry(name, name, "", label, "zh_CN")
     private val wubi = entry(InputMethodCatalog.WUBI, "五")
 
     private fun harness(
@@ -88,7 +86,6 @@ class HardwareKeyUatTest {
         h?.close()
     }
 
-    /** The keyboard the keys come from. */
     private var device = KeyCharacterMap.VIRTUAL_KEYBOARD
 
     private fun event(action: Int, code: Int, meta: Int, repeat: Int = 0): KeyEvent {
@@ -96,14 +93,14 @@ class HardwareKeyUatTest {
         return KeyEvent(now, now, action, code, repeat, meta, device, 0, 0, InputDevice.SOURCE_KEYBOARD)
     }
 
-    /** [code] goes down with [meta] held; whether the service took it. */
+    /** Whether the service took it. */
     private fun KeyboardHarness.down(code: Int, meta: Int = 0, repeat: Int = 0): Boolean =
         service.onKeyDown(code, event(KeyEvent.ACTION_DOWN, code, meta, repeat)).also { advance(20) }
 
     private fun KeyboardHarness.up(code: Int, meta: Int = 0): Boolean =
         service.onKeyUp(code, event(KeyEvent.ACTION_UP, code, meta)).also { advance(20) }
 
-    /** A key typed: down and up, then what fcitx says of the input method (an [HostEvent.InputMethodChanged] when it changed). */
+    /** Down and up, then what fcitx says of the input method. */
     private fun KeyboardHarness.press(vararg codes: Int) = codes.forEach {
         down(it)
         up(it)
@@ -147,8 +144,7 @@ class HardwareKeyUatTest {
 
     private val KeyboardHarness.current get() = api.inputMethodEntryCached.uniqueName
 
-    // the keys fcitx was sent, as their names, Space as " "
-    private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+    private fun KeyboardHarness.sentKeys() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
         .map { Regex("sym=(\\d+)").find(it)!!.groupValues[1].toInt() }
         // Shift, Ctrl and the like go to fcitx too, as on a device: not what was typed
         .filter { it !in 0xffe1..0xffee }
@@ -159,7 +155,6 @@ class HardwareKeyUatTest {
     private val KeyboardHarness.candidatesView: CandidatesView
         get() = KeyboardHarness.find(service.window.window!!.decorView) ?: error("no CandidatesView")
 
-    // the floating window's keyboard button
     private fun KeyboardHarness.touchKeyboardButton() {
         val button = KeyboardHarness.all(service.window.window!!.decorView)
             .first { it.contentDescription == service.getString(R.string.show_touch_keyboard) }
@@ -170,13 +165,8 @@ class HardwareKeyUatTest {
 
     private inline fun <reified T : View> KeyboardHarness.showing(): Boolean = KeyboardHarness.all(inputView).any { it is T && shown(it) }
 
-    /**
-     * The floating candidates window's text of [code] typed on the hardware keyboard with the code row
-     * [style]: the panel the engine shows for it, as [CodeInFieldUatTest] sends it.
-     */
     private fun floatingWindowTyping(style: CodeRowStyle, code: String): Pair<String, List<String>> {
         val h = harness(codeRow = style).start()
-        // a key from the hardware keyboard: the touch keyboard away, the candidates by the cursor
         h.type(code.take(1))
         val panel = HostEvent.InputPanel(FormattedText(arrayOf(code), intArrayOf(0), code.length), FormattedText.Empty, FormattedText.Empty, code = true)
         h.api.inputPanelCached = panel
@@ -214,8 +204,8 @@ class HardwareKeyUatTest {
         val h = harness().start()
         h.type("a")
         val cv = h.candidatesView
-        // the IME window not up (split screen, the other app's window focused): the view detached,
-        // its window token null. A touch window shown over it is the BadTokenException of HK-30
+        // the IME window not up (split screen): the view detached, its window token null; a touch window shown over it is
+        // a BadTokenException
         val parent = cv.parent as ViewGroup
         parent.removeView(cv)
         assertFalse(cv.isAttachedToWindow)
@@ -224,7 +214,7 @@ class HardwareKeyUatTest {
         h.advance(500)
         val popups = shadowOf(RuntimeEnvironment.getApplication())
         assertFalse(popups.latestPopupWindow?.isShowing == true)
-        // the window back: the position put off is placed at its first draw, the touch window with it
+        // the window back: the position put off is placed at its first draw
         parent.addView(cv)
         h.advance(500)
         assertTrue("touch window after the window came back", popups.latestPopupWindow?.isShowing == true)
@@ -238,8 +228,7 @@ class HardwareKeyUatTest {
         h.type("nihao ")
         h.type("shi")
         h.press(KeyEvent.KEYCODE_3)
-        assertEquals("nihao shi3".map { it.toString() }, h.sent())
-        // typed on: the touch keyboard put away, candidates by the cursor
+        assertEquals("nihao shi3".map { it.toString() }, h.sentKeys())
         assertFalse(h.touchKeyboardUp)
     }
 
@@ -252,7 +241,7 @@ class HardwareKeyUatTest {
         h.type("xyz")
         h.press(KeyEvent.KEYCODE_ESCAPE)
         val m = FcitxKeyMapping
-        assertEquals(listOf("a", "b", "c", "#${m.FcitxKey_Return}", "x", "y", "z", "#${m.FcitxKey_Escape}"), h.sent())
+        assertEquals(listOf("a", "b", "c", "#${m.FcitxKey_Return}", "x", "y", "z", "#${m.FcitxKey_Escape}"), h.sentKeys())
     }
 
     @Test
@@ -261,7 +250,7 @@ class HardwareKeyUatTest {
         val h = harness().start()
         h.type("nihao")
         h.press(KeyEvent.KEYCODE_DEL)
-        assertEquals("nihao".map { it.toString() } + "#${FcitxKeyMapping.FcitxKey_BackSpace}", h.sent())
+        assertEquals("nihao".map { it.toString() } + "#${FcitxKeyMapping.FcitxKey_BackSpace}", h.sentKeys())
     }
 
     @Test
@@ -274,7 +263,7 @@ class HardwareKeyUatTest {
         h.shiftTap()
         assertEquals(InputMethodCatalog.PINYIN, h.current)
         h.type("ni ")
-        assertEquals("hi ni ".map { it.toString() }, h.sent())
+        assertEquals("hi ni ".map { it.toString() }, h.sentKeys())
     }
 
     @Test
@@ -300,7 +289,7 @@ class HardwareKeyUatTest {
         h.press(KeyEvent.KEYCODE_B)
         assertEquals(InputMethodCatalog.ENGLISH, h.current)
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("activateIme") })
-        assertTrue(h.sent().toString(), h.sent().containsAll(listOf("A", "b")))
+        assertTrue(h.sentKeys().toString(), h.sentKeys().containsAll(listOf("A", "b")))
     }
 
     @Test
@@ -313,8 +302,7 @@ class HardwareKeyUatTest {
         h.ctrlSpace()
         assertEquals(InputMethodCatalog.PINYIN, h.current)
         h.type("ni ")
-        // no space went in for either Ctrl+Space
-        assertEquals("okni ".map { it.toString() }, h.sent())
+        assertEquals("okni ".map { it.toString() }, h.sentKeys())
     }
 
     @Test
@@ -351,7 +339,7 @@ class HardwareKeyUatTest {
             h.up(code, KeyEvent.META_CTRL_ON)
             h.up(KeyEvent.KEYCODE_CTRL_LEFT)
         }
-        // no switch; fcitx passes what it does not take on to the app (forwarded keys)
+        // fcitx passes what it does not take on to the app (forwarded keys)
         assertEquals(InputMethodCatalog.PINYIN, h.current)
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("activateIme") || it.startsWith("enumerateIme") })
     }
@@ -362,7 +350,7 @@ class HardwareKeyUatTest {
         val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, keyboards = KeyboardHarness.NINE_KEYS).start()
         h.synced()
         h.type("2026hao ")
-        assertEquals("2026hao ".map { it.toString() }, h.sent())
+        assertEquals("2026hao ".map { it.toString() }, h.sentKeys())
         h.touchKeyboardButton()
         h.synced()
         assertTrue(h.touchKeyboardUp)
@@ -378,7 +366,7 @@ class HardwareKeyUatTest {
             val h = harness().start()
             h.type("ni ")
             assertTrue(h.touchKeyboardUp)
-            assertEquals("ni ".map { it.toString() }, h.sent())
+            assertEquals("ni ".map { it.toString() }, h.sentKeys())
         } finally {
             mode.setValue(mode.defaultValue)
         }
@@ -396,8 +384,7 @@ class HardwareKeyUatTest {
             h.ctrlSpace()
             assertEquals(InputMethodCatalog.PINYIN, h.current)
             h.type("ni ")
-            // the shortcuts off switched nothing: what is typed after reaches the engine as typed
-            assertEquals("ni ".map { it.toString() }, h.sent().takeLast(3))
+            assertEquals("ni ".map { it.toString() }, h.sentKeys().takeLast(3))
             on.setValue(true)
             h.shiftTap()
             assertEquals(InputMethodCatalog.ENGLISH, h.current)
@@ -421,7 +408,6 @@ class HardwareKeyUatTest {
             assertEquals(cells.toString(), 3, cells.size)
             val ys = cells.map { IntArray(2).also(it::getLocationInWindow)[1] }
             val xs = cells.map { IntArray(2).also(it::getLocationInWindow)[0] }
-            // one under another: each lower, all at one left edge
             assertTrue("$xs $ys", ys.zipWithNext().all { (a, b) -> b > a } && xs.distinct().size == 1)
         } finally {
             orientation.setValue(orientation.defaultValue)
@@ -432,16 +418,14 @@ class HardwareKeyUatTest {
     @Uat("HK-27")
     fun unpluggedTheTouchKeyboardComesBack() {
         val h = harness().start()
-        // a keyboard of its own: the virtual id is also where the tracking starts, so would pass untracked
+        // the virtual id is also where the tracking starts, so would pass untracked
         device = 7
         h.type("ni ")
         assertFalse(h.touchKeyboardUp)
         val listener = h.service.inputDeviceListener
-        // another device gone: not the one typed on
         listener.onInputDeviceRemoved(8)
         h.idle()
         assertFalse(h.touchKeyboardUp)
-        // the system's word the keyboard typed on is gone
         listener.onInputDeviceRemoved(7)
         h.idle()
         assertTrue(h.touchKeyboardUp)
@@ -460,11 +444,9 @@ class HardwareKeyUatTest {
         assertTrue(h.touchKeyboardUp)
         val keyboard = KeyboardHarness.find<TextKeyboard>(h.inputView)
         assertNotNull(keyboard)
-        // split: G and V on both halves
         assertEquals(2, h.texts().count { it == "g" })
     }
 
-    // the floating candidates window's cards: one column, in landscape too (061-word-card.md §3.5)
     @Test
     @Uat("HK-47")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi-keysexposed-qwerty")
@@ -492,7 +474,6 @@ class HardwareKeyUatTest {
         assertEquals(LinearLayout.VERTICAL, (head() as CharCardView).orientation)
     }
 
-    // the engine's menu for 点了: one the user chose, 忘掉学到的 offered; the forget taken back with 3
     private fun learned(op: LearningOp): LearningResult {
         val inner = (op as? LearningOp.OnPage)?.op ?: op
         return if (inner is LearningOp.Menu) {
@@ -518,7 +499,6 @@ class HardwareKeyUatTest {
         h.emit(HostEvent.Paged(words.toList(), 1, false, false))
         h.api.calls.clear()
         h.down(KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.META_SHIFT_ON)
-        // held: the key repeats
         for (r in 0..10) h.down(KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.META_SHIFT_ON, repeat = r)
         h.up(KeyEvent.KEYCODE_FORWARD_DEL, KeyEvent.META_SHIFT_ON)
         h.up(KeyEvent.KEYCODE_SHIFT_LEFT)
@@ -526,7 +506,6 @@ class HardwareKeyUatTest {
         val forgets = h.forgets()
         assertEquals(h.api.calls.toString(), 1, forgets.size)
         assertTrue(forgets.single(), "点了" in forgets.single())
-        // no Delete to the engine, no switch
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(sym=${FcitxKeyMapping.FcitxKey_Delete}") })
         assertEquals(InputMethodCatalog.PINYIN, h.current)
     }

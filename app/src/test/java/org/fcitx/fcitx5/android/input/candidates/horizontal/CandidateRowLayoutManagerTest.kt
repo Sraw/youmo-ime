@@ -21,17 +21,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import kotlin.random.Random
 
-/**
- * The bar's row lays its candidates out to the pixel where FlexboxLayoutManager, set up as the bar had it
- * (design 060-perf-cands), did: the same count shown, the same bounds, in every fill style, the English
- * slots, both directions, and as the words change in one bar.
- */
+/** The bar's row lays its candidates out to the pixel where FlexboxLayoutManager did, in every fill style, both directions. */
 @RunWith(RobolectricTestRunner::class)
 class CandidateRowLayoutManagerTest {
 
     private val ctx: Context = RuntimeEnvironment.getApplication()
 
-    /** A word of [want] px at most, as wide as allowed when less. */
     private class Word(ctx: Context) : View(ctx) {
         var want = 0
             set(value) {
@@ -72,11 +67,7 @@ class CandidateRowLayoutManagerTest {
         addItemDecoration(FlexboxVerticalDecoration(ShapeDrawable().apply { intrinsicWidth = DIVIDER }, GAP))
     }
 
-    /**
-     * HorizontalCandidateComponent before this change: flexGrow and minWidth on each holder; in AutoFillWidth
-     * stretched, then, when every word was shown, laid out again at flexGrow 0 ([Bar.settle]: what its
-     * second pass in onLayoutCompleted asked for, and what the real bar shows, BarUatTest MN-23).
-     */
+    /** The old bar: flexGrow and minWidth per holder; AutoFillWidth laid out again at flexGrow 0 once every word showed ([Bar.settle]). */
     private fun flexbox(fill: Fill, rtl: Boolean): Bar {
         var widths = listOf<Int>()
         var total = 0
@@ -85,9 +76,8 @@ class CandidateRowLayoutManagerTest {
         var shown = -1
         lateinit var rv: RecyclerView
         val a = adapter({ widths }) {
-            // Flexbox's wrap check reads the insets of the view's last layout, none on a new view (a word
-            // then fit without its divider's room, depending on which holder it got): given here, as the
-            // new row always counts them (design 060-perf-cands, 待定)
+            // Flexbox's wrap check reads the insets of the view's last layout, none on a new view: given here, as the new
+            // row always counts them
             insets.get(it.layoutParams).let { r -> (r as Rect).set(if (rtl) DIVIDER + GAP else 0, 0, if (rtl) 0 else DIVIDER + GAP, 0) }
             it.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {
                 this.minWidth = minWidth
@@ -152,7 +142,7 @@ class CandidateRowLayoutManagerTest {
     }
 
     private fun Bar.layOut(width: Int) {
-        // a few passes: Flexbox's second pass waits for the layout its params asked for
+        // Flexbox's second pass waits for the layout its params asked for
         repeat(3) {
             view.measure(
                 View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),

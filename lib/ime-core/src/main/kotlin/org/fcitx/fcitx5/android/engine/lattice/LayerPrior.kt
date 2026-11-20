@@ -8,47 +8,28 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel
 import org.fcitx.fcitx5.android.engine.data.WordLayers
 
 /**
- * A log10 adjustment to every word of each layer of the dictionary ([WordLayers]), and of each
- * word pack's layer ([layer] gives a name an index; [extra] tells a pack word's): the words of
- * the last years, say, which the model scores as unknown or as rarer than they are now, lifted
- * as one. One value a layer, so it reaches words the user has never typed, where the user
- * model's counts cannot. The base layer, the first, is what the others are measured against and
- * stays at 0 (but for [parse], for measuring).
- *
- * The values are fixed now: the session no longer learns them from picks (learning-ux
- * impl/design-1b.md §4), so nothing in the app calls [learn] or sets [journal]. They stay, with
- * [step] and ±[bound], for measuring a learned prior again; [restore] still takes back what an
- * older build kept by name (`pinyin.user`'s log), a name no build or pack uses any more just
- * sitting in the log, a few bytes.
+ * A fixed log10 adjustment per dictionary layer ([WordLayers]) and word-pack layer ([layer] names one,
+ * [extra] maps a pack word): lifts recent words the model under-scores, including ones the user never
+ * typed, which user counts cannot reach. The base layer stays at 0 (except via [parse], for measuring).
  */
 class LayerPrior(
     private val layers: WordLayers,
     values: FloatArray = FloatArray(layers.count),
-    private val step: Float = STEP,
-    private val bound: Float = BOUND,
-    /** The layer index of a word past the dictionary's (a pack's, listed with the index from [layer]); -1 for a word of no pack. */
+    /** The layer of a word past the dictionary's (a pack's, by [layer]'s index); -1 for none. */
     private val extra: PackLayers = PackLayers { -1 },
 ) {
     init {
         require(values.size == layers.count) { "${values.size} values for ${layers.count} layers" }
         require(values.all { it.isFinite() }) { "prior ${values.contentToString()}" }
-        require(step > 0f && bound > 0f) { "step $step bound $bound" }
     }
 
-    /** Hears of each value changed by [learn], to keep it. */
-    fun interface Journal {
-        fun changed(name: String, value: Float)
-    }
-
-    /** Gives [extra]'s answer: an interface of its own, as an (Int) -> Int boxes the id of every word scored. */
+    /** Its own interface: an (Int) -> Int would box every scored word's id. */
     fun interface PackLayers {
         fun layerOf(word: Int): Int
 
-        /** The model's word [word] is scored as: a word of the user's mapped so takes that word's layer. */
+        /** The model word [word] is scored as: a user word mapped so takes that word's layer. */
         fun modelWord(word: Int): Int = word
     }
-
-    var journal: Journal? = null
 
     private val names = ArrayList(layers.names)
     private var values = values.copyOf()
@@ -60,16 +41,15 @@ class LayerPrior(
     fun of(word: Int): Float = values[layerOf(word)]
 
     private fun layerOf(word: Int): Int {
-        // a word the user chose, scored as the model's of its text, is that word's layer, a pack's
-        // word too; else a pack's word is the pack's layer even when the dictionary has it in a
-        // layer of its own, as it is the pack that scores it then
+        // a user-chosen word scored as the model's word of its text takes that word's layer (a pack's too);
+        // else a pack word is the pack's layer even if the dictionary has it, as the pack scores it then
         val model = extra.modelWord(word)
         if (model != word) return layers.layer(model)
         val packed = extra.layerOf(word)
         return if (packed >= 0) packed else layers.layer(word)
     }
 
-    /** The index of the layer called [name], given one if it is new; at 0 until [restore]d or [learn]ed. */
+    /** Added if new; at 0 unless [parse] names it. */
     fun layer(name: String): Int {
         val at = names.indexOf(name)
         if (at >= 0) return at
@@ -78,7 +58,7 @@ class LayerPrior(
         return names.lastIndex
     }
 
-    /** [inner]'s scores with the prior added, held to 0 as a score must be. */
+    /** Held to 0, as a score must be. */
     fun scorer(inner: WordScorer): WordScorer = object : WordScorer {
         override fun score(prev2: Int, prev: Int, word: Int) = minOf(0f, inner.score(prev2, prev, word) + of(word))
         override fun context(prev2: Int, prev: Int) = inner.context(prev2, prev)
@@ -87,56 +67,11 @@ class LayerPrior(
         override fun scoreAfter(context: Long, trigrams: NgramModel.Trigrams, word: Int) = minOf(0f, inner.scoreAfter(context, trigrams, word) + of(word))
     }
 
-    /**
-     * Learns from a pick: the user committed [picked] where [first] was offered first. A layer
-     * they went past the first choice to a word of goes up a step; one whose word the first
-     * choice had, and they left, goes down one. Taking the first choice as it was teaches nothing.
-     * @return whether a value changed: a decoder's kept scores are then stale
-     */
-    fun learn(picked: IntArray, first: IntArray): Boolean {
-        var changed = false
-        for (layer in 1 until names.size) {
-            val wanted = picked.any { layerOf(it) == layer }
-            val offered = first.any { layerOf(it) == layer }
-            if (wanted != offered) changed = move(layer, if (wanted) step else -step) || changed
-        }
-        return changed
-    }
-
-    private fun move(layer: Int, by: Float): Boolean {
-        val value = (values[layer] + by).coerceIn(-bound, bound)
-        if (value == values[layer]) return false
-        values[layer] = value
-        journal?.changed(names[layer], value)
-        return true
-    }
-
-    /** Takes [name]'s [value] back from a log, for any layer but the base: a pack's may be listed only later. */
-    fun restore(name: String, value: Float): Boolean {
-        if (name == names[0] || !value.isFinite()) return false
-        // the layer first: the array is grown if the name is new
-        val layer = layer(name)
-        values[layer] = value.coerceIn(-bound, bound)
-        return true
-    }
-
-    /** Each layer's name and value, the base and the layers at 0 left out. */
-    fun forEach(action: (String, Float) -> Unit) {
-        for (layer in 1 until names.size) if (values[layer] != 0f) action(names[layer], values[layer])
-    }
-
-    /** As [parse] takes it: `name=value,...` of the layers not at 0. */
+    /** `name=value,...` of the non-zero layers, as [parse] takes it. */
     override fun toString() = names.indices.filter { values[it] != 0f }.joinToString(",") { "${names[it]}=${values[it]}" }
 
     companion object {
-        const val STEP = 0.05f
-        const val BOUND = 1f
-
-        /**
-         * [spec] as `name=value,name=value` over [layers]' names and [packs]' (each given its
-         * index in that order, for [extra] to return); a layer not named is 0. Fixed values, for
-         * measuring: not held to [BOUND] as learned ones are.
-         */
+        /** [spec] as `name=value,...` over [layers]' names then [packs]' (indexed in that order for [extra]); unnamed layers are 0. */
         fun parse(layers: WordLayers, spec: String, packs: List<String> = emptyList(), extra: PackLayers = PackLayers { -1 }): LayerPrior {
             val prior = LayerPrior(layers, extra = extra)
             packs.forEach { prior.layer(it) }

@@ -29,7 +29,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.Duration
 
-/** The settings app's 开源许可 page over a fake engine (uat/12 VO-15): the voice pack's data credited, apart from SettingsPagesUatTest for its size. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -43,7 +42,7 @@ class LicensePageUatTest {
     @After
     fun close() = st.close()
 
-    // a page's work done off the main thread (a list read): waited for, as a user would
+    // a page's work done off the main thread: waited for, as a user would
     private fun until(what: String, test: () -> Boolean) =
         waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
 
@@ -62,7 +61,6 @@ class LicensePageUatTest {
         st.open(SettingsRoute.License)
         until("listed") { preferences((st.page as PreferenceFragmentCompat).preferenceScreen ?: return@until false).size > 3 }
         val prefs = preferences((st.page as PreferenceFragmentCompat).preferenceScreen)
-        // credited in every build: the voice input is (its models the voice pack's)
         fun credited(title: String, licence: String, url: String): () -> Unit = {
             val pref = prefs.firstOrNull { it.title == title }
             assertNotNull(title, pref)

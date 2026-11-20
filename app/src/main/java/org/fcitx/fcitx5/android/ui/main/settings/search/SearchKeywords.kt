@@ -8,12 +8,7 @@ import android.content.Context
 import androidx.annotation.ArrayRes
 import org.fcitx.fcitx5.android.R
 
-/**
- * What else a user may call a setting, by its id (SettingsIndex): the words in res/values*\/search_keywords.xml,
- * a group per array, a group for one id or several. Kept in one table, not by each of the five kinds of
- * setting (AppPrefs, ThemePrefs, InputMethodSettings, KeyCommand, the pages drawn by hand): a setting
- * renamed or removed leaves an id here that SettingsIndexTest finds in no index.
- */
+/** Kept in one table, not by each kind of setting: a setting renamed or removed leaves an id here that SettingsIndexTest finds. */
 object SearchKeywords {
 
     internal val TABLE: List<Pair<List<String>, Int>> = listOf(
@@ -58,7 +53,6 @@ object SearchKeywords {
         listOf("pref:hardware_switch_shortcuts") to R.array.kw_hardware_shortcuts,
     )
 
-    /** Each id's other names in [context]'s language; a group with none in a language adds none. */
     fun of(context: Context): Map<String, List<String>> = buildMap<String, List<String>> {
         for ((ids, @ArrayRes array) in TABLE) {
             val words = context.resources.getStringArray(array).filter { it.isNotBlank() }

@@ -33,7 +33,6 @@ class EnglishDecoderTest {
         assertEquals(NgramModel.NO_WORD, data.id("im"))
         assertEquals("dont", EnglishData.key("don't"))
         assertEquals("london", EnglishData.key("London"))
-        // in key order, the model's own words in none
         val keys = (0 until data.keyed).map { data.keyAt(it) }
         assertEquals(keys.sorted(), keys)
         assertFalse((0 until data.keyed).any { data.keyedWord(it) == data.start || data.keyedWord(it) == data.unknown })
@@ -55,14 +54,12 @@ class EnglishDecoderTest {
 
     @Test
     fun aSlipIsTheWordMeant() {
-        // swapped, a key beside, one missed, one doubled
         assertEquals("the", words("teh").first())
         assertEquals("hello", words("hwllo").first())
         assertEquals("hello", words("helo").first())
         assertEquals("hello", words("helllo").first())
     }
 
-    // se, a shorter prefix, is see at a doubled letter's cost: the word as typed is still found whole
     @Test
     fun aWordTypedWholeIsFoundAsSuchThoughAShorterPrefixIsNear() {
         val see = decoder.suggest("see", none, 5).first { data.word(it.word) == "see" }
@@ -89,15 +86,12 @@ class EnglishDecoderTest {
         assertEquals("I", data.word(decoder.predict(start, 1).single().word))
         val afterI = decoder.context(listOf(EnglishText.START, "I"))
         assertEquals(listOf("don't", "I'm"), decoder.predict(afterI, 2).map { data.word(it.word) })
-        // i is beside u, not a: cut alone, cat after the
         assertEquals("cut", words("cit").first())
         assertEquals("cat", words("cit", decoder.context(listOf("the"))).first())
-        // a word the data lacks: no context
         assertEquals(none, decoder.context(listOf("zzzz")))
     }
 
-    // the dict tool counted a sentence's first word as the commoner of it and its lower case, and a
-    // spelling it has none of as its letters' commonest: the words before the cursor are read the same
+    // the words before the cursor are read as the dict tool counted them (a sentence's first word as its commoner case)
     @Test
     fun theWordsBeforeAreReadAsTheyWereCounted() {
         // The, which the data lacks, after a sentence's start: the, and cat follows it
@@ -133,8 +127,6 @@ class EnglishDecoderTest {
         assertTrue(decoder.suggest("hel", none, 0).isEmpty())
     }
 
-    // a key or two start thousands of words: only those below FREQUENT are scored, as the dict tool
-    // numbers the words commonest first, and the likeliest of them are offered
     @Test
     fun aLongRunOfCompletionsIsScoredForItsCommonerWordsAlone() {
         val count = EnglishDecoder.FREQUENT + 100
@@ -172,13 +164,9 @@ class EnglishDecoderTest {
 
     @Test
     fun onTheNineKeysAKeyIsAnyOfItsLettersTheWordsAsLongAsTheKeysFirst() {
-        // 4355: hell, and hello it starts; help's 7 is not a 5
         assertEquals(listOf("hell", "hello"), nineWords("4355"))
-        // he, then what it starts, likeliest first
         assertEquals(listOf("he", "hello", "help", "hell"), nineWords("43"))
-        // an apostrophe is no key
         assertEquals(listOf("don't"), nineWords("3668"))
-        // a letter typed is itself alone
         assertEquals(listOf("hell", "hello"), nineWords("4e55"))
         assertEquals(emptyList<String>(), nineWords("4f55"))
     }
@@ -199,7 +187,6 @@ class EnglishDecoderTest {
 
     @Test
     fun aTapsPlaceSetsWhatTheKeyBesideItCosts() {
-        // with no place, the key beside one meant costs near alike
         assertEquals(1.0f, helloCost(null), 1e-4f)
         // tapped in the middle of w: no likelier e than any key (far); at its edge by e, nearly as likely as w
         assertEquals(3.0f, helloCost(arrayOf(null, onW(0f), null, null, null)), 1e-4f)
@@ -208,7 +195,6 @@ class EnglishDecoderTest {
         assertTrue("$edge", edge < 0.5f)
         // at the edge away from e: dearer than in the middle, never past far
         assertEquals(3.0f, helloCost(arrayOf(null, onW(-0.45f), null, null, null)), 1e-4f)
-        // touches not a key each (a stale list): not read
         assertEquals(1.0f, helloCost(arrayOf(onW(0f))), 1e-4f)
     }
 
@@ -224,16 +210,11 @@ class EnglishDecoderTest {
 
     @Test
     fun onTheNineKeysADigitTappedByTheNextIsItsLettersToo() {
-        // 4356: hell's last key slipped to 6, tapped at its edge by 5
         assertEquals(listOf("hell"), nineTapped("4356", arrayOf(null, null, null, onSix(-0.45f))))
-        // tapped in its middle: 6 alone, no word
         assertEquals(emptyList<String>(), nineTapped("4356", arrayOf(null, null, null, onSix(0f))))
-        // the digit's own letters cost nothing wherever it is tapped
         assertEquals(listOf("he", "hello", "help", "hell"), nineTapped("43", arrayOf(null, null)))
     }
 
-    // review F8289: a user's nine keys with l on 9 as well as 5; 6 tapped at its edge by 5, 9 listed first and far
-    // below the floor: the letter costs what 5's slip does, not never
     @Test
     fun aLetterOnTwoKeysAroundCostsTheCheaperSlip() {
         val letters = { d: Char -> if (d == '9') "lwxyz" else NineKeyLetters.STANDARD.letters(d) }
@@ -260,7 +241,6 @@ class EnglishDecoderTest {
         val legal = nineLegal.costs("8439", onNine)
         assertEquals(0f, legal.getValue("they"), 0f)
         assertEquals(plain.getValue("then") + 2f, legal.getValue("then"), 1e-4f)
-        // 4356 spells nothing as typed: hell's slip costs what it did
         val onSix = arrayOf(null, null, null, onSix(-0.45f))
         assertEquals(nineTapped.costs("4356", onSix), nineLegal.costs("4356", onSix))
     }

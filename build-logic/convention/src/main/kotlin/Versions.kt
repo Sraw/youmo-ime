@@ -27,8 +27,7 @@ object Versions {
     val supportedABIs = abiIds.keys
     const val fallbackABI = "arm64-v8a"
 
-    // what is built without -PbuildABI: the released one alone. The emulator tasks (CI's x86_64, the
-    // Mac's arm64) pass theirs; the 32-bit ones are still built when named
+    // built without -PbuildABI: the released ABI alone; the emulator tasks pass theirs
     val defaultABIs = setOf(fallbackABI)
 
     /** The ABIs a build makes: [override] (-PbuildABI / BUILD_ABI, comma-separated) if given, else [defaultABIs]. */
@@ -39,11 +38,7 @@ object Versions {
         return baseVersionCode * 10 + abiId
     }
 
-    /**
-     * The version code of the release [name], major.minor.patch, so that raising the name raises the
-     * code: 12 at 0.1.0, the first release (past the test builds before it, which carried upstream's
-     * 11, so they update in place), 1 more a patch, 100 a minor, 10,000 a major.
-     */
+    /** The version code of the release [name], major.minor.patch: 12 at 0.1.0, +1 a patch, +100 a minor, +10,000 a major. */
     internal fun versionCodeOf(name: String): Int {
         // minor and patch below 100: 0.1.100 would have 0.2.0's code
         val (major, minor, patch) = requireNotNull(Regex("(\\d+)\\.(\\d{1,2})\\.(\\d{1,2})").matchEntire(name)) {
@@ -54,14 +49,9 @@ object Versions {
         return code
     }
 
-    /**
-     * [versionName] (as appVersionName makes it of the tag), once checked: a release's, built at its
-     * tag, must be [baseVersionName]. Tagged without raising it, the release would carry the last
-     * one's version code ([baseVersionCode] follows the name), which an updater comparing codes takes
-     * for no update.
-     */
+    /** [versionName] checked: a release's, built at its tag, must be [baseVersionName], or it would carry the last one's code. */
     fun checkedVersionName(versionName: String, base: String = baseVersionName): String {
-        // a pre-release at its tag (0.6.0-beta1) is that version's too: its number before the dash
+        // a pre-release at its tag is that version's too: its number before the dash
         val release = RELEASE_NAME.matchEntire(versionName)?.value ?: PRE_RELEASE_NAME.matchEntire(versionName)?.groupValues?.get(1)
         check(release == null || release == base) {
             "built at v$versionName with baseVersionName $base: raise baseVersionName in Versions.kt (baseVersionCode follows it)"

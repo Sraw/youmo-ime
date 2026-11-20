@@ -41,11 +41,7 @@ import java.nio.ByteBuffer
 import java.time.Duration
 import org.fcitx.fcitx5.android.until as waitUntil
 
-/**
- * What 生僻字屏蔽's page tests share (dev/design/061-rare-char-block.md §6, 061-settings-cards.md §3): the
- * page over a grid of a few characters of each group, read as the real levels' table has them, and the
- * ways to look at it and touch it.
- */
+/** The page over a grid of a few characters of each group, read as the real levels' table has them. */
 abstract class RarePageUat {
 
     protected val api = FakeHostApi()
@@ -76,11 +72,9 @@ abstract class RarePageUat {
         waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
 
     /**
-     * One step of a walk over the page, done on what the step before left: the first to fail stops the test,
-     * named by [why]. Not a row of assertRows, which runs every row and so fails each one after a real failure
-     * (review R26 F8132). Any failure is named, not only a failed assert: a wait run out ([until]'s
-     * IllegalStateException), a view not found (NoSuchElementException, a null) is as much the step that broke
-     * (review R26 F8454).
+     * One step of a walk, done on what the step before left: the first to fail stops the test. Not a row of
+     * assertRows, which runs every row and so fails each one after a real failure. Any failure is named, a wait run out
+     * or a view not found too.
      */
     protected fun step(why: String, body: () -> Unit) {
         try {
@@ -100,8 +94,7 @@ abstract class RarePageUat {
 
     protected fun cells() = views().filterIsInstance<RareCharCell>().associateBy { it.char }
 
-    // [c]'s cell, the list scrolled to it where it is not shown: on a phone's height 其它表外字's cells, the last
-    // group's, are below 扩展区's head and the groups above (held by default, first)
+    // scrolled to where it is not shown: on a phone's height the last group's cells are below the groups above
     protected fun cell(c: String): RareCharCell {
         for (way in intArrayOf(1, -1)) {
             while (c !in cells()) {
@@ -115,7 +108,6 @@ abstract class RarePageUat {
         return cells()[c] ?: error("no cell $c in ${cells().keys}")
     }
 
-    // what a screen reader is told of a cell: its node's description, and an event's the same
     protected fun said(cell: RareCharCell): String {
         val info = AccessibilityNodeInfo.obtain()
         cell.onInitializeAccessibilityNodeInfo(info)
@@ -131,10 +123,8 @@ abstract class RarePageUat {
 
     protected fun fragment() = st.page as RareCharsFragment
 
-    // a group's strip, by what it reads out: its card's on the cards, the fixed one over its grid
     protected fun strip(group: Int) = views().filterIsInstance<CheckStrip>().first { it.contentDescription.toString().startsWith(s(group)) }
 
-    // a card's body, the part a tap opens the group by
     protected fun body(group: Int) = views().first { it !is CheckStrip && it.isClickable && it.contentDescription?.toString()?.startsWith(s(group)) == true }
 
     protected fun cards() = views().filterIsInstance<MaterialCardView>().filter { it.tag?.toString()?.startsWith("view:rare/group/") == true }.toList()
@@ -202,8 +192,7 @@ abstract class RarePageUat {
 
         fun cp(c: String) = c.codePointAt(0)
 
-        // each group's few, as the test's table has them: 犇 and 㑇 三级, 髮 繁体, 𤝰 扩展 B, the rest past the
-        // table in the basic block (TestCharLevels; the JVM tests have no APK assets)
+        // past the table in the basic block (TestCharLevels; the JVM tests have no APK assets)
         val grid: RareGrid by lazy {
             val b = PinyinDataBuilder().unigram("<unk>", -7f, 0f)
             fun read(c: String, vararg readings: Pair<String, Int>) = readings.forEach { (syllable, tone) ->
@@ -224,7 +213,6 @@ abstract class RarePageUat {
             RareGrid.copy(TestCharLevels.levels, data.charReadings, sequenceOf(cp(NO_READING)))
         }
 
-        // 其它表外字 a few screens long, over many letters (past the table, U+9C00 on), and 犇 for 三级字
         val many: RareGrid by lazy {
             val b = PinyinDataBuilder().unigram("<unk>", -7f, 0f)
             val syllables = listOf("ba", "ca", "da", "fa", "ga", "ha", "ka", "la", "ma", "na", "pa", "sa", "ta", "wa", "ya", "za")

@@ -36,11 +36,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
-/**
- * 标点位置 and 快捷键图标位置 on 按键, one after the other, one list of places in one order, never one
- * place in both but 无 (uat/02 KB-66): the other's place greyed out, said whose it is, not picked; one
- * stored in both (an import, a backup) read with the symbol moved ([KeyMarks.settled]).
- */
+/** 标点位置 and 快捷键图标位置 never share a place but 无: the other's place greyed out; both stored in one (an import) read moved. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -65,7 +61,7 @@ class KeyMarkPositionSettingsTest {
 
     private val places = listOf("右上", "右下", "左上", "左下", "顶部", "底部", "无")
 
-    // [title]'s dialog opened: its rows' texts, which can be picked
+    // its rows' texts, which can be picked
     private fun dialog(title: Int): AlertDialog {
         st.pref(title).performClick()
         st.idle()
@@ -83,7 +79,6 @@ class KeyMarkPositionSettingsTest {
         assertEquals("下滑 and 下滑图标位置 right after 上滑图标位置", listOf(symbol + 1, symbol + 2), listOf(titles.indexOf(st.s(R.string.swipe_down)), titles.indexOf(st.s(R.string.swipe_down_position))))
         assertEquals(places, (st.pref(R.string.swipe_up_position) as ListPreference).entries.map { it.toString() })
         assertEquals(places, (st.pref(R.string.swipe_down_position) as ListPreference).entries.map { it.toString() })
-        // the defaults: 右上, 左上
         assertEquals("右上", st.pref(R.string.swipe_up_position).summary)
         assertEquals("左上", st.pref(R.string.swipe_down_position).summary)
 
@@ -142,8 +137,7 @@ class KeyMarkPositionSettingsTest {
         assertEquals("左下（上滑图标在这里）" to false, rows(dialog(R.string.swipe_down_position))[3])
     }
 
-    // the two in one place (a backup restored, not yet stored apart at a start), then the other changed:
-    // the summary says where the keyboard draws it, as stored
+    // both in one place (a backup, not yet split at a start), then the other changed: the summary says where it draws
     @Test
     @Uat("KB-66")
     fun onePlaceStoredInBothThenTheOtherChangedTheSummaryIsTheKeyboards() {
@@ -159,9 +153,7 @@ class KeyMarkPositionSettingsTest {
         assertEquals(KeyMarkPosition.TopLeft, keyboard.swipeUpPosition.getValue())
     }
 
-    // where the two settings put the marks, the keyboard floating, split or one-handed as upright (060-keys-unify
-    // §6.2): z's 撤销 and its symbol; ⌫'s 清空 (上滑) and 恢复 (下滑), a mark left out where the key has no room for it
-    // (floating's low keys: KeyMarksEverywhereUatTest's left out)
+    // the marks floating, split or one-handed: z's 撤销 and symbol, ⌫'s 清空 and 恢复, one left out where the key has no room
     private fun placedIn(mode: String, restoreFits: Boolean = true) {
         prefs.set(keyboard.swipeUpPosition, KeyMarkPosition.BottomLeft)
         prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
@@ -175,7 +167,7 @@ class KeyMarkPositionSettingsTest {
                 (if (it.centerY < face.centerY) "T" else "B") + (if (it.centerX < face.centerX) "L" else "R")
             }
             assertEquals(mode, "BL", corner("delete-sweep"))
-            // 恢复 may be left out only where the keys are low (floating); docked one-handed or split it is there
+            // 恢复 may be left out only where the keys are low (floating)
             if (restoreFits) assertEquals(mode, "TR", corner("restore")) else assertTrue(mode, corner("restore").let { it == null || it == "TR" })
         }
     }

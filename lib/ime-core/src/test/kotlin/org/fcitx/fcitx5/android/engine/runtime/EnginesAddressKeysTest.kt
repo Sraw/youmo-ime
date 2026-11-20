@@ -11,11 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/**
- * A table's keys no letter in an address field ([InputMethodCatalog.readsAsKey], told [Engines.tableKeys]):
- * while something is typed a key where the table takes it, else text. Taken as text, 二笔's `;`
- * cut the code typed.
- */
+/** A table's keys in an address field: a key while something is typed, else text (二笔's `;` cut the code). */
 class EnginesAddressKeysTest : EnginesFixture() {
 
     // 二笔's keys, its punctuation within codes but for its / (、), as in its table
@@ -74,8 +70,7 @@ class EnginesAddressKeysTest : EnginesFixture() {
         }
     }
 
-    // asked on the keyboard's behalf, which waits: no table is read to answer, and with nothing typed
-    // nothing asked, as the keyboard asks first off fcitx's thread
+    // the keyboard waits on this, so no table is read to answer
     @Test
     fun anotherInputMethodOrATableWithNoSessionHasNoTableKeys() {
         typedIn(InputMethodCatalog.PINYIN, "ni").use { engines ->

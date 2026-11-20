@@ -9,7 +9,7 @@ import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.TextMetrics
 
 /**
- * The browser's [TextMeasurer] (060-render-v2 §6 step 5): a 2D context's measureText in the fonts the page has
+ * The browser's [TextMeasurer]: a 2D context's measureText in the fonts the page has
  * loaded, as the painter draws them ([CanvasPainter.font], [family]): the advance its width, the ink its
  * actualBoundingBox (Paint.getTextBounds'). The font's extent (FontMetrics' top and bottom: its head table's
  * yMax and yMin) is the page's own two fonts' ([EXTENTS]) where the family starts with one, as Android's comes

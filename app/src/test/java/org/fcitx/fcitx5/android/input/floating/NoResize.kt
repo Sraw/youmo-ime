@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.floating
 
-/** A floating handle's resize button that does nothing: a test of the rest of it. */
 object NoResize : FloatingHandle.Resizing {
     override fun start() = Unit
     override fun move(dx: Float, dy: Float) = Unit

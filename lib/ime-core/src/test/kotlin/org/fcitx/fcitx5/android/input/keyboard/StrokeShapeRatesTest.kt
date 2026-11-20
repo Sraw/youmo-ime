@@ -12,17 +12,13 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * StrokeShape over families of made-up strokes (issue #4: a 撇 or a 横 read as 折): 撇 and 横 as a
- * finger draws them, a little bowed, a tick where the stroke starts or ends, of many lengths and
- * angles, a little shaky; and the 折 of the strokes' order, a corner sharp or rounded. The share of
- * each read as each is printed (`./gradlew :lib:ime-core:test --tests '*StrokeShapeRates*' -i`) and held
- * to the floors below. Made up only: no stroke here was drawn by a finger on a phone, so the floors hold the
- * shapes these families have, not what a user draws.
+ * StrokeShape over made-up families of 撇, 横 (bowed, ticked, shaky) and the 折s, each share read printed
+ * (`./gradlew :lib:ime-core:test --tests '*StrokeShapeRates*' -i`) and held to floors. No finger-drawn strokes:
+ * the floors hold these families, not what users draw.
  */
 class StrokeShapeRatesTest {
 
     private class Drawn(val bow: Float, val start: Pair<Double, Float>?, val end: Pair<Double, Float>?, val noise: Float, val path: FloatArray) {
-        /** Drawn as a finger draws the stroke meant: bowed a little, a tick short, not very shaky. */
         val likely: Boolean get() = abs(bow) <= LIKELY_BOW && (start?.second ?: 0f) <= LIKELY_TICK && (end?.second ?: 0f) <= LIKELY_TICK && noise <= LIKELY_NOISE
     }
 
@@ -30,7 +26,7 @@ class StrokeShapeRatesTest {
         val xs = arrayListOf(0f)
         val ys = arrayListOf(0f)
 
-        // a straight piece from the last place, [length] at [degrees] (up positive), in [steps]
+        // [degrees] up positive
         fun line(degrees: Double, length: Float, steps: Int) {
             val r = Math.toRadians(degrees)
             val x = xs.last()
@@ -41,7 +37,7 @@ class StrokeShapeRatesTest {
             }
         }
 
-        // a bowed piece: its chord [length] at [degrees], its middle [bow] of [length] to the chord's right as drawn
+        // [bow]: the middle's offset of [length] to the chord's right as drawn
         fun arc(degrees: Double, length: Float, bow: Float, steps: Int = 16) {
             val r = Math.toRadians(degrees)
             val ux = cos(r).toFloat()
@@ -69,7 +65,7 @@ class StrokeShapeRatesTest {
         }
     }
 
-    // [degrees] of the stroke's chord, its [lengths], bows, ticks at its start and end (degrees, share of its length), shakes
+    // ticks at start and end as (degrees, share of its length)
     private fun family(
         degrees: List<Double>,
         bows: List<Float>,
@@ -84,7 +80,6 @@ class StrokeShapeRatesTest {
 
     private class Chord(val degrees: Double, val length: Float, val bow: Float)
 
-    // [chord] with each of the ticks at its start and end, each as shaky as [NOISES] say
     private fun ticked(random: Random, chord: Chord, starts: List<Pair<Double, Float>?>, ends: List<Pair<Double, Float>?>): List<Drawn> {
         val out = ArrayList<Drawn>()
         for (s in starts) for (e in ends) for (noise in NOISES) out += drawn(random, chord, s, e, noise)
@@ -117,7 +112,7 @@ class StrokeShapeRatesTest {
         ends = listOf(null, -90.0 to 0.12f, -45.0 to 0.15f, 90.0 to 0.12f, -135.0 to 0.2f, 45.0 to 0.15f),
     )
 
-    // the 折 of the strokes' order, each leg's direction and length as a share of the stroke's; one corner, or more
+    // each leg's direction and length as a share of the stroke's
     private val zhe = mapOf(
         "横折" to listOf(0.0 to 1f, -90.0 to 1f),
         "横折 短竖" to listOf(0.0 to 1f, -90.0 to 0.4f),
@@ -132,7 +127,6 @@ class StrokeShapeRatesTest {
         "横折弯" to listOf(0.0 to 0.6f, -100.0 to 0.7f, 0.0 to 0.7f),
     )
 
-    // each 折 drawn, and whether its corners were drawn round
     private fun zhes(): Map<String, List<Pair<Boolean, FloatArray>>> {
         val random = Random(SEED)
         return zhe.mapValues { (_, legs) ->
@@ -169,8 +163,7 @@ class StrokeShapeRatesTest {
         println("撇 all (${pie.size}): ${said(shares(pie.map { it.path }))}")
         println("横 likely (${hengLikely.size}): ${said(h)}")
         println("横 all (${heng.size}): ${said(shares(heng.map { it.path }))}")
-        // 7.1% and 3.7% before a corner's arms had to be straight (issue #4); 3.0% and 1.2% when each arm was
-        // measured against its own length, which lost 折 drawn round with a short arm (StrokeShapeTest)
+        // each arm measured against its own length lost round 折 with a short arm
         assertTrue("撇 likely read as 折: ${p['z']}", (p['z'] ?: 0.0) < 4.0)
         assertTrue("横 likely read as 折: ${h['z']}", (h['z'] ?: 0.0) < 2.0)
     }
@@ -185,13 +178,11 @@ class StrokeShapeRatesTest {
         println("折 drawn round: " + round.entries.joinToString(" ") { "${it.key} %.1f%%".format(it.value) })
         val total = all.values.sumOf { paths -> paths.count { StrokeShape.classify(it) == 'z' } } * 100.0 / all.values.sumOf { it.size }
         println("折 all: %.1f%%".format(total))
-        // a single corner, as one draws a 折 to filter by (the kind is all a stroke filters by), nearly always; a short
-        // arm too, its straightness measured against the long arm (a round corner's half is on it)
+        // a single corner, a short arm too, its straightness measured against the long arm (a round corner's half is on it)
         for (name in listOf("横折", "横折 短竖", "横折 短横", "竖折", "撇折", "横撇", "横钩", "横折钩", "竖弯钩")) {
             assertTrue("$name read as 折: ${each[name]}", each.getValue(name) >= 95.0)
         }
-        // more corners, rounded and shaky, are read less well: held where they are (issue #4's change took 竖折折钩
-        // from 93.1% to 80.6%; 横折弯, right, down, right, runs along its own chord and was 13.9% before it)
+        // more corners, rounded and shaky, are read less well: held where they are
         assertTrue("竖折折钩 read as 折: ${each["竖折折钩"]}", each.getValue("竖折折钩") >= 80.0)
         assertTrue("横折弯 read as 折: ${each["横折弯"]}", each.getValue("横折弯") >= 12.0)
     }

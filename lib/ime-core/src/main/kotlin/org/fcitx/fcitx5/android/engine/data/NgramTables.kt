@@ -6,11 +6,7 @@ package org.fcitx.fcitx5.android.engine.data
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData.Section
 
-/**
- * A backoff model's n-grams as added, by word id, written in the layout [NgramModel] reads: the
- * model half of [PinyinDataBuilder]'s file and of [EnglishDataBuilder]'s. Its sections are numbered
- * as [PinyinData] numbers them, in either kind of file. [name] names a word in an error.
- */
+/** A backoff model's n-grams by id in [NgramModel]'s layout, for pinyin and English data. */
 internal class NgramTables(private val name: (Int) -> String) {
     private val uniProb = FloatList()
     private val uniBackoff = FloatList()
@@ -23,7 +19,6 @@ internal class NgramTables(private val name: (Int) -> String) {
     private val triWord = IntList()
     private val triProb = FloatList()
 
-    /** The next word's unigram: words are numbered in the order they are added. */
     fun unigram(prob: Float, backoff: Float) {
         uniProb += prob
         uniBackoff += backoff
@@ -49,7 +44,7 @@ internal class NgramTables(private val name: (Int) -> String) {
         val bi = order(biWord.size, lmSize, { biPrev[it] }, { biWord[it] })
         val biKeys = LongArray(bi.size) { key(biPrev[bi[it]], biWord[bi[it]]) }
         for (k in 1 until biKeys.size) require(biKeys[k - 1] != biKeys[k]) { "duplicate bigram at ${bi[k]}" }
-        // each trigram's context is the position of its leading bigram in sorted order
+        // each trigram's context is its leading bigram's position in sorted order
         val triContext = IntArray(triWord.size) { t ->
             val at = biKeys.binarySearch(key(triPrev2[t], triPrev[t]))
             require(at >= 0) { "trigram ${name(triPrev2[t])} ${name(triPrev[t])} ${name(triWord[t])} has no leading bigram" }
@@ -82,7 +77,6 @@ internal class NgramTables(private val name: (Int) -> String) {
     private fun floats(size: Int, value: (Int) -> Float): ByteArray =
         LittleEndianOutput(size * 4).apply { for (i in 0 until size) writeFloat(value(i)) }.toByteArray()
 
-    /** For [count] items sorted by [owner] in 0 until [owners]: where each owner's run starts, plus the end. */
     private inline fun starts(owners: Int, count: Int, owner: (Int) -> Int): IntArray {
         val starts = IntArray(owners + 1)
         for (i in 0 until count) starts[owner(i) + 1]++
@@ -90,12 +84,7 @@ internal class NgramTables(private val name: (Int) -> String) {
         return starts
     }
 
-    /**
-     * Indices 0 until [count] sorted by ([major] in 0 until [majors], [minor]), ties in index
-     * order as a stable sort leaves them. Not sortedWith, which boxes each of millions of indices
-     * and keys: a count places each major's run, sorted on primitive keys, minor above index.
-     * Inline, as [major] and [minor] would box each index and key through Function1 too.
-     */
+    // a counting pass, not sortedWith: that boxes millions of indices; inline so the lambdas do not box either
     private inline fun order(count: Int, majors: Int, major: (Int) -> Int, minor: (Int) -> Int): IntArray {
         val runs = starts(majors, count, major)
         val next = runs.copyOf()

@@ -15,114 +15,61 @@ import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
-/**
- * An input method engine as its host sees it: actions in, what to show and commit out. The host
- * (the fcitx5 addon) turns key events into [Action]s and renders each [Snapshot]; the engine
- * keeps everything else.
- */
+/** An input method engine as its host (the fcitx5 addon) sees it: [Action]s in, a [Snapshot] out. */
 interface Session {
     fun apply(action: Action): Snapshot
 
-    /**
-     * Whether [c] goes into the input now. Other keys are the host's to act on: space and digits
-     * pick; the rest are sent as [Action.Key] all the same, to end the input, then typed.
-     */
+    /** Whether [c] goes into the input now; other keys are the host's (space and digits pick) and are still sent as [Action.Key] to end the input. */
     fun reads(c: Char): Boolean
 
-    /**
-     * Whether [c], sent as [Action.Key] now, ends what is typed instead of going into it: not [read][reads],
-     * or not where it stands (a 双拼 scheme's `;` read only where its syllable may start).
-     */
+    /** Whether [c] as [Action.Key] ends the input instead of going in: not read, or not where it stands (双拼's `;`). */
     fun endsInput(c: Char): Boolean = !reads(c)
 
-    /**
-     * Whether it takes every character itself, as English does: space ends a word and digits are
-     * typed, neither picks; an arrow commits what is typed; a key gone to the app resets it.
-     */
+    /** Whether it takes every character itself, as English does: space and digits pick nothing. */
     val takesEveryCharacter: Boolean get() = false
 
-    /**
-     * Whether a keypad's digit picks the candidate it numbers now, though the session
-     * [takesEveryCharacter]: English typed on the nine keys, whose digits are no text of it.
-     */
+    /** Whether a keypad digit picks though [takesEveryCharacter]: English on the nine keys. */
     val picksByDigit: Boolean get() = false
 
-    /**
-     * Whether what the user picks is learned. The host turns it off where the app asks it not to
-     * (a password, an incognito tab), before the actions typed there.
-     */
+    /** Whether picks are learned; the host turns it off for a password or incognito field, before what is typed there. */
     var learning: Boolean
 
-    /**
-     * The candidates from the [from]th of all, at most [count]: for a host that shows more than
-     * the page, such as fcitx's candidate bar scrolled sideways.
-     */
+    /** At most [count] candidates from the [from]th, for a host that shows more than the page. */
     fun candidates(from: Int, count: Int): List<Choice>
 
-    /** What a long press on the candidate at [index] of all offers, where [Snapshot.actionable]. */
     fun offers(index: Int): Set<Offer>
 
-    /**
-     * Why the candidate at [index] of all is where it is (U-81): its tier, its uses, the code it was
-     * ranked under (a prediction's: [Kinds.PREDICTION] after the word before). Null where the
-     * session does not say.
-     */
+    /** Why the candidate at [index] is where it is: its tier, uses and code; null where the session does not say. */
     fun why(index: Int): Why? = null
 
-    /**
-     * How the words of the candidate at [index] of all were read from what was typed, for 候选词注音
-     * (CandidateReadings); null where the session does not know, the candidate then read by its text.
-     */
+    /** How the candidate's words were read, for 候选词注音; null where unknown (read by text then). */
     fun readingOf(index: Int): List<WordReading>? = null
 
-    /**
-     * The text before the candidate at [index] of all, if it is a character looked up rather than
-     * typed by its reading (handwriting's last character, a character by its parts or strokes): the
-     * readings and the card of one go by it (CandidateReadings.ordered, CharCard). Null for any other.
-     */
+    /** The text before the candidate at [index] if it is a character looked up (handwriting, parts, strokes): readings and its card go by it. */
     fun lookedUp(index: Int): String? = null
 
-    /**
-     * Where a block of the candidate at [index] reaches, where this session says, not its input
-     * method (review H3): a character by strokes under them alone, one a table looked up by pinyin
-     * everywhere (pinyin's word); null for the input method's rule (a table's under its code).
-     */
+    /** Where a block of the candidate reaches if the session says (strokes: under them alone; a table's pinyin lookup: everywhere); null for the input method's rule. */
     fun blockScope(index: Int): BlockScope? = null
 
-    /**
-     * What was learned changed under the input (a long press taken back, a clear): the candidates
-     * read anew, to be shown ([Keyboard.AGAIN]); null where nothing is on show to read again.
-     */
+    /** What was learned changed under the input: the candidates read anew; null where nothing is shown. */
     fun reread(): Snapshot? = null
 
-    /** Whether [reread] reads what was learned as it is now; a session that does not is made anew after an undo. */
+    /** Whether [reread] reads what was learned as it is now; one that does not is made anew after an undo. */
     val rereads: Boolean get() = false
 
-    /**
-     * What learning leaves out in the field ([Action.Context.learnFlags]), told a session made after
-     * the field's context: nothing else of the field, whose text it does not know (review-int S5).
-     */
+    /** The field's [Action.Context.learnFlags], told a session made after the context. */
     fun fieldFlags(flags: Int) {}
 
-    /** A key went to the app, not here (Enter, an arrow with nothing typed), or the cursor moved: what came before it is past. */
+    /** A key went to the app, or the cursor moved: what came before is past. */
     fun passedOn() {}
 
-    /** The learning record of what was committed last, null for none: for a session over this one to take back (a table's lookup, U-03). */
+    /** The last commit's record, for a session over this one to take back. */
     val lastCommit: Commit? get() = null
 
-    /**
-     * The app typed [text] itself, right after what is before the cursor (a key where English
-     * suggests nothing; empty for none, [ERASED] for a Backspace): any offer goes, what was before
-     * stays. The host passes it on first ([passedOn]).
-     */
+    /** The app typed [text] itself after the cursor's text (empty for none, [ERASED] for a Backspace): any offer goes. The host calls [passedOn] first. */
     fun typed(text: String) {}
 
-    /**
-     * Ends what is typed, nothing learned of what was not picked: the words picked from its start
-     * put in as their pick puts them in, the keys after them handed back as typed, not read (a
-     * table's 拼 key turned off mid-lookup). Here, where nothing is picked in pieces, all of it is
-     * keys, put in with learning off.
-     */
+    /** Ends what is typed with nothing learned of what was not picked: picked words put in, the keys after them handed back raw (a table's 拼 turned off mid-lookup). */
     fun handBack(): HandedBack {
         val was = learning
         learning = false
@@ -136,51 +83,35 @@ interface Session {
 
     companion object {
         /**
-         * What the app [typed] for a Backspace it did itself: what the editor's Backspace takes
-         * before the cursor gone (in an opted-in editor one code point; else a key event, what the
-         * editor decides, perhaps an emoji sequence or a flag whole), or what was selected.
-         * English takes one code point off what it knows and forgets all of it where the code
-         * point taken or the char left may belong to a cluster (a CR taken or left: perhaps a
-         * "\r\n"'s half) (EnglishSession.erased); for a selection the service reads the context
-         * right after (handleBackspaceKey).
+         * What the app [typed] for a Backspace it did itself: the editor decides what goes (a code point, or a whole
+         * emoji or flag), so English forgets all where a cluster may be cut (a CR may be half of "\r\n").
          */
         const val ERASED = "\b"
     }
 }
 
-/** What [Session.handBack] ends with: [picked] put in, [record] its learning record's commit, and the [keys] after it, as typed. */
+/** What [Session.handBack] ends with: [picked] put in, its [record], and the raw [keys] after it. */
 data class HandedBack(val picked: String, val record: Commit?, val keys: String)
 
-/**
- * What a long press on a candidate may offer, each done by the [Action] of its name; [bit] is its
- * bit in the offers the androidengine addon reads (EngineOffer in androidengine_public.h).
- */
+/** What a long press may offer, each done by the [Action] of its name; [bit] is read by the addon (EngineOffer in androidengine_public.h). */
 enum class Offer(val bit: Int) {
     FORGET(1 shl 0), PIN(1 shl 1), UNPIN(1 shl 2), BLOCK(1 shl 3),
 
-    /** A custom phrase (a built-in date too) taken off the settings' list, by [Action.Unpin]: no word to unpin is one. */
+    /** A custom phrase (or built-in) taken off the settings' list, by [Action.Unpin]. */
     DELETE_PHRASE(1 shl 4),
 
-    /** A common word's replacement taken off its word (从常用词中删除), by [Action.Unpin], as [DELETE_PHRASE]. */
+    /** A common word's replacement taken off its word, by [Action.Unpin]. */
     DELETE_COMMON_WORD(1 shl 5),
 }
 
-/** A candidate as a host lists it, with its [hint] (see [Snapshot.hints]) and [readings] (see [Snapshot.readings]). */
 data class Choice(val text: String, val hint: String = "", val readings: List<String> = emptyList())
 
-/** What a user does. */
 sealed class Action {
     /**
-     * A key typed. One the engine [reads][Session.reads] goes into the input; any other ends it,
-     * committed as the engine would have it, and is the app's (the snapshot is not
-     * [handled][Snapshot.handled]): what comes after it does not run on from what came before.
-     * [glided]: typed by a glide, no key pressed (learning files it by its pinyin). [at]: where on
-     * its key a grouped keyboard's code was tapped ([Keyboard.tapKey][org.fcitx.fcitx5.android.engine.runtime.Keyboard.tapKey]):
-     * the 14 keys' across alone, 0 the left edge and 1 the right; a layout's own keyboard's across
-     * and down packed as one ([NineKeyLetters.place][org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.place]); NaN for none.
-     * [touch]: where on its key it was tapped and the keys around it, for reading it as one of
-     * those where it spells nothing or less likely ([Touch], 061-neighbour-correction); null for
-     * none (a hardware key, TalkBack, a key typed by a glide or sent by the app).
+     * A key typed. One the engine reads goes in; any other ends the input and is the app's (not handled).
+     * [glided]: typed by a glide. [at]: where across its key a grouped keyboard's code was tapped (the 14 keys: 0
+     * left, 1 right; a layout's own keyboard packs across and down, [NineKeyLetters.place][org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.place]); NaN for none.
+     * [touch]: the tap and its neighbour keys, for neighbour correction; null for hardware keys, TalkBack, glides.
      */
     data class Key(val char: Char, val glided: Boolean = false, val at: Float = Float.NaN, val touch: Touch? = null) : Action()
 
@@ -189,110 +120,57 @@ sealed class Action {
     /** The candidate at [index] on the page shown (a digit key; space is 0). */
     data class Select(val index: Int) : Action()
 
-    /** The candidate at [index] of all, whatever page is shown (a tap on the host's list). */
+    /** The candidate at [index] of all (a tap on the host's list). */
     data class Pick(val index: Int) : Action()
 
-    /**
-     * Forgets what was learned of the candidate at [index] of all (a long press on it), then
-     * reads the input again: see [Session.offers].
-     */
+    /** Forgets what was learned of the candidate at [index] of all, then rereads. */
     data class Forget(val index: Int) : Action()
 
-    /** Makes the candidate at [index] of all a custom phrase of the input, the first of them. */
     data class Pin(val index: Int) : Action()
 
-    /** Deletes the custom phrase the candidate at [index] of all is. */
     data class Unpin(val index: Int) : Action()
 
-    /** Never offers again the word the candidate at [index] of all is (the user can unblock it in the settings). */
+    /** Never offers the candidate's word again (unblockable in the settings). */
     data class Block(val index: Int) : Action()
 
     object NextPage : Action()
     object PreviousPage : Action()
 
-    /**
-     * Takes the syllable at [index] of [Snapshot.syllables] for the first keys it was offered
-     * for: on the nine keys, where those keys type several (`64` ni, mi, o …). [of] is the
-     * [Snapshot.syllablesId] of the list it was picked from, [ANY] for whichever is offered: a
-     * pick from a list a key typed since replaced is no pick, or it would take another syllable.
-     */
+    /** Takes syllable [index] of [Snapshot.syllables] for the first keys (nine keys); [of] is the list's [Snapshot.syllablesId], so a pick from a list replaced since takes nothing. */
     data class Syllable(val index: Int, val of: Int = ANY) : Action() {
         companion object {
             const val ANY = -1
 
-            /**
-             * Ids of the syllables offered run from 0 to this, less one, then again: 97 so that
-             * Keyboard.SYLLABLES ends at U+F83F, the private use area after it left to the grouped
-             * keyboards' codes (a layout's own from U+F840, NineKeyLetters.CUSTOM_BLOCK; ZhuyinKeys
-             * from U+F880). Was 98: an id is a list's on show alone, never kept.
-             */
+            /** Syllable ids run 0..this-1, then wrap: 97 so Keyboard.SYLLABLES ends at U+F83F, leaving U+F840 on to grouped keyboards' codes (NineKeyLetters.CUSTOM_BLOCK, ZhuyinKeys). */
             const val IDS = 97
 
-            /** At most this many syllables are offered. */
             const val MAX = 64
         }
     }
 
-    /**
-     * Types [letter] as itself, not as any letter of its key: on the nine keys, a letter chosen
-     * from a key's long press. [again]: the key pressed again soon (连按), [letter] the one the run
-     * came to; after the same key not yet picked a press of its own, read as a key or with the run
-     * as the letter, the context to pick (see [org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]).
-     * [glided] as for [Key].
-     */
+    /** Types [letter] as itself (nine keys: chosen from a long press); [again]: 连按 came to it (see [org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]). */
     data class Letter(val letter: Char, val again: Boolean = false, val glided: Boolean = false) : Action()
 
-    /**
-     * A key of the nine keys typed for English: [digit] (2 to 9), any of its letters, the session
-     * spelling the word ([upper]: that letter a capital, Shift on as it was pressed); or a letter
-     * a long press pinned there, itself, the word still the nine keys' (never corrected). [touch]:
-     * where on its key it was tapped and the keys around it, for reading it as one of those
-     * (061-neighbour-english); null for none.
-     */
+    /** A nine-key press for English: [digit] (2 to 9), any of its letters ([upper] with Shift), or a pinned letter itself; [touch] as for [Key]. */
     data class NineKey(val digit: Char, val upper: Boolean = false, val touch: Touch? = null) : Action()
 
-    /** Commits what was typed, as typed (enter). */
+    /** Commits what was typed, as typed (Enter). */
     object CommitRaw : Action()
 
-    /**
-     * Handwriting: what the pad read of its [piece], [reading], or, none, that [piece] finished;
-     * shown with those held before it (HandwritingSession.hold). Sent with the key that carries it
-     * ([Keyboard.INK]), so that it comes in order with the keys and taps around it; nothing to any
-     * other session.
-     */
+    /** Handwriting: what the pad read of [piece], or that it finished; sent with [Keyboard.INK] so it stays in order with keys. */
     data class Ink(val piece: Int, val reading: InkReading? = null) : Action()
 
-    /**
-     * Glide typing: the keyboard's [glide] (EnglishSession commits its word), or its [readings] as
-     * read when it was sent (GlideSession.read: a pinyin's or a table's types the first). Sent with
-     * the key that carries it ([Keyboard.GLIDE]), as [Ink]; nothing to any other session.
-     */
+    /** Glide typing: the [glide] or its [readings] as read when sent; sent with [Keyboard.GLIDE], as [Ink]. */
     data class Glide(val glide: GlidePath?, val readings: List<GlideReading>? = null) : Action()
 
-    /**
-     * 笔画筛选: a stroke drawn on the keyboard while something is typed, one of
-     * [Strokes.KEYS][org.fcitx.fcitx5.android.engine.stroke.Strokes.KEYS]: the candidates whose
-     * first character is written so are kept, the next stroke its next
-     * ([StrokeFilter][org.fcitx.fcitx5.android.engine.stroke.StrokeFilter]). Sent as its
-     * [Keyboard.strokeKey]; nothing to any other session.
-     */
+    /** 笔画筛选: a stroke drawn while something is typed, one of [Strokes.KEYS][org.fcitx.fcitx5.android.engine.stroke.Strokes.KEYS] ([StrokeFilter][org.fcitx.fcitx5.android.engine.stroke.StrokeFilter]); sent as [Keyboard.strokeKey]. */
     data class Stroke(val stroke: Char) : Action()
 
-    /**
-     * Puts the cursor [at] that character of the preedit (a tap in the composed text, where the
-     * app shows it): what is typed next goes there, and backspace deletes before it. English,
-     * pinyin (the nine keys too), the tables and the stroke lookup keep a cursor in their input;
-     * elsewhere (handwriting, words offered) the snapshot is not [handled][Snapshot.handled].
-     */
+    /** Puts the cursor [at] that preedit character; sessions keeping no cursor (handwriting, predictions) leave it unhandled. */
     data class Cursor(val at: Int) : Action()
 
-    /**
-     * Moves the cursor in the input [by] keys, back where negative (an arrow, a swipe on space);
-     * [Int.MIN_VALUE] and [Int.MAX_VALUE] to its start and end (Home, End). Where no cursor is
-     * kept, as for [Cursor].
-     */
+    /** Moves the input cursor [by] keys; [Int.MIN_VALUE]/[Int.MAX_VALUE] to the start/end. */
     data class Step(val by: Int) : Action() {
-        /** Where a cursor at [cursor] in an input [length] keys long goes: no further than its ends, [START] and [END] too. */
         fun applyTo(cursor: Int, length: Int): Int = (cursor.toLong() + by).coerceIn(0, length.toLong()).toInt()
 
         companion object {
@@ -301,45 +179,24 @@ sealed class Action {
         }
     }
 
-    /**
-     * The user pauses: some of the work that may put a better reading first, where the
-     * snapshot [refines][Snapshot.refines]. Any other action drops what is left of it.
-     */
+    /** The user pauses: a slice of work that may put a better reading first, while [Snapshot.refines]. */
     object Refine : Action()
 
-    /**
-     * The table's 拼 key: its pinyin lookup turned on or off, kept so till pressed again, every
-     * letter then looked up as [TableOptions.pinyinKey][org.fcitx.fcitx5.android.engine.table.TableOptions.pinyinKey]
-     * typed first would. Nothing to the other sessions.
-     */
+    /** The table's 拼 key: pinyin lookup toggled, as [TableOptions.pinyinKey][org.fcitx.fcitx5.android.engine.table.TableOptions.pinyinKey] typed first would. */
     object LookUp : Action()
 
-    /** Drops everything: the input, and what was committed as context (the cursor moved away). */
+    /** Drops the input and the context (the cursor moved away). */
     object Reset : Action()
 
-    /**
-     * 联想 put away (the bar's ×), nothing else: what was committed stays the context, as do the
-     * session's own space and a correction's undo, which [Reset] would drop (review 061-small M1).
-     * Nothing to a session showing no predictions.
-     */
+    /** 联想 put away (the bar's ×): unlike [Reset], the context, the session's own space and a correction's undo stay. */
     object DropPredictions : Action()
 
     /**
-     * Drops everything as [Reset] does, then takes [before], the text before the cursor, as what
-     * the input to come follows: what the host read off the editor, where the engine committed
-     * nothing yet (a field focused, the cursor put somewhere). [cleared]: [before] is what was
-     * written last in a field that has since cleared itself (a chat's box once a message is sent),
-     * which what is typed next follows, but the field is empty: nothing is before the cursor.
-     * [learnFlags]: what learning leaves out in the field (the host's, as told with it); null, as
-     * the engine's own contexts have it (a glide's word held back, a lookup committed), leaves them
-     * as they were (review-1a-r2 S1). [started]: the field was (re)started, its commits no longer
-     * this session's to take back (U-03); [after], the text after the cursor if the host read it,
-     * for an edit put back among them (design-1c §2). [selected]: text is selected, [before] what
-     * is before it and [after] what is after it, as if it were cut: nothing deleted yet (review-1c M2).
-     * [offers]: the session may offer candidates for [before] now (English's word typed in place of
-     * its correction); not where it is not the input method shown, which nothing would reset.
-     * [said]: the editor itself answered [before], so an empty one is a field really empty; false
-     * where it would not say (null) or nothing was read: an empty [before] then is not known (review-1c M1).
+     * As [Reset], then takes [before] (the text before the cursor) as what the input follows. [cleared]: [before] was
+     * written last in a field that has since emptied (a chat's sent message). [learnFlags]: null keeps the old ones
+     * (the engine's own contexts). [started]: the field restarted, its commits no longer to be taken back. [after]:
+     * the text after the cursor, if read. [selected]: text is selected, as if cut. [offers]: the session may offer
+     * candidates for [before] now. [said]: the editor answered, so an empty [before] is really empty.
      */
     data class Context(
         val before: String,
@@ -352,12 +209,7 @@ sealed class Action {
         val said: Boolean = false,
     ) : Action() {
         companion object {
-            /**
-             * As much of the text before the cursor as the host reads into a context, and keeps of
-             * what it wrote where the field has none (the service's ContextChars, ContextMemory.KEEP):
-             * the last two words, and what the pinyin reranker has room for. A context as long may
-             * be the end of more text, no field's start.
-             */
+            /** How much text before the cursor the host reads into a context (ContextChars, ContextMemory.KEEP): the last two words and the reranker's room; so it may be the end of more text. */
             const val HOST_CHARS = 64
         }
     }
@@ -366,32 +218,19 @@ sealed class Action {
 /**
  * The engine's state after an action.
  *
- * @property commit text to put into the app now, or empty
- * @property preedit what is being typed, as the engine reads it
- * @property candidates the page shown
- * @property handled false when the action is the app's to act on (backspace with nothing typed)
- * @property predicting the candidates follow what was committed, and read no input (联想)
- * @property hints shown beside each candidate, empty or one per candidate: what is left of its
- *   code to type, or its whole code when the input does not spell it out (a wildcard in a
- *   table's code, or a table's pinyin lookup)
- * @property total how many candidates there are in all, -1 if not yet known
- * @property first the index among all of the first candidate of the page shown
- * @property actionable whether a long press on a candidate may offer something: see
- *   [Session.offers]
- * @property labels the keys picking the candidates shown, in order, where they are not the
- *   digits (letters such as `qwertyuiop` where a table's codes are digits); empty for the digits
- * @property refines whether [Action.Refine] would do more: the host sends it while the user
- *   pauses, till this is false
- * @property syllables what the first keys not yet taken as a syllable may be, likeliest first,
- *   a letter for an initial last: on the nine keys, for [Action.Syllable]; empty elsewhere
- * @property syllablesId which list [syllables] is: another for each change of it, below
- *   [Action.Syllable.IDS]
+ * @property handled false when the action is the app's (backspace with nothing typed)
+ * @property predicting the candidates follow what was committed (联想), reading no input
+ * @property hints per candidate: what is left of its code, or its whole code where the input does not spell it
+ * @property total all candidates, -1 if not yet known
+ * @property first the index of the page's first candidate
+ * @property labels keys picking the candidates where not the digits (a table whose codes are digits)
+ * @property refines whether [Action.Refine] would do more
+ * @property syllables what the first untaken keys may be (nine keys), for [Action.Syllable]
+ * @property syllablesId which list [syllables] is, below [Action.Syllable.IDS]
  * @property cursor where in [preedit] the cursor is, in characters; -1 at its end
- * @property deleteBefore how many code points before the cursor go first (the app deletes in code points), before [commit]: English
- *   puts a space it added after a word behind the punctuation typed next (`word .` as `word. `)
- * @property lookingUp [preedit] is a table's pinyin lookup, not its code: the host marks it (拼)
- * @property readings 候选词注音: empty, or one per candidate, each one string per code point of it
- *   (CandidateReadings), empty for one shown none
+ * @property deleteBefore code points to delete before [commit]: English moves its added space after punctuation (`word .` as `word. `)
+ * @property lookingUp [preedit] is a table's pinyin lookup: the host marks it (拼)
+ * @property readings 候选词注音: empty, or per candidate one string per code point
  */
 data class Snapshot(
     val commit: String,
@@ -414,6 +253,6 @@ data class Snapshot(
     val cursor: Int = -1,
     val lookingUp: Boolean = false,
     val readings: List<List<String>> = emptyList(),
-    /** A key chose from a list shown (a digit, space: Keyboard's [Action.Select]; the nine keys' syllable bar); what it took hangs on that list. */
+    /** A key chose from a list shown (digit, space, the syllable bar): what it took depends on that list. */
     val picked: Boolean = false,
 )

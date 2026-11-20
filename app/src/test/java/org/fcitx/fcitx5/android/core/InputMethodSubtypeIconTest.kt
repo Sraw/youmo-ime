@@ -10,7 +10,7 @@ import org.w3c.dom.Element
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-/** The input method switcher shows the build type's icon, so a debug install is told apart from a release one. */
+/** So a debug install is told apart from a release one in the switcher. */
 class InputMethodSubtypeIconTest {
 
     @Test
@@ -20,7 +20,7 @@ class InputMethodSubtypeIconTest {
         assertEquals(application.getAttributeNS(ANDROID_NS, "icon"), subtype.getAttributeNS(ANDROID_NS, "icon"))
     }
 
-    // :app unit tests run without merged resources, so the source files are read; from app/ under Gradle, the repository root in an IDE
+    // :app unit tests have no merged resources, so the source files are read (from app/ under Gradle, the repo root in an IDE)
     private fun parse(path: String): Element =
         DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
             .newDocumentBuilder().parse(listOf(path, "app/$path").map { File(it) }.first { it.exists() }).documentElement

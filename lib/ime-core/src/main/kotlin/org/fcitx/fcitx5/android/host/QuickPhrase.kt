@@ -8,18 +8,16 @@ import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.TextFormatFlag
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 
-/** What quick input asks the app and tells it, for the user's own entries ([QuickPhraseBook.mine]). */
 interface QuickPhraseHooks {
-    /** The user's nine keys' letters, what the nine keys' digits are in a key ([QuickPhraseKeys]). */
+    /** What the nine keys' digits are in a key ([QuickPhraseKeys]). */
     val nineKeys: NineKeyLetters get() = NineKeyLetters.STANDARD
 
-    /** Whether the user's entries are offered: not with the habits off (借手机), a notebook being private. */
+    /** Not with the habits off (借手机): a notebook is private. */
     val withMine: Boolean get() = true
 
-    /** [entry] committed at [at] (never in a password field): kept in `mine.used`. */
+    /** Never in a password field. */
     fun used(entry: QuickPhraseEntry, at: Long) {}
 
-    /** ＋添加 tapped: the settings page's new entry. */
     fun add() {}
 
     fun now(): Long = System.currentTimeMillis()
@@ -30,49 +28,25 @@ interface QuickPhraseHooks {
 }
 
 /**
- * Quick input, fcitx's quick phrase temp mode (`modules/quickphrase/quickphrasetempmode.cpp`, the
- * module `quickphrase.cpp`/`quickphrase.h`): type a key (`:smile:`, `\alpha`, `yawn`), pick one of the
- * table's matches.
- *
- * What it ports and what it leaves out, the latter because nothing here reaches it:
- * - the trigger keys Super+grave and Super+semicolon (`quickphrase.h:35-39`, no setting, design Q6),
- *   and [trigger] for the keyboard's button (`native-lib.cpp:286-296`);
- * - only the built-in table's matches (`updateUI`, `:354-389`): no module registers a callback
- *   provider, the spell provider's English hints were removed, so every match commits
- *   (`QuickPhraseAction::Commit`) and the selection keys are always the digits, with no modifier
- *   (`Choose Modifier` is `None` and `conf/quickphrase.conf` is not read, design §2);
- * - no `setBuffer`/`setBufferWithRestoreCallback` (`:306-329`, only pinyin's quick phrase hand-off calls
- *   them, and this app's pinyin is not fcitx's), so no restore on Backspace (`:211-219`);
- * - no compose sequences: fcitx on Android is built without xkb (`ENABLE_KEYBOARD` off), so
- *   `processComposeString` is always the empty string (`fcitx/instance.cpp:1925-1929`) and a key
- *   types its own character.
- *
- * This app's own besides (design 051-quickphrase): the user's entries ([QuickPhraseBook.mine]) listed
- * with nothing typed, the last used first, then ＋添加; a key of several letters (the nine keys', the
- * 14 and 18 keys') any of them ([QuickPhraseKeys]); an entry shown as its first line's start
- * ([QuickPhraseExcerpt]) with its note (else its key) as the comment, committed whole and as it is (no traditional,
- * no full width: [TempModeHost.commitAsIs]); its use kept, but not in a password field.
- *
- * [book] is read once by the caller ([QuickPhraseBook.load]) and replaced with [reload]; it is
- * asked for at the first lookup, not before, so the caller can load it off the host thread meanwhile.
+ * Quick input, fcitx's quick phrase temp mode ported: only the built-in table's matches (no callback providers,
+ * so every match commits, the digits select) and no compose (Android's fcitx has no xkb). Added: the user's
+ * entries listed with nothing typed, multi-letter keys ([QuickPhraseKeys]), entries committed as is.
+ * [book] is first asked at the first lookup, so the caller can load it off the host thread.
  */
 @Suppress("LongParameterList")
 class QuickPhrase(
     private val host: TempModeHost,
     @Volatile private var book: () -> QuickPhraseBook,
-    /** `_("Quick Phrase: ")`, translated by the app. */
     private val auxLabel: String = "Quick Phrase: ",
     private val hooks: QuickPhraseHooks = QuickPhraseHooks.NONE,
-    /** The last candidate with nothing typed, the way to a new entry. */
     private val addLabel: String = "+ Add",
-    /** After [auxLabel] with nothing typed and none of the user's entries. */
     private val emptyHint: String = "type a key, or tap + Add for your own",
 ) : TempMode {
 
     constructor(host: TempModeHost, table: QuickPhraseTable, auxLabel: String = "Quick Phrase: ") :
         this(host, fixed(QuickPhraseBook(table)), auxLabel)
 
-    /** A key typed reads its code ([QuickPhraseKeys]), not the letter [TempModeManager] would make it. */
+    /** A key reads its code ([QuickPhraseKeys]), not the letter [TempModeManager] would make it. */
     override val readsCodes: Boolean get() = true
 
     private class State {
@@ -81,7 +55,7 @@ class QuickPhrase(
         var hint = ""
         val buffer = TempInputBuffer(MAX_SIZE)
 
-        // what each character of buffer may be in a key, in step with it: edited through the methods below
+        // in step with buffer: edited through the methods below
         val keys = ArrayList<Set<Int>>()
 
         fun backspace(): Boolean = buffer.backspace().also { if (it) keys.removeAt(buffer.cursor) }
@@ -91,7 +65,7 @@ class QuickPhrase(
         fun type(shown: Int, can: Set<Int>): Boolean = buffer.type(String(Character.toChars(shown))).also { if (it) keys.add(buffer.cursor - 1, can) }
         var list: TempCandidateList? = null
 
-        // what list shows, the user's or built-in, one for each candidate; null for ＋添加
+        // one for each candidate; null for ＋添加
         var found: List<QuickPhraseBook.Found?> = emptyList()
     }
 
@@ -101,35 +75,31 @@ class QuickPhrase(
         this.book = { book }
     }
 
-    /** As [reload], with a book read off the host thread: a lookup before it is read waits for it. */
+    /** A lookup before it is read waits for it. */
     fun reload(book: () -> QuickPhraseBook) {
         this.book = book
     }
 
-    /** The list made again from the book as it is now, if the mode is on in [ic]; what is typed, the page and the lit one stay. */
+    /** If the mode is on in [ic]; what is typed, the page and the lit one stay. */
     fun refresh(ic: InputContext) {
         val s = ic.propertyFor(state)
         if (s.active) updateUI(ic, kept = s.list)
     }
 
-    /** What the candidate at [globalIndex] of the list shown is: null for ＋添加, or none. */
+    /** Null for ＋添加, or none. */
     fun entryAt(ic: InputContext, globalIndex: Int): QuickPhraseBook.Found? =
         ic.propertyFor(state).takeIf { it.active }?.found?.getOrNull(globalIndex)
 
     override fun isActive(ic: InputContext) = ic.propertyFor(state).active
 
-    /** `triggerTempMode` (`quickphrasetempmode.cpp:86-94`). */
+    /** `triggerTempMode`. */
     override fun trigger(ic: InputContext, e: KeyEvent): Boolean {
         if (e.release || TRIGGER_KEYS.none { TempKeys.check(e.key, it) }) return false
         trigger(ic)
         return true
     }
 
-    /**
-     * `QuickPhraseTempMode::trigger` (`:289-304`): active with an empty buffer. fcitx's text, prefix,
-     * str, alt and key arguments are left out: only pinyin's quick phrase hand-off passes them, and
-     * the keyboard's button and the trigger keys never do.
-     */
+    /** `QuickPhraseTempMode::trigger`; fcitx's text/prefix/key arguments only come from pinyin's hand-off, never here. */
     fun trigger(ic: InputContext) {
         val s = ic.propertyFor(state)
         s.typed = false
@@ -141,20 +111,20 @@ class QuickPhrase(
 
     private fun nothingTypedOrLit(s: State): Boolean = s.buffer.isEmpty() && (s.list?.cursorIndex ?: -1) < 0
 
-    /** `keyEvent` (`:96-276`): true when the key was used. */
+    /** `keyEvent`: true when the key was used. */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     override fun keyEvent(ic: InputContext, e: KeyEvent): Boolean {
         if (e.release) return false
         val s = ic.propertyFor(state)
         val key = e.key
-        // nothing typed, nothing lit (the arrows light one): Space leaves and types itself, never a whole entry by mistake
+        // nothing typed or lit: Space leaves and types itself, never a whole entry by mistake
         if (key.sym == KeySyms.SPACE && key.states == 0 && nothingTypedOrLit(s)) {
             reset(ic)
             host.commit(ic, " ")
             return true
         }
         s.list?.let { list ->
-            // nothing typed, a digit is a key's: the list is the user's whole notebook, not a page to pick from
+            // nothing typed, a digit is a key's: the list is the whole notebook, not a page
             val idx = if (s.buffer.isEmpty()) -1 else TempKeys.digitSelection(key, 0)
             if (idx >= 0 && idx < list.size) {
                 list.candidate(idx).select?.invoke(ic)
@@ -246,10 +216,7 @@ class QuickPhrase(
         return true
     }
 
-    /**
-     * `invokeAction` (`:331-343`): a tap in the preedit moves the buffer's cursor there; any other
-     * action, or a context without client preedit, leaves the mode.
-     */
+    /** `invokeAction`: a preedit tap moves the buffer's cursor; else (or without client preedit) the mode leaves. */
     override fun invokeAction(ic: InputContext, e: InvokeActionEvent): Boolean {
         val s = ic.propertyFor(state)
         val cursor = e.cursor
@@ -264,7 +231,7 @@ class QuickPhrase(
         return true
     }
 
-    /** `reset` (`:278-283`, `QuickPhraseState::reset`, `:67-83`). */
+    /** `reset`. */
     override fun reset(ic: InputContext) {
         val s = ic.propertyFor(state)
         s.active = false
@@ -276,14 +243,14 @@ class QuickPhrase(
         host.showPanel(ic, TempPanel.EMPTY)
     }
 
-    /** `updateUI` (`:345-428`); [kept], the list it replaces, has its page and lit candidate kept where they still are. */
+    /** `updateUI`; [kept]'s page and lit candidate are kept where they still are. */
     private fun updateUI(ic: InputContext, kept: TempCandidateList? = null) {
         val s = ic.propertyFor(state)
         val book = book()
         val withMine = hooks.withMine
         val empty = s.buffer.isEmpty()
         val found: List<QuickPhraseBook.Found?> = if (empty) {
-            // the whole notebook, then the way to add to it: the built-in tables are thousands, not listed
+            // the built-in tables are thousands, not listed
             if (withMine) book.mine.map { QuickPhraseBook.Found.of(it) } + null else emptyList()
         } else {
             book.find(s.keys, withMine)
@@ -303,7 +270,6 @@ class QuickPhrase(
         show(ic)
     }
 
-    // [list] on [old]'s page, or its last if fewer now, the lit one at the same place if it is still there
     private fun keep(list: TempCandidateList, old: TempCandidateList) {
         while (list.currentPage < old.currentPage && list.hasNext) list.next()
         if (old.globalCursorIndex >= 0) list.setGlobalCursorIndex(minOf(old.globalCursorIndex, list.totalSize - 1))
@@ -316,8 +282,7 @@ class QuickPhrase(
                 reset(c)
             }
         }
-        // put in as it is, so shown so too: no traditional of the user's own words. Its note beside it
-        // when it has one: the key typed is the same for `#wz` 百度 and `#wz` 新浪, the note tells them apart
+        // as is, so no traditional; its note tells `#wz` 百度 from `#wz` 新浪
         return TempCandidate(QuickPhraseExcerpt.of(f.content), { f.note.ifEmpty { f.key } }, asIs = true, select = { c ->
             host.commitAsIs(c, f.content)
             // a password field's use is not kept: nothing typed in one leaves a trace
@@ -337,7 +302,7 @@ class QuickPhrase(
 
     private fun show(ic: InputContext) {
         val s = ic.propertyFor(state)
-        // capabilityFlags(), the preedit flag masked as setEnablePreedit left it (inputcontext.cpp:69-75)
+        // capabilityFlags(), the preedit flag masked as setEnablePreedit left it
         val client = ic.has(Capability.PREEDIT)
         val format = if (client) TextFormatFlag.Underline.flag else TextFormatFlag.NoFlag.flag
         val segments = listOf(s.buffer.userInput).filter { it.isNotEmpty() }
@@ -362,13 +327,13 @@ class QuickPhrase(
 
         private fun fixed(book: QuickPhraseBook): () -> QuickPhraseBook = { book }
 
-        /** `TriggerKey` default (`quickphrase.h:35-39`). */
+        /** `TriggerKey` default. */
         val TRIGGER_KEYS = listOf(
             Key(TempKeys.GRAVE, KeyStates.SUPER),
             Key(TempKeys.SEMICOLON, KeyStates.SUPER),
         )
 
-        /** Digits 1–9, 0 with no modifier (`setSelectionKeys`, `:430-465`). */
+        /** `setSelectionKeys`. */
         private val SELECTION_LABELS = (1..10).map { TempCandidateList.keyToLabel(Key(KeySyms.DIGIT_0 + it % 10)) }
     }
 }

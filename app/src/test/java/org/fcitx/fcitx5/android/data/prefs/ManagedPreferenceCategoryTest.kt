@@ -29,7 +29,7 @@ class ManagedPreferenceCategoryTest {
     private lateinit var ctx: Context
     private lateinit var sp: SharedPreferences
 
-    // a list that does not offer every value (as 0.5.x's text build did not offer Voice)
+    // a list that does not offer every value
     private class Sample(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.virtual_keyboard, sp) {
         val behavior = enumList(
             R.string.space_long_press_behavior,
@@ -46,27 +46,25 @@ class ManagedPreferenceCategoryTest {
         sp.edit { clear() }
     }
 
-    /** [category]'s list [key] as the settings page shows it, read from what is stored. */
     private fun shown(category: ManagedPreferenceCategory, key: String = "behavior"): ListPreference {
         val screen = PreferenceManager(ctx).apply { sharedPreferencesName = PREFS }.createPreferenceScreen(ctx)
         category.createUi(screen)
         return screen.findPreference(key)!!
     }
 
-    /** As the list's dialog stores the user's pick. */
+    /** As the list's dialog stores a pick. */
     private fun ListPreference.choose(value: String) {
         if (callChangeListener(value)) this.value = value
     }
 
-    // a stored value this build's list has no entry for (a backup's, another build's) reads and shows as the default,
-    // and is not written over: a build that has it reads it again
+    // a value the list lacks (a backup's, another build's) shows as the default and is not written over
     @Test
     fun aValueTheListDoesNotOfferReadsAndShowsAsTheDefaultAndIsKept() {
         class Row(val why: String, val stored: String)
         assertRows(
             listOf(
                 Row("the enum's value, which the list does not offer (0.5.x's text build and Voice)", SpaceLongPressBehavior.Voice.name),
-                // audit-061 app-rest-12: enumValueOf threw IllegalArgumentException on it, the settings read failing
+                // enumValueOf threw IllegalArgumentException on it, failing the settings read
                 Row("no name of the enum's at all (a later build's value, an older version installed back)", "SomethingLater"),
             ),
             { it.why },

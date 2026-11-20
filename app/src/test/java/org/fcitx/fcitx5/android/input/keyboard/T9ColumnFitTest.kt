@@ -30,11 +30,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.roundToInt
 
-/**
- * A7: the column's longest syllables (shuang, zhuang, chuang) on its narrowest, under the largest
- * font scales, stay one line and whole: drawn smaller to fit the item, never wrapped onto a second
- * line the cell cut off. The text is in dp, so the font scale does not grow it either.
- */
+/** The column's longest syllables on its narrowest under the largest font scales: drawn smaller, never wrapped; the text is in dp. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w240dp-h640dp-xxhdpi")
@@ -46,16 +42,14 @@ class T9ColumnFitTest {
     @Test
     fun theLongestSyllablesFitTheNarrowestColumnAtFontScale20() = fits(2.0f)
 
-    // laid out again at another size: the column in the scene's slot `side` in that same pass (T9Keyboard.onLayout)
+    // laid out again at another size: the column in the scene's slot in that same pass (T9Keyboard.onLayout)
     @Test
     fun theLongestSyllablesFitTheNarrowestColumnInItsSlot() = fits(2.0f, moved = true)
 
     @get:Rule
     val prefs = PrefsRule()
 
-    // no scene yet (never laid out): the column not shown; then shown in its slot, and laid out again at the same
-    // size nothing changes: its layout params the same object, not set again (setting them asks for a layout: a loop
-    // once, 0bfe7fa6b)
+    // laid out again at the same size: its layout params the same object, not set again (setting them asks for a layout: a loop once)
     @Test
     fun theColumnWaitsForTheSceneAndThenStaysPut() {
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
@@ -72,14 +66,13 @@ class T9ColumnFitTest {
         assertEquals(View.VISIBLE, column.visibility)
         pass()
         val params = column.layoutParams
-        // laid out again for certain (the same size alone would skip onLayout): the slot unmoved, its params not set again
+        // the same size alone would skip onLayout
         keyboard.requestLayout()
         pass()
         assertSame(params, column.layoutParams)
     }
 
-    // R20 F5933: the scene made anew as it is drawn, not in a layout: none (failed) with the column shown asks
-    // for a layout (which hides it); the same slot as placed asks nothing (a scene made again for Shift or Return)
+    // a scene made anew as it is drawn: none with the column shown asks for a layout (which hides it); the same slot asks nothing
     @Test
     fun aSceneMadeAsItIsDrawnPlacesTheColumnAgainOnlyWhenItsSlotChanged() {
         val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
@@ -96,9 +89,8 @@ class T9ColumnFitTest {
         assertTrue("no scene, the column shown: a layout asked", keyboard.isLayoutRequested)
     }
 
-    // no scene made (its layout unreadable): the column hidden with the keys, as the new drawing failing shows
-    // nothing (T9Keyboard.onLayout, no scene no slot); the same keyboard with its layout read shows it. The
-    // layout is read as the keyboard is made, so the unreadable one is in place before
+    // no scene made (its layout unreadable): the column hidden with the keys; the layout is read as the keyboard is
+    // made, so the unreadable one is in place before
     @Test
     fun theColumnHidesWhenTheSceneIsNotMade() {
         fun columnShown(): Int {
@@ -122,7 +114,7 @@ class T9ColumnFitTest {
                 override fun text(id: String) = if (id == "nine") "<not a layout" else own.text(id)
             }
         }
-        // the app's own is the step back where a source does not read: unreadable too, so no scene at all
+        // the app's own is the step back: unreadable too, so no scene at all
         SceneLayouts.source = unreadable
         SceneLayouts.fallback = unreadable
         try {
@@ -139,7 +131,7 @@ class T9ColumnFitTest {
         val longest = listOf("shuang", "zhuang", "chuang", "shuan")
         keyboard.show(T9State(composing = true, syllables = longest, id = 1))
         val density = keyboard.resources.displayMetrics.density
-        // the narrowest the nine keys are laid out: a 240dp-wide keyboard (one-handed on a small phone)
+        // a 240dp-wide keyboard (one-handed on a small phone)
         val w = (NARROWEST_DP * density).toInt()
         val h = (HEIGHT_DP * density).toInt()
         keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
@@ -147,12 +139,11 @@ class T9ColumnFitTest {
         val view = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         var height = h
         if (moved) {
-            // laid out again at another size: the column moves with the slot in that same pass
             height = h + h / 4
             keyboard.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
             keyboard.layout(0, 0, w, height)
         }
-        // one measure and layout, no frame after it (no looper run): the column in its slot already, shown
+        // one measure and layout, no looper run: the column in its slot already
         val slot = checkNotNull(view.scene).slots.single { it.id == "side" }.bounds
         val column = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single()
         assertEquals(View.VISIBLE, column.visibility)
@@ -169,11 +160,10 @@ class T9ColumnFitTest {
             val inside = ink.left >= item.paddingLeft - 0.5f && ink.right <= item.width - item.paddingRight + 0.5f &&
                 ink.top >= -0.5f && ink.bottom <= item.height + 0.5f
             assertTrue("${longest[i]} at font scale $scale: ink $ink in ${item.width}x${item.height}", inside)
-            // the text's size is in dp: the font scale does not grow it
             assertEquals(T9Keyboard.ITEM_TEXT_DP * density, item.textSize, 0.5f)
             if (item.paint.measureText(longest[i]) > item.width - item.paddingLeft - item.paddingRight) shrunk = true
         }
-        // the column this narrow is narrower than the syllables at full size: the fit was needed
+        // narrower than the syllables at full size: the fit was needed
         assertTrue("a syllable drawn smaller", shrunk)
     }
 

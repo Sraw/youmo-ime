@@ -37,7 +37,6 @@ open class PagingCandidateViewAdapter(val theme: Theme) :
         refresh()
     }
 
-    /** The theme's candidates (T6a): the window's, else worked out by the first candidate made. */
     var bar: BarLook? = null
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CandidateViewHolder {

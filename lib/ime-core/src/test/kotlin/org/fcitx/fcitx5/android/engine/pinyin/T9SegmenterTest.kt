@@ -30,7 +30,6 @@ class T9SegmenterTest {
         assertTrue(setOf("ni", "mi").all { it in g.read(0, 2) })
         assertTrue("hao" in g.read(2, 5))
         assertTrue("o" in g.read(0, 1))
-        // the last digits on their way to a longer syllable
         assertTrue(setOf("nian", "ming").all { it in segmenter.segment("64").read(0, 2, Kind.EXTENDED) })
     }
 
@@ -41,7 +40,6 @@ class T9SegmenterTest {
         assertTrue(setOf("ga", "ha").all { it in strict.read(0, 1, Kind.INITIAL) })
         // 呣 and 嗯 (6) and 儿 (7) keep no initial off: 79 is q, s … then w, x …
         assertTrue("qu" in T9Segmenter(abbreviations = false).segment("7948").read(0, 1, Kind.INITIAL))
-        // 64 reads ni: no initial n there
         assertTrue(T9Segmenter(abbreviations = false).segment("6426").read(0, 1, Kind.INITIAL).isEmpty())
         // with them, beside a syllable no longer than the initial too: 74 is si, and sh in 745 时间
         val abbreviating = T9Segmenter()
@@ -61,12 +59,9 @@ class T9SegmenterTest {
         assertTrue("zhong~" in fuzzy.segment("9664").marked(0, 4))
         assertTrue("zong~" in fuzzy.segment("94664").marked(0, 5))
         assertTrue("zhong~…" in fuzzy.segment("95").marked(0, 1, Kind.INITIAL))
-        // l is 5 and n 6
         assertTrue("nan~" in fuzzy.segment("526").marked(0, 3))
         assertTrue("lan~…" in fuzzy.segment("65").marked(0, 1, Kind.INITIAL))
-        // and a final pair: 546 is jing too
         assertTrue("jing~" in fuzzy.segment("546").marked(0, 3))
-        // none of it without the pairs
         assertFalse("zhong" in segmenter.segment("9664").read(0, 4))
         assertFalse("lan" in segmenter.segment("65").read(0, 1, Kind.INITIAL))
     }
@@ -78,15 +73,12 @@ class T9SegmenterTest {
         assertTrue("bei" in strict.segment("25").read(0, 1, Kind.INITIAL))
         assertTrue("nan" in strict.segment("65").read(0, 1, Kind.INITIAL))
         assertTrue("a" in strict.segment("25").read(0, 1))
-        // typed last, a syllable read on from a whole one, as on the full keyboard: a lone 2 is
-        // 啊 before 不, whose b only starts it (it read b once, 不 first)
         val six = segmenter.segment("6")
         assertTrue(setOf("men", "ni", "ou").all { it in six.read(0, 1, Kind.EXTENDED) })
         assertTrue(six.read(0, 1, Kind.PARTIAL).isEmpty())
         val two = segmenter.segment("2")
         assertTrue("a" in two.read(0, 1))
         assertTrue("ba" in two.read(0, 1, Kind.EXTENDED))
-        // with no whole syllable, only started
         assertTrue("ta" in segmenter.segment("8").read(0, 1, Kind.PARTIAL))
     }
 
@@ -97,13 +89,11 @@ class T9SegmenterTest {
         val g = ou.segment("86")
         assertTrue(g.read(0, 1).isEmpty())
         assertTrue("ta" in g.read(0, 1, Kind.INITIAL))
-        // after an initial the pair holds: 68 is mou too
         assertTrue(setOf("mu", "mou").all { it in ou.segment("68").read(0, 2) })
     }
 
     @Test
     fun aLetterTypedAsItselfKeepsTheSyllablesWithItThere() {
-        // 7 then 4 4 fast: s, p, q or r, then h
         val sh = segmenter.segment("7H")
         assertTrue(sh.read(0, 2).isEmpty())
         val starts = sh.read(0, 2, Kind.EXTENDED) + sh.read(0, 2, Kind.PARTIAL)
@@ -116,10 +106,8 @@ class T9SegmenterTest {
         assertTrue(segmenter.segment("6IG26").read(2, 5).none { it == "hao" })
         // at the end with no syllable whole left, the starts are only on their way (PARTIAL)
         assertTrue(sh.read(0, 2, Kind.EXTENDED).isEmpty())
-        // üe typed lue as well as lve: 略
         assertTrue("lve" in segmenter.segment("5U3").read(0, 3))
         assertTrue("lve" in segmenter.segment("5V3").read(0, 3))
-        // a letter no syllable has there leaves nothing to read
         assertTrue(segmenter.segment("6K").read(0, 2).isEmpty())
         assertTrue(T9Segmenter.isKey('H') && T9Segmenter.isKey('2') && !T9Segmenter.isKey('h') && !T9Segmenter.isKey('1'))
     }
@@ -129,7 +117,6 @@ class T9SegmenterTest {
         val g = segmenter.segment("ni'426")
         assertEquals(setOf("ni"), g.read(0, 3))
         assertTrue("hao" in g.read(3, 6))
-        // a letter taken is an initial, m too, which is 呣 alone
         assertTrue("hao" in segmenter.segment("h'26").read(0, 2, Kind.INITIAL))
         assertTrue("ma" in segmenter.segment("m'2").read(0, 2, Kind.INITIAL))
         assertTrue(segmenter.segment("m'2").read(0, 2).isEmpty())
@@ -139,13 +126,11 @@ class T9SegmenterTest {
 
     @Test
     fun lettersTheUserPutOnTheKeysAreReadFromEach() {
-        // a on 2 and on 5 too, l moved from 5 to 9
         val keys = NineKeyLetters.of(listOf("abc", "def", "ghi", "jka", "mno", "pqrs", "tuv", "wxyzl"))
         val custom = T9Segmenter(abbreviations = false, letters = keys)
         assertTrue("ba" in custom.segment("22").read(0, 2))
         assertTrue("ba" in custom.segment("25").read(0, 2))
         assertTrue("lai" in custom.segment("924").read(0, 3))
-        // l is no longer on 5
         assertFalse("lai" in custom.segment("524").read(0, 3))
         assertTrue("jia" in custom.segment("542").read(0, 3))
         // a letter typed as itself is that letter whichever key typed it
@@ -166,12 +151,11 @@ class T9SegmenterTest {
         assertTrue(empty.reads('2'))
     }
 
-    /** 连按 is strict (2026-10-19): 7 then 4 4 fast is 7 and H, read only as letters typed as themselves are. */
+    /** 连按 is strict: 7 then 4 4 fast is 7 and H, read only as letters typed as themselves are. */
     @Test
     fun aKeyPressedAgainIsInTheInputAsTheLetterItCameTo() {
         val sh = segmenter.segment("7H")
         assertTrue(setOf("sha", "shi", "shang").all { it in sh.read(0, 2, Kind.PARTIAL) + sh.read(0, 2, Kind.EXTENDED) })
-        // not 744 as keys: no si, no pi
         assertFalse(sh.read(0, 2).any { it.startsWith("si") || it.startsWith("pi") })
         assertFalse((sh.read(0, 2, Kind.PARTIAL) + sh.read(0, 2, Kind.EXTENDED)).any { !it.startsWith("sh") })
     }
@@ -183,7 +167,7 @@ class T9SegmenterTest {
         assertFalse(T9Segmenter.isKey('h') || T9Segmenter.isKey('1'))
     }
 
-    // the 14 keys (design §5.1): QW ER TY UI OP / AS DF GH JK L / ZX CV BN M, each key its code
+    // the 14 keys: QW ER TY UI OP / AS DF GH JK L / ZX CV BN M, each key its code
     private val g14 = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14)
 
     @Test
@@ -191,13 +175,9 @@ class T9SegmenterTest {
         val g = g14.segment(g14("bn ui gh as op"))
         assertTrue(g.read(0, 2).toString(), setOf("ni", "bu", "bi").all { it in g.read(0, 2) })
         assertTrue(setOf("hao", "gao").all { it in g.read(2, 5) })
-        // no 简拼 beside a syllable
         assertTrue(g.read(0, 1, Kind.INITIAL).isEmpty())
-        // half a syllable at the end: GH on its way to hao, gao
         assertTrue(setOf("hao", "gao").all { it in g14.segment(g14("bn ui gh")).read(2, 3, Kind.PARTIAL) })
-        // üe typed ue as well: L UI ER is lve, 略
         assertTrue("lve" in g14.segment(g14("l ui er")).read(0, 3))
-        // UI alone starts no syllable
         val ui = g14.segment(g14("ui"))
         assertTrue(listOf(Kind.SYLLABLE, Kind.INITIAL, Kind.PARTIAL, Kind.EXTENDED).all { ui.read(0, 1, it).isEmpty() })
     }

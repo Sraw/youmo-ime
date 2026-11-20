@@ -8,11 +8,7 @@ import org.fcitx.fcitx5.android.data.pack.AppData
 import org.fcitx.fcitx5.android.handwriting.OrtModel
 import org.junit.Test
 
-/**
- * The handwriting models open on the device: `OrtModel` takes one input and float outputs only
- * since the voice tagger's int64 run was added (ort-jni.cpp), and nothing else opens them in a test.
- * From the text pack, imported on the device first (uat.py's packs; specs/testing.md).
- */
+/** Nothing else opens these models in a test, and `OrtModel` changed for the voice tagger's int64 run. Needs the text pack imported. */
 class HandwritingModelsTest {
 
     @Test

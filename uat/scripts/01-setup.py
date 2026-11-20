@@ -6,8 +6,7 @@ from uat import IME, PKG, Blocked, case, check, import_packs, in_picker, install
 
 @case("SET-01", base="B0", mutates=True)
 def set01(d):
-    # 前提: the version under test reinstalled (the installed apk, copied off the device first),
-    # another keyboard the current one
+    # 前提: the version under test reinstalled, another keyboard current
     path = d.sh(f"pm path {PKG}").strip().replace("package:", "").splitlines()[0]
     copied = d.sh(f"cp {path} /data/local/tmp/uat-youmo.apk && cmp {path} /data/local/tmp/uat-youmo.apk && echo same")
     if "same" not in copied:
@@ -41,8 +40,7 @@ def set01(d):
     if not btn:
         raise Blocked(f"向导第一步没有按钮：{t1[:8]}")
     d.tap(btn.c, 2.0)
-    # the system's 屏幕键盘 page: the switch on our row (the row's text opens our own settings),
-    # then the warning's 确定
+    # the system's 屏幕键盘 page: our row's switch, then the warning's 确定
     s = d.screen()
     sws = [n for n in s.nodes if n.cls == "Switch"]
     ours = next((n for n in s.nodes if n.text.startswith("幽默")), None)
@@ -80,8 +78,7 @@ def set01(d):
     cur = d.sh("settings get secure default_input_method").strip()
     check(cur == IME, f"系统当前输入法是 {cur}")
     d.open_page("text")
-    # a fresh install has no resource packs: the keyboard asks for the text pack, then types once
-    # it is imported (as through the 资源包 page: the debug build's import, the same checks)
+    # a fresh install has no packs: the keyboard asks for the text pack, then types once it is imported
     d.step("没有文字包时键盘上提示导入")
     d.wait(lambda x: x.find(contains="需要导入文字包", where="ime"), 20, what="键盘上的「需要导入文字包」")
     import_packs(d, d.voice)
@@ -94,21 +91,6 @@ def set01(d):
     lab = d.im_label()
     check("拼音" in lab, f"空格键上是「{lab}」")
     return "向导两步，完成后是设置首页；键盘先提示导入文字包，导入后是幽默输入法（拼音）"
-
-
-case("SET-02", needs="jvm:SettingsMenuUatTest.enabledAndSelectedTheAppOpensOnItsHomePage")(lambda d: None)
-
-
-case("SET-03", needs="jvm:SettingsPagesUatTest.theInputMethodsListed")(lambda d: None)
-
-
-case("SET-05", needs="jvm:ImeSwitchUatTest.draggedFirstTheGlobeKeyGoesInTheNewOrder")(lambda d: None)
-
-
-case("SET-06", needs="jvm:ImeSwitchUatTest.aDeletedInputMethodIsNoLongerGoneRoundTo")(lambda d: None)
-
-
-case("SET-08", needs="jvm:ImeSwitchUatTest.theGlobeKeyGoesRoundAndTheSpaceSays")(lambda d: None)
 
 
 @case("SET-09", base="B0", mutates=True)
@@ -129,15 +111,3 @@ def set09(d):
 
 
 case("SET-11", needs="manual:要上游 Fcitx5 for Android 导出的备份")(lambda d: None)
-
-
-case("SET-12", needs="jvm:SettingsPagesUatTest.addingAnInputMethodOffersNoNineKeysAndWubiFirst")(lambda d: None)
-
-
-case("SET-13", needs="jvm:KotlinHostTest.zeroFoursNineKeysPinyinBecomesPinyinsKeyboardAndTheUserIsToldOnce")(lambda d: None)
-
-
-case("SET-14", needs="jvm:KotlinHostSchemeTest.anUpgradeKeepsItsScheme")(lambda d: None)
-
-
-case("SET-15", needs="jvm:KotlinHostSchemeTest.aDroppedSchemeIsXiaoheAndTheUserIsToldOnce")(lambda d: None)

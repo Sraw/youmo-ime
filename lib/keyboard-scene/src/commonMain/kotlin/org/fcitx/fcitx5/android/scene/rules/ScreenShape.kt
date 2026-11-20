@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.scene.rules
 /**
  * Whether the keyboard is laid out as 横屏 (landscape): every setting with a portrait and a landscape value,
  * the theme's `@landscape`, the split's AUTO, the low keys' marks all read this one answer. Here, not in
- * ime-core, so the web tools ask it too (061-wide-as-landscape §2.1): the app, the theme maker's page and the
+ * ime-core, so the web tools ask it too: the app, the theme maker's page and the
  * layout check's scenes (LayoutCheck) alike, so none of them lays out a keyboard as a device never shows it
  * (673 dp wide drawn upright).
  */

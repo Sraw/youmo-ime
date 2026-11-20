@@ -55,7 +55,6 @@ class PackShelfTest {
         files.forEach { (path, bytes) -> assertArrayEquals(path, bytes, File(dir, path).readBytes()) }
     }
 
-    // what is in root beside the packs in use: nothing once loaded
     private fun leftovers(kind: PackKind) =
         File(root, kind.id).listFiles().orEmpty().map { it.name }.filter { it != PackShelf.CURRENT }
 
@@ -79,18 +78,17 @@ class PackShelfTest {
         assertEquals(1, leftovers(PackKind.TEXT).size)
     }
 
-    // each rename's directory synced after it: the generation's, then `current`'s (review L8)
+    // each rename's directory synced after it: the generation's, then `current`'s
     @Test
     fun `an import syncs the pack's directory after each rename`() {
         val synced = ArrayList<String>()
         val shelf = PackShelf(root, listOf(packs.publicKey), needs, 0) { synced += it.name }.apply { load() }
         shelf.take(text())
         assertEquals(listOf(PackKind.TEXT.id, PackKind.TEXT.id), synced)
-        // a directory can be synced here (Linux, macOS), as on a phone
         assertTrue(PackShelf.syncDirectory(root))
     }
 
-    // what an import would replace asked about first (pending L8): the head's manifest, ours only; the one there
+    // what an import would replace is asked first: the head's manifest, ours only
     @Test
     fun `a pack's manifest is read from its head and the one there is known`() {
         val shelf = shelf()
@@ -98,7 +96,7 @@ class PackShelfTest {
         assertEquals(4, shelf.manifestOf(ByteArrayInputStream(text(version = 4)))!!.version)
         assertNull("another key's", shelf.manifestOf(ByteArrayInputStream(TestPacks().pack(PackKind.TEXT, TEXT_FILES, 4, 2))))
         assertNull("no zip", shelf.manifestOf(ByteArrayInputStream(byteArrayOf(1, 2, 3))))
-        // the provider's stream failing other than by I/O: none, said by the import that follows (not thrown out of it)
+        // the provider's stream failing other than by I/O: none, said by the import that follows
         assertNull("a SecurityException", shelf.manifestOf(object : InputStream() { override fun read(): Int = throw SecurityException("denied") }))
         shelf.take(text(version = 4))
         assertEquals(4, shelf.installed(PackKind.TEXT)!!.version)
@@ -140,10 +138,8 @@ class PackShelfTest {
         val shelf = shelf()
         shelf.take(text())
         shelf.take(packs.pack(PackKind.VOICE, VOICE_FILES))
-        // as it was copied: nothing changes
         assertFalse(shelf.verify(PackKind.TEXT))
         assertReady(shelf, PackKind.TEXT, 3, TEXT_FILES)
-        // none there: nothing to read
         assertFalse(PackShelf(tmp.newFolder(), listOf(packs.publicKey), needs).apply { load() }.verify(PackKind.TEXT))
         damage(shelf, PackKind.TEXT, "engine/pinyin.data")
         assertTrue(shelf.verify(PackKind.TEXT))
@@ -151,7 +147,6 @@ class PackShelfTest {
         assertTrue("$status", status is PackStatus.Damaged)
         assertEquals(3, (status as PackStatus.Damaged).manifest.version)
         assertNull(shelf.dir(PackKind.TEXT))
-        // the other pack as it was
         assertFalse(shelf.verify(PackKind.VOICE))
         assertTrue(shelf.status(PackKind.VOICE) is PackStatus.Ready)
         // a file gone is damage too
@@ -165,7 +160,7 @@ class PackShelfTest {
         assertFalse(shelf.verify(PackKind.TEXT))
     }
 
-    // review M-2: the damage found is kept, a restart's load reads it (the gate up at once), till imported again
+    // the damage found survives a restart till imported again
     @Test
     fun `a pack found damaged stays so after a restart till imported again`() {
         val shelf = shelf()
@@ -180,7 +175,6 @@ class PackShelfTest {
         assertEquals(3, (status as PackStatus.Damaged).manifest.version)
         assertNull(restarted.dir(PackKind.TEXT))
         assertSame(VerifyDue.NONE, restarted.due(PackKind.TEXT))
-        // imported again: mended, and so after the next restart
         val result = restarted.take(text())
         assertTrue("$result", result is ImportResult.Imported)
         assertReady(restarted, PackKind.TEXT, 3, TEXT_FILES)
@@ -188,7 +182,7 @@ class PackShelfTest {
         assertFalse(shelf().verify(PackKind.TEXT))
     }
 
-    // review M-1: read through at the first start after an import, then once its 30 days are past
+    // read through at the first start after an import, then once its 30 days are past
     @Test
     fun `a pack is read through once after its import, then after 30 days, the time kept by the next start`() {
         var now = 1_000_000_000_000L
@@ -215,14 +209,13 @@ class PackShelfTest {
         // the mark half written: read through again
         File(shelf.dir(PackKind.TEXT), PackShelf.VERIFIED).writeText("x")
         assertSame(VerifyDue.UNVERIFIED, shelf().due(PackKind.TEXT))
-        // the same pack imported again is read through, and so marked
         val again = shelf()
         assertTrue(again.take(text()) is ImportResult.AlreadyThere)
         assertSame(VerifyDue.NONE, again.due(PackKind.TEXT))
         assertSame(VerifyDue.NONE, shelf().due(PackKind.TEXT))
     }
 
-    // review L-6: the same pack again is read through, its progress told as an import's
+    // the same pack again is read through, its progress told as an import's
     @Test
     fun `the same pack again tells how far its read through got`() {
         val shelf = shelf()
@@ -240,8 +233,7 @@ class PackShelfTest {
         assertEquals(total, last)
     }
 
-    // review L-1: an import while a verify reads (the hook holds it between its read and its word):
-    // what it read is no longer used, the new pack neither marked damaged nor verified
+    // an import while a verify reads: the new pack neither marked damaged nor verified
     @Test
     fun `a verify whose pack is replaced as it reads leaves the new pack as it is`() {
         val reached = java.util.concurrent.CountDownLatch(1)
@@ -269,7 +261,6 @@ class PackShelfTest {
         assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
         assertFalse(File(old, PackShelf.DAMAGED).exists())
         assertReady(PackShelf(root, listOf(packs.publicKey), needs, 0).apply { load() }, PackKind.TEXT, 4, files)
-        // nor marked verified, read as it was
         lateinit var intact: PackShelf
         var imported = false
         intact = PackShelf(root, listOf(packs.publicKey), needs, 0, afterRead = {
@@ -283,7 +274,7 @@ class PackShelfTest {
         assertSame(VerifyDue.UNVERIFIED, intact.due(PackKind.TEXT))
     }
 
-    // review L-3: a file gone is damage; one the disk cannot read now says nothing of the pack
+    // a file gone is damage; one the disk cannot read now says nothing of the pack
     @Test
     fun `a file that cannot be read now is neither damage nor verified`() {
         var failing = true
@@ -302,8 +293,7 @@ class PackShelfTest {
         assertSame(VerifyDue.NONE, shelf.due(PackKind.TEXT))
     }
 
-    // review r4 MEDIUM: FileNotFoundException for a file that is there (no descriptor left, EMFILE;
-    // not readable, EACCES) is no damage: only a file not there is
+    // FileNotFoundException for a file that is there (EMFILE, EACCES) is no damage
     @Test
     fun `a file there that cannot be opened now is no damage`() {
         var failing = true
@@ -319,9 +309,7 @@ class PackShelfTest {
         assertTrue(shelf.status(PackKind.TEXT) is PackStatus.Ready)
         assertFalse(File(shelf.dir(PackKind.TEXT), PackShelf.DAMAGED).exists())
         assertSame(VerifyDue.UNVERIFIED, shelf.due(PackKind.TEXT))
-        // the same pack again: copied anew, not taken for damaged nor for there
         assertTrue(shelf.take(text()) is ImportResult.Imported)
-        // gone: damage
         failing = false
         File(shelf.dir(PackKind.TEXT), "engine/pinyin.data").delete()
         assertTrue(shelf.verify(PackKind.TEXT))
@@ -337,7 +325,7 @@ class PackShelfTest {
         val result = shelf.take(text(version = 4, files = files))
         assertEquals(3, (result as ImportResult.Imported).replaced?.version)
         assertReady(shelf, PackKind.TEXT, 4, files)
-        // kept till swept: the app's host restarted on the new one first (review L3)
+        // kept till swept: the host restarted on the new one first
         assertTrue(old.exists())
         shelf.sweep()
         assertFalse(old.exists())
@@ -345,7 +333,7 @@ class PackShelfTest {
         assertReady(shelf, PackKind.TEXT, 4, files)
     }
 
-    // a pack gone wrong taken back: the older one imported over the newer, the result saying what it replaced
+    // the older one imported over the newer, the result saying what it replaced
     @Test
     fun `an older pack is imported over a newer one`() {
         val shelf = shelf()
@@ -402,7 +390,6 @@ class PackShelfTest {
     @Test
     fun `a file's bytes changed in the zip are a bad file, not an unreadable one`() {
         val bytes = text()
-        // the pinyin file's 1000 counting bytes: the 500th changed
         val at = indexOf(bytes, ByteArray(1000) { it.toByte() }) + 500
         bytes[at] = (bytes[at] + 1).toByte()
         assertEquals("engine/pinyin.data", shelf().take(bytes).refused<Refusal.BadFile>().path)
@@ -428,8 +415,7 @@ class PackShelfTest {
         assertEquals(emptyList<String>(), leftovers(PackKind.TEXT))
     }
 
-    // a file listed once, in the zip twice (the same bytes both times): the zip writer refuses a
-    // name twice, so the second is written under a name of the same length and patched (review L1: M1)
+    // a file listed once, in the zip twice: the zip writer refuses a name twice, so it is patched in
     @Test
     fun `a file twice in the zip is refused`() {
         val shelf = shelf()
@@ -451,8 +437,7 @@ class PackShelfTest {
         assertSame(PackStatus.Missing, shelf.status(PackKind.TEXT))
     }
 
-    // a file longer than listed is refused as its bytes pass the size, not after all of them are
-    // written: the copy never holds more than the pack's size (review L1: M2)
+    // a file longer than listed is refused as its bytes pass the size: the copy never holds more
     @Test
     fun `a file longer than listed is refused before it is written past its size`() {
         val shelf = shelf()
@@ -467,8 +452,7 @@ class PackShelfTest {
         assertTrue("$most > $total", most <= total)
     }
 
-    // the manifest and its signature first, by name: the right bytes under other names, or the two
-    // the other way round, are no pack (review L1: M10)
+    // the manifest and its signature first, by name: other names or the other order are no pack
     @Test
     fun `the manifest and its signature must be the first two entries by name`() {
         val shelf = shelf()
@@ -480,7 +464,6 @@ class PackShelfTest {
             return out.toByteArray()
         }
         val files = TEXT_FILES.map { it.key to it.value }.toTypedArray()
-        // as built: imported (the helper makes good packs)
         assertTrue(shelf.take(zip(PackManifest.NAME to manifest, PackManifest.SIGNATURE to signature, *files)) is ImportResult.Imported)
         val other = shelf()
         other.take(zip("pack.json" to manifest, PackManifest.SIGNATURE to signature, *files)).refused<Refusal.NotAPack>()
@@ -502,11 +485,9 @@ class PackShelfTest {
         val shelf = shelf()
         shelf.take("hello".toByteArray()).refused<Refusal.NotAPack>()
         shelf.take(ByteArray(0)).refused<Refusal.NotAPack>()
-        // a zip whose first entry is not the manifest
         val out = java.io.ByteArrayOutputStream()
         java.util.zip.ZipOutputStream(out).use { TestPacks.stored(it, "readme.txt", byteArrayOf(1)) }
         shelf.take(out.toByteArray()).refused<Refusal.NotAPack>()
-        // a signature entry far too long
         val manifest = packs.manifest(PackKind.TEXT, TEXT_FILES, 3, 2)
         shelf.take(packs.pack(PackKind.TEXT, TEXT_FILES, manifest = manifest, signature = ByteArray(100))).refused<Refusal.NotAPack>()
     }
@@ -514,8 +495,7 @@ class PackShelfTest {
     @Test
     fun `an entry name that is not UTF-8 is no pack, not a crash`() {
         val shelf = shelf()
-        // ZipInputStream reads names as UTF-8 and throws IllegalArgumentException on a malformed one:
-        // it escaped the import and took the app's process with it. The first entry, and a file's
+        // ZipInputStream throws IllegalArgumentException on a malformed UTF-8 name; it used to kill the process
         val bad = String(byteArrayOf(0xff.toByte(), 'a'.code.toByte()), Charsets.ISO_8859_1)
         val out = java.io.ByteArrayOutputStream()
         java.util.zip.ZipOutputStream(out, Charsets.ISO_8859_1).use { TestPacks.stored(it, bad, byteArrayOf(1)) }
@@ -524,7 +504,6 @@ class PackShelfTest {
         shelf.take(packs.pack(PackKind.TEXT, TEXT_FILES, 3, 2, entries = files, charset = Charsets.ISO_8859_1)).refused<Refusal.NotAPack>()
         assertSame(PackStatus.Missing, shelf.status(PackKind.TEXT))
         assertEquals(emptyList<String>(), leftovers(PackKind.TEXT))
-        // and the shelf takes a good pack after them
         assertTrue(shelf.take(text()) is ImportResult.Imported)
     }
 
@@ -537,7 +516,7 @@ class PackShelfTest {
         shelf.take(text(format = 3)).refused<Refusal.Incompatible>()
         assertEquals(2, shelf.take(text(version = 2)).refused<Refusal.Incompatible>().manifest.version)
         assertSame(PackStatus.Missing, shelf.status(PackKind.TEXT))
-        // told before an import, as the store asks whether to replace a newer one (UAT 0.6.1)
+        // told before an import, as the store asks whether to replace a newer one
         fun usable(bytes: ByteArray) = shelf.usable(shelf.manifestOf(ByteArrayInputStream(bytes))!!)
         assertEquals(listOf(false, false, false, true), listOf(text(format = 1), text(format = 3), text(version = 2), text()).map(::usable))
     }
@@ -546,22 +525,18 @@ class PackShelfTest {
     fun `a pack the next build no longer takes reads as needing an update, or a newer app`() {
         PackShelf(root, listOf(packs.publicKey), mapOf(PackKind.TEXT to PackRequirement(2, 3), PackKind.VOICE to PackRequirement(1, 1)), 0)
             .apply { load() }.take(text())
-        // the next APK reads format 3: the pack needs updating
         val newer = PackShelf(root, listOf(packs.publicKey), mapOf(PackKind.TEXT to PackRequirement(3, 1), PackKind.VOICE to PackRequirement(1, 1)), 0)
         newer.load()
         val status = newer.status(PackKind.TEXT)
         assertTrue("$status", status is PackStatus.NeedsUpdate)
         assertEquals(3, (status as PackStatus.NeedsUpdate).needed.format)
         assertNull(newer.dir(PackKind.TEXT))
-        // needs version 4
         val later = PackShelf(root, listOf(packs.publicKey), mapOf(PackKind.TEXT to PackRequirement(2, 4), PackKind.VOICE to PackRequirement(1, 1)), 0)
         later.load()
         assertTrue(later.status(PackKind.TEXT) is PackStatus.NeedsUpdate)
-        // an older APK, which reads format 1, given it
         val older = PackShelf(root, listOf(packs.publicKey), mapOf(PackKind.TEXT to PackRequirement(1, 1), PackKind.VOICE to PackRequirement(1, 1)), 0)
         older.load()
         assertTrue(older.status(PackKind.TEXT) is PackStatus.NeedsNewerApp)
-        // its update imported over it
         newer.take(text(version = 5, format = 3))
         assertReady(newer, PackKind.TEXT, 5, TEXT_FILES)
     }
@@ -571,7 +546,6 @@ class PackShelfTest {
         shelf().take(text())
         val rotated = shelf(trusted = listOf(TestPacks().publicKey))
         assertSame(PackStatus.Missing, rotated.status(PackKind.TEXT))
-        // both trusted, the old key's packs still read
         assertReady(shelf(trusted = listOf(TestPacks().publicKey, packs.publicKey)), PackKind.TEXT, 3, TEXT_FILES)
     }
 
@@ -583,7 +557,7 @@ class PackShelfTest {
         assertEquals(emptyList<String>(), leftovers(PackKind.TEXT))
     }
 
-    // a file that stops partway: the user's storage taken away, or the process killed as it reads
+    // the storage taken away, or the process killed as it reads
     private class Breaking(input: InputStream, private var left: Int) : FilterInputStream(input) {
         override fun read(b: ByteArray, off: Int, len: Int): Int {
             if (left <= 0) throw IOException("gone")
@@ -618,7 +592,7 @@ class PackShelfTest {
         assertEquals(listOf(next.dir(PackKind.TEXT)!!.name), leftovers(PackKind.TEXT))
     }
 
-    // its manifest signed and there, a file of another size: damaged, said so, not as if never imported
+    // a file of another size: damaged, said so, not as if never imported
     @Test
     fun `a pack whose files are not all there reads as damaged`() {
         val shelf = shelf()
@@ -626,7 +600,6 @@ class PackShelfTest {
         File(shelf.dir(PackKind.TEXT), "engine/table/wbx.data").writeText("w")
         val status = shelf().status(PackKind.TEXT)
         assertTrue("$status", status is PackStatus.Damaged)
-        // the pointer naming nothing, or something unsafe
         File(root, "${PackKind.TEXT.id}/${PackShelf.CURRENT}").writeText("../voice")
         assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
     }
@@ -638,12 +611,10 @@ class PackShelfTest {
         val gen = shelf.dir(PackKind.TEXT)!!
         File(gen, PackManifest.SIGNATURE).delete()
         assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
-        // the voice pack's manifest, signed, in the text pack's place
         val voice = packs.manifest(PackKind.VOICE, emptyMap())
         File(gen, PackManifest.NAME).writeBytes(voice)
         File(gen, PackManifest.SIGNATURE).writeBytes(packs.sign(voice))
         assertSame(PackStatus.Missing, shelf().status(PackKind.TEXT))
-        // signed, but no manifest
         val junk = "[]".toByteArray()
         File(gen, PackManifest.NAME).writeBytes(junk)
         File(gen, PackManifest.SIGNATURE).writeBytes(packs.sign(junk))
@@ -657,7 +628,7 @@ class PackShelfTest {
         assertTrue(runCatching { PackShelf(root, listOf(packs.publicKey), needs - PackKind.VOICE) }.isFailure)
     }
 
-    // load(tidy = false) leaves what an import left behind; tidy() deletes it after (R20 F5931)
+    // load(tidy = false) leaves what an import left behind; tidy() deletes it after
     @Test
     fun `a load not tidying leaves the leftovers to tidy after`() {
         shelf().take(text())
@@ -672,7 +643,7 @@ class PackShelfTest {
         assertEquals(listOf(next.dir(PackKind.TEXT)!!.name), leftovers(PackKind.TEXT))
     }
 
-    // a pointer that cannot be read now: no pack this time, and nothing deleted (R20 F5932/F6047)
+    // a pointer that cannot be read now: no pack this time, and nothing deleted
     @Test
     fun `a pointer that cannot be read is no pack and deletes nothing`() {
         shelf().take(text())
@@ -691,7 +662,7 @@ class PackShelfTest {
         assertReady(shelf(), PackKind.TEXT, 3, TEXT_FILES)
     }
 
-    // the pointer's step failing after the generation's rename: the renamed generation deleted, the old pack kept (R20 F6172)
+    // the pointer's step failing after the generation's rename: the renamed one deleted, the old pack kept
     @Test
     fun `a failure after the generation's rename deletes it`() {
         shelf().take(text())
@@ -701,7 +672,7 @@ class PackShelfTest {
         assertEquals(1, leftovers(PackKind.TEXT).size)
     }
 
-    // a 0-byte file the manifest lists, gone: damaged, not ready (R20 F6389)
+    // a 0-byte file the manifest lists, gone: damaged, not ready
     @Test
     fun `an empty file gone reads as damaged`() {
         val shelf = shelf()
@@ -711,7 +682,7 @@ class PackShelfTest {
         assertTrue("$status", status is PackStatus.Damaged)
     }
 
-    // the provider's stream failing other than by I/O (a SecurityException): unreadable, not "no pack" (R20 F6048)
+    // a SecurityException from the provider: unreadable, not "no pack"
     @Test
     fun `a stream that throws a runtime exception is unreadable`() {
         val denied = object : InputStream() {

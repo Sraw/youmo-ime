@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.engine.platform.Clock
 import java.util.Calendar
 import java.util.TimeZone
 
-/** The device's [Clock]: the system's time and zone, and the JVM's monotonic clock. */
 object JvmClock : Clock {
     private const val NANOS_PER_MILLI = 1_000_000L
 
@@ -16,7 +15,7 @@ object JvmClock : Clock {
 
     override fun offset(at: Long) = TimeZone.getDefault().getOffset(at)
 
-    // the device's own, as the phrases always read it
+    // the device's own zone, as the phrases always read it
     override fun calendar(): Calendar = Calendar.getInstance()
 
     override fun uptimeMillis() = System.nanoTime() / NANOS_PER_MILLI

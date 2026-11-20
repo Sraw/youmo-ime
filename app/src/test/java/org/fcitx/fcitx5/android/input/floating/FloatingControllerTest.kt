@@ -31,19 +31,17 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.uat.TestStyles
 
-/** Docking from the floating keyboard: slid down first, its drag over meanwhile; at once with animation off. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class FloatingControllerTest {
 
     private val context = PlaceholderStrings(RuntimeEnvironment.getApplication())
-    // floating as 竖屏键盘样式 says, the shape the test runs in
     private val floatingNow get() = KeyboardStyles.floating(context)
     private val noAnimation = AppPrefs.getInstance().advanced.disableAnimation
 
     private val internal = AppPrefs.getInstance().internal
 
-    // where a test put the keyboard: put back as it was (FloatingUatTest and MotionNoticeUatTest do the same)
+    // put back as it was: AppPrefs outlives the test
     @get:Rule
     val prefsBack = PrefsRule().apply {
         set(internal.floatingKeyboardX, internal.floatingKeyboardX.getValue())
@@ -64,7 +62,6 @@ class FloatingControllerTest {
         return controller to keyboard
     }
 
-    // the handle's dock button (放回底部), by what TalkBack reads
     private fun FloatingController.dockButton() =
         handle!!.children.first { it.contentDescription == context.getString(R.string.floating_keyboard_dock) }
 
@@ -100,8 +97,6 @@ class FloatingControllerTest {
         assertEquals(0f, keyboard.translationY, 0f)
     }
 
-    // F3484: grabbed from the docked keyboard, laid out with its grip (the unlaid handle's 0, 0) under
-    // the finger, clamped to the bottom it can go; kept as the finger lifts
     @Test
     fun grabbedItGoesUnderTheFingerOnceLaidOutAndIsKeptAsTheFingerLifts() {
         internal.floatingKeyboardY.setValue(0f)
@@ -112,8 +107,7 @@ class FloatingControllerTest {
         assertEquals(1f, FloatingStore.spot(false).y, 0.001f)
     }
 
-    // F3467/F3470: TalkBack's detach has no finger down and no drop to come: kept as it is laid out,
-    // and the next drag moves it at once (no slack left from the grab)
+    // TalkBack's detach has no finger down and no drop to come: kept as laid out, and the next drag moves it at once
     @Test
     fun grabbedWithNoFingerDownItIsKeptAtOnceAndTheNextDragMovesIt() {
         internal.floatingKeyboardY.setValue(0f)

@@ -69,12 +69,10 @@ class DictionaryFileTest {
         val p = d.find("幽默", ids("you", "mo"))
         assertEquals("幽默", d.text(p))
         assertArrayEquals(ids("you", "mo"), d.syllables(p))
-        // against the source's best, 啊啊's 0.5
         assertEquals(log10(0.002f), d.score(p), 1e-5f)
         assertEquals(0f, d.score(d.find("啊啊", ids("a", "a"))), 1e-6f)
         assertEquals(-1, d.find("幽默", ids("you", "mei")))
         assertEquals(-1, d.find("没有", ids("mei", "you")))
-        // a node's words best first
         assertEquals(listOf("有没", "优美"), d.at("you", "mei"))
         assertEquals(listOf("幽默"), d.at("you", "mo"))
         assertEquals(listOf("三个字"), d.at("san", "ge", "zi"))
@@ -134,7 +132,6 @@ class DictionaryFileTest {
         // counts in one, probabilities in the other: each against its own best
         DictionaryCompiler.compile(listOf(sequenceOf("行 xing 10", "好 hao 1000", "乱"), sequenceOf("行 xing 1", "坏 huai 0.5")), file, names = listOf("a", "b"))
         val two = DictionaryFile.open(JvmFile(file))
-        // each source's words read, by name, for the settings' list
         assertEquals(mapOf("a" to 2, "b" to 2), DictionaryCompiler.sourceWords(file))
         assertEquals(emptyMap<String, Int>(), DictionaryCompiler.sourceWords(File(folder.root, "none.ymd")))
         assertEquals(0f, two.score(two.find("行", ids("xing"))), 1e-6f)
@@ -150,14 +147,11 @@ class DictionaryFileTest {
             val d = DictionaryFile.open(JvmFile(file))
             return lines.map { val (t, c) = it.split(' '); d.score(d.find(WordText.entry(t, c)!!)) }
         }
-        // libime's log10, 0.3.1's own 0.0 for none, counts
         assertEquals(listOf(0f, -2f), scores("好 hao -3", "坏 huai -5"))
-        // none weighted: all alike, as the unknown word
         assertEquals(listOf(0f, 0f), scores("好 hao 0.0", "坏 huai 0.0"))
         // none weighted however written (no weight, 0, 0.0): 0 and +0 exactly, List equality tells -0f apart
         assertEquals(listOf(0f, 0f, 0f), scores("好 hao", "坏 huai 0", "幽默 you'mo 0.0"))
         assertEquals(listOf(-1f, 0f), scores("好 hao 12.0", "坏 huai 120"))
-        // signs mixed: no kind, so as none
         assertEquals(listOf(0f, 0f), scores("好 hao -3", "坏 huai 5"))
     }
 
@@ -217,7 +211,7 @@ class DictionaryFileTest {
     ): ByteBuffer {
         val file = DataFile.open(ByteBuffer.wrap(bytes), DataFile.KIND_USER_DICTIONARY, DictionaryFile.VERSION)
         val out = DataFile.Writer(DataFile.KIND_USER_DICTIONARY, DictionaryFile.VERSION)
-        // the sections the file lists, not a range of ids: one added outside it not dropped (review F3436)
+        // the sections the file lists, not a range of ids: one added outside it not dropped
         for (id in file.ids.sorted()) {
             if (id == DictionaryFile.META) {
                 out.addMeta(id, meta(file.meta(id)))
@@ -230,19 +224,13 @@ class DictionaryFileTest {
         return ByteBuffer.wrap(out.toByteArray())
     }
 
-    // a file whose checksums hold but whose indexes do not, or of another syllable table (the app
-    // compiles again for that), is refused at a checked open, never read out of bounds (review NIT 5)
+    // refused at a checked open, never read out of bounds
     @Test
     fun aWellChecksummedFileOfBadIndexesOrOtherSyllablesDoesNotOpen() {
         val file = File(folder.root, "d.ymd")
-        // one the base has: a word apart, its syllables stored
-        // three words: a place of 2 bits, so one at size can be written
         DictionaryCompiler.compile(listOf(sequenceOf("幽默 you'mo 0.5", "好 hao 0.2", "中国 zhong'guo 0.1")), file, inBase = { t, _ -> t == "中国" })
         val bytes = file.readBytes()
         assertEquals(3, DictionaryFile.of(rewritten(bytes)).size)
-        // the message names the whole table: "syllables" must not pass on node syllables' message. A
-        // run's or a bound's check names its table first ("text places: 3 at 0 is not below 3"), the
-        // rest end on it
         data class Row(
             val why: String,
             val meta: (Map<String, String>) -> Map<String, String>,
@@ -253,10 +241,8 @@ class DictionaryFileTest {
         val first = { why: String, m: String -> ": $why: " in m }
         val rows = listOf(
             Row("other syllables", { it + ("syllableChecksum" to "1") }, { _, _ -> }, { why, m -> m.endsWith("of $why") }),
-            // BitPacked's values from byte 8, after its width and size; EliasFano's upper bits after
-            // its 16 bytes of header and its low bits, cleared: no value where one must be
             Row("text buckets", { it }, { id, b -> if (id == DictionaryFile.TEXT_BUCKETS) b.putLong(eliasFanoUpper(b), 0L) }, first),
-            // review F3634: a place past the words, the index every forEachOfText follows
+            // a place past the words, the index every forEachOfText follows
             Row("text places", { it }, { id, b -> if (id == DictionaryFile.TEXT_PLACES) putPacked(b, 0, 3) }, first),
             // a node's syllable past the table, node 1 (the root's has none)
             Row("node syllables", { it }, { id, b -> if (id == DictionaryFile.NODE_SYLLABLE) putPacked(b, 1, Syllables.count) }, endsOn),
@@ -279,14 +265,9 @@ class DictionaryFileTest {
         b.putLong(8, (b.getLong(8) and mask.inv()) or (value.toLong() shl (index * width)))
     }
 
-    // where an EliasFano section's upper bits begin: after its header (low width, size, upper
-    // words, samples) and its size low bits a value, in whole words (review F3635)
+    // past the header and the low bits, in whole words
     private fun eliasFanoUpper(b: ByteBuffer): Int = 16 + 8 * ((b.getInt(0).toLong() * b.getInt(4) + 63) / 64).toInt()
 
-    // review F3622: a damaged file read unverified (merged.ymd before the compile thread checks it)
-    // whose first word or first child points past where a walk up from it ends: syllables and length
-    // return, never a walk that does not end (v1's text chain guard, R12 F3360, gone with the chain);
-    // the timeout makes a walk that hangs again fail rather than stall the build (F3653)
     @Test(timeout = 10_000)
     fun aWalkUpInAnUncheckedDamagedFileEnds() {
         val (d0, _) = compile("中国 zhong'guo", "中 zhong")
@@ -302,10 +283,9 @@ class DictionaryFileTest {
         }
     }
 
-    // review F3636: the codebook's edge, 65536 scores (the last code 65535) told apart, one more linear
+    // the codebook's edge, 65536 scores (the last code 65535) told apart, one more linear
     @Test
     fun theCodebookHoldsExactlyAU16sScores() {
-        // fewer than MAX_PER_READING a reading
         val readings = listOf("shi", "you", "mo", "zhong", "guo", "ren", "hao", "de").map { "$it'shi" }
         for (n in listOf(DictionaryFile.CODE_MASK + 1, DictionaryFile.CODE_MASK + 2)) {
             fun text(i: Int) = String(charArrayOf((0x4E00 + i % 20000).toChar(), (0x4E00 + i / 20000).toChar()))
@@ -320,8 +300,7 @@ class DictionaryFileTest {
         }
     }
 
-    // the names a compile and a table's index build write on the way, and only those, told as work
-    // files: the app's backup filter and sweep ask here (review F3373)
+    // the backup filter and sweep ask here which files are work files
     @Test
     fun theWorkFilesOfACompileAndAnIndexBuildAreToldSo() {
         val work = listOf("merged.ymd.tmp", ".merged.ymd.build", "merged.engine-wubi.ymc.tmp", ".merged.engine-wubi.ymc.build")
@@ -330,8 +309,6 @@ class DictionaryFileTest {
         for (name in not) assertFalse(name, DictionaryCompiler.isWorkFile(name))
     }
 
-    // words long enough to fill a run's syllables and characters before its count of words: spilled
-    // part way, each word still once (review NIT 3)
     @Test
     fun longWordsSpillARunPartWayAndEachIsKeptOnce() {
         val spellings = (0 until Syllables.count).filter { Syllables.spelling(it)[0].isLowerCase() }.map(Syllables::spelling)
@@ -358,7 +335,7 @@ class DictionaryFileTest {
         assertEquals(n, walked)
     }
 
-    // the sources' names past what a reader takes in a header: the compile fails, the file there kept (R12 F3323)
+    // the sources' names past a header's limit: the compile fails, the file there kept
     @Test
     fun sourcesTooManyForTheHeaderFailTheCompile() {
         val file = File(folder.root, "d.ymd")
@@ -370,9 +347,6 @@ class DictionaryFileTest {
         assertEquals(1, DictionaryFile.open(JvmFile(file)).size)
     }
 
-    // a random dictionary's words (surrogates, text longer in chars than its reading, some the
-    // base's), each read back whole: text, syllables by the node's path or as stored, score exact
-    // through the codebook; found by reading and by text, each at a place of its own
     @Test
     fun aRandomDictionaryReadsBackWordForWord() {
         val r = Random(3)
@@ -381,8 +355,7 @@ class DictionaryFileTest {
         val words = LinkedHashMap<Pair<String, List<Int>>, Float>()
         while (words.size < 3000) {
             val reading = List(1 + r.nextInt(4)) { spellings[r.nextInt(spellings.size)] }
-            // a character a syllable, some past the BMP: more chars than syllables. Never fewer: a
-            // source's line of fewer characters than syllables is refused (WordText.entry), review F3631
+            // never fewer chars than syllables: such a line is refused (WordText.entry)
             val text = buildString {
                 repeat(reading.size) { if (r.nextInt(6) == 0) appendCodePoint(0x20000 + r.nextInt(500)) else append((0x4E00 + r.nextInt(300)).toChar()) }
             }
@@ -410,11 +383,9 @@ class DictionaryFileTest {
         }
     }
 
-    // more scores than a u16 code tells apart: linear, within half a step, a node's order kept
     @Test
     fun moreDistinctScoresThanCodesReadWithinHalfAStepInTheirOrder() {
         val n = 70_000
-        // fewer than MAX_PER_READING a reading
         val readings = listOf("shi", "you", "mo", "zhong", "guo", "ren", "hao", "de").map { listOf(it, "shi") }
         fun text(i: Int) = String(charArrayOf((0x4E00 + i % 20000).toChar(), (0x4E00 + i / 20000).toChar()))
         fun reading(i: Int) = readings[i % readings.size]
@@ -427,7 +398,7 @@ class DictionaryFileTest {
             val p = d.find(text(i), ids(*reading(i).toTypedArray()))
             assertEquals(log10((i + 1).toFloat() / n), d.score(p), step / 2 + 1e-6f)
         }
-        // the best +0f exactly, not floor * 0 = -0f, which assertEquals(0f, x, 0f) lets through (review F3623)
+        // the best +0f exactly, not -0f, which assertEquals(0f, x, 0f) lets through
         assertEquals(0, floatToRawIntBits(d.score(d.find(text(n - 1), ids(*reading(n - 1).toTypedArray())))))
         val node = d.child(d.child(DictionaryFile.ROOT, Syllables.id("shi")), Syllables.id("shi"))
         val texts = (0 until d.wordCount(node)).map { d.text(d.word(node, it)) }

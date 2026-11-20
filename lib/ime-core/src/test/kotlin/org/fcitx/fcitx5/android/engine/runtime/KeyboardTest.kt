@@ -25,12 +25,7 @@ class KeyboardTest {
     // one glide over h-e-l-l-o, its path carried with the key
     private fun Keyboard.glideHello() = onEvent(EngineEvent.CHAR, Keyboard.GLIDE, payload = Action.Glide(GlideDecoderTest.glide("hello")))
 
-    /**
-     * Reads lower-case letters; offers the input upper-cased, then the input with a `!`. Picking
-     * the second reads only the first letter, leaving the rest typed. A pick then offers `next`.
-     * Another key commits the first candidate. Two [Action.Refine] after a letter turn the
-     * candidates round.
-     */
+    /** Reads lower-case letters; offers the input upper-cased, then with a `!`; a pick offers `next`. */
     private class FakeSession(private val nineKeys: Boolean = false) : Session {
         val actions = ArrayList<Action>()
         val learned = ArrayList<Boolean>()
@@ -42,8 +37,6 @@ class KeyboardTest {
 
         override var learning = true
 
-        // a key it does not read commits the first letter alone, the rest left typed (strokes' kept
-        // first candidate of part of the pinyin)
         var endsInPart = false
 
         // a key it does not read ends the input but still says it was handled: the keyboard decides
@@ -167,7 +160,6 @@ class KeyboardTest {
 
     @Test
     fun onlyOnTheNineKeysIsEscapeWithNothingTypedSwallowedOrACharacterASyllable() {
-        // a table whose codes are digits reads 2 as the nine keys do
         val digits = FakeSession(nineKeys = true)
         val table = Keyboard(digits, nineKeys = false)
         assertFalse(table.onEvent(EngineEvent.ESCAPE, 0).handled)
@@ -206,7 +198,6 @@ class KeyboardTest {
         assertTrue(s.handled)
         assertEquals("6!", s.commit)
         assertEquals(listOf(Action.Key('6'), Action.Key('4'), Action.Select(1)), nine.actions)
-        // and a table whose codes are digits: KP_2 is no code either
         val digits = FakeSession(nineKeys = true)
         val table = Keyboard(digits, nineKeys = false)
         table.onEvent(EngineEvent.CHAR, '2'.code)
@@ -246,7 +237,6 @@ class KeyboardTest {
         assertFalse(keyboard.onEvent(EngineEvent.REFINE, 0).handled)
         assertTrue(session.actions.isEmpty())
         type("ab")
-        // a slice that changed nothing is not shown again
         val first = keyboard.onEvent(EngineEvent.REFINE, 0)
         assertFalse(first.handled)
         assertTrue(first.refines)
@@ -257,13 +247,11 @@ class KeyboardTest {
         session.actions.clear()
         assertFalse(keyboard.onEvent(EngineEvent.REFINE, 0).handled)
         assertTrue(session.actions.isEmpty())
-        // what was committed with the last key is not committed again
         char('c')
         char(',')
         val afterPunctuation = keyboard.onEvent(EngineEvent.REFINE, 0)
         assertEquals("", afterPunctuation.commit)
         assertFalse(afterPunctuation.handled)
-        // nor what a pick that left some typed committed
         type("ab")
         char('2')
         val afterPick = keyboard.onEvent(EngineEvent.REFINE, 0)
@@ -318,7 +306,6 @@ class KeyboardTest {
         val keyboard = Keyboard(deleting, nineKeys = false)
         assertEquals(1, keyboard.onEvent(EngineEvent.CHAR, ','.code).deleteBefore)
         assertEquals(0, keyboard.onEvent(EngineEvent.OTHER, 0).deleteBefore)
-        // nothing typed: a tap in the app's text
         preedit = ""
         keyboard.onEvent(EngineEvent.CHAR, ','.code)
         assertEquals(0, keyboard.onEvent(EngineEvent.CURSOR, 0).deleteBefore)
@@ -339,7 +326,6 @@ class KeyboardTest {
         type("ab")
         assertEquals("a!", char('2').commit)
         assertEquals(Action.Select(1), session.actions.last())
-        // 0 is the tenth
         type("c")
         char('0')
         assertEquals(Action.Select(9), session.actions.last())
@@ -369,9 +355,7 @@ class KeyboardTest {
         assertTrue(s.candidates.isEmpty())
     }
 
-    // a key the session does not read that leaves something composing was taken: the app typing it
-    // would put it before what is still typed. One that empties the input is the app's (on the nine
-    // keys, 0 typed after it by the keyboard itself)
+    // the app typing it would put it before what is still composing
     @Test
     fun aKeyNotReadIsTheAppsOnlyIfNothingIsLeftTyped() {
         data class Row(
@@ -412,7 +396,6 @@ class KeyboardTest {
     fun aPredictionIsDroppedByAKeyTheSessionDoesNotRead() {
         type("ab")
         assertTrue(char(' ').predicting)
-        // space after a word is a space
         val s = char(' ')
         assertFalse(s.handled)
         assertFalse(s.predicting)
@@ -427,7 +410,6 @@ class KeyboardTest {
         keyboard.context("x")
         assertEquals(Action.Key('b'), session.actions.last())
         char(' ')
-        // a prediction shown
         keyboard.context("x")
         assertEquals(Action.Select(0), session.actions.last())
         keyboard.onEvent(EngineEvent.RESET, 0)
@@ -440,7 +422,7 @@ class KeyboardTest {
         assertTrue(session.learning)
     }
 
-    // review-int S5: a keyboard made after the field's context takes its flags alone, no context of a text it does not know
+    // a keyboard made after the field's context takes its flags alone, no context of a text it does not know
     @Test
     fun theFieldsFlagsAloneAreNoContext() {
         keyboard.fieldFlags(Commit.NO_PREDICT)
@@ -448,7 +430,7 @@ class KeyboardTest {
         assertTrue(session.actions.none { it is Action.Context })
     }
 
-    // a field started, the text after the cursor: as the host read them, for what it may take back (U-03)
+    // a field started, the text after the cursor: as the host read them, for what it may take back
     @Test
     fun aFieldStartedAndTheTextAfterGoToTheSession() {
         keyboard.context("你好", started = true)
@@ -465,7 +447,6 @@ class KeyboardTest {
         assertEquals(Action.Reset, session.actions.last())
         type("ab")
         char(' ')
-        // escape only closes the offer
         assertTrue(keyboard.onEvent(EngineEvent.ESCAPE, 0).handled)
     }
 
@@ -541,7 +522,6 @@ class KeyboardTest {
         }
         assertFalse(keyboard.onEvent(EngineEvent.TYPED, 'c'.code).handled)
         assertEquals(" hello ", glided())
-        // a key that is no char: nothing known before the cursor
         keyboard.onEvent(EngineEvent.ENTER, 0)
         assertEquals("hello ", glided())
         // nor is Enter's arg a char typed (a hardware key's, which androidengine sends as Enter)
@@ -549,7 +529,6 @@ class KeyboardTest {
         assertEquals("hello ", glided())
     }
 
-    /** The offer androidengine puts away where English suggests nothing (TYPED 0): the app's next read of the text is taken, not dropped as if still on show. */
     @Test
     fun theOfferPutAwayWhereEnglishSuggestsNothingLetsTheTextBeRead() {
         val english = EnglishSession(EnglishDecoderTest.data())
@@ -562,7 +541,6 @@ class KeyboardTest {
         assertEquals(" hello ", keyboard.glideHello().commit)
     }
 
-    /** TYPED past the BMP (an emoji) or to a session not English's: the key passed on, the session not told of it. */
     @Test
     fun whatTheAppTypedIsPassedOnPastTheBmpOrNotEnglish() {
         val fake = FakeSession()
@@ -576,7 +554,6 @@ class KeyboardTest {
         assertEquals("hello ", keyboard.glideHello().commit)
     }
 
-    /** Only spaces before the cursor: they are the glide's space, none added. */
     @Test
     fun aGlideAfterOnlySpacesAddsNone() {
         val english = EnglishSession(EnglishDecoderTest.data())
@@ -601,7 +578,6 @@ class KeyboardTest {
         assertEquals("hello ", keyboard.glideHello().commit)
     }
 
-    /** TYPED of a letter or a Backspace while a word is typed: the word committed, the letter after it or its last char taken back. */
     @Test
     fun aLetterOrABackspaceTheAppTypedWhileAWordIsTypedCommitsIt() {
         val english = EnglishSession(EnglishDecoderTest.data())
@@ -614,7 +590,6 @@ class KeyboardTest {
         keyboard.context("ab ")
         keyboard.onEvent(EngineEvent.CHAR, 'h'.code)
         assertEquals("h", keyboard.onEvent(EngineEvent.TYPED, BACKSPACE).commit)
-        // the h taken back: the space before it last again
         assertEquals("hello ", keyboard.glideHello().commit)
     }
 
@@ -643,7 +618,6 @@ class KeyboardTest {
         "abc".forEach { keyboard.onEvent(EngineEvent.TYPED, it.code) }
         assertFalse(keyboard.onEvent(EngineEvent.TYPED, BACKSPACE).handled)
         assertEquals(" hello ", keyboard.glideHello().commit)
-        // a space taken back: the b before it again
         keyboard.onEvent(EngineEvent.TYPED, 0)
         keyboard.context("ab ")
         keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
@@ -670,7 +644,6 @@ class KeyboardTest {
         assertEquals(" hello ", glidedAfter("ab c", 2))
         assertEquals(" hello ", glidedAfter("ab c", 3))
         assertEquals("hello ", glidedAfter("ab c", 4))
-        // 33 typed, the edge keeps 32, and the spaces after them
         val long = "a".repeat(33) + "  "
         assertEquals(" hello ", glidedAfter(long, 2 + 31))
         assertEquals("hello ", glidedAfter(long, 2 + 32))
@@ -696,8 +669,6 @@ class KeyboardTest {
         assertEquals("hello ", glidedAfter("ab\uD83C\uDDEF\uD83C\uDDF5"))
         // an accent: the editor may take it alone or with its letter, so nothing is known
         assertEquals("hello ", glidedAfter("abe\u0301"))
-        // a variation selector left at the end: forgotten (EnglishGlideTest
-        // .theAppsBackspaceForgetsTheTextWhereAClusterMayBeCut tells forgetting by the case)
         assertEquals("hello ", glidedAfter("ab\u2764\uFE0Fc"))
         // a keycap's mark (Me), a vowel sign (Mc), a ZWJ taken: forgotten
         assertEquals("hello ", glidedAfter("ab1\u20E3"))
@@ -706,8 +677,6 @@ class KeyboardTest {
         // a lone "\n" taken off; a CR taken (else "ab" known, a space added): forgotten
         assertEquals(" hello ", glidedAfter("ab\n"))
         assertEquals("hello ", glidedAfter("ab\r"))
-        // a "\r\n" last, taken whole or in part by the editor: forgotten, so a second Backspace
-        // leaves nothing known (the CR left is checked as the FE0F and ZWJ left above are)
         keyboard.onEvent(EngineEvent.TYPED, 0)
         keyboard.context("ab\r\n")
         repeat(2) { keyboard.onEvent(EngineEvent.TYPED, BACKSPACE) }
@@ -732,14 +701,12 @@ class KeyboardTest {
             keyboard.context("ok", learning, cleared = true)
             keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
             assertFalse(glided().startsWith(" "))
-            // a glide's word taken back leaves the field empty again
             keyboard.onEvent(EngineEvent.TYPED, 0)
             keyboard.context("ok", learning, cleared = true)
             glided()
             keyboard.onEvent(EngineEvent.BACKSPACE, 0)
             keyboard.onEvent(EngineEvent.TYPED, BACKSPACE)
             assertFalse(glided().startsWith(" "))
-            // a char typed is before the cursor
             keyboard.onEvent(EngineEvent.TYPED, 0)
             keyboard.context("ok", learning, cleared = true)
             keyboard.onEvent(EngineEvent.TYPED, 'a'.code)
@@ -751,7 +718,6 @@ class KeyboardTest {
             repeat(4) { keyboard.onEvent(EngineEvent.TYPED, BACKSPACE) }
             assertFalse(glided().startsWith(" "))
         }
-        // not cleared: after "ok", a space
         keyboard.onEvent(EngineEvent.TYPED, 0)
         keyboard.context("ok")
         assertEquals(" hello ", glided())
@@ -767,7 +733,6 @@ class KeyboardTest {
         assertEquals("hello ", keyboard.glideHello().commit)
     }
 
-    /** TYPED to a session not English's while a word is typed: the word committed, the panel gone with the key. */
     @Test
     fun whatTheAppTypedWhileAWordIsTypedInAnotherSessionCommitsIt() {
         type("ab")
@@ -790,7 +755,6 @@ class KeyboardTest {
         nine('4', upper = true)
         assertEquals("He", nine('3').preedit)
         assertEquals("Hello ", keyboard.onEvent(EngineEvent.KEYPAD, '2'.code).commit)
-        // idle, a keypad's digit is typed
         keyboard.onEvent(EngineEvent.RESET, 0)
         assertFalse(keyboard.onEvent(EngineEvent.KEYPAD, '2'.code).handled)
         // a digit not the nine keys' (a hardware key) ends the word shown and is the app's
@@ -799,7 +763,6 @@ class KeyboardTest {
         val digit = keyboard.onEvent(EngineEvent.CHAR, '4'.code)
         assertEquals("he", digit.commit)
         assertFalse(digit.handled)
-        // Enter commits the word shown
         nine('4')
         nine('3')
         assertEquals("he", keyboard.onEvent(EngineEvent.ENTER, 0).commit)

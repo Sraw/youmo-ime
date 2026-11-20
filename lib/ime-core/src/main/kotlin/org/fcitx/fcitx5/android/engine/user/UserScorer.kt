@@ -10,16 +10,9 @@ import kotlin.math.log10
 import kotlin.math.pow
 
 /**
- * [model]'s scores with [user]'s counts added in: log10(P_model + [weight] · P_user). Adding
- * rather than interpolating leaves every word the user never typed as the model scores it, so
- * learning moves only what was learned; the sum is held to 0, as a score must be.
- *
- * A word the model lacks that a word pack scored ([UserModel.score]) takes that score in place
- * of the unknown word's, under the same backoff from the context: only under ime-eval, evaluating
- * a candidate pack, as the app lists no scored words; for it the look-up is one map miss for a
- * word the model lacks. One of the user's whose text the
- * model has (a word of the dictionary's at a reading of the user's) is that word to the model
- * ([UserModel.modelWord]), scored and as context: one rule for every input method.
+ * [model]'s scores with [user]'s counts added: log10(P_model + [weight] · P_user), capped at 0. Adding rather than
+ * interpolating leaves every word the user never typed as the model scores it. A pack-scored unknown word takes
+ * the pack's score (ime-eval only); a user word whose text the model has is that model word ([UserModel.modelWord]).
  */
 class UserScorer(
     private val model: NgramModel,
@@ -28,7 +21,6 @@ class UserScorer(
 ) : WordScorer {
     override fun score(prev2: Int, prev: Int, word: Int) = scoreAfter(context(prev2, prev), word)
 
-    // the model's context of the words as it has them, with prev as the user has it, for its counts
     override fun context(prev2: Int, prev: Int): Long {
         val bigram = model.context(user.modelWord(prev2), user.modelWord(prev))
         return (prev.toLong() shl Int.SIZE_BITS) or (bigram and 0xffffffffL)
@@ -46,8 +38,7 @@ class UserScorer(
         if (same >= model.vocabularySize) {
             val packed = user.score(word)
             if (!packed.isNaN()) base += packed - model.unknownScore
-            // a merged dictionary's word not yet the user's: below the unknown word as its dictionary
-            // ranks it, so the commoner of its homophones comes first (docs: 按常用程度排)
+            // a merged word not yet the user's goes below the unknown word as its dictionary ranks it, commoner homophones first
             val merged = user.mergedScore(word)
             if (!merged.isNaN()) base += MERGED_SPAN * merged
         }
@@ -60,13 +51,10 @@ class UserScorer(
     }
 
     companion object {
-        // of 0.03, 0.1 and 0.3 under `ime-eval learn`, the best on text not typed before (held-out
-        // top1 81.4% learning nothing, 85.9 / 87.7 / 85.1% learning), and near the best on text
-        // typed again (97.1 / 98.2 / 98.6%)
+        // the best of 0.03, 0.1 and 0.3 under `ime-eval learn` on held-out text, near the best on retyped text
         const val DEFAULT_WEIGHT = 0.1f
 
-        // how much of a merged dictionary's log10 spread a word's score keeps: rime-frost's words span
-        // about 6 below its best, so its rarest go 1.5 below the unknown word, still in a sentence's reach
+        // how much of a merged dictionary's log10 spread a score keeps: rime-frost's rarest go 1.5 below the unknown word
         const val MERGED_SPAN = 0.25f
     }
 }

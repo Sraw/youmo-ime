@@ -29,7 +29,7 @@ class ImportFilesTest {
         assertThrows(IOException::class.java) { ByteArray(9).inputStream().readImported(max = 8) }
     }
 
-    // LearningRestore.from's read (F3155): a head not taken is all that is read; one taken, the whole file within the bound
+    // LearningRestore.from's read: a head not taken is all that is read; one taken, the whole file within the bound
     @Test
     fun aPickedFileIsReadWholeOnlyPastAHeadTaken() {
         val file = ByteArray(10) { it.toByte() }
@@ -44,7 +44,7 @@ class ImportFilesTest {
         assertEquals(null, file.inputStream().readPicked(head = 4, max = 9) { true })
     }
 
-    // F3199/F3239: a file accepted by its head but past the whole limit (head included) is none, as a non-backup
+    // a file accepted by its head but past the whole limit (head included) is none, as a non-backup
     @Test
     fun tooLargeIsNoBackup() {
         val head = 1 shl 20

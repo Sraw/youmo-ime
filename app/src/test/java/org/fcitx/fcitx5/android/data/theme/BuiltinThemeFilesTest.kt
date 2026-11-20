@@ -13,10 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * The built-in themes as the app reads them from its files (060-render-p3 T3): the build's copies are the
- * files, each version referred to by name (`pixel#dark`, `deep-blue`), and what holds for every one.
- */
+/** The build's copies are the files, each version referred to by name (`pixel#dark`, `deep-blue`). */
 @RunWith(RobolectricTestRunner::class)
 class BuiltinThemeFilesTest {
 
@@ -25,7 +22,7 @@ class BuiltinThemeFilesTest {
     @Test
     fun theAppsResourcesAreTheFiles() {
         val loaded = BuiltinThemeFiles.load(RuntimeEnvironment.getApplication().resources, SystemColors.NONE)
-        // the app's: the files but those 0.6.0 dropped (BuiltinThemeFiles.RETIRED), kept for the web and tests
+        // the files but those 0.6.0 dropped, kept for the web and tests
         assertEquals(themes.filter { it.file !in retiredFiles }, loaded)
         assertEquals(BuiltinThemeFiles.FILES.map { it.first }, loaded.map { it.file }.distinct())
     }

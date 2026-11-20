@@ -15,12 +15,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/06-pinyin.md's and 07-shuangpin.md's cases of a grouped layout of the user's (061-custom-layout §6, L4) whose
- * 预期 is the engine's, with the app's data: the 17 keys of uat/fixtures/layouts/uat-k17-1.0.layout typed by their own
- * codes ([EngineSettings.ownKeys], as GroupedKeyboard tells them), the 18 keys rearranged (uat-k18-swapped-1.0) typed
- * on 双拼 by the 18 keys' codes. The device's cases test the keyboard drawn and the import.
- */
+/** A user's grouped layouts (uat-k17-1.0, uat-k18-swapped-1.0) typed by their own codes on the app's data. */
 class CustomGroupsUatTest {
 
     @After
@@ -37,8 +32,7 @@ class CustomGroupsUatTest {
         with(EngineReplay(settings(EngineSettings(ownKeys = k17)), im = InputMethodCatalog.PINYIN)) {
             val letters = NineKeyLetters.custom(k17)
             assertTrue(letters.codes.all { it.code in NineKeyLetters.CUSTOM_BLOCK })
-            // each key tapped where its letter sits, as the device's case taps (uat/06-pinyin.md): BN's right, IO's left,
-            // HJK's left third, A's middle, IO's right; their places lean the reading (按落点加权): 你好 first
+            // each key tapped where its letter sits, as the device's case taps: the places lean the reading to 你好
             val at = listOf(0.75f, 0.25f, 1 / 6f, 0.5f, 0.75f)
             val codes = letters.typings("nihao").single()
             type(buildString { codes.forEachIndexed { i, c -> appendCodePoint(Keyboard.tapKey(c, at[i], 0.5f)) } })

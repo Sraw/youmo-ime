@@ -22,17 +22,13 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * The keys' press effects (060-render-p3 A3) over [view]'s keys: a ripple image grown from where the finger
- * is, clipped to the key's face; particles flying out from there. Each image recorded once into a node of
- * its own ([sprites]) that every ripple and particle of it draws; a ripple a node clipped to its key's
- * face (a rounded rectangle's outline, another shape's path) round a node of the image, a particle a node of the image; all from pools that never grow past
- * [MAX_RIPPLES] and [MAX_PARTICLES] (more at once: the oldest taken). A frame only sets the nodes' alpha,
- * scale and place ([tick]): nothing recorded, nothing made. One [TimeAnimator] while any plays, ended when
- * none does.
+ * A ripple grown from the finger, clipped to the key's face, and particles flying out. Each image is
+ * recorded once into a node ([sprites]); pools never grow past [MAX_RIPPLES] and [MAX_PARTICLES] (the oldest
+ * taken). A frame only sets the nodes' alpha, scale and place: nothing recorded, nothing made.
  */
 internal class KeyEffects(private val view: View, private val images: BoardImages) {
 
-    // an image recorded once, at its decoded size; [sample] its file's width over that (KeyImageBudget may decode it smaller)
+    // [sample] its file's width over its decoded one (KeyImageBudget may decode it smaller)
     private class Sprite(val node: RenderNode, val width: Int, val height: Int, val sample: Float)
 
     private val sprites = HashMap<String, Sprite>()
@@ -41,21 +37,19 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         var sprite: Sprite? = null
         var start = 0L
 
-        // when it was taken, in order (two in the same ms told apart)
+        // in order (two in the same ms told apart)
         var taken = 0L
         var ms = 0
         var live = false
     }
 
-    // a ripple: [clip] at its key's face, clipped to its outline, drawing [inner], the image about where the finger was
-    // fading nodes of one image each: drawn straight at their alpha, no layer of their own a frame (the same look)
+    // drawn straight at their alpha, no layer of their own a frame (the same look)
     private class Ripple : Playing() {
         val clip = RenderNode("ripple clip").apply { setHasOverlappingRendering(false) }
         val inner = RenderNode("ripple").apply { setHasOverlappingRendering(false) }
         var scale = 1f
 
-        // the path it is clipped to, its own and set again each press (no press allocates); [clipped] false: its
-        // outline's rounded rectangle clips it
+        // set again each press (no press allocates); [clipped] false: its outline's rounded rectangle clips it
         val clipPath = Path()
         var clipped = false
     }
@@ -71,49 +65,42 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     private val ripples = ArrayList<Ripple>(MAX_RIPPLES)
     private val particles = ArrayList<Particle>(MAX_PARTICLES)
 
-    // the nodes taken so far: each one's turn, the oldest the lowest
     private var turns = 0L
 
-    // a key's outline or path, made again for each ripple into these (no allocation a press)
+    // made again for each ripple into these (no allocation a press)
     private val outline = Outline()
     private val path = Path()
     private val box = RectF()
     private val radii = FloatArray(RADII)
 
-    // the presses played: each one's particles a flight of their own, the same for the same count (reproducible)
+    // each press's particles a flight of their own, the same for the same count (reproducible)
     private var presses = 0
 
     private val ticker = TimeAnimator().apply { setTimeListener { _, _, _ -> tick(SystemClock.uptimeMillis()) } }
 
-    /** Nodes the pools hold: never more than [MAX_RIPPLES] + [MAX_PARTICLES]. */
     @get:VisibleForTesting
     val pooled: Int get() = ripples.size + particles.size
 
-    /** Whether its animator runs (asks for frames). */
     @get:VisibleForTesting
     val running: Boolean get() = ticker.isStarted
 
-    /** Effects playing now. */
     @get:VisibleForTesting
     val playing: Int get() = ripples.count { it.live } + particles.count { it.live }
 
-    /** The particles playing now, in their pool's order: where each is (a test reads their flight). */
     @VisibleForTesting
     fun particleNodes(): List<RenderNode> = particles.filter { it.live }.map { it.node }
 
-    /** The ripples playing now: the node of the image, its scale and place. */
     @VisibleForTesting
     fun rippleNodes(): List<RenderNode> = ripples.filter { it.live }.map { it.inner }
 
-    /** The clips of the ripples playing now. */
     @VisibleForTesting
     fun rippleClips(): List<RenderNode> = ripples.filter { it.live }.map { it.clip }
 
-    /** The path each ripple playing now is clipped to in its node; null where its outline (a rounded rectangle's) clips it. */
+    /** Null where its outline clips it. */
     @VisibleForTesting
     fun rippleClipPaths(): List<Path?> = ripples.filter { it.live }.map { r -> if (r.clipped) Path(r.clipPath) else null }
 
-    /** [effect] played over its key's face ([shape]) from ([x], [y]) in the view; nothing where its image is not in. */
+    /** Nothing where its image is not in. */
     fun play(effect: KeyEffect, shape: Shape, x: Float, y: Float) {
         val sprite = sprite(effect.file) ?: return
         val now = SystemClock.uptimeMillis()
@@ -141,7 +128,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         r.inner.pivotY = sprite.height / 2f
         r.inner.translationX = x - l - sprite.width / 2f
         r.inner.translationY = y - t - sprite.height / 2f
-        // the image's longer half grown to the radius
         r.scale = (effect.radius / (max(sprite.width, sprite.height) / 2.0)).toFloat()
         r.start = now
         r.ms = effect.ms
@@ -171,7 +157,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         }
     }
 
-    // one not playing from [pool], else a new one while it is short of [most], else the one taken longest ago
     private fun <T : Playing> taken(pool: ArrayList<T>, most: Int, made: () -> T): T {
         var pick: T? = null
         for (i in pool.indices) if (!pool[i].live) pick = pick ?: pool[i]
@@ -187,7 +172,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         return oldest
     }
 
-    // [node] made to draw [sprite] (a node holding the image's), its own size the image's
     private fun draw(node: RenderNode, sprite: Sprite) {
         node.setPosition(0, 0, sprite.width, sprite.height)
         val c = node.beginRecording()
@@ -198,7 +182,7 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         }
     }
 
-    // [file]'s image recorded, once; null where it is not decoded (yet, or at all: that press plays nothing)
+    // null where it is not decoded (yet, or at all: that press plays nothing)
     private fun sprite(file: String): Sprite? {
         sprites[file]?.takeIf { it.node.hasDisplayList() }?.let { return it }
         val bitmap = images.bitmap(file) ?: return null
@@ -215,9 +199,8 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         return Sprite(node, bitmap.width, bitmap.height, sample).also { sprites[file] = it }
     }
 
-    // [r]'s clip node (at [left], [top]) recorded round its image, clipped to [shape]: a rounded rectangle of one radius
-    // by its outline (antialiased), another shape by its path in the node (an outline's path clips from API 33 alone;
-    // a path clips any shape, concave too, by the non-zero rule its face is painted by; the hit test is still even-odd)
+    // a rounded rectangle by its outline (antialiased), another shape by its path in the node: an outline's
+    // path clips from API 33 alone; a path clips any shape, concave too, by non-zero (the hit test is still even-odd)
     private fun clipTo(r: Ripple, shape: Shape, left: Int, top: Int) {
         val b = shape.bounds
         box.set((b.left - left).toFloat(), (b.top - top).toFloat(), (b.right - left).toFloat(), (b.bottom - top).toFloat())
@@ -240,10 +223,9 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         if (r.clipped) r.clipPath.set(path)
     }
 
-    // [shape] into [path], at [left], [top] (its box in [box])
     private fun pathOf(shape: Shape, left: Int, top: Int) {
         path.rewind()
-        // as the faces fill it (ScenePainter: non-zero): a self-crossing shape clipped with no hole the face has not
+        // as the faces fill it (non-zero): a self-crossing shape clipped with no hole the face has not
         path.fillType = Path.FillType.WINDING
         when (shape) {
             is Shape.Rect -> {
@@ -263,7 +245,6 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
         }
     }
 
-    /** Each playing effect's nodes as they are at [now]; those done let go, the animator ended when none plays. */
     @VisibleForTesting
     fun tick(now: Long) {
         Trace.beginSection(ANIM_TRACE)
@@ -302,23 +283,20 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
 
     private fun fraction(p: Playing, now: Long): Float = if (p.ms <= 0) 1f else ((now - p.start).toFloat() / p.ms).coerceIn(0f, 1f)
 
-    // fast at first, slowing to its end (a decelerate curve)
     private fun easeOut(f: Float): Float = 1f - (1f - f) * (1f - f)
 
-    /** The effects playing drawn over the keys: the ripples, then the particles. */
     fun draw(canvas: Canvas) {
         for (i in ripples.indices) if (ripples[i].live) canvas.drawRenderNode(ripples[i].clip)
         for (i in particles.indices) if (particles[i].live) canvas.drawRenderNode(particles[i].node)
     }
 
-    /** Every effect stopped (the keyboard hidden, motion off): nothing drawn, no frame asked for. */
     fun stop() {
         ripples.forEach { it.live = false }
         particles.forEach { it.live = false }
         if (ticker.isStarted) ticker.end()
     }
 
-    /** Stopped, and every node's drawing let go now, not at GC (the view detached); recorded again at the next press. */
+    /** Let go now, not at GC (the view detached); recorded again at the next press. */
     fun release() {
         stop()
         sprites.values.forEach { it.node.discardDisplayList() }
@@ -330,13 +308,11 @@ internal class KeyEffects(private val view: View, private val images: BoardImage
     }
 
     companion object {
-        /** The most ripples at once (a key's each press; typing fast, the oldest taken). */
         const val MAX_RIPPLES = 8
 
-        /** The most particles at once (060-render-p3 A3): past it, the oldest taken. */
         const val MAX_PARTICLES = 48
 
-        // a particle's image drawn at this many of its pixels a dp (as an xxhdpi drawable)
+        // as an xxhdpi drawable
         private const val PX_PER_DP = 3f
         private const val RADII = 8
         private const val FOUR = 4

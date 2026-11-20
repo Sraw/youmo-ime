@@ -1,4 +1,4 @@
-// 弹出 (060-render-p3 §5.1 panel 6): the key's bubble (`preview`, T4b's shape, tail, size and offset), the long
+// 弹出: the key's bubble (`preview`, T4b's shape, tail, size and offset), the long
 // press's keys (`popup`, the one in focus `:selected`) and the menu (`menu`). The preview shows each (环境 → 显示).
 (function (root) {
   'use strict';

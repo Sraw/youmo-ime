@@ -14,7 +14,6 @@ class StrokeShapeTest {
 
     @Test
     fun eachShapeItsKindAndItsCharacter() {
-        // 行's 竖钩 a 竖; the turning ones each their own: 口 己 乙 九 马
         assertEquals("丿丿丨一一亅", StrokeShape.shown(StrokeShape.parse("P P S H H SG")))
         assertEquals("ppshhs", StrokeShape.keys(StrokeShape.parse("P P S H H SG")))
         assertEquals("丨㇕一", StrokeShape.shown(StrokeShape.parse("S HZ H")))
@@ -22,7 +21,6 @@ class StrokeShapeTest {
         assertEquals("㇈", StrokeShape.shown(StrokeShape.parse("HZWG")))
         assertEquals("丿㇈", StrokeShape.shown(StrokeShape.parse("P HZWG")))
         assertEquals("㇕㇉一", StrokeShape.shown(StrokeShape.parse("HZ SZWG H")))
-        // 提 a 横, 捺 a 点 (江 氵, 人)
         assertEquals("nnhhsh", StrokeShape.keys(StrokeShape.parse("D D T H S H")))
         assertEquals("pn", StrokeShape.keys(StrokeShape.parse("P N")))
     }

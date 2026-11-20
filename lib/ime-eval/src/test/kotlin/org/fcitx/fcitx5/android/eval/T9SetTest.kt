@@ -98,7 +98,7 @@ class T9SetTest {
         assertEquals(listOf(Sample("64426", "你好", "daily", "Ah，")), converted.useLines { EvalSet.parse(it) })
         assertEquals(2, runCli(arrayOf("t9", set.path), StringBuilder(), StringBuilder()))
         assertEquals(2, runCli(arrayOf("t9", set.path, converted.path, "--presses", "twice"), StringBuilder(), StringBuilder()))
-        // fast modelled the hybrid 连按 gone 2026-10-19
+        // fast modelled the hybrid 连按, now gone
         assertEquals(2, runCli(arrayOf("t9", set.path, converted.path, "--presses", "fast"), StringBuilder(), StringBuilder()))
         assertEquals(0, runCli(arrayOf("t9", set.path, converted.path, "--presses", "letters"), StringBuilder(), StringBuilder()))
         assertEquals("NIH2O", converted.useLines { EvalSet.parse(it) }.single().input)
@@ -126,7 +126,6 @@ class T9SetTest {
         assertFalse("时间" in candidates("t9-strict"))
     }
 
-    // the 14 keys (design §5.2): each letter its group's code, no 连按
     @Test
     fun onTheFourteenKeysEachLetterIsItsKeysCode() {
         val samples = listOf(Sample("nihao", "你好", "daily"), Sample("lv", "绿", "daily"))
@@ -173,7 +172,6 @@ class T9SetTest {
         assertEquals(2, runCli(arrayOf("pinyin-glide", data.path, set.path, "--keys", "14"), StringBuilder(), StringBuilder()))
     }
 
-    // `pinyin --taps` (k14-tap-position): where the hand tapped decides between the letters of a key
     @Test
     fun whereTheTapsLandDecidesBetweenAKeysLetters() {
         val data = tmp.newFile("pinyintaps.data").apply {

@@ -30,14 +30,7 @@ import org.robolectric.shadows.ShadowEnvironment
 import java.io.File
 import java.util.UUID
 
-/**
- * 060-render-p3 T3 review: a theme of the user's named as a built-in theme is referred to now (`monokai`,
- * `pixel#dark`: 0.5's import refused only 0.5's names) would hide it, the user's found first. At the start
- * it is saved again under a UUID, its files as they are, and each setting naming it names the copy: the
- * user sees what they saw, and the built-in theme can be picked. A kill midway is finished at the next
- * start, no second copy. And a setting naming a theme the user may have though it is not listed is not
- * moved to a built-in one for good.
- */
+/** A user theme named as a current built-in would hide it: at start resaved under a UUID, settings following the copy. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeNameClashTest {
@@ -55,12 +48,11 @@ class ThemeNameClashTest {
         phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
-        // the process's first listing done
         ThemeFilesManager.listThemes()
         sp.edit(commit = true) { clear() }
     }
 
-    // no theme left for a later test's list (the theme page's screenshots), nor a json that does not read
+    // no theme left for a later test's list, nor an unreadable json
     @After
     fun noThemesLeft() {
         dir.listFiles()?.forEach { it.deleteRecursively() }
@@ -70,7 +62,6 @@ class ThemeNameClashTest {
 
     private fun stored() = slots.map { sp.getString(it, null) }
 
-    // a theme of the user's with a picture, its json written at [modified]
     private fun saved(name: String, modified: Long, of: Theme.Builtin = TestThemes.TransparentDark): Theme.Custom {
         val key = UUID.nameUUIDFromBytes("files of $name".encodeToByteArray())
         val theme = of.deriveCustomBackground(
@@ -104,7 +95,7 @@ class ThemeNameClashTest {
         val mine = File(dir, "mine.json").readText()
         val moved = move()
         assertEquals(listOf(uuid("monokai"), uuid("nord#light"), uuid("pixel#dark")), stored())
-        // each where it was in the list, the theme it was: its look (its picture's files), its lightness
+        // each where it was in the list, the same theme: its look and lightness
         assertEquals(before.map { if (clashes(it.name)) uuid(it.name) else it.name }, moved.map { it.name })
         assertEquals(before.map { it.look }, moved.map { it.look })
         assertEquals(before.map { it.isDark }, moved.map { it.isDark })
@@ -112,9 +103,7 @@ class ThemeNameClashTest {
         // on disk so, in the same order (each json's age kept)
         assertEquals(moved, ThemeFilesManager.listThemes())
         assertEquals(setOf("mine.json") + names.drop(1).map { uuid(it) + ".json" }, jsons())
-        // the one not clashing untouched
         assertEquals(mine, File(dir, "mine.json").readText())
-        // the next start: nothing more to do, the list as it is
         val again = ThemeFilesManager.listThemes()
         assertSame(again, ThemeFilesManager.moveClashing(again, clashes, prefs::renameThemeRefs))
         assertEquals(listOf(uuid("monokai"), uuid("nord#light"), uuid("pixel#dark")), stored())
@@ -158,7 +147,7 @@ class ThemeNameClashTest {
         val changed = saved(uuid("monokai"), 1_000_000_000_000, of = TestThemes.TransparentLight)
         saved("monokai", 1_000_000_001_000)
         store("monokai", uuid("monokai"), "x")
-        // killed before the settings were written, twice: the same copy each start, no third json
+        // killed before the settings were written, twice: no third json
         repeat(2) {
             assertTrue(move { _, _ -> false }.any { it.name == "monokai" })
             assertEquals(setOf("monokai.json", uuid("monokai#1") + ".json", uuid("monokai") + ".json"), jsons())
@@ -175,8 +164,7 @@ class ThemeNameClashTest {
         saved("monokai", 1_000_000_000_000)
         File(dir, "monokai.json").renameTo(File(dir, "foo.json"))
         saved("mine", 1_000_000_001_000)
-        // a second json of a name listed already: not listed; one reading as the same theme deleted (else it would bring
-        // the theme back once that is deleted), one of another theme of the name left as it is
+        // a second json of a listed name: one reading as the same theme deleted (else it would resurrect it), another kept
         File(dir, "mine.json").copyTo(File(dir, "bar.json"))
         File(dir, "baz.json").writeText(File(dir, "mine.json").readText().replaceFirst("{", "{ "))
         val another = TestThemes.TransparentLight.deriveCustomNoBackground("mine")
@@ -187,13 +175,12 @@ class ThemeNameClashTest {
         assertEquals(listOf(uuid("monokai"), "mine", "x"), stored())
         assertEquals(setOf("qux.json", "mine.json", uuid("monokai") + ".json"), jsons())
         File(dir, "qux.json").delete()
-        // one of a name not clashing moved keeps its age (the list's order)
         saved("kept", 1_000_000_000_500)
         File(dir, "kept.json").renameTo(File(dir, "old.json"))
         assertEquals(listOf("mine", "kept", uuid("monokai")), ThemeFilesManager.listThemes().map { it.name })
         assertEquals(1_000_000_000_500, File(dir, "kept.json").lastModified())
         ThemeFilesManager.deleteThemeFiles(ThemeFilesManager.listThemes().single { it.name == "kept" })
-        // one not clashing deleted is gone: not listed again from its json of another name
+        // a deleted non-clashing one is not relisted from a json of another name
         saved("other", 1_000_000_002_000)
         File(dir, "other.json").renameTo(File(dir, "baz.json"))
         ThemeFilesManager.deleteThemeFiles(ThemeFilesManager.listThemes().single { it.name == "other" })
@@ -201,16 +188,14 @@ class ThemeNameClashTest {
         assertEquals(setOf("mine.json", uuid("monokai") + ".json"), jsons())
     }
 
-    // contract: Android's sepolicy denies apps hard links (`neverallow all_untrusted_apps file_type:file link`): a
-    // JVM test links fine, so no run here can tell; the source is read instead, the json move held to not using one
+    // contract: Android's sepolicy denies apps hard links, which a JVM test cannot tell; the source is read instead
     @Test
     fun aJsonIsMovedWithoutAHardLink() {
         val source = File("src/main/java/org/fcitx/fcitx5/android/data/theme/ThemeFilesManager.kt").readText()
         assertFalse(source.contains("createLink") || source.contains("Os.link"))
     }
 
-    // a json that does not read (a later build's), not listed. The user told it does not read: said here,
-    // not left for a later test's keyboard to show
+    // an unreadable json, not listed; told here, not left for a later test's keyboard to show
     private fun unreadable(name: String) {
         val before = EngineNotices.sayer
         EngineNotices.forgetToldOnce()
@@ -229,7 +214,6 @@ class ThemeNameClashTest {
     fun aThemeNotListedMayHoldAName() {
         val legacy = BuiltinThemeFiles.LEGACY.keys
         assertEquals(emptyList<String>(), ThemeFilesManager.mayHoldThemes(legacy))
-        // its name the user's all the same
         unreadable("MonetLight")
         assertEquals(listOf("MonetLight"), ThemeFilesManager.mayHoldThemes(legacy))
     }
@@ -243,9 +227,8 @@ class ThemeNameClashTest {
         assertTrue(changed)
         assertEquals(listOf(uuid("monokai")), themes.map { it.name })
         assertEquals(listOf(uuid("monokai"), "pixel#dark", "MonetLight"), stored())
-        // the next start: nothing to change
         assertEquals(themes to false, ThemeManager.listCustomThemes(prefs))
-        // an old name alone: changed too (the copy for before the first unlock synced)
+        // an old name alone: changed too (the pre-unlock copy synced)
         store("DeepBlue")
         assertTrue(ThemeManager.listCustomThemes(prefs).second)
         assertEquals("简蓝#dark", stored().first())
@@ -257,7 +240,7 @@ class ThemeNameClashTest {
         val de = androidx.preference.PreferenceManager.getDefaultSharedPreferences(appContext.createDeviceProtectedStorageContext())
         val key = ThemeManager.prefs.normalModeTheme.key
         val was = sp.getString(key, null)
-        // themes settled since the start (A4): one named as a built-in theme there now
+        // themes settled since the start: one named as a built-in there now
         saved("monokai", 1_000_000_000_000)
         sp.edit(commit = true) { putString(key, "monokai") }
         try {
@@ -265,7 +248,7 @@ class ThemeNameClashTest {
             assertEquals(uuid("monokai"), sp.getString(key, null))
             assertEquals(uuid("monokai"), de.getString(key, null))
             assertEquals(listOf(uuid("monokai")), ThemeManager.getAllThemes().filterIsInstance<Theme.Custom>().map { it.name })
-            // a name 0.6.0 dropped (BuiltinThemeFiles.RETIRED): the built-in pack it moved to
+            // a name 0.6.0 dropped: the built-in pack it moved to
             assertEquals(ThemeManager.getTheme("墨灰"), ThemeManager.getTheme("monokai"))
             assertTrue((ThemeManager.getTheme("monokai") as Theme.Pack).builtin)
         } finally {
@@ -281,7 +264,7 @@ class ThemeNameClashTest {
         saved("monokai", 1_000_000_000_000)
         val listed = ThemeFilesManager.listThemes()
         val external = appContext.getExternalFilesDir(null)!!
-        // an upgraded install started without its external storage, its themes not moved in yet (A4)
+        // themes not moved in yet (no external storage)
         dir.deleteRecursively()
         File(appContext.filesDir, "engine").mkdirs()
         ShadowEnvironment.setExternalStorageState(external, Environment.MEDIA_REMOVED)
@@ -303,7 +286,7 @@ class ThemeNameClashTest {
     @Test
     @Uat("ST-84")
     fun aThemeNamedAsABuiltInPackClashesAsABuiltInThemeDoes() {
-        // a 3.0 theme named 墨灰 (monokai's slot moved to the pack) was found before the pack, both listed
+        // a 3.0 theme named 墨灰 was found before the pack, both listed
         assertTrue(ThemeManager.BuiltinPackNames.isNotEmpty())
         assertTrue(ThemeManager.BuiltinPackNames.all(clashes))
     }

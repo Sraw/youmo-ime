@@ -34,8 +34,7 @@ MIXED = [
     b"", b"abc 123", "汉字abc混合123文字".encode(), "发展中国家的头发".encode(),
     "😀简体😀干燥🇨🇳".encode(), "后天́的组合字符干".encode(), "a‍后".encode(),
     "一\u0000后".encode(), b"\xed\xa0\x80\xe5\x90\x8e",  # a lone surrogate (CESU-8) before 后
-    # no invalid UTF-8 (b"\xff\xfe..."): opencc prints "Invalid UTF8" and stops; the Kotlin side
-    # only ever sees Java strings, whose lone surrogates come through as the case above
+    # no invalid UTF-8: opencc stops on it, and the Kotlin side only sees Java strings
     "里面的里程碑".encode(), "皇后在后面".encode(),
     "联系方式：电话０１２３，邮箱a@b.cn。".encode(), "「引号」『书名』".encode(),
     "《红楼梦》的作者是曹雪芹".encode(), "计算机软件开发工程师".encode(), "台湾的鼠标和软件".encode(),
@@ -83,8 +82,7 @@ def main():
         open(inp, "wb").write(data)
         for c in CONFIGS:
             res = os.path.join(tmp, c)
-            # stdin, not -i: only stdin is converted line by line (CommandLine.cpp:47-67, 200-205);
-            # -i converts whole buffers, where a NUL would cut the rest of the buffer
+            # stdin, not -i: only stdin is converted line by line, and -i's buffers are cut at a NUL
             with open(inp, "rb") as i:
                 subprocess.run([tool, "-c", os.path.join(share, c + ".json"), "-o", res], stdin=i, check=True)
             got = open(res, "rb").read().split(b"\n")

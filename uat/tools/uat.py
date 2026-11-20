@@ -15,16 +15,12 @@
 
 Cases live in uat/scripts/<file stem>.py (one per uat/*.md); the .md stays the source of truth:
 a script follows its case's 前提/操作/预期, and the caption under a screenshot is the case's 预期.
-Python 3 stdlib + PIL. `adb shell input tap/swipe/motionevent/keyevent/text`, uiautomator,
-am/pm/ime/settings drive the device. The devices are emulators (AVD youmo, android-36 google_apis
-arm64-v8a: the release ABI, native on Apple silicon; uat/tools/avd.sh makes it; UAT_AVD=youmo29 an
-Android 10 one, minSdk, without the test page's browser), VMs with their own
-kernel: root over `adb root`, and 17 实体键盘's USB keyboard a uinput one (uat/tools/emu-keyboard.sh),
-which is never made anywhere else. The voice cases' microphone is the debug build's clip microphone
-(`Device.say`: VoiceClipProvider plays dev/uat-out/voice-clips/ in place of the AudioRecord's samples).
-The resource packs (dev/design/060-asset-packs.md) are imported once a device, through the debug
-build's shell-only import (PackImportProvider: the same checks as the 资源包 page's); the reset
-between cases keeps them (`reset`), a release run imports them through the file picker.
+Python 3 stdlib + PIL; adb input, uiautomator, am/pm/ime/settings drive the device. Devices are rooted
+emulators of AVD youmo (arm64-v8a, the release ABI; uat/tools/avd.sh makes it; UAT_AVD=youmo29 is an
+Android 10 one without the test page's browser). 17 实体键盘's USB keyboard is a uinput one
+(uat/tools/emu-keyboard.sh). The voice cases hear clips through the debug build's VoiceClipProvider
+(`Device.say`). The resource packs are imported once per device through the debug build's
+PackImportProvider; the reset between cases keeps them; a release run imports them through the file picker.
 Output is kept short on purpose (counts and paths): an agent reading it re-reads its context.
 """
 import argparse
@@ -51,7 +47,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 UAT = os.path.join(REPO, "uat")
 OUT = os.path.join(REPO, "dev", "uat-out")
-# UAT_BUILD=release runs the cases on the arm64 release APK (a release's gate: R8's code, its own package)
+# UAT_BUILD=release runs the cases on the arm64 release APK
 BUILD = os.environ.get("UAT_BUILD", "debug")
 if BUILD not in ("debug", "release"):
     sys.exit(f"UAT_BUILD={BUILD}: debug or release")
@@ -62,20 +58,16 @@ BROWSER = "org.chromium.webview_shell/.WebViewBrowserActivity"
 # the testbed app (uat/TESTBED.md): every kind of field and app behaviour, Android 10 too
 TESTBED = "org.fcitx.fcitx5.android.testbed"
 TESTBED_READS = 10   # testbed_state's reads while a field is mid batch edit, 0.1 s apart
-# the ABI of the APKs installed: the emulator's, which is the release's
 ABI = "arm64-v8a"
-# adb 37's mDNS bridge aborts on a service name seen on this LAN (the server dies every few seconds):
-# a server this tool starts has it off
+# adb 37's mDNS bridge aborts on a service name seen on this LAN: a server this tool starts has it off
 os.environ.setdefault("ADB_MDNS", "0")
-# the devices: emulators of one AVD, each on its console port (serial emulator-<port>). 5554 and 5556
-# are the two of a run; a worktree may start its own on another even port up to 5584 (uat.py up --port)
+# emulators of one AVD, by console port; a worktree may start its own on another even port up to 5584
 AVD = os.environ.get("UAT_AVD", "youmo")
 SNAPSHOT = "clean"   # the AVD's state after uat/tools/avd.sh: zh-CN, three-button nav, the WebView shell
-# UAT_CANVAS is gone: the canvas (060's drawing) is the only one since 060-render-p2 S8a; a command still
-# setting it is told so rather than passed silently
+# UAT_CANVAS no longer exists: a command still setting it is told so rather than passed silently
 if "UAT_CANVAS" in os.environ:
     print("UAT_CANVAS 已不用：键盘只有一种画法（060-render-p2 S8a）", file=sys.stderr)
-# the default pair; any number runs (--devices 5554,5556,5558,… or auto: device_count from free memory)
+# the default pair; --devices takes any number (or auto)
 PORTS = ("5554", "5556")
 
 
@@ -108,7 +100,7 @@ def not_ours(d, name):
 
 def ours(d):
     """exit unless emulator-<port> runs this AVD: another project's emulator on the port is never
-    installed on, cleared or killed (redroid's runner refused other containers the same way)"""
+    installed on, cleared or killed"""
     name = avd_name(d)
     if name != AVD:
         not_ours(d, name)
@@ -130,11 +122,7 @@ def http_port(port):
     return 8800 + (int(port) - 5554) // 2
 
 
-# how many emulators a run may start (uat.py up --count auto, run --devices auto): the memory free now,
-# less some headroom (what runs now is already out of it) and ~7 GB per heavy Gradle job running
-# (heavy.sh's slots taken), over one emulator's budget, measured on the Mac mini: four -gpu host
-# emulators running cases took the ~23 GB free, ~1.5 GB of it compressed, nothing swapped
-# (see uat/README.md「设备」). UAT_MAX_DEVICES caps it; never under 1
+# emulators a run may start: free memory less reserved slots, over EMU_BUDGET each; UAT_MAX_DEVICES caps it
 GB = 1 << 30
 RESERVE = 2 * GB
 HEAVY_JOB = 7 * GB
@@ -221,8 +209,7 @@ def auto_ports(count="auto"):
         sys.exit(f"only {len(ports)} console ports free of {n}")
     return ports
 CLIPS = os.path.join(OUT, "voice-clips")
-# host side of `adb reverse tcp:8000`: one per first device, so two runs at once (on 5554 and on 5556,
-# from two checkouts) each serve their own fixtures rather than the other's
+# host side of `adb reverse tcp:8000`, one per first device: parallel runs serve their own fixtures
 HTTP_PORT = int(os.environ.get("UAT_HTTP_PORT", "0")) or None
 # the sheets' captions: a CJK font (it draws no Latin there) and a Latin one, the first present
 FONT = next((f for f in ("/System/Library/Fonts/Hiragino Sans GB.ttc", "/System/Library/Fonts/STHeiti Medium.ttc",
@@ -231,12 +218,7 @@ FONT_LATIN = next((f for f in ("/System/Library/Fonts/Helvetica.ttc", "/usr/shar
                    if os.path.exists(f)), None)
 
 
-# The pause after a touch. It was all slept after every touch (OLD); now a short part after it
-# (PAUSE) spaces the touches, and the rest is owed only by the next read of the screen (Device.screen):
-# a field read right after typing still sees what the old pause let it see (a busy host delays a web
-# field's text: PY-01 read 「你抱」 at 0.25 s under a load of 20), while touches with no read between
-# them, and waits that poll for their outcome (goto, choose), do not pay it. An explicit after= is
-# slept as given. UAT_SLOW=1 sleeps the old pauses in full after each touch
+# PAUSE is slept after a touch; the rest of OLD is owed by the next screen read, so touches with no read between them skip it
 SLOW = os.environ.get("UAT_SLOW") == "1"
 OLD = {"tap": 0.3, "taps": 0.4, "swipe": 0.4, "type": 0.5, "press": 0.5, "tap_text": 0.8, "back": 0.8}
 PAUSE = OLD if SLOW else {"tap": 0.15, "taps": 0.2, "swipe": 0.2, "type": 0.25, "press": 0.25, "tap_text": 0.3, "back": 0.4}
@@ -260,20 +242,14 @@ class Elsewhere(Exception):
     pass
 
 
-# needs kinds that name where a case runs instead, in place()'s order; unmet, tally and counts_line
-# read it too. (There was an "emu" kind while the runs were on redroid: the hardware keyboard needs the
-# emulator's own kernel; every device is an emulator now)
+# kinds that name where a case runs instead, in place()'s order; unmet, tally and counts_line read it
 ELSEWHERE = {"jvm": "JVM", "release": "发版时", "manual": "真机或手工", "voice": "语音"}
-# when a case of an ELSEWHERE kind runs on this device and build after all (a kind not here never does).
-# release,scripted: scripted but too long for every run (a big lexicon), so only in a release's own run
-# (UAT_BUILD=release)
+# an ELSEWHERE kind that runs on this device after all; release,scripted only when UAT_BUILD=release
 RUNS_HERE = {"voice": lambda d, kinds: d.voice,
              "release": lambda d, kinds: "scripted" in kinds and BUILD == "release"}
 # what a case in the .md with no script is registered as: tally reports each
 NO_SCRIPT = "block:没有脚本"
 
-
-# ---------------------------------------------------------------- the case registry
 
 CASES = {}
 
@@ -309,10 +285,8 @@ class Case:
         return None
 
     def heavy_here(self):
-        """whether this run may run the case at all, before a device is picked: a heavy case
-        that runs elsewhere goes with its group instead of waiting for every device to go idle only to be
-        listed as 在别处跑. The release,scripted ones as RUNS_HERE has them: BUILD=release; any other
-        ELSEWHERE kind counts as elsewhere (it would then run with its group, not alone)"""
+        """whether this run runs the case at all, before a device is picked: a heavy case that runs
+        elsewhere goes with its group instead of waiting for every device to go idle"""
         where = place(self.needs)
         if where == "release":
             return "scripted" in self.needs.split(":", 1)[0].split(",") and BUILD == "release"
@@ -323,8 +297,7 @@ class Case:
         return f"{self.base}·{self.page}" if self.page else self.base
 
     def order(self):
-        # read-only first; then cases that need no learning before them; then ones that only learn
-        # from what they commit; last the ones that change settings or words on purpose
+        # read-only first, then cases that need no learning, then ones that learn from their commits, last ones that change settings
         if not self.mutates:
             return 0
         if self.mutates == "learn":
@@ -339,7 +312,8 @@ def case(id, base="B0", page=None, mutates=False, clean=False, visual=False, nee
     needs: "skip:<why>" / "block:<why>" when the emulator cannot run it at all; "voice:<why>" for the
     voice build only; "release:<why>" run by hand at a release ("release,scripted:<why>": scripted,
     run only when UAT_BUILD=release), "manual:<why>" on a real phone, "jvm:<tests>" asserted by JVM tests carrying its @Uat (`uat.py jvm`
-    records it from those; the Class.method names, separated by 、, must each carry it too): those four are 在别处跑 where unmet, no reset. heavy: the case loads the host (a big
+    records it from those; the Class.method names, separated by 、, must each carry it too; a case with a **JVM** line and no
+    script is registered so by load_scripts, its tests read off @Uat): those four are 在别处跑 where unmet, no reset. heavy: the case loads the host (a big
     lexicon compiled, an upgrade, the heap measured): run last, alone, with the other devices idle,
     so its load does not break the timing (long presses, quick taps) of a case beside it."""
     if page is None:
@@ -355,7 +329,7 @@ def case(id, base="B0", page=None, mutates=False, clean=False, visual=False, nee
 
 
 def parse_md(path):
-    """{id: (title, base text, expected text)} from a uat/*.md"""
+    """{id: (title, base text, expected text, whether it has a **JVM** line)} from a uat/*.md"""
     out, cur = {}, None
     for line in open(path, encoding="utf-8"):
         m = re.match(r"### (\S+) \[P\d\] (.*)", line)
@@ -363,11 +337,13 @@ def parse_md(path):
             cur = m.group(1)
             if cur in out:
                 raise ValueError(f"{path}: case {cur} written twice")
-            out[cur] = [m.group(2).strip(), "", ""]
+            out[cur] = [m.group(2).strip(), "", "", False]
         elif cur and line.startswith("- **前提**"):
             out[cur][1] = line.split("：", 1)[-1].strip()
         elif cur and line.startswith("- **预期**"):
             out[cur][2] = line.split("：", 1)[-1].strip()
+        elif cur and line.startswith("- **JVM**") and not line.split("：", 1)[-1].startswith("暂无"):
+            out[cur][3] = True   # 「暂无」: no JVM test yet
     return out
 
 
@@ -415,25 +391,23 @@ def _load_scripts(areas, files):
         for cid in own():
             CASES[cid].area = f[:2]
         md = parse_md(os.path.join(UAT, f[:-3] + ".md"))
-        for cid in md:
+        for cid, (_, _, _, jvm) in md.items():
             if cid not in CASES:
-                # a case in the .md with no script would not show in a run at all and look covered
-                CASES[cid] = Case(lambda d: None, cid, "B0", "text", False, False, False, NO_SCRIPT)
+                # a case with no **JVM** line and no script would not show in a run at all and look covered
+                CASES[cid] = Case(lambda d: None, cid, "B0", "text", False, False, False,
+                                  jvm_needs(cid) if jvm else NO_SCRIPT)
                 CASES[cid].area = f[:2]
         for c in list(CASES.values()):
             if c.id in md:
-                c.title, _, c.expect = md[c.id]
+                c.title, _, c.expect, _ = md[c.id]
 
-
-# ---------------------------------------------------------------- one device
 
 class Node:
     __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "a11y", "selected",
                  "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt")
 
     def __init__(self, e, parent):
-        # an empty field reports its hint as its text
-        # fields.html's placeholder is zero-width spaces, read as text where the hint is not told apart
+        # an empty field reports its hint as its text; fields.html's placeholder is zero-width spaces
         self.text = "" if e.get("hint") == "true" else (e.get("text") or "").replace("\u200b", "")
         self.desc = e.get("content-desc") or ""
         self.rid = (e.get("resource-id") or "").split("/")[-1]
@@ -443,8 +417,7 @@ class Node:
         self.b = (x0, y0, x1, y1)
         self.checked = e.get("checked") == "true"
         self.focused = e.get("focused") == "true"
-        # the screen reader's focus (Dumper's a11y-focused): read by no case yet; kept for the
-        # TalkBack cases of 20-accessibility, which step the focus by gestures, when they are scripted
+        # the screen reader's focus: for 20-accessibility's TalkBack cases once they are scripted
         self.a11y = e.get("a11y-focused") == "true"
         self.selected = e.get("selected") == "true"
         self.clickable = e.get("clickable") == "true"
@@ -504,8 +477,7 @@ class Screen:
     @staticmethod
     def _in_ime(n):
         if n.wtype is not None:
-            # AccessibilityWindowInfo.TYPE_INPUT_METHOD: Dumper writes the number, `uiautomator
-            # dump --windows` (the fallback) the name
+            # AccessibilityWindowInfo.TYPE_INPUT_METHOD: Dumper writes the number, `uiautomator dump --windows` the name
             return n.wtype in ("2", "TYPE_INPUT_METHOD")
         while n.parent is not None:
             n = n.parent
@@ -582,7 +554,6 @@ class Device:
         self._kb_at = None     # the keyboard's bounds once settled (keys)
         self._tapped_on = None   # the screen's texts as tap_text tapped (goto waits for a change)
 
-    # --- adb
     def adb(self, *args, binary=False, check=False, timeout=60):
         r = subprocess.run(["adb", "-s", self.serial, *args], capture_output=True,
                            text=not binary, timeout=timeout)
@@ -614,7 +585,6 @@ class Device:
     def root(self, cmd):
         return self.sh(cmd)   # adbd runs as root (up)
 
-    # --- the emulator's hardware keyboard and microphone
     def kb(self, *args):
         """uat/tools/emu-keyboard.sh up|down|type …|key …|combo …: the script refuses anything but an
         emulator"""
@@ -634,14 +604,11 @@ class Device:
         return self._plugged
 
     def say(self, clip, wait=True, alongside=None):
-        """dev/uat-out/voice-clips/<clip>.wav as what the microphone hears: the debug build's clip
-        microphone (VoiceClipProvider), the file written into the app's files once, then queued; the
-        talk open now (clip_mic() before it) or the next one reads it at the microphone's pace. clip:
-        a name, or a list of names and pauses in ms ("a", 800, "b"). wait=False: returns at once
-        (poll/wait/kill, as a player would: done once the clips' time has passed). alongside: a
-        device command started in the background in the same shell just before the queueing, and
-        waited for (lift_early's wait for the clip's start: begun after the queueing, it could miss
-        the line)"""
+        """dev/uat-out/voice-clips/<clip>.wav as what the debug build's clip microphone hears: written into
+        the app's files once, then queued; the open talk (clip_mic() first) or the next reads it at the
+        microphone's pace. clip: a name, or a list of names and pauses in ms ("a", 800, "b"). wait=False:
+        returns at once. alongside: a device command started in the background in the same shell just
+        before the queueing and waited for (begun after it, it could miss the clip's start)"""
         parts = [clip] if isinstance(clip, str) else list(clip)
         secs = 0.0
         for c in parts:
@@ -661,8 +628,7 @@ class Device:
                     raise Blocked(f"片段麦克风写不进 {c}.wav（debug 包？）：{(r.stdout + r.stderr).strip()[:120]}")
                 self._clips_in.add(c)
         arg = ",".join(str(int(c)) if isinstance(c, (int, float)) else f"{c}.wav" for c in parts)
-        # the clips' time counted from the queueing, not from the shell's return (alongside waits
-        # for its command: the lift came after the clip began)
+        # the clips' time counted from the queueing, not the shell's return: the lift came after the clip began
         t0 = time.time()
         if alongside:
             out = self.adb("shell", f"({alongside}) & sleep 0.2; content call --uri {CLIP_URI} --method queue "
@@ -692,8 +658,7 @@ class Device:
         self.clip_call("clear")
         self.clip_call("on")
 
-    # --- reading the screen
-    # the dump server (Dumper.java): one UiAutomation connection kept open, ~0.1 s a dump
+    # the dump server (Dumper.java) keeps one UiAutomation connection open
     def start_dumper(self):
         dex = build_dumper()
         self.stop_dumper()
@@ -757,9 +722,7 @@ class Device:
                 except OSError:
                     pass
             self.stop_dumper()   # the slow way from here on
-        # `uiautomator dump`: ~2 s a read, and without Dumper's hint/visible attributes, so an empty
-        # field showing its hint reads as that text (the app's dialogs, search boxes: fields.html's
-        # fields have none) and hidden nodes count as shown. Checks on those are unreliable here.
+        # `uiautomator dump` lacks Dumper's hint/visible attributes, so checks on those are unreliable here
         for _ in range(4):
             x = self.adb("exec-out", "sh", "-c",
                          "uiautomator dump --windows /sdcard/w.xml >/dev/null && cat /sdcard/w.xml")
@@ -769,13 +732,10 @@ class Device:
         raise Blocked("uiautomator dump failed")
 
     def idle(self, timeout=10):
-        """wait till the debug build says it is idle (UatIdleProvider: no fcitx job waiting, no refine
-        due, no background work, the main thread's queue empty), twice running: a key `input` sent
-        may not have reached the input method at the first. Instead of reading what shows the
-        moment it is there, which a refine or a late background result changes after (Espresso's
-        IdlingResource). The release build has no provider and is taken as idle; a debug build still
-        busy at timeout too, the read then goes on as before. A query with no answer (an adb error,
-        the provider not yet published after a reinstall or pm clear) is not idle: tried again"""
+        """wait till the debug build reports idle (UatIdleProvider: no fcitx job, refine or background
+        work, the main queue empty) twice running: a key `input` may not have arrived at the first.
+        A release build is taken as idle; a debug build still busy at timeout reads anyway. A query
+        with no answer (adb error, provider not yet published) is not idle: tried again"""
         if BUILD == "release":
             return
         self.settle()
@@ -799,9 +759,8 @@ class Device:
         return out
 
     def code_row(self, s=None):
-        """the composing row's text (its left part, code_row_text), None when it is not up. A build
-        from before the id has the row's one HorizontalScrollView; the syllable strip beside it
-        (code_row_syllables) scrolls too, so the id is looked for first"""
+        """the composing row's text (its left part, code_row_text), None when it is not up. The id is
+        looked for first: the syllable strip beside it (code_row_syllables) scrolls too"""
         s = s or self.screen()
         return s.find(rid="code_row_text", where="ime") or \
             next((n for n in s.ime() if n.cls == "HorizontalScrollView"), None)
@@ -881,7 +840,6 @@ class Device:
                          else s.find(text=text, where=where) or s.find(desc=text, where=where),
                          timeout, what=f"「{text}」")
 
-    # --- touching
     def tap(self, xy, after=None, owe="tap"):
         self.sh(f"input tap {xy[0]} {xy[1]}")
         # PAUSE of its own kind: tap_text's default is its own 0.3 s, and only a default after owes OLD's rest
@@ -927,9 +885,7 @@ class Device:
     def visible(self, text, s, where="app", contains=False):
         """a node with this text whose centre is inside all its ancestors (not scrolled under a bar)"""
         pool = s.app() if where == "app" else s.ime() if where == "ime" else s.nodes
-        # an edge-to-edge page (API 35+) scrolls its rows under the system's navigation bar: a tap there is
-        # the bar's (seen: 按键圆角 at the page's foot, its dialog never opened)
-        # (the bar is systemui's, or the launcher's taskbar on API 36)
+        # an edge-to-edge page (API 35+) scrolls rows under the navigation bar or taskbar: a tap there is the bar's
         nav = [m.b[1] for m in s.nodes if m.pkg != PKG and m.rid in ("back", "home", "recent_apps")]
         under = min(nav) if nav and where == "app" else None
         found = []
@@ -946,8 +902,7 @@ class Device:
                 a = a.parent
             if ok and (under is None or y < under):
                 found.append(n)
-        # a category header and its row can carry the same title (词库与短语 → 用户词库): prefer the
-        # one that is, or sits in, something clickable
+        # a category header and its row can share a title (词库与短语 → 用户词库): prefer the clickable one
         def tappable(n):
             a = n
             for _ in range(3):
@@ -964,9 +919,7 @@ class Device:
         s = self.screen()
         n = self.visible(text, s, where, contains)
         if not n and scroll:
-            # not scrolled down since the last time at the top: a fresh page is at its top already, so
-            # look down from here first (a swipe up at the top costs a second for nothing); a page
-            # come back to scrolled (the back stack keeps its place) is found by the top-and-down after
+            # a fresh page is at its top already, so look down first; a page come back to scrolled is found by top-and-down after
             if self._scrolled:
                 self.scroll_top()
             n, s = self._scan_down(text, where, contains)
@@ -1000,8 +953,7 @@ class Device:
             return False
         n = max(lists, key=lambda n: (n.b[2] - n.b[0]) * (n.b[3] - n.b[1]))
         x0, y0, x1, y1 = n.b
-        # the texts and where they are: the list's end can move by its bottom padding (the navigation
-        # bar's) with no new text, and a row that came up from under the bar has moved (ST-26)
+        # the list's end can move by its bottom padding with no new text, and a row from under the bar has moved
         def seen(s):
             return [(n.text, n.b) for n in s.app() if n.text]
         before = seen(s)
@@ -1031,12 +983,11 @@ class Device:
                 break
         return seen
 
-    # --- the keyboard
     def keys(self, refresh=False):
         """label -> centre, from the keyboard on screen: a letter key by its letter, the others by
-        name: space bksp shift enter globe , . 符 123 (and the nine keys' digits). A key the canvas
-        draws (060-render-p2 S3) is one node: its label as text, its corner and scene id told apart
-        (Node.alt, Node.key), found by both as a key view was, and by its id too (`q`, `backspace`)"""
+        name: space bksp shift enter globe , . 符 123 (and the nine keys' digits). A canvas-drawn key
+        is one node (label as text, corner and scene id as Node.alt, Node.key), found by its id too
+        (`q`, `backspace`)"""
         if self._keys and not refresh:
             return self._keys
         kb = self.need_keyboard()
@@ -1063,8 +1014,7 @@ class Device:
             for x in t[1:]:   # the nine keys: "ABC" over "2"; a table's roots over their letter (日 over a)
                 if len(x) == 1 and (x.isdigit() or "a" <= x <= "z"):
                     k.setdefault(x, n.c)
-        # the scene's ids last: an alias only where no label or name took it (a corner's digit is its
-        # letter's key's, as on the views, not the digit key's of another layout's id)
+        # the scene's ids last: an alias only where no label or name took it
         for key, c in ids:
             k.setdefault(key, c)
         self._keys = k
@@ -1089,14 +1039,10 @@ class Device:
         return n
 
     def need_keyboard(self, timeout=20):
-        """our keyboard's view, waited for. Not up after a few seconds: another input method may have
-        taken over (the system falls back to LatinIME after a `pm clear`, at times late) or the field
-        lost the request; ours set again and the focused field tapped, once. Blocked with what was
-        current, so a run's log tells a lost keyboard from a dead process"""
-        # where it stays, too: a case reads the keys (or the floating handle) next, and the window
-        # sliding up has them lower than they end. Up once its bounds read the same twice, or once
-        # when they are where the keyboard last settled: keys(refresh=True) comes here on every key,
-        # and a second read each time cost a dump and a wait's step per key
+        """our keyboard's view, waited for. Not up after a few seconds (the system may fall back to
+        LatinIME after a `pm clear`, or the field lost the request): ours set again and the field
+        tapped, once. Blocked with what was current, so a log tells a lost keyboard from a dead process"""
+        # the window slides up: settled once its bounds read the same twice, or are where the keyboard last settled
         kb = [self._kb_at] if self._kb_at else []
 
         def up(s):
@@ -1336,9 +1282,7 @@ class Device:
             p, t = self.preedit(s), self.field_text(s) or ""
             if not p and not t:
                 return
-            # committed text alone: reload the page (or start the test host afresh) instead of
-            # backspacing it, as a backspace right after a commit takes the commit back and unlearns
-            # it (PY-64)
+            # committed text alone: reload the page instead of backspacing, as a backspace right after a commit unlearns it
             top = self.top_activity()
             on_page = self.page and "webview_shell" in top or self.host is not None and "TypingHostActivity" in top
             if not p and on_page:
@@ -1346,9 +1290,7 @@ class Device:
             if "|" in p:   # the cursor inside the composing row: backspace stops at its start
                 break
             if p and on_page:
-                # the composing text only, a key at a time until it is gone: what it shows is not
-                # the keys typed (双拼 or 九键 show full pinyin, longer), and a backspace past it
-                # takes the commit back (PY-64); the committed text is reloaded away above
+                # the composing text only, a key at a time: a backspace past it takes the commit back
                 for _ in range(40):
                     self.press("bksp", 1, after=0.15)
                     if not self.preedit():
@@ -1364,7 +1306,6 @@ class Device:
                 return
         raise Blocked("could not empty the field")
 
-    # --- pages
     def testbed(self, page=""):
         """the testbed app (:testbed, uat/TESTBED.md) at one page ("" its list): installed from its
         built APK where missing (emulators start from a read-only snapshot without it), or Blocked"""
@@ -1405,9 +1346,7 @@ class Device:
         self.reload_n += 1
         url = f"http://127.0.0.1:8000/fields.html?r={self.reload_n}#{page}"
         self.sh(f"am start -a android.intent.action.VIEW -d '{url}' -n {BROWSER}")
-        # the field where it stays: coming from another app the browser's window slides in, and
-        # bounds read on the way are off the screen (seen: x 1633 on a 1080 screen, three taps
-        # into nothing, the keyboard never asked for) — so twice the same before it is tapped
+        # coming from another app the browser's window slides in, so bounds must read the same twice before the tap
         last = []
 
         def ready(s):
@@ -1429,8 +1368,7 @@ class Device:
             at = (f.b[2] - 40, f.b[3] - 25) if f.b[3] - f.b[1] > 150 else f.c
             self.tap(at, 0.8)
             if self.kb_plugged():
-                # a hardware keyboard typed on: a tap in a web field tells the input method nothing,
-                # the touch keyboard comes back by the button by the cursor (HK-03)
+                # with a hardware keyboard a tap in a web field tells the input method nothing; the touch keyboard comes back by its button
                 s = self.screen()
                 b = s.find(desc="显示屏幕键盘", where="ime")
                 if b and not s.find(rid="keyboard_view", where="ime"):
@@ -1454,8 +1392,8 @@ class Device:
                 for n in s.app())
 
     def open_settings(self):
-        """the settings home: back out of the app's pages rather than relaunching it (a relaunch
-        with CLEAR_TASK over itself left a finishing activity that took the next tap away)"""
+        """the settings home: back out of the app's pages rather than relaunching it (a relaunch with
+        CLEAR_TASK left a finishing activity that took the next tap away)"""
         self._at_top = False
         for _ in range(8):
             if "MainActivity" not in self.top_activity():
@@ -1480,9 +1418,8 @@ class Device:
         return sp.desc if sp else ""
 
     def to_letters(self, s=None):
-        """a number pad, a panel or the emoji search left up: its way back (the scene's id `back`, which
-        says 返回 since 0.6.1, no longer ABC) until the letters are, three at most (the symbol panel
-        over a number pad, the emoji search over its panel); the screen then"""
+        """a number pad, a panel or the emoji search left up: its `back` key until the letters show,
+        three at most (the symbol panel over a number pad, the emoji search over its panel); the screen then"""
         s = s or self.screen()
         for _ in range(3):
             back = next((n for n in s.ime() if n.key == "back"), None)
@@ -1506,15 +1443,14 @@ class Device:
         raise Blocked(f"地球键切不到「{label}」：{self.im_label()}")
 
     def rotate(self, r):
-        """0 portrait, 1 landscape. Landscape is the display resized to 2340x1080 (as on redroid, whose
-        display did not rotate; the cases' landscape coordinates were measured so): the apps get a landscape configuration
-        (w851dp, "land") and go through the same configuration change as on a turn"""
+        """0 portrait, 1 landscape: the display resized to 2340x1080, so the apps get a landscape
+        configuration (w851dp, "land") through the same change as on a turn; the cases' landscape
+        coordinates assume this size"""
         self.sh("wm size 2340x1080" if r else "wm size reset")
         self.rot = r
         self._keys = None
         self._kb_at = None   # the keyboard is laid out again: its old bounds are not where it settles
-        # until the apps are laid out for the new size (a window as wide as landscape, or none wider
-        # than portrait) rather than a fixed 2 s; then a moment for the keyboard to come back
+        # until the apps are laid out for the new size, then a moment for the keyboard to come back
         wide = lambda s: max((n.b[2] for n in s.nodes), default=0)
         try:
             self.wait(lambda s: wide(s) > 1200 if r else 0 < wide(s) <= 1080, 6, step=0.2,
@@ -1527,8 +1463,7 @@ class Device:
         s = self.screen()
         if not s.find(desc="隐藏工具栏", where="ime") and not s.find(desc="展开工具栏", where="ime") \
                 and not self.preedit(s):
-            # the next-word suggestions hold the bar after a commit: the keyboard hidden and shown
-            # again brings the toolbar back
+            # the next-word suggestions hold the bar after a commit: hiding and showing the keyboard brings the toolbar back
             self.back(0.8)
             f = next((n for n in self.screen().app() if n.focused and "Edit" in n.cls), None) or \
                 next((n for n in self.screen().app() if "Edit" in n.cls and n.rid != "url_field"), None)
@@ -1536,8 +1471,7 @@ class Device:
                 self.tap((f.b[2] - 30, f.b[3] - 20) if f.b[3] - f.b[1] > 150 else (f.b[2] - 30, f.c[1]), 1.0)
             s = self.screen()
             if not s.find(desc="展开工具栏", where="ime") and "q" in self.keys(refresh=True):
-                # seen after a commit in the app's own clipboard editor: the suggestions stay on the
-                # bar through a new page and a backspace; a letter typed and taken back clears them
+                # suggestions can outlast a new page and a backspace; a letter typed and taken back clears them
                 self.type("q", after=0.4)
                 self.press("bksp", after=0.6)
                 s = self.screen()
@@ -1550,7 +1484,6 @@ class Device:
             self.tap(n.c)
             self._kb_at = None   # gone: the next one up slides in again
 
-    # --- settings rows
     def row(self, title, s=None):
         s = s or self.screen()
         n = s.find(text=title, rid="title") or s.find(text=title)
@@ -1564,8 +1497,7 @@ class Device:
             before = self._tapped_on
             now = self.wait_changed(before)
             if now == before:
-                # a tap right after the activity (re)starts can be lost (seen on the release build):
-                # still the same page, so tap once more
+                # a tap right after the activity (re)starts can be lost: still the same page, tap again
                 self.tap_text(t, after=0.2 if not SLOW else 1.0, owe=None)
                 now = self.wait_changed(before)
             self.wait_settled(now)
@@ -1596,8 +1528,7 @@ class Device:
         for _ in range(8):
             s = self.screen()
             r = self.row(title, s)
-            # the pages run under the navigation bar (edge to edge): a row whose middle is behind it
-            # is not tapped there (ST-05: 跟随系统深色模式 at the bottom once 大小与样式 grew)
+            # the pages run edge to edge: a row whose middle is behind the navigation bar is not tapped there
             nav = [n.b[1] for n in s.nodes if n.pkg == "com.android.systemui" and n.b[1] > 1200 and n.b[3] > n.b[1]]
             if r and nav and r.c[1] >= min(nav) - 10 and self.scroll(s):
                 continue
@@ -1610,14 +1541,11 @@ class Device:
                     self.tap(r.c, 0.8)
                     state, dialog = self._switch_wait(title, cls, was)
                     if state == was and not dialog:
-                        # a tap right after the activity (re)starts can be lost (goto's note; ST-05 on
-                        # the release build, as the first thing after a reset): again only when nothing
-                        # happened for 2 s, same page, same state, no dialog (F3721)
+                        # a tap right after the activity (re)starts can be lost: again only when nothing happened for 2 s
                         self.tap(r.c, 0.8)
                         state, dialog = self._switch_wait(title, cls, was)
                     if state == on:
-                        # read once more after a pause: a first tap that came late, after the second,
-                        # turns it back, and that must fail here rather than pass as on
+                        # read again after a pause: a late first tap after the second turns it back, which must fail here
                         time.sleep(0.8)
                         state, _ = self._switch_read(title, cls)
                     if state != on:
@@ -1690,13 +1618,11 @@ class Device:
         px = list(im.getdata())
         return sum(px) / len(px)
 
-    # --- the system
     def top_activity(self):
         out = self.sh("dumpsys activity activities | grep -m1 topResumedActivity")
         m = re.search(r"\{[^ ]+ [^ ]+ ([^ ]+)", out)
         return m.group(1) if m else out.strip()
 
-    # --- screenshots
     def shot(self, region="kb", note="", png=None):
         """a screenshot of a region, kept for the group's contact sheet: kb (candidate bar and keys),
         field (the field down to the keyboard's bottom), app (the app window), top (upper half),
@@ -1735,8 +1661,6 @@ class Device:
         return im
 
 
-# ---------------------------------------------------------------- baselines
-
 def ime_ready(d):
     """after a clear the engine prepares its data on the first keyboard: wait for candidates"""
     d.type("ni", after=0.3)
@@ -1763,23 +1687,20 @@ def ensure_ime(d):
     raise Blocked(f"输入法设不成幽默：{cur}")
 
 
-# baselines "B0-<x>": B0, then this input method added in settings and switched to with the globe key
-# (the space key's description names it); B0-英文 is B0 and the globe key once. The third: 双拼's 键盘
-# set to this before the page is opened again (B0-14键 and B0-九键 are 拼音's keyboards, their own branch in reset)
+# baselines "B0-<x>": B0, then this input method added and switched to by the globe key; the third is 双拼's 键盘
 IM_BASES = {"B0-五笔": ("五笔", "五笔", None),
             "B0-二笔": ("二笔", "二笔", None), "B0-仓颉": ("仓颉", "仓颉", None),
             "B0-双拼": ("双拼", "双拼", None),
             "B0-自然码": ("自然码", "自然码", None), "B0-五笔拼音": ("五笔拼音", "五笔拼音", None),
             "B0-英文": (None, "英文", None),
             "B0-18键": ("双拼", "双拼", "18 键"), "B0-九键双拼": ("双拼", "双拼", "九键")}
-# baselines that are B0 with 拼音's 键盘 set to this (0.5: 九键 is pinyin's keyboard, no 九键拼音 to add;
-# 0.5.1: the two 注音 keyboards are pinyin's too); the space key still names 拼音
+# baselines that are B0 with 拼音's 键盘 set to this; the space key still names 拼音
 PINYIN_KEYBOARDS = {"B0-14键": "14 键", "B0-九键": "九键", "B0-注音九键": "注音九键", "B0-注音全键盘": "注音全键盘"}
 
 
 def block_candidate(d, which, note):
-    """long-press the candidate which, shoot the menu, then 屏蔽 and its confirmation (U-82: the
-    confirmation is a row of its own); returns the menu's texts, then the confirmation's"""
+    """long-press the candidate which, shoot the menu, then 屏蔽 and its confirmation (a row of its
+    own); returns the menu's texts, then the confirmation's"""
     menu = d.long_pick(which)
     d.shot("full", note)
     check("屏蔽" in menu, f"长按「{which}」的菜单里没有屏蔽：{[t for t in menu if len(t) < 12][:12]}")
@@ -1804,24 +1725,20 @@ def add_im(d, name):
 
 
 def clear_keeping_packs(d):
-    """the app's data cleared as `pm clear` clears it, but for the resource packs (files/packs in
-    its device-protected storage): imported once a device, not ~3 s a case again. A debug build's own
-    shell (run-as) deletes the rest; the input method disabled first, so the system does not start
-    it again halfway (ensure_ime turns it back on). A release build is not debuggable: pm clear,
-    then the packs through the file picker"""
+    """the app's data cleared as `pm clear` does, but for the resource packs (files/packs in its
+    device-protected storage), imported once per device. A debug build's run-as deletes the rest, the
+    input method disabled first so the system does not restart it halfway (ensure_ime turns it back
+    on). A release build is not debuggable: pm clear, then the packs through the file picker"""
     if BUILD == "release":
         d.sh(f"pm clear {PKG}")
         import_packs_ui(d)
         return
-    # what pm clear resets besides the files: the microphone's denial flags (a denied-for-good
-    # permission keeps VO-01's dialog away) and the per-app language (ST-25's English); both
-    # commands are absent on old releases (API 29: no per-app language there either)
+    # what pm clear resets besides the files: the microphone's denial flags and the per-app language (absent on API 29)
     d.sh(f"ime disable {IME}; am force-stop {PKG}; pm revoke {PKG} android.permission.RECORD_AUDIO 2>/dev/null; "
          f"pm clear-permission-flags {PKG} android.permission.RECORD_AUDIO user-set user-fixed 2>/dev/null; "
          f"cmd locale set-app-locales {PKG} --locales '' 2>/dev/null; "
          f"rm -rf /sdcard/Android/data/{PKG}/* /sdcard/Android/data/{PKG}/.[!.]* 2>/dev/null")
-    # each step must succeed and the result is checked: a rm refused or a cd that failed would
-    # leave the last case's data under the next
+    # each step must succeed and is checked: a refused rm or failed cd would leave the last case's data under the next
     out = d.sh(f"run-as {PKG} sh -c " + shlex.quote(
         f"find /data/user/0/{PKG} -mindepth 1 -maxdepth 1 -exec rm -rf {{}} + && "
         f"cd /data/user_de/0/{PKG} && find . -mindepth 1 -maxdepth 1 ! -name files -exec rm -rf {{}} + && "
@@ -1843,8 +1760,7 @@ def reset(d, base, page):
     if not base.startswith("B0"):
         raise Blocked(f"unknown baseline {base}")
     plug(d, base)
-    # the microphone allowed (the clear took it back), on every baseline (B0-语音 is B0 there; VO-01
-    # revokes it itself)
+    # the microphone allowed again on every baseline (VO-01 revokes it itself)
     d.sh(f"pm grant {PKG} android.permission.RECORD_AUDIO 2>/dev/null")
     if d.voice:
         d.clip_mic()   # what the talks hear: Device.say's clips (the emulator runs with no audio)
@@ -1876,19 +1792,16 @@ def reset(d, base, page):
 
 
 def handwriting(d, on, offered=True):
-    """0.6.1: handwriting is the toolbar's 手写 toggle (pinned on a new install), kept across fields and
-    restarts: lit for B0-手写, off for every other baseline (a case before may have left it on). Where it
-    is [offered] (every Chinese input method) a missing button blocks, turning it off too: a case left on
-    would go unseen (raised from a reset it blocks the case being reset, not the one that left it); English and
-    a password field grey it out (described 「手写，这里用不了」, not found by its name here) and a hardware
-    keyboard has none (the toggle is kept for the next field it is offered in)"""
+    """handwriting is the toolbar's 手写 toggle, kept across fields and restarts: lit for B0-手写, off
+    for every other baseline. Where [offered] (every Chinese input method) a missing button blocks, so
+    one left on is never unseen; English and a password field grey it out and a hardware keyboard has
+    none"""
     tapped = False
     for _ in range(3):
         s = d.screen()
         b = s.find(desc="手写", where="ime")
         if not b and tapped and not on:
-            # turned off from the candidate bar while it shows predictions (HW-41 after 人 and space): that
-            # 手写 is there only while handwriting is on (docs/other-input-methods.md), so it goes, not dims
+            # turned off while predictions show: that 手写 shows only while handwriting is on, so it goes rather than dims
             d._keys = None
             return
         if not b:
@@ -1906,12 +1819,7 @@ def handwriting(d, on, offered=True):
 def plug(d, base):
     """B0-实体: the emulator's USB keyboard plugged in; any other baseline: unplugged"""
     want = base == "B0-实体"
-    # gesture nav while it is plugged: with no touch keyboard the input method's window takes touches
-    # only over the navigation bar (onComputeInsets), and under three-button nav's bar that region is
-    # covered, so accessibility (Dumper, uiautomator) leaves the whole window out: the floating
-    # candidates and the 显示屏幕键盘 button read as nothing. The other baselines keep avd.sh's three-button.
-    # Set every time (enable-exclusive is idempotent), before the keyboard, so a keyboard plugged by
-    # hand or left from an earlier run, or kb() raising, still leaves the nav the baseline wants
+    # gesture nav while plugged: with no touch keyboard the IME window takes touches only over the nav bar, so accessibility under three-button nav leaves it out
     nav = "gestural" if want else "threebutton"
     overlay = f"com.android.internal.systemui.navbar.{nav}"
     changed = f"[x] {overlay}" not in d.sh(f"cmd overlay list android | grep -F '{overlay}'")
@@ -1953,11 +1861,7 @@ def soft_reset(d, base, page):
     handwriting(d, base == "B0-手写", offered=base not in ("B0-英文", "B0-实体") and page != "password")
 
 
-# ---------------------------------------------------------------- helpers for the case scripts
-
-# Where the tree tells too little (a panel's rows have no ids),
-# a few scripts go by place: the portrait layout of 1080x2340 at 440 dpi, the default keyboard height
-# (measured on redroid, the same on the emulator with three-button nav). Named once here; a new device size or keyboard height changes them.
+# scripts go by place where the tree tells too little: portrait 1080x2340 at 440 dpi, default keyboard height, three-button nav
 BAR_BOTTOM = 1560                     # the toolbar / candidate bar's lower edge: the keys or a panel below
 PANEL_TOP, PANEL_BOTTOM = 1550, 2090  # a panel's content (symbols, emoji, clipboard rows)
 
@@ -1996,7 +1900,7 @@ def choose(d, title, option):
         pool = [n for n in box.walk()] if box and box.rid == "select_dialog_listview" else s.app()
         return next((n for n in pool if n.text == option), None) or \
             next((n for n in pool if n.text.startswith(option) and n.text != title and n.rid != "summary"), None)
-    try:   # the dialog up, then the option in it (bounds only: ended as soon as it shows; a loaded machine took over 3 s)
+    try:   # the dialog up, then the option in it (bounds only: ended as soon as it shows)
         d.wait(dialog, 10, step=0.15)
         n = d.wait(opt, 5, step=0.15)
     except Blocked:
@@ -2031,7 +1935,7 @@ def sym_char(d, ch):
             d.tap(n.c, 0.6)
         for _ in range(4):
             s = d.screen()
-            # a cell drawn by the canvas (S5) has its symbol as words, not as a view's text
+            # a canvas-drawn cell has its symbol as words, not as a view's text
             m = next((m for m in s.ime() if (m.text or m.desc) == ch and m.c[0] > 200 and PANEL_TOP < m.c[1] < PANEL_BOTTOM), None)
             if m:
                 d.tap(m.c, 0.9)
@@ -2084,16 +1988,14 @@ def shuangpin_scheme(d, keyboard=None):
         choose(d, "键盘", keyboard)
 
 
-# the grouped keyboards' codes (14 keys, 18 keys, 九键双拼) and a tap's place are all private use:
-# none of them may reach a field
+# the grouped keyboards' codes and a tap's place are private use: none may reach a field
 def has_keyboard_code(t):
     return any(unicodedata.category(c) == "Co" for c in t or "")
 
 
 def keys_at(d, keys, at, after=0.6):
-    """tap the letter or digit keys of keys one by one, the key at i where at[i] says: None its centre, or (fx, fy)
-    within its bounds (0 its left or top edge, 1 its right or bottom), a finger off the middle toward a key
-    beside it (061-neighbour-correction)"""
+    """tap the letter or digit keys of keys one by one, the key at i where at[i] says: None its centre,
+    or (fx, fy) within its bounds (0 left or top edge, 1 right or bottom), a finger off the middle"""
     if len(at) != len(keys):
         raise ValueError(f"at {at} for {keys}")
     k = d.keys(refresh=True)
@@ -2117,9 +2019,9 @@ def keys_at(d, keys, at, after=0.6):
 
 def grouped_keys(d, groups, *, after=0.6, at=None, drift=None):
     """tap the 14 or 18 keys by their letters ("bn ui gh"), a key a word; "'" is the separator key.
-    at: where across each key to tap, a value a word (0 its left edge, 1 its right; None its centre),
-    as the 14 keys weigh a letter by the half tapped; drift: the index of the one key tapped with a
-    MOVE of a couple of pixels before the lift (Device.tap_drift), as a real finger's tap"""
+    at: where across each key to tap, a value a word (0 left edge, 1 right; None centre), as the 14
+    keys weigh a letter by the half tapped; drift: the index of the one key tapped with a few pixels'
+    MOVE before the lift (Device.tap_drift)"""
     k = d.keys(refresh=True)
     s = d.screen() if at is not None else None
     if at is not None and len(at) != len(groups.split()):
@@ -2145,8 +2047,7 @@ def grouped_keys(d, groups, *, after=0.6, at=None, drift=None):
     if drift is None:
         d.taps(pts, gap=0.3, after=after)
         return
-    # the drifting tap a process of its own: one input swipe, never three input motionevent calls,
-    # which take long enough between DOWN and UP to be a long press (review N1)
+    # the drifting tap is one input swipe: separate motionevent calls are slow enough to be a long press
     if pts[:drift]:
         d.taps(pts[:drift], gap=0.3, after=0.3)
     d.tap_drift(pts[drift], after=0.3)
@@ -2164,12 +2065,11 @@ def open_host(d, **extras):
     """the debug build's TypingHostActivity, a native EditText with what a web field cannot have:
     next=True (an IME_ACTION_NEXT field and a second one under it), noLearning=True
     (IME_FLAG_NO_PERSONALIZED_LEARNING), sensitiveClip="…" (that text on the clipboard marked
-    sensitive), clip="…" with clipTimes=n (that text n times over on the clipboard, as any app copies). Not exported: started as root. A release run (UAT_BUILD=release) has no debug package:
-    it is installed for this case as a host app only, its own input method disabled so the system
-    has one 幽默输入法, and removed when the case ends (SET-01's wizard must see one)"""
+    sensitive), clip="…" with clipTimes=n. Not exported: started as root. A release run has no debug
+    package: it is installed for this case as a host only, its input method disabled so the system
+    has one 幽默输入法 (SET-01's wizard must see one), and removed when the case ends"""
     if BUILD == "release":
-        # removed when the case ends whether this case put it there or a run before left it
-        # once a case: clear() opens it again, and a second pm uninstall only logs a failure
+        # removed when the case ends, whoever installed it; registered once a case (clear() reopens it)
         if not any(getattr(u, "unhost", False) for u in d.after_case):
             u = lambda: unhost(d)   # noqa: E731
             u.unhost = True
@@ -2195,8 +2095,8 @@ def open_host(d, **extras):
 
 
 def in_picker(d, timeout=8):
-    """until the system's file picker (DocumentsUI) is in front and shows its content, rather than a
-    fixed 2.5 s after the tap that opens it; the caller still checks top_activity and says what failed"""
+    """until the system's file picker (DocumentsUI) is in front and shows its content; the caller still
+    checks top_activity and says what failed"""
     def shown(s):
         return "documentsui" in d.top_activity() and any(n.pkg.endswith("documentsui") and n.text for n in s.nodes)
     try:
@@ -2206,9 +2106,9 @@ def in_picker(d, timeout=8):
 
 
 def to_downloads(d, s=None):
-    """下载 in the file picker: through its roots drawer, opened by its ☰ (DocumentsUI's drawer_open, found by what it says
-    to a screen reader: no fixed place, which held for one AVD only), or tapped where the roots are listed with no ☰ (a
-    wide window keeps them on screen, review R26 F8494); blocked where neither shows"""
+    """下载 in the file picker: through its roots drawer, opened by its ☰ (found by its accessibility
+    description, not a place), or tapped where a wide window lists the roots with no ☰; blocked where
+    neither shows"""
     s = s or d.screen()
     menu = next((n for n in s.nodes if n.desc in ("显示根目录", "Show roots")), None)
     if menu:
@@ -2244,8 +2144,6 @@ def open_url(d, page, field=0):
     d._keys = None
 
 
-# ---------------------------------------------------------------- a run
-
 def read_json(path, default=None):
     if not os.path.exists(path):
         return default
@@ -2273,11 +2171,9 @@ class Run:
         rj, sj = os.path.join(self.dir, "results.json"), os.path.join(self.dir, "shots.json")
         self.results = {k: tuple(v) for k, v in read_json(rj, {}).items()}
         old = read_json(sj, [])
-        # a rerun replaces the result but keeps the attempts before it: a first run's failure is
-        # what tells a flaky case from a broken one
+        # a rerun keeps the attempts before it: a first run's failure tells a flaky case from a broken one
         self.prev = {cid: attempts_of(self.results[cid]) for cid in ids if cid in self.results}
-        # the rerun's old results, written by save() till each is run again: a rerun stopped half-way
-        # keeps the result and attempts of every case it did not reach
+        # held till each is run again, so a rerun stopped half-way keeps the cases it did not reach
         self.held = {cid: self.results.pop(cid) for cid in self.prev}
         self.spans = []     # [port, case id, start, end] of every case ended, for "beside"
         self.active = {}    # port: (case id, start) of the case running there now
@@ -2310,9 +2206,7 @@ class Run:
             end = time.time()
             start = end - secs
             self.active.pop(dev, None)
-            # what the other device ran while this one did: two emulators share the host's CPU. One still running
-            # there ran beside this one's end, started even in the same clock tick (s == end: time.time()'s
-            # resolution, two calls a microsecond apart; test_rerun_keeps_first_failure failed on it)
+            # what the other device ran meanwhile (emulators share the host's CPU)
             beside = [x[1] for x in self.spans if x[0] != dev and x[2] < end and x[3] > start] + \
                      [cid for p, (cid, s) in self.active.items() if p != dev and s <= end]
             self.spans.append([dev, c.id, start, end])
@@ -2332,8 +2226,8 @@ def stepped(d, e):
 
 
 def screen_back(d):
-    """The display's size and density as the device's own once a case ends: a case left in landscape (rotate's
-    wm size 2340x1080) or at another density failed the next ones on the device that need no reset (PR-10, ST-26)"""
+    """The display's size and density reset once a case ends: a case left in landscape or at another
+    density fails the next ones that need no reset"""
     out = d.sh("wm size; wm density")
     if "Override" in out:
         d.sh("wm size reset; wm density reset")
@@ -2441,7 +2335,7 @@ class Scheduler:
         d = Device(port, self.run, self.voice)
         try:
             if not d.start_dumper():
-                d.stop_dumper()   # falls back to `uiautomator dump`, ~2 s a read
+                d.stop_dumper()   # falls back to `uiautomator dump`
                 print(f"emulator-{port}: Dumper not up, reading the screen by `uiautomator dump`: the canvas "
                       "keys' corners and scene ids are not read, so cases tapping a key by its corner digit "
                       "or id fail as an unknown key", flush=True)
@@ -2490,8 +2384,6 @@ class Scheduler:
             self.busy.discard(port)
             self.lock.notify_all()
 
-
-# ---------------------------------------------------------------- sheets and the results file
 
 def build_sheets(run, cases):
     from PIL import Image, ImageDraw, ImageFont
@@ -2674,8 +2566,7 @@ def mark(run_name, cid, state, note):
 
 
 def flakes(names):
-    """cases that failed or blocked and then passed, with what the other device ran beside each
-    failure: the 2026-10-23 guess is that heavy cases there starve the timing-bound ones here"""
+    """cases that failed or blocked and then passed, with what the other device ran beside each failure"""
     names = names or sorted(n for n in os.listdir(OUT) if os.path.exists(os.path.join(OUT, n, "results.json")))
     tally, devs, n = {}, {}, 0
     for name in names:
@@ -2699,8 +2590,6 @@ def flakes(names):
         print("beside the failures most often: " +
               ", ".join(f"{k} ×{v}" for k, v in sorted(tally.items(), key=lambda kv: -kv[1])[:10]))
 
-
-# ---------------------------------------------------------------- devices and the page server
 
 SHIM_LOCK = threading.Lock()
 
@@ -2761,8 +2650,7 @@ def clips_done(state):
     mid-clip ends the talk, what was left of the clip with it)"""
     v = dict(re.findall(r"(\w+)=(\S*)", state))
     return v.get("queued") == "" and (v.get("playing") == "false" or v.get("talking") == "false")
-    # clips still queued when the talk ends stay queued (the provider outlives a talk): a list
-    # ("a", 800, "b") lifted during "a" is never done; its caller kill()s it instead
+    # clips still queued when the talk ends stay queued: the caller kill()s a list lifted mid-clip
 
 
 class ClipPlay:
@@ -2821,8 +2709,7 @@ def up(port="5556"):
         ours(d)
         print(f"{d.serial} already up")
     else:
-        # one still booting is waited for if it is this AVD; another project's, or one not answering,
-        # is left: starting ours on its port would fail and the wait below would take that one
+        # one still booting is waited for if it is this AVD; another's is left, as starting ours on its port would fail
         name = avd_name(d)
         if name not in ("", AVD):
             not_ours(d, name)
@@ -2830,10 +2717,7 @@ def up(port="5556"):
         log = os.path.join(OUT, "emu", f"emulator-{port}.log")
         if not name:
             os.makedirs(os.path.join(OUT, "emu"), exist_ok=True)
-            # -gpu host: the Mac's GPU (its OpenGL, through emulator_env's shim with no display attached;
-            # EMU_GPU=swiftshader_indirect for software, which the snapshot was not saved with: a cold boot).
-            # -audio none, not -no-audio: that drops the microphone, and the AudioRecord the clip
-            # microphone still opens would fail (NoMicrophone)
+            # -audio none, not -no-audio: that drops the microphone the clip microphone's AudioRecord still opens
             gpu = os.environ.get("EMU_GPU", "host")
             with open(log, "w") as f:   # the emulator holds its own copy of the file
                 emu = subprocess.Popen([emulator_bin(), "-avd", AVD, "-port", port, "-snapshot", SNAPSHOT,
@@ -2848,7 +2732,7 @@ def up(port="5556"):
             if emu is not None and emu.poll() is not None:   # no AVD or snapshot, a bad EMU_GPU, the port taken
                 sys.exit(f"the emulator exited ({emu.returncode}) before booting: {tail(log)}")
         else:
-            if emu is not None:   # ours, hung: not left running (3-4.5 GB each)
+            if emu is not None:   # ours, hung: not left running
                 emu.kill()
             sys.exit(f"{d.serial} did not boot in 3 min ({log})")
         ours(d)   # the port taken by another emulator between the look and the start: that one booted
@@ -2880,8 +2764,7 @@ def up(port="5556"):
 
 
 def install(d, voice=True, packs=True):
-    # UAT_APK_REPO: another checkout's build under this one's cases (the voice cases need a debug
-    # build's clip microphone: R15 has none)
+    # UAT_APK_REPO: another checkout's build under this one's cases (the voice cases need a debug build)
     apk_repo = os.environ.get("UAT_APK_REPO", REPO)
     apks = sorted((os.path.join(dp, f) for dp in [os.path.join(apk_repo, f"app/build/outputs/apk/{BUILD}")]
                    if os.path.isdir(dp) for f in os.listdir(dp) if ABI in f and f.endswith(".apk") and not f.endswith("-unsigned.apk")),
@@ -2899,8 +2782,7 @@ def install(d, voice=True, packs=True):
     with open(apks[-1], "rb") as f:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
-    # one 幽默输入法 on the device: with the debug and the release build both there, the system's
-    # picker lists two and the setup wizard (SET-01) can take the other one
+    # one 幽默输入法 on the device: with both builds there the setup wizard (SET-01) can pick the other
     other = "io.github.sraw.youmo" if BUILD == "debug" else "io.github.sraw.youmo.debug"
     if d.sh(f"pm path {other}").strip():
         d.sh(f"pm uninstall {other}")
@@ -2947,11 +2829,7 @@ def stop(d, msg):
     sys.exit(msg)
 
 
-# what was last imported, a pack's file SHA-256 each and the generation the app installed it as (<id>.sha256:
-# "<sha> <generation>"): a pack rebuilt during development keeps its version (packs.properties is raised for a
-# release), so the version the app reports cannot tell it from the old one. Only import_packs writes them; a pack
-# imported another way (Settings → 资源包 by hand) is a new generation (PackShelf names each import anew), so the
-# mark no longer matches and the build's pack is imported again
+# what was last imported, per pack its SHA-256 and generation (<id>.sha256): a rebuilt pack keeps its version
 PACK_MARKS = "/data/local/tmp/youmo-uat-packs"
 # an emulator a release gate brought up (gates.py, which kills only one with it); a run that takes the device drops it
 GATE_MARK = "/data/local/tmp/youmo-gate"
@@ -3012,12 +2890,10 @@ def import_packs_ui(d, files=None):
     name = os.path.basename(path)
     if not d.sh(f"ls /sdcard/Download/{name} 2>/dev/null").strip():
         d.adb("push", path, f"/sdcard/Download/{name}", check=True, timeout=600)
-    # the newest in 下载 each time, and scanned: adb push keeps the build's mtime, and the files the cases
-    # put there since (layouts, themes, backups) sorted it off the picker's first screen (0.6.1 release run)
+    # touched and scanned: adb push keeps the build's mtime, which could sort it off the picker's first screen
     d.sh(f"touch /sdcard/Download/{name}; "
          f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}")
-    # the picker started afresh: one left open or remembering another folder by a case before (seen in
-    # the 0.6.1 release run after PR-52b and ST-101 on loaded hosts) hid the pack from every reset after it
+    # the picker started afresh: one left open or remembering another folder by an earlier case hid the pack
     for p in re.findall(r"package:(\S*documentsui\S*)", d.sh("pm list packages documentsui")):
         d.sh(f"am force-stop {p}")
     home(d, "资源包")
@@ -3065,10 +2941,9 @@ _fixtures_checked = set()   # the HTTP ports found serving this checkout's fixtu
 
 
 def ensure_fixtures(d):
-    """the test page served and reversed to [d] before it is opened, whoever opens it: run starts both,
-    but reset or open_page called without run (up, packs, by hand) found nothing on 127.0.0.1:8000 and the
-    page said ERR_CONNECTION_REFUSED (a KB-01 time-out). A server already on this port is used only when its
-    fields.html is this checkout's"""
+    """the test page served and reversed to [d] before it is opened, whoever opens it (reset or
+    open_page without run, too). A server already on this port is used only when its fields.html is
+    this checkout's"""
     global HTTP_PORT, _fixtures_server
     HTTP_PORT = HTTP_PORT or http_port(d.port)
     # checked once a process and once a device: open_page comes here on every reset
@@ -3175,8 +3050,7 @@ def run_on(a, cases, ports):
     global HTTP_PORT
     HTTP_PORT = HTTP_PORT or http_port(ports[0])
     if BUILD != "debug":
-        # each reset imports them (clear_keeping_packs) on a device's thread, where a missing pack's
-        # exit would end that thread unrecorded: checked here, before any device starts
+        # checked before any device starts: a missing pack's exit on a device's thread would end it unrecorded
         pack_files(voice=False)
     for p in ports:
         d = Device(p)
@@ -3186,8 +3060,7 @@ def run_on(a, cases, ports):
         # this run's now: a gate left up with --keep (gates.py) would find its mark later and kill it under the run
         d.sh(f"rm -f {GATE_MARK}")
         need_root(d)   # one started by hand
-        # the voice pack only where it is used (a release run has no voice cases); a release run's
-        # packs come with each reset's pm clear (clear_keeping_packs), so not here as well
+        # the voice pack only where it is used; a release run's packs come with each reset (clear_keeping_packs)
         install(d, not a.no_voice and BUILD == "debug", packs=BUILD == "debug")
         d.adb("reverse", "tcp:8000", f"tcp:{HTTP_PORT}", check=True)
     ver = version(Device(ports[0]))
@@ -3225,7 +3098,19 @@ def run_on(a, cases, ports):
     print(f"results {os.path.relpath(p, REPO)}; {len(sheets)} sheets, {nshots} shots in {os.path.relpath(run.dir, REPO)}/")
 
 
-# ---------------------------------------------------------------- the cases asserted on the JVM
+# the test sources `uat.py jvm` reads @Uat from
+JVM_ROOTS = [os.path.join(REPO, p) for p in ("app/src/test", "lib/ime-core/src/test", "lib/ime-eval/src/uatTest",
+                                             "lib/keyboard-scene/src/commonTest")]
+_JVM_FOUND = {}
+
+
+def jvm_needs(cid):
+    """the needs= of a case with a **JVM** line and no script: "jvm:" and the tests carrying its @Uat"""
+    if not _JVM_FOUND:
+        _JVM_FOUND.update(uat_tests(JVM_ROOTS))
+    tests = [f"{cls.rsplit('.', 1)[-1]}.{method}" for cls, method in _JVM_FOUND.get(cid, [])]
+    return "jvm:" + ("、".join(tests) or "没有 @Uat 测试")
+
 
 UAT_RE = re.compile(r'@Uat\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*fun\s+(?:`([^`\n]+)`|(\w+))\s*\(')
 
@@ -3318,8 +3203,7 @@ def junit_results(dirs):
                 msg = ((bad.get("message") or "").splitlines() or [""])[0][:200] if bad is not None else ""
                 # a multiplatform module's jvmTest (keyboard-scene) names its methods "name[jvm]"
                 key = (tc.get("classname"), re.sub(r"\[jvm\]$", "", tc.get("name") or ""))
-                # the same test in two results (SDK 35's and 29's): the worse counts (a failure
-                # at one must not be hidden by the other read after it)
+                # the same test in two results (SDK 35's and 29's): the worse counts
                 if key not in out or WORSE.index(state) < WORSE.index(out[key][0]):
                     out[key] = (state, float(tc.get("time") or 0), msg)
     return out
@@ -3351,12 +3235,10 @@ def jvm_record(found, results, expected=()):
 
 def cmd_jvm(a):
     """the cases the app's and ime-core's JVM tests assert, recorded as a run of their own"""
-    # one APK since 0.6.0: the speech flavors' testText and testVoice are gone
-    roots = [os.path.join(REPO, p) for p in ("app/src/test", "lib/ime-core/src/test", "lib/ime-eval/src/uatTest", "lib/keyboard-scene/src/commonTest")]
     dirs = [os.path.join(REPO, p) for p in a.results.split(",")]
     load_scripts()
     expected = [c.id for c in CASES.values() if place(c.needs) == "jvm"]
-    found = uat_tests(roots)
+    found = uat_tests(JVM_ROOTS)
     rec = jvm_record(found, junit_results(dirs), expected)
     problems = needs_problems({c.id: c.needs for c in CASES.values()}, found)
     for p in problems:
@@ -3390,8 +3272,8 @@ def place(needs):
 def tally(cases, priority, jvm_line):
     """(counts, problems) for the README: cases {id: needs}, priority {id: "P0"…}, jvm_line {ids with a
     **JVM** line in their .md}. smoke = still on the device but asserted on the JVM too. A needs=jvm case
-    without the .md line, a case missing from the .md, or one in the .md with no script (registered
-    as NO_SCRIPT; it used to be blocked on every run and never reported) is a problem: the two would tell different stories"""
+    without the .md line, a case missing from the .md, or one in the .md with no script (NO_SCRIPT) is a
+    problem: the two would tell different stories"""
     n = {k: 0 for k in ("device", *ELSEWHERE, "smoke")}
     prios, problems = {}, []
     for cid, needs in sorted(cases.items()):

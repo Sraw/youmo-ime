@@ -20,7 +20,6 @@ import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.layout.Width
 
-/** A row as the environment has it: what shows, each key's text read (060-render-v2 §6 step 2). */
 class ExpandedRow(
     val height: Double,
     val indent: Double,
@@ -30,13 +29,11 @@ class ExpandedRow(
     val line: Int,
 )
 
-/** What a row holds once expanded: [rows] tall (one, or the rows below it too: rules C §2, §8). */
 sealed interface Item {
     val width: Width
     val rows: Int get() = 1
 }
 
-/** A key shown, its attributes laid over its row's and file's defaults (and the variant that holds), its bindings read. */
 class ExpandedKey(
     val key: Key,
     val attrs: KeyAttrs,
@@ -45,7 +42,7 @@ class ExpandedKey(
     val icon: String?,
     val badge: String?,
     val a11y: String,
-    /** [alt] as the layout wrote it, a binding unread (`{punct:~}`): read by snapshots, exports and tests; the app reads [alt] and [popup]. */
+    /** Read by snapshots, exports and tests; the app reads [alt] and [popup]. */
     val altRaw: String? = null,
 ) : Item {
     override val width: Width get() = attrs.width ?: Width.Units(1.0)
@@ -62,18 +59,10 @@ class ExpandedSlot(val slot: Slot) : Item {
     override val rows: Int get() = slot.rows
 }
 
-/**
- * Step 2 of §6: includes put in, `when=` weighed, a key's first `<variant>` that holds laid over it,
- * bindings read. [fragments] are the files includes name, by id; one not there is a problem, as is a
- * row with nothing shown, and two keys shown of one id (a file may write an id twice where each has
- * a `when=`: the number pad's `-`, at one place or another as the pad is).
- */
+/** A file may write an id twice where each has a `when=` (the number pad's `-`); two keys shown of one id are a problem. */
 object Expand {
 
-    /**
-     * [splitSide]: the side a board split goes to (`left`, `right`), which `split-side` asks; null
-     * where it is not split to a side (a board split in halves has both: LayoutReader refuses it there).
-     */
+    /** A board split in halves has both sides: LayoutReader refuses `split-side` there. */
     fun rows(layout: Layout, fragments: Map<String, Fragment>, env: Env, splitSide: String? = null): Parsed<List<ExpandedRow>> {
         val p = Problems()
         val all = env.facts
@@ -134,9 +123,7 @@ object Expand {
         )
     }
 
-    // the corner a screen reader says: a named key's long press's first as drawn, by its name ([Texts.alts], 060-keys-unify
-    // §3.4: the user's, not a theme's `alt=` they changed; none there, none said); a key of no name, or no readings
-    // given (the theme maker), its layout's `alt=`. A character key of `mark="false"`'s built-in first is no corner there (KeyResolver): none said
+    // a named key's corner is the user's long press's first, not a theme's `alt=` they changed; a key of no name its layout's
     private fun reading(attrs: KeyAttrs, env: Env): String? {
         val alts = env.texts.alts
         val name = attrs.shortcut
@@ -146,20 +133,12 @@ object Expand {
         return attrs.alt?.let { text(it, env) }?.takeIf { it.isNotEmpty() }
     }
 
-    // the label a screen reader is given: as following Shift shows it, whatever 拼音键字母大小写 draws (the key's
-    // meaning read the same, a capital not read as one only because it is drawn so)
+    // as following Shift shows it: a capital not read as one only because it is drawn so
     private fun heard(attrs: KeyAttrs, label: String?, env: Env): String? =
         if (env.texts.letterCase == LetterCase.Shift) label
         else attrs.label?.let { text(it, env.copy(texts = env.texts.copy(letterCase = LetterCase.Shift))) }
 
-    /**
-     * What a screen reader says of a key the layout gives no a11y, as theme 3.0's keys said it: the
-     * space with the input method's name (with none, plain `a11y_key_space`) ([Texts.a11ySpace], BaseKeyboard's a11y_key_space_with_ime:
-     * TalkBack reads the description, not the name drawn); a group key's letters one by one in
-     * capitals (a key with letters=), a `;` kept (GroupedKeyboard's "Q W", "L ;": TalkBack read the face "QW" as a word),
-     * any other label as it is (Rime, Fn, ABC); then the alt as shown ([Texts.a11yGrouped]'s
-     * a11y_key_grouped: "Q W, 1", "ABC, 2"; in Chinese "Q W，1", "ABC，2", on every keyboard that passes it).
-     */
+    /** As theme 3.0's keys said it: TalkBack reads the description, so a group's letters are spaced ("Q W"), not read as a word. */
     fun spoken(attrs: KeyAttrs, group: Boolean, label: String?, alt: String?, texts: Texts): String {
         if (attrs.role == SPACE) return if (label.isNullOrEmpty()) A11Y_SPACE else texts.a11ySpace.replace(ARG1, label)
         val said = label?.let { if (group) it.uppercase().toList().joinToString(" ") else it }.orEmpty()
@@ -174,7 +153,6 @@ object Expand {
     private const val SPACE = "space"
     private const val ARG1 = "%1\$s"
 
-    // the space with no name to say (an input method with none, a scene built before the name is known): the app's "Space"
     private const val A11Y_SPACE = "a11y_key_space"
     private val ARGS = Regex("%[12]\\$" + "s")
 
@@ -183,7 +161,6 @@ object Expand {
         is Text.Binding -> t.toString()
     }
 
-    /** [t] as [env] reads it: a literal as written, a binding's value (empty where the environment has none). */
     fun text(t: Text, env: Env): String = when (t) {
         is Text.Literal -> t.text
         is Text.Binding -> binding(t.name, t.arg.orEmpty(), env)
@@ -193,15 +170,11 @@ object Expand {
         val texts = env.texts
         return when (name) {
             "case" -> cased(arg, env)
-            // a table's root over its letter; a letter with none its letter as `{case:x}` shows it (so a screen
-            // reader's text, read under 跟随 Shift, is the same whatever 拼音键字母大小写 draws)
+            // so a screen reader's text, read under 跟随 Shift, is the same whatever 拼音键字母大小写 draws
             "root" -> texts.other["root:$arg"]?.takeIf { it.isNotEmpty() } ?: cased(arg, env)
-            // a 14/18 键 key's letters: capitals with no Shift to follow, unless the setting says otherwise
             "group" -> LetterCaseRule.shown(arg, LetterCaseRule.upper(texts.letterCase, env.shift, shiftless = true))
-            // a full keyboard letter's first ([Texts.alts] by its name): no built-in layout binds it any more (060-keys-unify
-            // S6), a theme's own written before still reads
+            // no built-in layout binds it any more; a theme's own written before still reads
             "alt" -> texts.alts?.get("full/$arg").orEmpty()
-            // each character as punctuation maps it: 九键 1's run `,.?!` as it types
             "punct" -> arg.map { c -> c.toString().let { texts.punctuation[it] ?: it } }.joinToString("")
             "comma" -> texts.comma
             "period" -> texts.period
@@ -217,11 +190,9 @@ object Expand {
     private fun cased(letter: String, env: Env): String =
         LetterCaseRule.shown(letter, LetterCaseRule.upper(env.texts.letterCase, env.shift, keepUppercase = env.texts.keepUppercase))
 
-    // rules C §2: pinyin's and 双拼's in capitals (or as 拼音键字母大小写 says); English's as Shift has them, small without
     private fun nineLetters(letters: String, env: Env): String =
         LetterCaseRule.shown(letters, LetterCaseRule.upper(env.texts.letterCase, env.shift, shiftless = env.input.ime != "english"))
 
-    /** An icon's name: as written, or a binding's (null: none drawn). */
     fun icon(t: Text, env: Env): String? = when (t) {
         is Text.Literal -> t.text
         is Text.Binding -> when (t.name) {
@@ -232,7 +203,6 @@ object Expand {
             }
             "return-icon" -> env.texts.returnIcon
             "hold-badge" -> "voice".takeIf { env.input.holdVoice }
-            // the symbols panel's lock (PickerLayout): open, or shut while the panel stays
             "lock-icon" -> if (env.states["lock"].orEmpty().contains(KeyState.Locked)) "lock" else "lock-open"
             else -> null
         }

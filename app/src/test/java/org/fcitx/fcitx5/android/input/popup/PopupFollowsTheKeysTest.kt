@@ -28,11 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * The popups draw in the theme the keys shown now do, asked as they draw: a keyboard whose keys the
- * engine refused (the built-in drawing them) after the popups were first made, then another keyboard
- * whose keys are the theme's own (060-render-p2 U8).
- */
+/** Popups draw in the theme the keys shown now do, asked as they draw. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PopupFollowsTheKeysTest {
@@ -42,7 +38,7 @@ class PopupFollowsTheKeysTest {
 
     private val popup = PopupComponent()
 
-    // a theme of its own name (the fall backs kept by name), the built-in's look
+    // a name of its own: the fall backs are kept by name
     private val theme: Theme = Theme.Custom("follows${System.nanoTime()}", true, TestThemes.PixelDark.look)
     private val look by lazy { ThemeManager.shownLook(theme) }
 
@@ -70,17 +66,15 @@ class PopupFollowsTheKeysTest {
         assertTrue(popup.scenesNow.ready)
         assertEquals(theme.name, popup.scenesNow.drawsIn)
         SceneBoard.keysFellBack(theme.name, look, "qwerty", true)
-        // another keyboard's keys refused: not the one shown
         assertEquals(theme.name, popup.scenesNow.drawsIn)
         SceneBoard.shown("qwerty")
         assertTrue(popup.scenesNow.ready)
         assertEquals(builtIn, popup.scenesNow.drawsIn)
-        // the theme's own keyboard shown again: its own again
         SceneBoard.shown("k18")
         assertEquals(theme.name, popup.scenesNow.drawsIn)
     }
 
-    // a bubble still up as the keys fell back goes away and is not kept for the next: it would draw in the old theme
+    // a bubble up as the keys fell back is not kept for the next: it would draw in the old theme
     @Test
     fun aPopupShowingAsTheKeysFellBackIsNotPooled() {
         SceneBoard.shown("k18")
@@ -89,7 +83,6 @@ class PopupFollowsTheKeysTest {
         SceneBoard.shown("qwerty")
         assertEquals(builtIn, popup.scenesNow.drawsIn)
         popup.dismissAll()
-        // the next bubble shown draws in the built-in, as the keys: none of the old theme's taken from the pool
         popup.listener.onPopupAction(PopupAction.PreviewAction(KeyRef("b"), "b", Rect(0, 0, 100, 100)))
         assertEquals(builtIn, popup.showing(KeyRef("b"))?.scenes?.drawsIn)
         popup.dismissAll()

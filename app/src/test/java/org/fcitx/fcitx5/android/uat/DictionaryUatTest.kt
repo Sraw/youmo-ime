@@ -47,12 +47,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
- * uat/13-words.md, the base dictionary's half: a file imported (its format as the confirmation
- * names it, or refused and why), turned off and on, deleted, cancelled, and what the merged file
- * the engine maps then holds. The files are uat/fixtures', imported as the page imports them
- * ([PinyinDictManager.prepare], then [PinyinDictManager.importPrepared]); a dictionary's row is
- * its state (on or off, its words, unreadable or not converted), the page's text of it its own.
- * "候选里有 X" is X in the merged file: what typing reads of an import.
+ * The base dictionary's half of the words page, the fixtures imported as the page imports them. "候选里有 X" is X in
+ * the merged file: what typing reads of an import.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -61,7 +57,6 @@ class DictionaryUatTest {
     private val dir get() = PinyinDictManager.pinyinDicDir
 
 
-    // the files of the directory but the merged file and its dot files
     private fun files() = dir.list()!!.filter { !it.startsWith(".") && !MergedDictionary.isCompiled(File(dir, it)) }.sorted()
 
     private fun merged(): DictionaryFile? = File(dir, MergedDictionary.FILE).takeIf { it.isFile }?.let { DictionaryFile.open(JvmFile(it)) }
@@ -72,12 +67,10 @@ class DictionaryUatTest {
 
     private fun detected(name: String) = prepare(name).use { it.analysis as DictionaryFormat.Detected }
 
-    // the page's 导入词库 into the base: analysed, confirmed, imported
     private fun import(name: String, file: File = fixture(name)) = prepare(name, file).use { PinyinDictManager.importPrepared(it, Incoming(name).name) }
 
     private fun refused(name: String): String? = import(name).exceptionOrNull()?.message
 
-    // as the page waits for the merged file to be made again after a change (合好)
     private fun made() = MergedDictionary.refreshNow(dir)
 
     private fun listed() = PinyinDictManager.listDictionaries().associate { it.name to it.isEnabled }
@@ -129,7 +122,6 @@ class DictionaryUatTest {
     fun aRimeDictionaryKnownAndImported() {
         assertFalse(startsInUser(Incoming("rime-words.dict.yaml")))
         val d = detected("rime-words.dict.yaml")
-        // Rime 词库 · 拼音用空格分开 · 第三列是词频 · 3 个词
         assertEquals(DictionaryFormat.Source.RIME, d.source)
         assertEquals(DictionaryFormat.Reading.SPACES, d.reading)
         assertEquals(DictionaryFormat.Weight.COUNT, d.weight)
@@ -161,7 +153,6 @@ class DictionaryUatTest {
             val counted = prepare("user-100k.txt", file).use { p -> wordsForUser(p.analysis) { error("not read again") } }
             assertEquals(words, counted)
             assertTrue(tooLargeForUser(counted, 0))
-            // 这个词库太大，请并入基础词库
             assertEquals(R.string.dict_too_large_for_user, userCapMessage(counted))
         } finally {
             file.delete()
@@ -173,12 +164,9 @@ class DictionaryUatTest {
     fun theUsersCapCountsWhatWasImportedBefore() {
         val big = fixture("big-words.txt")
         val imported = prepare("big-words.txt", big).use { p -> wordsForUser(p.analysis) { error("not read again") } }
-        // 1001 words and the blocked line, as the user dictionary takes them
         assertEquals(1002, imported)
-        // 99,500 more with 1001 imported: past the cap, 用户词库里导入的词已近上限
         assertTrue(tooLargeForUser(99_500, imported))
         assertEquals(R.string.dict_user_imports_full, userCapMessage(99_500))
-        // that batch dropped: in
         assertFalse(tooLargeForUser(99_500, 0))
         assertTrue(99_500 < USER_MAX_WORDS)
     }
@@ -255,11 +243,8 @@ class DictionaryUatTest {
     fun aNameInTheBaseAlreadyAsksForTheUser() {
         import("dict-words.txt").getOrThrow()
         val other = fixture("same-name/dict-words.txt")
-        // asked before it is read: 基础词库里已有名为「dict-words」的词库。改为并入用户词库吗？
         assertTrue(Incoming("dict-words.txt").namedForBase && ImportedDictionaries.hasDictionary(dir, "dict-words"))
-        // as the user dictionary takes it: its five words
         assertEquals(5, prepare("dict-words.txt", other).use { p -> wordsForUser(p.analysis) { error("not read again") } })
-        // never into the base over the one there
         assertTrue(import("dict-words.txt", other).isFailure)
         assertEquals(listOf("dict-words"), PinyinDictManager.listDictionaries().map { it.name })
     }
@@ -283,7 +268,7 @@ class DictionaryUatTest {
         import("trad-words.txt").getOrThrow()
         assertEquals(mapOf("trad-words" to true), listed())
         assertTrue(typed("氪喵燈塔"))
-        // what the base knows of these characters' readings (the app's from its assets, none in a test): the UTF-8 file's
+        // what the base knows of these characters' readings (the app's from its assets, none in a test)
         val known = fixture("trad-words.txt").readLines().flatMap { line ->
             val parts = line.trim().split(" ")
             parts.first().map(Char::toString).zip(parts.drop(1).map(Syllables::id))
@@ -303,7 +288,7 @@ class DictionaryUatTest {
         assertTrue(listed().isEmpty())
     }
 
-    // 0.6.0 #5: into the base, words alone get the readings a guess gives (the page passes the base lexicon's)
+    // into the base, words alone get the readings a guess gives
     @Test
     @Uat("WD-14q")
     fun wordsAloneGuessedAreCountedAndTheBaseTakesThem() {
@@ -320,7 +305,6 @@ class DictionaryUatTest {
             assertEquals(61, d.words)
             assertEquals(1, d.guessed)
         }
-        // one word alone the guess cannot read: skipped and counted, the file still goes into the base
         guessed("no-pinyin-most.txt", setOf("灯塔")).use {
             val d = it.analysis as DictionaryFormat.Detected
             assertEquals(1, d.unguessed)
@@ -336,9 +320,7 @@ class DictionaryUatTest {
         assertTrue(listed().isNotEmpty())
     }
 
-    // ------------------------------------------------------------------ an older build's, upgraded
-
-    // a dictionary as 0.3.1 kept it, text in libime's format: rime-frost's stand-in, a word of it and big-words' thousand
+    // text in libime's format, as 0.3.1 kept it
     private fun oldText(name: String, extra: String = "") = File(dir, "$name.txt").apply {
         writeText("阿坝州 a'ba'zhou 0.0\n" + extra + fixture("big-words.txt").readLines().filter { !it.startsWith("!") }
             .joinToString("") { line -> line.split(" ").let { "${it[0]} ${it.drop(1).joinToString("'")} 0.0\n" } })
@@ -346,7 +328,7 @@ class DictionaryUatTest {
 
     private fun small(name: String = "small") = File(dir, "$name.txt").apply { writeText("氪喵星港 ke'miao'xing'gang 0.0\n") }
 
-    // the keyboard shown: the engine's start compiles what an older build left; what each compile was for, told
+    // the keyboard shown: the engine's start compiles what an older build left
     private fun started(): Set<MergedDictionary.Kind> {
         val kinds = Collections.synchronizedSet(HashSet<MergedDictionary.Kind>())
         MergedDictionary.told = { kinds += it.kind }
@@ -354,12 +336,10 @@ class DictionaryUatTest {
         return kinds.toSet()
     }
 
-    // the app force-stopped as a compile runs, at [at] of it
     private fun killedAt(at: (MergedDictionary.Work) -> Boolean) {
         val cancel = AtomicBoolean()
         MergedDictionary.told = { if (at(it)) cancel.set(true) }
         assertTrue(runCatching { MergedDictionary.refreshNow(dir, cancel) }.exceptionOrNull() is CancellationException)
-        // the next process: nothing of this one's object left
         MergedDictionary.reset()
         MergedDictionary.made = {}
         MergedDictionary.base = { null }
@@ -371,8 +351,7 @@ class DictionaryUatTest {
     @Uat("WD-14s")
     fun anUpgradeKilledAsItConvertsIsFinishedAtTheNextStart() {
         oldText("frost")
-        // what a force stop halfway through the conversion leaves (no cancel reaches into a conversion):
-        // the text, and its gzip half written, from the process before
+        // what a force stop halfway through the conversion leaves (no cancel reaches into a conversion)
         File(dir, "frost${SourceNames.CONVERT_TMP}").apply { writeText("half"); setLastModified(System.currentTimeMillis() - 3_600_000) }
         assertEquals(setOf(MergedDictionary.Kind.UPGRADE), started())
         assertEquals(listOf("frost.txt.gz"), files())
@@ -400,7 +379,7 @@ class DictionaryUatTest {
         oldText("frost")
         small()
         val once = AtomicBoolean()
-        // the page's answers: asserted on this thread, a failure on the compile's would show as a failed compile
+        // asserted on this thread: a failure on the compile's would show as a failed compile
         val answered = Collections.synchronizedList(ArrayList<Boolean>())
         val kinds = Collections.synchronizedSet(HashSet<MergedDictionary.Kind>())
         MergedDictionary.told = {
@@ -418,7 +397,6 @@ class DictionaryUatTest {
         assertEquals(listOf("frost.txt.gz.disable"), files())
         assertEquals(mapOf("frost" to false), listed())
         assertFalse(typed("氪喵星港"))
-        // turned on again: an update, never told an upgrade
         kinds.clear()
         assertTrue(PinyinDictManager.turn(PinyinDictManager.listDictionaries().single(), true))
         made()
@@ -436,7 +414,6 @@ class DictionaryUatTest {
             File(dir, ".merged.left").writeText(LegacyTextConversion.leftKey(left) + "\n")
         }
         leave()
-        // the page opened: its retry deletes the text, never converts it
         val kinds = Collections.synchronizedSet(HashSet<MergedDictionary.Kind>())
         MergedDictionary.told = { kinds += it.kind }
         MergedDictionary.retry(dir)?.get(1, TimeUnit.MINUTES)
@@ -514,7 +491,6 @@ class DictionaryUatTest {
         started()
         assertEquals(setOf("big-words"), MergedDictionary.unreadable(dir))
         val words = PinyinDictManager.wordCount(PinyinDictManager.listDictionaries().single())
-        // 文件损坏，并入了 N 个词，可能不全
         assertTrue("$words", words in 1 until 1001)
         assertTrue(typed("鲸喵屿"))
         assertFalse(typed("橘星屿"))
@@ -532,7 +508,6 @@ class DictionaryUatTest {
         assertFalse(typed("氪喵星港"))
         assertTrue(File(dir, "small.txt").exists())
         File(dir, "small${SourceNames.CONVERT_TMP}").deleteRecursively()
-        // the page opened again
         MergedDictionary.retry(dir)!!.get(1, TimeUnit.MINUTES)
         assertEquals(listOf("small.txt.gz"), files())
         assertEquals(emptySet<String>(), MergedDictionary.unconverted(dir))
@@ -560,7 +535,6 @@ class DictionaryUatTest {
         try {
             assertTrue(PinyinDictManager.turn(PinyinDictManager.listDictionaries().single { it.name == "big-words" }, true))
             reading.await()
-            // 正在更新 N%: the other turned off then
             assertTrue(PinyinDictManager.turn(PinyinDictManager.listDictionaries().single { it.name == "rime-words" }, false))
             go.countDown()
             made()
@@ -578,7 +552,6 @@ class DictionaryUatTest {
         private const val CHARS = "啊吧擦大饿发嘎哈鸡卡"
         private val READINGS = "a ba ca da e fa ga ha ji ka".split(" ")
 
-        // WD-14g's words: the n-th six-character word of those ten characters, and its reading
         private fun digits(n: Int) = (5 downTo 0).map { n / pow(it) % 10 }
         private fun pow(e: Int) = (0 until e).fold(1) { a, _ -> a * 10 }
         fun sixChars(n: Int) = digits(n).joinToString("") { CHARS[it].toString() }

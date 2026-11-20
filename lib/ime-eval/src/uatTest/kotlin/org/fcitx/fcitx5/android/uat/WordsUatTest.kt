@@ -18,11 +18,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/13-words.md and 15-privacy-backup.md: what the user's words, phrases and habits do to typing.
- * The settings pages are where the user does it; here it is done as the pages do it (HostApi's
- * calls, the custom phrases file) and the page's list is what the engine lists.
- */
+/** uat/13-words.md and 15-privacy-backup.md: what the user's words, phrases and habits do to typing, set as the pages set them. */
 class WordsUatTest {
 
     private fun EngineReplay.added() = engines.userWords(UserWord.Kind.ADDED).map { it.text }

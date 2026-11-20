@@ -10,15 +10,9 @@ import org.fcitx.fcitx5.android.input.keyboard.BackspaceSwipeBehavior.State
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Swiping the backspace key means two different things depending on whether a composition is
- * in progress, and picking the wrong one either eats the user's text or silently does nothing.
- */
 class BackspaceSwipeBehaviorTest {
 
     private val behavior = BackspaceSwipeBehavior()
-
-    // region selecting, with nothing composed
 
     @Test
     fun swipingWithNothingComposedGrowsASelection() {
@@ -41,16 +35,12 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(State.Stopped, behavior.state)
     }
 
-    /** Direction is irrelevant once a selection exists: releasing always deletes it. */
+    /** Releasing always deletes an existing selection, whichever way. */
     @Test
     fun aRightwardSelectionIsStillDeletedOnRelease() {
         behavior.onMove(composing = false)
         assertEquals(ReleaseEffect.DeleteSelection, behavior.onRelease(totalCount = 2))
     }
-
-    // endregion
-
-    // region resetting, mid-composition
 
     @Test
     fun swipingMidCompositionDoesNotTouchTheSelection() {
@@ -65,7 +55,7 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(State.Stopped, behavior.state)
     }
 
-    /** Swiping the other way is a harmless cancel, not a reset. */
+    /** The other way is a harmless cancel, not a reset. */
     @Test
     fun aRightwardResetGestureDoesNothing() {
         behavior.onMove(composing = true)
@@ -88,15 +78,7 @@ class BackspaceSwipeBehaviorTest {
         assertEquals("still a reset gesture", State.Reset, behavior.state)
     }
 
-    // endregion
-
-    // region the reading is fixed at the start of the gesture
-
-    /**
-     * The composition may finish while the finger is still down. The gesture must keep the
-     * meaning it started with, or a swipe the user began as a reset would suddenly start
-     * selecting their text.
-     */
+    /** The composition finishing mid-swipe keeps the gesture's reading: a reset must not start selecting. */
     @Test
     fun aCompositionEndingMidSwipeDoesNotTurnItIntoASelection() {
         behavior.onMove(composing = true)
@@ -106,7 +88,6 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(ReleaseEffect.ResetComposition, behavior.onRelease(totalCount = -1))
     }
 
-    /** And the other way round: a selection swipe is not hijacked by a new composition. */
     @Test
     fun aCompositionStartingMidSwipeDoesNotTurnItIntoAReset() {
         behavior.onMove(composing = false)
@@ -119,10 +100,6 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(ReleaseEffect.DeleteSelection, behavior.onRelease(totalCount = -1))
     }
 
-    // endregion
-
-    // region release without a swipe
-
     @Test
     fun releasingWithoutHavingMovedDoesNothing() {
         assertEquals("a touch starts stopped", State.Stopped, behavior.state)
@@ -131,10 +108,6 @@ class BackspaceSwipeBehaviorTest {
         // even after a leftward count
         assertEquals(ReleaseEffect.None, behavior.onRelease(totalCount = -5))
     }
-
-    // endregion
-
-    // region consecutive gestures
 
     @Test
     fun aSecondGestureIsReadAfresh() {
@@ -157,11 +130,7 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(ReleaseEffect.None, behavior.onRelease(1))
     }
 
-    /**
-     * A swipe BaseKeyboard cancels directly (a scene key's gesture) gets no release. The next touch must
-     * not inherit its reading: a plain tap would otherwise delete a selection, and a new swipe
-     * would skip deciding afresh whether a composition is in progress.
-     */
+    /** A swipe cancelled with no release: the next touch must not inherit its reading. */
     @Test
     fun aTouchAfterACancelledSelectionSwipeStartsAfresh() {
         behavior.onMove(composing = false) // cancelled: no onRelease
@@ -184,5 +153,4 @@ class BackspaceSwipeBehaviorTest {
         assertEquals(ReleaseEffect.DeleteSelection, behavior.onRelease(-2))
     }
 
-    // endregion
 }

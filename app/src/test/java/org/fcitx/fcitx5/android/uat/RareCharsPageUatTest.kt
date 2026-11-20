@@ -62,10 +62,6 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import splitties.dimensions.dp
 
-/**
- * 生僻字屏蔽's page (dev/design/061-rare-char-block.md §6; 061-settings-cards.md §3) and the marks on the
- * user's words (§5.4).
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -268,7 +264,7 @@ class RareCharsPageUatTest : RarePageUat() {
         }
     }
 
-    // §6.2: a long press and a drag sets every cell between to the start's opposite, one undo for them all
+    // a long press and a drag sets every cell between to the start's opposite, one undo for them all
     @Test
     @Uat("WD-52")
     fun aDragHoldsBackARunAndOneUndoTakesItBack() {
@@ -293,7 +289,6 @@ class RareCharsPageUatTest : RarePageUat() {
             "while dragged: the run shown held" to { assertTrue(listOf("炟", "畣", "鎉", "龘").all { cell(it).held }) },
             "outside it, as it was" to { assertFalse(cell("荅").held) },
         )
-        // back to 畣: 鎉 and 龘 as they were
         touch(MotionEvent.ACTION_MOVE, "畣")
         idle()
         assertFalse(cell("鎉").held)
@@ -311,7 +306,7 @@ class RareCharsPageUatTest : RarePageUat() {
         }
     }
 
-    // §6.2: 恢复默认, asked first; a turn keeps what the page changed; a later version's file is not changed
+    // 恢复默认, asked first; a turn keeps what the page changed; a later version's file is not changed
     @Test
     @Uat("WD-57")
     fun resetATurnAndALaterVersionsFile() {
@@ -361,7 +356,6 @@ class RareCharsPageUatTest : RarePageUat() {
         }
     }
 
-    // §4.2, §6.2: a later version's file shown, nothing on the page changes it, nothing saved
     @Test
     fun aLaterVersionsFileIsShownNotChanged() {
         val later = "# youmo-rare-chars 2\non\t1\ngroups\tEXT OUT\n"
@@ -394,7 +388,6 @@ class RareCharsPageUatTest : RarePageUat() {
         }
     }
 
-    // §5.4: the user's words with a character held back marked, one tap letting it through
     @Test
     @Uat("WD-56")
     fun aUserWordWithACharacterHeldIsMarkedAndLetThrough() {
@@ -420,7 +413,6 @@ class RareCharsPageUatTest : RarePageUat() {
             assertTrue("reloadEngine()" in api.calls)
         }
         step("the add dialog says at once, 放行 there refreshes the list behind it (review N9), the word still saved") {
-            // a word with 𤝰 the list has not read yet: shown once the list is read again
             api.userWords += UserWord("大𤝰", "da da", UserWord.Kind.ADDED)
             views().filterIsInstance<FloatingActionButton>().single().performClick()
             idle()
@@ -442,7 +434,7 @@ class RareCharsPageUatTest : RarePageUat() {
         }
     }
 
-    // review N6: the words page's count read after a save of the page just left, not before it
+    // the words page's count read after a save of the page just left, not before it
     @Test
     fun theCountWaitsForTheSaveUnderWay() = runBlocking {
         val pending = CompletableDeferred<Boolean>()
@@ -459,11 +451,9 @@ class RareCharsPageUatTest : RarePageUat() {
         }
     }
 
-    // review S8: the cell's text grows with the font's scale, so does the cell, and fewer go across
     @Test
     fun aCellGrowsWithTheFontScaleAndFewerGoAcross() {
         val ctx = RuntimeEnvironment.getApplication()
-        // the cell's height and its two lines' at the scale now
         fun measured(): Pair<Int, Float> {
             val paints = RareCharCell.Paints(ctx)
             val cell = RareCharCell(ctx, paints)

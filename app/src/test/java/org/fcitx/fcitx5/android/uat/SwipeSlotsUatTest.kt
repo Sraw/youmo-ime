@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.sent
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
@@ -34,11 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Each key's two slots on a whole keyboard (060-swipe-slots): a text drawn as its first two characters and
- * typed whole, the slots flipped with their places, another keyboard's long press set by name and its
- * first swiped to.
- */
+/** Each key's two slots: a text drawn as its first two characters and typed whole, the slots flipped with their places. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -59,9 +56,6 @@ class SwipeSlotsUatTest {
     private fun harness(keyboard: ImKeyboard? = null) =
         KeyboardHarness(TestThemes.PixelLight, keyboards = keyboard?.let { ImKeyboards.Chosen(pinyin = it) }).also { made = it }.start()
 
-    private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
-
-    // a key's marks as drawn: its shortcuts' places, its symbol's (T/B, L/C/R)
     private fun KeyboardHarness.marksOf(label: String): String {
         val m = (keys().first { it.label == label } as SceneShownKey).markPlaces()
         return "${m.shortcuts.joinToString(",").ifEmpty { "-" }} ${m.symbol ?: "-"}"
@@ -79,18 +73,14 @@ class SwipeSlotsUatTest {
         h.swipe(q, 0f, q.height * 1.3f)
         h.idle()
         assertEquals("你好世界", h.field.text.toString())
-        // up is empty: a tap of q
         h.swipe(q, 0f, -q.height * 1.3f)
         h.idle()
         assertTrue(h.sent().toString(), "key=q," in h.sent().last())
     }
 
-    // a stroke set on a key's swipe (issue #4), the nine keys' 3 or 1 or the full keyboard's q: its icon drawn on the key;
-    // swiped up, the engine's stroke key sent and never the key's letters, nothing committed first (it filters what
-    // is typed), with 在键上划 off and with nothing typed under 笔画筛选 (the engine does nothing with it then:
-    // StrokeFilterTest); under 笔画筛选 with pinyin typed the swipe on a letter key is a stroke drawn (KB-42), up none;
-    // 九键's 1 starts one too (the 3×3 drawn over), so its slot's sent only where no stroke is drawn: nothing typed,
-    // 在键上划 off or 滑行输入 chosen (the nine keys never glide)
+    // a stroke set on a key's swipe: its icon drawn, swiped up the engine's stroke key sent, nothing committed first;
+    // under 笔画筛选 with pinyin typed the swipe on a letter key is a stroke drawn, and 九键's 1 starts one too, so its
+    // slot's sent only where no stroke is drawn
     @Test
     @Uat("ST-120")
     fun aStrokeSlotSendsItsStroke() {
@@ -126,7 +116,6 @@ class SwipeSlotsUatTest {
                 h.swipe(key, 0f, -key.height * 1.3f)
                 h.idle()
                 assertEquals("${h.sent()}", row.sent, h.sent().map { pie in it })
-                // what is typed is filtered, not committed or dropped first, and nothing reaches the field
                 assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("select(") || it.startsWith("reset(") || it == "clearTyped()" })
                 assertEquals("", h.field.text.toString())
             } finally {
@@ -151,7 +140,6 @@ class SwipeSlotsUatTest {
         assertTrue(h.sent().toString(), "key=@," in h.sent().last())
         assertEquals(SwipeSlot.Command(KeyCommand.SelectAll), SwipeSlots.parse(internal.keySwipes.getValue()).resolve("full/a", up = true))
         assertEquals(SwipeOrientation.FirstDown, SwipeSlots.parse(internal.keySwipes.getValue()).orientation)
-        // ⌫'s two stay where they were: 恢复, now up, at 上滑's top left; 清除, now down, at 下滑's top right
         val backspace = h.keyNamed("backspace") as SceneShownKey
         val face = backspace.node.shape.bounds
         val icons = backspace.node.ops(false).filterIsInstance<org.fcitx.fcitx5.android.scene.Op.Icon>().associate { it.name to it.box }
@@ -161,12 +149,10 @@ class SwipeSlotsUatTest {
         assertTrue("清除 top right: $clear", clear.centerX > face.centerX && clear.centerY < face.centerY)
     }
 
-    // 注音九键's ˉ, a key no layout names: its ˙ swiped the way the orientation puts every long press's first;
-    // a 0.5 upgrade (the first down) keeps swiping down to it, and 翻转全部 flips it
+    // 注音九键's ˉ, a key no layout names: its ˙ swiped the way the orientation puts every long press's first
     @Test
     fun anUnnamedKeysSwipeFollowsTheOrientation() {
         val k = AppPrefs.getInstance().keyboard
-        // the 简繁 hint not said
         prefs.set(internal.zhuyinTraditionalTold, true)
         fun swiped(orientation: SwipeOrientation, down: Boolean): Pair<String, String> {
             prefs.set(internal.keySwipes, SwipeSlots.Default.applied(orientation).serialize())
@@ -188,10 +174,8 @@ class SwipeSlotsUatTest {
         assertTrue("˙ and ˉ apart: $neutralUp $tappedDown", neutralUp.first.isNotEmpty() && neutralUp.first != tappedDown.first)
         assertEquals("first down: ˙ down", neutralUp.first, swiped(SwipeOrientation.FirstDown, down = true).first)
         assertEquals("first down: up a tap", tappedDown.first, swiped(SwipeOrientation.FirstDown, down = false).first)
-        // no corner drawn (a function key's cap), either way: nothing that says the other way
         assertEquals("- -", neutralUp.second)
         assertEquals("- -", swiped(SwipeOrientation.FirstDown, down = true).second)
-        // 翻转全部 from the new default: the orientation flipped, ˙ down
         prefs.set(internal.keySwipes, SwipeSlots.Default.flippedAll(listOf("fn/space", "fn/backspace")).serialize())
         val h = harness(ImKeyboard.ZHUYIN_NINE)
         val tone = h.key("ˉ")
@@ -207,7 +191,6 @@ class SwipeSlotsUatTest {
         prefs.setList("g14/qw", listOf("Q", "W", "1", "q", "w", "①", "②"), first = "①")
         val h = harness(ImKeyboard.KEYS14)
         val qw = h.key("QW")
-        // the whole list stored, the group's own row with it (060-row-unlock)
         val shown = h.longPress(qw)
         assertTrue(shown.toString(), shown.containsAll(listOf("①", "②", "Q", "w")))
         h.idle()

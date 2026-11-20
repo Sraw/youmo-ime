@@ -24,7 +24,7 @@ class ThemeLayoutSwitchTest {
     private val g18 = listOf("q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")
     private val g14 = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
 
-    // the 0.6.0 example pack's 17 keys (keyboard-scene's test data mint-k17): 17 groups of its own, pinyin's alone
+    // keyboard-scene's test data mint-k17: 17 groups of its own, pinyin's alone
     private val g17 = listOf("q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jkl", "z", "xc", "v", "bn", "m")
 
     private fun made(pack: String, board: String, family: String, groups: List<String> = emptyList(), drawn: Boolean = true, tableExtras: Boolean = false) =
@@ -50,7 +50,7 @@ class ThemeLayoutSwitchTest {
         val qwerty = made("mint", "qwerty", "letters")
         val chosen = Chosen(pinyin = ImKeyboard.KEYS18, shuangpin = ImKeyboard.KEYS18)
         val plan = ThemeLayoutSwitch.plan(chosen, xiaohe, emptyMap(), "mint", null, listOf(k17, qwerty))
-        // 双拼 on 17 keys of other groups: not (S8), drawn the app's 18 keys as in 0.6.0
+        // 双拼 on 17 keys of other groups: not, drawn the app's 18 keys
         assertEquals(mapOf(PINYIN to k17.choice.id, ENGLISH to qwerty.choice.id), plan.slots)
         assertEquals(mapOf(k17 to listOf(PINYIN), qwerty to listOf(ENGLISH)), plan.uses)
         // the tables on the full keyboard: not on letters without their extra keys

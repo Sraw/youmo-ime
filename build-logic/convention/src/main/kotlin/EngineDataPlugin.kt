@@ -50,34 +50,9 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
-/**
- * Compiles the own engine's data (lib/ime-dict-tool) and adds it to the app's assets as
- * `engine/pinyin.data` and `engine/table/<name>.data` for libime's code tables (五笔, 仓颉 ...).
- * The language model is this fork's own, fetched from its `engine-data-*` release: libime's,
- * mixed with the n-grams of chat-like web pages (FineWeb-2's and a CommonCrawl crawl's), which
- * lib/ime-dict-tool/engine-data.sh makes on a rented machine, a job of an hour that downloads a
- * hundred gigabytes and so no part of a build. Compiled with it is
- * libime's dictionary and, as a layer of its own, the words of the last years it lacks: the fork's
- * curated lexicon (`lexicon/`), packed for that model and published as a `words-*` release. The
- * sentence models, `engine/sentence-model.safetensors` (4M, weighing the readings at each key) and
- * `engine/sentence-model-large.safetensors` (25M, while the user pauses), are this fork's own too
- * (trained on FineWeb-2 pages scored by Qwen3.5-9B-Base), from another release. English's words
- * and model, `engine/english.data`, are compiled from the trigram model of FineWeb's English pages
- * the tool's `english-lm` made, an `english-data-*` release. The
- * .data files and the models are stored uncompressed, so the engine can map them straight out of
- * the APK rather than copying them out first; they are also left out of the data descriptor for
- * that reason (the descriptor lists only src/main/assets).
- *
- * Every download is checked against a SHA-256: libime's archives against the ones its CMake had,
- * the releases' files against the ones they were published with. Downloads go to the root
- * project's `.gradle/engine-downloads`, out of `build`: what `clean` should not fetch again, and
- * where one put there by hand is not taken for a stale output and deleted.
- * Each step declares its inputs and outputs, so the downloads and the compile run once and again
- * only when a source or the tool changes. Local builds and CI's compile the same data.
- */
+/** Compiles the engine's data into `engine/`, stored uncompressed so the engine maps it out of the APK. */
 class EngineDataPlugin : Plugin<Project> {
 
-    /** What a download task fetches, its SHA-256, and its path under the downloads directory. */
     private class Download(val url: String, val sha256: String, val file: String)
 
     private class Source(val name: String, sha256: String, val files: List<String>) {
@@ -93,7 +68,7 @@ class EngineDataPlugin : Plugin<Project> {
         private const val BASE_URL = "https://download.fcitx-im.org/data/"
         private const val RELEASES_URL = "https://github.com/Sraw/youmo-ime/releases/download/"
 
-        // as libime's data/CMakeLists.txt had them (libime 1.1.15-14-g65003b6, before it left the app)
+        // as libime's data/CMakeLists.txt had them (libime 1.1.15-14-g65003b6)
         private val DICT = Source(
             "dict-20260703.tar.zst",
             "c686cab6df8964c48d596f57d205bac31fc72870b06a83017e44503df8c09697",
@@ -104,8 +79,7 @@ class EngineDataPlugin : Plugin<Project> {
             "3e9d87b04a393f131723472c8eaa860dd23c378a3d4f6a9005513b2a95b3614b",
             listOf("cj", "erbi", "wbpy", "wbx", "zrm").map { "$it.txt" },
         )
-        // the language model engine-data.sh made (its manifest.txt in the release says from what),
-        // repacked as the tar CMake unpacks; a tag of its own, not "latest", as the models'
+        // the language model engine-data.sh made, as the tar CMake unpacks; a fixed tag, not "latest"
         private const val LM_RELEASE = "engine-data-20261005-3"
         private val LM = Download(
             "$RELEASES_URL$LM_RELEASE/lm.tar.zst",
@@ -114,8 +88,7 @@ class EngineDataPlugin : Plugin<Project> {
         )
         private const val LM_FILE = "lm.arpa"
         const val WORDS_TASK = "downloadEngineWords"
-        // the curated new words (lexicon/add.tsv) as packed for that model, a layer of pinyin.data:
-        // the words libime's dictionary has not got, which a build with no pack the user put in has too
+        // the curated new words (lexicon/add.tsv) packed for that model: a layer of pinyin.data
         private const val WORDS_RELEASE = "words-202610"
         private val WORDS = Download(
             "$RELEASES_URL$WORDS_RELEASE/youmo-new.words",
@@ -130,9 +103,7 @@ class EngineDataPlugin : Plugin<Project> {
             "b3e93dce89c185f45c3d6e189b86b3a8626913352cc85e1094c786579a665791",
             "engine-data/stroke-$STROKES_COMMIT.dict.yaml",
         )
-        // the tones of pinyin.data: Unihan's readings (Unicode License v3) as mozillazg/pinyin-data
-        // (MIT) lists them, the likeliest list first, and phrase-pinyin-data's words (MIT); not its
-        // large_pinyin.txt, which has CC-CEDICT (share-alike) and 汉典's (no licence) in it
+        // the tones: Unihan via mozillazg/pinyin-data and phrase-pinyin-data (MIT); not large_pinyin.txt, which has share-alike and unlicensed data
         private const val UNIHAN_COMMIT = "fe29ad32bdf352b31a02b9936e537f575432e9a6"
         private val UNIHAN = listOf(
             "kMandarin" to "643c38f4a533ac6f25d16390c3b09df41bac8e8f476da88cd18371fdb299198a",
@@ -154,9 +125,7 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/phrase-pinyin-data-$PHRASES_COMMIT-pinyin.txt",
         )
         const val ENGLISH_TASK = "compileEnglishData"
-        // FineWeb's English pages, counted by lib/ime-dict-tool's english-lm and pruned by its prune
-        // at 3e-8 (its manifest.txt in the release says from what and how): the arpa the tool
-        // compiles, in a tar CMake unpacks
+        // FineWeb's English pages counted by english-lm and pruned: the arpa the tool compiles
         private const val ENGLISH_RELEASE = "english-data-20261015"
         private val ENGLISH = Download(
             "$RELEASES_URL$ENGLISH_RELEASE/english.tar.zst",
@@ -165,8 +134,7 @@ class EngineDataPlugin : Plugin<Project> {
         )
         private const val ENGLISH_FILE = "english.arpa"
         const val EMOJI_TASK = "compileEmojiData"
-        // the emoji there are and the panel's groups, Unicode's emoji-test.txt; their Chinese words,
-        // CLDR's annotations (both Unicode-3.0), as lexicon/emoji.tsv corrects them
+        // the emoji and the panel's groups (emoji-test.txt) and their Chinese words (CLDR, corrected by lexicon/emoji.tsv)
         private val EMOJI_TEST = Download(
             "https://www.unicode.org/Public/17.0.0/emoji/emoji-test.txt",
             "1d8a944f88d7952f7ef7c5167fef3c67995bcae24543949710231b03a201acda",
@@ -181,7 +149,7 @@ class EngineDataPlugin : Plugin<Project> {
 
         const val CHAIZI_TASK = "compileChaiziData"
         private const val HANDWRITING_PLUGIN = "youmo.handwriting-data"
-        // characters by their parts, the open 汉语拆字字典 (CC BY 3.0), at a commit of its
+        // characters by their parts, the open 汉语拆字字典 (CC BY 3.0)
         private const val CHAIZI_COMMIT = "e177ab54ce4edf255315a60593ffecbd8167e96b"
         private val CHAIZI = Download(
             "https://raw.githubusercontent.com/kfcd/chaizi/$CHAIZI_COMMIT/chaizi-jt.txt",
@@ -190,8 +158,7 @@ class EngineDataPlugin : Plugin<Project> {
         )
 
         const val CHAR_INFO_TASK = "compileCharInfo"
-        // each character's radical and strokes, for its card: Unihan's kRSUnicode and kTotalStrokes,
-        // each radical's character (Unicode License v3, as the readings' Unihan)
+        // each character's radical and strokes for its card: Unihan's kRSUnicode and kTotalStrokes
         private val UNIHAN_ZIP = Download(
             "https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip",
             "f7a48b2b545acfaa77b2d607ae28747404ce02baefee16396c5d2d7a8ef34b5e",
@@ -203,13 +170,11 @@ class EngineDataPlugin : Plugin<Project> {
             "engine-data/CJKRadicals-17.0.0.txt",
         )
         const val OPENCC_TASK = "compileOpenccData"
-        // each listed character's group for 生僻字屏蔽: Unihan.zip's kTGH (Unicode License v3) and OpenCC's
-        // TSCharacters.txt (Apache-2.0), already the app's (learn/): no new data. In the APK, not the text
-        // pack: the groups go with the app's version, a pack changed changes none of the user's choice
+        // each character's group for 生僻字屏蔽 (Unihan kTGH, OpenCC); in the APK, as the groups go with the app's version
         const val CHAR_LEVELS_TASK = "compileCharLevels"
 
         const val MODEL_TASK = "copySentenceModels"
-        // a tag of its own, not "latest": what is downloaded is what was measured
+        // a fixed tag, not "latest": what is downloaded is what was measured
         private const val MODELS_RELEASE = "sentence-models-20261001"
         private const val MODEL_URL = "$RELEASES_URL$MODELS_RELEASE/"
         // asset name (the release's and the app's) to SHA-256
@@ -218,14 +183,12 @@ class EngineDataPlugin : Plugin<Project> {
             "sentence-model-large.safetensors" to "6f7fcb724738e2fbe4c26db70fd53aa5b5729cb4af7ce7f1e7bfea73003e669a",
         )
         const val TABLES_TASK = "compileEngineTables"
-        // each table run is a JVM of its own, up to 1 GB, beside the daemon's 2 GB (org.gradle.jvmargs in
-        // gradle.properties): a few at once, not as many as Gradle has workers, so the six leave room for an emulator
+        // each table run is a JVM of its own: a few at once, leaving room for an emulator
         private const val TABLE_RUNS_AT_ONCE = 3
         const val TOOL_CONFIGURATION = "engineDataTool"
         const val FINGERPRINT_TASK = "fingerprintEngineDataTool"
         private const val TOOL_MAIN = "org.fcitx.fcitx5.android.dicttool.MainKt"
 
-        /** A run of the tool built as [tool], in a JVM of [heap]. */
         private fun JavaExecSpec.configureTool(tool: FileCollection, heap: String, command: List<String>) {
             classpath = tool
             mainClass.set(TOOL_MAIN)
@@ -264,8 +227,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
         target.dependencies.add(tool.name, target.dependencies.project(mapOf("path" to ":lib:ime-dict-tool")))
 
-        // the tool's code that a run reaches, not all of :lib:ime-core it is built with (ToolFingerprint);
-        // a task's output, so it is read once, after the jars are built, the configuration cache on or off
+        // the tool's code a run reaches (ToolFingerprint); a task output, read once after the jars are built
         val fingerprint = target.tasks.register<FingerprintTool>(FINGERPRINT_TASK) {
             classpath.from(tool)
             mainClass.set(TOOL_MAIN)
@@ -336,7 +298,7 @@ class EngineDataPlugin : Plugin<Project> {
             traditional.set(target.layout.projectDirectory.file("src/main/assets/learn/TSCharacters.txt"))
             outputDir.set(target.layout.buildDirectory.dir("generated/engine-charlevels"))
         }
-        // OpenCC 1.2.0's s2tw dictionaries, committed (lib/ime-dict-tool/opencc/README.md): frozen data
+        // OpenCC 1.2.0's s2tw dictionaries, committed: frozen data
         val opencc = target.tasks.register<CompileOpenccData>(OPENCC_TASK) {
             classpath.from(tool)
             toolCode.set(fingerprint.flatMap { it.outputFile })
@@ -365,18 +327,14 @@ class EngineDataPlugin : Plugin<Project> {
         }
 
         target.extensions.configure<ApplicationExtension> {
-            // matched as a plain suffix: "data" alone would catch charselectdata too; and the
-            // sentence models: openFd cannot read one compressed, and the engine takes that for none
+            // a plain suffix: "data" alone would catch charselectdata; openFd cannot read a compressed sentence model
             androidResources.noCompress += listOf(".data", ".safetensors")
-            // what the settings show as the engine's data, and the release a missing-word report names
             defaultConfig.buildConfigField("String", "ENGINE_DATA", "\"$LM_RELEASE\"")
-            // the releases of the word pack and of the sentence models, which change apart from it
             defaultConfig.buildConfigField("String", "ENGINE_WORDS", "\"$WORDS_RELEASE\"")
             defaultConfig.buildConfigField("String", "SENTENCE_MODELS", "\"$MODELS_RELEASE\"")
             defaultConfig.buildConfigField("String", "ENGLISH_DATA", "\"$ENGLISH_RELEASE\"")
         }
-        // in the APK: the small data its code changes with. The pinyin data, English, the tables and
-        // strokes and the sentence models are the text pack's (AssetPacksPlugin), not the APK's
+        // in the APK only the small data its code changes with; the rest is the text pack's (AssetPacksPlugin)
         components.onVariants { variant ->
             variant.sources.assets?.addGeneratedSourceDirectory(emoji, CompileEmojiData::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(chaizi, CompileChaiziData::outputDir)
@@ -384,10 +342,7 @@ class EngineDataPlugin : Plugin<Project> {
             variant.sources.assets?.addGeneratedSourceDirectory(charLevels, CompileCharLevels::outputDir)
             variant.sources.assets?.addGeneratedSourceDirectory(opencc, CompileOpenccData::outputDir)
         }
-        // every directory of the engine's data (engine/… inside each, as the assets and the text pack have it), for
-        // :lib:ime-eval's replay: it depends on this instead of a copy of the task names and their directories.
-        // The assets above and the text pack's tasks (AssetPacksPlugin.SOURCES) together: a data task added to either
-        // goes here too, or uatTest (not in CI) misses it
+        // every directory of the engine's data, for :lib:ime-eval's replay: a data task added here too, or uatTest misses it
         target.configurations.consumable(DATA_CONFIGURATION)
         listOf(
             compile.flatMap { it.outputDir }, english.flatMap { it.outputDir }, emoji.flatMap { it.outputDir },
@@ -414,13 +369,11 @@ class EngineDataPlugin : Plugin<Project> {
             outputDir.set(into)
         }
 
-    /** One of libime's archives, downloaded and unpacked under [sources], as `extract<Stem>`. */
     private fun registerSource(target: Project, source: Source, downloads: Directory, sources: Provider<Directory>): TaskProvider<ExtractTask> {
         val download = registerDownload(target, "download" + taskName(source), source.download, downloads)
         return registerExtract(target, "extract" + taskName(source), download, sources.map { it.dir(stem(source)) })
     }
 
-    /** Writes the [ToolFingerprint] of [classpath] run from [mainClass], what the compiles are keyed on. */
     @DisableCachingByDefault(because = "walking the classes is quicker than the cache would be")
     abstract class FingerprintTool : DefaultTask() {
         @get:Classpath
@@ -496,7 +449,7 @@ class EngineDataPlugin : Plugin<Project> {
             exec.javaexec {
                 classpath = this@CompileEngineData.classpath
                 mainClass.set(TOOL_MAIN)
-                // the whole mixed model is held in memory while it is sorted: 3.6 GB resident, as measured
+                // the whole mixed model is held in memory while it is sorted
                 maxHeapSize = "4g"
                 args(
                     listOf(
@@ -511,13 +464,11 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** A data file under `engine/` compiled by a run of the tool, its classpath keyed on by toolCode only. */
     @DisableCachingByDefault(because = "an abstract base; each compile says whether it is kept")
     abstract class ToolDataTask : DefaultTask() {
         @get:Inject
         abstract val exec: ExecOperations
 
-        // built before this runs, but keyed on by toolCode only
         @get:Internal
         abstract val classpath: ConfigurableFileCollection
 
@@ -532,7 +483,6 @@ class EngineDataPlugin : Plugin<Project> {
         @get:OutputDirectory
         abstract val outputDir: DirectoryProperty
 
-        /** `engine/[name]` written by the tool's [command] of it, in a JVM of [heap]. */
         protected fun runTool(name: String, heap: String, command: (output: String) -> List<String>) {
             val output = outputDir.get().asFile.resolve("engine/$name")
             output.parentFile.mkdirs()
@@ -540,7 +490,6 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** English's words and model as `engine/english.data`, compiled from the arpa of the release. */
     @CacheableTask
     abstract class CompileEnglishData : ToolDataTask() {
         @get:InputFile
@@ -549,12 +498,12 @@ class EngineDataPlugin : Plugin<Project> {
 
         @TaskAction
         fun compile() {
-            // the model is held in memory while it is sorted: 2.1 GB resident, as measured
+            // the model is held in memory while it is sorted
             runTool("english.data", "2g") { listOf("english", "-o", it, "--lm", lm.get().asFile.path) }
         }
     }
 
-    /** The emoji panel's groups and the Chinese words emoji stand for as `engine/emoji.data` (EmojiData). */
+    /** The emoji panel's groups and the Chinese words emoji stand for (EmojiData). */
     @CacheableTask
     abstract class CompileEmojiData : ToolDataTask() {
         @get:InputFile
@@ -569,14 +518,13 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val edits: RegularFileProperty
 
-        /** The compiled pinyin data: each word's pinyin, for the panel's search, and how common it is. */
+        /** The compiled pinyin data: each word's pinyin for the panel's search, and how common it is. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val pinyin: RegularFileProperty
 
         @TaskAction
         fun compile() {
-            // the pinyin data mapped, its 800k words indexed
             runTool("emoji.data", "1g") {
                 listOf(
                     "emoji", "-o", it, "--test", test.get().asFile.path, "--lexicon", edits.get().asFile.path,
@@ -586,32 +534,23 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** `engine/chaizi.data`: ime-dict-tool's `chaizi` of the 汉语拆字字典, its parts read by the pinyin data. */
     @CacheableTask
     abstract class CompileChaiziData : ToolDataTask() {
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val source: RegularFileProperty
 
-        /** The compiled pinyin data: how each part reads, and how common each character is. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val pinyin: RegularFileProperty
 
         @TaskAction
         fun compile() {
-            // the pinyin data mapped, as for the emoji
             runTool("chaizi.data", "1g") { listOf("chaizi", "-o", it, "--pinyin", pinyin.get().asFile.path, source.get().asFile.path) }
         }
     }
 
-    /**
-     * `engine/charinfo.data`: ime-dict-tool's `charinfo`, each character's radical, strokes, parts and
-     * stroke order; the build fails if a character handwriting knows has no reading, radical or strokes,
-     * or under 97% of them are taken apart, or under 94% have the mainland's stroke order; or when one of
-     * lexicon/stroke-order.tsv's orders is unlike Unihan's count or, in the five kinds, rime-stroke's with no note why, or has a note
-     * with nothing to excuse.
-     */
+    /** `engine/charinfo.data`: each character's radical, strokes, parts and stroke order, checked against its sources. */
     @CacheableTask
     abstract class CompileCharInfo : ToolDataTask() {
         @get:InputFile
@@ -634,7 +573,6 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val orders: RegularFileProperty
 
-        /** The compiled pinyin data: whether each character handwriting knows has readings. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val pinyin: RegularFileProperty
@@ -646,7 +584,6 @@ class EngineDataPlugin : Plugin<Project> {
 
         @TaskAction
         fun compile() {
-            // Unihan's 100,000 characters' lines and the pinyin data mapped
             runTool("charinfo.data", "1g") {
                 listOf(
                     "charinfo", "-o", it, "--unihan", unihan.get().asFile.path, "--radicals", radicals.get().asFile.path,
@@ -657,7 +594,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** `engine/charlevels.data`: ime-dict-tool's `charlevels`; a kTGH that is not the table's 8,105 ranked once each fails. */
+    /** `engine/charlevels.data`: a kTGH that is not the table's 8,105 ranked once each fails. */
     @CacheableTask
     abstract class CompileCharLevels : ToolDataTask() {
         @get:InputFile
@@ -674,7 +611,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** `engine/opencc-s2tw.data`: ime-dict-tool's `opencc` of OpenCC 1.2.0's three s2tw dictionaries, in that order. */
+    /** `engine/opencc-s2tw.data`: OpenCC 1.2.0's three s2tw dictionaries, in that order. */
     @CacheableTask
     abstract class CompileOpenccData : ToolDataTask() {
         @get:InputFiles
@@ -692,7 +629,6 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The sentence models under `engine/`, named as they were downloaded. */
     @DisableCachingByDefault(because = "copying is quicker than the cache would be")
     abstract class CopyModels : DefaultTask() {
         @get:InputFiles
@@ -711,10 +647,7 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /**
-     * Compiles each code table's text into `engine/table/<name>.data`, one run of the tool each, and the
-     * strokes into `engine/stroke.data`; the runs side by side, [TABLE_RUNS_AT_ONCE] at a time ([runsAtOnce]).
-     */
+    /** Each code table into `engine/table/<name>.data` and the strokes into `engine/stroke.data`, [TABLE_RUNS_AT_ONCE] runs at a time. */
     @CacheableTask
     abstract class CompileTables @Inject constructor(private val workers: WorkerExecutor) : DefaultTask() {
         @get:Internal
@@ -735,17 +668,14 @@ class EngineDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val tables: ConfigurableFileCollection
 
-        /** The new-word pack, its words added to each table its rules can code them for. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val words: RegularFileProperty
 
-        /** The compiled pinyin data, whose words go into the tables too, the commonest first. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
         abstract val pinyin: RegularFileProperty
 
-        /** rime-stroke's dictionary, compiled beside the tables as `engine/stroke.data`. */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val strokes: RegularFileProperty
@@ -758,16 +688,14 @@ class EngineDataPlugin : Plugin<Project> {
             val out = outputDir.get().asFile.resolve("engine/table")
             out.deleteRecursively()
             out.mkdirs()
-            // a table is a few MB of text, the pinyin data mapped, its 800k words listed; the
-            // default heap is a quarter of the machine's
+            // the default heap is a quarter of the machine's: each run is given its own
             val runs = tables.files.map { table ->
                 "1g" to listOf(
                     "table", "-o", out.resolve(table.nameWithoutExtension + ".data").path,
                     "--words", words.get().asFile.path, "--pinyin", pinyin.get().asFile.path, table.path,
                 )
             } + ("512m" to listOf("strokes", "-o", out.resolveSibling("stroke.data").path, strokes.get().asFile.path))
-            // each run maps the pinyin data and sorts its 800k words anew: side by side, in a few work items that each
-            // take the next as one ends, as an item a run would hold one of Gradle's workers while it waits its turn
+            // a few work items each take the next run as one ends: one item per run would hold a worker while it waits
             val queued = runsAtOnce.get().queue(runs)
             val lanes = workers.noIsolation()
             repeat(minOf(TABLE_RUNS_AT_ONCE, runs.size)) {
@@ -780,29 +708,24 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /**
-     * The table runs (heap, arguments) a task has queued, which its [TABLE_RUNS_AT_ONCE] work items take one
-     * at a time: a build service, as a work item is handed a copy of its parameters and these must be shared.
-     */
+    /** The queued table runs (heap, arguments): a build service, as work items get copies of their parameters and these must be shared. */
     abstract class TableRuns : BuildService<BuildServiceParameters.None> {
         private val queues = ConcurrentHashMap<Int, ConcurrentLinkedQueue<Pair<String, List<String>>>>()
         private val ids = AtomicInteger()
 
-        /** Queues [runs] apart from any other task's, under the id it returns. */
         fun queue(runs: List<Pair<String, List<String>>>): Int =
             ids.incrementAndGet().also { queues[it] = ConcurrentLinkedQueue(runs) }
 
-        /** The next run queued under [id]; null once all are taken, the queue then let go. */
+        /** The next run queued under [id]; null once all are taken, the queue then dropped. */
         fun next(id: Int): Pair<String, List<String>>? = queues[id]?.poll() ?: run {
             queues.remove(id)
             null
         }
 
-        /** How many tasks' queues are held, each till a work item finds it empty. */
         internal fun queuedTasks(): Int = queues.size
     }
 
-    /** One run of the tool as a work item, as VoiceDataPlugin compiles the hotwords; the tables go by [RunTables]. */
+    /** One tool run as a work item, as VoiceDataPlugin compiles the hotwords; the tables use [RunTables]. */
     abstract class RunTool @Inject constructor(private val exec: ExecOperations) : WorkAction<RunTool.Parameters> {
         interface Parameters : WorkParameters {
             val classpath: ConfigurableFileCollection
@@ -815,7 +738,6 @@ class EngineDataPlugin : Plugin<Project> {
         }
     }
 
-    /** A work item running the table runs queued under [Parameters.queue], the next as each ends, till none is left. */
     abstract class RunTables @Inject constructor(private val exec: ExecOperations) : WorkAction<RunTables.Parameters> {
         interface Parameters : WorkParameters {
             val classpath: ConfigurableFileCollection

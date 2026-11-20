@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release gates 2 and 3 of dev/design/fcitx-replacement.md §8 on an emulator of their own (uat.py's AVD).
 
-  gates.py upgrade <new.apk> [--old DIR]        gate 2: v0.3.0/0.3.1/0.3.2/0.4.0 upgraded in place
+  gates.py upgrade <new.apk> [--old DIR]        gate 2: v0.3.0/0.3.1/0.3.2/0.4.0 upgraded in place (paused: README)
   gates.py backups <new.apk> --old DIR          gate 3: new backup → each old build; old backups → new
 
 DIR holds the released text APKs (`gh release download v0.3.x -p '*text-arm64*'`; those versions had
@@ -36,8 +36,7 @@ import uat  # noqa: E402
 
 RELEASED = "io.github.sraw.youmo"
 VERSIONS = ("v0.3.0", "v0.3.1", "v0.3.2", "v0.4.0")
-# on the device a gate brought up: up() kills only such an emulator of the AVD left up on its port;
-# a uat.py run on that device drops it (uat.run_on), so a gate after --keep refuses it then
+# on a device a gate brought up: up() kills only such an emulator, and a uat.py run on it drops the mark
 GATE_MARK = uat.GATE_MARK
 
 
@@ -84,12 +83,8 @@ class Gate:
         self.new = new_apk
         self.new_pkg, self.new_ver = badging(new_apk) if new_apk else (None, None)
 
-    # --- the device: uat.py's emulator from its read-only snapshot, so each gate starts on a clean device
     def up(self):
-        # uat.up keeps one already up as it is: one left by --keep or a gate that stopped before down() would
-        # bring its packages, pack marks and Download's zips into this gate. Started again from the snapshot;
-        # only a gate's (marked when it came up): this AVD on the port without the mark is a uat.py run's
-        # (--devices auto reaches 5560 too), killed under it
+        # an emulator left up would bring the last gate's packages and marks: restarted from the snapshot, if a gate's
         d = uat.Device(self.a.port)
         if uat.avd_name(d) == uat.AVD:
             if d.sh(f"cat {GATE_MARK} 2>/dev/null").strip() != "gate":
@@ -123,7 +118,7 @@ class Gate:
         return r.returncode == 0, last
 
     def checked(self, scenario, pkg, version=None, old=False):
-        """version: gate 2's fixture, whose user_de (if it has a de.tar) the check also reads;
+        """version: gate 2's fixture;
         old: a released v0.3.x build is installed, its files still on the external storage"""
         out = os.path.join(self.dir, f"{scenario}.json")
         ok, last = self.phase(pkg, "check", out, *([version] if version else []), *(["--old"] if old else []))
@@ -133,7 +128,6 @@ class Gate:
     def blocked(self, scenario, last):
         self.rows.append((scenario, False, last, []))
 
-    # --- the report
     def report(self, title, notes=""):
         date = datetime.date.today().isoformat()
         stem = os.path.splitext(os.path.basename(self.new))[0]

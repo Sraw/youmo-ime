@@ -23,8 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import java.io.File
 
-// the rules the clipboard's database opens and clears by, which need android's exceptions and a cache directory but no app:
-// apart from ClipboardManagerReopenTest, whose tests run under the one whose start opens it
+// the open and clear rules, which need Android's exceptions and a cache dir but no app (unlike ClipboardManagerReopenTest)
 @RunWith(RobolectricTestRunner::class)
 class ClipboardOpenRuleTest {
 
@@ -33,8 +32,7 @@ class ClipboardOpenRuleTest {
         listOf(false, true).forEach { assertEquals(listOf("open"), fallBack(databaseFile(), imported = it)) }
     }
 
-    // the files kept for the next start, and the clips of this run in memory, clearing the clipboard keeping them too:
-    // never started over, after an import either
+    // files kept for the next start and this run's clips in memory, clearing keeps them too: never started over, nor after an import
     @Test
     fun whatMayPassByTheNextStartKeepsTheFiles() {
         val file = databaseFile()
@@ -76,13 +74,13 @@ class ClipboardOpenRuleTest {
         assertEquals(startedOver, fallBack(journalled, imported = false, SQLiteFullException()))
     }
 
-    // after an import, the file the backup's: what will not pass is started over
+    // after an import the file is the backup's: what will not pass is started over
     @Test
     fun onlyWhatNeverOpensIsStartedOver() {
         val context = RuntimeEnvironment.getApplication()
         val file = databaseFile()
         val startedOver = listOf("open", "start over", "open")
-        // a corrupt file, one whose schema Room rejects (its identity hash, a missing migration), one it cannot create its tables in
+        // corrupt, rejected by Room (identity hash, missing migration), or tables uncreatable
         listOf(
             SQLiteDatabaseCorruptException(),
             IllegalStateException("Room cannot verify the data integrity"),
@@ -105,7 +103,7 @@ class ClipboardOpenRuleTest {
         )
     }
 
-    // what will not pass, the file for clearing the clipboard to delete, whatever a start-over did
+    // what will not pass is for clearing to delete, whatever a start-over did
     @Test
     fun whatWillNotPassIsKeptUnopenable() {
         val flags = listOf(false, true)
@@ -122,17 +120,15 @@ class ClipboardOpenRuleTest {
         }
     }
 
-    // what may pass, beside a file that holds clips as the open found it with no start-over: its clips back once it
-    // opens and the clearing not done till then. One that a start-over could not delete and that holds clips, which no
-    // start opens, each starting it over again: kept unopenable, for the clearing to try the deletion again. No row
-    // with clips left and no start-over: only a start-over leaves them
+    // beside a file holding clips with no start-over, clips come back once it opens and clearing waits; a start-over that
+    // could not delete a clip-holding file keeps it unopenable for clearing to retry
     @Test
     fun whatMayPassKeepsOnlyAFileThatStillHoldsClips() {
-        // started over, held clips before the open, left clips after the start-over: what is kept
+        // started over, held clips before, left clips after: what is kept
         listOf(
             Triple(false, false, false) to Kept.NOTHING,
             Triple(false, true, false) to Kept.MAY_OPEN,
-            // the start-over deleted it, left one holding none, or there was none to delete
+            // deleted, left one holding none, or none to delete
             Triple(true, false, false) to Kept.NOTHING,
             Triple(true, true, false) to Kept.NOTHING,
             // its directory not writable, say
@@ -144,11 +140,10 @@ class ClipboardOpenRuleTest {
         }
     }
 
-    // a clearing that fails once its DELETE is in, as Room's VACUUM after it does on a full disk: done if no row is
-    // left, which the panel is then told of; not done if rows are left, or their count fails too
+    // a clear failing after its DELETE (Room's VACUUM on a full disk): done if no row is left; not if rows remain or the count fails
     @Test
     fun aClearingThatFailsIsDoneOnlyIfNoRowIsLeft() = runTest {
-        // the clear failing, what the count finds (null: it fails): whether cleared, the steps run
+        // the clear failing, the count (null: fails): whether cleared, the steps run
         listOf(
             (false to false) to (true to listOf("clear")),
             (true to true) to (true to listOf("clear", "is empty", "told")),
@@ -159,8 +154,7 @@ class ClipboardOpenRuleTest {
         }
     }
 
-    // what clearedTables does with a clear that throws if [clearFails], then a count that finds the tables [empty] or,
-    // null, throws
+    // clearedTables with a clear that throws if [clearFails], then a count finding [empty] (null: throws)
     private suspend fun clearing(clearFails: Boolean, empty: Boolean?): Pair<Boolean, List<String>> {
         val done = mutableListOf<String>()
         val cleared = clearedTables(
@@ -177,8 +171,7 @@ class ClipboardOpenRuleTest {
         return cleared to done
     }
 
-    // what openOrFallBack does at [path], at a start or a reopening after an import, with an open that throws
-    // [thrown] in turn, then opens
+    // openOrFallBack at [path] after a start or an import, with an open throwing [thrown] in turn, then opening
     private fun fallBack(path: File, imported: Boolean, vararg thrown: Exception): List<String> {
         val done = mutableListOf<String>()
         val failures = thrown.iterator()
@@ -195,6 +188,6 @@ class ClipboardOpenRuleTest {
         return done
     }
 
-    // a database there, as a start finds it
+    // as a start finds it
     private fun databaseFile() = File(RuntimeEnvironment.getApplication().cacheDir, "clbdb").apply { writeText("") }
 }

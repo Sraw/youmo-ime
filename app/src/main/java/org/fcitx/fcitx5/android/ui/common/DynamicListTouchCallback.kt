@@ -51,7 +51,7 @@ open class DynamicListTouchCallback<T>(
         viewHolder: RecyclerView.ViewHolder
     ): Int {
         val position = viewHolder.bindingAdapterPosition
-        // a row being laid out or taken away has no entry to swipe
+        // a row being laid out or removed has no entry
         if (position == RecyclerView.NO_POSITION) return 0
         val item = adapter.entries[position]
         // no direction at all: up and down here would make a vertical move a swipe, and so a delete

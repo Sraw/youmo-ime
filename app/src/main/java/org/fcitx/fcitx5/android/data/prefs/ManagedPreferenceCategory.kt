@@ -15,11 +15,8 @@ abstract class ManagedPreferenceCategory(
     protected val sharedPreferences: SharedPreferences
 ) : ManagedPreferenceProvider() {
 
-    /** index of the first preference in a section -> the section's title */
+    /** Index of the first preference in a section -> the section's title. */
     private val sections = mutableMapOf<Int, Int>()
-
-    /** Keys of what [hidden] declares, but for those a [levels] sets. */
-    private val resettableKeys = mutableListOf<String>()
 
     /** Preferences registered after this call, up to the next [section], are grouped under [title]. */
     protected fun section(@StringRes title: Int) {
@@ -30,46 +27,30 @@ abstract class ManagedPreferenceCategory(
         sections[managedPreferencesUi.size] = title
     }
 
-    /**
-     * The preferences [block] declares, kept without a UI: a phone's user is not shown every knob
-     * the code has. Those of [AppPrefs] go back to their defaults once, and after an import of the
-     * user's data ([AppPrefs.resetHiddenSettings]), for what an older version or a backup set
-     * there could not be changed back; but not when [setByLevels], where a [levels] (in this
-     * category or another) still sets them.
-     */
-    protected fun <T> hidden(setByLevels: Boolean = false, block: () -> T): T {
-        val before = managedPreferences.keys.toSet()
+    /** Kept without a UI of their own: a [levels] sets them. */
+    protected fun <T> hidden(block: () -> T): T {
         hidingUi = true
         try {
             return block()
         } finally {
             hidingUi = false
-            if (!setByLevels) resettableKeys += managedPreferences.keys - before
         }
     }
 
-    /** Puts what [hidden] declares back to its defaults, but what a [levels] sets. */
-    fun resetHidden(editor: SharedPreferences.Editor) {
-        resettableKeys.forEach { editor.remove(it) }
-    }
-
-    /**
-     * One choice of a few [levels] for the int preferences [keys] (each with its default): the
-     * user picks how big or how strong, not a number of dp for each.
-     */
+    /** The user picks how big or strong, not a number of dp for each of [keys]. */
     protected fun levels(
         @StringRes title: Int,
         key: String,
         keys: List<Pair<String, Int>>,
         levels: List<ManagedPreferenceUi.Levels.Level>,
-        // 跟随主题, first in the list (060-render-p3 T5)
+        // 跟随主题, first in the list
         follow: ManagedPreference.PBool? = null,
         enableUiOn: (() -> Boolean)? = null,
     ) {
         ManagedPreferenceUi.Levels(title, key, sharedPreferences, keys, levels, enableUiOn, follow?.let { it.key to it.defaultValue }).registerUi()
     }
 
-    /** A line of [text] among the settings, stored nowhere. */
+    /** Stored nowhere. */
     protected fun note(@StringRes text: Int, key: String) {
         ManagedPreferenceUi.Note(text, key).registerUi()
     }
@@ -124,8 +105,7 @@ abstract class ManagedPreferenceCategory(
     ): ManagedPreference.PStringLike<T> where T : Enum<T>, T : ManagedPreferenceEnum {
         val names = ManagedPreference.enumCodec<T>()
         val codec = object : ManagedPreference.StringLikeCodec<T> {
-            // one the list does not offer, or not a name of T's (a value of another build's, a backup's): read as
-            // the default, left stored
+            // one the list does not offer (another build's, a backup's): read as the default, left stored
             override fun decode(raw: String): T? = names.decode(raw)?.takeIf { it in entryValues }
         }
         val entryLabels = entryValues.map { it.stringRes }
@@ -144,7 +124,7 @@ abstract class ManagedPreferenceCategory(
         @StringRes
         defaultLabel: Int? = null,
         special: ManagedPreferenceUi.EditTextInt.Special? = null,
-        // played as the slider is let go, with the value picked
+        // played on slider release, with the value picked
         preview: ((Int) -> Unit)? = null,
         enableUiOn: (() -> Boolean)? = null
     ): ManagedPreference.PInt {
@@ -204,16 +184,12 @@ abstract class ManagedPreferenceCategory(
 
     override fun createUi(screen: PreferenceScreen) = createUi(screen, ALL)
 
-    /**
-     * The preferences of [section] alone, put straight into [group] without its title: one category
-     * shown over two pages, each page a section of it (the keys, the sound and vibration). With
-     * [ALL], every preference, each section under its title.
-     */
+    /** One [section] without its title, for a category shown over two pages; [ALL]: every section under its title. */
     fun createUi(group: PreferenceGroup, @StringRes section: Int) {
         // a section with nothing after it would silently drop its title
         require(managedPreferencesUi.size !in sections) { "empty section at the end" }
         require(section == ALL || section in sections.values) { "no section $section" }
-        // one before the first section would be on no page made of a section
+        // one before the first section would be on no section-made page
         require(section == ALL || managedPreferencesUi.isEmpty() || 0 in sections) { "preferences before the first section" }
         val ctx = group.context
         var into: PreferenceGroup? = if (section == ALL) group else null
@@ -235,7 +211,7 @@ abstract class ManagedPreferenceCategory(
         /** Key of the [PreferenceCategory] created for [section], for fragments that append to it. */
         fun sectionKey(@StringRes title: Int) = "section_$title"
 
-        /** A category titled [title] added to [group], keyed and laid out as [createUi] makes a section's. */
+        /** Keyed and laid out as [createUi] makes a section's. */
         fun addSection(group: PreferenceGroup, @StringRes title: Int): PreferenceCategory =
             PreferenceCategory(group.context).apply {
                 key = sectionKey(title)
@@ -243,7 +219,6 @@ abstract class ManagedPreferenceCategory(
                 isIconSpaceReserved = false
             }.also(group::addPreference)
 
-        /** For [createUi]: every section, not one. */
         const val ALL = 0
     }
 }

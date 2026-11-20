@@ -1,7 +1,4 @@
-// The maker's document (src/maker.js, 060-render-p3 M1): opened and saved as the app imports it, kept as a
-// draft and given back, undone and redone, its preview's environment the engine's.
-// contract: the from-maker*.theme files it writes are what the app's ThemePackImportTest imports, and what save
-// refuses is what the app's ThemePackCheck would.
+// The maker's document: the from-maker*.theme files it writes are what the app's ThemePackImportTest imports.
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/maker.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +19,6 @@ globalThis.YoumoPanels = [];
 for (const f of readdirSync(join(src, 'panels')).sort()) vm.runInThisContext(readFileSync(join(src, 'panels', f), 'utf8'), { filename: f });
 const F = globalThis.YoumoForm;
 const P = Object.fromEntries(globalThis.YoumoPanels.map((p) => [p.id, p]));
-// a picture made the keyboard's as the 背景 page makes one: the picture and its two cuts, of [image] ([type])
 const withPicture = (d, image, type) => P.background.ops.setPicture(d, { type, src: image, cuts: { portrait: { bytes: image, type, rect: null }, landscape: { bytes: image, type, rect: null } } });
 const L = globalThis.YoumoLib;
 const M = globalThis.YoumoMaker;
@@ -32,7 +28,7 @@ const FORMAT = JSON.parse(generated('youmo-format'));
 const bytes = (name) => new Uint8Array(readFileSync(join(testdata, name)));
 const enc = (t) => new TextEncoder().encode(t);
 
-// a store as IndexedDB is to the page: values kept by structured clone, so what comes back is a copy
+// values kept by structured clone, as IndexedDB does, so what comes back is a copy
 function memoryStore() {
   const m = new Map();
   return { get: async (k) => (m.has(k) ? structuredClone(m.get(k)) : undefined), put: async (k, v) => { m.set(k, structuredClone(v)); }, remove: async (k) => { m.delete(k); }, m };
@@ -57,7 +53,6 @@ test('a document saved opens again the same: theme.xml, its files, its layouts k
   const { doc, notes } = await M.open(E, L, FORMAT, saved.bytes);
   assert.ok(M.same(doc, d));
   assert.deepEqual(notes, [{ kind: 'layouts', ids: ['k18'] }]);
-  // saved again: byte for byte
   assert.deepEqual(M.save(L, doc).bytes, saved.bytes);
 });
 
@@ -335,16 +330,13 @@ test('what is wrong is said with its line: a theme the engine refuses has no sce
   assert.ok(r.problems.some((p) => p.level === 'error' && p.line > 0), JSON.stringify(r.problems));
 });
 
-// the app's side (ThemePackImportTest) imports testdata/from-maker.theme: a document of a built-in theme as
-// the page saves it; UPDATE=1 writes it again
+// the app's side (ThemePackImportTest) imports testdata/from-maker.theme; UPDATE=1 writes it again
 test('the page saves from-maker.theme, byte for byte', () => {
   const made = M.save(L, M.fromBuiltin(E, 'nord')).bytes;
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker.theme'), made);
   assert.deepEqual(new Uint8Array(made), bytes('from-maker.theme'));
 });
 
-// and from-maker-picture.theme (the panels' save: a real 4×4 PNG cut for each orientation, keys see-through, a gradient, an icon) and from-maker-30.theme (the app's own 3.0
-// export converted: its Return an image, the label hidden, as 3.0 drew it)
 test('a 3.0 theme the app takes converts and saves to a pack the app takes', async () => {
   for (const f of ['from-web.theme', 'from-app.theme', 'from-app-2.1.theme']) {
     const { doc } = await M.open(E, L, FORMAT, bytes(f));
@@ -357,7 +349,6 @@ test('a 3.0 theme the app takes converts and saves to a pack the app takes', asy
 
 test('the page saves from-maker-picture.theme, byte for byte', () => {
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64');
-  // made as the panels make one: a picture with its two cuts, the keys see-through, a gradient, an icon of its own
   const px = new Uint8Array(png);
   let d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'png', src: px, cuts: { portrait: { bytes: px, type: 'png', rect: [0, 0, 4, 2] }, landscape: { bytes: px, type: 'png', rect: [0, 1, 4, 2] } } });
   d = P.background.ops.through(d, true);
@@ -370,8 +361,7 @@ test('the page saves from-maker-picture.theme, byte for byte', () => {
 });
 
 test('a 3.0 theme the app exports with every override it allows opens, and stays quick to edit (t10-review M2)', async () => {
-  // from-app.theme with every key of the app's boards overridden (up to format.limits.overrides), each a picture of its own, pressed and not: as 4.0
-  // past ThemeReader's 1000 styles, within what the app imports (LookTheme.MAX_STYLES), which the engine reads too
+  // past ThemeReader's 1000 styles, within what the app imports (LookTheme.MAX_STYLES)
   const opened = await L.openZip(FORMAT, bytes('from-app.theme'));
   const t = opened.theme;
   const ids = [];
@@ -405,16 +395,14 @@ test('a 3.0 theme the app exports with every override it allows opens, and stays
   const edited = M.doc(F.setProp(doc.xml, 'key', 'radius', '9dp'), doc.files, doc.layouts);
   assert.deepEqual(M.check(E, edited, 'qwerty', M.envJson(E, M.ENV), null).problems.filter((p) => p.level === 'error'), []);
   const editMs = performance.now() - at;
-  // loose: tens of ms here; a slip to seconds per edit (a quadratic cascade) is what this catches, not a slow machine
+  // loose: a slip to seconds per edit (a quadratic cascade) is what this catches, not a slow machine
   assert.ok(editMs < 5000, 'an edit and its check took ' + editMs.toFixed(0) + ' ms');
   console.log('# ' + names.length + ' overrides, ' + styles + ' styles: open ' + openMs.toFixed(0) + ' ms, check ' + checkMs.toFixed(0) + ' ms, edit and check ' + editMs.toFixed(0) + ' ms');
   assert.deepEqual(M.saveProblems(E, L, FORMAT, doc), []);
 });
 
-// 060-render-p3 M4: the examples the page starts from, as assemble.mjs puts them in
 const examples = JSON.parse(examplesJson());
 
-// 0.6.0's example 薄荷 17 键, a pack with its own k18.xml (an 18 keys of 17), kept as keyboard-scene's test data since L8
 const MINT_K17 = join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data', 'mint-k17');
 const oldMint = () => M.exampleDoc({
   xml: readFileSync(join(MINT_K17, 'theme.xml'), 'utf8'),
@@ -427,13 +415,11 @@ test('each example opens, passes the check before a save with no error, and save
     const d = M.exampleDoc(ex);
     const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV));
     assert.deepEqual(errors, [], ex.id);
-    // none carries layouts/ (§11: the 17 keys are the layout maker's example)
     assert.deepEqual(warnings.map((w) => w.message), [], ex.id);
     assert.deepEqual(Object.keys(ex.layouts || {}), [], ex.id);
     const again = (await M.open(E, L, FORMAT, M.save(L, d).bytes)).doc;
     assert.ok(M.same(d, again), ex.id);
   }
-  // 0.6.0's example, its k18.xml one of the user's layouts once imported since 0.6.1: said so, kept as it is
   const mint = oldMint();
   const told = M.exportCheck(E, L, FORMAT, mint, E.layouts(), M.envJson(E, M.ENV));
   assert.deepEqual(told.errors, []);
@@ -477,7 +463,6 @@ test("no marks given: the preview draws the board's defaults as a new install sh
 test("a pack's own layout of a board is the one the preview draws; one that does not read is a warning, the app's drawn", () => {
   const d = M.fromBuiltin(E, 'material');
   const keys = (doc) => M.check(E, doc, 'zhuyin', M.envJson(E, M.ENV), null).scene.json().keys.map((k) => k.id);
-  // 注音's, a board a pack still stands for: one key fewer drawn
   const fewer = E.layoutSource('zhuyin').replace(/<key id="q"[^>]*\/>/, '');
   assert.equal(keys(M.doc(d.xml, d.files, { 'zhuyin.xml': fewer })).length, keys(d).length - 1);
   const bad = M.doc(d.xml, d.files, { 'zhuyin.xml': '<keyboard' });
@@ -486,8 +471,7 @@ test("a pack's own layout of a board is the one the preview draws; one that does
   assert.deepEqual(keys(bad), keys(d));
 });
 
-// review R26 F8414: the app reads a pack's fragments only where its board includes them (ThemePackLayouts.taken); the
-// pack's other boards, keyboards and not fragments, read as fragments failed every one
+// the app reads a pack's fragments only where its board includes them; read as fragments, its other boards failed
 test("a pack's two boards the app still reads are each drawn as the pack's, its fragment where they include it", () => {
   const d = M.fromBuiltin(E, 'material');
   const ids = (doc, board) => M.check(E, doc, board, M.envJson(E, M.ENV), null);
@@ -525,9 +509,7 @@ test("a pack's layout writing a key's long press, corner or swipes: a warning a 
   const notices = r.problems.filter((p) => p.level === 'warning' && /不起作用/.test(p.message));
   assert.equal(notices.length, 1, JSON.stringify(r.problems));
   assert.ok(notices[0].message.startsWith('layouts/zhuyin.xml：第 ' + lines.join('、') + ' 行的'), notices[0].message);
-  // drawn as the app's: its corners the app's
   assert.equal(r.scene.text(), M.check(E, d, 'zhuyin', env, null).scene.text());
-  // the example 17 keys write its corners as the app draws them: no notice
   const k17 = M.check(E, oldMint(), 'k18', env, null);
   assert.deepEqual(k17.problems.filter((p) => /不起作用/.test(p.message)), []);
   assert.deepEqual(M.ignoredNotice([]), []);
@@ -536,10 +518,8 @@ test("a pack's layout writing a key's long press, corner or swipes: a warning a 
 test('the check before a save: an error of any board or version stops it, the app\'s refusals with them, each once', () => {
   const d = M.fromBuiltin(E, 'material');
   assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV)), { errors: [], warnings: [] });
-  // a file named and not brought: the app refuses it
   const missing = M.doc(F.setProp(d.xml, 'key', 'fill', 'image(nope.png, 0dp)'));
   assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
-  // a property of a later app: a warning, once though every board and version has it
   const later = M.doc(F.setProp(d.xml, 'key', 'sticker', 'none'));
   const w = M.exportCheck(E, L, FORMAT, later, E.layouts(), M.envJson(E, M.ENV));
   assert.deepEqual(w.errors, []);
@@ -553,18 +533,16 @@ test("a pack's layouts the app refuses on import stop a save, by the app's own l
   assert.ok(M.exportCheck(E, L, FORMAT, M.doc(d.xml, d.files, many), E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /最多收/.test(p.message)));
   const big = M.doc(d.xml, d.files, { 'k18.xml': k18 + '<!--' + 'x'.repeat(FORMAT.limits.layoutBytes) + '-->' });
   assert.ok(M.exportCheck(E, L, FORMAT, big, E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /超过 \d+ 字节/.test(p.message)));
-  // the app's 注音 nine keys under another board's name: the app keeps its own 注音, so does the preview, with a warning
   const keys = (doc, board) => M.check(E, doc, board, M.envJson(E, M.ENV), null).scene.json().keys.map((k) => k.id).join();
   const wrong = M.doc(d.xml, d.files, { 'zhuyin.xml': E.layoutSource('zhuyin-nine') });
   const r = M.check(E, wrong, 'zhuyin', M.envJson(E, M.ENV), null);
   assert.ok(r.problems.some((p) => p.level === 'warning' && /App 不会用它（its id is zhuyin-nine）/.test(p.message)), JSON.stringify(r.problems));
   assert.equal(keys(wrong, 'zhuyin'), keys(M.doc(d.xml), 'zhuyin'));
-  // and one with no backspace
   const noBack = M.doc(d.xml, d.files, { 'zhuyin.xml': E.layoutSource('zhuyin').replace(/<key\b[^>]*role="backspace"[^>]*>/, '') });
   assert.ok(M.check(E, noBack, 'zhuyin', M.envJson(E, M.ENV), null).problems.some((p) => /it has no key \[backspace\]/.test(p.message)));
 });
 
-// an animated WebP's head (RIFF, VP8X with the animation flag, its frames of [ms] each), as the app's ThemeAssetLimitsTest makes one
+// an animated WebP's head, as the app's ThemeAssetLimitsTest makes one
 function animWebp(w, h, ms, { frames = ms.length, flag = true, pad = 0 } = {}) {
   const parts = [];
   const le = (v, n) => Array.from({ length: n }, (_, i) => (v >> (8 * i)) & 255);
@@ -590,19 +568,15 @@ test("an animated picture past the app's limits (youmo-format's, the app's Theme
   };
   assert.equal(warned(animWebp(720, 480, [50, 80])), '');
   assert.match(warned(animWebp(720, 480, [50, 33])), /短于 50 ms/);
-  // single quotes, spaces around '=': XML all the same, read by the app
   for (const attrs of ["animated='true' ", 'animated = "true" ']) {
     assert.ok(check(animWebp(720, 480, [50, 33]), attrs).warnings.some((p) => /短于 50 ms/.test(p.message)), attrs);
   }
   assert.match(warned(animWebp(721, 480, [50])), /长边/);
-  // a phone keyboard's width: past the 720 the app plays (060-render-perf 动效: CPU)
   assert.match(warned(animWebp(1080, 720, [50])), /长边超过 720/);
   assert.match(warned(animWebp(100, 100, [50], { frames: 301 })), /300 帧/);
   assert.match(warned(animWebp(100, 100, [50], { flag: false })), /不是动画 WebP/);
-  // padded with chunks: not walked one by one, refused
   assert.match(warned(animWebp(100, 100, [50], { pad: 400 })), /不是动画 WebP/);
   assert.equal(M.animatedWebp(animWebp(100, 100, [60, 70]), 300).shortestMs, 60);
-  // a blur on it: the engine's warning; a <picture> without its still <cut>: refused
   assert.ok(check(animWebp(100, 100, [50]), 'animated="true" blur="4dp" ').warnings.some((p) => /not blurred/.test(p.message)));
   const d = withPicture(M.fromBuiltin(E, 'nord'), animWebp(100, 100, [50]), 'webp');
   const uncut = d.xml.replace('<picture ', '<picture animated="true" ').replace(/<cut\b[^>]*\/>/g, '');
@@ -641,7 +615,6 @@ test('背景: an animated WebP the app plays is kept as picked (animated="true")
   const lim = FORMAT.limits;
   const playing = animWebp(100, 100, [60, 70]);
   assert.ok(M.keepsAnimated(lim, playing));
-  // the reasons one is drawn still are the test "an animated picture past the app's limits … is warned of as drawn still" (check calls animatedStill); here one is enough
   assert.ok(!M.keepsAnimated(lim, bytes('tiny.ttf')));
   const cut = { bytes: enc('cut'), type: 'png', rect: [0, 0, 10, 10] };
   const d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'webp', src: playing, cuts: { portrait: cut, landscape: cut }, animated: true });
@@ -651,12 +624,10 @@ test('背景: an animated WebP the app plays is kept as picked (animated="true")
   assert.ok(!/animated=/.test(again.xml));
 });
 
-// 061-custom-layout §10 (W3): 环境 › 键盘 › 打开 .layout, the theme drawn on a layout of the user's
 test('a .layout opened for the preview: read as the app reads it, drawn with the theme, its keys styled by its own id', () => {
   const file = readFileSync(join(here, '..', 'examples', 'layouts', 'k17.layout'));
   const own = M.openLayout(E, new Uint8Array(file));
   assert.deepEqual([own.id, own.name], ['k17', '17 键']);
-  // a byte-order mark is no matter
   assert.equal(M.openLayout(E, new Uint8Array([0xef, 0xbb, 0xbf, ...file])).id, 'k17');
   const d = M.doc(F.setProp(M.fromBuiltin(E, 'material').xml, 'k17/hjk', 'fill', '#ff0000'));
   const r = M.check(E, d, own.layout, M.envJson(E, M.ENV), null);
@@ -664,12 +635,10 @@ test('a .layout opened for the preview: read as the app reads it, drawn with the
   assert.ok(r.scene.json().keys.some((k) => k.id === 'hjk'), 'the layout drawn, not a board of the app');
   const fill = E.sources(own.layout, r.theme, M.envJson(E, M.ENV), { widget: 'key', key: 'hjk' }).sources.find((s) => s.property === 'fill');
   assert.equal(F.styles(d.xml)[fill.order].select, 'k17/hjk');
-  // what it refuses, said
   assert.throws(() => M.openLayout(E, new Uint8Array([0x50, 0x4b, 3, 4])), /主题包/);
   assert.throws(() => M.openLayout(E, new Uint8Array(E.layoutFormat().limits.bytes + 1)), /布局最大 64 KB/);
   assert.throws(() => M.openLayout(E, new Uint8Array([0xff, 0xfe])), /UTF-8/);
   assert.throws(() => M.openLayout(E, enc('<keyboard xmlns="https://youmo-ime/layout/1" id="x"><row><key/></row></keyboard>')), /第 1 行：/);
-  // a built-in board's id (or a fragment's): the app's own, which the import refuses
   const text = file.toString('utf8');
   for (const id of ['qwerty', 'number', 'grouped-bottom']) {
     assert.throws(() => M.openLayout(E, enc(text.replace('id="k17"', 'id="' + id + '"'))), new RegExp('id「' + id + '」和 App 自带的键盘重名'));

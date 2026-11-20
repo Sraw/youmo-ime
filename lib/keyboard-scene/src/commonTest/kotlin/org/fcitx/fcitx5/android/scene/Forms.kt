@@ -20,17 +20,8 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 
 /**
- * The phone the snapshots are of, and the keyboard's size on it in each form, as the app works them
- * out (rules D §1, §2): 1080 × 2340 px at 2.625 (420 dpi), 411 dp across upright, 891 on its side.
- *
- * The keyboard's height upright is the screen's times the height setting, 30% by default, compact the
- * setting's lowest level (20%); on its side four rows of a phone's dp (061-landscape-height §5.1): 48 dp
- * by default, compact 34 (KeyboardHeightLevels). The floor, the app's 120 dp of the window over the candidate
- * bar, the code row and the bottom padding (KeyboardHeightCap), does not bind at any of these. Floating:
- * 70% of the width, kept to 300–420 dp, so 300 dp; 85% of the upright height, on its side of 0.6.0's 49%
- * of the short side; its text 0.85 (FloatingKeyboard). One-handed: 80% of the width, 328 dp
- * (SplitKeyboard.placement); split on its side, the letters across the whole width, the other boards
- * docked right at 42% (the default split_dock; 横屏 splits by default from 600 dp).
+ * The phone the snapshots are of (1080 × 2340 px at 2.625), and the keyboard's size on it in each form as the app works
+ * them out: upright 30% of the screen (compact 20%), on its side four rows of 48 dp (compact 34).
  */
 object Forms {
     const val DENSITY = 2.625
@@ -49,31 +40,26 @@ object Forms {
 
     private val portraitHeight = (SCREEN_LONG * UPRIGHT).toInt().toDouble()
 
-    /** The texts the app gives a pinyin keyboard in Chinese: Chinese punctuation, its name on the space, the screen reader's. */
     val texts = Texts(
         imeName = "拼音", comma = "，", period = "。", returnLabel = "换行", returnIcon = "enter",
         alts = Fixtures.qwertyReadings,
         punctuation = mapOf(
             "," to "，", "." to "。", "?" to "？", "!" to "！", "~" to "～", ":" to "：", "(" to "（", ")" to "）",
         ),
-        // values-zh-rCN's a11y_key_grouped and a11y_key_space_with_ime
         a11yGrouped = "%1\$s，%2\$s",
         a11ySpace = "空格，%1\$s",
     )
 
     private val base = Env(SCREEN_SHORT, portraitHeight, DENSITY, input = Input(langKey = true), texts = texts)
 
-    /** Block, the default 按键样式. */
     val block = base
 
     val flat = base.copy(flat = true)
 
     val compact = base.copy(height = (SCREEN_LONG * UPRIGHT_COMPACT).toInt().toDouble(), compact = true)
 
-    /** On its side, not split (split_mode off). */
     val landscape = base.copy(width = SCREEN_LONG, height = (ROWS * SIDEWAYS_ROW_DP * DENSITY).toInt().toDouble(), landscape = true)
 
-    /** On its side, split (横屏 by default at 891 dp). */
     val split = landscape.copy(split = true)
 
     val floating = base.copy(
@@ -86,54 +72,44 @@ object Forms {
 
     val oneHandedRight = base.copy(oneHanded = SplitKeyboard.Dock.RIGHT)
 
-    /** On its side and compact: the setting's lowest level there, four rows of 34 dp. */
     val landscapeCompact = landscape.copy(height = (ROWS * SIDEWAYS_COMPACT_ROW_DP * DENSITY).toInt().toDouble(), compact = true)
 
-    /**
-     * Floating on its side: 70% of 891 dp kept to 420; 85% of 0.6.0's docked height, 49% of the short side (floating
-     * keeps 0.6.0's size; the width's share, 47%, is under it).
-     */
+    /** Floating keeps 0.6.0's size: 85% of 0.6.0's docked height, 49% of the short side. */
     val floatingLandscape = landscape.copy(
         width = FLOATING_MAX_DP * DENSITY,
         height = ((SCREEN_SHORT * FLOATING_SIDEWAYS).toInt() * FLOATING_HEIGHT).toInt().toDouble(),
         floating = FLOATING_TEXT,
     )
 
-    /** One-handed on its side, not split: 80% of 891 dp is 712, kept to 420 (SplitKeyboard.DOCK_MAX_DP). */
+    /** 80% of 891 dp is 712, kept to 420 (SplitKeyboard.DOCK_MAX_DP). */
     val oneHandedLandscape = landscape.copy(oneHanded = SplitKeyboard.Dock.LEFT)
 
-    /** Every form, by the name its snapshot carries. */
     val all: Map<String, Env> = linkedMapOf(
         "block" to block, "flat" to flat, "compact" to compact, "landscape" to landscape, "split" to split,
         "floating" to floating, "one-handed-left" to oneHandedLeft, "one-handed-right" to oneHandedRight,
         "landscape-compact" to landscapeCompact, "floating-landscape" to floatingLandscape, "one-handed-landscape" to oneHandedLandscape,
     )
 
-    /** Every board of rules C, by its file (KeyNames.BOARDS; emoji the emoji's row and the emoticons', S8a), and the small boards of 060-render-p2 S6. */
     val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols", "emoji", "emoticon", "emoji-search", "expanded-side", "number-row")
 
     private val layouts = mutableMapOf<String, Layout>()
 
     fun layout(board: String): Layout = layouts.getOrPut(board) { LayoutReader.layout(testData("$board.xml")).ok() }
 
-    /** The files the boards include, by id. */
     val fragments: Map<String, Fragment> by lazy {
         listOf("grouped-bottom").associateWith { LayoutReader.fragment(testData("$it.xml")).ok() }
     }
 
     val materialDark: Theme by lazy { ThemeReader.theme(testData("material-dark.xml")).ok() }
 
-    /**
-     * [form] with what the app tells [board] by default: 注音 for the zhuyin boards, the full pad for number; its keys' marks
-     * as built in (DefaultMarks, the app's on a new install) and their corners as said (Texts.alts: each first drawn up).
-     */
+    /** [form] with what the app tells [board] by default, its keys' marks as built in (DefaultMarks). */
     fun env(board: String, form: Env): Env {
         val told = when (board) {
             "zhuyin", "zhuyin-nine" -> form.copy(input = form.input.copy(ime = "zhuyin"), texts = form.texts.copy(imeName = "注音"))
             "number" -> form.copy(input = form.input.copy(pad = "full"))
             else -> form
         }
-        // the first on the way told.marks puts it (the app's 首选 setting); the layout's own variant: no board here is 双拼's
+        // the layout's own variant: no board here is 双拼's
         val firstUp = told.marks.firstUp
         val marks = DefaultMarks.shortcuts(layout(board), fragments, punctuation = told.texts.punctuation, firstUp = firstUp)
         val way = if (firstUp) ":up" else ":down"
@@ -144,18 +120,13 @@ object Forms {
     fun scene(board: String, env: Env, theme: Theme = Fixtures.materialLight): Scene =
         SceneBuilder(theme, env, FakeMeasurer).build(layout(board), fragments).ok()
 
-    /**
-     * The popups in [env], by name, as the app asks for them: a letter's bubble over a key 36 dp
-     * across, a shortcut's words in one; a long press's seven keys in two rows round the second
-     * column, the top row's last slot empty (PopupKeyboardUi's order); the edit menu's icons, its
-     * middle in focus and its last disabled (a password field's); 手写's 注 menu of words.
-     */
+    /** The popups in [env], by name, as the app asks for them (PopupKeyboardUi's order). */
     fun popups(env: Env, theme: Theme = Fixtures.materialLight): List<Pair<String, () -> Scene>> {
         val b = SceneBuilder(theme, env, FakeMeasurer)
         return popupAsks.map { (name, ask) -> name to { ask.scene(b, env) } }
     }
 
-    /** [popups]' asks, by name: what each is made of, as the theme maker's library is asked for it too (FacadeShotsTest). */
+    /** As the theme maker's library is asked for them too (FacadeShotsTest). */
     val popupAsks: List<Pair<String, PopupAsk>> by lazy {
         val letters = listOf("a", "b", "c", "d", "e", "f", "g")
         val edit = listOf("select-all", "cut", "copy", "paste", "undo").map { MenuCell(it, it) }
@@ -169,14 +140,9 @@ object Forms {
         )
     }
 
-    // the key a bubble is over
     private const val KEY_DP = 36.0
 }
 
-/**
- * A popup's scene as asked for: a key's bubble ([Preview], over a key [Preview.keyDp] across, the
- * words' size where [Preview.words]), a long press's keys ([Keys], the screen's width their room), a menu.
- */
 sealed interface PopupAsk {
     fun scene(b: SceneBuilder, env: Env): Scene
 

@@ -24,10 +24,7 @@ import org.robolectric.annotation.Config
 import org.fcitx.fcitx5.android.Uat
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The listener failing while holding to talk (voice-3): each failure says its own message on the
- * card, the hold's hint gone from under it (voice-10), and what was heard before it is typed.
- */
+/** Each failure says its own message on the card, the hold's hint gone, and what was heard before it is typed. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -56,7 +53,7 @@ class VoiceFailureUatTest {
         ),
         { it.why },
     ) { row ->
-        // a keyboard and a recognizer of the row's own: a talk failed leaves its card and its session behind
+        // a talk failed leaves its card and its session behind: a keyboard and recognizer each row
         val voice = FakeRecognizer()
         VoiceSession.listening = { events -> voice.also { v -> v.events = events } }
         KeyboardHarness().use { h ->
@@ -71,7 +68,6 @@ class VoiceFailureUatTest {
             voice.fail(row.failure)
             h.advance(100)
             assertTrue(shown().toString(), h.service.getString(row.message) in shown())
-            // the hold's hint gone from under the message (voice-10)
             assertFalse(shown().toString(), h.service.getString(R.string.voice_hold_hint) in shown())
             assertEquals(row.heardFirst.orEmpty(), h.field.text.toString())
             f.up(h.at(h.keyNamed("space")))

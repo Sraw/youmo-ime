@@ -18,7 +18,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** The files of the user's quick phrases (design 051-quickphrase §3.1): each change read, made, written whole. */
+/** Each change reads, makes and writes the files whole. */
 class QuickPhraseManagerTest {
 
     @get:Rule
@@ -56,7 +56,7 @@ class QuickPhraseManagerTest {
         QuickPhraseManager.remove(gh, dir = dir)
         QuickPhraseManager.markUsed(gh, 9, dir = dir)
         assertEquals(listOf(addr), QuickPhraseManager.load(dir))
-        // and its old card's edit adds it back rather than losing it
+        // its old card's edit adds it back rather than losing it
         QuickPhraseManager.put(gh, gh.copy(content = "x"), now = 10, dir = dir)
         assertEquals(listOf(gh.copy(content = "x"), addr), QuickPhraseManager.load(dir))
     }
@@ -66,13 +66,13 @@ class QuickPhraseManagerTest {
     fun importAddsNewOnesAndCountsTheSkipped() {
         QuickPhraseManager.put(null, gh, now = 1, dir = dir)
         val long = QuickPhraseEntry("long", "x".repeat(QuickPhraseBook.MAX_CONTENT + 1))
-        // a key over MAX_KEY cannot be one: counted (so the toast can say it), not dropped unsaid
+        // a key over MAX_KEY: counted for the toast, not dropped unsaid
         val badKey = "k".repeat(QuickPhraseBook.MAX_KEY + 1) + " x\n"
         val file = QuickPhraseFiles.formatMine(listOf(gh, addr, long)) + "bad\n" + badKey
         assertEquals(QuickPhraseManager.Imported(1, 1, 1, badKey = 1), QuickPhraseManager.import(file.toByteArray(), dir = dir))
         assertEquals(setOf(gh, addr), QuickPhraseManager.load(dir).toSet())
         assertEquals(QuickPhraseManager.Imported(0, 2, 1, badKey = 1), QuickPhraseManager.import(file.toByteArray(), dir = dir))
-        // a file of only bad keys is told as such, not as "not a .mb file"
+        // only bad keys is told as such, not as "not a .mb file"
         assertEquals(QuickPhraseManager.Imported(0, 0, 0, badKey = 1), QuickPhraseManager.import(badKey.toByteArray(), dir = dir))
     }
 
@@ -85,15 +85,15 @@ class QuickPhraseManagerTest {
         // the file's first ones kept
         assertTrue(QuickPhraseManager.load(dir).any { it.key == "k1" })
         assertFalse(QuickPhraseManager.load(dir).any { it.key == "k${max + 1}" })
-        // full: none added, the new ones counted, the ones there still duplicates
+        // full: none added, the new ones counted, existing ones still duplicates
         val more = QuickPhraseFiles.formatMine(listOf(gh, QuickPhraseEntry("k1", "c1")))
         assertEquals(QuickPhraseManager.Imported(0, 1, 0, overLimit = 1), QuickPhraseManager.import(more.toByteArray(), dir = dir))
-        // the limit is the import's alone: one added by hand past it is kept (QU-15, R25r3 F7932)
+        // the limit is the import's alone: one added by hand past it is kept
         assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.put(null, QuickPhraseEntry("byhand", "h"), dir = dir))
         assertEquals(max + 1, QuickPhraseManager.load(dir).size)
     }
 
-    // review L11: a key in another case is found by the same keys, so it is the same entry
+    // a key in another case is the same entry
     @Test
     fun aKeyInAnotherCaseIsADuplicateButAnEntrysOwnCaseMayChange() {
         QuickPhraseManager.put(null, gh, now = 1, dir = dir)
@@ -119,8 +119,7 @@ class QuickPhraseManagerTest {
         QuickPhraseManager.put(null, addr, now = 2, dir = dir)
         val third = QuickPhraseEntry("zz", "a third")
         QuickPhraseManager.put(null, third, dir = dir)
-        // the file's own order, which load() (by time of use) hides: put back at its index, not
-        // appended last (an undo once added it at the end)
+        // the file's own order, which load() hides: put back at its index, not appended last
         fun inFile() = QuickPhraseFiles.parseMine(File(dir, "mine.mb").readBytes())
         val before = inFile()
         val removed = QuickPhraseManager.remove(gh, dir = dir)!!
@@ -130,14 +129,13 @@ class QuickPhraseManagerTest {
         QuickPhraseManager.remove(third, dir = dir)
         // its old time of use: after addr, not last as never used
         assertEquals(listOf(addr, gh), QuickPhraseManager.load(dir))
-        // one the same added meanwhile is kept as it is
+        // one the same added meanwhile is kept as is
         val again = QuickPhraseManager.remove(gh, dir = dir)!!
         QuickPhraseManager.put(null, gh, now = 5, dir = dir)
         assertEquals(QuickPhraseManager.Put.Duplicate, QuickPhraseManager.restore(again, dir = dir))
     }
 
-    // design 060-quick-input-folders: an upgrade's files of before read converted, their times kept,
-    // written as version 2 at the next change
+    // older files read converted, their times kept, written as version 2 at the next change
     @Test
     @Uat("QU-27")
     fun filesOfBeforeAreReadConvertedAndWrittenAnewAtTheNextChange() {
@@ -154,7 +152,7 @@ class QuickPhraseManagerTest {
         assertTrue(File(dir, "mine.mb").readText().startsWith(QuickPhraseFiles.HEADER + "\n#wz｜百度 www.baidu.com\n"))
         assertTrue(File(dir, "mine.used").readText().startsWith(QuickPhraseFiles.USED_HEADER + "\n"))
         assertEquals(listOf(sina, home.copy(key = "dz"), baidu), QuickPhraseManager.load(dir))
-        // the keyboard's use of before the write is still found
+        // the keyboard's use from before the write is still found
         QuickPhraseManager.markUsed(baidu, 9, dir = dir)
         assertEquals(baidu, QuickPhraseManager.load(dir).first())
     }
@@ -169,7 +167,7 @@ class QuickPhraseManagerTest {
         QuickPhraseManager.put(null, filed, now = 1, dir = dir)
         QuickPhraseManager.put(null, addr, now = 2, dir = dir)
         assertEquals(QuickPhraseMine(listOf(addr, filed), listOf("网址", "空的")), QuickPhraseManager.loadAll(dir))
-        // the keyboard's, of a read before a move: used and deleted all the same
+        // the keyboard's, from a read before a move: used and deleted all the same
         QuickPhraseManager.put(filed, gh, now = 1, dir = dir)
         QuickPhraseManager.markUsed(filed, 5, dir = dir)
         assertEquals(listOf(gh, addr), QuickPhraseManager.load(dir))
@@ -181,13 +179,13 @@ class QuickPhraseManagerTest {
         assertEquals(1, QuickPhraseManager.deleteFolder("站点", dir = dir))
         assertEquals(-1, QuickPhraseManager.deleteFolder("站点", dir = dir))
         assertEquals(QuickPhraseMine(listOf(gh, addr), listOf("空的")), QuickPhraseManager.loadAll(dir))
-        // deleted from the keyboard with its old folder: the one there now deleted, its time with it
+        // deleted from the keyboard with its old folder: the current one deleted, its time with it
         val removed = QuickPhraseManager.remove(filed, dir = dir)!!
         assertEquals(gh, removed.entry)
         assertEquals(5L, removed.usedAt)
         assertEquals(QuickPhraseManager.Put.Saved, QuickPhraseManager.restore(removed, dir = dir))
         assertEquals(QuickPhraseMine(listOf(gh, addr), listOf("空的")), QuickPhraseManager.loadAll(dir))
-        // the export keeps folders, a computer's fcitx5 reads its keys
+        // the export keeps folders; desktop fcitx5 reads its keys
         QuickPhraseManager.put(null, QuickPhraseEntry("#wz", "www.baidu.com", "百度", "网址"), now = 7, dir = dir)
         assertEquals(
             QuickPhraseFiles.HEADER + "\n" + "gh https://github.com\n" + "addr \"北京\\n3 号楼 \\\"502\\\"\"\n" + "【目录】空的\n【目录】网址\n#wz｜百度 www.baidu.com\n",
@@ -195,8 +193,7 @@ class QuickPhraseManagerTest {
         )
     }
 
-    // the code review of 060-quick: a deletion undone after its folder was deleted meanwhile puts it
-    // back into that folder, made again, with its time of use
+    // an undo after its folder was deleted puts it back into that folder, remade, with its time of use
     @Test
     @Uat("QU-26")
     fun aDeletionUndoneAfterItsFolderWentPutsItBackIntoTheFolderMadeAgain() {
@@ -228,7 +225,7 @@ class QuickPhraseManagerTest {
             ),
             QuickPhraseManager.loadAll(dir),
         )
-        // our own export imported again: all there already
+        // our own export reimported: all there already
         assertEquals(QuickPhraseManager.Imported(0, 3, 0), QuickPhraseManager.import(QuickPhraseManager.export(dir).toByteArray(), dir = dir))
     }
 }

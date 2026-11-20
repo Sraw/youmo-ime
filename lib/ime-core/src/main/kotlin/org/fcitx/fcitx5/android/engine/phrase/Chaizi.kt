@@ -5,35 +5,27 @@
 package org.fcitx.fcitx5.android.engine.phrase
 
 /**
- * Characters by the pinyin of their parts (拆字), as the app has them (`engine/chaizi.data`,
- * ime-dict-tool's `chaizi`, from the open 汉语拆字字典 kfcd/chaizi, CC BY 3.0): `niuniuniu` 犇,
- * `shuishuishui` 淼, `koukou` 吅. Full pinyin offers them first after [KEY], as 搜狗's U mode: a
- * character the user cannot read, looked up as one is by its strokes.
- *
- * The file is text, a line each: `<letters><TAB><character>...`, the letters the parts' pinyin run
- * together, the characters apart by spaces, the commonest first.
+ * Characters by the pinyin of their parts (拆字, from kfcd/chaizi, CC BY 3.0): `niuniuniu` 犇. Full pinyin
+ * offers them after [KEY], like 搜狗's U mode. File lines: `<letters><TAB><character>...`, commonest first.
  */
 class Chaizi private constructor(private val chars: Map<String, List<String>>) {
 
-    /** The characters whose parts [letters] spells in full, the commonest first; none for most. */
     fun of(letters: String): List<String> = chars[letters].orEmpty()
 
-    /** Every character found by its parts, repeats as spelt more ways than one. */
+    /** Repeats a character spelt more than one way. */
     fun all(): Sequence<String> = chars.values.asSequence().flatten()
 
-    /** How many spellings have characters. */
     val size get() = chars.size
 
     companion object {
         val EMPTY = Chaizi(emptyMap())
 
-        /** What a lookup starts with: no pinyin does. */
+        /** No pinyin starts with it. */
         const val KEY = 'u'
 
-        /** At most this many characters are kept of a spelling. */
         const val MAX = 8
 
-        /** What [text] has, as [format] writes it. A line that is not one is skipped, as are `#` comments. */
+        /** Lines that do not parse, and `#` comments, are skipped. */
         fun read(text: CharSequence): Chaizi {
             val chars = HashMap<String, List<String>>()
             for (line in text.lineSequence()) {
@@ -45,7 +37,6 @@ class Chaizi private constructor(private val chars: Map<String, List<String>>) {
             return Chaizi(chars)
         }
 
-        /** [chars] as [read] takes them, by spelling, [header] a comment above. */
         fun format(chars: Map<String, List<String>>, header: String = ""): String = buildString {
             for (line in header.lines()) if (line.isNotEmpty()) append("# ").append(line).append('\n')
             for ((letters, found) in chars.toSortedMap()) {

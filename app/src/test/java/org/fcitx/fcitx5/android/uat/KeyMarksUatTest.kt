@@ -29,11 +29,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Where the keys draw their marks (uat/02 KB-66): every shortcut's where 快捷键图标位置 says, every
- * symbol where 标点位置 says, whichever way swipes to them, the same the first time the keyboard opens
- * as after any setting changes. 0.5.1's testers saw the symbols pushed to the bottom right by the
- * shortcuts at first, then the shortcuts bottom right after a setting changed: they followed the way
- * 滑动 swiped to them.
+ * Every shortcut's mark where 快捷键图标位置 says, every symbol where 标点位置 says, whichever way swipes to them, the
+ * first time the keyboard opens as after any setting changes (they once followed 滑动's way).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -56,8 +53,7 @@ class KeyMarksUatTest {
         made?.close()
     }
 
-    // every key's marks as the scene drew them (SceneShownKey.markPlaces): its shortcuts' places, its
-    // symbol's; T(op) or B(ottom), L(eft), C(entre) or R(ight); - for none drawn
+    // T(op) or B(ottom), L(eft), C(entre) or R(ight); - for none drawn
     private fun marks(): List<String> = h.keys().map { k ->
         val m = (k as SceneShownKey).markPlaces()
         "${k.label.ifEmpty { k.description }} ${m.shortcuts.joinToString(",").ifEmpty { "-" }} ${m.symbol ?: "-"}"
@@ -82,16 +78,14 @@ class KeyMarksUatTest {
         symbolsAt(symbols)
     }
 
-    // the keyboard turned on its side for [block], upright again after it whether it passed or not; turned by h.turn()
-    // (the input started again, as a turn that remakes the view does), not KeyboardHarness.inLandscape's onConfigurationChanged
+    // turned by h.turn() (the input started again), not KeyboardHarness.inLandscape's onConfigurationChanged
     private fun inLandscapeRestarted(block: () -> Unit) {
         RuntimeEnvironment.setQualifiers("+land")
         h.turn()
         try {
             block()
         } catch (e: Throwable) {
-            // turned back all the same, but a turn failing on a harness the row broke is added to the row's failure,
-            // not put in its place (review R26 F8476)
+            // a turn failing on a harness the row broke is added to the row's failure, not put in its place
             RuntimeEnvironment.setQualifiers("+port")
             runCatching { h.turn() }.exceptionOrNull()?.let(e::addSuppressed)
             throw e
@@ -104,7 +98,6 @@ class KeyMarksUatTest {
     @Uat("KB-66")
     fun eachWhereItsSettingSays() {
         h.start()
-        // the defaults: 快捷键图标位置 左上, 标点位置 右上
         assertEquals("a TL TR", marksOf("a"))
         assertEquals("z TL TR", marksOf("z"))
         assertEquals("s - TR", marksOf("s"))
@@ -128,7 +121,6 @@ class KeyMarksUatTest {
         assertEquals("z BR BL", marksOf("z"))
         symbolsAt(KeyMarkPosition.Bottom)
         assertEquals("under the letter", "z BR BC", marksOf("z"))
-        // 无: that one not drawn, the swipe still there
         symbolsAt(KeyMarkPosition.None)
         assertEquals("z BR -", marksOf("z"))
         assertEquals("清除 not drawn", "BR", backspaceMarks())
@@ -137,13 +129,11 @@ class KeyMarksUatTest {
         assertEquals("", backspaceMarks())
     }
 
-    // 顶部 (user 2026-11-13): the top edge's middle, a shortcut's and a symbol's alike, ⌫'s way there too; on a
-    // landscape keyboard, too low for it, the first corner the other's place is not
+    // 顶部: the top edge's middle; on a landscape keyboard, too low for it, the first corner the other's place is not
     @Test
     @Uat("KB-89")
     fun theTopIsTheTopEdgesMiddle() {
         h.start()
-        // each row sets both places and its own screen: none stands on another's (review R26 F8131)
         assertRows(
             "下滑 at 顶部: the shortcut top centre, 恢复 too" to {
                 place(shortcuts = KeyMarkPosition.Top, symbols = KeyMarkPosition.TopRight)
@@ -182,8 +172,7 @@ class KeyMarksUatTest {
         )
     }
 
-    // the default is the long press's first up: only turning it down (the two places swapped with it) shows the
-    // marks staying where they were
+    // the default is the long press's first up: only turning it down shows the marks staying where they were
     @Test
     @Uat("KB-66")
     fun theSwipesTurnedTheMarksStay() {
@@ -215,7 +204,6 @@ class KeyMarksUatTest {
     fun theFirstOpenIsAsAfterAnySettingChanges() {
         h.start()
         val first = marks()
-        // each place chosen with the keyboard up, and the keyboard opened anew with it: the same
         for (position in KeyMarkPosition.entries) {
             at(position)
             val changed = marks()
@@ -231,16 +219,14 @@ class KeyMarksUatTest {
         }
         symbolsAt(KeyMarkPosition.TopRight)
         assertEquals(first, marks())
-        // the testers' second keyboard: swiped the other way and back
         for (choice in listOf(SwipeLayersChoice.SymbolUpShortcutDown, SwipeLayersChoice.ShortcutUpSymbolDown)) {
             prefs.setLayers(choice)
             h.idle()
             val changed = marks()
             fresh().start()
             assertEquals(choice.name, changed, marks())
-            // 预设 turned the other way (not 翻转上下滑, which swaps every key's swipes, ⌫'s too: SwipeSlotsUatTest):
-            // the letters' marks stay (the two places swapped with the ways); a function key's swipes stay as they
-            // are, so its marks each go with its way's place: ⌫'s 清除 to 左上 and back
+            // 预设 turned the other way: the letters' marks stay; a function key's swipes stay, so its marks each go with its
+            // way's place
             val function = setOf("Backspace", "Pinyin")
             fun letters(m: List<String>) = m.filter { it.substringBefore(' ') !in function }
             assertEquals(choice.name, letters(first), letters(marks()))
@@ -248,7 +234,6 @@ class KeyMarksUatTest {
             assertEquals(choice.name, if (flipped) "TL,TR" else "TR,TL", backspaceMarks())
         }
         val turned = marks()
-        // a shortcut changed and back
         val slots = AppPrefs.getInstance().internal.keySwipes
         val was = slots.getValue()
         prefs.setShortcuts(KeyShortcuts.Empty.with("full/s", KeyShortcut.Text("你好")))
@@ -261,8 +246,7 @@ class KeyMarksUatTest {
         assertEquals(turned, marks())
     }
 
-    // a letter's long press turned off with the keyboard up: its corner emptied, its shortcut's mark
-    // once stayed where it was placed beside the symbol, not where a keyboard made with the setting puts it
+    // a letter's long press turned off with the keyboard up: its shortcut's mark once stayed beside the symbol
     @Test
     @Uat("KB-66")
     fun aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt() {
@@ -277,9 +261,8 @@ class KeyMarksUatTest {
         assertEquals(marksOf("q"), changed)
     }
 
-    // either remakes the keyboards (FcitxInputMethodService.remakeKeyboardsPrefs): KeySwipes places
-    // the marks of the keys it has swipes for again, but a key it has none for (a keyboard without
-    // shortcuts, 五笔's every root) lays its symbol out only as it is made
+    // KeySwipes places the marks of the keys it has swipes for again, but a key it has none for lays its symbol out
+    // only as it is made
     @Test
     @Uat("KB-66")
     fun eitherChangedTheKeyboardIsMadeAnew() {
@@ -295,8 +278,7 @@ class KeyMarksUatTest {
         }
     }
 
-    // turned with the marks placed: a symbol at 底部 under the letter upright, in the top right corner
-    // on a landscape key (KeyMarks.onKeys), as a keyboard made landscape has it
+    // turned with the marks placed: a symbol at 底部 in the top right corner on a landscape key
     @Test
     @Uat("KB-66")
     fun turnedTheSymbolWhereTheNewOrientationPutsIt() {

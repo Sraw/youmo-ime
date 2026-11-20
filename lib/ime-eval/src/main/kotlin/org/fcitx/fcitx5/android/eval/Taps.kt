@@ -10,14 +10,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.util.Random
 import kotlin.math.roundToInt
 
-/**
- * Taps on the 14 keys simulated for `pinyin --taps <hand>:<α>[:<seed>]`: each sample's pinyin
- * typed as the keys' codes, each with where across its key a [Hand] tapped it, as the keyboard
- * sends it (to the nearest of [Keyboard.TAP_STEPS]); α the cost of a letter at its key's far edge
- * (`Penalties.tap`, negated). A key of two letters has its left one's centre at 0.25 and its right
- * one's at 0.75. Seeded by a sample's place in the set read: every α of a hand, on the same set and
- * --half, has the same taps, compared sample by sample.
- */
+/** Simulated 14-key taps for `pinyin --taps`, seeded by the sample so every α of a hand meets the same taps. */
 object Taps {
 
     /** How a hand taps a letter whose centre on its key is `centre`, drawing from `random`. */
@@ -65,11 +58,7 @@ object Taps {
         return Spec(Hand.of(parts[0]), alpha, parts.getOrNull(2)?.toLong() ?: 1L)
     }
 
-    /**
-     * [samples] as typed on the 14 keys (or [keys]: the 18 keys', 061-neighbour-18key) by [spec]'s hand: their
-     * input the keys' codes and the place of each tap; those with no one exact reading, or a letter on no key,
-     * dropped, as `t9 --keys 14` drops them.
-     */
+    /** [samples] as typed on the 14 keys by [spec]'s hand; those with no exact reading or a letter on no key dropped. */
     fun convert(samples: List<Sample>, spec: Spec, keys: NineKeyLetters = NineKeyLetters.G14): List<Sample> = samples.mapIndexedNotNull { index, sample ->
         val reading = ExactReading.of(sample) { !Syllables.spelling(it)[0].isUpperCase() } ?: return@mapIndexedNotNull null
         val letters = reading.joinToString("") { Syllables.spelling(it.syllable) }
@@ -78,8 +67,7 @@ object Taps {
         val random = Random(spec.seed * SEED_STRIDE + index)
         val taps = letters.mapIndexed { i, c ->
             val group = keys.letters(codes[i])
-            // a key of one letter (L, M, the 18 keys' L;) aimed at its centre: its place weighs nothing of its
-            // own, only a slip's from it (as the keyboard sends it, GroupedKeyboard.tapped)
+            // a key of one letter aimed at its centre: its place weighs nothing, only a slip's from it
             placed(spec.hand.tap(if (!keys.weighs(codes[i])) CENTRE else if (group.indexOf(c) == 0) LEFT else RIGHT, random).coerceIn(0.0, 1.0))
         }
         sample.copy(input = codes, taps = taps)

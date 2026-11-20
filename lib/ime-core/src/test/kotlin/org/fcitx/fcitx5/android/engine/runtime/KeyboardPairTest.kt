@@ -25,7 +25,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** [KeyboardPair]'s routes (design §1.3); UAT HK-43 and HK-44 on a device. */
+/** [KeyboardPair]'s routes; UAT HK-43 and HK-44 on a device. */
 class KeyboardPairTest {
 
     private val data = sessionTestData()
@@ -57,7 +57,6 @@ class KeyboardPairTest {
         assertEquals("你好", type(nihao14).candidates[0])
         assertEquals(1, made)
         assertTrue(pair.keyedActive)
-        // a syllable picked off the strip is the 14 keys' too
         val s = type(nihao14.take(2))
         assertTrue(pair.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(0, s.syllablesId).code).preedit.startsWith("ni"))
         assertTrue(pair.keyedActive)
@@ -82,7 +81,7 @@ class KeyboardPairTest {
         assertTrue(pair.keyedActive)
     }
 
-    // review M1: after its commit a Backspace, space or mark is the 14 keys' session's, which learned the commit (U-03)
+    // after its commit a Backspace, space or mark is the 14 keys' session's, which learned the commit
     @Test
     fun afterTheFourteenKeysCommitTheirSessionHasTheBackspacesAndMarks() {
         type(nihao14)
@@ -93,7 +92,6 @@ class KeyboardPairTest {
         assertEquals(2, keyed!!.actions.count { it is Action.Backspace })
         assertTrue(keyed!!.actions.last().let { it is Action.Key && it.char == '，' })
         assertTrue(full.actions.toString(), full.actions.isEmpty())
-        // and full pinyin's after a hardware keyboard's word
         pair.onEvent(EngineEvent.CHAR, 'n'.code)
         pair.onEvent(EngineEvent.CHAR, ' '.code)
         keyed!!.actions.clear()
@@ -102,7 +100,6 @@ class KeyboardPairTest {
         assertTrue(keyed!!.actions.isEmpty())
     }
 
-    // review S3: a hardware digit while the 14 keys type picks, as in full pinyin
     @Test
     fun aDigitWhileTheFourteenKeysTypePicks() {
         type(nihao14)
@@ -111,7 +108,6 @@ class KeyboardPairTest {
         assertTrue(one.handled)
     }
 
-    // review N2: a syllable of a strip gone stale, full pinyin typing, takes nothing and commits nothing
     @Test
     fun aStaleSyllableWhileFullPinyinTypesIsSwallowed() {
         val s = type(nihao14.take(2))
@@ -126,12 +122,10 @@ class KeyboardPairTest {
     @Test
     fun whileTypingOtherKeysGoToTheOneTypingButLettersToFullPinyin() {
         type(nihao14)
-        // the 14 keys' Escape drops what they typed
         val escaped = pair.onEvent(EngineEvent.ESCAPE, 0)
         assertTrue(escaped.handled)
         assertEquals("", escaped.preedit)
         type(nihao14)
-        // a keypad digit (a swipe) picks
         assertEquals("你好", pair.onEvent(EngineEvent.KEYPAD, '1'.code).commit)
         type(nihao14)
         val letter = pair.onEvent(EngineEvent.CHAR, 'w'.code)
@@ -146,13 +140,12 @@ class KeyboardPairTest {
         type(nihao14)
         full.actions.clear()
         val w = pair.onEvent(EngineEvent.CHAR, 'w'.code)
-        // review S2: both reset, as for text another wrote: the one left after its Enter, the other before its key
+        // both reset, as for text another wrote: the one left after its Enter, the other before its key
         assertTrue(keyed!!.actions.takeLast(2).let { it[0] is Action.CommitRaw && it[1] is Action.Reset })
         assertTrue(full.actions.toString(), full.actions[0] is Action.Reset && full.actions[1] is Action.Key)
         assertEquals("nihao", w.commit)
         assertTrue(w.commit.none(NineKeyLetters.G14::isCode))
         assertTrue(w.handled)
-        // and back: full pinyin's w kept as typed
         val b = pair.onEvent(EngineEvent.CHAR, g14Code('b').code)
         assertEquals("w", b.commit)
         assertTrue(pair.keyedActive)
@@ -162,7 +155,6 @@ class KeyboardPairTest {
     fun aResetAndAContextReachBothTheFourteenKeysMadeLaterToo() {
         pair.context("我", learning = true)
         type(nihao14.take(1))
-        // made after the context: told it all the same
         assertTrue(keyed!!.actions.first() is Action.Context)
         assertEquals("我", (keyed!!.actions.first() as Action.Context).before)
         pair.onEvent(EngineEvent.RESET, 0)
@@ -171,12 +163,9 @@ class KeyboardPairTest {
         full.actions.clear()
         pair.context("你", learning = true)
         assertTrue(full.actions.single() is Action.Context && keyed!!.actions.last() is Action.Context)
-        // only the active one's offers
         assertFalse((full.actions.single() as Action.Context).offers)
     }
 
-    // 060-render-p3 T9b review M1: a keyed session dropped alone (a layout's own groups told anew) is made again at
-    // its next code, told the last context as one made later
     @Test
     fun aKeyedSessionDroppedAloneIsMadeAgainToldTheLastContext() {
         pair.context("我", learning = true)
@@ -190,7 +179,6 @@ class KeyboardPairTest {
         assertEquals("我", (keyed!!.actions.first() as Action.Context).before)
     }
 
-    // review S2: a context made old by a commit is not told to the 14 keys' session made after it
     @Test
     fun aContextACommitMadeOldIsNotToldToTheFourteenKeysMadeAfter() {
         pair.context("今天", learning = true)
@@ -204,7 +192,6 @@ class KeyboardPairTest {
     fun mergedPutsTheDeletionFirstOnWhatWasCommitted() {
         fun snap(commit: String, delete: Int) = KeyboardPair.NOTHING.copy(commit = commit, deleteBefore = delete)
         assertEquals(snap("ab" + "x", 1), KeyboardPair.merged(snap("abc", 1), snap("x", 1)))
-        // deleting past what was committed deletes on before it
         assertEquals(snap("x", 3), KeyboardPair.merged(snap("ab", 1), snap("x", 4)))
     }
 
@@ -267,8 +254,7 @@ class KeyboardPairTest {
         assertTrue(keyed!!.actions.none { it is Action.Glide })
     }
 
-    // a session that offers 联想 for a context: the pair's Escape must see what the context left on the
-    // 14 keys' keyboard, whose own Escape with nothing shown is swallowed
+    // the pair's Escape must see what the context left on the 14 keys, whose own Escape with nothing shown is swallowed
     private class Associating : Session {
         override var learning = true
         private val shown = mutableListOf<String>()
@@ -293,7 +279,6 @@ class KeyboardPairTest {
         val closed = associating.onEvent(EngineEvent.ESCAPE, 0)
         assertTrue(closed.handled)
         assertTrue(closed.candidates.isEmpty())
-        // with them closed the next is the app's
         assertFalse(associating.onEvent(EngineEvent.ESCAPE, 0).handled)
     }
 }

@@ -22,15 +22,12 @@ class TypedKeysTest {
         val keys = TypedKeys()
         keys.insert(0, 'd', at(0.1f))
         keys.insert(1, 't', null)
-        // dt, then o put in between, then the apostrophe: do't
         keys.insert(1, 'o', at(0.3f))
         keys.insert(2, '\'', null)
         assertEquals("do't", keys.toString())
-        // the apostrophe no key of the decoder's
         assertArrayEquals(arrayOf(at(0.1f), at(0.3f), null), keys.keyTouches())
         keys.deleteAt(0)
         assertArrayEquals(arrayOf(at(0.3f), null), keys.keyTouches())
-        // put back as typed: no place
         keys.set("hello")
         assertEquals("hello", keys.toString())
         assertNull(keys.keyTouches())
@@ -59,7 +56,6 @@ class TypedKeysTest {
         val keys = TypedKeys()
         keys.append('4', upper = false, touch = null)
         keys.append('3', upper = true, touch = null)
-        // the 4 taken out: the shifted 3 is now the first
         keys.deleteAt(0)
         assertEquals("3", keys.toString())
         assertEquals(listOf(0), keys.upper.stream().toArray().toList())
@@ -67,7 +63,6 @@ class TypedKeysTest {
         keys.insert(0, '9', null)
         assertEquals("93", keys.toString())
         assertEquals(listOf(1), keys.upper.stream().toArray().toList())
-        // put back as a word: no Shift left from the keys before
         keys.set("hi")
         assertTrue(keys.upper.isEmpty)
     }

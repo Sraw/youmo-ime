@@ -25,7 +25,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** 外观 → 大小与样式's 竖屏键盘样式 and 横屏键盘样式 (061-wide-keyboard-style §2.3), upright on a phone. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -48,7 +47,6 @@ class KeyboardStyleSettingsUatTest {
         tab(1)
     }
 
-    // picked in its dialog: the dialog's own calls
     private fun ListPreference.pick(style: KeyboardStyle) {
         val v = style.ordinal.toString()
         if (callChangeListener(v)) value = v
@@ -62,9 +60,7 @@ class KeyboardStyleSettingsUatTest {
         val titles = st.titles()
         assertTrue(titles.toString(), s(R.string.keyboard_style_portrait) in titles && s(R.string.keyboard_style_landscape) in titles)
         assertFalse(titles.toString(), s(R.string.one_handed) in titles || s(R.string.floating_keyboard) in titles)
-        // both 普通: of no use
         assertFalse(st.pref(R.string.split_dock).isEnabled)
-        // turned split, then floating over it: docked back down it splits, so of use
         val turned = st.pref(R.string.keyboard_style_landscape) as ListPreference
         turned.pick(KeyboardStyle.SPLIT)
         turned.pick(KeyboardStyle.FLOATING)
@@ -74,8 +70,7 @@ class KeyboardStyleSettingsUatTest {
         assertTrue(st.pref(R.string.split_dock).isEnabled)
     }
 
-    // not set: as this phone turned shows it, 851 dp wide, split; the page opened stores nothing (a style not
-    // set stays so, by the width); picked as it is, stored
+    // not set: split as this phone turned shows it; the page opened stores nothing; picked as it is, stored
     @Test
     @Uat("ST-140")
     fun notSetShowsTheTurnedScreensOwn() {
@@ -92,7 +87,6 @@ class KeyboardStyleSettingsUatTest {
         assertEquals("", store.keyboardStylePortrait.getValue())
     }
 
-    // the keyboard's toggle while the page is open (floating from the turned keyboard): the list shows it
     @Test
     @Uat("ST-140")
     fun aStyleChangedFromTheKeyboardShowsAtOnce() {

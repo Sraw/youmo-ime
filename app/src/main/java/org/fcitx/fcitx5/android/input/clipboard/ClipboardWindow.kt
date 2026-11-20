@@ -77,7 +77,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
 
     private val loadStateListener: (CombinedLoadStates) -> Unit = {
         // not while a load is under way: its append is not at the end only because no page is in yet, which taken for
-        // a list turned the empty history's hint into the bar's clear button over no rows till Room's query came back
+        // a list turned the empty history's hint into the clear button over no rows till Room's query came back
         if (it.refresh !is LoadState.Loading) {
             val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
@@ -175,7 +175,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
                 clipboardEnabledPref.setValue(true)
             }
             deleteAllButton.setOnClickListener {
-                // the view's scope, cancelled on detach: the menu it shows is anchored to this view
+                // the menu it shows is anchored to this view
                 promptJob?.cancel()
                 promptJob = imeScope.launch {
                     promptDeleteAll(ClipboardManager.haveUnpinned())
@@ -234,7 +234,6 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>(), Inpu
         stateMachine = ClipboardStateMachine.new(initialState, isEmpty, isListening) {
             ui.switchUiByState(it)
         }
-        // manually switch to initial ui
         ui.switchUiByState(initialState)
         adapter.addLoadStateListener(loadStateListener)
         adapterSubmitJob = imeScope.launch {

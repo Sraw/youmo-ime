@@ -109,8 +109,7 @@ def fab(d):
     if not n:
         raise Blocked(f"没有 + 按钮：{s.texts()[:6]}")
     d.tap(n.c, 0.3)
-    # the dialog's fields, not a fixed pause: on a busy host 1.2 s was too short (VO-10's
-    # IndexError on edits(d)[0])
+    # the dialog's fields, not a fixed pause: on a busy host 1.2 s was too short
     d.wait(lambda s: edits(d, s), 10, step=0.2, what="the add dialog's fields")
 
 
@@ -210,8 +209,7 @@ def show_hidden(d):
 
 def pick_in_download(d, name, after=1.0):
     """the file picker, open: name in 下载 tapped, then after seconds"""
-    # a package the picker has not served yet opens in 最近 (the release build after the debug one
-    # had used it): go to 下载 through the roots drawer
+    # a package the picker has not served yet opens in 最近: go to 下载 through the roots drawer
     s = d.screen()
     if s.find(text="近期的文件"):
         to_downloads(d, s)
@@ -239,8 +237,7 @@ def import_file(d, name, target=None):
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出文件选择：{d.top_activity()}")
     pick_in_download(d, name)
-    # the whole file is read before the dialog (D6): a large one takes seconds; one refused shows
-    # 格式不支持 instead, its message returned with no choice
+    # the whole file is read before the dialog, a large one in seconds; one refused shows 格式不支持
     s = d.wait(lambda x: progress_seen(d, x) or (x if any(m.cls == "CheckedTextView" or m.rid == "message" for m in x.nodes) else None),
                timeout=180, step=1.0, what="并入哪个词库或格式提示")
     opts = [n for n in s.nodes if n.cls == "CheckedTextView"]
@@ -282,10 +279,6 @@ def dictionaries(d):
     return t[t.index("基础词库") + 1:t.index("导入")]
 
 
-# ---------------------------------------------------------------- user lexicon
-
-
-case("WD-02", needs="jvm:SettingsUatTest.aBlankPinyinIsFilledIn")(lambda d: None)
 
 
 @case("WD-03", base="B0-设置", mutates=True)
@@ -344,28 +337,6 @@ def wd03(d):
     return f"词数 {n0} → {n1}；鲸喵屿 第一、整句 {js[:1]}；编辑后第一个是它；删除后候选 {c[:2]}"
 
 
-case("WD-06", needs="jvm:LexiconUatTest.aWordBlockedInTheSettingsIsNoCandidate")(lambda d: None)
-
-
-case("WD-07", needs="jvm:LexiconUatTest.aBlockedWordRestoredIsBack")(lambda d: None)
-
-
-case("WD-08", needs="jvm:LexiconUatTest.aLearnedWordDeletedIsGone")(lambda d: None)
-
-
-case("WD-09", needs="jvm:LexiconUatTest.aWordListImportedIntoTheUserDictionary")(lambda d: None)
-
-
-case("WD-09b", needs="jvm:LexiconUatTest.aThousandWordsImportedIntoTheUserDictionary")(lambda d: None)
-
-
-case("WD-10", needs="jvm:LexiconUatTest.anExportImportedElsewhereHasTheAddedBlockedAndLearned")(lambda d: None)
-
-
-case("WD-10a", needs="jvm:LexiconUatTest.aBackupKeepsTheImportedBatch")(lambda d: None)
-
-
-# ---------------------------------------------------------------- imported dictionaries
 
 def import_dict_words(d):
     push(d, "dict-words.txt")
@@ -374,22 +345,6 @@ def import_dict_words(d):
     if not any("dict-words" in r for r in rows):
         raise Blocked(f"前提没到：基础词库一节 {rows}")
     return rows
-
-
-case("WD-11", needs="jvm:DictionaryUatTest.aTextDictionaryIntoTheBase")(lambda d: None)
-
-
-case("WD-13", needs="jvm:DictionaryUatTest.turnedOffThenDeleted")(lambda d: None)
-
-
-case("WD-14b", needs="jvm:LexiconUatTest.aDictFileIntoTheUserDictionaryRanksBecomesYoursDroppedAndUndone")(lambda d: None)
-
-
-case("WD-14z", needs="jvm:LexiconUatTest.aScelFileIntoTheUserDictionaryIsImportedWords")(lambda d: None)
-
-
-case("WD-14z2", needs="jvm:BaseDictionaryUpgradeUatTest.aScelFileIntoTheBaseIsConvertedAndMerged")(lambda d: None)
-case("WD-14z3", needs="jvm:PinyinDictManagerTest.aBinaryDictionaryPastItsCapIsRefusedAsItIsCopied")(lambda d: None)
 
 
 def title_of(s):
@@ -417,8 +372,7 @@ def heaps(d, n=5):
     return out
 
 
-# how far the Java heap may rise over a case's own reading with no large dictionary: frost held
-# whole on the heap was ~150 MB more (the OOM this guards), compiled and mapped it is a few MB
+# how far the Java heap may rise with a large dictionary: compiled and mapped it is a few MB, held whole it was ~150 MB
 HEAP_RISE_KB = 64 << 10
 
 
@@ -512,15 +466,6 @@ def wd14d(d):
     return f"目录 {sizes}；读 {read:.0f} s；标题 {title.splitlines()[-1]!r}；进度 {seen[:2]}…{seen[-1:]}；Java 堆 {base} → {heap} KB；abazhou {c[:3]}；gennishuo {words(g)[:3]}"
 
 
-case("WD-14e", needs="jvm:DictionaryUatTest.aRimeDictionaryKnownAndImported")(lambda d: None)
-
-
-case("WD-14f", needs="jvm:DictionaryUatTest.aFileNotSurelyReadIsRefusedWithWhy")(lambda d: None)
-
-
-case("WD-14g", needs="jvm:DictionaryUatTest.pastAHundredThousandWordsIsNoImportForTheUser")(lambda d: None)
-
-
 @case("WD-14h", base="B0-设置", mutates=True, heavy=True,
       needs="release,scripted:发版时用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def wd14h(d):
@@ -535,8 +480,7 @@ def wd14h(d):
     host_data = f"/data/data/{PKG}/files/host-data"
     d.root(f"mkdir -p {dicts} && chown -R $(stat -c %u:%g /data/data/{PKG}) {host_data} && restorecon -R {host_data}; "
            f"rm -f {dicts}/merged.ymd")
-    # no touch to an old mtime any more: a .txt an older version left is converted, an upgrade by
-    # itself (SourceNames.unconverted)
+    # a .txt an older version left is converted by itself (SourceNames.unconverted)
     put_dict(d, src, "frost.txt", timeout=300)
     # one 0.3.1 kept turned off: listed off, not compiled
     with tempfile.TemporaryDirectory() as tmp:
@@ -548,9 +492,7 @@ def wd14h(d):
     d.switch_im("拼音")
     early = page_cands(d, "nihao")
     d.clear()
-    # the idle bar says how far the upgrade is, typing going on meanwhile; then the notice. A
-    # release build compiles frost in ~20 s, done (the 1 s notice gone) before a slow dump looks:
-    # what was caught is reported, the end state is what is checked (the file, the compile's log, its words)
+    # the 1 s notice may be gone before a slow dump looks: what was caught is reported, the end state is checked
     d.open_page("text")
     caught = []
 
@@ -593,70 +535,9 @@ def wd14h(d):
     return f"合成前 nihao {words(early)[:2]}；空闲栏 {bar!r}；提示 {'看到' if said else '没赶上'}；合成 {compiled.group(1) if compiled else None} 词；目录 {files}；Java 堆 {base} → {heap} KB；abazhou {c[:3]}；gennishuo {words(g)[:3]}"
 
 
-case("WD-14i", needs="jvm:DictionaryUatTest.aCancelledImportChangesNothing")(lambda d: None)
+case("WD-14v", needs="release:这一版正式版并入雾凇拼音后备份，卸载装 v0.3.2 正式版恢复")(lambda d: None)
 
 
-case("WD-14j", needs="jvm:DictionaryUatTest.turnedOffOnAndDeleted")(lambda d: None)
-
-
-case("WD-14j2", needs="jvm:DictionaryUatTest.anotherTurnedOffWhileABigOneCompiles")(lambda d: None)
-
-
-case("WD-14r", needs="release:v0.3.2 正式版里并入雾凇拼音，再覆盖安装这一版正式版，签名要一致")(lambda d: None)
-
-
-case("WD-14v", needs="release:WD-14r 之后装回 v0.3.2 正式版（adb install -r -d），再装回这一版正式版")(lambda d: None)
-
-
-case("WD-14s", needs="jvm:DictionaryUatTest.anUpgradeKilledAsItConvertsIsFinishedAtTheNextStart")(lambda d: None)
-
-
-case("WD-14s2", needs="jvm:DictionaryUatTest.anUpgradeKilledAfterItsConversionIsStillAnUpgrade")(lambda d: None)
-
-
-case("WD-14t", needs="jvm:DictionaryUatTest.turnedOffAndDeletedAsTheyConvert")(lambda d: None)
-
-
-case("WD-14w", needs="jvm:DictionaryUatTest.anImportWhileAnUpgradeConverts")(lambda d: None)
-
-
-case("WD-14t2", needs="jvm:DictionaryUatTest.aTextLeftAfterAnUpgradeIsDeletedNotConvertedAgain")(lambda d: None)
-
-
-case("WD-14x", needs="jvm:DictionaryUatTest.aDamagedFileIsSkippedTheRestMerged")(lambda d: None)
-
-
-case("WD-14x2", needs="jvm:DictionaryUatTest.aFileDamagedHalfwayGivesWhatWasReadBefore")(lambda d: None)
-
-
-case("WD-14y", needs="jvm:DictionaryUatTest.aTextNotConvertedForSpaceIsKeptTillThereIsRoom")(lambda d: None)
-
-
-case("WD-14u", needs="jvm:BackupUatTest.a032BackupOnAFreshInstallBringsItsDictionaryWithoutThePage")(lambda d: None)
-
-
-case("WD-14k", needs="jvm:DictionaryUatTest.theThirdColumnRanksAsItIsRead")(lambda d: None)
-
-
-case("WD-14l", needs="jvm:DictionaryUatTest.aBinaryFileRefusedPinyinFirstRunTogetherRead")(lambda d: None)
-
-
-case("WD-14m", needs="jvm:DictionaryUatTest.aNameInTheBaseAlreadyAsksForTheUser")(lambda d: None)
-
-
-case("WD-14n", needs="jvm:DictionaryUatTest.rimesPercentWeightsImported")(lambda d: None)
-
-
-case("WD-14o", needs="jvm:DictionaryUatTest.theUsersCapCountsWhatWasImportedBefore")(lambda d: None)
-
-
-case("WD-14p", needs="jvm:DictionaryUatTest.utf8TraditionalInBig5Not")(lambda d: None)
-
-
-case("WD-14q", needs="jvm:DictionaryUatTest.wordsWithoutPinyinApartTooManyNotForTheBase、DictionaryUatTest.wordsAloneGuessedAreCountedAndTheBaseTakesThem")(lambda d: None)
-
-
-# ---------------------------------------------------------------- phrases
 
 def add_phrase(d, key, parts, order="1"):
     """自定义短语 → +: 输入码 key, 候选位置 order, 短语 typed from parts: ("cn", word) |
@@ -693,31 +574,6 @@ def dz(d):
         raise Blocked(f"短语框里打出 {got}")
 
 
-case("WD-16", needs="jvm:LexiconUatTest.aPhraseOfTwoLines")(lambda d: None)
-
-
-case("WD-18", needs="jvm:WordsUatTest.aCustomPhraseAddedNotMovedByLearningEditedDeleted、SettingsPagesUatTest.aCustomPhraseAddedEditedOnItsRowAndDeleted")(lambda d: None)
-
-
-case("WD-19", needs="jvm:LexiconUatTest.aPhraseOnEveryKeyboard、EnglishPhrasesTest.wherePhrasesGo")(lambda d: None)
-
-
-# ---------------------------------------------------------------- the user lexicon's pages
-
-
-case("WD-21", needs="jvm:SettingsPagesUatTest.theUsersWordsListsCountsAndDays")(lambda d: None)
-
-
-case("WD-22", needs="jvm:LexiconUatTest.aPinUndoneInOneStep")(lambda d: None)
-
-
-case("WD-33", needs="jvm:LexiconUatTest.aPhraseAlreadyBeforeDoesNotMoveTheNextUp")(lambda d: None)
-
-
-case("WD-35", needs="jvm:SettingsPagesUatTest.aCustomPhraseAddedEditedOnItsRowAndDeleted")(lambda d: None)
-
-
-case("WD-36", needs="jvm:TablePhraseOnlyCodeTest.aKeyThatEndsTheCodeCommitsNoPhrase、TablePhraseOnlyCodeTest.aTapTakesThePhrase")(lambda d: None)
 
 
 def phrase_menu(d, item):
@@ -743,13 +599,11 @@ def wd37(d):
     push(d, "phrases.txt")
     d.step("导入")
     phrase_menu(d, "导入")
-    # since 13c01a731 the import says its count on the one undo bar (a Snackbar, in the dump), no
-    # 已添加 bar and no toast
+    # the import says its count on the one undo bar (a Snackbar), no toast
     pick_in_download(d, "phrases.txt", after=0.1)
     bar = d.wait(lambda x: x if x.find(contains="导入了 1 条短语") else None, timeout=5, step=0.2,
                  what="提示条「导入了 1 条短语」")
-    # the bar is up 2.75 s (LENGTH_LONG): the list read off the screen the wait returned (two phrases, one
-    # screen), 撤销 tapped at once; its picture is taken at the second import, raced by nothing (R27 F8547)
+    # the bar is up 2.75 s: the list read off the screen the wait returned, 撤销 tapped at once
     shown = bar.texts()
     undo = bar.find(text="撤销")
     check(not bar.find(contains="已添加"), f"没有「已添加」：{shown}")
@@ -803,23 +657,11 @@ def wd37(d):
         check("dz,1=北京市海淀区" in text and "sh,1=上海" in text, f"导出的 {new[0]}：{text[:120]!r}")
 
 
-# ---------------------------------------------------------------- R11: 清空学到的 / 全部清空
 
 case("WD-25", needs="jvm:LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll、WordListsTest.aClearEmptiesTheListsAndTheLinesThatDoNotRead、"
      "EnginesLearningTest.aClearOfEverythingEmptiesTheWordListsOfTheLinesThisBuildDoesNotRead、WordListsTest.aClearDeletesAListThatDidNotRead")(lambda d: None)
 
 
-case("WD-30", needs="jvm:SettingsPagesUatTest.searchDeleteSeveralAndTakeThemBack")(lambda d: None)
-
-
-case("WD-38", needs="jvm:DictionaryFormatTest.aFewWordsAloneInAGbkFileWithPinyinRefuseNothing")(lambda d: None)
-
-
-case("WD-37a", needs="jvm:SettingsPagesUatTest.anImportFillsTheCustomPhrasesToTheirLimitAndSaysTheRest")(lambda d: None)
-case("WD-65", needs="jvm:ListPagesReadUatTest.openingTheCustomPhrasesOffersNoUndoOfThePhrasesRead、ListPagesReadUatTest.openingOrImportingTheCommonWordsOffersNoUndoThatDeletesThem")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 常用词 (060-common-words)
 
 def common_menu(d, item):
     """常用词 → ⋮ → item (导入 or 导出): the file picker, once the page has read its file"""
@@ -868,16 +710,6 @@ def wd39(d):
     d.clear()
 
 
-case("WD-40", needs="jvm:LexiconUatTest.aCommonWordOnTheNineAnd14KeysAndInShuangpin")(lambda d: None)
-
-
-case("WD-41", needs="jvm:LexiconUatTest.commonWordsOfOneKeyBeforeAPinNoneForAPart")(lambda d: None)
-
-
-case("WD-43", needs="jvm:CommonWordsPageUatTest.whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits")(lambda d: None)
-case("WD-44", needs="jvm:CommonWordsInSessionTest.aReplacementTwoWordsGiveDeletedFromTheKeyboardIsGoneFromBoth、CommonWordsTest.aReplacementTwoWordsGiveIsTakenOffBoth")(lambda d: None)
-
-
 @case("WD-42", base="B0-设置", mutates=True)
 def wd42(d):
     d.step("导入")
@@ -908,7 +740,6 @@ def wd42(d):
         check(text.startswith("# youmo-common-words 1\n") and "木字旁[mu'zi'pang]\t木\n" in text, f"导出的 {new[0]}：{text[:160]!r}")
 
 
-case("WD-45", needs="jvm:CommonWordsTest.replacementsAreKeptOnceNineAtMostTheWordItselfToo、CommonWordsInSessionTest.theWordItselfAsAReplacementGoesFirst")(lambda d: None)
 case("WD-46", needs="jvm:StatusAreaNotSavingTest.thePanelSaysLearningIsNotSavedOnlyWhileItIsNot、"
      "StatusAreaNotSavingTest.thePanelAsksOnlyWhetherLearningSavesNotTheOverview、"
      "UserWordsNotSavingTest.thePageSaysLearningIsNotSavedOnlyWhileItIsNot、"
@@ -944,14 +775,10 @@ case("WD-48", needs="jvm:WordListsTest.aListThatCannotBeWrittenIsKeptInMemory、
 case("WD-49", needs="manual:「打开方式」是系统文件应用的界面（从设备存储的 Download 打开）；在真机或模拟器上手工跑")(lambda d: None)
 
 
-case("WD-58", needs="jvm:VoiceAskUatTest.theSwitchOffAsksNothing、SettingsPagesUatTest.theUsersWordsListsCountsAndDays")(lambda d: None)
-
-
 case("WD-59", needs="jvm:EnginesVoiceEditsTest.a word typed again is asked about, added on 记住 and taken off on its 撤销、"
      "VoiceAskUatTest.aWordTypedAgainIsAskedAboutAndRememberedOnATap")(lambda d: None)
 
 
-# ---------------------------------------------------------------- 生僻字屏蔽 (061-rare-char-block)
 
 RARE = "生僻字屏蔽"
 RARE_SWITCH = "屏蔽生僻字"   # Android 10 reads a switch with its state after: 「屏蔽生僻字 关闭」
@@ -1036,7 +863,6 @@ def wd50(d):
     return f"关 {len(ext(before))} 个扩展区的；{row}：0 个；再关 {len(ext(off))} 个"
 
 
-case("WD-51", needs="jvm:RareCharsUatTest.byDefaultOnlyExtensionBIsHeld")(lambda d: None)
 case("WD-52", needs="jvm:RareCharsUatTest.theOtherOutOfTableHeldThenOneLetThrough、RareCharsPageUatTest.thePageHoldsBackAndLetsThrough、"
      "RareCharsPageUatTest.aDragHoldsBackARunAndOneUndoTakesItBack、RarePageTest.aDragSetsTheRangeToTheStartsOppositeAndLeavesTheRestAsTheyWere")(lambda d: None)
 case("WD-53", needs="jvm:RareCharsUatTest.wubiAutoCommitsTheOneLeftAndAgainChoosesOnceLetThrough、RareCharsUatTest.aWordWithAHeldCharacterIsNotOfferedNorPredicted、"
@@ -1070,7 +896,6 @@ def wd62(d):
     return f"{names}；{counts}"
 
 
-case("WD-63", needs="jvm:RareCharsCardsUatTest.theTitleBarsUndoTakesBackTheLastStepTillASave、RareCharsPageUatTest.thePageHoldsBackAndLetsThrough")(lambda d: None)
 case("WD-64", needs="jvm:RareCharsPageUatTest.fourCardsAndOffOnlyToLookAt、GroupCardTest.unusable, only the strip fades and stops, the body still opens、"
      "SettingsCardsTest.an unusable strip is dimmed and inert")(lambda d: None)
 
@@ -1080,8 +905,7 @@ def wd60(d):
     sw = rare_page(d)
 
     def heads(s):
-        # the groups' cards' strips in reading order (two rows of two): each one's name and box state, and the
-        # held of its 「已屏蔽 N/总数」
+        # the groups' cards in reading order: each one's name, box state and 「已屏蔽 N/总数」
         boxes = sorted((n for n in s.app() if n.cls == "CheckBox" and n.desc.startswith(GROUPS)), key=lambda n: (n.c[1], n.c[0]))
         held = sorted(((n.c[1], n.c[0]), int(m.group(1).replace(",", ""))) for n in s.app() if n.text
                       for m in [re.match(r"已屏蔽 ([\d,]+)/[\d,]+$", n.text)] if m)
@@ -1194,4 +1018,3 @@ def wd57(d):
     check(rare_note(s) == first_note, f"恢复默认后页顶：{rare_note(s)!r}，原来 {first_note!r}")
     check(any(n.text == "撤销" for n in s.app()), "恢复默认后底部没有「撤销」")
     return f"搜 da {len(found)} 格；{first_note.split(' · ')[0]}"
-

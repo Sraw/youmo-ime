@@ -92,7 +92,7 @@ class NumberPadTest {
 
     @Test
     fun theUsersNumberBoardIsShownForThePadsItIsForTheAppsForTheRest() {
-        // a board for 123's pad and the phone's (061-custom-layout §7, L5)
+        // a board for 123's pad and the phone's
         val mine = CustomChoice("my-num", "大数字", "number", "number", stamp = "1-2", pads = listOf("full", "phone"))
         val pad = FieldPad().apply { numbers = mine }
         val full = "Number|my-num@1-2"

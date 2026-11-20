@@ -23,8 +23,7 @@ class SetupFragment : Fragment() {
 
     private val page: SetupPage by lazy { requireArguments().serializable(PAGE)!! }
 
-    // 以前用过？从备份恢复 (U-106): the file picked and restored here, the settings not reached
-    // before the setup is done (review-E-ui M1); fcitx run for it alone, until the page goes
+    // a restore picked here, before the setup is done; fcitx run for it alone, until the page goes
     private var fcitx: HostConnection? = null
 
     // a name of this page's own: the page made anew connects before the old one goes and disconnects
@@ -64,7 +63,6 @@ class SetupFragment : Fragment() {
             // the icon sits where the button is: left visible it covered the button's text
             doneIcon.visibility = if (done) View.VISIBLE else View.GONE
             doneText.visibility = if (done) View.VISIBLE else View.GONE
-            // on the first page, where someone back from another phone starts
             restoreText.visibility = if (page == SetupPage.Enable) View.VISIBLE else View.GONE
             restoreText.setOnClickListener { pickBackup.launch(arrayOf("*/*")) }
         }

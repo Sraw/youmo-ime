@@ -26,11 +26,7 @@ import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.utils.lazyRoute
 
-/**
- * What the user did on purpose that the learning record keeps (U-80): the words pinned first
- * under keys (U-83), or the predictions turned off after a word (U-72). Tapped, one is taken off:
- * unpinned, or predicted again. A few dozen at most, so a page of preferences.
- */
+/** Pins and turned-off predictions the learning record keeps; tapping one undoes it. A few dozen at most, so a preference page. */
 class LearnedItemsFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
@@ -39,7 +35,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
 
     private val what by lazy { LearningOp.Listed.valueOf(args.what) }
 
-    // the input methods' names, a table's pin said under its own (review-E-ui N10)
+    // a table's pin is noted under its input method's name
     private var names = emptyMap<String, String>()
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -56,7 +52,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
         lifecycleScope.launch {
             val listed = viewModel.fcitx.runOnReady { learning(LearningOp.ListItems(what)) } as? LearningResult.Listed ?: return@launch
             val ctx = requireContext()
-            // as the list page names them (UserWordListFragment): translated, not fcitx's own
+            // as the list page names them: translated, not fcitx's own
             names = viewModel.fcitx.runOnReady { availableIme() }.associate { it.uniqueName to InputMethodNames.of(ctx, it) }
             val screen = preferenceScreen
             screen.removeAll()
@@ -82,7 +78,7 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
     }
 
     private fun detail(item: ListedItem): String {
-        // a whole phrase (U-73) is off everywhere, after no word
+        // a whole phrase is off everywhere, after no word
         val code = item.code ?: return if (item.prev.isEmpty()) getString(R.string.learning_no_predict_phrase_detail) else getString(R.string.learning_no_predict_detail, item.prev)
         val table = code.kind.takeIf { it.startsWith(TABLE) }?.let { names[it.removePrefix(TABLE)] }
         return getString(if (item.blocked) R.string.learning_table_blocked_detail else R.string.learning_pinned_detail, keys(code), table ?: label(requireContext(), code))
@@ -113,15 +109,13 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
         private val KEYS = Kinds.keys("")
 
         /**
-         * A pin's keys as the user reads them: a grouped keyboard's codes (private use, most fonts
-         * draw them blank, TalkBack reads nothing) as their letters, `bn ui`; a strokes block's
-         * (笔画查字) as the strokes, `一丨丿丶乛`, one of anything else (a hand-edited or damaged record)
-         * as stored; any other kind's as stored.
+         * As the user reads them: a grouped keyboard's private-use codes (blank in most fonts, unread by TalkBack) as letters,
+         * a strokes block's as strokes; anything else as stored.
          */
         fun keys(code: Code): String = if (code.kind == STROKES && code.keys.all { it in Strokes.KEYS }) Strokes.shown(code.keys)
             else Kinds.keysOf(code.kind)?.shown(code.keys) ?: code.keys
 
-        // a character blocked under the strokes typed (笔画查字), filed as a table's block is
+        // a character blocked under strokes typed (笔画查字), filed as a table's block
         private val STROKES = Kinds.table(StrokeLookup.BLOCK_TABLE)
 
         fun title(what: LearningOp.Listed) = when (what) {
@@ -130,30 +124,26 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
             LearningOp.Listed.TABLE_BLOCKS -> R.string.my_words_table_blocked
         }
 
-        /**
-         * [kind]'s name, and a 双拼 pin's scheme after it (`双拼 18 键 · 自然码`), on any keyboard: its
-         * keys read other syllables under each scheme, so two pins of the same keys are told apart.
-         */
+        /** A 双拼 pin's scheme follows (`双拼 18 键 · 自然码`): the same keys read other syllables under each scheme. */
         fun label(context: Context, code: Code): String {
             val kind = context.getString(kind(code))
             val scheme = Kinds.shuangpinScheme(code.kind)?.let { ShuangpinNames.of(context, it) }
             return if (scheme == null) kind else context.getString(R.string.learning_kind_with_scheme, kind, scheme)
         }
 
-        /** The keyboard a pin's [code] is of, as the user knows it. */
         fun kind(code: Code) = when {
             code.kind == Kinds.FULL -> R.string.learning_kind_full
             code.kind == Kinds.HANDWRITING -> R.string.learning_kind_handwriting
             code.kind == STROKES -> R.string.learning_kind_strokes
             code.kind.startsWith(Kinds.shuangpin("")) -> R.string.learning_kind_shuangpin
-            // the keyboard from the kind's tag; its scheme said by [label]
+            // the scheme is said by [label]
             Kinds.isShuangpin(code.kind) -> when (Kinds.keysTag(code.kind)) {
                 NineKeyLetters.NINE_SP.tag() -> R.string.learning_kind_shuangpin_nine
                 NineKeyLetters.G14.tag() -> R.string.learning_kind_shuangpin_keys14
                 else -> R.string.learning_kind_shuangpin_keys18
             }
             code.kind.startsWith(Kinds.nineKeys("")) || code.kind.startsWith(Kinds.nineKeysMultiTap("")) -> R.string.learning_kind_nine_keys
-            // pinyin's 18 keys and 14 keys, by the kind's tag (I1); a theme's keys of its own groups (060-render-p3 T9b)
+            // pinyin's 18 and 14 keys by tag; a theme's own groups
             code.kind.startsWith(KEYS) -> when (Kinds.keysOf(code.kind)) {
                 NineKeyLetters.G18 -> R.string.learning_kind_keys18
                 NineKeyLetters.G14 -> R.string.learning_kind_keys14

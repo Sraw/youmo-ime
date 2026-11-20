@@ -72,7 +72,6 @@ class ToneTableTest {
         val d = data()
         assertEquals(t(4, 4), d.tonesOf("爱好", "ai hao"))
         assertEquals(t(3, 2), d.tonesOf("好人", "hao ren"))
-        // the user's word, not in the data: by its characters
         assertEquals(t(4, 3), d.tonesOf("爱好", "ai hao", known = false))
     }
 
@@ -88,20 +87,16 @@ class ToneTableTest {
     @Uat("PY-110")
     fun aWordsNeutralToneIsItsCharactersOwn() {
         val d = data()
-        // listed dōng xi and zhuō zi: read in 西's and 子's own tones (the user, 2026-11-02)
         assertEquals(t(1, 1), d.tonesOf("东西", "dong xi"))
         assertEquals(t(1, 3), d.tonesOf("桌子", "zhuo zi"))
-        // typed: in its own tone and, as a word reads it, with ˙ (the user, 2026-11-02); not in another
+        // typed: in its own tone and, as a word reads it, with ˙; not in another
         for ((c, syllable, own) in listOf(Triple('子', "zi", 3), Triple('西', "xi", 1))) {
             assertTrue("$c ˙", d.tones.allows(c.code, Syllables.id(syllable), ToneMark.NEUTRAL))
             assertTrue("$c $own", d.tones.allows(c.code, Syllables.id(syllable), own))
             assertFalse("$c 2", d.tones.allows(c.code, Syllables.id(syllable), 2))
         }
-        // no word reads 好 neutral: ˙ is not its tone
         assertFalse(d.tones.allows('好'.code, Syllables.id("hao"), ToneMark.NEUTRAL))
-        // 们 has no tone but the neutral one: kept
         assertEquals(t(3, ToneMark.NEUTRAL), d.tonesOf("我们", "wo men"))
-        // a curated one is no different
         assertEquals(t(1, 1), data("东西\tdōng xi\t2026-11-02\ttest\n").tonesOf("东西", "dong xi"))
     }
 

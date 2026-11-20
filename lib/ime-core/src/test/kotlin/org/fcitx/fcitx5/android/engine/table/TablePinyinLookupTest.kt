@@ -20,10 +20,7 @@ import org.junit.Test
 /** A tap in the preedit while a table looks a character up by pinyin: the preedit and its cursor are the pinyin's. */
 class TablePinyinLookupTest {
 
-    /**
-     * Shows what it is typed, 我 for wo; keys go in at its cursor and backspace deletes before it,
-     * Enter gives the keys as it has them, as PinyinSession does; records every action.
-     */
+    /** Shows what is typed (我 for wo), edits at its cursor as PinyinSession does, Enter gives the keys; records every action. */
     private class Pinyin : Session {
         val actions = ArrayList<Action>()
         private val typed = StringBuilder()
@@ -69,7 +66,6 @@ class TablePinyinLookupTest {
         assertTrue(tapped.handled)
         assertEquals(1, tapped.cursor)
         assertEquals(listOf(Action.Cursor(1)), pinyin.actions.filterIsInstance<Action.Cursor>())
-        // the pinyin key alone typed: nothing to put the cursor in
         t.apply(Action.Reset)
         val (_, z) = t.type("z")
         assertEquals(z, t.apply(Action.Cursor(0)))
@@ -93,14 +89,12 @@ class TablePinyinLookupTest {
         assertEquals("nwo", t.apply(Action.Key('n')).preedit)
         // as many keys as the pinyin's, not in the order typed: nothing picked
         assertEquals("znwo", t.apply(Action.CommitRaw).commit)
-        // a key the app takes commits them so too
         t.type("zwo")
         t.apply(Action.Cursor(0))
         t.apply(Action.Key('n'))
         val comma = t.apply(Action.Key(','))
         assertEquals("znwo", comma.commit)
         assertFalse(comma.handled)
-        // one deleted in the middle
         t.type("zwo")
         t.apply(Action.Cursor(1))
         assertEquals("o", t.apply(Action.Backspace).preedit)
@@ -115,7 +109,6 @@ class TablePinyinLookupTest {
         t.apply(Action.Cursor(0))
         t.apply(Action.Key('n'))
         assertEquals("znwo", t.apply(Action.CommitRaw).commit)
-        // one deleted in the middle
         t.type("zwo")
         t.apply(Action.Cursor(1))
         t.apply(Action.Backspace)

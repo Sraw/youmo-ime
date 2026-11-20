@@ -33,14 +33,12 @@ class PinyinSessionRefineTest {
         val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20, refiner = refiner) { _, _, _ -> 0 }
         val typed = session.type("nizai")
         assertTrue(typed.refines)
-        // slices that pick nothing leave it as it was
         repeat(2) { assertEquals(typed, session.apply(Action.Refine)) }
         val refined = session.apply(Action.Refine)
         assertFalse(refined.refines)
         assertNotEquals(typed.candidates[0], refined.candidates[0])
         assertEquals(typed.candidates.toSet(), refined.candidates.toSet())
         assertEquals(List(3) { PinyinSession.REFINE_BUDGET }, budgets)
-        // done: nothing more asked of it
         assertEquals(refined, session.apply(Action.Refine))
         assertEquals(3, budgets.size)
         // any other action drops what was left: the refiner weighs the first page as last read
@@ -84,15 +82,10 @@ class PinyinSessionRefineTest {
             assertTrue(slices <= SentenceRefiner.SLICES + 1)
         }
         assertEquals(SentenceRefiner.SLICES, asked)
-        // the next input gets its own
         assertTrue(session.type("ma").refines)
     }
 
-    /**
-     * Keeps its work as [org.fcitx.fcitx5.android.engine.rerank.Reranker]'s scorer does: a unit for
-     * each start of a reading, [budget] of them a call, kept for later calls; all done, the last
-     * reading is its pick. [slices] few, for an input's work to pass them.
-     */
+    /** Keeps its work as the Reranker's scorer does: [budget] units a call, the last reading its pick. */
     private class KeepingRefiner(override val slices: Int) : SentenceRefiner {
         private val done = HashSet<String>()
 
@@ -112,8 +105,7 @@ class PinyinSessionRefineTest {
 
     @Test
     fun slicesBetweenKeysAreReusedAtThePauseSoTheTapPaceMayChangeTheResult() {
-        // DECISIONS.md 2026-10-25 (r2-7560): the pause goes on from work slices between keys did, its
-        // slices capped; typed with no slice between keys, the same input may give up where slow typing picks
+        // with no slice between keys the same input may give up where slow typing picks
         fun typed(slow: Boolean): Snapshot {
             val session = PinyinSession(data, PinyinSegmenter(), refiner = KeepingRefiner(slices = 6)) { _, _, _ -> 0 }
             for (c in "nizaima") {

@@ -10,35 +10,23 @@ import java.util.concurrent.Executor
 import org.fcitx.fcitx5.android.engine.platform.jvm.replaceFile
 
 /**
- * The host's config files written off its thread, merged: each [write] says a file changed and how
- * to make its text, and [executor] (one background thread) writes every file once with the latest
- * text, however many changes came before it ran. So a state change (繁體 on, the default input
- * method) is on disk shortly after it happens, not only when a settings page closes: native fcitx
- * saved such state at `MainActivity.onStop`, and a process killed from the keyboard lost it.
- *
- * Not [writable] (direct boot, before the user unlocks: `filesDir`, not the user's files; or a config
- * whose place is not settled, [ConfigHome.Problem.EXTERNAL_AWAY]) nothing is ever written, [flush]
- * included; the process is stopped at unlock and the next one reads the user's. A file [hold] names
- * is not written either: one there that could not be read, which the defaults in its place must not
- * replace.
+ * Config files written off the host thread, merged: each file once with its latest text, soon after a state change
+ * (native fcitx saved at `MainActivity.onStop`, and a process killed from the keyboard lost it). Not [writable]
+ * (direct boot, or [ConfigHome.Problem.EXTERNAL_AWAY]) nothing is written; a [hold]ed file (one that could not be
+ * read) is not either, so defaults never replace it.
  */
 class ConfigWriter(
     val writable: Boolean,
     private val executor: Executor,
-    /** Writes [text] to [path], whether it is on disk now: a failed write (a full disk) is not. */
+    /** False when not on disk (a full disk). */
     private val sink: (path: String, text: String) -> Boolean,
 ) {
     private val pending = LinkedHashMap<String, () -> String>()
-    // what is to run once a write of the path is on disk ([write]'s landed)
     private val landing = HashMap<String, MutableList<() -> Unit>>()
     private val held = HashSet<String>()
     private var scheduled = false
 
-    /**
-     * [path] is not written from now on, what is pending for it dropped. A write [drain] has already
-     * begun for it still lands: held between drain's check and its sink, the text is the one read
-     * before, not a default.
-     */
+    /** A write [drain] already began still lands, with the text read before, not a default. */
     fun hold(path: String) {
         synchronized(this) {
             held += path
@@ -48,21 +36,12 @@ class ConfigWriter(
         }
     }
 
-    /**
-     * [path] written again: it read back since [hold] (a reload), or is found not there at all, so what
-     * the host holds of it is the file's (or the defaults a missing file means). Never released, it
-     * stays held for the rest of the process.
-     */
+    /** It read back since [hold], or is not there at all; never released, held for the rest of the process. */
     fun release(path: String) {
         synchronized(this) { held -= path }
     }
 
-    /**
-     * [path] (under the config home, `conf/chttrans.conf`) is to hold [text]'s text, made when it is
-     * written. [landed] runs on the writer's thread once a write of [path] is on disk, this one or a
-     * later one merged into it: never if none lands (held, not [writable], the write failed), so what
-     * it settles is settled only by the file.
-     */
+    /** [landed] runs on the writer's thread once a write of [path] (this or a later merged one) is on disk; never if none lands. */
     fun write(path: String, landed: (() -> Unit)? = null, text: () -> String) {
         if (!writable) return
         val schedule = synchronized(this) {
@@ -74,18 +53,16 @@ class ConfigWriter(
         if (schedule) executor.execute(::drain)
     }
 
-    /** Writes what is pending now, on the caller's thread: the host's stop. */
+    /** On the caller's thread: the host's stop. */
     fun flush() {
         if (writable) drain()
     }
 
-    // one drain at a time: a flush (save(), the host's stop) returns only once a write the executor
-    // had already taken is on disk too, as fcitx's save() is done when it returns
+    // one drain at a time: a flush returns only once a write already taken is on disk too, as fcitx's save()
     private val draining = Any()
 
     private fun drain() = synchronized(draining) {
-        // what is to run once a path lands taken with its text: one asked for while this batch is
-        // written waits for the write after it, whose text has what it settles
+        // landing callbacks taken with the text: one asked for meanwhile waits for the next write
         val (batch, lands) = synchronized(this) {
             scheduled = false
             val batch = LinkedHashMap(pending).also { pending.clear() }
@@ -105,11 +82,7 @@ class ConfigWriter(
     }
 
     companion object {
-        /**
-         * Writes under [root] through [replaceFile]: to `<file>.new`, synced, then renamed over the
-         * file, so a reader (or the next start after a power cut) sees the old text or the new one,
-         * never part of it nor an empty file.
-         */
+        /** Via [replaceFile] (`<file>.new`, synced, renamed): a reader sees the old text or the new, never part. */
         fun files(root: File, onError: (String, IOException) -> Unit): (String, String) -> Boolean = { path, text ->
             val file = File(root, path)
             try {

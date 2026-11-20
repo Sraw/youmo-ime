@@ -43,7 +43,6 @@ class EnginesAsideBlockTest : EnginesFixture() {
             e.learning(PINYIN, LearningOp.Undo(done.undo))
             assertTrue("👌" in e.typed("hao"))
             e.onEvent(PINYIN, EngineEvent.BLOCK, e.typed("hao").indexOf("👌"))
-            // 好 itself still offered
             assertEquals(listOf("好", "👍"), e.typed("hao"))
         }
         Engines(::load, dir, warmUps = inPlace).use { e ->
@@ -71,9 +70,7 @@ class EnginesAsideBlockTest : EnginesFixture() {
         }
     }
 
-    // a polyphone by its parts, hinted "xing/hang/heng": blocked in the one reading shown above it (A5),
-    // its commonest alone, the one of the word it makes after what was picked before it (银 then 行: hang);
-    // still typed by its other readings
+    // blocked in the reading shown above it; still typed by its other readings
     @Test
     fun aPolyphoneByItsPartsIsBlockedInTheReadingShown() {
         pinyin = ReadingData.bytes

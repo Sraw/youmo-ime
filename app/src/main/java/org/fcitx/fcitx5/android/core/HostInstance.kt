@@ -4,10 +4,6 @@
  */
 package org.fcitx.fcitx5.android.core
 
-/**
- * The host the daemon runs, [KotlinHost]; it keeps [HostApi] and the event flow as callers knew
- * them from the native one (fcitx-replacement §4).
- */
 interface HostInstance : HostApi, HostLifecycleOwner {
     fun start()
     fun stop()

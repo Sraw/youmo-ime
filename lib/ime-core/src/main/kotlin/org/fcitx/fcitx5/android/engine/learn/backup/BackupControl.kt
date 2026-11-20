@@ -18,17 +18,9 @@ import java.io.IOException
 import java.io.OutputStream
 
 /**
- * Restores and makes the learning backups (U-100, U-106, C38) over what the engine has: the
- * learning [state], and the lists ([lists]: added, blocked). The engine says how the log is
- * rewritten whole ([rewrite]: LearnLog.rewrite, the sessions dropped) and how words go on and off
- * the lists ([addLists], [removeLists]; [importLines], the user dictionary's import, for its export).
- * The app's address bar's book goes with them ([addresses]; [putAddresses] merges a backup's in, or
- * puts the copy's back whole).
- *
- * A restore merges ([BackupMerge]), after the phone's learning is kept as it was
- * ([Backups.saveBeforeRestore], on disk first), so 退回恢复前 puts that back whole: what was
- * learned, added, deleted, pinned and blocked since (C38). The merge is a transform of the log as
- * it is on disk, not of [state], so what is written is what a restart would read.
+ * Restores and makes learning backups over the engine's [state] and [lists]. A restore merges
+ * ([BackupMerge]) after saving the phone's learning to disk for 退回恢复前, transforming the log as on disk
+ * (not [state]) so what is written is what a restart reads.
  */
 class BackupControl(
     val backups: Backups,
@@ -40,11 +32,10 @@ class BackupControl(
     private val addLists: (added: List<ListedWord>, blocked: List<ListedWord>) -> Unit,
     private val removeLists: (added: List<ListedWord>, blocked: List<ListedWord>) -> Unit,
     private val importLines: (Sequence<String>) -> Unit,
-    /** The phone's log as on disk, for an automatic backup made off the keyboard's thread; null: none, made here from [state]. */
+    /** The log as on disk, for an automatic backup off the keyboard thread; null: made here from [state]. */
     private val logBytes: (() -> ByteArray?)? = null,
-    /** What the address bar learned, as the app keeps it; null: the app keeps none (a test's). */
     private val addresses: () -> AddressData? = { null },
-    /** A backup's address book merged into the app's (true), or put in its place (false, 退回恢复前). */
+    /** Merge (true) or replace (false, 退回恢复前) the app's address book. */
     private val putAddresses: (AddressData, merge: Boolean) -> Unit = { _, _ -> },
 ) : LearningOps.Backups {
     fun run(op: BackupOp): BackupResult = try {
@@ -61,7 +52,7 @@ class BackupControl(
     } catch (e: IOException) {
         BackupResult(ok = false, error = e.message)
     } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-        // a file the user picked, however it came to be: told, never the keyboard stopped
+        // a user-picked file: report, never crash the keyboard
         BackupResult(ok = false, error = e.toString())
     }
 
@@ -71,12 +62,7 @@ class BackupControl(
         LearnBackup.read(bytes).head.let { BackupResult(head = it, own = isOwn(it)) }
     }
 
-    /**
-     * Writes in [log] that its days are this install's (review-int-records S5): a log carried to
-     * another phone (D2D, a settings zip) keeps each install that wrote it, so a backup one of them
-     * made is restored on the log's own day line, not moved past the phone's last day and counted
-     * twice. None for a log in memory or an install of no id.
-     */
+    /** Marks [log]'s days as this install's, so a backup made by it is restored on the log's own day line, not shifted and counted twice. */
     fun claim(log: LearnLog) {
         val id = backups.installId
         if (id == 0L || !log.onDisk || id in BackupMerge.origins(log.state)) return
@@ -85,29 +71,26 @@ class BackupControl(
 
     private fun isOwn(head: BackupHead?) = head != null && backups.installId != 0L && head.installId == backups.installId
 
-    // the user dictionary's export (`# youmo-words`, an older one's header, or blocked lines): restored by its import
+    // the user dictionary's export: restored by its import
     private fun isExport(bytes: ByteArray) = !LearnBackup.isBackup(bytes) && WordListFiles.isUserExport(bytes.copyOf(minOf(bytes.size, EXPORT_HEAD)))
 
-    /** The phone's learning as a backup of [kind]. */
     fun bytes(kind: Int): ByteArray {
         val (added, blocked) = lists()
         return bytes(kind, state(), added, blocked, clock.now(), addresses())
     }
 
-    // timed no earlier than its last commit, whose minute never goes back: after a clock set back,
-    // a clear's cut still finds a backup holding what it clears made at or after it (C25)
+    // timed no earlier than its last commit, so after a clock set back a clear's cut still finds it
     private fun bytes(kind: Int, s: LearnState, added: List<ListedWord>, blocked: List<ListedWord>, time: Long, book: AddressData?) =
         LearnBackup.bytes(BackupHead(maxOf(time, s.lastMinute * LearnClock.MINUTE), s.day, backups.installId, kind, version), s, added, blocked, book)
 
-    /** [bytes], a backup, a bare log or the user dictionary's export, merged in (U-100): its head. */
+    /** Merges in a backup, a bare log or the user dictionary's export; returns its head. */
     @Throws(IOException::class)
     fun restore(bytes: ByteArray): BackupHead? {
         if (!isExport(bytes)) return restore(LearnBackup.read(bytes))
-        // a restore as any other (U-100 lists 旧版幽默的导出): 退回恢复前 takes it back
         val previous = backups.beforeRestore()
         backups.saveBeforeRestore(bytes(BackupHead.BEFORE_RESTORE))
         val lists = lists()
-        // the log too: an import's learning lines are written after its words (WordImport.importWords)
+        // the log too: an import writes learning lines after its words (WordImport.importWords)
         val learned = state().let { it to it.version }
         val unchanged = { lists() == lists && state().let { it === learned.first && it.version == learned.second } }
         var imported = false
@@ -115,9 +98,7 @@ class BackupControl(
             importLines(WordLists.decode(bytes).lineSequence())
             imported = true
         } finally {
-            // nothing restored: 退回恢复前 goes back where it went before, as for a backup's; an import
-            // that failed part way (its words added, its blocks not) keeps this copy, else what it
-            // added could not be taken back (F3139), nor what it learned, its words the same (F3202)
+            // nothing restored: keep the old 退回恢复前 target, unless a partial import must stay undoable
             if (!imported && unchanged()) {
                 if (previous != null) backups.saveBeforeRestore(previous) else backups.dropBeforeRestore()
             }
@@ -126,14 +107,9 @@ class BackupControl(
     }
 
     /**
-     * Merges [backup] into the phone's learning: its head back. A head of no known install (a
-     * bare log, an older build's files) is another install's. In the order a kill at any point
-     * leaves whole (review-DE-design D-M2): the phone's copy for 退回恢复前 on disk, the log
-     * rewritten, the lists merged. A restore that fails puts back the copy there was before it.
-     *
-     * [since], a settings zip's stash's time (epoch milliseconds): a copy made at or after it,
-     * with nothing learned since but the restore, is of an earlier try of this one (taken again
-     * after a kill), the phone's as it was before, and kept.
+     * Merges [backup] into the phone's learning, in an order a kill at any point leaves whole: copy for
+     * 退回恢复前 on disk, log rewritten, lists merged. A copy made at or after [since] with nothing learned
+     * since is from an earlier try of this restore, and kept.
      */
     @Throws(IOException::class)
     fun restore(backup: Backup, since: Long? = null): BackupHead? {
@@ -144,7 +120,7 @@ class BackupControl(
         val minute = minute()
         val (added, blocked) = lists()
         val (add, block) = BackupMerge.lists(added, blocked, backup.added, backup.blocked)
-        // what is blocked once restored: the backup's block of a word the phone added is not (the phone's stays)
+        // a backup's block of a word the phone added does not apply
         val blocks = (blocked + block).mapTo(HashSet()) { it.text }
         val lastBatch = state().imports.lastId
         var written = false
@@ -155,14 +131,14 @@ class BackupControl(
                 true
             }
         } finally {
-            // nothing restored: 退回恢复前 goes back where it went before
+            // nothing restored: keep the old 退回恢复前 target
             if (!written && copy) {
                 if (previous != null) backups.saveBeforeRestore(previous) else backups.dropBeforeRestore()
             }
         }
         if (!written) throw IOException("the learning was not written")
         if (add.isNotEmpty() || block.isNotEmpty()) addLists(add, block)
-        // one made before they went with it: the phone's as they are
+        // a backup without addresses: keep the phone's
         backup.addresses?.let { putAddresses(it, true) }
         return backup.head
     }
@@ -173,16 +149,11 @@ class BackupControl(
         since ?: return false
         val made = backups.beforeRestoreTime()?.takeIf { it >= since } ?: return false
         val s = state()
-        // typed after it (the try's rewrite failed, the phone used since): that is no copy of the phone now
+        // typed after it: not a copy of the phone now
         return s.lastMinute <= maxOf(LearnClock.floorDiv(made, LearnClock.MINUTE).toInt(), s.restoredMinute)
     }
 
-    /**
-     * 退回恢复前: the lists and the learning as the copy made before the latest restore has them,
-     * whole, and the copy gone last; false if there is none (cleared since, or reverted). The
-     * typing day and the sequence stay where the phone has them, so backups made since are not
-     * in its future (review-DE-design D-S4).
-     */
+    /** 退回恢复前: restores lists and learning from the pre-restore copy, then deletes it; typing day and seq stay the phone's so later backups are not in its future. */
     @Throws(IOException::class)
     fun revert(): Boolean {
         val copy = LearnBackup.read(backups.beforeRestore() ?: return false)
@@ -191,7 +162,7 @@ class BackupControl(
             val (phone, kinds) = LearnBackup.replay(log)
             val s = copy.state
             val day = maxOf(phone.day, s.day)
-            // its own head but for the restore's minute: U-88 cuts no earlier than this
+            // its own head but the restore's minute: clears cut no earlier than this
             s.apply(
                 Head(
                     cut = minute,
@@ -215,16 +186,13 @@ class BackupControl(
         val add = copy.added.filter { it !in nowAdded }
         val block = copy.blocked.filter { it !in nowBlocked }
         if (add.isNotEmpty() || block.isNotEmpty()) addLists(add, block)
-        // as the copy has them; a copy made before they went with it: as they are
+        // a copy without addresses: keep the phone's
         copy.addresses?.let { putAddresses(it, false) }
         backups.dropBeforeRestore()
         return true
     }
 
-    /**
-     * After a commit: an automatic backup made if one is due (U-106), off the keyboard's thread
-     * where the log can be read there ([logBytes]): only the lists are read here.
-     */
+    /** Makes an automatic backup if due, off the keyboard thread where possible. */
     fun afterCommit() {
         val s = state()
         if (!backups.due(s.day)) return
@@ -235,19 +203,14 @@ class BackupControl(
             val bytes = bytes(BackupHead.AUTO, s, added, blocked, clock.now(), book)
             backups.saveAuto(s.day) { bytes }
         } else {
-            // its time after the read: a clear's cut between the two finds it made after (C25)
+            // timed after the read, so a clear's cut between the two finds it
             backups.saveAuto(s.day) { read()?.let { log -> LearnBackup.replay(log).first.let { bytes(BackupHead.AUTO, it, added, blocked, clock.now(), book) } } }
         }
     }
 
-    /**
-     * Before U-86 or U-88's rewrite (C25, review-DE-design DE-M1): an automatic backup being
-     * written finished, then this install's made at or after [fromMinute] (epoch minutes;
-     * [LearningResult.ALL], all of them) and the copy before a restore gone.
-     */
+    /** Before a clear's rewrite: finishes pending automatic backups, then deletes this install's made at or after [fromMinute] and the pre-restore copy. */
     override fun invalidate(fromMinute: Int) = backups.invalidate(fromMinute)
 
-    /** After U-86 or U-88's rewrite: one made at once of what is left, if they are made at all. */
     override fun saveIfOn() {
         val s = state()
         if (!backups.auto || backups.installId == 0L || s.day < 1) return
@@ -257,7 +220,7 @@ class BackupControl(
     }
 
     private companion object {
-        // as much of a file as tells an export from another list
+        // enough of a file to tell an export from another list
         const val EXPORT_HEAD = 4096
     }
 }

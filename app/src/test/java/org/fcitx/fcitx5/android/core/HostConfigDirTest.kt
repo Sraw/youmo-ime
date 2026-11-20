@@ -28,15 +28,13 @@ import org.robolectric.shadows.ShadowEnvironment
 import java.io.File
 import java.io.IOException
 
-// A4: fcitx's data settled once a process, for the engine and the editors alike
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class HostConfigDirTest {
 
     private val external get() = appContext.getExternalFilesDir(null)!!
 
-    // an upgraded install (its engine's directory there) started without the external storage: nothing
-    // moved, nothing written, and the storage back later in the process changes nothing till the next
+    // an upgraded install started without external storage: nothing moved or written, and storage back later changes nothing till the next process
     @Test
     fun theExternalStorageAwayFixesThePlaceForTheProcessAndAnEditorsSaveIsRefused() {
         File(appContext.filesDir, "engine").mkdirs()
@@ -57,7 +55,6 @@ class HostConfigDirTest {
         assertEquals("dz,1=北京\n", File(external, "data/pinyin/customphrase").readText())
     }
 
-    // the move made, the engine and the editor read and write the one directory
     @Test
     fun movedTheEditorWritesWhereTheEngineReads() {
         File(appContext.filesDir, "engine").mkdirs()
@@ -74,8 +71,6 @@ class HostConfigDirTest {
         assertFalse(File(external, "data").exists())
     }
 
-    // the move failed (used where it is, on the external storage) and that storage gone since: nowhere
-    // to write, not a write that silently goes nowhere
     @Test
     fun theExternalHomeRemovedAfterItWasSettledIsNotWritable() {
         File(appContext.filesDir, "engine").mkdirs()
@@ -85,7 +80,7 @@ class HostConfigDirTest {
         ShadowEnvironment.setExternalStorageState(externalDir, Environment.MEDIA_MOUNTED)
         // the copy cannot be staged: NOT_MOVED, used on the external storage
         try {
-            // root writes anyway: a skip there (F4987), not a failure
+            // root writes anyway: a skip there, not a failure
             assumeTrue("a directory not writable (not as root)", appContext.filesDir.setWritable(false) && !appContext.filesDir.canWrite())
             val first = HostConfigDir.settle(ConfigHome.DATA)
             assertEquals(HostConfig(File(externalDir, "data"), writable = true, ConfigHome.Problem.NOT_MOVED), first)
@@ -96,8 +91,7 @@ class HostConfigDirTest {
         }
     }
 
-    // 0.6.1 has no 中文标点 page (DECISIONS FB9): the table edited before is deleted at the first start, the built-in one
-    // used; once, a table put in after it (a test's) staying, and nothing else of the data touched
+    // the edited table deleted at the first start, once; a table put in after it stays and nothing else is touched
     @Test
     @Uat("ST-145")
     fun anEditedPunctuationTableIsDeletedOnceOnTheUpgrade() {
@@ -117,15 +111,13 @@ class HostConfigDirTest {
         val shipped = listOf(PunctuationMapEntry(",", "，", ""))
         val maps = PunctuationMaps(data.dir) { ", ，\n".byteInputStream() }
         assertEquals(shipped, maps.load("zh_CN"))
-        // the next start: done already
         table.writeText(", 、\n")
         HostConfigDir.forget()
         HostConfigDir.settle(ConfigHome.DATA)
         assertEquals(", 、\n", table.readText())
     }
 
-    // the data not writable this start (an upgrade's external storage away): the table where it is left alone
-    // and the reset not marked done, made at the start that has the data
+    // data not writable this start: the table left alone and the reset not marked done
     @Test
     @Uat("ST-145")
     fun withTheDataNotWritableThePunctuationResetWaits() {
@@ -139,7 +131,6 @@ class HostConfigDirTest {
         assertEquals(ConfigHome.Problem.EXTERNAL_AWAY, HostConfigDir.settle(ConfigHome.DATA).problem)
         assertEquals(", 、\n", table.readText())
         assertFalse(done.getValue())
-        // the storage back, the next start: moved in, then the table deleted
         phoneStorage()
         val data = HostConfigDir.settle(ConfigHome.DATA)
         assertEquals(File(appContext.filesDir, "host-data"), data.dir)

@@ -5,16 +5,9 @@
 package org.fcitx.fcitx5.android.input.hardware
 
 /**
- * The hardware keyboard's shortcuts for the input method, as a computer's Chinese input methods
- * have them and Sogou and Baidu on a phone: Shift pressed and let go by itself switches between
- * Chinese and English, as Ctrl+Space does (fcitx's); Ctrl and Shift together, let go, go on to the
- * next input method (Windows'), and again for each tap of one while the other is held. Told each
- * key as it goes down and up; says what to do, and whether the key is the shortcut's alone, kept
- * from the app and the engine.
- *
- * A modifier's tap counts only quickly done, within [tapMs], and with no other key between: Shift
- * held for a capital, or Ctrl+Shift+Z, is no tap. A key held down repeats its press, which neither
- * starts nor spoils one.
+ * Hardware keyboard shortcuts: Shift tapped alone switches 中/英 (as Ctrl+Space, fcitx's); Ctrl and Shift tapped
+ * together go to the next input method (Windows'), again for each tap of one while the other is held. A tap counts
+ * only within [tapMs] with no other key between; a held key's repeats neither start nor spoil one.
  */
 class HardwareShortcuts(private val tapMs: Long = TAP_MS) {
 
@@ -22,7 +15,7 @@ class HardwareShortcuts(private val tapMs: Long = TAP_MS) {
 
     enum class Action { TOGGLE, NEXT }
 
-    /** What to do, if anything, and whether the key goes no further. */
+    /** [consumed]: the key goes no further. */
     data class Decision(val action: Action?, val consumed: Boolean)
 
     // HELD: one of Ctrl and Shift still down after going on, the other pressed again goes on again
@@ -34,11 +27,7 @@ class HardwareShortcuts(private val tapMs: Long = TAP_MS) {
     // Ctrl+Space was the shortcut: its Space's release goes no further either
     private var spaceTaken = false
 
-    /**
-     * [key] goes down, with [ctrl] and [shift] held (before it) and [others], Alt or Meta, held or not;
-     * [repeat] for a held key's repeated press. [canToggle], asked of Ctrl+Space only: whether a toggle
-     * has an input method to go to.
-     */
+    /** [ctrl]/[shift] held before it; [canToggle], asked of Ctrl+Space only: a toggle has somewhere to go. */
     fun down(
         key: Key, ctrl: Boolean, shift: Boolean, others: Boolean, repeat: Boolean, timeMs: Long,
         canToggle: () -> Boolean = { true },
@@ -72,16 +61,12 @@ class HardwareShortcuts(private val tapMs: Long = TAP_MS) {
         else -> alone
     }
 
-    /**
-     * [key] went down where the shortcuts do not apply (switched off, a field of raw keys): no tap
-     * goes on across it, and a taken Space whose release never came is let go, as [down] does.
-     */
+    /** Where the shortcuts do not apply: no tap goes on across it, and a stuck taken Space is let go. */
     fun passed(key: Key) {
         pending = Pending.NONE
         if (key == Key.SPACE) spaceTaken = false
     }
 
-    /** [key] comes up. */
     fun up(key: Key, timeMs: Long): Decision {
         if (key == Key.SPACE && spaceTaken) {
             spaceTaken = false
@@ -108,7 +93,7 @@ class HardwareShortcuts(private val tapMs: Long = TAP_MS) {
     }
 
     companion object {
-        /** fcitx's own limit for a modifier-only shortcut (ModifierOnlyKeyTimeout). */
+        /** fcitx's ModifierOnlyKeyTimeout. */
         const val TAP_MS = 250L
 
         private val MODIFIERS = setOf(Key.SHIFT, Key.CTRL)

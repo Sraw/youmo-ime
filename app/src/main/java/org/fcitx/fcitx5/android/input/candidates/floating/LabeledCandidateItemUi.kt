@@ -19,17 +19,13 @@ import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.input.bar.CandidateBarHeight
 import org.fcitx.fcitx5.android.input.candidates.ReadingSpan
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.input.candidates.appendComment
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.CandidateLook
 import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.textView
 import kotlin.math.ceil
 
-/**
- * A candidate of the physical keyboard's window, its fcitx label before it: drawn as the theme has the
- * candidates ([bar], 060-render-p3 T6a), the one the cursor is on `:selected`, the page's first `:first`;
- * `label-style` none drops the label, dot puts a dot for it.
- */
 class LabeledCandidateItemUi(
     override val ctx: Context,
     val theme: Theme,
@@ -40,24 +36,21 @@ class LabeledCandidateItemUi(
     override val root = textView {
         setupTextView(this)
         SceneBar.typeface(theme, bar.plain)?.let { typeface = it }
-        // room above every candidate for a hint's reading at its floor (候选词注音 off; ReadingSpan), so the
-        // window keeps one height whichever candidates it shows. Kept with 候选词注音 on as well, where a pinyin
-        // reading raises the line by itself: the item is made once, not again as the setting changes
+        // room above every candidate for a hint's reading, so the window keeps one height whichever it shows. Kept with
+        // 候选词注音 on too: the item is made once, not again as the setting changes
         val fm = paint.fontMetrics
         val need = paint.textSize * CandidateBarHeight.HAN_TOP + floor * (fm.descent - fm.ascent) / paint.textSize
         val top = paddingTop + if (includeFontPadding) -fm.top else -fm.ascent
         if (need > top) setPadding(paddingLeft, paddingTop + ceil(need - top).toInt(), paddingRight, paddingBottom)
     }
 
-    // the padding above set once made; a candidate of no pinyin gets the reading's line on top of it (update)
     private val plainTop = root.paddingTop
 
     private val floor get() = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, CandidateBarHeight.HINT_FLOOR_SP, ctx.resources.displayMetrics)
 
-    // the look last drawn: its fill and font set again only as it changes
+    // set again only as it changes
     private var shown: CandidateLook? = null
 
-    /** Draws [candidate], the cursor on it if [active], the page's [first]. */
     fun update(candidate: CandidateWord, active: Boolean, first: Boolean = false) {
         val look = bar.candidate(first, active)
         if (look != shown) {
@@ -70,7 +63,6 @@ class LabeledCandidateItemUi(
         val labelFg = look.labelColor.value
         val fg = look.color.value
         val altFg = look.commentColor.value
-        // fcitx's label (its number) as ever, or what the theme's label-style puts there
         val label = when (bar.labelStyle) {
             BarLook.LabelStyle.Number, null -> candidate.label
             BarLook.LabelStyle.None -> ""
@@ -89,21 +81,13 @@ class LabeledCandidateItemUi(
                     ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, floor = floor)
                 }
             }
-            if (candidate.comment.isNotBlank()) {
-                if (candidate.spaceBetweenComment) {
-                    append(" ")
-                }
-                color(altFg) {
-                    append(candidate.comment)
-                }
-            }
+            appendComment(candidate, altFg)
         }
-        // with pinyin on, a candidate of none (an emoji, a word in English) as tall as one read and on the same
-        // baseline, as in the bar (the user, 2026-11-14): the room ReadingSpan.getSize puts above a line of pinyin
+        // with pinyin on, a candidate of none (an emoji, English) as tall as one read and on the same baseline
         val read = (root.text as? Spanned)?.getSpans(0, root.text.length, ReadingSpan::class.java)?.isNotEmpty() == true
         val room = if (EngineState.candidateReading.value == ReadingStyle.PINYIN && !read) ceil(root.paint.textSize * CandidateBarHeight.READING_LINE).toInt() else 0
         root.setPadding(root.paddingLeft, plainTop + room, root.paddingRight, root.paddingBottom)
-        // a theme's dot is not read out, only the candidate (fcitx's own label is, as ever)
+        // a theme's dot is not read out, only the candidate (fcitx's own label is)
         root.contentDescription = if (bar.labelStyle == BarLook.LabelStyle.Dot) root.text.subSequence(label.length, root.text.length) else null
     }
 }

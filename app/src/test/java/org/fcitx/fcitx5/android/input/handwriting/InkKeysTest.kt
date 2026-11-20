@@ -13,14 +13,9 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * A key held behind reads commits the piece the pad held as it was pressed: strokes drawn while it
- * waited (a tap's dot taken back, the stroke after it) stay on the pad. A backspace takes back the
- * stroke it was pressed on, or goes to the engine where none was.
- */
+/** A key held behind reads commits the piece as it was pressed; strokes drawn while it waited stay on the pad. */
 class InkKeysTest {
 
-    // a pad and its keys, fresh for each row
     private class Pad {
         private val worker = Queue()
         private val main = Queue()
@@ -29,13 +24,12 @@ class InkKeysTest {
         var nexts = 0
         var undos = 0
 
-        // what the key's action told the keyboard: true, taken by the pad; false, sent to the engine
+        // true: taken by the pad; false: sent to the engine
         var took: Boolean? = null
         private val keys = InkKeys(
             recognition,
             object : InkKeys.Pad {
                 override val pad = ink
-                // the stroke taken back off the pad, as the pad's view does
                 override fun undo() = (ink.undo(0) != null).also { if (it) undos++ }
                 override fun next() {
                     nexts++

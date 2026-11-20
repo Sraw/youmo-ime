@@ -7,15 +7,7 @@ package org.fcitx.fcitx5.android.engine.data
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * A read-only array of non-negative ints, each stored in exactly [width] bits, read
- * little-endian from a buffer (whatever its byte order) that is usually memory-mapped. The
- * language model is mostly arrays of word ids and offsets that need 19 to 23 bits; packing them
- * rather than using 32 is what keeps the data file near the size of libime's.
- *
- * Layout: `u32 width, u32 size`, then the values as little-endian 64-bit words, lowest bits
- * first. A value straddling two words only exists when the second word does, so no padding.
- */
+/** Read-only ints of [width] bits each, little-endian whatever the buffer's order: `u32 width, u32 size`, then 64-bit words lowest bits first, no padding. */
 class BitPacked(buffer: ByteBuffer) {
 
     // a view of its own: ByteBuffer.wrap's buffers are big-endian
@@ -51,8 +43,7 @@ class BitPacked(buffer: ByteBuffer) {
         if (from < 0 || to > size) throw IndexOutOfBoundsException("[$from, $to) of $size")
         var lo = from
         var hi = to
-        // get's reads without its check, the range checked once: the language model's lookups
-        // are a fifth to a third of a key, nearly all of it this loop
+        // unchecked get, range checked once: this loop is most of the language model's lookup time
         val b = buffer
         val width = width
         val mask = mask
@@ -68,11 +59,7 @@ class BitPacked(buffer: ByteBuffer) {
         return lo
     }
 
-    /**
-     * Checks that this is a table of run starts: [first] first, never decreasing, [end] last.
-     * Lookups index other arrays with these values unchecked, so a table that got this far must
-     * not point outside them; otherwise a corrupt file would load and fail at the first key press.
-     */
+    /** Checks this is a table of run starts ([first] first, never decreasing, [end] last): lookups index other arrays with them unchecked. */
     fun checkRuns(what: String, first: Int, end: Int) {
         ensureFormat(size >= 1 && get(0) == first) { "$what: does not start at $first" }
         var previous = first
@@ -84,13 +71,11 @@ class BitPacked(buffer: ByteBuffer) {
         ensureFormat(previous == end) { "$what: ends at $previous, not $end" }
     }
 
-    /** Checks that every value is below [limit]. */
     fun checkBelow(what: String, limit: Int) {
         for (i in 0 until size) ensureFormat(get(i) < limit) { "$what: ${get(i)} at $i is not below $limit" }
     }
 
     companion object {
-        /** values are ints; 31 bits covers every non-negative one */
         const val MAX_WIDTH = 31
         private const val HEADER_BYTES = 8
 
@@ -98,7 +83,6 @@ class BitPacked(buffer: ByteBuffer) {
 
         private fun words(width: Int, size: Int): Long = (size.toLong() * width + 63) / 64
 
-        /** Bits needed to store every value up to and including [max]; at least 1. */
         fun widthFor(max: Int): Int = maxOf(1, 32 - Integer.numberOfLeadingZeros(max))
 
         fun encode(values: IntArray): ByteArray = encode(values.size) { values[it] }
@@ -117,10 +101,7 @@ class BitPacked(buffer: ByteBuffer) {
         }
     }
 
-    /**
-     * [size] values of [width] bits written to [out] as they come, the layout [BitPacked] reads:
-     * for a table too large to build in the heap first (a dictionary the user merged, DictionaryCompiler).
-     */
+    /** Streams [size] values in [BitPacked]'s layout, for tables too large to build in the heap. */
     class Writer(private val out: java.io.OutputStream, private val width: Int, private val size: Int) {
         private val bytes = LittleEndian(out)
         private var bits = 0L
@@ -142,12 +123,10 @@ class BitPacked(buffer: ByteBuffer) {
             if (used >= 64) {
                 writeLong(bits)
                 used -= 64
-                // the high bits of a value straddling two words begin the next
                 bits = if (used == 0) 0L else value.toLong() ushr (width - used)
             }
         }
 
-        /** The last word written: every value added. */
         fun finish() {
             require(count == size) { "$count of $size values" }
             if (used > 0) writeLong(bits)
@@ -160,10 +139,7 @@ class BitPacked(buffer: ByteBuffer) {
     }
 }
 
-/**
- * Ints and longs written to [out] low byte first, a whole value per write: BitPacked's and
- * EliasFano's writers, which build the large tables of the data tools a long at a time.
- */
+/** Ints and longs written low byte first, a whole value per write. */
 internal class LittleEndian(private val out: java.io.OutputStream) {
     private val buffer = ByteArray(8)
 

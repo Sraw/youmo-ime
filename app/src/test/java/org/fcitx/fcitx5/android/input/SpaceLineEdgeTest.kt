@@ -18,12 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * The space's slide up and down sent in one go (SpaceCursor's rushed lines), as the service takes
- * the lines: past the first (last) line to the field's start (end) while the editor has not moved
- * yet; once it has, the lines not landed yet are sent, never past the line the user went to. The clock stands still under Robolectric,
- * so every line here counts as rushed.
- */
+/** Rushed lines (SpaceCursor): past the first or last line to the field's edge while the editor has not moved; once it has, never past the user's line. Robolectric's clock stands still, so every line is rushed. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SpaceLineEdgeTest {
@@ -32,7 +27,6 @@ class SpaceLineEdgeTest {
 
     private fun line(h: KeyboardHarness, sym: Int) = h.emit(lineKey(sym))
 
-    // a multi-line field holding [text], the cursor at [at]; [onLine] what the editor does with a line key
     private fun field(text: String, at: Int, onLine: (EditText, Int) -> Unit): KeyboardHarness =
         KeyboardHarness().start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE) { f ->
             f.setText(text)
@@ -44,10 +38,9 @@ class SpaceLineEdgeTest {
             }
         }
 
-    // an editor that applies the keys later: none landed while the slide sends
+    // applies the keys later: none landed while the slide sends
     private val later: (EditText, Int) -> Unit = { _, _ -> }
 
-    // an editor that applies a line at once: Up to the end of the line above, Down to the end of the line below
     private val atOnce: (EditText, Int) -> Unit = { f, code ->
         val s = f.text.toString()
         val at = f.selectionStart
@@ -62,8 +55,7 @@ class SpaceLineEdgeTest {
 
     private fun slide(text: String, at: Int, editor: (EditText, Int) -> Unit, sym: Int, times: Int): Int =
         field(text, at, editor).use { h ->
-            // [later]'s lines come back to back, nothing of the main thread's run between them: on a loaded full run
-            // an idle between ran Robolectric's clock on 150 ms (a task run past its time), and they were no longer rushed
+            // back to back: on a loaded run an idle between moved the clock 150 ms and they were no longer rushed
             if (editor === later) repeat(times - 1) { check(h.api.events.tryEmit(lineKey(sym))) }
             repeat(if (editor === later) 1 else times) { line(h, sym) }
             h.field.selectionStart
@@ -80,14 +72,11 @@ class SpaceLineEdgeTest {
             "two Downs from the first line, none landed: the second goes to the end, the text's length" to {
                 assertEquals(7, slide("aaa\nbbb", 0, later, down, 2))
             },
-            // the edge jump took a read already moved for stale and skipped the line the user went to;
-            // then the line was held instead and the cursor stopped a line short
+            // a read already moved was once taken for stale, then the line held and the cursor stopped a line short
             "a rushed line the editor already applied does not skip to the edge: two Ups from the third line, the first landed, the second is sent, onto the first line" to {
                 assertEquals(3, slide("aaa\nbbb\nccc", 11, atOnce, up, 2))
             },
-            // KB-71 on the emulator: the editor applies each Up before the next sample's read (the key and the
-            // read go to it in order), so no read is stale; counting sent lines as unlanded held the second
-            // and the cursor stopped on the first line, not the start
+            // the editor applies each Up before the next read, so no read is stale; counting sent lines as unlanded stopped a line short
             "three Ups from inside the third line, each landed before the next read: onto the very start" to {
                 assertEquals(0, slide("aaa\nbbb\nccc", 9, atOnce, up, 3))
             },

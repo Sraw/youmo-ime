@@ -68,7 +68,7 @@ class PreviewLabelTest {
         var longest = 0
         PreviewLabel.fit("字".repeat(200), 16f, 12f, room) { s, size -> longest = maxOf(longest, s.length); ems(s, size) }
         assertEquals("its first MAX_TEXT and the ellipsis", PreviewLabel.MAX_TEXT + 1, longest)
-        // review L4: cut there, told by the ellipsis however much room there is
+        // cut there, told by the ellipsis however much room there is
         val emoji = "a".repeat(PreviewLabel.MAX_TEXT - 1) + "😀"
         assertEquals("not half an emoji, the cut told", "a".repeat(PreviewLabel.MAX_TEXT - 1) + "…", PreviewLabel.fit(emoji, 1f, 1f, 1000f, ems).text)
         val forty = "字".repeat(PreviewLabel.MAX_TEXT)
@@ -77,7 +77,7 @@ class PreviewLabelTest {
         assertTrue("a cut one is words", PreviewLabel.isWords(" ".repeat(PreviewLabel.MAX_TEXT) + "字字"))
     }
 
-    // review L2: measured by UTF-16 units, as a paint may weigh a pair: a cut never leaves half of one
+    // measured by UTF-16 units, as a paint may weigh a pair: a cut never leaves half of one
     private val units: (String, Float) -> Float = { s, size -> s.length * size }
 
     private fun String.whole(): Boolean = indices.none { i ->
@@ -95,7 +95,7 @@ class PreviewLabelTest {
         }
     }
 
-    // review L3: a character as seen is one, however many code points: a symbol's size, never cut apart
+    // a character as seen is one, however many code points: a symbol's size, never cut apart
     @Test
     fun aCharacterAsSeenIsOne() {
         for (one in listOf("❤️", "🇨🇳", "👍🏽", "👨‍👩‍👧", "e\u0301")) {

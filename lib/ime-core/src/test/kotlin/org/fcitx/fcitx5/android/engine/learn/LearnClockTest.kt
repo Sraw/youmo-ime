@@ -18,13 +18,11 @@ class LearnClockTest {
     @Test
     fun aTypingDayIsACalendarDayTypedOn() {
         assertEquals(1, commit().day)
-        // 10:00 to 23:59 the same day
         clock.minutes(13 * 60 + 59)
         assertEquals(1, commit().day)
         // past local midnight, UTC+8: 16:00 UTC
         clock.minutes(1)
         assertEquals(2, commit().day)
-        // a week without typing: one day more
         clock.days(7)
         assertEquals(3, commit().day)
     }
@@ -63,12 +61,10 @@ class LearnClockTest {
         assertEquals(clock.at / LearnClock.MINUTE, right.minute.toLong())
         assertEquals(2, right.day)
         assertTrue(right.localDay < ahead.localDay)
-        // and the next calendar day after it is a typing day again
         clock.days(1)
         assertEquals(3, commit().day)
     }
 
-    // review-1a-core S1: a forget (or pin, undo) first after the clock is put right does not put it right itself
     @Test
     fun aClockPutRightThenAForgetStillStartsTheDaysAnew() {
         commit()
@@ -105,9 +101,7 @@ class LearnClockTest {
 
     @Test
     fun theCutIsLocalMidnightOrAnHourAgo() {
-        // 10:00: midnight is earlier
         assertEquals(LearnClock.midnight(clock, LearnClock.localDay(clock, (clock.at / LearnClock.MINUTE).toInt()), clock.at), LearnClock.cut(clock))
-        // 00:30: an hour ago is earlier
         clock.minutes(14 * 60 + 30)
         assertEquals((clock.at / LearnClock.MINUTE).toInt() - 60, LearnClock.cut(clock))
     }

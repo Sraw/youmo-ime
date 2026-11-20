@@ -15,40 +15,26 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
 /**
- * A commit typed again for those deleted before it (U-03, impl/design-1c.md §2): each deleted one
- * in turn takes the next of the commit's units (pinyin's syllables, a table's characters), as its
- * kind's [Matcher] reads them; what it took is learned under its code and word before, where the
- * word before is the same (dl typed 打了, deleted; dianlema typed: 点了 corrected to under dl).
+ * A commit typed again for those deleted before it: each deleted one takes the next of the commit's units as its
+ * kind's [Matcher] reads them, learned under its code where the word before is the same (dl typed 打了, deleted,
+ * then dianlema typed: 点了 corrected to under dl).
  */
 internal object Retype {
 
-    /**
-     * A commit as units, a character each: their [texts], what each was read as ([syllables]: a
-     * syllable each, for pinyin's matcher; else empty), and the word before those that start a
-     * word of it ([wordBefore]). [whole]: all of the commit is units, so it may go on to the next deleted.
-     */
+    /** A commit as units, a character each, with its syllable (pinyin only) and the word before word starts; [whole]: all of it is units. */
     class Units(val texts: List<String>, val syllables: IntArray, val wordBefore: Map<Int, String>, val whole: Boolean) {
         val size get() = texts.size
     }
 
-    /**
-     * How a deleted commit is typed again: how many of [Units] from a place it takes, or null if
-     * it does not take them. Pinyin's reads syllables ([byReading]); a table's would compare keys,
-     * handwriting's the candidates the commit was picked from (U-29), each session its own.
-     */
+    /** How many of [Units] from a place a deleted commit's retyping takes, or null. */
     fun interface Matcher {
         fun consume(units: Units, from: Int): Int?
     }
 
-    /** The rows a commit adds for the deleted it typed again, how many it [typedAgain], and whether the next of them waits for the commit after it ([goesOn]). */
+    /** The rows added, how many deleted commits were typed again, and whether the next waits for the commit after. */
     class Match(val rows: List<Row>, val typedAgain: Int, val goesOn: Boolean)
 
-    /**
-     * [units], the commit after [prev], typed again for [deleted] (in the order written), each by
-     * [matcherOf] its whole row's (null: none is, a prediction picked, which ends the run). A row
-     * for each whose word before is the same, unless the commit's own [rows] have its code, word
-     * before and text read so: that is this commit's use there alone (review-design-1c S6).
-     */
+    /** [units] typed again for [deleted], each by its matcher (none ends the run); a row for each with the same word before, unless the commit's own [rows] already have it. */
     fun match(deleted: List<Commit>, prev: String, units: Units, rows: List<Row>, matcherOf: (Row) -> Matcher?, origin: (Words) -> Int): Match {
         val out = ArrayList<Row>()
         var at = 0
@@ -69,9 +55,7 @@ internal object Retype {
         return Match(out, matched, goesOn = false)
     }
 
-    // [words] typed again for [whole]'s commit: corrected as against the first shown then, what it
-    // was weighed against (PLAN §2.4), or, not known (several picks), what was committed. Not WHOLE:
-    // a use and a correction there, no second use of the word nor a pair
+    // corrected as against the first shown then, else what was committed; not WHOLE: no second use nor a pair
     private fun row(whole: Row, words: Words, origin: (Words) -> Int): Row {
         val reference = whole.shown.ifEmpty { whole.words.text }
         val corrected = if (words.text != reference) Row.CORRECTED else 0
@@ -79,15 +63,10 @@ internal object Retype {
     }
 
     /**
-     * A handwriting commit's characters [units] typed again for [deleted] (in the order written),
-     * a character for each of their pick rows in turn, the first [skip] of the first typed again by
-     * a commit before (U-03, U-29, F2655): each taken where [inCandidates] has it among what the ink
-     * of that row's character was read as, the run ending at the first it does not. No word before is
-     * compared (keyed rows have none). A row under the deleted pick's code for each, corrected where
-     * the first shown then was another, unless the commit's own [rows] have that code and text. The
-     * units ending inside a deleted commit, the rest of it waits for the next commit ([Keyed.skip]).
-     * [written]: how many characters a deleted commit wrote, its first pick rows; those after are
-     * its corrections of a commit before it (review F3110), no character of its own.
+     * A handwriting commit's [units] typed again for [deleted]: each pick row's character taken where [inCandidates]
+     * has it among its ink's readings, the run ending at the first it does not; no word before is compared. A unit
+     * run ending inside a deleted commit leaves its rest for the next commit ([Keyed.skip]). [written]: a deleted
+     * commit's own characters, the pick rows after are its corrections of an earlier commit.
      */
     fun matchKeyed(
         deleted: List<Commit>,
@@ -102,7 +81,6 @@ internal object Retype {
         var matched = 0
         var from = skip
         for (k in deleted) {
-            // a prediction picked (one whole row) has none: the run ends there
             val picks = k.rows.filter { it.flags and Row.PICK != 0 && !it.whole }.take(written(k))
             if (picks.isEmpty()) break
             for (i in from until picks.size) {
@@ -120,16 +98,13 @@ internal object Retype {
         return Keyed(Match(out, matched, goesOn = at == units.size), 0)
     }
 
-    /** What [matchKeyed] typed again, and how many pick rows of the next deleted were typed already ([skip]): where the next commit goes on from. */
+    /** What [matchKeyed] typed again, and how many pick rows of the next deleted were typed already. */
     class Keyed(val match: Match, val skip: Int)
 
     /**
-     * Pinyin's matcher: [graph], the deleted commit's keys read as syllables, a syllable an edge,
-     * taking the units' syllables from its start to its end. Keys that read as whole syllables are
-     * not read by 简拼 in the middle (`xm` takes 先, not 下面), nor as slipped keys (`ta` takes 他, not
-     * 呀), as the first HabitOrder keeps there is the syllables' (061-sp-abbrev §3.3; 061-neighbour-correction §8.2).
-     * On purpose (review NIT-2): a word typed before goes second there by its keys alone and is learned when picked
-     * there, as any pick; a delete and the same keys again is no correction to it, so it never takes such a code's first.
+     * Pinyin's matcher over the deleted commit's keys: whole syllables are not read by 简拼 in the middle (`xm` takes
+     * 先, not 下面) nor slipped (`ta` takes 他, not 呀), as HabitOrder keeps there. So a delete and the same keys again
+     * never corrects to such a word; it is learned when picked, as any pick.
      */
     fun byReading(graph: SyllableGraph): Matcher {
         val whole = graph.hasOtherReadings && graph.readsWhole(graph.start, graph.end)
@@ -148,7 +123,7 @@ internal object Retype {
         }
     }
 
-    /** A pinyin commit's [picks] after [prev] as units: its characters, a syllable each, as far as its words are Han read so. */
+    /** A pinyin commit's [picks] as units: its characters, a syllable each, as far as its words are Han read so. */
     fun syllables(prev: String, picks: List<CommitRows.Pick>): Units {
         val syllables = ArrayList<Int>()
         val chars = ArrayList<String>()
@@ -169,7 +144,6 @@ internal object Retype {
         return Units(chars, syllables.toIntArray(), wordBefore, whole = true)
     }
 
-    // [w]'s syllables, a Han character each; null if it is not so read
     private fun syllablesOf(w: Word): List<Int>? {
         if (w.reading.isEmpty() || !Han.all(w.text)) return null
         val ids = w.reading.split(' ').map(Syllables::id)

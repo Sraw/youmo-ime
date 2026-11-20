@@ -9,30 +9,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 
-/**
- * Chooses [Penalties.fuzzy] and [Penalties.typo] on the [Halves.TUNE] half and reports the choice
- * on [Halves.HELD_OUT]. Each costs something on input typed right, so a point is judged by the
- * mean top1 of four runs:
- * - clean input, fuzzy sounds off (everyone: slips are forgiven by default);
- * - clean input, every fuzzy pair on (the most any user switches on);
- * - input with a fuzzy sound, every pair on;
- * - input with a slip, fuzzy sounds off.
- *
- * The fuzzy penalty moves only the middle two, weighed alike: as if half of what a user with
- * fuzzy sounds on types has one in it. A point must beat the default by more than [MARGIN] to be
- * chosen; the halves are a few hundred samples, and a sample or two either way is noise.
- *
- * [Penalties.neighbour] is chosen apart, as slips onto a neighbouring key are rarer than a
- * steady habit: the point that reads most of the [SlipSet.KEY] samples right while losing no
- * more than [MARGIN] of clean input to reading slips at all. It is no longer a slip's whole cost
- * but what is added to the cost by where the key was tapped; the [SlipSet.KEY] samples have no
- * place, so a slip of theirs costs [SlipCost.fixed][org.fcitx.fcitx5.android.engine.pinyin.SlipCost.fixed]
- * and this on top (`tune` prints both). The floor and the cost by place are chosen by the
- * clean gate of `pinyin --touch` instead (061-neighbour-correction).
- *
- * The points of a grid do not depend on one another: [search] and [searchKeys] measure them on
- * [threads] threads, each on data [load]ed for it, with the same results on any number.
- */
+/** Chooses [Penalties.fuzzy] and [Penalties.typo] on [Halves.TUNE], reports on [Halves.HELD_OUT]; a point must beat the default by [MARGIN]. */
 class Tuning(private val load: () -> PinyinData, private val clean: List<Sample>, slips: List<Sample>, private val threads: Int = 1) {
 
     /** On [data] alone: one thread, as data is not to be shared between threads. */
@@ -76,7 +53,7 @@ class Tuning(private val load: () -> PinyinData, private val clean: List<Sample>
 
     private val runner by lazy { Runner(load()) }
 
-    /** What a place-less slip costs on the segmenter [measureKeys] reads with: the tune report's label (R26 F8509). */
+    /** What a place-less slip costs on the segmenter [measureKeys] reads with: the tune report's label. */
     val slipFixed: Float get() = runner.slipping.slipFixed
 
     fun measure(penalties: Penalties, half: String): Point = runner.point(penalties, half)
@@ -88,11 +65,7 @@ class Tuning(private val load: () -> PinyinData, private val clean: List<Sample>
     fun searchKeys(grid: List<Float> = KEY_GRID, half: String = Halves.TUNE): List<Point> =
         dealt(grid, threads, { Runner(load()) }) { hand -> hand.map { keyPoint(Penalties().copy(neighbour = it), half, read = true) } }
 
-    /**
-     * Of [points], the one reading most slips right among those that keep clean input within
-     * [MARGIN] of [off] (slips not read), then the one keeping most of it, then the largest
-     * penalty, which prunes the most; null if none keeps it.
-     */
+    /** Of [points], the one reading most slips right while keeping clean input within [MARGIN] of [off]; null if none. */
     fun chooseKeys(points: List<Point>, off: Point): Point? {
         val floor = (off.rates[0] ?: 0.0) - MARGIN
         return points.filter { (it.rates[0] ?: 0.0) >= floor }

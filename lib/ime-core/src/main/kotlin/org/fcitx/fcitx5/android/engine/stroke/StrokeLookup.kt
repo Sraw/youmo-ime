@@ -17,27 +17,13 @@ import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
 /**
- * Pinyin with a character looked up by its strokes, as 搜狗 has it: [KEY] typed with nothing
- * else typed starts the lookup (no pinyin starts with u), then `h s p n z` are the strokes
- * ([Strokes]); each candidate shows its pinyin ([reading]) to learn it by. Picked, it is
- * committed, and the pinyin goes on after it. Any other letter ends the lookup, its keys and the
- * letter typed into pinyin instead: a Latin word (`usb` for USB) or a slip (`uan` for yan). Any
- * other key commits the first candidate, or with none what was typed, and is the app's, as in
- * pinyin: what is typed next does not run on from it, as after Enter.
+ * Pinyin with a character looked up by strokes, as 搜狗 has it: [KEY] with nothing typed starts it (no pinyin
+ * starts with u), then `h s p n z` are strokes; each candidate shows its pinyin. A pick commits and pinyin goes
+ * on after it. Any other letter ends the lookup and is typed into pinyin with its keys (`usb`, `uan`); any other
+ * key commits the first candidate and is the app's. The strokes keep a cursor as pinyin does.
  *
- * The strokes keep a cursor, at their end till moved ([Action.Cursor], [Action.Step]), as pinyin
- * keeps one: strokes go in there, backspace deletes before it, and the letter that ends the lookup
- * is typed there too.
- *
- * [strokes] is asked for at the first lookup: null, there are none, and [KEY] is [pinyin]'s. A
- * character the user [blocked] is not found. A character picked is handed to [follow], for the
- * pinyin to go on after: by default as the app's text ([Action.Context]); a PinyinSession's
- * `follow` keeps what it committed before too, whatever wraps either session. The keys of a
- * lookup a letter ended are handed to [retype], by default typed into the pinyin a key at a time.
- *
- * A character found may be blocked under the strokes typed alone ([blockUnder], the learning
- * record's, as a table blocks under its code: [BLOCK_TABLE]); those [blockedUnder] the strokes are
- * not found. None blocked here without, nor where nothing is learned.
+ * [strokes] null: [KEY] is [pinyin]'s. A pick goes to [follow] and a letter-ended lookup's keys to [retype].
+ * A character found may be blocked under the strokes alone ([blockUnder], under [BLOCK_TABLE]).
  */
 class StrokeLookup(
     private val pinyin: Session,
@@ -56,11 +42,11 @@ class StrokeLookup(
 
     private var looking = false
     private val input = StringBuilder()
-    private var cursor = 0 // where in the strokes the next goes
+    private var cursor = 0
     private var found = Found.none()
     private val pager = Pager(pageSize)
 
-    // whether pinyin shows nothing typed: only then does the key start a lookup
+    // only with pinyin showing nothing typed does the key start a lookup
     private var idle = true
 
     override var learning: Boolean
@@ -71,7 +57,7 @@ class StrokeLookup(
 
     override fun reads(c: Char): Boolean = if (looking) c in 'a'..'z' else (c == KEY && idle) || pinyin.reads(c)
 
-    // pinyin's own answer while it has the keys: one it reads only where it stands (双拼's ;) is its to say
+    // pinyin's own answer while it has the keys (双拼's ; is read only where it stands)
     override fun endsInput(c: Char): Boolean = if (looking) !reads(c) else !(c == KEY && idle) && pinyin.endsInput(c)
 
     override fun apply(action: Action): Snapshot {
@@ -91,7 +77,6 @@ class StrokeLookup(
             is Action.Key -> type(action.char)
             Action.Backspace -> when {
                 input.isEmpty() -> end()
-                // before the first stroke: the key that started the lookup stays
                 cursor == 0 -> snapshot()
                 else -> lookUp { input.deleteCharAt(--cursor) }
             }
@@ -108,7 +93,6 @@ class StrokeLookup(
             is Action.Cursor -> moved(action.at.coerceAtLeast(1) - 1)
             is Action.Step -> moved(action.applyTo(cursor, input.length))
             is Action.Block -> block(action.index)
-            // nothing learned, nothing to offer: as it was
             else -> snapshot()
         }
 
@@ -128,10 +112,8 @@ class StrokeLookup(
 
     override fun why(index: Int): Why? = if (looking) null else pinyin.why(index)
 
-    // the reading typed, while pinyin has the keys; a character found by its strokes is read by its text
     override fun readingOf(index: Int): List<WordReading>? = if (looking) null else pinyin.readingOf(index)
 
-    // a character found by its strokes, nothing typed before it (the lookup starts only then)
     override fun blockScope(index: Int): BlockScope? = if (!looking) pinyin.blockScope(index) else if (found[index] != null) BlockScope.UNDER_CODE else null
 
     override fun lookedUp(index: Int): String? = if (looking) found[index]?.let { "" } else pinyin.lookedUp(index)
@@ -142,8 +124,7 @@ class StrokeLookup(
 
     override fun fieldFlags(flags: Int) = pinyin.fieldFlags(flags)
 
-    // the members below are pinyin's to keep: not forwarded, Session's empty defaults dropped full pinyin's
-    // passedOn, and what was typed before Enter stayed its context (audit-061 engine-01)
+    // the members below must be forwarded: Session's empty defaults dropped pinyin's passedOn, so text before Enter stayed context
     override fun passedOn() {
         if (looking) end()
         idle = true
@@ -154,18 +135,15 @@ class StrokeLookup(
 
     override fun typed(text: String) = pinyin.typed(text)
 
-    // a lookup's keys as typed (the default's CommitRaw); else pinyin's, which may have picked words in pieces,
-    // and has nothing typed after: the key starts a lookup again, as after any other way its input ends
+    // a lookup's keys as typed; else pinyin's, after which the key starts a lookup again
     override fun handBack(): HandedBack = if (looking) super.handBack() else pinyin.handBack().also { idle = true }
 
     private fun type(c: Char): Snapshot = when {
         c in Strokes.KEYS -> lookUp { input.insert(cursor++, c) }
         c in 'a'..'z' -> toPinyin(c)
-        // a key not read: the first candidate, or what was typed as Enter has it; then the key is the app's
         else -> leave(found[0] ?: "$KEY$input", handled = false)
     }
 
-    /** Ends the lookup, [KEY], the strokes and [c] typed into [pinyin] instead. */
     private fun toPinyin(c: Char): Snapshot {
         val after = input.length - cursor
         val keys = "$KEY${input.substring(0, cursor)}$c${input.substring(cursor)}"
@@ -186,16 +164,12 @@ class StrokeLookup(
 
     private fun pick(index: Int): Snapshot {
         val text = found[index] ?: return snapshot()
-        // what follows follows it, after what the pinyin committed before, as the pinyin would have it
         val after = follow(text)
         idle = after.preedit.isEmpty()
         return end(commit = text)
     }
 
-    /**
-     * Ends the lookup, [text] committed as typed or before a key that is the app's: what is typed
-     * next does not run on from it, as after the pinyin's own.
-     */
+    /** Ends the lookup with [text] committed: what is typed next does not run on from it. */
     private fun leave(text: String, handled: Boolean = true): Snapshot {
         idle = pinyin.apply(Action.Reset).preedit.isEmpty()
         return end(commit = text, handled = handled)
@@ -241,7 +215,7 @@ class StrokeLookup(
         )
     }
 
-    /** The characters found, kept as they are made: the first stroke finds thousands, a page shows a few. */
+    /** The characters found, made lazily: the first stroke finds thousands, a page shows a few. */
     private class Found(private val rest: Iterator<String>) {
         private val made = ArrayList<String>()
         private var done = false
@@ -253,22 +227,20 @@ class StrokeLookup(
             return made.getOrNull(i)
         }
 
-        /** How many there are, -1 until all were made. */
         val size: Int get() = if (done) made.size else -1
 
         fun page(from: Int, count: Int): List<String> = (from until from + count).mapNotNull { get(it) }
 
         companion object {
-            // a new one each time, not one every StrokeLookup shares: get() writes done, on whichever thread a session is on
+            // a new one each time: get() writes done, on whichever thread a session is on
             fun none() = Found(emptySequence<String>().iterator())
         }
     }
 
     companion object {
-        /** The key that starts a lookup. */
         const val KEY = 'u'
 
-        /** The learning record's table a character is blocked under strokes in ([Kinds.table]; no table is named so). */
+        /** The record table strokes blocks are filed under ([Kinds.table]; no table is named so). */
         const val BLOCK_TABLE = "strokes"
         const val DEFAULT_PAGE_SIZE = 5
     }

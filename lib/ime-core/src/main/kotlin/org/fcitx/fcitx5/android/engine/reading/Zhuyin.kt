@@ -7,13 +7,8 @@ package org.fcitx.fcitx5.android.engine.reading
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
 /**
- * Each pinyin syllable of [Syllables] in zhuyin (bopomofo): `zhi` ㄓ, `yong` ㄩㄥ, `lve` ㄌㄩㄝ.
- * Written in code rather than shipped as data: the mapping is a fixed rule of the two scripts, not
- * a reading anyone could disagree with.
- *
- * Two pairs of syllables share a spelling, so [syllable] reads it back as the first of each:
- * `er` and the rhotic `r` are both ㄦ (`er`), `weng` and the rare `wong` are both ㄨㄥ (`weng`).
- * The spelt-out Latin letters (A股) have no zhuyin.
+ * Each [Syllables] syllable in zhuyin (`zhi` ㄓ, `lve` ㄌㄩㄝ), in code since it is a fixed rule. Two pairs
+ * share a spelling, read back as the first: `er`/`r` (ㄦ), `weng`/`wong` (ㄨㄥ). Latin letters have none.
  */
 object Zhuyin {
 
@@ -23,7 +18,7 @@ object Zhuyin {
         "j" to "ㄐ", "q" to "ㄑ", "x" to "ㄒ", "r" to "ㄖ", "z" to "ㄗ", "c" to "ㄘ", "s" to "ㄙ",
     )
 
-    // The initials whose bare `i` (zhi, ci) is no vowel at all: zhuyin writes the initial alone.
+    // initials whose bare `i` (zhi, ci) is no vowel: zhuyin writes the initial alone
     private const val BUZZING = "zh ch sh r z c s"
 
     private val FINALS = mapOf(
@@ -35,7 +30,7 @@ object Zhuyin {
         "un" to "ㄨㄣ", "uang" to "ㄨㄤ", "v" to "ㄩ", "ve" to "ㄩㄝ", "van" to "ㄩㄢ", "vn" to "ㄩㄣ",
     )
 
-    // Syllables with no initial, whose y/w is only pinyin's spelling of a medial, and the interjections.
+    // no-initial syllables, whose y/w only spells a medial, and the interjections
     private val WHOLE = mapOf(
         "yi" to "ㄧ", "ya" to "ㄧㄚ", "yo" to "ㄧㄛ", "ye" to "ㄧㄝ", "yao" to "ㄧㄠ", "you" to "ㄧㄡ",
         "yan" to "ㄧㄢ", "yin" to "ㄧㄣ", "yang" to "ㄧㄤ", "ying" to "ㄧㄥ", "yong" to "ㄩㄥ",
@@ -65,19 +60,15 @@ object Zhuyin {
         bySyllable.forEachIndexed { id, z -> if (z != null) putIfAbsent(z, id) }
     }
 
-    /** @return [syllable] (an id of [Syllables]) in zhuyin, or null for a spelt-out Latin letter */
+    /** Null for a Latin letter. */
     fun of(syllable: Int): String? = bySyllable.getOrNull(syllable)
 
-    /** @return [spelling] (a pinyin syllable, `v` for ü) in zhuyin, or null if it is none */
+    /** Null if [spelling] is not a syllable. */
     fun of(spelling: String): String? = Syllables.id(spelling).takeIf { it >= 0 }?.let(::of)
 
-    /** @return the id of the syllable spelt [zhuyin] (no tone mark), or -1 */
+    /** [zhuyin] without tone mark; -1 if none. */
     fun syllable(zhuyin: String): Int = byZhuyin[zhuyin] ?: -1
 
-    /**
-     * Every zhuyin symbol a syllable may use, initials first, then the medials and finals: what a zhuyin
-     * keyboard needs keys for. ZhuyinKeys.SYMBOLS is the same set in Unicode's order, which its codes
-     * follow; ZhuyinKeysTest holds the two to one set.
-     */
+    /** Every symbol a syllable may use, initials first; ZhuyinKeys.SYMBOLS is the same set in Unicode order (ZhuyinKeysTest holds them equal). */
     const val symbols: String = "ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦ"
 }

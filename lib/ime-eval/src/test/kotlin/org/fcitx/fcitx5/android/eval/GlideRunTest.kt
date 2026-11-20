@@ -77,8 +77,7 @@ class GlideRunTest {
 
     @Test
     fun readingsThatDifferOnlyInWhereTheSyllablesPartAreNotTheSame() {
-        // fangan cut longest first is fang'an (方案); the dictionary knows only fan'gan (反感), the
-        // same keys: a miss, not the hit comparing them without the separator made it
+        // fangan cut longest first is fang'an, the dictionary knows only fan'gan: a miss
         val data = PinyinData.load(
             ByteBuffer.wrap(
                 PinyinDataBuilder()

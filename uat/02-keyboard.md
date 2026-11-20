@@ -458,7 +458,7 @@
 ### KB-70 [P1] 空格左右滑动光标后，再上下挪换行
 - **前提**：B0，点「多行」框（`multiline`），写三行 `aaa`、`bbb`、`ccc`（回车换行），光标在末尾。
 - **操作**：手指按住空格向左滑一点，不抬手往上挪约一个键高，再往上一点，再往下挪一点后松开。另做一次：空格直接上滑。再到「短文本」单行框里横滑后上挪。
-- **预期**：横滑时光标左移；往上挪光标到上一行、再上一行，往下回一行，每行轻振一下；不打出空格。直接上滑还是弹编辑菜单，光标不动。单行框里上下挪光标不动，横滑照旧。
+- **预期**：横滑时光标左移；往上挪光标到上一行、再上一行，往下回一行；不打出空格。直接上滑还是弹编辑菜单，光标不动。单行框里上下挪光标不动，横滑照旧。
 - **JVM**：`KeyboardUatTest.spaceSlidesUpAndDownAfterSideways`、`spaceSlidesNoLine`（快速输入和单行框）、`spaceSlidesDiagonallyMovesBothWaysInOneSample`。
 
 ### KB-71 [P1] 空格竖滑到输入框最上、最下时不跳到别的框
@@ -573,8 +573,8 @@
 ### KB-85 [P1] 快捷键「滑选」：左右挪过以后上下挪，按屏幕上的行选到上一行、下一行
 - **前提**：B0，**按键字符和快捷键** 里把 q 的 **上滑** 设成命令 **滑选**。输入测试台（`types` 页）的「多行」框（`multiline`）里打一段不带换行、在框里自动折成五行以上的长文字（脚本打 24 段 `abcdefghij`，每段回车上屏字母），用空格滑动把光标放到中间一行的中间。
 - **操作**：q 上滑过阈值不松手，往左挪一个字（约 10 dp），再往上挪三行（每行约 28 dp），然后往下挪回五行（越过起点），再往左挪一个字，松手。再到测试台的「普通文本」单行框里写 `hello`，q 上滑不松手往左挪一个字，再往上挪一个键高，松手。
-- **预期**：往左挪选中一个字；往上每挪一行，选区跟着手指的一端到屏幕上的上一行（折出来的行也算一行，不是跳到整段开头），差不多同一列，三行后选中跨四行的一段，起点一直不动；往下挪回时选区缩回、越过起点后往下选到起点下面两行；再往左挪从那一端接着缩一个字。每行轻振一下；松手后选区留着，框里内容不变，没有打出 q。单行框里只选中 `o`，上挪不做事。不认 Shift 加上下键的输入框里上下挪不做事：选区不竖着动，也不改成按换行符挪。
-- **JVM**：`SwipeSelectLinesHostTest.swipeSelectMovesItsFreeEndALineUpAndDown`（真 `KotlinHost` + 真 `EditText`：按键次序 Shift↓、↑、↑、Shift↑，起点不动，之后横挪从输入框报的那一端接着）；同一个类里还有：`swipeSelectLineAtTheFieldsFirstOrLastLineGoesToItsEdge`（第一行上挪选到开头、最后一行下挪选到结尾）、`swipeSelectLineOverTheAnchorStaysSelectedAtTheLift`（越过起点的一行松手后仍选着）、`swipeSelectLineIgnoredGivesTheStepsBackAfterTheWait`（不认 Shift 加上下键：300 ms 后横挪从原处接着）、`swipeSelectLineNeverReportedIsNoLongerWaitedForAfterTheTouch`（松手或换框后不再等那一行，之后输入框自己的选区不被改）、`swipeSelectTwoLinesInOneSampleKeepEachOther`（一次连发两行）、`swipeSelectStepAndLineDownInOneSampleGoOnFromTheLine`（同一次里横挪加下挪）、`swipeSelectIsFeltOnceASample`（每次挪动只振一下）；ime-core `SwipeSelectionTest`（按输入框报的选区接着、起点不动、连发几行、不认 Shift 加上下键的输入框不竖移），上下挪从第一次横挪起算见 `SwipeStepsTest.crossStepsBeginAtTheFirstSidewaysStep`。折行的屏幕行、振动和单行框设备上跑；不认 Shift 加上下键的输入框只在 JVM 上查（测试台的框都认）。
+- **预期**：往左挪选中一个字；往上每挪一行，选区跟着手指的一端到屏幕上的上一行（折出来的行也算一行，不是跳到整段开头），差不多同一列，三行后选中跨四行的一段，起点一直不动；往下挪回时选区缩回、越过起点后往下选到起点下面两行；再往左挪从那一端接着缩一个字。松手后选区留着，框里内容不变，没有打出 q。单行框里只选中 `o`，上挪不做事。不认 Shift 加上下键的输入框里上下挪不做事：选区不竖着动，也不改成按换行符挪。
+- **JVM**：`SwipeSelectLinesHostTest.swipeSelectMovesItsFreeEndALineUpAndDown`（真 `KotlinHost` + 真 `EditText`：按键次序 Shift↓、↑、↑、Shift↑，起点不动，之后横挪从输入框报的那一端接着）；同一个类里还有：`swipeSelectLineAtTheFieldsFirstOrLastLineGoesToItsEdge`（第一行上挪选到开头、最后一行下挪选到结尾）、`swipeSelectLinesAfterAStepStaySelectedAtTheLift`（越过起点的一行松手后仍选着；一次连发两行）、`swipeSelectLineIgnoredGivesTheStepsBackAfterTheWait`（不认 Shift 加上下键：300 ms 后横挪从原处接着）、`swipeSelectLineNeverReportedIsNoLongerWaitedForAfterTheTouch`（松手或换框后不再等那一行，之后输入框自己的选区不被改）、`swipeSelectStepAndLineDownInOneSampleGoOnFromTheLine`（同一次里横挪加下挪）；ime-core `SwipeSelectionTest`（按输入框报的选区接着、起点不动、连发几行、不认 Shift 加上下键的输入框不竖移），上下挪从第一次横挪起算见 `SwipeStepsTest.crossStepsBeginAtTheFirstSidewaysStep`。折行的屏幕行和单行框设备上跑；不认 Shift 加上下键的输入框只在 JVM 上查（测试台的框都认）。
 
 ### KB-87 [P2] 长按首选太长时键角画前两个字加「…」，不伸出键外
 - **前提**：B0-设置；**按键 → 按键字符和快捷键 → 全键盘**，点 q，添加 `13895801474` 并设为首选，确定。
@@ -586,7 +586,7 @@
 - **前提**：B0；装了输入测试台（uat/TESTBED.md），打开它的 `behavior`（模拟应用行为）页，点 `null_before` 框（应用不给光标前的字：`getTextBeforeCursor` 这些都返回 null）。
 - **操作**：切到英文，在框里打 `hello world`（不打 `abc` 这类不是单词的字母：英文按空格时会把它改成词库里的写法 `ABC`），把光标点到 `hello` 后面（`o` 和空格之间）；退格上滑；再退格下滑。
 - **预期**：上滑清掉光标后的 ` world`，框里剩 `hello`，提示"已清除"带撤销；下滑放回，框里是 `hello world`，光标仍在 `hello` 后（不跳到开头或末尾）。
-- **JVM**：`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsAfterItIsClearedAndPutBackAtTheCursor`（真键盘、输入框的 `getTextBeforeCursor` 返回 null：上滑清掉光标后的、提示"已清除"，下滑放回、光标在原处）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenAFieldWithNothingAfterItIsNotTakenForAnEmptyOne`（光标后也没字时不清除，复制不当成空框）、`KeyShortcutsHostTest.whereNothingAfterTheCursorIsGivenWhatIsBeforeItIsClearedAndPutBack`（反过来，光标后读不到的应用：清掉光标前的、放回）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsTypedIsPutBackUnlessSomethingWasCommittedSince`（清掉正在打的拼音能放回；之后上屏过字就不放回，提示"没有可恢复的内容"）；ime-core `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`（光标前读不到时清除光标后的部分，放回后光标在原处）、`EditPlanTest.aLongFieldAfterACursorWithTextBeforeItNotReadKeepsThatText`（光标后超过一万字时只删读到的那部分，不全选，光标前没读到的字留着）、`EditPlanTest.aClearWithASideNotGivenIsNotPutBackOnceSomethingIsTyped`（有一边读不到的清除，之后打过字就不放回）、`EditPlanTest.whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt`（R25 F7834：光标刚挪、报告还没跟上时，放回后的光标按输入框里的位置）（前一条也记在 KB-62）。这一条还没写进脚本，在模拟器上手工跑。
+- **JVM**：`KeyShortcutsHostTest.whereOneSideOfTheCursorIsNotGivenTheOtherIsClearedAndPutBackAtTheCursor`（真键盘、输入框的 `getTextBeforeCursor` 返回 null：上滑清掉光标后的、提示"已清除"，下滑放回、光标在原处；反过来，光标后读不到的应用：清掉光标前的、放回）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenAFieldWithNothingAfterItIsNotTakenForAnEmptyOne`（光标后也没字时不清除，复制不当成空框）、`KeyShortcutsHostTest.whereNothingBeforeTheCursorIsGivenWhatIsTypedIsPutBackUnlessSomethingWasCommittedSince`（清掉正在打的拼音能放回；之后上屏过字就不放回，提示"没有可恢复的内容"）；ime-core `EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor`（光标前读不到时清除光标后的部分，放回后光标在原处）、`EditPlanTest.aLongFieldAfterACursorWithTextBeforeItNotReadKeepsThatText`（光标后超过一万字时只删读到的那部分，不全选，光标前没读到的字留着）、`EditPlanTest.aClearWithASideNotGivenIsNotPutBackOnceSomethingIsTyped`（有一边读不到的清除，之后打过字就不放回）、`EditPlanTest.whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt`（R25 F7834：光标刚挪、报告还没跟上时，放回后的光标按输入框里的位置）（前一条也记在 KB-62）。这一条还没写进脚本，在模拟器上手工跑。
 
 ### KB-90 [P1] 九键点 123：数字键盘和九键是同一副格子，键都在原位
 - **前提**：B0-九键。

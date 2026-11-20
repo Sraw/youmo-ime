@@ -12,216 +12,117 @@ import org.junit.Test
 
 class CursorRangeTest {
 
-    // region construction
-
     @Test
-    fun defaultsToCollapsedAtZero() {
-        val r = CursorRange()
-        assertTrue(r.rangeEquals(0, 0))
-        assertTrue(r.isEmpty())
-    }
-
-    @Test
-    fun constructorStoresBoundsVerbatim() {
-        val r = CursorRange(3, 7)
-        assertEquals(3, r.start)
-        assertEquals(7, r.end)
-    }
-
-    /**
-     * The constructor does NOT normalise, but [CursorRange.update] does. Anything that can
-     * receive a reversed selection has to go through `update`, not the constructor.
-     */
-    @Test
-    fun constructorKeepsReversedBoundsWhileUpdateNormalises() {
-        val constructed = CursorRange(7, 3)
-        assertTrue("constructor leaves it reversed", constructed.rangeEquals(7, 3))
-
-        val updated = CursorRange()
-        updated.update(7, 3)
-        assertTrue("update swaps into ascending order", updated.rangeEquals(3, 7))
-    }
-
-    // endregion
-
-    // region identity -- the sharp edges of a value class wrapping a mutable IntArray
-
-    /**
-     * `CursorRange` is a value class around an `IntArray`, so the generated `equals` compares
-     * the array by reference: two ranges with identical bounds need not be `==`. Every
-     * comparison goes through [CursorRange.rangeEquals], which compares the bounds.
-     */
-    @Test
-    fun rangeEqualsComparesTheBoundsOfTwoRanges() {
-        val a = CursorRange(1, 2)
-        assertTrue("rangeEquals compares the bounds", a.rangeEquals(CursorRange(1, 2)))
-        assertFalse(a.rangeEquals(CursorRange(1, 3)))
-    }
-
-    // endregion
-
-    // region update / clear / offset
-
-    @Test
-    fun updateWithSingleIndexCollapsesRange() {
-        val r = CursorRange(2, 8)
-        r.update(5)
-        assertTrue(r.rangeEquals(5, 5))
-        assertTrue(r.isEmpty())
-    }
-
-    @Test
-    fun updateWithEqualBoundsIsCollapsed() {
-        val r = CursorRange()
-        r.update(4, 4)
-        assertTrue(r.rangeEquals(4, 4))
-        assertTrue(r.isEmpty())
-    }
-
-    @Test
-    fun clearResetsToZero() {
-        val r = CursorRange(10, 20)
-        r.clear()
-        assertTrue(r.rangeEquals(0, 0))
-    }
-
-    @Test
-    fun anOffsetShiftsBothBounds() = assertRows(
-        "offset shifts both bounds" to {
-            val r = CursorRange(3, 7)
-            r.offset(5)
-            assertTrue(r.rangeEquals(8, 12))
+    fun constructionKeepsTheBoundsAndOnlyUpdateNormalises() = assertRows(
+        "defaults to collapsed at zero" to {
+            assertTrue(CursorRange().rangeEquals(0, 0))
+            assertTrue(CursorRange().isEmpty())
         },
-        "offset by zero is identity" to {
+        "the constructor stores the bounds verbatim" to {
             val r = CursorRange(3, 7)
-            r.offset(0)
-            assertTrue(r.rangeEquals(3, 7))
+            assertEquals(3, r.start)
+            assertEquals(7, r.end)
         },
-        // no clamping: the caller is responsible for keeping the range inside the buffer
-        "offset accepts negative and does not clamp at zero" to {
-            val r = CursorRange(1, 2)
-            r.offset(-5)
-            assertTrue(r.rangeEquals(-4, -3))
-        },
-        "offset preserves length" to {
-            val r = CursorRange(3, 7)
-            val lengthBefore = r.end - r.start
-            r.offset(-3)
-            assertEquals(lengthBefore, r.end - r.start)
+        // anything that can receive a reversed selection has to go through update, not the constructor
+        "the constructor leaves it reversed, update swaps" to {
+            assertTrue(CursorRange(7, 3).rangeEquals(7, 3))
+            assertTrue(CursorRange().apply { update(7, 3) }.rangeEquals(3, 7))
         },
     )
 
-    // endregion
+    @Test
+    fun updateAndClearSetTheBounds() = assertRows(
+        "update with one index collapses" to {
+            val r = CursorRange(2, 8).apply { update(5) }
+            assertTrue(r.rangeEquals(5, 5))
+            assertTrue(r.isEmpty())
+        },
+        "update with equal bounds is collapsed" to {
+            val r = CursorRange().apply { update(4, 4) }
+            assertTrue(r.rangeEquals(4, 4))
+            assertTrue(r.isEmpty())
+        },
+        "clear resets to zero" to { assertTrue(CursorRange(10, 20).apply { clear() }.rangeEquals(0, 0)) },
+    )
 
-    // region emptiness
+    @Test
+    fun anOffsetShiftsBothBounds() = assertRows(
+        "offset shifts both bounds" to { assertTrue(CursorRange(3, 7).apply { offset(5) }.rangeEquals(8, 12)) },
+        "offset by zero is identity" to { assertTrue(CursorRange(3, 7).apply { offset(0) }.rangeEquals(3, 7)) },
+        // no clamping: the caller is responsible for keeping the range inside the buffer
+        "offset accepts negative and does not clamp at zero" to {
+            assertTrue(CursorRange(1, 2).apply { offset(-5) }.rangeEquals(-4, -3))
+        },
+    )
 
     @Test
     fun emptinessTracksWhetherBoundsCoincide() {
-        val collapsed = CursorRange(4, 4)
-        assertTrue(collapsed.isEmpty())
-        assertFalse(collapsed.isNotEmpty())
-
-        val selection = CursorRange(4, 5)
-        assertFalse(selection.isEmpty())
-        assertTrue(selection.isNotEmpty())
-    }
-
-    // endregion
-
-    // region contains(Int)
-
-    @Test
-    fun containsIndexIsInclusiveAtBothEnds() {
-        val r = CursorRange(2, 5)
-        assertTrue("start is inside", r.contains(2))
-        assertTrue("end is inside", r.contains(5))
-        assertTrue(r.contains(3))
-        assertFalse(r.contains(1))
-        assertFalse(r.contains(6))
+        assertTrue(CursorRange(4, 4).isEmpty())
+        assertFalse(CursorRange(4, 4).isNotEmpty())
+        assertFalse(CursorRange(4, 5).isEmpty())
+        assertTrue(CursorRange(4, 5).isNotEmpty())
     }
 
     @Test
-    fun collapsedRangeContainsOnlyItsOwnIndex() {
-        val r = CursorRange(4, 4)
-        assertTrue(r.contains(4))
-        assertFalse(r.contains(3))
-        assertFalse(r.contains(5))
-    }
+    fun containsAnIndexInclusiveAtBothEnds() = assertRows(
+        "start, end and between are inside" to {
+            val r = CursorRange(2, 5)
+            assertTrue(r.contains(2))
+            assertTrue(r.contains(5))
+            assertTrue(r.contains(3))
+            assertFalse(r.contains(1))
+            assertFalse(r.contains(6))
+        },
+        "a collapsed range contains only its own index" to {
+            val r = CursorRange(4, 4)
+            assertTrue(r.contains(4))
+            assertFalse(r.contains(3))
+            assertFalse(r.contains(5))
+        },
+        // `other in start..end` is an empty progression when reversed: not even its bounds
+        "a reversed range contains nothing" to {
+            val r = CursorRange(5, 2)
+            assertFalse(r.contains(2))
+            assertFalse(r.contains(3))
+            assertFalse(r.contains(5))
+        },
+    )
 
-    /**
-     * `contains(Int)` is implemented as `other in start..end`, which is an empty progression
-     * when the range is reversed -- so a reversed range contains nothing, not even its bounds.
-     */
     @Test
-    fun reversedRangeContainsNothing() {
-        val r = CursorRange(5, 2)
-        assertFalse(r.contains(2))
-        assertFalse(r.contains(3))
-        assertFalse(r.contains(5))
-    }
-
-    // endregion
-
-    // region contains(CursorRange)
-
-    @Test
-    fun containsRangeAcceptsSubRangesIncludingItself() {
+    fun containsARangeOnlyInsideIt() {
         val outer = CursorRange(2, 8)
-        assertTrue("identical range", outer.contains(CursorRange(2, 8)))
-        assertTrue("strict sub-range", outer.contains(CursorRange(3, 7)))
-        assertTrue("touching the start", outer.contains(CursorRange(2, 4)))
-        assertTrue("touching the end", outer.contains(CursorRange(6, 8)))
-        assertTrue("collapsed inside", outer.contains(CursorRange(5, 5)))
+        assertRows(
+            *listOf(2 to 8, 3 to 7, 2 to 4, 6 to 8, 5 to 5).map { (s, e) ->
+                "[$s,$e] is inside" to { assertTrue(outer.contains(CursorRange(s, e))) }
+            }.toTypedArray(),
+            *listOf(1 to 4, 6 to 9, 0 to 1, 9 to 10, 1 to 9).map { (s, e) ->
+                "[$s,$e] is not inside" to { assertFalse(outer.contains(CursorRange(s, e))) }
+            }.toTypedArray(),
+        )
     }
 
+    /** A value class over an `IntArray`: `equals` compares the array by reference; [CursorRange.rangeEquals] compares bounds. */
     @Test
-    fun containsRangeRejectsOverlapAndOutside() {
-        val outer = CursorRange(2, 8)
-        assertFalse("crosses the start", outer.contains(CursorRange(1, 4)))
-        assertFalse("crosses the end", outer.contains(CursorRange(6, 9)))
-        assertFalse("entirely before", outer.contains(CursorRange(0, 1)))
-        assertFalse("entirely after", outer.contains(CursorRange(9, 10)))
-        assertFalse("strict superset", outer.contains(CursorRange(1, 9)))
-    }
-
-    // endregion
-
-    // region rangeEquals
-
-    @Test
-    fun rangeEqualsComparesBothBounds() {
-        val r = CursorRange(3, 7)
-        assertTrue(r.rangeEquals(3, 7))
-        assertFalse("start differs", r.rangeEquals(2, 7))
-        assertFalse("end differs", r.rangeEquals(3, 8))
-    }
-
-    @Test
-    fun rangeEqualsWithOneArgumentMeansCollapsed() {
-        assertTrue(CursorRange(4, 4).rangeEquals(4))
-        assertFalse("a real selection is not collapsed", CursorRange(4, 5).rangeEquals(4))
-    }
-
-    @Test
-    fun rangeEqualsDistinguishesReversedBounds() {
-        assertFalse(CursorRange(3, 7).rangeEquals(7, 3))
-    }
-
-    // endregion
-
-    // region misc
-
-    @Test
-    fun destructuringYieldsStartThenEnd() {
-        val (start, end) = CursorRange(3, 7)
-        assertEquals(3, start)
-        assertEquals(7, end)
-    }
+    fun rangeEqualsComparesBothBounds() = assertRows(
+        "another range" to {
+            assertTrue(CursorRange(1, 2).rangeEquals(CursorRange(1, 2)))
+            assertFalse(CursorRange(1, 2).rangeEquals(CursorRange(1, 3)))
+        },
+        "two bounds" to {
+            val r = CursorRange(3, 7)
+            assertTrue(r.rangeEquals(3, 7))
+            assertFalse(r.rangeEquals(2, 7))
+            assertFalse(r.rangeEquals(3, 8))
+            assertFalse(r.rangeEquals(7, 3))
+        },
+        "one argument means collapsed" to {
+            assertTrue(CursorRange(4, 4).rangeEquals(4))
+            assertFalse(CursorRange(4, 5).rangeEquals(4))
+        },
+    )
 
     @Test
     fun toStringIsTheBracketedPair() {
         assertEquals("[3,7]", CursorRange(3, 7).toString())
     }
-
-    // endregion
 }

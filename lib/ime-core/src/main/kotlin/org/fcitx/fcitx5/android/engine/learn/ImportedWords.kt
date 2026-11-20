@@ -13,60 +13,54 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.util.BitSet
 
 /**
- * The words the user imported from other input methods' lists (U-101, U-102, PLAN §2.9), as the
- * learning record has them: the batches, a file taken in on a day each, and their words by text
- * and reading, each with the batch that brought it and its place there (D24: the file's counts
- * order the imported words among themselves, nothing more). A word is imported once: a later
- * batch that has it again does not take it over. Whether one is the user's word by now is the
- * record's MINE, not asked here: undoing a batch takes its words out, the user's words staying theirs.
+ * Words imported from other input methods' lists, as the learning record has them: batches (a file on a
+ * day each) and their words by text and reading, each with its batch and place (the file's counts order
+ * imported words among themselves, nothing more). A word is imported once: a later batch does not take it
+ * over. Whether one is the user's word by now is the record's MINE: undoing a batch leaves those theirs.
  *
- * Packed, as a list of 100 000 words is common: each word a place in arrays (its text's
- * characters, its syllables, its batch and order), found by a table of its text. A word taken out
- * keeps its place, marked gone, till the record is read afresh: the places are the user model's
- * ids of them (`UserModel.attachImports`), and a batch undone can be put back from them ([restore]).
+ * Packed, as 100 000-word lists are common: each word a place in arrays (chars, syllables, batch, order),
+ * found by a hash of its text. A removed word keeps its place, marked gone, till the record is reread:
+ * places are the user model's ids (`UserModel.attachImports`), and [restore] brings undone batches back by them.
  */
 class ImportedWords {
-    /** A batch: the [file] it came from, the calendar day it came in on, and how many words it brought. */
+    /** A batch: its source [file], the calendar day it came in, how many words it brought. */
     data class Batch(val id: Int, val file: String, val localDay: Int, val count: Int)
 
     private val batchMap = HashMap<Int, Batch>()
-    // those undone, for restore: their words keep their places, gone
+    // undone batches, for restore: their words keep their places, gone
     private val undone = HashMap<Int, Batch>()
 
-    // the words by place: text i is chars[textAt[i] until textAt[i + 1]], its syllables likewise
+    // words by place: text i is chars[textAt[i] until textAt[i + 1]], syllables likewise
     private var chars = CharArray(INITIAL * 3)
     private var textAt = IntArray(INITIAL + 1)
     private var syllables = ShortArray(INITIAL * 3)
     private var syllablesAt = IntArray(INITIAL + 1)
-    private var batchOf = IntArray(INITIAL) // NO_BATCH once forgotten: not put back with its batch
+    private var batchOf = IntArray(INITIAL) // NO_BATCH once forgotten: not restored with its batch
     private var orderOf = IntArray(INITIAL)
     private val gone = BitSet()
 
-    // by text: each slot the first place of a text plus one (0 for none), its other readings by nextSame
+    // by text: each slot a text's first place plus one (0 for none), other readings via nextSame
     private var table = IntArray(INITIAL * 2)
     private var texts = 0
     private var nextSame = IntArray(INITIAL)
 
-    /** How many places: every word put in since this record was read, gone ones too. */
+    /** Every word put in since this record was read, gone ones too. */
     var places = 0
         private set
 
-    /** How many words there are, of every reading. */
+    /** Live words, every reading. */
     var size = 0
         private set
 
-    /** Goes up as words come and go: for what is made of them to know it is stale. */
+    /** Changes as words come and go, so derived data knows it is stale. */
     var version = 0
         private set
 
-    /**
-     * Goes up as words come (a place live again too), not as they go: what holds every live one
-     * and tells a gone one by [has] (the user model's start trie) is stale only then.
-     */
+    /** Changes as words come (or a place goes live again), not as they go: a structure holding every live one and checking [has] is stale only then. */
     var grown = 0
         private set
 
-    /** The highest batch id seen, undone ones too: a new batch is not given an id an undone one may come back as. */
+    /** The highest batch id seen, undone too: a new batch never takes an id an undone one may come back as. */
     var lastId = 0
         private set
 
@@ -74,34 +68,29 @@ class ImportedWords {
 
     fun isEmpty() = batchMap.isEmpty() && size == 0
 
-    /** The text of the word at [place]. */
     fun text(place: Int) = String(chars, textAt[place], textAt[place + 1] - textAt[place])
 
-    /** The syllables of the word at [place]. */
     fun syllables(place: Int) = IntArray(length(place)) { syllable(place, it) }
 
-    /** How many syllables the word at [place] has. */
     fun length(place: Int) = syllablesAt[place + 1] - syllablesAt[place]
 
-    /** The [i]th syllable of the word at [place]. */
     fun syllable(place: Int, i: Int) = syllables[syllablesAt[place] + i].toInt()
 
-    /** The reading of the word at [place], syllables apart by spaces. */
+    /** Syllables space-separated. */
     fun reading(place: Int) = Syllables.spelled(length(place)) { syllable(place, it) }
 
-    /** The batch the word at [place] came in. */
     fun batch(place: Int) = batchOf[place]
 
-    /** Whether the word at [place] is imported still: not undone nor forgotten. */
+    /** Not undone nor forgotten. */
     fun has(place: Int) = place in 0 until places && !gone[place]
 
-    /** The place of [text] read [syllables], imported still; -1 if it is none. */
+    /** -1 if none. */
     fun find(text: String, syllables: IntArray): Int = find(text, syllables, live = true)
 
-    /** Whether [text] read [reading] (syllables apart by spaces) is imported. */
+    /** [reading]: syllables space-separated. */
     fun has(text: String, reading: String): Boolean = syllablesOf(reading)?.let { find(text, it) >= 0 } == true
 
-    /** The places of [text]'s readings imported still. */
+    /** Readings still imported. */
     fun placesOf(text: String): List<Int> {
         val out = ArrayList<Int>(1)
         var p = first(text)
@@ -112,16 +101,12 @@ class ImportedWords {
         return out
     }
 
-    /**
-     * Where [text] goes among the imported words (D24): its batch, then its place there, the
-     * earliest of its readings; -1 if it is none.
-     */
+    /** Its batch, then its place there, over its earliest reading; -1 if none. */
     fun order(text: String): Long = placesOf(text).minOfOrNull(::order) ?: -1L
 
-    /** Where the word at [place] goes among the imported words: see [order]. */
     fun order(place: Int): Long = (batchOf[place].toLong() shl Int.SIZE_BITS) or orderOf[place].toLong()
 
-    /** Applies an import's record, or a snapshot's row of one: whether its words changed. */
+    /** An import record, or a snapshot row of one; whether the words changed. */
     fun apply(record: LearnRecord): Boolean = when (record) {
         is ImportBatch -> putBatch(Batch(record.id, record.file, record.localDay, record.count))
         is BatchRow -> putBatch(Batch(record.id, record.file, record.localDay, record.count))
@@ -139,7 +124,7 @@ class ImportedWords {
     }
 
     private fun add(batch: Int, order: Int, text: String, reading: String): Boolean {
-        // a word of a batch not (or no longer) there is not taken: an undo of it was written first
+        // a word of a batch not (or no longer) there is not taken: its undo was written first
         if (batch !in batchMap || text.isEmpty()) return false
         val read = syllablesOf(reading) ?: return false
         val known = find(text, read, live = false)
@@ -167,7 +152,7 @@ class ImportedWords {
         return changed
     }
 
-    /** Takes [text] out, in every reading (U-82 删除, U-84): whether it was imported. */
+    /** In every reading; whether it was imported. */
     fun forget(text: String): Boolean {
         val out = placesOf(text)
         for (p in out) {
@@ -184,13 +169,11 @@ class ImportedWords {
     }
 
     /**
-     * Made what [now] is (a record read afresh: a rewrite), each word in the place it had here, a
-     * new one in a new place, what [now] lacks gone: the user model's ids of them stay what they
-     * were, so a session over it goes on as typed (an undo while typing). A rewrite (全部清空,
-     * 退回恢复前, an act's undo) ends every 撤销, as a fold and a start do: a batch undone before it
-     * is not put back by [restore], nor one the rewrite took (review-int-records N3, F2811). Not
-     * [endUndo]: a rewrite the user did not make (the older builds' learning landing), which keeps
-     * the 撤销 of the batches [now] has undone as well (F3209).
+     * Becomes [now] (the record reread after a rewrite), each word keeping its place here, new ones in new
+     * places, missing ones gone: the user model's ids stay, so a session goes on as typed. A rewrite
+     * (全部清空, 退回恢复前, an undo) ends every 撤销 as a fold or start does: no earlier undone batch can be
+     * restored. With [endUndo] false (a rewrite the user did not make, older builds' learning landing) the
+     * 撤销 of batches [now] has undone too is kept.
      */
     fun takeFrom(now: ImportedWords, endUndo: Boolean = true) {
         for (p in 0 until places) if (!gone[p]) take(p)
@@ -198,15 +181,15 @@ class ImportedWords {
         for (b in now.batches) putBatch(b)
         for (p in now.places()) add(now.batchOf[p], now.orderOf[p], now.text(p), now.reading(p))
         lastId = maxOf(lastId, now.lastId)
-        // cleared, not kept to what [now] has undone: a rewrite that keeps the tail (an act's undo,
-        // 清掉最近) replays an earlier ImportUndo into [now], and F2811 ends that 撤销 too (F3075)
+        // cleared, not trimmed to [now]'s undone: a tail-keeping rewrite (an undo, 清掉最近) replays an earlier
+        // ImportUndo into [now], whose 撤销 must end too
         if (endUndo) undone.clear() else undone.keys.retainAll(now.undone.keys)
     }
 
-    /** The places of the words imported, of [batch] alone if given, in place order. */
+    /** Of [batch] alone if given, in place order. */
     fun places(batch: Int? = null): List<Int> = (0 until places).filter { !gone[it] && (batch == null || batchOf[it] == batch) }
 
-    /** As a snapshot's rows: the batches by id, then the words by batch and place. */
+    /** As snapshot rows: batches by id, then words by batch and place. */
     fun rows(): List<LearnRecord> = buildList {
         for (b in batches) add(BatchRow(b.id, b.file, b.localDay, b.count))
         val all = places().map { ImportedRow(batchOf[it], orderOf[it], text(it), reading(it)) }
@@ -214,11 +197,9 @@ class ImportedWords {
     }
 
     /**
-     * The records that bring [batch] back as [ImportUndo] took it (撤销 of 撤掉这批, U-102), its
-     * words but those forgotten or imported again since; empty if it is not undone, or the record
-     * was read afresh or rewritten since (a fold, a start, 全部清空). A word another batch imported again since, that
-     * batch undone too, keeps that batch's place and is not brought back here (review-G NIT 5):
-     * putting back the later batch brings it.
+     * The records that restore [batch] as [ImportUndo] removed it (撤销 of 撤掉这批), minus words forgotten or
+     * re-imported since; empty if not undone or the record was reread or rewritten since. A word another
+     * batch re-imported, that batch undone too, keeps that batch's place: restoring that batch brings it.
      */
     fun restore(batch: Int): List<LearnRecord> {
         val b = undone[batch] ?: return emptyList()
@@ -309,14 +290,14 @@ class ImportedWords {
     private fun fit(a: CharArray, n: Int) = if (n <= a.size) a else a.copyOf(maxOf(n, a.size * 2))
     private fun fit(a: ShortArray, n: Int) = if (n <= a.size) a else a.copyOf(maxOf(n, a.size * 2))
 
-    /** A word of a file to import: [text] read [reading] (spelt syllables apart by spaces), with the file's [frequency], if it gives one. */
+    /** [reading]: spelt syllables space-separated; [frequency] if the file gives one. */
     data class Incoming(val text: String, val reading: String, val frequency: Double? = null)
 
     companion object {
         private const val INITIAL = 16
         private const val NO_BATCH = -1
 
-        // a reading as the record spells it, as syllable ids; null for one that is none
+        // syllable ids; null if not a reading
         private fun syllablesOf(reading: String): IntArray? {
             if (reading.isEmpty()) return null
             val parts = reading.split(' ')
@@ -324,11 +305,9 @@ class ImportedWords {
         }
 
         /**
-         * The records that import [words] of [file] on [localDay] as batch [id] (U-101): each word
-         * once, those [known] says are words already (the dictionary's, a user dictionary's, the
-         * user's own, added or blocked by hand, imported before) left out, the rest in the order
-         * D24 gives them, the file's frequency first (higher first), its order where it has none.
-         * Empty if none is left.
+         * The records importing [words] of [file] on [localDay] as batch [id]: each word once, those [known]
+         * already (dictionary, user dictionaries, the user's own, added or blocked, imported before) left out,
+         * the rest by the file's frequency (higher first), else its order. Empty if none is left.
          */
         fun plan(id: Int, file: String, localDay: Int, words: List<Incoming>, known: (String, String) -> Boolean): List<LearnRecord> {
             val seen = HashSet<Word>()

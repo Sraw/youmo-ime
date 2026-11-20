@@ -18,35 +18,25 @@ plugins {
     alias(libs.plugins.roborazzi)
 }
 
-// What every app unit test task runs with, AGP's (testOptions.unitTests.all) and testDebugUnitTestAt29
+// AGP's unit test tasks and testDebugUnitTestAt29 alike
 fun Test.unitTestSettings() {
     maxHeapSize = "3g"
     forkEvery = 40
-    // two test JVMs at once (-PtestForks=<n>): CI's runner has 4 cores and 16 GB, each JVM up to 3 GB
-    // beside Gradle's 2; a run one at a time took 14 min there
+    // CI's runner has 4 cores and 16 GB, each JVM up to 3 GB beside Gradle's 2
     maxParallelForks = project.findProperty("testForks")?.toString()?.let {
         it.toIntOrNull()?.takeIf { n -> n >= 1 } ?: error("-PtestForks=<n>: a whole number, 1 or more, not '$it'")
     } ?: 2
-    // -PskipExhaustive: KeyMarksEverywhereUatTest (every key of every keyboard, every pair of mark places)
-    // left out, half a run's time; CI runs it in key_marks.yml (at 35 and 29), when the keys' code changes and weekly.
+    // -PskipExhaustive: KeyMarksEverywhereUatTest left out, half a run's time; CI runs it in key_marks.yml.
     // Not with --tests naming it: the exclusion wins, "No tests found"
     if (project.hasProperty("skipExhaustive")) filter.excludeTestsMatching("org.fcitx.fcitx5.android.uat.KeyMarksEverywhereUatTest")
-    // mockk's agent attached from inside the test JVM: by default ByteBuddy starts a second
-    // process to attach it, which under a full run's load at times fails and takes every
-    // mockk test of that JVM with it (JvmMockKGateway); the attach's own wait, 10 s, ran
-    // out under that load too (the JVM's attach listener slow to answer), and so did a minute:
-    // the agent loaded when the JVM starts instead, so nothing is attached (ByteBuddyAgent
-    // finds it already installed); the attach settings stay for an IDE's run without it
+    // mockk's agent loaded when the JVM starts: ByteBuddy's attach from a second process at times failed under a full
+    // run's load and took every mockk test of that JVM with it; the attach settings stay for an IDE's run without it
     jvmArgs(
         "-Djdk.attach.allowAttachSelf=true", "-XX:+EnableDynamicAgentLoading",
         "-Dsun.tools.attach.attachTimeout=60000",
     )
-    // a test JVM out of memory ends there, its heap written for the cause (build/test-oom/<task>/java_pid<n>.hprof):
-    // once (060 P2 S4c's gate) one ran out in ThemeMakerLayoutTest and the next class and spun in GC for
-    // 17 min, nothing left to find why; five runs since (at 3 GB, at 1 GB, under full CPU load) never did.
-    // A dir a task (both run at once in the gate), in it a dir a run, named when it starts (not when configured: the
-    // configuration cache would keep one name). The same task runs again soon after (a full run with the canvas, then
-    // the gate): the newest two runs' dirs kept, so the run after an OOM does not take its dump with it; CI keeps a failed run's
+    // a test JVM out of memory writes its heap here for the cause; a dir a run, named when it starts (the configuration
+    // cache would keep one name); the newest two runs' dirs kept, so the run after an OOM does not take its dump with it
     val oom = layout.buildDirectory.dir("test-oom/$name").get().asFile
     val gcLog = project.hasProperty("testGcLog")
     var run: File? = null
@@ -55,61 +45,51 @@ fun Test.unitTestSettings() {
         dir.mkdirs()
         run = dir
         oom.listFiles { f -> f.isDirectory }.orEmpty().sortedByDescending { it.lastModified() }.drop(2).forEach { it.deleteRecursively() }
-        // the dumps of before, loose in the task's dir
         oom.listFiles { f -> f.name.endsWith(".hprof") }?.forEach { it.delete() }
     }
     jvmArgs("-XX:+ExitOnOutOfMemoryError", "-XX:+HeapDumpOnOutOfMemoryError")
     jvmArgumentProviders.add(CommandLineArgumentProvider {
         val dir = run ?: error("the run's dump dir not made (doFirst)")
-        // -PtestGcLog: the test JVM's GC a line a collection, the heap left after each, for a leak's trend
+        // -PtestGcLog: the test JVM's GC a line a collection, for a leak's trend
         listOf("-XX:HeapDumpPath=${dir.path}/") + if (gcLog) listOf("-Xlog:gc:file=${dir.path}/gc-%p.log:uptime") else emptyList()
     })
-    // a run that hangs (that one spun in GC with no end) stops: the longest gate, both tasks and lint, took 12 min
-    // here, and CI's one fork at a time 14 min
+    // a run that hangs (one spun in GC with no end) stops
     timeout.set(Duration.ofMinutes(40))
     val test = this
-    // the byte-buddy-agent on the test's own classpath: the version mockk resolved to
+    // the version mockk resolved to
     jvmArgumentProviders.add(CommandLineArgumentProvider {
         val agents = test.classpath.files.filter { f -> f.name.startsWith("byte-buddy-agent-") }
         val agent = agents.singleOrNull()
             ?: error("${test.name}: one byte-buddy-agent expected on the classpath, found ${agents.map { f -> f.name }} (mockk's dependency changed?)")
         listOf("-javaagent:${agent.path}")
     })
-    // fixtures found from any working directory (an IDE's run too): core/Fixtures.kt
+    // fixtures found from any working directory (an IDE's run too)
     systemProperty("uat.fixtures", rootProject.file("uat/fixtures").path)
-    // read from disk, not the classpath: each an input, so an edit to it alone runs the tests again rather than
-    // leaving them up to date. The fixtures (Fixtures, BackupUatTest, PinyinDictManagerTest)
+    // read from disk, not the classpath: each an input, so an edit to it alone runs the tests again
     inputs.dir(rootProject.file("uat/fixtures")).withPropertyName("uatFixtures")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-    // the strokes' names (StrokeNamesTest), the docs' settings tables (SettingsPagesTest), the punctuation table
-    // the app ships (ChinesePunctuation: assets are not on the unit tests' classpath)
+    // the strokes' names, the docs' settings tables, the punctuation table the app ships (assets are not on the unit
+    // tests' classpath)
     inputs.files(
         rootProject.file("lexicon/stroke-order.tsv"), rootProject.file("docs/settings.md"), rootProject.file("docs/words.md"),
         file("src/main/host-assets/pkgdata/punctuation/punc.mb.zh_CN"),
     ).withPropertyName("repoFiles").withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-    // the Room schemas each version was exported as (ClipboardDatabaseMigrationTest)
     inputs.dir(file("schemas")).withPropertyName("roomSchemas")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
     // the theme maker's shared cases (ThemeMakerRulesTest): compared, or with -PupdateThemeMaker written
     systemProperty("themeMaker.testdata", rootProject.file("web/theme-maker/test/testdata").path)
     systemProperty("enginePaint.out", layout.buildDirectory.dir("w1-pixel").get().asFile.path)
     systemProperty("themeMaker.update", project.hasProperty("updateThemeMaker").toString())
-    // the built-in themes' files (src/commonMain/themes, raw resources too) and the scene's test data (src/commonTest/data:
-    // TestThemes' Transparent, EnginePaintTest, the k17 and qwerty-060 layouts)
+    // the built-in themes' files and the scene's test data
     systemProperty("scene.src", rootProject.file("lib/keyboard-scene/src").path)
     inputs.dir(rootProject.file("lib/keyboard-scene/src/commonTest/data")).withPropertyName("sceneTestData")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-    // compared with the page and its files: a change there is a reason to run again, not an up-to-date skip
+    // a change there is a reason to run again, not an up-to-date skip
     inputs.dir(rootProject.file("web/theme-maker")).withPropertyName("themeMaker")
         .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-    // ThemeLookScreenshotTest's whole set of themes × keyboards × modes, for the eye: -PthemeShots=<dir>
+    // ThemeLookScreenshotTest's whole set for the eye: -PthemeShots=<dir>
     systemProperty("themeShots.dir", project.findProperty("themeShots")?.toString().orEmpty())
-    // ThemeBaselineCompareTest: -PthemeBaseline.tighten=true lowers limits.tsv to what is drawn now; the record and
-    // its limits are inputs (outside the test's sources and resources)
-    systemProperty("themeBaseline.tighten", project.findProperty("themeBaseline.tighten")?.toString().orEmpty())
-    inputs.dir(file("src/test/baseline-060")).withPropertyName("themeBaseline")
-        .withPathSensitivity(org.gradle.api.tasks.PathSensitivity.RELATIVE)
-    // the packs not read through 30 s into a test (PackStore.verifiesInBackground): PacksUatTest does it itself
+    // not read through 30 s into a test: PacksUatTest does it itself
     systemProperty("youmo.packs.verify", "off")
 }
 
@@ -141,9 +121,8 @@ android {
             resValue("mipmap", "app_icon_round", "@mipmap/ic_launcher_round_debug")
             resValue("string", "app_name", "@string/app_name_debug")
         }
-        // what a release runs like, for the instrumented performance tests (KeyboardPerfBaselineTest,
-        // specs/testing.md): not debuggable, R8's, but the debug key, its own id, and debug's typing host.
-        // Nothing is removed (benchmark-rules.pro): the tests reach members only they use
+        // what a release runs like, for the instrumented performance tests: not debuggable, R8's, but the debug key and its
+        // own id. Nothing is removed (benchmark-rules.pro): the tests reach members only they use
         create("benchmark") {
             initWith(getByName("release"))
             applicationIdSuffix = ".bench"
@@ -155,42 +134,28 @@ android {
             proguardFile("benchmark-rules.pro")
         }
     }
-    // `-Pyoumo.testBuildType=benchmark`: the instrumented tests against the benchmark build
     testBuildType = providers.gradleProperty("youmo.testBuildType").getOrElse("debug")
 
-    // Everything runs on the phone, with no network permission at all. One APK: the big data (the
-    // engine's, handwriting's, voice's) is in the resource packs the user imports (AssetPacksPlugin);
-    // voice input works once the voice pack is there, the microphone asked for at its first use.
+    // No network permission at all. The big data is in the resource packs the user imports (AssetPacksPlugin).
 
     androidResources {
-        // Android 13's per-app languages are xml/locales_config.xml, AppLanguage's: generated, they
-        // would offer every values-* directory, the partial translations too
+        // Android 13's per-app languages are xml/locales_config.xml: generated, they would offer the partial translations too
         @Suppress("UnstableApiUsage")
         generateLocaleConfig = false
-        // Chinese and English only, library translations too; zh-HK/zh-MO still resolve to
-        // values-zh-rTW through Android's Hant script matching
+        // zh-HK/zh-MO still resolve to values-zh-rTW through Android's Hant script matching
         localeFilters += listOf("en") + Versions.translations.map { it.replace("_", "-r") }
     }
 
     testOptions {
         unitTests {
-            // Off on purpose: a plain JVM test that reaches an android.jar stub fails loudly
-            // instead of getting false/0/null back and passing for the wrong reason (a Rect
-            // whose fields all read 0, say). Logic belongs in :lib:ime-core; anything that
-            // genuinely needs the framework runs under Robolectric.
+            // Off on purpose: a plain JVM test that reaches an android.jar stub fails loudly instead of getting false/0/null
+            // back and passing for the wrong reason. Anything that needs the framework runs under Robolectric.
             isReturnDefaultValues = false
-            // Also left off. Turning it on made :app:test depend on the merged-assets pipeline,
-            // which dragged in the native host's CMake install tasks (gone since the Kotlin host);
-            // the resources reach Robolectric without the assets instead: unit-test-resources.
+            // Also off: on, :app:test depended on the merged-assets pipeline; the resources reach Robolectric without the assets
+            // instead (unit-test-resources).
             isIncludeAndroidResources = false
-            // Robolectric keeps what each test's keyboard left in the app's objects till the JVM
-            // ends; the UAT classes, a keyboard or more a test, ran out of Gradle's 512 MB default,
-            // and of 1 GB once F1 moved the redroid UI cases here (about 1200 tests, four SDK sandboxes),
-            // and of 2 GB with 0.5.1's streams merged (about 1500, the screenshots of every keyboard's marks);
-            // with the themes' (ThemeMakerLayoutTest's 55 measured views) 4 GB ran out too, ThemeMakerLayoutTest
-            // thrashing 8 minutes first: a new JVM every 40 classes, what is kept dropped with it (80 ran
-            // out again once feat/051's popups were merged; the test alone takes 8 s and little heap)
-            // unitTestSettings (top of this file): testDebugUnitTestAt29 gets the same
+            // Robolectric keeps what each test's keyboard left in the app's objects till the JVM ends: the heap and forkEvery
+            // are in unitTestSettings (top of this file), which testDebugUnitTestAt29 gets too
             all { it.unitTestSettings() }
         }
     }
@@ -198,38 +163,33 @@ android {
     sourceSets.getByName("main").assets.srcDir("src/main/host-assets")
     // the evaluation sets, for EngineEvalRunner (lib/ime-eval/run-on-device.sh)
     sourceSets.getByName("androidTest").assets.srcDir("../lib/ime-eval/data")
-    // what the JVM tests and the instrumented ones both run: ClipboardScale's benchmark, numbers on a device too
+    // what the JVM tests and the instrumented ones both run
     sourceSets.getByName("test").kotlin.srcDir("src/sharedTest/java")
     sourceSets.getByName("androidTest").kotlin.srcDir("src/sharedTest/java")
-    // the benchmark build types into debug's field (TypingHostActivity) and has its manifest: the shell's
-    // providers (packs, voice clips, idle) come with it, though the voice clips are heard only in a debug
-    // build (VoiceListener reads them under BuildConfig.DEBUG)
+    // the benchmark build types into debug's field (TypingHostActivity) and has its manifest; voice clips are heard only
+    // in a debug build (BuildConfig.DEBUG)
     sourceSets.getByName("benchmark") {
         kotlin.srcDir("src/debug/java")
         manifest.srcFile("src/debug/AndroidManifest.xml")
     }
 }
 
-// 0.3.x's native host installed fcitx's data (usr/) and its descriptor into src/main/assets; they are
-// untracked, so an old checkout still has them and they would be packed. Stop rather than filter.
+// 0.3.x's native host put fcitx's data here, untracked, so an old checkout still has them and they would be packed.
+// Stop rather than filter.
 listOf("src/main/assets/usr", "src/main/assets/descriptor.json").map(::file).filter { it.exists() }.let { left ->
     check(left.isEmpty()) { "0.3.x leftovers would go into the APK, delete them: ${left.joinToString()}" }
 }
 
-// TablesSettingsUatTest runs the real engine on build/generated's pinyin and table blobs. Nothing
-// else of a unit test run builds them, so a fresh checkout (CI) had none and the test's lookups
-// failed quietly; as inputs they are built first and key the test task's cache entry.
+// TablesSettingsUatTest runs the real engine on build/generated's blobs: as inputs they are built first (a fresh
+// checkout had none and the test's lookups failed quietly)
 tasks.withType<Test>().matching { it.name.endsWith("UnitTest") || it.name.endsWith("UnitTestAt29") }.configureEach {
     inputs.files(tasks.named("compileEngineData"), tasks.named("compileEngineTables"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
-// Android 10 (minSdk 29) must keep working, so every Robolectric test runs at 29 as well as 35
-// (robolectric.properties lists both): 0.5.1 shipped a cast and a call Android 10-12 lack, which
-// the tests at 35 alone ran past. One SDK a JVM: robolectric.enabledSdks puts 29 in a task of its
-// own, :app:testDebugUnitTestAt29, the same classes and settings (both SDKs in one JVM ran out
-// of its 3 GB, and broke the native SQLite and android-all's zip filesystem across the sandboxes).
-// (a pin outside 29..36 then runs in neither, unreported)
+// Android 10 (minSdk 29) must keep working, so every Robolectric test runs at 29 as well as 35. One SDK a JVM:
+// robolectric.enabledSdks puts 29 in :app:testDebugUnitTestAt29 (both in one JVM ran out of memory and broke
+// native SQLite across the sandboxes). A pin outside 29..36 then runs in neither, unreported.
 tasks.withType<Test>().matching { it.name.endsWith("UnitTest") }.configureEach {
     systemProperty("robolectric.enabledSdks", "30,31,32,33,34,35,36")
 }
@@ -241,16 +201,14 @@ tasks.register<Test>("testDebugUnitTestAt29") {
     classpath = base.classpath
     unitTestSettings()
     systemProperty("robolectric.enabledSdks", "29")
-    // one sandbox a JVM: a test of the other graphics mode in the same JVM found Robolectric's native
-    // runtime loaded into the first one's class loader (UnsatisfiedLinkError: TypefaceNatives, SQLite's).
-    // Nothing is compared at 29, so every test there draws natively.
+    // one sandbox a JVM: another graphics mode in the same JVM found Robolectric's native runtime loaded into the first
+    // one's class loader (UnsatisfiedLinkError). Nothing is compared at 29, so every test there draws natively.
     systemProperty("robolectric.graphicsMode", "NATIVE")
     useJUnit()
 }
 
-// The layouts the scene engine draws (060; KeyboardCanvasView) and the built-in themes (060-render-p3 T3):
-// one copy, lib/keyboard-scene's, which its tests and snapshots hold and the web reads; raw resources, so
-// Robolectric reads them too (the unit tests get the app's resources, not its assets: unit-test-resources)
+// The layouts the scene engine draws and the built-in themes: one copy, lib/keyboard-scene's; raw resources, so
+// Robolectric reads them too (the unit tests get the app's resources, not its assets)
 abstract class SceneLayoutsTask : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
@@ -270,13 +228,11 @@ abstract class SceneLayoutsTask : DefaultTask() {
         raw.mkdirs()
         // a resource's name has no `-`: grouped-bottom.xml is scene_layout_grouped_bottom (SceneLayouts.RAW)
         layouts.forEach { it.copyTo(File(raw, "scene_layout_${it.name.replace('-', '_')}")) }
-        // deep-blue.xml is scene_theme_deep_blue (BuiltinThemes)
         themes.forEach { it.copyTo(File(raw, "scene_theme_${it.name.replace('-', '_')}")) }
     }
 }
 
 val sceneLayouts = tasks.register<SceneLayoutsTask>("copySceneLayouts") {
-    // every layout the app draws and the fragments they include (060-render-p2 S4: a keyboard's moved there as it is drawn)
     layouts.from(rootProject.fileTree("lib/keyboard-scene/src/commonMain/layouts") { include("*.xml") })
     themes.from(rootProject.fileTree("lib/keyboard-scene/src/commonMain/themes") { include("*.xml") })
     outputDir.set(layout.buildDirectory.dir("generated/scene-layouts"))
@@ -289,10 +245,8 @@ androidComponents {
     }
     onVariants { variant ->
         variant.sources.res?.addGeneratedSourceDirectory(sceneLayouts, SceneLayoutsTask::outputDir)
-        // The build type's resValue entries (app_icon, app_icon_round, app_name) point at launcher
-        // resources that live in the app's own resource set. AGP copies them into the
-        // androidTest APK too, where those references cannot be resolved and resource
-        // linking fails. The test APK has no launcher, so just drop them there.
+        // The build type's resValues point at launcher resources in the app's own resource set; copied into the androidTest
+        // APK they cannot be resolved and linking fails. The test APK has no launcher, so drop them there.
         variant.androidTest?.resValues?.empty()
     }
 }
@@ -360,9 +314,7 @@ dependencies {
 
 configurations {
     all {
-        // remove Baseline Profile Installer or whatever it is...
         exclude(group = "androidx.profileinstaller", module = "profileinstaller")
-        // remove unwanted splitties libraries...
         exclude(group = "com.louiscad.splitties", module = "splitties-appctx")
         exclude(group = "com.louiscad.splitties", module = "splitties-systemservices")
     }

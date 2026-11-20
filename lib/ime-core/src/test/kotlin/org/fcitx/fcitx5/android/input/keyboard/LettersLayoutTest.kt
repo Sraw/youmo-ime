@@ -10,11 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * On 九键 the letters are the nine keys: every switch back to the letters goes there, from a
- * switch key or a field starting, and an input method change shows its letters at once unless
- * another layout is showing.
- */
+/** On 九键 the letters are the nine keys: every way back to the letters goes there; an input method change shows them unless another layout is up. */
 class LettersLayoutTest {
 
     private val layout = LettersLayout(setOf("Text", "T9", "Number"), text = "Text", symbolPicker = "Symbol")

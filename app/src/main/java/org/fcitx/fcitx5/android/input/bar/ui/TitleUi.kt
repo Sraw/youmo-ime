@@ -44,8 +44,7 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
 
     private var extension: View? = null
 
-    // as tall as the bar (候选字号), so nothing is cut at a small size; the button never narrower
-    // than a 40 dp touch target
+    // as tall as the bar, so nothing is cut at a small size; the button never narrower than a 40 dp touch target
     private val barHeight = ctx.dp(KawaiiBarComponent.heightDp(ctx))
     private val buttonWidth = ctx.dp(KawaiiBarComponent.buttonWidthDp(ctx))
 
@@ -62,7 +61,6 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
         })
     }
 
-    /** What ← says it goes back to: the keyboard, or the panel the window came from. */
     fun setReturnButtonDescription(description: String) {
         backButton.contentDescription = description
     }
@@ -75,7 +73,7 @@ class TitleUi(override val ctx: Context, theme: Theme) : Ui {
 
     fun setTitle(title: String) {
         titleText.text = title
-        // shown again: a window before may have hidden them with an extension of its own
+        // a window before may have hidden them with an extension of its own
         backButton.isVisible = true
         titleText.isVisible = true
     }

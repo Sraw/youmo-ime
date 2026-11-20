@@ -44,7 +44,6 @@ class TableSessionTest {
         val (commit, s) = session().type("a")
         assertEquals("", commit)
         assertEquals("a", s.preedit)
-        // 工 once, by its shortest code
         assertEquals(listOf("工", "戈", "式", "或", "恭恭敬敬"), s.candidates)
         assertEquals(listOf("", "", "a", "aa", "aaa"), s.hints)
         assertTrue(s.hasNextPage)
@@ -96,11 +95,9 @@ class TableSessionTest {
     fun aHostListsAndPicksAmongAllCandidatesWithTheirHints() {
         val t = session()
         val s = t.type("a").second
-        // more than a page: not counted until asked for
         assertEquals(-1, s.total)
         assertEquals(listOf(Choice("恭恭敬敬", "aaa"), Choice("工期", "aad")), t.candidates(4, 10))
         assertEquals("工期", t.apply(Pick(5)).commit)
-        // a page's worth is counted
         assertEquals(1, t.type("vb").second.total)
         assertTrue(t.apply(Pick(9)).handled)
         t.apply(Reset)
@@ -119,7 +116,6 @@ class TableSessionTest {
         val cangjie = session(TableOptions.CANGJIE)
         assertTrue(cangjie.reads('*'))
         assertFalse(cangjie.reads('z'))
-        // a pinyin key that is no code key only starts a code
         val lookUpOnly = session(TableOptions(pinyinKey = '`'), FakePinyin())
         assertTrue(lookUpOnly.reads('`'))
         lookUpOnly.type("a")
@@ -145,7 +141,6 @@ class TableSessionTest {
         val t = session(TableOptions.CANGJIE)
         val (commit, s) = t.type("wx")
         assertEquals("", commit)
-        // shown in its roots (TableRoots.CANGJIE)
         assertEquals("田難", s.preedit)
         // full, then the next key drops the code that has no candidate
         assertEquals("日", t.type("xxa").second.preedit)
@@ -169,7 +164,6 @@ class TableSessionTest {
         assertTrue(s.handled)
         assertEquals("", s.commit)
         assertEquals("", s.preedit)
-        // nothing typed: space is the app's
         assertFalse(t.apply(Select(0)).handled)
     }
 
@@ -180,7 +174,6 @@ class TableSessionTest {
         assertEquals("戈", t.apply(Select(1)).commit)
         t.type("a")
         assertTrue(t.apply(NextPage).hasPreviousPage)
-        // off the page: ignored
         assertEquals("", t.apply(Select(3)).commit)
         assertEquals("工期", t.apply(Select(0)).commit)
         t.type("aa")
@@ -204,7 +197,6 @@ class TableSessionTest {
         assertFalse(t.apply(Key('1')).handled)
         t.type("aa")
         assertEquals("", t.apply(Reset).preedit)
-        // the app's text drops the input as a reset does
         t.type("aa")
         assertEquals("", t.apply(Context("工")).preedit)
     }
@@ -213,11 +205,8 @@ class TableSessionTest {
     fun theMatchingKeyStandsForAnyKey() {
         val (_, s) = session().type("wziy")
         assertEquals(listOf("你"), s.candidates)
-        // the whole code, since what was typed is not its start
         assertEquals(listOf("wqiy"), s.hints)
-        // never committed by itself: the user did not type its code
         assertEquals("", s.commit)
-        // first, it matches every code as long
         val cangjie = session(TableOptions.CANGJIE)
         assertEquals(listOf("工", "戈", "人"), cangjie.type("*").second.candidates)
     }
@@ -235,7 +224,7 @@ class TableSessionTest {
 
     @Test
     fun charactersTypedOneByOneMakeNoPhrase() {
-        // 自动造词 is gone (U-28 C46): 你 then 们, again and again, make no 你们 under wqwu
+        // 自动造词 is gone: 你 then 们, again and again, make no 你们 under wqwu
         val log = savedLog()
         val t = TableSession(wubi, TableOptions.WUBI, saved = wubi.savedIn(log))
         repeat(3) {
@@ -253,7 +242,7 @@ class TableSessionTest {
         val t = TableSession(wubi, TableOptions.WUBI, saved = saved)
         val shown = t.type("aaaa").second
         assertEquals(listOf("工", "恭恭敬敬"), shown.candidates)
-        // nothing learned of the table's own here (PY-33, as pinyin); nothing to pin or block to without a learning record
+        // nothing learned of the table's own here, as pinyin; nothing to pin or block to without a learning record
         assertEquals(emptySet<Offer>(), t.offers(0))
         assertEquals(shown.copy(commit = ""), t.apply(Pin(0)).copy(commit = ""))
         assertEquals(listOf("工", "恭恭敬敬"), t.apply(Forget(0)).candidates)
@@ -262,7 +251,6 @@ class TableSessionTest {
         assertEquals(setOf(Offer.FORGET), t.offers(0))
         assertTrue(t.apply(Forget(0)).candidates.isEmpty())
         assertTrue(saved.saved("").isEmpty())
-        // nothing to forget: nothing typed
         t.apply(Reset)
         assertFalse(t.apply(Forget(0)).handled)
     }
@@ -270,10 +258,8 @@ class TableSessionTest {
     @Test
     fun whileLearningIsOffNothingIsForgottenOrBlocked() {
         val records = ArrayList<List<TableWordRow>>()
-        // what a forget would take out of the learning record
         val saved = SavedPhrases(wubi, "engine-wubi", { null }, { records += it })
         val forgotten = ArrayList<String>()
-        // 你们, wqwu by the rules: a word of the other input methods
         val shared = object : SharedWords {
             val coded = CodedWords(wubi, listOf("你们"))
             override fun words(prefix: String) = coded.words(prefix)
@@ -293,7 +279,6 @@ class TableSessionTest {
         assertEquals(listOf("你们"), t.apply(Block(0)).candidates)
         assertEquals(0, records.size)
         assertEquals(emptyList<String>(), forgotten)
-        // learning again: offered again
         t.learning = true
         assertEquals(setOf(Offer.FORGET), t.offers(0))
     }
@@ -303,7 +288,6 @@ class TableSessionTest {
         val typed = StringBuilder()
         var resets = 0
         override var learning = true
-        // "nini": 你 picked from the start, "ni" left
         var picked = false
 
         private fun candidates() = when (typed.toString()) {
@@ -343,7 +327,6 @@ class TableSessionTest {
         assertEquals("z", t.type("z").second.preedit)
         val (_, s) = t.type("wo")
         assertEquals(listOf("我", "窝"), s.candidates)
-        // 窝 is not in the table and has no rule for one character
         assertEquals(listOf("trnt", ""), s.hints)
         assertFalse(s.predicting)
         // what pinyin learned is forgotten, but no phrase of its own pinned
@@ -352,7 +335,6 @@ class TableSessionTest {
         val picked = t.apply(Select(0))
         assertEquals("我", picked.commit)
         assertEquals(1, pinyin.resets)
-        // back to codes
         assertEquals(listOf("工", "戈"), t.type("a").second.candidates.take(2))
     }
 
@@ -401,7 +383,6 @@ class TableSessionTest {
         t.type("znini")
         t.apply(Select(0))
         assertEquals("你ni", t.apply(CommitRaw).commit)
-        // the pinyin key alone is committed as typed
         t.type("z")
         assertEquals("z", t.apply(CommitRaw).commit)
     }
@@ -439,7 +420,6 @@ class TableSessionTest {
 
     @Test
     fun aWildcardInTheCodeLeadsOnByTheStartOfLongerCodes() {
-        // wz is no code, but starts wqiy: typing on
         assertEquals("", session().type("wz").first)
         assertTrue(wubi.hasMatch("wz", 'z'))
         assertTrue(wubi.match("wz", 'z').isEmpty())
@@ -449,7 +429,6 @@ class TableSessionTest {
     @Test
     fun theConstructCodeIsWhatPhrasesAreBuiltFrom() {
         val d = dictionary("wqiy 你", "^abc 你", "wun 们", header = mapOf("构词" to "^"))
-        // with 构词 codes, only those build phrases: 们 has none
         assertEquals(null, d.encode("你们"))
         val both = dictionary("wqiy 你", "^abcd 你", "wun 们", "^wunn 们", header = mapOf("构词" to "^"))
         assertEquals("abwu", both.encode("你们"))
@@ -464,17 +443,14 @@ class TableSessionTest {
 
     private val wubiPinyin = dictionary(
         "a 工", "aa 式", "ai 蛙", "@a 啊", "@ai 爱", "@ai 哀", "@gong 公", "@gong 工", "@zhong 中", "@zhongguo 中国", "@ni 你",
-        // few keys, so that most letters are pinyin's alone
         header = mapOf("拼音" to "@", "键码" to "aiy"),
     )
 
     @Test
     fun aTablesOwnPinyinEntriesAreSortedWithItsLongerCodesNeverFirst() {
         val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN)
-        // one key: only what it spells whole, as libime has it
         assertEquals(listOf("工", "啊", "式", "蛙"), t.type("a").second.candidates)
         t.apply(Reset)
-        // then those it starts too, a code as long first
         assertEquals(listOf("蛙", "爱", "哀"), t.type("ai").second.candidates)
         t.apply(Reset)
         // g is no key of the table's codes, but leads to pinyin: showing the code to learn
@@ -494,12 +470,10 @@ class TableSessionTest {
         assertEquals("zhongguo", s.preedit)
         assertEquals(listOf("中国"), s.candidates)
         assertEquals("中国", t.apply(Select(0)).commit)
-        // within 码长 too: ni spells 你 alone and whole, yet it waits
         val (short, ni) = t.type("ni")
         assertEquals("", short)
         assertEquals(listOf("你"), ni.candidates)
         assertEquals("你", t.apply(Select(0)).commit)
-        // a key leading nowhere commits the first, as for codes
         assertEquals("中", t.type("zhongx").first)
     }
 
@@ -507,7 +481,6 @@ class TableSessionTest {
     fun aPinyinEntryIsNeverFirstWhenACodeHasACandidate() {
         val d = dictionary("aa 式", "@a 啊", header = mapOf("拼音" to "@"))
         val options = TableOptions.WUBI_PINYIN.copy(noSortInputLength = 0)
-        // 啊's pinyin is the shorter, yet 式 leads
         assertEquals(listOf("式", "啊"), TableSession(d, options).type("a").second.candidates)
     }
 
@@ -534,8 +507,7 @@ class TableSessionTest {
         val d = dictionary("aaaa 工", "aaaa 式", header = mapOf("拼音" to "@"))
         assertEquals(null, d.pinyinMarker)
         assertTrue(d.matchPinyin("a", prefix = true).isEmpty())
-        // so a full code commits the first on the next key, as without the marker: two candidates,
-        // none alone, and no key leading nowhere to commit them otherwise
+        // without a lone candidate, a full code commits the first on the next key
         assertEquals("工", TableSession(d, TableOptions.WUBI_PINYIN.copy(noMatchAutoSelectLength = 0)).type("aaaaa").first)
         assertEquals(listOf(4), wubiPinyin.matchPinyin("gong", prefix = false).map { wubiPinyin.codeLength(it) - 1 }.distinct())
     }
@@ -555,7 +527,6 @@ class TableSessionTest {
         val (commit, s) = TableSession(d, ending).type("a,b")
         assertEquals("挨", commit)
         assertEquals("b", s.preedit)
-        // without it, a,b is a code going on
         assertEquals("a,b", TableSession(d, ending.copy(endKeys = "")).type("a,b").second.preedit)
     }
 
@@ -580,17 +551,14 @@ class TableSessionTest {
         assertFalse(t.reads('w'))
         val typed = t.type("0").second
         assertEquals(listOf("一", "丁", "七"), typed.candidates)
-        // labelled by the keys that pick them
         assertEquals("qwertyuiop", typed.labels)
         assertEquals("", session().type("a").second.labels)
         assertTrue(t.reads('w'))
         assertFalse(t.reads('a'))
         assertEquals("丁", t.apply(Key('w')).commit)
-        // beyond the page: nothing
         t.type("0")
         assertEquals("", t.apply(Key('p')).commit)
         assertEquals("0", t.apply(Key('p')).preedit)
-        // with no candidate to pick, a selection key is any other key
         val none = TableSession(d, digits.copy(noMatchAutoSelectLength = 0))
         assertEquals("05", none.type("05").second.preedit)
         val passed = none.apply(Key('w'))

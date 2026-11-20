@@ -42,11 +42,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The search kept in step with the pages (dev/design/061-settings-search.md §4.8): every page registered, every
- * preference and every tappable control found, every setting the docs name found by that name. T5, every
- * id with other names indexed, is SettingsIndexTest.everyIdWithOtherNamesIsIndexed.
- */
+/** The search kept in step with the pages: every page registered, every preference and tappable control found, every setting the docs name found. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -57,7 +53,7 @@ class SettingsPagesTest {
     @Before
     fun phone() {
         phoneStorage()
-        // 生僻字屏蔽 over a few characters of each group, its cards shown (RarePageUat)
+        // a few characters per group, its cards shown
         RareCharsManager.useLevels(TestCharLevels.levels)
         api.rareGridAnswer = RarePageUat.grid
     }
@@ -72,7 +68,7 @@ class SettingsPagesTest {
 
     private fun harness() = st ?: SettingsHarness(api).also { st = it }
 
-    // T1: a page added says how it is searched, or why it is not
+    // a page added says how it is searched, or why not
     @Test
     fun everyRouteIsRegistered() {
         val routes = SettingsRoute::class.java.declaredClasses.filter { SettingsRoute::class.java.isAssignableFrom(it) && it != SettingsRoute::class.java }
@@ -81,7 +77,7 @@ class SettingsPagesTest {
         assertEquals(routes.map { it.simpleName }.sorted(), registered.map { it.simpleName }.sorted())
     }
 
-    // T2: each preference of a page built from a list has its key, found by it; each choice worth one, by its value
+    // each list-built preference found by its key, each choice worth one by its value
     @Test
     fun everyTitledPreferenceHasAnEntry() {
         val ctx = harness().activity
@@ -113,8 +109,7 @@ class SettingsPagesTest {
 
     private fun views(st: SettingsHarness): List<View> = KeyboardHarness.all(st.page.requireView()).filter { it.isShown }.toList()
 
-    // a control a tap does something on, and the words on it: a button's, a switch's; a key cap or a card has none (T3's bound).
-    // Disabled ones too: with no data of the user's a button is often disabled, and is searched all the same
+    // a tappable control's words (a key cap or card has none); disabled ones too, as no user data often disables them
     private fun tappable(st: SettingsHarness): List<String> = views(st)
         .filter { it is TextView && (it.hasOnClickListeners() || it is CompoundButton) }
         .map { (it as TextView).text.toString().trim() }.filter { it.isNotEmpty() }
@@ -128,13 +123,12 @@ class SettingsPagesTest {
         return (0 until menu.size()).map(menu::getItem).filter { it.isVisible }.map { it.title.toString() }
     }
 
-    // the page's rows a tap opens or changes, shown or not
+    // rows a tap opens or changes, shown or not
     private fun rows(st: SettingsHarness): List<Preference> = st.preferences().filter { it.title != null && it.isSelectable && it !is PreferenceGroup }
 
     /**
-     * T3: each page drawn by hand, opened with no data of the user's, says all it shows that a tap does something on: its
-     * buttons and switches, its tagged controls, its menu's items, its rows; or says why not. And all it says it has is
-     * there: a row by its key, a control revealed and shown. 按键字符和快捷键 also as 多选 shows it.
+     * Each hand-drawn page, opened with no user data, says everything tappable it shows (or why not), and all it says is
+     * there. 按键字符和快捷键 also as 多选 shows it.
      */
     @Test
     @Uat("ST-168")
@@ -150,8 +144,7 @@ class SettingsPagesTest {
             SearchHighlight.Hooks.readied = null
             st.open(source.open)
             idle()
-            // what the page shows once it has it, read on another thread first (生僻字屏蔽's cards once the engine's table
-            // is read, 词库与短语's rows once the dictionaries are counted): the looper's time idled is not that thread's
+            // content read on another thread first: the looper's idle time is not that thread's
             if (st.page is ReadyLater) {
                 until("$name ready", step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(SETTLE_MS)) }) {
                     SearchHighlight.Hooks.readied === st.page
@@ -171,7 +164,7 @@ class SettingsPagesTest {
         assertTrue(problems.joinToString("\n"), problems.isEmpty())
     }
 
-    /** What the page shows that a tap does something on and it does not say: [said] besides its entries. */
+    /** Tappable but unsaid. */
     private fun unsaid(st: SettingsHarness, name: String, entries: List<PageEntry>, said: Set<String>): List<String> {
         val titles = entries.map { it.title }.toSet() + said
         val ids = entries.map { it.id }.toSet()
@@ -181,7 +174,7 @@ class SettingsPagesTest {
                 .map { "$name: row \"${it.title}\" (${it.key}) is not searched" }
     }
 
-    /** What the page says it has and is not there: a row by its key, a control revealed and shown. */
+    /** Said but not there. */
     private fun absent(st: SettingsHarness, name: String, entries: List<PageEntry>): List<String> = entries.filter { it.where == 0 }.mapNotNull { e ->
         if (e.id.startsWith(SearchHighlight.PREF)) {
             val key = e.id.removePrefix(SearchHighlight.PREF)
@@ -196,7 +189,7 @@ class SettingsPagesTest {
         }
     }
 
-    // the themes' first tab: each built-in one's card revealed (外观 is a page of preferences, with these beside them)
+    // the themes' first tab: each built-in one's card revealed
     @Test
     fun everyBuiltInThemeIsRevealed() {
         val st = harness()
@@ -211,10 +204,7 @@ class SettingsPagesTest {
         }
     }
 
-    /**
-     * T4: every setting the docs name in a table's first column, in bold, is found by that name: as an entry's title, or
-     * as another name of one (B5: a dialog's choice). [UNSEARCHED]: why not.
-     */
+    /** Every bold setting name in the docs' tables is found by that name, as a title or another name; [UNSEARCHED]: why not. */
     @Test
     fun everySettingInTheDocsIsFound() {
         val index = SettingsIndex.build(harness().activity)
@@ -242,9 +232,9 @@ class SettingsPagesTest {
 
         // named in the docs, found otherwise: why
         val UNSEARCHED = mapOf(
-            // 开发者's count of 语音改字, its N and M the user's own: found as 开发者
+            // 开发者's count, found as 开发者
             "语音改字：问过 N 次，记住 M 次" to "a count, not a setting",
-            // a choice of the dictionary import's question, found as 基础词库 (B5)
+            // a choice of the import's question, found as 基础词库
             "基础词库（推荐）" to "a dialog's choice",
         ).keys
     }

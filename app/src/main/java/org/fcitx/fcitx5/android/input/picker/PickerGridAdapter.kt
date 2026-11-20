@@ -32,10 +32,7 @@ import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.utils.alpha
 import splitties.dimensions.dp
 
-/**
- * The sections of [PickerGridView]: recently used first, then [rawData]'s categories; or [only]
- * one of them, as the symbol panel shows it.
- */
+/** Or [only] one of them, as the symbol panel shows it. */
 class PickerGridAdapter(
     private val grid: PickerGridView,
     private val keyActionListener: KeyActionListener,
@@ -50,10 +47,10 @@ class PickerGridAdapter(
 
     private var sections = PickerSections.Empty
 
-    /** the one category shown, from the next [rebuild]; null for all of them */
+    /** from the next [rebuild]; null for all of them */
     var only: Int? = null
 
-    /** U-93's 「用我的输入习惯」: off, the recently used are neither shown nor kept (U-67) */
+    /** off: the recently used are neither shown nor kept */
     var habits = true
 
     val recentEmpty get() = recentlyUsed.items(habits).isEmpty()
@@ -63,7 +60,7 @@ class PickerGridAdapter(
     private var filtered: List<List<String>> = emptyList()
     private var filteredKey: Any? = null
 
-    // what each item commits as under filteredKey: a skin tone's (code points, RGI set, glyph check) is too dear for every bind
+    // a skin tone's (code points, RGI set, glyph check) is too dear for every bind
     private val transforms = HashMap<String, String>()
 
     private val popupOnKeyPress by AppPrefs.getInstance().keyboard.popupOnKeyPress
@@ -80,10 +77,7 @@ class PickerGridAdapter(
         recentlyUsed.insert(text, habits)
     }
 
-    /**
-     * Laid out again with what was recently used: each time the picker opens, not as a symbol is
-     * picked, which would move the list under the finger picking the next.
-     */
+    /** Each time the picker opens, not as a symbol is picked, which would move the list under the finger picking the next. */
     @SuppressLint("NotifyDataSetChanged")
     fun rebuild() {
         val key = policy.invalidateKey()
@@ -96,7 +90,7 @@ class PickerGridAdapter(
         notifyDataSetChanged()
     }
 
-    /** where [category] starts; past the end (the last ones all hidden), where the last with items does */
+    /** past the end (the last ones all hidden), where the last with items does */
     fun startOf(category: Int): Int {
         val start = sections.startOf(category)
         return if (start < sections.rows.size) start else sections.startOf(sections.categoryAt(sections.rows.lastIndex))
@@ -132,20 +126,15 @@ class PickerGridAdapter(
         }
         val key = holder.itemView as SceneKeyCell
         key.layoutParams.let { if (it.height != grid.rowHeight) key.layoutParams = it.apply { height = grid.rowHeight } }
-        // recently used ones as they were picked, skin tone and all: no popup to pick again
+        // skin tone and all: no popup to pick again
         if (entry.category == 0) bindAsIs(key, entry.text) else bind(key, entry.text)
     }
 
-    /**
-     * A symbol of two characters at a single's size reads as a bar across the panel's key: the
-     * Chinese dash —— (two em dashes, drawn joined) and ellipsis …… are each two wide.
-     */
+    /** —— and …… are each two wide: at a single's size they read as a bar across the key. */
     private fun label(key: SceneKeyCell, text: String) {
         val long = grid.density == PickerGridView.Density.Panel && text.codePointCount(0, text.length) > 1
         val size = grid.density.textSize * if (long) LONG else 1f
-        // a scene of the one key (060-render-p2 S6): its text, its size, a face where the grid has borders
         key.attrs = cellAttrs(text, size)
-        // what TalkBack reads
         key.contentDescription = text
     }
 
@@ -167,8 +156,7 @@ class PickerGridAdapter(
     }
 
     private fun bind(key: SceneKeyCell, item: String) = key.apply {
-        // a popup knows its key by the view's id: each cell its own, so two fingers on two cells
-        // each drive their own popup (an id-less cell would share the one ref "view:-1")
+        // each cell its own, so two fingers on two cells each drive their own popup (an id-less cell would share "view:-1")
         if (id == View.NO_ID) id = View.generateViewId()
         val transformed = transforms.getOrPut(item) { policy.transform(item) }
         label(this, transformed)
@@ -198,7 +186,7 @@ class PickerGridAdapter(
         keyActionListener.onKeyAction(CommitAction(text), Source.Keyboard)
     }
 
-    // where the key's face is now (the list may have scrolled since it was laid out)
+    // the list may have scrolled since it was laid out
     private fun boundsOf(view: View): Rect = (view as SceneKeyCell).bounds
 
     private fun showKeyboard(view: View, popup: KeyDef.Popup.Keyboard) {

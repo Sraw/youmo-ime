@@ -27,14 +27,12 @@ class SimplifierTest {
             assertEquals(text, text, s.simplify(text))
     }
 
-    // review-1a-r2 S3: in traditional text, a character simplified text has too is the simplified one
     @Test
     fun inTraditionalTextCharactersOfBothAreSimplified() {
         assertEquals("干净", s.simplify("乾淨"))
         assertEquals("这是由于", s.simplify("這是由於"))
         assertEquals("特征说", s.simplify("特徵說"))
         assertEquals("说以后", s.simplify("說以後"))
-        // verify-1a-r2 S3: one OpenCC lists first as itself stays
         assertEquals("覆盖", s.simplify("覆蓋"))
         assertEquals("这是慰藉", s.simplify("這是慰藉"))
         assertEquals("这是大阪", s.simplify("這是大阪"))
@@ -45,13 +43,10 @@ class SimplifierTest {
         val odd = Simplifier.read("# a comment\n軟體\t软件\n點\n\n".toByteArray(), ByteArray(0))
         assertEquals("軟體點", odd.simplify("軟體點"))
         assertEquals("點", Simplifier.NONE.simplify("點"))
-        // listed simplified the other way: kept
         assertEquals("點", Simplifier.read("點\t点\n".toByteArray(), "點\t點\n".toByteArray()).simplify("點"))
-        // its own reading too: changed only in traditional text
         val both = Simplifier.read("乾\t干 乾\n淨\t净\n覆\t覆 复\n".toByteArray(), ByteArray(0))
         assertEquals("乾", both.simplify("乾"))
         assertEquals("干净", both.simplify("乾淨"))
-        // listed first as itself: itself, in traditional text too
         assertEquals("覆净", both.simplify("覆淨"))
     }
 }

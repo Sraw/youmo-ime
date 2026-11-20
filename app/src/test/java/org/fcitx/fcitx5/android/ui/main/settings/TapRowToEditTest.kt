@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/** WD-18: tapping a custom phrase's row did nothing; only its pen edited it. */
+/** Tapping a custom phrase's row did nothing; only its pen edited it. */
 @RunWith(RobolectricTestRunner::class)
 class TapRowToEditTest {
 

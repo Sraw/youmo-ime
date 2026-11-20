@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-// 060-render-v2 §6 step 1: the engine's own reader of the XML the formats use, its errors with lines
+// the engine's own reader of the XML the formats use, its errors with lines
 class XmlTest {
 
     @Test
@@ -39,7 +39,7 @@ class XmlTest {
 
     @Test
     fun strayTextAndNonAsciiNamesAreProblems() {
-        // nothing the formats read is text: a stray word is a slip (L7)
+        // nothing the formats read is text: a stray word is a slip
         // a line ended by LF, by a lone CR (XML 1.0 §2.11), or by CRLF (one line, not two): the stray word on line 3
         for (nl in listOf("\n", "\r", "\r\n")) {
             val p = assertIs<Parsed.Failed>(Xml.parse("<a>$nl<b/>$nl  oops$nl</a>"))
@@ -107,7 +107,7 @@ class XmlTest {
         }
         Xml.parse("<a x=\"&#x10FFFF;\"/>").ok()
         // written as they are: dropped, before a reference in the value and after one, and between elements, so a value is
-        // only ever XML's characters and a file 0.6.0 wrote or read with one still reads (R26 F8187)
+        // only ever XML's characters and a file 0.6.0 wrote or read with one still reads
         for (c in listOf('\u0000', '\u0001', '\u000B', '\u001F', '￾', '￿')) {
             assertEquals("ab", Xml.parse("<a x=\"a${c}b\"/>").ok()["x"], c.code.toString())
             assertEquals("&b", Xml.parse("<a x=\"&amp;${c}b\"/>").ok()["x"], c.code.toString())

@@ -30,7 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** A key's menu picked as a long press's keys are ([PopupFocus]): by how far the finger moves from where it started. */
+/** Picked as a long press's keys are ([PopupFocus]): by how far the finger moves from where it started. */
 @RunWith(RobolectricTestRunner::class)
 // the canvas's scenes read the theme's look (ThemeManager, so AppPrefs)
 @Config(application = FcitxApplication::class)
@@ -59,10 +59,9 @@ class PopupMenuUiTest {
         scenes = PopupScenes(View(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, measuring),
     )
 
-    // the handwriting pad's 注: words, no icons
     private val words = arrayOf("关", "拼音", "注音符号").map { KeyDef.Popup.Menu.Item(it, 0, KeyAction.CommitAction(it)) }.toTypedArray()
 
-    // the menu's keys are 48 dp square; Robolectric's density is 1
+    // 48 dp square; Robolectric's density is 1
     private val step = 48 * PopupFocus.STEP
 
     @Test
@@ -76,7 +75,6 @@ class PopupMenuUiTest {
         assertFalse(ui.changeFocus(20f + step, 25f))
         assertNotEquals(first, ui.onTrigger())
         assertEquals(1, moved)
-        // a little further, the same item: not told again
         assertFalse(ui.changeFocus(20f + step + 1, 25f))
         assertEquals(1, moved)
     }
@@ -84,15 +82,12 @@ class PopupMenuUiTest {
     @Test
     fun downOffTheKeyCancels() {
         val ui = menu()
-        // the key's own coordinates, as BaseKeyboard passes them: below its bottom edge cancels
         ui.changeFocus(10f, trigger.height() - 5f)
         assertFalse(ui.changeFocus(10f, trigger.height() - 1f))
         assertTrue(ui.changeFocus(10f, trigger.height() + 1f))
         assertTrue(dismissed)
     }
 
-    // 060-render-p2 S2: a key the canvas draws has its menu as the engine's scene, the focus its
-    // Selected state, drawn again as it moves; each item's icon by a name the painter finds
     @Test
     fun onTheCanvasTheItemInFocusIsDrawnSelected() {
         val ui = menu()
@@ -110,14 +105,12 @@ class PopupMenuUiTest {
         assertEquals(android.R.drawable.ic_menu_add, SceneIcons.of(icon.name))
     }
 
-    // words in pills as the views' (CELL_DP × 1.75 across), their text drawn, not an icon
     @Test
     fun onTheCanvasWordsAreInPillsAsTheViews() {
         val view = menu(items = words).root as PopupSceneView
         val keys = view.scene!!.keys
-        // in the columns' order round the focus, as the views'
         assertEquals(words.map { it.label }.sorted(), keys.mapNotNull { it.label }.sorted())
-        // Robolectric's density 1: the views' pill, (48 * 1.75).toInt()
+        // the views' pill, (48 * 1.75).toInt()
         assertEquals(listOf(84.0), keys.map { it.bounds.right - it.bounds.left }.distinct())
         for (k in keys) {
             val ops = k.ops(false)
@@ -126,8 +119,7 @@ class PopupMenuUiTest {
         }
     }
 
-    // a drawable's name reads back only as a menu gave it: a theme's "drawable:<id>" names no
-    // resource that may not be there for the painter to look up (and throw)
+    // a theme's "drawable:<id>" names no resource that may not be there for the painter to look up (and throw)
     @Test
     fun aDrawablesNameReadsBackOnlyAsAMenuGaveIt() {
         val id = android.R.drawable.ic_menu_delete
@@ -138,8 +130,6 @@ class PopupMenuUiTest {
         assertEquals(id, SceneIcons.of(name))
     }
 
-    // a test finds a menu's words on the canvas as the long press's keys (KeyboardHarness), its
-    // icons not, as the views' (popupKeys has no ImageView)
     @Test
     fun onTheCanvasAMenusWordsAreAmongThePopupsChoices() {
         val view = menu(items = words).root as PopupSceneView
@@ -150,8 +140,6 @@ class PopupMenuUiTest {
         assertEquals(emptyList<KeyboardHarness.PopupKey>(), KeyboardHarness.sceneChoices(menu().root as PopupSceneView, Rect()))
     }
 
-    // the edit menu's: cells in their own order where it is put (Fixed.at), the disabled faded and
-    // never in focus; placed as the views' are, none of the key's menus' lift
     @Test
     fun onTheCanvasTheEditMenuKeepsItsPlaceAndItsDisabled() {
         val at = EditMenuLayout.Spot(300, 100)
@@ -162,12 +150,10 @@ class PopupMenuUiTest {
         assertEquals(listOf("0", "1", "2"), keys.map { it.label })
         assertEquals(listOf(false, true, false), keys.map { KeyState.Disabled in it.states })
         assertEquals(listOf(true, false, false), keys.map { KeyState.Selected in it.states })
-        // a key's menu, nowhere fixed: 52 dp above the key's top, as the views'
         val lifted = menu()
         assertEquals(-52, lifted.offsetY)
     }
 
-    // TalkBack reads each cell (its name), the one in focus selected, the disabled not enabled
     @Test
     fun onTheCanvasTalkBackReadsEachItem() {
         val ui = menu(fixed = PopupMenuUi.Fixed(start = 0, disabled = setOf(2)))
@@ -178,8 +164,7 @@ class PopupMenuUiTest {
         assertTrue(nodes.all { !it.getBoundsInParentCompat().isEmpty })
     }
 
-    // S3: each cell told as its view was: its class (a word's TextView, an icon's ImageView), its words,
-    // not clickable (picked as the finger lifts), read a character, word or paragraph at a time
+    // not clickable (picked as the finger lifts)
     @Test
     fun onTheCanvasEachCellIsToldAsItsViewWas() {
         for (cells in listOf(items, words)) {
@@ -193,7 +178,7 @@ class PopupMenuUiTest {
             val read = AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_CHARACTER or
                 AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_WORD or AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_PARAGRAPH
             for (node in nodes) assertEquals(read, node.movementGranularities)
-            // a cell's words a character at a time, forward then back (its events sent: TalkBack on)
+            // its events sent: TalkBack on
             org.robolectric.Shadows.shadowOf(canvas.context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)).setEnabled(true)
             val provider = canvas.accessibilityNodeProvider!!
             val keys = canvas.scene!!.keys
@@ -206,15 +191,12 @@ class PopupMenuUiTest {
                 val steps = listOf(true, true, true, true, false, false, false, false)
                     .map { if (it) AccessibilityNodeInfoCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY else AccessibilityNodeInfoCompat.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY }
                 val nodeSaid = steps.map { provider.performAction(id, it, chars) }
-                // as far as its words go and back: a view moved while there were characters left
                 val n = said.length.coerceAtMost(4)
                 assertEquals(said, List(n) { true } + List(4 - n) { false } + List(n) { true } + List(4 - n) { false }, nodeSaid)
             }
         }
     }
 
-    // the engine could not make the menu: unmade, nothing to show (PopupComponent shows none); it
-    // could not make the focus moved: the scene before kept, the focus with it
     @Test
     fun onTheCanvasWhatCannotBeMadeIsNotShownOrMoved() {
         assertTrue(menu(items = words, measuring = { TextMeasurer { _, _, _, _ -> error("no font") } }).unmade)

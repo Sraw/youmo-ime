@@ -18,29 +18,25 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowToast
 
-/** What the engine says from its own threads: on the keyboard when it runs, a toast with none. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class EngineNoticesTest {
 
     private val said = mutableListOf<String>()
 
-    // what another class left in the object of the same process (KotlinHost tells nine keys merged till seen): not
-    // this case's, said with its own failures
+    // another class may have left notices waiting in this process's object
     @Before
     fun nothingTold() = EngineNotices.forgetToldOnce()
 
     @After
     fun noKeyboard() {
         EngineNotices.sayer = null
-        // what a case left unseen is not said with the next one's
         EngineNotices.forgetToldOnce()
     }
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
-    // F3464: fcitx's own tips (punctuation, full width, a group switched) went the failure's way,
-    // 6 s and not typed away, and lapsed a pending clipboard delete as they replaced it
+    // fcitx's tips once went the failure's way: 6 s, not typed away, and replacing a pending clipboard delete
     @Test
     fun aTipIsAPlainLineAndOnlyAFailureIsSteady() {
         EngineNotices.sayer = EngineNotices.Sayer { message, steady -> said += "$message steady=$steady"; true }
@@ -51,7 +47,6 @@ class EngineNoticesTest {
         assertEquals(listOf("全角 steady=false", "${appContext.getString(android.R.string.ok)} steady=true"), said)
     }
 
-    // A4: the settings unreadable as the host starts, no keyboard shown: said again when one shows, once
     @Test
     fun aFailureUntilSeenIsSaidAgainWhenTheKeyboardShowsOnce() {
         var shown = false
@@ -65,7 +60,6 @@ class EngineNoticesTest {
         EngineNotices.keyboardShown()
         idle()
         assertEquals(listOf("$message shown=false", "$message shown=true"), said)
-        // said on the keyboard the first time: not again
         said.clear()
         EngineNotices.failedUntilSeen(android.R.string.ok)
         EngineNotices.keyboardShown()
@@ -73,7 +67,7 @@ class EngineNoticesTest {
         assertEquals(listOf("$message shown=true"), said)
     }
 
-    // two failures before any keyboard: the keyboard has one notice slot, so both said together, once
+    // the keyboard has one notice slot, so both said together, once
     @Test
     fun failuresUntilSeenAreSaidTogetherOnTheKeyboard() {
         EngineNotices.failedUntilSeen(android.R.string.ok)
@@ -88,8 +82,7 @@ class EngineNoticesTest {
         assertEquals(1, said.size)
     }
 
-    // I1: news told until seen (九键拼音 merged) is no failure: plain on the keyboard, no toast with
-    // none shown (as the host starts), said plain when one shows; with a failure among them, steady
+    // with a failure among them, steady
     @Test
     fun newsUntilSeenIsPlainAndWaitsForTheKeyboard() {
         val ok = appContext.getString(android.R.string.ok)
@@ -113,8 +106,7 @@ class EngineNoticesTest {
         assertEquals(listOf("$ok\n$cancel steady=true"), said)
     }
 
-    // news of several lines (the theme packs' boards chosen, L7) asks its own time: said with it, on the keyboard at
-    // once and when it waits for one; joined with others, the longest asked; the rest their kind's (null)
+    // joined with others, the longest asked; the rest their kind's (null)
     @Test
     fun newsUntilSeenSaysTheTimeItAsks() {
         val ok = appContext.getString(android.R.string.ok)
@@ -142,7 +134,6 @@ class EngineNoticesTest {
         assertEquals(listOf("$ok ms=4000", "$cancel ms=null", "$ok\n$cancel ms=4000"), said)
     }
 
-    // a sayer that times none (a lambda, the tests') says one asking a time as any
     @Test
     fun aSayerThatTimesNoneSaysItAsAny() {
         EngineNotices.sayer = EngineNotices.Sayer { message, steady -> said += "$message steady=$steady"; true }
@@ -151,7 +142,6 @@ class EngineNoticesTest {
         assertEquals(listOf("${appContext.getString(android.R.string.ok)} steady=false"), said)
     }
 
-    // F3521: no keyboard running, said all the same
     @Test
     fun withNoKeyboardItIsAToast() {
         EngineNotices.tip("全角")
@@ -159,8 +149,7 @@ class EngineNoticesTest {
         assertEquals("全角", ShadowToast.getTextOfLatestToast())
     }
 
-    // review 2: the input method's own sayer, no keyboard shown yet (the host starting as an app's field
-    // takes focus): news until seen is no toast there either, and said on the keyboard when it shows
+    // the host starting as an app's field takes focus, no keyboard yet
     @Test
     fun newsUntilSeenIsNoToastThroughTheKeyboardsSayerBeforeTheKeyboard() {
         KeyboardHarness().use { h ->
@@ -175,8 +164,7 @@ class EngineNoticesTest {
         }
     }
 
-    // review 2: two waiting, the keyboard's window not on the screen the first time it shows: each waits
-    // again as itself, so the next time says each once; each seen only then
+    // the keyboard's window not on screen the first time: each waits again as itself, so the next says each once
     @Test
     fun noticesNotSaidAsTheKeyboardShowsAreEachSaidOnceTheNextTime() {
         val ok = appContext.getString(android.R.string.ok)
@@ -195,13 +183,11 @@ class EngineNoticesTest {
         idle()
         assertEquals(listOf("$ok\n$cancel", "$ok\n$cancel"), said)
         assertEquals(listOf("ok", "cancel"), seen)
-        // said on the keyboard at once: seen at once
         EngineNotices.toldUntilSeen(android.R.string.ok) { seen += "ok again" }
         idle()
         assertEquals(listOf("ok", "cancel", "ok again"), seen)
     }
 
-    // with no keyboard, a failure joined with news toasts the failure alone: news is no toast
     @Test
     fun aFailureWithNewsWaitingToastsTheFailureAlone() {
         val cancel = appContext.getString(android.R.string.cancel)
@@ -216,7 +202,7 @@ class EngineNoticesTest {
         assertEquals(1, ShadowToast.shownToastCount())
     }
 
-    // news told again before it is seen (the host restarted first) is said once when the keyboard shows
+    // the host restarted first
     @Test
     fun newsToldTwiceBeforeItIsSeenIsSaidOnce() {
         val seen = mutableListOf<String>()
@@ -228,7 +214,7 @@ class EngineNoticesTest {
         idle()
         assertEquals(listOf(appContext.getString(android.R.string.ok)), said)
         assertEquals(listOf("ok"), seen)
-        // told twice while the keyboard says it: the second not said again on top of the first
+        // the second not said again on top of the first
         said.clear()
         seen.clear()
         EngineNotices.toldUntilSeen(android.R.string.cancel) { seen += "cancel" }

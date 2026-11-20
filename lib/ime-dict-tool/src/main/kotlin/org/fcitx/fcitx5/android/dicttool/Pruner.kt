@@ -8,20 +8,7 @@ import kotlin.math.ln
 import kotlin.math.log10
 import kotlin.math.pow
 
-/**
- * [model] less the n-grams that tell it little, by relative entropy (Stolcke, "Entropy-based
- * pruning of backoff language models", 1998; SRILM's `-prune`): an n-gram goes when the model
- * without it, backing off instead, strays from the model with it by less than [threshold], the
- * difference weighted by how likely its context is. Each n-gram is judged against the whole model,
- * trigrams and then the bigrams no trigram keeps as its context; the backoff weights are then
- * worked out again, as [Mixer] does. Unigrams all stay.
- *
- * A context's likelihood is its words' chained through the model. The start of a sentence [start]
- * has no probability of its own in an ARPA model (it is never predicted), so it is given
- * [startProb], how often a word is the first of its sentence. SRILM gives it 1 instead, which weighs
- * the n-grams that start a sentence more; and it compares 10^ΔH − 1, its change in perplexity, where
- * this takes ΔH in nats, the same to first order at the thresholds that are used.
- */
+/** [model] less the n-grams that tell it little, by relative entropy (Stolcke 1998, SRILM's `-prune`); unigrams all stay. */
 class Pruner(
     private val model: ArpaModel,
     private val threshold: Double,
@@ -89,12 +76,7 @@ class Pruner(
         return rebuild(keepBigram, keepTrigram)
     }
 
-    /**
-     * What dropping one n-gram of probability [p] costs its context in relative entropy (nats): its
-     * word backs off to [lower] times the context's new weight, and the words that backed off
-     * already change by the new weight against the old. The context's n-grams sum to [explicit],
-     * their lower order's probabilities to [lowerSum].
-     */
+    /** What dropping one n-gram of probability [p] costs its context in relative entropy (nats). */
     private fun loss(p: Double, lower: Double, explicit: Double, lowerSum: Double): Double {
         val left = maxOf(1 - explicit, LEAST)
         val lowerLeft = 1 - lowerSum

@@ -44,7 +44,6 @@ object InputFeedbacks {
     private val soundOnKeyPress by keyboardPrefs.soundOnKeyPress
     private val soundOnKeyPressVolume by keyboardPrefs.soundOnKeyPressVolume
     private val hapticOnKeyPress by keyboardPrefs.hapticOnKeyPress
-    private val hapticOnKeyUp by keyboardPrefs.hapticOnKeyUp
     private val buttonPressVibrationMilliseconds by keyboardPrefs.buttonPressVibrationMilliseconds
     private val buttonLongPressVibrationMilliseconds by keyboardPrefs.buttonLongPressVibrationMilliseconds
     private val buttonPressVibrationAmplitude by keyboardPrefs.buttonPressVibrationAmplitude
@@ -54,13 +53,12 @@ object InputFeedbacks {
 
     private val hasAmplitudeControl = vibrator.hasAmplitudeControl()
 
-    fun hapticFeedback(view: View, longPress: Boolean = false, keyUp: Boolean = false) {
+    fun hapticFeedback(view: View, longPress: Boolean = false) {
         when (hapticOnKeyPress) {
             InputFeedbackMode.Enabled -> {}
             InputFeedbackMode.Disabled -> return
             InputFeedbackMode.FollowingSystem -> if (!systemHapticFeedback) return
         }
-        if (keyUp && !hapticOnKeyUp) return
         val duration: Long
         val amplitude: Int
         val hfc: Int
@@ -71,11 +69,7 @@ object InputFeedbacks {
         } else {
             duration = buttonPressVibrationMilliseconds.toLong()
             amplitude = buttonPressVibrationAmplitude
-            hfc = if (keyUp) {
-                HapticFeedbackConstants.KEYBOARD_RELEASE
-            } else {
-                HapticFeedbackConstants.KEYBOARD_TAP
-            }
+            hfc = HapticFeedbackConstants.KEYBOARD_TAP
         }
 
         // there is `VibrationEffect.DEFAULT_AMPLITUDE` but no default duration;
@@ -102,14 +96,6 @@ object InputFeedbacks {
         }
     }
 
-    /**
-     * The four system clicks the old keys were made with (KeyDef.Appearance): kept for the tests that hold the
-     * layouts' keys to those (060-theme-sounds-icons); a press plays by [SoundKey].
-     */
-    enum class SoundEffect {
-        Standard, SpaceBar, Delete, Return
-    }
-
     /** 按键音音色: the selected theme's sounds where it has them, or the system's always. */
     enum class KeySoundSource(override val stringRes: Int) : ManagedPreferenceEnum {
         FollowTheme(R.string.key_sound_source_theme),
@@ -120,10 +106,7 @@ object InputFeedbacks {
 
     private val audioManager = appContext.audioManager
 
-    /**
-     * A key of class [key] pressed (060-theme-sounds-icons §1.4): whether it sounds, then which and how loud
-     * (KeySoundChoice); [system] the system's click it plays where no theme's does.
-     */
+    /** Whether it sounds, then which and how loud (KeySoundChoice); [system]: the click where no theme sound plays. */
     fun soundEffect(key: SoundKey, system: SoundKey = key) {
         Trace.beginSection("InputFeedbacks.soundEffect")
         try {
@@ -137,10 +120,7 @@ object InputFeedbacks {
         }
     }
 
-    /**
-     * A letter's sound at [volume] (按键音音量's 0..100, 0 the system's), as a press would play it: the
-     * slider let go, so the user hears what they picked. It plays whether or not the keys would.
-     */
+    /** As a press would play it at [volume] (0 the system's), on slider release; plays whether or not the keys would. */
     fun previewSound(volume: Int) {
         val fromTheme = keySoundSource == KeySoundSource.FollowTheme
         ThemeSounds.sync(fromTheme)
@@ -162,12 +142,12 @@ object InputFeedbacks {
         InputFeedbackMode.FollowingSystem -> systemSoundEffects
     }
 
-    /** The selected theme's sounds loaded ahead of the first press, where they would play (the keyboard shown). */
+    /** Loaded ahead of the first press, where they would play. */
     fun syncSounds() = ThemeSounds.sync(soundPlays() && keySoundSource == KeySoundSource.FollowTheme)
 
     private fun playSystemClick(key: SoundKey, volume: Float) = audioManager.playSoundEffect(fx(key), volume)
 
-    // a function key clicks as the standard one: the system has no click of its own for it
+    // the system has no click of its own for a function key
     private fun fx(key: SoundKey): Int = when (key) {
         SoundKey.SPACE -> AudioManager.FX_KEYPRESS_SPACEBAR
         SoundKey.BACKSPACE -> AudioManager.FX_KEYPRESS_DELETE
@@ -175,7 +155,7 @@ object InputFeedbacks {
         SoundKey.LETTER, SoundKey.FUNCTION -> AudioManager.FX_KEYPRESS_STANDARD
     }
 
-    /** No theme sounds held: the service is gone. */
+    /** The service is gone. */
     fun releaseSounds() = ThemeSounds.shared.release()
 
 }

@@ -35,14 +35,13 @@ class SwipeSelectionTest {
 
     @Test
     fun theFieldsStartStopsIt() {
-        // to the right no read says the field ends: aShortReadAfterIsNotTheEndOfTheField covers it
+        // to the right no read says the field ends (aShortReadAfterIsNotTheEndOfTheField)
         val s = begun(before = "ab", after = "c")
         assertEquals("0..2", s.move(-5).text())
         assertNull("nothing further left", s.move(-1))
     }
 
-    // the bug: an app that gave less after the cursor than it has stopped the selection where the
-    // read ended. Past it a step is tried, and goes on once the editor reports it taken
+    // an app that gave less after the cursor stopped the selection where the read ended: past it a step is tried
     @Test
     fun aShortReadAfterIsNotTheEndOfTheField() {
         val s = begun(before = "ab", after = "c")
@@ -50,8 +49,7 @@ class SwipeSelectionTest {
         assertEquals("taken: on past it", "2..5", s.move(1, CursorRange(2, 4), settled = true).text())
     }
 
-    // the probe moves the right end alone: a report starting where it is (the cursor put there by
-    // something else) is not it taken
+    // a report starting where the probe is (the cursor put there by something else) is not it taken
     @Test
     fun aReportStartingAtTheProbeDoesNotTakeIt() {
         val s = begun(before = "ab")
@@ -82,8 +80,7 @@ class SwipeSelectionTest {
         assertEquals("back to the cursor, known to be there", "2..2", s.move(2).text())
     }
 
-    // no end known to the right: a step past what is known is tried alone, the steps after it kept
-    // till the editor reports it taken
+    // no end known to the right: one step past is tried alone, the rest kept till reported taken
     @Test
     fun pastWhatIsKnownToTheRightTheStepsWaitForTheEditor() {
         val s = SwipeSelection()
@@ -192,8 +189,7 @@ class SwipeSelectionTest {
         assertEquals("the anchor kept at 3", "3..3", s.move(-1).text())
     }
 
-    // lifted before it began (the host busy committing what was typed): the steps moved still taken
-    // as it begins, none past what is known, nothing after the lift
+    // lifted before it began (the host busy): the steps still taken as it begins, nothing after the lift
     @Test
     fun liftedBeforeItBeganTakesTheStepsMoved() {
         val s = SwipeSelection()

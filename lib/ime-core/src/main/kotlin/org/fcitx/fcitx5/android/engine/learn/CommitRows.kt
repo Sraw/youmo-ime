@@ -5,43 +5,38 @@
 package org.fcitx.fcitx5.android.engine.learn
 
 /**
- * The rows one commit learns (PLAN §2.1 「记在哪个编码下」, impl/design-1a.md §3), from the picks
- * that made it, as the session saw them. Positions are the session's input's.
+ * The rows one commit learns, from its picks as the session saw them; positions are the session input's.
  *
  * - Level 1: each pick, under its keys, after the word before it.
  * - Level 2: the whole commit, under all its keys, corrected if any pick was.
- * - Level 3: each word of a pick that the first sentence shown has as a word too (both its ends
- *   are ends there), under its own keys: 老师 of 老师指导 picked over 老师知道 is used, 指导 corrected.
- *   A word the first shown has no ends around (点 of 点｜了 over 带来) is not learned on its own.
+ * - Level 3: each word of a pick that the first shown sentence also has as a word (both ends are ends
+ *   there), under its own keys: 老师 of 老师指导 picked over 老师知道 is used, 指导 corrected. A word
+ *   with no matching ends there (点 of 点｜了 over 带来) is not learned alone.
  *
- * A row is learned once a commit, a pick of one word being all three: level 1 says whether it
- * was corrected, level 3 only adds the other words.
+ * A row is learned once per commit (a one-word pick is all three): level 1 says whether it was
+ * corrected, level 3 only adds the other words.
  */
 object CommitRows {
 
-    /** The first sentence shown when a pick was made: its words' texts, and where each ends, from [from]. */
+    /** The first sentence shown at a pick: its words' texts and where each ends, from [from]. */
     class Shown(val from: Int, val texts: List<String>, val ends: IntArray)
 
     /**
-     * A pick: its [words], from [from], each ending at [ends]; [how] it was committed ('A' to 'H');
-     * the first of the candidates it was picked from ([reference]: those ending where it ends,
-     * phrases and emoji aside, or for 'H' the first when a syllable was taken); the first sentence
-     * shown then ([shown]), if any; [own] the decoder's own first there, before the habits ranked it (F2739).
+     * A pick: [words] from [from], each ending at [ends]; [how] it was committed ('A' to 'H'); [reference]
+     * the first candidate it was picked from (of those ending where it ends, phrases and emoji aside, or for
+     * 'H' the first when a syllable was taken); [shown] the first sentence then; [own] the decoder's own
+     * first, before the habits ranked it.
      */
     class Pick(
         val from: Int, val words: List<Word>, val ends: IntArray, val how: Char, val reference: String, val shown: Shown?, val own: Boolean = false,
-        /** Its keys read as the keys next to them, each place of the input to the key meant: learned as that key. */
+        /** Keys read as their neighbours, by input position to the key meant: learned as that key. */
         val slips: Map<Int, Char> = emptyMap(),
     ) {
         val to get() = ends.last()
         val text get() = words.joinToString("") { it.text }
     }
 
-    /**
-     * The rows of a commit of [picks] after [prev] ("" for none): [code] says what the keys from
-     * one position to another were, read as [words] (a glide: their pinyin), [origin] where a
-     * text comes from ([Row.DICTIONARY] and so on).
-     */
+    /** The rows of [picks] after [prev] ("" for none): [code] gives the keys between positions read as [words] (a glide: their pinyin); [origin] a text's source. */
     fun build(
         prev: String,
         picks: List<Pick>,
@@ -82,13 +77,12 @@ object CommitRows {
     }
 
     /**
-     * The word a pick after [picks] follows, as its level-1 row files it: the commit's [prev] before
-     * the first, else the last word of the last pick (impl/design-1b.md M2). What a session ranks
-     * the next pick's candidates after, so the order shown is the one the row learns into.
+     * The word the next pick follows, as its level-1 row files it: [prev] before the first, else the last
+     * pick's last word. Sessions rank the next pick's candidates after it, so the order shown is the one learned into.
      */
     fun prevAfter(prev: String, picks: List<Pick>): String = picks.lastOrNull()?.words?.last()?.text ?: prev
 
-    // level 3: the words of [p] the first sentence shown has as words too, after [prev]
+    // level 3: [p]'s words the first shown sentence also has as words, after [prev]
     private inline fun words(p: Pick, prev: String, code: (Int, Int, List<Word>) -> Code, origin: (Words) -> Int, add: (Row) -> Unit) {
         val sentence = p.shown ?: return
         val bounds = HashSet<Int>().apply {
@@ -110,7 +104,7 @@ object CommitRows {
         }
     }
 
-    // the text of [shown]'s words from [start] to [end], both ends of its words
+    // [shown]'s text from [start] to [end], both at its word ends
     private fun shownBetween(shown: Shown, start: Int, end: Int): String {
         val text = StringBuilder()
         var from = shown.from

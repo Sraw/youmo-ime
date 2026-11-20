@@ -10,15 +10,10 @@ import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 
-/**
- * The key style settings (大小与样式 → 按键样式) over a theme's keys: each null follows the theme, else
- * it is used in place of the theme's. The gap is two settings (the user, 2026-11-06): [hGap] the room
- * left and right of a key, [vGap] above and below it, each over its half of the theme's [Gap] alone.
- * The theme itself is not changed: what is exported or saved is its own.
- */
+/** 按键样式 over a theme's keys: null follows the theme. [hGap]/[vGap] each over its half of the theme's [Gap]. The theme itself is not changed. */
 data class KeyStyleChoice(val blocks: Boolean?, val hGap: Spacing?, val vGap: Spacing?, val radiusDp: Int?) {
 
-    /** One direction's room round a key, dp: upright and on its side, as [Gap] has each. */
+    /** dp, upright and on its side. */
     data class Spacing(val portrait: Int, val landscape: Int) {
         init {
             require(portrait in 0..Gap.MAX_GAP_DP && landscape in 0..Gap.MAX_GAP_DP) { "spacing out of 0..${Gap.MAX_GAP_DP}" }
@@ -29,11 +24,7 @@ data class KeyStyleChoice(val blocks: Boolean?, val hGap: Spacing?, val vGap: Sp
         require(radiusDp == null || radiusDp in 0..Keys.MAX_RADIUS_DP) { "radiusDp $radiusDp out of 0..${Keys.MAX_RADIUS_DP}" }
     }
 
-    /**
-     * [look] with these over its keys; the very [look] when all follow the theme, as what is decoded of a
-     * look is kept by the look. A block theme made flat here gets [LegacyLook.applyTo]'s bar: the bar colour
-     * for a transparent one; a theme flat already keeps its own, so 无边框 over it draws as following it does.
-     */
+    /** The very [look] when all follow, so its decoded state is kept. A block theme made flat gets [LegacyLook.applyTo]'s bar; a flat one keeps its own. */
     fun applyTo(look: ThemeLook): ThemeLook {
         if (this == FOLLOW) return look
         val keys = look.keys
@@ -53,10 +44,7 @@ data class KeyStyleChoice(val blocks: Boolean?, val hGap: Spacing?, val vGap: Sp
         )
     }
 
-    /**
-     * These over a 4.0 pack's keys, laid on each key after the pack's cascade (the engine's Env.keyStyle); null
-     * when all follow the pack, which then draws as its file says. 有边框 is the pack's own faces (it is not flat).
-     */
+    /** Laid on each key after a 4.0 pack's cascade; null when all follow the pack. 有边框 is the pack's own faces. */
     val overPack: KeyStyleOver?
         get() = KeyStyleOver(
             across = hGap?.let { KeyStyleOver.Level(it.portrait, it.landscape) },
@@ -68,12 +56,12 @@ data class KeyStyleChoice(val blocks: Boolean?, val hGap: Spacing?, val vGap: Sp
     companion object {
         val FOLLOW = KeyStyleChoice(null, null, null, null)
 
-        // the levels of 0.5.0's key_spacing_level (and 0.5.2's one key_spacing_choice), a direction each
+        // 0.5's key_spacing_level (and 0.5.2's key_spacing_choice) levels, a direction each
         val H_COMPACT = Spacing(2, 2)
         val H_STANDARD = Spacing(3, 3)
         val H_LOOSE = Spacing(5, 5)
 
-        // up and down only, since 0.6.1: as tight as H_COMPACT, the gaps across and up and down alike (the user, 2026-11-16)
+        // up and down only: as tight as H_COMPACT
         val V_VERY_COMPACT = Spacing(2, 2)
         val V_COMPACT = Spacing(5, 3)
         val V_STANDARD = Spacing(7, 4)

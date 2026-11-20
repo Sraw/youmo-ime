@@ -7,66 +7,37 @@ package org.fcitx.fcitx5.android.input.voice
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 
 /**
- * Words the recognizer is told to listen for (sherpa-onnx's hotwords, a bonus on each of their
- * tokens as the beam search goes): the new-word pack's, in the voice pack by VoiceDataPlugin, spelled by
- * [HotwordSpelling.spelled] too, and the user's own. On the voice evaluation's new words, those in the list went
- * from 89 to some 104 of 138 heard, the rest of the speech much as it was; a larger bonus
- * hears more of them and mishears more of everything else.
- *
- * A word the user blocked is not written, the pack's or not, as a word: [VoiceBlocking] picks a
- * hypothesis without it, else our sherpa-onnx's beam search (lib/sherpa-onnx) is told not to let
- * one complete it. Only those [HotwordSpelling.spelled]: two to twelve Chinese characters, [MAX_USER] of them;
- * and only once the engine has told the listener the user's words (VoiceEngine.userHotwords
- * waits so long).
- * Each stream with the user's words holds a graph of the pack's too, some 37 MB.
+ * Words the recognizer listens for (sherpa-onnx hotwords, a bonus per token in the beam search): the pack's and
+ * the user's, [HotwordSpelling.spelled]. Blocked words are never written: [VoiceBlocking] picks a hypothesis
+ * without them, else our sherpa-onnx fork's search refuses to complete one. A larger bonus mishears everything else more.
  */
 object VoiceHotwords {
 
-    /** the bonus on each token of a hotword: 1 to 2 measured, 3 too much for everyday speech */
+    /** Per token: 3 is too much for everyday speech. */
     const val SCORE = 1.5f
 
-    /**
-     * the bonus on each token of a word the user added by hand (an imported word stays apart until
-     * used twice, then is learned: [SCORE], the user's choice 2026-10-22): at [SCORE], 澜境花园
-     * was heard 兰静花园 or 蓝镜花园 every time (VO-14). On five takes through the emulator's
-     * microphone, 3 heard it in none, 4 in three, 5 in all five. Learned words keep [SCORE]: the
-     * same 5 on 3000 of them (jieba's commonest) took aishell's CER from 3.9% to 9.9% and fleurs'
-     * from 8.7% to 12.8%, and still lost 澜境花园 among them; with added at 5 and those 3000 at
-     * [SCORE], 4.2% and 8.9%, 澜境花园 five of five. A big list belongs in the base lexicon.
-     */
+    /** For words added by hand: at [SCORE] they were misheard every time. Learned words keep [SCORE]: thousands at 5 doubled the CER. */
     const val ADDED_SCORE = 5f
 
-    // the recognizer builds its graph again for each stretch from the pack's words and these:
-    // a few thousand add little to the pack's 78 thousand
+    // the graph is rebuilt per stretch from the pack's words and these: a few thousand add little
     const val MAX_USER = 3000
 
-    /** What a stream is told of the user's words: each list's words [HotwordSpelling.spelled], apart by `/`. */
     data class Words(
         val hotwords: String,
         val blocked: String,
-        /** the user's words put in for what was heard read alike ([VoiceHomophones]) */
         val homophones: VoiceHomophones = VoiceHomophones.NONE,
-        /**
-         * the recognizer's characters 生僻字屏蔽 holds back (the engine's answer, [withHeld]): none of
-         * them completed in the search ([searchBlocked]), nor typed ([holds]). Not among [blockedWords],
-         * which are words standing alone in a text (VoiceBlocking), a character being in any (design §5.3)
-         */
+        /** 生僻字屏蔽's held characters: none completed in the search nor typed. Not in [blockedWords], which match whole words. */
         val held: Set<String> = emptySet(),
     ) {
-        /** the blocked words as written, not [HotwordSpelling.spelled] */
+        /** As written, not spelled. */
         val blockedWords: List<String> get() = blocked.split('/').filter { it.isNotEmpty() }.map { it.replace(" ", "") }
 
-        /** what the search is told never to complete: the blocked words, then each character [held], a token of its own */
+        /** The blocked words, then each held character as a token of its own. */
         val searchBlocked: String get() = (listOf(blocked).filter { it.isNotEmpty() } + held.sorted()).joinToString("/")
 
-        /** whether [text] has a character [held] */
         fun holds(text: String): Boolean = held.isNotEmpty() && held.any { it in text }
 
-        /**
-         * As listened for with U-93's [habits]: off, none of the user's words (nor [homophones]), the blocked still
-         * blocked. For words read before the switch went off (one shared, or the last read for a
-         * read too late), which [ofUser] made with it on.
-         */
+        /** [habits] off: none of the user's words, the blocked still blocked (for words read while it was on). */
         fun withHabits(habits: Boolean): Words = if (habits) this else copy(hotwords = "", homophones = VoiceHomophones.NONE)
 
         companion object {
@@ -74,11 +45,7 @@ object VoiceHotwords {
         }
     }
 
-    /**
-     * The user's words as last read from the engine, for a listener whose read comes too late:
-     * the engine busy on its thread, those words rather than none. Without them, a word the user
-     * blocked was typed and one they added never heard (VO-10, VO-14), with nothing in the log.
-     */
+    /** The last words read, for a listener whose read comes too late: without them a blocked word was typed, an added one never heard. */
     class Remembered {
         @Volatile
         var last: Words = Words.NONE
@@ -89,12 +56,7 @@ object VoiceHotwords {
 
         private var underWay: Any? = null
 
-        /**
-         * The read under way while [running] says it still runs, else one [launch]ed now with its
-         * ticket: one read at a time, so a hold while a busy engine has not answered waits on that
-         * read rather than queueing another. Checked and set under one lock: two holds at once
-         * launch one read.
-         */
+        /** One read at a time: a hold while the engine is busy waits on that read rather than queueing another. */
         @Synchronized
         fun <R : Any> shared(running: (R) -> Boolean, launch: (Long) -> R): R {
             @Suppress("UNCHECKED_CAST")
@@ -102,11 +64,7 @@ object VoiceHotwords {
             return launch(++started).also { underWay = it }
         }
 
-        /**
-         * [words], read by the read [ticket] names, remembered unless a read started after it was
-         * remembered first (reads run on another thread and may finish out of order); returned.
-         * A read that comes after its listener stopped waiting is still remembered, for the next.
-         */
+        /** Remembered unless a later-started read was remembered first (reads may finish out of order). */
         @Synchronized
         fun read(ticket: Long, words: Words): Words = words.also {
             if (ticket > lastFrom) {
@@ -115,27 +73,17 @@ object VoiceHotwords {
             }
         }
 
-        /** What a listener uses: [read] if it came in time (not null), else the words last read. */
+        /** [read] if it came in time, else the words last read. */
         fun inTime(read: Words?): Words = read ?: last
     }
 
-    /**
-     * [words] less those [held] names (生僻字屏蔽: a character held back in them), the blocked kept:
-     * what is listened for and what [VoiceHomophones] may put in for what was heard (design §5.3)
-     */
+    /** Less those with a held character, the blocked kept. */
     fun unheld(words: List<UserWord>, held: Set<String>): List<UserWord> =
         if (held.isEmpty()) words else words.filter { it.kind == UserWord.Kind.BLOCKED || it.text !in held }
 
     /**
-     * The user's words for one stream: as hotwords, those they added first, then those they made
-     * as they typed, most used first
-     * ([org.fcitx.fcitx5.android.engine.runtime.Engines.userWords]' order): 我的词 alone (U-30, D29), no
-     * word of another kind, nor one the user only typed once; blocked, those they blocked. With
-     * U-93's 「用我的输入习惯」 off, [Words.withHabits] drops their hotwords, the blocked still blocked.
-     * Of [held], 生僻字屏蔽's answer for these words' texts and the recognizer's characters: a word of
-     * the user's with a character held back is no hotword (nor one for [VoiceHomophones], VoiceEngine);
-     * [Words.held], those of it among [chars], the recognizer's: a user's one-character word is in
-     * [held] too, and a character not a token of the recognizer's is none to tell its search (review S6).
+     * The user's words for one stream: added then learned as hotwords (no other kind), blocked as blocked. A word
+     * with a held character is no hotword; [Words.held] keeps only the recognizer's tokens among [chars].
      */
     fun ofUser(words: List<UserWord>, held: Set<String> = emptySet(), chars: Collection<String> = emptyList()): Words {
         val kept = unheld(words, held)
@@ -145,7 +93,7 @@ object VoiceHotwords {
             // added and learned both: added, which comes first
             .distinctBy { it.first }
             .take(MAX_USER)
-            // sherpa-onnx's own bonus for one hotword, after its tokens; learned ones get [SCORE]
+            // sherpa-onnx's own bonus for one hotword, after its tokens
             .joinToString("/") { (spelling, kind) -> if (kind == UserWord.Kind.ADDED) "$spelling :$ADDED_SCORE" else spelling }
         return Words(
             hotwords = spell { it in MINE },
@@ -154,6 +102,5 @@ object VoiceHotwords {
         )
     }
 
-    // the kinds of [UserWord] that are the user's own words (稿子 §1 我的词)
     private val MINE = setOf(UserWord.Kind.ADDED, UserWord.Kind.LEARNED)
 }

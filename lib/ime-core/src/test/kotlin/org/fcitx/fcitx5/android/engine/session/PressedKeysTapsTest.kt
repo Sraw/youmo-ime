@@ -38,7 +38,6 @@ class PressedKeysTapsTest {
         assertEquals("0.75 0.75 0.75 0.25 0.75", keys.taps(0, 5).shown())
         assertEquals("0.75 0.25", keys.taps(2, 4).shown())
         assertEquals(3, keys.taps(2, 5)!!.size)
-        // the keys as learning files them, as with no place
         val plain = PressedKeys().apply { insert(0, g14.typings("nihao").single()) }
         assertEquals(plain.keys(0, 5), keys.keys(0, 5))
         assertNull(plain.taps(0, 5))
@@ -50,7 +49,6 @@ class PressedKeysTapsTest {
         keys.delete(1, input, g14)
         input.deleteCharAt(1)
         assertEquals("0.75 0.75 0.25 0.75", keys.taps(0, 4).shown())
-        // typed again in the middle
         keys.insert(1, g14("ui"), tapAt = 0.25f, input = input, letters = g14)
         input.insert(1, g14Code('u'))
         assertEquals("0.75 0.25 0.75 0.25 0.75", keys.taps(0, 5).shown())
@@ -76,8 +74,6 @@ class PressedKeysTapsTest {
         assertNull(keys.taps(0, 3))
     }
 
-    // 061-neighbour-correction: each key's touch kept by its place, as its place is; a key read as the one
-    // beside it learned as that one (N1-A)
     @Test
     fun eachTouchIsAtItsPlaceAndASlipIsLearnedAsTheKeyMeant() {
         val keys = PressedKeys()
@@ -92,17 +88,14 @@ class PressedKeysTapsTest {
         assertEquals("hao", keys.keys(2, 5, mapOf(3 to 'a')))
     }
 
-    // the slip is by the input's place, not by the keys' index: a separator is a place with no key, and 九键's
-    // syllable taken one run of several places, never swapped
+    // by the input's place: a separator is a place with no key, 九键's taken syllable one run of places
     @Test
     fun aSlipAfterASeparatorIsSwappedAtItsPlace() {
         val keys = PressedKeys()
         "ni'hso".forEachIndexed { i, c -> keys.insert(i, c.toString()) }
         assertEquals("nihso", keys.keys(0, 6))
         assertEquals("nihao", keys.keys(0, 6, mapOf(4 to 'a')))
-        // the keys' index 3 is s, the place 3 h: by the place
         assertEquals("nijso", keys.keys(0, 6, mapOf(3 to 'j')))
-        // a run of several places is no key's: as typed
         val nine = PressedKeys()
         nine.insert(0, "64")
         nine.insert(2, "426")

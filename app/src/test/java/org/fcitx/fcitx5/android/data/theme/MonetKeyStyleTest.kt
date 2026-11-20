@@ -26,11 +26,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-/**
- * The key style a Monet theme in use kept from the settings before theme file 3.0 (not copied: its
- * colours follow the wallpaper): there after a restart, after a switch to another theme and back, and
- * in what it exports, which is a copy of its colours as they are.
- */
+/** A Monet theme's pre-3.0 key style survives restarts, a switch away and back, and export (its colours as they are). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class MonetKeyStyleTest {
@@ -44,7 +40,7 @@ class MonetKeyStyleTest {
     fun settled() {
         phoneStorage()
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
-        // the old settings, a Monet theme in use: what an upgrade finds
+        // what an upgrade finds
         sp.edit(commit = true) {
             putBoolean("key_border", false); putInt("key_radius", 10); putInt("key_vertical_margin", 2)
         }
@@ -74,11 +70,11 @@ class MonetKeyStyleTest {
     @Test
     @Uat("ST-35")
     fun itLastsARestart() {
-        // a new process: nothing in memory, what ThemeManager reads before the first Monet theme is made
+        // a new process: nothing in memory
         ThemeLookMigration.monetLook = null
         ThemeLookMigration.monetLook = ThemeManager.prefs.monetLook()
         assertEquals(old, ThemeLookMigration.monetLook)
-        // the next start's settling finds nothing to do and leaves it
+        // the next start's settling leaves it
         val slot = ThemeLookMigration.Slot({ monet() }, { error("a Monet theme is not copied") })
         assertFalse(ThemeManager.prefs.settleLook(listOf(slot), ThemeManager::saveTheme))
         assertEquals(old, ThemeManager.prefs.monetLook())
@@ -95,7 +91,6 @@ class MonetKeyStyleTest {
         ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         assertTrue(ThemeManager.activeTheme.look.keys.blocks)
         assertEquals(old, ThemeManager.prefs.monetLook())
-        // back by the list, and as the setting reads it at a start
         ThemeManager.setNormalModeTheme(monet())
         ThemeManager.activeTheme.styled()
         ThemeManager.prefs.normalModeTheme.getValue().styled()
@@ -110,7 +105,7 @@ class MonetKeyStyleTest {
         val fixed = monet.toCustom()
         fixed.styled()
         ThemeFilesManager.exportTheme(fixed, bytes).getOrThrow()
-        // gone from this app since: the file keeps it, a theme 4.0 (060-render-p3 Q5) drawn as the key style was
+        // gone from this app since: the file keeps it as a 4.0 theme
         ThemeLookMigration.monetLook = null
         val opened = ThemeFilesManager.openTheme(ByteArrayInputStream(bytes.toByteArray())).getOrThrow() as ThemeFilesManager.Opened.Pack
         val imported = opened.commit().getOrThrow().single()
@@ -122,8 +117,7 @@ class MonetKeyStyleTest {
         assertEquals(emptyList<Theme.Pack>(), ThemeManager.Packs)
     }
 
-    // the Monet themes' key style is no managed preference, so it was not copied to the device-protected
-    // store: before the first unlock a Monet theme was drawn without it; and one cleared stays cleared there
+    // not a managed preference, so not in device-protected storage: before unlock it was drawn without it
     @Test
     fun theKeyStyleIsCopiedToTheStoreReadBeforeTheFirstUnlock() {
         val locked = PreferenceManager.getDefaultSharedPreferences(appContext.createDeviceProtectedStorageContext())

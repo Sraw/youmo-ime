@@ -28,10 +28,7 @@ import org.fcitx.fcitx5.android.input.learning.clearAndTell
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
 
-/**
- * What the ⋯ panel's own entries do, in one place: the panel (StatusAreaWindow) and the bar's
- * buttons (ToolbarConfig) call the same, so a button and its entry never differ.
- */
+/** The panel and the bar's buttons call the same, so a button and its entry never differ. */
 class PanelActions(
     private val context: Context,
     private val service: FcitxInputMethodService,
@@ -44,23 +41,21 @@ class PanelActions(
 
     val habitsOn get() = useHabits.getValue()
 
-    // the shape the keyboard was made on: each its own 键盘样式, the toggles that one's (not the screen there is
-    // now, a turn's view not yet made)
+    // each shape its own 键盘样式: not the screen there is now, a turn's view not yet made
     private val screen get() = service.screenBuilt ?: KeyboardArea.screen(context)
 
     val floating get() = KeyboardStyles.of(screen).floating
 
     val oneHanded get() = KeyboardStyles.of(screen).oneHanded
 
-    // floating, one-handed mode is of no use: not offered. Split, one-handed over it, and off is split again
+    // floating, one-handed is of no use. Split, one-handed over it, and off is split again
     val oneHandedOffered get() = !floating
 
     private var popupMenu: PopupMenu? = null
 
-    // 键盘: the input method now on, as the keyboard last heard of it (asking fcitx would block)
+    // as the keyboard last heard of it (asking fcitx would block)
     private val keyboardPicker by lazy { KeyboardPicker(context) { fcitx.runImmediately { inputMethodEntryCached }.uniqueName } }
 
-    /** Whether the input method on has keyboards to choose from (I1 Q1). */
     val keyboardsOffered get() = keyboardPicker.offers()
 
     fun activate(action: StatusEntry) {
@@ -75,9 +70,8 @@ class PanelActions(
 
     fun themes() = AppUtil.launchMainToThemeList(context)
 
-    // on, at the side it was last at, or off; then, from the panel, the keyboard as it now goes. Split to or from
-    // it the input view is made anew (the service), on its letters already: this one, gone, attaches nothing; from
-    // the bar TalkBack's focus goes back to the new view's button (§3.6)
+    // split to or from it the input view is made anew, on its letters already: this one attaches nothing; from the
+    // bar TalkBack's focus goes back to the new view's button
     fun toggleOneHanded(fromBar: Boolean = false) {
         val s = screen
         val splitBefore = KeyboardStyles.of(s).splits
@@ -99,11 +93,11 @@ class PanelActions(
         val on = !useHabits.getValue()
         useHabits.setValue(on)
         fcitx.launchOnReady { it.learning(LearningOp.UseHabits(on)) }
-        // said as it goes off and as it comes back, nothing on the bar showing which (§3 rule 1)
+        // nothing on the bar shows which
         service.say(if (on) R.string.learning_habits_on_said else R.string.learning_habits_off_said)
     }
 
-    /** U-88: how far back, then asked once more, saying what stays and what goes with it. */
+    /** Asked once more, saying what stays and what goes with it. */
     fun clearRecent(anchor: View) {
         val popup = PopupMenu(context, anchor)
         val spans = listOf(
@@ -122,7 +116,6 @@ class PanelActions(
         popup.show()
     }
 
-    /** The input method's keyboards to pick from (KeyboardPicker), shown at [anchor]. */
     fun chooseKeyboard(anchor: View) {
         popupMenu?.dismiss()
         popupMenu = keyboardPicker.show(anchor)
@@ -139,8 +132,7 @@ class PanelActions(
             .setMessage(R.string.learning_clear_recent_message)
             .setPositiveButton(R.string.learning_clear) { _, _ ->
                 scope.launch {
-                    // not on disk (the phone locked since it started) is not now; a disk that failed, again, or a
-                    // restart first while learning is not saving (review-E-ui S6, F8022)
+                    // a restart first while learning is not saving
                     service.say(fcitx.runOnReady { clearAndTell(LearningOp.ClearRecent(span)) })
                 }
             }
@@ -150,10 +142,9 @@ class PanelActions(
     }
 
     companion object {
-        /** fcitx's 简繁 action (chttrans), by the name it gives it */
         const val TRAD_SIMP = "chttrans"
 
-        /** The bar's buttons that are the panel's own entries too: one with no slot on the bar is there already */
+        /** One with no slot on the bar is there already */
         val OWN = setOf(
             ToolbarButton.TradSimp, ToolbarButton.Floating, ToolbarButton.OneHanded, ToolbarButton.Habits, ToolbarButton.ClearRecent,
             ToolbarButton.Theme, ToolbarButton.InputMethodSettings, ToolbarButton.Keyboard,

@@ -40,26 +40,16 @@ import java.io.ByteArrayInputStream
 import java.io.DataInputStream
 import java.io.OutputStream
 
-/**
- * How the user's acts rewrite the learning record (impl/streams/E-design.md §3, PLAN §2.2 「整份重写」):
- * the log's bytes in, what is kept out, nothing else read. [LearningControl] runs them under
- * `LearnLog.rewrite`, which replays what they wrote.
- */
+/** How the user's acts rewrite the learning log: bytes in, what is kept out; run under `LearnLog.rewrite`. */
 internal object LogRewrites {
 
-    /**
-     * U-88: [log] as though nothing was typed from [cut] (an epoch minute) on. The snapshot stays
-     * as it is, and so does the tail but for the commits at or after the cut and the undos of
-     * them; an undo after the cut of a commit before it stays, as does every act of the user's
-     * (pins, forgets, predictions turned off, imports) and what this build does not know. False if
-     * there was nothing to take out.
-     */
+    /** 清掉最近: [log] without commits at or after [cut] and their undos; the snapshot, user acts and unknown records stay. False if nothing to take out. */
     fun clearSince(log: ByteArray, cut: Int, to: OutputStream): Boolean {
         val spans = spans(log)
         val reader = LearnRecords.Reader()
         val records = spans.map { decode(log, it, reader) }
         val keep = BooleanArray(spans.size) { true }
-        // an English correction taken back is the user's act, not typing: what it set stays (review-E-engine S7)
+        // a taken-back English correction is a user act, not typing: what it set stays
         val kept = arrayOfNulls<ByteArray>(spans.size)
         val gone = HashSet<Long>()
         for (i in records.indexOfFirst { it === Cut } + 1 until records.size) {
@@ -81,19 +71,16 @@ internal object LogRewrites {
         return true
     }
 
-    // the flag a reverted English commit set, without the commit: as an older build's change is taken in
+    // the flag a reverted English commit set, without the commit
     private fun neverCorrected(c: EnCommit) =
         LearnRecords.encode(Absorbed(c.minute, listOf(EnWordRow(c.word, EnWordRow.NEVER_CORRECT, DayCounts())), emptyList()))
 
-    /**
-     * [log] without its last records, if they are [records], as written: an act taken back
-     * (the chip's 撤销). False, nothing written, if they are not its last.
-     */
+    /** [log] without its last records if they are [records] (the chip's 撤销); false, nothing written, otherwise. */
     fun dropLast(log: ByteArray, records: List<LearnRecord>, to: OutputStream): Boolean {
         val spans = spans(log)
         if (records.isEmpty() || spans.size < records.size) return false
         val from = spans.size - records.size
-        // acts are events, which name no kind: a reader of their own reads them
+        // acts are events, which name no kind: a reader of their own
         val reader = LearnRecords.Reader()
         for (i in records.indices) if (decode(log, spans[from + i], reader) != records[i]) return false
         to.write(log, 0, RecordFormat.HEADER_SIZE)
@@ -102,15 +89,10 @@ internal object LogRewrites {
     }
 
     /**
-     * U-86 清空学到的: the rows of [state]'s snapshot, cut at [cut], that stay. What the user did
-     * on purpose stays: their own words (their uses gone, so 0 times), the pins, the predictions
-     * turned off, a table's saved words and the order its 调频 learned (U-28: restored in the
-     * table's settings; its uses and firsts both), imports, an English word's flags (never
-     * corrected, added) without its uses; HEAD as it is, so typing days and seqs go on (review
-     * E-M1). The rest goes, what this build does not know too: the uses and corrections under each
-     * code, the firsts, the texts typed once, the pairs, the whole phrases (U-73), the nine keys' bar, English's uses and
-     * pairs; but a restore's offsets ([BackupMerge.ORIGIN]) stay till 全部清空, as the rows they moved do. [all] 「全部清空」: everything, as installed; the counters of HEAD go on, so what is
-     * written after is newer than what was.
+     * 清空学到的: the snapshot rows that stay. Deliberate user acts stay (own words with uses zeroed, pins,
+     * predictions off, a table's saved words and learned order, imports, English flags) and HEAD, so typing days
+     * and seqs go on; learned counts go, as does whatever this build does not know. Restore offsets
+     * ([BackupMerge.ORIGIN]) stay till [all] (「全部清空」), which clears everything.
      */
     fun cleared(state: LearnState, cut: Int, all: Boolean): List<LearnRecord> = state.snapshot(cut).mapNotNull { r ->
         when (r) {
@@ -119,11 +101,9 @@ internal object LogRewrites {
             is FirstRow -> r.takeIf { !all && isTable(r.code.kind) }
             is PendingRow, is PairRow, is BarRow, is EnPairRow, is WordUseRow, is DateRow, is PhraseRow -> null
             is EnWordRow -> if (all || r.flags == 0) null else EnWordRow(r.word, r.flags, DayCounts())
-            // the offsets a restore moved another install's days by: the rows they moved may stay
-            // (a table's order), and the same backup restored again must land on the same days (D-M1)
+            // restore offsets: rows they moved may stay, and the same backup restored again must land on the same days
             is Unknown -> r.takeIf { it.type == BackupMerge.ORIGIN && !all }
-            // the user's own acts (pins, blocks, a table's per-code blocks, words added, imports):
-            // only 全部清空 clears them. Every type named, no else: a new row is decided here (review R11)
+            // the user's own acts: only 全部清空 clears them. Every type named, no else: a new row must decide here
             is MineRow, is PinRow, is NoPredictRow, is TableBlockRow, is TableWordRow, is BatchRow, is ImportedRow -> r.takeIf { !all }
             // events: never in a snapshot
             is Commit, is Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
@@ -138,10 +118,10 @@ internal object LogRewrites {
 
     private val TABLE = Kinds.table("")
 
-    // where each record is: its start, from its length, shifted up, and its end after its CRC
+    // each record's start (shifted up) and its end after the CRC
     private fun spans(log: ByteArray): List<Long> {
         val spans = ArrayList<Long>()
-        // an emptied mark is RecordStore's, not a record: skipped, as LearnLog's walk does (review R11)
+        // an emptied mark is RecordStore's, not a record: skipped, as LearnLog's walk does
         LearnRecords.FORMAT.spans(log) { start, end ->
             if (log[start + 4] != LearnLog.EMPTIED) spans += (start.toLong() shl 32) or end.toLong()
         }
@@ -153,7 +133,7 @@ internal object LogRewrites {
         to.write(log, start, span.toInt() - start)
     }
 
-    // one that does not read is kept as it is (LearnRecords.Reader); null for a kind's name
+    // one that does not read is kept as it is; null for a kind's name
     private fun decode(log: ByteArray, span: Long, reader: LearnRecords.Reader): LearnRecord? {
         val start = (span ushr 32).toInt()
         val end = span.toInt()

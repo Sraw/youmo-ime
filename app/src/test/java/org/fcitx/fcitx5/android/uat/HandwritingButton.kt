@@ -11,14 +11,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 
-/** The toolbar's 手写 as offered (not greyed), shown, or null. */
 fun KeyboardHarness.toolbarHandwriting(): ToolButton? = KeyboardHarness.all(inputView).filterIsInstance<ToolButton>()
     .firstOrNull { shown(it) && it.contentDescription == service.getString(R.string.handwriting) }
 
-/**
- * 手写 where it writes nothing (a password, English): on the bar still, greyed and said so (061-handwriting-toolbar Q2).
- * One check for every test of it, so the handwriting UATs cannot drift apart (review R26 F8462).
- */
+/** One check for every test of a greyed 手写, so the handwriting UATs cannot drift apart. */
 fun KeyboardHarness.assertHandwritingGreyed(where: String) {
     val greyed = service.getString(R.string.handwriting_unavailable, service.getString(R.string.handwriting))
     val button = KeyboardHarness.all(inputView).filterIsInstance<ToolButton>().firstOrNull { shown(it) && it.contentDescription == greyed }

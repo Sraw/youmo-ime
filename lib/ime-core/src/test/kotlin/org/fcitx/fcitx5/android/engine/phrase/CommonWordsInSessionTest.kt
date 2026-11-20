@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.phrase
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
@@ -21,7 +22,6 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
-import org.fcitx.fcitx5.android.engine.session.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.session.sessionTestData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -29,11 +29,7 @@ import org.junit.Test
 import java.util.Calendar
 import java.util.GregorianCalendar
 
-/**
- * 常用词 in a pinyin session (dev/design/060-common-words.md): a word's replacements first under its
- * whole pinyin, its first three characters' and its initials, on every pinyin keyboard; before a pin
- * and a custom phrase of order 1; picked as text, never learned; deleted from the keyboard.
- */
+/** 常用词 in a pinyin session: replacements first under the word's pinyin, its first three characters' and its initials. */
 class CommonWordsInSessionTest {
 
     private val data = sessionTestData()
@@ -67,7 +63,6 @@ class CommonWordsInSessionTest {
         val s = session(niHao)
         val whole = s.type("nihao")
         assertEquals(listOf("您好", "你好呀"), whole.take(2))
-        // the word itself after them, as ranked
         assertEquals("你好", whole[2])
         assertEquals(listOf("您好", "你好呀"), s.type("nh").take(2))
         assertEquals("拜", s.type("nihaoma").first())
@@ -127,7 +122,6 @@ class CommonWordsInSessionTest {
     fun whatIsLeftAfterAPieceIsWhatIsRead() {
         val s = session(niHao)
         val shown = s.type("zainihao")
-        // 在 picked off the front: nihao left
         s.apply(Action.Pick(shown.indexOfFirst { it == "在" || it == "再" }))
         assertEquals(listOf("您好", "你好呀"), s.candidates(0, 2).map { it.text })
     }
@@ -138,14 +132,11 @@ class CommonWordsInSessionTest {
         s.type("nihao")
         assertEquals("您好", s.apply(Action.Pick(0)).commit)
         assertEquals(emptyList<LearnRecord>(), written)
-        // the control: the word picked is learned
         s.type("nihao")
         s.apply(Action.Pick(2))
         assertTrue(written.isNotEmpty())
     }
 
-    // §4: a replacement is text, the 联想 after it as at the start; the word itself picked goes on
-    // from it as ever, and the 联想 offers no replacement
     @Test
     fun theLianxiangAfterAReplacementIsTheStartsAndOffersNone() {
         val s = session(CommonWordBook(words("再[zai]\t拜\n见[jian]\t剑\n")), prediction = true)
@@ -155,7 +146,6 @@ class CommonWordsInSessionTest {
         val following = s.candidates(0, 20).map { it.text }
         assertEquals("见", following.first())
         assertTrue(following.toString(), "剑" !in following && "拜" !in following)
-        // 见 picked from the 联想 is 见, not its replacement
         assertEquals("见", s.apply(Action.Pick(0)).commit)
         s.type("zai")
         assertEquals("拜", s.apply(Action.Pick(0)).commit)
@@ -169,7 +159,6 @@ class CommonWordsInSessionTest {
         val book = CommonWordBook(words("你好[ni'hao]\t您好\t你好呀\n")) { saved += it }
         val s = session(book)
         s.type("nihao")
-        // the only thing offered, learning or not (Q5)
         assertEquals(setOf(Offer.DELETE_COMMON_WORD), s.offers(0))
         s.learning = false
         assertEquals(setOf(Offer.DELETE_COMMON_WORD), s.offers(0))
@@ -177,7 +166,6 @@ class CommonWordsInSessionTest {
         s.apply(Action.Unpin(0))
         assertEquals("你好[ni'hao] 你好呀", saved.single().words.single().toString())
         assertEquals("你好呀", s.candidates(0, 1).single().text)
-        // the word itself is a word as ever
         assertTrue(Offer.DELETE_COMMON_WORD !in s.offers(s.candidates(0, 20).indexOfFirst { it.text == "你好" }))
     }
 
@@ -192,15 +180,13 @@ class CommonWordsInSessionTest {
 
     @Test
     fun onEveryPinyinKeyboardByItsKeysTheInitialsOfTwoOnFullPinyinAlone() {
-        // [keys]: 你好's whole, and 你好吗再见's initials, as typed there
-        // [initialsOfTwo]: whether two initials type a word of two there (full pinyin's 26 keys alone)
+        // [initialsOfTwo]: whether two initials type a two-character word there (full pinyin's 26 keys alone)
         class Board(val name: String, val segmenter: Segmenter, val whole: String, val letters: NineKeyLetters? = null, val initialsOfTwo: Boolean = false)
         val zrm = ShuangpinScheme.ZIRANMA
         val boards = listOf(
             Board("全拼 26 键", PinyinSegmenter(), "nihao", initialsOfTwo = true),
             Board("九键", T9Segmenter(abbreviations = false), "nihao", NineKeyLetters.STANDARD),
             Board("拼音 14 键", T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), "nihao", NineKeyLetters.G14),
-            // 自然码: ni ni, hao hk
             Board("双拼 26 键", ShuangpinSegmenter(zrm), "nihk"),
             Board("双拼 18 键", GroupedShuangpinSegmenter(zrm, NineKeyLetters.G18), "nihk", NineKeyLetters.G18),
             Board("九键双拼", GroupedShuangpinSegmenter(zrm, NineKeyLetters.NINE_SP), "nihk", NineKeyLetters.NINE_SP),
@@ -243,8 +229,7 @@ class CommonWordsInSessionTest {
         assertTrue("緑" !in s.type("lu"))
     }
 
-    // a replacement two words give, deleted from the keyboard, is taken off both: deleting it from the
-    // word alone that listed it first left it offered by the other's initials
+    // taken off both words, not only the one that listed it first
     @Test
     @Uat("WD-44")
     fun aReplacementTwoWordsGiveDeletedFromTheKeyboardIsGoneFromBoth() {
@@ -259,9 +244,7 @@ class CommonWordsInSessionTest {
         assertTrue(saved.last().words.none { "米" in it.replacements })
     }
 
-    // every reading of the whole input held back (coarse) and a replacement shown first: the preedit,
-    // the syllables offered and Enter go by the first candidate that is no replacement, not by the
-    // replacement's text, which has no reading
+    // the preedit, syllables and Enter go by the first candidate that is no replacement
     @Test
     fun everyReadingHeldThePreeditIsNoReplacement() {
         // lattice/coarse.txt's words (CoarseWords.LIST), all read bi: held past the first page

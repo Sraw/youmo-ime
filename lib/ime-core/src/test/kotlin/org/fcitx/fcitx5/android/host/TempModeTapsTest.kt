@@ -10,10 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The 14 keys' codes in a temporary mode (design k14-tap-position §1.4, review S1): the letter
- * they stand for, a tap's half's; no character of a private use area typed into the buffer.
- */
+/** The 14 keys' codes in a temporary mode: the letter they stand for, a tap's half's; no private use character typed. */
 class TempModeTapsTest {
 
     private val rig = TempModeRig(QuickPhraseTable.load(emptyList()), { UnicodeInputTest::class.java.getResourceAsStream("/pkgdata/unicode/charselectdata")!!.readBytes() })
@@ -48,7 +45,7 @@ class TempModeTapsTest {
 
     @Test
     fun aRejectedCodeLeavesQuickInputUntouched() {
-        // code review N5: a key quick input does not take (a syllable tapped in the strip) types nothing and leaves the mode on
+        // a key quick input does not take (a syllable tapped in the strip) types nothing and leaves the mode on
         rig.quickPhrase.trigger(rig.ic)
         rig.type("a")
         send(Keyboard.SYLLABLES.first.code)

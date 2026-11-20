@@ -6,29 +6,16 @@ package org.fcitx.fcitx5.android.engine.data
 
 import java.nio.ByteBuffer
 
-/**
- * Which group a Han character is in, for 生僻字屏蔽 (dev/design/061-rare-char-block.md §3.1): the
- * 通用规范汉字表's three levels (Unihan's kTGH, Unicode License v3), the traditional characters
- * whose simplified one is in the table (OpenCC's TSCharacters, Apache-2.0), both listed in
- * `engine/charlevels.data` (ime-dict-tool's `charlevels`, [CharLevelsBuilder]); the rest by fixed
- * ranges of code points. Never by the runtime's `Character.UnicodeScript`: Android 10's Unicode is
- * older, and the same choice would hold back other characters on another phone.
- */
+/** A Han character's 生僻字屏蔽 group: listed ones from `engine/charlevels.data`, the rest by fixed ranges. Not `Character.UnicodeScript`: Android 10's Unicode is older. */
 class CharLevels private constructor(private val chars: BitPacked, private val levels: BitPacked) {
 
-    /**
-     * The groups in order: [L1] and [L2], the table's first two levels, are never held back; the
-     * grid's are [GRID]. [OUT]: the basic block, 扩展 A and the compatibility ideographs not listed;
-     * [EXT]: planes 2 and 3 (扩展 B on, their compatibility supplement too) not listed.
-     */
+    /** [L1] and [L2] are never held back. [OUT]: unlisted basic block, 扩展 A and compatibility; [EXT]: unlisted planes 2 and 3. */
     enum class Level {
         L1, L2, L3, TRAD, OUT, EXT;
 
         companion object {
-            /** The groups the grid shows and a user may hold back. */
             val GRID = listOf(L3, TRAD, OUT, EXT)
 
-            /** The group named [name] in the user's file; null for one this build does not know. */
             fun named(name: String): Level? = entries.firstOrNull { it.name == name }
         }
     }
@@ -43,21 +30,15 @@ class CharLevels private constructor(private val chars: BitPacked, private val l
         return if (i < chars.size && chars[i] == codePoint) i else -1
     }
 
-    /**
-     * [codePoint]'s group: listed first (a table character beyond the basic block is the table's,
-     * 三级字 among 扩展 B), then by its range; null for one this is not about (〇, the radicals,
-     * strokes, tags, variation selectors, private use, anything not Han).
-     */
+    /** Listed first, then by range; null for non-Han (〇, radicals, strokes, variation selectors, private use). */
     fun of(codePoint: Int): Level? {
         val i = listed(codePoint)
         if (i >= 0) return Level.entries[levels[i]]
         return rangeOf(codePoint)
     }
 
-    /** How many characters are listed (the table's 8,105 and the traditional ones). */
     val size: Int get() = chars.size
 
-    /** The [index]th listed character, by code point, and its group: for a walk of them all. */
     fun codePointAt(index: Int): Int = chars[index]
     fun levelAt(index: Int): Level = Level.entries[levels[index]]
 
@@ -67,16 +48,13 @@ class CharLevels private constructor(private val chars: BitPacked, private val l
     }
 
     companion object {
-        /** Layout of the sections; bump on any change to it. */
+        /** Bump on any layout change. */
         const val VERSION = 1
 
-        /** The ranges [OUT][Level.OUT] covers: 扩展 A, the basic block, the compatibility ideographs. */
         val OUT_RANGES = listOf(0x3400..0x4DBF, 0x4E00..0x9FFF, 0xF900..0xFAFF)
 
-        /** The range [EXT][Level.EXT] covers: planes 2 and 3, 扩展 B to J and the compatibility supplement. */
         val EXT_RANGE = 0x20000..0x3FFFF
 
-        /** The group of a character not listed: [Level.OUT], [Level.EXT] or none. */
         fun rangeOf(codePoint: Int): Level? = when {
             OUT_RANGES.any { codePoint in it } -> Level.OUT
             codePoint in EXT_RANGE -> Level.EXT
@@ -90,10 +68,7 @@ class CharLevels private constructor(private val chars: BitPacked, private val l
     }
 }
 
-/**
- * Builds `engine/charlevels.data` ([CharLevels]): [tgh], Unihan_OtherMappings.txt's kTGH lines
- * (`U+4E00<TAB>kTGH<TAB>2013:1`), then [traditional], OpenCC's TSCharacters.txt (`<traditional><TAB><simplified> ...`).
- */
+/** Builds `engine/charlevels.data` from Unihan's kTGH lines ([tgh]), then OpenCC's TSCharacters.txt ([traditional]). */
 class CharLevelsBuilder {
     private val rank = HashMap<Int, Int>()
     private val traditional = HashSet<Int>()
@@ -110,7 +85,6 @@ class CharLevelsBuilder {
         }
     }
 
-    /** The traditional characters of TSCharacters.txt one of whose simplified ones is in the table; call after [tgh]. */
     fun traditional(lines: Sequence<String>) = apply {
         for (line in lines) {
             val f = line.split('\t')
@@ -121,7 +95,6 @@ class CharLevelsBuilder {
         }
     }
 
-    /** The file; a table that is not the 8,105 characters ranked 1 to 8,105 once each fails. */
     fun build(): DataFile.Writer {
         val ranks = rank.values.sorted()
         if (ranks.size != TABLE || ranks != (1..TABLE).toList()) {
@@ -145,7 +118,6 @@ class CharLevelsBuilder {
     companion object {
         private const val HEX = 16
 
-        /** The table's characters, and where its first two levels end. */
         const val TABLE = 8105
         const val LEVEL_1 = 3500
         const val LEVEL_2 = 6500

@@ -43,7 +43,6 @@ class EnginesReadingsTest : EnginesFixture() {
         assertEquals("", strokes.hints[at])
         val listed = engines(ReadingStyle.OFF).run { type(PINYIN, "upsnp"); candidates(PINYIN, 0, 10) }.single { it.text == "你" }
         assertEquals(Choice("你", "", listOf("nǐ")), listed)
-        // a part's
         val parts = engines(ReadingStyle.OFF).type(PINYIN, "unvzi")
         assertEquals(parts.toString(), listOf("hǎo"), parts.readings[parts.candidates.indexOf("好")])
     }
@@ -58,7 +57,6 @@ class EnginesReadingsTest : EnginesFixture() {
             assertEquals("", s.hints.getOrElse(at) { "" })
             assertEquals(want, e.candidates(PINYIN, 0, 10).single { it.text == "角色" }.readings)
         }
-        // typed by its true reading: as typed, no hint
         assertEquals(listOf("jué", "sè"), engines(ReadingStyle.PINYIN).type(PINYIN, "juese").let { it.readings[it.candidates.indexOf("角色")] })
         assertTrue(engines(ReadingStyle.OFF).type(PINYIN, "juese").readings.all { it.isEmpty() })
     }
@@ -87,7 +85,6 @@ class EnginesReadingsTest : EnginesFixture() {
         assertTrue(off.readings.all { it.isEmpty() })
         assertTrue("$off", off.hints.any { it.isNotEmpty() })
         assertEquals(off.hints, on.hints)
-        // a table's candidate read by its text
         assertEquals(listOf("hǎo"), on.readings[on.candidates.indexOf("好")])
     }
 
@@ -96,8 +93,7 @@ class EnginesReadingsTest : EnginesFixture() {
         assertEquals(emptyList<List<String>>(), engines(ReadingStyle.PINYIN).type(ENGLISH, "th").readings)
     }
 
-    // full pinyin's chain (stroke filter, glide, table forgetting, stroke lookup) hands on the reading typed:
-    // 行 typed hang reads háng, not its text's likelier xíng
+    // the chain hands on the reading typed: 行 typed hang reads háng
     @Test
     @Uat("PY-113")
     fun aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers() {
@@ -112,8 +108,7 @@ class EnginesReadingsTest : EnginesFixture() {
         assertEquals(listOf("háng"), e.candidates(PINYIN, 0, 10).single { it.text == "行" }.readings)
     }
 
-    // a table's pinyin lookup (五笔's z) hands on the reading typed as full pinyin does: 行 looked up
-    // by hang reads háng, not its text's likelier xíng; the table's own candidates stay read by their text
+    // the table's own candidates stay read by their text
     @Test
     fun aTablesPinyinLookupIsReadAsTyped() {
         pinyin = PinyinDataBuilder()
@@ -132,9 +127,7 @@ class EnginesReadingsTest : EnginesFixture() {
         assertEquals(listOf("hǎo"), coded.readings[coded.candidates.indexOf("好")])
     }
 
-    // a polyphone found by its parts or strokes is hinted all its readings ("xing/hang/heng"): drawn above as
-    // one, toned, as any candidate is (A5, the user, 2026-11-06), the one it has after what was put before it
-    // (银 then 行: háng), else its commonest (xíng); no hint left beside it, 候选词注音 on or off
+    // drawn above as one toned reading; no hint beside it, 候选词注音 on or off
     @Test
     @Uat("PY-111", "PY-118")
     fun aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove() {
@@ -155,7 +148,6 @@ class EnginesReadingsTest : EnginesFixture() {
                 assertEquals("$style $keys", "", s.hints.getOrElse(at) { "" })
                 assertEquals(Choice("行", "", listOf(alone)), e.candidates(PINYIN, 0, 10).single { it.text == "行" })
             }
-            // 银 picked, then 行 by its parts after it
             val e = engines(style)
             val typed = e.type(PINYIN, "yinuchichu")
             val yin = typed.candidates.indexOf("银")

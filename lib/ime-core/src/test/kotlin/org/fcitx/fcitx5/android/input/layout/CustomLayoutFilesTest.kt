@@ -59,7 +59,7 @@ class CustomLayoutFilesTest {
         assertEquals("layout.layout", CustomLayoutFiles.exportName("\u202E"))
     }
 
-    // a stream that hands out a few bytes a read, as a content provider may
+    // a few bytes a read, as a content provider may
     private class Trickle(private val bytes: ByteArray) : InputStream() {
         private var at = 0
         var read = 0
@@ -103,14 +103,14 @@ class CustomLayoutFilesTest {
         assertFalse("not UTF-8", CustomLayoutFiles.restorable("mine.xml", byteArrayOf(0xff.toByte(), 0xfe.toByte()), sources, "0.6.1"))
         val big = own("mine").replace("</keyboard>", "<!--" + "x".repeat(CustomLayoutFiles.MAX_BYTES.toInt()) + "--></keyboard>")
         assertFalse("too big", restorable("mine.xml", big))
-        // what the strict check only refuses is taken (the 信息 tells it), what would break the list or a key's name is not
+        // what the strict check only refuses is taken, what would break the list or a key's name is not
         assertTrue("a name of hidden characters", restorable("mine.xml", own("mine").replaceFirst("name=\"", "name=\"&#x202E;")))
         assertFalse("a family the list has no section for", restorable("my-zhuyin.xml", boards.getValue("zhuyin").replaceFirst("id=\"zhuyin\"", "id=\"my-zhuyin\" based-on=\"qwerty\"")))
         assertFalse("an app's board's id", restorable("k18.xml", boards.getValue("k18").replaceFirst("id=\"k18\"", "id=\"k18\" based-on=\"k18\"")))
         assertFalse("a key name's prefix", restorable("g18.xml", own("g18")))
         assertFalse("what its base must be typed on gone", restorable("mine.xml", own("mine").replace("role=\"backspace\" ", "")))
         assertFalse("for a newer app", restorable("mine.xml", own("mine").replaceFirst("<defaults", "<meta min-app=\"9.0.0\"/>\n  <defaults")))
-        // a number board whose pad lacks what a field of it types: not drawn, whatever the backup says (L5 review N1)
+        // a number board whose pad lacks what a field of it types: not drawn, whatever the backup says
         val numbers = boards.getValue("number").replaceFirst("id=\"number\"", "id=\"my-num\" based-on=\"number\" pads=\"decimal\"")
         assertTrue("a number board", restorable("my-num.xml", numbers))
         assertFalse("its decimal pad without 5", restorable("my-num.xml", numbers.replace("send=\"sym:KP_5\"", "send=\"commit:x\"")))
@@ -134,9 +134,7 @@ class CustomLayoutFilesTest {
         assertTrue(CustomLayoutFiles.mergeConverted(null, wide).encodeToByteArray().size <= CustomLayoutFiles.MAX_CONVERTED_BYTES)
     }
 
-    // a pack imported again records its new stamp in place of the old one (review NIT2: the old ones piled up, and past
-    // the most lines the new one was dropped, the pack converted at each start); a layout written again its new digest.
-    // The new line goes last, as written (R26 F8170: left where the old stood, it was read as older than lines after it)
+    // a pack imported again replaces its old stamp, the new line last (left in place it read as older than later lines)
     @Test
     fun aRecordKeepsEachPacksAndLayoutsLastLineTheNewestWhereFull() {
         assertEquals("b@1\na@2\n", CustomLayoutFiles.mergeConverted("a@1\nb@1\n", "a@2"))
@@ -148,14 +146,13 @@ class CustomLayoutFilesTest {
         assertEquals(CustomLayoutFiles.MAX_CONVERTED_LINES, lines.size)
         assertEquals(CustomLayoutFiles.CURRENT, lines.first())
         assertEquals("new@1", lines.last())
-        // R26 F8170: p1 imported again is the newest, kept when full; p2, the oldest now, dropped
+        // p1 imported again is the newest, kept when full; p2, the oldest now, dropped
         val again = CustomLayoutFiles.convertedLines("$full\np1@2\nnew@1")
         assertEquals(listOf("p1@2", "new@1"), again.takeLast(2))
         assertFalse("p2@1" in again)
     }
 
-    // R26 F8170: pack P made t1-k18; the user's own file put over that id, P imported again made t1-k18-2; both deleted,
-    // P imported again wrote t1-k18. Its last write is t1-k18: an update of P goes there, not to a gone -2
+    // the user's file over t1-k18 made P's next import t1-k18-2; both deleted, P's last write is t1-k18: updates go there
     @Test
     fun aLayoutWrittenAgainIsThePacksLastAfterOnesWrittenSince() {
         val r = CustomLayoutFiles.record("#l7\nP@1\n=t1-k18 k18 d1 P\nP@2\n=t1-k18-2 k18 d2 P\nP@3\n=t1-k18 k18 d3 P")
@@ -177,11 +174,11 @@ class CustomLayoutFilesTest {
         assertFalse(CustomLayoutFiles.record(null).current)
     }
 
-    // L7 re-check NIT-1: a pack whose file name begins with `=` is a pack's line, kept a line of its own, not dropped
+    // a pack whose file name begins with `=` is a pack's line of its own, not dropped
     @Test
     fun aPackNamedWithAnEqualsSignFirstIsRecordedAsAPack() {
         val r = CustomLayoutFiles.record("#l7\n=mint.theme@5\n=odd one.theme@6\n=t1-k18 k18 d1 =mint.theme\n=mint.theme@7")
-        // in the order last written (R26 F8170): mint's new stamp after odd one's
+        // in the order last written: mint's new stamp after odd one's
         assertEquals(listOf("=odd one.theme@6", "=mint.theme@7"), r.packs)
         assertEquals(setOf("=mint.theme", "=odd one.theme"), r.packNames)
         assertEquals(listOf(CustomLayoutFiles.Made("t1-k18", "k18", "d1", "=mint.theme")), r.made)
@@ -197,7 +194,7 @@ class CustomLayoutFilesTest {
         assertEquals(CustomLayoutFiles.digest("x".encodeToByteArray()), CustomLayoutFiles.digest("x".encodeToByteArray()))
     }
 
-    // L7 review S2: what a pack's conversion writes over, and what it keeps
+    // what a pack's conversion writes over, and what it keeps
     @Test
     fun aPacksBoardReplacesOnlyTheLayoutItMadeAsItIs() {
         val record = CustomLayoutFiles.record("=t1-k18 k18 d1 mint\nmint@1")
@@ -214,8 +211,7 @@ class CustomLayoutFilesTest {
         // another pack of the same hash, or the user's own of that id: kept
         assertEquals(CustomLayoutFiles.Target("t1-k18-2", CustomLayoutFiles.Put.NEW), target(mapOf("t1-k18" to "d1"), file = "other"))
         assertEquals(CustomLayoutFiles.Target("t1-k18-3", CustomLayoutFiles.Put.NEW), target(mapOf("t1-k18" to "", "t1-k18-2" to "x"), file = "other"))
-        // L7 re-check SHOULD-1: a file already what the board makes under its id (saved, then killed before the record
-        // was written; tried again) is written over as it is, not a second copy at -2
+        // a file already what the board makes (killed before the record was written) is written over, not copied to -2
         fun unrecorded(files: Map<String, String>, writes: Map<String, String>) =
             CustomLayoutFiles.target(CustomLayoutFiles.record("#l7"), "mint", "k18", "t1-k18", same = false, writes = { writes[it] }) { files[it] }
         assertEquals(CustomLayoutFiles.Target("t1-k18", CustomLayoutFiles.Put.REPLACE), unrecorded(mapOf("t1-k18" to "d1"), mapOf("t1-k18" to "d1")))

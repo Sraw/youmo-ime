@@ -7,12 +7,7 @@ package org.fcitx.fcitx5.android.engine.data
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
-/**
- * A `charlevels.data` made up for the tests ([CharLevelsBuilder] over kTGH lines of its own): the
- * characters the tests type are 一级 ([FIRST], ranks 1 on), the boundaries' ranks hold the
- * characters named here, the rest of the 8,105 count up from U+4E00. The shipped table is read by
- * ime-eval's RareCharsUatTest.
- */
+/** A made-up `charlevels.data`: the test's characters 一级, the boundaries' ranks named here, the rest from U+4E00. */
 object TestCharLevels {
     /** 一级 from rank 1, in order: what the fixtures' dictionaries and tables have. */
     const val FIRST = "的是大打你拟好角色一二三四五六七上八下叫员日期妤人山高谈淡话天行长畅达发干"

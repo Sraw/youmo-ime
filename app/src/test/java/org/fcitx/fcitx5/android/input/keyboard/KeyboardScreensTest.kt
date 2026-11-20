@@ -12,10 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The screens upright and turned the input method has on a display ([KeyboardArea.screensOf]), as measured on the
- * API 29, 30, 33 and 36 emulators: the bar as held now, the other way's, the cutout across the short side.
- */
+/** [KeyboardArea.screensOf] as measured on the API 29, 30, 33 and 36 emulators. */
 class KeyboardScreensTest {
 
     private fun KeyboardArea.Screen.px() = "${widthPx}x$heightPx/$widthDp"
@@ -25,14 +22,13 @@ class KeyboardScreensTest {
 
     @Test
     fun theScreensUprightAndTurned() = assertRows(
-        // API 33, pixel_6, gestures, a 128 px camera cutout: upright 1080x2209, turned 2272x1017 (the IME's own)
+        // API 33, pixel_6, gestures, a 128 px camera cutout: upright 1080x2209, turned 2272x1017
         "gesturesAndACutoutUprightNow" to {
             assertEquals("1080x2209/411" to "2272x1017/866", screens(1080, 2400, NavBar(63, 0), NavBar(63, 0), cutout = 128))
         },
         "gesturesAndACutoutTurnedNow" to {
             assertEquals("1080x2209/411" to "2272x1017/866", screens(2400, 1080, NavBar(63, 0), NavBar(63, 0), cutout = 128))
         },
-        // three buttons on a phone: at the bottom upright, at the side turned
         "buttonsUprightNow" to {
             assertEquals("1080x2274/411" to "2274x1080/866", screens(1080, 2400, NavBar(126, 0), NavBar(0, 126)))
         },
@@ -42,11 +38,9 @@ class KeyboardScreensTest {
         "buttonsAndACutout" to {
             assertEquals("1080x2146/411" to "2146x1080/818", screens(1080, 2400, NavBar(126, 0), NavBar(0, 126), cutout = 128))
         },
-        // no bar, no cutout (edge to edge from API 35): the display whole
         "edgeToEdge" to {
             assertEquals("1080x2340/360" to "2340x1080/780", screens(1080, 2340, NavBar.NONE, NavBar.NONE, density = 3f))
         },
-        // API 29 (youmo29, 2.75): the bar at the bottom upright, at the side turned, the width truncated
         "api29Truncates" to {
             assertEquals("1080x2208/392" to "2208x1080/802", screens(1080, 2340, NavBar(132, 0), NavBar(0, 132), density = 2.75f, round = false))
         },
@@ -55,13 +49,12 @@ class KeyboardScreensTest {
     @Test
     @Uat("LS-49")
     fun aLargeScreenIsTheDisplaysShortSideNotTheWindows() {
-        // a 601 × 962 dp tablet at 2x, its 48 dp bar at the bottom both ways (API 29–34 leave it out of the window):
-        // turned the window is 553 dp high, yet the display's short side, 601, says large (061-landscape-height §5.1)
+        // a 601 × 962 dp tablet at 2x, its bar at the bottom both ways (API 29–34 leave it out of the window): turned
+        // the window is 553 dp high, yet the display's short side says large
         val (up, turned) = KeyboardArea.screensOf(1202, 1924, 2f, NavBar(96, 0), NavBar(96, 0), 0, roundDp = true)
         assertEquals(1202 - 96, turned.heightPx)
         assertEquals(601 to 601, up.shortSideDp to turned.shortSideDp)
         assertTrue(up.large && turned.large)
-        // a phone's 393: not large either way; the status bar and the input method's bar each way as given
         val (pu, pt) = KeyboardArea.screensOf(1080, 2340, 2.75f, NavBar(132, 0), NavBar(0, 132), 0, roundDp = false,
             statusBar = { if (it) 66 else 132 }, imeNav = { if (it) 0 else 132 })
         assertFalse(pu.large || pt.large)
@@ -72,7 +65,6 @@ class KeyboardScreensTest {
         const val D = 2.625f
     }
 
-    // 横屏 of each, upright and turned (ScreenShape: turned, or 600 dp wide either way)
     private fun shapes(w: Int, h: Int, density: Float = D, round: Boolean = true, nowDp: Int? = null) =
         KeyboardArea.screensOf(w, h, density, NavBar.NONE, NavBar.NONE, 0, round, nowDp).let { (up, turned) ->
             "${up.widthDp}/${up.landscape}" to "${turned.widthDp}/${turned.landscape}"
@@ -82,10 +74,8 @@ class KeyboardScreensTest {
     @Uat("LS-37")
     fun eachScreenIsLandscapeAsWideAsItIs() = assertRows(
         "aPhone" to { assertEquals("393/false" to "851/true", shapes(1080, 2340, density = 2.75f)) },
-        // a foldable unfolded, 673 × 841 dp: 横屏 both ways up, held either way now
         "aFoldableUnfolded" to { assertEquals("673/true" to "841/true", shapes(1767, 2208)) },
         "aFoldableUnfoldedTurnedNow" to { assertEquals("673/true" to "841/true", shapes(2208, 1767)) },
-        // its outer screen, a phone's
         "aFoldableFolded" to { assertEquals("412/false" to "891/true", shapes(1082, 2340)) },
         "aTablet" to { assertEquals("800/true" to "1280/true", shapes(1600, 2560, density = 2f)) },
     )
@@ -96,9 +86,9 @@ class KeyboardScreensTest {
         "truncatedAlone" to { assertEquals("599/false" to "841/true", shapes(1574, 2208, round = false)) },
         "theConfigurationsWidth" to { assertEquals("600/true" to "841/true", shapes(1574, 2208, round = false, nowDp = 600)) },
         "roundedTheSame" to { assertEquals("599/false" to "841/true", shapes(1574, 2208, round = false, nowDp = 599)) },
-        // held turned now: the configuration's is the turned one's (842 of 841.1), the upright one's worked out
+        // held turned: the configuration's is the turned one's (842 of 841.1), the upright one's worked out
         "notTheOneHeldNow" to { assertEquals("599/false" to "842/true", shapes(2208, 1574, round = false, nowDp = 842)) },
-        // an activity's half of a split screen is no rounding: the display's own width kept
+        // an activity's half of a split screen: the display's own width kept
         "farOffIsNoRounding" to { assertEquals("599/false" to "841/true", shapes(1574, 2208, round = false, nowDp = 300)) },
     )
 

@@ -24,9 +24,7 @@ class CharReadingsTest {
     fun theFrequencyDictionarysOrderFirstThenTheWordsThatReadEachWay() {
         // xíng háng as 《现代汉语频率词典》 heard them; héng (道行) commoner than hàng (树行子) in the model; not 大字典's xìng
         assertEquals(listOf("xíng", "háng", "héng", "hàng"), of('行'))
-        // 频率词典 heard hāo, which no dictionary has
         assertEquals(listOf("hǎo", "hào"), of('好'))
-        // a character only 频率词典 has: its readings
         assertEquals(listOf("gōng"), of('工'))
         assertEquals(listOf("hái", "huán"), of('还'))
         // 一 in its own tone alone, not the yí yì it is said in before others
@@ -52,7 +50,6 @@ class CharReadingsTest {
         // 子's zi is 频率词典's alone, no dictionary's: not even the card's
         assertEquals(listOf("zǐ"), readings.of('子'.code, card = true).map { it.pinyin })
         assertEquals(of('的'), readings.of('的'.code, card = true).map { it.pinyin })
-        // its words by the card's place
         assertEquals(emptyList<String>(), readings.examples('和'.code, 5))
         assertEquals(listOf("和平"), readings.examples('和'.code, 0))
     }
@@ -80,7 +77,6 @@ class CharReadingsTest {
         // yet the model's others order the readings: 长大 puts zhǎng first, and is no example
         assertEquals(listOf("zhǎng", "cháng"), readings.of('长'.code).map { it.pinyin })
         assertEquals(emptyList<String>(), readings.examples('长'.code, 0))
-        // one reading: none kept
         assertEquals(emptyList<String>(), readings.examples('银'.code, 0))
         assertEquals(emptyList<String>(), readings.examples('a'.code, 0))
     }

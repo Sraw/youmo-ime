@@ -37,7 +37,6 @@ class PagedCandidatesUi(
 
     private var data = HostEvent.Paged.EMPTY
 
-    // the theme's candidates (T6a), worked out once for every holder
     private val bar = SceneBar.of(ctx, theme)
 
     private var isVertical = false

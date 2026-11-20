@@ -6,11 +6,7 @@ package org.fcitx.fcitx5.android.engine
 
 import kotlin.coroutines.cancellation.CancellationException
 
-/**
- * Every row of a table test checked, the failing ones listed together at the end, each under the
- * name [why] gives it: a regression in one row hides none of the others (review F3407). A row that
- * crashes (a `!!`, an ExecutionException) is a failure like an assertion, not the table's end (F3452).
- */
+/** Every row is checked and the failing ones listed together; a row that crashes fails like an assertion. */
 @Suppress("TooGenericExceptionCaught")
 fun <T> assertRows(rows: Iterable<T>, why: (T) -> String, check: (T) -> Unit) {
     var first: Throwable? = null

@@ -15,19 +15,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-/**
- * What the painter draws of the ops the app's own drawing is not compared on (web/theme-maker/test/engine.test.mjs
- * holds the rest to the app's ScenePainter: no snapshot has these): a nine-slice, the picture, a gradient, a
- * ripple, a shape less another, an inner shadow, outlined text, letters set one by one, an icon's stroke, on a
- * context that writes down each call. A nine-slice is cut as the app's NineSliceLayout cuts it
- * (KeyFaceGeometryTest's cases, here).
- */
+/** What the painter draws of the ops engine.test.mjs does not compare with the app's ScenePainter, on a recording context. */
 class CanvasPainterTest {
     private val red = Argb.of(255, 255, 0, 0)
     private val half = Argb.of(128, 0, 0, 255)
     private val box = Shape.Rect(Box(10.0, 20.0, 110.0, 70.0))
 
-    // the half-alpha blue as CSS has it (128/255 to the last digit)
     private val blue = CanvasPainter.css(half)
 
     private class Assets(val images: Map<String, dynamic> = emptyMap(), val picture: dynamic = null, val icons: Map<String, dynamic> = emptyMap()) : PaintAssets {
@@ -50,7 +43,6 @@ class CanvasPainterTest {
         return (ctx.calls as Array<String>).toList()
     }
 
-    // a context with no canvas (an offscreen one made wrong) fails as the painter is made, before any op is half drawn
     @Test
     fun aContextWithoutACanvasFailsAtOnce() {
         val ctx: dynamic = js("({})")
@@ -72,11 +64,9 @@ class CanvasPainterTest {
         assertEquals("restore()", calls.last())
         val pieces = calls.filter { it.startsWith("drawImage") }
         assertEquals(9, pieces.size)
-        // corners of 30 source px at 3 px a dp, drawn at 2: 20 px
         assertEquals("drawImage(IMG,0,0,30,30,10,20,20,20)", pieces[0])
         assertEquals("drawImage(IMG,30,30,30,30,30,40,60,10)", pieces[4])
         assertEquals("drawImage(IMG,60,60,30,30,90,50,20,20)", pieces[8])
-        // no insets: the whole image over the whole shape
         val whole = drawn(Op.NineSlice(box, "key.png", listOf(0, 0, 0, 0), 1), Assets(mapOf("key.png" to image)))
         assertEquals(listOf("drawImage(IMG,0,0,90,90,10,20,100,50)"), whole.filter { it.startsWith("drawImage") })
     }
@@ -88,11 +78,9 @@ class CanvasPainterTest {
         assertEquals(NineSliceCut.Piece(Box(0.0, 0.0, 30.0, 30.0), Box(0.0, 0.0, 20.0, 20.0)), nine[0])
         assertEquals(NineSliceCut.Piece(Box(30.0, 30.0, 60.0, 60.0), Box(20.0, 20.0, 180.0, 80.0)), nine[4])
         assertEquals(NineSliceCut.Piece(Box(60.0, 60.0, 90.0, 90.0), Box(180.0, 80.0, 200.0, 100.0)), nine[8])
-        // corners of 20 and 60 px in a 40 px target: 10 and 30, the middle column gone
         val tight = NineSliceCut.of(100.0, 10.0, 20, 0, 60, 0, 1, Box(0.0, 0.0, 40.0, 10.0), 1.0)
         assertEquals(listOf(Box(0.0, 0.0, 10.0, 10.0), Box(10.0, 0.0, 40.0, 10.0)), tight.map { it.dst })
         assertEquals(listOf(Box(0.0, 0.0, 20.0, 10.0), Box(40.0, 0.0, 100.0, 10.0)), tight.map { it.src })
-        // insets past the image take nothing outside it
         val past = NineSliceCut.of(10.0, 10.0, 8, 8, 8, 8, 1, Box(0.0, 0.0, 100.0, 100.0), 1.0)
         assertEquals(true, past.isNotEmpty())
         past.forEach { assertEquals(true, it.src.left >= 0 && it.src.top >= 0 && it.src.right <= 10 && it.src.bottom <= 10, "$it") }
@@ -101,15 +89,12 @@ class CanvasPainterTest {
 
     @Test
     fun aNineSlicesInnerEdgesAreWholePixelsAsTheAppsAndASideWithNoInsetKeepsItsEdge() {
-        // R23 ST-101 seams and F7525 (a side with no inset kept whole)
-        // a fractional target, the same case ThemeMakerRulesTest pins for the app's NineSliceLayout: inner edges at
-        // 80.9 and 17.65 drawn at 81 and 18; no left or bottom inset, those edges the target's own
+        // the same case ThemeMakerRulesTest pins for the app's NineSliceLayout
         val cut = NineSliceCut.of(40.0, 40.0, 0, 8, 12, 0, 2, Box(3.5, 7.25, 96.5, 60.75), 2.6)
         assertEquals(
             listOf(Box(3.5, 7.25, 81.0, 18.0), Box(81.0, 7.25, 96.5, 18.0), Box(3.5, 18.0, 81.0, 60.75), Box(81.0, 18.0, 96.5, 60.75)),
             cut.map { it.dst },
         )
-        // edges on odd halves (2.5, 18.5, 3.5, 8.5) go to the even pixel, as the app's
         val tie = NineSliceCut.of(20.0, 20.0, 4, 4, 4, 4, 2, Box(0.5, 1.5, 20.5, 10.5), 1.0)
         assertEquals(listOf(0.5, 2.0, 18.0), tie.take(3).map { it.dst.left })
         assertEquals(listOf(1.5, 4.0, 8.0), listOf(tie[0], tie[3], tie[6]).map { it.dst.top })
@@ -127,7 +112,6 @@ class CanvasPainterTest {
             calls,
         )
         assertEquals(listOf("10 80"), assets.pictures)
-        // none yet: the colour alone; the theme's own blur and brightness asked for as none
         val none = Assets()
         assertEquals(listOf("beginPath()", "rect(10,20,100,50)", "fillStyle=$blue", "fill()"), drawn(Op.Picture(box, null, null, half), none))
         assertEquals(listOf("null null"), none.pictures)
@@ -136,13 +120,11 @@ class CanvasPainterTest {
 
     @Test
     fun aGradientRunsAsCssAngles() {
-        // 90deg: left to right across the middle; 180deg: top to bottom
         val across = drawn(Op.Gradient(box, 90.0, listOf(red to 0.0, half to 1.5)))
         assertEquals("createLinearGradient(10,45,110,45)", across[0])
         assertEquals(listOf("stop(0,rgba(255,0,0,1))", "stop(1,$blue)"), across.filter { it.startsWith("stop") })
         assertEquals(listOf("beginPath()", "rect(10,20,100,50)", "fillStyle=GRADIENT", "fill()"), across.takeLast(4))
         assertEquals("createLinearGradient(60,20,60,70)", drawn(Op.Gradient(box, 180.0, listOf(red to 0.0)))[0])
-        // 45deg on a box twice as wide as tall: the corners reach the ends
         assertEquals("createLinearGradient(22.5,82.5,97.5,7.5)", drawn(Op.Gradient(box, 45.0, listOf(red to 0.0)))[0])
     }
 
@@ -157,12 +139,10 @@ class CanvasPainterTest {
 
     @Test
     fun radiiTooLargeForASideAreScaledDownAlikeAsSkiaDoes() {
-        // 30 + 30 on a 40 px side: each two thirds, 20
         val calls = drawn(Op.Fill(Shape.Rect(Box(0.0, 0.0, 40.0, 100.0), listOf(30.0, 30.0, 30.0, 30.0)), red))
         assertEquals(listOf("arc(20,20,20,-1.571,0)", "arc(20,80,20,0,1.571)", "arc(20,80,20,1.571,3.142)", "arc(20,20,20,3.142,4.712)"), calls.filter { it.startsWith("arc") })
     }
 
-    // the layer as [laid] sets it up over the device's [area], drawing in [style]; its calls after, then laid
     private fun layer(area: String, style: String, vararg calls: String): List<String> =
         listOf("layer.save()", "layer.setTransform(1,0,0,1,0,0)", "layer.clearRect($area)", "layer.setTransform(M)", "layer.fillStyle=$style", "layer.strokeStyle=$style") +
             calls.map { "layer.$it" } + "layer.restore()"
@@ -213,7 +193,6 @@ class CanvasPainterTest {
         )
     }
 
-    // FILL_AND_STROKE: the outline and the letters drawn opaque on a layer, laid once at the colour's alpha
     @Test
     fun anOutlineNotOpaqueIsLaidOnceNotOverItsOwnFill() {
         val calls = drawn(Op.Text("ab", 10.0, 50.0, "system", 400, 20.0, red, stroke = TextStroke(1.5, half)))
@@ -221,8 +200,7 @@ class CanvasPainterTest {
             "save()", "font=400 20px sans-serif", "letterSpacing=0px", "textAlign=left", "textBaseline=alphabetic", "translate(10,50)",
             "lineWidth=3", "lineJoin=round", "strokeText(ab,0,0)", "fillText(ab,0,0)", "restore()",
         )
-        // the layer over the text's room alone (its run 20 px, 20 px letters, the outline 1.5 px round), not the canvas:
-        // how generous its margins are is the painter's, not pinned here
+        // how generous the layer's margins are is the painter's, not pinned here
         val measured = listOf("save()", "font=400 20px sans-serif", "measureText(ab)", "restore()")
         val rect = layerRect(calls.first { it.startsWith("drawImage(LAYER") })
         assertLayerRound(rect, 8.5, 28.5, 31.5, 55.5)
@@ -235,13 +213,10 @@ class CanvasPainterTest {
         )
     }
 
-    // a shadow of outlined text: the two together, blurred as one
     @Test
     fun anOutlinedTextsShadowIsItsOutlineAndLettersBlurredAsOne() {
         val calls = drawn(Op.Text("ab", 10.0, 50.0, "system", 400, 20.0, red, stroke = TextStroke(1.0, red), shadow = TextShadow(2.0, 3.0, 4.0, half)))
         val shadow = calls.subList(0, calls.indexOfFirst { it.startsWith("drawImage(LAYER") } + 1)
-        // each laid over its own room: the shadow's moved and blurred 4 px round (its blur reaching twice that), the
-        // outline's where the text is
         val (shadowLayer, outlineLayer) = calls.filter { it.startsWith("drawImage(LAYER") }.map(::layerRect)
         assertLayerRound(shadowLayer, 3.0, 24.0, 41.0, 66.0)
         assertLayerRound(outlineLayer, 9.0, 29.0, 31.0, 55.0)
@@ -250,7 +225,6 @@ class CanvasPainterTest {
         assertEquals(2, calls.count { it.startsWith("drawImage(LAYER") }, "the shadow, then the outline")
     }
 
-    // a canvas without letterSpacing: each letter where one with it would put it, not the whole text off by the half
     @Test
     fun spacedTextOnACanvasWithoutLetterSpacingIsSetLetterByLetter() {
         val op = Op.Text("ab", 10.0, 50.0, "system", 400, 20.0, red, letterSpacing = 0.1)
@@ -264,8 +238,7 @@ class CanvasPainterTest {
         assertEquals(listOf("letterSpacing=2px", "translate(11,50)", "fillText(ab,0,0)"), with.filter { it.startsWith("translate") || it.startsWith("fillText") || it.startsWith("letterSpacing") })
     }
 
-    // a viewBox whose origin is not 0 0 (Material Symbols' 0 -960 960 960): moved to the key's corner, else the
-    // icon is drawn a whole key higher
+    // Material Symbols' viewBox 0 -960 960 960: moved to the key's corner, else the icon is drawn a whole key higher
     @Test
     fun anIconsViewBoxOriginIsMovedToTheCorner() {
         val icon: dynamic = js("({ vx: 0, vy: -960, vw: 960, vh: 960, paths: [{ d: 'M0 0' }] })")
@@ -274,7 +247,6 @@ class CanvasPainterTest {
         assertEquals(listOf("translate(0,24)", "scale(0.025,0.025)"), calls.subList(scale - 1, scale + 1), "$calls")
     }
 
-    // a wide theme SVG keeps its shape, centred down the box (SVG's xMidYMid meet), not stretched
     @Test
     fun aWideIconIsScaledAlikeAndCentred() {
         val icon: dynamic = js("({ vx: 0, vy: 0, vw: 48, vh: 24, paths: [{ d: 'M0 0L48 24Z' }] })")
@@ -283,7 +255,6 @@ class CanvasPainterTest {
         assertEquals(listOf("translate(0,6)", "scale(0.5,0.5)"), calls.subList(scale - 1, scale + 1), "$calls")
     }
 
-    // the app's own icons (no vx) fill the box as their VectorDrawable's bounds do, a box a px wider than tall too
     @Test
     fun anAppIconIsStretchedToItsBox() {
         val icon: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L24 24Z' }] })")
@@ -292,7 +263,6 @@ class CanvasPainterTest {
         assertTrue(calls.none { it == "translate(0.5,0)" }, "$calls")
     }
 
-    // a theme path's own colour (an ARGB integer from readIcon) keeps its hue, faded by the tint's alpha; one without takes the tint
     @Test
     fun anIconPathsOwnFillIsKeptAndTheTintsAlphaApplied() {
         val icon: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L1 1Z', fill: 0xff0000ff | 0 }, { d: 'M0 0L2 2Z' }] })")
@@ -302,10 +272,8 @@ class CanvasPainterTest {
             listOf("fillStyle=rgba(0,0,255,${128 / 255.0})", "fillStyle=rgba(255,0,0,${128 / 255.0})"),
             calls.filter { it.startsWith("fillStyle") },
         )
-        // the faded alpha rounded, not cut: 200 × 200 / 255 is 156.86
         val faded = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.of(200, 255, 0, 0)), Assets(icons = mapOf("x" to js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L1 1Z', fill: 0xc80000ff | 0 }] })"))))
         assertEquals(listOf("fillStyle=rgba(0,0,255,${157 / 255.0})"), faded.filter { it.startsWith("fillStyle") })
-        // a transparent icon-color hides the whole icon, its own colours too
         val none = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.TRANSPARENT), Assets(icons = mapOf("x" to icon)))
         assertTrue(none.none { it.startsWith("fill") }, "$none")
     }
@@ -321,18 +289,11 @@ class CanvasPainterTest {
     }
 }
 
-/**
- * A 2D context that writes down each call and each property set, numbers to three places; a gradient's stops too.
- * Its canvas is 400 × 300, and a canvas made of its document (a painter's layer) writes down on the same list,
- * `layer.` before each; its transform is none, written `M`; measureText's advance is 10 a letter. Without
- * [letterSpacing], it has none (a canvas from before 2023).
- */
+/** A 2D context that writes down each call and property set; a canvas made of its document writes `layer.` calls on the same list. */
 internal fun recorder(letterSpacing: Boolean = true): dynamic = makeRecorder(letterSpacing)
 
-// a layer's room (x, y, w, h) as its drawImage call wrote it
 private fun layerRect(call: String): List<Double> = call.substringAfter("drawImage(LAYER,").split(",").take(4).map { it.toDouble() }
 
-// [rect] within the recorder's canvas (400 × 300) and smaller, round the ink from [left], [top] to [right], [bottom]
 private fun assertLayerRound(rect: List<Double>, left: Double, top: Double, right: Double, bottom: Double) {
     val x = rect[0]
     val y = rect[1]

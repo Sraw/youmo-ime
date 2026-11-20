@@ -35,7 +35,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What [PinyinSession] writes to the learning record, keyboard by keyboard (impl/design-1a.md §3); nothing it ranks by. */
+/** What [PinyinSession] writes to the learning record, keyboard by keyboard; nothing it ranks by. */
 class PinyinSessionLearnLogTest {
     private val data = sessionTestData()
     private val habits = RecordingHabits()
@@ -65,7 +65,6 @@ class PinyinSessionLearnLogTest {
         val s = session()
         s.type("nihao")
         assertEquals("你好", s.apply(Select(0)).commit)
-        // the first shown, 你｜好: its words each used too
         assertEquals(listOf("qp:nihao||你好(ni hao)|A|3", "qp:ni||你(ni)|A|4", "qp:hao|你|好(hao)|A|4"), rows())
     }
 
@@ -90,12 +89,10 @@ class PinyinSessionLearnLogTest {
         s.type("hao")
         s.apply(Select(0))
         assertEquals("你", habits.last.first().prev)
-        // the app's text, traditional: read simplified, its last word
         s.apply(Action.Context("我點"))
         s.type("zai")
         s.apply(Select(0))
         assertEquals("点", habits.last.first().prev)
-        // a field that cleared itself: nothing before
         s.apply(Action.Context("你好", cleared = true))
         s.type("zai")
         s.apply(Select(0))
@@ -112,13 +109,11 @@ class PinyinSessionLearnLogTest {
         val s = session()
         s.type("nihao")
         s.apply(Select(0))
-        // the field cleared itself with the text the session committed still reported (no 联想 shown
-        // to reset first): the shortcut for an unmoved cursor must not keep the message (F2652)
+        // the shortcut for an unmoved cursor must not keep the message
         s.apply(Action.Context("你好", cleared = true))
         s.type("zai")
         s.apply(Select(0))
         assertEquals("", habits.last.first().prev)
-        // nor a backspace in the empty field bring it back (F2704)
         s.apply(Action.Context("你好再", cleared = true))
         s.apply(Action.Backspace)
         s.type("zai")
@@ -131,7 +126,6 @@ class PinyinSessionLearnLogTest {
         val s = session()
         s.type("nihao")
         assertEquals("你好", s.apply(Key(',')).commit.removeSuffix(","))
-        // the first shown, 你｜好: its words each used too
         assertEquals(listOf("qp:nihao||你好(ni hao)|A|3", "qp:ni||你(ni)|A|4", "qp:hao|你|好(hao)|A|4"), rows())
     }
 
@@ -200,7 +194,6 @@ class PinyinSessionLearnLogTest {
         s.apply(Action.Syllable(1))
         s.apply(Backspace)
         assertTrue(s.pressedInStep)
-        // then a digit goes
         s.apply(Backspace)
         s.type("6")
         assertTrue(s.pressedInStep)
@@ -209,7 +202,6 @@ class PinyinSessionLearnLogTest {
         assertEquals(emptyList<Take>(), habits.takes.last())
     }
 
-    // review-1a-core S5: a key typed with the cursor in a syllable taken keeps the keys a place each
     @Test
     fun aKeyTypedInASyllableTakenKeepsTheKeysInStep() {
         val s = session(T9Segmenter(abbreviations = false), spell = true)
@@ -271,7 +263,6 @@ class PinyinSessionLearnLogTest {
         assertEquals(listOf("拟"), habits.forgotten)
     }
 
-    // review-1a-core S4: a sentence forgotten is that text, not each word of it everywhere
     @Test
     fun aSentenceForgottenIsItsTextAlone() {
         val s = session()
@@ -283,8 +274,7 @@ class PinyinSessionLearnLogTest {
         assertEquals(listOf("你好吗"), habits.forgotten)
     }
 
-    // review-1a-core open question: a key the session does not read (a comma) leaves no word before
-    // what comes next, with no Context from the host
+    // a key the session does not read (a comma) leaves no word before what comes next, with no Context from the host
     @Test
     fun aKeyNotReadEndsTheWordBefore() {
         val s = session()
@@ -295,8 +285,6 @@ class PinyinSessionLearnLogTest {
         assertEquals("", habits.last.single { it.whole }.prev)
     }
 
-    // review-1a-core open question: a phrase is no word picked (PLAN §2.4); the decoder's first after
-    // it is the first shown, not a correction (NIT 10)
     @Test
     fun aPhrasePickedLearnsNothingAndTheWordAfterItIsFirst() {
         val s = session(phrases = PhraseBook(CustomPhrases.parse("nihao,1=你好呀")) {})
@@ -309,7 +297,7 @@ class PinyinSessionLearnLogTest {
         assertEquals('A', habits.last.single { it.whole }.how)
     }
 
-    // review-1a-app S1: a fault of the learning record's is reported, and the commit goes on
+    // a fault of the learning record's is reported, and the commit goes on
     @Test
     fun aFaultOfTheRecordsLosesNoCommit() {
         val failed = ArrayList<RuntimeException>()
@@ -327,7 +315,6 @@ class PinyinSessionLearnLogTest {
         assertEquals(1, failed.size)
     }
 
-    // review-1a-app S2: an unpin where nothing is learned is recorded as its pin was
     @Test
     fun anUnpinWhereNothingIsLearnedIsRecorded() {
         val s = session(phrases = PhraseBook(CustomPhrases.parse("")) {})
@@ -348,11 +335,10 @@ class PinyinSessionLearnLogTest {
         val after = s.pick("再")
         assertEquals("见", after.candidates.first())
         s.apply(Select(0))
-        // by its text, of no reading: 联想's alone (review-C S1)
         assertEquals(listOf("pred:再|再|见|D|3"), rows())
     }
 
-    // review-1a-core S3: an address field's commits learn no pairs, a search's no 联想 (U-91)
+    // an address field's commits learn no pairs, a search's no 联想
     @Test
     fun aFieldsLearnFlagsGoWithItsCommits() {
         val s = session()
@@ -360,19 +346,18 @@ class PinyinSessionLearnLogTest {
         s.type("ni")
         s.apply(Select(0))
         assertEquals(LearnRecord.Commit.NO_PAIRS, habits.flags.last())
-        // the engine's own context (a glide's word held back, a lookup committed) leaves them (review-1a-r2 S1)
+        // the engine's own context (a glide's word held back, a lookup committed) leaves them
         s.apply(Action.Context("你"))
         s.type("ni")
         s.apply(Select(0))
         assertEquals(LearnRecord.Commit.NO_PAIRS, habits.flags.last())
-        // the host's next, of another field, sets them
         s.apply(Action.Context("你", learnFlags = 0))
         s.type("ni")
         s.apply(Select(0))
         assertEquals(0, habits.flags.last())
     }
 
-    // U-91: a 联想 pick in an address field learns no pair either (the reducer leaves pairs out by the flag)
+    // a 联想 pick in an address field learns no pair either (the reducer leaves pairs out by the flag)
     @Test
     fun aPredictionPickedGoesWithTheFieldsLearnFlags() {
         val s = session(prediction = true)
@@ -402,7 +387,6 @@ class PinyinSessionLearnLogTest {
             s.pick("拟")
             s.pick("再")
         }
-        // committed twice, none's: the user's word
         assertTrue(log.state.mine.containsKey("拟再"))
     }
 }

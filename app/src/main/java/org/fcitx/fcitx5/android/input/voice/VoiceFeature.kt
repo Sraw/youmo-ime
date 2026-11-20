@@ -16,20 +16,11 @@ import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.utils.AppUtil
 
-/**
- * Voice input: holding the space and tapping the bar's microphone talk. Offered in every build;
- * its models are the voice pack's, which is optional: without it (or with one this app does not
- * read) a talk asks for it instead. The microphone is asked for at the first talk.
- */
+/** Its models are the optional voice pack's: without it a talk asks for it instead. */
 object VoiceFeature {
     class Credit(val title: String, val licence: String, val url: String)
 
-    /**
-     * Hold to talk: the long press on space has fired, its finger ([pointer]) still down; what is
-     * said is [commit]ted once it lifts. Without the voice pack nothing happens (its caller does not
-     * hold for voice then; checked again here, the pack gone meanwhile, with a tip only); without the
-     * microphone permission, asks for it instead.
-     */
+    /** Without the voice pack nothing happens (checked again here, the pack gone meanwhile, with a tip only). */
     fun hold(inputView: InputView, pointer: Int, commit: (String) -> Unit) {
         // a talk going on already (tapped, then the space held): that one goes on
         if (inputView.hold != null) return
@@ -39,13 +30,7 @@ object VoiceFeature {
         VoiceHoldOverlay(inputView, pointer, commit).begin()
     }
 
-    /**
-     * Tap to talk: the bar's microphone (or a key's shortcut) tapped. Stops the talk going on, or
-     * starts one, its mask over the keys; what is said is [commit]ted (the settled part as it is
-     * said: the session's own). Not in a password field, nor while a hold is still being
-     * recognized. Without the voice pack, opens the 资源包 page; without the microphone permission,
-     * asks for it instead.
-     */
+    /** Stops the talk going on, or starts one. Not in a password field, nor while a hold is still being recognized. */
     fun tap(inputView: InputView, commit: (String) -> Unit) {
         when (val going = inputView.hold) {
             is VoiceTapOverlay -> going.micTapped()
@@ -56,13 +41,12 @@ object VoiceFeature {
         }
     }
 
-    // the voice pack there, one this app reads; else said on the keyboard, and the packs' page opened if [open]
     private fun packReady(context: Context, open: Boolean): Boolean {
         val status = PackStore.status(PackKind.VOICE)
         val tip = when (status) {
             is PackStatus.Ready -> return true
             is PackStatus.NeedsUpdate -> context.getString(R.string.pack_voice_needed_update, status.needed.minVersion)
-            // the pack is newer than this app reads: the app is what needs updating, not the pack
+            // the app is what needs updating, not the pack
             is PackStatus.NeedsNewerApp -> context.getString(R.string.pack_voice_needed_app, status.manifest.version)
             is PackStatus.Damaged -> context.getString(R.string.pack_voice_damaged)
             PackStatus.Missing -> context.getString(R.string.pack_voice_needed)
@@ -72,30 +56,25 @@ object VoiceFeature {
         return false
     }
 
-    // the microphone allowed; else the asking page opened
     private fun permitted(context: Context): Boolean {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return true
         VoicePermissionActivity.start(context)
         return false
     }
 
-    /** on the licences page */
     fun credits(context: Context) = listOf(
         Credit(context.getString(R.string.voice_model_credit), "Apache-2.0", "https://github.com/Gilgamesh-J/X-ASR"),
         // the encoder's fine-tuning kept its English with LibriSpeech, whose licence asks for the notice
         Credit("LibriSpeech", "CC-BY-4.0", "https://www.openslr.org/12/"),
-        // the polish tagger (0.6.0's, the voice pack v2's) is trained on data allowed for non-commercial use only
-        // (RAMC, RealTalk-CN; CS2W's sentences are RAMC's): the voice pack is licensed so, apart from the app
-        // (dev/design/060-tagger-data-licenses.md); each source credited, its creator named. Its FineWeb-2 sentences
-        // (ODC-By) are on the engine data's FineWeb-2 row (LicensesFragment), one row for both
+        // trained on data for non-commercial use only: the voice pack is licensed so, apart from the app. Its FineWeb-2
+        // sentences are on the engine data's FineWeb-2 row (LicensesFragment)
         Credit(context.getString(R.string.voice_tagger_credit), "CC-BY-NC-SA-4.0", "https://creativecommons.org/licenses/by-nc-sa/4.0/"),
         Credit("MagicData-RAMC (Magic Data Technology)", "CC-BY-NC-ND-4.0", "https://www.openslr.org/123/"),
         Credit("RealTalk-CN (BAAI)", "CC-BY-NC-SA-4.0", "https://huggingface.co/datasets/BAAI/RealTalk-CN"),
         Credit("CS2W (Guo et al., EMNLP 2023; sentences from MagicData-RAMC)", "CC-BY-SA-4.0", "https://github.com/guozishan/CS2W"),
         Credit("Chinese ELECTRA (hfl/chinese-electra-180g-small-ex-discriminator)", "Apache-2.0", "https://github.com/ymcui/Chinese-ELECTRA"),
         Credit("sherpa-onnx:1.13.8", "Apache-2.0", "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE"),
-        // what sherpa-onnx is built with (lib/sherpa-onnx/README.md), in its library in the APK; its
-        // onnxruntime is handwriting's too, credited on the page with it
+        // what sherpa-onnx is built with, in its library in the APK; its onnxruntime is credited with handwriting
         Credit("kaldi-native-fbank:1.22.3", "Apache-2.0", "https://github.com/csukuangfj/kaldi-native-fbank/blob/master/LICENSE"),
         Credit("kissfft", "BSD-3-Clause", "https://github.com/mborgerding/kissfft/blob/master/COPYING"),
         Credit("kaldi-decoder:0.3.0", "Apache-2.0", "https://github.com/k2-fsa/kaldi-decoder/blob/master/LICENSE"),

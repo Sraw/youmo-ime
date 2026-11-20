@@ -9,10 +9,9 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.WordIndex
 
 /**
- * The model's words that text the engine did not commit ends with, such as what the editor has
- * before the cursor: its last chars split as the model finds them likeliest, word by word (the
- * sum of their unigram scores), a char no word of the model's covers counting as `<unk>`. [scorer]
- * weighs a text for [logProb]: the model, or the model with the user's words mixed in.
+ * The model's words at the end of text the engine did not commit (the editor's text before the cursor):
+ * its last chars split as the model finds likeliest (sum of unigrams), an uncovered char counting as
+ * `<unk>`. [scorer] weighs text for [logProb]: the model, or with the user's words mixed in.
  */
 class TextWords(
     private val model: NgramModel,
@@ -20,13 +19,12 @@ class TextWords(
     private val scorer: WordScorer = WordScorer { prev2, prev, word -> model.score(prev2, prev, word) },
 ) {
 
-    /** The model's word of [text] whole, [NO_WORD] for none. */
+    /** [NO_WORD] for none. */
     fun id(text: CharSequence): Int = index.find(text)
 
     /**
-     * The last two words [text] ends with, the last one last: fewer when it has fewer, none when
-     * it ends with a char the model has no word for (a space, a letter), as after text kept as
-     * typed nothing is gone on from. [NO_WORD] for a first that is no word.
+     * The last two words [text] ends with, last last: fewer if it has fewer; none if it ends with a char no
+     * model word covers (space, letter), as nothing continues from text kept as typed. [NO_WORD] for a non-word first.
      */
     fun lastTwo(text: CharSequence): IntArray {
         // enough for two words and what decides where they begin
@@ -42,12 +40,10 @@ class TextWords(
     }
 
     /**
-     * Where [text] splits into words, split whole as [lastTwo] splits its end: the offsets
-     * between them, 0 and the length included, ascending. A char no word covers is one of its own.
-     * With [splitLong] (voice blocking), a word of three chars or more is split again, as likeliest
-     * without itself, down to words of two: the model has phrases as words, and 今天天气 is 今天
-     * 天气 (a voice result with a blocked 天气 in it is not typed, VO-10), 开饭店 开 饭店. Without
-     * it, the model's words as they are (ime-eval's 联想 after each word, comparable with earlier runs).
+     * Word boundaries of [text], split as [lastTwo] splits its end: offsets ascending, 0 and length
+     * included; an uncovered char is its own word. With [splitLong] (voice blocking) a word of 3+ chars is
+     * split again down to twos, since the model has phrases as words (今天天气 as 今天 天气, so a blocked
+     * 天气 is caught). Without, the model's words as they are (ime-eval's 联想, comparable with earlier runs).
      */
     fun boundaries(text: CharSequence, splitLong: Boolean = false): IntArray {
         val ends = ArrayList<Int>()
@@ -56,8 +52,7 @@ class TextWords(
         return ends.toIntArray()
     }
 
-    // the ends of the words [begin, end) of text splits into, with [longest] chars at most, each
-    // of three chars or more split again with [splitLong]
+    // the ends of the words in [begin, end), at most [longest] chars, 3+ char ones split again with [splitLong]
     private fun within(text: CharSequence, begin: Int, end: Int, longest: Int, ends: MutableList<Int>, splitLong: Boolean) {
         if (end == begin) return
         val split = split(text, begin, end, longest)
@@ -76,19 +71,17 @@ class TextWords(
     }
 
     /**
-     * log10 P of [text] as [scorer] has it, after the words [before] ends with ([lastTwo]), split
-     * into words as makes it likeliest, each word after the two before it: a char no word covers
-     * is `<unk>`. For ranking texts heard alike, or a code's 重码.
+     * log10 P of [text] by [scorer] after [before]'s last words ([lastTwo]), split to be likeliest, each word
+     * after the two before it; an uncovered char is `<unk>`. For ranking homophones or a code's 重码.
      */
     fun logProb(text: CharSequence, before: CharSequence = ""): Float = previous(lastTwo(before)).let { (prev2, prev) -> logProb(text, prev2, prev) }
 
-    /** As [logProb] after [prev2] and [prev] (as [previous] gives them): for many texts after the same. */
+    /** After [prev2] and [prev] (from [previous]): for many texts after the same. */
     fun logProb(text: CharSequence, prev2: Int, prev: Int): Float {
         val n = text.length
         if (n == 0) return 0f
-        // at each offset, the words a split can end on there, by their length (0: the word before the
-        // text, at 0 alone), with the best score to it and the word before it: flat, as the decoder
-        // keeps its lattice, for this runs for each of a table's 重码 at each key
+        // per offset, the words a split can end on there by length (0: the word before the text, at 0 only), with
+        // best score and predecessor: flat, as the decoder's lattice, since this runs for each 重码 on each key
         val score = FloatArray((n + 1) * STATES) { Float.NEGATIVE_INFINITY }
         val last = IntArray(score.size)
         val before = IntArray(score.size)
@@ -101,7 +94,7 @@ class TextWords(
             for (length in 1..longest) ids[length] = index.find(text, begin, begin + length)
             for (s in begin * STATES until (begin + 1) * STATES) {
                 if (score[s] == Float.NEGATIVE_INFINITY) continue
-                // looked up once for every word that may follow it, as the decoder does
+                // looked up once for every word that may follow, as the decoder does
                 val context = scorer.context(before[s], last[s])
                 val trigrams = scorer.trigrams(context)
                 for (length in 1..longest) {
@@ -122,8 +115,7 @@ class TextWords(
         return best
     }
 
-    // the likeliest split of text from [from] on, word by word: the word ending at each offset
-    // (relative to from) and where it starts
+    // the likeliest split from [from] on: the word ending at each offset (relative to from) and its start
     private class Split(val word: IntArray, val start: IntArray)
 
     private fun split(text: CharSequence, from: Int, until: Int = text.length, longest: Int = MAX_WORD): Split {
@@ -156,18 +148,14 @@ class TextWords(
         // the longest word looked for: the model's are shorter, but for a few names
         const val MAX_WORD = 8
 
-        // a word as long as this is split again for boundaries: one of two holds no other of two
+        // a word this long is split again for boundaries: one of two holds no other of two
         private const val MIN_SPLIT = 3
         private const val WINDOW = 3 * MAX_WORD
 
-        // the states of logProb at an offset: a word ending there of each length, or the word before
+        // logProb's states at an offset: a word ending there per length, or the word before
         private const val STATES = MAX_WORD + 1
 
-        /**
-         * The last two of [words] (as [lastTwo] gives them) as the decoder takes them, the one
-         * before the last first: [NO_WORD] for each [words] lacks, and for the one before when
-         * the last is none.
-         */
+        /** The last two of [words] ([lastTwo]) as the decoder takes them, second-last first: [NO_WORD] for each missing, and before a non-word last. */
         fun previous(words: IntArray): Pair<Int, Int> {
             val n = words.size
             val prev = if (n >= 1) words[n - 1] else NO_WORD

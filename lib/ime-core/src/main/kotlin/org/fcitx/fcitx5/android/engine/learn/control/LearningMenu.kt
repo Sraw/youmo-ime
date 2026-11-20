@@ -7,13 +7,9 @@ package org.fcitx.fcitx5.android.engine.learn.control
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 
-/**
- * A long press's menu as the keyboard shows it (U-82, U-81): its rows from the engine's
- * [LearningResult.Menu], what each asks of it, and the reason 为什么排在这 gives. The app only
- * puts words to them.
- */
+/** A long-press menu as the keyboard shows it: rows from [LearningResult.Menu], their ops, and 为什么排在这's reason. */
 object LearningMenu {
-    /** A row of the menu, in its order; [DELETE] and [FORGET] are the one item named by what the word is. */
+    /** [DELETE] and [FORGET] are one item, named by the word's kind. */
     enum class Row {
         /** 删除: the user's own word, added or imported. */
         DELETE,
@@ -24,7 +20,7 @@ object LearningMenu {
         PIN,
         UNPIN,
 
-        /** 从自定义词组中删除: a custom phrase, a built-in date too. */
+        /** 从自定义词组中删除: a custom phrase or built-in date. */
         DELETE_PHRASE,
 
         /** 从常用词中删除: a common word's replacement. */
@@ -46,10 +42,7 @@ object LearningMenu {
         }
     }
 
-    /**
-     * What [row] asks of the engine for the candidate [text] at [index], counted from the page
-     * shown if [paged]: null for [Row.WHY], which shows what the menu already has.
-     */
+    /** The op [row] sends for candidate [text] at [index] (from the shown page if [paged]); null for [Row.WHY], shown from the menu itself. */
     fun op(row: Row, index: Int, text: String, paged: Boolean): LearningOp? {
         val op = when (row) {
             Row.DELETE, Row.FORGET -> LearningOp.Delete(index, text)
@@ -62,38 +55,34 @@ object LearningMenu {
         return onCandidate(op, paged)
     }
 
-    /** [op] as the list it was asked on counts: from the page shown if [paged]. */
     fun onCandidate(op: LearningOp.OnCandidate, paged: Boolean): LearningOp = if (paged) LearningOp.OnPage(op) else op
 
-    /** Whether [row] asks first: a block reaches everywhere (U-82 C12), so the menu says where and asks. */
+    /** A block reaches everywhere, so it asks first. */
     fun confirms(row: Row) = row == Row.BLOCK
 
-    /** The reasons 为什么排在这 gives (U-81), one for each ranking tier and for a prediction. */
     enum class Reason {
         PINNED,
         FIRST_HERE,
         ACROSS,
 
-        /** 双拼: a word the user typed, read by its keys alone, put up front (061-sp-abbrev §3.3). */
+        /** 双拼: a user-typed word read by lone keys, put up front. */
         ALONE,
         USED,
 
-        /** No lower than second: picked over the first under its 简拼 (U-20, D32 B). */
+        /** No lower than second: picked over the first under its 简拼. */
         FLOORED,
 
-        /** Up to third: used typed in full on this keyboard (U-20, D32 B). */
+        /** Up to third: used typed in full on this keyboard. */
         LIFTED,
         MINE,
         IMPORTED,
         DICTIONARY,
 
-        /** A prediction: it follows the word before. */
         PREDICTION,
 
-        /** The rest of a whole phrase (U-73): it was put in whole [Why.uses] times. */
+        /** The rest of a whole phrase, committed whole [Why.uses] times. */
         PHRASE,
 
-        /** The ranking did not say: shown as not known. */
         UNKNOWN,
     }
 
@@ -102,8 +91,7 @@ object LearningMenu {
         return when {
             why == null -> Reason.UNKNOWN
             why.whole.isNotEmpty() -> Reason.PHRASE
-            // a 联想 says so by its code, its tier telling only what the user did after that word: the
-            // predictor's order is no dictionary's, nor keys typed (verify-int-step1a V1)
+            // a 联想's tier only tells what the user did after that word: the predictor's order is no dictionary's
             why.code?.kind == Kinds.PREDICTION -> reason?.takeIf { it in DONE_AFTER } ?: Reason.PREDICTION
             else -> reason ?: Reason.UNKNOWN
         }
@@ -122,6 +110,5 @@ object LearningMenu {
         HabitRanker.Tier.DICTIONARY -> Reason.DICTIONARY
     }
 
-    // a prediction's tiers that tell what the user did after the word before
     private val DONE_AFTER = setOf(Reason.PINNED, Reason.FIRST_HERE, Reason.USED)
 }

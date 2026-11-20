@@ -35,7 +35,7 @@ class FloatingHandleTest {
     @After
     fun destroy() = activities.forEach { it.pause().stop().destroy() }
 
-    // docked (始终显示悬浮条), attached: its long press is posted to the view
+    // attached: its long press is posted to the view
     private fun docked() = FloatingHandle(
         PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.Bottom,
         FloatingHandle.Mode.Docked { x, y, touch ->
@@ -54,19 +54,16 @@ class FloatingHandleTest {
     private fun touch(handle: FloatingHandle, action: Int, x: Float) =
         handle.onTouchEvent(MotionEvent.obtain(7, 7, action, x, 12f, 0))
 
-    // each drop's lifted flag, for a drag ended by [end] and then a stray up
     private fun floatingDrops(end: Int): List<Boolean> {
         val drops = ArrayList<Boolean>()
         val handle = FloatingHandle(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, FloatingHandleSide.entries.first(), FloatingHandle.Mode.Floating({ _, _ -> }, { drops += it }, {}, NoResize))
         handle.onTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0f, 0f, 0))
         handle.onTouchEvent(MotionEvent.obtain(0, 1, end, 0f, 0f, 0))
-        // ended once: a second end is no drop
         handle.onTouchEvent(MotionEvent.obtain(0, 2, MotionEvent.ACTION_UP, 0f, 0f, 0))
         return drops
     }
 
-    // F2895/F3048: only a finger lifted drops the keyboard where it is; a cancel or a second finger
-    // ends the drag as not lifted
+    // only a lift drops the keyboard where it is; a cancel or a second finger ends the drag not lifted
     @Test
     fun aDragEndsLiftedOnlyOnAnUp() = assertRows(
         "a finger lifted drops it where it is" to { assertEquals(listOf(true), floatingDrops(MotionEvent.ACTION_UP)) },
@@ -84,15 +81,12 @@ class FloatingHandleTest {
         touch(handle, MotionEvent.ACTION_MOVE, 503f)
         waitLongPress()
         assertEquals(listOf(503f to 12f), detached)
-        // the touch and its finger, for the drag to go on with only them
         assertEquals(listOf(0), touches.map { it!!.pointerId })
-        // once: the finger staying down after is the floating keyboard's drag
         waitLongPress()
         assertEquals(1, detached.size)
     }
 
-    // which slide or end lets go is GripPress's (GripPressTest); here the view asks it and drops
-    // its pending long press. Each row its own handle and a cleared record: no state between rows
+    // which slide or end lets go is GripPress's (GripPressTest); each row its own handle, no state between rows
     private fun noHoldAfter(vararg steps: Pair<Int, Float>) {
         detached.clear()
         val handle = docked()
@@ -104,14 +98,10 @@ class FloatingHandleTest {
     @Test
     fun dockedNoDetachWithoutAStillPressOnTheGrip() = assertRows(
         "the strip's end, nothing to hold" to { noHoldAfter(MotionEvent.ACTION_DOWN to 990f) },
-        // F3557: its long press goes with the lift
         "a tap on the grip" to { noHoldAfter(MotionEvent.ACTION_DOWN to 500f, MotionEvent.ACTION_UP to 500f) },
-        // F3557: a slide past the slop disarms it before the long press is due
         "a slide off the grip" to { noHoldAfter(MotionEvent.ACTION_DOWN to 500f, MotionEvent.ACTION_MOVE to 700f) },
     )
 
-    // a second finger on the strip while the first resizes, on the resize button while it drags, or on the dock button
-    // while it resizes: it ends the first's resize (drag), and nothing of its own starts beside it
     @Test
     fun oneFingerAtATimeOnTheFloatingStrip() {
         val log = ArrayList<String>()
@@ -163,8 +153,7 @@ class FloatingHandleTest {
         )
     }
 
-    // a right-to-left language (Arabic, Hebrew, Uyghur): the dock button at the right end still, the resize button at the
-    // left, not both at the left with the resize button over the dock button (R26 F8126: Gravity.END was the left there)
+    // right to left: the dock button still at the right end, not under the resize button (Gravity.END is the left there)
     @Test
     @Uat("TB-24")
     fun rightToLeftTheDockButtonStaysAtTheRightEnd() {

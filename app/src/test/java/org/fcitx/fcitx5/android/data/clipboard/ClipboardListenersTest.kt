@@ -15,9 +15,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 
-// listeners added and removed on one thread while another tells them of entries: no
-// ConcurrentModificationException (the telling thread's scope has no handler: one would crash the app; the listeners
-// told from a copy since 02f50f466)
+// added and removed on one thread while another tells them: no ConcurrentModificationException (no handler there)
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ClipboardListenersTest {

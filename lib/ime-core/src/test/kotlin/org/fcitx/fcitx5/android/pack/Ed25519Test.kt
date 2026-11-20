@@ -103,12 +103,7 @@ class Ed25519Test {
         assertFalse(Ed25519.verify(negativeZero, hex(message), hex(signature)))
     }
 
-    /**
-     * The identity as a public key: [k]A is the identity whatever k, so (R, S) with R = [S]B
-     * verifies any message. R: RFC 8032 test 1's public key, [a]B; S: its secret scalar a, mod L.
-     * Its canonical encoding verifies; written otherwise (y = p + 1, or x = 0 marked negative) it is
-     * refused, as RFC 8032 says: a check left out would take them (review L1: M5, M17).
-     */
+    /** The identity as a public key verifies any message with R = [S]B; its canonical encoding verifies, non-canonical ones (y = p + 1, negative x = 0) are refused. */
     @Test
     fun `the identity written otherwise than canonically is refused`() {
         val seed = hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")

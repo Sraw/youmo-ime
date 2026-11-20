@@ -87,8 +87,7 @@ class WebTextTest {
 
     @Test
     fun aShardOfManyRowGroupsIsReadInItsOrder() {
-        // row groups of 2048 rows, which DuckDB's two threads read side by side: in the file's order
-        // only while preserve_insertion_order holds
+        // DuckDB reads row groups side by side: in the file's order only while preserve_insertion_order holds
         val pages = 20_000
         val shard = tmp.root.resolve("many.parquet")
         DriverManager.getConnection("jdbc:duckdb:").use { connection ->
@@ -135,8 +134,7 @@ class WebTextTest {
         assertEquals("# chars\t14", lines[1])
         val rows = lines.filter { !it.startsWith("#") }.map { it.split("\t") }
         assertEquals(listOf("你好"), rows.map { it[0] })
-        // four times on three pages, first on the dated page, and no word of the data; 吧/啊/吗 are
-        // among the 14 chars, but each run they end is seen once only
+        // four times on three pages; each run 吧/啊/吗 end is seen once only
         assertEquals(listOf("4", "2023", "0"), listOf(rows[0][1], rows[0][2], rows[0][7]))
         // log10(4 / 14) against the model's 你 (-1) 好 after 你 (-0.3)
         assertEquals(0.756, rows[0][6].toDouble(), 1e-3)
@@ -159,11 +157,7 @@ class WebTextTest {
         assertTrue(out.toString(), out.contains("chat: 2 documents, 6 words"))
     }
 
-    /**
-     * A parquet file of (url, text, date) rows, written by DuckDB as FineWeb-2's are read, the first
-     * page dated by an ISO string as FineWeb-2's and [WebText.write]'s are; a quote in its name, as
-     * read_parquet's path is a string literal.
-     */
+    /** A parquet file of (url, text, date) rows as FineWeb-2's; a quote in its name, as read_parquet's path is a literal. */
     private fun parquet(vararg pages: Pair<String?, String?>): File {
         val file = tmp.root.resolve("it's a shard.parquet")
         DriverManager.getConnection("jdbc:duckdb:").use { connection ->

@@ -23,16 +23,10 @@ import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import java.io.IOException
 
-/**
- * [Engines.learning]: the user's controls over learning (PLAN §2.8, impl/streams/E-design.md),
- * on the sessions of [session] and the words of [lexicon], the record of [log], acts made
- * undoable by [control]. An act on a candidate goes the way a long press's always went, as the
- * host's event ([act]: the addon's, which shows the list it leaves), recorded so the chip can take
- * it back.
- */
+/** [Engines.learning]: the user's controls over learning on [session]s, [lexicon] and the record [log], made undoable by [control]. Candidate acts go through the host's long-press event ([act]) as always, recorded so the chip can undo them. */
 internal class LearningOps(
-    // the session an input method types with now: a pair's keyed one while it types (KeyboardPair.sessionOf),
-    // so a long press forgets, blocks or pins what that session showed (design M4)
+    // the session an input method types with now: a pair's keyed one while it types (KeyboardPair.sessionOf), so a
+    // long press acts on what that session showed
     private val session: (String) -> Session?,
     private val lexicon: UserLexicon,
     private val log: () -> LearnLog,
@@ -47,18 +41,14 @@ internal class LearningOps(
     private val restoreCorrection: (List<String>) -> Unit = {},
     private val resetTableOrder: (String) -> Unit = {},
 ) {
-    /**
-     * What the backups (stream D) do around a clear (review-DE-design DE-M1, C25): [invalidate] those
-     * saved at or after a minute ([LearningResult.ALL]: every one of this install's) before the
-     * rewrite, [saveIfOn] a fresh one after it.
-     */
+    /** The backups' part in a clear: [invalidate] those saved at or after a minute ([LearningResult.ALL]: all of this install's) before the rewrite, [saveIfOn] a fresh one after. */
     interface Backups {
         fun invalidate(fromMinute: Int)
 
         fun saveIfOn()
 
         companion object {
-            /** No backups kept: an engine of a test's, or of the eval tools. */
+            /** For test and eval engines. */
             val NONE = object : Backups {
                 override fun invalidate(fromMinute: Int) {}
 
@@ -67,14 +57,8 @@ internal class LearningOps(
         }
     }
 
-    /**
-     * Does [op] in [im], the input method in use (null where none is: the settings); [act] has the
-     * host send the long press's event (an [EngineEvent]) for the candidate at an index of all,
-     * the engine's text there given: the host does nothing (false) where it does not show that.
-     * [shown]: a candidate's text as the host shows it (繁體: chttrans's output filter), as the menu's text is.
-     */
+    /** Does [op] in [im] (null: the settings); [act] has the host send the long press's [EngineEvent] for a candidate index and the engine's text, false where the host does not show that. [shown] as the host shows a text (繁體). */
     fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int, text: String) -> Boolean): LearningResult = when (op) {
-        // the backups' own (stream D): listed, restored, made
         is BackupOp -> backup(op)
         is LearningOp.OnCandidate -> im?.let { onCandidate(it, op, shown, act) } ?: LearningResult.Unavailable
         is LearningOp.OnPage -> im?.let { onCandidate(it, op.op.at(first(it) + op.op.index), shown, act) } ?: LearningResult.Unavailable
@@ -101,22 +85,18 @@ internal class LearningOps(
         is LearningOp.RestoreCorrection -> LearningResult.Done().also { restoreCorrection(op.texts) }
     }
 
-    // whether learning is written now, and whether the record takes a rewrite at all till the process starts anew (F8037)
+    // whether learning is written now, and whether the record takes rewrites at all till restart
     private fun saving(): LearningResult = log().let { LearningResult.Saving(it.saving, it.takesRewrites) }
 
-    // U-88, U-86: the backups that hold what goes forgotten before the rewrite, a fresh one after
-    // (C25); failed in the rewrite, a fresh one all the same, as those were gone already (review-E-engine S1).
-    // Failed before it (a record that stopped taking writes: R25 F8021) they were left, and the fresh one is
-    // asked for all the same, to no harm: nothing was cleared for it to bring back
-    // what the tables learn is in the record (stream C), their order kept but by 全部清空, as their
-    // per-code blocks; the phrases an older build saved for them, the record's too, go with 全部清空
+    // backups holding what is forgotten go before the rewrite and a fresh one after, even if the rewrite failed
+    // (those were gone already). Tables' learning is in the record too: order kept except by 全部清空
     private fun clearRecent(op: LearningOp.ClearRecent): LearningResult = cleared {
         control.clearRecent(op.span, backups::invalidate)?.let { LearningResult.Cleared(it) }
     }
 
     private fun clearLearned(op: LearningOp.ClearLearned): LearningResult = cleared {
         if (control.clearLearned(op.all, backups::invalidate)) {
-            // the lists only once the record is cleared: a clear that failed forgets nothing (verify-int-E)
+            // clear the lists only once the record is cleared: a failed clear forgets nothing
             if (op.all) {
                 lexicon.clearLists()
             }
@@ -142,9 +122,9 @@ internal class LearningOps(
         fun entries(kind: UserWord.Kind) = words.filter { it.kind == kind }.mapNotNull(lexicon::entryOf)
         val added = lexicon.addedPlaces(entries(UserWord.Kind.ADDED))
         val blocked = entries(UserWord.Kind.BLOCKED)
-        // English's, no reading to them (review M1): those blocked now blocked again on an undo
+        // English's have no reading: those blocked now are blocked again on undo
         val english = lexicon.englishBlocks
-        // as written: "The" is not on the list where "the" is, though has() says it is blocked
+        // as written: "The" is not listed where "the" is, though has() says it is blocked
         val englishNow = english.blocked.toSet()
         val englishBlocked = words.filter { it.kind == UserWord.Kind.BLOCKED && it.pinyin.isEmpty() && it.text in englishNow }.map { it.text }
         val forgets = tableForgets()
@@ -154,17 +134,12 @@ internal class LearningOps(
             english.block(englishBlocked)
             dropSessions()
         }) { lexicon.removeWords(words) }
-        // what the tables' logs forgot of them stays forgotten: no undo rather than half of one. A table not
-        // loaded this run has each row of the word forgotten (TableRegistry.drop), its counts 0.4 made too,
-        // so a word an unopened table had gives none either: accepted, as the table not loaded cannot tell
+        // what tables' logs forgot stays forgotten: no undo rather than half of one (an unloaded table cannot tell)
         return LearningResult.Done(if (tableForgets() != forgets) LearningResult.NO_UNDO else token)
     }
 
-    // a session reads the record as it is now when told to show anew: not made again, what is typed
-    // or written kept (DE-S4, review-int S1); one that cannot (Session.rereads false: the strokes'
-    // lookup) is (review-E-engine S5)
-    // Failed, not Unavailable, where the record could not be written without the act: the app says that apart
-    // from an act no longer the last (R25 F8038)
+    // a session told to show anew rereads the record, keeping its input; one that cannot (Session.rereads false)
+    // is remade. Failed, not Unavailable, where the record could not be written, so the app tells them apart
     private fun undo(im: String?, token: Long): LearningResult {
         when (control.takeBack(token)) {
             LearningControl.TakenBack.DONE -> Unit
@@ -175,14 +150,9 @@ internal class LearningOps(
         return LearningResult.Done()
     }
 
-    // [act] made undoable: its token, or null where the host made no act of it (the list it was
-    // asked of gone by then; review-E-engine S4). Not done but [wrote] something (another candidate
-    // shown alike acted on, the pressed one then refused): that taken back at once (review R4 M1).
-    // Where that is not done (GONE or FAILED: see LearningControl.TakenBack; e.g. storage full and something else
-    // learned in memory alone, R25 F8066) the words alike stay deleted, and the user is told it was not done (a
-    // block's take-back writes its opposite or is undone in its own list, and is done). Kept so (R25 F8079): they
-    // are the text the user asked to delete, and to take them back there would drop the rest learned since the
-    // disk filled
+    // [act] made undoable: its token, or null where the host did nothing (its list gone). If not done but [wrote]
+    // something (a look-alike candidate acted on), that is taken back at once; where that fails the look-alikes
+    // stay deleted and the user is told it was not done, since undoing would drop what was learned since
     private fun acted(inverse: () -> Unit = {}, wrote: () -> Boolean = { false }, act: () -> Boolean): Long? {
         var did = false
         val token = control.undoable(inverse) { did = act() }
@@ -203,7 +173,7 @@ internal class LearningOps(
             is LearningOp.Delete -> if (Offer.FORGET in offers) deleteAlike(im, s, op, shown, act) else LearningResult.Unavailable
             is LearningOp.Block -> if (Offer.BLOCK in offers) blockAlike(im, s, op, shown, act) else LearningResult.Unavailable
             is LearningOp.Pin -> event(Offer.PIN, EngineEvent.PIN)
-            // a phrase's file holds it, not the learning record: no undo
+            // a phrase file holds it, not the record: no undo
             is LearningOp.Unpin -> if (Offer.DELETE_PHRASE in offers || Offer.DELETE_COMMON_WORD in offers) {
                 if (act(EngineEvent.UNPIN, op.index, op.text)) LearningResult.Done(LearningResult.NO_UNDO) else LearningResult.Unavailable
             } else {
@@ -211,7 +181,7 @@ internal class LearningOps(
             }
             is LearningOp.NoPredict -> {
                 val prev = prediction(s, op.index) ?: return LearningResult.Unavailable
-                // a whole phrase off everywhere, filed after no word (U-73)
+                // a whole phrase off everywhere, filed after no word
                 val whole = s.why(op.index)?.whole.orEmpty()
                 LearningResult.Done(control.undoable { if (whole.isEmpty()) log().noPredict(prev, op.text, on = true) else log().noPredict("", whole, on = true) })
             }
@@ -219,20 +189,16 @@ internal class LearningOps(
         }
     }
 
-    // [asShown] as the engine has it, or null where the list changed since the menu showed (another
-    // candidate at the index now). The menu and the report are asked with the text as shown (國家 for
-    // 国家); an act comes back with the menu's text, the engine's, and must be it: another candidate
-    // shown alike (a dictionary's own 國家) is not the one the menu was for
+    // [asShown] in the engine's text, or null if the list changed since the menu showed. Menus are asked with the
+    // shown text (國家 for 国家); an act comes back with the engine's and must match, not a look-alike
     private fun engines(s: Session, asShown: LearningOp.OnCandidate, shown: (String) -> String): LearningOp.OnCandidate? {
         val text = s.candidates(asShown.index, 1).firstOrNull()?.text ?: return null
         val asked = asShown is LearningOp.Menu || asShown is LearningOp.Report
         return asShown.at(asShown.index, text).takeIf { text == asShown.text || asked && shown(text) == asShown.text }
     }
 
-    // the candidates of the list shown as [text] is, where the host converts one of them (國家: 国家 and
-    // a dictionary's own 國家): what is blocked or deleted is gone as shown, not left in its other
-    // form (review R2). Each at its index of all, the engine's text: [text]'s own among them. One
-    // look at the list; with nothing converted, none but it
+    // the shown list's candidates that look like [text] after conversion (国家 and a dictionary's own 國家), so a
+    // block or delete removes it in every form; each at its index with the engine's text. One look at the list
     private fun alike(s: Session, op: LearningOp.OnCandidate, shown: (String) -> String): List<IndexedValue<String>> {
         val pressed = IndexedValue(op.index, op.text)
         val asShown = shown(op.text)
@@ -252,25 +218,23 @@ internal class LearningOps(
         return block(all.map { it.value }) { actOn(im, all, Offer.BLOCK, EngineEvent.BLOCK, act) }
     }
 
-    // [event] on each of [words] still where the list had it, the last first (an act takes one off
-    // the list, those before it where they were). The texts done: the pressed one ([words]' first)
-    // among them or the act is not (and those done taken back: acted)
+    // [event] on each of [words] still where the list had it, last first (an act removes one, keeping earlier
+    // positions). Returns the texts done; without the pressed one (first), the act is not done
     private fun actOn(im: String, words: List<IndexedValue<String>>, offer: Offer, event: Int, act: (Int, Int, String) -> Boolean): List<String> {
         val done = ArrayList<String>()
         for ((at, t) in words.sortedByDescending { it.index }) {
             val s = session(im) ?: break
-            // an act before may have moved the list: only the candidate still the engine's [t] there
+            // an earlier act may have moved the list: only if the engine's [t] is still there
             if (s.candidates(at, 1).firstOrNull()?.text == t && offer in s.offers(at) && act(event, at, t)) done += t
         }
         return done
     }
 
-    // [whole]: the whole phrase (U-73) [texts]' first is the rest of, "" for a word; [texts]: it and
-    // the words shown alike; [act] the texts deleted, none where the first was not
+    // [whole]: the whole phrase [texts]' first ends, "" for a word; [texts]: it and look-alikes; [act]: those
+    // deleted, none where the first was not
     private fun delete(texts: List<String>, whole: String, act: () -> List<String>): LearningResult {
-        // a word added by hand comes off the list with it (Engines.changed): put back if taken back,
-        // of those deleted only. A whole phrase takes no word with it, the rest's nor its own (U-73)
-        // the words shown alike are words though the pressed one is a phrase's rest: theirs put back too
+        // a deleted added word leaves its list (Engines.changed) and returns on undo, deleted ones only; a whole phrase
+        // takes no word with it. Look-alikes are words even when the pressed one is a phrase's rest
         val added = lexicon.addedPlaces((if (whole.isEmpty()) texts else texts.drop(1)).flatMap { lexicon.addedOf(it) })
         val forgets = tableForgets()
         var done = emptyList<String>()
@@ -278,17 +242,15 @@ internal class LearningOps(
             done = act()
             texts.first() in done
         } ?: return LearningResult.Unavailable
-        // what the tables' own logs forgot (a phrase they saved, theirs or shared with pinyin) no
-        // rewrite of the learning record brings back: no chip, rather than one that half undoes;
-        // what a table learned is in the record (stream C), and comes back. A table not loaded this run
-        // forgets every row of the word (TableRegistry.drop): no chip for a word it had, as above
+        // what tables' own logs forgot no record rewrite brings back: no chip rather than a half undo (an unloaded
+        // table forgets every row of the word, so none either)
         return LearningResult.Done(if (tableForgets() != forgets) LearningResult.NO_UNDO else token)
     }
 
-    // [texts]: the pressed one first, then those shown alike; [act] the texts blocked
+    // [texts]: the pressed one first, then look-alikes; [act] returns those blocked
     private fun block(texts: List<String>, act: () -> List<String>): LearningResult {
         val before = texts.flatMap { lexicon.blockedOf(it) }.toSet()
-        // English's words have a list of their own (no reading)
+        // English's words have their own list (no reading)
         val english = lexicon.englishBlocks
         // as written, which the shown text need not be (The for the; EnglishBlocks)
         val englishBefore = english.blocked.toSet()
@@ -307,7 +269,7 @@ internal class LearningOps(
         return LearningResult.Done(token)
     }
 
-    // the word before a prediction at [index], where it is one and turning it off is kept
+    // the word before a prediction at [index], where turning it off is kept
     private fun prediction(s: Session, index: Int): String? =
         s.why(index)?.code?.takeIf { it.kind == Kinds.PREDICTION && it.keys.isNotEmpty() && habits() }?.keys
 
@@ -322,15 +284,12 @@ internal class LearningOps(
             if (Offer.DELETE_PHRASE in offers) add(MenuItem.DELETE_PHRASE)
             if (Offer.DELETE_COMMON_WORD in offers) add(MenuItem.DELETE_COMMON_WORD)
             if (prediction(s, op.index) != null) add(MenuItem.NO_PREDICT)
-            // English ranks by its own rules, not the habits' tiers; where nothing may be done
-            // (a field that learns nothing) there is no menu, nor for a phrase alone (UAT PY-49); nor where the
-            // session cannot say (review-int-runtime M2)
+            // English ranks by its own rules, not the habits' tiers; no 为什么 where nothing may be done (a field that
+            // learns nothing), for a phrase alone, or where the session cannot say
             if (im != InputMethodCatalog.ENGLISH && any { it !in TEXT_ONLY } && why != null) add(MenuItem.WHY)
         }
-        // a table blocks its candidate under the code typed alone (U-28, stream C; review-E-ui Q1);
-        // what may follow, as pinyin's, everywhere
-        // the session's where it says (review H3): a character by its strokes under them alone as a
-        // table's (U-28), one a table looked up by pinyin everywhere, as pinyin blocks it
+        // a table blocks its candidate under the code typed alone, predictions everywhere; otherwise as the session
+        // says (a character by strokes under them alone, a table's pinyin lookup everywhere)
         val underCode = im in InputMethodCatalog.TABLES && why?.code?.kind != Kinds.PREDICTION
         val scope = s.blockScope(op.index) ?: if (underCode) BlockScope.UNDER_CODE else BlockScope.EVERYWHERE
         return LearningResult.Menu(op.text, kindOf(op.text), items, why, scope)
@@ -343,10 +302,7 @@ internal class LearningOps(
         else -> WordKind.DICTIONARY
     }
 
-    /**
-     * 复制给开发者 (U-81, D26): the candidates the user sees, each with its tier and uses, and the
-     * keys typed; never the text before them, nor a prediction's word before (that is the text).
-     */
+    /** 复制给开发者: the visible candidates with tier and uses, and the keys typed; never the text before them, nor a prediction's preceding word. */
     private fun report(im: String, s: Session): String = buildString {
         append("youmo learning report 1\n")
         append("im ").append(im).append('\n')
@@ -359,7 +315,7 @@ internal class LearningOps(
         }
     }
 
-    // a grouped keyboard's codes as their keys' letters (bn ui): the report is pasted where they would read as nothing
+    // grouped codes as their keys' letters (bn ui): pasted elsewhere they would read as nothing
     private fun reported(code: Code): String =
         Kinds.keysOf(code.kind)?.shown(code.keys) ?: code.keys
 
@@ -399,22 +355,17 @@ internal class LearningOps(
         }
     }
 
-    /**
-     * [words] as the lexicon page lists them (U-80): each with the calendar day it was last used
-     * ([UserWord.lastUsed]), the typing days since ([UserWord.idle]), and how recently it became
-     * the user's ([UserWord.order]: a learned word's rank by the typing day it became the user's, then its seq, an added one's place in its list, the
-     * latest last).
-     */
+    /** [words] as the lexicon page lists them: last-used day ([UserWord.lastUsed]), typing days since ([UserWord.idle]) and recency of becoming the user's ([UserWord.order]). */
     fun dated(words: List<UserWord>): List<UserWord> = LexiconView.dated(log().state, words)
 
     private companion object {
-        // as many as a page or two show: enough to see where the word went
+        // a page or two: enough to see where the word went
         const val REPORTED = 20
 
-        // how far the list is looked through for a word shown alike: past any page the menu is on
+        // how far to look for look-alikes: past any page the menu is on
         const val ALIKE_SCAN = 200
 
-        // the rows of a text the settings own (a custom phrase, a common word's replacement): no 为什么 for them alone
+        // settings-owned text rows (custom phrase, common-word replacement): no 为什么 for them alone
         val TEXT_ONLY = setOf(MenuItem.DELETE_PHRASE, MenuItem.DELETE_COMMON_WORD)
     }
 }

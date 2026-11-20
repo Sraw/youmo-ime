@@ -14,11 +14,7 @@ import java.io.IOException
 
 object PickerData {
 
-    /**
-     * [name] heads the category's section in the list, [label] when it has none; [short] (or
-     * [name]) is what the symbol panel's narrow side lists it as. [id]: the symbol panel's pick kept by it
-     * across restarts, never changed once released (a label changes, a resource's name is shrunk away)
-     */
+    /** [id]: the symbol panel's pick kept by it across restarts, never changed once released (a label changes, a resource's name is shrunk away) */
     data class Category(
         val label: String = "",
         val icon: Int = 0,
@@ -30,7 +26,7 @@ object PickerData {
     val RecentlyUsedCategory = Category("⟳", R.drawable.ic_baseline_access_time_24, R.string.picker_recent, R.string.picker_short_recent, id = "recent")
 
     val Symbol: List<Pair<Category, Array<String>>> = listOf(
-        // what a Chinese text needs most, then the ASCII ones it borrows: the picker opens here
+        // the picker opens here
         Category("，。", R.drawable.symbol_common, R.string.picker_common, id = "common") to arrayOf(
             "，", "。", "？", "！", "、", "：", "；", "……", "——", "·",
             "“", "”", "‘", "’", "（", "）", "《", "》", "【", "】",
@@ -46,7 +42,7 @@ object PickerData {
             "～", "—", "－", "﹏", "＿", "￥", "＃", "％", "＆", "＊",
             "＠", "｜", "／", "＼", "々", "〃", "〇", "※", "§", "№"
         ),
-        // no digits (the keyboard's row and the number pad have them), but the English comma and full stop
+        // no digits (the keyboard's row and the number pad have them)
         Category("!?#", R.drawable.symbol_ascii, R.string.picker_ascii, R.string.picker_short_ascii, id = "ascii") to arrayOf(
             "!", "@", "#", "$", "%", "^", "&", "*", "(", ")",
             ",", ".", "'", "\"", "=", "_", "`", ":", ";", "?",
@@ -125,7 +121,7 @@ object PickerData {
         )
     )
 
-    // the panel's tabs, by the ids of Unicode's groups (EmojiData.GROUPS; PickerDataTest holds them to it)
+    // by the ids of Unicode's groups (PickerDataTest holds them to it)
     internal val EmojiCategories = mapOf(
         "smileys" to Category("🙂", R.drawable.ic_baseline_tag_faces_24, R.string.picker_smileys),
         "people" to Category("🧑", R.drawable.ic_baseline_emoji_people_24, R.string.picker_people),
@@ -138,16 +134,11 @@ object PickerData {
         "flags" to Category("🏁", R.drawable.ic_baseline_flag_24, R.string.picker_flags),
     )
 
-    /**
-     * The emoji, as Unicode groups and orders them (emoji-test.txt), read from the data the engine's
-     * emoji candidates are of (engine/emoji.data): a new Unicode release is a new download in the
-     * build, not a list written out here. None if the app has not got it.
-     */
+    /** Read from the engine's emoji data: a new Unicode release is a new download in the build, not a list written here. */
     val Emoji: List<Pair<Category, Array<String>>> by lazy {
         EmojiWords.groups.mapNotNull { (id, emoji) -> EmojiCategories[id]?.let { it to emoji.toTypedArray() } }
     }
 
-    /** That data, its words too: what the panel's search finds emoji by. */
     val EmojiWords: EmojiData by lazy {
         try {
             appContext.assets.open(InputMethodCatalog.EMOJI_DATA).use { EmojiData.read(it.reader().readText()) }

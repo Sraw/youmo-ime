@@ -8,11 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The keyboard must stay on the input method fcitx last switched to: the system's echo of an
- * earlier switch is no pick of the user's. On the emulator, the startup switch to Pinyin and a
- * switch to English ran back to back, and the echo of the first put the keyboard back on Pinyin.
- */
+/** The system's echo of an earlier switch is no pick of the user's: on the emulator it put the keyboard back on Pinyin. */
 class SubtypeEchoesTest {
 
     private var now = 0L
@@ -29,7 +25,7 @@ class SubtypeEchoesTest {
         assertFalse(echoes.isEcho(PINYIN))
     }
 
-    /** As after the user's pick, or a sub-mode's change: the system calls back for neither. */
+    /** As after the user's pick or a sub-mode's change: the system calls back for neither. */
     @Test
     fun aSwitchToTheSubtypeTheSystemHasIsNotToldAndAwaitsNoEcho() {
         assertFalse(echoes.shouldTell(ENGLISH, had = ENGLISH))
@@ -83,21 +79,19 @@ class SubtypeEchoesTest {
         assertFalse(echoes.isEcho(SHUANGPIN))
 
         assertFalse(echoes.shouldTell(SHUANGPIN, had = SHUANGPIN))
-        // nothing awaited for it: picked again, it is the user's pick again
         assertFalse(echoes.isEcho(SHUANGPIN))
     }
 
-    /** Pinyin is pending, but the system has the user's English: compared with the pending switch, it would stay on English. */
+    /** Compared with the pending Pinyin, it would stay on the user's English. */
     @Test
     fun aSwitchAwayFromTheUsersPickIsToldThoughTheSameIsPending() {
         echoes.shouldTell(PINYIN, had = ENGLISH)
-        // the user picks English before Pinyin's echo is back
         assertFalse(echoes.isEcho(ENGLISH))
 
         assertTrue(echoes.shouldTell(PINYIN, had = ENGLISH))
     }
 
-    /** As for a switch fcitx made after the keyboard was disabled: the system throws instead of switching. */
+    /** As for a switch after the keyboard was disabled: the system throws instead of switching. */
     @Test
     fun aSwitchTheSystemRefusedAwaitsNoEchoWhileTheOnesToldBeforeItStillDo() {
         echoes.shouldTell(PINYIN, had = ENGLISH)
@@ -107,11 +101,9 @@ class SubtypeEchoesTest {
 
         assertTrue(echoes.isEcho(PINYIN))
         assertTrue(echoes.isEcho(ENGLISH))
-        // the user's pick: the refused switch's echo is not awaited
         assertFalse(echoes.isEcho(PINYIN))
     }
 
-    /** Refused with nothing told, as no caller does: nothing is awaited, and nothing throws. */
     @Test
     fun aRefusalWithNoSwitchToldForgetsNothing() {
         echoes.refused(PINYIN)
@@ -125,7 +117,7 @@ class SubtypeEchoesTest {
         echoes.shouldTell(ENGLISH, had = PINYIN)
         now = 10_001
 
-        // the user's pick: Pinyin's echo, 10 001 ms on, is overdue
+        // 10 001 ms on: overdue
         assertFalse(echoes.isEcho(PINYIN))
         // exactly ten seconds behind a stalled main thread, still an echo
         assertTrue(echoes.isEcho(ENGLISH))

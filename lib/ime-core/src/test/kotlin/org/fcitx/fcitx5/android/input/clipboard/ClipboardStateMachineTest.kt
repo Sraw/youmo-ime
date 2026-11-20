@@ -14,17 +14,12 @@ import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.State.Norm
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardDbUpdated
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardListeningUpdated
+import org.fcitx.fcitx5.android.utils.getBooleanState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The clipboard window has three faces: [Normal] lists entries, [AddMore] prompts the user to
- * copy something, and [EnableListening] prompts them to turn clipboard listening on.
- *
- * Unlike the other two machines this one takes its starting state from the caller, so the
- * tests construct it directly rather than jumping.
- */
+/** [Normal] lists, [AddMore] prompts a copy, [EnableListening] prompts listening on; built with its start state, not jumped. */
 class ClipboardStateMachineTest {
 
     private val seen = mutableListOf<State>()
@@ -64,8 +59,7 @@ class ClipboardStateMachineTest {
         "a listening update that changes nothing is a no-op (list)" to { assertTransition(Normal, ClipboardListeningUpdated, empty = false, listening = true, expected = Normal) },
         "a listening update that changes nothing is a no-op (copy prompt)" to { assertTransition(AddMore, ClipboardListeningUpdated, empty = true, listening = true, expected = AddMore) },
         "a listening update that changes nothing is a no-op (listening prompt)" to { assertTransition(EnableListening, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening) },
-        // an asymmetry worth knowing: leaving Normal or AddMore for the listening prompt ignores
-        // the database flag, so listening off from Normal with an empty database skips AddMore
+        // leaving Normal or AddMore for the listening prompt ignores the database flag: off from an empty Normal skips AddMore
         "leaving the list for the listening prompt ignores the database flag" to { assertTransition(Normal, ClipboardListeningUpdated, empty = true, listening = false, expected = EnableListening) },
         "leaving the copy prompt for the listening prompt ignores the database flag" to { assertTransition(AddMore, ClipboardListeningUpdated, empty = false, listening = false, expected = EnableListening) },
     )
@@ -77,12 +71,7 @@ class ClipboardStateMachineTest {
         assertEquals(true, m.getBooleanState(ClipboardListeningEnabled))
     }
 
-    // region ClipboardDbUpdated
-
-    /**
-     * No rule leaves [EnableListening] on a database update: while listening is off the prompt
-     * stays put no matter what lands in the database.
-     */
+    /** While listening is off the prompt stays put whatever lands in the database. */
     @Test
     fun aDatabaseUpdateCannotDismissTheListeningPrompt() {
         for (empty in listOf(true, false)) {
@@ -92,11 +81,7 @@ class ClipboardStateMachineTest {
         }
     }
 
-    // endregion
-
-    // region realistic sequences
-
-    /** Open the clipboard with listening off, enable it, then copy something. */
+    /** Listening off, enable it, then copy something. */
     @Test
     fun enablingListeningThenCopyingReachesTheList() {
         val m = machine(EnableListening, empty = true, listening = false)
@@ -110,7 +95,7 @@ class ClipboardStateMachineTest {
         assertEquals(listOf(AddMore, Normal), seen)
     }
 
-    /** Turning listening off from the list, then back on, returns to the list. */
+    /** Listening off from the list, then back on, returns to the list. */
     @Test
     fun togglingListeningOffAndOnRestoresTheList() {
         val m = machine(Normal, empty = false, listening = true)
@@ -122,7 +107,7 @@ class ClipboardStateMachineTest {
         assertEquals(Normal, m.currentState)
     }
 
-    /** Clearing the clipboard history while listening is on falls back to the copy prompt. */
+    /** Clearing history while listening falls back to the copy prompt. */
     @Test
     fun clearingHistoryFallsBackToTheCopyPrompt() {
         val m = machine(Normal, empty = false, listening = true)
@@ -130,5 +115,4 @@ class ClipboardStateMachineTest {
         assertEquals(AddMore, m.currentState)
     }
 
-    // endregion
 }

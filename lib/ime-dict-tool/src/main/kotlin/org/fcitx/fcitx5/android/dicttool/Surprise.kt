@@ -8,13 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import kotlin.math.log10
 
-/**
- * How much more often a run of characters occurs than the language model predicts: log10 of its
- * frequency (count over the corpus's characters) over the probability of its likeliest reading
- * as the model's words, a character of no word of the model's counting as `<unk>`. A phrase of
- * old words (的事情, 一个人) is as frequent as the model says, however well it holds together;
- * a word the model lacks, or has no idea follows what it follows, is not.
- */
+/** How much more often a run occurs than the model predicts (log10): a phrase of old words is as frequent as predicted, a new word is not. */
 class Surprise(data: PinyinData) {
     private val model = data.model
     private val index = data.wordIndex

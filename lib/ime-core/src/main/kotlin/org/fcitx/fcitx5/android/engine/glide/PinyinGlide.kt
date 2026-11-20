@@ -13,37 +13,22 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
 /**
- * Pinyin glide typing (拼音滑行): the words a finger's path across the letters may be, a word's
- * syllables glided in one go. The words are walked as the dictionary's syllable trie, each
- * syllable's letters held to the path by [GlidePath]; each reading with a word is scored by its
- * likeliest word not blocked (its unigram, the user's counts in it ([User]), or its characters'
- * where the model lacks it; a rarer reading's weight added) less what fitting the path cost. The
- * user's own words, in a trie of theirs ([User.words]), are walked alongside: added, they glide too.
- * A word a glide: chained in one, the words' readings ran to thousands and the search to seconds.
- * Each pinyin input method glides its own keys ([Spelling]): full pinyin's and the nine keys' the
- * letters, 双拼's its scheme's two a syllable.
+ * Pinyin glide typing: one word's syllables per glide, walking the dictionary's syllable trie (and the user's
+ * beside it), each syllable's keys held to the path by [GlidePath]; a reading scores by its likeliest unblocked
+ * word less the fitting cost. One word per glide: chaining made thousands of readings and seconds of search.
  */
 class PinyinGlide(
     private val data: PinyinData,
     private val weights: GlidePath.Weights = WEIGHTS,
     private val user: () -> User = { User.NONE },
-    /**
-     * The decoder's: a word only imported goes [Penalties.imported] below the dictionary's here as
-     * there. Every caller (Engines, ime-eval) takes the default; a seam for one tuned to pass its own.
-     */
     penalties: Penalties = Penalties(),
 ) {
     private val importedPenalty = penalties.imported
 
     /**
-     * The user's part in a glide's words, asked once a glide: [unigram], a word's score with the
-     * user's counts and added words in it (the model's own where null); [blocked], a word the user
-     * blocked at a dictionary node (-1 for one of [words]), never a reading's word; [words], the
-     * words the user added, not the dictionary's; [learned], a word the user's counts are in, its
-     * score worked out each glide; [version], what changes the other words' scores or what is
-     * blocked or added (those worked out before are then worked out again). Counts only grow
-     * between [version]'s changes (forgetting or halving them changes it), so a word's score worked
-     * out before its first count is never above its score after.
+     * The user's part, asked once per glide; [version] changes with anything that changes scores, blocks or
+     * additions. Counts only grow between [version] changes, so a score cached before a word's first count is never
+     * above its later one.
      */
     class User(
         val version: Any?,
@@ -60,16 +45,10 @@ class PinyinGlide(
         }
     }
 
-    /**
-     * How an input method types a syllable, the keys a glide passes for it: full pinyin's letters
-     * ([FULL]), the nine keys' too (on their digits' keys, GlideLayout.sameKey), 双拼's
-     * [shuangpin] two. [separated]: a reading's syllables typed apart by [SEPARATOR], as full
-     * pinyin's must be (xi'an); 双拼's are two keys each.
-     */
+    /** The keys a glide passes for a syllable per scheme; [separated]: syllables typed apart by [SEPARATOR] (xi'an). */
     class Spelling(val separated: Boolean, spell: (Int) -> String?) {
         private val spelt = Array(Syllables.count, spell)
 
-        /** [syllable]'s keys; null for none: the scheme cannot type it. */
         fun of(syllable: Int): String? = spelt[syllable]
 
         companion object {
@@ -79,18 +58,14 @@ class PinyinGlide(
         }
     }
 
-    // each node's likeliest word and its score, as first asked (NaN till then), of the words the user
-    // had no count of then: a node's words are in no such order, and a glide after each learned word
-    // worked them all out again (F2067)
+    // each node's likeliest uncounted word score as first asked (NaN till then): recomputing all after each
+    // learned word was too slow
     private val likeliest = FloatArray(data.dictionary.nodeCount) { Float.NaN }
     private val likeliestWord = IntArray(data.dictionary.nodeCount)
 
-    // whether a node had a word the user has counts of when [likeliest] worked it out (they only
-    // get their first count with a new [User.version]): only those nodes are gone through again
-    // each glide, not yi's and shi's many words every time
+    // nodes with a counted word when [likeliest] was computed: only those are redone each glide
     private val hasLearned = BooleanArray(data.dictionary.nodeCount)
 
-    // the user's part the scores above were worked out with
     private var scoredFor: User = User.NONE
 
     private fun likeliest(node: Int): Float {
@@ -115,9 +90,7 @@ class PinyinGlide(
         return best
     }
 
-    // the model's, or its characters' one after another where likelier, as the pinyin session's best
-    // path takes them: 你好 is likelier as 你 then 好 (-5.2) than as a word (-6.5), the model's
-    // text cut 你好 apart mostly
+    // or its characters' in sequence where likelier, as the session's best path takes them (你好 as 你 then 好)
     private fun score(word: Int): Float {
         val model = data.model
         val own = scoredFor.unigram?.invoke(word) ?: if (word < model.vocabularySize) model.score(word) else model.unknownScore
@@ -136,11 +109,9 @@ class PinyinGlide(
     private fun text(word: Int): String =
         if (word < data.vocabulary.size) data.vocabulary.word(word) else checkNotNull(scoredFor.words).text(word)
 
-    /** The search steps ([GlidePath.steps]) the last decode took: for ime-eval to measure. */
     var lastSteps = 0
         private set
 
-    /** The [limit] likeliest readings of [path] over [layout] as [spelling] types them, best first, each once. */
     fun decode(path: FloatArray, layout: GlideLayout, limit: Int, spelling: Spelling = Spelling.FULL): List<GlideReading> {
         if (limit <= 0) return emptyList()
         val glide = GlidePath(path, layout, weights, MAX_LETTERS)
@@ -155,17 +126,14 @@ class PinyinGlide(
         private val dictionary = data.dictionary
         private val syllables = IntArray(MAX_LETTERS)
         private val words = scoredFor.words
-        // the words only imported: a glide is a word the input starts with, so these glide too (U-101)
+        // words only imported glide too: a glide is a word the input starts with
         private val starts = words?.startWords
-        // the dictionaries the user merged: a fourth trie, walked beside the others
         private val merged = words?.mergedWords
         private val learned = scoredFor.learned
 
-        // the word [pick] found
         private var picked = NO_WORD
 
-        // the [limit] best readings with a word so far, best first, as found earlier where as likely:
-        // a scribble fits thousands, their keys put together only for those kept
+        // ties keep the earlier; keys joined only for those kept
         private val best = ArrayList<Found>()
 
         private inner class Found(val word: Int, val syllables: IntArray, val score: Float)
@@ -175,10 +143,8 @@ class PinyinGlide(
             return best.map { reading(it) }
         }
 
-        // where a reading is in each trie: the dictionary's, the user's, the imported, the merged (-1 for none of each)
         private inner class Nodes(val node: Int, val user: Int, val start: Int, val merged: Int)
 
-        // the children of [at]'s nodes, [depth] letters and [count] syllables in: a reading of all four is one reading
         private fun visit(at: Nodes, depth: Int, count: Int) {
             if (at.node >= 0) {
                 val first = dictionary.firstChild(at.node)
@@ -198,8 +164,7 @@ class PinyinGlide(
 
         private fun mergedChild(mergedNode: Int, s: Int) = if (mergedNode >= 0) checkNotNull(merged).child(mergedNode, s) else -1
 
-        // the children of [at]'s user node that its dictionary node lacks: the user's trie
-        // tells a child by its syllable only, and it is small
+        // the user's trie only tells a child by syllable, and is small
         private fun visitUsers(at: Nodes, depth: Int, count: Int) {
             val own = checkNotNull(words)
             for (s in 0 until Syllables.count) {
@@ -210,8 +175,6 @@ class PinyinGlide(
             }
         }
 
-        // the children of [trieNode] in [trie] (the imported or the merged) that no trie before it has:
-        // reached once, each with every trie's node of its syllable
         private fun visitOthers(at: Nodes, trie: StartWords, trieNode: Int, depth: Int, count: Int) {
             val first = trie.firstChild(trieNode)
             for (child in first until first + trie.childCount(trieNode)) {
@@ -226,7 +189,6 @@ class PinyinGlide(
             }
         }
 
-        // [at]'s nodes by [syllable], from [depth] letters and [count] syllables in
         private fun reach(at: Nodes, syllable: Int, depth: Int, count: Int) {
             val d = stepped(spelling.of(syllable), depth) ?: return
             syllables[count] = syllable
@@ -238,8 +200,6 @@ class PinyinGlide(
             if (d < MAX_LETTERS) visit(at, d, count + 1)
         }
 
-        // the likeliest word not blocked of [at]'s dictionary, user, imported and merged nodes, into [picked]: the dictionary's
-        // as worked out before but for those the user has counts of now, worked out again
         private fun pick(at: Nodes): Float {
             val node = at.node
             val userNode = at.user
@@ -268,7 +228,6 @@ class PinyinGlide(
                 val own = checkNotNull(words)
                 for (i in 0 until imported.wordCount(startNode)) {
                     val word = imported.word(startNode, i)
-                    // one the user made theirs is in their trie; below the dictionary's of the same reading (review-G S2)
                     if (!own.startOnly(word) || scoredFor.blocked(word, -1)) continue
                     val score = score(word) + importedPenalty
                     if (score > best) {
@@ -281,13 +240,12 @@ class PinyinGlide(
             return best
         }
 
-        // the merged dictionaries' best word at [mergedNode] not blocked, into [picked] if above [above]: its
-        // words come best first, and rime-frost has hundreds at a syllable, so the first is the one scored
+        // words come best first and rime-frost has hundreds per syllable, so the first is the one scored
         private fun pickMerged(mergedNode: Int, above: Float): Float? {
             val trie = checkNotNull(merged)
             val words = scoredFor.words
             val learned = scoredFor.learned
-            // the user's chosen or learned words score above where their file ranks them: looked for past the first
+            // the user's chosen or learned words score above their file rank: look past the first
             val chosen = words?.anyMergedChosen() == true || (learned != null && words?.anyMergedCounted() != false)
             var top = above
             var best = NO_WORD
@@ -325,7 +283,6 @@ class PinyinGlide(
             return best
         }
 
-        // a node whose words are all blocked is no reading
         private fun keep(count: Int, score: Float) {
             if (score == Float.NEGATIVE_INFINITY) return
             if (best.size == limit && score <= best.last().score) return
@@ -335,7 +292,6 @@ class PinyinGlide(
             if (best.size > limit) best.removeAt(best.size - 1)
         }
 
-        // the keys of [spelling] stepped from [depth]: where they end, or null where the path does not pass them or there are none
         private fun stepped(spelling: String?, depth: Int): Int? {
             if (spelling == null) return null
             var d = depth
@@ -355,16 +311,12 @@ class PinyinGlide(
     }
 
     companion object {
-        /** Letters a glide spells at most. */
         const val MAX_LETTERS = 30
 
-        /**
-         * Pinyin's weights: the path weighed more against the model than English's (GlidePath.Weights),
-         * a word's unigram lower in a vocabulary of many more (ime-eval pinyin-glide).
-         */
+        /** The path weighs more than English's: unigrams are lower in a much larger vocabulary. */
         val WEIGHTS = GlidePath.Weights(shape = 5f, proximity = 6.25f, corner = 1.5f)
 
-        /** Between syllables: the pinyin session reads it as their boundary (SyllableGraph.SEPARATOR). */
+        /** The pinyin session reads it as a syllable boundary (SyllableGraph.SEPARATOR). */
         const val SEPARATOR = '\''
     }
 }

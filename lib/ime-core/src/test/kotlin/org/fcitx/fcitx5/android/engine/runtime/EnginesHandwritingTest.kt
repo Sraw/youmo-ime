@@ -34,7 +34,6 @@ class EnginesHandwritingTest : EnginesFixture() {
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         engines.context(InputMethodCatalog.PINYIN, "好")
         val shown = engines.write(0, "你", "拟")
-        // 好 then 拟: the model's bigram
         assertEquals("拟", shown.preedit)
         assertEquals(listOf("拟", "你"), engines.candidates(InputMethodCatalog.PINYIN, 0, 5).map { it.text })
         assertEquals("你", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 1).commit)
@@ -55,8 +54,7 @@ class EnginesHandwritingTest : EnginesFixture() {
         assertEquals(1, engines.inkEnded)
     }
 
-    // UAT HW-20 (U-06): two characters no word, written and put in twice, are the user's word, typed
-    // in pinyin at the reading the dictionary gives them; never moving pinyin's order (D28)
+    // never moving pinyin's order
     @Test
     fun aSentenceWrittenTwiceThatIsNoWordIsTheUsersWord() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -103,7 +101,7 @@ class EnginesHandwritingTest : EnginesFixture() {
         assertTrue(Offer.BLOCK in engines.offers(InputMethodCatalog.PINYIN, 0))
     }
 
-    // U-72 in handwriting (review-E-engine S10): 拟 after 好 turned off there, as pinyin's
+    // 拟 after 好 turned off there, as pinyin's
     @Test
     fun handwritingTurnsAPredictionOffAfterItsWord() {
         val engines = Engines(::load, MemoryFiles(), warmUps = inPlace)
@@ -116,7 +114,6 @@ class EnginesHandwritingTest : EnginesFixture() {
         engines.close()
     }
 
-    // turned off after 好, not offered when 好 is written and put in again
     @Test
     fun handwritingsPredictionTurnedOffStaysOffWhenItsWordIsWrittenAgain() {
         val engines = Engines(::load, MemoryFiles(), warmUps = inPlace)
@@ -132,7 +129,7 @@ class EnginesHandwritingTest : EnginesFixture() {
         engines.close()
     }
 
-    // review-int S1: 不再联想 taken back shows what may follow again, the session kept with its word before
+    // 不再联想 taken back shows what may follow again, the session kept with its word before
     @Test
     fun handwritingsPredictionTurnedOffAndTakenBackIsOfferedAgain() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -145,11 +142,10 @@ class EnginesHandwritingTest : EnginesFixture() {
         }
     }
 
-    // review-int S1: an undo while characters are written keeps them, read anew, the pad's piece not ended
+    // an undo while characters are written keeps them, read anew, the pad's piece not ended
     @Test
     fun handwritingKeepsWhatIsWrittenThroughAnUndo() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
-            // 拟 picked once: learned, to be deleted
             engines.write(0, "拟")
             assertEquals("拟", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).commit)
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
@@ -172,7 +168,6 @@ class EnginesHandwritingTest : EnginesFixture() {
                 return engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).candidates
             }
             assertEquals(listOf("拟"), afterHao())
-            // picked: learned, to be forgotten
             assertEquals("拟", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).commit)
             afterHao()
             assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, 0))

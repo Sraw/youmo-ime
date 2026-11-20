@@ -31,7 +31,6 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The bar in slots of one width (uat/05 TB-02), 手写 greyed in English (TB-67); the floating keyboard's (FloatingUatTest, TB-22). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
@@ -50,9 +49,8 @@ class ToolbarSpacingUatTest {
 
     private fun s(id: Int) = h.service.getString(id)
 
-    // the bar in slots of one width (the user's call, 2026-11-15): shut, the menu key in the first, the right's in the
-    // last; open, the toolbar's and ⋯ in the slots from the menu key on, here every slot filled, no gap; the menu key
-    // and the right's where they were and as wide, open or shut
+    // the bar in slots of one width: shut, the menu key in the first, the right's in the last; open, the toolbar's and ⋯
+    // from the menu key on, no gap
     @Test
     @Uat("TB-02")
     fun theBarsButtonsAreInSlotsOfOneWidthOpenOrShut() {
@@ -64,15 +62,14 @@ class ToolbarSpacingUatTest {
         val open = barCells(h)
         assertEquals("ten slots, all filled: $open", 10, open.size)
         assertOnSlots(open)
-        // whole px slots (IdleUi.sizeCells): the bar's width over them leaves under a px a slot, all of it between ⋯ and the right's
+        // whole px slots (IdleUi.sizeCells): under a px a slot left over, all of it between ⋯ and the right's
         val roundingPx = open.size
         assertEvenlyApart(open, bigGapAfter = open.indexOfFirst { it.first == s(R.string.status_area) }, gap = roundingPx)
         h.tap(h.described(s(R.string.hide_toolbar)))
         assertTheEndsStay(h, "393 dp")
     }
 
-    // the menu key and the right's never move nor change width as the toolbar opens and shuts (the user's call,
-    // 2026-11-15), on the wide bar of a phone held sideways too, the slots the toolbar has nothing for after ⋯
+    // the menu key and the right's never move nor change width as the toolbar opens and shuts, on a sideways phone too
     @Test
     @Uat("TB-02")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
@@ -85,8 +82,7 @@ class ToolbarSpacingUatTest {
         assertEvenlyApart(open, bigGapAfter = open.indexOfFirst { it.first == s(R.string.status_area) })
     }
 
-    // 手写 in English greyed in its place, not taken off: nothing on the bar moves as 中/英 switch, open or shut; a tap
-    // says why, and TalkBack does (the user's call, 2026-11-15)
+    // 手写 in English greyed in its place, not taken off: nothing on the bar moves as 中/英 switch
     @Test
     @Uat("TB-67")
     fun englishGreysHandwritingInItsPlaceAndNothingMoves() {
@@ -110,7 +106,6 @@ class ToolbarSpacingUatTest {
         assertFalse("not turned on", AppPrefs.getInstance().internal.handwritingOpen.getValue())
         h.tap(h.described(s(R.string.hide_toolbar)))
         assertEquals(shutChinese.map { it.second }, barCells(h).map { it.second })
-        // back in 中文: as it was
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
         h.relayout()
         assertEquals(shutChinese, barCells(h))
@@ -118,21 +113,15 @@ class ToolbarSpacingUatTest {
     }
 
     companion object {
-        /** The bar's buttons in view, left to right: what each is (its description) and where. */
         fun barCells(h: KeyboardHarness): List<Pair<String, Rect>> {
             val bar = h.box(h.bar)
             return KeyboardHarness.all(h.bar).filter { it is ToolButton && h.shown(it) }.map { it.contentDescription.toString() to h.box(it) }
                 .filter { (_, b) -> b.left >= bar.left - 1 && b.right <= bar.right + 1 }.sortedBy { it.second.left }.toList()
         }
 
-        /** The bar's right in a new install's order: 表情, 手写, 语音, 收起. */
         val RIGHT = listOf(ToolbarButton.Emoji, ToolbarButton.Handwriting, ToolbarButton.Voice, ToolbarButton.Hide)
 
-        /**
-         * The menu key's and [right]'s boxes the same with the toolbar shut, open and shut again (the user's call,
-         * 2026-11-15): none of them moves or changes width, and every one of [right] is there. The toolbar shut before
-         * and after.
-         */
+        /** None of the menu key and [right] moves or changes width as the toolbar opens and shuts. */
         fun assertTheEndsStay(h: KeyboardHarness, at: String, right: List<ToolbarButton> = RIGHT) {
             val described = right.map { h.service.getString(ToolbarButtonLooks.of(it).label) }
             fun ends(): List<Rect> {
@@ -148,11 +137,7 @@ class ToolbarSpacingUatTest {
             assertEquals("$at: shut again", shut, ends())
         }
 
-        /**
-         * [cells], the bar's buttons left to right, in its slots: all as wide as the menu key (the first), the ones
-         * from the menu key on a slot after another, the right's ([right] of them, the last) a slot before another
-         * from the bar's end.
-         */
+        /** All as wide as the menu key, the left ones a slot after another, the right's [right] a slot before another from the end. */
         fun assertOnSlots(cells: List<Pair<String, Rect>>, right: Int = RIGHT.size) {
             val w = cells.first().second.width()
             val start = cells.first().second.left
@@ -165,7 +150,7 @@ class ToolbarSpacingUatTest {
             }
         }
 
-        /** [d] of the toolbar's opened: its button where the bar has a slot for it, else its entry in ⋯'s panel. */
+        /** Its button where the bar has a slot for it, else its entry in ⋯'s panel. */
         fun openFromToolbar(h: KeyboardHarness, d: Int) {
             val name = h.service.getString(d)
             val on = KeyboardHarness.all(h.bar).firstOrNull { h.shown(it) && it.contentDescription?.toString() == name }
@@ -175,20 +160,18 @@ class ToolbarSpacingUatTest {
             h.tap(generateSequence(entry) { it.parent as? View }.first { it.hasOnClickListeners() })
         }
 
-        /** ⋯ tapped: its panel's entries, in order. */
         fun openMore(h: KeyboardHarness): List<String> {
             h.tap(h.described(h.service.getString(R.string.status_area)))
             h.waitFor("⋯'s panel") { h.relayout(); panelEntries(h).isNotEmpty() }
             return panelEntries(h)
         }
 
-        /** ⋯'s panel's entries in view, in order. */
         fun panelEntries(h: KeyboardHarness): List<String> {
             val grid = KeyboardHarness.all(h.inputView).firstOrNull { h.shown(it) && it is RecyclerView && it.layoutManager is GridLayoutManager } ?: return emptyList()
             return KeyboardHarness.all(grid).filter { h.shown(it) && it is TextView }.map { (it as TextView).text.toString() }.toList()
         }
 
-        /** [cells] all as wide, each right beside the last but after [bigGapAfter]'s (the room past them all), at most [gap] px there. */
+        /** Each right beside the last but after [bigGapAfter]'s, at most [gap] px there. */
         fun assertEvenlyApart(cells: List<Pair<String, Rect>>, bigGapAfter: Int, gap: Int = Int.MAX_VALUE) {
             val widths = cells.map { it.second.width() }
             assertTrue("$cells: as wide", widths.max() - widths.min() <= 1)

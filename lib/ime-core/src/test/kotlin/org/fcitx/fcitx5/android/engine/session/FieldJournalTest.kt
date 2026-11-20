@@ -11,11 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The journal every session keeps the same way (U-03, F2655): which calls see the record as it is
- * now (settle, backspace, a context, a commit followed, one of its own) and which the journal as
- * it stands (unverify, a password's context, a commit), as CommitRecorder split them.
- */
+/** The journal every session keeps: which calls see the record now and which see the journal as it stands. */
 class FieldJournalTest {
 
     private var learns = true
@@ -73,9 +69,7 @@ class FieldJournalTest {
         assertTrue(undone.isEmpty())
     }
 
-    // the raw journal's contract, which no session reaches (each calls before() or pending first,
-    // which see a rewrite): committed() looks for none, so a rewrite just before it, seen at the next
-    // settle, drops that commit with what was before; the commit after is kept as the record now has it
+    // committed() looks for no rewrite, so one just before it drops that commit at the next settle
     @Test
     fun aCommitRightAfterARewriteGoesWithItTheNextIsKept() {
         rewrites++
@@ -136,7 +130,7 @@ class FieldJournalTest {
         assertTrue(undone.isEmpty())
     }
 
-    // review F2655 S: a traditional table's text, written and read simplified alike
+    // a traditional table's text, written and read simplified alike
     @Test
     fun traditionalTextIsComparedSimplified() {
         val c = commit()

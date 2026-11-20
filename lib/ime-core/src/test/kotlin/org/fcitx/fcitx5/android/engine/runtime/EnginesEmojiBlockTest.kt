@@ -16,7 +16,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** An emoji of more code points than its word has syllables (👍🏻 hao), blocked: kept so, listed, undone, backed up (review H1). */
+/** An emoji of more code points than its word has syllables (👍🏻 hao), blocked: kept so, listed, undone, backed up. */
 class EnginesEmojiBlockTest : EnginesFixture() {
     init {
         emoji = EmojiData.format(emptyList(), mapOf("好" to listOf("👍🏻", "👌"), "你好" to listOf("😃"))).toByteArray()
@@ -66,7 +66,6 @@ class EnginesEmojiBlockTest : EnginesFixture() {
             val listed = e.userWords().single()
             val done = e.learning(null, LearningOp.RemoveWords(listOf(listed))) as LearningResult.Done
             assertTrue("👍🏻" in e.typed("hao"))
-            // review M1: the unblock taken back blocks it again
             e.learning(null, LearningOp.Undo(done.undo))
             assertFalse("👍🏻" in e.typed("hao"))
             assertEquals(listOf(listed), e.userWords())
@@ -98,7 +97,7 @@ class EnginesEmojiBlockTest : EnginesFixture() {
         }
     }
 
-    // review R2: the user's text export, imported again: the reading as blocked, not split among the code points
+    // the user's text export, imported again: the reading as blocked, not split among the code points
     @Test
     fun twoCodePointEmojiTextExportImportRoundTrip() {
         val lines = Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->

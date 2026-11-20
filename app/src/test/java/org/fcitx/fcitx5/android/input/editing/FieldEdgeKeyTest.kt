@@ -10,11 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The edit panel's |< went to the start of the line in a multi-line field, not of the field
- * (TB-06): it sent a bare Home, which a text view reads as the line's start; Ctrl+Home is the
- * field's (ArrowKeyMovementMethod).
- */
+/** In a multi-line field a bare Home goes to the line's start; Ctrl+Home is the field's (ArrowKeyMovementMethod). */
 class FieldEdgeKeyTest {
 
     @Test
@@ -22,18 +18,17 @@ class FieldEdgeKeyTest {
         assertTrue(fieldEdgeCtrl(rawKeyInput = false))
     }
 
-    // F2378: a terminal reads Ctrl+Home as ESC[1;5H, which a shell echoes; a bare Home moves
+    // a terminal reads Ctrl+Home as ESC[1;5H, which a shell echoes; a bare Home moves
     @Test
     fun aRawKeyFieldGetsThemBare() {
         assertFalse(fieldEdgeCtrl(rawKeyInput = true))
     }
 
-    // TB-06: 选择 stayed on after 复制, so >| extended the selection and 粘贴 replaced it
+    // 选择 stayed on after 复制, so >| extended the selection and 粘贴 replaced it
     @Test
     fun aCopyLeavesTheCursorAtTheSelectionsEnd() {
         assertEquals(3, cursorAfterCopy(0, 3))
         assertEquals("selected backwards", 3, cursorAfterCopy(3, 0))
-        // F2376: nothing selected, the cursor is left alone
         assertNull(cursorAfterCopy(2, 2))
     }
 

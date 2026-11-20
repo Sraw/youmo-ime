@@ -92,7 +92,7 @@ class StatusAreaEntryUi(override val ctx: Context, private val theme: Theme) : U
 
     private val icons = PackIcons.of(theme)
 
-    // the entry bound last: a theme's icon read after it was bound again draws nothing of it
+    // a theme's icon read after it was bound again draws nothing of it
     private var shown: StatusAreaEntry? = null
 
     fun setEntry(entry: StatusAreaEntry) {
@@ -103,7 +103,6 @@ class StatusAreaEntryUi(override val ctx: Context, private val theme: Theme) : U
         if (named != null) {
             icon.visibility = View.VISIBLE
             textIcon.visibility = View.GONE
-            // a theme's of its name in the cell's colour, nothing till it is read (the cell bound again then), else the app's
             icon.imageDrawable = BarIconDrawables.of(ctx, icons, named, contentColor, ctx.dp(ICON_DP)) { if (shown === entry) setEntry(entry) }
         } else if (entry.icon != 0) {
             icon.visibility = View.VISIBLE
@@ -131,7 +130,6 @@ class StatusAreaEntryUi(override val ctx: Context, private val theme: Theme) : U
     }
 
     private companion object {
-        // the app's vectors' side
         const val ICON_DP = 24
     }
 }

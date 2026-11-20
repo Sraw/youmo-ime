@@ -13,11 +13,7 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import com.google.android.material.R as MaterialR
 
-/**
- * A keyboard card's picture (dev/design/061-settings-cards.md §4.1): a small square a key, [rows] the
- * keys in each row, so the full keyboard, 九键 and 14 键 tell apart without reading; [bars] draws
- * three bars instead (the function keys). Shorter rows are centred. Only a picture: no node.
- */
+/** A square per key, [rows] keys per row (so keyboards tell apart at a glance); [bars] draws three bars. No accessibility node. */
 class KeyboardGlyphView(ctx: Context, private val rows: List<Int>, private val bars: Boolean = false) : View(ctx) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ctx.styledColor(MaterialR.attr.colorOutline) }
@@ -28,7 +24,7 @@ class KeyboardGlyphView(ctx: Context, private val rows: List<Int>, private val b
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
-    /** The colour of its keys: the card's text colour, so a chosen card's picture is as its name. */
+    /** The card's text colour, so a chosen card's picture matches its name. */
     fun setColor(color: Int) {
         paint.color = color
         invalidate()
@@ -37,7 +33,7 @@ class KeyboardGlyphView(ctx: Context, private val rows: List<Int>, private val b
     override fun onDraw(canvas: Canvas) {
         val lines = if (bars) BARS else rows.size
         if (lines == 0 || width == 0) return
-        // the middle part of the card's width, the badge's corner left clear
+        // the middle, the badge's corner left clear
         val span = width * WIDTH_PART
         val h = (height - gap * (lines - 1)) / lines
         val most = if (bars) 1 else rows.max()
@@ -58,7 +54,6 @@ class KeyboardGlyphView(ctx: Context, private val rows: List<Int>, private val b
     companion object {
         const val HEIGHT_DP = 28
 
-        /** The part of its width drawn on, in the middle: the badge in the card's corner stays off it. */
         const val WIDTH_PART = 0.7f
 
         private const val BARS = 3

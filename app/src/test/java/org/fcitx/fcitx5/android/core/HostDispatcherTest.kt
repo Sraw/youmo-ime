@@ -18,12 +18,12 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 class HostDispatcherTest {
 
-    // the debug build's idle signal: a key's call queued on the Kotlin host's thread is not idle
+    // the debug build's idle signal
     @Test
     fun callsNotRunOutArePending() {
         val d = HostDispatcher().apply { start() }
         try {
-            // the counter is process-wide: another test's leftover jobs must not count here (F4112)
+            // the counter is process-wide: another test's leftover jobs must not count here
             val before = HostDispatcher.pendingJobs
             val release = CountDownLatch(1)
             val ran = CountDownLatch(2)
@@ -40,27 +40,24 @@ class HostDispatcherTest {
         }
     }
 
-    // a call queued behind the last step is one that did not run; a timer not due is none (F3926);
-    // nothing stays counted, even a call shutdownNow interrupted mid-run (F3830, F4042)
+    // nothing stays counted, even a call shutdownNow interrupted mid-run
     @Test
     fun stopReturnsTheCallsDroppedNotTheTimersAndCountsNone() {
         val d = HostDispatcher().apply { start() }
         d.schedule(60_000) {}
         val never = CountDownLatch(1)
-        // the first holds the thread till shutdownNow interrupts it (it may or may not have started),
-        // so the second is still queued: one or both come back, never the timer
+        // the first holds the thread till shutdownNow interrupts it, so the second is still queued: one or both come back, never the timer
         val rest = d.stop {
             d.dispatch(EmptyCoroutineContext, Runnable { never.await() })
             d.dispatch(EmptyCoroutineContext, Runnable {})
         }
         assertTrue("${rest.size}", rest.size in 1..2)
-        // checked directly, not by the count: with the first call started, call two + the timer is 2 too
+        // checked directly: with the first call started, call two + the timer is 2 too
         assertTrue(rest.toString(), rest.none { it is ScheduledFuture<*> && it.getDelay(TimeUnit.MILLISECONDS) > 0 })
-        // a -1 here needs the first call to have started before shutdownNow; the other order leaves 0 either way
+        // a -1 here needs the first call to have started before shutdownNow; the other order gives 0 either way
         assertEquals(0, HostDispatcher.pendingJobs)
     }
 
-    // a last step that throws still ends the thread (F3799: shutdownNow was skipped, the thread lived on);
     // the host can start again (restartFcitx)
     @Test
     fun aLastStepThatThrowsStillStops() {
@@ -73,11 +70,8 @@ class HostDispatcherTest {
         d.stop {}
     }
 
-    // a call that ignores the interrupt past the stop's wait counts itself out after it: zero, not -1
-    // (F4242). It must be running when the stop comes, not queued behind the last step (dropped
-    // unstarted, it passed on the old zeroing too, F4279): the stop's own thread is interrupted
-    // while it waits behind the call, so it shuts down with the call still on the thread.
-    // No wait: the call outlasts any, and the full one only made the test slow (F4315).
+    // the call must be running when the stop comes, not queued (dropped unstarted it would pass anyway): the stopper is
+    // interrupted while waiting behind it, so the shutdown happens with the call still on the thread
     @Test
     fun aCallPastTheWaitStillEndsAtZero() {
         val d = HostDispatcher(stopWaitSeconds = 0).apply { start() }
@@ -98,7 +92,7 @@ class HostDispatcherTest {
         stopper.interrupt()
         stopper.join(10_000)
         assertFalse(stopper.isAlive)
-        // still running past the wait: counted, not zeroed (the old set(0) gave 0, then -1)
+        // still running past the wait: counted, not zeroed
         assertEquals(before + 1, HostDispatcher.pendingJobs)
         release.countDown()
         val end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)

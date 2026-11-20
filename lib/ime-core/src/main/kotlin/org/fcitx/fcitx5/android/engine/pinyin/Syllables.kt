@@ -7,16 +7,10 @@ package org.fcitx.fcitx5.android.engine.pinyin
 import java.util.zip.CRC32
 
 /**
- * Every syllable the pinyin dictionary may use. A syllable's id is its index here, and compiled
- * dictionaries store those ids, so this list is append-only: reordering or removing an entry
- * would silently re-spell every word in an existing data file. Data files record how many
- * syllables they were built with and the [checksum] of those; [matches] accepts a file built
- * before later syllables were appended, and rejects one whose ids mean something else.
- *
- * `v` stands for ü (lv, nve). The upper-case letters are spelt-out Latin letters, as in A股 or
- * T恤; `r` is the rhotic 儿 of words like 这儿; `m`, `n`, `ng` are the interjections 呣, 嗯.
- * The set is what libime's dictionary uses (dict-20260703), which includes a few rare syllables
- * such as fiao, kei and bong.
+ * Every syllable the dictionary may use; a syllable's id is its index and compiled dictionaries store ids,
+ * so this list is append-only (reordering would re-spell every word in existing data). Files record the
+ * count and [checksum]; [matches] accepts files built before later appends. `v` is ü; upper case are
+ * Latin letters (A股); `r` is 儿; `m`, `n`, `ng` are 呣, 嗯. The set is libime's (dict-20260703).
  */
 object Syllables {
 
@@ -61,23 +55,16 @@ object Syllables {
     /** @return the id of [spelling], or -1 if it is not a syllable */
     fun id(spelling: String): Int = ids[spelling] ?: -1
 
-    /**
-     * [syllables] [from] to [to] spelt, a space between them: a reading as the learning record, the
-     * word lists and the settings keep it (`ni hao`). One copy, as `pin yin` and `pin'yin` were each
-     * written out in a dozen places ([apostrophed] the other way).
-     */
+    /** Space-separated (`ni hao`): the reading form of the learning record, word lists and settings. */
     fun spelled(syllables: IntArray, from: Int = 0, to: Int = syllables.size): String = spelled(to - from) { syllables[from + it] }
 
-    /** [count] syllables [spelled], the [i]th of them [syllable]: for syllables kept otherwise than in an array. */
     fun spelled(count: Int, syllable: (i: Int) -> Int): String = joined(count, ' ', syllable)
 
-    /** [syllables] spelt, `'` between them: a reading as libime's text dictionaries and the lists shown in the settings have it (`ni'hao`). */
+    /** `'`-separated (`ni'hao`): libime's text dictionaries and settings lists. */
     fun apostrophed(syllables: IntArray): String = joined(syllables.size, '\'') { syllables[it] }
 
-    /** A reading [spelled] (`ni hao`) as [apostrophed] has it (`ni'hao`). */
     fun apostrophed(reading: String): String = reading.replace(' ', '\'')
 
-    /** A reading [apostrophed] (`ni'hao`) as [spelled] has it (`ni hao`). */
     fun spaced(reading: String): String = reading.replace('\'', ' ')
 
     private fun joined(count: Int, separator: Char, syllable: (Int) -> Int): String = buildString {
@@ -87,9 +74,6 @@ object Syllables {
         }
     }
 
-    /**
-     * The initial and final of [spelling], the initial empty for a, ai, er ...; null for a
-     * syllable that is no initial plus a final (m, ng, the Latin letters).
-     */
+    /** Initial (empty for a, ai, er) and final; null if not initial plus final (m, ng, Latin letters). */
     fun split(spelling: String): Pair<String, String>? = SpellingIndex.split(spelling)
 }

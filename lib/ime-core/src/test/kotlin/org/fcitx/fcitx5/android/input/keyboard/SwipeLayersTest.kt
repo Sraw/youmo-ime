@@ -14,6 +14,14 @@ import org.junit.Test
 
 class SwipeLayersTest {
 
+    /** Which way swipes to [layer]: true up, false down, null neither. */
+    private fun SwipeLayers.wayOf(layer: Layer): Boolean? = when (layer) {
+        Layer.Off -> null
+        up -> true
+        down -> false
+        else -> null
+    }
+
     @Test
     fun theChoicesTheDefaultFirstNoneRepeated() {
         assertEquals(SwipeLayers.entries.size, SwipeLayers.entries.toSet().size)

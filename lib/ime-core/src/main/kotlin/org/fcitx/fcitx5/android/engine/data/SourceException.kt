@@ -6,14 +6,10 @@ package org.fcitx.fcitx5.android.engine.data
 
 import java.io.BufferedReader
 
-/** A problem in a text source, reported with where it is. */
 class SourceException(val source: String, val line: Int, message: String, cause: Throwable? = null) :
     Exception("$source:$line: $message", cause)
 
-/**
- * Calls [block] with each line and its 1-based number, turning a failure inside it into a
- * [SourceException] that points at the line. A leading byte-order mark is dropped.
- */
+/** Calls [block] per line with its 1-based number, wrapping failures as [SourceException]. Drops a leading BOM. */
 inline fun BufferedReader.forEachNumberedLine(source: String, block: (line: String, number: Int) -> Unit) {
     var number = 0
     while (true) {

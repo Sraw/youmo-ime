@@ -18,17 +18,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * A tab whose category filtering emptied at the end of the list went to a row past it, and showed
- * the recently used as current; a skin tone's transform reran its code points, the RGI set and a
- * glyph check on every bind as the list scrolled. Under the app, whose preferences the adapter
- * and its keys read.
- */
+/** A tab whose category emptied at the list's end went past it; a skin tone's transform reran on every bind as the list scrolled. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PickerGridAdapterTest {
 
-    /** Hides [HIDDEN], marks what an item commits as, and counts how often it works that out. */
     private class CountingPolicy : PickerPolicy {
         var key = 0
         var transforms = 0
@@ -63,24 +57,21 @@ class PickerGridAdapterTest {
     fun anItemIsTransformedOnceForTheKeyNotOnEachBind() {
         val policy = CountingPolicy()
         val adapter = adapter(policy, PickerData.Category("a") to arrayOf("x"))
-        // nothing used yet: the header, then "x"
         val holder = adapter.onCreateViewHolder(grid, adapter.getItemViewType(1))
         repeat(3) { adapter.onBindViewHolder(holder, 1) }
         assertEquals(1, policy.transforms)
-        // the cell as the grid lays it out: the engine's scene of it made at a size
         holder.itemView.apply {
             measure(View.MeasureSpec.makeMeasureSpec(120, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(120, View.MeasureSpec.EXACTLY))
             layout(0, 0, 120, 120)
         }
         assertEquals("x!", KeyboardHarness.cellText(holder.itemView))
-        // another key, as another skin tone picked since: worked out again
         policy.key = 1
         adapter.rebuild()
         adapter.onBindViewHolder(holder, 1)
         assertEquals(2, policy.transforms)
     }
 
-    // F1969: emoji.data missing, the emoji picker has the recently used alone and opened past it
+    // emoji.data missing: the emoji picker has the recently used alone and opened past it
     @Test
     fun aPickerWithNoDataOpensOnTheRecentlyUsed() {
         val adapter = adapter(CountingPolicy())

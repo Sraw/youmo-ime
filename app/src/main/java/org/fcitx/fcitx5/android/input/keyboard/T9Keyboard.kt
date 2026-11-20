@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
@@ -46,18 +45,13 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
-import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
-import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
@@ -73,125 +67,57 @@ import splitties.views.dsl.constraintlayout.topOfParent
 import splitties.views.dsl.core.add
 
 /**
- * Pinyin on nine keys (九键), laid out as 搜狗 does: a column on the left offering what the first
- * digits not yet taken may be (the engine's [EngineState.syllables] of 九键), or punctuation while
- * nothing is typed; 1 is the separator (分词) while something is typed, else punctuation
- * (, . ? ! as punctuation maps them, ，。？！ with Chinese punctuation on, English's too; with 连按 on pressed again
- * soon the next in place of the last, as a digit key's letters; its long
- * press more); backspace, start over (重输) and 0 on the right; symbols, numbers, space, the
- * language switch and return below. Swiping a digit key, 1 too, types the digit itself (picks its
- * candidate while typing, as the number keyboard's digits do).
- *
- * A syllable is sent to the engine as a character of [Keyboard.SYLLABLES], saying which of
- * which list it is ([Keyboard.syllableKey]).
- *
- * A digit key pressed again soon is its next letter ([MultiTap], as [AppPrefs.Keyboard.t9MultiTap]
- * sets; off by default), sent as a character of [Keyboard.LETTERS] ([Keyboard.letterKey]), which
- * the engine puts in as that letter typed as itself and nothing else; its preview shows the letter.
- * Its long press offers a row of its letters in capitals, the digit and its letters (A B C 2 a b
- * c), the one chosen committed as it is after what is typed, and in rows above its symbols
- * (the resolver's, KeyDefaults.NINE_SYMBOLS by default), typed as the full keyboard's long press types them, 1's too.
- *
- * A glide across the digit keys ([GlideInput], the setting on) is read as full pinyin's, each
- * key's letters on it: the engine types the reading's letters as themselves.
- *
- * Pinyin's ([Name], its keyboard set to the nine keys): a digit key with letters sends its code
- * ([Keyboard.pinyinNineKey]), which pinyin's nine keys' session reads, and so does 1 while typing
- * (the separator); 0 and a digit key with no letters are digits, typed or picking.
- *
- * [english]: the nine keys of English ([EnglishName]), its keyboard set so. Its digit keys spell words (预测, [Keyboard.nineKey]: 4663 good, home,
- * gone) or type a letter at a time (连按, as [AppPrefs.Keyboard.t9EnglishTyping] sets, and where
- * English suggests nothing); Shift ([NineKeyShift]) where 重输 is; English's marks in the column
- * and on 1, an apostrophe in the word while one is typed. It never glides.
- *
- * [shuangpin]: 九键双拼 ([ShuangpinName], design §3.4), 双拼 on [NineKeyLetters.NINE_SP]'s keys
- * (5 JKL alone): a digit key sends its group's code, which the engine reads as any of its
- * letters; 1 while typing the separator `'`, but 微软's `;` (its ing, a small `;` beside 1's digit)
- * that the engine reads as ing where a final goes, else as the separator; the column 双拼's syllables. No
- * 连按, no glide, the letters always the standard ones. None has 中/英 (I1): the language key goes
- * round the input methods, each on its own keyboard.
+ * Pinyin's digit keys send [Keyboard.pinyinNineKey] codes, since a plain digit would pick a candidate as a
+ * hardware keyboard's does. A syllable goes to the engine as a character of [Keyboard.SYLLABLES] naming its
+ * list; a 连按 letter as one of [Keyboard.LETTERS], typed as itself.
  */
 @SuppressLint("ViewConstructor")
 class T9Keyboard(
     context: Context,
     theme: Theme,
-    /** What each digit key types, as the user set it: the engine reads the digits by the same. */
     private val letters: NineKeyLetters = NineKeyLetters.STANDARD,
     private val english: Boolean = false,
     private val shuangpin: Boolean = false,
-    /** 九键双拼's 1 types `;` while typing, shown beside its digit: only under a scheme that types it (微软's ing). */
     private val semicolon: Boolean,
-    /** A layout of the user's drawn in place of the app's ([customLayout]: `id@stamp`); null for the app's. */
+    /** `id@stamp` ([customLayout]); null for the app's. */
     private val custom: String? = null,
-) : BaseKeyboard(
-    context, theme, layout(letters, english, shuangpin, semicolon), themeBoard = KeyNames.NINE,
-), AutoCapsKeys, TypingKeys {
+) : BaseKeyboard(context, theme, themeBoard = KeyNames.NINE), AutoCapsKeys, TypingKeys {
 
     companion object {
         const val Name = "T9"
 
-        /** The nine keys of English: a layout of its own, so that switching between it and [Name] shows the other. */
+        /** A layout of its own, so that switching between it and [Name] shows the other. */
         const val EnglishName = "T9English"
 
-        /** 九键双拼: a layout of its own, as [EnglishName]. */
         const val ShuangpinName = "T9Shuangpin"
 
-        /** 九键双拼 under a scheme that types no `;`: 5 is JKL alone, its long press no `;` or `:` of it. */
         const val ShuangpinPlainName = "T9ShuangpinPlain"
 
-        // the column's share of the width, and of the right one
-        private const val SIDE = 0.16f
-
-        // the column's name in a theme (KeyNames.NINE)
         private const val SIDE_KEY = "side"
 
-        /** A column item's text size, in dp, before a long syllable is drawn smaller to fit. */
         internal const val ITEM_TEXT_DP = 16f
 
-        /** The nine keys' layout for the scene engine (060-render-p2 S5a), every variant's. */
         const val LAYOUT = "nine"
-        private const val RIGHT = 0.18f
 
-        private const val DIGIT = (1f - SIDE - RIGHT) / 3
-
-        /**
-         * Shown in the column while nothing is typed: each as punctuation maps it, shown as typed (用户 2026-11-11, 显示即所打):
-         * ，。？！ with Chinese punctuation on, , . ? ! with it off, as 1's.
-         */
         private val PUNCTUATION = listOf(",", ".", "?", "!", "…", "、", ":", "~", "@")
 
-        /**
-         * What 1 types while nothing is typed: the first, pressed again soon the next in its place; each as punctuation
-         * maps it ([marked]), as its face shows them (nine.xml's `{punct:,.?!}`): ，。？！ with Chinese punctuation on,
-         * , . ? ! in English or with it off (用户 2026-11-11: English's 1 as pinyin's, its ' and - on the long presses).
-         */
         internal const val ONE = ",.?!"
 
-        /** [ONE] as [marks] (the punctuation's map now) type it, the first to the last. */
         internal fun oneLabel(marks: Map<String, String>) = ONE.map { marked(it, marks) }.joinToString("")
 
         private fun marked(c: Char, marks: Map<String, String>) = c.toString().let { marks[it] ?: it }
 
-        /** The column's for English: typed through it, which puts a word's space behind them. */
+        /** Typed through English, which puts a word's space behind them. */
         private val ENGLISH_PUNCTUATION = listOf(",", ".", "?", "!", "'", "-", ":", ";", "@")
 
-        // what 1 types while an English word is typed
         private const val APOSTROPHE = "'"
 
-        /** How soon English's 连按 takes a key pressed again as its next letter, 连按选字母 being off. */
         internal const val ENGLISH_TAP_MILLIS = 600L
 
-        /** How many items of the column show at once. */
         private const val SHOWN = 4
 
-        // nothing typed, or nothing of it left to take: the column offers punctuation
         private fun T9State.offersSyllables() = composing && syllables.isNotEmpty()
 
-        /**
-         * The column's items for [state]: its syllables while typing, else punctuation; [english]'s
-         * marks; in an address field ([address]) what addresses are made of ([AddressKeys.column]),
-         * pinyin's syllables still while typing.
-         */
         internal fun labels(
             state: T9State,
             english: Boolean = false,
@@ -204,10 +130,6 @@ class T9Keyboard(
             else -> PUNCTUATION.map { marks[it] ?: it }
         }
 
-        /**
-         * What picking item [i] of [state]'s column types: for [english], the mark through English, the
-         * word typed ended by it; an address's, committed as it is; punctuation as [marks] map it, as it is shown.
-         */
         internal fun pick(
             state: T9State,
             i: Int,
@@ -216,7 +138,7 @@ class T9Keyboard(
             marks: Map<String, String> = emptyMap(),
         ): KeyAction =
             if (!english && state.offersSyllables()) {
-                // with the list's id: shown before a key typed since replaced it, the pick is dropped
+                // the list's id: a pick shown before a key replaced the list is dropped
                 KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
             } else if (address != AddressKeys.NONE) {
                 KeyAction.CommitAction(AddressKeys.column(address)[i])
@@ -227,11 +149,8 @@ class T9Keyboard(
             }
 
         /**
-         * What [action] from [source] types for 九键双拼: a digit key's press its group's code
-         * ([NineKeyLetters.NINE_SP]), every press a key of its own; 1 while [composing] the
-         * separator, or with [semicolon] (微软's) the code of `;`, which the engine reads as ing
-         * after an initial and as the separator elsewhere; else punctuation as [resolve] has it; a
-         * long press's letter or digit committed as it is; anything else as it is.
+         * 1 while [composing] is the separator, or with [semicolon] (微软's) `;`, which the engine reads as
+         * ing after an initial and as the separator elsewhere.
          */
         internal fun resolveShuangpin(
             action: KeyAction,
@@ -256,11 +175,8 @@ class T9Keyboard(
         }
 
         /**
-         * What pinyin's nine keys send for [action] as [resolve] gave it: a digit key with [letters]
-         * its code ([Keyboard.pinyinNineKey]), which pinyin reads on the nine keys alone; while
-         * [typing] every digit its code, 1 the separator, 0 and a key with no letters ending the input
-         * as 九键拼音's did (the first candidate, then the digit). Sent as the digit itself, pinyin would
-         * read it as a hardware keyboard's: the candidate it numbers picked. Any other as it is.
+         * While [typing] every digit is its code, 1 the separator; 0 and a key with no letters end the input
+         * (first candidate, then the digit). A digit sent as itself would pick its numbered candidate.
          */
         internal fun coded(action: KeyAction, typing: Boolean, letters: NineKeyLetters): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull() ?: return action
@@ -268,38 +184,16 @@ class T9Keyboard(
             return if (code) KeyAction.SymAction(KeySym(UNICODE + Keyboard.pinyinNineKey(key)), KeyStates.Virtual, (action as KeyAction.HostKeyAction).touch) else action
         }
 
-        /** The code of 九键双拼's digit key [digit]: its group's, sent as a Unicode character, with where it was tapped. */
         internal fun codeOf(digit: Char, touch: Touch? = null) =
             KeyAction.SymAction(KeySym(UNICODE + NineKeyLetters.NINE_SP.codes[digit - '2'].code), KeyStates.Virtual, touch)
 
-        /** A digit as a keypad's, as the number keyboard's: typed, or its candidate picked while typing (EngineEvent.KEYPAD). */
-        private fun keypad(digit: Char) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (digit - '0')), KeyStates.Virtual)
-
-        /** The letters on digit key [d] (2 to 9), as [layout] puts them. */
         internal fun lettersOn(d: Char, letters: NineKeyLetters, english: Boolean, shuangpin: Boolean) = when {
             shuangpin -> NineKeyLetters.NINE_SP.letters(NineKeyLetters.NINE_SP.codes[d - '2']).uppercase()
             english -> letters.letters(d).lowercase()
             else -> letters.letters(d).uppercase()
         }
 
-        private fun digitKey(digit: Char, letters: String) = KeyDef(
-            KeyDef.Appearance.AltText(displayText = letters, altText = digit.toString(), textSize = 20f, percentWidth = DIGIT),
-            setOf(
-                KeyDef.Behavior.Press(KeyAction.HostKeyAction(digit.toString())),
-                KeyDef.Behavior.Swipe(keypad(digit)),
-            ),
-            arrayOf(KeyDef.Popup.AltPreview(letters, digit.toString())),
-            name = digit.toString(),
-            shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, digit.toString()),
-        )
-
-        /**
-         * What [action] from [source] types: a digit key's press [MultiTap] reads at [time]
-         * through [letters]; a letter or digit of its long press committed as it is; 1, while nothing is [composing],
-         * punctuation ([ONE] as [marks] map it); anything else resets [tap] and types as it is: a symbol of 1 to 9's
-         * long press goes to the engine as the full keyboard's do (the first candidate, then the
-         * mark Chinese punctuation maps it to, quotes in turn, brackets paired; 用户 2026-11-11: 1's too).
-         */
+        /** A long press's symbols go to the engine as the full keyboard's do (first candidate, then the mapped punctuation). */
         internal fun resolve(
             action: KeyAction,
             source: KeyActionListener.Source,
@@ -310,7 +204,6 @@ class T9Keyboard(
             marks: Map<String, String> = emptyMap(),
         ): KeyAction {
             val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
-            // as a digit key's letters: pressed again soon, the next in place of the last
             if (key == '1' && source != KeyActionListener.Source.Popup && !composing) return one(tap, time, marks)
             asIs(key, source)?.let {
                 tap.reset()
@@ -324,14 +217,12 @@ class T9Keyboard(
             return letter(letter, again = true)
         }
 
-        // a long press's letter or digit, committed as it is; null for any other key
         private fun asIs(key: Char?, source: KeyActionListener.Source): Char? =
             key?.takeIf { source == KeyActionListener.Source.Popup && (it in '0'..'9' || it.isAsciiLetter()) }
 
         private fun Char.isAsciiLetter() = this in 'a'..'z' || this in 'A'..'Z'
 
-        // a letter or the digit a long press offers, committed as it is: what is typed goes in
-        // first (the first candidate), as for its symbols; never read as a key, nor a candidate picked
+        // what is typed goes in first (the first candidate); never read as a key or a candidate pick
         private fun chosen(c: Char) = KeyAction.CommitAction(c.toString())
 
         private fun pinned(c: Char) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.nineLetter(c)), KeyStates.Virtual)
@@ -339,13 +230,6 @@ class T9Keyboard(
         private fun letter(c: Char, again: Boolean) =
             KeyAction.SymAction(KeySym(UNICODE + Keyboard.letterKey(c, again)), KeyStates.Virtual)
 
-        /**
-         * What [action] from [source] types for English: where it [spells] words, a digit key's
-         * press is the key ([Keyboard.nineKey], a capital if [upper]); else a letter at a time,
-         * committed, pressed again soon ([tap]) the next in place of the last, in the case
-         * [runUpper] the run started in. A letter or digit of a long press is committed as it is (as
-         * [resolve] has it); 1 while [composing] is an apostrophe in the word, else [ONE] as [resolve] has it.
-         */
         internal fun resolveEnglish(
             action: KeyAction,
             source: KeyActionListener.Source,
@@ -366,8 +250,7 @@ class T9Keyboard(
             }
             asIs(key, source)?.let {
                 tap.reset()
-                // where English spells the word, a letter goes into it, pinned, the rest still guessed:
-                // a word the data lacks spelled so, and learned; the digit as it is
+                // a letter goes into the spelled word pinned, the rest still guessed: so a word the data lacks is learned
                 return if (spells && it.isAsciiLetter()) pinned(it) else chosen(it)
             }
             if (key == null || key !in '2'..'9') {
@@ -381,15 +264,13 @@ class T9Keyboard(
             }
             if (spells) {
                 tap.reset()
-                // with where it fell, for English to read it as a digit key next to it (061-neighbour-english)
+                // with where it fell, for English to read it as a neighbouring digit key
                 return KeyAction.SymAction(KeySym(UNICODE + Keyboard.nineKey(key, upper)), KeyStates.Virtual, (action as KeyAction.HostKeyAction).touch)
             }
             val next = tap.press(key, keyLetters, time)
             return cycled(tap, next, keyLetters) { cased(it, if (next == null) upper else runUpper) }
         }
 
-        // 1's [ONE], pressed again soon the next in place of the last, each as [marks] mapped them at the run's
-        // first press ([MultiTap.marks])
         private fun one(tap: MultiTap, time: Long, marks: Map<String, String>): KeyAction.CommitAction {
             val next = tap.press('1', ONE, time)
             if (next == null) tap.marks = marks
@@ -397,8 +278,7 @@ class T9Keyboard(
             return cycled(tap, next, ONE, punctuation = true) { marked(it, run) }
         }
 
-        // the first of [run] committed for no [next], else [next] in place of what the run's last
-        // press committed ([MultiTap.typed]), not the letter before it mapped anew
+        // [next] replaces what the run's last press committed ([MultiTap.typed]), not the letter before mapped anew
         private fun cycled(tap: MultiTap, next: Char?, run: String, punctuation: Boolean = false, text: (Char) -> String): KeyAction.CommitAction {
             val action = if (next == null) {
                 KeyAction.CommitAction(text(run[0]), punctuation = punctuation)
@@ -411,7 +291,6 @@ class T9Keyboard(
 
         private fun cased(c: Char, upper: Boolean) = if (upper) c.uppercase() else c.toString()
 
-        /** Whether [action] typed for English starts a letter, which Shift pressed once is used up by. */
         internal fun startsLetter(action: KeyAction): Boolean = when (action) {
             is KeyAction.SymAction -> action.sym.sym - UNICODE in Keyboard.NINE_DIGITS || action.sym.sym - UNICODE in Keyboard.NINE_LETTERS
             is KeyAction.HostKeyAction -> action.act.singleOrNull()?.isLetter() == true
@@ -419,100 +298,16 @@ class T9Keyboard(
             else -> false
         }
 
-        /** The run [setting] times: off, every press of a digit key or 1 is a key of its own. */
         internal fun multiTapOf(setting: T9MultiTap) = MultiTap(setting.timeout)
-
-        // the column is drawn over these placeholders, so they are never touched; a theme names the
-        // column by the first ([name]), its look one for the whole column
-        private fun spacer(name: String? = null) = KeyDef(
-            KeyDef.Appearance.Text("", 16f, percentWidth = SIDE, border = KeyDef.Appearance.Border.Off, margin = false),
-            emptySet(),
-            name = name,
-        )
-
-        /**
-         * The keys, each digit key with [letters]' letters on it; [english]'s in lower case, Shift for
-         * 重输; [shuangpin]'s [NineKeyLetters.NINE_SP]'s (1 marked `;` beside its digit with [semicolon]), and no 中/英.
-         */
-        internal fun layout(
-            letters: NineKeyLetters,
-            english: Boolean = false,
-            shuangpin: Boolean = false,
-            semicolon: Boolean = true,
-        ): List<List<KeyDef>> {
-            fun on(d: Char) = lettersOn(d, letters, english, shuangpin)
-            return layoutOf(::on, english, oneAlt = if (shuangpin && semicolon) ONE_SEMICOLON else "1")
-        }
-
-        /** 1's digit with 微软's `;` beside it: what 1 types while typing on its 九键双拼. */
-        internal const val ONE_SEMICOLON = "1;"
-
-        private fun layoutOf(on: (Char) -> String, english: Boolean, oneAlt: String): List<List<KeyDef>> = listOf(
-            listOf(
-                spacer(SIDE_KEY),
-                KeyDef(
-                    KeyDef.Appearance.AltText(displayText = ONE, altText = oneAlt, textSize = 16f, percentWidth = DIGIT),
-                    setOf(
-                        KeyDef.Behavior.Press(KeyAction.HostKeyAction("1")),
-                        KeyDef.Behavior.Swipe(keypad('1')),
-                    ),
-                    null,
-                    name = "1",
-                    // a character key, as the digits are: its swipe types 1 as ever
-                    shortcut = KeyShortcuts.charKey(KeyShortcutPreset.NINE, "1"),
-                ),
-                digitKey('2', on('2')),
-                digitKey('3', on('3')),
-                BackspaceKey(RIGHT),
-            ),
-            listOf(
-                spacer(),
-                digitKey('4', on('4')),
-                digitKey('5', on('5')),
-                digitKey('6', on('6')),
-                if (english) {
-                    CapsKey(RIGHT)
-                } else {
-                    KeyDef(
-                        KeyDef.Appearance.Text("重输", 16f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
-                        setOf(KeyDef.Behavior.Press(KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_Escape)))),
-                        name = "reset",
-                        shortcut = "retype",
-                    )
-                },
-            ),
-            listOf(
-                spacer(),
-                digitKey('7', on('7')),
-                digitKey('8', on('8')),
-                digitKey('9', on('9')),
-                KeyDef(
-                    KeyDef.Appearance.Text("0", 20f, percentWidth = RIGHT, variant = KeyDef.Appearance.Variant.Alternative),
-                    setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("0"))),
-                    name = "0",
-                    shortcut = "zero",
-                ),
-            ),
-            listOf(
-                LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, SIDE, longPress = KeyAction.QuickPhraseAction),
-                LayoutSwitchKey("123", NumberKeyboard.Name, 0.14f),
-                SpaceKey(),
-                LanguageKey(),
-                ReturnKey(RIGHT),
-            ),
-        )
     }
 
     override fun onPunctuationUpdate(mapping: Map<String, String>) {
         val changed = mapping != keysPunctuation
         super.onPunctuationUpdate(mapping)
-        // the column's punctuation shows what it types, as the keys do: its labels only, not show(), which would
-        // take the engine's last word for whether 1 is typing (a digit sent, not answered yet, made it so) and
-        // cancel a press on the column
+        // labels only: show() would take the engine's last word for whether 1 is typing and cancel a press on the column
         if (changed) showLabels()
     }
 
-    /** The field's address: what the column offers in place of punctuation ([AddressKeys.column]). */
     override var address: AddressKeys = AddressKeys.NONE
         set(value) {
             if (field == value) return
@@ -520,9 +315,6 @@ class T9Keyboard(
             show(columnState)
         }
 
-    // each letter where the scene draws its digit's key (nine.xml's key N)
-    // the digit keys with letters as the engine reads them (061-neighbour-correction, 061-neighbour-english): pinyin's
-    // and English's digits, 双拼's their NINE_SP codes (061-neighbour-groups); not 1 (双拼's `;` among them) and 0
     override fun typingKeys(): List<Pair<Char, KeyRef>> =
         if (shuangpin) {
             ('2'..'9').map { NineKeyLetters.NINE_SP.codes[it - '2'] to KeyRef(it.toString()) }
@@ -534,33 +326,25 @@ class T9Keyboard(
         scenePlace(d.toString()).let { at -> letters.letters(d).map { it.lowercaseChar() to at } }
     }
 
-    // glide typing (滑行输入) over the digit keys, read as full pinyin's letters, and a stroke drawn
-    // over them (笔画筛选) in pinyin's and 双拼's; English's never glides, its keys being no full
-    // keyboard's, nor 双拼's, which reads no letters glided
+    // English's never glides (no full keyboard's keys), nor 双拼's (it reads no glided letters)
     override val glide: GlideInput? = if (english) {
         null
     } else {
-        // the keys where the scene draws them (their centres, GlideGesture's)
         glideInput(
             letters = { sceneLetters }, down = GlideGesture.NINE_KEYS_DOWN, enabled = { !shuangpin },
-            // written on: the 3×3 of the letters with 1 (punctuation), not the side columns' Shift (061-handwriting-toolbar §3.2);
-            // a stroke drawn starts on the same 3×3 (a 横 along the top row starts on 1)
+            // the 3×3 with 1, not the side columns' Shift; a stroke starts there too (a 横 along the top row starts on 1)
             writesAlso = { it.id == "1" },
         ) { path, layout ->
-            // a glide ends a run of presses: a key pressed soon after it is a press of its own, not 连按's next letter
+            // a key pressed soon after a glide is a press of its own, not 连按's next letter
             multiTap.reset()
             onAction(KeyAction.GlideAction(Glide(path, layout)))
         }
     }
 
-    private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
-
-    // 拼音键字母大小写 (made anew when it changes): pinyin's letters in capitals but where it says otherwise
     private val letterCase by AppPrefs.getInstance().keyboard.letterCase
 
     private val multiTapPref = AppPrefs.getInstance().keyboard.t9MultiTap
 
-    // English's 连按 is on always where it types a letter at a time: at 连按选字母's pace, or its own
     private fun tapOf(setting: T9MultiTap) =
         if (english) MultiTap(setting.timeout.takeIf { it > 0 } ?: ENGLISH_TAP_MILLIS) else multiTapOf(setting)
 
@@ -573,18 +357,11 @@ class T9Keyboard(
 
     private val englishTyping = AppPrefs.getInstance().keyboard.t9EnglishTyping
 
-    /** Set per field ([KeyboardWindow]): it asks for no suggestions, where English spells no word. */
     var noSuggestions = false
 
     private val shift = NineKeyShift()
 
-    // the case of the letter 连按 is cycling through, as Shift was when its run started
     private var runUpper = false
-
-    @Keep
-    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
-        canvas?.invalidateScene()
-    }
 
     private val items = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
@@ -598,7 +375,7 @@ class T9Keyboard(
     }.apply {
         isVerticalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
-        // its face is the scene's slot's (nine.xml's `side`): the column draws only its items, which take the press
+        // its face is the scene's slot (nine.xml's `side`): the column draws only its items
         val keys = ThemeManager.shownLook(theme).keys
         val landscape = KeyboardArea.landscape(context)
         val h = dp(if (landscape) keys.gap.hLand else keys.gap.h)
@@ -609,13 +386,10 @@ class T9Keyboard(
 
     private var itemHeight = 0
 
-    /** What the column shows, read by its items when picked. */
     private var columnState = T9State()
 
-    // something typed, as the engine last told, or a key sent since that types
     private var typing = false
 
-    // a digit with letters (one with none the app types as it is), or a letter 连按 sends
     private fun isTypingKey(action: KeyAction) = when (action) {
         is KeyAction.HostKeyAction -> action.act.singleOrNull()?.let { it in '2'..'9' && letters.letters(it).isNotEmpty() } == true
         is KeyAction.SymAction -> (action.sym.sym - UNICODE).let { c ->
@@ -624,21 +398,17 @@ class T9Keyboard(
         else -> false
     }
 
-    /** The column shows its syllables: 九键's, or 双拼's here; the code row's are not shown beside it. */
     override val ownsSyllables: Boolean get() = !english
 
     init {
-        // placed in onLayout, not shown before
         column.isInvisible = true
         add(column, lParams(0, 0))
-        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
         multiTapPref.registerOnChangeListener(multiTapListener)
         show(T9State())
     }
 
     private var scope: CoroutineScope? = null
 
-    // the input method whose syllables the column offers
     private val ownIm = if (shuangpin) InputMethodCatalog.SHUANGPIN else InputMethodCatalog.PINYIN
 
     override fun onAttachedToWindow() {
@@ -648,8 +418,8 @@ class T9Keyboard(
                 s.launch { EngineState.englishTyping.collectLatest { show(T9State(composing = it)) } }
             } else {
                 s.launch {
-                    // another input method answering: nothing typed on the nine keys (not "no news", as a
-                    // filter had it: a switch's last answer, another's, would leave the column's syllables shown)
+                    // another input method answering: nothing typed on the nine keys (a filter would leave a switch's
+                    // syllables shown)
                     EngineState.syllables
                         .map { if (it.im == ownIm) T9State(it.composing, it.syllables, it.id) else T9State() }
                         .collectLatest(::show)
@@ -666,36 +436,31 @@ class T9Keyboard(
 
     private val columnHit = Rect()
 
-    // the keyboard takes every touch for a key (BaseKeyboard.onInterceptTouchEvent): the column's are the column's
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         column.getHitRect(columnHit)
         if (columnHit.contains(ev.x.toInt(), ev.y.toInt())) return false
         return super.onInterceptTouchEvent(ev)
     }
 
-    /** The column for [state]: its syllables while typing, else punctuation; its items kept, made only when more are needed. */
     internal fun show(state: T9State) {
-        // a press on the list replaced is cancelled, as removing its items did: its pick would take what now sits there
+        // a press on the replaced list is cancelled: its pick would take what now sits there
         MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).also {
             items.dispatchTouchEvent(it)
             it.recycle()
         }
-        // and so is a click released but not run yet (View posts it on ACTION_UP), as a removed item's was
+        // and so is a click released but not run yet (View posts it on ACTION_UP)
         items.cancelPendingInputEvents()
-        // what was typed gone (a candidate picked on the bar, which is not this keyboard's): the
-        // next press is a key of its own. Only then: 1's punctuation resets the engine, which tells
-        // of nothing typed again, and its next press must still be the next symbol
+        // what was typed gone (a candidate picked on the bar): the next press is a key of its own. Only then:
+        // 1's punctuation resets the engine, and its next press must still be the next symbol
         val was = columnState.composing
         if (!state.composing && was) multiTap.reset()
         columnState = state
         typing = state.composing
         showLabels()
         column.scrollTo(0, 0)
-        // the keys drawn anew only when typing starts or ends
         if (state.composing != was) canvas?.invalidateScene()
     }
 
-    // the column's items as [columnState] and the punctuation have them now: their text only, a press on them kept
     private fun showLabels() {
         val labels = labels(columnState, english, address, keysPunctuation)
         while (items.childCount < labels.size) items.addView(item(items.childCount))
@@ -706,8 +471,7 @@ class T9Keyboard(
         }
     }
 
-    // one line, in dp as the keys' text is: a syllable longer than the column (shuang, zhuang on a
-    // narrow one) is drawn smaller to fit, not wrapped onto a second line the cell cuts off (A7)
+    // one line: a syllable longer than the column (zhuang) shrinks to fit, not wrapped onto a cut-off line
     private fun item(i: Int) = AutoScaleTextView(context).apply {
         setTextSize(TypedValue.COMPLEX_UNIT_DIP, ITEM_TEXT_DP)
         scaleMode = AutoScaleTextView.Mode.Proportional
@@ -725,7 +489,6 @@ class T9Keyboard(
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
-        // a digit key's press as its preview counted it, when it went down
         val key = (action as? KeyAction.HostKeyAction)?.act?.singleOrNull()
         val time = pressed?.takeIf { it.digit == key }?.time ?: SystemClock.uptimeMillis()
         pressed = null
@@ -736,15 +499,13 @@ class T9Keyboard(
         } else {
             resolve(action, source, multiTap, time, typing, letters, marks)
         }
-        // a key the engine reads as typing: 1 right after it is the separator, though the engine
-        // has not told of what is typed yet
+        // 1 right after it is the separator, though the engine has not told of the typing yet
         if (isTypingKey(out)) typing = true
         super.onAction(if (shuangpin) out else coded(out, typing, letters), source)
     }
 
     private fun onEnglish(action: KeyAction, source: KeyActionListener.Source, time: Long) {
         if (action is KeyAction.CapsAction) {
-            // a run of 连按 ends with it: the key pressed next is a letter of its own, in Shift's case
             multiTap.reset()
             shift.pressed(action.lock)
             canvas?.invalidateScene()
@@ -762,16 +523,14 @@ class T9Keyboard(
         if (startsLetter(out)) {
             runUpper = shift.typed()
             canvas?.invalidateScene()
-            // a key English spells with: 1 right after it is an apostrophe, though the engine has not told of the word yet
+            // 1 right after it is an apostrophe, though the engine has not told of the word yet
             if (out !is KeyAction.CommitAction) typing = true
         }
         super.onAction(out, source)
     }
 
-    /** Caps lock on: no sentence start changes Shift. */
     override val capsLocked: Boolean get() = shift.caps == AutoCaps.Caps.LOCK
 
-    /** Shift on by itself where the editor [wants] a capital next, as [AutoCaps] decides; English's alone. */
     override fun applyAutoCaps(wants: Boolean) {
         if (english && shift.auto(wants)) canvas?.invalidateScene()
     }
@@ -783,43 +542,32 @@ class T9Keyboard(
         canvas?.invalidateScene()
     }
 
-    /**
-     * The cursor moved, not by this keyboard's own commit (a tap in the text, the app): 1 pressed
-     * next is a symbol of its own, not one in place of a ， now before the cursor.
-     */
+    /** Not by this keyboard's commit: 1 next is a symbol of its own, not one replacing a ， before the cursor. */
     fun cursorMoved() = multiTap.reset()
 
-    /** A digit key gone down at [time]: its press counts from then, as its preview did. */
     private class Pressed(val digit: Char, val time: Long)
 
-    /** The [letter] the preview of the key [key] shows in place of its own [letters] (GHI), while it is held. */
     private class Previewing(val key: KeyRef, val letters: String, val letter: String)
 
     private var previewing: Previewing? = null
 
-    // a pressed letter's bubble: English's as Shift has it (what it types), pinyin's as its face (拼音键字母大小写)
     private fun previewCase(letter: Char): String = LetterCaseRule.shown(
         letter.toString(),
         if (english) runUpper else LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true),
     )
 
-    // the digit key gone down last
     private var pressed: Pressed? = null
 
-    // a digit key's preview shows the letter pressing it again now types
     override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> {
-                // the scene's key by its id there, the digit (nine.xml)
                 val digit = action.key.id.singleOrNull()?.takeIf { it in '1'..'9' }
                 val now = SystemClock.uptimeMillis()
                 pressed = digit?.let { Pressed(it, now) }
-                // 九键双拼 has no 连按: a key's preview is its letters
                 val letter = digit?.takeUnless { shuangpin }?.let { multiTap.peek(it, letters.letters(it), now) }
                 previewing = letter?.let { Previewing(action.key, action.content, previewCase(it)) }
                 previewing?.let { action.copy(content = it.letter) }
             }
-            // back from the digit a swipe shows
             is PopupAction.PreviewUpdateAction ->
                 previewing?.takeIf { it.key == action.key && it.letters == action.content }?.let { action.copy(content = it.letter) }
             else -> null
@@ -831,26 +579,12 @@ class T9Keyboard(
         addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(theme.keyPressHighlightColor))
     }
 
-    // Return as last shown: its icon on the scene's key too
-    private var returnAppearance = ReturnKeyAppearance.Enter
-
-    override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
-        returnAppearance = appearance
-        canvas?.invalidateScene()
-    }
-
-    // the input method shown, for whether a stroke is drawn (笔画筛选)
-    private var imeName = ""
-
     override val keysIm: String get() = imeName
 
-    // none on English's, which has no glide
     override val strokesDrawn get() = glide != null
 
-    // a getter, not a lazy: the scene may ask before this keyboard's fields past it are made. Made once after
-    // (null till then), as the resolver's cache is asked on every swipe and compares it: the null branch is
-    // taken only while BaseKeyboard's init runs, before this class's fields are assigned (a lazy's delegate
-    // field would be null there too)
+    // not a lazy: the scene may ask during BaseKeyboard's init, before this class's fields are assigned (a
+    // lazy's delegate would be null too). The null branch is taken only then
     override val keysNineLetters: Map<Char, String> get() = nineLettersMade ?: nineLetters()
 
     private val nineLettersMade: Map<Char, String>? = nineLetters()
@@ -858,32 +592,23 @@ class T9Keyboard(
     private fun nineLetters() = ('2'..'9').associateWith { lettersOn(it, letters, english, shuangpin).lowercase() }
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        imeName = ime.uniqueName
+        super.onInputMethodUpdate(ime)
         showInputMethodName(ime)
-        canvas?.invalidateScene()
     }
 
-    // what the keys show now (nine.xml's when= and bindings): English's or not, 1 as what the engine
-    // says is typed, each digit's letters (the user's, 双拼's, Shift's
-    // case), Shift, the language key, the space's input method, Return
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
-        // 微软's 九键双拼: scheme-types=semicolon, 1's `;` (nine.xml)
         val state = TextBoardState(semicolonScheme = shuangpin && semicolon, langKey = showLangSwitchKey.getValue(), holdVoice = holdsToTalk)
         val base = state.input()
         val input = base.copy(ime = if (english) "english" else base.ime, composing = columnState.composing)
         val texts = Texts(
-            // the corners as said (Texts.alts by key name)
             alts = keyReadings(layout),
             imeName = shownImeName.orEmpty(),
-            returnLabel = returnAppearance.label(context).toString(),
-            returnIcon = SceneIcons.returnName(returnAppearance.icon),
             letterCase = LetterCaseRule.forIme(letterCase.case, english),
             nineLetters = ('2'..'9').associate { d -> d.toString() to lettersOn(d, letters, english, shuangpin).let { if (english && shift.upper) it.uppercase() else it } },
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
-            // 1's face ({punct:,.?!}) as it types
             punctuation = keysPunctuation,
-        )
+        ).withReturn()
         val caps = when {
             !english -> Shift.None
             else -> when (shift.caps) {
@@ -897,8 +622,7 @@ class T9Keyboard(
 
     private val columnSlot = Rect()
 
-    // the column where the scene has its slot `side` (nine.xml), over the canvas, in the same pass as the canvas:
-    // never a frame elsewhere; no scene (060-render-p2 U8), the column not shown either
+    // the column where the scene has its slot `side`, in the same pass as the canvas: never a frame elsewhere
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val c = canvas ?: return
@@ -911,9 +635,8 @@ class T9Keyboard(
         column.isInvisible = !placed
         if (!placed) return
         columnSlot.offset(c.left, c.top)
-        // its layout params kept to the slot too, set only when the slot moved (one layout more, then the same): the
-        // constraint pass sizing it otherwise (0×0) and this pass back would change its size each time, its
-        // onSizeChanged posting a layout again, never done
+        // set only when the slot moved: else the constraint pass (0×0) and this pass would fight, each
+        // onSizeChanged posting another layout, never done
         val lp = column.layoutParams as ConstraintLayout.LayoutParams
         val moved = lp.leftMargin != columnSlot.left || lp.topMargin != columnSlot.top
         if (moved || lp.width != columnSlot.width() || lp.height != columnSlot.height()) {
@@ -929,16 +652,11 @@ class T9Keyboard(
         column.layout(columnSlot.left, columnSlot.top, columnSlot.right, columnSlot.bottom)
     }
 
-    // in onLayout, which reads the scene (made there if it must be): placed already, nothing to ask
     private var placing = false
 
-    // the scene made anew as it is drawn (a field's or an input method's scene, its spacing or padding
-    // another): the column placed by its slot again, or hidden with the keys, not left where the last
-    // layout put it
     override fun onSceneBuilt(scene: Scene?) {
         if (placing) return
-        // asked only when the slot moved, appeared or went: a scene made again for Shift or Return alone lays
-        // nothing out
+        // a scene remade for Shift or Return alone lays nothing out
         val slot = scene?.slots?.firstOrNull { it.id == SIDE_KEY }
         val c = canvas ?: return
         if (slot == null) {
@@ -952,8 +670,7 @@ class T9Keyboard(
 
     private val builtSlot = Rect()
 
-    // last: the scene reads the state above (the keys drawn by the scene engine, each wired as nine.xml's
-    // node says; the column a native view in its slot)
+    // last: the scene reads the state above
     init {
         drawKeysWithScene(custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, LAYOUT))
         column.bringToFront()

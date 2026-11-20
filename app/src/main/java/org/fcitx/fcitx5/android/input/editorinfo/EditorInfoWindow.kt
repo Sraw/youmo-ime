@@ -50,7 +50,7 @@ class EditorInfoWindow : InputWindow.ExtendedInputWindow<EditorInfoWindow>() {
             setOnClickListener {
                 val clipData = ClipData.newPlainText("", buildMarkdownString())
                 context.clipboardManager.setPrimaryClip(clipData)
-                // what was done, as every copy says it (§3 rule 3): not a bare 完成
+                // not a bare 完成
                 service.say(R.string.text_copied)
             }
         }

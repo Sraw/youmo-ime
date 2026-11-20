@@ -10,10 +10,7 @@ import org.junit.Test
 
 class FakeEditorTest {
 
-    /**
-     * As `InputConnectionEditor` with no connection, every call is dropped: a test of the text
-     * alone cannot pass on an edit a real editor would not make.
-     */
+    /** As `InputConnectionEditor` with no connection, every call is dropped, so no test passes on an edit a real editor would not make. */
     @Test
     fun withNoConnectionNothingIsEditedOrRead() {
         val e = FakeEditor("abcd", cursor = 2)

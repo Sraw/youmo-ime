@@ -11,11 +11,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The group cards' samples (dev/design/061-settings-cards.md §3.1). That each picked one is its group's
- * by the shipped table, and drawn, is RareSamplesGlyphTest's (the APK's table and a phone's fonts); here
- * what holds without them.
- */
+/** What holds without the APK's table and fonts (those are RareSamplesGlyphTest's). */
 class RareSamplesTest {
 
     private val all: (String) -> Boolean = { true }
@@ -31,8 +27,7 @@ class RareSamplesTest {
         assertEquals(every.size, every.toSet().size)
     }
 
-    // the groups the table cannot be asked about here are the ranges' own: 扩展区 planes 2 and 3, the
-    // rest the basic block or 扩展 A (三级字, 繁体字 and 其它表外字 told apart only by the table)
+    // the groups the table can't be asked here are the ranges': 扩展区 planes 2 and 3, the rest the basic block or 扩展 A
     @Test
     fun thePickedAreInTheirGroupsRanges() {
         val ext = RareSamples.PICKED.getValue(Level.EXT).map { it.codePointAt(0) }

@@ -14,15 +14,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-/**
- * What the handwriting recognizers are shown, computed from the pen's strokes as the training code
- * computed it (`portable.py` in the recognizers' training sources, held to the training pipeline
- * there): the single character as a raster thinned to its skeleton with 8 gradient-direction maps
- * ([charImage]) and as a path ([charPath]).
- *
- * A stroke is a [FloatArray] of x, y pairs in screen pixels, y downward. Every function takes the
- * strokes in writing order and needs at least one point (else IllegalArgumentException).
- */
+/** The recognizers' inputs computed exactly as the training code (`portable.py`) does: a skeletonised raster with 8 gradient maps, and a path. Strokes are x, y pixel pairs, at least one point. */
 object InkFeatures {
 
     const val RASTER = 128
@@ -34,7 +26,6 @@ object InkFeatures {
     private const val RADIUS = 2.5
     private const val SEQ_STEP = 0.04
 
-    /** The single character's image input: (1 + [DIRS]) planes of [SIZE] x [SIZE], plane-major. */
     fun charImage(strokes: List<FloatArray>): FloatArray = planes(rasterize(strokes))
 
     private fun check(strokes: List<FloatArray>) {
@@ -42,10 +33,6 @@ object InkFeatures {
         require(strokes.any { it.isNotEmpty() }) { "no ink" }
     }
 
-    /**
-     * The pen's strokes drawn into a [RASTER] square, aspect kept: every pixel within [RADIUS] of a
-     * segment, or of a lone point. Row-major.
-     */
     fun rasterize(strokes: List<FloatArray>, size: Int = RASTER): BooleanArray {
         check(strokes)
         var loX = Double.MAX_VALUE
@@ -90,8 +77,8 @@ object InkFeatures {
         }
     }
 
-    // scikit-image's Zhang–Suen table (BSD-3): a pixel's 8 neighbours, bit 0 the upper left, then
-    // clockwise, to 1 (removed in the first pass), 2 (in the second), 3 (in either), 0 (kept)
+    // scikit-image's Zhang-Suen table (BSD-3): 8 neighbours from upper left clockwise, to 1/2 (removed in that pass),
+    // 3 (either), 0 (kept)
     private val THIN = intArrayOf(
         0, 0, 0, 1, 0, 0, 1, 3, 0, 0, 3, 1, 1, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 3, 0, 3, 3,
         0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 3, 0, 2, 2,
@@ -103,7 +90,7 @@ object InkFeatures {
         2, 3, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 2, 0, 0, 0,
     )
 
-    /** A row-major boolean image thinned to one-pixel lines (scikit-image's `skeletonize`). */
+    /** Thins to one-pixel lines (scikit-image's `skeletonize`). */
     fun thin(img: BooleanArray, w: Int, h: Int): BooleanArray {
         val pw = w + 2
         val a = ByteArray(pw * (h + 2))
@@ -117,7 +104,6 @@ object InkFeatures {
         return BooleanArray(w * h) { a[(it / w + 1) * pw + it % w + 1].toInt() != 0 }
     }
 
-    /** One of the two passes over [a] (bordered by a blank pixel): whether it removed any. */
     private fun thinPass(a: ByteArray, kill: BooleanArray, w: Int, h: Int, pass: Int): Boolean {
         val pw = w + 2
         var any = false
@@ -133,12 +119,7 @@ object InkFeatures {
         return any
     }
 
-    /**
-     * Ink and [DIRS] gradient-direction maps of a [RASTER] square thinned to its skeleton, each
-     * halved to [SIZE]: the skeleton widened (3 x 3) and blurred (OpenCV's 5 x 5 Gaussian, sigma 1),
-     * its Sobel gradient's magnitude shared between the two nearest of [DIRS] directions; the ink
-     * plane and the direction planes each scaled to a maximum of 1.
-     */
+    /** Ink and [DIRS] gradient maps of a skeleton: OpenCV's 3 x 3 dilate, 5 x 5 Gaussian (sigma 1), Sobel split between the two nearest directions, halved to [SIZE]. */
     fun planes(ink: BooleanArray, size: Int = RASTER, out: Int = SIZE): FloatArray {
         val dil = widen(thin(ink, size, size), size)
         val g = gaussian5()
@@ -151,7 +132,6 @@ object InkFeatures {
         for (i in 0 until size * size) {
             val x = gx[i]
             val y = gy[i]
-            // no gradient adds nothing: most of the square is blank
             if (x == 0f && y == 0f) continue
             val mag = sqrt(x * x + y * y)
             var angle = atan2(y, x) % turn
@@ -179,10 +159,8 @@ object InkFeatures {
         return m
     }
 
-    /** Each pixel on where any of its 3 x 3 neighbourhood is (OpenCV's `dilate`, the border blank). */
     private fun widen(sk: BooleanArray, size: Int): FloatArray {
         val out = FloatArray(size * size)
-        // each skeleton pixel lights its neighbourhood: the same, without a look around every blank one
         for (i in sk.indices) {
             if (!sk[i]) continue
             val x = i % size
@@ -192,7 +170,6 @@ object InkFeatures {
         return out
     }
 
-    /** [plane] ([size] square) averaged down to [out] square, written into [res] from [at]. */
     private fun shrink(plane: FloatArray, size: Int, out: Int, res: FloatArray, at: Int) {
         val f = size / out
         for (y in 0 until out) for (x in 0 until out) {
@@ -231,11 +208,7 @@ object InkFeatures {
         return res
     }
 
-    /**
-     * The single character's path: points every [SEQ_STEP] of its size along each stroke, each x,
-     * y in the character's box about its middle, the move from the point before, that move's
-     * direction, and 1 where the pen came down. [CHAR_PATH_DIM] values a point.
-     */
+    /** The path: points every [SEQ_STEP] along each stroke, each x, y, the move, its direction, and 1 at pen-down. */
     fun charPath(strokes: List<FloatArray>): FloatArray {
         check(strokes)
         var loX = Float.MAX_VALUE
@@ -278,7 +251,7 @@ object InkFeatures {
         }
     }
 
-    /** Points every [step] along a polyline of x, y pairs, its last point too (numpy's `interp`). */
+    /** Points every [step] along a polyline, its last too (numpy's `interp`). */
     fun resample(pts: FloatArray, step: Double): FloatArray {
         val n = pts.size / 2
         if (n < 2) return pts.copyOf()

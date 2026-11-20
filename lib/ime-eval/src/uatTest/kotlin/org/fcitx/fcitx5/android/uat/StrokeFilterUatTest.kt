@@ -98,8 +98,7 @@ class StrokeFilterUatTest {
         type(",")
         expectText("$kept,")
         expectPreedit("")
-        // a kept first of part of the pinyin (the sentence's 我 starts with 丿, not 一): a mark picks it,
-        // the rest stays typed after it, the mark is not typed
+        // a kept first of part of the pinyin: a mark picks it, the rest stays typed, the mark is not typed
         type("woxiangqushanghai")
         stroke("h")
         val part = candidates.first()
@@ -142,8 +141,7 @@ class StrokeFilterUatTest {
         expectNotAmong("系", "西")
     }
 
-    // 首页单字 (2 by default): keyi and 一, 可以 still first, the first two characters alone written from 一 right
-    // after it, the words they passed after them; 关, the order as filtered alone. The same on the nine keys and in 双拼
+    // 首页单字: 可以 still first, the first two characters written from 一 after it; the same on the nine keys and 双拼
     @Test
     @Uat("PY-135", "T9-65", "SP-37")
     fun keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst() = assertRows(

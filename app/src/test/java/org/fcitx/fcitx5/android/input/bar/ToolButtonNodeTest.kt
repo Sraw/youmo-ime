@@ -23,9 +23,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * How TalkBack is told the bar's toggles (061-handwriting-toolbar §3.8): one named for itself (单手) a checkable node,
- * checked while on; one whose name is its state's (简繁) or a tap's (我的输入习惯) none, or the two would contradict
- * each other (R26 F8269: 已选中，恢复我的输入习惯).
+ * One toggle named for itself (单手) is a checkable node, checked while on; one named for its state (简繁) or a
+ * tap (我的输入习惯) is none, or TalkBack would read 已选中，恢复我的输入习惯.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -60,7 +59,6 @@ class ToolButtonNodeTest {
         h.api.statusAreaCached = traditional
         h.emit(HostEvent.StatusArea(traditional, KeyboardHarness.PINYIN))
         h.relayout()
-        // habits off: drawn on, named for turning them back on
         assertFalse(node(R.string.learning_habits_on).isCheckable)
         assertFalse(node(R.string.status_traditional).isCheckable)
         val oneHanded = node(R.string.one_handed)

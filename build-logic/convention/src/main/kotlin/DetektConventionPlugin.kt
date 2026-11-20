@@ -7,18 +7,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import java.io.File
 
-/**
- * Applied once, to the root project. Every subproject that turns into an Android or JVM Kotlin
- * module gets detekt, wired to the shared config and its own baseline, so a new module cannot
- * be left out by forgetting a line in some list.
- *
- * Existing findings are frozen in `config/detekt/baseline-<module>.xml`, so `detekt` fails only
- * on new ones. A module with no baseline file yet is held to the full rule set; create it with
- * `./gradlew :<module>:detektBaseline`, run on its own.
- *
- * This configures subprojects from the root, which Gradle's (opt-in, currently off) Isolated
- * Projects mode forbids. If that is ever turned on, move the body into a plugin each module applies.
- */
+/** Applied to the root: every Kotlin subproject gets detekt with the shared config and its own baseline. */
 @Suppress("unused")
 class DetektConventionPlugin : Plugin<Project> {
 
@@ -40,8 +29,7 @@ class DetektConventionPlugin : Plugin<Project> {
             config.setFrom(rootProject.file("config/detekt/detekt.yml"))
             baseline.set(rootProject.file("config/detekt/baseline-${path.removePrefix(":").replace(':', '-')}.xml"))
             parallel.set(true)
-            // every source set's code, not only detekt's defaults (main and test): flavors, debug,
-            // androidTest, testFixtures, whichever a module has
+            // every source set's code, not only main and test
             source.setFrom(kotlinSourceDirs(projectDir))
         }
     }

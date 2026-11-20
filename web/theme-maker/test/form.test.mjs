@@ -1,8 +1,5 @@
-// The editing's forms (src/form.js and src/panels/, 060-render-p3 M2): each panel's operations write the style text
-// meant, find the style of exactly the same select= or add one, keep what they do not know, and the engine reads
-// the result; the cascade check names the style the engine says each value comes from.
-// contract: the forms' bounds (F.LIMITS) against the engine's E.limits(), and every value a form writes against what
-// the engine reads (no "does nothing" / "not supported" warning).
+// The editing's forms: each panel's operations write the style text meant, and the engine reads the result.
+// contract: the forms' bounds (F.LIMITS) against E.limits(), and every value a form writes against what the engine reads.
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/form.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,7 +39,6 @@ test('a form edit changes the style of exactly that select=, the last one that g
   assert.equal(out, BASE.replace('fill="#111111"', 'fill="#333333"'), 'only the value moved; the attribute it does not know kept, its spacing too');
   const color = F.setProp(BASE, 'key.letter', 'color', '#444444');
   assert.equal(color, BASE.replace('color="#222222"', 'color="#444444"'));
-  // a property no style of it gives: the last of that select=
   assert.equal(F.setProp(BASE, 'key.letter', 'radius', '8dp'), BASE.replace('color="#222222"/>', 'color="#222222" radius="8dp"/>'));
 });
 
@@ -64,7 +60,7 @@ test('values are written escaped and read back as written', () => {
   const out = F.setProp(BASE, 'key', 'fill', 'a"b<c&');
   assert.ok(out.includes('fill="a&quot;b&lt;c&amp;"'));
   assert.equal(F.valueOf(out, 'key', 'fill'), 'a"b<c&');
-  // character references read as the XML reader reads them, in one pass (&amp;#65; is the text &#65;)
+  // in one pass (&amp;#65; is the text &#65;)
   assert.equal(F.unescape('&#65;&#x4e2d;&amp;#66;&lt;&apos;&#x110000;'), 'A中&#66;<\'&#x110000;');
 });
 
@@ -88,7 +84,6 @@ test('colours: changed, added, taken out, a dark version made of the light one a
   assert.deepEqual(F.variants(x), ['light']);
   assert.equal(F.elements(x, 'colors').length, 1);
   assert.equal(F.colors(F.setColor(x, 'mine', null)).mine, undefined);
-  // a theme with no <colors>: one is made, first in the theme
   const bare = '<theme xmlns="https://youmo-ime/theme/4" name="b" version="4.0">\n  <style select="key" fill="@key"/>\n</theme>\n';
   const made = F.setColor(bare, 'key', '#abcdef');
   assert.ok(made.indexOf('<colors>') < made.indexOf('<style'));
@@ -98,7 +93,6 @@ test('colours: changed, added, taken out, a dark version made of the light one a
   assert.equal(F.parseHex('@key'), null);
 });
 
-// R25 web-7: a theme of the app's 4100 styles (a 3.0 theme of 400 keys of their own, converted) is edited without a wait
 // the time limit is far above the few ms it takes, so a loaded CI runner does not fail it; quadratic took seconds
 test('a theme of 4100 styles: a change and the 按键 tab\'s dozen-odd values of it within a second, each style on its line', () => {
   const many = Array.from({ length: 4100 }, (_, i) => '  <style select="qwerty/k' + i + '" fill="#ff' + String(i % 10).repeat(6) + '"/>').join('\n');
@@ -114,14 +108,11 @@ test('a theme of 4100 styles: a change and the 按键 tab\'s dozen-odd values of
   const ms = performance.now() - t0;
   assert.equal(F.valueOf(changed, 'qwerty/k17', 'radius'), '4dp');
   assert.ok(ms < 1000, ms + ' ms');
-  // what styles() hands out is the caller's to sort or reverse: the next call is as before
   F.styles(changed).reverse();
   assert.equal(F.styles(changed)[0].select, at[0].select);
 });
 
-// the same written on one line (a minified theme.xml), where elements() counts no line break up to each element:
-// the line numbers right where there is no break to count. Not timed: the loop before F7898 was right here too, only
-// slow, and a clock limit on a whole minified theme is the kind that fails a loaded CI runner (F7909)
+// not timed: a clock limit on a whole minified theme is the kind that fails a loaded CI runner
 test('a theme of 4100 styles on one line: all of them found, all on line 1', () => {
   const many = Array.from({ length: 4100 }, (_, i) => '<style select="qwerty/k' + i + '" fill="#ff' + String(i % 10).repeat(6) + '"/>').join('');
   const xml = BASE.replace(/\n\s*/g, ' ').replace('</theme>', many + '</theme>');
@@ -130,7 +121,6 @@ test('a theme of 4100 styles on one line: all of them found, all on line 1', () 
   assert.deepEqual([...new Set(at.map((s) => s.line))], [1]);
 });
 
-// R25 web-4: a dark-only theme's <colors> without variant= are its dark colours (AMOLED, Deep Blue, Monokai start so)
 test('a dark-only theme: its colours shown and set in its one block, its switch adds a light version, never drops the dark', () => {
   const dark = F.setColor(E.themeSource('amoled-black'), 'key', '#ff222222');
   assert.deepEqual(F.variants(dark), ['dark']);
@@ -153,8 +143,7 @@ test('a dark-only theme: its colours shown and set in its one block, its switch 
   const r = read(both);
   assert.equal(r.theme.info(true).colors.key, '#ff222222');
   assert.equal(r.theme.info(false).colors.key, '#ff222222');
-  // 从背景图取色 on it: its one block is the dark version the app reads, so worked out for dark whatever the picture
-  // or the preview (a light picture once wrote a light palette there)
+  // worked out for dark whatever the picture (a light picture once wrote a light palette there)
   const bright = Array.from({ length: 20 }, () => [235, 235, 235]);
   const ops = P.colors.ops;
   assert.notEqual(ops.fromPicture(bright, true).key, ops.fromPicture(bright, false).key, 'the row tells the two apart');
@@ -164,8 +153,6 @@ test('a dark-only theme: its colours shown and set in its one block, its switch 
   }
 });
 
-// a dark-only theme written with <colors variant="dark"> (by hand: the built-in ones have no variant=): its light
-// version starts as its colours too, not the defaults of a light block it never had
 test('a dark-only theme whose block says variant="dark" gets a light version of its colours', () => {
   const x = E.themeSource('amoled-black').replace(/<colors>/, '<colors variant="dark">');
   assert.deepEqual(F.variants(x), ['dark']);
@@ -228,7 +215,6 @@ test('the 按键 panel writes each property as the engine reads it', () => {
   }
   assert.equal(F.valueOf(k.set(doc, 'key', 'radius', null).xml, 'key', 'radius'), null, 'cleared: the attribute gone');
   assert.equal(F.valueOf(k.set(doc, 'key', 'border', null).xml, 'key', 'border'), null, '不设: the wider style shows');
-  // past what the engine reads: kept to it, and the engine reads what is written
   const past = [['radius', 64, '24dp'], ['border', { width: 8, color: '#000000' }, '3dp #000000'], ['depth', 20, '8dp'],
     ['shadow', { dx: 0, dy: 40, blur: 30, color: '#000000' }, '0dp 16dp 16dp #000000'], ['inset', [30, 2.25], '24dp 2.3dp']];
   for (const [prop, v, text] of past) {
@@ -356,11 +342,9 @@ test('the cascade check names the style the engine says each value comes from', 
   assert.equal(src('q', 'label', false).color, lineOf('key'), 'inherited from the key');
   assert.deepEqual(E.sources('qwerty', r.theme, ENV, { widget: 'key', key: 'no-such-key' }).sources, []);
   assert.equal(E.sources('qwerty', r.theme, ENV, { widget: 'bar' }).ok, false);
-  // what the panel shows: each property, its value, the style's select= and line
   const rows = P.keys.ops.sources(E, F, { xml: x }, r.theme, 'qwerty', ENV, { key: 'q' });
   const fill = rows.find((row) => row.property === 'fill');
   assert.deepEqual(fill, { property: 'fill', value: 'linear(90deg, #ff0000 0%, #0000ff 100%)', select: 'key.letter', line: lineOf('key.letter') });
-  // every property's source has that property, as the engine read it
   for (const row of rows) assert.ok(F.styles(x).find((s) => s.line === row.line).attrs.some((a) => a[0] === row.property), row.property);
 });
 
@@ -380,11 +364,9 @@ test('从背景图取色: see-through keys of the picture\'s lightness, text tha
   assert.equal(F.colors(made.xml, 'dark').accentKey, '#88c0d0', 'the light version shown: the dark one kept');
 });
 
-// ---- M3: 栏, 弹出, 面板和窗口, 尺寸, 动效, 信息, 源码 ----
 
 const PNG4 = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQCFgARwzEcQC/wxGBfpfKIQAAAABJRU5ErkJggg==', 'base64'));
 
-// a value the form would write of [p] (its kind's middle)
 function sampleOf(p) {
   switch (p.kind) {
     case 'color': return '#ff123456';
@@ -466,7 +448,6 @@ test('动效: every MOTION property, each effect kind and a clamped value, writt
   const base = ops.addEffectImage({ xml: nord, files: {}, layouts: {} }, L, 'Dot.png', PNG4);
   const file = base.file;
   const parse = { transition: ops.parseTransition, appear: ops.parseAppear, effect: ops.parseEffect };
-  // [prop, value written, value read back], each the form's own: percent and dp as numbers, the rest objects
   const rows = [
     ['transition', { ms: 120, easing: 'ease-out' }, { ms: 120, easing: 'ease-out' }],
     ['press-scale', 95, '95%'],
@@ -474,9 +455,7 @@ test('动效: every MOTION property, each effect kind and a clamped value, writt
     ['appear', { kind: 'fade', ms: 200 }, { kind: 'fade', ms: 200 }],
     ['effect', { kind: 'none' }, { kind: 'none' }],
     ['effect', { kind: 'ripple-image', file, radius: 150, ms: 300 }, { kind: 'ripple-image', file, radius: 150, ms: 300 }],
-    // past the bounds: count 12 at most, spread 64dp at most
     ['effect', { kind: 'particles', file, count: 40, spread: 99, ms: 400 }, { kind: 'particles', file, count: 12, spread: 64, ms: 400 }],
-    // a ripple's radius 10..200 %, its duration 1..600 ms (the engine's)
     ['effect', { kind: 'ripple-image', file, radius: 0, ms: 0 }, { kind: 'ripple-image', file, radius: 10, ms: 1 }],
     ['effect', { kind: 'ripple-image', file, radius: 999, ms: 300 }, { kind: 'ripple-image', file, radius: 200, ms: 300 }],
   ];
@@ -588,25 +567,19 @@ test('按键音: a sound goes in <sounds> after the icons, one per key, its old 
   d = s.removeSound(s.removeSound(d, 'letter'), 'space');
   assert.ok(!/<sounds?\b/.test(d.xml));
   assert.deepEqual(Object.keys(d.files), ['star.svg']);
-  // a key a later app knows: kept as it is, taken out alone
   const later = F.setSound(F.setSound(nord, 'future', 'f.wav').xml, 'space', 's.ogg').xml;
   assert.deepEqual(F.removeSound(later, 'space').gone, ['s.ogg']);
   assert.match(F.removeSound(later, 'space').xml, /<sounds>\s*<sound key="future" src="f.wav"\/>\s*<\/sounds>/);
-  // a hand-written <sounds/> opens into a pair that reads back
   const empty = F.setSound(nord.replace('</theme>', '  <sounds/>\n</theme>'), 'space', 's.ogg').xml;
   assert.match(empty, /<sounds>\s*<sound key="space" src="s.ogg"\/>\s*<\/sounds>/);
   assert.deepEqual(JSON.parse(JSON.stringify(read(empty).theme.info(false).sounds)), [{ key: 'space', src: 's.ogg' }]);
-  // the same format twice: the new file is sound-space-2.ogg, the old one gone (one file left)
   let same = s.setSound({ xml: nord, files: {}, layouts: {} }, E, 'space', 'a.ogg', ogg);
   same = s.setSound(same, E, 'space', 'b.ogg', ogg);
   assert.deepEqual(Object.keys(same.files).filter((f) => f.startsWith('sound-space')), ['sound-space-2.ogg']);
-  // replacing keeps a later app's attributes on the <sound>: only src= changes
   const extra = F.setSound(F.setSound(nord, 'space', 'a.ogg').xml.replace('src="a.ogg"', 'src="a.ogg" volume="50"'), 'space', 'b.ogg').xml;
   assert.match(extra, /<sound key="space" src="b.ogg" volume="50"\/>/);
-  // a key given twice (the engine refuses that): the one listed is the one changed
   const twice = nord.replace('</theme>', '  <sounds>\n    <sound key="space" src="a.ogg"/>\n    <sound key="space" src="b.ogg"/>\n  </sounds>\n</theme>');
   assert.equal(F.sounds(F.setSound(twice, 'space', 'c.ogg').xml).space, 'c.ogg');
-  // a hand-written <sound></sound>: only its open tag changes, its close stays and the file reads back
   const paired = F.setSound(nord.replace('</theme>', '  <sounds>\n    <sound key="space" src="a.ogg"></sound>\n  </sounds>\n</theme>'), 'space', 'b.ogg').xml;
   assert.match(paired, /<sound key="space" src="b.ogg"><\/sound>/);
   assert.deepEqual(JSON.parse(JSON.stringify(read(paired).theme.info(false).sounds)), [{ key: 'space', src: 'b.ogg' }]);
@@ -616,7 +589,6 @@ test('the 内缩 note names only the scene-only key rules with an inset that out
   const both = '<theme><style select="key" inset="2dp"/><style select="@compact key" inset="0dp 1dp"/>'
     + '<style select="@compact @landscape key" inset="0dp 2dp"/><style select="@landscape key" inset="1dp"/></theme>';
   const rows = [
-    // [why, xml, sel, expected]
     ['on key: every scene-only key rule with an inset wins in its scene', both, 'key', ['@compact key', '@compact @landscape key', '@landscape key']],
     ['on @landscape key: only the rule of more scenes than it outranks it', both, '@landscape key', ['@compact @landscape key']],
     ['on @compact key itself: the rule being edited is not named to itself', both, '@compact key', ['@compact @landscape key']],

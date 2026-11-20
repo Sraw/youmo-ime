@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.engine.learn.CommitRows.Shown
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** [CommitRows]: the three levels a commit learns at (PLAN §2.1), once each. */
+/** [CommitRows]: the three levels a commit learns at, once each. */
 class CommitRowsTest {
 
     // keys from one place to another of the input [keys]
@@ -20,7 +20,6 @@ class CommitRowsTest {
 
     @Test
     fun aWordRightOfASentenceCorrectedIsUsed() {
-        // laoshizhidao: 老师知道 shown first, 老师指导 picked
         val shown = Shown(0, listOf("老师", "知道"), intArrayOf(6, 12))
         val pick = Pick(0, listOf(word("老师", "lao shi"), word("指导", "zhi dao")), intArrayOf(6, 12), 'B', "老师知道", shown)
         assertEquals(
@@ -35,7 +34,6 @@ class CommitRowsTest {
 
     @Test
     fun aWordTheShownHasNoEndsAroundIsNotLearnedAlone() {
-        // dl: 带来 shown, 点 picked then 了
         val shown = Shown(0, listOf("带来"), intArrayOf(2))
         val dian = Pick(0, listOf(word("点", "dian")), intArrayOf(1), 'C', "点", shown)
         val le = Pick(1, listOf(word("了", "le")), intArrayOf(2), 'A', "了", Shown(1, listOf("了"), intArrayOf(2)))
@@ -49,7 +47,6 @@ class CommitRowsTest {
         )
     }
 
-    // F2739: the decoder's own first picked over another shown first (a habit's) is marked so; picked where it is shown first, not
     @Test
     fun theDecodersOwnFirstPickedOverAnotherIsMarked() {
         val build = { reference: String -> CommitRows.build("", listOf(Pick(0, listOf(word("你", "ni")), intArrayOf(2), 'B', reference, null, own = true)), { _, _, _ -> Code(Kinds.FULL, "ni") }) { Row.DICTIONARY } }

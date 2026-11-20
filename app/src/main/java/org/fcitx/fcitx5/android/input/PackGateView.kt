@@ -21,11 +21,8 @@ import org.fcitx.fcitx5.android.utils.InputMethodUtil
 import splitties.dimensions.dp
 
 /**
- * Over the whole keyboard while the text pack is not usable ([status]): the keyboard cannot type
- * without it, so it says so, and any touch on it opens the 资源包 page; but its button, which
- * switches to another keyboard (the system's picker): the gate covers the bar too, and without it
- * only the navigation bar's switcher was left. Made with the keyboard (FcitxInputMethodService),
- * which is made anew once the pack is imported.
+ * Any touch on it opens the 资源包 page, but its button, which switches to another keyboard: the gate covers the
+ * bar too, and without it only the navigation bar's switcher was left. The keyboard is made anew once the pack is imported.
  */
 @SuppressLint("ViewConstructor")
 class PackGateView(context: Context, theme: Theme, status: PackStatus) : LinearLayout(context) {
@@ -84,7 +81,6 @@ class PackGateView(context: Context, theme: Theme, status: PackStatus) : LinearL
     }
 
     companion object {
-        /** The system's keyboard picker; a test's, to see the button asked for it. */
         @VisibleForTesting
         internal var pickInputMethod: () -> Unit = { InputMethodUtil.showPicker() }
 

@@ -54,7 +54,6 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
 
     val bar = view(::View)
 
-    // the theme's keys in little (ThemeThumbnailKeys)
     val keys = view(::View)
 
     val checkMark = imageView {
@@ -67,7 +66,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         imageResource = R.drawable.ic_baseline_auto_awesome_24
     }
 
-    // a built-in theme of two versions (ThemeCards): which is shown, tapped the other
+    // a two-version built-in theme: shows which; a tap shows the other
     val versionChip = textView {
         gravity = Gravity.CENTER
         textSize = 12f
@@ -78,10 +77,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
-    /**
-     * What is tapped of [versionChip]: 48 dp at the least (the chip 32 dp high, its corner of the card),
-     * the chip in its top end corner as before, so the card looks the same.
-     */
+    /** 48 dp at the least around the 32 dp chip, so the card looks the same. */
     val version = FrameLayout(ctx).apply {
         minimumWidth = dp(48)
         minimumHeight = dp(48)
@@ -89,7 +85,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         visibility = View.GONE
     }
 
-    /** The thumbnail itself; [root] is it with the theme's name under it. */
+    /** [root] is it with the theme's name under it. */
     val card = constraintLayout {
         outlineProvider = ViewOutlineProvider.BOUNDS
         elevation = dp(2f)
@@ -109,20 +105,19 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         })
     }
 
-    // the theme's name (the owner, 0.6.0-beta2): one line, a long one ellipsized; read out with the card (its text)
+    // one line, ellipsized; read out with the card
     val name = themeNameView(ctx)
 
     override val root = themeCardWithName(ctx, card, name)
 
-    /** Shows [theme], named as one of [among] (the list: ThemeNames.shown). */
+    /** Named as one of [among] (ThemeNames.shown). */
     fun setTheme(theme: Theme, among: List<Theme> = emptyList()) {
         card.apply {
             foreground = rippleDrawable(theme.keyPressHighlightColor)
         }
         name.text = ThemeNames.shown(ctx, theme, among)
         val look = theme.look
-        // the picture under the keyboard if it is there (decoded small off the main thread, blurred as on
-        // the keyboard: ThemeAssets.thumbnail), its colour else; the bar's colour if it has one
+        // the picture (decoded small off the main thread, blurred: ThemeAssets.thumbnail), else its colour
         bkg.imageDrawable = null
         bkg.setTag(R.id.theme_thumbnail_look, look)
         if (look.base == BoardBase.Picture) {
@@ -152,10 +147,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         }
     }
 
-    /**
-     * A theme of one version ([dark]'s): the chip says which it lacks (无深色/无浅色), nothing to tap; picked while
-     * 跟随系统深色模式 is on, it is used in both modes (ThemeSlots).
-     */
+    /** A one-version theme: the chip says which it lacks; picked while following the system, used in both modes (ThemeSlots). */
     fun setOnly(dark: Boolean) {
         version.isVisible = true
         version.setOnClickListener(null)
@@ -173,7 +165,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
             return
         }
         versionChip.setText(if (dark) R.string.theme_version_dark else R.string.theme_version_light)
-        // the version shown and what a tap does (a screen reader's: the chip's 浅/深 alone says neither)
+        // the chip's 浅/深 alone tells a screen reader neither
         version.contentDescription = ctx.getString(if (dark) R.string.theme_version_dark_switch else R.string.theme_version_light_switch)
         version.setOnClickListener { switch() }
     }
@@ -197,7 +189,7 @@ class ThemeThumbnailUi(override val ctx: Context) : Ui {
         const val BAR_DP = 14
         const val ONLY_ALPHA = 0.7f
 
-        // the picture decoded this wide: the item's 128 dp, cropped to its height from a little wider
+        // the item's 128 dp, cropped to its height from a little wider
         const val PICTURE_DP = 160
     }
 }

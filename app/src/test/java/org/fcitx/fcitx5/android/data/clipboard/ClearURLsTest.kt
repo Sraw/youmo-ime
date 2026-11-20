@@ -54,7 +54,7 @@ class ClearURLsTest {
 
     @Test
     fun textAfterTheLinkIsNoPartOfIt() {
-        // not dropped with the tracker it follows, as when the whole clip was read as one link
+        // not dropped with the tracker it follows
         assertEquals(
             "https://example.com/page?id=42 看这个\n第二行",
             clearUrls.transform("https://example.com/page?id=42&utm_source=x 看这个\n第二行")
@@ -88,7 +88,7 @@ class ClearURLsTest {
 
     @Test
     fun aTrackerWhoseValueIsChineseFromItsStartIsRemovedWhole() {
-        // no ASCII before the Chinese, so it is the tracker's raw value and not text after the link
+        // no ASCII before the Chinese, so it is the tracker's raw value
         assertEquals(
             "https://example.com/page?id=42",
             clearUrls.transform("https://example.com/page?id=42&utm_term=输入法")
@@ -97,7 +97,7 @@ class ClearURLsTest {
 
     @Test
     fun chineseTextRunOnFromARewrittenValueKeepsTheClipAsCopied() {
-        // the rawRule's or the redirect's result would otherwise run into the text
+        // the rawRule's or redirect's result would otherwise run into the text
         val path = "https://www.amazon.com/dp/B0X/ref=sr_1中文"
         assertEquals(path, clearUrls.transform(path))
         val redirect = "https://www.google.com/url?q=https%3A%2F%2Fexample.com%2Fa&sa=D看这个"
@@ -226,7 +226,6 @@ class ClearURLsTest {
             "https://example.com/a?id=1",
             clearUrls.transform("https://www.google.com/url?q=https%3A%2F%2Fexample.com%2Fa%3Fid%3D1%26utm_source%3Dx&sa=D")
         )
-        // facebook's redirect inside google's
         assertEquals(
             "https://example.com/a?id=1",
             clearUrls.transform(
@@ -239,16 +238,15 @@ class ClearURLsTest {
     @Test
     fun onlySoManyRedirectsDeepAreUnwrapped() {
         val target = "https://example.com/a"
-        // href.li's raw tail: each layer the next, as it is
         fun wrapped(layers: Int) = "https://href.li/?".repeat(layers) + target
-        // MAX_REDIRECTS: the sixth layer is the last unwrapped, a seventh stays
+        // MAX_REDIRECTS: the sixth layer is the last unwrapped
         assertEquals(target, clearUrls.transform(wrapped(6)))
         assertEquals(wrapped(1), clearUrls.transform(wrapped(7)))
     }
 
     @Test
     fun aRedirectTargetThatDoesNotDecodeIsLeftWrapped() {
-        // its stray % would decode to U+FFFD, and the redirect still takes the user where it leads
+        // its stray % would decode to U+FFFD
         assertEquals(
             "https://www.google.com/url?q=https://example.com/50%off",
             clearUrls.transform("https://www.google.com/url?q=https://example.com/50%off&sa=D")
@@ -271,8 +269,7 @@ class ClearURLsTest {
     companion object {
         private lateinit var clearUrls: ClearURLs
 
-        // :app unit tests run without merged resources, so read the bundled rules from the source tree:
-        // from the module dir, where Gradle runs them, or the repo root, where an IDE run may start
+        // :app unit tests run without merged resources: rules read from the source tree (module dir or repo root)
         @BeforeClass
         @JvmStatic
         fun loadRules() {

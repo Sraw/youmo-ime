@@ -14,17 +14,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * A 3.0 theme exported as a pack is named as a pack's import takes it: a 3.0 name a pack may not have (a version's,
- * `.`-led, too long) made one, so the export always imports back.
- */
+/** A 3.0 name a pack may not have made one, so the export always imports back. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeExportNameTest {
 
     @Test
     fun aThreeZeroNameIsMadeAPacksName() {
-        // each made name also one a pack's import takes (the cut-to-length one its edge)
         fun row(name: String, want: String) = {
             val made = ThemeFilesManager.packName(name)
             assertEquals(name, want, made)

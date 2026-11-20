@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.learn.Code
@@ -31,7 +32,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A pinyin session ranked by the user's habits (impl/design-1b.md §2, §6): what follows the first, pins, forgetting, expiry. */
+/** A pinyin session ranked by the user's habits: what follows the first, pins, forgetting, expiry. */
 class PinyinSessionHabitTest {
 
     private val data = sessionTestData()
@@ -74,8 +75,6 @@ class PinyinSessionHabitTest {
         assertEquals("西安", refining.apply(Action.Refine).candidates.first())
     }
 
-    // review F3092/F3102 (F2739): 西安 corrected to once, then shown first by a pin; 先, the decoder's
-    // own first, picked over it is a use of it: the streak restarts, so 西安 needs two more picks
     @Test
     fun theDecodersOwnFirstPickedOverAnotherShownFirstRestartsTheStreak() {
         val recorded = ArrayList<Row>()
@@ -115,7 +114,6 @@ class PinyinSessionHabitTest {
         assertEquals("先", session.type("xian").candidates.first())
     }
 
-    // U-07: a first unused for 30 typing days is gone; days with no typing are none
     @Test
     fun aFirstUnusedForThirtyTypingDaysIsGone() {
         repeat(2) { session.pick("xian", "西安") }
@@ -131,7 +129,7 @@ class PinyinSessionHabitTest {
         assertEquals("先", session.type("xian").candidates.first())
     }
 
-    // S8: a word of level 2 (ending where the decoder's first word ends) is pinned under the keys up to there
+    // a word of level 2 (ending where the decoder's first word ends) is pinned under the keys up to there
     @Test
     fun aWordOfLevelTwoIsPinnedUnderItsOwnKeys() {
         val habits = RecordingHabits()
@@ -141,12 +139,11 @@ class PinyinSessionHabitTest {
         assertTrue("你好 in $shown", at > 0)
         s.apply(Pin(at))
         assertEquals(listOf("qp:nihao 你好 on"), habits.pins)
-        // and goes in front there
         s.apply(Reset)
         assertEquals("你好", s.type("nihao").candidates.first())
     }
 
-    // design-1b M2: the second of two picks is ranked after the word the first ends on, as it is filed
+    // the second of two picks is ranked after the word the first ends on, as it is filed
     @Test
     fun theRestAfterAPieceIsRankedAfterIt() {
         fun pieces(): Snapshot {
@@ -162,7 +159,7 @@ class PinyinSessionHabitTest {
         assertEquals("再", pieces().candidates.first())
     }
 
-    // design-1b §6 (b): 点 then 了 picked under dl is 点了 there next time, walked along the input, never made
+    // 点 then 了 picked under dl is 点了 there next time, walked along the input, never made
     @Test
     fun twoPicksAreOneTextUnderTheirKeysNextTime() {
         val dl = pinyinDataOf(Triple("带来", "dai lai", -2f), Triple("点", "dian", -3f), Triple("打", "da", -3f), Triple("了", "le", -2f), Triple("来", "lai", -3f))
@@ -181,8 +178,7 @@ class PinyinSessionHabitTest {
         assertEquals("点了", s.type("dl").candidates.first())
     }
 
-    // U-20 (D32 B), R14 F3734: 点了, no word of the dictionary, corrected to once under dl is walked in
-    // under dianl, no lower than second; under dl itself it goes by U-02
+    // walked in under dianl no lower than second; under dl it goes by the correction rule
     @Test
     fun aWordCorrectedToUnderItsInitialsIsWalkedInSpeltInPart() {
         val dl = pinyinDataOf(
@@ -201,8 +197,7 @@ class PinyinSessionHabitTest {
         assertEquals(1, s.type("dianl").candidates.indexOf("点了"))
     }
 
-    // U-20 (D32 B): 奉化 used twice spelt in full goes third under its 简拼 and its parts (fengh, feng'h:
-    // 半截 as the user asked); once is not enough, and never first nor second so
+    // once is not enough, and never first nor second so
     @Test
     fun aWordUsedTwiceSpeltInFullGoesThirdUnderItsInitialsAndParts() {
         val fh = pinyinDataOf(
@@ -229,7 +224,6 @@ class PinyinSessionHabitTest {
         }
     }
 
-    // review-1b S3: where nothing is learned (a password) the pin is still first, nothing recorded
     @Test
     fun aPinIsFirstWhereNothingIsLearned() {
         learner.habits.pin(Code(Kinds.FULL, "zai"), "再", "zai", on = true)
@@ -241,7 +235,6 @@ class PinyinSessionHabitTest {
         assertEquals(before, learner.log.state.stats.size)
     }
 
-    // M3: a word of the user's own unused for 31 typing days keeps its reading for 联想 and glide
     @Test
     fun aWordOfTheirOwnUnusedForAMonthKeepsItsReading() {
         repeat(2) {
@@ -263,12 +256,10 @@ class PinyinSessionHabitTest {
         val glide = PinyinGlide(data, user = { PinyinGlide.User(model to model.changes, null, model, null, model::blocked) })
         val path = "nizai".flatMap { GlideLayout.QWERTY.centre(it).toList() }.toFloatArray()
         assertTrue(glide.decode(path, GlideLayout.QWERTY, 10).any { it.word == "拟再" })
-        // and under 简拼, after the model's first
         assertEquals("拟再", session.type("nz").candidates[1])
     }
 
-    // review-1b M1: a name added by hand, none of the model's words, is put in under its 简拼 and in full,
-    // past the decoder's first words: right after those used there
+    // put in right after those used there
     @Test
     fun aNameAddedByHandIsOnTheFirstPage() {
         val names = names()
@@ -282,14 +273,14 @@ class PinyinSessionHabitTest {
         assertEquals("wxm: $short", listOf("王小明", "汪小明"), short.take(2))
         val full = session().type("wangxiaoming").candidates
         assertTrue("wangxiaoming: $full", full.indexOf("汪小明") in 0..1)
-        // level 2 (S2): the decoder's first word 王小明, the name put in right after it, in that level's places
+        // level 2: the decoder's first word 王小明, the name put in right after it, in that level's places
         val wide = PinyinSession(names, PinyinSegmenter(), pageSize = 20, prediction = false, user = model, learnTo = learner.learnTo(), addedWords = { setOf("汪小明") })
         val longer = wide.type("wxmxm").candidates
         assertTrue(longer.toString(), "王小明" in longer)
         assertEquals(longer.toString(), longer.indexOf("王小明") + 1, longer.indexOf("汪小明"))
     }
 
-    // review-1b N3: letters committed as typed are learned (U-27), so they are the user's to forget (U-82)
+    // letters committed as typed are learned, so they are the user's to forget
     @Test
     fun lettersLearnedCanBeForgotten() {
         val fresh = session.type("vvv").candidates
@@ -301,7 +292,7 @@ class PinyinSessionHabitTest {
         assertTrue(Offer.FORGET in session.offers(learned.indexOf("vvv")))
     }
 
-    // review-1b S2: a word added by hand deleted from the keyboard is the dictionary's again at once, the sessions kept
+    // a word added by hand deleted from the keyboard is the dictionary's again at once, the sessions kept
     @Test
     fun aWordAddedByHandDeletedIsTheirsNoMore() {
         val added = mutableSetOf("西安")
@@ -317,7 +308,7 @@ class PinyinSessionHabitTest {
         assertTrue(Offer.FORGET !in s.offers(again.indexOf("西安")))
     }
 
-    // review-1b S4: a sentence pinned, no word of the model's, is put in as its words, whatever the decoder's beam kept
+    // a sentence pinned, no word of the model's, is put in as its words, whatever the decoder's beam kept
     @Test
     fun aSentencePinnedIsFirstThoughTheDecoderMissesIt() {
         val names = names()
@@ -330,8 +321,7 @@ class PinyinSessionHabitTest {
         assertEquals("丁小明丁小明", s.type("wxmwxm").candidates.first())
     }
 
-    // more names of wxm than the decoder lists words of all the input (PinyinDecoder.DEFAULT_WORDS), each
-    // likelier than a word the model has not; 王小明 likelier still
+    // more names of wxm than the decoder lists (DEFAULT_WORDS), each likelier than an unknown word
     private fun names(): PinyinData {
         val w = listOf("wa", "wai", "wan", "wang", "wei", "wen", "weng", "wo", "wu")
         val names = (0 until 80).map { Triple(String(Character.toChars(0x4E00 + it)) + "小明", w[it % w.size] + " xiao ming", -3f) }

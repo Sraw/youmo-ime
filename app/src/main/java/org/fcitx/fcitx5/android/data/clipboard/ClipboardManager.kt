@@ -44,8 +44,7 @@ import java.io.File
 
 object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
-    // open and its fallbacks replace them, under the mutex (or in init, before anything reads them) and on whichever
-    // thread calls them, while the other calls read them without it
+    // replaced under the mutex on any thread, read without it
     @Volatile
     private lateinit var clbDb: ClipboardDatabase
     @Volatile
@@ -54,14 +53,12 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     @Volatile
     private var kept = Kept.NOTHING
 
-    // internal for keptInMemory, which chooses it
     internal enum class Kept {
-        // clbDb the file, or this run's in-memory one beside a file that holds none of the user's clips
+        // clbDb the file, or in-memory beside a file holding none of the user's clips
         NOTHING,
-        // this run's in-memory one beside a file that failed with what will not pass, or one holding clips that a
-        // start-over could not delete
+        // in-memory beside a file failing with what will not pass, or holding undeletable clips
         UNOPENABLE,
-        // this run's in-memory one beside a file of the user's that failed with what may pass: its clips back once it opens
+        // in-memory beside the user's file that failed with what may pass: its clips back once it opens
         MAY_OPEN
     }
 
@@ -84,7 +81,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     private val clearUrlsPref = AppPrefs.getInstance().clipboard.clipboardClearUrls
 
-    // parsing and compiling ~200 providers' regexes takes a while; only pay for it once needed
+    // compiling ~200 providers' regexes takes a while
     private val clearUrls by lazy {
         runCatching {
             val rules = appContext.resources.openRawResource(R.raw.clearurls_rules)
@@ -96,8 +93,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     private fun transform(text: String): String =
         if (clearUrlsPref.getValue()) cleanClipboardText(text, clearUrls?.let { it::transform }) else text
 
-    // added and removed on main, told on Default: guarded by itself, told from a copy outside the lock (a
-    // ConcurrentModificationException there, twice, would take the process down: the scope has no handler)
+    // told from a copy outside the lock: a ConcurrentModificationException there would kill the process (no handler)
     fun addOnUpdateListener(listener: OnClipboardUpdateListener) {
         synchronized(onUpdateListeners) { onUpdateListeners.add(listener) }
     }
@@ -124,17 +120,15 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         launch {
             orNeutral(Unit) {
                 removeOutdated()
-                // the panel opens on the count
                 updateItemCount()
             }
         }
     }
 
-    // written on Default, read on main
     @Volatile
     var lastEntry: ClipboardEntry? = null
 
-    // listeners first: whoever sees [lastEntry] knows what they posted to the main thread is queued already
+    // listeners first: whoever sees [lastEntry] knows what they posted to main is queued already
     @VisibleForTesting
     internal fun updateLastEntry(entry: ClipboardEntry) {
         synchronized(onUpdateListeners) { onUpdateListeners.snapshot() }.forEach { it.onUpdate(entry) }
@@ -154,19 +148,18 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         }
     }
 
-    // what a start does once a database is open: each step's failure only logged
     private suspend fun tidyUp() {
         startUp {
             // marked by a process that died with its undo offer up: nothing can undo them now
             clbDao.purgeAllMarked()
-            // the limit applied here, after the open, rather than by a launch of limitListener's that could run before it
+            // after the open, not by a limitListener launch that could run before it
             removeOutdated()
         }
-        // after a failed purge too: else the panel would open as if there were no clips
+        // after a failed purge too: else the panel would open as if empty
         startUp { updateItemCount() }
     }
 
-    // nothing handles init's launch's exceptions: one that persists would crash the app at every start
+    // nothing handles init's launch's exceptions: a persistent one would crash every start
     private suspend fun startUp(step: suspend () -> Unit) {
         runCatching { step() }.onFailure {
             if (it is CancellationException || it !is Exception) throw it
@@ -178,7 +171,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         switchTo(clipboardDatabase(context, CLIPBOARD_DATABASE), Kept.NOTHING)
     }
 
-    /** Until the process next starts, which tries the kept files again: this run's clips and the ids held of them ([lastEntry], the panel's, the editor's) cannot move into the file mid-run. */
+    /** Until the next start retries the kept files: this run's clips cannot move into the file mid-run. */
     private fun openInMemory(context: Context, kept: Kept) {
         clbDb.close()
         switchTo(Room.inMemoryDatabaseBuilder(context, ClipboardDatabase::class.java).build(), kept)
@@ -190,8 +183,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         this.kept = kept
     }
 
-    // what it could not delete, its directory not writable say: a file left there that holds clips, which no start
-    // opens, and the user's clearing tries the deletion again (keptInMemory)
+    // returns what it could not delete: a clip-holding file the user's clearing tries to delete again
     private fun startOver(context: Context, path: File): List<File> {
         clbDb.close()
         val left = deleteWithJournals(context, path)
@@ -209,13 +201,13 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         return withJournals(path).filter { it.exists() }
     }
 
-    // off the main thread, where reopenDatabase's caller is: a failing open sleeps 500 ms before it retries
+    // a failing open sleeps 500 ms before it retries
     private suspend fun openDatabase(context: Context) {
         withContext(Dispatchers.IO) {
             val path = context.getDatabasePath(CLIPBOARD_DATABASE)
-            // the import's, for the start after it: a successful import exits the app before anything opens the file
+            // a successful import exits the app before anything opens the file
             val marker = importedClipboardMarker(path.parentFile)
-            // whether it may hold the user's clips: read before the open, which makes the file it does not find
+            // read before the open, which creates a missing file
             val heldClips = path.isFile && path.length() > 0
             var startedOver = false
             var leftClips = false
@@ -233,14 +225,12 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
                     openInMemory(context, keptInMemory(it, startedOver, heldClips, leftClips))
                 }
             )
-            // for this open alone, once the file opened or was started over: kept for what may pass, the file is still
-            // the backup's, which the next start would else take for the user's and, Room rejecting it, keep at every start
+            // kept for what may pass, the file is still the backup's; else the next start takes it for the user's and keeps it forever
             if (startedOver || !inMemoryForWhatMayPass) marker.deleteRecursively()
         }
     }
 
-    // around an import, which replaces the database's files: an open connection would go on
-    // writing to the old ones, and the clips copied meanwhile be lost at the next start
+    // around an import: an open connection would keep writing to the old files, losing clips
     suspend fun closeDatabase() {
         mutex.withLock {
             clbDb.close()
@@ -249,7 +239,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         }
     }
 
-    /** After a failed import: the file the backup's if the import's marker is beside it, else the user's, kept as at a start. */
+    /** The backup's file if the marker is beside it, else the user's, kept as at a start. */
     suspend fun reopenDatabase() = mutex.withLock {
         if (!clbDb.isOpen) open(appContext)
         openDatabase(appContext)
@@ -266,10 +256,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     suspend fun unpin(id: Int) = orNeutral(Unit) { clbDao.updatePinStatus(id, false) }
 
-    /**
-     * [ids] pasted from the panel, in the order pasted: used now, first of the unpinned and the last the
-     * limit drops, as a copy would be; the last pasted first.
-     */
+    /** As a copy would be; the last pasted first. */
     suspend fun used(ids: List<Int>, now: Long = System.currentTimeMillis()) = orNeutral(Unit) {
         ids.forEachIndexed { i, id -> clbDao.updateTimeIfUnpinned(id, now + i) }
     }
@@ -286,7 +273,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         updateItemCount()
     }
 
-    // none, for the keyboard's undo hint to offer back, if they cannot be marked
+    // none, for the undo hint to offer back, if they cannot be marked
     suspend fun deleteAll(skipPinned: Boolean = true): IntArray = orNeutral(IntArray(0)) {
         val ids = if (skipPinned) {
             clbDao.findUnpinnedIds()
@@ -307,24 +294,19 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         inBatches(ids) { clbDao.purgeMarked(*it) }
     }
 
-    // an IN (:ids) of at most ID_BATCH, in one transaction: Android 10 and 11's SQLite takes 999 variables
-    // at most, and 「无上限」 makes a clearing of thousands
+    // Android 10 and 11's SQLite takes 999 variables at most, and 「无上限」 can clear thousands
     private suspend fun inBatches(ids: IntArray, statement: suspend (IntArray) -> Unit) {
         val batches = idBatches(ids)
         if (batches.size <= 1) return statement(ids)
         clbDb.withTransaction { for (batch in batches) statement(batch) }
     }
 
-    /** How many unpinned entries a history limit of [limit] would delete now: what to confirm before it is set. */
     suspend fun outdatedBy(limit: Int): Int = orNeutral(0) {
         val last = lastKept(limit, System.currentTimeMillis()) { clbDao.unpinnedTimestampAt(it) } ?: return@orNeutral 0
         clbDao.countUnpinnedEarlierThan(last)
     }
 
-    /**
-     * Clears every clip: false when some may be left, in a file no start opens that could not be deleted, in one kept
-     * for what may pass, which they come back from once it opens, or in tables the database would not clear.
-     */
+    /** False when some may be left: in an unopenable file, one kept for what may pass, or tables not cleared. */
     suspend fun nukeTable(): Boolean = withContext(coroutineContext) {
         val deleted = deleteAFileKeptUnopenable(appContext)
         val cleared = clearTables()
@@ -334,20 +316,19 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
         deleted && cleared && !mayOpen
     }
 
-    // cleared too when it threw once its DELETE was in: Room's clearAllTables VACUUMs after it, which a full disk fails
+    // cleared even if it threw after its DELETE: Room's clearAllTables then VACUUMs, which a full disk fails
     private suspend fun clearTables(): Boolean = clearedTables(
         clear = { clbDb.clearAllTables() },
         isEmpty = { clbDao.countAll() == 0 },
         onClearedThoughFailed = {
             Timber.w("Clipboard database cleared though its clearing failed: no row left")
-            // Room tells observers only after the VACUUM: the panel's Pager would else go on listing the deleted rows
+            // Room tells observers only after the VACUUM: the panel would keep listing the deleted rows
             clbDb.invalidationTracker.refreshAsync()
         }
     )
 
-    // asked to clear the clipboard, the user gives up the file no start opens too, a backup Room rejects say: else their
-    // only way out of a clipboard in memory at every start is clearing all the app's data. Deleted for the next start to
-    // make anew, not started over: the run stays on its in-memory database, which the panel and the editor may be using
+    // clearing gives up the unopenable file too, else only clearing app data ends an in-memory clipboard; deleted for the
+    // next start, as the panel may be using this run's database
     private suspend fun deleteAFileKeptUnopenable(context: Context): Boolean {
         if (kept != Kept.UNOPENABLE) return true
         return mutex.withLock {
@@ -360,7 +341,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
                 kept = Kept.NOTHING
                 Timber.w("Clipboard database that would not open deleted at the user's clearing: a new one at the next start")
             } else {
-                // still the file every start keeps: the state stays, for the next clearing to try again
+                // the next clearing tries again
                 Timber.w(
                     "Clipboard database that would not open could not be deleted at the user's clearing: %s left",
                     left.joinToString { it.name }
@@ -373,8 +354,7 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     @VisibleForTesting
     internal var lastClipTimestamp = -1L
 
-    // duplicates are of a start's clips: a test's app, started again in this process, has its clock started over, while
-    // this object keeps the last start's
+    // a test's restarted app has its clock started over, while this object keeps the last start's
     @VisibleForTesting
     internal fun resetDuplicateCheck() {
         lastClipTimestamp = -1L
@@ -416,17 +396,14 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
     }
 
     private suspend fun removeOutdated() {
-        // the last one we will keep; with fewer than limit unpinned, none is outdated
         val last = lastKept(limitPref.getValue(), System.currentTimeMillis()) { clbDao.unpinnedTimestampAt(it) } ?: return
-        // delete all unpinned before that, or delete all when limit <= 0; outright, as no undo
-        // offers them back and a purge takes only what its undo hint showed
+        // outright: no undo offers them back, and a purge takes only what its hint showed
         clbDao.deleteUnpinnedEarlierThan(last)
     }
 
 }
 
-// a statement that fails though the database opened (a full disk, say) costs its call, not the IME: the
-// callers' launches, the panel's and limitListener's, have no handler
+// a failing statement (a full disk) costs its call, not the IME: the callers' launches have no handler
 private inline fun <T> orNeutral(neutral: T, statement: () -> T): T =
     try {
         statement()
@@ -435,10 +412,7 @@ private inline fun <T> orNeutral(neutral: T, statement: () -> T): T =
         neutral
     }
 
-/**
- * Whether [clear] emptied the clipboard's tables: when it fails, whether [isEmpty] then finds no row left, as after a
- * clearing that threw once its DELETE was in, [onClearedThoughFailed] run then; false when that fails too.
- */
+/** On failure, whether [isEmpty] finds no row (a clear that threw after its DELETE). */
 internal suspend fun clearedTables(
     clear: suspend () -> Unit,
     isEmpty: suspend () -> Boolean,
@@ -454,11 +428,7 @@ internal suspend fun clearedTables(
     return true
 }
 
-/**
- * When the last unpinned entry kept for [limit] was copied, those copied before it outdated: the
- * [limit]th newest time ([unpinnedAt] gives the newest from 0), null with fewer than [limit] or
- * [CLIPBOARD_UNLIMITED] (not asked: OFFSET 2147483646 would sort the whole table), [now] with no room for one.
- */
+/** Null below [limit] or for [CLIPBOARD_UNLIMITED] (OFFSET 2147483646 would sort the whole table); [now] with no room. */
 internal suspend fun lastKept(limit: Int, now: Long, unpinnedAt: suspend (Int) -> Long?): Long? = when {
     limit == CLIPBOARD_UNLIMITED -> null
     // not OFFSET -1, which SQLite takes as 0, keeping the newest
@@ -467,15 +437,9 @@ internal suspend fun lastKept(limit: Int, now: Long, unpinnedAt: suspend (Int) -
 }
 
 /**
- * Opens the clipboard's database at [path] with [open], or puts another in its place, so that no start crashes on
- * it and none deletes the user's clips. What fails keeps every file for the next start, this run's clips going
- * [openInMemory]: a migration left out, a schema Room rejects, a lock, a full disk (a file SQLite finds corrupt as it
- * opens, the framework deletes itself). Only what cannot be the user's history is started over, [startOver], and
- * opened again: a directory at the database or a journal, which a failed import may leave, and, [imported], a file
- * from the backup that fails with what will not pass, the import having replaced the user's own. That failing too,
- * the clips go in memory as well. [openInMemory] is told whether the failure may pass: a file left for what will not,
- * or one holding clips that a start-over could not delete ([keptInMemory]), the user's clearing of the clipboard
- * ([ClipboardManager.nukeTable]) tries to delete, for the next start to make anew.
+ * No start may crash on the database or delete the user's clips: a failure keeps every file and runs [openInMemory].
+ * Only what cannot be the user's history is started over: a directory at the database or a journal, and when
+ * [imported] a backup failing with what will not pass.
  */
 internal fun openOrFallBack(
     path: File,
@@ -499,7 +463,7 @@ internal fun openOrFallBack(
     openInMemory(mayPass(again, path))
 }
 
-// what [open] throws, null once it opens: of any kind, as what Room throws of a schema it rejects is no SQLiteException
+// of any kind: what Room throws of a rejected schema is no SQLiteException
 private fun openFailure(open: () -> Unit): Exception? =
     try {
         open()
@@ -508,12 +472,9 @@ private fun openFailure(open: () -> Unit): Exception? =
         e
     }
 
-// whether [e], thrown opening the database at [path], starts it over: a directory there or at a journal, which holds
-// no clips, at any open; after an import, what will not pass, the file being the backup's
 private fun startsOver(e: Exception, path: File, imported: Boolean) =
     withJournals(path).any { it.isDirectory } || (imported && !mayPass(e, path))
 
-// whether [e], thrown opening the database at [path], may pass by a later try
 private fun mayPass(e: Exception, path: File) = when (e) {
     // with the file there: EMFILE, a permission or SELinux denial, a journal on a full disk
     is SQLiteCantOpenDatabaseException -> path.isFile
@@ -522,62 +483,47 @@ private fun mayPass(e: Exception, path: File) = when (e) {
     else -> false
 }
 
-/**
- * What this run's in-memory database leaves beside it, the open having failed with what [mayPass] or not: the user's
- * clips come back once it opens only from a file that holds them as the open found it, [heldClips], with no
- * [startedOver]. One that a start-over could not delete and that holds clips, [leftClips], no start opens, each
- * starting it over again: kept unopenable, for the user's clearing to try the deletion again.
- */
+/** Clips return only from a file that held them and was not started over; an undeletable clip holder is unopenable. */
 internal fun keptInMemory(mayPass: Boolean, startedOver: Boolean, heldClips: Boolean, leftClips: Boolean) = when {
     !mayPass -> Kept.UNOPENABLE
     startedOver -> if (leftClips) Kept.UNOPENABLE else Kept.NOTHING
     heldClips -> Kept.MAY_OPEN
-    // new or empty: none of the user's clips to come back once it opens
     else -> Kept.NOTHING
 }
 
-// internal for ClipboardDatabaseMigrationTest, which upgrades every exported schema with these migrations
+// internal for ClipboardDatabaseMigrationTest
 internal fun clipboardDatabase(context: Context, name: String): ClipboardDatabase = Room
     .databaseBuilder(context, ClipboardDatabase::class.java, name)
     // allow wipe the database instead of crashing when downgrade
     .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
     .build()
 
-// the database at [path] and its journals, any of which an import may have put in as a directory: it copies whatever the backup holds
+// an import copies whatever the backup holds, so any of these may be a directory
 private fun withJournals(path: File) = listOf("", "-journal", "-wal", "-shm").map { File(path.path + it) }
 
-// the clipboard's database, by the name UserDataManager's export and import know it by too
+// UserDataManager's export and import know it by this name too
 internal const val CLIPBOARD_DATABASE = "clbdb"
 
-// below SQLite's 999 variables of an older build (SQLITE_MAX_VARIABLE_NUMBER before 3.32)
+// below SQLite's 999 variables before 3.32 (SQLITE_MAX_VARIABLE_NUMBER)
 internal const val ID_BATCH = 900
 
-/** [ids] in order, in batches of [ID_BATCH] at most. */
 internal fun idBatches(ids: IntArray): List<IntArray> =
     (ids.indices step ID_BATCH).map { ids.copyOfRange(it, minOf(ids.size, it + ID_BATCH)) }
 
-/** The history limit that is none, 「无上限」: no entry outdated. */
 const val CLIPBOARD_UNLIMITED = Int.MAX_VALUE
 
-/**
- * Left in [databases], beside the clipboard's database, by an import once the backup's is in, for the next open to take
- * it as imported: the app exits after a successful import, and the next start is the first to open it. Made here alone,
- * for the import's directories and the clipboard's to find the one file.
- */
+/** The app exits after a successful import, so the next open takes the file as imported. */
 internal fun importedClipboardMarker(databases: File) = File(databases, "$CLIPBOARD_DATABASE.imported")
 
-/**
- * Applies [clearUrls] if its rules could be loaded. A cleaner that throws must not cost the user
- * the clipboard entry, so that falls back to the original text.
- */
+/** A throwing cleaner must not cost the entry: the original text is kept. */
 internal fun cleanClipboardText(text: String, clearUrls: ((String) -> String)?): String =
     cleanClipboardText(text, BuildConfig.DEBUG, clearUrls)
 
-// debug a parameter, BuildConfig.DEBUG's, so that one test run holds both builds' logging
+// [debug] is a parameter so one test run covers both builds' logging
 internal fun cleanClipboardText(text: String, debug: Boolean, clearUrls: ((String) -> String)?): String =
     clearUrls?.let {
         runCatching { it(text) }.onFailure { e ->
-            // its message may quote the clip: release builds log only its class, as ClearURLs logs no URL
+            // its message may quote the clip: release builds log only its class
             if (debug) {
                 Timber.w(e, "Failed to clear URLs")
             } else {

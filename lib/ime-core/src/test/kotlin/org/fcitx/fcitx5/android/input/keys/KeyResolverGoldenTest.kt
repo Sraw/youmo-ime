@@ -22,14 +22,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Every named key of every built-in keyboard as the resolver makes it with nothing the user set
- * (060-keys-unify §6.1): its long press (the row, `|`, the symbols; `=` an as-is item, `#` a keypad's, `@`
- * an action's), its first and its two marks, in a few states. Written to build/keys-golden.tsv on every run;
- * a change to src/test/resources/keys-golden.tsv is reviewed line by line and its reason given in its commit.
- * A board is here once per variant that makes a different key: English's boards are pinyin's (no English special
- * case, the variant has no language), and 双拼's nine keys are pinyin's too (NINE_SP's letters on 2 to 9 are
- * STANDARD_NINE's, its `;` on no digit, and `semicolon` reaches only the 18 keys' L), so neither has rows of its own;
- * 双拼's 18 keys with `;` do (shuangpin-18-ms).
+ * Every named key of every built-in keyboard as resolved with no user settings: long press (`=` as-is, `#` keypad,
+ * `@` action), first and marks, in a few states, written to build/keys-golden.tsv; a change to the resource is
+ * reviewed line by line. English's boards and 双拼's nine keys resolve as pinyin's, so have no rows of their own.
  */
 class KeyResolverGoldenTest {
     private class Board(val name: String, val file: String, val variant: KeyboardVariant)
@@ -48,7 +43,7 @@ class KeyResolverGoldenTest {
         Board("emoticon", "emoticon", KeyboardVariant(Form.Panel)),
         Board("emoji-search", "emoji-search", KeyboardVariant(Form.Panel)),
         Board("expanded-side", "expanded-side", KeyboardVariant(Form.Panel)),
-        // a theme's own groups and corners (the 0.6.0 theme maker example's 18 keys of its own, now keyboard-scene's test data)
+        // a theme's own groups and corners (keyboard-scene's test data)
         Board("theme-k18", "../keyboard-scene/src/commonTest/data/mint-k17/layouts/k18", KeyboardVariant(Form.Grouped18)),
     )
 

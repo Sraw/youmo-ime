@@ -24,22 +24,19 @@ class PopupMenuUi(
     onDismissSelf: PopupContainerUi.() -> Unit = {},
     private val items: Array<KeyDef.Popup.Menu.Item>,
     private val onFocusMoved: (View) -> Unit = {},
-    /** Cells in their own order, [Fixed.start] over the finger: the edit menu's ([EditMenuLayout]). */
+    /** [Fixed.start] over the finger: the edit menu's. */
     private val fixed: Fixed? = null,
-    /** The engine's: the cells drawn as its scene (060-render-p2 S2), sized by its rules. */
     private val scenes: PopupScenes,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
-    // the engine's scene of the cells: made again as the focus moves
+    // made again as the focus moves
     private val builder = scenes.builder()
     private val cells = items.map { MenuCell(it.label, if (it.icon == 0) null else SceneIcons.nameOf(it.icon)) }
     private val sceneKeys = scenes.made("menu's size", builder?.menuKeys(cells))
 
     /**
-     * A row whose cells stay where they are, the one in focus first [start]; [disabled] ones drawn
-     * faded, picking nothing. Opened by a swipe up, the finger already above the key: back down onto
-     * the key cancels it. [at]: its top-left corner in window pixels ([EditMenuLayout.place]), up
-     * where the notices go; null just over the key.
+     * Cells that stay where they are; [disabled] ones faded, picking nothing. Opened by a swipe up, the finger
+     * already above the key: back down onto the key cancels it. [at]: window pixels; null just over the key.
      */
     class Fixed(val start: Int, val disabled: Set<Int>, val at: EditMenuLayout.Spot? = null)
 
@@ -65,27 +62,22 @@ class PopupMenuUi(
 
     private val sceneView = sceneKeys?.let { made(focusedIndex) }?.let { first -> scenes.view(ctx).also { it.scene = first } }
 
-    /**
-     * The engine could not make the cells (logged): nothing to show, the long press as one with no
-     * menu, never cells not drawn that a lift would still pick (060: no other drawing to fall back to).
-     */
+    /** Logged: the long press as one with no menu, never cells not drawn that a lift would still pick. */
     val unmade: Boolean get() = sceneView == null
 
-    // unmade: never shown (PopupComponent), so nothing
+    // never shown (PopupComponent)
     override val root: View = sceneView ?: View(ctx)
 
-    // the cells in their columns' order, the one in focus selected, the disabled faded
     private fun made(focus: Int) = scenes.made("menu", builder?.menu(cells, columnOrder.toList(), focus, fixed?.disabled.orEmpty()))
 
-    // the focus to move to [focus]: the scene made again; false where it could not be, the one before
-    // kept and the focus with it, so a lift picks the cell drawn selected
+    // false where it could not be: the one before kept with the focus, so a lift picks the cell drawn selected
     private fun drawScene(focus: Int): Boolean {
         val view = sceneView ?: return true
         view.scene = made(focus) ?: return false
         return true
     }
 
-    // as a long press's keys pick ([PopupKeyboardUi]): by how far the finger moves, down off the key none
+    // as a long press's keys pick: by how far the finger moves, down off the key none
     private val focus = PopupFocus(
         rows = listOf(columnOrder.copyOf()),
         startRow = 0,
@@ -93,28 +85,19 @@ class PopupMenuUi(
         stepX = itemWidth * PopupFocus.STEP,
         stepY = keySize * PopupFocus.STEP,
         cancelBelow = triggerBounds.height().toFloat(),
-        // the key's bottom edge, in onChangeFocus's coordinates (the popup's, offsetY up); the edit
-        // menu's its top, the finger above it as the menu opens
+        // in onChangeFocus's coordinates (offsetY up); the edit menu's its top, the finger above it as it opens
         cancelAt = ((if (fixed != null) 0 else triggerBounds.height()) - offsetY).toFloat(),
     )
 
-    override fun onChangeFocus(x: Float, y: Float): Boolean {
-        val newFocus = focus.moveTo(x, y)
-        if (newFocus == PopupFocus.CANCELLED) {
-            onDismissSelf(this)
-            return true
-        }
-        if (newFocus != focusedIndex && drawScene(newFocus)) {
-            focusedIndex = newFocus
-            onFocusMoved(root)
-        }
-        return false
+    override fun onChangeFocus(x: Float, y: Float) = moveFocus(focus, x, y, focusedIndex, ::drawScene) {
+        focusedIndex = it
+        onFocusMoved(root)
     }
 
     override fun onTrigger() = items.getOrNull(focusedIndex)?.takeIf { fixed?.disabled?.contains(focusedIndex) != true }?.action
 
     companion object {
-        /** A cell's width and height, in dp: a key's. */
+        /** In dp: a key's. */
         const val CELL_DP = 48
     }
 }

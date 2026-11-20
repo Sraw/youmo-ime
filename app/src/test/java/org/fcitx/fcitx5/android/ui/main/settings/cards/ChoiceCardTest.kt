@@ -26,7 +26,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
 
-/** A keyboard's card on the 按键字符和快捷键 page (dev/design/061-settings-cards.md §2.3, §2.8, §4.1). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -70,7 +69,7 @@ class ChoiceCardTest {
         c.edited = 3
         assertTrue(c.badgeView.isVisible)
         assertEquals("3", c.badgeView.text.toString())
-        // said after the state, a stateDescription set taking the place of the checked state's own words
+        // said after the state: a stateDescription replaces the checked state's own words
         c.selected = true
         assertEquals(
             ctx.getString(R.string.shortcut_card_edited, ctx.getString(R.string.shortcut_card_selected), 3),
@@ -111,12 +110,11 @@ class ChoiceCardTest {
         assertTrue(cards[4].cell.top > cards[0].cell.bottom)
     }
 
-    // [v]'s bounds in [c]'s cell
     private fun ChoiceCard.rectOf(v: View) = android.graphics.Rect(0, 0, v.width, v.height).also { cell.offsetDescendantRectToMyCoords(v, it) }
 
     @Test
     fun `the badge hangs over the corner, touching neither the picture nor the name`() {
-        // the narrowest card (76 dp) to the widest of a phone's row of four (89 dp), with a count of two digits
+        // the narrowest card (76 dp) to the widest of a phone's row of four (89 dp), with a two-digit count
         listOf(76, 89).forEach { wide ->
             val c = ChoiceCard(ctx, "全键盘", KeyboardGlyphView(ctx, listOf(10, 9, 7))).apply { edited = 26 }
             val grid = CardGrid(ctx, 1).apply { addView(c.cell) }
@@ -124,11 +122,11 @@ class ChoiceCardTest {
             grid.layout(0, 0, grid.measuredWidth, grid.measuredHeight)
             val badge = c.rectOf(c.badgeView)
             assertTrue(c.badgeView.isVisible)
-            // over the card's top edge and past its end, the cell unclipped
+            // over the top edge and past the end, the cell unclipped
             assertTrue("$badge", badge.top < 0 && badge.bottom > 0)
             assertTrue("$badge", badge.right > c.cell.width)
             assertFalse(c.cell.clipChildren)
-            // the picture's drawn part: the middle WIDTH_PART of its width
+            // the drawn middle WIDTH_PART of its width
             val glyph = c.rectOf(c.glyphView)
             val side = ((1 - KeyboardGlyphView.WIDTH_PART) / 2 * glyph.width()).toInt()
             val drawn = android.graphics.Rect(glyph.left + side, glyph.top, glyph.right - side, glyph.bottom)
@@ -137,10 +135,9 @@ class ChoiceCardTest {
         }
     }
 
-    // names of two lines making every card two lines high: the rule is the page's, tested there
-    // (PopupOverridesLayoutTabTest.aLongNameMakesEveryCardTwoLinesHigh, R26 F8159)
+    // two-line names making every card two lines high: tested on the page (PopupOverridesLayoutTabTest)
 
-    // R26 F8320: named for what it checks; what the squares look like is the screenshot tests'
+    // what the squares look like is the screenshot tests'
     @Test
     fun `the picture is no node and draws without a crash, bars and no rows too`() {
         val glyph = KeyboardGlyphView(ctx, listOf(10, 9, 7))

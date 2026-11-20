@@ -10,7 +10,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The segmenters' tables made once for their settings and shared (S15 N2): never another's, never stale. */
+/** The segmenters' tables made once for their settings and shared: never another's, never stale. */
 class SettingsMemoTest {
 
     @Test
@@ -26,7 +26,6 @@ class SettingsMemoTest {
         assertEquals(2, memo.size)
         assertSame(a, memo["a"])
         assertEquals(listOf("a", "b", "c"), made)
-        // b went: made again, another
         memo["b"]
         assertEquals(listOf("a", "b", "c", "b"), made)
         assertEquals(2, memo.size)
@@ -55,7 +54,6 @@ class SettingsMemoTest {
         for (f in Fuzzy.entries.take(SpellingIndex.MEMO + 1)) PinyinSegmenter(setOf(f)).segment(input)
         assertEquals(first, PinyinSegmenter(setOf(Fuzzy.U_OU), typos = true, neighbours = true).segment(input).toString())
 
-        // f on 2: 2 starts feng there, not on the phone's keys
         val custom = NineKeyLetters.parse("abcf,de,ghi,jkl,mno,pqrs,tuv,wxyz")
         val digits = "2364"
         val t9 = T9Segmenter(letters = custom).segment(digits).toString()

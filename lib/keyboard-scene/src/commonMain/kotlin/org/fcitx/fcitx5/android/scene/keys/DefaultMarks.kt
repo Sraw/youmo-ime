@@ -77,7 +77,7 @@ object DefaultMarks {
     /**
      * The variant a layout's family stands for, its default input method's. The 14 and 18 keys are told apart by the
      * app's keyboard the layout is of, [basedOn] (`k18`): a theme pack's is of its own id (PackLayouts.judge), which its
-     * callers pass whatever `based-on=` it writes; a user's layout of the one it was made from (061-custom-layout §5.3),
+     * callers pass whatever `based-on=` it writes; a user's layout of the one it was made from,
      * its `based-on=`, whatever its own id.
      */
     fun variantOf(layout: Layout, basedOn: String = layout.basedOn ?: layout.id): KeyboardVariant = KeyboardVariant(
@@ -124,10 +124,10 @@ object DefaultMarks {
     }
 
     /**
-     * [layout]'s [nodes] as a user's layout's keys have them (061-custom-layout §19.2; L6 review S2, team-lead's decision):
+     * [layout]'s [nodes] as a user's layout's keys have them:
      * a key of a name of the app's is that key of the app's, its long press and corner the app's board's node of the
      * name's ([appBoard]), whatever letters= or alt= the layout writes (LayoutCheck's `held` tells of them); a name of
-     * its own, what the layout writes. [basedOn]: the board KeyData held it to, its own `based-on` (R26 F8117). [board]
+     * its own, what the layout writes. [basedOn]: the board KeyData held it to, its own `based-on`. [board]
      * reads one of the app's boards, its fragments with it, by its id.
      */
     fun ownNodes(
@@ -150,7 +150,7 @@ object DefaultMarks {
         return LOOKED_IN.firstOrNull { boards[it]?.named?.containsKey(name) == true }
     }
 
-    // [appBoard]'s boards after the based-on, made once: asked of every node of a layout on the main thread (R26 F8296)
+    // [appBoard]'s boards after the based-on, made once: asked of every node of a layout on the main thread
     private val LOOKED_IN by lazy { (KeyData.ORDER + BuiltInKeyData.BOARDS.keys.sorted()).distinct() }
 
     // a send= that is a character (`q`, `,`, `:`) rather than an action (`sym:BackSpace`, `action:zhuyin`)

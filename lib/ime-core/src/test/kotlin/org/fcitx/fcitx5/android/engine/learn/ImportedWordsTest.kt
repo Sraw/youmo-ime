@@ -16,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 
-/** The imported words in the learning record (U-101, U-102): batches written, replayed, folded, undone. */
+/** The imported words in the learning record: batches written, replayed, folded, undone. */
 class ImportedWordsTest {
     private val dir = MemoryFiles()
 
@@ -90,13 +90,11 @@ class ImportedWordsTest {
         // a word of the batch undone is not taken: it comes back only with its batch
         log.imports(listOf(Imported(1, 0, "鲸园", "jing yuan")))
         assertFalse(log.state.imports.has("鲸园", "jing yuan"))
-        // 撤销: the batch as it was, from the places its words keep
         val back = log.state.imports.restore(1)
         assertEquals(listOf(ImportBatch(1, "a.txt", 20000, 2), Imported(1, 0, "汪小明", "wang xiao ming"), Imported(1, 1, "鲸园", "jing yuan")), back)
         log.imports(back)
         assertTrue(log.state.imports.has("鲸园", "jing yuan"))
         assertEquals(1, log.state.imports.lastId)
-        // the same places: the user model's ids of them stay
         assertEquals(2, log.state.imports.places)
         assertEquals(emptyList<LearnRecord>(), log.state.imports.restore(1))
     }
@@ -115,7 +113,6 @@ class ImportedWordsTest {
         assertEquals(listOf("鲸园"), log.state.imports.restore(1).filterIsInstance<Imported>().map { it.text })
     }
 
-    // review-int-records N3: a batch a rewrite took (全部清空, 退回恢复前) is not put back by a 撤销 left on screen
     @Test
     fun aBatchARewriteTookIsNotPutBack() {
         val log = open()
@@ -126,7 +123,6 @@ class ImportedWordsTest {
         log.close()
     }
 
-    // F2811: a batch undone before 全部清空 is not put back by its 撤销 after it
     @Test
     fun aBatchUndoneBeforeAClearIsNotPutBack() {
         val log = open()
@@ -138,7 +134,7 @@ class ImportedWordsTest {
         log.close()
     }
 
-    // F3075: a rewrite that keeps the ImportUndo (an act's undo drops only the act after it) ends the 撤销 too
+    // a rewrite that keeps the ImportUndo (an act's undo drops only the act after it) ends the 撤销 too
     @Test
     fun aBatchUndoneBeforeARewriteKeepingItIsNotPutBack() {
         val log = open()
@@ -149,7 +145,7 @@ class ImportedWordsTest {
         log.close()
     }
 
-    // F3078: an import written in one append while the log is being compacted in the background loses no word
+    // an import written in one append while the log is being compacted in the background loses no word
     @Test
     fun anImportWhileCompactingKeepsEveryWord() {
         val later = ArrayList<Runnable>()
@@ -177,8 +173,6 @@ class ImportedWordsTest {
         assertTrue(live.contains("ImportedRow(batch=1, order=0, text=鲸园, reading=jing yuan)"))
     }
 
-    // review-G M1: a record read afresh (a fold, then a rewrite) numbers the places again; taken
-    // over by the words the model reads, each keeps the place it had, what is gone stays gone
     @Test
     fun aRecordReadAfreshKeepsEachWordsPlace() {
         val log = open()
@@ -191,14 +185,13 @@ class ImportedWordsTest {
         assertTrue(log.state.imports === held)
         assertEquals(places, held.places().associateBy { held.text(it) })
         assertFalse(held.has("汪小明", "wang xiao ming"))
-        // a rewrite ends every 撤销, as a start does (F2811): the batch undone before it stays out
+        // a rewrite ends every 撤销, as a start does: the batch undone before it stays out
         assertEquals(emptyList<LearnRecord>(), held.restore(1))
         assertEquals(listOf(2, 3), held.places())
         assertEquals(listOf(2), held.batches.map { it.id })
     }
 
-    // the packed table past its first size (16): hundreds of words, some in two readings, undone
-    // and put back, replayed; every word still found where it was (R11 F2702)
+    // past the packed table's first size (16), undone and put back, every word still found
     @Test
     fun manyWordsGrowTheTableAndAreFoundUndoneAndBack() {
         val syllables = listOf("ni", "hao", "ma", "shi", "de", "wo", "ta", "zhong", "guo", "ren")
@@ -215,7 +208,6 @@ class ImportedWordsTest {
             for ((t, r) in first) assertEquals(t, firstLive, imports.has(t, r))
             for ((t, r) in second) assertTrue(t, imports.has(t, r))
             for ((t, _) in first.take(50)) assertEquals(t, if (firstLive) 2 else 1, imports.placesOf(t).size)
-            // the file's order kept within each batch
             if (firstLive) assertTrue(first.zipWithNext().all { (a, b) -> imports.order(a.first) < imports.order(b.first) })
             assertEquals((if (firstLive) 600 else 0) + 100, imports.rows().count { it is LearnRecord.ImportedRow })
         }

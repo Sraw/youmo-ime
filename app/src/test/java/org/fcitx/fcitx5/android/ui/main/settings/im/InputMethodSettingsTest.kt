@@ -23,12 +23,11 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The app's own input methods, each of which has a page. */
 internal val appInputMethods = InputMethodSettings.BUILT_IN
 
 internal fun List<Item>.flat(): List<Item> = flatMap { if (it is Section) it.items.flat() else listOf(it) }
 
-/** Every row's key on [page], whatever its kind: a kind added later is not skipped. */
+/** Whatever its kind: a kind added later is not skipped. */
 internal fun keys(page: String): List<String> = InputMethodSettings.of(page)!!.flat().map {
     when (it) {
         is Toggle -> it.key
@@ -42,26 +41,22 @@ internal fun item(page: String, key: String) = InputMethodSettings.of(page)!!.fl
     (it is Choice && it.key == key) || (it is Toggle && it.key == key)
 }
 
-/** The pages as items, which need no Android: see InputMethodSettingsScreenTest for them as preferences. */
 class InputMethodSettingsTest {
 
     @Test
     fun everyInputMethodOfTheAppHasAPageAndOthersNone() {
         appInputMethods.forEach { assertNotNull(it, InputMethodSettings.of(it)) }
         assertNull(InputMethodSettings.of("keyboard-de"))
-        // 0.6.0's handwriting, retired (061-handwriting-toolbar §6): no page; its pause is the shared page's
         assertNull(InputMethodSettings.of(InputMethodCatalog.HANDWRITING_RETIRED))
-        // a route to it saved before opens 通用输入, where its 停笔时间 went (061-handwriting-toolbar §3.9)
+        // a route saved before opens 通用输入, where 停笔时间 went
         assertEquals(SettingsRoute.SharedInput, SettingsRoute.now(SettingsRoute.InputMethodConfig("手写", InputMethodCatalog.HANDWRITING_RETIRED)))
         val pinyin = SettingsRoute.InputMethodConfig("拼音", InputMethodCatalog.PINYIN)
         assertEquals(pinyin, SettingsRoute.now(pinyin))
-        // a route 0.4 saved to its 九键拼音 opens pinyin's page, not the tables' it would fall to by its engine- name
+        // a route 0.4 saved to 九键拼音 opens pinyin's page, not the tables' its engine- name would give
         assertSame(InputMethodSettings.of(InputMethodCatalog.PINYIN), InputMethodSettings.of(InputMethodCatalog.T9))
     }
 
-    // appInputMethods is BUILT_IN itself: held here to the names androidengine.cpp registers (and
-    // English), by hand, so that one BUILT_IN leaves out is not skipped by every check above; the
-    // nine keys' engine-t9 is pinyin's keyboard since I1, a session with no page of its own
+    // held by hand to the names androidengine.cpp registers, so one BUILT_IN omits is not skipped everywhere
     @Test
     fun builtInIsEveryInputMethodTheEngineRegisters() {
         val registered = setOf(
@@ -72,8 +67,7 @@ class InputMethodSettingsTest {
         assertEquals(registered.size, InputMethodSettings.BUILT_IN.size)
     }
 
-    // a ListPreference shows nothing for a value not among its own: whatever fcitx stored (out of
-    // range, an old enum name, nothing at all) shows as one of them
+    // a ListPreference shows nothing for a value not its own
     @Test
     fun anyValueStoredShowsAsOneOfTheChoices() {
         val stored = listOf("", "x", "-5", "-1", "0", "1", "4", "7", "100", "Fast", "Ziranma", "Alt")
@@ -99,13 +93,12 @@ class InputMethodSettingsTest {
 
     @Test
     fun aTableHasNoAutoPhraseSettings() {
-        // 自动造词 is gone (U-28 C46): an older config's two keys are left, read by nothing
+        // 自动造词 is gone: an older config's two keys are left, read by nothing
         for (im in InputMethodCatalog.TABLES.keys) {
             assertEquals(im, emptyList<String>(), keys(im).filter { it == "AutoPhraseLength" || it == "SaveAutoPhraseAfter" })
         }
     }
 
-    /** Every row's key on the shared page, as [keys] for an input method's. */
     private fun sharedKeys(): List<String> = InputMethodSettings.SHARED.flat().map {
         when (it) {
             is Toggle -> it.key
@@ -115,7 +108,6 @@ class InputMethodSettingsTest {
         }
     }
 
-    // what every input method shares is on its own page, and on no input method's
     @Test
     fun theSharedOptionsAreOnTheSharedPageAlone() {
         val shared = listOf(
@@ -126,16 +118,13 @@ class InputMethodSettingsTest {
         assertEquals(shared, sharedKeys())
         appInputMethods.forEach { page ->
             assertEquals(page, emptySet<String>(), keys(page).toSet() intersect shared.toSet())
-            // nor the page size, the physical keyboard's
             assertFalse(page, EngineSettings.PAGE_SIZE in keys(page))
         }
         assertEquals(listOf(EngineSettings.PAGE_SIZE), InputMethodSettings.HARDWARE_KEYBOARD.flat().map { (it as Choice).key })
     }
 
-    // the nine keys' own (a section 九键 on the page of each keyboard they are, 11-01): one pref each
     private val nineKeys = listOf(AppPrefs.T9_MULTI_TAP, InputMethodSettings.T9_LETTERS)
 
-    // each page's own, and first a way to the shared page
     @Test
     fun eachPageHasItsOwnOptionsAfterTheWayToTheSharedOnes() {
         val own = mapOf(
@@ -146,7 +135,6 @@ class InputMethodSettingsTest {
                 EngineSettings.ENGLISH_SUGGEST, AppPrefs.ENGLISH_AUTO_CAPS, InputMethodSettings.ENGLISH_WORDS,
             ),
         ) + InputMethodCatalog.TABLES.mapValues { (_, method) ->
-            // the tables' one keyboard (a layout of the user's, 061-custom-layout Q6), what the keys show, where a table has roots on them (仓颉, 五笔)
             TableSettings.KEYS.toList() + InputMethodSettings.RESET_TABLE_ORDER + AppPrefs.TABLE_KEYBOARD_LAYOUT + listOfNotNull(TableSettings.KEY_LABELS.takeIf { method.options.roots != null })
         }
         assertEquals(appInputMethods.toSet(), own.keys)
@@ -159,7 +147,6 @@ class InputMethodSettingsTest {
         }
     }
 
-    // said under each: the input methods it is no use to, as the engine has them
     @Test
     fun eachSharedOptionSaysWhichInputMethodsItIsNoUseTo() {
         val rows = InputMethodSettings.SHARED.flat()
@@ -168,23 +155,20 @@ class InputMethodSettingsTest {
             is InputMethodSettings.Titled -> row.notFor
             else -> error("$row")
         }
-        // a finger drawn on the keyboard: one list whose choices reach different input methods, said in the docs, not under it
+        // one list whose choices reach different input methods: said in the docs, not under it
         assertEquals(emptyList<String>(), notFor(AppPrefs.KEY_DRAWING))
         assertEquals(emptyList<String>(), notFor(AppPrefs.AUTO_PAIRS))
         assertEquals(emptyList<String>(), notFor(AppPrefs.CALCULATION_REPLACES_SUM))
-        // the Chinese input methods' section says English for all of it: under a row, only an exception within it
+        // the section says English for all of it: under a row, only an exception
         assertEquals(emptyList<String>(), notFor(EngineSettings.PREDICTION))
-        // what is handwritten has none: said in their words (061-handwriting-toolbar §1.3), no input method to name
         assertEquals(emptyList<String>(), notFor(EngineSettings.EMOJI))
         assertEquals(emptyList<String>(), notFor(EngineSettings.BUILT_IN_PHRASES))
         assertEquals(emptyList<String>(), notFor(EngineSettings.MODEL_LEVEL))
-        // pinyin's nine, 14 and 18 keys, 双拼's grouped keyboards and both zhuyin keyboards read a key tapped by its
-        // neighbour's edge (061-neighbour-correction, 061-neighbour-groups; 注音九键 since the user's 11-16)
         assertEquals(emptyList<String>(), notFor("${EngineSettings.FUZZY}/${EngineSettings.TYPOS}"))
-        // u and v are both on 8 (9 keys' 双拼 too): the pair alone is said to be no use to the nine keys, the others are
+        // u and v are both on 8: only that pair is no use to the nine keys
         val fuzzy = rows.filterIsInstance<Flags>().single()
         assertEquals(mapOf(Fuzzy.V_U.name to listOf(InputMethodCatalog.T9, InputMethodCatalog.SHUANGPIN_NINE)), fuzzy.notFor)
-        // each a name the app has: one it does not know would be said by its id
+        // an unknown one would be said by its id
         val named = appInputMethods.toSet() + InputMethodCatalog.T9 + InputMethodCatalog.PINYIN_KEYS18 + InputMethodCatalog.PINYIN_KEYS +
             InputMethodCatalog.SHUANGPIN_KEYS18 + InputMethodCatalog.SHUANGPIN_KEYS14 + InputMethodCatalog.SHUANGPIN_NINE +
             InputMethodCatalog.ZHUYIN_NINE + InputMethodCatalog.ZHUYIN
@@ -199,7 +183,7 @@ class InputMethodSettingsTest {
         }
     }
 
-    // the labels are the app's, the pairs and a table's options the engine's: one it adds gets a row
+    // one the engine adds gets a row
     @Test
     fun everyFuzzyPairAndTableOptionOfTheEngineHasARow() {
         val fuzzy = InputMethodSettings.SHARED.flat().filterIsInstance<Flags>().single()
@@ -208,13 +192,11 @@ class InputMethodSettingsTest {
         assertEquals((TableSettings.KEYS + TableSettings.KEY_LABELS).sorted(), keys("engine-wubi").filter { it !in listOf(InputMethodSettings.SHARED_LINK, InputMethodSettings.RESET_TABLE_ORDER, AppPrefs.TABLE_KEYBOARD_LAYOUT) }.sorted())
     }
 
-    // the page's main choice, right under the way to the shared page
     @Test
     fun pinyinsKeyboardIsItsFirstOwnRow() {
         assertEquals(AppPrefs.PINYIN_KEYBOARD, keys(InputMethodCatalog.PINYIN)[1])
     }
 
-    // the hardware keyboard still types full pinyin and reads both: said not for the nine, 18 and 14 keys, not hidden
     @Test
     fun pinyinsOwnOptionsSayTheyAreNoUseToThe14Keys() {
         val rows = InputMethodSettings.of(InputMethodCatalog.PINYIN)!!.flat().filterIsInstance<Toggle>().associateBy { it.key }

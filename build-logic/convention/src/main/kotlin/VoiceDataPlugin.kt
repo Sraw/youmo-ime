@@ -29,41 +29,10 @@ import java.io.IOException
 import java.nio.file.Files
 import javax.inject.Inject
 
-/**
- * Voice input: the speech recognizer, in every build, and its models, the voice pack's
- * (AssetPacksPlugin): none of them in the APK. Without the voice pack imported, voice input asks
- * for it; the microphone is asked for at the first use only.
- *
- * - sherpa-onnx (k2-fsa, Apache-2.0), the recognizer: the :lib:sherpa-onnx module, built from
- *   source, ours to change.
- * - X-ASR zh-en (Gilgamesh-J, Apache-2.0), int8, as sherpa-onnx exports it: a Zipformer transducer
- *   trained on some million hours, Mandarin and English with punctuation. Of the models sherpa-onnx
- *   runs, the most accurate on the voice evaluation sets (AISHELL-1, FLEURS, ASCEND mixed speech)
- *   but for those five to fifteen times slower, the fastest, and the smallest; and, a transducer,
- *   it takes hotwords. Numbers it writes in characters: the polish tagger puts them in digits. Its encoder
- *   is fine-tuned by us for accented Mandarin (KeSpeech's dialect speech 17.1% -> 14.6% wrong,
- *   standard sets unchanged), on synthesized dialect speech held to the original by anchor batches.
- * - silero VAD (MIT): whether what was heard is speech at all (VoiceQuiet).
- * - The polish tagger (ours, 060-voice-tagger.md): drops fillers and words taken back, adds marks,
- *   writes numbers in digits (its num head), as the text streams; for now from [LOCAL_PROPERTY]'s directory only, with the streaming model.
- * - Hotwords: the new-word pack (EngineDataPlugin's `downloadEngineWords`), each word's characters
- *   apart by spaces as the dict tool's `hotwords` writes them (HotwordSpelling.spelled), and the
- *   model's BPE vocabulary, which sherpa-onnx encodes them with, read out of its SentencePiece model.
- *
- * The transducer goes in as onnxruntime's own format (`.ort`), converted from sherpa-onnx's export
- * by the release `voice-models-*` of this fork (its manifest.txt says how): the recognizer maps it
- * where the voice pack's import put it, rather than reading it onto the heap (lib/sherpa-onnx README).
- *
- * For now the transducer, its tokens and the tagger come from [LOCAL_PROPERTY]'s directory alone (the
- * pinned release is the offline model; its download tasks stay registered, wired to nothing, for when
- * the streaming one is released); the hotwords and the VAD are built or downloaded (SHA-256 checked,
- * DownloadTask). All go into `voice/` of the voice pack. The directory is checked against the listing of
- * the pack's version ([listing]): a machine whose directory is another version's builds no pack under this one.
- */
+/** Voice input: the recognizer in every build, its models in the voice pack, from [LOCAL_PROPERTY]'s directory held to [listing]. */
 class VoiceDataPlugin : Plugin<Project> {
 
     companion object {
-        /** what makes the voice pack's files */
         const val COPY_TASK = "copyVoiceModels"
         internal const val MODEL_NAME = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val MODEL_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/$MODEL_NAME.tar.bz2"
@@ -73,25 +42,16 @@ class VoiceDataPlugin : Plugin<Project> {
         internal val MODEL_FILES = listOf("tokens.txt")
         internal const val BPE_MODEL = "bpe.model"
 
-        // the archive's decoder and joiner, and its encoder fine-tuned for accented Mandarin (the
-        // release's manifest.txt), converted by onnxruntime 1.30's convert_onnx_models_to_ort, the
-        // version the recognizer is built with
+        // our fine-tuned encoder with the archive's decoder and joiner, converted to .ort at the recognizer's onnxruntime version
         private const val ORT_RELEASE = "voice-models-20261017"
 
         // the archive ORT_RELEASE was converted from: another archive's tokens would go with these weights
         private const val ORT_MODEL = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03"
         private const val ORT_URL = "https://github.com/Sraw/youmo-ime/releases/download/$ORT_RELEASE/x-asr-ort.tar.zst"
         private const val ORT_SHA256 = "89416b38b51238674c19df4eb6c9d2356917e77e5276a028ce87b13234f785bf"
-        internal const val ORT_DIR = "x-asr-ort"
         internal val ORT_FILES = listOf("encoder.ort", "decoder.ort", "joiner.ort")
 
-        /**
-         * A directory of the voice pack's models instead of the downloads, until they are published
-         * (dev/design/060-voice-tagger.md §5.1): the streaming transducer's [ORT_FILES], its
-         * [MODEL_FILES] and [BPE_MODEL], and the polish tagger's [TAGGER_FILES]. A machine's own,
-         * in ~/.gradle/gradle.properties. What each voice pack version has of it: [listing]
-         * (`shasum -a 256 -c` in the directory); the build holds the directory to it.
-         */
+        /** A machine's own directory of the voice models (~/.gradle/gradle.properties), held to [listing]. */
         const val LOCAL_PROPERTY = "youmo.voiceModelDir"
 
         internal val TAGGER_FILES = listOf("polish-tagger.ort", "polish-tagger.json")
@@ -99,7 +59,7 @@ class VoiceDataPlugin : Plugin<Project> {
         /** the model files voice pack [version] has of [LOCAL_PROPERTY]'s directory, by SHA-256 (the root project's) */
         internal fun listing(version: Int) = "gradle/voice-pack-v$version.sha256"
 
-        // whether a stretch heard is speech at all (VoiceQuiet): not where it ends, as before 0.6.0
+        // whether a stretch heard is speech at all (VoiceQuiet)
         private const val VAD_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
         private const val VAD_SHA256 = "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
     }
@@ -120,7 +80,7 @@ class VoiceDataPlugin : Plugin<Project> {
         }
         target.tasks.register<ExtractTask>("extractVoiceModel") {
             archive.set(modelArchive.flatMap { it.outputFile })
-            // the weights come converted from ORT_RELEASE: of the archive's 176 MB, the 0.2 MB the assets read
+            // the weights come converted from ORT_RELEASE: only the small files the assets read
             members.set((MODEL_FILES + BPE_MODEL).map { "$MODEL_NAME/$it" })
             cmake.set(target.sdkCmake)
             outputDir.set(target.layout.buildDirectory.dir("voice-sources"))
@@ -148,7 +108,6 @@ class VoiceDataPlugin : Plugin<Project> {
             outputFile.set(target.layout.buildDirectory.file("generated/voice-hotwords/hotwords.txt"))
         }
         val localDir = target.providers.gradleProperty(LOCAL_PROPERTY)
-        // the version AssetPacksPlugin packs under (app/packs.properties)
         val version = packsProperty(packsProperties(target), "voice.version")
         target.tasks.register<CopyVoiceModels>(COPY_TASK) {
             // nothing downloaded for the model without it: copy() then fails, saying where it comes from
@@ -164,10 +123,9 @@ class VoiceDataPlugin : Plugin<Project> {
         target.dependencies.add("implementation", target.dependencies.project(mapOf("path" to ":lib:sherpa-onnx")))
     }
 
-    /** The pack's words as the recognizer's hotwords, a line each: the dict tool's `hotwords`, so the app's rule spells them. */
+    /** The pack's words as the recognizer's hotwords, a line each, spelled by the dict tool as the app spells them. */
     @CacheableTask
     abstract class CompileHotwords @Inject constructor(private val workers: WorkerExecutor) : DefaultTask() {
-        // built before this runs, but keyed on by toolCode only
         @get:Internal
         abstract val classpath: ConfigurableFileCollection
 
@@ -196,7 +154,7 @@ class VoiceDataPlugin : Plugin<Project> {
         }
     }
 
-    /** The model (ORT), its tokens and the tagger (from [local], as [expected] lists them), the hotwords and the VAD, as `voice/` of the voice pack. */
+    /** The model, tokens and tagger (from [local], as [expected] lists them), the hotwords and the VAD, as the voice pack's `voice/`. */
     @DisableCachingByDefault(because = "linking is quicker than the cache would be")
     abstract class CopyVoiceModels : DefaultTask() {
         /** [LOCAL_PROPERTY]'s directory (`~/` taken as home): without it [copy] fails */
@@ -205,7 +163,6 @@ class VoiceDataPlugin : Plugin<Project> {
         @get:PathSensitive(PathSensitivity.RELATIVE)
         abstract val local: DirectoryProperty
 
-        /** [listing] of the pack's version: each file of [local] the pack takes, by SHA-256 */
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NAME_ONLY)
         abstract val expected: RegularFileProperty
@@ -226,8 +183,7 @@ class VoiceDataPlugin : Plugin<Project> {
             val out = outputDir.get().asFile.resolve("voice")
             out.deleteRecursively()
             out.mkdirs()
-            // the release pinned is the offline model, which the streaming recognizer cannot load
-            // (sherpa-onnx ends the process): no APK with it until the streaming one is released
+            // the pinned release is the offline model, which the streaming recognizer cannot load
             val local = checkNotNull(local.orNull?.asFile) {
                 "voice: the streaming model and the polish tagger come from $LOCAL_PROPERTY alone for now (in ~/.gradle/gradle.properties); the pinned release is the offline model"
             }
@@ -240,9 +196,7 @@ class VoiceDataPlugin : Plugin<Project> {
             vad.get().asFile.copyTo(out.resolve("silero_vad.onnx"))
         }
 
-        // the directory is a machine's own, not in the repo: a pack under this version with another
-        // version's model would ship it silently
-        // (a listing missing for the version is Gradle's to say: expected is an @InputFile)
+        // the directory is not in the repo: another version's model would ship silently
         private fun check(local: File, listing: File) {
             val sums = listing.readLines().filter { it.isNotBlank() && !it.startsWith("#") }.associate { line ->
                 val fields = line.trim().split(Regex("\\s+"), limit = 2)
@@ -260,7 +214,7 @@ class VoiceDataPlugin : Plugin<Project> {
             }
         }
 
-        // some 175 MB in the local directory: a second name for it, not a second copy
+        // a large file in the local directory: a second name for it, not a second copy
         private fun link(from: File, to: File) {
             try {
                 Files.createLink(to.toPath(), from.toPath())
@@ -271,11 +225,7 @@ class VoiceDataPlugin : Plugin<Project> {
             }
         }
 
-        /**
-         * A SentencePiece model's pieces and their scores, `piece<TAB>score` a line, as
-         * sherpa-onnx's bpe_vocab has them (its export_bpe_vocab.py, without the protobuf
-         * library): ModelProto's field 1, each a SentencePiece of piece (1) and score (2).
-         */
+        /** A SentencePiece model's pieces as `piece<TAB>score` lines, as sherpa-onnx's export_bpe_vocab.py writes, without protobuf. */
         private fun vocabulary(model: ByteArray): String {
             val out = StringBuilder()
             Proto(model).fields { field, piece ->

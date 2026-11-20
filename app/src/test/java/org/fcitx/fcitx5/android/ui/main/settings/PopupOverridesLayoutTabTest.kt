@@ -38,10 +38,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import java.io.File
 
-/**
- * 按键字符和快捷键's tab of a layout of the user's in use (061-custom-layout §9, L6): its name the card's, its keys its
- * own, a key of a name another tab has marked 共用 and its editor saying which; one not in use none.
- */
+/** A user layout's tab: its name the card's, its own keys, a key another tab shares marked 共用 (none when not in use). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
@@ -68,8 +65,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         SceneBoard.forgetScenes()
     }
 
-    // the 18 keys made 17 (H and JK one key of its own name) with a key of its own typing 哈, its long press written;
-    // [changed] what else is done to the file
+    // the 18 keys made 17 (HJK one key of its own name) plus a key typing 哈 with a long press; [changed] edits the file further
     private fun k17(changed: (String) -> String = { it }) {
         val text = BuiltInLayouts(st.activity).text("k18")!!.replaceFirst("id=\"k18\" name=\"18 键\"", "id=\"my-k17\" name=\"我的 17 键\" based-on=\"k18\"")
             .replace(Regex("<key id=\"r2c4\"[^>]*/>\\s*<key id=\"r2c5\"[^>]*/>"), "<key id=\"hjk\" width=\"fill\" label=\"HJK\" letters=\"hjk\" lean=\"off\" shortcut=\"my-k17/hjk\"/>")
@@ -87,7 +83,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
 
     private fun texts() = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
 
-    // a text on the page tapped: the card it names
+    // tap the card a text names
     private fun clickName(name: String) {
         var v: android.view.View = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == name }
         while (!v.hasOnClickListeners()) v = v.parent as android.view.View
@@ -104,7 +100,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "my-k17")
         openPage()
         clickName("我的 17 键")
-        // the tab's title, its own keys; the 18 keys' WE shared, its HJK and 哈 not
+        // the tab's title and own keys; the 18 keys' WE shared, its HJK and 哈 not
         assertTrue(texts().count { it == "我的 17 键" } >= 2)
         val shared = st.s(R.string.shortcut_shared_tag)
         assertTrue(keyCalled("WE").contentDescription.toString(), keyCalled("WE").contentDescription.endsWith(", $shared"))
@@ -113,7 +109,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         assertTrue(KeyboardHarness.all(we.window!!.decorView).filterIsInstance<TextView>().any { it.text.toString() == st.s(R.string.shortcut_shared_with, st.s(R.string.shortcut_page_g18)) })
         we.dismiss()
         st.idle()
-        // its own key's long press as the layout writes it: 哈哈 first, then 嘿
+        // as the layout writes it: 哈哈 first, then 嘿
         val ha = dialogOf("哈")
         assertTrue(ha.isShowing)
         ha.dismiss()
@@ -123,9 +119,8 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         assertEquals("哈哈", list.first)
     }
 
-    // a key of the app's name is the app's key: letters and a swipe of the layout's own (WE's written EW, its down 我们)
-    // none of its long press nor of its editor's, the 18 keys' WE's (L6 review S2, N9); the layout let go, the tab picked
-    // goes, 全键盘 picked
+    // an app-named key is the app's: letters and swipes the layout's own, the long press and editor the 18 keys'; the layout
+    // let go, its tab goes and 全键盘 is picked
     @Test
     fun aSharedKeyIsTheAppsKeyAndItsTabGoesWithItsLayout() {
         k17 { it.replace("letters=\"we\" shortcut=\"g18/we\"", "letters=\"ew\" shortcut=\"g18/we\" swipe-down=\"commit:我们\"") }
@@ -142,7 +137,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         assertTrue(items.toString(), "w" in items && items.indexOf("w") < items.indexOf("e") && items.none { "我们" in it })
         we.dismiss()
         st.idle()
-        // let go of: the page made again on the tab it had, which is gone
+        // let go: the page remade on the tab it had, which is gone
         keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.KEYS18)
         st.recreate()
         assertFalse(texts().toString(), "我的 17 键" in texts())
@@ -150,9 +145,7 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         assertTrue(full.isSelected)
     }
 
-    // a key of a name of its own two layouts in use have (the 17 keys' 哈, a 26 keys saved from it keeping its name): 共用,
-    // and edited on its layout, its default its own (嘿), not on the app's board, which has no such key (R26 F8160: the
-    // editor opened as a key with no long press, its OK saving a list without the layout's own on both)
+    // a key name two layouts share is 共用, edited on its layout with its own default (嘿), not on the app board, which lacks it
     @Test
     fun aKeyOfItsOwnNameTwoLayoutsShareIsEditedOnItsLayout() {
         k17()
@@ -180,9 +173,8 @@ class PopupOverridesLayoutTabTest : PopupOverridesFragmentTest.EditorDialog() {
         st.idle()
     }
 
-    // a name that breaks makes every card's name two lines high, the app's short ones too, so the cards of a row are
-    // as high as one another (R26 F8159: the rule, not ChoiceCard's setter). Native graphics: the names are measured,
-    // and the legacy Paint's measure is a character a pixel, no name ever breaking
+    // one name breaking makes every card's name two lines high so a row is even. Native graphics: legacy Paint measures a
+    // character a pixel, so no name would break
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun aLongNameMakesEveryCardTwoLinesHigh() {

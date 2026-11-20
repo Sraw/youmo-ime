@@ -148,7 +148,7 @@
 - **前提**：B0-注音九键，**通用输入** 的 **纠正错拼和按偏的键** 开着。
 - **操作**：点 ㄅㄉㄚ 最靠右的边上（靠 ㄍㄐㄞ），再点 ㄖㄥㄩ、ㄈㄌㄝ，看候选，删光；三个键都点在正中再打一遍；点 ㄆㄊㄛ 靠右边缘（靠 ㄎㄑㄟ）后再点声调键 ˉ 靠右边缘；到 **通用输入** 关掉 **纠正错拼和按偏的键**，照第一次打。
 - **预期**：第一次候选里有读 jue 的字（「觉」「决」等；ㄅㄉㄚ 读成 ㄍㄐㄞ 的 ㄐ，按原样 ㄅㄖㄈ 拼不成）；点在正中、关掉以后都没有。声调键点在边上不读成旁边的键。（0.6.1 起注音九键也纠，用户 2026-11-16 定；地板 −2：按原样拼得成的不改读，所以点在键中间打的句子不会被改错。）
-- **JVM**：`EnginesZhuyinSlipTest.zhuyinsNineKeysReadASlipUnlessSlipsAreOff`、`NeighbourSlipTest.zhuyinsNineKeysReadAGroupAsTheOneNextToIt`、`NeighbourTouchTest.zhuyinsNineGroupKeysGoWithTheGroupKeysAround`（组键带落点和旁边的组键，声调键不带）；设备上不跑。
+- **JVM**：`EnginesTableSlipTest.zhuyinsNineKeysReadASlipUnlessSlipsAreOff`、`NeighbourSlipTest.zhuyinsNineKeysReadAGroupAsTheOneNextToIt`、`NeighbourTouchTest.zhuyinsNineGroupKeysGoWithTheGroupKeysAround`（组键带落点和旁边的组键，声调键不带）；设备上不跑。
 
 ### PY-152 [P1] 拼音 18 键：两个字母的键点在哪一半有用
 - **前提**：B0；**输入法 → 拼音** 的「键盘」选「18 键」。
@@ -659,7 +659,7 @@
 - **前提**：B0，另外笔画筛选；**通用输入 → 性能档位** 是默认的高档。先让 nizai 的第一页被学过的词占满：打 nizai，选「你在」并在长按菜单里置顶；再选几次别的 nizai 候选（如「你再」「拟在」）。
 - **操作**：打 nizai，在键上划一撇（「你」开头的词都留下），看候选；停 2 秒（等高档把候选再精挑一遍）；再看候选，点一个不是第一个的。重复几次，每次点不同位置。
 - **预期**：停顿后候选可以重新筛一遍、顺序可以变，但点哪个就上屏哪个，不会上屏一个没显示过或笔画不符的词（0.6.1 用户实录：九键微软双拼 gj 划折，点「好看」上屏「估计」、点「敢」上屏「参加」）。
-- **JVM**：`StrokeFilterRefineTest.aRefineThatReordersPastTheFirstPageLeavesATapTheCandidateTapped`（ime-core：真 PinyinSession，置顶词占满第一页，Refine 只重排第一页之后）、`StrokeFilterTest`（只重排第一页之后时重新筛并用 Select 点；会话悄悄错位时 Pick/Forget/why 仍落在原来的词上；候选消失时不上屏并重新筛）；设备上停顿时机不好控制，只做冒烟。
+- **JVM**：`StrokeFilterTest.aRefineThatReordersPastTheFirstPageLeavesATapTheCandidateTapped`（ime-core：真 PinyinSession，置顶词占满第一页，Refine 只重排第一页之后）、`StrokeFilterTest`（只重排第一页之后时重新筛并用 Select 点；会话悄悄错位时 Pick/Forget/why 仍落在原来的词上；候选消失时不上屏并重新筛）；设备上停顿时机不好控制，只做冒烟。
 
 ### PY-105 [P1] 拼音 18 键
 - **前提**：B0，在 **输入法 → 拼音** 里把 **键盘** 选成「18 键」，回测试页点「普通文本」框。
@@ -692,7 +692,7 @@
 - **前提**：B0-注音全键盘。
 - **操作**：看键盘；点 ㄋ ㄧ ˇ ㄏ ㄠ ˇ，看码行和候选，点「你好」；点 ㄇ ㄚ，按空格，看码行和候选，再按空格；点 ㄉ ㄜ ˙，看候选，按空格；点 ㄅ ˇ，按回车。
 - **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
-- **JVM**：`ZhuyinKeyboardTest.dachenHasEachSymbolAndToneWhereTaiwanPrintsIt`、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
+- **JVM**：`ZhuyinSceneGesturesTest`（`everyKeyGestures`、`dachenOnTheKeysAsShown`）、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
 
 ### PY-110 [P1] 候选词注音一律标本调，不标轻声
 - **前提**：B0，**候选词注音** 选「拼音」。

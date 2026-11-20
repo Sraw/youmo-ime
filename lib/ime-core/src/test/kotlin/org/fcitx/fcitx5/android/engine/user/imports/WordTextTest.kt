@@ -22,7 +22,6 @@ class WordTextTest {
         assertEquals(entry("绿", "lv"), WordText.entry("绿", "lü"))
         assertEquals(entry("虐", "nve"), WordText.entry("虐", "nüe"))
         assertEquals(entry("略", "lve"), WordText.entry("略", "lue"))
-        // no such syllable; a reading of another length; nothing read
         assertNull(WordText.entry("你", "nii"))
         assertNull(WordText.entry("你好", "ni"))
         assertNull(WordText.entry("你", ""))
@@ -65,7 +64,6 @@ class WordTextTest {
     fun aTextAloneIsReadByTheSyllablesOfItsCharacters() {
         val d = polyphones
         fun reading(text: String) = WordText.readings(d.dictionary, d.vocabulary, setOf(text))[text]?.joinToString(" ") { Syllables.spelling(it) }
-        // only yin then hang or xing walked: 行's rarer reading too
         assertEquals("yin hang", reading("银行"))
         assertEquals("xing", reading("行"))
         assertNull(reading("银好"))
@@ -77,9 +75,7 @@ class WordTextTest {
     fun aCharacterIsReadInsideAWordAsItIsNeverAlone() {
         val d = polyphones
         fun reading(text: String) = WordText.readings(d.dictionary, d.vocabulary, setOf(text))[text]?.joinToString(" ") { Syllables.spelling(it) }
-        // 儿 alone is er: read char by char, 这儿 would be zhe er
         assertEquals("zhe r", reading("这儿"))
-        // a character past U+FFFF: two chars, one syllable
         assertEquals("qiu", reading("\uD840\uDC00"))
         // neither of 𠀀儿's syllables is its character's alone, more than the walk strays: so 𠀀's own were known, two chars as it is
         assertNull(reading("\uD840\uDC00儿"))
@@ -93,13 +89,10 @@ class WordTextTest {
         // 了 alone is le: liao, at the first depth, is walked only as an import asks
         assertNull(reading("了解", strayFirst = false))
         assertEquals("liao jie", reading("了解", strayFirst = true))
-        // one stray a path still
         assertNull(reading("\uD840\uDC00儿", strayFirst = true))
     }
 
     private companion object {
-        // 行 is read xing more often than hang; 银行 only yin hang; 河 only in 银河; 儿 r only in 这儿;
-        // 𠀀 (U+20000) qiu, and 𠀀儿 as neither of its characters is alone; 了 le alone, liao in 了解
         val polyphones = PinyinData.load(
             ByteBuffer.wrap(
                 PinyinDataBuilder()

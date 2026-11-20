@@ -10,11 +10,9 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /**
- * One touch on a letter, measured for the debug build's `YoumoStrokeTap` log (dev/design/061-swipe-eval.md,
- * 真机核对): how far a real finger drifts in a tap, where it lands in the key, how fast a stroke is drawn.
- * The synthetic taps the stroke threshold was chosen on are swapped for these. Geometry and times only:
- * never which letter, nothing typed. Places in px, written out in dp. What came of it (res): L a tap typed, T a stroke
- * lifted short typed as a tap, S and the stroke read, U a stroke unread, P a long press, O off the key, G a glide, C cancelled.
+ * One letter touch for the debug build's `YoumoStrokeTap` log: tap drift, landing spot, stroke speed; geometry and
+ * times only, never the letter. res: L tap, T stroke lifted short as a tap, S+kind stroke read, U unread, P long
+ * press, O off the key, G glide, C cancelled.
  */
 class StrokeTapTrace(private val density: Float, private val touchSlop: Float) {
 
@@ -50,7 +48,7 @@ class StrokeTapTrace(private val density: Float, private val touchSlop: Float) {
     private var right = 0f
     private var bottom = 0f
 
-    /** A finger down at [x], [y] at [time] in the cell [left]..[right], [top]..[bottom] (all the keyboard's px). */
+    /** All in the keyboard's px. */
     fun down(
         x: Float, y: Float, time: Long, left: Float, top: Float, right: Float, bottom: Float,
         keyboard: String, strokeMode: Boolean, longPress: Long,
@@ -85,7 +83,6 @@ class StrokeTapTrace(private val density: Float, private val touchSlop: Float) {
         tappedBack = false
     }
 
-    /** The finger at [x], [y]. */
     fun move(x: Float, y: Float) {
         if (!active) return
         lastX = x
@@ -99,40 +96,35 @@ class StrokeTapTrace(private val density: Float, private val touchSlop: Float) {
         if (x !in left..<right || y !in top..<bottom) outside = true
     }
 
-    /** The touch became a stroke or a glide at [time], its keys cancelled. */
+    /** Its keys cancelled. */
     fun started(time: Long) {
         if (!active || startedAt >= 0) return
         startedAt = time - t0
         startedFar = far
     }
 
-    /** Another finger went down meanwhile. */
     fun otherFinger() {
         if (active) multi = true
     }
 
-    /** The stroke the path was read as, null where it was none. */
+    /** Null where it was none. */
     fun read(kind: Char?) {
         stroke = kind
         read = true
     }
 
-    /** The stroke lifted short: the key's tap after all (GlideTouch.Route.TAP_KEY). */
+    /** GlideTouch.Route.TAP_KEY. */
     fun tapped() {
         tappedBack = true
     }
 
-    /**
-     * The finger lifted at [time] (or the touch [cancelled]): the line for the log, null where no touch was traced.
-     * [time] is the touch's last lift: with another finger down (multi=1) the last finger's, so dur= runs to it
-     * (a stroke short of its lift as another lands is tapped then, T, its own lift not told apart).
-     */
+    /** Null where no touch was traced. With another finger down, [time] is the last finger's lift (a short stroke then is T). */
     fun up(time: Long, cancelled: Boolean): String? {
         if (!active) return null
         active = false
         lastUp = time
         val dur = time - t0
-        // what came of it: the keys' own say (a tap typed, off the key no tap, a long press) where no stroke started
+        // the keys' own say where no stroke started
         val result = when {
             cancelled -> "C"
             startedAt >= 0 && !strokeMode -> "G"
@@ -154,7 +146,7 @@ class StrokeTapTrace(private val density: Float, private val touchSlop: Float) {
         )
     }
 
-    /** A backspace pressed at [time]: its line, so a stroke taken back right after it is seen as a misread. */
+    /** So a stroke taken back right after it is seen as a misread. */
     fun backspace(time: Long): String = "bksp since=${if (lastUp < 0) -1 else time - lastUp}"
 
     private fun dp(px: Float) = px / density

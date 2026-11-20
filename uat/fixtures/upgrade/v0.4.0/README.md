@@ -25,10 +25,9 @@ What was set, in order:
 To use: install the same APK on a clean device, untar both as root into those paths (owner: the app's
 uid), then upgrade with the new APK (`adb install -r`).
 
-The engine's part (`data.tar`'s `files/engine/` and `no_backup/learn.install`, and the custom phrase of
-`external.tar`) is copied under `lib/ime-core/src/test/resources/upgrade/v0.4.0/`, where
-`EnginesUpgradeTest` opens it on every JVM test run: what this build reads of a 0.4.0 install and what
-it leaves (F2 S0, `dev/design/engine-restructure.md`).
+An in-place upgrade from 0.4.0 is no longer supported (it goes through 0.6.2), so release gate 2, which
+used this fixture, is paused (`uat/gates/README.md`); gate 3 restores its `backup.zip`. The JVM copy of
+the engine's part and `EnginesUpgradeTest` that read it are gone.
 
 ## Time per step (seconds)
 

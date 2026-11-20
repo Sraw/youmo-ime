@@ -10,17 +10,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * A table's word of the built-in phrases (日期) while the user's habits are off (U-93's 借手机): the
- * built-in dates, as pinyin's fresh phrase book has them, not the user's file (audit-061 engine-09).
- */
+/** A table's built-in phrases with habits off (借手机): the built-in dates, not the user's file. */
 class EnginesBorrowedPhrasesTest : EnginesFixture() {
 
     private val date = Regex("\\d{4}-\\d{2}-\\d{2}")
 
-    // PR-17b's own steps, on one Engines (R25 F7930): a session keeps the book it was made with (F7910: chosen
-    // once, not for every candidate), so each switch of the habits, and the phrases read anew, must make the
-    // sessions anew or the book before would go on deciding
+    // a session keeps its phrase book, so each switch must make the sessions anew
     @Uat("PR-17b")
     @Test
     fun aSwitchOfTheHabitsOrThePhrasesReadAnewChangesTheBookThatDecides() {
@@ -28,7 +23,6 @@ class EnginesBorrowedPhrasesTest : EnginesFixture() {
         var phrases = "rq,1=我的日期\n"
         val engines = Engines(::load, null, additions = { Engines.Additions(phrases, "", { }, dictionary = { null }) }, warmUps = inPlace)
         engines.settings = wubiShown
-        // their habits used: their phrases decide
         assertEquals(listOf("日期"), engines.type(WUBI, "jjad").candidates)
         // their habits off: the built-in ones come, as pinyin's fresh phrase book has them
         engines.useHabits = false

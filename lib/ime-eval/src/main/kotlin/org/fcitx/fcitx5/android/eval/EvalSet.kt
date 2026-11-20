@@ -6,23 +6,12 @@ package org.fcitx.fcitx5.android.eval
 
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
-/**
- * One thing a user types as [input], and what they meant by it, after [context] when there is
- * any: the text before the cursor. [taps]: where across its key each of [input] was tapped, for
- * the 14 keys ([Taps]); null for none. [touches]: where each was tapped and the keys around it
- * ([TouchSim]), null each one with no place.
- */
+/** One thing a user types as [input] after [context], meaning [expected]; [taps] places across keys, [touches] places for [TouchSim]. */
 data class Sample(val input: String, val expected: String, val tag: String, val context: String = "", val taps: List<Float>? = null, val touches: List<Touch?>? = null)
 
 object EvalSet {
 
-    /**
-     * `input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches[<TAB>places]]]`; `#` starts a comment line.
-     * The touches ([line]'s, `pinyin --touch … --touched`): each key's [Touch.text] a space apart, `-`
-     * one with no place; the context before them may be empty. The places ([Sample.taps]): where across
-     * its key each was tapped, as the 14 and 18 keys send it, `-` none; the touches before them may be
-     * all `-` (`--taps`).
-     */
+    /** `input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches[<TAB>places]]]`, `-` for no place; `#` starts a comment line. */
     fun parse(lines: Sequence<String>): List<Sample> = lines
         .mapIndexedNotNull { index, line ->
             if (line.isBlank() || line.startsWith("#")) return@mapIndexedNotNull null
@@ -47,7 +36,7 @@ object EvalSet {
     fun line(s: Sample): String {
         val after = (s.touches ?: s.taps?.map { null })?.joinToString(" ", "\t") { it?.text() ?: NO_TOUCH }.orEmpty() +
             s.taps?.joinToString(" ", "\t") { if (it.isNaN()) NO_TOUCH else it.toString() }.orEmpty()
-        // an empty context with nothing after it is no field: [parse] reads an empty one only before the touches (review F8206)
+        // an empty context with nothing after it is no field: [parse] reads an empty one only before the touches
         val context = if (s.context.isEmpty() && after.isEmpty()) emptyList() else listOf(s.context)
         return (listOf(s.input, s.expected, s.tag) + context).joinToString("\t") + after
     }
@@ -57,18 +46,10 @@ object EvalSet {
     private const val PLACES = 5
 }
 
-/**
- * What an engine did with one [Sample]: the candidates it offered once the whole input was
- * typed, best first, and how long each keystroke took.
- */
+/** What an engine did with one [Sample]: its candidates for the whole input, best first, and each keystroke's time. */
 data class RunResult(val input: String, val candidates: List<String>, val keyLatenciesMicros: List<Long>)
 
-/**
- * `input<TAB>latency,latency,...<TAB>candidate<TAB>candidate...`, one line per sample. Plain TSV
- * so that the on-device runner can write it without pulling in a JSON library. Tabs and line
- * breaks inside a candidate (a custom phrase can hold them) become spaces; such a candidate
- * never equals an expected sentence anyway.
- */
+/** `input<TAB>latency,...<TAB>candidate...`, plain TSV so the on-device runner needs no JSON; tabs and newlines in a candidate become spaces. */
 object RunResultFormat {
 
     private val separators = Regex("[\t\r\n]")

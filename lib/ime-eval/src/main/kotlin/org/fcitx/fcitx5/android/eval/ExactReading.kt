@@ -8,11 +8,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 
-/**
- * The syllables a full-pinyin sample was typed as: the cut of its input into whole syllables
- * spelt exactly, one per character of the expected text (`xian` for 先 as xian, for 西安 as
- * xi'an). Sets derived from a typed set start from it.
- */
+/** The syllables a full-pinyin sample was typed as, one per character of its expected text (`xian` for 先, `xi'an` for 西安). */
 object ExactReading {
 
     /** A syllable of the reading and where it was typed: [length] letters from [at], separators not counted. */
@@ -20,10 +16,7 @@ object ExactReading {
 
     private val segmenter = PinyinSegmenter(typos = false)
 
-    /**
-     * The one exact cut of [sample]'s input into syllables that [keep] allows, or null if there
-     * is none or several.
-     */
+    /** The one exact cut of [sample]'s input that [keep] allows, or null if there is none or several. */
     fun of(sample: Sample, keep: (Int) -> Boolean = { true }): List<Typed>? {
         val count = sample.expected.codePointCount(0, sample.expected.length)
         return cut(segmenter.segment(sample.input), count, keep)

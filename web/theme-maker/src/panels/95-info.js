@@ -1,4 +1,4 @@
-// 信息 (060-render-p3 §5.1 panel 10): the theme's name (its file's: what the app lists and an import keys on) and its
+// 信息: the theme's name (its file's: what the app lists and an import keys on) and its
 // <meta>: author, version, license, the least app version, a preview image (taken from the preview by default).
 (function (root) {
   'use strict';

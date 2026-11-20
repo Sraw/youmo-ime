@@ -57,7 +57,6 @@ class EnglishUserTest {
         user.commit(null, "dog")
         assertTrue(user.probability("the", "cat") > user.probability(null, "cat"))
         assertEquals(0f, user.probability("the", "fish"))
-        // a score the user's count raises, never past 0
         assertTrue(user.score(-5f, "the", "cat") > -5f)
         assertEquals(-5f, user.score(-5f, "the", "fish"))
         assertTrue(user.score(-0.001f, "the", "cat") <= 0f)
@@ -65,7 +64,6 @@ class EnglishUserTest {
         assertEquals(3f, user.total)
     }
 
-    // U-42: what is not typed for 30 typing days is forgotten; days nothing was typed do not count
     @Test
     fun aWordNotTypedForThirtyTypingDaysIsForgotten() {
         user.commit(null, "youmo")
@@ -84,7 +82,7 @@ class EnglishUserTest {
         assertEquals(30f, user.count("the"))
     }
 
-    // U-31, U-42: a word never corrected stays so however long untyped; one added counts as typed twice
+    // a word never corrected stays so however long untyped; one added counts as typed twice
     @Test
     fun whatIsNeverCorrectedStaysTillForgotten() {
         user.commit(null, "teh", how = EnCommit.REVERTED)
@@ -106,7 +104,6 @@ class EnglishUserTest {
         assertEquals(0f, user.count("youmo"))
     }
 
-    // U-31 恢复: corrected again, the uses and pairs kept; as read again from the record (EN_CORRECT)
     @Test
     fun aWordRestoredIsCorrectedAgainItsUsesKept() {
         user.commit(null, "the")
@@ -116,7 +113,6 @@ class EnglishUserTest {
         assertFalse(user.neverCorrected("teh"))
         assertEquals(1f, user.count("teh"))
         assertEquals(setOf("teh"), user.followers("the"))
-        // added and never typed: nothing of it left
         assertEquals(emptySet<String>(), user.addedWords)
         assertFalse("youmo" in user.words)
         val session = EnglishSession(data, user = user)
@@ -130,7 +126,7 @@ class EnglishUserTest {
         again.close()
     }
 
-    // D11: it takes a correction taken back, not a count
+    // it takes a correction taken back, not a count
     @Test
     fun aWordTypedTwiceIsCorrectedStill() {
         user.commit(null, "nad")
@@ -148,7 +144,7 @@ class EnglishUserTest {
         assertEquals(1f, user.total)
     }
 
-    // PLAN §2.2: English learns into the record, read back as written by a start
+    // English learns into the record, read back as written by a start
     @Test
     fun whatIsLearnedIsReadAgainFromTheLearningRecord() {
         user.commit(null, "the")
@@ -177,7 +173,7 @@ class EnglishUserTest {
         assertFalse(user.undo(seq))
     }
 
-    // review-int-records S2: an undo takes back only a pair its commit counted, none in a field that learns none
+    // an undo takes back only a pair its commit counted, none in a field that learns none
     @Test
     fun anUndoOfAnUnpairedCommitLeavesThePairLearned() {
         user.commit(null, "hello")
@@ -199,7 +195,7 @@ class EnglishUserTest {
         assertEquals(0f, off.count("youmo"))
     }
 
-    // each word an EN_COMMIT (design-1a §1): the word before it, the keys typed, how it came, the field's flags
+    // each word an EN_COMMIT: the word before it, the keys typed, how it came, the field's flags
     @Test
     fun eachWordCommittedIsAnEnglishCommitOfTheRecord() {
         val session = EnglishSession(data, user = user)
@@ -217,7 +213,6 @@ class EnglishUserTest {
             recorded.map { Triple(it.prev, it.word, it.typed) to it.how },
         )
         assertTrue(recorded.all { it.flags == Commit.NO_PAIRS })
-        // an address field's: no pairs
         assertEquals(emptySet<String>(), user.followers("the"))
     }
 
@@ -233,7 +228,6 @@ class EnglishUserTest {
     @Test
     fun aWordPickedOverItsCorrectionIsNeverCorrected() {
         val session = EnglishSession(data, user = user)
-        // nad, a word, but one the far likelier and is a slip from
         assertEquals("and ", session.commit("nad"))
         session.apply(Action.Context(""))
         session.type("nad")
@@ -297,7 +291,6 @@ class EnglishUserTest {
         session.apply(Action.Context(""))
         session.commit("Youmo")
         assertEquals(setOf("hello", "London", "youmo"), user.words)
-        // inside a sentence a capital is the word's
         session.apply(Action.Context("I met "))
         session.commit("Steve")
         assertEquals(1f, user.count("Steve"))
@@ -317,7 +310,6 @@ class EnglishUserTest {
         assertEquals("teh ", session.apply(Action.Key(' ')).commit)
         assertEquals(1f, user.count("teh"))
         assertEquals(listOf("the" to EnCommit.AUTOCORRECTED, "teh" to EnCommit.REVERTED), recorded.map { it.word to it.how })
-        // a capital at a sentence's start: theirs inside one too
         val start = EnglishSession(data, user = EnglishUser())
         start.apply(Action.Context(""))
         start.commit("Teh")
@@ -326,7 +318,6 @@ class EnglishUserTest {
         assertEquals("teh ", start.commit("teh"))
     }
 
-    // the word typed kept over its correction, as by a correction taken back
     @Test
     fun theWordTypedPickedOverItsCorrectionIsTheUsersAtOnce() {
         val session = EnglishSession(data, user = user)
@@ -336,7 +327,6 @@ class EnglishUserTest {
         assertTrue(user.neverCorrected("teh"))
     }
 
-    // U-31: a tap back right after a correction offers the word typed in its place; picked, it is never corrected again
     @Test
     fun aTapBackAfterACorrectionOffersTheWordTypedInItsPlace() {
         val session = EnglishSession(data, user = user)
@@ -344,7 +334,6 @@ class EnglishUserTest {
         session.commit("teh")
         session.commit("cat")
         assertEquals(1f, user.count("the"))
-        // the cursor put after "the " again, by a tap
         session.apply(Action.Reset)
         val shown = session.apply(Action.Context("I fed the "))
         assertEquals(listOf("teh"), shown.candidates)
@@ -355,12 +344,11 @@ class EnglishUserTest {
         assertEquals(0f, user.count("the"))
         assertTrue(user.neverCorrected("teh"))
         assertEquals(Triple("fed", "teh", EnCommit.REVERTED), recorded.last().let { Triple(it.prev, it.word, it.how) })
-        // taken back once: not offered again there
         session.apply(Action.Reset)
         assertEquals(emptyList<String>(), session.apply(Action.Context("I fed the ")).candidates)
     }
 
-    // R11 F2650: a word picked is the user's own, no correction: a backspace or a tap after it takes nothing back
+    // a word picked is the user's own, no correction: a backspace or a tap after it takes nothing back
     @Test
     fun aWordPickedIsNoCorrectionToTakeBack() {
         val session = EnglishSession(data, user = user)
@@ -377,7 +365,7 @@ class EnglishUserTest {
         assertEquals(emptyList<String>(), session.apply(Action.Context("I said hello ")).candidates)
     }
 
-    // R11 F2650: on the nine keys, a word other than the first picked and a backspace after it leave the keys alone
+    // on the nine keys, a word other than the first picked and a backspace after it leave the keys alone
     @Test
     fun onTheNineKeysAWordPickedIsNoCorrectionToTakeBack() {
         val session = EnglishSession(data, user = user)
@@ -392,7 +380,6 @@ class EnglishUserTest {
         assertTrue(recorded.none { it.how == EnCommit.REVERTED })
     }
 
-    // R11 F2740: after the field cleared itself (a chat sent), a correction at its new start is found by a tap
     @Test
     fun aCorrectionAfterTheFieldClearedItselfIsOfferedBack() {
         val session = EnglishSession(data, user = user)
@@ -414,8 +401,6 @@ class EnglishUserTest {
         assertEquals(3, back.deleteBefore)
     }
 
-    // review R11 F3073/F3085: the word typed offered back goes with the offer when anything but its pick
-    // comes: no longer shown, nor committed by a pick after it
     @Test
     fun anOfferBackLeftByAnotherActIsNoLongerShown() {
         val session = EnglishSession(data, user = user)
@@ -436,14 +421,13 @@ class EnglishUserTest {
         session.commit("teh")
         session.apply(Action.Reset)
         assertEquals(emptyList<String>(), session.apply(Action.Context("I saw the ")).candidates)
-        // a key after the offer goes on as typed, the offer gone
         session.apply(Action.Reset)
         session.apply(Action.Context("I fed the "))
         assertEquals("cat ", session.commit("cat"))
         assertEquals(1f, user.count("the"))
     }
 
-    // review-B M1: an incognito field learns nothing, yet a backspace right after a correction takes it back
+    // an incognito field learns nothing, yet a backspace right after a correction takes it back
     @Test
     fun withoutLearningBackspaceStillTakesTheCorrectionBack() {
         val session = EnglishSession(data, user = user)
@@ -456,8 +440,7 @@ class EnglishUserTest {
         assertEquals(emptyList<EnCommit>(), recorded)
     }
 
-    // review-B S4: a word committed is counted at once, asked next with nothing else read between
-    // (the session makes its own copy of the words again at its next key)
+    // a word committed is counted at once, asked next with nothing else read between
     @Test
     fun aWordCommittedChangesTheWordsAtOnce() {
         user.commit(null, "youmo")

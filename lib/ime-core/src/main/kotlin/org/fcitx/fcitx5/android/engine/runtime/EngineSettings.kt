@@ -12,53 +12,39 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 
-/**
- * What the user set for the input methods, in the androidengine addon's config. Its keys are
- * those of libime's pinyin config, so a user's old settings carried over as they were (0.4 moved
- * them).
- */
+/** The user's input-method settings from the androidengine addon's config; keys are libime pinyin's so old settings carried over. */
 data class EngineSettings(
     val shuangpin: String = ZIRANMA,
     val fuzzy: Set<Fuzzy> = emptySet(),
-    /** Whether a key slipped onto a neighbour, or a common misspelling, is read as meant. */
+    /** Whether neighbour slips and common misspellings are read as meant. */
     val typos: Boolean = true,
-    /** Whether words that may follow are offered after a commit. */
     val prediction: Boolean = true,
-    /** Whether a word's emoji are offered among its candidates (EmojiCandidates). */
     val emoji: Boolean = true,
-    /** Whether full pinyin offers a character by the pinyin of its parts (Chaizi): niuniuniu 犇. */
+    /** niuniuniu 犇. */
     val chaizi: Boolean = true,
-    /** Whether full pinyin offers the date, the time and the weekday under rq, sj and xq (CustomPhrases.BUILT_IN). */
+    /** rq, sj, xq (CustomPhrases.BUILT_IN). */
     val builtInPhrases: Boolean = true,
     val pageSize: Int = DEFAULT_PAGE_SIZE,
-    /** How much the sentence models weigh pinyin's readings again: the 性能档位. */
+    /** 性能档位. */
     val modelLevel: ModelLevel = ModelLevel.HIGH,
-    /** Whether full pinyin reads the Latin words typed in it (iphone for iPhone). */
+    /** iphone for iPhone. */
     val latinWords: Boolean = true,
-    /** What the user set for each table input method, by its group in the config (`Wubi`). */
+    /** By config group (`Wubi`). */
     val tables: Map<String, TableSettings> = emptyMap(),
-    /** The nine keys' letters: the app's, set on the keyboard's side, not in the addon's config. */
+    /** Set by the keyboard, not the addon's config. */
     val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
-    /**
-     * The letter groups of a layout of its own the screen shows in place of the 14 or 18 keys (a theme's
-     * 17 keys, 060-render-p3 T9b), each a key's `letters=` as written (rows apart by a space), null for
-     * none: what [org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN] types on
-     * ([ownKeyboard]). The keyboard's, as [nineKeys]; the rows kept, as where a tap leans goes by them.
-     */
+    /** A layout's own letter groups replacing the 14/18 keys (`letters=` per key, rows space-separated), typed by [org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_KEYS_OWN]; rows kept since tap lean goes by them. */
     val ownKeys: List<String>? = null,
-    /** Whether English suggests words ([ENGLISH_SUGGEST]): the keyboard's to know, the engine's is the addon's. */
+    /** The keyboard's to know; the engine's copy is the addon's. */
     val englishSuggest: Boolean = true,
-    /** 候选词注音: what is shown above or beside each character of a Chinese candidate. */
+    /** 候选词注音. */
     val candidateReading: ReadingStyle = ReadingStyle.OFF,
-    /** 首页单字: how many characters alone a stroke drawn moves right after its first candidate (StrokeFilter), 0 none. */
+    /** 首页单字: how many single characters a stroke moves right after the first candidate (StrokeFilter), 0 none. */
     val strokeSingles: Int = StrokeFilter.SINGLES,
 ) {
     val scheme: ShuangpinScheme get() = SCHEMES[shuangpin] ?: ShuangpinScheme.ZIRANMA
 
-    /**
-     * The keyboard of its own [ownKeys] make ([NineKeyLetters.ownOf]), null for none, groups that make none, or the 14
-     * or 18 keys' groups (a built-in keyboard, typed by its own session).
-     */
+    /** Null for none, groups that make none, or the built-in 14/18 keys' groups (typed by their own session). */
     val ownKeyboard: NineKeyLetters? get() = ownKeys?.let(NineKeyLetters::ownOf)
 
     companion object {
@@ -73,31 +59,24 @@ data class EngineSettings(
         const val LATIN_WORDS = "LatinWords"
         const val CANDIDATE_READING = "CandidateReading"
         const val STROKE_SINGLES = "StrokeSingles"
-        /**
-         * Read by the addon itself: off, English hands the session no key, and they type themselves.
-         * The nine keys read it too: there they type English a letter at a time (连按).
-         */
+        /** Read by the addon: off, English gets no keys and they type themselves; the nine keys then type English a letter at a time (连按). */
         const val ENGLISH_SUGGEST = "EnglishSuggest"
 
-        /** libime's key for its common misspellings (gn for ng); here it turns slips on too. */
+        /** libime's key for its misspellings (gn for ng); here it turns slips on too. */
         const val TYPOS = "NG_GN"
 
         const val DEFAULT_PAGE_SIZE = 7
         val PAGE_SIZES = 3..10
 
-        /**
-         * 自然码: libime's default and 0.4's, an upgrade with none stored pinned to it ([SchemeMigration]);
-         * still this class's default (the engine's, its tests'), the app's is EngineOptions'.
-         */
+        /** libime's and 0.4's default, which upgrades with none stored are pinned to ([SchemeMigration]); still this class's default, the app's is EngineOptions'. */
         const val ZIRANMA = "Ziranma"
 
-        /** 小鹤: the app's default since 0.5 (EngineOptions), and what a scheme 0.5 dropped is read as ([SchemeMigration]). */
+        /** The app's default (EngineOptions), and what a dropped scheme is read as ([SchemeMigration]). */
         const val XIAOHE = "Xiaohe"
 
-        /** 微软. */
         const val MS = "MS"
 
-        /** The schemes by the names libime's config gives them. */
+        /** By libime's config names. */
         val SCHEMES: Map<String, ShuangpinScheme> = linkedMapOf(
             ZIRANMA to ShuangpinScheme.ZIRANMA,
             MS to ShuangpinScheme.MICROSOFT,
@@ -106,32 +85,26 @@ data class EngineSettings(
     }
 }
 
-/**
- * The 性能档位, by the names the addon's config keeps ([key]): how much of the sentence models the
- * pinyins run, from the decoder alone to the most right and the most work.
- */
+/** 性能档位, by config [key]: how much of the sentence models pinyin runs. */
 enum class ModelLevel(val key: String) {
-    /** 低档: the decoder alone, its n-gram model. */
+    /** The decoder's n-gram alone. */
     LOW("Low"),
 
-    /** 中档: and the small sentence model, at every key, picking among the decoder's sentences. */
+    /** Plus the small sentence model at every key. */
     MEDIUM("Medium"),
 
-    /** 高档: and the large one too, once the user pauses (PinyinSession's refiner). */
+    /** Plus the large one once the user pauses. */
     HIGH("High"),
 }
 
-/**
- * What the user set for a table input method, under libime table's keys; what is null stays as
- * the table's own [TableOptions] have it.
- */
+/** A table's settings under libime table's keys; null keeps the table's own [TableOptions]. */
 data class TableSettings(
     val autoSelect: Boolean? = null,
     val hint: Boolean? = null,
     val orderByUse: Boolean? = null,
     val keyLabels: KeyLabels? = null,
 ) {
-    /** [options] with what was set here instead; key labels only where the table has roots. */
+    /** Key labels only where the table has roots. */
     fun applyTo(options: TableOptions) = options.copy(
         autoSelect = autoSelect ?: options.autoSelect,
         hint = hint ?: options.hint,
@@ -144,16 +117,12 @@ data class TableSettings(
         const val HINT = "Hint"
         const val ORDER_POLICY = "OrderPolicy"
 
-        /** What a table with roots ([TableOptions.roots]) shows on its keys: [KeyLabels]'s keys. */
         const val KEY_LABELS = "KeyLabels"
 
-        /** What 调频 on is written as (Fast orders by use alike). */
+        /** 调频 on (Fast orders by use too). */
         const val ORDER_BY_USE = "Freq"
 
-        /**
-         * The keys a table's group has. 自动造词's two (AutoPhraseLength, SaveAutoPhraseAfter) are
-         * gone (U-28 C46): an older config's are read by nothing, and fcitx drops them at its next save.
-         */
+        /** 自动造词's two keys are gone: an older config's are ignored and fcitx drops them at its next save. */
         val KEYS = setOf(AUTO_SELECT, HINT, ORDER_POLICY)
     }
 }

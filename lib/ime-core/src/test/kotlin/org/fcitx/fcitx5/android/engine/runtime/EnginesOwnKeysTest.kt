@@ -25,22 +25,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/**
- * Pinyin on a layout's own letter groups through Engines (060-render-p3 T9b): the sample 17 keys told as
- * [EngineSettings.ownKeys], their codes and taps typed by pinyin's own-keys session, learned under their tag,
- * shown as letters; their codes with no keyboard told swallowed; the built-in keys' kinds as they were.
- */
+/** Pinyin on a layout's own letter groups through Engines: typed, learned under their tag, shown as letters. */
 class EnginesOwnKeysTest : EnginesFixture() {
 
     private val root = MemoryFiles()
     private val written = SceneGroups.written((LayoutReader.layout(SceneData.read("k17.xml")) as Parsed.Ok).value)
     private val k17 = NineKeyLetters.custom(written)
 
-    private fun engines(ownKeys: List<String>? = written, files: MemoryFiles = root) = Engines(::load, files, warmUps = inPlace).also {
-        it.settings = it.settings.copy(ownKeys = ownKeys)
-        it.onEvent(PINYIN, EngineEvent.RESET, 0)
-        it.context(PINYIN, "")
-    }
+    private fun engines(ownKeys: List<String>? = written, files: MemoryFiles = root) = ready(PINYIN, files, EngineSettings(ownKeys = ownKeys))
 
     // the keyboard in use is process-wide (NineKeyLetters.inUse): none of another test's left for this, nor this one's for the next
     @Before
@@ -67,7 +59,6 @@ class EnginesOwnKeysTest : EnginesFixture() {
     fun theOwnKeysCodesAndTapsReachTheirOwnSession() {
         assertEquals(InputMethodCatalog.PINYIN_KEYS_OWN, KeyboardPair.pinyinKeyed(code("bn").code))
         assertEquals(InputMethodCatalog.PINYIN_KEYS_OWN, KeyboardPair.pinyinKeyed(Keyboard.tapKey(code("pqrs"), 0.2f, 0.8f)))
-        // the built-in keys' as they were
         assertEquals(InputMethodCatalog.PINYIN_KEYS, KeyboardPair.pinyinKeyed(NineKeyLetters.G14.key('n').code))
         assertEquals(InputMethodCatalog.PINYIN_KEYS, KeyboardPair.pinyinKeyed(Keyboard.tapKey(NineKeyLetters.G14.key('n'), 0.9f)))
         assertEquals(InputMethodCatalog.PINYIN_KEYS18, KeyboardPair.pinyinKeyed(Keyboard.pinyin18Key(NineKeyLetters.G18.key('n'))))
@@ -82,7 +73,6 @@ class EnginesOwnKeysTest : EnginesFixture() {
         // the taps leaning to the letters meant: n and i right, h right, a left, o left
         val tapped = engines.typeCodes(nihao.zip(listOf(0.9f, 0.9f, 0.9f, 0.1f, 0.1f)).map { (g, x) -> Keyboard.tapKey(code(g), x, 0.5f) })
         assertEquals("你好", tapped.candidates.first())
-        // committed by a pick, back to nothing typed
         val picked = engines.onEvent(PINYIN, EngineEvent.PICK, 0)
         assertEquals("你好", picked.commit)
         engines.close()
@@ -119,12 +109,10 @@ class EnginesOwnKeysTest : EnginesFixture() {
     @Test
     fun theirCodesWithNoKeyboardToldTypeNothingAndLeaveWhatIsShown() {
         val engines = engines(ownKeys = null)
-        // nothing typed: nothing, never the code as a character
         val alone = engines.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code)
         assertTrue(alone.handled)
         assertEquals("", alone.commit)
         assertEquals("", alone.preedit)
-        // typed on the full keyboard: left as it was
         val ni = engines.type(PINYIN, "ni")
         for (c in listOf(code("bn").code, Keyboard.tapKey(code("pqrs"), 0.5f, 0.5f))) {
             val out = engines.onEvent(PINYIN, EngineEvent.CHAR, c)
@@ -133,7 +121,7 @@ class EnginesOwnKeysTest : EnginesFixture() {
             assertEquals(ni.preedit, out.preedit)
             assertEquals(ni.candidates, out.candidates)
         }
-        // review L7: a pick (space) or a refine the snapshot before had is not the swallowed key's
+        // a pick (space) or a refine the snapshot before had is not the swallowed key's
         val picked = engines.onEvent(PINYIN, EngineEvent.CHAR, ' '.code)
         assertTrue(picked.toString(), picked.picked)
         val after = engines.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code)
@@ -141,15 +129,12 @@ class EnginesOwnKeysTest : EnginesFixture() {
         assertEquals("", after.commit)
         assertFalse(after.picked)
         assertFalse(after.refines)
-        // groups that make no keyboard are none told
         val none = engines(ownKeys = listOf("ab", "cd"), files = MemoryFiles())
         assertEquals("", none.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code).commit)
         none.close()
         engines.close()
     }
 
-    // review M1: other groups told at the field's first key, after its context: the new session on them knows the
-    // text before the cursor (好 puts 拟 first, as EnginesKeys14Test), and the others keep what they typed
     @Test
     fun otherGroupsToldKeepTheTextBeforeTheCursorAndTheOtherSessions() {
         val engines = engines()
@@ -163,7 +148,6 @@ class EnginesOwnKeysTest : EnginesFixture() {
         engines.settings = engines.settings.copy(ownKeys = reversed)
         val ni = engines.typeCodes(listOf("bn", "ui").map { code(it, other).code })
         assertEquals(listOf("拟", "你"), ni.candidates.take(2))
-        // 五笔's input kept: its session not made anew
         assertEquals(wubi.preedit + "g", engines.type(InputMethodCatalog.WUBI, "g").preedit.replace(" ", ""))
         engines.close()
     }
@@ -183,8 +167,6 @@ class EnginesOwnKeysTest : EnginesFixture() {
         engines.close()
     }
 
-    // the keyboard told no more (another layout, no own groups): its codes no longer read by it anywhere in the
-    // process (NineKeyLetters.ofCode), not the last one kept
     @Test
     fun ownKeysToldNoMoreAreReadByNone() {
         val engines = engines()
@@ -194,8 +176,7 @@ class EnginesOwnKeysTest : EnginesFixture() {
         engines.close()
     }
 
-    // other groups told make the session on them anew: a reading late for a piece written on the old one is
-    // not let in by the new one, as when every session is made anew (EnginesInkOverTest.madeAgainKeepsWhatWasEnded)
+    // a reading late for a piece on the old session is not let into the new one
     @Test
     fun otherGroupsToldKeepThePieceOfHandwritingEnded() {
         val engines = engines()
@@ -209,7 +190,6 @@ class EnginesOwnKeysTest : EnginesFixture() {
         val reversed = written.reversed()
         engines.settings = engines.settings.copy(ownKeys = reversed)
         assertEquals(1, engines.inkEnded)
-        // the new session on the other groups, nothing typed on it
         engines.typeCodes(listOf(code("bn", NineKeyLetters.custom(reversed)).code))
         engines.onEvent(PINYIN, EngineEvent.BACKSPACE, 0)
         assertEquals("", write(1, "好").preedit)

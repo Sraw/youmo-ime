@@ -34,10 +34,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLooper
 import kotlin.math.roundToInt
 
-/**
- * The settings' keys put a key's symbol where the keyboard does: where 标点位置 says; 底部 under the
- * letter, but at 紧凑 top right (bottom right where 快捷键图标位置 is top right).
- */
+/** A key's symbol where 标点位置 says; 底部 under the letter, but at 紧凑 top right (bottom right if shortcuts are top right). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -50,22 +47,22 @@ class KeyCapsTest {
 
     private enum class At { Under, TopRight, BottomRight, TopLeft, BottomLeft, None }
 
-    // the key as the page lays it out, the engine's cell in it
+    // as the page lays it out, the engine's cell in it
     private fun key(): FrameLayout = KeyCaps.key(ctx, "W", "2", marked = false, dimmed = false).apply {
         measure(View.MeasureSpec.makeMeasureSpec(SIZE, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(SIZE, View.MeasureSpec.EXACTLY))
         layout(0, 0, SIZE, SIZE)
     }
 
-    // where the engine drew the symbol, from the letter: under it (in its column), or in a corner of the key
+    // from the letter: under it (its column), or a corner
     private fun at(key: FrameLayout): At {
         val cell = (0 until key.childCount).map(key::getChildAt).filterIsInstance<SceneKeyCell>().single()
         val texts = cell.keyNode!!.ops(false).filterIsInstance<Op.Text>()
         val letter = texts.single { it.text == "W" }
         val symbol = texts.singleOrNull { it.text == "2" } ?: return At.None
-        // a text drawn from its left: its middle, its width about its size a character
+        // drawn from its left: its middle, about its size a character
         fun middle(t: Op.Text) = t.x + t.size * t.scaleX * 0.3 * t.text.length
         val below = symbol.baseline > letter.baseline
-        // the ops at the keyboard key's size the cap stands for (SceneKeyCell.keyboardKeyHeight)
+        // the ops at the keyboard key's size the cap stands for
         val w = cell.scene!!.width
         val side = middle(symbol) - w / 2.0
         return when {
@@ -77,12 +74,11 @@ class KeyCapsTest {
         }
     }
 
-    // a tap as a finger makes it, down and up: the frame's click, though the engine's cell under it is a gesture view
-    // (the bug pinned: in 0.6.0's first beta the cell kept the touch, and tapping a key on 按键字符和快捷键 opened no dialog)
+    // a real down-up tap reaches the frame's click though the engine cell under it is a gesture view (once it opened no dialog)
     @Test
     fun aTapOnTheKeyIsItsClick() {
         val k = key()
-        // in a window: a view not in one queues its click for an attach that never comes
+        // in a window: a view in none queues its click for an attach that never comes
         Robolectric.buildActivity(Activity::class.java).setup().get().setContentView(FrameLayout(ctx).apply { addView(k, SIZE, SIZE) })
         ShadowLooper.idleMainLooper()
         var clicks = 0
@@ -101,12 +97,12 @@ class KeyCapsTest {
         assertEquals(At.Under, at(key()))
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        // the shortcuts top left (the default): top right
+        // shortcuts top left (default): top right
         assertEquals(At.TopRight, at(key()))
-        // the shortcuts top right: bottom right
+        // shortcuts top right: bottom right
         prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
         assertEquals(At.BottomRight, at(key()))
-        // the swipes turned (the two places swapped with them): the symbol stays
+        // swipes swapped (places with them): the symbol stays
         prefs.setLayers(SwipeLayersChoice.ShortcutUpSymbolDown)
         assertEquals(At.BottomRight, at(key()))
         prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
@@ -130,9 +126,7 @@ class KeyCapsTest {
         }
     }
 
-    // the engine's cap (060-render-p2 S6 review): dimmed (its long press off), its words faded alone, the face and
-    // the symbol as they are, never a disabled key's fading; edited, outlined along the face drawn in the keyboard
-    // theme's accent
+    // dimmed fades only its words, never a disabled key's fading; edited, outlined along the face in the theme's accent
     @Test
     @Uat("ST-22")
     fun theEnginesCapFadesItsWordsAloneAndOutlinesItsFace() {
@@ -148,7 +142,7 @@ class KeyCapsTest {
         for ((a, b) in plain.zip(dim)) {
             if (a is Op.Text && a.text == "W") {
                 assertEquals(a.copy(color = Argb(0)), (b as Op.Text).copy(color = Argb(0)))
-                // 0.4 of its alpha, the colour itself kept
+                // 0.4 of its alpha, the colour kept
                 assertEquals((a.color.alpha * 0.4).roundToInt(), b.color.alpha)
                 assertEquals(a.color.value and 0xFFFFFF, b.color.value and 0xFFFFFF)
             } else {
@@ -161,7 +155,7 @@ class KeyCapsTest {
         val line = drawn.last() as Op.Stroke
         assertEquals(edited.keyNode!!.shape, line.shape)
         assertEquals(Argb(ThemeManager.activeTheme.accentKeyBackgroundColor), line.color)
-        // the item acted on (selected) outlined in the settings' colour, alone or over the marked outline (R20 F6504)
+        // the selected item outlined in the settings' colour, alone or over the marked outline
         val primary = Argb(ctx.styledColor(android.R.attr.colorPrimary))
         for (marked in listOf(false, true)) {
             val ops = cap(marked = marked, dimmed = false, selected = true).drawn()
@@ -170,8 +164,7 @@ class KeyCapsTest {
         }
     }
 
-    // a cap is the keyboard's key made at its size and drawn shrunk to the cap (060-pending-decisions, the
-    // shortcut page's marks where the keyboard puts them): its ops the key's at the keyboard's height
+    // the keyboard's key made at its size and drawn shrunk: its ops the key's at the keyboard's height
     @Test
     fun theEnginesCapIsTheKeyboardsKeyShrunkToIt() {
         val k = KeyCaps.keyboardKeyHeight(ctx)
@@ -191,13 +184,13 @@ class KeyCapsTest {
     private companion object {
         private const val W = 150
         private const val H = 160
-        // a key cap's size on the page, about 56dp at 440dpi
+        // about 56dp at 440dpi
         const val SIZE = 154
     }
 
     @Test
     fun aZhuyinCapIsAKeyOfItsFiveRows() {
-        // 注音's keys share the keyboard's height five ways, the letters' four: a cap stands for its own board's key
+        // 注音's keys share the height five ways, the letters' four: a cap stands for its own board's key
         val qwerty = KeyCaps.keyboardKeyHeight(ctx)
         val zhuyin = KeyCaps.keyboardKeyHeight(ctx, "zhuyin")
         assertEquals(qwerty * 4 / 5.0, zhuyin.toDouble(), 1.0)

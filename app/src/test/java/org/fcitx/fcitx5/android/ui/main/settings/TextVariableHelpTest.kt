@@ -31,10 +31,6 @@ import org.robolectric.annotation.Config
 import java.util.Calendar
 import java.util.Locale
 
-/**
- * 插入变量's help under a text (061-text-variables §2.4–2.5) and a swipe's text section that has it (R26 F8164,
- * F8183, F8280).
- */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class TextVariableHelpTest {
@@ -42,8 +38,7 @@ class TextVariableHelpTest {
     private val app = RuntimeEnvironment.getApplication()
     private val ctx = ContextThemeWrapper(app, R.style.Theme_FcitxAppTheme)
 
-    // the names' descriptions are matched to the names by place (TextVariableHelp.choose): one each, in every
-    // language, or each after a missing or added one is another's (F8164)
+    // descriptions match names by place (TextVariableHelp.choose): one each in every language
     @Test
     fun theDescriptionsAreOnePerVariableInEachLanguage() {
         assertRows(
@@ -56,7 +51,7 @@ class TextVariableHelpTest {
         )
     }
 
-    // what is typed now read at the help's clock; what of the text is not filled in told, nothing when all is (F8280)
+    // what is typed now, at the help's clock; what is not filled in told
     @Test
     fun theHelpPreviewsAtItsClockAndTellsWhatIsNotFilledIn() {
         val field = EditText(ctx)
@@ -80,7 +75,7 @@ class TextVariableHelpTest {
     private fun SwipeSlotSection.radio(text: Int) =
         KeyboardHarness.all(view).filterIsInstance<RadioButton>().first { it.text.toString() == ctx.getString(text) }
 
-    // 文字 with its variables on: the help shown under it, the summary the text as it types now (F8280)
+    // the help under 文字, the summary as it types now
     @Test
     fun aSwipesTextWithVariablesIsSummedUpFilledIn() {
         val (section, _) = section(SwipeSlot.Text("x"))
@@ -92,8 +87,7 @@ class TextVariableHelpTest {
         assertEquals(ctx.getString(R.string.shortcut_command_is, ctx.getString(R.string.shortcut_text), year), section.summary())
     }
 
-    // the text typed in, then another way picked: its field hidden, the keyboard put away and the field let go of,
-    // or the keys go on typing into it and pick 文字 again (F8183)
+    // another way picked: the field hidden and let go, or the keys type into it and pick 文字 again
     @Test
     @Uat("ST-97")
     fun anotherWayPickedPutsTheTextsKeyboardAway() {

@@ -17,10 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * uat/06-pinyin.md: a held candidate's reading line and word card on the shipped data (061-word-card.md §8.2):
- * the card reads a candidate as the bar does above it, whatever was typed to get it.
- */
+/** uat/06-pinyin.md: a held candidate's word card reads it as the bar does, whatever was typed to get it. */
 class WordCardUatTest {
 
     private fun EngineReplay.cardOf(text: String): CandidateCard? = engines.card(im, candidates.indexOf(text).also { assertTrue("$text not in ${candidates.take(SHOWN)}", it >= 0) }, text)
@@ -82,10 +79,7 @@ class WordCardUatTest {
         },
     )
 
-    /**
-     * The card's readings are the bar's, each code point: the first candidate of [rows] (typed, and a word
-     * typed as it is often misread: its target), in each style (typed once: a style changed keeps the session).
-     */
+    /** The card's readings are the bar's for the first candidate of [rows], in each style. */
     private fun sameAsTheBar(rows: List<Pair<String, String?>>): Pair<Int, List<String>> {
         val misses = ArrayList<String>()
         var checked = 0
@@ -98,9 +92,7 @@ class WordCardUatTest {
             for (style in listOf(ReadingStyle.PINYIN, ReadingStyle.ZHUYIN)) {
                 // the style alone changed: the session and what was typed kept (Engines.settings), nothing made anew
                 r.engines.settings = r.engines.settings.copy(candidateReading = style)
-                // what is held: the first page, or for a misreading the pages its target is on (compiled at a lower
-                // weight, lexicon/misreadings.tsv: 绮丽 under yili is on the second). Its target not there is a miss,
-                // not the first candidate checked instead (review F8175)
+                // the first page, or for a misreading the pages its target is on; its target missing is a miss
                 val page = r.engines.candidates(r.im, 0, if (target == null) PAGE else MISREAD_PAGES * PAGE)
                 val at = if (target == null) 0 else page.indexOfFirst { it.text == target }
                 val miss = if (at < 0) "$style $keys: $target not in the first $MISREAD_PAGES pages"

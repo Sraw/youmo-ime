@@ -12,29 +12,17 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * A skin's looks ([SkinLook]) written as a theme 4.0 pack: `theme.xml` and its files ([SkinOutput]), for the
- * import's own check to read as any pack (ThemeReader, the asset limits). The rules (dev/design/060-skin-import.md §4):
- *
- * - The 24 colours of [ThemeReader.REQUIRED_COLORS] and `first` from the skin's (the board's mean, a key face's,
- *   the labels'); a dark version's only where they differ, under `<colors variant="dark">`.
- * - One `<picture>`, the first version's board (a theme has one); a second version's board is its colour.
- * - Key faces as `image(…)` nine-patches, their transparent margins cut off (the gap is the key's inset), at most
- *   [MAX_KEY_SIDE] px, drawn at the skin's pixels per dp ([SkinLook.width] / 360).
- * - Square keys with no border nor shadow, as a skin's images draw their own; a pressed face where the skin has one,
- *   else the app's press tint (every kind without one says so itself: another's pressed face never shows through).
- * - The key's gap, and at 紧凑 its gap up and down as the app's own themes' ([Gap.compact]).
- * - A second version restates what the first set that it has not (a single key's face, a kind's press): a light
- *   style never shows in the dark.
- * - The skin's own name and author; the theme's file names its own (`l-key-n.png`), never a name from the skin.
+ * A skin's looks written as a theme 4.0 pack, for the import's own check to read as any pack. A second version
+ * restates what the first set that it has not, so a light style never shows in the dark; file names are its own,
+ * never a name from the skin.
  */
 class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) -> Pixels?, private val fallbackName: String) {
     private val files = LinkedHashMap<String, SkinOutput>()
 
-    // an image of the skin's written once, whichever keys have it (Baidu's styles share an atlas's tiles)
+    // written once, whichever keys have it (Baidu's styles share an atlas's tiles)
     private val written = HashMap<SkinFill.Image, String>()
 
-    // a second version's board let go as it is read (only the first's is written): one board in memory, not two;
-    // with whether that second version had a picture
+    // a second version's board let go as it is read: one board in memory, not two
     private fun readLooks(): Pair<Map<Variant, SkinLook>, Boolean> {
         val order = source.variants.sortedBy { it.ordinal }
         var darkPicture = false

@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/** Every key's name a layout gives, and names no layout gives yet, stored in `key_lists` and read back as they were (§6.4). */
+/** Every key name a layout gives, and names none gives yet, stored in `key_lists` and read back unchanged. */
 class KeyIdRoundTripTest {
     private val builtIn = listOf(
         "qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols",

@@ -20,8 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-// the app's own application: a Monet theme reads the wallpaper's colours through it (appContext). With
-// Robolectric's plain one the Monet test passed only after another test had made the app once, never alone
+// the app's own application: a Monet theme reads the wallpaper through it; with Robolectric's it passed only after another test
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeLookMigrationTest {
@@ -62,7 +61,7 @@ class ThemeLookMigrationTest {
 
     @Test
     fun whatTheOldPageDidNotShowIsTheDefaultsAndGoes() {
-        // an old backup's hidden values: nobody could set them, so nothing of the user's to keep
+        // an old backup's hidden values: nobody could set them, nothing to keep
         prefs.edit(commit = true) {
             putBoolean("key_ripple_effect", true)
             putBoolean("key_border_stroke", true)
@@ -104,7 +103,7 @@ class ThemeLookMigrationTest {
         assertEquals(1, s.saved.size)
     }
 
-    // a 4.0 pack's keys are its file's: not copied into a 3.0 theme of its look with the old settings
+    // a 4.0 pack's keys are its file's: not copied into a 3.0 theme
     @Test
     fun aPackInUseIsLeftAsItIs() {
         prefs.edit(commit = true) { putBoolean("key_border", false); putInt("key_radius", 10) }
@@ -166,7 +165,7 @@ class ThemeLookMigrationTest {
         val kept = LegacyLook(keyBorder = false)
         assertEquals(kept, ThemeLookMigration.monet(prefs))
         assertEquals(kept, ThemeLookMigration.monetLook)
-        // a Monet theme made now draws its keys so, its colours the wallpaper's still
+        // its colours the wallpaper's still
         val drawn = TestThemes.MonetLight.look
         assertFalse(drawn.keys.blocks)
         assertEquals(monet.look.palette, drawn.palette)
@@ -181,8 +180,7 @@ class ThemeLookMigrationTest {
         assertNull(ThemeLookMigration.decode("x,false,false,1,1,1,1,1"))
     }
 
-    // the bug: the old key style settings were read bare, so one stored as another type (a bad
-    // backup) threw a ClassCastException at every start; now each is its default
+    // a key style setting stored as another type (a bad backup) threw at every start; now each is its default
     @Test
     fun aSettingOfTheWrongTypeIsItsDefaultNotACrashAtEveryStart() {
         prefs.edit(commit = true) {

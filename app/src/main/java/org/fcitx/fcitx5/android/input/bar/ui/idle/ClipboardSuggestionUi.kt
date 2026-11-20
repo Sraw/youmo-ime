@@ -36,7 +36,6 @@ import splitties.views.imageDrawable
 
 class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme) : Ui {
 
-    // the toolbar's clipboard's icon (a theme's `clipboard` too: 061-toolbar-icons), in the strip's own colour
     private val icon = imageView()
 
     private fun drawIcon() {
@@ -47,7 +46,6 @@ class ClipboardSuggestionUi(override val ctx: Context, private val theme: Theme)
         drawIcon()
     }
 
-    /** The icon as drawn now; null where the theme's is not read yet. */
     @get:VisibleForTesting
     internal val iconDrawable: Drawable? get() = icon.drawable
 

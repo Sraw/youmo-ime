@@ -7,35 +7,25 @@ package org.fcitx.fcitx5.android.engine.user.imports
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.data.escapeValue
 
-/**
- * libime's pinyin dictionaries (`.dict`) read without libime, as the text its own tools write of
- * them: those made for it (fcitx5-pinyin-zhwiki's), which the user imports.
- */
+/** libime's pinyin `.dict` files (fcitx5-pinyin-zhwiki's) read without libime, as the text its own tools write. */
 object LibimeFiles {
 
     private const val PINYIN_MAGIC = 0x000fc613
 
-    // what separates a pinyin key's reading from its text
     private const val PINYIN_SEPARATOR = '!'.code.toByte()
 
-    /** Whether [data] starts as a libime pinyin dictionary does. */
-    fun isPinyinDictionary(data: ByteArray): Boolean = magic(data) == PINYIN_MAGIC
-
     /**
-     * A pinyin dictionary (`.dict`, libime's `PinyinDictionary` saved), a line a word as its
-     * `saveText` writes them: `text pin'yin cost`. The cost is written so that it reads back as
-     * the same float, not always as libime prints it.
+     * A `.dict` as `saveText` writes it: `text pin'yin cost` a line, the cost written to read back as the same float.
      *
-     * @throws DataFormatException for a file that is not what it should be
+     * @throws DataFormatException for a malformed file
      */
     fun pinyinDictionary(data: ByteArray): List<String> = ArrayList<String>().also { lines -> forEachPinyinLine(data) { lines += it } }
 
     /**
-     * [pinyinDictionary]'s lines written to [out] as they are read, each ended by a newline: an import
-     * holds no list of a whole dictionary's strings beside its bytes (0.6.1 audit engine-08; zhwiki's is
-     * 64.5 MiB decompressed, and the import is to fit a 256 MB heap).
+     * [pinyinDictionary]'s lines streamed to [out], so no list of a whole dictionary's strings is held (zhwiki's is
+     * 64.5 MiB and the import must fit a 256 MB heap).
      *
-     * @throws DataFormatException for a file that is not what it should be
+     * @throws DataFormatException for a malformed file
      */
     fun writePinyinDictionary(data: ByteArray, out: Appendable) = forEachPinyinLine(data) { out.append(it).append('\n') }
 
@@ -74,7 +64,6 @@ object LibimeFiles {
 
     private fun magic(data: ByteArray): Int = if (data.size < 8) -1 else BigEndianInput(data).u32()
 
-    /** What follows [magic] and the version, decompressed from version [compressedFrom] on. */
     private fun body(data: ByteArray, magic: Int, what: String, compressedFrom: Int): BigEndianInput {
         if (magic(data) != magic) throw DataFormatException("not a libime $what")
         val version = BigEndianInput(data, 4).u32()

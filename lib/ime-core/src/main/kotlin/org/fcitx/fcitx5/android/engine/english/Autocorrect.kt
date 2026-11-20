@@ -6,23 +6,13 @@ package org.fcitx.fcitx5.android.engine.english
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel
 
-/**
- * Which word space puts in place of the one typed, for [EnglishSession]: a slip of no more than
- * [maxCorrection], or a [misspelling][Misspellings] in [misspellings]. Whether to correct at all
- * (a word never corrected, one with a hyphen) is the session's.
- */
+/** Which word space puts in place of the one typed: a slip within [maxCorrection] or a known misspelling. */
 internal class Autocorrect(private val maxCorrection: Float, private val misspellings: Map<String, String>) {
 
     /**
-     * What the word [typed] was meant to be, of what was [found] for its [keys] after [context]:
-     * - typed no word, the likeliest the keys spell written otherwise (dont as don't, london as
-     *   London), or else the likeliest a slip of no more than [maxCorrection] from them (teh as
-     *   the), from [EnglishSession.MIN_CORRECTED] keys; typed as a [name], a slip of no more than
-     *   [EnglishSession.NAME_CORRECTION], of a word with a capital (Stebe as Steve; Anushika is someone's);
-     * - typed a word (nad, oft, of the many the pages have), the same if [EnglishSession.KNOWN_MARGIN] likelier,
-     *   but not a capital more or less (ladies, Ladies), nor a longer word (gear, years).
-     * An apostrophe typed is never taken away. Null for none, or for keys that start a word likelier.
-     * A [misspelling][Misspellings] is no word, whatever the pages have: the word meant.
+     * What [typed] was meant to be: with no word typed, the likeliest respelling (dont as don't) else a slip within
+     * [maxCorrection] (teh as the); a typed word only if [EnglishSession.KNOWN_MARGIN] likelier, never by case or a
+     * longer word (gear, years). A typed apostrophe is never removed; null for keys likelier a word's start.
      */
     fun of(data: EnglishData, typed: String, keys: String, found: List<EnglishDecoder.Suggestion>, context: Long, name: Boolean): String? {
         misspellings[typed.lowercase()]?.let { return it }
@@ -37,11 +27,9 @@ internal class Autocorrect(private val maxCorrection: Float, private val misspel
         return data.word(best.word)
     }
 
-    // what may stand for [typed] (the word [id], if [known]): not itself, an apostrophe typed kept,
-    // and a word not as typed but for a capital more or less
+    // candidates for [typed]: not itself, its apostrophe kept, and a known word only differing in case is out
     private fun allowedFor(data: EnglishData, typed: String, id: Int, known: Boolean): (EnglishDecoder.Suggestion) -> Boolean {
         val apostrophe = '\'' in typed
-        // what follows the last apostrophe typed: s, ll, t, or nothing (dogs')
         val after = typed.substringAfterLast('\'').lowercase()
         return { s ->
             val text = data.word(s.word)
@@ -62,8 +50,8 @@ internal class Autocorrect(private val maxCorrection: Float, private val misspel
         return found.firstOrNull { it.cost <= most && allowed(it) && (!name || data.word(it.word)[0].isUpperCase()) }
     }
 
-    // typed so far, not wrong: the start of a word likelier than a slip (hel for hello, not he);
-    // a letter short with a slip as well is wrong all the same (softwae for software), but for a word
+    // typed so far, not wrong: a likelier word start beats a slip (hel for hello); a letter short with a slip
+    // too is still wrong (softwae)
     private fun startsInstead(data: EnglishData, best: EnglishDecoder.Suggestion, keys: String, known: Boolean): Boolean {
         if (!best.completes || known) return best.completes
         return best.cost == 0f || EnglishData.key(data.word(best.word)).length > keys.length + 1

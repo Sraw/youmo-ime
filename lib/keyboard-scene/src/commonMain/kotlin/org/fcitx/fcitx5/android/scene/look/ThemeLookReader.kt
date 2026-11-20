@@ -12,24 +12,25 @@ import org.fcitx.fcitx5.android.scene.json.JsonValue
 data class ThemeLookFile(val name: String, val dark: Boolean, val look: ThemeLook)
 
 /**
- * Theme file 3.0's json ([Json]) as a [ThemeLook], for the web's theme maker: what the app's
- * ThemeLookJson reads, the same way (held so by the app's ThemeLookReaderParityTest). Every field
- * is there, `null` written where one may be none; one not known is refused, as is a value out of
- * [ThemeLook]'s ranges. `"version": "3.0"` only: the app's migrations of older files are its own.
- * Its JSON is strict where kotlinx's is not (a key twice, a number in quotes, `8e0` for an int, a
- * control character unescaped: refused here), and a byte order mark is skipped (kotlinx refuses
- * one); no maker writes any of these. A problem is the file's, with its line, never a crash.
+ * Theme file 3.0's json ([Json]) as a [ThemeLook], for the web's theme maker and the app (its
+ * CustomThemeSerializer; [ThemeLookWriter] writes what this reads). Every field is there, `null`
+ * written where one may be none; one not known is refused, as is a value out of [ThemeLook]'s ranges.
+ * `"version": "3.0"` only: the app's migrations of older files are its own. Its JSON is strict (a key
+ * twice, a number in quotes, `8e0` for an int, a control character unescaped: refused), and a byte
+ * order mark is skipped; no maker writes any of these. A problem is the file's, with its line, never a crash.
  */
 object ThemeLookReader {
     const val VERSION = "3.0"
 
     // whatever else goes wrong (a bug of ours a file finds) a problem of the file too, as ThemeReader has it;
     // an exception, not an Error (out of memory is not the file's); the file's shape is fixed, no recursion
+    // [maxOverrides]: the single keys taken at most (the app takes any here: its import's limits refuse more, in the
+    // user's words)
     @Suppress("TooGenericExceptionCaught")
-    fun read(source: String): Parsed<ThemeLookFile> = when (val json = Json.parse(source)) {
+    fun read(source: String, maxOverrides: Int = Keys.MAX_OVERRIDES): Parsed<ThemeLookFile> = when (val json = Json.parse(source)) {
         is Parsed.Failed -> json
         is Parsed.Ok -> try {
-            Parsed.Ok(file(json.value))
+            Parsed.Ok(file(json.value, maxOverrides))
         } catch (e: ShapeException) {
             Parsed.Failed(e.line, e.message.orEmpty())
         } catch (e: Exception) {
@@ -37,7 +38,7 @@ object ThemeLookReader {
         }
     }
 
-    private fun file(root: JsonValue): ThemeLookFile = fields(root) {
+    private fun file(root: JsonValue, maxOverrides: Int): ThemeLookFile = fields(root) {
         val version = str("version")
         if (version != VERSION) fail(at("version"), "version \"$version\": this reads $VERSION only")
         val name = str("name")
@@ -59,7 +60,7 @@ object ThemeLookReader {
                 else -> fail(at("type"), "no bar of type \"$t\"")
             }
         }
-        val keys = obj("keys") { keys() }
+        val keys = obj("keys") { keys(maxOverrides) }
         val text = obj("text") { make { Text(nullableStr("keyFont"), nullableStr("candidateFont"), int("keyWeight"), int("candidateWeight"), int("keyScale")) } }
         ThemeLookFile(name, dark, make { ThemeLook(palette, picture, base, bar, keys, text) })
     }
@@ -107,7 +108,7 @@ object ThemeLookReader {
         return make { Crop(file, rect, int("rotation")) }
     }
 
-    private fun Fields.keys(): Keys {
+    private fun Fields.keys(maxOverrides: Int): Keys {
         val blocks = bool("blocks")
         val radius = int("radiusDp")
         val border = int("borderDp")
@@ -120,7 +121,7 @@ object ThemeLookReader {
         }
         val kinds = listOf("letter", "function", "space", "enter").map { k -> obj(k) { make { KindStyle(obj("fill") { fill() }, obj("pressed") { pressed() }) } } }
         val overrides = members("overrides").also { o ->
-            if (o.size > Keys.MAX_OVERRIDES) fail(at("overrides"), "over ${Keys.MAX_OVERRIDES} single keys")
+            if (o.size > maxOverrides) fail(at("overrides"), "over $maxOverrides single keys")
         }.mapValues { (_, v) ->
             fields(v) {
                 val fill = nullable("fill") { fields(it) { fill() } }

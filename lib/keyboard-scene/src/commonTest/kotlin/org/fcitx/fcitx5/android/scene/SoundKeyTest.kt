@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** 060-theme-sounds-icons §1.1: which `<sound key>` class a key plays. */
+/** Which `<sound key>` class a key plays. */
 class SoundKeyTest {
 
     @Test

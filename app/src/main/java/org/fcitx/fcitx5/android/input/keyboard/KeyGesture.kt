@@ -19,41 +19,35 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.GestureType
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 
 /**
- * A key's touch, apart from whatever draws the key (060-render-p2 S1): a [CustomGestureView]'s, or a
- * key a scene draws (canvas/SceneTouch's SceneKey). It decodes the finger's steps, runs the long
- * press's and the repeat's timers as coroutines in [Key.timers] and tells [key] what they come to,
- * while every decision about what a gesture *means* comes from the recognizer ([KeyGestureRecognizer]).
+ * A key's touch, apart from whatever draws it: decodes the finger's steps and runs the long press and
+ * repeat timers in [Key.timers]; what a gesture *means* is the recognizer's ([KeyGestureRecognizer]).
  */
 class KeyGesture(private val key: Key, touchSlop: Float) {
 
-    /** What a touch reads of its key and does to it. */
     interface Key {
-        /** Its size, px: a finger past it has left the key. */
+        /** Px: a finger past it has left the key. */
         val keyWidth: Int
         val keyHeight: Int
         val keyEnabled: Boolean
 
-        /** Shown pressed or not; told every time, a change or not, as View.setPressed is. */
+        /** Told every time, a change or not, as View.setPressed is. */
         fun showPressed(pressed: Boolean)
 
-        /** Where the finger is on it, for a ripple's start (a view's drawable hotspot). */
+        /** For a ripple's start. */
         fun hotspot(x: Float, y: Float) = Unit
 
-        /** What buzzes ([InputFeedbacks.hapticFeedback]). */
         val feedback: View
 
-        /** Where the long press's and the repeat's timers run: the main thread's, the window's lifetime. */
+        /** The main thread's, the window's lifetime. */
         val timers: CoroutineScope
 
-        /** Its click (View.performClick); whether anything took it. */
         fun click(): Boolean
 
-        /** Its long press (View.performLongClick); whether it took the touch. */
         fun longClick(): Boolean
         fun doubleTap()
         fun repeat()
 
-        /** [event] to its listener: whether it consumed it, null where it has none. */
+        /** Null where it has none. */
         fun onGesture(event: Event): Boolean?
     }
 
@@ -62,47 +56,34 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     @Volatile
     private var longPressTriggered = false
 
-    /** the finger on this key, by the id the keyboard's touch gives it */
     var touchPointer = MotionEvent.INVALID_POINTER_ID
         private set
 
-    // where across the key the finger came down, 0 its left edge and 1 its right: nearest what was
-    // aimed at, a lift is dragged off it. The key's width, its margins too (its cell's)
+    // 0 left edge, 1 right, across its cell: nearest what was aimed at, as a lift is dragged off it
     private var downAt = Float.NaN
 
-    // where down the key it came down, 0 its top and 1 its bottom: its cell's height, as [downAt]'s width
     private var downDown = Float.NaN
 
-    // each finger's own [downAt] and [downDown] by its id: typed fast, a second finger comes down on the
-    // same key (14 键's UI for "ui") before the first lifts, and the first's lift is its own place, not the
-    // second's (060-fast-typing). Two floats a pointer id (Android's are 0 to 31), NaN where none: no
-    // allocation a key's touch
+    // per finger id: typed fast, a second finger comes down on the same key (14 键's UI for "ui") before the first
+    // lifts, and each lift keeps its own place. Two floats per id (0 to 31), NaN where none: no allocation
     private val downs = FloatArray(POINTER_IDS * 2) { Float.NaN }
 
     /**
-     * Where across the key the touch that clicks it came down ([downAt]), for the click listener
-     * alone: set as the finger lifts, before the touch's state is reset, cleared once the click
-     * returns. NaN for a click no touch made (TalkBack), and for the touch's own click where it left the
-     * key or swiped past the threshold. A swipe's own click (KeySwipe's Tap, made at the Up) and a stroke
-     * lifted short ([tap]) have where it came down: where the finger landed is what neighbour correction reads.
+     * For the click listener alone: set as the finger lifts, cleared once the click returns. NaN for a
+     * click no touch made (TalkBack), and where the touch left the key or swiped past the threshold. A
+     * swipe's own click and a stroke lifted short have it: neighbour correction reads where it landed.
      */
     var clickAt = Float.NaN
         private set
 
-    /** Where down the key that touch came down ([clickAt]'s y: 0 its top, 1 its bottom), NaN as [clickAt] is: a layout's own groups' taps (060-render-p3 T9b). */
+    /** 0 top, 1 bottom; for a layout's own groups' taps. */
     var clickDown = Float.NaN
         private set
 
-    /**
-     * Where across and down the key ([clickAt], [clickDown]) the touch that clicks it came down,
-     * however far it went: a swipe's own click (KeySwipe's Tap) has it too, set before the Up goes to
-     * the swipe. For the click listener alone, NaN for a click no touch made (TalkBack): where a tap
-     * fell, the engine's to read a key next to it (061-neighbour-correction).
-     */
+    /** However far the touch went; NaN for a click no touch made. The engine reads a neighbouring key by it. */
     var fellAt = Float.NaN
         private set
 
-    /** [fellAt]'s down the key. */
     var fellDown = Float.NaN
         private set
 
@@ -116,10 +97,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     @Volatile
     var longPressFeedbackEnabled = true
 
-    /**
-     * Whether its long press does anything as things are now, asked as it would fire: where not, neither felt nor
-     * told, the touch a tap's still (a named key whose list is off or empty now, its long press wired whatever the list).
-     */
+    /** Asked as it would fire: where not, neither felt nor told, the touch still a tap (a named key's list off or empty). */
     var longPressNow: () -> Boolean = { true }
 
     @Volatile
@@ -132,14 +110,12 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
     private var repeatJob: Job? = null
 
     /**
-     * This touch's hold, made anew as it goes down: a held ⌫'s repeats carry it ([BackspaceHold]), and once it is
-     * seen stopped the key repeats no more (what was typed as it began all deleted). It stops on the host's thread:
-     * a repeat or two already on their way are felt still, though not sent.
+     * Made anew at each down. Once seen stopped (what was typed as it began all deleted) the key repeats no
+     * more; it stops on the host's thread, so a repeat or two on their way are felt, not sent.
      */
     var hold = BackspaceHold()
         private set
 
-    /** Told [hold] as a touch of a key that repeats goes down: a ⌫'s, for what is typed then. */
     var holdBegan: ((BackspaceHold) -> Unit)? = null
 
     var swipeEnabled
@@ -163,14 +139,14 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             recognizer.swipeThresholdY = value
         }
 
-    /** Vertical steps after a sideways one ([KeyGestureRecognizer.crossStepY]): the space's cursor up and down. */
+    /** The space's cursor up and down. */
     var crossStepY
         get() = recognizer.crossStepY
         set(value) {
             recognizer.crossStepY = value
         }
 
-    /** One axis a touch ([KeyGestureRecognizer.axisLock]): a key swiped sideways and up. */
+    /** A key swiped sideways and up. */
     var axisLock
         get() = recognizer.axisLock
         set(value) {
@@ -183,17 +159,16 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             recognizer.doubleTapEnabled = value
         }
 
-    /** The class of key it sounds as (060-theme-sounds-icons: SoundKey.of). */
     var soundEffect: SoundKey = SoundKey.LETTER
 
-    /** The system's click it plays where no theme's sound does (SceneBehavior.systemSound). */
+    /** Where no theme's sound plays. */
     var systemSound: SoundKey = SoundKey.LETTER
 
     private fun across(x: Float) = if (key.keyWidth > 0) x / key.keyWidth else Float.NaN
 
     private fun downward(y: Float) = if (key.keyHeight > 0) y / key.keyHeight else Float.NaN
 
-    // where the touch came down ([downAt] across, [downDown] down), if it stayed a tap: on the key, swiped past no threshold
+    // if it stayed a tap: on the key, past no threshold
     private fun tapPlace(at: Float = downAt) =
         if (!recognizer.touchMovedOutside && recognizer.swipeTotalX == 0 && recognizer.swipeTotalY == 0) at else Float.NaN
 
@@ -223,17 +198,11 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         recognizer.cancel()
     }
 
-    /**
-     * A finger's step on the key, [action] a [MotionEvent]'s masked action, at ([x], [y]) in the key's
-     * pixels, finger [pointerId]'s, at [eventTime]: what the key's own onTouchEvent did with it.
-     */
     fun onTouch(action: Int, x: Float, y: Float, pointerId: Int, eventTime: Long): Boolean {
-        // Refreshed per touch: the key's size changes with the scene's (another height, one-handed)
+        // per touch: the key's size changes with the scene's
         recognizer.viewWidth = key.keyWidth
         recognizer.viewHeight = key.keyHeight
-        // longPressDelay is a live preference; the timers below read it per touch, so the
-        // double-tap window must too or the two drift apart after the user changes it (the
-        // recognizer freezes the value written at ACTION_DOWN for the rest of the touch)
+        // a live preference: frozen per touch like the timers, else the two drift apart after the user changes it
         recognizer.doubleTapTimeoutMs = longPressDelay.toLong()
         when (action) {
             MotionEvent.ACTION_DOWN -> down(x, y, pointerId)
@@ -300,16 +269,11 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
         recognizer.onDown(x, y)
     }
 
-    /**
-     * A tap at ([x], [y]) in the key's pixels after its touch was cancelled for a stroke drawn that, lifted short, was
-     * none (笔画筛选, GlideTouch.Route.TAP_KEY): its click as a tap's there, the key-up buzz with it (the down's was given).
-     */
+    /** After its touch was cancelled for a stroke that, lifted short, was none (GlideTouch.Route.TAP_KEY). */
     fun tap(x: Float, y: Float) {
         if (!key.keyEnabled) return
-        InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
         clickAt = across(x)
         clickDown = downward(y)
-        // and where it fell, for the engine to read a key next to it (061-neighbour-correction)
         fellAt = clickAt
         fellDown = clickDown
         key.click()
@@ -329,8 +293,7 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             downs[pointerId * 2 + 1] = Float.NaN
         }
         key.showPressed(false)
-        InputFeedbacks.hapticFeedback(key.feedback, longPress = true, keyUp = true)
-        // a swipe whose slot is nothing clicks the key at its Up (KeySwipe.Outcome.Tap): where it came down
+        // a swipe whose slot is nothing clicks the key at its Up: where it came down
         clickAt = at
         clickDown = atDown
         fellAt = at
@@ -341,9 +304,8 @@ class KeyGesture(private val key: Key, touchSlop: Float) {
             longPressTriggered = longPressTriggered,
             repeatStarted = repeatStarted,
         )
-        // not on every Move, which a grouped key dispatches however little the finger moved: only
-        // a swipe past the threshold, or off the key, is no tap. The total is signed, so one
-        // swiped a step and back counts as a tap, as it clicks anyway
+        // not on every Move, which a grouped key dispatches however little the finger moved. The total is
+        // signed, so a swipe a step and back counts as a tap, as it clicks anyway
         clickAt = tapPlace(at)
         clickDown = tapPlace(atDown)
         resetState()

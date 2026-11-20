@@ -5,10 +5,9 @@
 package org.fcitx.fcitx5.android.engine.lattice
 
 /**
- * A syllable trie of words beside the user's: node [root] the root, each node's children in a run
- * from [firstChild], sorted by the [syllable] reaching them. Two uses: [UserWords.startWords], the
- * words only imported, walked from the input's start alone (U-101, C19); and [UserWords.mergedWords],
- * the merged dictionaries', walked mid-sentence too.
+ * A syllable trie beside the user's: node [root], children in runs from [firstChild] sorted by [syllable].
+ * Used for [UserWords.startWords] (imported-only words, walked from the input's start only) and
+ * [UserWords.mergedWords] (merged dictionaries, walked mid-sentence too).
  */
 interface StartWords {
     val root: Int get() = 0
@@ -20,7 +19,6 @@ interface StartWords {
 
     fun childCount(node: Int): Int
 
-    /** The syllable that reaches [node]. */
     fun syllable(node: Int): Int
 
     fun wordCount(node: Int): Int

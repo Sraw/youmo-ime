@@ -16,36 +16,6 @@ def kb01(d):
     return f"`{p}`，候选 {c[:4]}"
 
 
-case("KB-02", needs="jvm:KeysUatTest.englishLettersTypeThemselvesASpaceAfter")(lambda d: None)
-
-
-case("KB-03", needs="jvm:KeyboardUatTest.swipingALetterUpTypesItsCorner")(lambda d: None)
-
-
-case("KB-04", needs="jvm:KeyboardUatTest.aLongPressLetGoTypesTheCorner")(lambda d: None)
-
-
-case("KB-05", needs="jvm:KeyboardUatTest.aLongPressesChoicesTypeWhereTheFingerIs")(lambda d: None)
-
-
-case("KB-06", needs="jvm:KeyboardUatTest.cornersShowChinesePunctuationWhileChinese")(lambda d: None)
-
-
-case("KB-07", needs="jvm:KeysUatTest.shiftCapitalisesTheNextLetter")(lambda d: None)
-
-
-case("KB-08", needs="jvm:KeyboardUatTest.shiftTwiceLocksCaps")(lambda d: None)
-
-
-case("KB-09", needs="jvm:KeyboardUatTest.backspaceOnce")(lambda d: None)
-
-
-case("KB-10", needs="jvm:KeyboardFieldsUatTest.backspaceTakesAnEmojiWithItsSkinToneWhole")(lambda d: None)
-
-
-case("KB-11", needs="jvm:KeyboardUatTest.holdingBackspaceRepeatsFasterTillLetGo")(lambda d: None)
-
-
 @case("KB-112")
 def kb112(d):
     d.open_page("text")
@@ -67,60 +37,6 @@ def kb112(d):
     d.hold(bksp, 2000)
     d.expect_field("", msg="没在打字时按住退格，框里还剩「{got}」")
     return "第一次按住 4 秒：删光拼音、停住后再松手，框里留着「你好」；第二次按住删空"
-
-
-case("KB-12", needs="jvm:KeyboardUatTest.swipingBackspaceLeftSelectsAndDeletes")(lambda d: None)
-
-
-case("KB-13", needs="jvm:KeyboardUatTest.swipingBackspaceWhileTypingClearsThePinyin")(lambda d: None)
-
-
-case("KB-14", needs="jvm:HostCasesUatTest.commaAndFullStopAfterChineseAreChinese")(lambda d: None)
-
-
-case("KB-15", needs="jvm:HostCasesUatTest.aCommaAfterADigitIsChinese")(lambda d: None)
-
-
-case("KB-16", needs="jvm:KeyboardUatTest.holdingTheCommaOffersTwoRows")(lambda d: None)
-
-
-case("KB-17", needs="jvm:KeyboardUatTest.spaceSlidesMoveTheCursor")(lambda d: None)
-
-
-case("KB-18", needs="jvm:KeysUatTest.spaceCommitsTheFirstCandidate")(lambda d: None)
-
-
-case("KB-19", needs="jvm:KeysUatTest.returnCommitsTheLettersAsTyped")(lambda d: None)
-
-
-case("KB-20", needs="jvm:KeyboardUatTest.searchFieldsReturnSearches")(lambda d: None)
-
-
-case("KB-21", needs="jvm:KeyboardUatTest.nextFieldsReturnGoesOn")(lambda d: None)
-
-
-case("KB-22", needs="jvm:KeyboardUatTest.addressFieldHasSlashDotAndDotCom")(lambda d: None)
-
-
-case("KB-23", needs="jvm:KeyboardUatTest.holdingDotComOffersMore")(lambda d: None)
-
-
-case("KB-24", needs="jvm:KeysUatTest.anEmailFieldsLettersBeforeAtAreCommittedAsTyped")(lambda d: None)
-
-
-case("KB-25", needs="jvm:HostCasesUatTest.anAddressFieldTypesDigitsAndMarksAsTheyAre")(lambda d: None)
-
-
-case("KB-26", needs="jvm:PairsUatTest.aBracketComesInPairsTheCursorBetween")(lambda d: None)
-
-
-case("KB-27", needs="jvm:PairsUatTest.theClosingBracketStepsOverTheOneThere")(lambda d: None)
-
-
-case("KB-28", needs="jvm:PairsUatTest.backspaceRightAfterDeletesThePair")(lambda d: None)
-
-
-case("KB-30", needs="jvm:KeyboardUatTest.aKeyHeldShowsItLarger")(lambda d: None)
 
 
 @case("KB-31", base="B0-设置", mutates=True, visual=True)
@@ -152,28 +68,10 @@ def kb31(d):
     return f"聊天框 {w0[0]}、键盘顶 {w0[1]} 始终不动；拼音行 `{p}`"
 
 
-# ---------------------------------------------------------------- 滑行
-
-case("KB-32", needs="jvm:KeyboardUatTest.glideIsOffByDefault")(lambda d: None)
 
 
 case("KB-33", needs="jvm:HostCasesUatTest.aGlideGoesInWithItsSpaceItsWordChangedOrErasedWholeAMarkTakesTheSpace、KeyboardFieldsUatTest.aGlideDrawsTheFingersTrail、"
      "TextSceneWiringTest.aGlideReadsEachLetterWhereTheKeySendingItIsWhateverItsId")(lambda d: None)
-
-
-case("KB-35", needs="jvm:KeyboardUatTest.tapsShortSwipesAndHoldsAreNoGlide")(lambda d: None)
-
-
-case("KB-36", needs="jvm:KeyboardFieldsUatTest.noGlideInAPasswordAnAddressOrAnEmail")(lambda d: None)
-
-
-case("KB-38", needs="jvm:KeyboardUatTest.holdingTheSpaceSetToNothingIsOneSpace")(lambda d: None)
-
-
-case("KB-39", needs="jvm:KeyboardUatTest.shiftChangesAllThreeRows")(lambda d: None)
-
-
-case("KB-41", needs="jvm:KeyboardUatTest.aFirstMoveSidewaysAfterSlippingOffKeepsThePopup")(lambda d: None)
 
 
 @case("KB-106", visual=True)
@@ -193,18 +91,6 @@ def kb106(d):
     d.expect_field("西安")
     check("shift" in d.keys(refresh=True), "上屏后没变回 ⇧")
     return f"编码行「{pre}」，上屏「西安」"
-
-
-case("KB-107", needs="jvm:ShiftSeparatorCanvasTest.aShiftKeptBesideTheSeparatorStaysShift、ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas、ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator、ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce、ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped、ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce")(lambda d: None)
-
-
-case("KB-42", needs="jvm:StrokeUatTest.aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone、StrokeUatTest.theNineAndFourteenKeysSendAStrokeToo、StrokeUatTest.aStrokeStartsInTheSplitGapTooATapOrAGlideThereDoNothing、StrokeUatTest.aSecondFingerOnALetterWhileOneRestsInTheGapTypesIt、StrokeUatTest.aStrokeFromTheGapCancelledSendsNothingAndLeavesNoTrail、StrokeUatTest.noOtherLayoutHasAGap、StrokeUatTest.theSweepFindsTheSplitGap")(lambda d: None)
-
-
-case("KB-43", needs="jvm:StrokeUatTest.withNothingTypedGlideChosenOrEnglishNoStrokeIsSent")(lambda d: None)
-case("KB-101", needs="jvm:StrokeUatTest.aFingerThatSlidesShortOfTheLiftDistanceIsTheKeysTap、StrokeUatTest.aShortStrokeAsAnotherFingerLandsIsItsTapAndTheOtherKeyTypedToo")(lambda d: None)
-case("KB-102", needs="jvm:StrokeUatTest.aTapNearTheEdgeSlidingOffTheKeyIsStillItsTap")(lambda d: None)
-case("KB-103", needs="jvm:StrokeUatTest.aSlowStrokeIsReadBeforeAnyLongPress")(lambda d: None)
 
 
 @case("KB-104", mutates=True)
@@ -231,88 +117,9 @@ def kb104(d):
     return f"15dp：「{short}」；40dp：「{long}」"
 
 
-case("KB-44", needs="jvm:AddressUatTest.anEmptyEmailFieldOffersTheSuffixesTheCursorStaysBeforeTheAt")(lambda d: None)
-
-
-case("KB-45", needs="jvm:AddressUatTest.aNameTypedGetsTheSuffixTheCursorAtTheEnd")(lambda d: None)
-
-
-case("KB-46", needs="jvm:AddressUatTest.afterTheAtTheLettersTypedFilter")(lambda d: None)
-
-
-case("KB-47", needs="jvm:AddressUatTest.aUrlFieldGetsItsStartsThenTheSuffixes")(lambda d: None)
-
-
-case("KB-48", needs="jvm:AddressUatTest.theUsersOwnListsAreOffered")(lambda d: None)
-
-
-case("KB-49", needs="jvm:AddressUatTest.addressesTypedAreRememberedAndTheirSuffixesComeFirst")(lambda d: None)
-
-
-case("KB-50", needs="jvm:AddressUatTest.incognitoFieldsAndNoHabitsLearnNothing")(lambda d: None)
-
-
-case("KB-51", needs="jvm:AddressUatTest.aRestartedFieldOffersNothingOfTheOneBefore")(lambda d: None)
-
-
-case("KB-52", needs="jvm:AddressUatTest.halfAnAddressIsNotLearnedTillTheFieldIsLeft")(lambda d: None)
-
-
-case("KB-53", needs="jvm:AddressUatTest.anAddressTheAppFilledInIsNotLearnedWhateverIsSelected")(lambda d: None)
-
-
-case("KB-54", needs="jvm:AddressUatTest.aSuffixHalfTypedIsFinished")(lambda d: None)
-
-
-case("KB-55", needs="jvm:AddressUatTest.beforeTheFirstUnlockOrInALongTextNothingIsLearned")(lambda d: None)
-
-
-case("KB-56", needs="jvm:AddressUatTest.fieldsThatShareANameAreToldApartByTheirText")(lambda d: None)
-
-
-case("KB-57", needs="jvm:AddressUatTest.theLastFieldIsLearnedAsTheKeyboardGoesNotWhatTheSettingsForgot")(lambda d: None)
-
-
-case("KB-58", needs="jvm:AddressUatTest.onlyTheAddressAddedToWhatTheFieldStartedWithIsLearned")(lambda d: None)
-
-
-case("KB-59", needs="jvm:AddressUatTest.aUrlFieldsStartingHostIsNotCountedAddedOnesAre")(lambda d: None)
-
-
-case("KB-60", needs="jvm:HostCoreContractTest.an app unbound clears the panel its focus out dropped before no context is active")(lambda d: None)
-
-
-case("KB-61", needs="jvm:BaseKeyboardTest.aLettersSwipeDownIsItsShortcutAndUpItsFirst")(lambda d: None)
-
-
-case("KB-62", needs="jvm:BaseKeyboardTest.theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore、EditPlanTest、EditPlanTest.aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor、EditPlanTest.aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor、EditPlanTest.aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor、EditPlanTest.nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor、KeyShortcutsHostTest.aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen、HostCoreEnginesTest.what is typed is cleared without a commit and typed again、HostCoreEnginesTest.what is typed after a syllable taken off the nine keys' bar is never typed again、EnginesTest.aSyllableTakenOffTheBarIsAPick、SwipePopupScreenshotTest.theEditMenusCellsAreReadByTheirLabels")(lambda d: None)
-
-
 case("KB-105", needs="jvm:SwipePopupScreenshotTest.uprightOnTheCanvas、SwipePopupScreenshotTest.compactOnTheCanvas、SwipePopupScreenshotTest.floatingOnTheCanvas、"
      "SwipePopupScreenshotTest.turnedOnTheCanvas、KeyShortcutsScreenshotTest.theEditMenuOverTheSpace、BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme、"
      "PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded、PopupsTest.aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded")(lambda d: None)
-
-
-case("KB-63", needs="jvm:BaseKeyboardTest.aKeysOwnTextShortcutIsWhatItsSwipeRuns")(lambda d: None)
-
-
-case("KB-64", needs="jvm:DeletionRunTest")(lambda d: None)
-
-
-case("KB-65", needs="jvm:SwipePopupScreenshotTest.theBubbleSaysTheShortcutFitted、GroupedKeyboardTest.aSwipesShortcutShowsAsItIsNamedNotInTheLettersCase、PreviewLabelTest")(lambda d: None)
-
-
-case("KB-66", needs="jvm:KeyMarksUatTest.eachWhereItsSettingSays、KeyMarksUatTest.onePlaceStoredInBothTheSymbolYields、KeyMarkPositionSettingsTest.theTwoTogetherTheOthersPlaceGreyedOut、KeyMarksUatTest.theFirstOpenIsAsAfterAnySettingChanges、KeyMarksUatTest.aLongPressTurnedOffPlacesTheMarksAsAKeyboardMadeWithIt、KeyMarksScreenshotTest.everyPlaceOnTheKeyboards、KeyMarksTest、KeyMarkYieldTest")(lambda d: None)
-case("KB-89", needs="jvm:KeyMarksUatTest.theTopIsTheTopEdgesMiddle")(lambda d: None)
-
-
-case("KB-68", needs="jvm:LetterCaseScreenshotTest、LetterCaseRuleTest")(lambda d: None)
-
-
-case("KB-67", needs="jvm:KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherUpright、KeyMarksEverywhereUatTest.noKeyDrawsTwoThingsOverEachOtherTurned、KeyMarkYieldTest")(lambda d: None)
-
-
-case("KB-69", needs="jvm:KeyShortcutsHostTest.swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways、KeyShortcutsHostTest.swipeSelectCommitsWhatIsTypedFirst、KeyShortcutsHostTest.swipeSelectStepsOverAnEmojiWhole、SwipeSelectionTest、SwipeStepsTest")(lambda d: None)
 
 
 def testbed_field(d, rid):
@@ -361,8 +168,7 @@ def kb85(d):
     qx, qy = d.keys(refresh=True)["q"]
     sel = lambda: (ml()["selStart"], ml()["selEnd"])
     free = lambda a, b: a if b == anchor else b
-    # 42 dp up: past the keys' swipe threshold, 36 dp (BaseKeyboard.inputSwipeThreshold); 30 dp fell short, 滑选 never
-    # began and the lift typed q's 1
+    # 42 dp up: past the 36 dp swipe threshold; 30 dp fell short
     d.touch(("down", qx, qy), ("move", qx, qy - 21 * p), ("move", qx, qy - 42 * p), ("sleep", 0.2),
             ("move", qx - 10 * p, qy - 42 * p), ("sleep", 0.3))
     s1 = sel()
@@ -476,34 +282,6 @@ def kb71(d):
     return f"上到 {top['selStart']}，下到 {end['selStart']}，焦点一直在多行框"
 
 
-# ---------------------------------------------------------------- 一个键一份长按（060-keys-unify）
-
-
-case("KB-73", needs="jvm:KeysEverywhereUatTest.commaIsOneKey")(lambda d: None)
-
-
-case("KB-74", needs="jvm:KeysEverywhereUatTest.commaEditedOnceEverywhere")(lambda d: None)
-
-
-case("KB-75", needs="jvm:KeysEverywhereUatTest.commaFirstDrawnAndTyped、KeysEverywhereUatTest.heldAndLetGoTypesTheFirst、KeysEverywhereUatTest.heldAndLetGoTypesTheFirstOnANarrowKeyboard")(lambda d: None)
-
-
-case("KB-76", needs="jvm:KeysEverywhereUatTest.nineKeysOneThroughThePunctuationEverywhereAndSharedOnceEdited、KeysEverywhereUatTest.nineKeysOnesTapCyclesThePunctuationAsItMapsInBothLanguages")(lambda d: None)
-
-
-case("KB-77", needs="jvm:KeysEverywhereUatTest.nineKeysFiveSymbolsSharedLettersByInputMethod")(lambda d: None)
-
-
-case("KB-78", needs="jvm:KeysEverywhereUatTest.zhuyinNinesToneAndSlot、KeysEverywhereUatTest.zhuyinNinesToneOff")(lambda d: None)
-
-
-case("KB-79", needs="jvm:KeysEverywhereUatTest.fourteenKeysQwFirstDrawnAndTyped")(lambda d: None)
-
-
-case("KB-82", needs="jvm:PanelKeysUatTest.aLayerOf16OnTheNarrowestOneHanded、PanelKeysUatTest.aLayerOf16Landscape、PopupEditorTest.addStopsAtSixteen")(lambda d: None)
-
-
-case("KB-83", needs="jvm:DisplayIsTypedUatTest.everyKeyShowsWhatItTypes、DisplayIsTypedUatTest.toggledWithTheKeyboardUp")(lambda d: None)
 
 
 case("KB-84", needs="manual:18 键 L 的弹出在微软双拼和拼音下各看一次；规则由 KeyResolverTest.eighteenLsColonOnlyOnASchemeTypingSemicolon 查")(lambda d: None)
@@ -552,8 +330,7 @@ def kb81(d):
     d.clear()
     c = d.face("，", ",")
     corner = c.desc
-    # swiped first: the engine's “ ” alternation is its own state, which a clear does not reset (a hold let go
-    # first would type “ and leave ” next)
+    # swiped first: the engine's “ ” alternation is its own state, which a clear does not reset
     d.swipe(c.c, (c.c[0], c.c[1] - 130), 150, after=1.0)
     one = d.field_text()
     d.swipe(c.c, (c.c[0], c.c[1] - 130), 150, after=1.0)
@@ -798,14 +575,8 @@ def kb93(d):
     return f"预览「{now}」，弹出有「{value}」，选了打出「{got}」"
 
 
-case("KB-94", needs="jvm:TextVariablesUatTest.aSwipesTextOfVariablesTypesTheTimeItIsSwiped")(lambda d: None)
-
-case("KB-95", needs="jvm:TextVariablesUatTest.withoutTheMarkAsWrittenWithItAsFilledIn")(lambda d: None)
-
 case("KB-96", needs="manual:键盘开着等到下一分钟再选带变量的项，打出新时间；JVM 见 KeyResolverMarksTest.outputFillsInAgainAsPicked、"
                      "TextVariablesUatTest.rowsCountedInANewMinuteLeaveTheCatchUpToDrawIt")(lambda d: None)
-
-case("KB-97", needs="jvm:TextVariablesUatTest.anItemOfVariablesFirstIsTypedBySwipingUp")(lambda d: None)
 
 
 def comma_as_is(d):
@@ -843,14 +614,3 @@ def kb98(d):
     then = d.expect_field(first + ".", msg=f"打着 ni 选 `.` 打出「{{got}}」，应是「{first}.」")
     check(said == "不转中文标点，已开", f"按钮排的开关读作「{said}」")
     return f"开关读作「{said}」；弹出 {[t for t in shown if t in ('.', '。', '，', '？', '！')]}；打出「{got}」，打着 ni「{then}」"
-
-
-case("KB-99", needs="jvm:AsIsPunctuationTypedTest.aMarkedFirstIsTypedBySwipingUp")(lambda d: None)
-
-case("KB-100", needs="jvm:AsIsPunctuationTypedTest.notMarkedItIsChinesePunctuationAsEver、AsIsPunctuationTypedTest.englishTypesTheSameMarkedOrNot")(lambda d: None)
-
-
-case("KB-110", needs="jvm:AsIsPunctuationTypedTest.aMarkedBracketGoesInPairedAfterTheCandidate")(lambda d: None)
-
-
-case("KB-111", needs="jvm:AsIsPunctuationTypedTest.englishPairsTheBracketMarkedOrNot")(lambda d: None)

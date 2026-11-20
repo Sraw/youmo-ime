@@ -274,15 +274,10 @@ class PinyinRunTest {
         assertTrue(shown.toString(), "小穴" in shown && shown.first() != "小穴")
     }
 
-    /**
-     * Only those the first page would show wait past it, as in the session: one further down keeps
-     * its place, where moving every one after the first page would put 骚穴 right after 小穴. With
-     * the user's words too: a coarse word of a pack, which the data lacks, waits as well.
-     */
+    /** Only those the first page would show wait past it, as in the session; a pack's coarse word waits as well. */
     @Test
     fun aCandidateWithACoarseWordFurtherDownKeepsItsPlaceAsInTheSession() {
-        // ten words of xiao xue a quarter apart from a point a step above the penalty, so that, lowered
-        // by it, 小穴 falls among the first page's and 骚穴 past it, the penalty retuned or not
+        // ten words a quarter apart, so the penalty puts 小穴 on the first page and 骚穴 past it
         val reading = intArrayOf(Syllables.id("xiao"), Syllables.id("xue"))
         val words = List(10) { (0x4E00 + it).toChar().toString().repeat(2) }
         val data = PinyinData.load(

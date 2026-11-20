@@ -16,7 +16,6 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import kotlin.math.abs
 
-/** Taps simulated with a place (`pinyin --touch`, [TouchSim]; 061-neighbour-correction §5). */
 class TouchSimTest {
 
     @get:Rule
@@ -47,9 +46,7 @@ class TouchSimTest {
         assertNotEquals(slipped.map { it.touches }, TouchSim.convert(samples, "qwerty:s0.25:slip:2").map { it.touches })
     }
 
-    // the 18 keys' taps with where across the key they fell, as the app sends them (061-neighbour-18key): every
-    // key its dx from the left edge, to the nearest of the app's 17 places (a key of one letter's too, for a slip
-    // from it); another keyboard's none at all
+    // the 18 keys' taps with where across the key they fell, to the nearest of the app's places; another keyboard's none
     @Test
     fun theEighteenKeysTapsGoWithTheirPlace() {
         val g18 = listOf(Sample("nihao".map(NineKeyLetters.G18::key).joinToString(""), "你好", "t"))
@@ -62,15 +59,13 @@ class TouchSimTest {
         assertEquals(tapped, TouchSim.placed(tapped, NineKeyLetters.STANDARD))
     }
 
-    // the set as tapped, for the device's runner: read back the same
     @Test
     fun aSetTappedIsWrittenAndReadBack() {
         val tapped = TouchSim.convert(samples, "qwerty-ms:s0.3:slip") + Sample("a1", "啊1", "t", touches = listOf(TouchSim.board("qwerty").boxes.touch('a', 20f, 80f), null))
         assertEquals(tapped, EvalSet.parse(tapped.asSequence().map(EvalSet::line)))
     }
 
-    // the 18 keys' places too, for the device's runner to send each key as the app does (061-neighbour-18key);
-    // a set of places alone (--taps) its touches all none
+    // the 18 keys' places too, for the device's runner; a set of places alone has no touches
     @Test
     fun aSetTappedWithPlacesIsWrittenAndReadBack() {
         val g18 = listOf(Sample("nihao".map(NineKeyLetters.G18::key).joinToString(""), "你好", "t"))
@@ -100,7 +95,7 @@ class TouchSimTest {
         assertEquals(";", TouchSim.board("qwerty-ms").keys.keys.filter { it == ';' }.joinToString(""))
     }
 
-    // the gate (§7.2): keys tapped each in its own box read first what they read with no place
+    // the gate: keys tapped each in its own box read first what they read with no place
     @Test
     fun cleanTapsReadFirstWhatNoPlaceReads() {
         val data = tmp.newFile("pinyin.data").apply {

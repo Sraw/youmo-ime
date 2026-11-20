@@ -25,9 +25,6 @@ class SpanHelper(
         max(1, ceil(adapter.measureWidth(position) / 1.5).toInt()), manager.spanCount
     )
 
-    /**
-     * clear calculated layout
-     */
     private fun invalidate() {
         layout.clear()
     }
@@ -37,24 +34,17 @@ class SpanHelper(
         super.invalidateSpanIndexCache()
     }
 
-    /**
-     * Ensure layout of item at [position] in [adapter] have been calculated and return its layout
-     */
     private fun layoutItem(position: Int): ItemLayout {
-        // skip calculation if we already have the result
         if (layout.size > position) return layout[position]
         val spanCount = manager.spanCount
         var span = 0
         var group = 0
-        // start layout from the last known position
         layout.lastOrNull()?.also { last ->
             val lastSpan = last.spanIndex + last.spanSize
             if (lastSpan == spanCount) {
                 // the last known item is at the end of its group
-                // start from beginning of next group
                 group = last.groupIndex + 1
             } else {
-                // start from last span position
                 span = lastSpan
                 group = last.groupIndex
             }
@@ -71,11 +61,8 @@ class SpanHelper(
                 // stretch this item to fill the line
                 size = spanCount - span
             }
-            // save calculated layout
             layout.add(ItemLayout(span, size, group))
-            // accumulate span size
             span += size
-            // bump group index
             if (span == spanCount) {
                 span = 0
                 group++

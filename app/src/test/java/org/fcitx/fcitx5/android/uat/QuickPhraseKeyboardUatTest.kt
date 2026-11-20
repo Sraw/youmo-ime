@@ -46,10 +46,7 @@ import org.robolectric.shadows.ShadowPopupMenu
 import org.robolectric.shadows.ShadowToast
 import java.io.File
 
-/**
- * Quick input on the keyboard (uat/11 QU-12, QU-17, QU-18) over a fake engine: the zhuyin keyboards
- * lending their place to the full keyboard (the toolbar's 手写 pausing: KeyHandwritingUatTest), a candidate's card, the clipboard's 存为快速输入.
- */
+/** Quick input on the keyboard: the zhuyin keyboards lending their place to the full one, a candidate's card. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -77,8 +74,8 @@ class QuickPhraseKeyboardUatTest {
 
     private fun lettersShown() = "q" in h.texts() && "p" in h.texts()
 
-    // the zhuyin keyboards send no letters: 大千 and 注音九键 give way to the full keyboard, and an input method
-    // chosen meanwhile keeps its own letters, the zhuyin keyboard not brought back over them
+    // the zhuyin keyboards send no letters: they give way to the full keyboard, and an input method chosen meanwhile
+    // keeps its own letters
     @Test
     @Uat("QU-12")
     fun theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard() {
@@ -98,7 +95,6 @@ class QuickPhraseKeyboardUatTest {
                 assertTrue("$keyboard: ${h.texts()}", lettersShown() && !zhuyinShown())
                 quickInput(false)
                 assertTrue("$keyboard: ${h.texts()}", zhuyinShown())
-                // another input method while it lasts: its letters stay after
                 quickInput(true)
                 h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
                 quickInput(false)
@@ -144,7 +140,6 @@ class QuickPhraseKeyboardUatTest {
         h.api.quickPhrases[0] = QuickPhraseBook.Found(addr.key, addr.content, true)
         h.api.quickPhrases[1] = QuickPhraseBook.Found("ghost", "👻", false)
         candidates("北京市海淀区⏎", "👻")
-        // a built-in one: put in or copied, nothing else
         longPress("👻")
         assertEquals(listOf(s(R.string.quick_phrase_commit), s(R.string.quick_phrase_copy)), lines().drop(1))
         pick(s(R.string.quick_phrase_copy))
@@ -166,7 +161,6 @@ class QuickPhraseKeyboardUatTest {
             SettingsRoute.QuickPhrase(edit = true, key = addr.key, content = addr.content, existing = true),
             opened.parcelable<SettingsRoute>(MainActivity.EXTRA_SETTINGS_ROUTE),
         )
-        // deleted, the same menu then offering its undo
         longPress("北京市海淀区⏎")
         h.api.calls.clear()
         pick(s(R.string.delete))
@@ -201,7 +195,7 @@ class QuickPhraseKeyboardUatTest {
             SettingsRoute.QuickPhrase(edit = true, content = "北京市海淀区 3 号楼"),
             opened.parcelable<SettingsRoute>(MainActivity.EXTRA_SETTINGS_ROUTE),
         )
-        // review M2: past the page's limit, told and not opened (its text would not fit the Intent)
+        // past the page's limit, told and not opened (its text would not fit the Intent)
         val long = "长".repeat(QuickPhraseBook.MAX_CONTENT + 1)
         h.copied(long)
         h.waitFor("the long one listed") { KeyboardHarness.all(h.inputView).any { h.shown(it) && it is TextView && it.text.startsWith("长长长") } }
@@ -209,8 +203,7 @@ class QuickPhraseKeyboardUatTest {
         h.menuPick(s(R.string.clipboard_save_quick_phrase))
         assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
         assertEquals(s(R.string.quick_phrase_too_long_to_save, QuickPhraseBook.MAX_CONTENT), ShadowToast.getTextOfLatestToast())
-        // a password (shown as dots): not offered. The clipboard's object outlives the test: what it last
-        // stored put back after, passed or failed
+        // a password (shown as dots): not offered. The clipboard's object outlives the test: its last stored put back after
         val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
         val stampWas = cm.lastClipTimestamp
         val entryWas = cm.lastEntry

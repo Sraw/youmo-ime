@@ -10,7 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Every code a keyboard sends is internal, so the app never commits one handed back (code review S2). */
+/** Every code a keyboard sends is internal, so the app never commits one handed back. */
 class KeyCodesTest {
 
     @Test

@@ -9,14 +9,8 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.io.IOException
 
 /**
- * The common words ([CommonWords]) the pinyin sessions share, and the user's deleting one of their
- * replacements from the keyboard, handed to [save] as the whole list, as the file keeps them; a
- * [save] refused (an [IOException]) takes no effect, as [PhraseBook]'s. Only a refusal at once: a
- * [save] that queues the write (the app's) and fails later (I/O, a newer file restored) leaves the
- * replacement gone from the keyboard until the file is read again, when it is back, the write logged.
- *
- * Indexed by the way each session spells a syllable ([indexFor]): one index a spelling, made anew
- * after a change, a few kept ([MAX_INDEXES]: the keyboards switched between).
+ * The common words the pinyin sessions share; keyboard deletions hand the whole list to [save], and a
+ * refused [save] takes no effect. Indexed per syllable spelling ([indexFor]), a few kept ([MAX_INDEXES]).
  */
 class CommonWordBook(
     words: CommonWords = CommonWords.EMPTY,
@@ -25,12 +19,7 @@ class CommonWordBook(
     var words: CommonWords = words
         private set
 
-    /**
-     * [CommonWords.index] of [words] as [spell] spells, kept for [spelling] (a key naming the way,
-     * 双拼's scheme or full pinyin, [Syllables]) and [lettered] (keys of letter groups typing it).
-     * Full pinyin's 26 keys alone key a word of two by its initials: elsewhere they are a syllable's
-     * keys (双拼's `wm` is wen, the nine keys' 96 wo); and they alone type lüe `lue` as well.
-     */
+    /** The index for [spelling] (scheme or full pinyin) and [lettered]; only full pinyin's 26 keys key a two-syllable word by initials (elsewhere they spell a syllable) and type lüe as `lue`. */
     fun indexFor(spelling: Any, spell: (Int) -> String?, lettered: Boolean = false): CommonWords.Index {
         val key = spelling to lettered
         indexes[key]?.takeIf { it.of === words }?.let { return it }
@@ -42,12 +31,7 @@ class CommonWordBook(
 
     private val indexes = HashMap<Pair<Any, Boolean>, CommonWords.Index>()
 
-    /**
-     * The replacements [typed], what is left of a pinyin input, is a key of, as [indexFor] spells:
-     * as typed where the keys type letters, a separator only where a syllable of the word ends
-     * ([CommonWords.Index.foundTyped]); with [letters], keys of letter groups, each key any of its
-     * letters, as the custom phrases read them ([PhraseKeys], [PhraseBook.typed]).
-     */
+    /** Replacements [typed] is a key of: as typed on letter keys, `'` only at the word's syllable ends; with [letters], each grouped key any of its letters ([PhraseKeys]). */
     fun typed(
         typed: CharSequence,
         spelling: Any,
@@ -63,10 +47,10 @@ class CommonWordBook(
         return if (keys.isEmpty()) emptyList() else index.found(keys)
     }
 
-    /** [replacement] no longer one of [word]'s (从常用词中删除). */
+    /** 从常用词中删除. */
     fun remove(word: String, replacement: String) = remove(listOf(word), replacement)
 
-    /** [replacement] no longer one of any of [texts]' words: all that offered it ([CommonWords.Found.words]). */
+    /** From every word that offered it ([CommonWords.Found.words]). */
     fun remove(texts: Collection<String>, replacement: String) {
         val to = words.without(texts, replacement)
         try {
@@ -79,16 +63,12 @@ class CommonWordBook(
     }
 
     companion object {
-        // the ways of spelling indexed at once: a keyboard or two in use, the rest made again if switched to
+        // a keyboard or two in use; others rebuilt when switched to
         private const val MAX_INDEXES = 4
 
-        /** None, as a fresh install has (U-93's 借手机 too). */
         fun none() = CommonWordBook()
 
-        /**
-         * [list] with [found]'s replacements first, each [asText], one of their text further down
-         * taken out: it is them (060-common-words §4).
-         */
+        /** [list] with [found]'s replacements first, the same texts further down removed. */
         fun <C> first(found: List<CommonWords.Found>, list: List<C>, text: (C) -> String, asText: (String) -> C): List<C> {
             if (found.isEmpty()) return list
             val texts = found.mapTo(HashSet()) { it.text }

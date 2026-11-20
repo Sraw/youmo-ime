@@ -26,10 +26,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-/**
- * A restore beside the dictionaries' compile thread (MergedDictionary), which may be converting an
- * older build's texts as the copy writes them: the copy holds the sources lock (ImportedDictionaries).
- */
+/** A restore beside the compile thread, which may convert old texts as the copy writes them: the copy holds the sources lock. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class RestoreWhileCompilingTest {
@@ -52,7 +49,7 @@ class RestoreWhileCompilingTest {
         MergedDictionary.reset()
     }
 
-    // [dirs] exported, its metadata named as the app's (the package Robolectric runs it as may differ)
+    // its metadata named as the app's (Robolectric's package may differ)
     private fun exported(dirs: UserDataManager.Dirs) = ByteArrayOutputStream().also { bytes ->
         val export = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, dirs).getOrThrow() }
         ZipInputStream(export.toByteArray().inputStream()).use { from ->
@@ -69,13 +66,11 @@ class RestoreWhileCompilingTest {
         }
     }.toByteArray().inputStream()
 
-    // the locks each compile thread waits to take: this sandbox's and an idle one of another's in the same test JVM
-    // (each Robolectric sandbox its own MergedDictionary, its thread of the same name), told apart by the lock
+    // each Robolectric sandbox has its own compile thread of the same name: told apart by the lock
     private fun compileWaitsOn(): List<String> = Thread.getAllStackTraces().keys.filter { it.name == "dictionary-compile" }.map {
         ManagementFactory.getThreadMXBean().getThreadInfo(it.id)?.takeIf { info -> info.threadState == Thread.State.BLOCKED }?.lockInfo.toString()
     }
 
-    // this sandbox's compile thread waits for the sources lock, the one object here
     private fun compileWaitsOnTheSourcesLock(): Boolean {
         val lock = System.identityHashCode(ImportedDictionaries)
         return Thread.getAllStackTraces().keys.filter { it.name == "dictionary-compile" }.any {
@@ -84,12 +79,8 @@ class RestoreWhileCompilingTest {
         }
     }
 
-    // an older build's text the copy has made and not yet written to as a conversion lists it: the conversion
-    // waits for the copy and finds the text whole. Without the lock it was committed empty and deleted under the
-    // copy's write, its words gone. The copy's stand-in stops there till the compile is done or waits on the lock
-    // Times one interleaving: the compile queued behind the copy's lock. A conversion already reading the text
-    // as the copy writes it is kept by the commit's length and time check (ImportedDictionariesTest's
-    // aConversionIsCommittedAsTheTextIsThen)
+    // a text the copy made but has not written yet: the conversion waits for the lock (unlocked, it committed it empty).
+    // A conversion already reading is covered by ImportedDictionariesTest's length and time check
     @Test
     fun aRestoredTextIsNotConvertedHalfWritten() {
         val old = dirsUnder(File(folder.root, "old"))

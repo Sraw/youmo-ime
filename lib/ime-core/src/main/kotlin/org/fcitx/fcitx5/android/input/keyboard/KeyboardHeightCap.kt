@@ -11,23 +11,14 @@ import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
 import kotlin.math.roundToInt
 
-/**
- * The keys give way so the app keeps at least [MIN_APP_DP] over the keyboard (061-landscape-height §5.2; it took the
- * place of 0.6.0's 70% of the screen, which left an app 72–88 dp turned under gesture navigation, the bars not
- * counted), but never below [MIN_ROW_DP] a row: there the rows win and the app gets less (the user, 2026-11-14, over
- * 2026-10-22's 封顶赢). The level's own keys lower than that (紧凑) are not raised. Upright the levels are far from it.
- */
+/** The keys give way so the app keeps [MIN_APP_DP] over the keyboard, but never below [MIN_ROW_DP] a row; a level's own lower keys are not raised. */
 object KeyboardHeightCap {
     const val MIN_APP_DP = 120
     const val MIN_ROW_DP = 36
 
     /**
-     * The keys' height: [requested] unless the app would be left less than [MIN_APP_DP] of [available] (ImeRoom)
-     * over the keyboard, then down to [rows] × [MIN_ROW_DP]; never below 0. [barsHeight] is everything docked above
-     * the keys: the candidate bar and the code row in the keyboard (the preedit line; a code row floating over the
-     * app comes and goes and is not counted, as contentTopInsets never counted it), each fixed while one input method
-     * is shown, so no row pushes the keys about. [handleHeight] a docked drag handle (始终显示悬浮条), added to the
-     * keyboard. [rows] the layout's rows as [rowUnits] counts them; [density] px a dp.
+     * [barsHeight]: everything docked above the keys, fixed per input method (a floating code row not counted, as
+     * contentTopInsets never did); [handleHeight]: a docked drag handle; [rows] as [rowUnits] counts them.
      */
     fun keysHeight(
         requested: Int,
@@ -43,24 +34,16 @@ object KeyboardHeightCap {
         return maxOf(minOf(requested, room), minOf(requested, least)).coerceAtLeast(0)
     }
 
-    /**
-     * The rows a layout has in rows of its tallest ([heights], each row's weight): a row half as tall is half a row.
-     * By the tallest, not the shortest: a custom layout's thin row (a weight down to 0, LayoutReader) would count the
-     * others many times over and put the floor over the room (four rows and a half one by the shortest: nine, 324 dp).
-     * A tall row over short ones (the symbols' 1 and 3) counts less than their number: the floor is the rows' height.
-     */
+    /** Rows in units of the tallest: by the shortest, a thin custom row would count the others many times and push the floor past the room. */
     fun rowUnits(heights: List<Double>): Double {
         val tallest = heights.filter { it > 0 }.maxOrNull() ?: return DEFAULT_ROWS
         return heights.filter { it > 0 }.sum() / tallest
     }
 
-    /**
-     * [rowUnits] of [layout] as [env] expands it: the keyboard's (KeyboardWindow), the settings' caps and their notes
-     * (KeyCaps, SwipeFates) count a board's rows one way, 注音's five; four where it does not expand.
-     */
+    /** As the keyboard and settings expand it (注音's five); four where it does not expand. */
     fun rowUnits(layout: Layout, fragments: Map<String, Fragment>, env: Env): Double =
         rowUnits(Expand.rows(layout, fragments, env).getOr { return DEFAULT_ROWS }.map { it.height })
 
-    /** A layout of letters: four rows (a layout not read yet counts so). */
+    /** A layout not read yet counts so. */
     const val DEFAULT_ROWS = 4.0
 }

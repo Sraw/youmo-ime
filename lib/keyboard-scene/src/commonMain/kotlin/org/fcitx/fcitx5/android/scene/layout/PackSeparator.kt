@@ -15,38 +15,26 @@ import org.fcitx.fcitx5.android.scene.xml.Xml
 import org.fcitx.fcitx5.android.scene.xml.XmlElement
 
 /**
- * A theme pack's qwerty.xml given the app's 分词 in its Shift's place while pinyin or 双拼 is typed (0.6.1, FB12,
- * dev/design/061-theme-separator-migration.md): Shift's `when=` made to yield then, and after it a 分词 key in the same
- * place, as the app's own qwerty has them. Done once to the packs installed before 0.6.1 (ThemeSeparators), the file
- * itself rewritten: two places of its text changed, every other byte as it was (its comments, a 0.6.0 `<gap look=>`,
- * which LayoutWriter would not keep), so 0.6.0 reads it as before (there `composing` is only a table's).
+ * A pre-0.6.1 theme pack's qwerty.xml given the app's 分词 in its Shift's place while pinyin or 双拼 is typed. Two places
+ * of its text changed, every other byte as it was (LayoutWriter would not keep its comments), so 0.6.0 reads it as before.
  */
 object PackSeparator {
 
     sealed interface Rewrite {
-        /** The file's new text. */
         class Done(val text: String) : Rewrite
 
-        /** Left as it is, [why]. */
         class Kept(val why: String) : Rewrite
     }
 
-    /** The key put in: the app's 分词's id, which the keyboard tells it by (TextKeyboard.SEPARATOR_KEY). */
+    /** The app's 分词's id, which the keyboard tells it by (TextKeyboard.SEPARATOR_KEY). */
     const val ID = "apostrophe"
 
-    // the 分词 key's name as read (`separator` written), whatever key or variant has it
     private val NAME = KeyId.of("separator").name
 
-    // what of Shift's the 分词 key takes, as written on it: where it is and how it looks, so the two in turn fill one place alike
+    // where Shift is and how it looks, so the two in turn fill one place alike
     private val COPIED = listOf("kind", "width", "rows", "split", "margin", "face", "class")
 
-    /**
-     * [text] (a pack's qwerty.xml, its byte-order mark gone) with 分词 in each Shift's place while pinyin or 双拼 is typed,
-     * or why it is kept. [own]: the pack's file of a fragment's id, [appText] the app's; [app] the app's qwerty and its
-     * [appFragments], which the rewritten one must stand for as the original did (PackLayouts.judge). Checked before it
-     * is given: it reads, is judged as the original, and drawn in each of composing × table shows in each Shift's place
-     * exactly one of Shift and 分词, as wide as Shift was, and no key twice.
-     */
+    /** Checked before it is given: it reads, is judged as the original, and each Shift's place shows exactly one of Shift and 分词, as wide. */
     fun addSeparator(
         text: String,
         own: (String) -> String?,
@@ -82,17 +70,14 @@ object PackSeparator {
         return checked(rewritten, layout, fragments, own, appText, app, appFragments, found.shifts)
     }
 
-    // a Shift and what its and its 分词's `when=` become
     private class Placed(val element: XmlElement, val shift: List<List<Condition.Term>>, val separator: List<List<Condition.Term>>)
 
-    // the Shifts of a file, each 分词 put in with its conditions and its row's (whether two could show together); or why none
     private class Found(
         val shifts: List<Key> = emptyList(),
         val separators: List<Pair<Placed, List<List<Condition.Term>>>> = emptyList(),
         val why: String? = null,
     )
 
-    // each row's keys as read, by the elements they were read of (one a <key>, in order)
     private fun shifts(root: XmlElement, layout: Layout): Found {
         val rowElements = root.all("row")
         val layoutRows = layout.parts.filterIsInstance<Row>()
@@ -108,9 +93,9 @@ object PackSeparator {
                 val groups = groups(key.condition)
                 val separator = separatorGroups(groups)
                 val shift = shiftGroups(groups)
-                // Shift there only while pinyin is typed: a when= of nothing is none, and 分词 alone in its place is no Shift's
+                // a when= of nothing is none, and 分词 alone in its place is no Shift's
                 if (separator.isNotEmpty() && shift.isEmpty()) return Found(why = "Shift shows only while pinyin is typed")
-                // every pair of the row's and the 分词's (product): a few as written, bounded so a file cannot make millions
+                // bounded so a file cannot make millions
                 if (groups(row.condition).size.toLong() * separator.size > PackLayouts.MAX_ALTERNATIVES) {
                     return Found(why = "over ${PackLayouts.MAX_ALTERNATIVES} when= alternatives a Shift's and its row's make")
                 }
@@ -136,7 +121,6 @@ object PackSeparator {
     private fun isShift(key: Key): Boolean =
         key.attrs.role == "shift" || key.attrs.role == null && key.attrs.actions["send"]?.let { it == "caps" || it == "caps:lock" } == true
 
-    // a 分词 of its own already: a key or a variant of the name, `'` sent while typing, or a key of the id
     private fun hasSeparator(rows: List<Row>): String? {
         for (row in rows) for (cell in row.cells) {
             if (cell.id == ID) return "a key $ID already"
@@ -155,43 +139,38 @@ object PackSeparator {
 
     private fun term(name: String, negated: Boolean) = Condition.Term(name, null, negated)
 
-    // a table's, whichever: `table` or `table=wbx`
     private fun List<Condition.Term>.table() = any { it.name == TABLE && !it.negated }
 
-    // not a table's at all: `!table` alone, not `!table=wbx`
+    // `!table` alone, not `!table=wbx`
     private fun List<Condition.Term>.noTable() = any { it.name == TABLE && it.negated && it.values == null }
 
     private fun List<Condition.Term>.has(name: String, negated: Boolean) = any { it.name == name && it.values == null && it.negated == negated }
 
     private fun List<Condition.Term>.and(t: Condition.Term) = if (t in this) this else this + t
 
-    /** Shift's [groups] and not (composing and not a table's). */
     internal fun shiftGroups(groups: List<List<Condition.Term>>): List<List<Condition.Term>> = groups.flatMap { g ->
         when {
             g.table() || g.has(COMPOSING, negated = true) -> listOf(g)
-            // a group that asks composing yields whole while no table's: `G !composing` would never hold
+            // `G !composing` would never hold
             g.noTable() -> listOfNotNull(g.and(term(COMPOSING, true)).takeUnless { g.has(COMPOSING, negated = false) })
             else -> listOfNotNull(g.and(term(COMPOSING, true)).takeUnless { g.has(COMPOSING, negated = false) }, g.and(term(TABLE, false)))
         }
     }
 
-    /** Shift's [groups] and composing and not a table's: none where Shift never shows then. */
     internal fun separatorGroups(groups: List<List<Condition.Term>>): List<List<Condition.Term>> = groups.mapNotNull { g ->
         // `composing !table` last, as the app's own qwerty writes it
         if (g.table() || g.has(COMPOSING, negated = true)) null else g.filter { it != term(TABLE, true) }.and(term(COMPOSING, false)) + term(TABLE, true)
     }
 
-    // every group of [a] with every one of [b]: the key's when= under its row's
     private fun product(a: List<List<Condition.Term>>, b: List<List<Condition.Term>>) = a.flatMap { x -> b.map { y -> x + y.filter { it !in x } } }
 
-    // never both: each group of one with each of the other has a fact one asks and the other asks not
     internal fun exclusive(a: List<List<Condition.Term>>, b: List<List<Condition.Term>>): Boolean = a.all { x ->
         b.all { y -> x.any { t -> y.any { u -> t.name == u.name && t.values == u.values && t.negated != u.negated } } }
     }
 
     private fun write(groups: List<List<Condition.Term>>) = Condition(groups).toString()
 
-    // [text] with each Shift's when= changed and its 分词 after it, from the last back so the offsets before hold
+    // from the last back so the offsets before hold
     private fun rewrite(text: String, placed: List<Placed>): String {
         val out = StringBuilder(text)
         for (p in placed.sortedByDescending { it.element.offsets!!.from }) {
@@ -207,7 +186,6 @@ object PackSeparator {
         return out.toString()
     }
 
-    // what goes before the 分词: on a line of its own where Shift starts one (that line's break and indent), else a space
     private fun before(text: String, from: Int): String {
         var start = from
         while (start > 0 && text[start - 1] != '\n' && text[start - 1] != '\r') start--
@@ -229,8 +207,6 @@ object PackSeparator {
         return "<key ${attrs.joinToString(" ")}/>"
     }
 
-    // the rewritten text as it would be drawn: read, judged, and in each of composing × table each Shift's place shows
-    // what it did but Shift's 分词 while pinyin is typed, as wide
     internal fun checked(
         rewritten: String,
         original: Layout,
@@ -251,12 +227,11 @@ object PackSeparator {
             val after = (Expand.rows(layout, fragments, env) as? Parsed.Ok)?.value ?: return Rewrite.Kept("rewritten, not drawn")
             if (!swappedAlone(before, after, if (composing && !table) shiftIds else emptySet())) return Rewrite.Kept("rewritten, a key changes where it is")
         }
-        // never given it twice: a start after a kill, or a pack of a later one's (its 分词 is what the next asks first)
+        // a start after a kill, or a pack of a later one's
         if (hasSeparator(layout.parts.filterIsInstance<Row>()) == null) return Rewrite.Kept("rewritten, would be rewritten again")
         return Rewrite.Done(rewritten)
     }
 
-    // [after] as [before] key by key, as wide, but 分词 where a key of [swapped] was
     private fun swappedAlone(before: List<ExpandedRow>, after: List<ExpandedRow>, swapped: Set<String>): Boolean =
         before.size == after.size && before.zip(after).all { (b, a) ->
             b.items.size == a.items.size && b.items.zip(a.items).all { (x, y) ->
@@ -266,7 +241,7 @@ object PackSeparator {
             }
         }
 
-    // a phone upright, as the drawing's tests have it: the check asks only what shows, not where
+    // the check asks only what shows, not where
     private const val WIDTH = 1080.0
     private const val HEIGHT = 720.0
     private const val DENSITY = 2.625

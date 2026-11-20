@@ -25,7 +25,6 @@ class NgramWordsTest {
         assertEquals(2, model.add("c"))
         assertEquals(2, model.add("c"))
         assertEquals(listOf("a", "b", "c"), model.words)
-        // both builders through it
         assertThrows(IllegalArgumentException::class.java) { PinyinDataBuilder().unigram("a", -1f, 0f).unigram("a", -2f, 0f) }
         assertThrows(IllegalArgumentException::class.java) { EnglishDataBuilder().unigram("a", -1f, 0f).bigram("a", "b", -1f, 0f) }
     }

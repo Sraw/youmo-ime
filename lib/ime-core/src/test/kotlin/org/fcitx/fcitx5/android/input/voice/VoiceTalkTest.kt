@@ -134,7 +134,7 @@ class VoiceTalkTest {
         assertEquals("你好", talk.rest("你好", raw = true))
     }
 
-    // review F5784, F6545, F6514: each form a number is written in, found in the raw text as said
+    // each form a number is written in, found in the raw text as said
     @Test
     @Uat("VO-29")
     fun thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce() = assertRows(
@@ -148,7 +148,7 @@ class VoiceTalkTest {
             Triple("长12.5米。", "长十二点五米然后", "然后"),
             // a letter the polish cased otherwise
             Triple("V1.23版。", "v一点二三版然后", "然后"),
-            // 万 and 亿 inside the number (F6514)
+            // 万 and 亿 inside the number
             Triple("共336005元。", "共三十三万六千零五元再见", "再见"),
             Triple("共100070000元。", "共一亿零七万元再见", "再见"),
             // a 万 written as a character stays one

@@ -27,11 +27,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.setup
 import org.fcitx.fcitx5.android.utils.toast
 
-/**
- * 资源包 (dev/design/060-asset-packs.md): each pack's state, and the import of the files the user
- * picks (several at once), checked whole before any replaces what is there. The keyboard without
- * the text pack, and voice input without the voice pack, open this page.
- */
+/** Picked files (several at once) are checked whole before replacing anything. */
 class PacksFragment : PaddingPreferenceFragment() {
 
     private lateinit var picker: ActivityResultLauncher<Array<String>>
@@ -66,7 +62,7 @@ class PacksFragment : PaddingPreferenceFragment() {
                 if (PackImports.running.value != null) {
                     ctx.toast(R.string.pack_import_busy)
                 } else {
-                    // a .youmopack has no type of its own: any file, refused by its content if it is no pack
+                    // a .youmopack has no MIME type: any file, refused by content if no pack
                     picker.launch(arrayOf("*/*"))
                 }
             }
@@ -92,8 +88,7 @@ class PacksFragment : PaddingPreferenceFragment() {
         }
     }
 
-    // on the main thread: PackStore.status reads the shelf loaded at the app's start (FcitxApplication warms it);
-    // the page opened before that is done waits for it once, a settings page's moment, not the keyboard's
+    // on the main thread: PackStore.status reads the shelf FcitxApplication warms; a page opened earlier waits once
     private fun show() {
         val ctx = context ?: return
         for ((kind, row) in rows) {
@@ -116,15 +111,13 @@ class PacksFragment : PaddingPreferenceFragment() {
 
     private var olderDialog: AlertDialog? = null
 
-    // an older pack would replace the newer one there (pending L8): replaced only on 替换, kept on 保留 or
-    // back. Gone with the activity (a rotation), unanswered: asked again by the page made anew. One collected
-    // again while its dialog is up: one dialog
+    // unanswered and gone with the activity, it is asked again by the recreated page; recollected while shown, still one dialog
     private fun askOlder(question: PackImports.ReplaceNewerQuestion) {
         val ctx = context ?: return
         if (olderDialog?.isShowing == true) return
         olderDialog = AlertDialog.Builder(ctx)
             .setTitle(PackImports.name(ctx, question.kind))
-            // the file named: of several picked at once, which one is asked
+            // of several picked, which file is asked
             .setMessage(question.file + "\n\n" + ctx.getString(R.string.pack_replace_newer, question.installed, question.version))
             .setPositiveButton(R.string.pack_replace) { _, _ -> PackImports.answer(question, true) }
             .setNegativeButton(R.string.pack_keep_newer) { _, _ -> PackImports.answer(question, false) }
@@ -135,12 +128,12 @@ class PacksFragment : PaddingPreferenceFragment() {
     private fun results(outcomes: List<PackImports.Outcome>) {
         val ctx = context ?: return
         if (outcomes.isEmpty()) return PackImports.seen()
-        // the results collected again (back from the background) while their dialog is up: one dialog
+        // recollected while shown: one dialog
         if (resultsDialog?.isShowing == true) return
         val lines = outcomes.map { PackImports.describe(ctx, it) }
-        // the user's files are never deleted: they are told they may, once all of them are in
+        // the user's files are never deleted: they are told they may, once all are in
         val hint = when {
-            // a newer pack kept (保留) is no file used: not "done"
+            // a newer pack kept (保留) is not "done"
             outcomes.all { it.result is ImportResult.Imported || it.result is ImportResult.AlreadyThere } ->
                 ctx.getString(R.string.pack_import_done_hint)
             outcomes.none { it.result is ImportResult.Imported } -> ctx.getString(R.string.pack_unchanged_hint)
@@ -150,15 +143,13 @@ class PacksFragment : PaddingPreferenceFragment() {
             .setTitle(R.string.pack_import_results)
             .setMessage((lines + listOfNotNull(hint)).joinToString("\n\n"))
             .setPositiveButton(android.R.string.ok, null)
-            // seen once read: a rotation (the activity recreated) takes the dialog away unread, and the
-            // results stay to be shown again (a refused file's reason seen nowhere else). Kept in memory
-            // only: a process killed loses them
+            // seen once read: a rotation dismisses it unread and it shows again; memory only, lost with the process
             .setOnDismissListener { PackImports.seen() }
             .show()
         show()
     }
 
-    // the view gone (a rotation): the dialogs go with it, unanswered and unseen, shown again by the page made anew
+    // the dialogs go unanswered with the view and the recreated page shows them again
     override fun onDestroyView() {
         for (dialog in listOfNotNull(olderDialog, resultsDialog)) {
             dialog.setOnCancelListener(null)

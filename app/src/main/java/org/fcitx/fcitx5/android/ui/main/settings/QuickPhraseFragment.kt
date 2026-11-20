@@ -14,9 +14,6 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.Gravity
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -30,13 +27,11 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.widget.doAfterTextChanged
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -62,6 +57,7 @@ import org.fcitx.fcitx5.android.host.QuickPhraseEntry
 import org.fcitx.fcitx5.android.host.QuickPhraseFiles
 import org.fcitx.fcitx5.android.host.QuickPhraseMine
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.ui.main.addOverflowMenu
 import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchAnchors
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
@@ -83,12 +79,7 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.wrapContent
 import timber.log.Timber
 
-/**
- * 快速输入's page: the user's entries in the keyboard's order (the last used first), a row of their
- * folders to show one (全部, 未分类, each folder, 待补关键词 while an old entry has no key), a search
- * over keys, notes and content, the built-in tables' switches. Each change is saved as it is made
- * ([QuickPhraseManager]), and the keyboard reads them again.
- */
+/** Each change is saved at once and the keyboard rereads. */
 class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     private val args by lazyRoute<SettingsRoute.QuickPhrase>()
@@ -98,32 +89,28 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
     private var shown = emptyList<QuickPhraseEntry>()
     private var query = ""
 
-    // the folder chip picked, kept over a rotation
     private var shelf: Shelf = Shelf.All
 
-    // the built-in tables' switches as the files have them, each turned at once: rows bound again
-    // (filter) read this, never a copy made as the page opened
+    // as the files have them, turned at once: rebound rows read this, never a copy made as the page opened
     private val on = HashMap<String, Boolean>()
 
-    // the switches whose writes are still to come, how many each: counted down as each is written
+    // pending writes per switch, counted down as each is written
     private val switching = ConcurrentHashMap<String, Int>()
 
     private lateinit var adapter: Adapter
     private lateinit var list: RecyclerView
     private var undo: Snackbar? = null
 
-    // the keyboard's ask (＋添加, a card's 编辑, the clipboard's 存为) answered once, not again on a rotation
+    // the keyboard's ask answered once, not again on rotation
     private var asked = false
 
-    // the editor open, put back as it was after a rotation, a theme change or the process's death
     private var editor: Editor? = null
     private var editorWas: Bundle? = null
 
-    // the keyboard's ask taken (takeRequest) while the editor restored is not yet shown again: asked once
-    // it is; kept with it over another rotation before that
+    // the keyboard's ask taken while the restored editor is not yet shown: asked once it is
     private var pending: SettingsRoute.QuickPhrase? = null
 
-    // 放弃修改？ over the editor: gone with the page, the editor shown again without it
+    // gone with the page; the editor is shown again without it
     private var discard: AlertDialog? = null
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
@@ -143,7 +130,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         super.onSaveInstanceState(outState)
         outState.putBoolean(ASKED, asked)
         outState.putString(SHELF, shelf.saved)
-        // the editor's, or one restored and not yet shown again (the page still reading its files)
+        // or one restored and not yet shown again
         (editor?.saved() ?: editorWas)?.let { outState.putBundle(EDITOR, it) }
         pending?.let { outState.putParcelable(PENDING, it) }
     }
@@ -152,7 +139,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     override suspend fun initialize(): View {
         val read = try {
-            // after any change still being saved (made on the page before a rotation)
+            // after any change still being saved from before a rotation
             withContext(changes) { QuickPhraseManager.loadAll() }
         } catch (e: IOException) {
             Timber.w(e, "quick phrases")
@@ -176,20 +163,18 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         val fab = FloatingActionButton(ctx).apply {
             setImageDrawable(ctx.drawable(R.drawable.ic_baseline_plus_24))
             contentDescription = getString(R.string.quick_phrase_new)
-            // a new one in the folder shown
             setOnClickListener { edit(null, QuickPhraseEntry("", "", folder = (shelf as? Shelf.In)?.name.orEmpty())) }
         }
         addMenu()
         val was = editorWas
         editorWas = null
         val typedWas = was?.entry(TYPED)
-        // OK tapped before, and its entry there now
-        // and the entry it changed gone: one the same added meanwhile (by the keyboard) refused the save
+        // OK was tapped and its entry is there, the old one gone: one the same added meanwhile refused the save
         val savedWas = typedWas?.takeIf { t ->
             was.getBoolean(SAVING) && all.any { it.sameAs(t) && it.folder == t.folder } && was.entry(OLD).let { old -> old == null || old.sameAs(t) || stored(old) == null }
         }
         if (savedWas != null) {
-            // OK was tapped and the old page's save finished meanwhile: saved, nothing to show again
+            // the old page's save finished meanwhile: nothing to show again
             asked = true
             ctx.toast(R.string.quick_phrase_saved)
         } else if (was != null) {
@@ -202,7 +187,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         }
         pending?.let { request ->
             pending = null
-            // the restored editor up now: asked over it as takeRequest does, else (saved meanwhile) opened
+            // the restored editor is up: asked over it as takeRequest does
             if (!takeRequest(request) && request.edit) {
                 val entry = request.entry
                 editStored(entry, request.existing)
@@ -223,23 +208,12 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
     }
 
     private fun addMenu() {
-        requireActivity().addMenuProvider(object : MenuProvider {
-            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                menu.add(R.string.import_file).setOnMenuItemClickListener {
-                    importLauncher.launch("*/*")
-                    true
-                }
-                menu.add(R.string.export_file).setOnMenuItemClickListener {
-                    exportLauncher.launch("QuickPhrase.mb")
-                    true
-                }
-            }
-
-            override fun onMenuItemSelected(menuItem: MenuItem) = false
-        }, viewLifecycleOwner, Lifecycle.State.STARTED)
+        addOverflowMenu(
+            R.string.import_file to { importLauncher.launch("*/*") },
+            R.string.export_file to { exportLauncher.launch("QuickPhrase.mb") },
+        )
     }
 
-    // the folder shown, then the search over keys, notes and content alike, case aside
     private fun matching(): List<QuickPhraseEntry> {
         val inShelf = when (val s = shelf) {
             Shelf.All -> all
@@ -257,7 +231,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     @SuppressLint("NotifyDataSetChanged")
     private fun filter() {
-        // a folder gone (deleted, renamed) or none left to give a key: all of them again
+        // a folder gone or none left to give a key: all again
         val gone = when (val s = shelf) {
             is Shelf.In -> s.name !in folders
             Shelf.Keyless -> all.none { it.keyless }
@@ -275,14 +249,9 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     private class Read(val mine: QuickPhraseMine, val on: Map<String, Boolean>)
 
-    /**
-     * [op] saved, then the entries and the switches read back, failed or not (a row swiped away
-     * comes back, a switch turns back), and the keyboard told: the files are the one truth, the
-     * keyboard writing them too. [after] with what [op] gave, [failed] if it threw, while the page is there;
-     * [settled] last on the main thread whatever happened, its read back applied (or the page gone).
-     */
+    /** Read back whether or not [op] failed: the files are the one truth, as the keyboard writes them too. */
     private fun <T> change(what: String, op: () -> T, failed: () -> Unit = {}, settled: () -> Unit = {}, after: (T) -> Unit = {}) {
-        // outlives the page: a change made just before leaving it is still saved
+        // outlives the page: a change made just before leaving is still saved
         FcitxApplication.getInstance().coroutineScope.launch(Dispatchers.Main.immediate) {
             try {
                 changed(what, op, failed, after)
@@ -293,7 +262,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
     }
 
     private suspend fun <T> changed(what: String, op: () -> T, failed: () -> Unit, after: (T) -> Unit) {
-        // one at a time, in the order made: a switch turned twice quickly is read back as last turned
+        // one at a time, in order: a switch turned twice quickly reads back as last turned
         val (done, read) = withContext(changes) {
             val done = try {
                 Result.success(op())
@@ -312,23 +281,21 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             Timber.w(it, what)
             appContext.toast(it)
         }
-        // not the page's connection: it is gone once the page is, the change made just before leaving it
+        // not the page's connection: gone with the page
         if (done.isSuccess) HostDaemon.runIfRunning { reloadConfig() }
         if (view == null) return
         read?.let {
             all = it.mine.entries
             folders = it.mine.folders
-            // a switch whose write's read back is still to come here (this one's too) keeps what it
-            // was turned to
+            // a switch whose read back is still to come keeps what it was turned to
             on.putAll(it.on.filterKeys { name -> !switching.containsKey(name) })
         }
-        // before the rows are bound again: a switch whose write failed, unread, turns back
+        // before rebinding: a switch whose write failed turns back
         done.onFailure { failed() }
         filter()
         done.onSuccess(after)
     }
 
-    /** The editor up: what it changes ([entry], null for a new one), what it was filled with. */
     private inner class Editor(
         val dialog: AlertDialog,
         val entry: QuickPhraseEntry?,
@@ -339,7 +306,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         private val folderButton: TextView,
         folder: String,
     ) {
-        /** The folder picked. */
         var folder: String = folder
             set(value) {
                 field = value
@@ -352,11 +318,9 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
         val typed get() = QuickPhraseEntry(key.str, content.str, note.str, folder)
 
-        /** OK tapped, its save not answered yet. */
         var saving = false
 
-        // what was typed kept within a Bundle's means (hundreds of thousands of characters pasted
-        // would not fit the transaction), one past the limit: put back, still told too long at OK
+        // within a Bundle's means (a huge paste would not fit the transaction); still told too long at OK
         fun saved() = Bundle().apply {
             putEntry(OLD, entry)
             putEntry(FILLED, filled)
@@ -364,17 +328,14 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             putBoolean(SAVING, saving)
         }
 
-        /** Back or 取消: at once with nothing changed, asked first otherwise. */
         fun leave() {
             if (typed == filled) dialog.cancel() else confirmDiscard(dialog)
         }
     }
 
-    // [e] as the files have it now, its folder aside: the keyboard's (a card's 编辑) may be of a read
-    // before the page moved it to another folder
+    // the folder aside: a card's 编辑 may be of a read before the page moved it
     private fun stored(e: QuickPhraseEntry): QuickPhraseEntry? = all.firstOrNull { it.unfiled == e.unfiled }
 
-    // an editor asked for from outside: of the entry still there ([existing]) as it is now, else a new one
     private fun editStored(entry: QuickPhraseEntry, existing: Boolean) {
         val there = if (existing) stored(entry) else null
         edit(there, there ?: entry)
@@ -387,8 +348,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         val (keyLayout, keyField) = ctx.materialTextInput { hint = keyLabel }
         keyField.apply {
             isSingleLine = true
-            // a key ends at its first space in the file: none typed. No length filter: one would cut a
-            // key filled in (30 code points may be 60 units); its length is checked at OK
+            // a key ends at its first space in the file. No length filter: it would cut a filled-in key; checked at OK
             filters = arrayOf(
                 InputFilter { source, start, end, _, _, _ ->
                     val typedNow = source.subSequence(start, end)
@@ -397,7 +357,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             )
             imeOptions = EditorInfo.IME_ACTION_NEXT
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            // told as typed, not only at OK: Chinese typed here is what the note is for
+            // told as typed: Chinese typed here is what the note is for
             doAfterTextChanged { t ->
                 error = if (t.isNullOrEmpty() || t.all(QuickPhraseFiles::keyChar)) null else getString(R.string.quick_phrase_key_invalid, QuickPhraseBook.MAX_KEY)
             }
@@ -407,7 +367,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             isSingleLine = false
             maxLines = 10
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            // no length filter either: it would cut what is pasted or filled in unseen; too long is told at OK
+            // no length filter: it would cut what is pasted unseen; too long is told at OK
         }
         val (noteLayout, noteField) = ctx.materialTextInput { hint = getString(R.string.quick_phrase_note) }
         noteField.isSingleLine = true
@@ -434,23 +394,22 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             .apply { if (entry != null) setNeutralButton(R.string.delete) { _, _ -> delete(entry) } }
             .show()
         val ed = Editor(
-            // filled the same way: a new one from a folder deleted meanwhile, nothing typed, is not asked to be given up
+            // a new one from a folder deleted meanwhile, nothing typed, is not asked to be given up
             dialog, entry, (filled ?: QuickPhraseEntry("", "")).let { f -> if (f.folder in folders) f else f.copy(folder = "") }, keyField, contentField, noteField, folderButton,
-            // a folder deleted meanwhile is none
             (typed ?: filled)?.folder?.takeIf { it in folders }.orEmpty(),
         )
         folderButton.setOnClickListener { pickFolder(ed) }
         editor = ed
         dialog.setOnDismissListener { if (editor === ed) editor = null }
         dialog.setCanceledOnTouchOutside(false)
-        // Back with something changed asks first: what was typed is not lost to a slip
+        // asked first: what was typed is not lost to a slip
         dialog.onBackPressedDispatcher.addCallback(dialog) { ed.leave() }
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener { ed.leave() }
         if (typed != null && typed.key.isEmpty()) keyField.requestFocus()
         dialog.onPositiveButtonClick { save(ed) }
     }
 
-    /** OK: checked here, then saved; the editor stays up until the file says it is saved. */
+    /** The editor stays up until the file says it is saved. */
     private fun save(ed: Editor): Boolean {
         val key = ed.key.str
         if (!QuickPhraseFiles.validKey(key)) {
@@ -515,15 +474,10 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             .show()
     }
 
-    /**
-     * The keyboard asks for this page again ([request]) while it is up: taken here if its editor has
-     * something changed, which is not dropped unasked (放弃修改？, then [request]'s editor; kept
-     * editing, the request is let go). False otherwise: the page is opened anew as usual.
-     */
+    /** Taken here if the editor has changes, which are not dropped unasked; false: the page is opened anew as usual. */
     fun takeRequest(request: SettingsRoute.QuickPhrase): Boolean {
         val ed = editor ?: run {
-            // restored after a rotation or the process's death, the page still reading its files:
-            // what was typed is not dropped by the page opened anew; asked once it is shown again
+            // restored while the page still reads its files: asked once it is shown again
             val was = editorWas ?: return false
             if (was.entry(TYPED) == was.entry(FILLED)) return false
             pending = request
@@ -539,7 +493,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         return true
     }
 
-    // the editor's folder: none, or one of the user's
     private fun pickFolder(ed: Editor) {
         val names = listOf("") + folders
         val labels = names.map { it.ifEmpty { getString(R.string.quick_phrase_unfiled) } }.toTypedArray()
@@ -552,7 +505,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             .show()
     }
 
-    /** A folder's name asked: a new one ([old] null) or [old] renamed; [then] with a good one not taken. */
     private fun askFolderName(old: String?, then: (String) -> Unit) {
         val ctx = requireContext()
         val (layout, field) = ctx.materialTextInput { hint = getString(R.string.quick_phrase_folder_name) }
@@ -595,7 +547,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         change("quick phrase folder", { QuickPhraseManager.addFolder(name) }) { made -> if (made) show(Shelf.In(name)) }
     }
 
-    // a folder chip held: 改名, 删除目录 (its entries kept, out of any folder)
+    // 删除目录 keeps its entries, out of any folder
     private fun folderMenu(name: String) {
         val ctx = requireContext()
         AlertDialog.Builder(ctx)
@@ -603,7 +555,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             .setItems(arrayOf(getString(R.string.quick_phrase_folder_rename), getString(R.string.quick_phrase_folder_delete))) { _, which ->
                 if (which == 0) {
                     askFolderName(name) { new ->
-                        // the folder shown, asked before: reading it back has already left it (its old name gone)
+                        // asked before: reading it back has already left it
                         val shownBefore = shelf == Shelf.In(name)
                         change("quick phrase folder", { QuickPhraseManager.renameFolder(name, new) }) { done ->
                             if (done && shownBefore) show(Shelf.In(new))
@@ -624,10 +576,10 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     private fun delete(entry: QuickPhraseEntry) {
         change("quick phrase delete", { QuickPhraseManager.remove(entry) }) { removed ->
-            // gone already (the keyboard deleted it meanwhile): nothing deleted here, nothing to undo
+            // the keyboard deleted it meanwhile: nothing to undo
             if (removed == null) return@change
             undo = Snackbar.make(list, R.string.quick_phrase_deleted, Snackbar.LENGTH_LONG)
-                // put back where it was, its time of use too; one the same added meanwhile is kept as it is
+                // one the same added meanwhile is kept as it is
                 .setAction(R.string.undo) { change("quick phrase undo", { QuickPhraseManager.restore(removed) }) }
                 .also { it.show() }
         }
@@ -642,7 +594,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
             override fun onSwiped(holder: RecyclerView.ViewHolder, direction: Int) {
                 val at = holder.bindingAdapterPosition
-                // gone from the list meanwhile: the row put back, not left swiped away blank
+                // gone meanwhile: the row put back, not left swiped away blank
                 val entry = shown.getOrNull(at - HEAD) ?: return run { if (at >= 0) adapter.notifyItemChanged(at) }
                 delete(entry)
             }
@@ -668,7 +620,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         val ctx = requireContext()
         lifecycleScope.launch {
             ctx.showingFileErrors("quick phrases export") {
-                // after the changes still being saved, as they are written
                 withContext(changes) {
                     val text = QuickPhraseManager.export()
                     ctx.contentResolver.openOutputStreamOrThrow(uri).use { it.write(text.toByteArray()) }
@@ -681,12 +632,10 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
 
     private class HeaderHolder(view: View, val banner: TextView, val chips: ViewGroup) : RecyclerView.ViewHolder(view)
 
-    // the hint and the search first, the entries, then the built-in tables' switches
     private inner class Adapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
         private val tables = QuickPhraseManager.BUILT_IN.zip(TABLES)
 
-        /** Where the built-in table [name]'s switch is in the list; -1 for none. */
         fun tableAt(name: String) = tables.indexOfFirst { it.first == name }.let { if (it < 0) -1 else HEAD + shown.size + 1 + it }
 
         override fun getItemCount() = HEAD + shown.size + 1 + tables.size
@@ -732,15 +681,13 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
                     s.tag = TABLE + name
                     s.isChecked = on[name] != false
                     s.setOnCheckedChangeListener { _, checked ->
-                        // before the change's list is bound again (filter): the row keeps what was turned
+                        // before the rebinding: the row keeps what was turned
                         on[name] = checked
                         switching.merge(name, 1) { a, b -> a + b }
                         change(
                             "quick phrase table", { QuickPhraseManager.setBuiltIn(name, checked) },
                             failed = { on[name] = !checked },
-                            // counted down on the main thread once this write's read back is applied, not
-                            // as it is written: two turns written before the first's read back reached the
-                            // main thread had it bind the switch to the first turn, then flip to the second
+                            // counted down when the read back is applied, not when written: else two quick turns flipped the switch twice
                             settled = { switching.computeIfPresent(name) { _, n -> (n - 1).takeIf { it > 0 } } },
                         )
                     }
@@ -748,7 +695,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             }
         }
 
-        // the key, or that it has none (an old key all Chinese), then its note lighter
+        // an old all-Chinese key has none
         private fun title(ctx: Context, e: QuickPhraseEntry): CharSequence {
             val out = SpannableStringBuilder()
             if (e.keyless) {
@@ -762,7 +709,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             return out
         }
 
-        // 待补关键词's word while there are such, and the folder chips as they are now
         private fun bindHeader(holder: HeaderHolder) {
             val ctx = holder.itemView.context
             val keyless = all.count { it.keyless }
@@ -808,7 +754,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             searchField.setText(query)
             searchField.doAfterTextChanged {
                 query = it?.toString().orEmpty()
-                // the header stays, the rows after it change: the field keeps its focus
+                // the header stays: the field keeps its focus
                 val before = shown.size
                 shown = matching()
                 notifyItemRangeRemoved(HEAD, before)
@@ -857,7 +803,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         undo?.dismiss()
         undo = null
         discard?.dismiss()
-        // its state is saved (onSaveInstanceState comes first) and shown again by the page made anew
         editor?.let {
             editorWas = it.saved()
             editor = null
@@ -866,7 +811,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         super.onDestroyView()
     }
 
-    // a built-in table's switch, at the list's end, or ＋目录 at its top: the list scrolled to it first
+    // scrolled to first: a table switch at the list's end, ＋目录 at its top
     override fun reveal(id: String, found: (View) -> Unit) {
         val at = if (id == NEW_FOLDER) 0 else adapter.tableAt(id.removePrefix(TABLE)).takeIf { it >= 0 } ?: return
         list.scrollToPosition(at)
@@ -878,10 +823,10 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         private const val TABLE = "view:quick/table/"
         private const val NEW_FOLDER = "view:quick/new_folder"
 
-        // the folders' chips 全部 and 未分类 show the list otherwise, not a setting
+        // 全部 and 未分类 filter the list; they are not settings
         override val notSearched = setOf(R.string.quick_phrase_all, R.string.quick_phrase_unfiled)
 
-        // the built-in tables' switches, ＋目录; ⋮'s items, no View to point at, said where they are
+        // ⋮'s items have no View to point at: said where they are
         override fun searchEntries(context: Context) =
             QuickPhraseManager.BUILT_IN.zip(TABLES) { name, label -> PageEntry(context.getString(label), TABLE + name) } + listOf(
                 PageEntry(context.getString(R.string.quick_phrase_folder_new), NEW_FOLDER),
@@ -898,10 +843,9 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
         private const val SAVING = "saving"
         private const val SHELF = "shelf"
 
-        // a field's text kept over a rotation: one past the content's limit, the key's far below
         private const val KEPT = QuickPhraseBook.MAX_CONTENT + 1
 
-        // every page's changes, one after another (they outlive the page)
+        // every page's changes, in order (they outlive the page)
         @OptIn(ExperimentalCoroutinesApi::class)
         @VisibleForTesting
         internal val changes = Dispatchers.IO.limitedParallelism(1)
@@ -910,7 +854,7 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
             if (entry != null) putStringArray(name, arrayOf(entry.key, entry.content, entry.note, entry.folder))
         }
 
-        // two strings: a state saved before notes and folders (the app updated under it)
+        // two strings: state saved before notes and folders existed
         private fun Bundle.entry(name: String): QuickPhraseEntry? = getStringArray(name)?.let {
             when (it.size) {
                 2 -> QuickPhraseEntry(it[0], it[1])
@@ -927,7 +871,6 @@ class QuickPhraseFragment : ProgressFragment(), SearchAnchors {
     }
 }
 
-/** Which entries the page shows: all, those in no folder, those with no key, or a folder's. */
 private sealed class Shelf(val saved: String) {
     data object All : Shelf("all")
     data object Unfiled : Shelf("unfiled")
@@ -944,7 +887,6 @@ private sealed class Shelf(val saved: String) {
     }
 }
 
-/** What [QuickPhraseFragment]'s import says of [r]: every skipped line counted, those with a bad key too, and the keyless added. */
 internal fun quickPhraseImportToast(ctx: Context, r: QuickPhraseManager.Imported): String {
     val skipped = skippedToast(ctx, r)
     val said = if (r.overLimit == 0) skipped else ctx.getString(R.string.import_over_limit, skipped, r.overLimit, QuickPhraseManager.MAX_ENTRIES)
@@ -953,8 +895,7 @@ internal fun quickPhraseImportToast(ctx: Context, r: QuickPhraseManager.Imported
 
 private fun skippedToast(ctx: Context, r: QuickPhraseManager.Imported): String {
     if (r.added + r.duplicates + r.tooLong + r.overLimit == 0) {
-        // not a .mb file (a picture picked, say): said so, not "0 imported", though a line or
-        // two with a bad key are still said
+        // not a .mb file: said so, not "0 imported"
         return if (r.badKey == 0) ctx.getString(R.string.quick_phrase_import_none)
         else ctx.getString(R.string.quick_phrase_import_bad_key, ctx.getString(R.string.quick_phrase_import_done, 0, 0), r.badKey, QuickPhraseBook.MAX_KEY, QuickPhraseBook.MAX_NOTE)
     }

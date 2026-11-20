@@ -7,11 +7,7 @@ package org.fcitx.fcitx5.android.dicttool
 import java.util.Formatter
 import java.util.Locale
 
-/**
- * Runs [write] with one Formatter over [out], for the millions of lines a file gets (String.format
- * makes one for every call), then throws the IOException of a write that failed: a Formatter
- * keeps it instead of throwing it, and a file cut short would pass for whole.
- */
+/** Runs [write] with one Formatter over [out], then throws the IOException a Formatter keeps, so a cut file never passes for whole. */
 internal fun formatting(out: Appendable, write: (Formatter) -> Unit) {
     val formatter = Formatter(out, Locale.ROOT)
     write(formatter)

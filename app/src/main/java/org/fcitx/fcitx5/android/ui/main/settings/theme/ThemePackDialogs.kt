@@ -22,13 +22,9 @@ import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import splitties.dimensions.dp
 import java.io.File
 
-/**
- * What a theme is (060-render-p3 T8a): a pack's metadata (`<meta>`: author, version, license, preview) before it
- * is imported, with what it warns of, and any theme of the user's on 信息.
- */
 object ThemePackDialogs {
 
-    /** [meta]'s lines and the theme's format ([format]: `4.0`, `3.0`), what is not given left out. */
+    /** [format]: `4.0`, `3.0`; what is not given is left out. */
     fun lines(ctx: Context, meta: Meta?, format: String): List<String> = listOfNotNull(
         meta?.author?.let { ctx.getString(R.string.theme_info_author, it) },
         meta?.version?.let { ctx.getString(R.string.theme_info_version, it) },
@@ -36,7 +32,7 @@ object ThemePackDialogs {
         ctx.getString(R.string.theme_info_format, format),
     )
 
-    // as each translation joins a list (Chinese with 、, others with a comma)
+    // Chinese joins with 、, others with a comma
     private fun listSeparator(ctx: Context) = ctx.getString(R.string.list_separator)
 
     private fun soundClass(key: SoundKey): Int = when (key) {
@@ -47,7 +43,6 @@ object ThemePackDialogs {
         SoundKey.BACKSPACE -> R.string.sound_class_backspace
     }
 
-    /** What the import of [pack] asks the user to take: its metadata, that it replaces one, what it warns of. */
     fun confirmText(ctx: Context, pack: ThemeFilesManager.Opened.Pack): String {
         val staged = pack.staged
         val out = lines(ctx, staged.theme.meta, staged.theme.version).toMutableList()
@@ -55,7 +50,7 @@ object ThemePackDialogs {
         val layouts = staged.layoutReport
         if (layouts.listed.isNotEmpty()) {
             out += ctx.resources.getQuantityString(R.plurals.theme_pack_layouts_listed, layouts.listed.size, layouts.listed.size, layouts.listed.joinToString(listSeparator(ctx)))
-            // what their keys type written in them (§13), what they write over (§4.2 第 4 步), what has no room
+            // what their keys type, what they write over, what has no room
             if (layouts.listedCommits > 0) out += ctx.getString(R.string.theme_pack_layouts_listed_commits, layouts.listedCommits)
             layouts.replaced.forEach { out += ctx.getString(R.string.theme_pack_layouts_replaces, it) }
             if (layouts.notFitting > 0) {
@@ -90,7 +85,6 @@ object ThemePackDialogs {
         SkinNote.PANELS -> R.string.theme_pack_skin_note_panels
     }
 
-    /** [theme]'s 信息: a pack's metadata, a 3.0 theme's name and format. */
     fun infoText(ctx: Context, theme: Theme): String = when (theme) {
         is Theme.Pack -> lines(ctx, theme.scene.meta, theme.scene.version).joinToString("\n")
         else -> lines(ctx, null, CUSTOM_FORMAT).joinToString("\n")
@@ -98,7 +92,7 @@ object ThemePackDialogs {
 
     private const val CUSTOM_FORMAT = "3.0"
 
-    /** [title] and [text], with [preview] above it (a pack's; checked an image as it was imported). */
+    /** [preview] above (a pack's, checked as an image at import). */
     fun builder(ctx: Context, title: String, text: String, preview: File?, below: View? = null): AlertDialog.Builder {
         val padding = ctx.dp(PADDING_DP)
         val body = LinearLayout(ctx).apply {
@@ -108,12 +102,11 @@ object ThemePackDialogs {
             addView(TextView(ctx).apply { this.text = text })
             below?.let(::addView)
         }
-        // scrolled: an AlertDialog's own view does not scroll, so on a low screen (a phone turned) the preview and a long
-        // text left [below] (一起导入, checked) no room, unseen and not to be unchecked (R26 F8162)
+        // scrolled: an AlertDialog's view does not scroll, so on a low screen the preview and text would hide [below]
         return AlertDialog.Builder(ctx).setTitle(title).setView(ScrollView(ctx).apply { addView(body) })
     }
 
-    // the preview at most the dialog's size: a 2048 px one (ThemeAssetLimits) decoded at a quarter
+    // at most the dialog's size: a 2048 px one decoded at a quarter
     private fun image(ctx: Context, file: File?): ImageView? {
         if (file == null || !file.isFile) return null
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -130,10 +123,9 @@ object ThemePackDialogs {
         }
     }
 
-    /** A pack's preview in its folder ([Theme.Pack.dir]), if it has one. */
     fun preview(theme: Theme): File? = (theme as? Theme.Pack)?.scene?.meta?.preview?.let { File(theme.dir, it) }
 
-    /** A pack's name as the list shows it: its file's (its versions one card). */
+    /** Its file's name (its versions are one card). */
     fun title(theme: Theme): String = (theme as? Theme.Versioned)?.file ?: theme.name
 
     private const val PADDING_DP = 24

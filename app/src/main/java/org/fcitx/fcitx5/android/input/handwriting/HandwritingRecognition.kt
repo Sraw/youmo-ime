@@ -27,12 +27,10 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 /**
- * The handwriting recognizer, run on a thread of its own ([worker]), its readings handed on on
- * the main thread ([main]). [shared] is the app's: its two models (the character's image and its
- * path), mapped from the text pack, are opened as the keyboard is first shown ([warmUp]), and kept. Of a
- * piece's reads, a newer one makes those still waiting stale: they are skipped. An earlier piece's
- * last read is not: it is what that piece shows, and commits. A read of a piece the engine ended
- * ([ended], the latest) is dropped.
+ * Runs on its own [worker] thread, readings handed on on [main]. [shared]'s two models, mapped from the
+ * text pack, open as the keyboard is first shown ([warmUp]). A newer read of a piece makes its waiting
+ * ones stale; an earlier piece's last read is not (it is what that piece commits). Reads of a piece the
+ * engine [ended] are dropped.
  */
 class HandwritingRecognition internal constructor(
     private val worker: Executor,
@@ -42,33 +40,25 @@ class HandwritingRecognition internal constructor(
     @get:VisibleForTesting internal var reader: Reader,
 ) {
 
-    /** What reads the strokes, on the worker. */
+    /** On the worker. */
     internal interface Reader {
-        /**
-         * False once it could not be loaded: nothing is asked of it then, till the text pack's folder changes
-         * (another text pack imported). Read on the main thread.
-         */
+        /** False once it could not be loaded, till another text pack is imported. Read on the main thread. */
         val loadable: Boolean
 
-        /** Loaded, if it is not yet. */
         fun load()
 
-        /** [strokes] read, loaded first if need be; null if they cannot be. */
+        /** Null if they cannot be read. */
         fun read(strokes: List<FloatArray>): InkReading?
     }
 
-    // each piece's newest read asked for: an older one of the piece still waiting is not run
+    // an older read of the piece still waiting is not run
     private val newest = ConcurrentHashMap<Int, Int>()
 
-    // on the main thread: reads asked for whose reading is not handed on yet, and actions held behind them
+    // main thread: reads not handed on yet, and actions held behind them
     private var pending = 0
     private var held = 0
 
-    /**
-     * Reads [read] on the worker and hands the reading to [done] on the main thread; no strokes are
-     * read as nothing. A read no longer its piece's newest when its turn comes is dropped, as is
-     * one of a piece the engine ended, and one that fails. Asked on the main thread.
-     */
+    /** A read no longer its piece's newest when its turn comes is dropped, as is a failure. Asked on the main thread. */
     fun read(read: InkPad.Read, done: (InkReading) -> Unit) {
         if (!reader.loadable) return
         newest[read.piece] = read.id
@@ -78,7 +68,7 @@ class HandwritingRecognition internal constructor(
             try {
                 reading = recognize(read)
             } finally {
-                // handed on, or not, but counted off whatever was thrown: else keys would wait on it for good
+                // counted off whatever was thrown: else keys would wait on it for good
                 val r = reading
                 main.execute {
                     r?.let(done)
@@ -88,13 +78,13 @@ class HandwritingRecognition internal constructor(
         }
     }
 
-    /** Whether the reader can read: false once it could not be loaded, for good; on the main thread. */
+    /** Main thread. */
     val loadable: Boolean get() = reader.loadable
 
-    /** Whether a reading asked for is not handed on yet, or an action held behind one not run; on the main thread. */
+    /** Main thread. */
     val busy: Boolean get() = pending > 0 || held > 0
 
-    /** [action] on the main thread once the readings asked for so far are handed on; asked on the main thread. */
+    /** Asked on the main thread. */
     fun afterReads(action: () -> Unit) {
         held++
         worker.execute {
@@ -108,19 +98,18 @@ class HandwritingRecognition internal constructor(
         }
     }
 
-    /** The recognizer loaded before a read needs it (the keyboard shown); no read, it holds no key behind it. */
+    /** No read, so it holds no key behind it. */
     fun warmUp() {
         if (reader.loadable) worker.execute { reader.load() }
     }
 
     private fun recognize(read: InkPad.Read): InkReading? {
-        // its piece's newest: run, and forgotten unless a newer came meanwhile
+        // run, and forgotten unless a newer came meanwhile
         if (!newest.remove(read.piece, read.id) || read.piece <= ended()) return null
         return if (read.strokes.isEmpty()) InkReading.NONE else reader.read(read.strokes)
     }
 
     companion object {
-        /** The app's, reading with the recognizer of the app's assets. */
         val shared: HandwritingRecognition by lazy {
             val main = Handler(Looper.getMainLooper())
             HandwritingRecognition(
@@ -131,34 +120,23 @@ class HandwritingRecognition internal constructor(
             ).also { made = true }
         }
 
-        // whether [shared] was made: a JVM test's wait for its reads does not make it
+        // a JVM test's wait for its reads does not make it
         @Volatile
         private var made = false
 
-        /** Whether [shared] is made and [busy]: a JVM test's main looper not idle till its reads are in; on the main thread. */
+        /** A JVM test's main looper not idle till its reads are in; main thread. */
         @VisibleForTesting
         internal val sharedBusy: Boolean get() = made && shared.busy
 
-        /**
-         * What the recognizer's files are of: the text pack's directory, a new one at each import of
-         * it; not PackStore's generation, which an import of the voice pack counts up too (the
-         * recognizer let go and loaded again for nothing, one that cannot load told again).
-         */
+        /** Not PackStore's generation, which a voice pack import counts up too (reloading for nothing). */
         internal fun textPack(): Any? = PackStore.dir(PackKind.TEXT)
     }
 }
 
 /**
- * The recognizer [open] makes, on the worker only: loaded at its first load, and kept. What cannot be
- * loaded (its library, its files) is not tried again at every stroke: the pad draws on with nothing
- * read, and the user is [told] once. [open] adds what it opens to the list it is given, closed if
- * the recognizer is of no use.
- *
- * Its files are the text pack's: without the pack (PackUnavailableException, the keyboard under its
- * gate) it is not loaded, but neither given up nor told: the gate says what is missing. Whatever
- * was loaded or given up is of the pack [pack] says (HandwritingRecognition.textPack: its
- * directory): once that changes (the text pack imported), it is let go and loaded anew from the
- * new pack at the next read.
+ * Loaded at its first load and kept. What cannot load is not retried at every stroke: the pad draws on
+ * and the user is [told] once. Without the text pack it is neither loaded nor given up: the gate says
+ * what is missing. Once [pack] changes it is let go and loaded anew at the next read.
  */
 internal class LoadingReader(
     private val open: (opened: MutableList<AutoCloseable>) -> InkRecognizer,
@@ -172,7 +150,7 @@ internal class LoadingReader(
     @Volatile
     private var broken = false
 
-    // the pack what is loaded (or was given up) is of; NotLoaded till the first load
+    // NotLoaded till the first load
     @Volatile
     private var of: Any? = NotLoaded
 
@@ -213,8 +191,7 @@ internal class LoadingReader(
             letGo()
             null
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            // a file missing (IOException) or not the recognizer's (IllegalArgumentException), a model this
-            // onnxruntime refuses (IllegalStateException: one a newer one wrote); one opened before is of no use
+            // a file missing or not the recognizer's, or a model this onnxruntime refuses (written by a newer one)
             cannotLoad(e)
         } catch (e: LinkageError) {
             // the native library not loaded (ExceptionInInitializerError is one too): the IME lives on without handwriting
@@ -225,7 +202,7 @@ internal class LoadingReader(
     private fun cannotLoad(e: Throwable): Nothing? {
         Timber.e(e, "handwriting cannot load: not tried again till the app restarts or a text pack is imported")
         broken = true
-        // of no use from now on, whether it failed loading or reading (a LinkageError): not held open for the process
+        // whether it failed loading or reading (a LinkageError): not held open for the process
         letGo()
         told()
         return null
@@ -233,23 +210,16 @@ internal class LoadingReader(
 
     private fun letGo() {
         recognizer = null
-        // closing is native too, and may throw after a LinkageError: the rest closed and the user told all the same
+        // closing is native too, and may throw after a LinkageError: the rest closed all the same
         models.forEach { model -> runCatching { model.close() }.onFailure { Timber.w(it, "handwriting model close") } }
         models.clear()
     }
 }
 
-/**
- * Nothing written on the keys can be read, the recognizer or handwriting's session given up: the toolbar's 手写
- * turned off (061-handwriting-toolbar §3.4), not left on drawing ink that reads nothing; what failed is told
- * where it did, once. Any thread: the switch's listeners hear it on the main one.
- */
+/** Not left on drawing ink that reads nothing. Any thread: the switch's listeners hear it on the main one. */
 internal fun handwritingCannotLoad() = AppPrefs.getInstance().internal.handwritingOpen.setValue(false)
 
-/**
- * The recognizer of the text pack's files (AppData): its models opened and its files read as it loads. Internal, not
- * private: HandwritingUatTest's reader that fails tells the user as this one does ([told]).
- */
+/** Internal: HandwritingUatTest's failing reader tells the user as this one does ([told]). */
 internal object AssetRecognizer {
 
     fun open(opened: MutableList<AutoCloseable>): InkRecognizer = InkRecognizer(
@@ -263,13 +233,13 @@ internal object AssetRecognizer {
         handwritingCannotLoad()
     }
 
-    // opened at once, not at its first run: one onnxruntime refuses is found as the recognizer loads
+    // opened at once: one onnxruntime refuses is found as the recognizer loads
     private fun net(name: String, opened: MutableList<AutoCloseable>): InkNet {
         val model = OrtModel.open(AppData.map("$DIR/$name.ort"), THREADS).also(opened::add)
         return InkNet { x, shape -> model.run(x, shape).values }
     }
 
-    // each character's log frequency, float32 little-endian
+    // float32 little-endian
     private fun prior(): FloatArray {
         val b = ByteBuffer.wrap(AppData.open("$DIR/prior.data").use { it.readBytes() }).order(ByteOrder.LITTLE_ENDIAN)
         return FloatArray(b.remaining() / Float.SIZE_BYTES) { b.getFloat() }
@@ -277,9 +247,8 @@ internal object AssetRecognizer {
 
     private const val DIR = "handwriting"
 
-    // a character's two models are some 20 ms a run on one desktop core: two of the phone's
+    // some 20 ms a run on one desktop core
     private const val THREADS = 2
 }
 
-// LoadingReader's pack before its first load: none read yet, nothing to let go
 private object NotLoaded

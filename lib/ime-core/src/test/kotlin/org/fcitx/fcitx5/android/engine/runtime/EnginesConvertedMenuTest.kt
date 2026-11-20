@@ -45,12 +45,9 @@ class EnginesConvertedMenuTest : EnginesFixture() {
             val at = e.typed().indexOf("国家")
             val menu = e.learning(PINYIN, LearningOp.Menu(at, "國家"), traditional) as LearningResult.Menu
             assertTrue(MenuItem.BLOCK in menu.items)
-            // the engine's: what the acts name
             assertEquals("国家", menu.text)
-            // a text as shown is no act's: the menu's is
             assertEquals(LearningResult.Unavailable, e.learning(PINYIN, LearningOp.Block(at, "國家"), traditional))
             val done = e.learning(PINYIN, LearningOp.Block(at, menu.text), traditional) as LearningResult.Done
-            // the dictionary's own 國家 too: nothing left shown 國家 (review R2)
             assertFalse("国家" in e.typed())
             assertFalse("國家" in e.typed())
             assertEquals(setOf("国家", "國家"), e.userWords().filter { it.kind == UserWord.Kind.BLOCKED }.map { it.text }.toSet())
@@ -65,7 +62,7 @@ class EnginesConvertedMenuTest : EnginesFixture() {
         }
     }
 
-    // the dictionary's own 國家 pressed: 国家, converted to it, blocked with it (UAT PY-116)
+    // the dictionary's own 國家 pressed: 国家, converted to it, blocked with it
     @Test
     fun blockingTheDictionarysOwnTakesTheOneConvertedToIt() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
@@ -77,8 +74,7 @@ class EnginesConvertedMenuTest : EnginesFixture() {
         }
     }
 
-    // the menu was for the dictionary's own 國家; the list changed and the index names 国家, shown
-    // alike: the act's text is the engine's, and not the one there now (review R2)
+    // the act's text is the engine's, not the one there now
     @Test
     fun anActOnACandidateShownAlikeButAnotherIsNotDone() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
@@ -90,7 +86,6 @@ class EnginesConvertedMenuTest : EnginesFixture() {
         }
     }
 
-    // a pin is the pressed one's alone; a delete, like a block, every one shown alike, undone together
     @Test
     fun aPinIsThePressedOnesADeleteEveryOneShownAlike() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->

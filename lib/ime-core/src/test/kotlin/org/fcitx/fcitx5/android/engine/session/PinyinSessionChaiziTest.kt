@@ -34,12 +34,9 @@ class PinyinSessionChaiziTest {
         val session = session()
         val s = session.type("uni'hao")
         assertEquals(listOf("妳", "好"), s.candidates.subList(0, 2))
-        // a candidate the decoder read as well is listed once
         assertEquals(1, s.candidates.count { it == "好" })
         assertEquals(listOf("ni", "hao"), session.candidates(0, 2).map { it.hint })
-        // nothing to pin, forget nor block; put in as text
         assertEquals(emptySet<Offer>(), session.offers(0))
-        // no emoji of a reading of u…
         assertFalse("👋" in s.candidates)
         assertEquals("妳", session.apply(Select(0)).commit)
     }
@@ -55,12 +52,9 @@ class PinyinSessionChaiziTest {
     fun withoutTheUOrOnlyPartOfASpellingNone() {
         assertFalse("妳" in session().type("nihao").candidates)
         assertFalse("妳" in session().type("unih").candidates)
-        // 双拼's u is a key of its own
         assertFalse("妳" in session(spell = true).type("unihao").candidates)
     }
 
-    // a polyphone by its parts is blocked in the reading the lookup picks of those its hint lists: the
-    // hint goes to the lookup, so a reading the hint leaves out is never the one blocked
     @Test
     fun aPolyphoneByItsPartsIsBlockedInTheReadingTheLookupPicksOfItsHint() {
         val hints = ArrayList<String?>()

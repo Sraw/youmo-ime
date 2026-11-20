@@ -12,7 +12,6 @@ import org.junit.Assert.assertSame
 import org.junit.Test
 import org.mechdancer.dependency.DynamicScope
 
-/** The scope's key of a component, found once per class, is the library's own. */
 class ComponentTypesTest {
 
     @Test

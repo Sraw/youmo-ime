@@ -28,10 +28,7 @@ import org.robolectric.RuntimeEnvironment
 import java.io.File
 import java.io.IOException
 
-/**
- * MainActivity is exported: another app's intent must not open any page through the deep-link
- * extras Navigation acts on when the graph is set, while the route the keyboard sends still arrives.
- */
+/** Exported: another app's intent opens no page through Navigation's deep-link extras; the keyboard's route still arrives. */
 @RunWith(RobolectricTestRunner::class)
 class MainActivityTest {
 
@@ -91,13 +88,12 @@ class MainActivityTest {
         assertFalse(MainActivity.importable(ctx, file(File(ctx.filesDir, "before-restore.fxlb"))))
         assertFalse(MainActivity.importable(ctx, file(File(ctx.createDeviceProtectedStorageContext().dataDir, "files/x"))))
         assertFalse(MainActivity.importable(ctx, file(File(ctx.getExternalFilesDir(null), "x"))))
-        // a path that climbs into them is taken where it leads: from a directory there is (on the JVM too, where
-        // /sdcard is not, and a missing one is climbed out of by name, past a link such as macOS's /var)
+        // a climbing path is resolved where it leads, also past a link such as macOS's /var
         assertFalse(MainActivity.importable(ctx, Uri.parse("file:///usr/../" + ctx.filesDir.path.trimStart('/') + "/x")))
         assertFalse(MainActivity.importable(ctx, Uri.parse("http://example.com/x.txt")))
     }
 
-    // the pickers' pages read and write through PickedFiles, which holds every URI to the same rule (L2 security N5)
+    // the pickers read and write through PickedFiles, which applies the same rule
     @Test
     @Config(application = FcitxApplication::class)
     fun aPickedFileIsOpenedByTheSameRule() {

@@ -180,8 +180,7 @@ class VoiceHomophonesTest {
     fun `a stretch put in where it was typed already stays, though the engine says no as the text grows`() {
         val hold = homophones(added("何芮")).hold()
         val yes = VoiceHomophones.Lexicon { spans -> BooleanArray(spans.size) { VoiceHomophones.allowed(spans[it], FakeDictionary()) } }
-        // 何 typed already (settled 3), then 典 makes 和瑞典 a common word over its edge: 何芮 stays,
-        // or tap to talk would type it all again
+        // 何 typed already (settled 3), then 典 makes 和瑞典 a common word over its edge: 何芮 stays, or tap to talk retypes it all
         assertEquals("好，何芮", now { hold.replace(VoiceLive.Heard("好，和瑞", 3), yes) }.whole)
         assertEquals("好，何芮典", now { hold.replace(VoiceLive.Heard("好，和瑞典", 3), yes) }.whole)
         // not typed yet: the engine's no stands
@@ -227,8 +226,7 @@ class VoiceHomophonesTest {
         val hold = homophones(added("徐婧")).hold()
         var asked = 0
         val text = "徐静" + "来".repeat(11)
-        // the run grows past the words that could cross 徐静: not asked again
-        // a cache that skipped asking but put in the wrong word would pass a count alone
+        // the run grows past the words that could cross 徐静: not asked again (a count alone would pass a wrong-word cache)
         assertEquals("徐婧" + "来".repeat(11), now { hold.replace(text) { asked++; BooleanArray(it.size) { true } } })
         assertEquals("徐婧" + "来".repeat(14), now { hold.replace(text + "来来来") { asked++; BooleanArray(it.size) { true } } })
         assertEquals(1, asked)

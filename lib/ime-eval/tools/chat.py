@@ -8,8 +8,7 @@ name cannot be imported; the three import it by name from this directory.
 import re
 from collections import defaultdict
 
-# the reading a chat line means by a word the dictionary gives more than one, looked at by hand
-# for the words that most often keep a run out
+# the reading a chat line means by a polyphonic word, checked by hand for the words that most keep a run out
 READINGS = {
     '的': 'de', '了': 'le', '不': 'bu', '都': 'dou', '还': 'hai', '这': 'zhe', '没': 'mei',
     '那': 'na', '会': 'hui', '呢': 'ne', '说': 'shuo', '能': 'neng', '给': 'gei', '哦': 'o',
@@ -30,11 +29,9 @@ READINGS = {
 MUST = ('还', '也', '就', '都', '那', '总', '非', '可', '你', '我', '他', '她', '咱')
 # 了 and 着 after a verb and 不, where they say it cannot be done (去不了, 摸不着)
 CANNOT = {'了': 'liao', '着': 'zhao'}
-# a word read otherwise before these (系鞋带); None where either reading is as likely (还给你 gives
-# back, 还给你买 buys as well), which leaves the run out
+# a word read otherwise before these (系鞋带); None where either reading is as likely, which leaves the run out
 AHEAD = {'系': (('鞋带', '领带', '安全带'), 'ji'), '还': (('给',), None)}
-# a run in KEEP_ONE_IN is kept, by the hash of its text: pinyin-chat.tsv keeps bucket 0,
-# pinyin-dialog.tsv bucket 1
+# a run in KEEP_ONE_IN is kept by its text's hash: pinyin-chat.tsv bucket 0, pinyin-dialog.tsv bucket 1
 KEEP_ONE_IN = 25
 MAX_WORD = 8
 # the most of what came before a run kept as its context, in chars

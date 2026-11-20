@@ -1,8 +1,4 @@
-// The layout maker's editing (061-custom-layout §12.3, §12.5): a layout's text changed as the forms and the preview
-// ask. A key moved, added, taken out, its attributes set; a row's; letter keys merged into a group; the app's bottom
-// row made the layout's own. Every change is on the text, the rest of it kept as it was (comments, what the forms do
-// not know), as YoumoForm's on a theme. A key is where it is written: `{row, index}`, its row the n-th <row> of the
-// file, its index among the row's keys, gaps and slots.
+// The layout maker's edits on a layout's text, keeping the rest as written. A key is where it is written: `{row, index}`.
 (function (root) {
   'use strict';
 
@@ -10,16 +6,11 @@
   const LM = root.YoumoLayoutMaker;
 
   const LETTER = /^[a-z;]$/;
-  // the ids a probe gives a key written twice (when=) to see which of them the scene draws
   const PROBE = 'youmo-probe';
 
   const attrs = (el) => Object.fromEntries(el.attrs);
 
-  /**
-   * The layout's parts in order: `{rows, includes, parts}`. A row `{start, end, line, tag, a, index, cells}`, each cell
-   * a key, gap or slot `{start, end, line, tag, name, a, row, index}` (`a`: its attributes); an include `{…, a, index}`;
-   * `parts` the rows and includes as the file has them (what the row order moves).
-   */
+  /** `{rows, includes, parts}`; each element `{start, end, line, tag, a, …}` (`a`: its attributes), `parts` in file order. */
   function parse(xml) {
     const rows = F.elements(xml, 'row').map((r, index) => ({ ...r, a: attrs(r), index, cells: [] }));
     const cells = ['key', 'gap', 'slot'].flatMap((name) => F.elements(xml, name).map((c) => ({ ...c, name, a: attrs(c) })));
@@ -39,12 +30,9 @@
 
   const cellAt = (p, at) => (at && p.rows[at.row] ? p.rows[at.row].cells[at.index] || null : null);
   const put = (xml, start, end, text) => xml.slice(0, start) + text + xml.slice(end);
-  // the white space the line of [at] starts with
   const indentAt = (xml, at) => /^[ \t]*/.exec(xml.slice(xml.lastIndexOf('\n', at - 1) + 1))[0];
-  // [text] (an element, its later lines indented as at [from]) with its later lines at [to]
   const reindent = (text, from, to) => text.split('\n').map((l, i) => (i && l.startsWith(from) ? to + l.slice(from.length) : l)).join('\n');
 
-  // [xml] without [start, end): its whole lines with it where nothing else is on them
   function cut(xml, start, end) {
     const s = xml.lastIndexOf('\n', start - 1) + 1;
     let e = xml.indexOf('\n', end);
@@ -53,33 +41,29 @@
     return xml.slice(0, start) + xml.slice(end);
   }
 
-  // [xml] with the tag of the element at [el] changed by [values] ({name: value, null: taken out})
   function retag(xml, el, values) {
     let tag = el.tag;
     for (const [name, value] of Object.entries(values)) tag = LM.withAttr(tag, name, value === '' ? null : value);
     return put(xml, el.start, el.start + el.tag.length, tag);
   }
 
-  /** [xml] with the cell at [at]'s attributes set ({name: value}; null or '': taken out). */
   function setAttrs(xml, at, values) {
     const c = cellAt(parse(xml), at);
     return c ? retag(xml, c, values) : xml;
   }
 
-  /** [xml] with the [row]-th row's attributes set, as setAttrs. */
   function setRow(xml, row, values) {
     const r = parse(xml).rows[row];
     return r ? retag(xml, r, values) : xml;
   }
 
-  // [xml] with the rows a change left without a cell taken out (the reader refuses an empty <row>)
+  // the reader refuses an empty <row>
   function dropEmpty(xml) {
     const empty = parse(xml).rows.filter((r) => !r.cells.length).reverse();
     for (const r of empty) xml = cut(xml, r.start, r.end);
     return xml;
   }
 
-  /** [xml] with [text] (one element) put in the [at.row]-th row before its [at.index]-th cell (its count: at the end). */
   function insert(xml, at, text) {
     const row = parse(xml).rows[at.row];
     if (!row) return xml;
@@ -100,7 +84,6 @@
     return put(xml, after, after, '\n' + ind + reindent(text, '', ind));
   }
 
-  /** [xml] without the cell at [at]; its row with it where it was the row's only one. */
   function remove(xml, at) {
     const p = parse(xml);
     const c = cellAt(p, at);
@@ -109,13 +92,9 @@
     return row.cells.length === 1 ? cut(xml, row.start, row.end) : cut(xml, c.start, c.end);
   }
 
-  // the cell's text, its later lines without the indent it has where it is
   const textOf = (xml, c) => reindent(xml.slice(c.start, c.end), indentAt(xml, c.start), '');
 
-  /**
-   * [xml] with the cell at [from] moved before the [to.index]-th cell of the [to.row]-th row (as they are before the
-   * move; the row's count: at its end): `{xml, at}`, [at] where it is now. A row it leaves empty goes.
-   */
+  /** Indices before the move; returns `{xml, at}`. A row it leaves empty goes. */
   function move(xml, from, to) {
     const p = parse(xml);
     const c = cellAt(p, from);
@@ -135,7 +114,6 @@
     return { xml: out, at: { row, index } };
   }
 
-  /** The cell's place one to the left (-1) or right (1) in its row, or into the row above (-1) or below (1) at its end or start. */
   function step(xml, at, dx, dy) {
     const p = parse(xml);
     if (!cellAt(p, at)) return { xml, at };
@@ -149,9 +127,7 @@
     return move(xml, at, { row, index: dy < 0 ? p.rows[row].cells.length : 0 });
   }
 
-  // ---- rows ----
 
-  /** [xml] with a row of [text] (one element) put before the [at]-th part (rows and includes; their count: at the end). */
   function addRow(xml, at, text) {
     const p = parse(xml);
     const ind = p.parts.length ? indentAt(xml, p.parts[0].start) : '  ';
@@ -164,13 +140,11 @@
     return close < 0 ? xml : put(xml, close, close, ind + row + '\n');
   }
 
-  /** [xml] without its [at]-th part (a row or an include). */
   function removePart(xml, at) {
     const part = parse(xml).parts[at];
     return part ? cut(xml, part.start, part.end) : xml;
   }
 
-  /** [xml] with its [from]-th part (rows and includes) moved before the [to]-th (as they are before; their count: at the end). */
   function movePart(xml, from, to) {
     const p = parse(xml);
     const part = p.parts[from];
@@ -186,14 +160,9 @@
     return put(out, last.end, last.end, '\n' + ind + reindent(text, '', ind));
   }
 
-  /** The [row]-th row's place among the parts (what addRow, removePart and movePart count), -1 for none. */
   const partOfRow = (xml, row) => parse(xml).parts.findIndex((x) => x.row && x.row.index === row);
 
-  /**
-   * [xml] with its [at]-th include (the app's bottom row, §12.3) replaced by the rows of [fragment] (the fragment's
-   * text): the rows the layout's own from now on, each with the include's when= (with its own, both), indented as the
-   * include was.
-   */
+  /** The include replaced by [fragment]'s rows, which become the layout's own, each with the include's when=. */
   function ownRows(xml, at, fragment) {
     const inc = parse(xml).includes[at];
     if (!inc || !fragment) return xml;
@@ -513,7 +482,7 @@
   const BOARD_OF = { full: '26 键', g14: '14 键', g18: '18 键', t9: '九键', zy9: '注音九键', zyfull: '注音全键盘', num: '数字键盘', fn: '功能键' };
 
   /**
-   * Why a key's actions but its tap are not the layout's to say (§9, §19.2, Q11): it shares a name with the app's
+   * Why a key's actions but its tap are not the layout's to say (§9, §19.2): it shares a name with the app's
    * keys (or has none: its base's key's), what the user sets in the app goes for both. Null: its own name, all of them
    * its layout's defaults. [prefixes]: the app's name prefixes (layoutFormat's).
    */

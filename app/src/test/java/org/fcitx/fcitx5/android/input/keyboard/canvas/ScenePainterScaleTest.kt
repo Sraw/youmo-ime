@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard.canvas
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// the scale an icon's raster is sized by: a matrix gone NaN or infinite reads as 1, not a throw in the draw
+// a matrix gone NaN or infinite reads as 1, not a throw in the draw
 class ScenePainterScaleTest {
     @Test
     fun aScaleNotFiniteIsOne() {

@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.problems
+import org.fcitx.fcitx5.android.scene.Fixtures.warnings
+import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.WindowLooks
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -21,21 +24,9 @@ import kotlin.test.assertTrue
 
 // 060-render-p3 T7a: the window round the keys, `frame`, `handle`, `side-button`, `split-gap`, `navbar`
 class WindowLooksTest {
-    private val source = testData("material-light.xml")
-
-    private fun withStyle(style: String) = source.replace("</theme>", "$style\n</theme>")
-
     private fun theme(s: String): Theme = ThemeReader.theme(s).ok()
 
     private fun looks(t: Theme = Fixtures.materialLight) = WindowLooks(Cascades(t))
-
-    private fun warnings(s: String): List<String> {
-        val t = ThemeReader.theme(s)
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
-
-    private fun problems(s: String) = ThemeReader.theme(s).problems().map { it.message }
 
     private fun argb(v: Long) = Argb(v.toInt())
 

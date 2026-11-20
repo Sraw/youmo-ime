@@ -1,3 +1,0 @@
-E scel2org5.cpp:568] Read error: Failed to read long description, current offset: -1
-FORTIFY: pthread_mutex_lock called on a destroyed mutex
-Aborted (core dumped) 

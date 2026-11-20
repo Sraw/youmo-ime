@@ -43,12 +43,8 @@ abstract class ClipboardAdapter(
         }
 
         /**
-         * excerpt text to show on ClipboardEntryUi, to reduce render time of very long text
-         * @param str text to excerpt
-         * @param mask mask text content with "•"
-         * @param lines max output lines
-         * @param chars max chars per output line; a longer line is cut there. No more of [str] is
-         * looked at than [lines] full lines and their breaks: a line reaching past that ends the excerpt
+         * excerpt text to show on ClipboardEntryUi, to reduce render time of very long text.
+         * No more of the text is looked at than [lines] full lines and their breaks.
          */
         fun excerptText(
             str: String,
@@ -64,7 +60,6 @@ abstract class ClipboardAdapter(
                 val excerptEnd = min(start + chars, scanEnd)
                 lineBreak = (start until scanEnd).firstOrNull { str[it] == '\n' } ?: -1
                 if (lineBreak < 0) {
-                    // no line break within what is scanned, substring to the excerpt's end
                     if (mask) {
                         append(ClipboardEntry.BULLET.repeat(excerptEnd - start))
                     } else {
@@ -73,7 +68,6 @@ abstract class ClipboardAdapter(
                     break
                 } else {
                     val end = min(excerptEnd, lineBreak)
-                    // append one line exactly
                     if (mask) {
                         appendLine(ClipboardEntry.BULLET.repeat(end - start))
                     } else {

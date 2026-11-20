@@ -28,7 +28,7 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
         fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
-    // 联想's × (0.6.1): shown with 联想's words alone, at the far right, the ⌄ before it
+    // shown with 联想's words alone, at the far right, the ⌄ before it
     val dropPredictionsButton = ToolButton(ctx, BarIcons.PREDICTIONS_CLOSE, theme).apply {
         id = R.id.drop_predictions_btn
         visibility = View.GONE
@@ -36,7 +36,7 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
         fixIconSize(ctx.dp(KawaiiBarComponent.ICON_DP))
     }
 
-    // the toolbar's 手写 while it is on (061-handwriting-toolbar Q4): turned off from here as a character is written
+    // turned off from here as a character is written
     val handwritingButton = ToolButton(ctx, BarIcons.HANDWRITING, theme).apply {
         id = R.id.candidate_handwriting_btn
         visibility = View.GONE
@@ -45,7 +45,7 @@ class CandidateUi(override val ctx: Context, theme: Theme, private val horizonta
     }
 
     override val root = ctx.constraintLayout {
-        // the bar's height (候选字号), never narrower than a 40 dp touch target
+        // never narrower than a 40 dp touch target
         add(dropPredictionsButton, lParams(dp(KawaiiBarComponent.buttonWidthDp(ctx)), dp(KawaiiBarComponent.heightDp(ctx))) {
             centerVertically()
             endOfParent()

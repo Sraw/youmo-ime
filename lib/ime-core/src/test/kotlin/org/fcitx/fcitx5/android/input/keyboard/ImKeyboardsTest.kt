@@ -41,7 +41,7 @@ class ImKeyboardsTest {
 
     @Test
     fun schemesTypingTheSemicolonOfferNoFourteenKeys() {
-        // 微软's ; is ing: no key of the 14 has it (I1 Q5)
+        // 微软's ; is ing: no key of the 14 has it
         assertEquals(listOf(FULL, KEYS18, NINE_KEYS), ImKeyboards.choices(SHUANGPIN, microsoft))
         assertFalse(ImKeyboards.has14(microsoft))
         assertTrue(ImKeyboards.has14(ShuangpinScheme.XIAOHE))
@@ -106,8 +106,7 @@ class ImKeyboardsTest {
         assertFalse(ImKeyboards.spellsWords(predictive = true, suggests = true, password = false, address = false, noSuggestions = true))
     }
 
-    // 清除's 恢复 types again on the same alone: the layout shown, and 双拼's scheme, which reads
-    // the same letters as other syllables (review2)
+    // 清除's 恢复 types again on the same alone: the layout shown, and 双拼's scheme
     @Test
     fun whatIsTypedWithIsTheLayoutAndShuangpinsScheme() {
         val chosen = Chosen(pinyin = NINE_KEYS, shuangpin = KEYS14)
@@ -120,7 +119,7 @@ class ImKeyboardsTest {
         assertEquals(Layout.SHUANGPIN18, ImKeyboards.typedWith(SHUANGPIN, chosen, ShuangpinScheme.MICROSOFT).layout)
     }
 
-    // a layout of the user's own (061-custom-layout §5): who may use it, what is shown, what stands in for it
+    // a layout of the user's own: who may use it, what is shown, what stands in for it
     private val g18 = listOf("q", "we", "rt", "y", "u", "io", "p", "a", "sd", "fg", "h", "jk", "l;", "z", "xc", "v", "bn", "m")
     private val g14 = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m")
     private val letters = CustomChoice("my-qwerty", "我的", "letters", "qwerty", tableExtras = true)
@@ -129,8 +128,7 @@ class ImKeyboardsTest {
     private val k14 = CustomChoice("my-k14", "14", "grouped", "k14", g14)
     private val k17 = CustomChoice("k17", "17", "grouped", "k18", listOf("qw", "er", "t", "y", "u", "io", "p", "as", "df", "g", "h", "jk", "l", "zx", "cv", "bn", "m"))
 
-    // review L4 N4: two layouts of the 18 keys' groups in other orders type the same codes, so what was typed on one is
-    // typed again on the other; two groupings of their own in other orders type other codes
+    // two layouts of the 18 keys' groups in other orders type the same codes; two of their own groupings do not
     @Test
     fun theEighteenKeysRearrangedEitherWayAreTypedWithAlike() {
         val zr = ShuangpinScheme.ZIRANMA
@@ -158,7 +156,7 @@ class ImKeyboardsTest {
         assertEquals(listOf(letters, nine, k18, k14), ImKeyboards.customs(SHUANGPIN, ziranma, all))
         assertEquals(listOf(letters, nine, k18), ImKeyboards.customs(SHUANGPIN, microsoft, all))
         assertEquals(listOf(letters, nine), ImKeyboards.customs(ENGLISH, ziranma, all))
-        // a table: letters with the keys it types beside them (Q6)
+        // a table: letters with the keys it types beside them
         assertEquals(listOf(letters), ImKeyboards.customs(WUBI, ziranma, all))
         assertEquals(emptyList<CustomChoice>(), ImKeyboards.customs(WUBI, ziranma, listOf(letters.copy(tableExtras = false))))
         assertTrue(ImKeyboards.offers(WUBI, ziranma, all))
@@ -192,7 +190,7 @@ class ImKeyboardsTest {
 
     @Test
     fun aLayoutOfOnesOwnNotDrawnOrDeletedGivesWayToItsBase() {
-        // not drawn (its file refused): the base, the choice kept (§4.4)
+        // not drawn (its file refused): the base, the choice kept
         val refused = k18.copy(drawn = false)
         assertEquals(KEYS18, ImKeyboards.effective(PINYIN, CUSTOM, ziranma, refused))
         assertEquals(ImKeyboards.Shown(Layout.PINYIN18), ImKeyboards.shown(PINYIN, chosen(PINYIN, refused), ziranma))
@@ -216,7 +214,7 @@ class ImKeyboardsTest {
         assertEquals(emptyMap<String, ImKeyboard>(), ImKeyboards.afterDelete(Chosen(layouts = mapOf(PINYIN to "my-k18")), "my-k18", k18, ziranma))
     }
 
-    // 按键字符和快捷键's tabs of the user's layouts (061-custom-layout §9, L6): each drawn once, in the slots' order
+    // 按键字符和快捷键's tabs of the user's layouts: each drawn once, in the slots' order
     @Test
     fun theLayoutsInUseAreThoseDrawn() {
         val customs = listOf(letters, nine, k14).associateBy { it.id }

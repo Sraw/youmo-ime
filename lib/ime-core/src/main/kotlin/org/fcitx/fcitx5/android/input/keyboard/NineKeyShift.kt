@@ -4,11 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-/**
- * Shift on the nine keys' English, as the full keyboard's: pressed once, the next letter a
- * capital; pressed twice quickly or held, caps lock, until pressed again. On by itself where a
- * sentence starts ([AutoCaps]).
- */
+/** The nine keys' English Shift, as the full keyboard's: once a capital, twice quickly or held caps lock; on at a sentence start ([AutoCaps]). */
 class NineKeyShift {
 
     var caps: AutoCaps.Caps = AutoCaps.Caps.NONE
@@ -16,10 +12,9 @@ class NineKeyShift {
 
     private val autoCaps = AutoCaps()
 
-    /** Whether the next letter is a capital. */
     val upper: Boolean get() = caps != AutoCaps.Caps.NONE
 
-    /** Shift pressed, [lock] twice quickly or held: caps lock on, or off where it is. */
+    /** [lock]: twice quickly or held. */
     fun pressed(lock: Boolean) {
         autoCaps.changed()
         caps = when {
@@ -29,7 +24,7 @@ class NineKeyShift {
         }
     }
 
-    /** Where the editor [wants] a capital next or no longer: whether Shift changed. */
+    /** Whether Shift changed. */
     fun auto(wants: Boolean): Boolean {
         val next = autoCaps.next(caps, wants)
         if (next == caps) return false
@@ -37,7 +32,7 @@ class NineKeyShift {
         return true
     }
 
-    /** A letter typed: whether it is a capital, Shift pressed once used up by it. */
+    /** Whether it is a capital; Shift-once used up. */
     fun typed(): Boolean {
         val upper = upper
         if (caps == AutoCaps.Caps.ONCE) {
@@ -47,7 +42,7 @@ class NineKeyShift {
         return upper
     }
 
-    /** Off, as the keys attach afresh. */
+    /** As the keys attach afresh. */
     fun reset() {
         autoCaps.changed()
         caps = AutoCaps.Caps.NONE

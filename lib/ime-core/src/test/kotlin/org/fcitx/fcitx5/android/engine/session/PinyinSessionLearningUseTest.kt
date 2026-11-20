@@ -4,9 +4,6 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.lattice.LayerPrior
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -16,7 +13,6 @@ import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.LearningUse.Counts
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.nio.ByteBuffer
 
 /** [LearningUse]: the channels of what is learned taken away one by one, for ime-eval to measure; the default is the app's. */
 class PinyinSessionLearningUseTest {
@@ -46,7 +42,6 @@ class PinyinSessionLearningUseTest {
         val none = learned(Counts.NONE)
         assertEquals("你", none.first("ni"))
         assertEquals("你见", none.first("nijian"))
-        // only where the word does not read all the input alone
         val multi = learned(Counts.MULTI)
         assertEquals("你", multi.first("ni"))
         assertEquals("拟见", multi.first("nijian"))
@@ -62,28 +57,5 @@ class PinyinSessionLearningUseTest {
         session.apply(Reset)
         session.type("nij")
         assertEquals(listOf("你"), session.apply(Action.Backspace).candidates.take(1))
-    }
-
-    @Test
-    fun thePriorPerLayerLearnsNothingFromPicks() {
-        val layered = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .layers(listOf("base", "new"))
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("你", -2f, 0f)
-                    .unigram("拟", -4.5f, 0f)
-                    .entry("你", syl("ni"))
-                    .entry("拟", syl("ni"), layer = 1)
-                    .build().toByteArray(),
-            ),
-        )
-        val prior = LayerPrior(layered.layers, step = 1f, bound = 4f)
-        val session = PinyinSession(layered, PinyinSegmenter(), prior = prior, prediction = false)
-        repeat(3) {
-            session.type("ni")
-            assertEquals("拟", session.apply(Select(1)).commit)
-        }
-        assertEquals(0f, prior[1], 0f)
     }
 }

@@ -11,11 +11,7 @@ import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * uat/03's nine keys, the host's half: what the keys T9UatTest sees sent (the keys' codes, the
- * keypad's digits, a mark, a reset) make of the field, on the Kotlin host with the app's data:
- * pinyin on its nine keys (I1), the keypad's digits typed or picking as on any of pinyin's keyboards.
- */
+/** uat/03's nine keys, the host's half: what the keys T9UatTest sees sent make of the field, with the app's data. */
 class NineKeysHostUatTest {
 
     private fun HostReplay.keypad(digits: String) {

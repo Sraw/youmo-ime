@@ -16,21 +16,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.os.UserManagerCompat
 
 /**
- * Asks for the microphone, which an input method cannot do from its own window, and closes. Once
- * refused for good the system shows no dialog and refuses at once: then, and only then, the
- * app's settings page, where it can still be granted.
+ * An input method cannot ask from its own window. Once refused for good the system shows no dialog and
+ * refuses at once: then, and only then, the app's settings page.
  */
 class VoicePermissionActivity : ComponentActivity() {
 
-    // asked before, and the system not to explain why: refused for good, or never asked at all
     // kept over a rebuild (a rotation, the dark theme) while the dialog shows
     private var refusedForGood = false
-    // when it was asked (uptime): a refusal that comes back at once is the system's, no dialog shown
+    // a refusal that comes back at once is the system's, no dialog shown
     private var askedAt = 0L
 
     private val ask = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        // a dialog shown and dismissed (Android 11+: a tap outside) is no refusal for good, though
-        // the system gives no rationale after it either: only a refusal with no dialog opens the settings
+        // a dialog dismissed (Android 11+: a tap outside) is no refusal for good, though the system gives no rationale
+        // after it either: only a refusal with no dialog opens the settings
         val noDialog = SystemClock.uptimeMillis() - askedAt < NO_DIALOG_MS
         val forGood = refusedForGood && noDialog
         if (!granted && forGood && !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
@@ -50,8 +48,7 @@ class VoicePermissionActivity : ComponentActivity() {
             askedAt = 0L
             return
         }
-        // its own file, not AppPrefs: a mark of what the system was asked on this device, not a
-        // setting of the user's to back up or restore elsewhere
+        // not AppPrefs: a mark of what this device's system was asked, not a setting to back up or restore elsewhere
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         refusedForGood = prefs.getBoolean(ASKED, false) &&
             !shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)

@@ -28,17 +28,13 @@ import java.nio.ByteBuffer
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * Another input method's skin imported (dev/design/060-skin-import.md): converted, then shown and taken as a theme
- * 4.0 pack is, what did not carry over listed; refused with a reason for what is no skin read here. The skins are
- * made here (no third party's in the repository), their images in a fake's format, written as the probe reads them.
- */
+/** Another input method's skin converted and taken as a 4.0 pack; skins made here (none third-party in the repo), images faked. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeSkinImportTest : ThemePackFixture() {
     private val realCodec = ThemeFilesManager.skinCodec
 
-    // an image is "IMG", its width and height, its ARGB ints; one written is "<w>x<h>", as PackProbe reads it
+    // an image is "IMG", width, height, ARGB ints; one written is "<w>x<h>", as PackProbe reads it
     private object FakeCodec : ThemeFilesManager.SkinCodec {
         override fun image(bytes: ByteArray): SkinImage? {
             if (bytes.size < 11 || String(bytes, 0, 3) != "IMG") return null
@@ -91,7 +87,7 @@ class ThemeSkinImportTest : ThemePackFixture() {
         }
     }.toByteArray()
 
-    // a Baidu skin: a key face of its own (a 6 px transparent margin), a panel picture, colours, a click
+    // a key face (6 px transparent margin), a panel picture, colours, a click
     private fun baidu(name: String = "Sea Breeze"): ByteArray {
         val face = Pixels(162, 180).also { it.paste(Pixels.filled(150, 168, 0xFFFFFFFF.toInt()), 6, 6) }
         val letters = "qwertyuiopasdfghjklzxcvbnm".mapIndexed { i, c ->
@@ -102,7 +98,7 @@ class ThemeSkinImportTest : ThemePackFixture() {
             "demo.png" to img(Pixels.filled(300, 200, 0xFF336699.toInt())),
             "res/keys.png" to img(face),
             "res/keys.til" to "[IMG1]\nSOURCE_RECT=0,0,162,180\nINNER_RECT=30,30,102,120\n".toByteArray(),
-            // small, stretched to the panel: a flat image packs past the ratio a zip bomb is refused by
+            // small and stretched: a flat image packs past the zip-bomb ratio
             "res/panel.png" to img(Pixels.filled(108, 60, 0xFFDDE4EE.toInt())),
             "res/panel.til" to "[IMG1]\nSOURCE_RECT=0,0,108,60\n".toByteArray(),
             "res/click.wav" to wav(60),
@@ -125,7 +121,7 @@ class ThemeSkinImportTest : ThemePackFixture() {
         assertEquals("Ann", staged.theme.meta!!.author)
         assertEquals(mapOf(SoundKey.LETTER to "sound-letter.wav"), staged.theme.sounds)
         assertTrue(SkinNote.LAYOUT in pack.notes)
-        // the converter's files in the folder unpacked, the key face cut to its body
+        // the key face cut to its body
         assertEquals("150x168", File(staged.from, "l-key-n.png").readText())
         assertTrue(File(staged.from, "board.png").isFile)
         assertTrue(File(staged.from, "preview.png").isFile)
@@ -193,9 +189,7 @@ class ThemeSkinImportTest : ThemePackFixture() {
         assertEquals(appContext.getString(R.string.exception_skin_unknown), skinRefusal(zip, "Ocean.flex"))
     }
 
-    // a theme as upstream fcitx5-android exports it (its ThemeFilesManager.exportTheme): `<name>.json` of version 2.1
-    // with the 24 colours of its Theme.Custom and the picture's two files by name beside it, a .zip the user renames
-    // to .theme (dev/design/060-skin-formats.md)
+    // upstream fcitx5-android's export: a 2.1 `<name>.json` with the picture's two files, a .zip renamed to .theme
     @Test
     fun anUpstreamThemeIsImported() {
         val names = listOf(

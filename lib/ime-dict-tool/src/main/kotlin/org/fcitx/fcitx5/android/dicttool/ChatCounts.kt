@@ -6,10 +6,7 @@ package org.fcitx.fcitx5.android.dicttool
 
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 
-/**
- * Bigrams and trigrams counted, as [KneserNey] and [Mixer] take them: word ids below [start], which
- * is a virtual start no n-gram is kept from (counted for the continuation counts alone).
- */
+/** Bigrams and trigrams for [KneserNey] and [Mixer]: word ids below [start], a virtual start no n-gram is kept from. */
 interface NgramCounts {
     val start: Int
     val bigrams: LongIndex
@@ -17,23 +14,11 @@ interface NgramCounts {
     val trigrams: LongIndex
     val trigramCount: IntColumn
 
-    /**
-     * A word of the model's own every sentence starts with (`<s>`), none before it: its bigrams
-     * have no continuation counts, and are counted as they were seen, as KenLM has it. -1 for none.
-     */
+    /** The model's `<s>`: its bigrams count as seen, as KenLM has it, having no continuation counts. -1 for none. */
     val sentenceStart: Int get() = -1
 }
 
-/**
- * N-gram counts of text split into [model]'s words: what people write to each other, which the
- * model (news and the like) has little of.
- *
- * Each run of text between chars that are no word by themselves (a letter, a digit, an emoji, a
- * char only ever inside longer words) is split as the
- * model finds likeliest, the sum of its words' unigram scores, and counted from a virtual start,
- * [start]: counted only for how many different words come before a word (Kneser-Ney's
- * continuation counts), never an n-gram of its own, as the model has no sentence start.
- */
+/** N-gram counts of chat text split into [model]'s likeliest words, each run counted from a virtual [start]. */
 class ChatCounts(private val model: ArpaModel) : NgramCounts {
 
     private val ids = WordIds(model.words)
@@ -119,10 +104,7 @@ class ChatCounts(private val model: ArpaModel) : NgramCounts {
     }
 }
 
-/**
- * [words]' ids by their text, found from the chars where they lie rather than from strings made
- * of them, as ime-core's WordIndex: [ChatCounts] looks up every run of up to 8 chars of the chat.
- */
+/** [words]' ids found from the chars where they lie, not from strings made of them, as ime-core's WordIndex. */
 private class WordIds(private val words: List<String>) {
 
     // id + 1 of the word hashed there, 0 for none; at most two thirds full
@@ -164,12 +146,7 @@ private class WordIds(private val words: List<String>) {
     }
 }
 
-/**
- * Interpolated Kneser-Ney over [counts], one discount an order (n1 / (n1 + 2 n2) of that order's
- * counts): the highest order by what was counted, the lower ones by how many different words
- * came before. Every word of the model has a probability: each, seen or not, gets an equal share
- * of what the unigrams' discount leaves.
- */
+/** Interpolated Kneser-Ney over [counts], one discount an order; unseen words share what the unigrams' discount leaves. */
 class KneserNey(private val counts: NgramCounts) {
 
     private val vocabulary = counts.start
@@ -253,8 +230,7 @@ class KneserNey(private val counts: NgramCounts) {
         return (maxOf(c - discount3, 0.0) + discount3 * after3[context] * p2(v, w)) / total3[context]
     }
 
-    // what bigram [i], of [v] and a word, counts for: how many different words came before it, or,
-    // nothing ever before it, how many times it was seen
+    // a bigram's count: how many different words came before it, or, nothing ever before it, how often it was seen
     private fun count2(i: Int, v: Int) = if (v == counts.sentenceStart) counts.bigramCount[i] else before2[i]
 
     private companion object {

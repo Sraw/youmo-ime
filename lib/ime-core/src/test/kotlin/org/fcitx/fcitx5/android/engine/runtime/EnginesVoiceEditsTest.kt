@@ -33,7 +33,7 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             .unigram("徐", -4f, 0f).entry("徐", syl("xu"))
             .unigram("婧", -4f, 0f).entry("婧", syl("jing"))
             .unigram("靖", -4.5f, 0f).entry("靖", syl("jing"))
-            // 单, read dan, and shan as a surname: what is added is read as typed (review S2)
+            // 单, read dan, and shan as a surname: what is added is read as typed
             .unigram("单", -4f, 0f).entry("单", syl("dan")).entry("单", syl("shan"))
             .apply {
                 for ((c, s, t) in listOf(
@@ -48,8 +48,7 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             .toByteArray()
     }
 
-    // voice's [said] in an empty field, its last two deleted with Backspace, [keys] typed in pinyin and [word] picked:
-    // what is asked
+    // voice's [said], its last two deleted, [keys] typed in pinyin and [word] picked: what is asked
     private fun Engines.retyped(
         said: String = "我找徐静",
         learning: Boolean = true,
@@ -66,7 +65,6 @@ class EnginesVoiceEditsTest : EnginesFixture() {
     // [keys] typed in pinyin after [kept], [word] picked a candidate at a time: what is asked
     private fun Engines.typedAgain(kept: String, keys: String, word: String, learning: Boolean = true): VoiceEdits.Ask? {
         type(PINYIN, keys)
-        // a part picked commits nothing till the whole is
         var picked = ""
         var commit = ""
         while (commit.isEmpty()) {
@@ -94,16 +92,15 @@ class EnginesVoiceEditsTest : EnginesFixture() {
         val dir = MemoryFiles()
         Engines(::load, dir, warmUps = inPlace).use { e ->
             e.context(PINYIN, "", said = true)
-            // the steps of one scenario, in order: each needs the one before (review F8112)
+            // the steps of one scenario, in order: each needs the one before
             val ask = e.retyped()
             // asked, read as typed: voice's rules with it added would put it in
             assertEquals("徐婧", ask?.word)
             assertEquals("xu jing", ask?.pinyin)
-            // 记住: added by hand
             assertNotNull(ask)
             assertTrue(e.voiceRemember(ask!!))
             assertEquals(listOf("徐婧"), added(e))
-            // 撤销: off the added words, nothing forgotten in the learning record (review R1)
+            // 撤销: off the added words, nothing forgotten in the learning record
             e.voiceForget("徐婧")
             assertEquals(emptyList<String>(), added(e))
             assertFalse(records(dir).any { it is LearnRecord.Forget && it.text == "徐婧" })
@@ -119,7 +116,6 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             // 单 typed shan: asked, read shan jing (its readings, dan and shan, leave it open)
             assertEquals("单婧", ask?.word)
             assertEquals("shan jing", ask?.pinyin)
-            // then 记住: added so
             assertTrue(e.voiceRemember(ask!!))
             assertEquals(listOf("shan jing"), e.userWords(UserWord.Kind.ADDED).map { it.pinyin })
         }
@@ -135,10 +131,8 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             // the word deleted again and another of the same reading typed: voice judged without the first, ranked first
             repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
             val second = e.typedAgain("我找", "xujing", "徐靖")
-            // asked as replacing the first
             assertEquals("徐靖", second?.word)
             assertEquals("徐婧", second?.replaces)
-            // 记住: the second added, the first taken off
             assertTrue(e.voiceRemember(second!!))
             assertEquals(listOf("徐靖"), added(e))
         }
@@ -154,10 +148,8 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             e.addedUnrelated()
             e.context(PINYIN, "", said = true)
             val ask = e.retyped()
-            // asked, read as typed
             assertEquals("徐婧", ask?.word)
             assertEquals("xu jing", ask?.pinyin)
-            // 记住: added after it
             assertTrue(e.voiceRemember(ask!!))
             assertEquals(listOf("许静", "徐婧"), added(e))
         }
@@ -172,10 +164,8 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             assertTrue(e.voiceRemember(e.retyped()!!))
             repeat(2) { e.onEvent(PINYIN, EngineEvent.BACKSPACE, 0) }
             val second = e.typedAgain("我找", "xujing", "徐靖")
-            // asked as replacing the first
             assertEquals("徐靖", second?.word)
             assertEquals("徐婧", second?.replaces)
-            // 记住: the second in the first's stead, the unrelated one kept
             assertTrue(e.voiceRemember(second!!))
             assertEquals(listOf("许静", "徐靖"), added(e))
         }
@@ -187,9 +177,7 @@ class EnginesVoiceEditsTest : EnginesFixture() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
             e.context(PINYIN, "", said = true)
             assertTrue(e.voiceRemember(e.retyped()!!))
-            // read as nothing spells: not added
             val bad = VoiceEdits.Ask("徐靖", "xu", "徐静", replaces = "徐婧", hint = false, cells = emptySet())
-            // not added, and so the first still added
             assertFalse(e.voiceRemember(bad))
             assertEquals(listOf("徐婧"), added(e))
         }
@@ -293,8 +281,7 @@ class EnginesVoiceEditsTest : EnginesFixture() {
         },
     )
 
-    // a word asked about (the user's words read for it, voice's tables made), then the window closed by [closing]:
-    // what was read let go, not kept with the engines till the next window's (review F8342, R26 F8435/F8442)
+    // what was read for the question is let go when the window closes, not kept till the next
     private fun letGo(closing: Engines.() -> Unit) = Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
         e.addedUnrelated()
         e.context(PINYIN, "", said = true)

@@ -15,10 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * A resize that changed the theme grid's columns changed only the grid: the spacing between the
- * themes was still worked out for the columns it had first.
- */
+/** A resize changing the grid's columns once left the spacing worked out for the columns it had first. */
 @RunWith(RobolectricTestRunner::class)
 class ResponsiveThemeListViewTest {
 
@@ -44,7 +41,6 @@ class ResponsiveThemeListViewTest {
         list.layout(0, 0, 400, 800)
         val narrow = (list.layoutManager as GridLayoutManager).spanCount
         assertNotEquals(wide, narrow)
-        // the first row as laid out: the gap before each theme as wide as the one after the last
         val row = (0 until narrow).map { list.findViewHolderForAdapterPosition(it)!!.itemView }
         val gaps = listOf(row.first().left) + row.zipWithNext { a, b -> b.left - a.right } + (list.width - row.last().right)
         assertEquals(listOf(48, 48, 48), gaps)

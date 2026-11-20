@@ -9,12 +9,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 
-/**
- * Fails unless a test may start an engine of its own in this process. While this app is the
- * device's keyboard the system binds its input method here, and that one's engine would share
- * fcitx's events and data files with the test's: fcitx is one per process, and `Fcitx`'s own
- * guard checks only the new instance.
- */
+/** fcitx is one per process: a test's engine would share events and data with this app's bound input method, which `Fcitx`'s guard does not check. */
 fun checkThisInputMethodIsNotBound() {
     val instrumentation = InstrumentationRegistry.getInstrumentation()
     val device = UiDevice.getInstance(instrumentation)

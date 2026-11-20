@@ -13,10 +13,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.input.picker.RecentItems
 import timber.log.Timber
 
-/**
- * A picker's 「最近」 ([RecentItems]), kept in the preferences under [type], oldest first, and when
- * each was used under [type]`.times`. [habits] is U-93's 「用我的输入习惯」, passed in each time.
- */
+/** A picker's 「最近」, oldest first, with times under [type]`.times`; [habits] is 「用我的输入习惯」. */
 class RecentlyUsed(val type: String, val limit: Int) {
 
     companion object {
@@ -29,18 +26,14 @@ class RecentlyUsed(val type: String, val limit: Int) {
         private val preferences
             get() = FcitxApplication.getInstance().directBootAwareContext.getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE)
 
-        // goes up as [clear] clears them all: each picker's own copy is read again
+        // bumped by [clear]: each picker's copy is reread
         @Volatile
         private var cleared = 0
 
-        // clear runs on the fcitx thread, a pick on the main one: a pick between clear's save and
-        // its cleared++ saved its stale copy back, and what was cleared came back (review R11)
+        // clear runs on the fcitx thread, a pick on the main one: unlocked, a pick could save its stale copy back
         private val lock = Any()
 
-        /**
-         * Forgets what every picker used at [from] (ms since the epoch) or later, all of it for 0:
-         * cleared with what was learned (U-88 清掉最近, U-86 清空学到的).
-         */
+        /** Forgets what every picker used at [from] (epoch ms) or later; 0 clears all. */
         fun clear(from: Long): Unit = synchronized(lock) {
             val prefs = preferences
             val types = prefs.all.keys.filterNot { it.endsWith(TIMES) }
@@ -66,7 +59,7 @@ class RecentlyUsed(val type: String, val limit: Int) {
             }
         }
 
-        // none for those an older build kept: as of long ago
+        // none for an older build's: as of long ago
         private fun loadTimes(prefs: SharedPreferences, type: String): List<Long> =
             prefs.getString(type + TIMES, null)?.let { runCatching { Json.decodeFromString<List<Long>>(it) }.getOrNull() }.orEmpty()
 
@@ -83,7 +76,7 @@ class RecentlyUsed(val type: String, val limit: Int) {
     private val recent = RecentItems(limit)
     private var read = -1
 
-    // [recent], read again if [clear] ran since
+    // reread if [clear] ran since
     private fun fresh(): RecentItems {
         if (read != cleared) {
             recent.load(if (read == -1) migrate() ?: loadItems(sharedPreferences, type) else loadItems(sharedPreferences, type), loadTimes(sharedPreferences, type))
@@ -92,10 +85,10 @@ class RecentlyUsed(val type: String, val limit: Int) {
         return recent
     }
 
-    /** What is shown, the newest first: nothing while the habits are off. */
+    /** Newest first: nothing while the habits are off. */
     fun items(habits: Boolean): List<String> = synchronized(lock) { fresh().shown(habits) }
 
-    /** [item] used now: kept, unless the habits are off. */
+    /** Unless the habits are off. */
     fun insert(item: String, habits: Boolean) = synchronized(lock) {
         if (fresh().use(item, System.currentTimeMillis(), habits)) save(sharedPreferences, type, recent)
     }

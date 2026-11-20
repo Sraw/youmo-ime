@@ -61,14 +61,12 @@ class CodedIndexTest {
         assertNull(CodedIndex.open(dest, "k"))
         dest.writeBytes(bytes.copyOf(bytes.size - 1))
         assertNull(CodedIndex.open(dest, "k"))
-        // no temporaries left beside it
         assertEquals(setOf("merged.ymd", "wubi.ymc"), folder.root.list()!!.toSet())
     }
 
     @Test
     fun aSecondBuildOfOneIndexWaitsForTheFirst() {
-        // a newer file's build started while the older still runs (each on its own warm-up thread):
-        // they shared the work dir and temporary, the newer deleting the older's runs (review F3271)
+        // the builds once shared a work dir, the newer deleting the older's runs
         val older = file("我们 wo'men 0.4")
         val newer = File(folder.root, "newer.ymd").also { DictionaryCompiler.compile(listOf(sequenceOf("好你 hao'ni 0.2")), it) }.let { DictionaryFile.open(JvmFile(it)) }
         val dest = File(folder.root, "wubi.ymc")
@@ -79,7 +77,6 @@ class CodedIndexTest {
             if (!started) {
                 started = true
                 other.start()
-                // long enough for the second to run whole, had it not waited
                 other.join(WAIT_MS)
             }
             true

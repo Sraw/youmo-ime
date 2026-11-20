@@ -4,29 +4,18 @@
  */
 package org.fcitx.fcitx5.android.host
 
-/**
- * `conf/punctuation.conf` (`ca/punctuation/punctuation.h:36-46`): [enabled] is the toggle (saved,
- * hidden), the other two the options page's. The hotkey is fixed at Ctrl+. (Q6).
- */
+/** `conf/punctuation.conf`: [enabled] is the toggle (saved, hidden); the hotkey is fixed at Ctrl+. */
 data class PunctuationConfig(
     val enabled: Boolean = true,
-    // off by default, as the app always set it (AddonDefaults till 0.4): a Chinese comma after 3 stays one
+    // off by default, as the app always set it: a Chinese comma after 3 stays one
     val halfWidthAfterLatinOrNumber: Boolean = false,
     val typePairedTogether: Boolean = false,
 )
 
 /**
- * The punctuation module, fcitx's `Punctuation` (`ca/punctuation/punctuation.cpp`), for the one
- * table there is (zh_CN; fcitx keys its profiles by language and every input method asks for zh_CN,
- * `androidengine.cpp:518-533`).
- *
- * Plugs into the [KeyPipeline] as its [commitFilter], [keyResult], [forwardKey], [contextListener]
- * and [hotkey]; the engine's key router asks it for marks ([pushPunctuationV2] and the rest), as
- * `androidengine` calls `IPunctuation`. Per-context state ([State]) is an [IcProperty]. The toggle
- * is in the [statusArea] as [action]; [save] is told of each change to [config] to write it out.
- *
- * Not ported: rebuilding the state from the surrounding text (`:277-286,304-360`): the frontend
- * never sets the capability nor sends the text, so fcitx never gets there either.
+ * fcitx's `Punctuation` for its one table (zh_CN, which every input method asks for), plugged into the
+ * [KeyPipeline]; the key router asks it for marks as `androidengine` calls `IPunctuation`. Rebuilding state
+ * from surrounding text is not ported: the frontend never sends it.
  */
 class Punctuation(
     profile: PunctuationProfile,
@@ -34,13 +23,10 @@ class Punctuation(
     private val statusArea: StatusArea,
     private val tip: (Tip) -> Unit,
     private val save: (PunctuationConfig) -> Unit = {},
-    /**
-     * The marks that now type as the key's own character ([typesAsItself]) changed on [InputContext]:
-     * the keyboard shows them as they will be typed (060-render-p2 S7 #7).
-     */
+    /** The marks now typed as the key's own character changed: the keyboard shows them as they will be typed. */
     private val asTyped: (InputContext, Set<String>) -> Unit = { _, _ -> },
 ) {
-    /** `PunctuationState` (`:64-72`); the backups only serve the surrounding text rebuild, not ported. */
+    /** `PunctuationState`; the backups only served the surrounding-text rebuild, not ported. */
     class State {
         val lastPuncStack = HashMap<Int, String>()
         var lastIsEngOrDigit = 0
@@ -48,9 +34,7 @@ class Punctuation(
 
     private val stateProperty = IcProperty { State() }
 
-    // the marks last told through [asTyped] (bit i: AS_TYPED[i] types as itself) and the context they
-    // were told for: another context's are told anew. One focused anew is told whatever was told
-    // before (another context's state, or the keyboard's of an earlier host)
+    // the marks last told (bit i: AS_TYPED[i] types as itself) and their context; another context is told anew
     private var told = 0
     private var toldFor: InputContext? = null
     private var focused: InputContext? = null
@@ -72,34 +56,28 @@ class Punctuation(
 
     fun state(ic: InputContext): State = ic.propertyFor(stateProperty)
 
-    /** A new table: the edit page saved one, or the user's file went away (`setSubConfig`, `reloadConfig`). */
+    /** `setSubConfig`, `reloadConfig`. */
     fun setProfile(profile: PunctuationProfile) {
         this.profile = profile
         // the keys' marks ([keys]) go out with the status: sent anew
         focused?.let(action::updateOn)
     }
 
-    /** The options page's change (`setConfig`); the toggle's own state comes in with it. */
+    /** `setConfig`; the toggle's own state comes in with it. */
     fun setConfig(config: PunctuationConfig) {
         this.config = config
         save(config)
-        // on or off: the status, and the keys' marks with it ([keys]), sent anew
         focused?.let(action::updateOn)
         // "half width after a letter or number" may have turned: the keyboard shown anew
         focused?.let(::tell)
     }
 
-    /**
-     * Whether the key [unicode] now types its own character, not its mark: after a letter or digit,
-     * `.` and `,` while "half width after a letter or number" is on (`:444-448`). What [push] types
-     * and what the keyboard shows ([asTyped]) both come from here.
-     */
+    /** After a letter or digit, `.` and `,` while that option is on; [push] and the keyboard ([asTyped]) both read this. */
     fun typesAsItself(ic: InputContext, unicode: Int): Boolean =
         enabled && state(ic).lastIsEngOrDigit != 0 && config.halfWidthAfterLatinOrNumber && dontConvertWhenEn(unicode)
 
-    // the marks [typesAsItself] now, told when they change
     private fun tell(ic: InputContext, always: Boolean = false) {
-        // no set made a key: the marks' bits compared, the set made when they are told
+        // the marks' bits compared; the set made only when told
         var now = 0
         for (i in AS_TYPED.indices) if (typesAsItself(ic, AS_TYPED[i].code)) now = now or (1 shl i)
         // nothing told yet: none is what the keyboard has, no need to tell it
@@ -110,10 +88,9 @@ class Punctuation(
         asTyped(ic, AS_TYPED.filterIndexed { i, _ -> now and (1 shl i) != 0 }.mapTo(HashSet()) { it.toString() })
     }
 
-    /** `setEnabled` (`punctuation.h:150-155`): saved, and the action shown anew. */
+    /** `setEnabled`: saved, and the action shown anew. */
     fun setEnabled(enabled: Boolean, ic: InputContext) {
         if (enabled == config.enabled) return
-        // the focused context's status and marks setConfig sends
         setConfig(config.copy(enabled = enabled))
         if (ic !== focused) {
             action.updateOn(ic)
@@ -121,13 +98,10 @@ class Punctuation(
         }
     }
 
-    /**
-     * What each key types now on [ic] (a key's first mark), none where punctuation is off or its input method
-     * has not the toggle: what the keyboard draws on the keys, sent with the status (060-render-p2 S7a).
-     */
+    /** A key's first mark, none where off or without the toggle: drawn on the keys, sent with the status. */
     fun keys(ic: InputContext): Map<String, String> = keys(inWhiteList(ic))
 
-    /** [keys] for an input method that has the toggle ([hasToggle]: a Chinese one) or not, before a context has one (the host's start). */
+    /** Before a context exists (the host's start). */
     fun keys(hasToggle: Boolean): Map<String, String> {
         if (!enabled || !hasToggle) return emptyMap()
         val map = LinkedHashMap<String, String>()
@@ -135,10 +109,10 @@ class Punctuation(
         return map
     }
 
-    /** `inWhiteList` (`:434-436`): the context's input method put the toggle in its status area. */
+    /** `inWhiteList`: the input method put the toggle in its status area. */
     fun inWhiteList(ic: InputContext) = statusArea.contains(ic, action)
 
-    /** `CommitFilter` (`:217-228`): whether the last character committed is an ASCII letter or digit. */
+    /** `CommitFilter`: whether the last character committed is an ASCII letter or digit. */
     val commitFilter = CommitFilter { ic, text ->
         val last = text.lastOrNull()
         state(ic).lastIsEngOrDigit = if (last != null && isAsciiLetterOrDigit(last)) last.code else 0
@@ -146,13 +120,12 @@ class Punctuation(
         text
     }
 
-    /** `KeyEventResult` (`:229-248`): an unaccepted press of a letter or digit is the last character, any other clears it. */
+    /** `KeyEventResult`: an unaccepted letter or digit press is the last character, any other clears it. */
     val keyResult = KeyResultListener { ic, e -> onKey(ic, e.key, e.release, e.accepted) }
 
-    /** A key the engine forwarded, the same rule (`:249-254`). */
     val forwardKey = ForwardKeyListener { ic, e -> onKey(ic, e.key, e.release, false) }
 
-    /** `InputContextReset` (`:287-302`): the state goes. */
+    /** `InputContextReset`. */
     val contextListener = object : ContextListener {
         override fun onReset(ic: InputContext) {
             val s = state(ic)
@@ -161,7 +134,6 @@ class Punctuation(
             tell(ic)
         }
 
-        // focused (an app's field, a context switched to): told whatever was told last
         override fun onFocusIn(ic: InputContext) {
             focused = ic
             tell(ic, always = true)
@@ -172,7 +144,7 @@ class Punctuation(
         }
     }
 
-    /** Ctrl+. at PostInputMethod (`:255-276`): toggles, says so, and takes the key; presses only, in the white list only. */
+    /** Ctrl+. at PostInputMethod: toggles, says so, takes the key; presses only, in the white list only. */
     val hotkey = PostKeyHook { ic, e ->
         if (e.release || !inWhiteList(ic) || e.key != HOTKEY) return@PostKeyHook
         setEnabled(!enabled, ic)
@@ -182,24 +154,19 @@ class Punctuation(
 
     private fun onKey(ic: InputContext, key: Key, release: Boolean, accepted: Boolean) {
         if (release || accepted) return
-        // Key.isDigit takes the keypad's digits too, as fcitx's (fcitx-utils/key.cpp:412-415)
+        // Key.isDigit takes the keypad's digits too, as fcitx's
         val letterOrDigit = key.isUAZ || key.isLAZ || key.isDigit
         state(ic).lastIsEngOrDigit = if (letterOrDigit) KeySyms.toUnicode(key.sym) else 0
         tell(ic)
     }
 
-    /** `getPunctuation` (`:531-543`): the key's first entry, whatever the context; empty when off. */
+    /** `getPunctuation`: the key's first entry, whatever the context; empty when off. */
     fun getPunctuation(unicode: Int): Pair<String, String> = if (enabled) profile.punctuation(unicode) else EMPTY_PAIR
 
-    /** `getPunctuationCandidates` (`:518-529`): every mark of the key; none when off. */
+    /** `getPunctuationCandidates`. */
     fun getPunctuationCandidates(unicode: Int): List<String> = if (enabled) profile.punctuations(unicode) else emptyList()
 
-    /**
-     * `pushPunctuationV2` (`:469-502`): the mark [unicode] types on [ic], a pair's halves in turn, or both
-     * at once when "type paired together" is on. After a letter or digit, `.` and `,` stay as typed when
-     * the option says so (empty). fcitx's V1 `pushPunctuation` and `cancelLast` (`:438-468, 504-516`)
-     * are left out: nothing here calls them.
-     */
+    /** `pushPunctuationV2`: a pair's halves in turn, or both with "type paired together". V1 and `cancelLast` are not ported (unused). */
     fun pushPunctuationV2(ic: InputContext, unicode: Int): Pair<String, String> {
         if (!enabled || typesAsItself(ic, unicode)) return EMPTY_PAIR
         val state = state(ic)
@@ -211,13 +178,13 @@ class Punctuation(
     }
 
     companion object {
-        /** `Control+period` (`punctuation.h:38-39`). */
+        /** `Control+period`. */
         val HOTKEY = Key('.'.code, KeyStates.CTRL)
         private val EMPTY_PAIR = "" to ""
 
         private fun isAsciiLetterOrDigit(c: Char) = c in 'A'..'Z' || c in 'a'..'z' || c in '0'..'9'
 
-        // the keys left as typed after a letter or digit (`:444-448`), the one place they are written
+        // the one place they are written
         private const val AS_TYPED = ".,"
 
         private fun dontConvertWhenEn(c: Int) = AS_TYPED.any { it.code == c }

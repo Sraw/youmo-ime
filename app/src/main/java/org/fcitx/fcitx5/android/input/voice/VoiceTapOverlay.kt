@@ -22,14 +22,9 @@ import org.fcitx.fcitx5.android.input.voice.VoiceTap.Press
 import splitties.dimensions.dp
 
 /**
- * Tap to talk, the bar's microphone (060-voice-tap-to-talk.md): a mask over the keys, the bar left
- * above it, the bars moving with the voice and what it is doing; listening on with no finger held
- * till the microphone or the mask is tapped (no ×: the user's decision 2026-11-07, what is not
- * wanted is deleted after). The settled part of what is said is typed
- * as it is said, the tail composing in the field ([VoiceSession], [VoiceTalk]); what each press does
- * is [VoiceTap]'s. No Enter of its own (the user's decision 2026-11-06: it would not follow the
- * theme): to send, stop it, then the keyboard's Enter. The mask is the keyboard view's own child,
- * so it moves and scales with it (floating, one-handed).
+ * Listening on with no finger held till the microphone or the mask is tapped. No Enter of its own (it
+ * would not follow the theme): to send, stop it, then the keyboard's Enter. The mask is the keyboard
+ * view's own child, so it moves and scales with it.
  */
 class VoiceTapOverlay(
     private val inputView: InputView,
@@ -44,10 +39,8 @@ class VoiceTapOverlay(
     private val main = Handler(Looper.getMainLooper())
     private var gone = false
 
-    // what the session tells: the mask's status, the bars, the quiet stop put off
     private val ui: VoiceSession.Ui = object : VoiceSession.Ui {
         override fun ready() {
-            // the cue to start talking: felt as well as seen
             VoiceStyle.vibrate(card, cue = true)
             status.setText(R.string.voice_hold_listening)
         }
@@ -63,9 +56,7 @@ class VoiceTapOverlay(
 
         override fun recognizing() {
             main.removeCallbacks(quiet)
-            status.setText(R.string.voice_hold_recognizing)
-            hint.visibility = View.INVISIBLE
-            wave.active = false
+            VoiceCard.recognizing(status, hint, wave)
         }
 
         override fun ended(message: Int?) = this@VoiceTapOverlay.ended(message)
@@ -74,8 +65,7 @@ class VoiceTapOverlay(
     private val session: VoiceSession = VoiceSession(service, inputView.fcitx, ui, asItGoes = true, commit)
 
     private val heard = VoiceCard.heard(ctx, theme).apply {
-        // INVISIBLE, not GONE: its share of the height kept, the pill stays in the middle
-        // what is said shows in the field as it is said; here only where the field cannot show it
+        // INVISIBLE, not GONE: its share of the height kept, the pill stays in the middle. Here only where the field cannot show it
         visibility = if (session.composes) View.INVISIBLE else View.VISIBLE
     }
     private val wave = VoiceCard.wave(ctx, look.micColor.value)
@@ -96,11 +86,11 @@ class VoiceTapOverlay(
             addView(pill, VoiceCard.pillParams(ctx))
             addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
             addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(2) })
-            // the pill a little above the middle, not pushed to the bottom
+            // a little above the middle
             addView(View(ctx), LinearLayout.LayoutParams(-1, 0, 1f))
         }
         addView(column, FrameLayout.LayoutParams(-1, -1))
-        // anywhere on it stops; the keys under it get nothing
+        // the keys under it get nothing
         setOnClickListener { press(Press.MASK) }
         addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) = Unit
@@ -117,9 +107,8 @@ class VoiceTapOverlay(
         if (tap.state == VoiceTap.State.LISTENING) main.postDelayed(quiet, VoiceTap.QUIET_MS)
     }
 
-    /** Tapped: the microphone opens now, the models load meanwhile. */
     fun begin() {
-        // under the bar (and the code row above it): the bar stays, its microphone stops it
+        // the bar stays, its microphone stops it
         inputView.overKeys(card, underBar = true)
         glass.under(card, inputView.keyboardView as ViewGroup)
         card.alpha = 0f
@@ -130,36 +119,31 @@ class VoiceTapOverlay(
         quietFromNow()
     }
 
-    /** The bar's microphone tapped again. */
     fun micTapped() = press(Press.MIC)
 
-    // a press off the mask stops it and then acts as usual (the bar's other buttons, the
-    // candidates); the microphone's own is its tap's, the mask's its click's
+    // a press off the mask stops it and then acts as usual; the microphone's own is its tap's
     override fun touched(ev: MotionEvent) {
         val action = ev.actionMasked
         if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_POINTER_DOWN) return
         val x = ev.getRawX(ev.actionIndex)
         val y = ev.getRawY(ev.actionIndex)
-        // the microphone where it is now: the talk may have started from a key's shortcut, the
-        // toolbar shown since
+        // where it is now: the talk may have started from a key's shortcut, the toolbar shown since
         if (card.contains(x, y) || inputView.voiceButton()?.contains(x, y) == true) return
-        // the keyboard moved by its handle: not a press off the mask, the talk goes on
+        // the keyboard moved by its handle: the talk goes on
         if (inputView.handleShown()?.contains(x, y) == true) return
         press(Press.OUTSIDE)
     }
 
     override fun inputEnded(how: BaseInputView.Hold.InputEnd) = when (how) {
-        // what is left typed straight in once recognized: the field and its connection stay
+        // the field and its connection stay
         BaseInputView.Hold.InputEnd.HIDDEN -> press(Press.HIDDEN)
-        // the same field restarted (a WebView, the app's restartInput), or the keyboard shown again
-        // over it: talk on; what composed is taken away or was the app's (EditingSession.provisionalRestarted)
+        // the same field restarted (a WebView, restartInput) or the keyboard shown again over it: talk on
         BaseInputView.Hold.InputEnd.STARTED -> if (!session.sameField) press(Press.INPUT_ENDED) else Unit
-        // what was heard typed into the field it was said in, before its connection goes
+        // before its connection goes
         BaseInputView.Hold.InputEnd.LEFT -> press(Press.INPUT_ENDED)
     }
 
-    // where it is seen, on the screen (as the raw x and y): moved and scaled with the keyboard
-    // (floating), which its width and height alone do not tell
+    // on the screen: moved and scaled with the keyboard (floating), which its width and height alone do not tell
     private fun View.contains(x: Float, y: Float): Boolean {
         val seen = Rect()
         if (!isShown || !getGlobalVisibleRect(seen)) return false

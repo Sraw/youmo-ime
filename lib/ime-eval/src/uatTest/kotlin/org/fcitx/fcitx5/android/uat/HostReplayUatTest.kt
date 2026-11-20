@@ -15,11 +15,7 @@ import org.junit.Assert.assertTrue
 import org.fcitx.fcitx5.android.Uat
 import org.junit.Test
 
-/**
- * uat/ cases on the Kotlin host ([HostReplay]): what [EngineReplay] cannot reach because fcitx did it
- * (the punctuation module, paging, activate and deactivate, the field around the cursor), as the
- * app runs them.
- */
+/** uat/ cases on the Kotlin host ([HostReplay]): what fcitx did and [EngineReplay] cannot reach (punctuation, paging, activation, the field). */
 class HostReplayUatTest {
 
     @Test
@@ -94,8 +90,7 @@ class HostReplayUatTest {
         type("ni")
         space()
         backspace()
-        // the memory of the field lost what Backspace took (handleBackspaceKey): nothing to tell
-        // when the field is told next
+        // the field's memory lost what Backspace took (handleBackspaceKey): nothing to tell next
         tapField()
         assertEquals("", contextTold)
     }
@@ -111,12 +106,11 @@ class HostReplayUatTest {
     @Test
     fun leavingTheFieldDropsPinyinTyping() = with(HostReplay()) {
         type("nihao")
-        // pinyin's code is above the candidates, not in the field (androidengine.cpp:380-383, 495)
+        // pinyin's code is above the candidates, not in the field (androidengine)
         assertEquals("", clientPreedit)
         assertTrue(preedit.isNotEmpty())
         focus("")
-        // nothing committed: fcitx leaves it to the client (ClientUnfocusCommit, instance.cpp:1131-1138),
-        // whose field has nothing composing, and androidengine drops the typing (androidengine.cpp:765-771)
+        // nothing committed: fcitx leaves it to the client, whose field has nothing composing
         assertEquals("", left)
         assertTrue(commits.isEmpty())
         expectPreedit("")
@@ -128,7 +122,7 @@ class HostReplayUatTest {
         val shown = clientPreedit
         assertTrue("English composes in the field (androidengine.cpp:380-383): [$shown] [$preedit] [$text]", shown.isNotEmpty())
         focus("")
-        // the field keeps its composing text as the app finishes it; fcitx commits nothing (instance.cpp:1131-1138)
+        // the field keeps its composing text as the app finishes it; fcitx commits nothing
         assertEquals(shown, left)
         assertTrue(commits.isEmpty())
     }
@@ -175,15 +169,13 @@ class HostReplayUatTest {
         pause()
         // the timer that ran was the refine's: its guards (focus, the same input method, the engine's list) let it through
         assertTrue("no refine slice sent on the pause", refines > refinesBefore)
-        // nothing else ran meanwhile to cancel it: the pause ran it out, slice after slice, till the
-        // session stopped refining (each slice that refines sets the next)
+        // nothing cancelled it meanwhile: the pause ran it out slice after slice (each refining slice sets the next)
         assertEquals("timers left after the pause", 0, clock.pending)
         space()
         assertTrue("committed $text", text.isNotEmpty())
     }
 
-    // the learning design's U-31 (a word corrected, offered again on a tap); no uat/ case of its own
-    // (EN-11 taps into the corrected word, which this does not), so no @Uat
+    // a word corrected, offered again on a tap; no uat/ case of its own (EN-11 taps into the corrected word), so no @Uat
     @Test
     fun aTapAfterACorrectionOffersTheWordTypedThroughTheRecallKey() = with(HostReplay(im = InputMethodCatalog.ENGLISH)) {
         type("fed teh ")
@@ -217,9 +209,7 @@ class HostReplayUatTest {
         const val SHOWN = 6
     }
 
-    // UAT PY-64's steps, as the device ran them (带来 first): the app tells the engine the field only on
-    // a cursor report it did not expect, not after its own commits, so 「点了吗。」 typed before is not
-    // a context the engine is told; a replay that told it after every commit ranked 的脸 first
+    // PY-64: the app tells the engine the field only on an unexpected cursor report, not after its own commits
     @Test
     @Uat("PY-64")
     fun aSentenceTypedBeforeIsNotToldAfterTheAppsOwnCommits() = with(HostReplay()) {
@@ -251,8 +241,7 @@ class HostReplayUatTest {
     @Test
     fun theQuickInputPromptIsInTheDevicesLanguage() = with(HostReplay(engines = UatEngines.fresh(), strings = checkNotNull(ResourceHostStrings.device()))) {
         quick()
-        // values-zh-rCN's host_quick_phrase_aux, its quotes keeping the space, then its hint: none of
-        // the user's own yet
+        // values-zh-rCN's host_quick_phrase_aux, its quotes keeping the space, then its hint
         assertEquals("快速输入: 打关键词，或点＋添加自己的", row)
         backspace()
         unicode()
@@ -312,7 +301,7 @@ class HostReplayUatTest {
     @Test
     fun aMalformedStepStopsOnlyItsSequence() {
         val ims = listOf(InputMethodCatalog.PINYIN)
-        // a hardware key the replay has no name for: F4127's catch, not the shard's run
+        // a hardware key the replay has no name for: the run's error, not the shard's
         val out = ParityReplay.run(ims, Sequence("s", InputMethodCatalog.PINYIN, "text", listOf(Step("type", "nihao"), Step("hw", "NoSuchKey"))))
         assertTrue("not stopped", out.error != null)
         // the steps before it kept
@@ -353,8 +342,7 @@ class HostReplayUatTest {
     fun keysTypedTogetherAreTappedApartAsTheDevicesDriverTapsThem() = with(HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.PINYIN)) {
         val start = clock.uptimeMillis()
         pinyinNine("94")
-        // 200 ms between the two taps, as an `input tap` each takes: the refine's pause runs out between
-        // them; then the user's pause
+        // 200 ms between the two taps, as an `input tap` takes: the refine's pause runs out between them
         assertTrue(200L > Refiner.PAUSE_MILLIS)
         assertEquals(200L + 5_000L, clock.uptimeMillis() - start)
     }

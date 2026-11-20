@@ -8,13 +8,9 @@ import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import timber.log.Timber
 import java.nio.ByteBuffer
 
-/**
- * [MatrixKernel] in C++ (`lib/handwriting/src/main/cpp/matrix-kernel.cpp`), in libyoumo-matrix: a
- * library of its own, not native-lib, so it outlives the native fcitx host, and not
- * libyoumo-handwriting, which would bring onnxruntime in with every user's first key.
- */
+/** [MatrixKernel] in C++, in libyoumo-matrix: not native-lib, and not libyoumo-handwriting, which would load onnxruntime at the first key. */
 object NativeMatrixKernel : MatrixKernel {
-    /** This kernel, or [MatrixKernel.JVM] (slower, same sums) where the library does not load. */
+    /** [MatrixKernel.JVM] (slower, same sums) where the library does not load. */
     val loaded: MatrixKernel by lazy {
         try {
             System.loadLibrary("youmo-matrix")

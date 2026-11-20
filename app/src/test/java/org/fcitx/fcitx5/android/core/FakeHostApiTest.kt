@@ -12,10 +12,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/** The fake answers as fcitx and the engine do where a test may depend on it. */
 class FakeHostApiTest {
 
-    private fun entry(name: String) = InputMethodEntry(name, name, "", "", "", "zh_CN", "androidengine", false)
+    private fun entry(name: String) = InputMethodEntry(name, name, "", "", "zh_CN")
 
     private val pinyin = entry("pinyin")
     private val t9 = entry("t9")

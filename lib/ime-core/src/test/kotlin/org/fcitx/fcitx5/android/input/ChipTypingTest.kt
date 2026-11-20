@@ -40,7 +40,7 @@ class ChipTypingTest {
     @Test
     fun aKeysReleaseIsNoTyping() {
         val t = shownWith("", "")
-        // F3554: the shortcut that raised a tip (Ctrl+.), coming back up: the tip stays
+        // the shortcut that raised a tip (Ctrl+.), coming back up: the tip stays
         assertFalse(t.key(up = true))
         assertFalse(t.editorPreedit(""))
         // a key pressed is typing

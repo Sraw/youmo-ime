@@ -9,9 +9,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
 import android.view.LayoutInflater
-import android.view.Menu
-import android.view.MenuInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -19,10 +16,8 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
-import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import java.io.File
@@ -45,9 +40,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.WordLists
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
-import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.ui.main.addEditDeleteMenu
+import org.fcitx.fcitx5.android.ui.main.addOverflowMenu
 import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.appContext
@@ -62,29 +58,24 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
 import timber.log.Timber
 
-/**
- * 常用词 (dev/design/060-common-words.md): a word, its pinyin and the replacements typing it offers
- * first. The list is the file's; saved, over what the keyboard deleted meanwhile, as the page is left,
- * and read again as it comes back, so what the keyboard deleted is not saved back by the next edit.
- */
+/** Saved over the keyboard's meanwhile deletions as the page is left and reread as it returns, so an edit never restores them. */
 class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> {
 
     private val viewModel: MainViewModel by activityViewModels()
 
     private lateinit var ui: BaseDynamicListUi<CommonWords.Word>
 
-    // false till the file is read, and when it could not be: nothing saved over it (as the custom phrases')
+    // false till read, or when unreadable: nothing saved over it
     private var readable = false
 
-    // the read; an import or export delivered before it ends waits on it
+    // an import or export delivered before it ends waits on it
     private var read: Job? = null
 
-    // the file as last loaded or saved here: what the keyboard changed since is kept on save
+    // what the keyboard changed since is kept on save
     private var loaded = CommonWords.EMPTY
 
     private var dirty = false
 
-    // the save begun as the page was last left: read again after it as the page comes back
     private var saving: Deferred<Boolean>? = null
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
@@ -112,7 +103,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             override fun onBindViewHolder(holder: ViewHolder, position: Int) {
                 super.onBindViewHolder(holder, position)
                 val word = entries[position]
-                // the keys it is typed by in full pinyin, under it; a word of two's initials on the 26 keys alone
+                // a two-character word's initials on the 26 keys alone
                 val keys = CommonWords.keys(word, Syllables::spelling).joinToString(" · ") { (kind, key) ->
                     if (kind == CommonWords.Kind.INITIALS && word.syllables.size == 2) getString(R.string.common_word_keys_full_pinyin_only, key) else key
                 }
@@ -125,17 +116,12 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             }
         }
         ui.addOnItemChangedListener(this)
-        // a swipe left deletes, undone from the snackbar
         ui.addTouchCallback()
         ui.setViewModel(viewModel)
         return ui.root
     }
 
-    /**
-     * Asks for a word, its pinyin and its replacements, one a line in their order; kept open, with
-     * an error under the field at fault, until they make a word ([CommonWords.problem]). The pinyin
-     * left blank is filled in as the dictionary reads the word, for the user to check (as 我的词's).
-     */
+    /** A blank pinyin is filled in for the user to check. */
     private fun edit(title: String, entry: CommonWords.Word?, block: (CommonWords.Word) -> Unit) {
         val ctx = requireContext()
         val (textLayout, textField) = ctx.materialTextInput { hint = getString(R.string.common_word_text) }
@@ -208,7 +194,6 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                     }
                 }
                 val word = CommonWords.Word(text, checkNotNull(syllables), CommonWords.clean(replacements))
-                // one text, one word: edit the one listed
                 if (ui.entries.any { it.text == text && it.text != entry?.text }) {
                     textField.error = getString(R.string.common_word_listed)
                     return@onClick false
@@ -220,10 +205,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
 
     private fun rowOf(entry: CommonWords.Word) = ui.entries.indexOfFirst { it.text == entry.text }
 
-    /**
-     * [entry] edited into [word], in its row as listed now: the file read again ([readAgain]) may
-     * have put a new list in while the dialog was open, the entry it opened with no longer in it.
-     */
+    /** By its current row: a reread may have replaced the list while the dialog was open. */
     private fun saveOver(entry: CommonWords.Word, word: CommonWords.Word) {
         val at = rowOf(entry)
         when {
@@ -244,7 +226,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         }
     )
 
-    // [block] on fcitx; null, said, where it failed or fcitx stopped. "" for a word of no known pinyin.
+    // "" for a word of no known pinyin
     private suspend fun onFcitx(block: suspend HostApi.() -> String?): String? = try {
         viewModel.fcitx.runOnReady(block).orEmpty()
     } catch (e: CancellationException) {
@@ -259,7 +241,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         super.onViewCreated(view, savedInstanceState)
         read = viewLifecycleOwner.lifecycleScope.launch {
             val words = try {
-                // a later version's file is not shown, so as not to be saved over (CommonWords.newer)
+                // a later version's file is not shown, so as not to be saved over
                 withContext(Dispatchers.IO) { load() }.also { if (it.newer) throw IOException(getString(R.string.common_words_newer)) }
             } catch (e: IOException) {
                 Timber.w(e, "common words")
@@ -268,7 +250,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
                 return@launch
             }
             loaded = words
-            // shown, not added: an add offered its undo, which deleted the words read (UAT 0.6.1)
+            // shown, not added: an add offered an undo that deleted the words read
             ui.showAll(words.words)
             dirty = false
             readable = true
@@ -277,35 +259,13 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             viewModel.toolbarButton.value = if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
         }
         viewModel.toolbarButton.value = ButtonMode.NONE
-        requireActivity().addMenuProvider(
-            EditDeleteMenuProvider(
-                buttonMode = viewModel.toolbarButton,
-                editButtonAction = { ui.enterMultiSelect(requireActivity().onBackPressedDispatcher) },
-                deleteButtonAction = { ui.deleteSelected(); ui.exitMultiSelect() },
-                menuHost = requireActivity(),
-                lifecycleOwner = viewLifecycleOwner,
-            ),
-            viewLifecycleOwner,
-            Lifecycle.State.STARTED,
+        addEditDeleteMenu(viewModel.toolbarButton, ui)
+        addOverflowMenu(
+            R.string.import_file to { importLauncher.launch("text/*") },
+            R.string.export_file to { exportLauncher.launch("youmo-common-words-${LocalDate.now()}.txt") },
+            R.string.delete_all to { deleteAll() },
+            enabled = { readable },
         )
-        requireActivity().addMenuProvider(object : MenuProvider {
-            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                menu.add(R.string.import_file).setEnabled(readable).setOnMenuItemClickListener {
-                    importLauncher.launch("text/*")
-                    true
-                }
-                menu.add(R.string.export_file).setEnabled(readable).setOnMenuItemClickListener {
-                    exportLauncher.launch("youmo-common-words-${LocalDate.now()}.txt")
-                    true
-                }
-                menu.add(R.string.delete_all).setEnabled(readable).setOnMenuItemClickListener {
-                    deleteAll()
-                    true
-                }
-            }
-
-            override fun onMenuItemSelected(menuItem: MenuItem) = false
-        }, viewLifecycleOwner, Lifecycle.State.STARTED)
     }
 
     @VisibleForTesting
@@ -318,11 +278,6 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             .show()
     }
 
-    /**
-     * Reads a file the user picks (an export, or a list typed by hand: [CommonWords.parse]), the
-     * readings it lacks as the dictionary reads them, and says what it would add, update and skip;
-     * on the user's yes, lays it over the list ([CommonWords.importing]).
-     */
     @VisibleForTesting
     internal fun importWords(uri: Uri) {
         val ctx = requireContext()
@@ -355,7 +310,6 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         val skipped = parsed.skipped.size + imported.full.size
         val message = buildString {
             append(getString(R.string.common_words_import_counts, imported.added, imported.updated, skipped))
-            // the first few reasons, a line each
             val reasons = parsed.skipped.map { getString(R.string.common_words_import_line, it.line, it.text.take(LINE_SHOWN), said(it.problem)) } +
                 imported.full.map { getString(R.string.common_words_import_full, it.text) }
             reasons.take(REASONS_SHOWN).forEach { append('\n').append(it) }
@@ -365,12 +319,10 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             .setTitle(R.string.import_file)
             .setMessage(message)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                // merged again over the list as it is now: the file read again while the picker was up (a
-                // replacement the keyboard removed) is not put back by the merge made before
+                // merged over the list as it is now: a reread while the picker was up is not undone
                 val now = CommonWords.of(ui.entries.toList()).importing(parsed.words)
                 if (now.added + now.updated == 0) return@setPositiveButton
-                // the whole list shown anew, as the dialog said: an add of all of it offered an undo that
-                // deleted the words there before the import too (UAT 0.6.1)
+                // shown whole: an add offered an undo that deleted the pre-import words too
                 ui.showAll(now.words.words)
                 dirty = true
             }
@@ -378,14 +330,13 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             .show()
     }
 
-    /** Writes the list to a file the user picks, once the file is read. */
     @VisibleForTesting
     internal fun exportWords(uri: Uri) {
         val ctx = requireContext()
         lifecycleScope.launch {
             read?.join()
             if (!readable) return@launch
-            // the file's lines not read too, as the file keeps them: an export moved to another phone loses none
+            // keeps the file's unread lines: an export moved to another phone loses none
             val words = CommonWords.merged(loaded, CommonWords.of(ui.entries.toList()), loaded)
             ctx.showingFileErrors("common words export") {
                 withContext(Dispatchers.IO) {
@@ -426,7 +377,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         dirty = false
         val words = CommonWords.of(ui.entries.toList())
         val base = loaded
-        // outlives the page, whose scope leaving cancels; begun at once: a page made anew reads the file next
+        // outlives the page, whose scope leaving cancels; begun at once: a recreated page reads the file next
         val saved = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
             try {
                 loaded = withContext(Dispatchers.IO) { CommonWordsManager.saveOver(base, words) }
@@ -434,7 +385,6 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
             } catch (e: IOException) {
                 Timber.w(e, "common words")
                 if (e is CommonWordsManager.Newer) appContext.toast(R.string.common_words_newer) else appContext.toast(e)
-                // not saved: tried again at the next stop
                 dirty = true
                 false
             }
@@ -446,12 +396,7 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         }
     }
 
-    /**
-     * The file read again, once what the page saved as it was left is, and shown where the user
-     * changed nothing since: the keyboard may have deleted a replacement meanwhile, or the save laid
-     * the page's list over such a change ([CommonWordsManager.saveOver]); the rows shown are then the
-     * next save's list, which would put back what was deleted.
-     */
+    /** Shown only if the user changed nothing since: else the rows would restore what the keyboard deleted. */
     private fun readAgain() {
         if (!readable || dirty) return
         val pending = saving
@@ -496,7 +441,6 @@ class CommonWordsFragment : Fragment(), OnItemChangedListener<CommonWords.Word> 
         private const val REASONS_SHOWN = 8
         private const val LINE_SHOWN = 24
 
-        // the file's read; a test holds it to see the page while it waits
         @VisibleForTesting
         internal var load: () -> CommonWords = { CommonWordsManager.load() }
     }

@@ -24,7 +24,6 @@ class LicensesFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val res = resources
         val ort = HandwritingBuildConfig.ORT_VERSION
-        // the engine's data: whose text its words and model are counted from
         val engineData = listOf(
             VoiceFeature.Credit(getString(R.string.engine_data_libime), "LGPL-2.1-or-later", "https://github.com/fcitx/libime"),
             VoiceFeature.Credit(getString(R.string.engine_data_fineweb), "ODC-By-1.0", "https://huggingface.co/datasets/HuggingFaceFW/fineweb-2"),
@@ -32,7 +31,6 @@ class LicensesFragment : PaddingPreferenceFragment() {
             VoiceFeature.Credit(getString(R.string.engine_data_stroke), "LGPL-3.0-only", "https://github.com/rime/rime-stroke"),
             VoiceFeature.Credit(getString(R.string.engine_data_emoji), "Unicode-3.0", "https://www.unicode.org/license.txt"),
             VoiceFeature.Credit(getString(R.string.engine_data_chaizi), "CC-BY-3.0", "https://github.com/kfcd/chaizi"),
-            // MIT: its notice kept, the licence's text at the link
             VoiceFeature.Credit(
                 getString(R.string.engine_data_stroke_order), "MIT, Copyright (c) 2017 - present theajack",
                 "https://github.com/theajack/cnchar/blob/b8397db3e08e88ebbf8acf92b5cbab1a7e4c1550/LICENSE",
@@ -40,7 +38,6 @@ class LicensesFragment : PaddingPreferenceFragment() {
             VoiceFeature.Credit(getString(R.string.engine_data_unihan), "Unicode-3.0", "https://www.unicode.org/license.txt"),
             VoiceFeature.Credit(getString(R.string.engine_data_pinyin_data), "MIT", "https://github.com/mozillazg/pinyin-data"),
             VoiceFeature.Credit(getString(R.string.engine_data_phrase_pinyin), "MIT", "https://github.com/mozillazg/phrase-pinyin-data"),
-            // what runs the handwriting recognizers (lib/handwriting), and the speech one
             VoiceFeature.Credit("onnxruntime:$ort", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
             // others' code built into libonnxruntime.so: the notices of the release it is built from
             VoiceFeature.Credit(

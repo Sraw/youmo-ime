@@ -24,7 +24,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** Every keyboard's scene environment alike ([SceneEnvs]): the screen's and the settings', the keyboard's own given. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SceneEnvsTest {
@@ -51,7 +50,6 @@ class SceneEnvsTest {
         assertEquals(SplitKeyboard.Dock.FULL, env.dock)
     }
 
-    // a settings page's preview is no floating keyboard: its text not scaled as one
     @Test
     fun floatingOnlyInTheInputMethod() {
         TestStyles.set(KeyboardStyle.FLOATING)

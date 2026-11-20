@@ -14,14 +14,9 @@ import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.Row
 
-/**
- * A layout of the user's, its file read to be drawn, as the keyboard options take it (061-custom-layout §5, L3): what it
- * is ([CustomChoice]) and whether it is drawn. The file is not trusted (one restored, one of an older build's rules): it is
- * held again to what needs no scene ([LayoutCheck.loaded]); one that fails is not drawn, its base drawn in its place and
- * said so (§4.4: 读不出，暂用 …), the input methods that chose it left so.
- */
+/** A user layout's file read to draw: untrusted, held again to [LayoutCheck.loaded]; one that fails is not drawn, its base in its place (读不出，暂用 …), the choices left. */
 object CustomLayoutChoices {
-    /** What [layout], file [stamp] (its time and size), comes to for an app of [appVersion], with why it is not drawn (empty: it is). */
+    /** [problems] empty: drawn. */
     class Read(val choice: CustomChoice, val problems: List<LayoutCheck.Finding>)
 
     fun of(layout: Layout, sources: LayoutCheck.Sources, appVersion: String, stamp: String): Read {
@@ -32,7 +27,7 @@ object CustomLayoutChoices {
             id = layout.id,
             name = LayoutCheck.plain(layout.name).takeIf { it.isNotBlank() } ?: layout.id,
             family = layout.family,
-            // the board it is drawn as where it cannot be: of its own family, whatever based-on= says (L3 review S2)
+            // the board it is drawn as where it cannot be: of its own family, whatever based-on= says
             basedOn = runCatching { LayoutCheck.baseId(layout, sources) }.getOrNull(),
             groups = runCatching { SceneGroups.of(layout, fragments) }.getOrDefault(emptyList()),
             drawn = problems.isEmpty(),
@@ -46,7 +41,7 @@ object CustomLayoutChoices {
     // the keys a table types beside the letters, the full keyboard's (TextKeyboard.EXTRA_SLOTS): `;` and `*`
     private val TABLE_EXTRAS = listOf("semicolon", "star")
 
-    // whether a key of [layout] is there for a table's extra key [extra]: one whose when= or a variant's asks table-extra=[extra]
+    // one whose when= or a variant's asks table-extra=[extra]
     private fun tableExtra(layout: Layout, fragments: Map<String, Fragment>, extra: String): Boolean {
         val rows = layout.parts.flatMap { part ->
             when (part) {

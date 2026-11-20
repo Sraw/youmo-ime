@@ -4,22 +4,17 @@
  */
 package org.fcitx.fcitx5.android.input
 
-/**
- * The life of the keyboard's one notice (specs/app.md, "Notices"), what UndoChip
- * draws: which end of an act's 撤销 is reached, whether typing puts it away, how long it stays.
- * [U] is what 撤销 takes back; of each the chip calls its undo or its lapse, once, as said here.
- */
+/** The keyboard's one notice, as UndoChip draws it: when typing puts it away and how long it stays; each [U] gets its undo or lapse once. */
 class NoticeState<U : Any> {
 
-    /** What [show] leaves to the chip: the act of the one replaced, to lapse, and how long the new one stays. */
+    /** The replaced one's act, to lapse. */
     data class Shown<U>(val lapsed: U?, val ms: Long)
 
     private var pending: U? = null
 
-    /** An act is still pending behind the notice shown (its 撤销 still works). */
+    /** Its 撤销 still works. */
     val holdsUndo: Boolean get() = pending != null
 
-    // the one shown is not put away by typing
     private var steady = false
 
     // on its way out: a key typed meanwhile lets it go on rather than start it again
@@ -28,25 +23,21 @@ class NoticeState<U : Any> {
     // hidden under the edit menu ([cover], or [show] while it is up), to come back as it goes
     private var hidden = false
 
-    /** What a menu opened where the notice is ([cover]) does to it. */
+    /** What a menu opened where the notice is does to it. */
     enum class Cover {
-        /** Put away, as a key typed would. */
+        /** As a key typed would. */
         Away,
 
         /** A steady one, a failure not yet read: hidden, its time stopped, until [uncover]. */
         Hide,
 
-        /** Going already, or hidden already: left alone. */
+        /** Going or hidden already: left alone. */
         None,
     }
 
     /**
-     * A notice in the place of any shown (rule 5: one at a time), with [undo] to take back, or none.
-     * [steady]: a failure, said once as a key fails; the key comes after it and must not put it away
-     * unseen, and it stays [STEADY_MS] (rule 4), longer than a line said, read before it goes.
-     * [hidden]: said while the edit menu is up where it would show: under the menu till it goes
-     * ([uncover]), its time not started, any notice alike (none lost to the menu, none over it).
-     * [ms]: how long it stays where its sayer times it (a notice of several lines); null its kind's time.
+     * One at a time. [steady]: a failure, said as a key fails; the key after it must not put it away unseen.
+     * [hidden]: said while the edit menu is up: shown when it goes, its time not started. [ms] null: its kind's time.
      */
     fun show(undo: U?, steady: Boolean, hidden: Boolean = false, ms: Long? = null): Shown<U> {
         val lapsed = pending
@@ -57,43 +48,38 @@ class NoticeState<U : Any> {
         return Shown(lapsed, ms ?: if (undo != null) UNDO_MS else if (steady) STEADY_MS else SAID_MS)
     }
 
-    /** A key typed, a word put in: whether it puts the notice away, as a tap would. */
+    /** Whether it puts the notice away, as a tap would. */
     fun typed(): Boolean = !steady && !leaving
 
-    /** Put away (tapped, timed out, typed on, the keyboard gone): the act to lapse, if one is still pending. */
+    /** The act to lapse, if one is still pending. */
     fun dismiss(): U? {
         leaving = true
         hidden = false
         return pending.also { pending = null }
     }
 
-    /**
-     * The edit menu opened where the notice is (it would be under the notice's window): one typing puts
-     * away goes; a steady one, a failure, is hidden and comes back as the menu goes ([uncover]), not
-     * lost while a finger picks. Only for a notice on show: what is not shown has nothing to cover.
-     */
+    /** One typing puts away goes; a steady failure is hidden till the menu goes, not lost while a finger picks. */
     fun cover(): Cover = when {
         leaving || hidden -> Cover.None
         typed() -> Cover.Away
         else -> Cover.Hide.also { hidden = true }
     }
 
-    /** The menu gone: whether a notice [cover] or [show] hid is shown (and timed from then, for as long as at first). */
+    /** Timed from then, for as long as at first. */
     fun uncover(): Boolean = (hidden && !leaving).also { hidden = false }
 
-    /** Gone from the screen: the next [typed] has nothing on its way out to leave alone. */
+    /** The next [typed] has nothing on its way out to leave alone. */
     fun gone() {
         leaving = false
     }
 
-    /** 撤销 on [undo] tapped: whether it takes back. One replaced, fading, has lapsed: its act stands. */
+    /** One replaced, fading, has lapsed: its act stands. */
     fun undo(undo: U): Boolean {
         if (pending !== undo) return false
         pending = null
         return true
     }
 
-    // the user, 2026-11-15: shorter, out of the way sooner
     companion object {
         // one with a button (撤销, 记住): long enough to reach for it
         const val UNDO_MS = 3000L

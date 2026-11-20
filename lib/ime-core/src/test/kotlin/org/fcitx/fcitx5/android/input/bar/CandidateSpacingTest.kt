@@ -8,10 +8,7 @@ import org.fcitx.fcitx5.android.engine.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The candidate bar's spacing as numbers: a word's padding and width by the text size, and when
- * words stretch. The bar itself (KawaiiBarComponent, AutoFillWidth) is BarUatTest's.
- */
+/** The candidate bar's spacing as numbers; the bar itself is BarUatTest's. */
 class CandidateSpacingTest {
 
     @Test
@@ -36,8 +33,7 @@ class CandidateSpacingTest {
 
     @Test
     fun smallerTextFitsMoreOfNihaoInTheBar() {
-        // 你好 then single characters, in the 353 dp beside ⌄ on a 393 dp phone (337 at 28 sp, its ⌄ is wider).
-        // A model of the bar's packing (1 dp between words), not the bar: what it shows is BarUatTest's
+        // 你好 then single characters in the 353 dp beside ⌄ on a 393 dp phone (337 at 28 sp); a model of the packing, not the bar
         fun fit(sp: Int, barDp: Int): Int {
             var left = barDp
             return (listOf(2) + List(20) { 1 }).takeWhile { n ->

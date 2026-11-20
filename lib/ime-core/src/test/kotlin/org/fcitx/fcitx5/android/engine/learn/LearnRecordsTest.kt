@@ -68,7 +68,6 @@ class LearnRecordsTest {
         LearnRecord.PhraseForget(29_874_003, "你好呀亲爱的"),
         NoPredict(29_874_004, "你", "好", false),
         TableOrderReset(29_874_005, "engine-wbx"),
-        // blocked under a table's code, and no more
         TableBlock(29_874_005, "engine-wbx", "aaaa", "工工", on = true),
         TableBlock(29_874_005, "engine-wbx", "aaaa", "工工", on = false),
         EnCommit(8, 29_874_006, 3, 20_746, 0, "the", "cat", "cta", EnCommit.AUTOCORRECTED),
@@ -128,7 +127,6 @@ class LearnRecordsTest {
             reader.decode(type, input)?.let(read::add)
         }
         assertEquals(rows, read)
-        // qp, t9:abc, sp:Ziranma
         assertEquals(3, kinds)
     }
 
@@ -137,7 +135,6 @@ class LearnRecordsTest {
         val later = LearnRecords.FORMAT.record(99) { writeUTF("later"); writeInt(5) }
         val read = LearnRecords.decode(later)
         assertEquals(Unknown(99, LearnRecords.FORMAT.record(99) { writeUTF("later"); writeInt(5) }.copyOfRange(5, later.size - 4)), read)
-        // written again as it was
         assertEquals(later.toList(), LearnRecords.encode(read!!).toList())
     }
 
@@ -171,17 +168,16 @@ class LearnRecordsTest {
     fun aRowOfAKindNotNamedIsKeptAsItIs() {
         val bytes = ByteArrayOutputStream()
         LearnRecords.SnapshotWriter(bytes::write).write(PinRow(Code("qp", "dz"), "地址", ""))
-        // the KIND row left out
         val all = bytes.toByteArray()
         val kindRow = LearnRecords.FORMAT.record(LearnRecords.KIND) { writeShort(0); writeUTF("qp") }
         val pin = all.copyOfRange(kindRow.size, all.size)
-        // review-1a-core M2: not read, so kept as it is (LearnState.kept), written again the same
+        // not read, so kept as it is (LearnState.kept), written again the same
         val read = LearnRecords.decode(pin)
         assertTrue(read is Unknown)
         assertEquals(pin.toList(), LearnRecords.encode(read!!).toList())
     }
 
-    // U-73: the phrase a 联想 went on with, appended to a commit only where there is one: an older reader stops before it
+    // the phrase a 联想 went on with, appended to a commit only where there is one: an older reader stops before it
     @Test
     fun aCommitsPhraseIsAppendedAndReadBack() {
         val plain = commit.copy(takes = emptyList())

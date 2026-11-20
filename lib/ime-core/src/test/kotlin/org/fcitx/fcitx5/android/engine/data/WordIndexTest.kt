@@ -20,7 +20,6 @@ class WordIndexTest {
             PinyinDataBuilder().apply {
                 words.forEach { unigram(it, -3f, 0f) }
                 entry("你", intArrayOf(Syllables.id("ni")))
-                // a word of the dictionary only, not the model's
                 entry("妳", intArrayOf(Syllables.id("ni")))
             }.build().toByteArray(),
         ),
@@ -49,7 +48,6 @@ class WordIndexTest {
         assertEquals(NO_WORD, index.find("词3000"))
         assertEquals(NO_WORD, index.find(""))
         assertEquals(NO_WORD, index.find("他说你好吗", 1, 3))
-        // an empty model finds nothing
         assertEquals(NO_WORD, WordIndex(data.vocabulary, 0).find("你"))
     }
 }

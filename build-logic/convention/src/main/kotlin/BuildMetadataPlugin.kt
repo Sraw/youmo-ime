@@ -18,9 +18,6 @@ import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.register
 import org.gradle.work.DisableCachingByDefault
 
-/**
- * Add task `generateBuildMetadata${Variant}`
- */
 @Suppress("unused")
 class BuildMetadataPlugin : Plugin<Project> {
 
@@ -45,8 +42,7 @@ class BuildMetadataPlugin : Plugin<Project> {
                     target.tasks.register<BuildMetadataTask>("generateBuildMetadata${variantName}") {
                         val packageTask =
                             target.tasks.getByName("package${variantName}") as PackageAndroidArtifact
-                        // create metadata file after package, because it's outputDirectory would
-                        // be cleared at some time before package
+                        // after package, as its outputDirectory is cleared before package
                         mustRunAfter(packageTask)
                         versionName.set(version)
                         commitHash.set(commit)

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.handwriting
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.handwriting.InkNet
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.handwriting.InkRecognizer
@@ -16,15 +17,11 @@ import java.io.IOException
 import java.util.concurrent.Executor
 
 /**
- * The recognizer's ordering, its worker and main thread queues run by hand: of a piece's reads
- * still waiting only the newest is run, a read of a piece the engine ended is dropped, an action
- * held behind reads runs after their readings are handed on, and a recognizer that cannot load is
- * asked nothing and holds no key; one that fails loading or reading natively is given up once, the
- * user told once and what it opened closed.
+ * Of a piece's waiting reads only the newest runs; a read of an ended piece is dropped; an action behind reads
+ * runs after their readings; a recognizer that fails loading or reading is given up once, the user told once.
  */
 class HandwritingRecognitionTest {
 
-    /** Tasks kept till [run]. */
     class Queue : Executor {
         private val tasks = ArrayDeque<Runnable>()
         override fun execute(command: Runnable) {
@@ -38,7 +35,6 @@ class HandwritingRecognitionTest {
         val size get() = tasks.size
     }
 
-    /** Reads every set of strokes as its stroke count; [loadable] as told. */
     class Reader(override var loadable: Boolean = true) : HandwritingRecognition.Reader {
         var loads = 0
         val asked = ArrayList<Int>()
@@ -95,7 +91,6 @@ class HandwritingRecognitionTest {
         assertTrue(recognition.busy)
         recognition.afterReads { order += "key" }
         worker.run()
-        // handed on, but not yet run on the main thread
         assertTrue(recognition.busy)
         main.run()
         assertEquals(listOf("reading", "key"), order)
@@ -126,7 +121,6 @@ class HandwritingRecognitionTest {
         assertFalse(recognition.busy)
     }
 
-    /** A model [LoadingReader] opened: closed or not. */
     private class Model : AutoCloseable {
         var closed = false
         override fun close() {
@@ -135,46 +129,30 @@ class HandwritingRecognitionTest {
     }
 
     @Test
-    fun aRecognizerThatCannotLoadIsGivenUpOnceAndWhatItOpenedClosed() {
-        val model = Model()
-        var opens = 0
-        var told = 0
-        val loading = LoadingReader({ opened ->
-            opens++
-            opened += model
-            throw IOException("chars.txt missing")
-        }, { told++ })
-        loading.load()
-        assertNull(loading.read(strokes(1)))
-        loading.load()
-        assertEquals(1, opens)
-        assertEquals(1, told)
-        assertFalse(loading.loadable)
-        assertTrue(model.closed)
-    }
-
-    @Test
-    fun aRecognizerWhoseLibraryFailsInAReadIsGivenUpAndItsModelsClosed() {
-        val model = Model()
-        var opens = 0
-        var told = 0
+    fun aRecognizerThatFailsIsGivenUpOnceAndWhatItOpenedClosed() {
         val broken = InkNet { _, _ -> throw UnsatisfiedLinkError("onnxruntime") }
-        val loading = LoadingReader({ opened ->
-            opens++
-            opened += model
-            InkRecognizer(broken, broken, "一", floatArrayOf(0f))
-        }, { told++ })
-        loading.load()
-        assertTrue(loading.loadable)
-        assertNull(loading.read(strokes(1)))
-        assertNull(loading.read(strokes(1)))
-        assertEquals(1, opens)
-        assertEquals(1, told)
-        assertFalse(loading.loadable)
-        assertTrue(model.closed)
+        fun givenUp(loads: Boolean) = {
+            val model = Model()
+            var opens = 0
+            var told = 0
+            val loading = LoadingReader({ opened ->
+                opens++
+                opened += model
+                if (!loads) throw IOException("chars.txt missing")
+                InkRecognizer(broken, broken, "一", floatArrayOf(0f))
+            }, { told++ })
+            loading.load()
+            assertEquals(loads, loading.loadable)
+            assertNull(loading.read(strokes(1)))
+            if (loads) assertNull(loading.read(strokes(1))) else loading.load()
+            assertEquals(1, opens)
+            assertEquals(1, told)
+            assertFalse(loading.loadable)
+            assertTrue(model.closed)
+        }
+        assertRows("its file missing" to givenUp(loads = false), "its library failing in a read" to givenUp(loads = true))
     }
 
-    /** Given up on one pack's files: a pack imported since (its generation) is loaded, and what the old one opened let go. */
     @Test
     fun aRecognizerGivenUpIsLoadedAgainOnceAPackIsImported() {
         var generation = 0
@@ -195,14 +173,12 @@ class HandwritingRecognitionTest {
         assertEquals(listOf("一"), loading.read(strokes(1))?.texts)
         assertEquals(2, opens)
         assertEquals(1, told)
-        // another import: the loaded one let go, the new pack's loaded
         generation = 2
         assertEquals(listOf("一"), loading.read(strokes(1))?.texts)
         assertTrue(model.closed)
         assertEquals(3, opens)
     }
 
-    /** Closing is native too: one that throws as it closes leaves the rest closed and the user told. */
     @Test
     fun aModelThatThrowsAsItClosesStillLeavesTheRestClosed() {
         val model = Model()

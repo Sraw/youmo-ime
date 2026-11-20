@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.Kinds
@@ -24,10 +25,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/** [HabitCounts]: the counts the decoder and 联想 go by, as the learning record has them (impl/design-1b.md §4). */
+/** [HabitCounts]: the counts the decoder and 联想 go by, as the learning record has them. */
 class HabitCountsTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     // 了 at two readings, 解, 了解; 你, 好, 你好
     private val data = PinyinData.load(
@@ -71,8 +70,6 @@ class HabitCountsTest {
         assertEquals(0f, count("你", "ni"), 0f)
     }
 
-    // 简拼 in the middle of 双拼 reads the words typed, along the dictionary's nodes to them
-    // ([UserModel.typedBelow]): each reading a word was typed at, while it is counted
     @Test
     @Uat("SP-44")
     fun theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt() {
@@ -86,13 +83,10 @@ class HabitCountsTest {
         assertTrue(below("le") && below("liao"))
         commit(row("nihao", "你好", "ni hao"))
         assertTrue(below("ni") && below("ni", "hao") && !below("hao") && !typed("你", "ni"))
-        // made anew from the record, both readings still
         learner.counts.rebuild(learner.log.state)
         assertTrue(below("le") && below("liao") && below("ni", "hao"))
-        // forgotten: typed no more
         learner.habits.forget("了")
         assertTrue(!below("le") && !below("liao") && below("ni") && !typed("了", "le"))
-        // and after 30 typing days of something else
         repeat(LearnState.WINDOW) {
             learner.clock.days(1)
             commit(row("jie", "解", "jie"))
@@ -100,13 +94,11 @@ class HabitCountsTest {
         assertTrue(!below("ni") && !below("ni", "hao") && below("jie"))
     }
 
-    // M1: a word twice in a commit is used twice
     @Test
     fun aWordTwiceInACommitCountsTwice() {
         val haohao = Words(listOf(Word("好", "hao"), Word("好", "hao")))
         commit(Row(Row.PICK or Row.WHOLE, Code(Kinds.FULL, "haohao"), "", haohao, 'A', Row.DICTIONARY, ""))
         assertEquals(2f, count("好", "hao"), 0f)
-        // and the pair of its two
         assertEquals(mapOf("好(hao) 好" to 1f), pairs())
     }
 
@@ -117,7 +109,7 @@ class HabitCountsTest {
         assertEquals(mapOf("你好(ni, hao) 了" to 2f), pairs())
     }
 
-    // S9: a word before, as the app's text gives it, is found by its text, whichever reading it was typed at
+    // a word before, as the app's text gives it, is found by its text, whichever reading it was typed at
     @Test
     fun aWordBeforeIsFoundByItsText() {
         commit(row("le", "了", "le"))
@@ -126,8 +118,7 @@ class HabitCountsTest {
         assertEquals(listOf(1f), pairs().filterKeys { it.startsWith("了") && it.endsWith(" 解") }.values.toList())
     }
 
-    // D28: a table's or handwriting's word, of no reading, never counts for pinyin's order; a word
-    // after it is still counted after it, for 联想, as many times as it was used
+    // counts for 联想 after it, never for pinyin's order
     @Test
     fun aWordOfNoReadingCountsNotForPinyinButWhatFollowsItDoes() {
         commit(row("wqvb", "你好", kind = Kinds.table("wubi")))
@@ -139,7 +130,7 @@ class HabitCountsTest {
         assertEquals(listOf(model.known(UserModel.Entry("了", syl("le")))), after)
     }
 
-    // review C S2: a pair to a word put in by its text alone (a table's, handwriting's) is 联想's, never the decoder's
+    // a pair to a word put in by its text alone (a table's, handwriting's) is 联想's, never the decoder's
     @Test
     fun aPairToAWordOfNoReadingIsForPredictionAlone() {
         repeat(2) { commit(row("nihao", "你好", "ni hao")) }
@@ -148,7 +139,6 @@ class HabitCountsTest {
         val prev = model.known(UserModel.Entry("你好", syl("ni", "hao")))
         val next = model.known(UserModel.Entry("了", syl("le")))
         assertTrue(model.probability(prev, next) > model.decoderProbability(prev, next))
-        // as if never typed after it, for the decoder
         val after = ArrayList<Int>()
         model.forEachAfter(prev) { after += it }
         assertEquals(listOf(next), after)
@@ -156,12 +146,12 @@ class HabitCountsTest {
     }
 
     private fun predicted(model: UserModel = this.model): Map<String, Float> = HashMap<String, Float>().apply {
-        // the user's words made past the model's, by id: every one there is (review R11 F2813)
+        // the user's words made past the model's, by id: every one there is
         fun text(id: Int) = if (id < data.vocabulary.size) data.vocabulary.word(id) else "#$id"
         for (prev in 0 until data.vocabulary.size + model.size) model.forEachPredicted(prev) { next, c -> put("${text(prev)} ${text(next)}", c) }
     }
 
-    // U-71: 联想 counts what was put in after a word as often as it was, whatever the word before was used
+    // 联想 counts what was put in after a word as often as it was, whatever the word before was used
     @Test
     fun aPairToPredictIsCountedAsPutInNotHeldToTheWordBefore() {
         commit(row("nihao", "你好", "ni hao"))
@@ -171,8 +161,7 @@ class HabitCountsTest {
         assertEquals(mapOf("你好 了" to 3f), predicted())
     }
 
-    // U-71: one count for 联想 whatever the word was read as or put in by, the same made anew as
-    // counted commit by commit (H review S5)
+    // one count for 联想 whatever the word was read as or put in by, the same made anew as counted commit by commit
     @Test
     fun aPairToPredictIsSummedOverReadingsAsMakingThemAnewSumsIt() {
         commit(row("le", "了", "le", prev = "你好"))
@@ -183,7 +172,7 @@ class HabitCountsTest {
         assertEquals(mapOf("你好 了" to 4f), predicted())
     }
 
-    // U-91: a URL's or e-mail's field learns no pair, a search field's none for 联想 (H review M1)
+    // a URL's or e-mail's field learns no pair, a search field's none for 联想
     @Test
     fun aFieldThatLearnsNoPairsFeedsNoPrediction() {
         for (flags in listOf(Commit.NO_PAIRS, Commit.NO_PREDICT)) repeat(3) {
@@ -193,7 +182,7 @@ class HabitCountsTest {
         assertEquals(emptyMap<String, Float>(), pairs())
     }
 
-    // review-1b S1: 联想's counts too wait for a field to start on a new typing day, made then as anew
+    // 联想's counts too wait for a field to start on a new typing day, made then as anew
     @Test
     fun aPairToPredictOutOfTheWindowGoesAsAFieldStarts() {
         val learner = Learner(data, settles = false)
@@ -209,7 +198,7 @@ class HabitCountsTest {
         assertEquals(mapOf("好 你" to 30f), predicted(learner.model))
     }
 
-    // U-71: a commit taken back (deleted) is no pair
+    // a commit taken back (deleted) is no pair
     @Test
     fun aPairUndoneCountsNoMore() {
         val commits = List(3) { commit(row("le", "了", "le", prev = "你好")) }
@@ -218,17 +207,15 @@ class HabitCountsTest {
         assertEquals(mapOf("你好 了" to 2f), predicted())
     }
 
-    // review-C S1, S2: a word of no reading (a table's, handwriting's, 联想's) and the pairs to it are 联想's alone
+    // a word of no reading (a table's, handwriting's, 联想's) and the pairs to it are 联想's alone
     @Test
     fun aPredictionPickedIsCountedForPredictionAlone() {
         commit(row("nihao", "你好", "ni hao"))
         commit(Row(Row.PICK or Row.WHOLE, Code(Kinds.PREDICTION, "你好"), "你好", Words.of("了"), 'D', Row.DICTIONARY, "了"))
-        // 联想's pick is no use of 了 the decoder counts
         assertEquals(0f, count("了", "le"), 0f)
         commit(row("le", "了", kind = Kinds.HANDWRITING, prev = "你好"))
         assertEquals(emptyMap<String, Float>(), pairs())
         assertEquals(mapOf("你好 了" to 2f), predicted())
-        // forgotten, gone from both
         learner.habits.forget("了")
         assertEquals(emptyMap<String, Float>(), predicted())
     }
@@ -243,7 +230,7 @@ class HabitCountsTest {
         assertEquals(1f, count("了", "le"), 0f)
     }
 
-    // review R11 F2936: a text forgotten is forgotten at every reading it was typed at
+    // a text forgotten is forgotten at every reading it was typed at
     @Test
     fun aWordForgottenCountsNoMoreAtAnyReading() {
         commit(row("le", "了", "le"))
@@ -256,7 +243,7 @@ class HabitCountsTest {
         assertEquals(1f, count("解", "jie"), 0f)
     }
 
-    // U-07: what was not used in the last 30 typing days counts no more; a calendar day with no typing is none
+    // what was not used in the last 30 typing days counts no more; a calendar day with no typing is none
     @Test
     fun aWordUnusedForThirtyTypingDaysCountsNoMore() {
         commit(row("nihao", "你好", "ni hao"))
@@ -272,7 +259,7 @@ class HabitCountsTest {
         assertEquals(30f, count("好", "hao"), 0f)
     }
 
-    // M3: the user's own word stays theirs when its counts have gone
+    // the user's own word stays theirs when its counts have gone
     @Test
     fun aWordOfTheUsersOwnIsTheirsUnused() {
         repeat(2) { commit(corrected("nijie", "你解", "ni jie", origin = Row.NONE)) }
@@ -287,7 +274,6 @@ class HabitCountsTest {
         assertTrue(model.owns(model.known(UserModel.Entry("你解", syl("ni", "jie")))))
     }
 
-    // review-1b S1: a word formed is counted, with the pairs it is in, as making every count anew counts it
     @Test
     fun aWordFormedIsCountedAsMakingThemAnewCountsIt() {
         commit(row("hao", "好", "hao"))
@@ -295,18 +281,17 @@ class HabitCountsTest {
         commit(row("hao", "好", "hao", prev = "你解"))
         commit(corrected("nijie", "你解", "ni jie", prev = "好", origin = Row.NONE))
         assertTrue(model.owns(model.known(UserModel.Entry("你解", syl("ni", "jie")))))
-        val words = HashMap<String, Float>().apply { model.forEachWordCount { e, c -> put(e.toString(), c) } }
+        val words = HashMap<String, Float>().apply { model.forEachCount({ e, c -> put(e.toString(), c) }) { _, _, _ -> } }
         val pairs = pairs()
         val predicted = predicted()
         assertEquals(2f, count("你解", "ni", "jie"), 0f)
         assertTrue(pairs.keys.any { it.startsWith("你解") } && pairs.keys.any { it.endsWith(" 你解") })
         HabitCounts(model).rebuild(learner.log.state)
-        assertEquals(words, HashMap<String, Float>().apply { model.forEachWordCount { e, c -> put(e.toString(), c) } })
+        assertEquals(words, HashMap<String, Float>().apply { model.forEachCount({ e, c -> put(e.toString(), c) }) { _, _, _ -> } })
         assertEquals(pairs, pairs())
         assertEquals(predicted, predicted())
     }
 
-    // review R11 F2659: a text found as no word while pending is found anew once imported, and typed
     @Test
     fun aWordImportedAfterItWasPendingIsCountedAsMakingThemAnewCountsIt() {
         // 好 used twice first: a pair after it is held to its count, which only a rebuild raises (committed)
@@ -315,16 +300,16 @@ class HabitCountsTest {
         learner.log.imports(ImportedWords.plan(1, "a.txt", 20000, listOf(ImportedWords.Incoming("你解", "ni jie"))) { _, _ -> false })
         commit(corrected("nijie", "你解", "ni jie", prev = "好", origin = Row.NONE))
         commit(row("hao", "好", "hao", prev = "你解"))
-        val words = HashMap<String, Float>().apply { model.forEachWordCount { e, c -> put(e.toString(), c) } }
+        val words = HashMap<String, Float>().apply { model.forEachCount({ e, c -> put(e.toString(), c) }) { _, _, _ -> } }
         val pairs = pairs()
         val predicted = predicted()
         HabitCounts(model).rebuild(learner.log.state)
-        assertEquals(HashMap<String, Float>().apply { model.forEachWordCount { e, c -> put(e.toString(), c) } }, words)
+        assertEquals(HashMap<String, Float>().apply { model.forEachCount({ e, c -> put(e.toString(), c) }) { _, _, _ -> } }, words)
         assertEquals(pairs(), pairs)
         assertEquals(predicted(), predicted)
     }
 
-    // review-1b S1: a new typing day's counts wait for a field to start, a commit's words counted anew still
+    // a new typing day's counts wait for a field to start, a commit's words counted anew still
     @Test
     fun aNewTypingDaysCountsAreMadeAsAFieldStarts() {
         val learner = Learner(data, settles = false)
@@ -337,7 +322,6 @@ class HabitCountsTest {
             learner.clock.days(1)
             learner.habits.record(listOf(row("ni", "你", "ni")))
         }
-        // 解 out of the window, waiting; 你, committed, counted
         assertTrue(learner.counts.stale)
         assertEquals(1f, count("解", "jie"), 0f)
         assertEquals(30f, count("你", "ni"), 0f)

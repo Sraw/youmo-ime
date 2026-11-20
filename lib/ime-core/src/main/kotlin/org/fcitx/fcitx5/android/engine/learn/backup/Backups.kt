@@ -17,36 +17,28 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 
-/** A backup [Backups] keeps: its file's [name], its head, and whether this install made it. */
 data class BackupInfo(val name: String, val head: BackupHead, val own: Boolean, val size: Long)
 
 /**
- * The learning backups kept in the input method's own directory [dir] (U-106, D31: no other app
- * reads them; they go with the app): those made every [EVERY] typing days, of which the [KEEP]
- * newest of this install stay, those copied in from elsewhere (another phone's, an earlier
- * install's), which stay till the user deletes them, and the one copy made before a restore
- * ([BEFORE_RESTORE]), for 退回恢复前.
- *
- * Which install made a backup is told by [installId], kept where backups do not go (the app's
- * no-backup directory), so a copy brought over is another's.
+ * Learning backups in the app's own directory [dir]: automatic ones every [EVERY] typing days (the [KEEP]
+ * newest of this install stay), ones copied from elsewhere (kept till deleted), and the pre-restore copy
+ * ([BEFORE_RESTORE]). [installId] is kept in the no-backup directory, so a copied-in backup is another install's.
  */
 class Backups(
     private val dir: UserFiles?,
     val installId: Long,
     private val onError: (IOException) -> Unit = {},
-    // writes a backup made due by a commit, so the key does not wait on the disk; null: here
+    // writes due backups so the key does not wait on disk; null: inline
     private val background: Executor? = null,
-    // the time of a backup whose record has none: the learning's clock, a replay's virtual one
     private val clock: LearnClock = JvmClock,
 ) {
-    /** Whether a backup is made every [EVERY] typing days (U-106's switch). */
     var auto = true
 
-    // the typing day of this install's newest automatic backup, once listed: asked on every commit
+    // asked on every commit
     @Volatile
     private var lastAuto: Int? = null
 
-    /** The backups kept, newest first; the copy made before a restore apart ([beforeRestore]). */
+    /** Newest first; the pre-restore copy apart ([beforeRestore]). */
     fun list(): List<BackupInfo> {
         val dir = dir ?: return emptyList()
         val files = dir.files().filter { it.endsWith(LearnBackup.EXTENSION) && it != BEFORE_RESTORE }.map(dir::file)
@@ -60,39 +52,32 @@ class Backups(
         null
     }
 
-    /** The bytes of the backup [name], as [list] names it; null if there is none. */
     fun read(name: String): ByteArray? = file(name)?.takeIf { it.exists() }?.read()
 
-    /** Deletes the backup [name]: whether there was one. */
     fun delete(name: String): Boolean {
         val gone = file(name)?.delete() == true
         if (gone) lastAuto = null
         return gone
     }
 
-    // a name as listed, never a path out of the directory nor the copy [list] keeps apart
+    // a listed name only: never a path out of the directory, nor the pre-restore copy
     private fun file(name: String) = dir?.takeIf { '/' !in name && name != BEFORE_RESTORE && name.endsWith(LearnBackup.EXTENSION) }?.file(name)
 
-    /** Whether an automatic backup is due on typing day [day]: on the first, then every [EVERY]; never for an install of no id. */
+    /** On the first typing day, then every [EVERY]; never for an install without an id. */
     fun due(day: Int): Boolean {
         if (!auto || dir == null) return false
         if (installId == 0L || day < 1) return false
-        // the newest not after [day]: one kept from before the log went back behind it (F3090) would
-        // otherwise make every day before it due, a backup at every start till typing passed it (F3238)
+        // the newest not after [day]: a backup from before the log went back would make every earlier day due
         val last = lastAuto ?: (
             list().filter { it.own && it.head.kind == BackupHead.AUTO && it.head.day <= day }.maxOfOrNull { it.head.day } ?: NONE
             ).also { lastAuto = it }
         return last == NONE || day - last >= EVERY || day < last
     }
 
-    // the automatic backups being written: what invalidate waits for
+    // what invalidate waits for
     private val writing = ArrayList<Future<*>>()
 
-    /**
-     * Keeps the automatic backup of typing day [day] [make] gives (null: none, the log not read),
-     * named by its head's time, and drops this install's older ones past the [KEEP] newest; in
-     * the background if there is one, where [make] runs too. One not written is due again.
-     */
+    /** Saves the automatic backup [make] builds (null: log not read) and drops this install's older ones past [KEEP]; in the background if any. */
     fun saveAuto(day: Int, make: () -> ByteArray?) {
         val dir = dir ?: return
         lastAuto = day
@@ -100,15 +85,14 @@ class Backups(
             try {
                 val bytes = make()
                 if (bytes == null) {
-                    // nothing to back up yet (no log read): due again, not in seven typing days
+                    // nothing to back up yet: due again
                     lastAuto = null
                 } else {
                     val time = LearnBackup.head(bytes.inputStream())?.time ?: clock.now()
                     val name = "$AUTO_PREFIX$time${LearnBackup.EXTENSION}"
                     write(dir.file(name), bytes)
-                    // the one just written kept, it holds the learning now, and the newest of the others by
-                    // typing day, as [due] reads them: neither a clock set back nor a log begun again behind
-                    // the newest (due's day < last) may make it the one dropped (F3090)
+                    // keep the new one and the newest of the others by typing day: neither a clock set back nor a restarted
+                    // log may make it the one dropped
                     list().filter { it.own && it.head.kind == BackupHead.AUTO && it.name != name }
                         .sortedWith(compareByDescending<BackupInfo> { it.head.day }.thenByDescending { it.head.time })
                         .drop(KEEP - 1).forEach { dir.file(it.name).delete() }
@@ -116,7 +100,7 @@ class Backups(
             } catch (e: IOException) {
                 notWritten(e)
             } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-                // the log read wrong, however: told, never a thread's death unseen
+                // report; never let the thread die unseen
                 notWritten(IOException("an automatic backup not made", e))
             }
         }
@@ -130,31 +114,23 @@ class Backups(
         onError(e)
     }
 
-    /** Keeps [bytes] as the copy made before a restore, in place of the last. */
     @Throws(IOException::class)
     fun saveBeforeRestore(bytes: ByteArray) {
         write((dir ?: throw IOException("no directory for backups")).file(BEFORE_RESTORE), bytes)
     }
 
-    /** The copy made before the last restore, if it is kept. */
     fun beforeRestore(): ByteArray? = dir?.file(BEFORE_RESTORE)?.takeIf { it.exists() }?.read()
 
-    /** Whether the copy made before the last restore is kept, without reading it (it may be megabytes). */
+    /** Without reading it (it may be megabytes). */
     fun hasBeforeRestore(): Boolean = dir?.file(BEFORE_RESTORE)?.exists() == true
 
-    /** When the copy made before the last restore was made (epoch milliseconds), if it is kept and reads. */
     fun beforeRestoreTime(): Long? = dir?.file(BEFORE_RESTORE)?.takeIf { it.exists() }?.let(::info)?.head?.time
 
     fun dropBeforeRestore() {
         dir?.file(BEFORE_RESTORE)?.delete()
     }
 
-    /**
-     * What U-86 and U-88 leave (C25), done before their rewrite (review-DE-design DE-M1): an
-     * automatic backup being written finished, then this install's made at or after
-     * [fromMinute] (epoch minutes; [Int.MIN_VALUE], U-86, all of them) and the copy made before a
-     * restore deleted, so none brings back what is cleared; those from elsewhere left.
-     */
+    /** Before a clear's rewrite: finishes pending automatic backups, then deletes this install's made at or after [fromMinute] and the pre-restore copy, so none brings back what is cleared. */
     fun invalidate(fromMinute: Int) {
         for (w in writing) {
             try {
@@ -176,13 +152,10 @@ class Backups(
     }
 
     companion object {
-        /** U-106's 〔7〕 typing days. */
         const val EVERY = 7
 
-        /** U-106's 〔2〕. */
         const val KEEP = 2
 
-        /** The directory, in the engine's. */
         const val DIR = "backups"
 
         const val BEFORE_RESTORE = "before-restore.fxlb"
@@ -190,17 +163,13 @@ class Backups(
         private const val AUTO_PREFIX = "auto-"
         private const val NONE = Int.MIN_VALUE
 
-        /**
-         * The install's id, in [file] (made the first time); a random one for no [file], as a
-         * test's phone is another install each time. 0, told, if [file] can be neither read nor
-         * written: never a new one each start, which would make this install's backups another's.
-         */
+        /** The install's id from [file], made the first time; random without a file. 0 if unreadable and unwritable, never a fresh one each start, which would make this install's backups another's. */
         fun installId(file: LogFile?, onError: (IOException) -> Unit = {}): Long {
             if (file == null) return random()
             return try {
                 val kept = file.takeIf { it.exists() }?.read()?.toString(Charsets.UTF_8)
                 kept?.trim()?.toLongOrNull() ?: random().also { id ->
-                    // a garbled file: this install's backups become another's from here on, so say so
+                    // garbled: this install's backups become another's from here on
                     if (kept != null) onError(IOException("$file does not read as an install id: a new one made"))
                     file.mkdirs()
                     replaceFile(file, file.beside(".new")) { it.write(id.toString().toByteArray()) }
@@ -211,7 +180,7 @@ class Backups(
             }
         }
 
-        // never 0, which a backup of no known install has
+        // never 0, which means no known install
         private fun random(): Long {
             var id = 0L
             while (id == 0L) id = SecureRandom().nextLong()

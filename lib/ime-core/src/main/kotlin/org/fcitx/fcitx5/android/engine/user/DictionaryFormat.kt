@@ -20,82 +20,59 @@ import java.nio.charset.CodingErrorAction
 import java.util.concurrent.CancellationException
 
 /**
- * What a text file to import is, told from the whole of it before a word is imported: its
- * charset, which column is the text and which the pinyin and how the pinyin is spelt, and what
- * its numbers are. Anything it is not sure of is refused with the reason ([Refused]), never
- * imported half right (the user's rule, after a 1.9-million-word file read wrongly cost them
- * their keyboard): a file of two layouts, or of initials only, or one too many of whose lines do
- * not read. [Detected] says what it found, for the confirm dialog, and [analyse] writes the lines in the
- * one form the compiler and the kept sources take (`text pin'yin weight`), as it reads them.
+ * What a text file to import is, told from all of it before a word is imported: charset, column order, pinyin
+ * spelling, number kind. Anything unsure is refused with a [Reason], never imported half right (a 1.9-million-word
+ * file read wrongly once cost a user their keyboard). [analyse] writes lines as `text pin'yin weight`.
  */
 object DictionaryFormat {
 
-    /** How many lines the layout is decided from, spread from the file's head to its tail. */
     const val SAMPLE = 2000
 
-    /** Rime's own `*.dict.yaml` (its header said so), or any other list. */
     enum class Source { RIME, PLAIN }
 
-    /** Which comes first on a line. */
     enum class Order { TEXT_FIRST, PINYIN_FIRST }
 
-    /** How the pinyin is written: `ni'hao`, `ni hao`, `nihao` (split one way only), or none at all. */
+    /** How the pinyin is written: `ni'hao`, `ni hao`, `nihao` (split one way only), or none. */
     enum class Reading { APOSTROPHES, SPACES, RUN_TOGETHER, NONE }
 
-    /** What a line's number is: a probability in (0, 1), a count, a log10 probability (< 0), or there is none. */
     enum class Weight { PROBABILITY, COUNT, LOG, NONE }
 
-    /** Why a file is refused. */
     enum class Reason {
-        /** neither UTF-8 (or UTF-16 by its byte order mark) nor GBK/GB18030, through the whole file */
+        /** neither UTF-8 (or UTF-16 by BOM) nor GBK/GB18030 through the whole file */
         ENCODING,
 
         /** a NUL in it: a binary file, whatever it decodes as */
         BINARY,
 
-        /** no line that is a word */
         NO_WORDS,
 
         /** more than 2% of the sample in a second layout */
         MIXED,
 
-        /** the pinyin is initials only (`nh 你好`): no reading to give the words */
+        /** the pinyin is initials only (`nh 你好`) */
         INITIALS,
 
-        /** too many lines do not read as a word and its pinyin */
         UNREADABLE,
 
-        /** the numbers are not of one kind */
         MIXED_WEIGHTS,
 
-        /** more words than [DictionaryCompiler.MAX_WORDS] */
         TOO_MANY,
 
         /** no pinyin on most lines: only the user dictionary takes words without it */
         NO_PINYIN,
 
-        /**
-         * the characters do not have the readings given them, as the base dictionary knows them:
-         * another encoding read as GBK (Big5's pairs all decode so), or another romanisation
-         */
+        /** the characters lack the readings given: another encoding read as GBK (Big5 decodes so), or another romanisation */
         MISMATCH,
 
-        /** the file larger than an import takes of its type, or than the memory converting it needs (the app's to say: not analysed) */
+        /** too large for its import type or the memory converting it needs (the app's check) */
         TOO_LARGE,
     }
 
     sealed class Analysis
 
-    /** Refused, for [reason]. */
     class Refused(val reason: Reason) : Analysis()
 
-    /**
-     * A file read as [charset], laid out so. [words] lines read as a word with its pinyin,
-     * [textOnly] as a word alone or a blocked one (`!`; only the user dictionary takes those),
-     * [unread] as neither. With a guess (see [analyse]): [guessed] of [words] were words alone given
-     * the reading guessed for them, [unguessed] of [textOnly] words alone it had none for, skipped
-     * by the base.
-     */
+    /** A file read as [charset]: [words] with pinyin, [textOnly] words alone or blocked (`!`), [unread] neither; [guessed]/[unguessed] of the words alone given or denied a guessed reading. */
     class Detected internal constructor(
         val charset: Charset,
         val source: Source,
@@ -108,11 +85,7 @@ object DictionaryFormat {
         val guessed: Int = 0,
         val unguessed: Int = 0,
     ) : Analysis() {
-        /**
-         * Why the base dictionary does not take it, which has nothing to guess a reading from;
-         * null if it does. Lines without pinyin are unread there, held to the same 2%; words alone
-         * a guess had no reading for are skipped, said in the dialog, not held to it.
-         */
+        /** Why the base dictionary refuses it (it has no reading to guess from); null if it takes it. */
         val refusedForBase: Reason?
             get() = when {
                 words == 0 -> if (textOnly > 0) Reason.NO_PINYIN else Reason.NO_WORDS
@@ -123,16 +96,10 @@ object DictionaryFormat {
     }
 
     /**
-     * What the file [open] reads (opened again for each pass: two, a third if it is not UTF-8,
-     * none holding more than a line and the sample) is, or why it is refused. Its words go to [write] as the
-     * sources keep them (`text pin'yin weight`), in the second pass: the caller drops what it
-     * wrote if it is refused then. [progress] hears the share of [size] read, both passes over 0..1;
-     * a throw from it (a CancellationException, the user cancelled) stops it. [guess], how the
-     * dictionary reads words (`ni hao`, null for none it reads), gives a word alone on its line (a
-     * list of words only, or such lines among others) its reading, asked [GUESS_BATCH] at a time; one
-     * it reads is written as any word, one it does not skipped ([Detected.unguessed]), a batch whose
-     * guess throws (but for a cancel) too. A file read as GB18030 whose words alone it reads fewer
-     * than [AGREE] of is refused ([Reason.MISMATCH]): Big5 decoded as GBK, characters it never meant.
+     * What the file [open] reads is, or why refused. Up to three passes, holding no more than a line and the sample;
+     * words go to [write] in the second pass, dropped by the caller if refused then. A throw from [progress] cancels.
+     * [guess] gives a word alone its reading, [GUESS_BATCH] at a time. A GB18030 file whose words alone it reads
+     * under [AGREE] is refused ([Reason.MISMATCH]): Big5 decoded as GBK.
      *
      * @throws IOException if it cannot be read
      */
@@ -145,8 +112,7 @@ object DictionaryFormat {
         guess: ((List<String>) -> Map<String, String?>)? = null,
         progress: (Float) -> Unit = {},
     ): Analysis {
-        // pass 1: the charset, decoded strictly through, with the lines and a sample spread over them;
-        // a UTF-8 pass failed late and the GB18030 one from 0 never moves the bar back
+        // pass 1: the charset, decoded strictly, with a spread sample; a late UTF-8 failure never moves the bar back
         var shown = 0f
         val scan = scanned(open, size) { progress(maxOf(shown, it / 2).also { s -> shown = s }) } ?: return Refused(Reason.ENCODING)
         if (scan.binary) return Refused(Reason.BINARY)
@@ -158,10 +124,8 @@ object DictionaryFormat {
             is Refusal -> return Refused(decided.reason)
             is Layout -> decided
         }
-        // only a file read as GB18030 can be another encoding that decoded so (Big5): a UTF-8 one's
-        // characters are what they are, if the base lacks them (traditional, rare ones)
+        // only a GB18030 read can be another encoding (Big5); a UTF-8 file's characters are what they are
         if (knows != null && scan.charset == WordLists.GB18030 && !readingsHold(scan.sample, layout, knows)) return Refused(Reason.MISMATCH)
-        // pass 2: every line read in that layout, and written as the sources keep them
         var lines = 0
         var words = 0
         var textOnly = 0
@@ -184,7 +148,6 @@ object DictionaryFormat {
                     }
                 }
             }
-            // the last batch guessed inside the pass: its progress reaches 1 after it, not before
             alone.flush()
         }
         if (!alone.agrees(words)) return Refused(Reason.MISMATCH)
@@ -196,8 +159,7 @@ object DictionaryFormat {
         return Detected(scan.charset, scan.source, layout.order, layout.reading ?: Reading.NONE, layout.weight, words, textOnly, unread, alone.guessed, alone.unguessed)
     }
 
-    // words alone and their weights, waiting for [guess] (none: kept for no one); written as the sources keep them once read, a batch at a time
-    // [gbk]: read as GB18030, held to [AGREE] ([agrees])
+    // words alone and weights waiting for [guess], written a batch at a time; [gbk]: held to [AGREE]
     private class Alone(
         private val guess: ((List<String>) -> Map<String, String?>)?,
         private val write: ((String) -> Unit)?,
@@ -206,18 +168,11 @@ object DictionaryFormat {
         var guessed = 0
         var unguessed = 0
 
-        // of those the guess was asked for and answered, not one that threw
         private var failed = 0
 
         private val waiting = ArrayList<Pair<String, Double>>()
 
-        /**
-         * Whether the guesses bear the encoding out: judged only where the words alone are the file's
-         * most (more than the [read] that had their own pinyin, which readingsHold judged). A few a
-         * GBK export with pinyin could not read (a rare name) refuse nothing. Only a guess that reads
-         * nothing much fails it: a real one reads Big5's wrong characters too, so it stops a file
-         * whose words alone are mostly no words, not every misread one.
-         */
+        /** Whether the guesses bear the encoding out, judged only where words alone are most of the file: a real guess reads Big5's wrong characters too, so only one that reads little fails. */
         fun agrees(read: Int): Boolean {
             val asked = guessed + unguessed - failed
             return !gbk || asked == 0 || asked <= read || guessed >= asked * AGREE
@@ -229,8 +184,7 @@ object DictionaryFormat {
             if (waiting.size >= GUESS_BATCH) flush()
         }
 
-        // a guess that failed (the engine gone, a bug): the batch unread, skipped, not the whole file refused;
-        // a cancel goes on up, the import stopped
+        // a failed guess (engine gone, a bug) skips the batch, not the whole file; a cancel goes on up
         @Suppress("TooGenericExceptionCaught")
         private fun readings(guess: (List<String>) -> Map<String, String?>): Map<String, String?> = try {
             guess(waiting.mapTo(LinkedHashSet()) { it.first }.toList())
@@ -257,9 +211,7 @@ object DictionaryFormat {
         }
     }
 
-    // whether the sample's characters have their readings, as [knows] (the base dictionary) has
-    // them, for [AGREE] of them: Big5 read as GBK decodes without an error, each pair one
-    // character, the pinyin beside it right; only the characters tell
+    // Big5 read as GBK decodes without error and the pinyin beside it is right; only the characters' readings tell
     private fun readingsHold(sample: List<String>, layout: Layout, knows: (String, IntArray) -> Boolean): Boolean {
         var chars = 0
         var hold = 0
@@ -275,13 +227,12 @@ object DictionaryFormat {
         return chars == 0 || hold >= chars * AGREE
     }
 
-    // the share of the characters that must have their readings: polyphones and rare ones the base lacks fall short of all
+    // polyphones and rare characters the base lacks fall short of all
     private const val AGREE = 0.9
 
     private class Scan(val charset: Charset, val source: Source, val binary: Boolean, val sample: List<String>)
 
-    // the file decoded through: UTF-16 or UTF-8 by a byte order mark, else UTF-8 if all of it
-    // decodes so, else GB18030 if all of it does; null for none
+    // BOM first, else UTF-8 if all decodes, else GB18030; null for none
     private fun scanned(open: () -> InputStream, size: Long, progress: (Float) -> Unit): Scan? {
         val head = ByteArray(3)
         val n = open().use { input -> input.readNBytesCompat(head) }
@@ -292,8 +243,7 @@ object DictionaryFormat {
         return scan(open, WordLists.GB18030, size, progress)
     }
 
-    // one pass: decoded strictly (null if it does not), Rime's header seen, a NUL, and [SAMPLE]
-    // lines drawn evenly at random from all of them (reservoir), the same each time
+    // one strict pass: Rime's header, a NUL, and [SAMPLE] lines by reservoir (deterministic)
     private fun scan(open: () -> InputStream, charset: Charset, size: Long, progress: (Float) -> Unit): Scan? = try {
         var source = Source.PLAIN
         var binary = false
@@ -303,7 +253,6 @@ object DictionaryFormat {
             read(input, charset) { seq ->
                 var seen = 0L
                 for (line in seq.withHeaders { source = Source.RIME }) {
-                    // a NUL: a binary file, read no further
                     if ('\u0000' in line) {
                         binary = true
                         break
@@ -326,7 +275,6 @@ object DictionaryFormat {
         null
     }
 
-    // [block] on what [open] reads, [progress] told the share of [size] read so far (none for 0)
     private fun <T> counted(open: () -> InputStream, size: Long, progress: (Float) -> Unit, block: (InputStream) -> T): T {
         val input = object : java.io.FilterInputStream(open()) {
             var read = 0L
@@ -343,21 +291,18 @@ object DictionaryFormat {
         return input.use(block).also { if (size > 0) progress(1f) }
     }
 
-    // told every this many bytes read: about 80 times for an 85 MB file
     private const val PROGRESS_BYTES = 1L shl 20
 
     private const val SEED = 20261022L
 
-    /** How many words alone one guess is asked for: a list of a million read without holding it. */
+    /** Words alone per guess: a list of a million read without holding it. */
     const val GUESS_BATCH = 4096
 
-    // what [decide] makes of the sample: a layout, or why there is none
     private sealed interface Decision
 
     private class Refusal(val reason: Reason) : Decision
 
-    // the layout most of the sample has, or why there is none
-    // [guessing]: words alone are given a reading, so lines of no word are what is wrong, not the pinyin missing
+    // [guessing]: words alone get a reading, so lines of no word are what is wrong, not missing pinyin
     private fun decide(sample: Map<Layout, Int>, sampled: Int, guessing: Boolean): Decision {
         val read = sample.filterKeys { it.reads }
         val order = read.entries.filter { it.key.order != null }.groupBy({ it.key.order }, { it.value })
@@ -388,18 +333,16 @@ object DictionaryFormat {
         return Layout(order, reading, weight)
     }
 
-    // more than 2% of [of]
     private fun tooMany(n: Int, of: Int) = n * 50 > of
 
     private val SPELT = setOf(Reading.APOSTROPHES, Reading.SPACES, Reading.RUN_TOGETHER)
 
-    // a line's layout; reading ANY for one syllable (any spelling reads so), INITIALS and BAD for none
+    // ANY for one syllable (any spelling reads so); INITIALS and BAD for none
     private enum class LineReading { APOSTROPHES, SPACES, RUN_TOGETHER, NONE, ANY, INITIALS, BAD }
 
     private data class Layout(val order: Order?, val reading: Reading?, val weight: Weight, val line: LineReading? = null) : Decision {
         val reads get() = line != LineReading.INITIALS && line != LineReading.BAD
 
-        // whether a line of [other]'s layout reads as this one's: its weight aside
         fun takes(other: Layout): Boolean {
             if (!other.reads) return false
             if (other.order != null && order != null && other.order != order) return false
@@ -411,11 +354,8 @@ object DictionaryFormat {
 
         fun takes(read: Read) = takes(read.layout())
 
-        // what [read]'s number is written as: a 1 (or 0) is of any kind but a log10 probability's,
-        // where a 1 is none (a 1 kept made the compiler's signs mixed: the whole source unranked);
-        // one of another kind than this layout's, or in a layout of none, tells nothing (0). A 0
-        // in a log file is its best (log10 1) but goes as 0, none, as 0.3.1 wrote one missing:
-        // the compiler cannot tell the two, and libime's own files give no word 0
+        // a 1 (or 0) is of any kind but log10's, where 1 is none (else the compiler saw mixed signs); a 0 in a log file
+        // goes as none, as 0.3.1 wrote one missing
         fun weigh(read: Read): Double = when {
             weight == Weight.NONE -> 0.0
             read.weight == weight -> read.value
@@ -424,7 +364,6 @@ object DictionaryFormat {
         }
     }
 
-    // [alone]: the word of a line that is a word alone (not a blocked one), for a guess of its reading
     private class Read(val order: Order?, val line: LineReading, val weight: Weight, val value: Double, val entry: Entry?, val alone: String? = null) {
         fun layout(): Layout {
             val reading = when (line) {
@@ -438,21 +377,18 @@ object DictionaryFormat {
         }
     }
 
-    // the initials of pinyin: a file of these alone has no reading
     private const val INITIALS = "bpmfdtnlgkhjqxzcsryw"
 
     private val NUMBER = Regex("-?\\d+(\\.\\d+)?([eE]-?\\d+)?")
 
-    // Rime's share of a polyphone's readings (`的	di	10%`): a number, of no kind that ranks a word
+    // Rime's share of a polyphone's readings (`的	di	10%`): no weight
     private val PERCENT = Regex("\\d+(\\.\\d+)?%")
     private val SPACES = Regex("\\s+")
 
-    // a line's layout and word; null for a blank line or a comment
     private fun classify(raw: String): Read? {
         val line = raw.removePrefix("\uFEFF").trim()
         if (line.isEmpty() || line.startsWith("#")) return null
-        // a word blocked, as a user's list has them: the user dictionary's alone, as a word without pinyin
-        // the marks stripped at once: a line of thousands of them recursed one call each (review)
+        // a blocked word: the user dictionary's alone. Marks stripped at once: thousands of them recursed one call each
         if (line.startsWith("!")) return if (classify(line.trimStart('!'))?.layout()?.reads == true) BLOCKED else BAD
         return libimeLine(line) ?: wordListLine(line)
     }
@@ -460,7 +396,7 @@ object DictionaryFormat {
     private val BAD = Read(null, LineReading.BAD, Weight.NONE, 0.0, null)
     private val BLOCKED = Read(null, LineReading.NONE, Weight.NONE, 0.0, null)
 
-    // libime's text, as the engine wrote it (a value in quotes if escaped): null if it is not
+    // libime's text, as the engine wrote it (a value in quotes if escaped)
     private fun libimeLine(line: String): Read? {
         val fields = splitValues(line)
         if (fields.size !in 2..3) return null
@@ -470,7 +406,6 @@ object DictionaryFormat {
         return Read(Order.TEXT_FIRST, reading, weightOf(value), value, entry)
     }
 
-    // a line's word, its pinyin (a token of letters and ' each) and its number, in the order they come
     private class Tokens(val text: String, val pinyin: List<String>, val pinyinFirst: Boolean, val value: Double?)
 
     private fun tokens(line: String): Tokens? {
@@ -491,19 +426,17 @@ object DictionaryFormat {
                 text = token
                 textAt = i
             }
-            // a second word: no line of a list
             else -> return null
         }
         return text?.let { Tokens(it, pinyin, pinyinAt in 0 until textAt, value) }
     }
 
-    // a line of another input method's list, read as WordLists reads one
     private fun wordListLine(line: String): Read {
         val t = tokens(line) ?: return BAD
         val weight = t.value?.let(::weightOf) ?: Weight.NONE
         val w = t.value ?: 0.0
         if (t.pinyin.isEmpty()) {
-            // a word alone: Han only, or it is no word (Baidu's `词(ci)`, a sentence of punctuation)
+            // Han only, or it is no word (Baidu's `词(ci)`)
             val han = isHan(t.text)
             return Read(null, if (han) LineReading.NONE else LineReading.BAD, weight, w, null, t.text.takeIf { han })
         }
@@ -521,14 +454,13 @@ object DictionaryFormat {
 
     private fun isHan(text: String): Boolean = text.codePoints().allMatch { Character.isIdeographic(it) }
 
-    // a reading that does not read: initials alone, a letter a character, or none
     private fun unreadReading(text: String, spelt: String): LineReading {
         val letters = spelt.filter { it.isLetter() }.lowercase()
         val initials = letters.isNotEmpty() && letters.all { it in INITIALS } && letters.length == text.codePointCount(0, text.length)
         return if (initials) LineReading.INITIALS else LineReading.BAD
     }
 
-    // 1 is a probability and a count alike, 0 none (0.3.1 wrote one missing so): neither tells the kind
+    // 1 is a probability and a count alike, 0 none: neither tells the kind
     private fun weightOf(v: Double): Weight = when {
         v == 0.0 || v == 1.0 -> Weight.NONE
         v < 0 -> Weight.LOG
@@ -536,7 +468,7 @@ object DictionaryFormat {
         else -> Weight.COUNT
     }
 
-    // the lines but Rime's header: `---` (comments before it) to `...`, told to [rime]
+    // Rime's header (`---` to `...`) skipped, told to [rime]
     private fun Sequence<String>.withHeaders(rime: () -> Unit): Sequence<String> = sequence {
         var at = HeaderState.BEFORE
         for (raw in this@withHeaders) {
@@ -551,7 +483,6 @@ object DictionaryFormat {
         }
     }
 
-    // before any line but comments, in Rime's header, past it
     private enum class HeaderState { BEFORE, HEADER, BODY }
 
     // InputStream.readNBytes is API 33
@@ -572,8 +503,7 @@ object DictionaryFormat {
     private fun <T> read(input: InputStream, charset: Charset, block: (Sequence<String>) -> T): T =
         BufferedReader(Capped(InputStreamReader(input, strict(charset))), BUFFER).use { block(it.lineSequence()) }
 
-    // a line longer than [MAX_LINE] broken where it reaches it (a character dropped for the break):
-    // a file of no newlines (minified JSON) is no one String of all of it, and reads as lines unread
+    // a line over [MAX_LINE] is broken there: a file with no newlines is no single String
     private class Capped(reader: Reader) : FilterReader(reader) {
         private var run = 0
 

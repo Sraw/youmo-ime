@@ -10,27 +10,18 @@ import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.WordLists
 
-/**
- * What pinyin lists beside its readings (AsideCandidates), blocked by their text in a reading
- * (U-82): a character by its parts in its own ([hint], toned), an emoji in that of the word it
- * stands for ([standsFor]'s words).
- */
+/** Blocks for what pinyin lists beside its readings (AsideCandidates), by text in a reading: a parts character in its own ([hint], toned), an emoji in its word's ([standsFor]). */
 internal object AsideBlocks {
 
-    /** The entry blocking [text] blocks; null where no reading is known. */
+    /** Null where no reading is known. */
     fun entry(text: String, hint: String, standsFor: () -> List<Entry>?): Entry? =
         if (hint.isNotEmpty()) WordLists.entry(text, Misreadings.toneless(hint)) else standsFor()?.let { Entry.of(text, it) }
 
-    /**
-     * The reading [text], a character by its parts, is blocked in by its [hint]: a polyphone's several
-     * (`xing/hang`) the one shown above it ([shown], CandidateReadings.oneOf after what was picked before
-     * it; else the first), as a one-reading character is blocked in its own (A5). Not each: that would
-     * take it from the pinyin of its other readings too.
-     */
+    /** The reading a parts character is blocked in: for a polyphone hint (`xing/hang`), the one shown above it ([shown]), else the first; not each, which would remove it from its other readings' pinyin. */
     fun shown(text: String, hint: String, shown: (String) -> String?): String =
         if (CandidateReadings.SEPARATOR !in hint) hint else shown(text) ?: hint.substringBefore(CandidateReadings.SEPARATOR)
 
-    /** [emoji] but those [user] blocked in the reading of the word they stand for: that of [read] whose [text] it is, in its [words]. */
+    /** [emoji] minus those [user] blocked in their word's reading (of the [read] item whose [text] it is). */
     fun <T> emoji(emoji: (String) -> List<String>, user: UserModel?, read: List<T>, text: (T) -> String, words: (T) -> List<Entry>?): (String) -> List<String> =
         if (user == null) emoji else { word -> emoji(word).filterNot { e -> user.blocksSentence(e) { read.firstOrNull { text(it) == word }?.let(words) } } }
 }

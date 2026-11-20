@@ -9,11 +9,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * The debug build's clip microphone, for the device UAT (uat.py Device.say): clips queued from the
- * shell (VoiceClipProvider, the debug source set) are what [VoiceListener] reads in place of
- * the AudioRecord's samples, at the microphone's pace, then a faint noise till the talk ends. The
- * AudioRecord is still opened, started and released as ever. Reached only under BuildConfig.DEBUG,
- * so R8 drops it from a release build.
+ * The debug build's clip microphone for the device UAT: clips queued from the shell are read in place of
+ * the AudioRecord's samples, at the microphone's pace; the AudioRecord is still opened and released as
+ * ever. Reached only under BuildConfig.DEBUG, so R8 drops it from a release build.
  */
 object VoiceClipMic {
 
@@ -32,16 +30,14 @@ object VoiceClipMic {
     @Volatile
     private var generation = 0
 
-    /** on from the first [queue] till [clear]: every talk meanwhile hears the clips, none the microphone */
     @Volatile
     var on = false
         private set
 
-    /** a [Feed] is playing a clip or a pause now */
     @Volatile
     internal var playing = false
 
-    /** a talk is reading a [Feed] now: once it ends, what it left unplayed never will be */
+    /** Once a talk ends, what it left unplayed never will be */
     @Volatile
     internal var talking = false
 
@@ -59,8 +55,7 @@ object VoiceClipMic {
         on = false
     }
 
-    // the talk reading the queue now: one that ended (its close may come after the next talk's
-    // feed()) takes nothing more and says nothing of playing or talking
+    // one that ended (its close may come after the next talk's feed()) takes nothing more
     private var current: Feed? = null
 
     @Synchronized
@@ -71,8 +66,7 @@ object VoiceClipMic {
     internal fun take(by: Feed): Part? =
         if (by !== current) null else queue.removeFirstOrNull()?.also { playing = true }
 
-    // under the lock and checked against the generation: a window read before a clear() does not
-    // say playing after it
+    // checked against the generation: a window read before a clear() does not say playing after it
     @Synchronized
     private fun busy(by: Feed, b: Boolean) {
         if (by === current && by.generationSeen == generation) playing = b
@@ -86,14 +80,13 @@ object VoiceClipMic {
         playing = false
     }
 
-    /** what this talk reads in place of the microphone ([Feed.close]d as it ends); null: the microphone */
+    /** null: the microphone */
     @Synchronized
     fun feed(): Feed? {
         if (!on) return null
         lateinit var f: Feed
         f = Feed(VoiceEngine.SAMPLE_RATE, { take(f) }, generation = { generation }, busy = { busy(f, it) }, done = { done(f) },
-            // uat/scripts/12-voice.py times VO-23's lift from it (the clip's start as its frames are
-            // read) and measures the lift against the frame, the speech's real place in the record
+            // uat/scripts/12-voice.py times a lift from it, against the frame, the speech's real place in the record
             started = { name, frame -> Timber.d("voice clip started: %s frame=%d", name, frame) })
         current = f
         talking = true
@@ -106,10 +99,7 @@ object VoiceClipMic {
         is Part.Pause -> "${ms}ms"
     }
 
-    /**
-     * A WAV (16-bit PCM, mono, 16 kHz) or raw 16-bit little-endian PCM as samples, -1 to 1.
-     * Throws IllegalArgumentException on another format or a truncated header.
-     */
+    /** Throws IllegalArgumentException on another format or a truncated header. */
     fun decode(bytes: ByteArray): FloatArray {
         val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         var data = b
@@ -151,10 +141,8 @@ object VoiceClipMic {
     }
 
     /**
-     * One talk's reading of the queue: [read] fills a window at the pace a microphone would (it
-     * sleeps till the window's last sample is due since the first read), the clips in order, a
-     * pause or the queue run dry as a faint noise (the onset and a silent microphone's 2 s are
-     * for exact zeroes, which no real microphone gives). [close]d as the talk ends.
+     * [read] sleeps till the window's last sample is due. A pause or a dry queue is a faint noise: the onset
+     * and a silent microphone's 2 s are for exact zeroes, which no real microphone gives.
      */
     class Feed(
         private val rate: Int,
@@ -164,7 +152,6 @@ object VoiceClipMic {
         private val generation: () -> Int = { 0 },
         private val busy: (Boolean) -> Unit = {},
         private val done: () -> Unit = {},
-        /** a clip starts at [frame] of what the talk read */
         private val started: (name: String, frame: Long) -> Unit = { _, _ -> },
     ) {
         private var start = 0L
@@ -177,7 +164,6 @@ object VoiceClipMic {
         private var sinceHiss = HISS_EVERY - 1
         private var seen = generation()
 
-        /** the generation as of the last [read]'s check */
         internal val generationSeen get() = seen
 
         fun read(buffer: FloatArray): Int {
@@ -186,7 +172,6 @@ object VoiceClipMic {
             val ahead = fed + buffer.size - due
             if (ahead > 0) sleep(ahead * MS_PER_S / rate)
             if (generation() != seen) {
-                // cleared: what was playing stops
                 seen = generation()
                 clip = null
                 pause = 0
@@ -200,7 +185,6 @@ object VoiceClipMic {
             return buffer.size
         }
 
-        /** The talk over: what is left of the clip playing is dropped, nothing plays. */
         fun close() {
             clip = null
             pause = 0
@@ -231,9 +215,8 @@ object VoiceClipMic {
             }
         }
 
-        // ±1 of 16 bits once in HISS_EVERY samples, zero between: never a window of exact zeroes
-        // (VoiceOnset's), yet nothing to hear. White noise of ±2 (and of ±1), a few seconds of it
-        // before the clip, was heard as speech ("I'm sorry.") on the emulator
+        // never a window of exact zeroes, yet nothing to hear: white noise of ±2 before the clip was heard as
+        // speech ("I'm sorry.") on the emulator
         private fun hiss(): Float {
             if (++sinceHiss < HISS_EVERY) return 0f
             sinceHiss = 0

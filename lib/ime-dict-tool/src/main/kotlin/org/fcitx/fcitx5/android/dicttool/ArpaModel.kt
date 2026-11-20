@@ -22,10 +22,7 @@ object NgramKey {
     fun word(key: Long, order: Int, i: Int) = ((key ushr ((order - 1 - i) * BITS)) and MASK).toInt()
 }
 
-/**
- * A trigram backoff model held whole, log10 as ARPA has it, for computing a new one from it
- * (see [Mixer]). Ids are the unigrams' order; n-grams are found through their [NgramKey]s.
- */
+/** A trigram backoff model held whole, log10 as ARPA has it, for computing a new one from it ([Mixer]). */
 class ArpaModel(
     val words: List<String>,
     val unigramProb: DoubleArray,
@@ -52,12 +49,7 @@ class ArpaModel(
         return (if (context >= 0) bigramBackoff[context] else 0.0) + log10(v, w)
     }
 
-    /**
-     * This model with those of [added]'s words it lacks as unigrams, at the log10 probabilities
-     * given, the old unigrams scaled to leave them room; the first of a word given holds. They have
-     * no n-grams: a mix splits text into them too and counts theirs, so a word the model never had
-     * gets a context.
-     */
+    /** This model with [added]'s missing words as unigrams, the old ones scaled to leave room; a mix then counts their n-grams. */
     fun withUnigrams(added: List<Pair<String, Double>>): ArpaModel {
         val known = HashSet(words)
         val more = added.filter { (word, _) -> known.add(word) }

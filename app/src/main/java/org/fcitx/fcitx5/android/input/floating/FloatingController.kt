@@ -32,13 +32,9 @@ import org.fcitx.fcitx5.android.utils.motionSettings
 import splitties.dimensions.dp
 
 /**
- * The input view's floating keyboard ([FloatingKeyboard]) and the docked keyboard's handle
- * (始终显示悬浮条): the [handle], where the floating keyboard is ([FloatingPlacer]) and its frame, the
- * docking zone's mark, and the switches between docked and floating with their motion
- * ([FloatingSwitch]). Docked, the grip held lets the keyboard go floating under the finger, which
- * drags it on ([FloatingHandoff]); floating, docking slides it down first; switched to floating any
- * way while shown, it shrinks from the docked keyboard ([DockedBounds]). [root] is the input view,
- * filling the screen; [find] gives the controller of an input view the service puts in its frame.
+ * The floating keyboard and the docked keyboard's handle (始终显示悬浮条). Docked, the grip held lets
+ * the keyboard go floating under the finger, which drags it on ([FloatingHandoff]); floating, docking
+ * slides it down first; switched to floating while shown, it shrinks from the docked keyboard.
  */
 class FloatingController(
     private val root: ViewGroup,
@@ -48,25 +44,21 @@ class FloatingController(
     private val context = root.context
     private val prefs = ThemeManager.prefs
 
-    /**
-     * The screen the view is made on: its shape's 键盘样式 is what this writes, whenever it does (the view taken
-     * out after a turn docks the shape it floated on, not the one turned to).
-     */
+    /** What this writes is its shape's 键盘样式: the view taken out after a turn docks the shape it floated on. */
     val screenBuilt = KeyboardArea.screen(context)
 
-    /** Floating: read once, the view made anew as it changes (the service, ViewRebuild.STYLE), the letters splitting or not. */
+    /** Read once: the view is made anew as it changes. */
     val floating = KeyboardStyles.of(screenBuilt).floating
 
-    /** The letters split as made (TextKeyboard.Split), read with [floating]. */
     val splitsBuilt = KeyboardStyles.of(screenBuilt).splits
 
     private val side = prefs.floatingHandle.getValue()
     val handleAtBottom = side == FloatingHandleSide.Bottom
 
-    // floating, told as a resize changes its size ([FloatingStore] has it), its width set: the input view lays its keys out
+    // its width set: the input view lays its keys out
     private var onResize: () -> Unit = {}
 
-    // the handle's resize button's (061-floating-resize): declared before the handle, which is made with it
+    // declared before the handle, which is made with it
     private val resizing = object : FloatingHandle.Resizing {
         override fun start() = beginResize()
         override fun move(dx: Float, dy: Float) {
@@ -76,14 +68,13 @@ class FloatingController(
         override fun step(bigger: Boolean): Boolean = stepResize(bigger)
     }
 
-    /** Floating, its handle; docked, the same strip if 始终显示悬浮条 (read once too), its grip held letting go. */
+    /** Docked: the same strip if 始终显示悬浮条 (read once too). */
     val handle: FloatingHandle? = when {
         floating -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Floating(::drag, ::drop, ::dock, resizing), handleLook())
         prefs.alwaysShowHandle.getValue() -> FloatingHandle(context, theme, side, FloatingHandle.Mode.Docked(::detach), handleLook())
         else -> null
     }
 
-    /** The theme's handle in [scenes] (SceneWindow.scenes: docked, as the board is placed), at the handle's side. */
     fun handleLook(scenes: Set<String> = SceneWindow.scenes(context, theme, floating)): WindowLooks.Handle =
         SceneWindow.handle(theme, scenes, side == FloatingHandleSide.Top)
 
@@ -93,7 +84,7 @@ class FloatingController(
     var placer: FloatingPlacer? = null
         private set
 
-    // across the bottom of the screen while a drag is in the docking zone: where it will go, let go
+    // across the bottom of the screen while a drag is in the docking zone
     private val dockMark = if (!floating) null else View(context).apply {
         background = GradientDrawable().apply {
             cornerRadius = dp(4f)
@@ -102,17 +93,15 @@ class FloatingController(
         }
         alpha = 0f
         isVisible = false
-        // it opens up from the bottom and folds back down: its pivot there, once laid out
+        // it opens up from the bottom and folds back down
         addOnLayoutChangeListener { v, _, top, _, bottom, _, _, _, _ -> v.pivotY = (bottom - top).toFloat() }
     }
 
-    /** Floating, what carries on a drag the docked keyboard's handle began ([FloatingHandoff]). */
     val carried: FloatingHandoff.Receiver? = if (!floating) null else object : FloatingHandoff.Receiver {
         override fun drag(dx: Float, dy: Float) = this@FloatingController.drag(dx, dy)
         override fun drop(lifted: Boolean) = this@FloatingController.drop(lifted)
     }
 
-    /** The [keyboard] view, added to the root; floating, framed and placed, the mark under it; [onResize] as a resize changes its size. */
     fun setUp(keyboard: View, onResize: () -> Unit = {}) {
         this.keyboard = keyboard
         this.onResize = onResize
@@ -133,12 +122,10 @@ class FloatingController(
         keyboard.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> laidOut() }
     }
 
-    /** Floating, [layer] (the popups) drawn over the lifted keyboard. */
     fun keepAbove(layer: View) {
         if (floating) FloatingCorners.keepAbove(layer, keyboard)
     }
 
-    /** Floating, the navigation bar ([bottom]) it stays above and the status bar ([top]) below. */
     fun insets(bottom: Int, top: Int) {
         val placer = placer ?: return
         placer.bottomInset = bottom
@@ -146,29 +133,24 @@ class FloatingController(
         dockMark?.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = bottom }
     }
 
-    /** Floating, where the keyboard is in the window, all of it that takes touches; false docked. */
+    /** All of it that takes touches; false docked. */
     fun region(out: Rect): Boolean {
         placer?.region(out) ?: return false
         return true
     }
 
-    /**
-     * Floating, let go of by the docked keyboard [from]: its grip under the finger at [x], [y] in the
-     * input view, once laid out; [ended] no finger down to drop it (TalkBack), kept there at once.
-     */
+    /** [ended]: no finger down to drop it (TalkBack), kept there at once. */
     fun grab(x: Float, y: Float, from: Bounds, ended: Boolean = false) {
         if (floating) switch.grab(x, y, from, ended)
     }
 
-    /** The input view put in the service's frame: floating in place of a docked keyboard shown, shrunk from it. */
     fun attached() {
         val docked = DockedBounds.take(root.parent)
         if (floating && docked != null) switch.shrinkFrom(docked)
     }
 
-    /** The input view taken out: docked and shown, a floating one put in its place shrinks from here. */
     fun detached() {
-        // taken out mid-resize (a turn): what it was resized to so far is not kept, nor read on
+        // taken out mid-resize (a turn): what it was resized to so far is not kept
         if (resize != null) FloatingStore.resizing(screenBuilt.landscape, null)
         resize = null
         if (!floating && keyboard.isShown && keyboard.isLaidOut) root.parent?.let { DockedBounds.leave(it, keyboard.bounds()) }
@@ -176,10 +158,8 @@ class FloatingController(
         if (switch.slideOver()) Handler(Looper.getMainLooper()).post { KeyboardStyles.floatingOff(screenBuilt) }
     }
 
-    /** Hidden, or its field left. */
     fun inputEnded() = switch.inputEnded()
 
-    /** Floating, while it is dragged or resized, scaled from or into the docked keyboard, or slid down to dock. */
     val moving: Boolean
         get() = placer?.dragging == true || resize != null || switch.docking || (floating && (keyboard.scaleX != 1f || keyboard.scaleY != 1f))
 
@@ -192,11 +172,9 @@ class FloatingController(
         if (switch.drop() && placer?.drop(lifted) == true) dock()
     }
 
-    // docked, its handle's grip held: a buzz, and the keyboard floating under the finger, which still
-    // down drags it on. The view is made anew for floating, so the rest of the touch is passed to the
-    // new one from the frame both are in. TalkBack's long press is no touch ([touch] null): the grip
-    // goes where it was, nothing carried on, or a later touch would be taken for it; no drop to come,
-    // so its place is kept as it is laid out (F3467: else lost on the next turn or theme)
+    // the view is made anew for floating, so the rest of the touch is passed to the new one from the frame
+    // both are in. TalkBack's long press is no touch: nothing carried on (a later touch would be taken for
+    // it), and its place kept as laid out, else lost on the next turn or theme
     private fun detach(rawX: Float, rawY: Float, touch: HandoffTouch?) {
         val frame = root.parent as? ViewGroup ?: return
         InputFeedbacks.hapticFeedback(keyboard, longPress = true)
@@ -217,8 +195,6 @@ class FloatingController(
         }
     }
 
-    // in place of the docked keyboard: its grip under the finger if grabbed, else at its spot, and
-    // shrunk from the docked keyboard into its own size
     private fun placeGrabbed(placer: FloatingPlacer, grab: FloatingSwitch.Grab) {
         val board = keyboard
         val handle = handle ?: return
@@ -233,14 +209,13 @@ class FloatingController(
         board.animate().scaleX(1f).scaleY(1f).setDuration(ms).setInterpolator(Motion.Curve.Move.interpolator).setListener(null).start()
     }
 
-    // floating to docked (放回底部, or let go in the zone): slid down to the bottom, centred, where the
-    // docked keyboard will be, then docked; ended or cancelled, it docks
+    // ended or cancelled, it docks
     private fun dock() {
         val ms = Motion.Long.enter(motionSettings())
         when (switch.dock(animates = ms > 0L && keyboard.isLaidOut)) {
             FloatingSwitch.Dock.Now -> KeyboardStyles.floatingOff(screenBuilt)
             FloatingSwitch.Dock.Sliding -> Unit
-            // laid out at the bottom in the middle, moved from there by translation (FloatingPlacer)
+            // laid out at the bottom in the middle, moved from there by translation
             FloatingSwitch.Dock.Slide -> keyboard.animate().translationX(0f).translationY(0f).scaleX(1f).scaleY(1f)
                 .setDuration(ms).setInterpolator(Motion.Curve.Move.interpolator)
                 .setListener(object : AnimatorListenerAdapter() {
@@ -251,9 +226,7 @@ class FloatingController(
         }
     }
 
-    // a resize under way ([resizing]): from the size it began at, a right corner staying at [stayX], [stayY] in the root
-    // (its top as it [growsDown], else its bottom: FloatingKeyboard.growsDown); the bars' height,
-    // which a resize leaves as it is; the width it is at now, dp, and the limit it is at, buzzed once as it gets there
+    // a right corner staying at [stayX], [stayY]: its top as it [growsDown], else its bottom. The limit buzzed once
     private var resize: FloatingKeyboard.Resize? = null
     private var stayX = 0f
     private var stayY = 0f
@@ -266,7 +239,7 @@ class FloatingController(
     private fun beginResize() {
         val placer = placer ?: return
         if (!keyboard.isLaidOut || switch.docking) return
-        // not while dragged, nor while it still grows from the docked keyboard (scaled: its bounds not yet its own)
+        // nor while it still grows from the docked keyboard (scaled: its bounds not yet its own)
         if (placer.dragging || keyboard.scaleX != 1f || keyboard.scaleY != 1f) return
         val size = KeyboardArea.floatingSize(screenBuilt)
         val left = keyboard.left + keyboard.translationX
@@ -279,7 +252,6 @@ class FloatingController(
         stayX = left + w
         stayY = if (growsDown) top else top + h
         barsPx = h - size.keysHeightPx
-        // from the staying corner to the room's edge it grows towards: its bottom, or its top
         val along = if (growsDown) roomBottom - top else top + h - roomTop
         val r = FloatingKeyboard.Resize(
             size.widthDp, context.resources.displayMetrics.density, w, h, size.keysHeightPx.toFloat(), growsDown,
@@ -291,22 +263,19 @@ class FloatingController(
         limit = r.limit(size.widthDp)
     }
 
-    // whether a resize begun now grows it down (FloatingKeyboard.growsDown), where it is now
     private fun growsDown(placer: FloatingPlacer): Boolean {
         val top = keyboard.top + keyboard.translationY
         val roomTop = placer.topInset.toFloat()
         return FloatingKeyboard.growsDown(handleAtBottom, top, top + keyboard.height, roomTop, roomTop + placer.room)
     }
 
-    // the resize button's arrow the way it grows now: as it is placed (laid out, dragged, its insets changed) and as a
-    // resize ends, not while one is under way (the way it grows is set as it begins)
+    // not while one is under way: the way it grows is set as it begins
     private fun showGrowth() {
         val placer = placer ?: return
         if (resize == null) handle?.showGrowth(growsDown(placer))
     }
 
-    // at [dp] wide, laid out anew: the keys' scene made again at the size (their text and marks with it), the bars only
-    // wider; its staying corner where it was. A buzz (按键振动) as it gets to a limit
+    // the keys' scene made again at the size, the bars only wider; its staying corner where it was
     private fun resizeTo(dp: Int) {
         val r = resize ?: return
         val placer = placer ?: return
@@ -324,7 +293,6 @@ class FloatingController(
         onResize()
     }
 
-    // the finger lifted (or taken): the width and the place kept, the shape's own, if it changed
     private fun endResize() {
         resize ?: return
         resize = null
@@ -335,11 +303,11 @@ class FloatingController(
             FloatingStore.resizing(screenBuilt.landscape, null)
         }
         showGrowth()
-        // a frame drawn: the floating code strip, hidden while resized, shows again on one (InputView)
+        // the floating code strip, hidden while resized, shows again on one (InputView)
         keyboard.invalidate()
     }
 
-    // TalkBack's 放大 or 缩小 (no finger): a tenth at once, kept; at a limit a buzz and 已是最大 or 已是最小 said
+    // TalkBack's 放大 or 缩小 (no finger): a tenth at once
     private fun stepResize(bigger: Boolean): Boolean {
         beginResize()
         val r = resize ?: return false
@@ -354,8 +322,7 @@ class FloatingController(
         return changed
     }
 
-    // a word for TalkBack: announceForAccessibility is deprecated from API 36 for describing the UI, but nothing on
-    // screen says 已是最大 (BaseKeyboard.announce, the same)
+    // announceForAccessibility is deprecated from API 36 for describing the UI, but nothing on screen says 已是最大
     @Suppress("DEPRECATION")
     private fun announce(text: String) = handle?.announceForAccessibility(text)
 
@@ -367,7 +334,7 @@ class FloatingController(
         val mark = dockMark ?: return
         mark.animate().cancel()
         val motion = motionSettings()
-        // opened up from the bottom as it fades in, folded back down as it goes, as Gboard's
+        // as Gboard's
         if (shown) {
             InputFeedbacks.hapticFeedback(keyboard)
             if (!mark.isVisible) {
@@ -382,11 +349,8 @@ class FloatingController(
         }
     }
 
-    // the theme's frame (`frame`) in the scenes now: not set, as round as the keys on their margins
-    // (WindowLooks.cornerDp), square where the keys are (按键圆角 直角). Worked out once: a turn of the
-    // screen, another size or 紧凑 (`@compact`) makes the input view, and this controller, anew, which its
-    // border, shadow and elevation (set once in setUp) rely on too. The corner once a keyboard size: asked
-    // for each outline and border drawn
+    // worked out once: a turn, another size or 紧凑 makes the input view and this controller anew, which its
+    // border, shadow and elevation (set once in setUp) rely on too
     private val frame: WindowLooks.Frame by lazy { SceneWindow.frame(theme, SceneWindow.scenes(context, theme, floating = true)) }
     private var corneredWidth = -1
     private var corneredHeight = -1
@@ -395,7 +359,6 @@ class FloatingController(
     private fun cornerPx(): Float {
         if (keyboard.width == corneredWidth && keyboard.height == corneredHeight) return corneredPx
         val f = frame
-        // resized, as round as the keys, which are all as much bigger or smaller (061-floating-resize)
         corneredPx = if (f.round) minOf(keyboard.width, keyboard.height) / 2f else SceneWindow.px(context, f.radiusDp) * KeyboardArea.floatingSize(screenBuilt).resize
         corneredWidth = keyboard.width
         corneredHeight = keyboard.height
@@ -405,7 +368,6 @@ class FloatingController(
     private fun View.bounds() = Bounds(left.toFloat(), top.toFloat(), width.toFloat(), height.toFloat())
 
     private companion object {
-        // the docking zone's mark: its fill's alpha over the accent colour
         const val DOCK_MARK_ALPHA = 0x33
         const val DOCK_MARK_STROKE_ALPHA = 0x80
     }

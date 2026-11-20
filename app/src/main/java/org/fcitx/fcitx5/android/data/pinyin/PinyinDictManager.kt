@@ -32,74 +32,51 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object PinyinDictManager {
 
-    // under fcitx's data, the app's own files once an older build's is moved in (A4): where the engine reads
-    // them, one directory a process (HostConfigDir); nothing written while it is not settled, what would be
-    // lost at the next start
+    // nothing is written while not settled, as it would be lost at the next start
     private val data get() = HostConfigDir.inUse(ConfigHome.DATA)
     internal val pinyinDicDir: File
         get() = data.let { File(it.dir, "pinyin/dictionaries").also { dir -> if (it.writable) dir.mkdirs() } }
 
     private fun notSettled(): Nothing = errorArg(R.string.user_data_not_settled)
 
-    /** The dictionaries the user imported, on or off, by name. */
     fun listDictionaries(): List<TextDictionary> {
         if (data.writable) ImportedDictionaries.migrate(pinyinDicDir)
-        // each made under the sources lock: a conversion's commit deletes a text listed, which TextDictionary refuses (F3602)
+        // under the sources lock: a conversion's commit deletes a listed text, which TextDictionary refuses
         return synchronized(ImportedDictionaries) { ImportedDictionaries.list(pinyinDicDir).map(::TextDictionary) }
     }
 
-    /** The dictionaries libime's migration put aside unread, until [forgetUnread] is told of them. */
     fun unread() = ImportedDictionaries.unread(pinyinDicDir)
 
-    /** Forgets [told], the dictionaries put aside unread the user was told of. */
     fun forgetUnread(told: List<ImportedDictionaries.Unread>) = runCatching {
         if (!data.writable) notSettled()
         ImportedDictionaries.forgetUnread(pinyinDicDir, told)
     }
 
-    /**
-     * Deletes [dictionary], by its name: whichever of its files is there now (the page may have
-     * listed a text since converted); whether it went. The merged file is made again without it.
-     */
+    /** By its name: the page may have listed a text since converted. */
     fun delete(dictionary: TextDictionary): Boolean {
         // refused as turn is, so the page says why rather than "cannot delete"
         if (!data.writable) notSettled()
         return ImportedDictionaries.delete(pinyinDicDir, dictionary.name).also { if (it) MergedDictionary.refresh(pinyinDicDir) }
     }
 
-    /**
-     * Turns [dictionary] on or off; whether it is so now. The merged file is made again for it.
-     * One turned on that would take the merged words past what the compiler takes is refused
-     * ([Refusal], TOO_MANY), left off: its compile would fail at every start (review S5). [max]
-     * is the compiler's, a test's smaller.
-     */
+    /** One past what the compiler takes is refused and left off: its compile would fail at every start. */
     fun turn(dictionary: TextDictionary, on: Boolean, max: Int = DictionaryCompiler.MAX_WORDS): Boolean {
         if (!data.writable) notSettled()
-        // counted by its name, as it is turned: the file the page listed may be a text converted since (F3591)
+        // counted by name: the file the page listed may be a text converted since
         if (on && mergedWords() + wordCount(dictionary) > max) {
             refuse(DictionaryFormat.Reason.TOO_MANY)
         }
-        // by its name, as delete: not the file the page listed
         return ImportedDictionaries.turn(pinyinDicDir, dictionary.name, on).also { if (it) MergedDictionary.refresh(pinyinDicDir) }
     }
 
-    /**
-     * The words of the dictionaries on: each as [wordCount] has it, from the merged file's header
-     * or, for one not in it yet (an older build's text still upgrading, or its compile failed),
-     * from its text. The header alone counted those as none, and one more could be turned on past
-     * the limit.
-     */
+    /** The text for one not in the merged header yet: the header alone counted those as none, past the limit. */
     private fun mergedWords(): Int {
-        // a file each by name, listed at once: a text and its gzip of one name (a kill, a restore) counted once (F3595)
+        // a text and its gzip of one name counted once
         val header = MergedDictionary.sourceWords(pinyinDicDir)
         return ImportedDictionaries.list(pinyinDicDir).filter { SourceNames.isOn(it.name) }.sumOf { wordCount(SourceNames.nameOf(it.name), header) }
     }
 
-    /**
-     * A file picked to import, as text in the cache ([text], its charset whatever it was) and
-     * what [DictionaryFormat] made of it; null [analysis] for the user's own export, which is
-     * no other input method's list and is read as it is. [close] deletes the copy.
-     */
+    /** [text] is in the cache whatever its charset was; null [analysis] for the user's own export, read as is. */
     class Prepared(val text: File, val analysis: DictionaryFormat.Analysis?, val lines: File? = null) : Closeable {
         override fun close() {
             text.delete()
@@ -107,13 +84,7 @@ object PinyinDictManager {
         }
     }
 
-    /**
-     * [stream], a file called [name] of any [PinyinDictionary.Type] (or of none, a word list for
-     * the user dictionary), copied into the cache, a binary dictionary converted to text, and
-     * analysed through; [stream] is closed. Before anything is imported: the confirm dialog
-     * shows what it is, or that it is refused. [guess] reads words alone (no pinyin) for the base
-     * ([DictionaryFormat.analyse]); none, and those are the user dictionary's alone.
-     */
+    /** Analysed before anything is imported, so the confirm dialog shows what it is. [guess]: read bare words for the base. */
     fun prepare(
         stream: InputStream,
         name: String,
@@ -121,14 +92,14 @@ object PinyinDictManager {
         guess: ((List<String>) -> Map<String, String?>)? = null,
         progress: (Float) -> Unit = {},
     ): Prepared {
-        // the name a provider gives is no path to trust: only its extension, which tells the type
+        // a provider's name is no path to trust: only its extension, which tells the type
         val type = PinyinDictionary.Type.fromFileName(withLowercaseExtension(File(name).name))
         val raw = File.createTempFile("import", ".${type?.ext ?: PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
         var made: File? = null
         var lines: File? = null
         var done = false
         try {
-            // the copy a tenth of the way, as [size] (the provider's, 0 for none known) says
+            // [size] is the provider's, 0 if unknown
             stream.use { input -> raw.outputStream().use { copy(input, it, size, maxImported(type)) { share -> progress(COPY_SHARE * share) } } }
             val text = if (type == null || type == PinyinDictionary.Type.Text) {
                 raw
@@ -144,7 +115,7 @@ object PinyinDictManager {
             val prepared = if (isOwnExport(text)) {
                 Prepared(ownExportAsText(text), null)
             } else {
-                // the words written as the base keeps them while it is analysed: no pass more to import it (frost's 85 MB took 29 s in three)
+                // written as the base keeps them while analysed: no further pass to import (85 MB took 29 s in three)
                 val out = File.createTempFile("import", ".lines", appContext.cacheDir).also { lines = it }
                 val analysis = out.bufferedWriter().use { w ->
                     DictionaryFormat.analyse({ text.inputStream() }, text.length(), { w.write(it); w.write('\n'.code) }, knows(), guess) { progress(COPY_SHARE + (1 - COPY_SHARE) * it) }
@@ -175,27 +146,23 @@ object PinyinDictManager {
         }
     }
 
-    /** Compiles again what failed to compile in this process; nothing where fcitx's data is not settled: it would be written there. */
+    /** Nothing where fcitx's data is not settled: it would be written there. */
     fun retryMerged() {
         val data = data
         if (data.writable) MergedDictionary.retry(File(data.dir, "pinyin/dictionaries"))
     }
 
-    /**
-     * Deletes what an import left in the cache when its page was killed (the copy and its lines,
-     * about twice the file): those older than an hour, never one an import under way still uses.
-     */
+    /** Leftovers of a killed import page, older than an hour, never one in use. */
     fun sweepCache() {
         val old = System.currentTimeMillis() - STALE_MS
         appContext.cacheDir.listFiles { f -> f.name.startsWith("import") && f.lastModified() < old }?.forEach { it.delete() }
     }
 
-    // the base dictionary's readings, a file's characters checked against: none in a test (no assets)
+    // none in a test (no assets)
     private fun knows(): ((String, IntArray) -> Boolean)? = MergedDictionary.base()?.has?.invoke()
 
     private fun isOwnExport(text: File) = text.inputStream().use { WordListFiles.isOwnExport(it.readAtMost(EXPORT_PEEK)) }
 
-    // the user's own export put into the base: its learned words too, as WordListFiles.baseLines reads it
     private fun ownExportAsText(export: File): File {
         val text = File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
         var done = false
@@ -211,13 +178,7 @@ object PinyinDictManager {
         return text
     }
 
-    /**
-     * Imports [prepared] into the base dictionary, named [name] (a file's name, its extension
-     * dropped), as gzip'd text the engine's compile reads, then compiles the merged file with it and
-     * waits for that: the words are there once this returns. Refused as [DictionaryFormat] said,
-     * or for no pinyin, or where one of the name is there, or where it would take the merged
-     * words past what the compiler takes.
-     */
+    /** Compiles the merged file and waits, so the words are there on return. */
     fun importPrepared(
         prepared: Prepared,
         name: String,
@@ -226,10 +187,9 @@ object PinyinDictManager {
     ): Result<TextDictionary> = runCatching {
         if (!data.writable) notSettled()
         val dest = File(pinyinDicDir, TextDictionary.fileName(name, true))
-        // one of that name, on or off, is the user's: the list may not have shown it yet
+        // one of that name, on or off: the list may not have shown it yet
         if (ImportedDictionaries.hasDictionary(pinyinDicDir, name)) errorArg(R.string.dict_already_exists)
-        // made, it is the dictionary's: deleted on any way out but success, none left on that the user was told failed (review M2);
-        // set once it is renamed into place, never for one of its name that came meanwhile (the commit refuses it)
+        // once in place it is the dictionary's: deleted on any way out but success, so none stays on after a told failure
         var made = false
         try {
             val words = try {
@@ -240,24 +200,23 @@ object PinyinDictManager {
                         analysis.refusedForBase?.let(::refuse)
                         if (mergedWords() + analysis.words > DictionaryCompiler.MAX_WORDS) refuse(DictionaryFormat.Reason.TOO_MANY)
                         val lines = prepared.lines ?: error("analysed without its lines")
-                        // already as the sources keep them: deflated, not read again (review S10)
+                        // already deflated as the sources keep them: not read again
                         copyLines(lines, dest, cancel, progress)
                         made = true
                         analysis.words
                     }
                 }
             } catch (e: ImportedDictionaries.NameTaken) {
-                // one of its name came as it was written: told as the check above tells it (F3603)
+                // one of its name came as it was written: told as the check above tells it
                 Timber.d(e)
                 errorArg(R.string.dict_already_exists)
             }
             if (words == 0) errorArg(R.string.exception_dict_no_words, name)
-            // out of the sources lock (the commit's): the compile thread takes it
+            // out of the sources lock: the compile thread takes it
             MergedDictionary.refreshNow(pinyinDicDir, cancel)
             made = false
         } finally {
             if (made) {
-                // cancelled, or failed: not imported, the merged file as it was
                 dest.delete()
                 MergedDictionary.refresh(pinyinDicDir)
             }
@@ -265,8 +224,7 @@ object PinyinDictManager {
         TextDictionary(dest).also { Timber.d("Imported %s as %s", name, it) }
     }
 
-    // [lines] into [dest], gzip'd through a temporary file outside the sources lock, [cancel]
-    // checked as it goes (the bytes read tell how far, the deflate with them); committed under it
+    // gzip'd through a temp file outside the sources lock, committed under it
     private fun copyLines(lines: File, dest: File, cancel: AtomicBoolean, progress: (Float) -> Unit) {
         val temp = File(dest.path + ".tmp")
         try {
@@ -285,12 +243,11 @@ object PinyinDictManager {
         }
     }
 
-    /** What the user is told of a file refused for [reason]: 格式不支持, and why. */
     fun refusal(reason: DictionaryFormat.Reason): String = appContext.getString(R.string.dict_refused, appContext.getString(reasonText(reason)))
 
     private fun refuse(reason: DictionaryFormat.Reason): Nothing = throw Refusal(reason)
 
-    /** A file refused for [reason] ([DictionaryFormat]), its message the user's. */
+    /** Its message is the user's. */
     class Refusal(val reason: DictionaryFormat.Reason) : IllegalArgumentException() {
         override val message: String get() = refusal(reason)
     }
@@ -310,25 +267,19 @@ object PinyinDictManager {
         DictionaryFormat.Reason.TOO_LARGE -> R.string.dict_refused_too_large
     }
 
-    /**
-     * Imports [file], of any [PinyinDictionary.Type], into the base dictionary, named as it is:
-     * [prepare]d, then [importPrepared]. One imported into the user dictionary is read word by
-     * word by the settings page, not kept as a file. The page itself prepares and imports in two
-     * steps, its confirm dialog between.
-     */
+    /** [prepare] then [importPrepared], which the page does with its confirm dialog between. */
     @VisibleForTesting
     fun importFromFile(file: File): Result<TextDictionary> = importFromInputStream(file.inputStream(), file.name)
 
     @VisibleForTesting
     fun importFromInputStream(stream: InputStream, name: String): Result<TextDictionary> {
-        // the name a provider gives is no path to trust: its last part alone, which names the dictionary
+        // a provider's name is no path to trust: its last part alone names the dictionary
         val fileName = withLowercaseExtension(File(name).name)
-        // one that is no dictionary's is refused unread: "." or ".." would be the cache or what holds it
+        // refused unread: "." or ".." would be the cache or what holds it
         if (PinyinDictionary.Type.fromFileName(fileName) == null) {
             stream.close()
             return runCatching { errorArg(R.string.exception_dict_filename, name) }
         }
-        // named as the settings page names it (dictionaryName): none for a hidden name, refused unread too
         val dictionary = dictionaryName(fileName) ?: run {
             stream.close()
             return runCatching { errorArg(R.string.exception_dict_filename, name) }
@@ -337,31 +288,18 @@ object PinyinDictManager {
         return prepare(stream, fileName).use { importPrepared(it, dictionary) }
     }
 
-    /**
-     * What a file named [fileName] is kept as in the base dictionaries: Rime's `luna_pinyin.dict.yaml` as `luna_pinyin`,
-     * any other without its extension. It may name no file of the base ([dictionaryName]).
-     */
+    /** Rime's `luna_pinyin.dict.yaml` as `luna_pinyin`, any other without its extension. */
     fun keptName(fileName: String): String =
         if (isRimeDictionary(fileName)) fileName.dropLast(RIME_DICTIONARY.length) else PinyinDictionary.nameOf(fileName)
 
-    /**
-     * [keptName], where it can name a file of the base: none for `.dict.yaml` alone (empty), nor for a hidden one
-     * (`.txt`'s, the list would show it untitled). The one rule of the settings page's import and [importFromInputStream].
-     */
+    /** None for `.dict.yaml` alone, nor for a hidden name (the list would show it untitled). */
     fun dictionaryName(fileName: String): String? = keptName(fileName).takeIf { it.isNotEmpty() && !it.startsWith(".") }
 
-    /** Whether [fileName] is a Rime dictionary's (`*.dict.yaml`), read as a word list. */
     fun isRimeDictionary(fileName: String) = fileName.lowercase().endsWith(RIME_DICTIONARY)
 
     private const val RIME_DICTIONARY = ".dict.yaml"
 
-    /**
-     * [block] run on the words of [stream], a dictionary of any [PinyinDictionary.Type] called
-     * [name], as lines for the user dictionary to import: read as it takes them, once and only
-     * while it runs. [stream] is copied and closed first, on the caller's thread: [block] reads
-     * the lines of a local file, on whichever thread takes them (fcitx's, for the engine).
-     * Nothing is kept of the file.
-     */
+    /** [stream] is copied and closed first on the caller's thread; [block] reads the copy on whichever thread takes it. */
     suspend fun <T> readWords(stream: InputStream, name: String, block: suspend (Sequence<String>) -> T): T {
         val text = stream.use { textOf(it, name) }
         try {
@@ -371,20 +309,14 @@ object PinyinDictManager {
         }
     }
 
-    /**
-     * The most of a file of [type] copied into the cache to import (0.6.1 audit import-edit-2): a .scel is
-     * read whole, as the user dictionary's import caps it; a .dict is read whole and decompressed (Zstd's
-     * cap is 128 MiB out); text is streamed, capped for the cache alone. Past it, refused as TOO_LARGE
-     * before anything is read: a file picked by mistake must not take down the keyboard in this process.
-     */
+    /** Past it, refused as TOO_LARGE before reading: a mistaken pick must not take down the keyboard. */
     internal fun maxImported(type: PinyinDictionary.Type?): Long = when (type) {
         PinyinDictionary.Type.Sougou -> MAX_SCEL
         PinyinDictionary.Type.LibIME -> MAX_LIBIME
         else -> MAX_TEXT
     }
 
-    // a binary dictionary written to [dest] as text; one too large for the heap refused, as the old dictionaries'
-    // migration does (ImportedDictionaries), rather than the OutOfMemoryError ending the process with the keyboard
+    // one too large for the heap is refused rather than an OOM ending the keyboard's process
     private fun convert(dictionary: PinyinDictionary, dest: File) {
         try {
             dictionary.toTextDictionary(dest)
@@ -395,9 +327,8 @@ object PinyinDictManager {
         }
     }
 
-    /** [input], a dictionary called [name], as text in a file of the cache, the caller's to delete. */
     private fun textOf(input: InputStream, name: String): File {
-        // the name a provider gives is no path to trust: only its extension, which tells the type
+        // a provider's name is no path to trust: only its extension, which tells the type
         val raw = File.createTempFile("import", ".${withLowercaseExtension(name).substringAfterLast('.', "")}", appContext.cacheDir)
         val text = File.createTempFile("import", ".${PinyinDictionary.Type.Text.ext}", appContext.cacheDir)
         var made = false
@@ -415,16 +346,10 @@ object PinyinDictManager {
         }
     }
 
-    /**
-     * How many words [dictionary] has: as the merged file's header has it for one on, compiled
-     * with it; else its lines, but for comments and blank ones, read a line at a time.
-     */
+    /** From the merged header for one on; else its non-comment, non-blank lines. */
     fun wordCount(dictionary: TextDictionary): Int = wordCount(dictionary.name, MergedDictionary.sourceWords(pinyinDicDir))
 
-    // the dictionary called [name] as its file is now, not as a page listed it (a text converted since
-    // counted none, and one more turned on past the limit, F3591); [header] the merged file's counts.
-    // One replaced as it is counted (a conversion's commit) is counted again as it is then
-    // (no test: the rename cannot be timed into a count without a hook in this code, F3656)
+    // by its file now, not as a page listed it; one replaced mid-count is counted again (untested: no hook to time it)
     private fun wordCount(name: String, header: Map<String, Int>): Int {
         repeat(COUNT_TRIES) {
             val file = ImportedDictionaries.fileOf(pinyinDicDir, name) ?: return 0
@@ -441,11 +366,10 @@ object PinyinDictManager {
         return 0
     }
 
-    /** A .scel file as the text dictionary the import keeps: scel2org5's output, read in Kotlin (ImportFiles.Scel). */
+    /** scel2org5's output, read in Kotlin. */
     @Throws(IOException::class)
     fun sougouDictConv(src: File, dest: File) {
-        // the text streamed out: a cell dictionary of a million words built whole in a String is tens of MB in the keyboard's
-        // own process. The file itself is read whole, at most MAX_SCEL (maxImported)
+        // streamed out: a million words in a String is tens of MB in the keyboard's process
         try {
             dest.bufferedWriter().use { ImportFiles.Scel.writeTextDictionary(src.readBytes(), it) }
         } catch (e: IOException) {
@@ -455,27 +379,23 @@ object PinyinDictManager {
     }
 
 
-    /** How much of a file is read to tell it: the export's header is its first line, and a blocked word's `!` is soon there if it has one. */
+    /** The header is the first line, and a blocked word's `!` comes soon if there is one. */
     internal const val EXPORT_PEEK = 64 shl 10
 
     private const val COPY_BUFFER = 1 shl 16
 
-    /** As the user dictionary's import of a .scel caps it (PinyinDictionaryFragment). */
     internal const val MAX_SCEL = 32L shl 20
 
-    // libime's own are tens of MB (zhwiki's 0.6 of it keys); read whole, decompressed, then streamed out as text
     private const val MAX_LIBIME = 64L shl 20
 
-    // streamed throughout, but copied into the cache first
     private const val MAX_TEXT = 512L shl 20
 
     private const val COUNT_TRIES = 3
 
     private const val STALE_MS = 60 * 60 * 1000L
 
-    // the share of an import's reading that is the copy into the cache: a fast pass beside the analysis
     private const val COPY_SHARE = 0.1f
 }
 
-/** The lines of [file] that may be words: not blank, not a comment. Read a line at a time; one rule for the page's count and the import's cap. */
+/** One rule for the page's count and the import's cap. */
 internal fun countWordLines(file: File): Int = SourceNames.open(file).bufferedReader().useLines { lines -> lines.count { it.isNotBlank() && !it.startsWith("#") } }

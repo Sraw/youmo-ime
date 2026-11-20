@@ -49,7 +49,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowPopupMenu
 
-/** UAT cases of the toolbar, the text editing panel, the clipboard and the status area (uat/05). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
@@ -94,11 +93,9 @@ class ToolbarUatTest {
         h.idle()
     }
 
-    // a 切词 piece's cell, which takes its taps
     private fun piece(text: String): View =
         generateSequence(h.entry(text)!!) { it.parent as? View }.first { it.isClickable }
 
-    // the place in the order shown on [text]'s piece, null for one not picked
     private fun place(text: String): String? = KeyboardHarness.all(piece(text)).filterIsInstance<TextView>()
         .firstOrNull { it.visibility == View.VISIBLE && it.text.toString() != text }?.text?.toString()
 
@@ -200,7 +197,6 @@ class ToolbarUatTest {
         h.tap(h.described(s(R.string.back_to_keyboard)))
         for (w in listOf("今天", "天气", "我们", "一起")) h.copied(w)
         h.clipboard("一起")
-        // the oldest unpinned trimmed to the limit, the pinned kept though older still
         h.waitFor("the limit kept") { h.entry("今天") == null }
         assertNotNull(h.entry("公园"))
         assertEquals(listOf("天气", "我们", "一起"), listOf("今天", "天气", "我们", "一起").filter { h.entry(it) != null })
@@ -216,19 +212,16 @@ class ToolbarUatTest {
         h.waitFor("the pieces shown") { h.entry("x.com") != null }
         assertNotNull(h.entry("@"))
         assertNotNull(h.entry("li"))
-        // ← back to the list it came from, not the keyboard
         h.tap(h.described(s(R.string.back_to_clipboard)))
         h.waitFor("the list back") { h.entry("发到 li@x.com 看看") != null && h.entry("x.com") == null }
         menu("发到 li@x.com 看看", R.string.clipboard_split)
         h.waitFor("the pieces shown again") { h.entry("x.com") != null }
-        // a tap picks, commits nothing; 上屏 off till then
         assertFalse(h.entry(s(R.string.clipboard_split_commit))!!.isEnabled)
         h.tap(piece("x.com"))
         assertEquals("1", place("x.com"))
         assertEquals("", h.field.text.toString())
         h.tap(h.entry(s(R.string.clipboard_split_commit))!!)
         assertEquals("x.com", h.field.text.toString())
-        // back to the keyboard, as after a paste
         h.waitFor("the keyboard back") { h.entry("li") == null }
     }
 
@@ -243,9 +236,7 @@ class ToolbarUatTest {
         h.tap(piece("x.com"))
         h.tap(piece("li"))
         h.tap(piece("@"))
-        // each picked with its place in the order
         assertEquals(listOf("1", "2", "3"), listOf("x.com", "li", "@").map(::place))
-        // tapped again, dropped; tapped once more, last
         h.tap(piece("li"))
         assertEquals(listOf("1", null, "2"), listOf("x.com", "li", "@").map(::place))
         h.tap(piece("li"))
@@ -253,13 +244,12 @@ class ToolbarUatTest {
         h.tap(h.entry(s(R.string.clipboard_split_commit))!!)
         // x.com then @ are not neighbours and @ is no letter: nothing between; @ then li neither, nothing again
         assertEquals("x.com@li", h.field.text.toString())
-        // again: x.com then li, not neighbours but both Latin, a space; li then @, neighbours, the text between (none)
+        // x.com then li, not neighbours but both Latin, a space; li then @, neighbours, the text between (none)
         h.field.setText("")
-        // from the panel again: the bar no longer offers the clip, let go when the toolbar was expanded to open it
+        // the bar no longer offers the clip, let go when the toolbar was expanded to open it
         h.clipboard("发到 li@x.com 看看")
         menu("发到 li@x.com 看看", R.string.clipboard_split)
         h.waitFor("the pieces shown again") { h.entry("x.com") != null }
-        // 重选 drops what was picked
         h.tap(piece("li"))
         h.tap(h.entry(s(R.string.clipboard_split_reset))!!)
         assertEquals(listOf(null, null, null), listOf("x.com", "li", "@").map(::place))
@@ -269,7 +259,6 @@ class ToolbarUatTest {
         h.tap(piece("@"))
         h.tap(h.entry(s(R.string.clipboard_split_commit))!!)
         assertEquals("x.com li@", h.field.text.toString())
-        // back to the keyboard, as after a paste
         h.waitFor("the keyboard back") { h.entry("li") == null && h.entry(s(R.string.clipboard_split_commit)) == null }
     }
 
@@ -289,14 +278,13 @@ class ToolbarUatTest {
         edit.findViewById<View>(R.id.clipboard_edit_ok).performClick()
         h.waitFor("saved") { h.entry("公园门口") != null }
         menu("公园门口", R.string.delete)
-        // the database's delete, then the list's: as long as the machine takes, not a fixed half second
+        // as long as the machine takes, not a fixed half second
         h.waitFor("deleted") { h.relayout(); h.entry("公园门口") == null }
     }
 
     private fun deleteAll(confirm: Boolean = true): String {
         val before = ShadowPopupMenu.getLatestPopupMenu()
         h.tap(h.described(s(R.string.delete_all)))
-        // asked once the pinned are counted, off the main thread
         h.waitFor("the question") { ShadowPopupMenu.getLatestPopupMenu() !== before }
         val question = ShadowPopupMenu.getLatestPopupMenu().menu.getItem(0).title.toString()
         if (confirm) h.menuPick(h.service.getString(android.R.string.ok))
@@ -317,9 +305,7 @@ class ToolbarUatTest {
         h.clipboard("散步")
         assertEquals(s(R.string.delete_all_except_pinned), deleteAll())
         h.waitFor("the notice") { h.notice() != null }
-        // the list drops 散步 after the notice says so (the database's change, then the page Paging loads anew): else 散步,
-        // still listed, passes "back" below at once, before the undo is in, and the next 全部删除 is asked of a
-        // database still without 散步 (only 公园 left to delete, then 散步 coming back: SDK 29, full runs)
+        // the list drops 散步 after the notice says so: else, still listed, it passes "back" below before the undo is in
         h.waitFor("散步 gone") { h.entry("散步") == null }
         h.noticeTexts().let { assertTrue(it.toString(), h.service.resources.getString(R.string.num_items_deleted, 1) in it) }
         val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>().last { it.text.toString() == s(R.string.undo) }
@@ -338,7 +324,6 @@ class ToolbarUatTest {
         return shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity ?: error("nothing opened")
     }
 
-    // the page an intent opens: the activity made from it, its page's route
     private fun page(intent: Intent): String = SettingsHarness(intent = intent).use { st ->
         val nav = st.activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         nav.navController.currentDestination?.route.orEmpty()
@@ -388,7 +373,6 @@ class ToolbarUatTest {
         h.tap(button(s(R.string.one_handed)))
         h.start()
         assertTrue("${keyboardBox()}", keyboardBox().left <= 2 && keyboardBox().width() < width * 0.9)
-        // typing as ever
         h.tap(h.key("n"))
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(key=n") })
     }
@@ -416,15 +400,14 @@ class ToolbarUatTest {
         harness = KeyboardHarness(im = KeyboardHarness.ENGLISH)
         h.start()
         typed("12*3.5")
-        // the engine commits the = typed (English passes keys on as they are)
+        // English passes keys on as they are
         h.emit(HostEvent.Commit("=", -1))
         val result = button("= 42")
         h.tap(result)
         assertEquals("12*3.5=42", h.field.text.toString())
     }
 
-    // a copy's suggestion under a sum's result, not yet seen: the toolbar expanded by hand then keeps it, offered
-    // once the result goes (the cursor moved off the =)
+    // a copy's suggestion under a sum's result: the toolbar expanded by hand keeps it, offered once the result goes
     @Test
     fun aClipUnderASumsResultOutlivesTheToolbarExpanded() {
         harness = KeyboardHarness(im = KeyboardHarness.ENGLISH)
@@ -455,7 +438,7 @@ class ToolbarUatTest {
         h.tap(select)
         h.tap(button(h.service.getString(android.R.string.copy)))
         assertEquals(0 to 0, h.field.selectionStart to h.field.selectionEnd)
-        // nothing copied, nothing done: 选择 stays on as it shows, → selects (review M1)
+        // nothing copied, nothing done: 选择 stays on as it shows, → selects
         h.noticeTexts().let { assertTrue(it.toString(), s(R.string.nothing_to_copy) in it) }
         assertTrue(select.isActivated)
         h.tap(h.described(s(R.string.move_cursor_right)))
@@ -493,11 +476,9 @@ class ToolbarUatTest {
         assertEquals("公园公园", h.field.text.toString())
     }
 
-    // the service's requests to put the keyboard away, recorded by HideRecordingShadow from here on: the
-    // list goes on filling as the test runs, not a snapshot
+    // the list goes on filling as the test runs, not a snapshot
     private fun startRecordingHides(): List<Int> = HideRecordingShadow.hides.also { it.clear() }
 
-    // the system's answer to the request: the window hidden, then the field tapped again
     private fun hiddenThenTappedAgain() {
         h.service.hideWindow()
         h.idle()
@@ -528,10 +509,8 @@ class ToolbarUatTest {
         candidates(*Array(60) { "字$it" })
         h.longPress(h.described(s(R.string.expand_candidates_list)))
         assertEquals(asked.toString(), 1, asked.size)
-        // the table not opened
         assertFalse(h.texts(h.inputView).toString(), "字20" in h.texts(h.inputView) || has(R.string.hide_candidates_list))
         hiddenThenTappedAgain()
-        // 你 picked: 联想 after it, the same ⌄ on the bar. A tap opens their table
         candidates()
         h.service.currentInputConnection.commitText("你", 1)
         candidates(*Array(60) { "联$it" })
@@ -540,7 +519,6 @@ class ToolbarUatTest {
         h.tap(h.described(s(R.string.hide_candidates_list)))
         h.after(1000)
         assertFalse(h.texts(h.inputView).toString(), "联20" in h.texts(h.inputView))
-        // held: away, no table
         h.longPress(h.described(s(R.string.expand_candidates_list)))
         assertEquals(asked.toString(), 2, asked.size)
         assertFalse(has(R.string.hide_candidates_list))
@@ -550,21 +528,18 @@ class ToolbarUatTest {
     @Uat("PR-05")
     fun aPasswordsBarIsTheDigitsRow() {
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-        // androidengine switches a password to English (PR-03)
+        // androidengine switches a password to English
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
-        // the number row's keys, whichever draws them
         fun row() = h.keys(KeyboardHarness.find<org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow>(h.bar)!!)
         assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"), row().map { it.label })
         assertFalse(has(R.string.expand_toolbar))
         h.api.calls.clear()
         for (d in listOf("1", "2", "3")) h.tap(row().first { it.label == d })
-        // each digit to the engine as its key, as English types a digit (EngineReplay: PR-03's 123)
         val sent = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
             .map { Regex("sym=(\\d+)").find(it)?.groupValues?.get(1)?.toInt() }
         assertEquals(h.api.calls.toString(), listOf(49, 50, 51), sent)
     }
 
-    // the bar's buttons, in order, by their names: the toolbar's (opened) and the right's
     private fun barButtons(): List<String> {
         val names = ToolbarButton.entries.map { s(ToolbarButtonLooks.of(it).label) }.toSet() +
             listOf(R.string.status_simplified, R.string.status_traditional, R.string.learning_habits_on).map(::s)
@@ -576,10 +551,8 @@ class ToolbarUatTest {
 
     private val toolbarButtons get() = AppPrefs.getInstance().internal.toolbarButtons
 
-    // every button's situation: the microphone, one-handed and the keyboards' choice there
     private val everywhere = ToolbarConfig.Situation(voice = true, tradSimp = false, oneHanded = true, keyboards = true)
 
-    // where [button] is on the toolbar buttons page
     private fun DynamicListAdapter<ToolbarConfig.Item>.indexOf(button: ToolbarButton) =
         entries.indexOfFirst { it is ToolbarConfig.Item.Button && it.button == button }
 
@@ -601,14 +574,11 @@ class ToolbarUatTest {
                 KeyboardHarness.all(row(name)).filterIsInstance<CheckBox>().first { it.isShown }.performClick()
                 st.idle()
             }
-            // every button and the divider; the ⋯ fixed, not listed
             assertTrue(st.texts().containsAll(listOf(st.s(R.string.undo), st.s(R.string.theme), st.s(R.string.toolbar_divider))))
             assertFalse(st.texts().contains(st.s(R.string.status_area)))
             check(st.s(R.string.undo))
             check(st.s(R.string.theme))
-            // 快速输入, not on the bar by default (the user's call, 2026-11-02), ticked
             check(st.s(R.string.quick_phrases))
-            // the theme dragged below the divider: always there
             val divider = adapter.entries.indexOf(ToolbarConfig.Item.Divider)
             val theme = adapter.indexOf(ToolbarButton.Theme)
             for (i in theme until divider) adapter.swapItem(i, i + 1)
@@ -623,11 +593,9 @@ class ToolbarUatTest {
             config.layout(everywhere)
         )
         h.start()
-        // the theme there before the toolbar is opened, the undo not even then; the microphone as ever
         val pinned = listOf(R.string.theme, R.string.a11y_key_emoji, R.string.handwriting, R.string.voice_input, R.string.hide_keyboard)
         assertEquals(pinned.map(::s), barButtons())
         expand()
-        // ten slots: the menu key, five at the right, three of the toolbar's and ⋯; 快速输入 with no slot in ⋯'s panel
         assertEquals((listOf(R.string.redo, R.string.text_editing, R.string.clipboard, R.string.status_area) + pinned).map(::s), barButtons())
         assertEquals(s(R.string.quick_phrases), ToolbarSpacingUatTest.openMore(h).first())
     }
@@ -635,7 +603,6 @@ class ToolbarUatTest {
     @Test
     @Uat("TB-42")
     fun theToolbarButtonsPageResetsAndKeepsTheVoice() {
-        // the microphone moved first: an edit leaves it there
         prefs.set(toolbarButtons, "undo,|,voice,emoji,hide")
         SettingsHarness().use { st ->
             val adapter = page(st)
@@ -645,7 +612,6 @@ class ToolbarUatTest {
             st.idle()
             val pinned = ToolbarConfig.parse(toolbarButtons.getValue()).layout(everywhere).pinned
             assertEquals(listOf(ToolbarButton.Voice, ToolbarButton.Hide, ToolbarButton.Emoji), pinned)
-            // the others above the divider (handwriting, pinned by default since 0.6.1, too): the microphone still below it
             (st.page as ToolbarButtonsFragment).reset()
             st.idle()
             for (b in listOf(ToolbarButton.Emoji, ToolbarButton.Handwriting, ToolbarButton.Hide)) {
@@ -670,7 +636,6 @@ class ToolbarUatTest {
         prefs.set(AppPrefs.getInstance().internal.useHabits, true)
         h.start()
         expand()
-        // no 简繁 till the input method offers it; the ⋯ there, fixed
         assertEquals(listOf(R.string.learning_habits_off, R.string.one_handed, R.string.status_area, R.string.a11y_key_emoji, R.string.hide_keyboard).map(::s), barButtons())
         val chttrans = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-inactive", "", false))
         h.api.statusAreaCached = chttrans
@@ -685,7 +650,6 @@ class ToolbarUatTest {
         val traditional = listOf(StatusEntry(7, "chttrans", "fcitx-chttrans-active", "", true))
         h.emit(HostEvent.StatusArea(traditional, KeyboardHarness.PINYIN))
         assertTrue(lit(R.string.status_traditional))
-        // the panel's one-handed toggle, the same, lit while on; off from elsewhere, unlit
         assertFalse(lit(R.string.one_handed))
         h.tap(h.described(s(R.string.one_handed)))
         assertEquals(KeyboardStyle.ONE_HANDED, TestStyles.stored(landscape = false))
@@ -693,7 +657,6 @@ class ToolbarUatTest {
         TestStyles.clear()
         h.idle()
         assertFalse(lit(R.string.one_handed))
-        // habits off: lit, and named for turning them back on
         h.tap(h.described(s(R.string.learning_habits_off)))
         assertFalse(AppPrefs.getInstance().internal.useHabits.getValue())
         assertTrue(lit(R.string.learning_habits_on))
@@ -727,8 +690,7 @@ class ToolbarUatTest {
     @Test
     @Uat("TB-43")
     fun floatingTheBarFitsAndHasNoOneHanded() {
-        // more at the right than a floating bar holds at a button's width: all of them there, narrower (the user's call,
-        // 2026-11-15), none over the menu key, ⋯ reachable
+        // more at the right than a floating bar holds at a button's width: all there, narrower, none over the menu key
         prefs.set(toolbarButtons, "undo,|,emoji,voice,hide,theme,floating,one_handed,habits,clear_recent,input_method_settings,redo")
         prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
@@ -742,7 +704,6 @@ class ToolbarUatTest {
             assertTrue("$name $b over the menu key $menu", b.left >= menu.right && b.right <= bar.right)
         }
         assertFalse(s(R.string.one_handed) in right)
-        // lit at the right
         expand()
         assertTrue(lit(R.string.floating_keyboard))
         val all = barButtons()

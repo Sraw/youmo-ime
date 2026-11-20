@@ -44,11 +44,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.math.roundToInt
 
-/**
- * The keys the scene draws take their touches themselves (060-render-p2 S1, [SceneTouch]): each
- * gesture done to the text and told the engine as the key views did (compared with them till S8a
- * deleted them).
- */
+/** The scene's keys take their own touches ([SceneTouch]): each gesture as the removed key views did it. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class SceneTouchTest {
@@ -58,7 +54,7 @@ class SceneTouchTest {
 
     private val delay get() = AppPrefs.getInstance().keyboard.longPressDelay.getValue().toLong()
 
-    /** [done] on the keyboard, its field holding "hello world", the cursor after hello: what it came to. */
+    /** The field holds "hello world", the cursor after hello. */
     private fun <T> gesture(im: InputMethodEntry = KeyboardHarness.PINYIN, done: (KeyboardHarness) -> T): T =
         KeyboardHarness(im = im).start().use { h ->
             assertNotNull(h.canvas())
@@ -74,14 +70,12 @@ class SceneTouchTest {
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 
-    // the key [name]'s copies (a split row's G and V two)
     private fun KeyboardHarness.views(name: String): List<ShownKey> = keys().filter { it.id == name }.sortedBy { it.copy }
 
     private fun KeyboardHarness.keyView(name: String): ShownKey = keyNamed(name)
 
     private fun KeyboardHarness.typed() = api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
 
-    // fingers at [at] (the window's), as the window passes them on
     private class Fingers(private val h: KeyboardHarness, private val at: List<Pair<Float, Float>>) {
         private val down = SystemClock.uptimeMillis()
         private val props = Array(at.size) { MotionEvent.PointerProperties().apply { id = it; toolType = MotionEvent.TOOL_TYPE_FINGER } }
@@ -98,14 +92,13 @@ class SceneTouchTest {
 
     private fun KeyboardHarness.middle(k: ShownKey) = box(k).let { it.exactCenterX() to it.exactCenterY() }
 
-    // a quick tap where a finger does it (not performClick, which no touch makes)
+    // not performClick, which no touch makes
     private fun KeyboardHarness.touchTap(k: ShownKey) {
         val f = finger(k, at(k))
         after(16)
         f.up(at(k))
     }
 
-    // two fingers down on q and p, each lifted on its own key: each types its own, in the order lifted
     @Test
     fun twoFingersOnTwoKeysEachTypesItsOwn() {
         val typed = gesture { h ->
@@ -119,24 +112,20 @@ class SceneTouchTest {
             assertFalse(h.canvas()!!.shownPressed("q"))
             h.typed()
         }
-        // p lifted first, typed first
         assertEquals(typed.toString(), 2, typed.size)
         assertTrue(typed.toString(), "p" in typed[0] && "q" in typed[1])
     }
 
     @Test
     fun aLongPressShowsItsChoicesAndTypesThePicked() {
-        // e's choices (3, é, …), the finger slid onto 3
         val (labels, typed) = gesture { h -> h.longPress(h.keyView("e"), pick = "3") to h.typed() }
         assertTrue(labels.toString(), labels.size > 1)
-        // one choice typed, not e itself: which one the harness's straight slide lands on is not exact
-        // (the popup's own focus stepping is PopupFocusTest's)
+        // which one the harness's straight slide lands on is not exact (PopupFocusTest steps the focus)
         assertEquals(typed.toString(), 1, typed.size)
         assertFalse(typed.toString(), Regex("""(key=|char=|commit\()e\b""").containsMatchIn(typed[0]))
     }
 
-    // the finger's place on the popup read from the key's cell's corner, as from its view's: A's cell
-    // starts after the row's blank end, which is A's to touch but no part of where its popup is
+    // read from the key's cell's corner: A's cell starts after the row's blank end, A's to touch but no part of where its popup is
     @Test
     fun aPopupsKeyPickedWhereTheFingerIs() {
         val picked = gesture { h ->
@@ -149,13 +138,10 @@ class SceneTouchTest {
                 h.typed()
             }
         }
-        // the harness's slide lands on the popup's rows as laid out, not always on the label it names: each
-        // typed one thing
         assertTrue(picked.toString(), picked.values.all { it.size == 1 })
     }
 
-    // the key's touch read in its cell, as in its view: a finger slid from A's middle into the row's blank
-    // end before it has left A (its long press called off), though the blank end is A's to start a touch in
+    // slid from A's middle into the row's blank end has left A (long press called off), though a touch may start there
     @Test
     fun aFingerSlidOffTheKeysCellHasLeftIt() {
         val shown = gesture { h ->
@@ -169,7 +155,6 @@ class SceneTouchTest {
             h.after(delay + 100L)
             h.popupChoices().size.also { f.up(KeyboardHarness.Touch(-slop - 2f, a.height / 2f)) }
         }
-        // the press's bubble at most, none of its long press's keys (12 on A)
         assertTrue("$shown", shown <= 1)
     }
 
@@ -199,7 +184,7 @@ class SceneTouchTest {
 
     @Test
     fun spaceSwipedMovesTheCursor() {
-        // the cursor's keys sent to the engine (FakeHostApi moves no cursor)
+        // FakeHostApi moves no cursor
         val typed = gesture { h ->
             val space = h.keyView("space")
             h.swipe(space, -h.box(space).width() / 2f, 0f)
@@ -210,7 +195,6 @@ class SceneTouchTest {
 
     @Test
     fun backspaceSwipedUpClearsDownRestores() {
-        // what is cleared is the engine's and the field's (Clear): the same commands, the text back as it was
         val (cleared, restored) = gesture { h ->
             val b = h.keyView("backspace")
             val height = h.box(b).height().toFloat()
@@ -220,7 +204,6 @@ class SceneTouchTest {
             cleared to h.field.text.toString()
         }
         assertTrue(cleared.toString(), "clearTyped()" in cleared.first)
-        // what was before the cursor cleared, what was after it kept
         assertEquals(" world", cleared.second)
         assertEquals("hello world", restored)
     }
@@ -247,7 +230,6 @@ class SceneTouchTest {
         typed.forEach { assertEquals(typed.toString(), 1, it.size) }
     }
 
-    // a long press that does nothing buzzes for nothing (A4.13): the scene's space told as its setting is
     @Test
     fun theSpacesLongPressBuzzesAsTheViewsDid() {
         listOf(SpaceLongPressBehavior.None to false, SpaceLongPressBehavior.Enumerate to true).forEach { (behavior, buzzes) ->
@@ -260,8 +242,7 @@ class SceneTouchTest {
         }
     }
 
-    // a split row's second copy with no key of its own is the first's ([SceneTouch.find]): a finger on
-    // each copy, each read from its own copy's cell, not from where the other finger came down
+    // a split row's second copy with no key of its own is the first's ([SceneTouch.find]): each read from its own cell
     @Test
     fun aKeysTwoCopiesEachReadFromItsOwnCell() {
         TestStyles.set(KeyboardStyle.SPLIT)
@@ -272,7 +253,6 @@ class SceneTouchTest {
             val gs = h.views("g")
             assertEquals(2, gs.size)
             val g = checkNotNull(kb.sceneKey(checkNotNull(c.keyAt("g"))))
-            // each node's key its first copy's: g's two copies one key
             val touch = SceneTouch(c, keyFor = { n -> c.keyAt(n.id)?.let(kb::sceneKey) }, shown = { true })
             val origin = h.box(kb)
             val at = gs.map { v -> h.box(v).let { it.exactCenterX() - origin.left to it.exactCenterY() - origin.top } }
@@ -281,7 +261,6 @@ class SceneTouchTest {
             val xs = mutableListOf<Float>()
             val wired = g.gestureListener
             g.gestureListener = { k, e -> xs += e.x; wired?.invoke(k, e) ?: false }
-            // the first finger's step, after the second came down: from the first copy's corner, mid-key
             val t = SystemClock.uptimeMillis()
             val e = MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, at[0].first, at[0].second, 0)
             pointers[0].send(e, MotionEvent.ACTION_DOWN, 0)
@@ -292,8 +271,8 @@ class SceneTouchTest {
         }
     }
 
-    // a key the scene drawn last has not: no place for a popup over it, so none shown (not at the window's corner)
-    // a key across rows (rows=): its bubble over its first row, its long press's list over the whole key (KeyNode.head)
+    // a key the scene has not drawn: no place for a popup over it, so none (not at the window's corner); a key across
+    // rows: its bubble over its first row, its list over the whole key (KeyNode.head)
     @Test
     fun aKeyAcrossRowsHasItsBubbleOverItsFirstRow() {
         KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
@@ -354,7 +333,6 @@ class SceneTouchTest {
             assertNotNull(h.api.calls.toString(), g)
             g!!.path.toList()
         }
-        // the path as the finger went (the letters' centres the glide reads: TextSceneWiringTest.aGlideIsReadOnTheScene)
         assertTrue(glide.toString(), glide.size > 4)
     }
 }

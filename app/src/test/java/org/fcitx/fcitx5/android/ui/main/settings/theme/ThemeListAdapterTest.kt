@@ -13,10 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * The marks on the theme list after a theme is deleted or imported again: ThemeManager reports no change
- * for either unless it was the active theme, so a mark left on the wrong row stays there.
- */
+/** ThemeManager reports no change for a delete or reimport unless it was active, so a wrong mark would stick. */
 @RunWith(RobolectricTestRunner::class)
 class ThemeListAdapterTest {
 
@@ -35,7 +32,6 @@ class ThemeListAdapterTest {
         override fun onThemeInfo(theme: Theme) = Unit
     }.apply { setThemes(themes.toList()) }
 
-    /** Each theme's name and mark, in the list's order. */
     private fun ThemeListAdapter.marks() =
         entries.mapIndexed { i, theme -> theme.name to stateAt(i + ThemeListAdapter.OFFSET) }
 
@@ -77,7 +73,7 @@ class ThemeListAdapterTest {
         )
     }
 
-    // region a built-in theme of two versions, one card (060-render-p3 T3)
+    // region a built-in theme of two versions, one card
 
     private val light = TestThemes.PixelLight
     private val dark = TestThemes.PixelDark
@@ -97,7 +93,7 @@ class ThemeListAdapterTest {
         assertEquals(listOf("a" to State.Normal, "pixel#light" to State.Normal), list.marks())
         list.switchVersion(2)
         assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.Selected), list.marks())
-        // a card of one version has none to switch to
+        // a one-version card has none to switch to
         list.switchVersion(1)
         assertEquals(listOf("a" to State.Normal, "pixel#dark" to State.Selected), list.marks())
     }
@@ -128,7 +124,7 @@ class ThemeListAdapterTest {
         val light = Theme.Pack("x#light", false, "x", "/x", 0)
         val dark = Theme.Pack("x#dark", true, "x", "/x", 0)
         val list = adapter(a, x, light, dark, b).apply { setSelectedThemes(b) }
-        // the pack's other version than its card shows: the pack's card all the same, the 3.0 "x" kept
+        // the version the card doesn't show still removes the pack's card; the 3.0 "x" kept
         list.removeTheme(dark as Theme)
         assertEquals(listOf("a", "x", "b"), list.entries.map { it.name })
         assertEquals("b" to State.Selected, list.marks().last())

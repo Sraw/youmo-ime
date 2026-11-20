@@ -11,7 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** `mine.mb` and `mine.used` of version 2 (design 060-quick-input-folders): notes, folders, the old files read. */
+/** `mine.mb` and `mine.used` of version 2: notes, folders, the old files read. */
 class QuickPhraseFilesTest {
 
     private val baidu = QuickPhraseEntry("#wz", "www.baidu.com", "百度")
@@ -133,8 +133,7 @@ class QuickPhraseFilesTest {
         assertFalse(baidu.sameAs(baidu.copy(note = "新浪")))
     }
 
-    // the code review of 060-quick: a file of now written again by a build before 0.6.0 (a downgrade,
-    // an edit there, an upgrade back) has no version line but keeps its bars
+    // a file rewritten by a build before 0.6.0 (downgrade, edit, upgrade back) has no version line but keeps its bars
     @Test
     @Uat("QU-27")
     fun aFileOfNowABuildBeforeWroteAgainReadsAsItWasMeantNotWithBarsPiledUp() {
@@ -146,8 +145,7 @@ class QuickPhraseFilesTest {
         assertEquals(text.replace("【目录】网址\n", ""), QuickPhraseFiles.formatMine(back.entries, back.folders))
     }
 
-    // the code reviews of 060-quick: 0.5.x took `｜` alone as a key; it is kept as a note, an entry to
-    // give a key, and written back so; one made elsewhere with neither key nor note is no entry
+    // 0.5.x took `｜` alone as a key: kept as a note, written back so; neither key nor note is no entry
     @Test
     @Uat("QU-27")
     fun aKeyThatWasABarAloneIsKeptAsItsNoteAndOneWithNeitherIsNoEntry() {
@@ -166,12 +164,11 @@ class QuickPhraseFilesTest {
         assertEquals(listOf(bar, QuickPhraseEntry("x", "y", "｜")), merged.entries)
         assertEquals(emptyMap<QuickPhraseEntry, Long>(), QuickPhraseFiles.parseUsed(QuickPhraseFiles.USED_HEADER + "\n5\t\tx\n"))
         // a key field of no-break spaces alone is neither key nor note: no entry, in the file nor in its times
-        assertEquals(listOf("｜"), QuickPhraseFiles.parseLines("\u00a0 blank\n｜ bar\n".encodeToByteArray()).map { it.note })
+        assertEquals(listOf("｜"), QuickPhraseFiles.parse("\u00a0 blank\n｜ bar\n".encodeToByteArray()).entries.map { it.note })
         assertEquals(emptyMap<QuickPhraseEntry, Long>(), QuickPhraseFiles.parseUsed(QuickPhraseFiles.USED_HEADER + "\n5\t\u00a0\tx\n"))
     }
 
-    // the code review of 060-quick: a computer's key with an ideographic space or a no-break space at
-    // its end imports, the note as it is kept
+    // a computer's key ending in an ideographic or no-break space imports, the note kept
     @Test
     @Uat("QU-27")
     fun anImportTakesANoteOfOtherSpacesAsItIsKept() {

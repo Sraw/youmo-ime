@@ -9,15 +9,10 @@ import java.io.IOException
 import java.util.Calendar
 
 /**
- * The custom phrases the pinyin sessions, the tables and English share, and the user's changes to them from the keyboard
- * (a candidate pinned, a phrase deleted), each handed to [save] as the whole list, as the file
- * keeps them; one [save] refuses (an [IOException]) takes no effect. [builtIn] phrases ([CustomPhrases.BUILT_IN]: the date under `rq`) are offered under
- * a key the user has none of; a change under such a key makes them the user's first, so pinning
- * a word there keeps the date, and deleting the date turns it off rather than letting it come back,
- * while deleting the user's own word gives the key back to the built-in ones not deleted.
- * The built-in ones are for full pinyin's keyboards only ([offered] without them elsewhere): in 双拼 `sj` and
- * `xq` spell syllables (san, xiu in 自然码), whose words they would push down; so there the user's
- * lines reading as a built-in one are left out too, as a change in either made them the user's.
+ * The custom phrases pinyin, tables and English share, with keyboard edits saved whole via [save] (a
+ * refused save takes no effect). [builtIn] phrases (`rq` date) show under keys the user has none of; an edit
+ * there adopts them, so deleting the date turns it off. Built-ins are for full pinyin only: in 双拼 `sj`/`xq`
+ * spell syllables, so there user lines matching a built-in are left out too.
  */
 class PhraseBook(
     phrases: CustomPhrases = CustomPhrases.EMPTY,
@@ -27,21 +22,15 @@ class PhraseBook(
 
     private var user: CustomPhrases = phrases
 
-    /** What is offered: the user's, and the built-in ones under keys the user has none of. */
     var phrases: CustomPhrases = phrases.over(builtIn)
         private set
 
-    // the user's without the built-in ones they were made to keep
+    // the user's without the built-ins they adopted
     private var own: CustomPhrases = withoutBuiltIns(phrases)
 
-    /** What is offered where [builtIns] are: [phrases]; elsewhere the user's alone. */
     fun offered(builtIns: Boolean): CustomPhrases = if (builtIns) phrases else own
 
-    /**
-     * What is offered (as [offered]) and the keys of it [typed] is (A1): itself where the keys type
-     * letters, [letters] null; on keys of letter groups each key any of its letters ([PhraseKeys]),
-     * [taken] spelling a syllable taken off the bar, so one input may be several keys.
-     */
+    /** What is offered and the keys [typed] is: itself on letter keys; on grouped keys each key any of its letters, [taken] spelling a bar syllable. */
     fun typed(
         typed: CharSequence,
         builtIns: Boolean,
@@ -58,24 +47,17 @@ class PhraseBook(
         return offered to keys
     }
 
-    /** [value] made the first phrase under [key], the built-in ones there kept for where they are offered. */
+    /** Built-ins under [key] are adopted first, so pinning keeps them. */
     fun pin(key: String, value: String) = change(user.adopting(key, builtIn).pinned(key, value))
 
-    /**
-     * [value] no longer a phrase under [key]: one reading as a built-in one there is turned off, the
-     * user's own line too as the two cannot be told apart once adopted, so it stays gone; any other
-     * is deleted, and a key emptied so offers again the built-in ones never deleted.
-     */
+    /** Removes [value] under [key]: an adopted built-in is turned off so it stays gone; deleting the last of the user's own gives the key back to the built-ins. */
     fun remove(key: String, value: String) {
         val builtInOne = builtIn.all.any { it.key == key && it.value == value }
         val mine = user.adopting(key, builtIn)
         change(if (builtInOne) mine.turnedOff(key, value) else mine.without(key, value))
     }
 
-    /**
-     * The texts at [now] of the built-in phrases [word] stands for ([WORD_KEYS]: 日期's under `rq`),
-     * those still offered under their key: one the user deleted stays off here too.
-     */
+    /** Texts at [now] of the built-in phrases [word] stands for ([WORD_KEYS]), only those still offered under their key. */
     fun builtInsOf(word: String, now: () -> Calendar): List<String> {
         val key = WORD_KEYS[word] ?: return emptyList()
         return phrases.offered(key, now()).filter { o -> builtIn.all.any { it.key == key && it.value == o.phrase.value } }.map { it.text }
@@ -85,8 +67,7 @@ class PhraseBook(
         builtIn.all.fold(phrases) { p, b -> p.without(b.key, b.value) }
 
     private fun change(to: CustomPhrases) {
-        // a save refused (it throws: the file not read, the data not settled) takes no effect, the
-        // phrases as they were, rather than kept this run and gone at the next start
+        // a refused save takes no effect, rather than holding this run and vanishing at the next start
         try {
             save(to)
         } catch (_: IOException) {
@@ -98,7 +79,7 @@ class PhraseBook(
     }
 
     companion object {
-        /** The words whose built-in phrases every Chinese input method offers beside them, by their key. */
+        /** Words whose built-in phrases every Chinese input method offers beside them, by key. */
         val WORD_KEYS = mapOf("日期" to "rq", "时间" to "sj", "星期" to "xq")
     }
 }

@@ -21,17 +21,9 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.theme.Value
 
-/**
- * A theme 3.0 look as a theme 4.0 ([theme]; its file, [xml], as [ThemeWriter] writes it) for the scene
- * engine, made as the built-in themes' are (keyboard-scene's material-light.xml: LookDefaults as
- * styles): the palette as its colours, the shape, gaps and press as `key` styles, each kind's fill and
- * pressed face as its class's, single keys' overrides by their names, which theme 4 selects by the
- * same `board/key` and `*`/role. Files are named by their names alone (4.0 takes no path):
- * [fileNames] is what the app looks a file up by.
- */
+/** A theme 3.0 look as a theme 4.0, made as the built-in themes are; files are named by their names alone (4.0 takes no path). */
 object LookTheme {
 
-    /** The 24 colours in theme 4's names, as the palette has them. */
     fun colors(p: Palette): List<Pair<String, Int>> = listOf(
         "background" to p.backgroundColor,
         "bar" to p.barColor,
@@ -59,16 +51,9 @@ object LookTheme {
         "toolbarIcon" to p.toolbarIconColor,
     )
 
-    /** A file of the look ([ThemeLook.files]) as theme 4 names it: its name without the folders. */
     fun fileName(path: String): String = path.substringAfterLast('/')
 
-    /**
-     * The look's files ([ThemeLook.files]) by the names theme 4 gives them: each its [fileName] as theme 4
-     * takes a file's name (ThemeReader's FILE: a character it does not, `,()/\:*?"<>|` and white space,
-     * as `_`; [MAX_FILE] characters at most, the extension kept), one that another file has already
-     * numbered (`a~2.png`), so two images of one name in two folders stay two. What the app looks a
-     * file up by, and the theme written ([xml]) names: a 3.0 file of any names (the web converts any) reads.
-     */
+    /** Numbered where another file took the name (`a~2.png`), so two images of one name in two folders stay two. */
     fun fileNames(look: ThemeLook): Map<String, String> {
         val taken = HashSet<String>()
         return look.files().associateWith { path ->
@@ -82,60 +67,43 @@ object LookTheme {
         }
     }
 
-    // every file a theme names is one of ThemeLook.files, named by fileNames: one not is a bug of ours
     private fun notAFile(path: String): Nothing = error("$path is not among the look's files (ThemeLook.files)")
 
-    // a file's name of the characters theme 4 takes in one, one at least
     private fun safe(name: String): String =
         name.map { if (it in UNSAFE || it.isWhitespace() || it.code < 0x20) '_' else it }.joinToString("").let { if (it.all { c -> c == '.' }) "_" else it }
 
-    // [s] at most [n] characters, not a character cut in two (a surrogate pair's first left alone)
     private fun cut(s: String, n: Int): String = if (s.length <= n) s else s.take(n).let { if (it.last().isHighSurrogate()) it.dropLast(1) else it }
 
-    /** A file's name in a theme 4 at its longest (ThemeReader's FILE). */
     const val MAX_FILE = 128
     private const val MAX_EXTENSION = 10
     private const val UNSAFE = ",()/\\:*?\"<>|"
 
-    /** [name] as a theme 4's name: cut to [ThemeReader.MAX_NAME], `theme` where blank (a 3.0 file's may be either). */
     fun themeName(name: String): String = cut(name, ThemeReader.MAX_NAME).ifBlank { UNNAMED }
 
     private const val UNNAMED = "theme"
 
-    // a layout's key id at its longest: no key is named longer, and a longer name only grows the file
     private const val MAX_KEY_NAME = 32
 
-    // a 3.0 single key's name theme 4 can select: `*`'s only for a role (`*/Shift`, `*/,` select nothing
-    // and would make the whole theme unreadable), any key no longer than a key id; the others kept in
-    // the 3.0 file, not used, as an unknown board's are
+    // `*/Shift`, `*/,` select nothing and would make the whole theme unreadable; the others stay in the 3.0 file, unused
     private fun named(name: String): Boolean = KeyNames.split(name).let { (board, key) ->
         key.length <= MAX_KEY_NAME && (board != KeyNames.ALL || KeyNames.isRole(key))
     }
 
-    /** The font's name in the file written, for the look's key font (theme 4 names a `<font>`). */
     const val KEY_FONT = "key"
 
-    /** The font's name in the file written, for the look's candidate font (060-render-p3 T6a). */
     const val CANDIDATE_FONT = "candidate"
 
-    /**
-     * The look's candidates' font and weight as a 4.0 theme's `candidate` has them; null where it sets
-     * neither (the system's font at 400: the engine's default), so a theme of none writes no style.
-     */
     fun candidateFont(text: Text): Pair<String, Int>? =
         if (text.candidateFont == null && text.candidateWeight == LookDefaults.TEXT.candidateWeight) null
         else (if (text.candidateFont != null) CANDIDATE_FONT else "system") to text.candidateWeight
 
-    /** The look as a 4.0 theme's text: [theme], as [ThemeWriter] writes every theme. */
     fun xml(look: ThemeLook, name: String, dark: Boolean): String = ThemeWriter.write(theme(look, name, dark))
 
-    /** The look as a 4.0 theme: what [ThemeReader] reads [xml]'s text as (its styles at no line). */
     fun theme(look: ThemeLook, name: String, dark: Boolean): Theme {
         val keys = look.keys
         val names = fileNames(look)
         fun fileName(path: String) = names[path] ?: notAFile(path)
         val s = Styles(names)
-        // the board: the picture under it, or ThemeColors.board's colour (block: background, flat: keyboard)
         if (look.picture != null && look.base == BoardBase.Picture) {
             s.add(of("keyboard"), "fill" to Value.OfFill(Fill.Picture(null, null)))
         } else {
@@ -167,7 +135,6 @@ object LookTheme {
             "press" to press(keys),
         )
         s.add(key.with(LANDSCAPE), "inset" to inset(keys.gap.vLand, keys.gap.hLand))
-        // the keyboard height 紧凑: the rows closer (Gap.vCompact); on its side both scenes, the more specific
         s.add(key.with(COMPACT), "inset" to inset(keys.gap.vCompact, keys.gap.h))
         s.add(key.with(COMPACT).with(LANDSCAPE), "inset" to inset(keys.gap.vLandCompact, keys.gap.hLand))
         s.add(key.with(state = PRESSED), "overlay" to color("keyPressHighlight"))
@@ -175,11 +142,9 @@ object LookTheme {
         s.add(key.with(kind = "enter"), "fill" to s.face(keys.enter.fill, ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"))
         s.add(key.with(kind = "space"), "fill" to s.face(keys.space.fill, KEY))
         kinds(keys).forEach { (kind, k, color) -> s.pressed(listOf(key.with(kind = kind, state = PRESSED)), k.pressed, color) }
-        // a flat space's colour is the space bar's (ThemeColors.face), its pressed image's too
         s.pressed(listOf(key.with(FLAT, "space", PRESSED)), keys.space.pressed, SPACE_BAR)
         s.add(key.with(kind = "alt-text"), "color" to color("altKeyText"), "icon-color" to color("altKeyText"))
         s.add(listOf(key.with(part = "mark"), key.with(part = "shortcut")), "color" to color("keyHint"), "icon-color" to color("keyHint"))
-        // a shortcut's text is not of the theme's size (rules B §6: keyScale leaves it be)
         s.add(key.with(part = "shortcut"), "scale" to Value.Number(FULL))
         s.add(key.with(kind = "enter", part = "mark"), "color" to color("accentKeyText"))
         s.add(key.with(part = "badge"), "icon-color" to color("altKeyText"))
@@ -187,28 +152,20 @@ object LookTheme {
         s.add(key.with(FLAT), "fill" to TRANSPARENT, "shadow" to Value.OfShadow(Shadow.NONE), "radius" to radius(0))
         s.add(key.with(FLAT, "space"), "fill" to solid(SPACE_BAR), "shape" to Value.Word("bar"), "radius" to radius(FLAT_SPACE_RADIUS_DP))
         s.add(key.with(FLAT, "enter"), "fill" to solid(ACCENT_KEY), "shape" to Value.Word("circle"))
-        // single keys over their kinds, later so they win the tie
+        // single keys after their kinds, so they win the tie
         s.overrides(keys, keys.overrides.entries.filter { named(it.key) }.sortedBy { it.key }.associate { it.key to it.value })
         val popupShadow = Shadow(0.0, POPUP_SHADOW_DP, POPUP_SHADOW_DP, ColorExpr.Literal(Argb(POPUP_SHADOW)))
         s.add(listOf(of("preview"), of("popup")), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "radius" to radius(keys.radiusDp), "shadow" to Value.OfShadow(popupShadow))
         s.add(of("popup", state = "selected"), "fill" to solid(ref("genericActiveBackground")), "color" to color("genericActiveForeground"))
-        // the menu's cells as a long press's (the popup's colours), the one in focus Return's: theme 3.0's were all
-        // Return's, the one in focus its pressed colour over it, too like the others to tell (0.6.1)
         s.add(of("menu"), "fill" to solid(ref("popupBackground")), "color" to color("popupText"), "icon-color" to color("popupText"), "radius" to Value.OfRadius(Radius(List(CORNERS) { 0.0 }, half = true)))
         s.add(of("menu", state = "selected"), "fill" to solid(ACCENT_KEY), "color" to color("accentKeyText"), "icon-color" to color("accentKeyText"))
-        // no rounder than a radius is read (keys of 24 dp and a gap made no theme, and no keyboard was drawn); the
-        // frame round it is the app's outline, of no such limit (WindowLooks.cornerDp), so its corners are the same.
-        // The handle the engine's default (WindowLooks.handleColor), as the window's frame
-        // WindowLooks.cornerDp's rule: square keys, a square frame (0); flat keys drawn square, the least margin
-        // alone; else the keys' radius and it; upright and turned, each with its margins
+        // no rounder than a radius is read (else no theme is made and no keyboard drawn)
         fun floating(flat: Boolean, h: Int, v: Int) =
             if (keys.radiusDp == 0) 0 else minOf((if (flat) 0 else keys.radiusDp) + minOf(h, v), Keys.MAX_RADIUS_DP)
         s.add(of("keyboard", FLOATING), "radius" to radius(floating(false, keys.gap.h, keys.gap.v)))
         s.add(of("keyboard", FLOATING).with(LANDSCAPE), "radius" to radius(floating(false, keys.gap.hLand, keys.gap.vLand)))
         s.add(of("keyboard", FLOATING).with(FLAT), "radius" to radius(floating(true, keys.gap.h, keys.gap.v)))
         s.add(of("keyboard", FLOATING).with(FLAT).with(LANDSCAPE), "radius" to radius(floating(true, keys.gap.hLand, keys.gap.vLand)))
-        // at 紧凑 the rows' margin is less (Gap.vCompact, as the keys' @compact insets): each of the four again, one
-        // scene more specific, so whichever applies is the full one
         s.add(of("keyboard", FLOATING).with(COMPACT), "radius" to radius(floating(false, keys.gap.h, keys.gap.vCompact)))
         s.add(of("keyboard", FLOATING).with(COMPACT).with(LANDSCAPE), "radius" to radius(floating(false, keys.gap.hLand, keys.gap.vLandCompact)))
         s.add(of("keyboard", FLOATING).with(FLAT).with(COMPACT), "radius" to radius(floating(true, keys.gap.h, keys.gap.vCompact)))
@@ -217,21 +174,12 @@ object LookTheme {
             val cuts = listOfNotNull("portrait" to fileName(p.portrait.file), p.landscape?.let { "landscape" to fileName(it.file) }).toMap()
             Picture(fileName(p.src), p.brightness.toDouble(), p.blurDp.toDouble(), cuts, p.animated)
         }
-        // the candidates' font and weight (T6a): theme 3.0's own, so a theme exported or shown on the web keeps them
         candidateFont(text)?.let { (font, weight) -> s.add(of("candidate"), "font" to Value.Word(font), "weight" to Value.Number(weight.toDouble())) }
         val fonts = listOfNotNull(text.keyFont?.let { KEY_FONT to fileName(it) }, text.candidateFont?.let { CANDIDATE_FONT to fileName(it) }).toMap()
         val colors = colors(look.palette).associate { (n, c) -> n to Argb(c) }
-        // one version, light or dark; the dark one's colours its dark version's too, as a file of it reads
         return Theme(themeName(name), dark, VERSION, colors, s.styles, fonts, emptyMap(), picture, darkColors = colors.takeIf { dark })
     }
 
-    // Single keys' faces, each over its kind's colour as ThemeColors.face gives it (under a picture, while an
-    // image loads or cannot be read, and as fill=Color's face): a key and its kind together outrank the key
-    // alone, so a kind whose colour is not the letters' has its own style. Flat, a letter or function key has
-    // no face at all, its own or pressed (3.0's face=null), the space and Return theirs. Keys of one face
-    // share its styles (a list of selectors), and the styles go in this order for the ties: a key's, its
-    // function kind's, flat none, then Return's and the flat space's. [named]: by the keys' names, each as 3.0
-    // drew it ([resolved]).
     // the keys one cannot type without: BlankKeys' own, which refuses a pack that leaves one blank
     private val REQUIRED_KEYS = BlankKeys.REQUIRED_ROLES
 
@@ -245,7 +193,6 @@ object LookTheme {
         val fills = overrides.entries.mapNotNull { (k, o) -> o.fill?.let { k to it } }.groupBy({ it.second }, { it.first })
         val pressed = overrides.entries.mapNotNull { (k, o) -> o.pressed?.takeIf { it != KeyPressed.Darken }?.let { k to it } }
             .groupBy({ it.second }, { it.first })
-        // Darken, a key's own: its face tinted as it is, not its kind's pressed one (3.0's own won); by its own fill
         val darkened = overrides.entries.filter { it.value.pressed == KeyPressed.Darken }.groupBy({ it.value.fill }, { it.key })
         fun List<Selector>.of(scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) =
             map { it.with(scene, kind, state, part) }
@@ -259,7 +206,6 @@ object LookTheme {
         }
         darkened(keys, darkened, beforeFlat = true)
         fills.values.flatten().takeIf { it.isNotEmpty() }?.let { add(it.of(FLAT), "fill" to TRANSPARENT) }
-        // flat, nothing pressed either: no face, and no tint where 3.0 drew none over a pressed face of its own
         pressed.values.flatten().takeIf { it.isNotEmpty() }
             ?.let { add(it.of(FLAT, state = PRESSED), "fill" to TRANSPARENT, "press" to Value.Word(if (ripple) "ripple" else "face")) }
         darkened.values.flatten().takeIf { it.isNotEmpty() }?.let { add(it.of(FLAT, state = PRESSED), "fill" to TRANSPARENT) }
@@ -281,31 +227,23 @@ object LookTheme {
         labels(keys, overrides, named, resolved)
     }
 
-    // the keys' labels: hidden as 3.0 hid them, a key one cannot type without keeping its words
     private fun Styles.labels(keys: Keys, overrides: Map<Selector, KeyOverride>, named: Map<String, KeyOverride>, resolved: Map<String, KeyOverride>) {
         fun List<Selector>.of(scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) =
             map { it.with(scene, kind, state, part) }
-        // a key one cannot type without (Shift, Backspace, Space, Return) keeps its words unless its face is an
-        // image of its own, which is then what it shows: 4.0 refuses a blank one (ThemePackCheck.hidesRequired), and
-        // a 3.0 theme the app took must convert to one it takes
+        // 4.0 refuses a blank required key, and a 3.0 theme the app took must convert to one it takes
         overrides.filter { (k, o) -> hidesLabel(k, o) }
             .keys.toList().takeIf { it.isNotEmpty() }
             ?.let { hid ->
                 add(hid.of(part = "label"), "hidden" to Value.Flag(true))
-                // flat draws no face (3.0's flat): a required key whose image is gone there keeps its words
-                // (Return's and the space bar's kinds keep their image flat, above: hidden there still)
                 hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }.takeIf { it.isNotEmpty() }?.let {
                     add(it.of(FLAT, part = "label"), "hidden" to Value.Flag(false))
                     add(it.of(FLAT, "enter", part = "label") + it.of(FLAT, "space", part = "label"), "hidden" to Value.Flag(true))
                 }
-                // pressed, a face of a colour (its own, or its kind's where it names none) is no image: its words
-                // back there, flat too; Darken tints its image and an image (its own, or its kind's) is one
                 val required = hid.filter { (it.key ?: it.starRole) in REQUIRED_KEYS }
                 required.filter { overrides.getValue(it).pressed is KeyPressed.Color }.takeIf { it.isNotEmpty() }?.let {
                     add(it.of(state = PRESSED, part = "label"), "hidden" to Value.Flag(false))
                     add(it.of(FLAT, "enter", PRESSED, "label") + it.of(FLAT, "space", PRESSED, "label"), "hidden" to Value.Flag(false))
                 }
-                // none of its own: as each kind it may be pressed as, only where that kind's pressed face is a colour
                 required.filter { overrides.getValue(it).pressed == null }.takeIf { it.isNotEmpty() }?.let { ks ->
                     kinds(keys).filter { (_, k, _) -> k.pressed is KeyPressed.Color }.forEach { (kind, _, _) ->
                         add(ks.of(kind = kind, state = PRESSED, part = "label"), "hidden" to Value.Flag(false))
@@ -313,31 +251,21 @@ object LookTheme {
                     }
                 }
             }
-        // a board's key that shows its label where its role's on every board hides theirs: as an id, it wins
         named.keys.filter { n -> resolved.getValue(n).label == KeyLabel.Show && role(named, n)?.label == KeyLabel.Hide }
             .takeIf { it.isNotEmpty() }?.let { ns -> add(ns.map { selector(it).with(part = "label") }, "hidden" to Value.Flag(false)) }
     }
 
-    /**
-     * [overrides] as theme 3.0 drew each (KeyStyleResolver): a board's key of a role (`qwerty/shift`)
-     * takes what it does not set from the role's on every board (`*`/shift), so its own Darken tints the
-     * role's fill, not its kind's, and its own label wins; an id outranks a role in theme 4, so the key
-     * has it all on its own styles.
-     */
+    /** An id outranks a role in theme 4, so a role key's 3.0 inheritance is folded into its own styles. */
     internal fun resolved(overrides: Map<String, KeyOverride>): Map<String, KeyOverride> = overrides.mapValues { (name, own) ->
         role(overrides, name)?.let { all -> KeyOverride(own.fill ?: all.fill, own.pressed ?: all.pressed, own.label) } ?: own
     }
 
-    // [overrides] of a face of their own and no pressed one: pressed as their kind (3.0's own ?: all ?: kind), which
-    // their fill, an id's, would outrank; each kind's on the keys' own names, after their flat style (the tie the
-    // kind's wins too), one style a kind for them all
     private fun Styles.kindsPressed(keys: Keys, overrides: Map<Selector, KeyOverride>) {
         val ks = overrides.filterValues { it.fill != null && it.pressed == null }.keys.toList().takeIf { it.isNotEmpty() } ?: return
         kinds(keys).forEach { (kind, k, color) -> pressed(ks.map { it.with(kind = kind, state = PRESSED) }, k.pressed, color) }
         pressed(ks.map { it.with(FLAT, "space", PRESSED) }, keys.space.pressed, SPACE_BAR)
     }
 
-    // each kind's class, its look and its colour
     private fun kinds(keys: Keys) = listOf(
         Triple("letter", keys.letter, KEY),
         Triple("function", keys.function, ALT_KEY),
@@ -345,13 +273,11 @@ object LookTheme {
         Triple("space", keys.space, KEY),
     )
 
-    // the override of [name]'s role on every board, where [name] is a board's key of a role
     private fun role(overrides: Map<String, KeyOverride>, name: String): KeyOverride? {
         val (board, key) = KeyNames.split(name)
         return if (board != KeyNames.ALL && KeyNames.isRole(key)) overrides["${KeyNames.ALL}/$key"] else null
     }
 
-    // [overrides]' Darken styles, before the flat ones (a key's, its function kind's, the space's) or after (Return's, the flat space's)
     private fun Styles.darkened(keys: Keys, darkened: Map<KeyFill?, List<Selector>>, beforeFlat: Boolean) {
         darkened.forEach { (f, ks) ->
             fun of(scene: String? = null, kind: String? = null) = ks.map { it.with(scene, kind, PRESSED) }
@@ -366,7 +292,6 @@ object LookTheme {
         }
     }
 
-    // the styles of the theme made, in order; the look's files by the names it gives them
     private class Styles(private val names: Map<String, String>) {
         val styles = ArrayList<Style>()
 
@@ -376,15 +301,12 @@ object LookTheme {
 
         fun add(selector: Selector, vararg values: Pair<String, Value>) = add(listOf(selector), *values)
 
-        /** A kind's or key's fill as the look has it, over [color], the kind's colour. */
         fun face(f: KeyFill, color: ColorExpr): Value = when (f) {
             KeyFill.Color -> solid(color)
             is KeyFill.Image -> Value.OfFill(image(f.slice, color))
-            // theme 3.0 laid the kind's colour over the picture (its face's colour, translucent or not)
             is KeyFill.Picture -> Value.OfFill(Fill.Picture(f.blurDp.toDouble(), f.brightness.toDouble(), color))
         }
 
-        // a pressed face of its own is not tinted too (rules B §3): press="face"
         fun pressed(selectors: List<Selector>, p: KeyPressed, color: ColorExpr?) {
             when (p) {
                 KeyPressed.Darken -> Unit
@@ -393,8 +315,7 @@ object LookTheme {
             }
         }
 
-        // [fallback]: the kind's colour, which theme 3.0 showed where the image was not (yet) there; an inset
-        // past any key image's side (a 3.0 file has no bound) at that side: theme 4 takes four digits at most
+        // an inset past an image's side (a 3.0 file has no bound) clamped to that side: theme 4 takes four digits at most
         private fun image(s: NineSlice, fallback: ColorExpr?) = Fill.Image(
             names[s.file] ?: notAFile(s.file),
             listOf(s.insets.left, s.insets.top, s.insets.right, s.insets.bottom).map { it.coerceIn(0, NineSlice.MAX_SIDE) },
@@ -403,24 +324,14 @@ object LookTheme {
         )
     }
 
-    /**
-     * The styles a written theme may have ([ThemeReader]'s `maxStyles`), more than a theme file's
-     * `ThemeReader.MAX_STYLES` when single keys' faces all differ: the look's own (some 30), up to nine
-     * for each single key of the most a 3.0 theme brings (four its fill's, five its pressed face's, a
-     * Darken's), and a dozen the keys share (flat, the kinds' pressed faces on their names, labels).
-     */
+    /** Past `ThemeReader.MAX_STYLES` when single keys' faces all differ. */
     const val MAX_STYLES = 100 + 10 * Keys.MAX_OVERRIDES
 
-    /**
-     * A 3.0 key's name (`board/key`, `*`/role) as the selector of that key: `*`/role every board's key of
-     * the role, any other the board's key of that id, whatever characters it has (大千's `zhuyin/,` is
-     * its comma key, the number pad's star its star key, not every key: ThemeWriter escapes them).
-     */
+    /** 大千's `zhuyin/,` is its comma key, not a list: ThemeWriter escapes it. */
     internal fun selector(name: String): Selector = KeyNames.split(name).let { (board, key) ->
         if (board == KeyNames.ALL) Selector(emptySet(), "key", starRole = key) else Selector(emptySet(), "key", board = board, key = key)
     }
 
-    // a widget's selector: in [scene], of [kind], in [state], its [part]
     private fun of(widget: String, scene: String? = null, kind: String? = null, state: String? = null, part: String? = null) =
         Selector(setOfNotNull(scene), widget, classes = setOfNotNull(kind), states = setOfNotNull(state), part = part)
 
@@ -439,7 +350,6 @@ object LookTheme {
 
     private fun radius(dp: Int): Value = Value.OfRadius(Radius(List(CORNERS) { dp.toDouble() }))
 
-    // vertical, horizontal
     private fun inset(v: Int, h: Int): Value = Value.OfInset(Inset(v.toDouble(), h.toDouble(), v.toDouble(), h.toDouble()))
 
     private fun press(keys: Keys): Value = Value.Word(if (keys.press == PressEffect.Ripple) "ripple" else "tint")

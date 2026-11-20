@@ -128,7 +128,7 @@ class VoiceLiveTest {
         val live = VoiceLive()
         live.closed("今天天气不错")
         live.closed("我们出去走走。")
-        // a mark at the pause is the tagger's (the owner's decision 2026-11-10): none without it
+        // a mark at the pause is the tagger's: none without it
         assertEquals("今天天气不错我们出去走走。", live.raw)
         assertEquals("今天天气不错我们出去走走。", live.finish())
     }
@@ -248,8 +248,7 @@ class VoiceLiveTest {
         val comma = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size) { if (w[it] == '到'.code) 1 else 0 }) }
         val live = VoiceLive(VoicePolishStream(tags, comma, freezeAfter = 1, window = 8))
         live.closed("我到")
-        // the closed segment polished alone is 「我到，」; the next starts with the recognizer's 。:
-        // not typed up to the 「，」, which goes
+        // the closed segment polished alone is 「我到，」; the next starts with the recognizer's 。: not typed up to the 「，」
         val heard = live.heard("。走吧")
         assertEquals("我到。走吧", heard.whole)
         assertEquals(0, heard.settled)

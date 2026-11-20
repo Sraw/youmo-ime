@@ -19,7 +19,6 @@ class MatrixTest {
         // what the int8 weights stand for: whole numbers over 128, exact as floats
         val floats = FloatArray(q.size) { q[it] * scales[it / columns] }
 
-        /** `x · row r` by the textbook, in doubles. */
         fun dot(x: FloatArray, r: Int) = (0 until columns).sumOf { x[it].toDouble() * floats[r * columns + it] }.toFloat()
     }
 
@@ -28,7 +27,6 @@ class MatrixTest {
 
     @Test
     fun everyColumnCountsWhateverTheWidth() {
-        // short of, at and past the eight sums the kernels keep
         for (columns in listOf(1, 7, 8, 12, 17)) {
             val w = weights(3, columns)
             val x = FloatArray(columns) { random.nextGaussian().toFloat() }
@@ -77,7 +75,6 @@ class MatrixTest {
         val y = FloatArray(2)
         Matrix.quantized(2, 5, ByteBuffer.wrap(w.q), w.scales, kernel).times(FloatArray(5) { 1f }, y)
         assertEquals(listOf(2 to 5), asked)
-        // unpacked, it is floats: the kernel is not asked again
         Matrix.quantized(2, 5, ByteBuffer.wrap(w.q), w.scales, kernel).unpacked().times(FloatArray(5) { 1f }, y)
         assertEquals(listOf(2 to 5), asked)
         val floats = Matrix.of(2, 5, w.floats)

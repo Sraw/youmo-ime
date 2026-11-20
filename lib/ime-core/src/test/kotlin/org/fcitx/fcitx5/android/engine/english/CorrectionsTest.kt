@@ -27,8 +27,6 @@ class CorrectionsTest {
         assertNull(c.at("I fed the "))
     }
 
-    // review-B S1: nothing known before it, the same word anywhere would be taken for it: not kept to
-    // tap back to, a backspace right after taking it back still; at the field's start, found only there
     @Test
     fun aCorrectionWithNothingKnownBeforeItIsKeptOnlyAtTheFieldsStart() {
         val c = Corrections()
@@ -53,7 +51,7 @@ class CorrectionsTest {
         assertEquals("w${Corrections.SIZE}", c.at("a w${Corrections.SIZE} ")?.made?.word)
     }
 
-    // R11 F2740: what of the text before a correction tells it apart, and whether that is all of it
+    // what of the text before a correction tells it apart, and whether that is all of it
     @Test
     fun theLeadIsTheFieldsOwnTextCutAtLead() {
         val long = "a".repeat(Corrections.LEAD + 4)
@@ -63,7 +61,6 @@ class CorrectionsTest {
             // the field cleared itself: only what came after, and that is all of it
             Triple("sent. I fed ", 6, false) to ("I fed " to true),
             Triple("sent. ", 6, false) to ("" to true),
-            // longer than LEAD: its end only, never all of it
             Triple(long, -1, true) to (long.takeLast(Corrections.LEAD) to false),
             Triple("x $long", 2, false) to (long.takeLast(Corrections.LEAD) to false),
         )

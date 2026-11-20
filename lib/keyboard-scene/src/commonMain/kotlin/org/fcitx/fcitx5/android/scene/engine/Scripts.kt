@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 /**
- * A text cut where its script changes, for a theme's `font-han` and `font-latin` (060-render-v2 §16-4):
+ * A text cut where its script changes, for a theme's `font-han` and `font-latin`:
  * each run set in its own font, measured on its own and drawn on from where the one before ends. The
  * engine cuts and measures, so every backend draws the runs it was given, in the fonts it was given:
  * nothing is left to a platform's fallback, which takes a glyph from the first font that has it (a

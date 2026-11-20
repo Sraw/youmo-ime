@@ -37,7 +37,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.Duration
 
-/** UAT cases of the globe key and the clipboard's privacy (uat/01, 15), on the whole keyboard. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -51,7 +50,6 @@ class ImeSwitchUatTest {
     @After
     fun close() = h.close()
 
-    // fcitx tells of the switch it made
     private fun told() = h.emit(HostEvent.InputMethodChanged(h.api.inputMethodEntryCached))
 
     @Test
@@ -63,7 +61,6 @@ class ImeSwitchUatTest {
         told()
         assertEquals(KeyboardHarness.ENGLISH.uniqueName, h.api.inputMethodEntryCached.uniqueName)
         val english = h.texts()
-        // still the 26 keys
         assertTrue(english.toString(), "English" in english && "q" in english && "m" in english)
         h.tap(h.describedKey(h.service.getString(R.string.a11y_key_switch_language)))
         told()
@@ -79,10 +76,9 @@ class ImeSwitchUatTest {
         }
         h.service.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
         h.waitFor("stored") { org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry?.text == "mima1234" }
-        // the next field: the bar offers it
         h.start()
         fun all() = KeyboardHarness.all(h.service.window.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList()
-        // the bar takes the clip a looper turn or more after the field starts under load: wait, not read once
+        // the bar takes the clip a looper turn or more after the field starts under load
         h.waitFor("dots on the bar") { all().any { "•" in it } }
         h.tap(h.described(h.service.getString(R.string.expand_toolbar)))
         h.tap(h.described(h.service.getString(R.string.clipboard)))
@@ -94,10 +90,9 @@ class ImeSwitchUatTest {
         h.capture("ImeSwitchUatTest/clipboard_sensitive")
     }
 
-    private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
 
-    // the 输入法 page over its own fake engine, the list as the user left it saved there
     private fun imPage(enabled: Array<InputMethodEntry>, edit: SettingsHarness.(RecyclerView) -> Unit): Array<InputMethodEntry> =
         SettingsHarness().use { st ->
             st.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, shuangpin)
@@ -116,7 +111,6 @@ class ImeSwitchUatTest {
 
     private fun name(e: InputMethodEntry) = InputMethodNames.of(h.service, e)
 
-    // the names on the space key as the globe key goes round [times], from the input method it starts on
     private fun globeRound(enabled: Array<InputMethodEntry>, times: Int): List<String> {
         h.api.enabledIme = enabled
         h.start()
@@ -138,10 +132,8 @@ class ImeSwitchUatTest {
         val saved = imPage(arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi)) { list ->
             val row = list.getChildAt(2)
             val handle = KeyboardHarness.all(row).first { it !is TextView && it.isShown && it.isLongClickable }
-            // held on ═: the drag starts there
             assertTrue(handle.performLongClick())
-            // dragged up past each row: what ItemTouchHelper calls as the held row crosses one (Robolectric's
-            // looper never settles under its own move events, so the crossings are made as it makes them)
+            // what ItemTouchHelper calls as the held row crosses one: Robolectric's looper never settles under its own move events
             val callback = DynamicListTouchCallback(activity, list.adapter as DynamicListAdapter<InputMethodEntry>)
             for (to in 1 downTo 0) {
                 callback.onMove(list, list.findViewHolderForAdapterPosition(to + 1)!!, list.findViewHolderForAdapterPosition(to)!!)
@@ -151,7 +143,6 @@ class ImeSwitchUatTest {
             assertEquals(listOf(wubi, KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH).map(::name), rows(list))
         }
         assertEquals(listOf(wubi, KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH).map { it.uniqueName }, saved.map { it.uniqueName })
-        // from the current input method on, the next in the list each time, the last back to the first
         h.api.availableIme = saved
         val said = globeRound(saved, 3)
         assertEquals(listOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH, wubi, KeyboardHarness.PINYIN).map(::name), said)

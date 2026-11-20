@@ -9,12 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
-/**
- * One thing made ahead for the next use (the VAD for the next microphone opening), handed over
- * without a lock: the capture thread takes it while the models may be loading under the engine's
- * lock, and waiting on that kept 准备中 up for the whole load (4 s and more) with the microphone on.
- * [release] lets go of one not kept.
- */
+/** One thing made ahead (the next opening's VAD), handed over lock-free: waiting on the engine's load lock kept 准备中 up for seconds. */
 class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
 
     private val spare = AtomicReference<T?>(null)
@@ -23,14 +18,10 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
     // counts [clear]s: one made across a clear is let go, not kept to hold its memory to the next
     private val cleared = AtomicInteger(0)
 
-    // the step between a build's keep and its undo, where a clear on another thread can land; set by
-    // tests alone, to put that clear there rather than hope a race does
+    // set by tests alone, to land a clear between a build's keep and its undo rather than hope a race does
     internal var afterOffer: () -> Unit = {}
 
-    /**
-     * One made with [make] if none is there or on its way: the keyboard shown again and again
-     * while one builds starts no second build beside it. Whether this call made it.
-     */
+    /** None if one is there or on its way, so repeated shows start no second build. Whether this call made it. */
     fun build(make: () -> T): Boolean {
         if (spare.get() != null || !building.compareAndSet(false, true)) return false
         try {
@@ -38,8 +29,7 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
             val made = make()
             val kept = offer(made)
             afterOffer()
-            // a clear during the build or before the offer found nothing to let go: undo the keep (one
-            // after it let go of [made] itself, and the swap fails)
+            // a clear during the build or before the offer found nothing to let go: undo the keep (if one after let [made] go, the swap fails)
             if (kept && cleared.get() != at && spare.compareAndSet(made, null)) {
                 release(made)
                 return false
@@ -50,11 +40,7 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
         }
     }
 
-    /**
-     * [build] off the talk's own path: a failure, an Error too (the native library not loading,
-     * memory running out), given to [failed] rather than thrown into a coroutine that would end the
-     * process; none made, the opening makes one or goes without. A cancellation is still thrown.
-     */
+    /** A failure, an Error too (native library, memory), goes to [failed] rather than ending the process; cancellation still thrown. */
     @Suppress("TooGenericExceptionCaught")
     fun tryBuild(make: () -> T, failed: (Throwable) -> Unit): Boolean = try {
         build(make)
@@ -65,17 +51,13 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
         false
     }
 
-    /** the one made ahead, now no one else's; null if none */
+    /** Null if none. */
     fun take(): T? = spare.getAndSet(null)
 
-    /** [clear]s so far: read before what decides an [offer]'s `wanted`, and given to it */
+    /** Read before deciding an [offer]'s `wanted`, and given to it. */
     val clears: Int get() = cleared.get()
 
-    /**
-     * [made] kept for the next use; released if one is already there. Whether it was kept.
-     * [clearsBefore]: [clears] read before [wanted] was decided; a clear since (the decision
-     * stale) undoes the keep, as in [build].
-     */
+    /** Released if one is already there. A clear since [clearsBefore] (the decision stale) undoes the keep. */
     fun offer(made: T, wanted: Boolean = true, clearsBefore: Int? = null): Boolean {
         // not wanted: nothing holds the models (a talk whose models failed), so nothing would let it go
         if (wanted && spare.compareAndSet(null, made)) {
@@ -89,7 +71,7 @@ class VoiceSpare<T : Any>(private val release: (T) -> Unit) {
         return false
     }
 
-    /** the one made ahead let go: memory back while voice is not used */
+    /** Memory back while voice is not used. */
     fun clear() {
         cleared.incrementAndGet()
         spare.getAndSet(null)?.let(release)

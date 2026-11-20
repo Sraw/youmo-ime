@@ -49,11 +49,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowSystemClock
 
-/**
- * A search result whose setting its page did not have once flashed a setting of the same title,
- * or switched the theme page's tab, on the next page opened within a few seconds: the setting is
- * now named by its key, on the result's own entry on the back stack.
- */
+/** Named by key on the result's own back-stack entry, so a later page within seconds is not flashed. */
 @RunWith(RobolectricTestRunner::class)
 class SearchHighlightTest {
 
@@ -66,7 +62,6 @@ class SearchHighlightTest {
         override fun createDestination() = NavDestination(this)
     }
 
-    // a page's preferences without hosting its fragment: only its screen and where it scrolled are read
     private class Page(var screen: PreferenceScreen) : PreferenceFragmentCompat() {
         var scrolledTo: Preference? = null
 
@@ -79,8 +74,7 @@ class SearchHighlightTest {
         }
     }
 
-    // a page hosted for the public overloads, which find the NavController by its view; any fragment
-    // will do for isWaiting, and a preference one would need androidx.preference's resources
+    // hosted for the public overloads, which find the NavController by view
     class Hosted : Fragment() {
         override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
             View(inflater.context)
@@ -90,7 +84,7 @@ class SearchHighlightTest {
     fun setUp() {
         ctx = RuntimeEnvironment.getApplication()
         controller = NavHostController(ctx)
-        // where an entry's saved state is kept: NavHostFragment gives it the activity's
+        // NavHostFragment gives it the activity's
         controller.setViewModelStore(ViewModelStore())
         val navigator = TestNavigator()
         controller.navigatorProvider.addNavigator(navigator)
@@ -106,7 +100,6 @@ class SearchHighlightTest {
         )
     }
 
-    /** [page] opened, and its entry, as SettingsSearchFragment.open finds it after navigating. */
     private fun open(page: Int): NavBackStackEntry {
         controller.navigate(page)
         return controller.currentBackStackEntry!!
@@ -138,7 +131,6 @@ class SearchHighlightTest {
         val page = Hosted()
         Robolectric.buildActivity(FragmentActivity::class.java).setup().get()
             .supportFragmentManager.beginTransaction().add(android.R.id.content, page).commitNow()
-        // as NavHostFragment would have it for findNavController
         Navigation.setViewNavController(page.requireView(), controller)
         SearchHighlight.point(open(RESULT), "pref:wanted")
         assertTrue(SearchHighlight.isWaiting(page))
@@ -147,7 +139,7 @@ class SearchHighlightTest {
         assertFalse(SearchHighlight.isWaiting(page))
         controller.popBackStack()
         assertTrue(SearchHighlight.isWaiting(page))
-        // posted from its view after it left: no NavController to ask, nothing pointed at
+        // posted from its view after it left: no NavController, nothing pointed at
         val gone = Page(screen("wanted"))
         SearchHighlight.showIn(gone)
         assertNull(gone.scrolledTo)
@@ -167,7 +159,6 @@ class SearchHighlightTest {
     @Test
     fun aSettingIsWaitedForTillItsPageFindsIt() {
         val result = open(RESULT)
-        // a result that is a page, not a setting on one
         SearchHighlight.point(result, null)
         assertFalse(SearchHighlight.isWaiting(result))
         SearchHighlight.point(result, "pref:wanted")
@@ -178,8 +169,7 @@ class SearchHighlightTest {
         assertFalse(SearchHighlight.isWaiting(result))
     }
 
-    // kept whole (061 §4.1): an id not a preference's, which no preference page has, pointed at nothing and let go;
-    // a control's (view:) left for the page drawn by hand around the preferences (外观's tabs), which says when it is ready
+    // a non-preference id is let go by a preference page; a control's is left for the hand-drawn host page
     @Test
     fun theIdIsKeptWholeAndOnlyAPreferencesIsPointedAt() {
         val result = open(RESULT)
@@ -214,7 +204,7 @@ class SearchHighlightTest {
         const val OTHER = 4
     }
 
-    // a page opened from a search stayed at its top: its list had no adapter yet when it was scrolled
+    // a page opened from a search stayed at its top: its list had no adapter yet when scrolled
     @Test
     fun aListIsScrolledOnlyOnceItHasItsAdapter() {
         val list = RecyclerView(ctx)
@@ -229,12 +219,11 @@ class SearchHighlightTest {
         }
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
         assertEquals(1, scrolled)
-        // one with no list yet goes at once (scrollToPreference waits for the list itself)
         SearchHighlight.whenListed(null) { scrolled++ }
         assertEquals(2, scrolled)
     }
 
-    // a setting in a hidden section (a keyboard not chosen): the row that shows it is pointed at, not the page's top
+    // a setting in a hidden section: the row that shows it is pointed at, not the page's top
     @Test
     fun aHiddenSettingPointsAtTheRowThatShowsIt() {
         val result = open(RESULT)
@@ -242,7 +231,6 @@ class SearchHighlightTest {
         val page = Page(screen("keyboard", "wanted").apply { findPreference<Preference>("wanted")!!.isVisible = false })
         SearchHighlight.showIn(page, result)
         assertEquals("keyboard", page.scrolledTo?.key)
-        // as the pages hide one: the section's group hidden, the setting in it still visible itself
         SearchHighlight.point(result, "pref:wanted", "pref:keyboard")
         val grouped = Page(screen("keyboard").apply {
             val section = PreferenceCategory(ctx).apply { key = "section"; isPersistent = false }
@@ -254,7 +242,6 @@ class SearchHighlightTest {
         assertEquals("keyboard", grouped.scrolledTo?.key)
     }
 
-    // a page drawn by hand: what it was asked to reveal, and the control it gives, if any
     class Anchored(val control: View? = null) : Fragment(), SearchAnchors {
         val revealed = mutableListOf<String>()
 
@@ -267,7 +254,6 @@ class SearchHighlightTest {
         }
     }
 
-    // dev/design/061-settings-search.md §4.7: asked once the page says it is ready, then forgotten
     @Test
     fun aControlIsRevealedOnceThePageIsReadyAndOnlyOnce() {
         val result = open(RESULT)
@@ -280,7 +266,6 @@ class SearchHighlightTest {
         assertEquals(1, page.revealed.size)
     }
 
-    // a preference's is the preference page's to point at: a page drawn by hand leaves it
     @Test
     fun aPageDrawnByHandLeavesAPreferencesId() {
         val result = open(RESULT)
@@ -291,7 +276,7 @@ class SearchHighlightTest {
         assertTrue(SearchHighlight.isWaiting(result))
     }
 
-    // 生僻字屏蔽 reads the whole table from the engine first, cold more than the 5 s a preference is waited for
+    // 生僻字屏蔽 reads the whole table first, cold more than the 5 s a preference is waited for
     @Test
     fun aControlIsWaitedForUpToThirtySeconds() {
         val result = open(RESULT)
@@ -308,7 +293,7 @@ class SearchHighlightTest {
         assertFalse(SearchHighlight.isWaiting(result))
     }
 
-    // the control gone (a button moved into ⋮): nothing flashed, the page left at its top, no crash
+    // the control gone (moved into ⋮): nothing flashed, no crash
     @Test
     fun aControlThePageNoLongerHasLeavesThePageAtItsTop() {
         val result = open(RESULT)
@@ -319,8 +304,7 @@ class SearchHighlightTest {
         assertFalse(SearchHighlight.isWaiting(result))
     }
 
-    // a control with no ripple of its own, or disabled (a ripple shows nothing then): a veil of the theme's touch colour
-    // drawn over it while it is pressed, a moment after the page is there (it fades in), gone with the press
+    // no ripple of its own, or disabled: a veil of the theme's touch colour, after the page fades in
     @Test
     fun aControlFlashesUnderAVeilForAMoment() {
         fun drawn(view: View) = Bitmap.createBitmap(100, 40, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }.getPixel(50, 20)
@@ -335,7 +319,6 @@ class SearchHighlightTest {
             val result = open(RESULT)
             SearchHighlight.point(result, "view:keys/flip")
             SearchHighlight.ready(Anchored(control), result)
-            // pressed once the page has faded in
             assertFalse(control.isPressed)
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300))
             assertTrue(control.isPressed)
@@ -346,7 +329,6 @@ class SearchHighlightTest {
         }
     }
 
-    // 外观's card shows its row's state (the name under it pressed with it): flashed through the row, its ripple pressed
     @Test
     fun aControlShowingItsParentsStateFlashesThroughIt() {
         val card = View(ctx).apply {
@@ -365,8 +347,7 @@ class SearchHighlightTest {
         assertFalse(android.R.attr.state_pressed in card.drawableState)
     }
 
-    // ready said by a page another was opened over (its read done late): the page on top is not pointed at, the page
-    // itself is once it is back on top and says it again
+    // ready said by a page with another opened over it: the top page is not pointed at
     @Test
     fun aPageReadyUnderAnotherPointsAtNothingThere() {
         val result = open(RESULT)
@@ -384,7 +365,6 @@ class SearchHighlightTest {
         assertEquals(listOf("view:keys/flip"), page.revealed)
     }
 
-    // the public overloads find the NavController by the fragment's view; tagged as FragmentNavigator tags a destination's
     private fun host(fragment: Fragment, entry: NavBackStackEntry, tag: String? = null) {
         val activity = Robolectric.buildActivity(FragmentActivity::class.java).setup().get()
         activity.supportFragmentManager.beginTransaction().add(android.R.id.content, fragment, tag).commitNow()

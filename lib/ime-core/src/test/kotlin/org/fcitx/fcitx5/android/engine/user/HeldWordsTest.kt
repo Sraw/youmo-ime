@@ -6,35 +6,26 @@ package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.TestCharLevels
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
 /** 生僻字屏蔽's gate by code point, the dictionary's words it holds back by id, and the user model asking both. */
 class HeldWordsTest {
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("大", -2f, 0f).entry("大", syl("da"))
-                .unigram("龘", -6f, 0f).entry("龘", syl("da"))
-                .unigram("𤝰", -7f, 0f).entry("𤝰", syl("da"))
-                .unigram("大龘", -6f, 0f).entry("大龘", syl("da", "da"))
-                .unigram("大大", -4f, 0f).entry("大大", syl("da", "da"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("大", "da", -2f),
+        Triple("龘", "da", -6f),
+        Triple("𤝰", "da", -7f),
+        Triple("大龘", "da da", -6f),
+        Triple("大大", "da da", -4f),
     )
 
     // the extension B group held, as a first turn-on holds it
@@ -81,22 +72,17 @@ class HeldWordsTest {
         val mine = model.own(UserModel.Entry("龘龘", syl("da", "da")))
         val before = model.changes
         model.held = HeldWords.of(outToo, data.vocabulary)
-        // the steps of one scenario, in order, each on the model as the one before left it (review F8119)
-        // a new HeldWords is a change, as a block is: a glide's cache reads the model anew
+        // the steps of one scenario, in order, each on what the one before left
+        // a new HeldWords is a change, so a glide's cache reads the model anew
         assertTrue(model.changes > before)
-        // the dictionary's 龘 blocked anyhow and at any node
         assertTrue(model.blockedAnyhow(id("龘")))
         assertTrue(model.blocked(id("龘"), 0))
-        // the dictionary's 大 not
         assertFalse(model.blockedAnyhow(id("大")))
-        // the user's own 龘龘, past the dictionary's ids, by its text
         assertTrue(mine >= data.vocabulary.size)
         assertTrue(model.blockedAnyhow(mine))
-        // held no longer, neither is
         model.held = HeldWords.NONE
         assertFalse(model.blockedAnyhow(id("龘")))
         assertFalse(model.blockedAnyhow(mine))
-        // an imported word with 龘, past the merged ids, by its text
         model.attachImports(ImportedWords().import("龘好" to "da hao", "大好" to "da hao"))
         model.held = HeldWords.of(outToo, data.vocabulary)
         val imported = model.known(UserModel.Entry("龘好", syl("da", "hao")))
@@ -109,7 +95,6 @@ class HeldWordsTest {
         assertEquals(listOf("大好"), model.continuationsAfter("大", intArrayOf(0), "大").map { it.rest })
         model.held = HeldWords.NONE
         assertEquals(setOf("龘大", "大好"), model.continuationsAfter("大", intArrayOf(0), "大").map { it.rest }.toSet())
-        // the same HeldWords again is no change
         val held = HeldWords.of(gate, data.vocabulary)
         model.held = held
         val now = model.changes

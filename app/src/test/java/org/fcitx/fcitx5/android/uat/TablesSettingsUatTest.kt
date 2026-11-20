@@ -34,16 +34,12 @@ import java.nio.channels.FileChannel
 import java.time.Duration
 import java.util.concurrent.Executor
 
-/**
- * uat/10-tables.md's page half: the user lexicon's row of a word a table cannot take, over the
- * real engine with the app's tables (the engine's half, typing, is TablesUatTest's in :lib:ime-eval).
- */
+/** The user lexicon's row of a word a table cannot take, over the real engine with the app's tables. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class TablesSettingsUatTest {
 
-    // the app's data as the build makes it into its assets. Not there (the data task not run) is a
-    // failure that says so, not a skip: a skipped case would pass the UAT gate unrun
+    // not there (the data task not run) is a failure that says so, not a skip: a skipped case would pass the UAT gate unrun
     private val roots = File("build/generated").listFiles().orEmpty().toList()
 
     private fun blob(path: String) = roots.map { File(it, path) }.firstOrNull { it.isFile }
@@ -66,14 +62,14 @@ class TablesSettingsUatTest {
     @Test
     @Uat("TBL-12")
     fun aPinyinWordOnATablesOnlyCodeSaysWhichWord() {
-        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
         fake.availableIme = arrayOf(KeyboardHarness.PINYIN, wubi)
         fake.enabledIme = fake.availableIme
         assertTrue(runBlocking { engines.addWord("鲸园", "jing yuan") })
         st.activity
         st.open(SettingsRoute.UserWordList(UserWord.Kind.ADDED.name))
         val row = st.s(R.string.same_code_as, InputMethodNames.of(st.activity, wubi), "昏天黑地")
-        // the row waits for 五笔's table to load: tens of seconds on a slow runner
+        // tens of seconds on a slow runner
         until("「$row」", { "in ${shown()}" }, timeoutMs = 60_000, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }) {
             shown().any { row in it }
         }

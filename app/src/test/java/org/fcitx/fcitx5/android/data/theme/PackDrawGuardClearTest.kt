@@ -29,11 +29,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * A pack's draw mark left pending by the keyboard's canvas (its window hidden before the frame committed) is the
- * keyboard's: cleared once a keyboard canvas (that one, or one built anew as the theme changed) draws anything
- * other than the pack (a built-in theme, another pack even one already drawn this process), so the next start
- * resets no slot for a pack no longer shown; a canvas in an activity (a settings preview, a theme card) drawing
- * meanwhile keeps it, so a pack that then takes the keyboard down is still caught.
+ * A pending mark is cleared once a keyboard canvas draws anything other than the pack; an activity's canvas (a preview,
+ * a theme card) keeps it, so a pack that then crashes the keyboard is still caught.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -60,7 +57,7 @@ class PackDrawGuardClearTest {
         marks.deleteRecursively()
     }
 
-    // a canvas whose scene is of the pack [shows] names (null: a theme not a pack's), made anew as it changes
+    // of the pack [shows] names (null: not a pack), remade as it changes
     private class Canvas(context: Context = appContext) {
         var shows: PackDrawGuard.Key? = null
             set(value) {
@@ -81,7 +78,7 @@ class PackDrawGuardClearTest {
             layout(0, 0, 400, 200)
         }
 
-        // a frame recorded on the RenderThread's canvas (hardware): never committed here, as with a window hidden
+        // a hardware frame, never committed here, as with a window hidden
         fun frame() {
             val node = RenderNode("frame")
             view.draw(node.beginRecording(view.width, view.height))
@@ -139,7 +136,7 @@ class PackDrawGuardClearTest {
         val preview = preview()
         preview.frame()
         assertTrue(mark.exists())
-        // nor does one drawing that same pack then something else clear it: the keyboard's to clear
+        // nor does a preview drawing the same pack then something else: the keyboard's to clear
         preview.shows = mine
         preview.frame()
         preview.shows = null

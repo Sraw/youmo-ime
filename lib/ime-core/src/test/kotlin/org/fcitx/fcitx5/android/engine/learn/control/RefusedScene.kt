@@ -35,7 +35,6 @@ internal class RefusedScene {
 
     fun forget(text: String = "指导") = control.undoable { log.forget(text) }.also { assertEquals(0, uses(log.state, text)) }
 
-    // what the file replays to
     fun fromFile(): LearnState = LearnLog.replay(written())
 
     private fun written() = dir.file(LearnLog.FILE).read()

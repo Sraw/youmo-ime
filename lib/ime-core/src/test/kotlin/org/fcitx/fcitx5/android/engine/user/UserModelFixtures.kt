@@ -7,16 +7,9 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
-// What an older build learned through, kept for the tests that seed a model with it: the model
-// typing goes on with never learns through these (see UserModel). Out of the model's own code (S11).
+// What an older build learned through, for tests that seed a model; typing never learns through these.
 
-/**
- * Counts [sentence], each word and each pair, the first after [prev] if given (the word committed
- * before it) and still known: one forgotten since is not made a word again. Words of the sentence
- * the dictionary lacks become the user's made words ([madeWords]).
- *
- * @return the words' ids
- */
+/** Counts [sentence], its words and pairs, after [prev] if still known; words the dictionary lacks become [madeWords]. */
 internal fun UserModel.learn(prev: Entry?, sentence: List<Entry>): IntArray {
     require(sentence.isNotEmpty()) { "nothing to learn" }
     val words = IntArray(sentence.size) { idAsTyped(sentence[it]) }
@@ -30,12 +23,7 @@ internal fun UserModel.learn(prev: Entry?, sentence: List<Entry>): IntArray {
     return words
 }
 
-/**
- * Forgets [words], a candidate the user asked to: their counts and every pair they are in. One of
- * the user's own words, forgotten alone, is gone from the trie too, as libime drops it from its
- * user dictionary. One listed stays typeable, its counts gone; so does one in a longer candidate,
- * till the next start.
- */
+/** Forgets [words]: their counts and every pair; the user's own, forgotten alone, leaves the trie as libime drops it. */
 internal fun UserModel.forget(words: List<Entry>) {
     val forgotten = words.mapNotNull(::idOf).toSet()
     if (forgotten.isEmpty()) return
@@ -52,9 +40,6 @@ internal fun UserModel.addCount(entry: Entry, count: Float) = add(NO_WORD, idAsT
 /** Adds [count] to [second] after [first]. */
 internal fun UserModel.addCount(first: Entry, second: Entry, count: Float) = add(idAsTyped(first), idAsTyped(second), count)
 
-/**
- * The words the user made, by putting a reading together from pieces, with how often each was
- * typed: not those of their dictionaries or packs, nor those forgotten.
- */
+/** The words the user made by putting a reading together, with their counts. */
 internal fun UserModel.madeWords(): List<Pair<Entry, Float>> = entries.filter { (id, entry) -> isMade(id) && entry !in blockedEntries }
     .map { (id, entry) -> entry to count(id) }

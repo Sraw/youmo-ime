@@ -12,11 +12,7 @@ import org.junit.Test
 import java.lang.reflect.Modifier
 
 /**
- * The record types of `learn.log` (LearnRecords) and of a backup (LearnBackup, BackupMerge.ORIGIN)
- * are never reused (LearnRecords' allocation, F2 S1): a log written by one build is read by every
- * later one, so an id once given means that record for good, even after its type is deleted.
- * [ALLOCATED] is every id ever given; a new type is added to it, and a type deleted moves to
- * [RETIRED], its id kept there. Neither is edited otherwise.
+ * The record type ids of `learn.log` and of a backup are never reused: [ALLOCATED] lists every id given, a deleted type moves to [RETIRED].
  *
  * contract: the type bytes of a file format, which mutation cannot see.
  */
@@ -37,9 +33,7 @@ class RecordTypeIdsTest {
         assertEquals("retired twice or reallocated", RETIRED.size, RETIRED.values.toSet().size)
     }
 
-    // the Byte constants of [holder] (the companion-less objects keep them as static fields), by name:
-    // a type id is a Byte by convention, an Int constant there a limit (ABSORBED_ROWS), not a type.
-    // The holders are listed by hand: a type id in another object is to be added to the list above
+    // a type id is a Byte by convention; an Int constant there is a limit. Holders are listed by hand
     private fun constants(holder: Any, prefix: String = ""): Map<String, Int> =
         holder.javaClass.declaredFields
             .filter { Modifier.isStatic(it.modifiers) && it.type == java.lang.Byte.TYPE }
@@ -54,13 +48,11 @@ class RecordTypeIdsTest {
             "PAIR_ROW" to 38, "PIN_ROW" to 39, "BAR_ROW" to 40, "EN_WORD_ROW" to 41, "EN_PAIR_ROW" to 42,
             "TABLE_WORD_ROW" to 43, "NO_PREDICT_ROW" to 44, "CUT" to 45, "BATCH_ROW" to 46, "IMPORTED_ROW" to 47,
             "WORD_USE_ROW" to 48, "PHRASE_ROW" to 49, "TABLE_BLOCK_ROW" to 65, "DATE_ROW" to 80,
-            // a backup's own (70–79, never a log's but ORIGIN)
             "backup.HEAD" to 70, "backup.ADDED" to 71, "backup.BLOCKED" to 72, "backup.ORIGIN" to 73,
             // LAST: not a type, the bound of a backup's range, kept as fixed as one
             "backup.END" to 74, "backup.ADDRESS_COUNTS" to 75, "backup.ADDRESSES" to 76, "backup.LAST" to 79,
         )
 
-        // a type deleted: its name and id, never given again
         val RETIRED = emptyMap<String, Int>()
     }
 }

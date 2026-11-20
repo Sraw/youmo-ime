@@ -10,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * `ca/punctuation/punctuation.cpp:107-173`.
+ * fcitx's punctuation table reader.
  * contract: fcitx's punctuation data files, which mutation cannot see.
  */
 class PunctuationTableTest {
@@ -27,7 +27,7 @@ class PunctuationTableTest {
             assertEquals(name, bytes.decodeToString().lines().count { it.isNotBlank() }, entries.size)
             assertArrayEquals(name, bytes, PunctuationTable.write(entries))
         }
-        // the v0.3.2 fixture's edit (uat/fixtures/upgrade/v0.3.2/README.md step 6)
+        // the v0.3.2 upgrade fixture's edit
         assertEquals(Entry(",", "、"), PunctuationTable.parse(resource("device-v0.3.2.zh_CN")).first { it.key == "," })
         assertEquals(Entry("\"", "“", "”"), PunctuationTable.parse(resource(BUILT_IN)).first { it.key == "\"" })
     }

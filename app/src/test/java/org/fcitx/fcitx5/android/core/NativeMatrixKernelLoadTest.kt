@@ -9,7 +9,6 @@ import org.junit.Assert.assertSame
 import org.junit.Test
 
 class NativeMatrixKernelLoadTest {
-    // no libyoumo-matrix on the JVM's library path: the engines still get a kernel, the JVM's
     @Test
     fun aLibraryThatDoesNotLoadFallsBackToTheJvmKernel() {
         assertSame(MatrixKernel.JVM, NativeMatrixKernel.loaded)

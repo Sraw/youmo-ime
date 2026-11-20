@@ -52,14 +52,7 @@ import org.junit.Test
 import org.junit.rules.Timeout
 import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * The keyboard end to end: this app's input method, shown over a real `EditText`, driven by
- * tapping its keys. Everything between a tap and the text in the editor runs for real -- the
- * service, fcitx, EditingSession's predictions and the editor's reports.
- *
- * Needs a device or emulator. Selects this app's input method itself, and puts back the
- * device's input method and fcitx's input method list afterwards.
- */
+/** End to end over a real `EditText`; selects this input method itself and puts the device's back afterwards. */
 class SoftKeyboardTest {
 
     @get:Rule
@@ -67,24 +60,20 @@ class SoftKeyboardTest {
 
     private lateinit var scenario: ActivityScenario<TypingHostActivity>
 
-    // pinyin's keyboard before a nine keys' case chose the nine keys (launch)
     private var pinyinKeyboardWas: PinyinKeyboard? = null
 
-    /** Descriptions come from the app's strings, so the tests run in any device language. */
+    /** From the app's strings, so the tests run in any device language. */
     private fun string(id: Int, vararg args: Any): String = context.getString(id, *args)
 
     private fun launch(action: Int? = null, inputMethod: String, nineKeys: Boolean = false) {
-        // pinyin's nine keys are its keyboard (I1), chosen before the keyboard is made; put back in tearDown. The
-        // full keyboard set as plainly, whatever an earlier run left: once the pref was found left at NineKeys after a
-        // class run on API 36 (its put-back lost), and every later pinyin test met the nine keys
+        // set before the keyboard is made, whatever an earlier run left (its put-back once lost on API 36)
         val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
         if (pinyinKeyboardWas == null) pinyinKeyboardWas = keyboard.getValue()
         keyboard.setValue(if (nineKeys) PinyinKeyboard.NineKeys else PinyinKeyboard.Full)
-        // lives in the debug app (see app/src/debug), next to the input method
+        // in the debug app (app/src/debug)
         val intent = Intent(context, TypingHostActivity::class.java)
         action?.let { intent.putExtra(TypingHostActivity.EXTRA_ACTION, it) }
         scenario = ActivityScenario.launch(intent)
-        // the keyboard is up once its Backspace is
         key(By.pkg(imePkg).desc(string(R.string.a11y_key_backspace)))
         val ime = withFcitx {
             if (originalIms == null) originalIms = enabledIme().map { it.uniqueName }.toTypedArray()
@@ -96,28 +85,17 @@ class SoftKeyboardTest {
             currentIme()
         }
         assertEquals("the input method switched to", inputMethod, ime.uniqueName)
-        // the Space key names the input method; wait for the switch to show
         key(onKeyboard().desc(string(R.string.a11y_key_space_with_ime, spaceName(ime))))
     }
 
-    /**
-     * Space's name for [ime], as TextKeyboard.onInputMethodUpdate puts it: the app's name for the
-     * input method, in the app's language (fcitx names the engine's own in Chinese only: 拼音), and
-     * its sub-mode's.
-     */
-    private fun spaceName(ime: InputMethodEntry) = buildString {
-        append(InputMethodNames.of(context, ime))
-        ime.subMode.run { label.ifEmpty { name.ifEmpty { null } } }?.let { append(" ($it)") }
-    }
+    // as TextKeyboard.onInputMethodUpdate: the app's name, in the app's language (fcitx's own names are Chinese only)
+    private fun spaceName(ime: InputMethodEntry) = InputMethodNames.of(context, ime)
 
     @Before
     fun selectThisInputMethod() {
-        // bound anew in this process before the host asks for the keyboard: am instrument force-stops this package,
-        // which kills the input method's service, and `ime set` on the one already chosen binds nothing anew -- the
-        // system may leave it unbound, and a field focused then has its show request fail (ImeTracker onFailed at
-        // PHASE_SERVER_UPDATE_CLIENT_VISIBILITY): no keyboard, no keys to find (API 36; API 29 bound it again in time).
-        // Disabled and enabled again, it is unbound and bound once more; once, while it runs in no process of this run
-        // (a test after the first finds it up: a second disable would race the old service's record going away)
+        // am instrument force-stops this package, and `ime set` on the chosen one binds nothing anew: on API 36 the field's
+        // show request then fails (no keyboard). Disable and enable rebinds it; once only, since a second disable would race
+        // the old service's record going away.
         shell("ime enable $imeId")
         shell("ime set $imeId")
         if (running()) return
@@ -129,7 +107,6 @@ class SoftKeyboardTest {
         assertTrue("input method running in this process", running())
     }
 
-    // the input method's service up in this process (the system's record of it, with this process's pid)
     private fun running(): Boolean = shell("dumpsys activity services $imePkg").let {
         FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
     }
@@ -145,21 +122,16 @@ class SoftKeyboardTest {
             ?: error("no key $selector on screen; keys: " +
                 device.findObjects(By.pkg(imePkg)).mapNotNull { it.contentDescription ?: it.text }.distinct())
 
-    /**
-     * Keys and candidates, kept apart from each other and from the host's `EditText` -- the
-     * same package, so a bare text match could hit the field or a candidate instead of a key.
-     */
+    // the same package as the host's EditText: a bare text match could hit the field or a candidate
     private fun onKeyboard() = By.pkg(imePkg).hasAncestor(By.res(imePkg, "keyboard_view"))
     private fun candidate(text: String) = By.pkg(imePkg).text(text).hasAncestor(By.res(imePkg, "candidate_view"))
     private fun anyCandidate() = By.pkg(imePkg).clazz("android.widget.TextView").hasAncestor(By.res(imePkg, "candidate_view"))
 
-    /** A letter key: its label is a TextView inside the key. */
     private fun tapLetters(letters: String) = letters.forEach {
         key(onKeyboard().text("$it")).click()
         device.waitForIdle()
     }
 
-    /** Space is described with the input method's name. */
     private fun tapSpace() {
         key(onKeyboard().res(imePkg, "button_space")).click()
         device.waitForIdle()
@@ -191,10 +163,10 @@ class SoftKeyboardTest {
         assertFieldBecomes("你好")
     }
 
-    // nothing typed, 1 is ，。？！: pressed again soon, the next in place of the last; while typing, 分词
+    // nothing typed, 1 is ，。？！ and a quick second press replaces the last; while typing it is 分词
     @Test
     fun nineKeysOneIsPunctuationTillSomethingIsTyped() {
-        // 连按 on at 中, 0.6 s, whatever this device has: off (the default), 1 does not cycle; Fast's 0.4 s is less room
+        // 连按 on at 中 (0.6 s) whatever the device has; Fast's 0.4 s leaves less room
         val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
         val before = multiTap.getValue()
         multiTap.setValue(T9MultiTap.Medium)
@@ -211,19 +183,17 @@ class SoftKeyboardTest {
         }
     }
 
-    // a field that asks not to be learned from is not read: the cursor the editor reported after ， tells it is there
+    // a no-learning field is not read back: the cursor the editor reports after ， is what tells it is there
     @Test
     fun nineKeysOnePressedAgainInAFieldNotLearnedFromTakesThePlaceOfTheLast() {
         val multiTap = AppPrefs.getInstance().keyboard.t9MultiTap
         val before = multiTap.getValue()
-        // at its slowest, 0.9 s: the most room for the editor's report of ， before the second press
         multiTap.setValue(T9MultiTap.Slow)
         try {
             launch(action = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING, inputMethod = InputMethodCatalog.PINYIN, nineKeys = true)
             val one = oneKey()
             val first = press(one)
-            // again once the editor's report of ， is handled, as at a person's pace (before it, ，。 goes in:
-            // commitOverEngine), and still within 连按's 0.9 s: a device slower to report skips the test, saying how slow
+            // after the editor's report of ， (before it, ，。 goes in: commitOverEngine) and within 0.9 s; a slower device skips
             assertFieldBecomes("，")
             instrumentation.waitForIdleSync()
             val reported = SystemClock.uptimeMillis() - first
@@ -238,7 +208,6 @@ class SoftKeyboardTest {
         }
     }
 
-    /** 九键's 1 pressed twice, 0.1 s apart, within the multi-tap timeout. */
     private fun pressOneTwiceSoon() {
         val one = oneKey()
         repeat(2) {
@@ -247,10 +216,10 @@ class SoftKeyboardTest {
         }
     }
 
-    // found once: a search for the key takes time out of 连按's window
+    // found once: a search takes time out of 连按's window
     private fun oneKey(): Rect = key(onKeyboard().text("，。？！")).visibleBounds
 
-    /** A press at the centre of [bounds], injected, as a click waits for the screen to settle; when it went down. */
+    /** Injected, since a click waits for the screen to settle; returns when it went down. */
     private fun press(bounds: Rect): Long {
         val down = SystemClock.uptimeMillis()
         for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
@@ -262,10 +231,9 @@ class SoftKeyboardTest {
         return down
     }
 
-    // a real field, learning: the word the data lacks typed once is offered by its keys
     @Test
     fun englishOffersAWordOnceTyped() {
-        // typed once: not left learned by a run before, nor kept on the device after this one
+        // not left learned by an earlier run, nor kept after this one
         fun forget() = withFcitx { forgetEnglishWords(listOf("qwzx")) }
         forget()
         try {
@@ -288,11 +256,7 @@ class SoftKeyboardTest {
         assertFieldBecomes("你好")
     }
 
-    /**
-     * After a pick, Pinyin offers predictions (的, 了, ...) for what might come next. A Backspace
-     * then goes to the app, which deletes, and the predictions go away with it (PinyinSession's
-     * backspace with nothing typed); libime's pinyin instead took the first one only to dismiss them.
-     */
+    /** The predictions go with the Backspace (PinyinSession's backspace with nothing typed); libime used to eat the key. */
     @Test
     fun backspaceAfterAPickDeletesAndDismissesThePredictions() {
         launch(inputMethod = PINYIN)
@@ -310,7 +274,7 @@ class SoftKeyboardTest {
     @Test
     fun backspaceDeletesTypedText() {
         launch(inputMethod = ENGLISH)
-        // words as written: "abc" a space corrects (ABC), which backspace would take back
+        // "abc" would be corrected by space (ABC), which backspace takes back
         tapLetters("cat")
         tapSpace()
         assertFieldBecomes("cat ")
@@ -319,12 +283,7 @@ class SoftKeyboardTest {
         assertFieldBecomes("ca")
     }
 
-    /**
-     * fcitx switching again before the system's echo of a switch is back leaves the keyboard, and
-     * the system's subtype, on the last switch. On the emulator the service's startup switch to
-     * Pinyin and a test's switch to English ran 2 ms apart, and the echo of the first put the
-     * keyboard back on Pinyin. Ending on an input method the system did not have shows it was told.
-     */
+    /** On the emulator the startup switch and a test's switch ran 2 ms apart and the first's echo put the keyboard back. */
     @Test
     fun switchesBackToBackLeaveTheKeyboardOnTheLast() {
         assumeTrue("subtypes from Android 14 on", Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -333,29 +292,25 @@ class SoftKeyboardTest {
             if (originalIms == null) originalIms = enabledIme().map { it.uniqueName }.toTypedArray()
             val missing = switched.filter { im -> enabledIme().none { it.uniqueName == im } }
             if (missing.isNotEmpty()) setEnabledIme((enabledIme().map { it.uniqueName } + missing).toTypedArray())
-            // without a subtype the service tells the system nothing, and no echo comes back;
-            // before the launch, so that its switch to English is told
+            // without a subtype the service tells the system nothing and no echo comes; before the launch, so its switch is told
             if (switched.any { SubtypeManager.subtypeOf(it) == null }) SubtypeManager.syncWith(enabledIme())
         }
         launch(inputMethod = ENGLISH)
-        // the launch's switch told: a service that never tells the system fails here, or at the end on
-        // Shuangpin if the system had English already
+        // a service that never tells the system fails here, or at the end on Shuangpin
         val deadline = SystemClock.uptimeMillis() + 5_000
         while (systemIme() != ENGLISH && SystemClock.uptimeMillis() < deadline) SystemClock.sleep(50)
         assertEquals("the system's subtype after the launch", ENGLISH, systemIme())
-        // back to back from one block (each activateIme its own hop to fcitx): all three HostEvent.InputMethodChanged events
-        // most likely reach the service before the first's echo is back, as on the emulator
+        // back to back: all three events most likely reach the service before the first's echo
         val changes = withFcitx {
             val seen = CopyOnWriteArrayList<String>()
             coroutineScope {
-                // in the emitting thread: eventFlow drops its oldest event past 15 buffered
+                // in the emitting thread: eventFlow drops its oldest past 15 buffered
                 val collecting = launch(Dispatchers.Unconfined, CoroutineStart.UNDISPATCHED) {
                     eventFlow.filterIsInstance<HostEvent.InputMethodChanged>().collect { seen += it.im }
                 }
                 activateIme(PINYIN)
                 activateIme(ENGLISH)
                 activateIme(SHUANGPIN)
-                // the system on Shuangpin, the main thread idle, and a second more for a switch back
                 val told = SystemClock.uptimeMillis() + 5_000
                 while (systemIme() != SHUANGPIN && SystemClock.uptimeMillis() < told) delay(50)
                 instrumentation.waitForIdleSync()
@@ -364,20 +319,15 @@ class SoftKeyboardTest {
             }
             seen.toList()
         }
-        // a single slot holds the last switch (Shuangpin), so the earlier switches' echoes read as the user's picks and switch fcitx back
-        // from the third switch on only its sub-modes' changes, which repeat the input method (KotlinHost.emit)
+        // earlier echoes must not read as user picks; from the third switch on only sub-mode changes repeat it (KotlinHost.emit)
         assertEquals("input methods from the third switch on, of $changes", listOf(SHUANGPIN), changes.dropWhile { it != SHUANGPIN }.distinct())
         assertEquals("the input method switched to last", SHUANGPIN, withFcitx { currentIme().uniqueName })
         assertEquals("the system's subtype", SHUANGPIN, systemIme())
     }
 
-    /** The fcitx input method of the system's subtype, null if not one of ours. */
     private fun systemIme() = context.inputMethodManager.currentInputMethodSubtype?.let(SubtypeManager::inputMethodOf)
 
-    /**
-     * Dragging left from Backspace selects text before the cursor; letting go deletes it. The
-     * normal touch path, where every touch ends in an Up; the cancel path is the next test.
-     */
+    /** The touch path ending in Up; the cancel path is the next test. */
     @Test
     fun swipingLeftFromBackspaceDeletesWhatItSelected() {
         launch(inputMethod = ENGLISH)
@@ -394,12 +344,10 @@ class SoftKeyboardTest {
         val text = fieldText()
         assertTrue("deleted from the end: '$text' at $selection", text.length < "to be ".length && "to be ".startsWith(text))
         assertEquals(text.length to text.length, selection)
-        // a tap afterwards is a plain Backspace again
         tap(R.string.a11y_key_backspace)
         assertFieldBecomes(text.dropLast(1))
     }
 
-    /** The Return key says and performs the editor's action. */
     @Test
     fun returnPerformsASearchFieldsAction() {
         launch(action = EditorInfo.IME_ACTION_SEARCH, inputMethod = ENGLISH)
@@ -407,11 +355,7 @@ class SoftKeyboardTest {
         awaitEditorActions(listOf(EditorInfo.IME_ACTION_SEARCH))
     }
 
-    /**
-     * Characterises current behaviour, as upstream has it: while a word is composed the key
-     * shows "Enter", yet the English engine commits the word and then passes Return on, so the
-     * search runs as well.
-     */
+    /** Upstream's behaviour: the key shows "Enter" yet English commits the word and passes Return on. */
     @Test
     fun returnWhileComposingEnglishCommitsTheWordAndSearches() {
         launch(action = EditorInfo.IME_ACTION_SEARCH, inputMethod = ENGLISH)
@@ -433,11 +377,7 @@ class SoftKeyboardTest {
         return actions
     }
 
-    /**
-     * English composes the word being typed in the editor. Tapping inside it moves fcitx's
-     * cursor there (EditingSession.onCursorUpdate -> MovePreeditCursor), so the next letter
-     * lands at the tap.
-     */
+    // EditingSession.onCursorUpdate -> MovePreeditCursor
     @Test
     fun tappingInsideTheComposedWordTypesThere() {
         launch(inputMethod = ENGLISH)
@@ -449,7 +389,6 @@ class SoftKeyboardTest {
         assertFieldBecomes("abcdzefgh")
     }
 
-    /** Tapping outside finishes the composition where it is; the next letter lands at the tap. */
     @Test
     fun tappingOutsideTheComposedWordLeavesItAndTypesThere() {
         launch(inputMethod = ENGLISH)
@@ -463,7 +402,6 @@ class SoftKeyboardTest {
         assertFieldBecomes("axb cd")
     }
 
-    /** Screen coordinates of the caret position before [offset] in the field. */
     private fun pointInField(offset: Int): Pair<Int, Int> {
         var point = 0 to 0
         scenario.onActivity {
@@ -494,7 +432,7 @@ class SoftKeyboardTest {
         const val SHUANGPIN = InputMethodCatalog.SHUANGPIN
         const val ENGLISH = "keyboard-us"
 
-        // allowed for an injected press's way to the keyboard, which counts 连按 from when it gets there
+        // an injected press's way to the keyboard, which counts 连按 from its arrival
         const val PRESS_LATENCY = 100L
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()!!
@@ -503,14 +441,12 @@ class SoftKeyboardTest {
         val imePkg: String = context.packageName
         val imeId = "$imePkg/${FcitxInputMethodService::class.java.name}"
 
-        /** What the device and fcitx had before, put back after the class. */
         var originalDeviceIme: String? = null
         var wasEnabled = false
-        // the system's list as it was: selectThisInputMethod's disable and enable move this input method to its end
-        // and drop its subtypes there, which `ime disable` alone does not put back
+        // selectThisInputMethod's disable and enable move this input method to the end and drop its subtypes
         var enabledIms: String? = null
         var spellChecker: String? = null
-        // whether rememberDeviceIme got as far as turning it off: JUnit runs @AfterClass after a failed @BeforeClass too
+        // JUnit runs @AfterClass after a failed @BeforeClass too
         var spellCheckerOff = false
         var originalIms: Array<String>? = null
 
@@ -526,32 +462,26 @@ class SoftKeyboardTest {
         @JvmStatic
         fun rememberDeviceIme() {
             originalDeviceIme = shell("settings get secure default_input_method").takeIf { it.isNotEmpty() && it != "null" }
-            // "pkg/.Short;subtype:pkg/full.Name" -- compared as components, subtypes dropped
+            // "pkg/.Short;subtype:pkg/full.Name": compared as components
             val self = ComponentName.unflattenFromString(imeId)
             enabledIms = shell("settings get secure enabled_input_methods").takeIf { it.isNotEmpty() && it != "null" }
             wasEnabled = enabledIms.orEmpty().split(':')
                 .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
-            // the system's spell checker (on in AOSP images, as redroid) underlines "ab", and a tap
-            // on it opens its suggestions over the field, which takes the next tap on a key
+            // the spell checker underlines "ab", and a tap on it opens suggestions that take the next key tap
             spellChecker = shell("settings get secure spell_checker_enabled").takeIf { it.isNotEmpty() && it != "null" }
             spellCheckerOff = true
             shell("settings put secure spell_checker_enabled 0")
         }
 
         /**
-         * Leaves the device as it was: a developer's own keyboard back, and this input method
-         * no longer bound in this process, where it would share the native engine with the next
-         * test class (HostTest starts one of its own).
-         *
-         * On a device whose keyboard is this app already, it is left selected -- and bound here,
-         * where HostTest then refuses to start an engine of its own (checkThisInputMethodIsNotBound).
+         * Unbinds this input method from the process, where it would share the native engine with the next class.
+         * Where this app is the device's keyboard it stays bound, and HostTest refuses to start (checkThisInputMethodIsNotBound).
          */
         @AfterClass
         @JvmStatic
         fun restoreDeviceIme() {
             try {
-                // the device's input method is put back even if fcitx's list could not be; the
-                // subtypes with it, as the input method list's settings page does on a change
+                // the device's input method is put back even if fcitx's list could not be
                 val restoreIms = runCatching {
                     originalIms?.let { ims ->
                         withFcitx {
@@ -570,8 +500,7 @@ class SoftKeyboardTest {
                     else -> shell("ime set $original")
                 }
                 if (!wasEnabled) shell("ime disable $imeId")
-                // The system unbinds the service asynchronously; its onDestroy stops the engine
-                // (HostDaemon.disconnect -> KotlinHost.stop, which blocks until stopped).
+                // unbinding is async; onDestroy stops the engine (HostDaemon.disconnect -> KotlinHost.stop, blocking)
                 val deadline = SystemClock.uptimeMillis() + 10_000
                 while (FcitxInputMethodService::class.java.name in shell("dumpsys activity services $imePkg") &&
                     SystemClock.uptimeMillis() < deadline
@@ -583,8 +512,7 @@ class SoftKeyboardTest {
                 // the record goes before onDestroy has run on this process's main thread
                 instrumentation.waitForIdleSync()
             } finally {
-                // also where this app is the device's input method (returned above) or a restore failed; no spaces
-                // in it, and executeShellCommand passes no shell, so unquoted
+                // executeShellCommand passes no shell, so unquoted (the value has no spaces)
                 enabledIms?.let { shell("settings put secure enabled_input_methods $it") }
                 if (spellCheckerOff) {
                     if (spellChecker == null) shell("settings delete secure spell_checker_enabled")

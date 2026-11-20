@@ -4,17 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
-/**
- * The words [UserModel] made, by the syllables they are read as, for the decoder to walk as
- * [org.fcitx.fcitx5.android.engine.lattice.UserWords]: node 0 is the root, and each node has
- * its children by syllable, sorted, and its words.
- */
+/** The words [UserModel] made, by syllables, for the decoder to walk as [org.fcitx.fcitx5.android.engine.lattice.UserWords]: node 0 the root, children sorted by syllable. */
 internal class SyllableTrie {
     private val childSyllables = arrayListOf(IntArray(0))
     private val childNodes = arrayListOf(IntArray(0))
     private val nodeWords = arrayListOf(IntArray(0))
 
-    /** @return the child of [node] reached by [syllable], or -1 */
     fun child(node: Int, syllable: Int): Int {
         val syllables = childSyllables[node]
         val at = syllables.binarySearch(syllable)
@@ -27,7 +22,6 @@ internal class SyllableTrie {
 
     fun word(node: Int, index: Int) = nodeWords[node][index]
 
-    /** Puts [word] at the node [syllables] lead to, making the nodes it lacks. */
     fun add(syllables: IntArray, word: Int) {
         var node = ROOT
         for (s in syllables) {

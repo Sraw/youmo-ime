@@ -15,7 +15,7 @@ import kotlin.test.assertNotEquals
 /**
  * A user's layout as the layout maker's page reads it (YoumoEngine.readOwnLayout): a grouped one based on the 26 keys (the
  * page's merge makes one) is drawn with its own based-on's styles and shortcuts, the 26 keys', as the app draws it and as
- * LayoutCheck tells of it; the 18 keys are only what it is held to (R26 F8117).
+ * LayoutCheck tells of it; the 18 keys are only what it is held to.
  */
 class YoumoEngineLayoutTest {
     @Test
@@ -26,13 +26,13 @@ class YoumoEngineLayoutTest {
         val layout = read.layout as YoumoLayout
         assertEquals("grouped", layout.family)
         assertEquals("qwerty", layout.variantOf, "the board whose styles (Env.base) and shortcuts it draws with")
-        // its key shape its own family's, the 18 keys' (R26 F8437): the 11th group's corner (, not the 14 keys' ~
+        // its key shape its own family's, the 18 keys': the 11th group's corner (, not the 14 keys' ~
         assertEquals("k18", layout.shapeOf)
         assertEquals("(", YoumoEngine.defaultMarks(layout, null).shortcuts["g18/h:up"].symbol as String?)
     }
 
     // a layout written back (the layout maker's 从示例开始) as it was read, not with the app's keys' long presses and swipes
-    // KeyData laid on it to draw it (R26 F8297): its q's swipe of its own is drawn as the app's q's (held), written as its
+    // KeyData laid on it to draw it: its q's swipe of its own is drawn as the app's q's (held), written as its
     // own. (qwerty.xml as it is draws as it writes: the app's key data is its own.)
     @Test
     fun aLayoutIsWrittenAsItWasRead() {
@@ -45,7 +45,7 @@ class YoumoEngineLayoutTest {
         assertEquals(LayoutWriter.write((LayoutReader.layout(xml) as Parsed.Ok).value), YoumoEngine.writeLayout(layout))
         val board = YoumoEngine.readLayout(testData("qwerty.xml"), null, "qwerty").layout as YoumoLayout
         assertEquals(LayoutWriter.write((LayoutReader.layout(testData("qwerty.xml")) as Parsed.Ok).value), YoumoEngine.writeLayout(board))
-        // the same of a theme pack's board (readLayout's, R26 F8488): its q's swipe of its own drawn as the app's q's, not
+        // the same of a theme pack's board (readLayout's): its q's swipe of its own drawn as the app's q's, not
         // taken, and written as its own
         val packs = testData("qwerty.xml").replaceFirst("send=\"q\" shortcut=\"full/q\"", "send=\"q\" shortcut=\"full/q\" swipe-down=\"x\"")
         val pack = YoumoEngine.readLayout(packs, null, "qwerty")

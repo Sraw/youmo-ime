@@ -54,21 +54,12 @@ import java.io.File
 import java.util.Locale
 
 /**
- * How fast the keyboard is drawn now, measured on a device so that its redraw (design 060: one View a
- * keyboard, a RenderNode a key) can be held to no worse: each keyboard made and first drawn, a theme
- * changed, a key's press shown, the process's memory with the keyboard up. Results go to logcat,
- * tag [TAG], a line a number; how to read them and the numbers so far: dev/design/060-render-perf.md.
+ * On-device drawing baseline: keyboards made and first drawn, theme switches, key presses, memory. Results go to
+ * logcat under [TAG]; how to read them: dev/design/060-render-perf.md. Driven only through what a user does, so it
+ * runs unchanged on another renderer ([shows] is the one place that knows the keyboard's classes).
  *
- * Measured through what a user does, so that the same test runs on the new drawing unchanged: a
- * keyboard picked in ⋯ (the setting, which makes the input view anew), keys tapped as the system
- * delivers touches, a theme picked as its list does. What it reads of the views is the window
- * ([KeyboardFrames]), the keyboard's frame (`keyboard_view`) and, in [shows], which keyboard is in
- * it: the one place to change when the keyboards are drawn by other classes.
- *
- * Not a check run with the rest: it takes minutes and asserts nothing about speed. Run alone, with
- * `-Pandroid.testInstrumentationRunnerArguments.class=…KeyboardPerfBaselineTest` (perfRuns sets the
- * samples, 20 by default). Puts back what it changes: the device's keyboard, the input methods, the
- * settings and themes; not the screen it wakes, nor perfScreenshot's file.
+ * Not a regular check: run alone with `-Pandroid.testInstrumentationRunnerArguments.class=…KeyboardPerfBaselineTest`
+ * (perfRuns sets the samples). Puts back the device's keyboard, input methods, settings and themes.
  */
 class KeyboardPerfBaselineTest {
 
@@ -83,14 +74,11 @@ class KeyboardPerfBaselineTest {
     internal val warmUp = 3
     private val only = InstrumentationRegistry.getArguments().getString("perfOnly")?.split(',')
 
-    // perfScreenshot=true: the picture theme's keyboard captured once, to see the picture is drawn
     private val screenshots = InstrumentationRegistry.getArguments().getString("perfScreenshot") == "true"
 
-    // put back after the test, each once changed
     private var deviceIme: String? = null
     private var deviceImeEnabled = false
-    // the system's list as it was: the disable and enable below move this input method to its end, and `ime reset`
-    // would put the device's default list in its place
+    // the disable and enable below move this input method to the end, and `ime reset` would install the default list
     private var enabledIms: String? = null
     private var spellChecker: String? = null
     private var imsWere: Array<String>? = null
@@ -106,7 +94,7 @@ class KeyboardPerfBaselineTest {
         log("device ${android.os.Build.MODEL} sdk $sdk runs $runs warm-up $warmUp")
         selectThisInputMethod()
         if (only != null) {
-            // perfOnly=theme,shift,build,press,popup,anim,picture: those parts alone, for a trace short enough to read (or an A/B of a few)
+            // perfOnly=theme,shift,build,press,popup,anim,picture: those parts alone, for a short trace or an A/B
             launch()
             if ("theme" in only) switchThemes()
             if ("shift" in only) sceneCosts()
@@ -134,7 +122,7 @@ class KeyboardPerfBaselineTest {
         popupSlide()
         idleRows()
         motionRows().also { pictureRows(soak = false) }
-        // the theme of before the motion rows: the last memory rows not of the animated picture's decoder and frames
+        // so the last memory rows do not count the animated picture's decoder
         onMain { themeWas?.let { ThemeManager.prefs.normalModeTheme.setValue(it) } }
         hideKeyboard()
         memory("after the runs, hidden")
@@ -142,15 +130,13 @@ class KeyboardPerfBaselineTest {
         memory("after the runs, shown")
     }
 
-    // ---- the device
-
     private fun selectThisInputMethod() {
         deviceIme = shell("settings get secure default_input_method").takeIf { it.isNotEmpty() && it != "null" }
         val self = ComponentName.unflattenFromString(imeId)
         enabledIms = shell("settings get secure enabled_input_methods").takeIf { it.isNotEmpty() && it != "null" }
         deviceImeEnabled = enabledIms.orEmpty().split(':')
             .any { ComponentName.unflattenFromString(it.substringBefore(';')) == self }
-        // the system's spell checker would underline what the runs type, a frame of its own in the field
+        // the spell checker's underline would draw frames of its own in the field
         spellChecker = shell("settings get secure spell_checker_enabled")
         shell("settings put secure spell_checker_enabled 0")
         shell("ime enable $imeId")
@@ -159,7 +145,6 @@ class KeyboardPerfBaselineTest {
     }
 
     private fun launch() {
-        // a phone left locked: the field over the lock screen (this activity only), the keyboard with it
         shell("input keyevent KEYCODE_WAKEUP")
         scenario = ActivityScenario.launch(Intent(context, TypingHostActivity::class.java))
         scenario.onActivity {
@@ -167,7 +152,6 @@ class KeyboardPerfBaselineTest {
             it.setTurnScreenOn(true)
         }
         showKeyboard()
-        // pinyin on the 26 keys first
         AppPrefs.getInstance().keyboard.pinyinKeyboard.let { pref ->
             pinyinKeyboardWas = pref.getValue()
             if (pref.getValue() != PinyinKeyboard.Full) onMain { pref.setValue(PinyinKeyboard.Full) }
@@ -208,8 +192,6 @@ class KeyboardPerfBaselineTest {
         }
     }
 
-    // ---- 1. each keyboard made and first drawn
-
     private enum class Board(val label: String, val pinyin: PinyinKeyboard?) {
         FULL("26 keys (pinyin)", PinyinKeyboard.Full),
         NINE("9 keys", PinyinKeyboard.NineKeys),
@@ -224,16 +206,10 @@ class KeyboardPerfBaselineTest {
     private val built = linkedMapOf<Board, MutableList<KeyboardFrames.Sample>>()
     private val viewsIn = linkedMapOf<Board, Pair<Int, Int>>()
 
-    /**
-     * A keyboard picked in ⋯ is a setting, and the keyboards are made anew with it (the input view
-     * kept): counted from the setting to its first frame. The number and symbol keyboards are made
-     * the first time a fresh input view shows them: the 26 keys made anew (via 14 keys, a setting
-     * each), then counted from the tap's lift.
-     */
+    /** A keyboard picked in ⋯ is a setting that remakes the keyboards; number and symbol keyboards are timed from the tap's lift on a fresh input view. */
     private fun buildEachKeyboard() {
         val picked = Board.entries.filter { it.pinyin != null && it != Board.FULL }
         repeat(warmUp + runs) {
-            // from the 26 keys and back: the 26 keys' samples are the way back from each
             for (board in picked) {
                 record(board, pick(board))
                 record(Board.FULL, pick(Board.FULL))
@@ -260,14 +236,13 @@ class KeyboardPerfBaselineTest {
         if (board !in viewsIn) viewsIn[board] = onMain { viewCount(keyboardArea()) to viewCount(service.window.window!!.decorView) }
     }
 
-    // a fresh input view on the 26 keys: none of the others made yet
     internal fun fresh() {
         pick(Board.KEYS14)
         pick(Board.FULL)
     }
 
     private fun pick(board: Board): KeyboardFrames.Sample {
-        // the keyboard made anew (InputView.remakeKeyboards keeps the frame and the view around it)
+        // InputView.remakeKeyboards keeps the frame and the view around it
         val before = onMain { keyboardFrame()?.getChildAt(0) }
         return measure({ keyboardFrame().let { it?.getChildAt(0) !== before && shows(it, board) } }) {
             AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(board.pinyin!!)
@@ -275,7 +250,7 @@ class KeyboardPerfBaselineTest {
     }
 
     private fun tapTo(key: PointF, board: Board): KeyboardFrames.Sample {
-        // the area as it is before the tap: the symbols take the keyboard's frame away
+        // before the tap: the symbols take the keyboard's frame away
         onMain { keyboardArea() }
         val mark = onMain { frames.mark(0) { shows(keyboardFrame(), board) } }
         val heap = Heap.now()
@@ -294,11 +269,7 @@ class KeyboardPerfBaselineTest {
         return sample.also { settle() }.heap(Heap.now() - heap)
     }
 
-    /**
-     * Whether [frame] shows [board]: the keyboard in it by its class; the symbols, a window of their own,
-     * as the keyboard's frame gone. The one part to change for the new drawing, if its keyboards are
-     * other classes.
-     */
+    /** The symbols are a window of their own, so they show as the keyboard's frame gone. */
     private fun shows(frame: ViewGroup?, board: Board): Boolean {
         if (board == Board.SYMBOLS) return frame == null || !frame.isShown
         if (frame == null || !frame.isShown || frame.childCount == 0) return false
@@ -315,22 +286,13 @@ class KeyboardPerfBaselineTest {
 
     private fun keyboardFrame(): ViewGroup? = service.window.window!!.decorView.findViewById(R.id.keyboard_view)
 
-    // what holds the keyboard's frame and the pickers (InputWindowManager's view): the keyboard area
     private var area: View? = null
     private fun keyboardArea(): View {
         keyboardFrame()?.parent?.let { area = it as View }
         return area!!
     }
 
-    // ---- 2. a theme picked
-
-    /**
-     * Themes picked as the theme list picks them (followed by no day and night setting), each made anew
-     * with the input view: a block theme (a built-in's look) and a flat one, and a flat one over a
-     * picture. No built-in has a picture, so the two flat ones are made here and deleted after. The
-     * first frame of the new view is counted; a picture is decoded off the main thread
-     * (ThemeAssets.prefetch) and may come a frame or more later.
-     */
+    /** Themes as the list picks them; a picture is decoded off the main thread (ThemeAssets.prefetch) and may show a frame or more later. */
     private fun switchThemes() {
         val prefs = ThemeManager.prefs
         followSystemWas = prefs.followSystemDayNightTheme.getValue()
@@ -361,12 +323,11 @@ class KeyboardPerfBaselineTest {
         }
         samples.forEach { (label, s) -> row("theme", label, s.drop(warmUp)) }
         row("theme", "every switch above", samples.values.flatMap { it.drop(warmUp) })
-        // a theme not seen before: a flat one with corners of its own each run, saved before it is timed
+        // a theme not seen before each run: a flat one with corners of its own
         val unseen = mutableListOf<KeyboardFrames.Sample>()
         repeat(warmUp + runs) { i ->
             val radius = (flat.look.keys.radiusDp + 1 + i) % (Keys.MAX_RADIUS_DP + 1)
             val new = Theme.Custom("$UNSEEN-$i", isDark = false, look = flat.look.copy(keys = flat.look.keys.copy(radiusDp = radius)))
-            // one not saved: that sample alone left out, the runs after it measured
             if (!onMain { ThemeManager.saveTheme(new) }) {
                 log("theme\t${new.name} could not be saved: left out")
                 return@repeat
@@ -382,11 +343,10 @@ class KeyboardPerfBaselineTest {
 
     internal fun theme(to: Theme): KeyboardFrames.Sample {
         val before = onMain { keyboardFrame() }
-        // the 26 keys in the new frame, as a build's: the frame shown alone, its keyboard not yet in it, is not the switch done
+        // the frame shown alone, its keyboard not yet in it, is not the switch done
         return measure({ keyboardFrame().let { it !== before && shows(it, Board.FULL) } }) { ThemeManager.setNormalModeTheme(to) }
     }
 
-    // a picture as wide as a phone's keyboard, as a theme's cut is: a gradient and some shapes
     private fun picture(): Picture {
         val file = File(ThemeFilesManager.themeDir, "$PICTURED.png")
         val bitmap = Bitmap.createBitmap(PICTURE_W, PICTURE_H, Bitmap.Config.ARGB_8888)
@@ -408,13 +368,7 @@ class KeyboardPerfBaselineTest {
         }
     }
 
-    // ---- 3. a key's press shown
-
-    /**
-     * Keys pressed on the 26 keys as the system delivers touches: a single key (a letter, lifted after
-     * 80 ms, then Space and the field emptied), and ten letters in a row at 80 ms a key. Each down is
-     * counted from its event's time to the window's next frame done ([DownMarks]).
-     */
+    /** Each down timed from its event to the window's next frame done ([DownMarks]). */
     private fun pressFeedback() {
         fresh()
         val letters = "nihaoshiji"
@@ -442,10 +396,8 @@ class KeyboardPerfBaselineTest {
             row("press", "single key", single)
             row("press", "10-key run, every key", run)
             log("press\t10-key run, slowest key of a run\t${Stats(runWorst)}")
-            // every frame of the runs (press and release), FrameTimingMetric's way: the reference for A1's
             log("frames\t10-key run, every frame\t${frames.summary(runFrames)}")
-            // a field that sends (a chat's): Return's label changes with the first key and the commit
-            // (发送, then 换行 while composing), the scene made again for each, where a plain field keeps it
+            // a send field: Return's label changes with the first key and the commit, remaking the scene each time
             fieldAction(EditorInfo.IME_ACTION_SEND)
             val sent = mutableListOf<KeyboardFrames.Sample>()
             repeat(warmUp + runs) { i ->
@@ -460,7 +412,6 @@ class KeyboardPerfBaselineTest {
         }
     }
 
-    // the field single-line with [action] (null: back to the plain field), the input method told anew
     private fun fieldAction(action: Int?) {
         scenario.onActivity {
             it.field.isSingleLine = action != null
@@ -482,7 +433,7 @@ class KeyboardPerfBaselineTest {
             SystemClock.sleep(gapMs / 2)
         }
         marks.recording = false
-        // a down with no frame after it (nothing drawn for the press) is told, not counted
+        // a down with no frame after it is reported, not counted
         val drawn = marks.marks.mapNotNull { runCatching { frames.await(it) }.getOrNull() }
         if (drawn.size != keys.size) log("press\t${keys.size - drawn.size} of ${keys.size} downs had no frame")
         settle()
@@ -490,7 +441,6 @@ class KeyboardPerfBaselineTest {
         return drawn.onEach { it.heap(step, keys.size) }
     }
 
-    // what was typed committed and the field emptied, for the next run to start alike
     internal fun endTyping(space: PointF) {
         val down = SystemClock.uptimeMillis()
         inject(MotionEvent.ACTION_DOWN, space, down, down)
@@ -500,20 +450,13 @@ class KeyboardPerfBaselineTest {
         settle()
     }
 
-    // ---- 3b. what the keys show changed: Shift
-
-    /**
-     * Shift tapped on the 26 keys (each letter shown anew: on the scene engine, the scene made again
-     * as the frame draws), counted from the lift to the frame showing Shift's state, Shift tapped back
-     * after; drawn by the scene engine, also what making the scene costs alone, on the main thread:
-     * made anew as things are, and asked again with nothing changed (the first key typed in pinyin).
-     */
+    /** Shift's tap to the frame that shows it, and the scene's build cost alone on the main thread, fresh and unchanged. */
     private fun sceneCosts() {
         fresh()
         val shift = keyAt(onKeyboard().res(imePkg, "button_caps"))
         val taps = mutableListOf<KeyboardFrames.Sample>()
         repeat(warmUp + runs) { i ->
-            // on and back off, each a scene of its own; apart, so no tap is taken for a double tap's lock
+            // apart, so the second tap is not a double tap's lock
             repeat(2) {
                 val sample = shiftTap(shift)
                 if (i >= warmUp) taps += sample
@@ -537,7 +480,7 @@ class KeyboardPerfBaselineTest {
     }
 
     internal fun shiftTap(at: PointF): KeyboardFrames.Sample {
-        // Shift's state is the canvas's now (no button_caps view to ask): its scene made anew is the tap shown
+        // Shift's state is the canvas's: its scene made anew is the tap shown
         val scene = onMain { canvasView()?.scene }
         val mark = onMain { frames.mark(0) { canvasView()?.scene.let { it != null && it !== scene } } }
         val heap = Heap.now()
@@ -556,13 +499,7 @@ class KeyboardPerfBaselineTest {
 
     private fun all(v: View): List<View> = listOf(v) + ((v as? ViewGroup)?.let { g -> (0 until g.childCount).flatMap { all(g.getChildAt(it)) } } ?: emptyList())
 
-    // ---- 3c. the keyboard made again for a new size, Shift with faces that do not follow it, a popup's focus moved
-
-    /**
-     * The keyboard's height setting changed (30% and 35% in turn: the input view laid out anew at a new
-     * size) and the screen turned (portrait and landscape in turn: the input view made anew), each
-     * counted from the change to the first frame at the new size.
-     */
+    /** Height setting changed and screen rotated, each timed to the first frame at the new size. */
     private fun rebuilds() {
         fresh()
         val height = AppPrefs.getInstance().keyboard.keyboardHeightPercent
@@ -607,7 +544,6 @@ class KeyboardPerfBaselineTest {
         if (turned.isNotEmpty()) row("rebuild", "screen turned", turned)
     }
 
-    /** Shift tapped as in [sceneCosts], with the letters' faces lower case whatever Shift is (the faces left as they are). */
     private fun shiftWithLowerFaces() {
         val case = AppPrefs.getInstance().keyboard.letterCase
         val caseWas = onMain { case.getValue() }
@@ -631,11 +567,7 @@ class KeyboardPerfBaselineTest {
         }
     }
 
-    /**
-     * E held for its popup (13 choices), then the finger moved over it a choice at a time, right and
-     * back: each move counted from its event to the frame after it, then lifted on the choice and the
-     * field emptied. A move that drew no frame (the focus not moved) is told, not counted.
-     */
+    /** A move that drew no frame (focus not moved) is reported, not counted. */
     private fun popupSlide() {
         fresh()
         val e = keyAt(onKeyboard().text("e"))
@@ -644,7 +576,7 @@ class KeyboardPerfBaselineTest {
         val space = keyAt(onKeyboard().res(imePkg, "button_space"))
         val moved = mutableListOf<KeyboardFrames.Sample>()
         var undrawn = 0
-        // each move's mark made as the window gets it (a mark made before it would take a traversal already due)
+        // made as the window gets each move: one made earlier would take a traversal already due
         val marks = onMain { DownMarks(service.window.window!!.callback, frames, MotionEvent.ACTION_MOVE).also { service.window.window!!.callback = it } }
         try {
             repeat(warmUp + runs) { i ->
@@ -680,14 +612,7 @@ class KeyboardPerfBaselineTest {
         row("popup", "focus moved a choice", moved)
     }
 
-    // ---- 3d. after the keys: the window idle (design 060-render-p3 §4.3)
-
-    /**
-     * Frames and CPU when nothing happens, on the static theme in use: the 2 s after a 10-key run
-     * (`anim | idle after`: no frame expected), the keyboard shown and left alone, and the keyboard
-     * hidden (`anim | hidden`'s reference: no frame, CPU about 0). The process's CPU is its share of a
-     * core over the wall time ([ProcessCpu]).
-     */
+    /** Frames and CPU with nothing happening: after a run, shown and idle, and hidden (expect no frame, CPU about 0). */
     internal fun idleRows() {
         fresh()
         val letters = "nihaoshiji"
@@ -698,7 +623,6 @@ class KeyboardPerfBaselineTest {
         try {
             repeat(warmUp + runs) { i ->
                 presses(marks, letters.map(at::getValue), gapMs = FAST_GAP_MS)
-                // the release's frame and what follows it a little after the last key, then 2 s counted
                 SystemClock.sleep(IDLE_LEAD_MS)
                 val from = System.nanoTime()
                 SystemClock.sleep(IDLE_AFTER_MS)
@@ -715,8 +639,6 @@ class KeyboardPerfBaselineTest {
         log("anim\thidden, static theme\t${frames.idle(IDLE_MS)}")
         showKeyboard()
     }
-
-    // ---- 4. memory
 
     internal fun memory(label: String) = log(memoryLine(label, ::shell))
 
@@ -735,9 +657,6 @@ class KeyboardPerfBaselineTest {
         settle()
     }
 
-    // ---- the parts
-
-    /** Counts [action] (main thread) to the first frame where [ready] holds. */
     private fun measure(ready: () -> Boolean, action: () -> Unit): KeyboardFrames.Sample {
         val heap = Heap.now()
         val mark = onMain {
@@ -754,7 +673,7 @@ class KeyboardPerfBaselineTest {
         event.recycle()
     }
 
-    // the main thread idle, and a little more for what is posted after a frame (the bar, a11y)
+    // the main thread idle, plus a little for what is posted after a frame (the bar, a11y)
     internal fun settle() {
         instrumentation.waitForIdleSync()
         SystemClock.sleep(SETTLE_MS)
@@ -764,13 +683,11 @@ class KeyboardPerfBaselineTest {
 
     private fun find(selector: BySelector) = device.wait(Until.findObject(selector), 10_000) ?: error("not on screen: $selector")
 
-    // a key's centre on the screen, found as TalkBack and the UAT find it
     internal fun keyAt(selector: BySelector) = find(selector).visibleBounds.let { PointF(it.exactCenterX(), it.exactCenterY()) }
 
     internal fun row(what: String, label: String, samples: List<KeyboardFrames.Sample>, extra: String = "") {
         fun stats(of: (KeyboardFrames.Sample) -> Double?) = Stats(samples.mapNotNull(of))
         val withMetrics = samples.count { it.toDone != null }
-        // a press's event to the window, and from there: the system's part and the app's
         val dispatch = if (samples.any { it.dispatch != null }) "\tdispatch ${stats { it.dispatch }}\tdispatch to done ${stats { it.fromDispatch }}" else ""
         log(
             "$what\t$label\tn ${samples.size} (metrics $withMetrics)\tto frame done ${stats { it.latency }}" +
@@ -831,11 +748,9 @@ class KeyboardPerfBaselineTest {
     }
 }
 
-// bound anew in this process (as SoftKeyboardTest.selectThisInputMethod): am instrument force-stops this
-// package, and `ime set` on the one already chosen binds nothing anew on API 36: no keyboard to measure.
-// Out of the class, as [memoryLine]: its size (detekt LargeClass)
+// as SoftKeyboardTest: am instrument force-stops this package, and on API 36 `ime set` on the chosen one binds
+// nothing anew. Out of the class for detekt LargeClass.
 private fun bindInThisProcess(imeId: String, imePkg: String, shell: (String) -> String) {
-    // the input method's service up in this process (the system's record of it, with this process's pid)
     fun running() = shell("dumpsys activity services $imePkg").let {
         FcitxInputMethodService::class.java.name in it && " ${Process.myPid()}:$imePkg" in it.replace("{", " ").replace("/", " ")
     }
@@ -851,7 +766,7 @@ private fun bindInThisProcess(imeId: String, imePkg: String, shell: (String) -> 
 private const val GC_WAIT_MS = 500L
 private const val MEMORY_SAMPLES = 3
 
-// a [memory] row's line: the process's heaps, the median of MEMORY_SAMPLES after two collections
+// median of MEMORY_SAMPLES after two collections
 private fun memoryLine(label: String, shell: (String) -> String): String {
     repeat(2) {
         Runtime.getRuntime().gc()

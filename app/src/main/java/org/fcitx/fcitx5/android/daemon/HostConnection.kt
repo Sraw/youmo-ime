@@ -7,33 +7,15 @@ package org.fcitx.fcitx5.android.daemon
 import kotlinx.coroutines.CoroutineScope
 import org.fcitx.fcitx5.android.core.HostApi
 
-/**
- * Clients should use [HostConnection] to run fcitx operations.
- */
 interface HostConnection {
 
-    /**
-     * Run an operation immediately
-     * The suspended [block] will be executed in caller's thread.
-     * Use this function only for non-blocking operations like
-     * accessing [HostApi.eventFlow].
-     */
+    /** Runs [block] in the caller's thread now; only for non-blocking operations such as [HostApi.eventFlow]. */
     fun <T> runImmediately(block: suspend HostApi.() -> T): T
 
-    /**
-     * Run an operation immediately if fcitx is at ready state.
-     * Otherwise, caller will be suspended until fcitx is ready and operation is done.
-     * The suspended [block] will be executed in caller's thread.
-     * Client should use this function in most cases.
-     */
+    /** Runs [block] in the caller's thread, suspending until fcitx is ready. The usual choice. */
     suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T
 
-    /**
-     * Run an operation if fcitx is at ready state.
-     * Otherwise, do nothing.
-     * The suspended [block] will be executed in thread pool.
-     * This function does not block or suspend the caller.
-     */
+    /** Runs [block] in a thread pool if fcitx is ready, else does nothing; never blocks the caller. */
     fun runIfReady(block: suspend HostApi.() -> Unit)
 
     val lifecycleScope: CoroutineScope

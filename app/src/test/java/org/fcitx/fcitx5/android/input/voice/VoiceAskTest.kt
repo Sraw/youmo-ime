@@ -9,12 +9,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A talk's text handed over whole ([VoiceAsk]): a commit of the talk before landing late is not this one's. */
+/** A talk's text handed over whole: a commit of the talk before landing late is not this one's. */
 class VoiceAskTest {
 
     private val ask = VoiceAsk()
 
-    // [talk]'s commit of [text] in, as the service lands it, on [ask]: the talk's text if it is over and all in
     private fun land(talk: Int, text: String, ask: VoiceAsk = this.ask): String? {
         ask.voice(talk) { ask.putIn(text) }
         return ask.landed(talk, inField = true)
@@ -30,12 +29,10 @@ class VoiceAskTest {
         assertEquals("我找徐静", land(talk, "徐静"))
     }
 
-    // a talk's commit landing after the next talk began, the talk before ended either way: none of the next one's, which
-    // is handed over whole as its own lands (R26 F8367: the next talk began while fcitx was busy with the last's commit)
+    // the next talk began while fcitx was busy with the last's commit: none of it the next one's
     @Test
     fun aCommitOfTheTalkBeforeLandsUncountedAndUngathered() {
         fun row(why: String, between: (VoiceAsk) -> Unit) = why to {
-            // each row's own
             val ask = VoiceAsk()
             ask.began()
             val first = ask.posting()

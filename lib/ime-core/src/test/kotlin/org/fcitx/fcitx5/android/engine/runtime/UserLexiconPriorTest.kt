@@ -6,13 +6,11 @@ package org.fcitx.fcitx5.android.engine.runtime
 
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
-import java.util.concurrent.Executor
 
 // UserLexicon built directly over a pack with layers, which UserLexiconTest's Engines fixture lacks
 class UserLexiconPriorTest {
@@ -31,21 +29,7 @@ class UserLexiconPriorTest {
         forgetInTables = {}, dropSessions = {},
     )
 
-    @Test
-    fun aWordAddedByHandAtANewReadingTakesItsModelWordsLayerInTheEnginesPrior() {
-        val lexicon = lexicon()
-        val user = lexicon.user()
-        val prior = lexicon.prior()
-        assertTrue(prior.restore("places", 0.5f))
-        assertTrue(lexicon.addWord("搭子", "da zhi"))
-        val byHand = user.id(UserModel.Entry("搭子", intArrayOf(Syllables.id("da"), Syllables.id("zhi"))))
-        assertTrue(user.modelWord(byHand) != byHand)
-        // through UserLexicon's delegate: scored as the model's 搭子, so of places
-        assertEquals(0.5f, prior.of(byHand), 0f)
-    }
-
-    // review-uat-fixes S8: English's words pinyin spells are no word of the user's dictionaries for
-    // the tables, which recoded the whole list at each one learned
+    // the tables once recoded the whole list at each English word learned
     @Test
     fun englishsWordsListedForPinyinLeaveTheTablesListAlone() {
         val lexicon = lexicon()

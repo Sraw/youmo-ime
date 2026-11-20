@@ -44,7 +44,7 @@ class MainTest {
 
     @Test
     fun openccTakesS2twsDictionariesInTheirOrderOnly() {
-        // F3929: by position, STCharacters before STPhrases would compile and convert char by char
+        // by position: STCharacters before STPhrases would compile and convert char by char
         val phrases = file("STPhrases.txt", "头发\t頭髮")
         val chars = file("STCharacters.txt", "发\t發 髮")
         val variants = file("TWVariants.txt", "线\t線")
@@ -163,7 +163,6 @@ class MainTest {
         assertEquals(File(pack).readLines(), File(low).readLines())
     }
 
-    /** A character past U+FFFF (dict_extb's) is two chars and one syllable, as the dictionaries and misreadings.tsv count it. */
     @Test
     fun aCuratedReadingHasASyllableACharacterNotAChar() {
         val lm = file("lm.arpa", ReadersTest.TINY_ARPA)
@@ -446,7 +445,7 @@ class MainTest {
 
     @Test
     fun tooFewCharactersWithTheMainlandsStrokeOrderFailTheBuildAndLeaveTheFileThere() {
-        // the cover checked before the file is written: it was written first
+        // the cover checked before the file is written
         val output = tmp.root.resolve("charinfo.data").apply { writeText("before") }
         val (code, _, err) = run("charinfo", "-o", output.path, *charInfoInputs("你\tP S P HG SG P D\n"), "--cover", file("chars.txt", "你好江"))
         assertEquals(1, code)
@@ -593,7 +592,7 @@ class MainTest {
         // the words typed, by their keys: the model's own are none
         assertEquals(listOf("am", "I"), (0 until data.keyed).map { data.word(data.keyedWord(it)) })
 
-        // <s> I is worth 0.51 nats to its context: past 0.1 once a sentence's start is as likely as 0.9, not at English's 1/14
+        // <s> I is worth 0.51 nats to its context: past 0.1 once a sentence's start is as likely as 0.9, not at the default
         val pruned = tmp.root.resolve("pruned.arpa").path
         val (pruneCode, pruneOut, pruneErr) = run("prune", "-o", pruned, "--lm", lm, "--threshold", "0.1")
         assertEquals(pruneErr, 0, pruneCode)

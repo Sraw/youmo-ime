@@ -20,10 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * 0.5.2's one 按键间距 (`key_spacing_choice`) moved into 0.6.0's two, 横向间距 and 纵向间距, each the same
- * level; a backup of 0.5.2 or 0.6.0-beta1 brought back the same at the next start.
- */
+/** The old single 按键间距 becomes both 横向间距 and 纵向间距 at the same level, also from a restored old backup. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KeySpacingMigrationTest {
@@ -47,14 +44,13 @@ class KeySpacingMigrationTest {
             assertEquals(level, KeyVSpacingChoice.valueOf(level), prefs.keyVSpacingChoice.getValue())
             assertFalse(level, sp.contains(ThemePrefs.KEY_SPACING_052))
         }
-        // what it drew before, it draws now: 0.5.2's 宽松 was 5 across and 9 (6) up and down
+        // the same drawing: the old 宽松 was 5 across and 9 (6) up and down
         sp.edit(commit = true) { clear(); putString(ThemePrefs.KEY_SPACING_052, "Loose") }
         val choice = migrated().keyStyleChoice()
         assertEquals(KeyStyleChoice.Spacing(5, 5) to KeyStyleChoice.Spacing(9, 6), choice.hGap to choice.vGap)
     }
 
-    // the theme manager's first read of the key style (a start after an upgrade, a restored 0.5.2 backup's
-    // restart) is of the two moved already: 0.5.2's 宽松, not following the theme
+    // the theme manager's first read already sees the two moved
     @Test
     fun theThemeManagerMovesTheOneBeforeItReadsTheKeyStyle() {
         sp.edit(commit = true) { putString(ThemePrefs.KEY_SPACING_052, "Loose") }
@@ -63,8 +59,7 @@ class KeySpacingMigrationTest {
         assertFalse(sp.contains(ThemePrefs.KEY_SPACING_052))
     }
 
-    // 纵向间距 is stored by its level's name: 0.6.1's 很紧凑 added before 紧凑 leaves what each stored name
-    // means (a backup of 0.6.0 brought back draws as it did); the list shows it first after following
+    // stored by name, so inserting 很紧凑 changes no stored meaning; listed first after following
     @Uat("ST-160")
     @Test
     fun theUpAndDownLevelsAreStoredByName() {
@@ -84,7 +79,6 @@ class KeySpacingMigrationTest {
             assertEquals(name, KeyVSpacingChoice.valueOf(name), prefs.keyVSpacingChoice.getValue())
             assertEquals(name, gap, prefs.keyStyleChoice().vGap)
         }
-        // picked: stored as its name
         ThemePrefs(sp).keyVSpacingChoice.setValue(KeyVSpacingChoice.VeryCompact)
         assertEquals("VeryCompact", sp.getString(ThemePrefs.KEY_V_SPACING, null))
     }
@@ -103,7 +97,7 @@ class KeySpacingMigrationTest {
 
     @Test
     fun aValueNotALevelIsFollowingAndDropped() {
-        // a damaged backup, a hand edit: not a level's name, or not a string at all; never a crash at every start
+        // a damaged backup or hand edit: never a crash at every start
         sp.edit(commit = true) { putString(ThemePrefs.KEY_SPACING_052, "Huge") }
         migrated().let {
             assertEquals(KeyHSpacingChoice.FollowTheme, it.keyHSpacingChoice.getValue())

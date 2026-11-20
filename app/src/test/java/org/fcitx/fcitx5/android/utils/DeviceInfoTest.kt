@@ -16,13 +16,11 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The device's report (LogActivity's export): what it says of the keyboard is the keyboard's. */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w900dp-h600dp-land")
 class DeviceInfoTest {
 
-    // R26 F8329: a tablet held turned, the log page half of a split screen (its window 400 dp, upright): the keyboard is
-    // 横屏 all the same, its window the display's width, and the report says so, not the page's window's shape
+    // a tablet held turned, the log page half of a split screen: the keyboard is 横屏 all the same, and the report says so
     @Test
     fun theKeyboardsLandscapeIsTheDisplaysNotThePagesWindow() {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->

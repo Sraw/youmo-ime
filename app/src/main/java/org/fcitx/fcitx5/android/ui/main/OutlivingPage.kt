@@ -14,11 +14,7 @@ import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 import java.io.IOException
 
-/**
- * Runs [block] on the app's scope, for what a page starts that must outlive it: leaving a page
- * cancels the page's own scope right after onStop. It starts at once on the main thread, so what
- * it reads of the page is read before the page goes; a failure is logged under [tag] and shown.
- */
+/** On the app's scope (leaving cancels the page's own right after onStop); starts at once on the main thread, failures shown. */
 fun launchOutlivingPage(tag: String, block: suspend () -> Unit): Job =
     FcitxApplication.getInstance().coroutineScope.launch(Dispatchers.Main.immediate) {
         reportingFailure({
@@ -28,12 +24,7 @@ fun launchOutlivingPage(tag: String, block: suspend () -> Unit): Job =
         }, block)
     }
 
-/**
- * Runs [block], handing [onFailure] what a save may meet: a file not written (IOException), the
- * database (SQLException), or a provider or the clipboard refusing (SecurityException). Anything
- * else is a bug and goes on to the crash handler, as PickedFiles' showingFileErrors lets it; a
- * cancellation is no failure and goes on too.
- */
+/** IO, SQL and Security exceptions go to [onFailure]; anything else is a bug and crashes, cancellation passes through. */
 internal suspend fun reportingFailure(onFailure: (Throwable) -> Unit, block: suspend () -> Unit) {
     try {
         block()

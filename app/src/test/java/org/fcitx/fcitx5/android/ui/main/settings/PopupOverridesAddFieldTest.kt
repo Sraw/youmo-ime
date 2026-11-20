@@ -31,7 +31,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowDialog
 
-/** The key editor over the keyboard: 确定 in reach while it is up; the 添加字符 field's Done adds and puts it away. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PopupOverridesAddFieldTest {
@@ -46,7 +45,7 @@ class PopupOverridesAddFieldTest {
 
     @Test
     fun doneInTheAddFieldAddsAndPutsTheKeyboardAway() {
-        // the dialog's 确定 sits under the keyboard while it is up: Done adds what was typed and hides it
+        // 确定 sits under the keyboard while it is up: Done adds what was typed and hides it
         st.activity
         st.open(SettingsRoute.PopupOverrides)
         KeyboardHarness.all(st.activity.window.decorView)
@@ -72,7 +71,7 @@ class PopupOverridesAddFieldTest {
 
     @Test
     fun aFullListKeepsTheFieldAndKeyboardWithItsError() {
-        // what did not fit is said under the field: Done leaves the keyboard up and 确定 keeps the dialog to show it
+        // what did not fit is said under the field: Done leaves the keyboard up
         st.activity
         st.open(SettingsRoute.PopupOverrides)
         KeyboardHarness.all(st.activity.window.decorView)
@@ -99,8 +98,7 @@ class PopupOverridesAddFieldTest {
         assertTrue(field.error != null)
     }
 
-    // the dialog's buttons above the keyboard while it is up, its content scrolling in the room left: resized as asked
-    // on 29; from 30 the window the screen's height and the content padded by the keyboard, back as it goes
+    // resized as asked on 29; from 30 the window the screen's height and the content padded by the keyboard
     @Test
     fun theDialogKeepsAboveTheKeyboard() {
         st.activity

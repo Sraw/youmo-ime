@@ -21,7 +21,6 @@ class GridDecoration(val drawable: Drawable) : RecyclerView.ItemDecoration() {
     ) {
         val lp = view.layoutParams as GridLayoutManager.LayoutParams
         val layoutManager = parent.layoutManager as GridLayoutManager
-        // add space for items except last in each row
         if (lp.spanIndex + lp.spanSize != layoutManager.spanCount) {
             outRect.setTrailingDivider(parent, drawable)
         } else {
@@ -34,10 +33,8 @@ class GridDecoration(val drawable: Drawable) : RecyclerView.ItemDecoration() {
         for (i in 0 until layoutManager.childCount) {
             val view = parent.getChildAt(i)
             val lp = view.layoutParams as GridLayoutManager.LayoutParams
-            // break if it is the last item in data set
             if (parent.getChildAdapterPosition(view) == (parent.adapter!!.itemCount - 1))
                 break
-            // skip if it is the last item in each row
             if (lp.spanIndex + lp.spanSize == layoutManager.spanCount)
                 continue
             drawTrailingDivider(c, parent, view, drawable)

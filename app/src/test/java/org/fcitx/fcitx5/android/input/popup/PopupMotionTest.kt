@@ -43,11 +43,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import java.time.Duration
 
-/**
- * 060-render-p3 A2: a theme's popups coming up (`appear`) and going (`transition`): a bubble and a long
- * press's keys by their views' properties; a focus moved plays nothing again; a finger slides over the
- * keys as they come up; a bubble sooner than the motion after the last does not move; 键盘动效 off: as ever.
- */
+/** `appear` and `transition`: a focus moved plays nothing again; a bubble sooner than the motion after the last does not move. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PopupMotionTest {
@@ -55,14 +51,13 @@ class PopupMotionTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // it writes a user's pack: the themes settled writable whatever ran before in this JVM (phoneStorage)
+    // it writes a user's pack: the themes settled writable whatever ran before in this JVM
     @Before
     fun phone() = phoneStorage()
 
     private val key = Rect(55, 500, 95, 550)
     private val five = KeyDef.Popup.Keyboard.Explicit(arrayOf("1", "2", "3", "4", "5"))
 
-    // a user's pack: material's file, named its own, [styles] put last; its light version (as KeyMotionTest's)
     private fun pack(vararg styles: String): Theme = materialPack("moving", *styles)
 
     private val moving by lazy {
@@ -73,7 +68,7 @@ class PopupMotionTest {
         )
     }
 
-    // the IME's scopes the popups were made with: cancelled as the test ends, no bubble's job outliving it
+    // cancelled as the test ends, no bubble's job outliving it
     private val imes = mutableListOf<CoroutineScope>()
 
     @After
@@ -106,14 +101,13 @@ class PopupMotionTest {
         val p = popups()
         p.send(PopupAction.PreviewAction(ID, "q", key))
         val b = p.last()
-        // risen from below, faded in, from the first frame on
         assertEquals(0f, b.alpha, 0f)
         assertEquals(b.dp(PopupMoves.RISE_DP).toFloat(), b.translationY, 0f)
         frames(300)
         assertEquals(1f, b.alpha, 0f)
         assertEquals(0f, b.translationY, 0f)
         p.send(PopupAction.DismissAction(ID))
-        // still there, fading (Robolectric's paused looper ends it at its first frame), then gone; taken again whole
+        // Robolectric's paused looper ends the fade at its first frame
         assertEquals(1, p.root.childCount)
         frames(500)
         assertEquals(0, p.root.childCount)
@@ -132,7 +126,6 @@ class PopupMotionTest {
         frames(1000)
         RuntimeEnvironment.setQualifiers("+land")
         p.send(PopupAction.PreviewAction(ID, "w", key))
-        // faded in, not risen: the motion read again in the new environment
         assertEquals(0f, p.last().translationY, 0f)
         assertEquals(0f, p.last().alpha, 0f)
     }
@@ -158,18 +151,15 @@ class PopupMotionTest {
         assertEquals(1, p.root.childCount)
         val other = KeyRef.view(2)
         p.send(PopupAction.PreviewAction(other, "w", key))
-        // the slow one: it comes up as ever, and the one fading is gone at once
         val w = p.last()
         assertEquals(0f, w.alpha, 0f)
         assertEquals(1, p.root.childCount)
-        // the next at once (a frame here runs Robolectric's animations to their end, its clock with them)
+        // a frame here runs Robolectric's animations to their end, its clock with them
         p.send(PopupAction.PreviewAction(KeyRef.view(3), "e", key))
-        // fast: whole at once, and at once gone
         val e = p.last()
         assertNotEquals(w, e)
         assertEquals(1f, e.alpha, 0f)
         assertEquals(0f, e.translationY, 0f)
-        // let go after its 100 ms at least: gone at once, no fade
         frames(150)
         p.send(PopupAction.DismissAction(KeyRef.view(3)))
         assertTrue(e.parent == null)
@@ -181,18 +171,15 @@ class PopupMotionTest {
         p.send(PopupAction.PreviewAction(ID, "q", key))
         p.send(PopupAction.ShowKeyboardAction(ID, five, key))
         val keys = p.last()
-        // the bubble gone at once, the keys growing from the key's middle
         assertEquals(1, p.root.childCount)
         assertEquals(PopupMoves.SCALE_FROM, keys.scaleX, 0f)
         assertEquals(0f, keys.alpha, 0f)
-        // no frame yet: a slide picks by where the finger is
         p.send(PopupAction.ChangeFocusAction(ID, 20f, 25f))
         val first = PopupAction.TriggerAction(ID).also { p.send(it) }.outAction
         p.send(PopupAction.ChangeFocusAction(ID, 200f, 25f))
         val moved = PopupAction.TriggerAction(ID).also { p.send(it) }.outAction
         assertNotEquals(first, moved)
         assertTrue(moved is KeyAction)
-        // a focus moved plays it no more
         frames(300)
         p.send(PopupAction.ChangeFocusAction(ID, 20f, 25f))
         assertEquals(1f, keys.scaleX, 0f)
@@ -221,7 +208,6 @@ class PopupMotionTest {
         p.send(PopupAction.PreviewAction(ID, "q", key))
         assertEquals(1f, p.last().alpha, 0f)
         p.send(PopupAction.ShowKeyboardAction(ID, five, key))
-        // the long press's pop in, as ever (Motion.Short, from 90%)
         assertEquals(0.9f, p.last().scaleX, 1e-4f)
     }
 
@@ -232,8 +218,7 @@ class PopupMotionTest {
         frames(300)
         p.send(PopupAction.DismissAction(ID))
         val b = p.last()
-        // the next key at once: its fade ended, the bubble back in the pool and taken again, coming up from the
-        // start (300 ms after the last bubble: not typed fast), nothing of its fade left
+        // 300 ms after the last: not typed fast; nothing of its fade left
         p.send(PopupAction.PreviewAction(KeyRef.view(2), "w", key))
         assertSame(b, p.last())
         assertEquals(1, p.root.childCount)

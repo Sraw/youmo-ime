@@ -10,18 +10,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Holding ⌫ while typing pinyin used to delete the pinyin and run on into the field's text: a hold
- * begun with something typed stops once that is gone.
- */
+/** A held ⌫ begun with something typed stops once that is gone, not running on into the field. */
 class BackspaceHoldTest {
 
     // each repeat's turn, as the host saw things then; whether it deleted
     private fun BackspaceHold.turns(vararg composing: Boolean) = composing.map(::repeat)
 
-    // each row its own hold. The rules: what was typed as the hold began (its press, else its first turn, or a repeat
-    // the keyboard took before that) decides; begun typing, it stops once that is gone and stays stopped; begun with
-    // nothing typed, it deletes on whatever is typed meanwhile
+    // what was typed as the hold began decides: begun typing, it stops once that is gone; begun empty, it deletes on
     @Test
     fun aHoldBegunTypingStopsOnceThatIsGone() = assertRows(
         "begun typing: \"ni\"'s two repeats take it, the third finds nothing typed and deletes nothing of the field's" to {

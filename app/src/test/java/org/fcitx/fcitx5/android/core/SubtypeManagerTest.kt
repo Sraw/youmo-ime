@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 class SubtypeManagerTest {
 
     private fun entry(uniqueName: String) =
-        InputMethodEntry(uniqueName, uniqueName, "", "", "", "", "", false, InputMethodSubMode())
+        InputMethodEntry(uniqueName, uniqueName, "", "", "")
 
     @Test
     fun theKeyboardIsRegisteredLastAndTheRestKeepTheirOrder() {

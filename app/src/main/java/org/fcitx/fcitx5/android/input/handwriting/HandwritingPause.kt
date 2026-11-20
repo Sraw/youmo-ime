@@ -7,10 +7,6 @@ package org.fcitx.fcitx5.android.input.handwriting
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 
-/**
- * How long the pen stays up before the character written counts as done ([InkPad.finishMillis]):
- * a fast hand starts the next one at once, a slow one pauses between strokes of the same.
- */
 enum class HandwritingPause(override val stringRes: Int, val millis: Long) : ManagedPreferenceEnum {
     Fastest(R.string.handwriting_pause_fastest, 300),
     Fast(R.string.handwriting_pause_fast, 500),

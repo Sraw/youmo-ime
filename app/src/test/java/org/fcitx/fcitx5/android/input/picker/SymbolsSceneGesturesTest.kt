@@ -33,12 +33,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The symbol panel drawn by the scene (060-render-p2 S5c): its row of keys (each tapped and held:
- * what reaches the engine, against the record `gestures/symbols-row.txt`), the
- * categories and the grid in symbols.xml's slots over the canvas, the lock shut as its state and
- * said as what a tap does, 返回 in the app's words.
- */
+/** The symbol panel's row of keys against `gestures/symbols-row.txt`, the categories and grid in symbols.xml's slots, the lock said as what a tap does. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
@@ -66,7 +61,7 @@ class SymbolsSceneGesturesTest {
         for (id in ids) {
             panel().use { h ->
                 val k = h.rowKeys().single { it.id == id }
-                // what TalkBack reads (a text view's text where it has no description), and its view's name
+                // a text view's text where it has no description, and its view's name
                 out += "$id said: ${k.description ?: k.label} as ${k.resourceName}"
                 h.api.calls.clear()
                 h.tap(k)
@@ -74,15 +69,13 @@ class SymbolsSceneGesturesTest {
                 out += "$id tap: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
                     " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
             }
-            // held: its long press's keys or menu, what reaches the engine
             panel().use { h ->
                 h.api.calls.clear()
                 out += "$id long press: " + h.longPress(h.rowKeys().single { it.id == id })
                 h.idle()
-                // the host's own triggers too: 123's 输入 Unicode (060-keys-unify J2)
+                // the host's own triggers too: 123's 输入 Unicode
                 val sent = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") || it.startsWith("trigger") }
-                // ⌫ held repeats, how many times as the press falls in the frame (one fewer at SDK 29): the
-                // record keeps what it sends and that it repeats, not the count
+                // how many times depends on where the press falls in the frame (one fewer at SDK 29): the record keeps that it repeats
                 val shown = if (id == "backspace") "repeats ${sent.distinct()}".also { assertTrue(sent.toString(), sent.size >= MIN_REPEATS) } else "$sent"
                 out += "$id long press sent: " + shown +
                     " field ${h.field.text} panel ${KeyboardHarness.find<PickerLayout>(h.inputView)?.isAttachedToWindow == true}"
@@ -91,18 +84,14 @@ class SymbolsSceneGesturesTest {
         return out
     }
 
-    // the row's keys tapped and held (R20 F5817: the long presses too), each line against the record;
-    // ⌫, space and Return each send their own key to the engine; ⌫ and space leave the panel up
-    // (BackSpace 0xff08, space 0x20, Return 0xff0d, by name or keysym as the panel sends them)
+    // ⌫ and space leave the panel up (BackSpace 0xff08, space 0x20, Return 0xff0d, by name or keysym)
     @Test
     fun theRowsKeysSendTheirOwnKeys() {
         val out = gestures()
         GestureSnapshot.check("symbols-row", out)
         fun tap(id: String) = out.single { it.startsWith("$id tap: ") }
         assertRows(
-            // ⌫ deletes as on the keyboard
             "backspace" to { assertTrue(tap("backspace"), Regex("key=BackSpace|sym=65288,").containsMatchIn(tap("backspace"))) },
-            // space types a space
             "space" to { assertTrue(tap("space"), Regex("key=space|sym=32,|char= ,|commit\\( ").containsMatchIn(tap("space"))) },
             // Return its own key, not a newline typed as text
             "enter" to { assertTrue(tap("enter"), Regex("key=Return|sym=65293,").containsMatchIn(tap("enter"))) },
@@ -123,7 +112,6 @@ class SymbolsSceneGesturesTest {
         }
     }
 
-    // the scene's own slot at the canvas's size now, in the panel's pixels
     private fun cellOf(layout: PickerLayout, slot: String): Rect {
         val kb = layout.embeddedKeyboard
         val canvas = KeyboardHarness.find<KeyboardCanvasView>(kb)!!
@@ -133,14 +121,13 @@ class SymbolsSceneGesturesTest {
         }
     }
 
-    // narrower (one-handed, split): the categories and the grid follow the slots of the scene at the new size
     @Test
     fun theCategoriesAndTheGridFollowTheirSlotsAfterAResize() {
         panel().use { h ->
             val layout = KeyboardHarness.find<PickerLayout>(h.inputView)!!
             val before = cellOf(layout, PickerLayout.GRID_SLOT)
             val w = layout.width * 7 / 10
-            // one pass at the new width: the views moved into the slots in it (layoutIn lays them out at once)
+            // layoutIn lays them out at once
             layout.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(layout.height, View.MeasureSpec.EXACTLY))
             layout.layout(layout.left, layout.top, layout.left + w, layout.top + layout.height)
             for ((slot, view) in listOf(PickerLayout.CATEGORIES_SLOT to layout.side!!, PickerLayout.GRID_SLOT to layout.grid)) {
@@ -148,14 +135,13 @@ class SymbolsSceneGesturesTest {
                 assertEquals(slot, cell, Rect(view.left, view.top, view.right, view.bottom))
             }
             assertTrue("$before", cellOf(layout, PickerLayout.GRID_SLOT).width() < before.width())
-            // as symbols.xml has them, whatever slot() says: the categories 18 of 100 across, the grid the 82 beside them
+            // as symbols.xml has them, whatever slot() says: the categories 18 of 100 across
             assertEquals(w * 0.18f, layout.side!!.width.toFloat(), w * 0.01f)
             assertEquals(w * 0.82f, layout.grid.width.toFloat(), w * 0.01f)
             assertEquals(layout.side!!.right, layout.grid.left)
         }
     }
 
-    // the events [canvas] sends that say a node's words changed (a view's new contentDescription), as [under] passes them up
     private fun wordsTold(under: ViewGroup, canvas: KeyboardCanvasView): MutableList<AccessibilityEvent> {
         val events = mutableListOf<AccessibilityEvent>()
         ViewCompat.setAccessibilityDelegate(under, object : AccessibilityDelegateCompat() {
@@ -170,7 +156,6 @@ class SymbolsSceneGesturesTest {
         return events
     }
 
-    // the lock shut: TalkBack told its node's words changed (what a tap does now), as its view's new description was
     @Test
     fun theLocksNewWordsToldToAScreenReader() {
         panel().use { h ->
@@ -184,7 +169,6 @@ class SymbolsSceneGesturesTest {
         }
     }
 
-    // the field's action changed while the panel is up (onReturnDrawableUpdate): Return said as the new one
     @Test
     fun returnAsTheFieldsActionWhenItChanges() {
         panel().use { h ->
@@ -218,7 +202,6 @@ class SymbolsSceneGesturesTest {
     }
 
     private companion object {
-        // a hold of ⌫ deletes over and over: more than the one of a tap
         const val MIN_REPEATS = 2
         val ROW = setOf("back", "lock", "numbers", "space", "backspace", "enter")
     }

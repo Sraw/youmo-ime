@@ -28,13 +28,7 @@ import java.io.File
 import kotlin.math.pow
 import kotlin.random.Random
 
-/**
- * How long a heavy user's learning record takes to open (impl/design-1a.md §8): [commits]
- * commits over [days] typing days of words drawn as people type them (a few common, most rare),
- * corrected now and then, after the word before; the log as written, unfolded, then folded as a
- * start the next day folds it. Times are the best of a few opens, on this machine's JVM. A commit
- * here is one row; the phone's carry a word's pieces and pairs too, so sizes and times are a lower bound.
- */
+/** How long a heavy user's learning record takes to open, best of a few opens; a lower bound for a phone. */
 internal class LearnLogBench(private val commits: Int, private val days: Int, private val seed: Int = 7) {
 
     class Result(
@@ -101,21 +95,19 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         val fold = (System.nanoTime() - foldStart) / NANOS_PER_MS
         var state = LearnLog(file, clock).also { it.open() }.also { it.close() }.state
         val foldedOpen = best { state = LearnLog(file, clock).also { it.open() }.also { it.close() }.state }
-        // what a key pays to count the words across the spellings (R14 F3733): the first letter of most rows;
-        // and what the state holds, its indexes in it (R14 F3761)
+        // what a key pays to count the words across the spellings, and what the state holds
         val before = usedHeap()
         val opened = LearnLog(file, clock).also { it.open() }
         val heap = usedHeap() - before
         val spelledRows = opened.state.stats.keys.count { SpelledForm.of(it.code.kind, it.code.keys, it.reading).let { f -> f == SpelledForm.FULL || f == SpelledForm.INITIALS } }
         val first = vocabulary[0].reading.first()
-        // anew each time: as the first key after a commit finds it, each word's counts read once with
-        // its reading split (S15 B5.1), what HabitOrder's levels then read
+        // anew each time, as the first key after a commit finds it
         val spelled = bestNanos { LogHabits({ opened }).spelledFrom(Kinds.FULL, first).size } / NANOS_PER_MS.toDouble()
         opened.close()
         return Result(unfolded, unfoldedOpen, fold, file.length(), foldedOpen, state.stats.size, state.mine.size, state.pairs.size, spelled, heap, spelledRows)
     }
 
-    /** What the counts cost on [run]'s record: made anew (a new typing day, a word formed), and a key typed (review-1b S1). */
+    /** What the counts cost on [run]'s record: made anew (a new typing day, a word formed), and a key typed. */
     class Counts(
         val attachMs: Long,
         val rebuildMs: Double,
@@ -146,8 +138,7 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         val attach = best { HabitCounts(model).attach(state) }
         val counts = HabitCounts(model).also { it.attach(state) }
         val rebuild = bestNanos { counts.rebuild(state) } / NANOS_PER_MS.toDouble()
-        // one word formed: what the counts do of it
-        // none where a small --commits formed none
+        // one word formed: what the counts do of it (none where a small --commits formed none)
         val formed = vocabulary(state).firstOrNull()?.let { word ->
             val changes = LearnState.Changes().apply { formed[word.first] = word.second }
             bestNanos { counts.apply(state, changes) } / NANOS_PER_MS.toDouble()
@@ -162,7 +153,7 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         }
         val key = typing(LearnTo(LogHabits({ log })), model)
         val bare = typing(LearnTo(), UserModel(data.dictionary, data.vocabulary))
-        // what keeping words in sentences costs: words added by hand, some over the keys, and pins (review-1c N8)
+        // what keeping words in sentences costs: words added by hand, some over the keys, and pins
         val kept = UserModel(data.dictionary, data.vocabulary).also { HabitCounts(it).attach(state) }
         val random = Random(seed)
         val added = (0 until ADDED).mapTo(LinkedHashSet()) { i ->
@@ -172,7 +163,7 @@ internal class LearnLogBench(private val commits: Int, private val days: Int, pr
         }
         for ((keys, word) in PINS) log.pin(Code(Kinds.FULL, keys), word.first, word.second, on = true)
         val keyKept = typing(LearnTo(LogHabits({ log })), kept, added)
-        // a large list imported, words the keys' starts read among them: each level sorts those it offers (review-int-runtime N4)
+        // a large list imported, words the keys' starts read among them: each level sorts those it offers
         val list = (0 until IMPORTED).map { i ->
             val n = 2 + i % 2
             val text = (0 until n).joinToString("") { k -> String(Character.toChars(IMPORTED_TEXT + (i * n + k) % IMPORTED_SPAN)) }

@@ -5,14 +5,9 @@
 package org.fcitx.fcitx5.android.engine.pinyin
 
 /**
- * Every way to cut [input] into syllables. Nodes are positions in [input], from [start] to
- * [end]; an edge covers the typed text from one node to the next and carries the syllables that
- * text may stand for. Separators (`'`) belong to no edge: an edge ending before one leads to the
- * node after it, so no edge can span a separator.
- *
- * Every node reachable from [start] has an edge onwards and every edge moves forward, so every
- * path from [start] reaches [end]. Which path is right is not decided here: `xian` holds both
- * xian and xi'an, and the decoder scores them.
+ * Every way to cut [input] into syllables: nodes are positions, edges carry the syllables their text may
+ * be; separators belong to no edge. Every reachable node has an edge onward, so every path reaches [end];
+ * the decoder chooses (`xian` holds xian and xi'an).
  */
 class SyllableGraph internal constructor(
     val input: String,
@@ -22,9 +17,9 @@ class SyllableGraph internal constructor(
     private val edgeTo: IntArray,
     private val edgeKind: Array<Kind>,
     private val edgeMatches: Array<SyllableMatches>,
-    // per edge, how far each of its matches' letters go against where their keys were tapped; null for none at all
+    // per edge, per match: how far letters go against tap places; null for none
     private val edgeAgainst: Array<FloatArray?>? = null,
-    // per edge of keys read as the keys next to them, what each match costs and which key it took for which; null for none at all
+    // per slipped edge: each match's cost and key; null for none
     private val edgeSlips: Array<Slips?>? = null,
 ) {
     enum class Kind {
@@ -34,16 +29,16 @@ class SyllableGraph internal constructor(
         /** An initial on its own (简拼): `zh` for any syllable starting with it. */
         INITIAL,
 
-        /** The start of a syllable, still being typed at the end of the input or closed by a separator: `zho`. */
+        /** A syllable still being typed at the input's end or before a separator: `zho`. */
         PARTIAL,
 
-        /** A whole syllable read as the start of a longer one, as [PARTIAL]: `xian` on the way to xiang. */
+        /** A whole syllable read as the start of a longer one: `xian` toward xiang. */
         EXTENDED,
 
-        /** Input that is no pinyin at all (`i`, a digit): no syllables, kept as typed. */
+        /** No pinyin (`i`, a digit): kept as typed. */
         RAW,
 
-        /** A letter of a Latin word typed in lower case, as its letter syllable: `i` of iPhone as I. */
+        /** A lower-case letter of a Latin word as its letter syllable: `i` of iPhone. */
         LETTER,
     }
 
@@ -51,56 +46,38 @@ class SyllableGraph internal constructor(
 
     val edgeCount: Int get() = edgeTo.size
 
-    /**
-     * The edges leaving the node at [position]; empty for [end] and for positions no path reaches.
-     * Not sorted by where they lead: an initial comes after the longer syllables from the same place.
-     */
+    /** Empty for [end] and unreachable positions. Not sorted by target: an initial follows longer syllables. */
     fun edges(position: Int): IntRange = firstEdge[position] until firstEdge[position + 1]
 
     fun from(edge: Int): Int = edgeFrom[edge]
 
-    /** The node this edge leads to, past any separators after its text. */
+    /** Past any separators after its text. */
     fun to(edge: Int): Int = edgeTo[edge]
 
     fun kind(edge: Int): Kind = edgeKind[edge]
 
     fun matches(edge: Int): SyllableMatches = edgeMatches[edge]
 
-    /**
-     * How far the letters the [i]th of [edge]'s matches reads its keys as go against where the keys
-     * were tapped: for each key of two letters, 0 tapped at its centre or on its letter's side, up
-     * to 1 at the other edge, summed over the edge. 0 where nothing was tapped with a place (any
-     * keyboard but the grouped ones). What it costs is the decoder's to say, as for the flags.
-     */
+    /** Summed over the edge's two-letter keys: 0 tapped on the letter's side, up to 1 at the far edge; 0 without tap places. The decoder prices it. */
     fun against(edge: Int, i: Int): Float = edgeAgainst?.get(edge)?.get(i) ?: 0f
 
-    /**
-     * For an edge whose keys read as one of them slipped from the key next to it (every match
-     * [SyllableMatches.NEIGHBOUR]), what each match costs and which key it reads as which; null
-     * for any other edge (061-neighbour-correction §3).
-     */
+    /** For a slipped edge (every match [SyllableMatches.NEIGHBOUR]), costs and keys; null otherwise. */
     fun slips(edge: Int): Slips? = edgeSlips?.get(edge)
 
-    /** Whether [edge] reads its keys as slipped ([slips]): never the keys as typed. */
     fun isSlip(edge: Int): Boolean = edgeSlips?.get(edge) != null
 
-    /** What the [i]th match of [edge] costs as a slip (log10), 0 for none. */
+    /** Log10; 0 for none. */
     fun slipCost(edge: Int, i: Int): Float = edgeSlips?.get(edge)?.cost(i) ?: 0f
 
-    /** The typed text of [edge], without separators. */
     fun text(edge: Int): String = text(edgeFrom[edge], edgeTo[edge])
 
-    /** The typed text from [from] to [to], without the separators it ends with. */
     fun text(from: Int, to: Int): String {
         var until = to
         while (until > from && isSeparator(input[until - 1])) until--
         return input.substring(from, until)
     }
 
-    /**
-     * The tone typed after [edge]'s syllable on the zhuyin keyboards ([ZhuyinKeys.toneOf]), 1 to 5
-     * (5 轻声); 0 for none, the separator alone too.
-     */
+    /** The zhuyin tone typed after [edge] ([ZhuyinKeys.toneOf]), 1 to 5 (5 轻声); 0 for none. */
     fun tone(edge: Int): Int {
         var at = edgeTo[edge]
         while (at > edgeFrom[edge] && isSeparator(input[at - 1])) {
@@ -110,58 +87,39 @@ class SyllableGraph internal constructor(
         return 0
     }
 
-    /**
-     * Whether [edge] is 双拼's key read alone where it and the next make a syllable ([SyllableMatches.ABBREV]).
-     * Its first match's flags stand for all: ShuangpinSegmenter flags every match of such an edge, fuzzy
-     * partners too, and those of no other.
-     */
+    /** 双拼's lone key read where it pairs with the next ([SyllableMatches.ABBREV]); ShuangpinSegmenter flags every match of such an edge, so the first stands for all. */
     fun isAbbreviation(edge: Int): Boolean = edgeMatches[edge].let { it.size > 0 && it.flags(0) and SyllableMatches.ABBREV != 0 }
 
-    /** Whether any edge [isAbbreviation]: only 双拼's graphs have one. */
     val hasAbbreviations: Boolean by lazy(LazyThreadSafetyMode.NONE) { (0 until edgeCount).any(::isAbbreviation) }
 
-    /** Whether [edge] reads its keys otherwise than typed: an [isAbbreviation] or an [isSlip]. */
     fun readsOtherwise(edge: Int): Boolean = isAbbreviation(edge) || isSlip(edge)
 
-    /** Whether any edge [readsOtherwise]. */
     val hasOtherReadings: Boolean by lazy(LazyThreadSafetyMode.NONE) { hasAbbreviations || edgeSlips != null }
 
     /**
-     * This graph without the edges that [readsOtherwise], nor what only they reach: the input read
-     * in whole syllables as typed, a key alone an initial only where it and the next make none, as
-     * before 简拼 in the middle, and no key read as the key next to it. Itself where it has none.
-     * Whether the input ends on a syllable, or `;` ends one, is asked of this: `lj;` in 微软 is 蓝
-     * and ；, though `l` alone and `j;` (jing) read it too; `nihap` ends on no syllable, though hao
-     * reads its `hap`.
+     * Without [readsOtherwise] edges and what only they reach: the input in whole typed syllables. Ask this
+     * whether the input or `;` ends on a syllable (`lj;` in 微软 is 蓝 and ；; `nihap` ends on none).
      */
     fun withoutOtherReadings(): SyllableGraph = whole
 
-    // made once a graph: asked of the same one on a key by the session and the ranking more than once
+    // made once per graph: asked several times per key
     private val whole: SyllableGraph by lazy(LazyThreadSafetyMode.NONE) {
         if (hasOtherReadings) dropOtherReadings() else this
     }
 
-    /** Whether any edge [isSlip]. */
     val hasSlips: Boolean get() = edgeSlips != null
 
-    /**
-     * Whether an edge from [from] up to [to] (not from [to]) [isSlip]: where none does, every path from [from] to [to]
-     * reads the keys with no slip, and [withoutSlips] has those paths if it reaches [from]. What HabitOrder holds back
-     * where a code reads whole; a key read alone is the user's 简拼, no slip (061-sp-abbrev §3.6).
-     */
+    /** Whether a slipped edge lies within [from]..[to]; if not, [withoutSlips] has the same paths there. HabitOrder holds back on it; a lone key is 简拼, not a slip. */
     fun readsSlipWithin(from: Int, to: Int): Boolean = hasSlips && slipsBefore.let { it[to] > it[from] }
 
-    // how many edges [isSlip] from the positions before each: made once a graph, where it has any
+    // slipped edges before each position: made once per graph, where it has any
     private val slipsBefore: IntArray by lazy(LazyThreadSafetyMode.NONE) {
         IntArray(end + 1).also { n ->
             for (at in 0 until end) n[at + 1] = n[at] + edges(at).count(::isSlip)
         }
     }
 
-    /**
-     * This graph without the edges that [isSlip], nor what only they reach: [withoutOtherReadings] keeping the keys
-     * read alone. Itself where it has none.
-     */
+    /** Without slipped edges and what only they reach; lone keys kept. */
     fun withoutSlips(): SyllableGraph = noSlips
 
     private val noSlips: SyllableGraph by lazy(LazyThreadSafetyMode.NONE) {
@@ -186,18 +144,12 @@ class SyllableGraph internal constructor(
             input, start, first, IntArray(kept.size) { edgeFrom[kept[it]] }, IntArray(kept.size) { edgeTo[kept[it]] },
             Array(kept.size) { edgeKind[kept[it]] }, Array(kept.size) { edgeMatches[kept[it]] },
             edgeAgainst?.let { a -> Array(kept.size) { a[kept[it]] } },
-            // no edge kept is a slip (both ways drop them all): none, or the graph had other readings still (review F8203)
+            // no slipped edge kept: none, or the graph still had other readings
             null,
         )
     }
 
-    /**
-     * Whether the input from [from] to [to] reads as whole syllables, by [Kind.SYLLABLE] and
-     * [Kind.LETTER] edges that are no [isAbbreviation] nor [isSlip]: `xm` (xian) and `xwmm` (xia mian) in 自然码,
-     * not `ufmuh`, whose h is only begun. A code so read is likely the user's whole syllables: the
-     * words they typed read by its keys alone go after its first reading there, not before it, and
-     * no slip raises a word under it (HabitOrder, 061-sp-abbrev §3.3, §3.6).
-     */
+    /** Whether [from]..[to] reads as whole typed syllables ([Kind.SYLLABLE]/[Kind.LETTER], no abbreviation or slip): `xm` yes, `ufmuh` no. Then lone-key typed words go after its first reading, and no slip raises a word. */
     fun readsWhole(from: Int, to: Int): Boolean {
         if (from >= to) return false
         val ok = BooleanArray(to + 1).also { it[from] = true }
@@ -210,15 +162,10 @@ class SyllableGraph internal constructor(
         return ok[to]
     }
 
-    // a whole syllable or a letter, as typed: not a key read alone where it and the next make a syllable,
-    // nor keys read as slipped (a slip of keys that spell nothing reads through, but is no syllable the user typed)
+    // a whole syllable or letter as typed: no lone key, no slip
     private fun asTyped(e: Int) = edgeKind[e].let { it == Kind.SYLLABLE || it == Kind.LETTER } && !readsOtherwise(e)
 
-    /**
-     * The first position whose edges, or the input up to it, differ from [other]'s; past both ends
-     * when the two are alike. What is read from before it, along edges that stay before it, reads
-     * the same in both: the decoder keeps those words from key to key (PinyinDecoder.buildLattice).
-     */
+    /** The first position whose edges or input differ from [other]'s: what is read before it is the same in both (PinyinDecoder.buildLattice keeps those words). */
     fun sameUntil(other: SyllableGraph): Int {
         val ends = minOf(end, other.end)
         var at = 0
@@ -248,11 +195,7 @@ class SyllableGraph internal constructor(
     companion object {
         const val SEPARATOR = '\''
 
-        /**
-         * Whether [c] ends a syllable: [SEPARATOR], or a tone of the zhuyin keyboards ([KeySpelling.Bopomofo]'s
-         * separators, the one place they are said). The graph reads every input so, its spelling not
-         * known here: a tone's code is in [ZhuyinKeys.BLOCK], which only the zhuyin keyboards send.
-         */
+        /** [SEPARATOR], or a zhuyin tone: the one place it is said. Tone codes are in [ZhuyinKeys.BLOCK], which only zhuyin keyboards send. */
         fun isSeparator(c: Char): Boolean = c == SEPARATOR || ZhuyinKeys.toneOf(c) > 0
     }
 }

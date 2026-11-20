@@ -32,7 +32,6 @@ class SentenceModelTest {
             val expected = t.logProbs(intArrayOf(SentenceModel.BOS) + tokens)
             val got = run(t.load(), tokens)
             for (i in tokens.indices) assertEquals("${t.width} wide, at $i", expected[i][tokens[i]], got[i].toDouble(), 1e-4)
-            // floats instead of int8: the same weights, the same numbers
             assertArrayEquals(got, run(t.load(unpack = true), tokens), 1e-4f)
         }
     }
@@ -50,7 +49,6 @@ class SentenceModelTest {
         }
         val got = run(SentenceModel.load(ByteBuffer.wrap(tiny.bytes()), kernel = kernel), tokens)
         assertArrayEquals(run(model, tokens), got, 1e-4f)
-        // tok, qkv, fc and out: the int8 ones
         val w = tiny.width
         assertEquals(setOf(tiny.vocab.size to w, 3 * w to w, 4 * w to w, w to 4 * w), shapes)
     }
@@ -65,8 +63,7 @@ class SentenceModelTest {
     @Test
     fun charactersAreTokensAndTheRestUnknown() {
         assertArrayEquals(intArrayOf(3, 5, 1, 4), model.encode("我好x你"))
-        // one unknown for a character beyond the BMP, not two; entries longer than a character
-        // (ab) and the specials are never matched by text
+        // one unknown per non-BMP character; longer entries and specials never match text
         assertArrayEquals(intArrayOf(3, 1, 1, 1), model.encode("我\uD840\uDC00ab"))
         assertArrayEquals(intArrayOf(1, 1, 1, 1, 1), model.encode("<bos>"))
         assertEquals("Apache-2.0", model.license)
@@ -78,14 +75,11 @@ class SentenceModelTest {
         val scorer = model.Scorer(room = 3)
         val expected = tiny.logProbs(intArrayOf(SentenceModel.BOS, 3, 5, 4, 6))
         val both = expected[2][4] + expected[3][6]
-        // the context keeps what it is and scores nothing
         assertEquals(both, scorer.score("我好", listOf("你的"))[0].toDouble(), 1e-4)
-        // again, from what was kept, and for readings sharing a start
         val again = scorer.score("我好", listOf("你", "你的", ""))
         assertEquals(expected[2][4], again[0].toDouble(), 1e-4)
         assertEquals(both, again[1].toDouble(), 1e-4)
         assertEquals(Float.NEGATIVE_INFINITY, again[2])
-        // another context starts over
         val other = tiny.logProbs(intArrayOf(SentenceModel.BOS, 4, 4))
         assertEquals(other[1][4], scorer.score("你", listOf("你"))[0].toDouble(), 1e-4)
     }
@@ -120,7 +114,6 @@ class SentenceModelTest {
 
     @Test
     fun aScoringThatNeedsMoreThanIsKeptGoesOnFromWhatItGotDone() {
-        // no start shared: nine steps, against a limit of three
         val readings = listOf("我好你", "你好的", "天的我")
         val whole = model.Scorer().score("好", readings, relative = true)
         val scorer = model.Scorer(limit = 3)
@@ -152,7 +145,6 @@ class SentenceModelTest {
         assertEquals(after(5), scorer.score("的的的我好我好", listOf("你"))[0].toDouble(), 1e-4)
         assertEquals(after(6, 3), scorer.score("的我", listOf("你"))[0].toDouble(), 1e-4)
         assertEquals(after(), scorer.score("", listOf("你"))[0].toDouble(), 1e-4)
-        // a reading longer than what is left is scored on what fits
         val long = "我".repeat(20)
         val fit = "我".repeat(tiny.window)
         val whole = model.Scorer()
@@ -177,7 +169,6 @@ class SentenceModelTest {
         assertEquals(null, scorer.within("我好你的", listOf(""), relative = false, budget = 0))
         assertEquals(1, tries("我好你的", 1))
         assertEquals(1, tries("我好你的", 0))
-        // a context the one read is not in is read again
         assertEquals(null, scorer.within("你我", listOf(""), relative = false, budget = 0))
         assertEquals(1, tries("你我", 2))
         // committed text is read on from what was, until the window is full; then from half of it
@@ -212,7 +203,6 @@ class SentenceModelTest {
         val good = tiny.bytes()
         rejects(good.copyOf(4))
         rejects(good.copyOf(100))
-        // a header size past the file, or absurd
         rejects(good.copyOf().also { ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putLong(0, good.size.toLong()) })
         rejects(good.copyOf().also { ByteBuffer.wrap(it).order(ByteOrder.LITTLE_ENDIAN).putLong(0, -1) })
         // the data cut short: the last tensor's range runs past the end

@@ -8,12 +8,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * How many pieces of work handed off the input thread (warm-ups, codings, compactions, the merged
- * dictionary's compiles) are queued or running now: zero is part of the debug build's idle signal,
- * which the device UAT waits for before it reads the candidates, so that a result landing late
- * (a table's coded words, a compile) is not read half-way.
- */
+/** Off-input-thread work queued or running; zero is part of the debug build's idle signal, which device UAT waits for so late results are not read half-way. */
 open class BackgroundCount internal constructor() {
     private val running = AtomicInteger()
 
@@ -23,10 +18,9 @@ open class BackgroundCount internal constructor() {
     fun counted(work: Runnable): Runnable = Counted(work, running, null)
 
     /**
-     * [executor], each piece of work it is handed [counted]; one it refuses is not. Only work that
-     * never started is handed back: an executor that runs it inline and lets its exception out has
-     * already counted it down, and a thread that cannot be started throws an Error, not a
-     * RuntimeException, so either way catching less would leave [busy] wrong for good.
+     * [executor] with each task [counted]; one it refuses is uncounted. Only never-started work is handed back:
+     * an inline executor has already counted down, and a thread that cannot start throws an Error, so catching
+     * less would leave [busy] wrong for good.
      */
     fun counted(executor: Executor) = Executor { work ->
         val started = AtomicBoolean()
@@ -38,7 +32,7 @@ open class BackgroundCount internal constructor() {
         }
     }
 
-    /** [work] as an executor is handed it, counted down once it has run: [work] what was handed, for who reads the queue. */
+    /** Counted down once run; [work] kept for whoever reads the queue. */
     internal class Counted(val work: Runnable, private val running: AtomicInteger, private val started: AtomicBoolean?) : Runnable {
         init {
             running.incrementAndGet()
@@ -55,5 +49,5 @@ open class BackgroundCount internal constructor() {
     }
 }
 
-/** The process's count, the one the debug build's idle signal reads. */
+/** The process's count, read by the debug build's idle signal. */
 object BackgroundWork : BackgroundCount()

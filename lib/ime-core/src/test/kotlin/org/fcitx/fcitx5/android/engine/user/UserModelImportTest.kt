@@ -22,11 +22,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The words the user imported, in the model (U-101; review-G M3, M5): read from the learning
- * record's, offered from the start alone ([UserModel.startWords]) till the user's, added by hand
- * or listed, then whole words in the trie; out of it again as that ends, never dropped while imported.
- */
+/** The user's imported words in the model: offered from the start alone till theirs, never dropped while imported. */
 class UserModelImportTest {
     private val niHao = entry("妮好", "ni", "hao")
     private val imports = ImportedWords().import("妮好" to "ni hao", "拟浩" to "ni hao", "妮" to "ni")
@@ -49,12 +45,10 @@ class UserModelImportTest {
         // only in the start trie: no sentence nor handwriting walks it
         assertFalse(inTrie(m, "妮好", "ni", "hao"))
         assertTrue(id in m.startWords!!.at("ni", "hao")!!)
-        // not a word the user made, nor theirs to read or score
         assertFalse(m.chosen(id))
         assertNull(m.reading(id))
         assertEquals(id, m.modelWord(id))
         assertEquals(emptyList<Pair<UserModel.Entry, Float>>(), m.madeWords())
-        // a character too, one the dictionary has not
         assertTrue(m.startOnly(m.known(entry("妮", "ni"))))
     }
 
@@ -75,7 +69,6 @@ class UserModelImportTest {
         assertTrue(inTrie(m, "妮好", "ni", "hao"))
         assertEquals("妮好", m.text(id))
         assertNull(m.startWords)
-        // theirs no more and imported no more: gone
         m.disown(niHao)
         assertFalse(inTrie(m, "妮好", "ni", "hao"))
         assertFalse(m.startOnly(id))
@@ -113,7 +106,6 @@ class UserModelImportTest {
         assertFalse(m.blocked(id, -1))
     }
 
-    // review-G M5: a model made again from the record (a reload, a rollback) has them, as imported
     @Test
     fun aModelMadeFromTheRecordHasThem() {
         val state = LearnState()
@@ -131,7 +123,6 @@ class UserModelImportTest {
         assertNull(listed.startWords!!.at("ni", "hao"))
     }
 
-    // review-G S4: the start trie is made again as words come, not as they go: one gone is no start-only word
     @Test
     fun theStartTrieIsMadeAgainOnlyAsWordsCome() {
         val trie = m.startWords

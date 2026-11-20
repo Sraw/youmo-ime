@@ -31,7 +31,6 @@ class BackupsTest {
 
     private fun Backups.saveOn(day: Int, time: Long = day * 1000L) = saveAuto(day) { bytes(day, installId, time = time) }
 
-    // U-106: on the first typing day, then every seven
     @Test
     fun oneIsDueOnTheFirstTypingDayThenEverySeven() {
         val backups = Backups(root, 1L)
@@ -55,12 +54,10 @@ class BackupsTest {
         val listed = backups.list()
         assertEquals(listOf(15, 8, 3), listed.map { it.head.day })
         assertEquals(listOf(true, true, false), listed.map { it.own })
-        // read again from the files, as a new start does
         assertFalse(Backups(root, 1L).due(21))
         assertTrue(Backups(root, 1L).due(22))
     }
 
-    // F3090: a log begun again behind the newest (due's day < last): the one written for it is kept, the newest other with it
     @Test
     fun oneWrittenForALogBehindTheNewestIsKept() {
         val backups = Backups(root, 1L)
@@ -68,12 +65,12 @@ class BackupsTest {
         assertTrue(backups.due(3))
         backups.saveOn(3, time = 99_000L)
         assertEquals(listOf(3, 15), backups.list().map { it.head.day }.sorted())
-        // F3238: the next start reads the one for the log as it is now, not the newest: not due again till its seven days
+        // the next start reads the one for the log as it is now, not the newest: not due again till its seven days
         assertFalse(Backups(root, 1L).due(4))
         assertTrue(Backups(root, 1L).due(10))
     }
 
-    // C25: what was cleared never comes back from this install's backups; another's are left
+    // what was cleared never comes back from this install's backups; another's are left
     @Test
     fun aClearDropsThisInstallsBackupsAndTheCopyBeforeARestore() {
         val backups = Backups(root, 1L)
@@ -88,7 +85,7 @@ class BackupsTest {
         assertTrue(backups.due(2))
     }
 
-    // DE-S1: U-88 drops only those made at or after its cut, an older one holding nothing of the span
+    // 清掉最近 drops only those made at or after its cut, an older one holding nothing of the span
     @Test
     fun aClearOfTheLastMinutesDropsOnlyThoseMadeSince() {
         val backups = Backups(root, 1L)
@@ -98,7 +95,7 @@ class BackupsTest {
         assertEquals(listOf(10 * MINUTE), backups.list().map { it.head.time })
     }
 
-    // DE-M1 step 1: one being written in the background is waited for, then dropped with the rest
+    // one being written in the background is waited for, then dropped with the rest
     @Test
     fun aClearWaitsForOneBeingWritten() {
         val started = CountDownLatch(1)
@@ -129,7 +126,6 @@ class BackupsTest {
         assertEquals(2, errors.size)
     }
 
-    // the two kept are the newest by typing day, as due reads them: a clock set back keeps the one just written
     @Test
     fun theNewestByTypingDayAreKeptAfterTheClockWasSetBack() {
         val backups = Backups(root, 1L)
@@ -200,10 +196,8 @@ class BackupsTest {
         assertEquals(1, errors)
     }
 
-    // D-N1: an id that cannot be kept is none, told: never a new one each start
     @Test
     fun anIdThatCannotBeKeptIsNone() {
-        // a file where its directory would be
         root.file("a-file").createNew()
         var errors = 0
         assertEquals(0L, Backups.installId(root.dir("a-file").file("learn.install")) { errors++ })

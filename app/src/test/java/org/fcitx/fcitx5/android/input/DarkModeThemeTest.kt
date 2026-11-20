@@ -24,12 +24,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The system's dark mode switched (060-render-p3 T3), the built-in themes' versions in the light and dark
- * slots: the keyboard made anew with the slot's version, a pair's (`pixel#light`) and Monet's
- * (`monet#dark`), whose colours are the system's from Android 12 and its fallbacks before (at 29, the
- * colours 0.5 had there). Run at 35 and at 29 (testDebugUnitTestAt29).
- */
+/** The system's dark mode switched: the keyboard remade with the slot's version, Monet's from the system from Android 12 and fallbacks before. Run at 35 and 29. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -60,7 +55,6 @@ class DarkModeThemeTest {
         h.idle()
     }
 
-    // what the keyboard is drawn with: the input view's theme, which its bar, keyboard and panels are made with
     private fun shown(): Theme = h.inputView.theme
 
     @Test
@@ -76,7 +70,6 @@ class DarkModeThemeTest {
         assertEquals("monet#dark", dark.name)
         assertTrue(dark.isDark && dark.followsSystem)
         assertSame(ThemeManager.activeTheme, dark)
-        // read again as the configuration changed, with the system's colours as they are now
         assertEquals(ThemeMonet.systemColors(appContext).dark["primary"]?.value ?: 0xffaac7ff.toInt(), dark.accentKeyBackgroundColor)
         switch(false)
         assertEquals("pixel#light", shown().name)
@@ -88,13 +81,13 @@ class DarkModeThemeTest {
         val dark = ThemeManager.builtin("monet#dark")
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             assertEquals(SystemColors.NONE, ThemeMonet.systemColors(appContext))
-            // 0.5's colours below Android 12 (MD3 of #769CDF): monet.xml's fallbacks
+            // below Android 12: monet.xml's fallbacks
             assertEquals(0xffededf4.toInt(), light.backgroundColor)
             assertEquals(0xff415f91.toInt(), light.accentKeyBackgroundColor)
             assertEquals(0xff1d2024.toInt(), dark.backgroundColor)
             assertEquals(0xffaac7ff.toInt(), dark.accentKeyBackgroundColor)
         } else {
-            // the roles (Android 14 on; 12 and 13 the palette's tones for them)
+            // the roles from Android 14; on 12 and 13 the palette's tones
             fun color(id: Int) = appContext.getColor(id)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 assertEquals(color(android.R.color.system_surface_container_light), light.backgroundColor)
@@ -104,20 +97,17 @@ class DarkModeThemeTest {
                 assertEquals(color(android.R.color.system_surface_container_high_dark), dark.barColor)
                 assertEquals(color(android.R.color.system_primary_dark), dark.accentKeyBackgroundColor)
             }
-            // the system's, not the fallbacks
             assertNotEquals(0xff415f91.toInt(), light.accentKeyBackgroundColor)
-            // every name a theme's system() may take, in both (none its fallback for a role missed)
             val system = ThemeMonet.systemColors(appContext)
             assertEquals(ColorExpr.SYSTEM_NAMES, system.light.keys)
             assertEquals(ColorExpr.SYSTEM_NAMES, system.dark.keys)
         }
-        // the press highlight the text's at 12% (light) and 20% (dark), as 0.5 had it
+        // the text's colour at 12% (light) and 20% (dark)
         assertEquals(light.keyTextColor and 0xffffff or (0x1f shl 24), light.keyPressHighlightColor)
         assertEquals(dark.keyTextColor and 0xffffff or (0x33 shl 24), dark.keyPressHighlightColor)
     }
 
-    // Android 12 and 13 have no roles: the palette's tones 0.5 took for them (ThemeMonet's approximations),
-    // the two 0.5 had none for (the light high, the dark highest) too. Not run at 29 (its task's SDK alone)
+    // Android 12 and 13 have no roles: the palette tones ThemeMonet approximates with. Not run at 29
     @Test
     @Config(sdk = [Build.VERSION_CODES.TIRAMISU])
     fun onAndroid13MonetIsThePalettesTonesForTheRoles() {
@@ -135,9 +125,7 @@ class DarkModeThemeTest {
         assertEquals(color(android.R.color.system_neutral2_900), dark("surface-container-high"))
         assertEquals(color(android.R.color.system_neutral2_800), dark("surface-container-highest"))
         assertEquals(color(android.R.color.system_accent1_200), dark("primary"))
-        // the tones as they are
         assertEquals(color(android.R.color.system_accent3_300), light("accent3-300"))
-        // Monet's versions drawn with them: 0.5's bar (light the highest, dark the high) and keys
         val monetLight = ThemeManager.builtin("monet#light")
         val monetDark = ThemeManager.builtin("monet#dark")
         assertEquals(light("surface-container"), monetLight.backgroundColor)

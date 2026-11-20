@@ -19,7 +19,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A sentence put in and deleted at once is taken back; one written again for it is a pick there (U-03, U-29, F2655). */
+/** A sentence put in and deleted at once is taken back; one written again for it is a pick there. */
 class HandwritingSessionUndoTest {
 
     private val d = handwritingData
@@ -66,21 +66,18 @@ class HandwritingSessionUndoTest {
         assertFalse("人" in learner.log.state.wordUses)
     }
 
-    // switched to in an empty field (UAT HW-23): fcitx's reset of the session leaves the field
-    // unknown, an empty context does not say it; told the field started (FieldPolicy.inputMethodChanged), it is known
+    // fcitx's reset leaves the field unknown; told the field started (FieldPolicy.inputMethodChanged), it is known
     @Test
     fun switchedToInAnEmptyFieldTheFieldToldStartedLetsADeletionBeTakenBack() {
         session.apply(Action.Reset)
         session.apply(Action.Context("", learnFlags = 0))
         put(tianRead, "人")
         delete(1)
-        // kept: the Backspace was not known to take it
         assertEquals(1, uses(tian, "人"))
         session.apply(Action.Reset)
         session.apply(Action.Context("", learnFlags = 0, started = true))
         put(tianRead, "人")
         delete(1)
-        // the second taken back
         assertEquals(1, uses(tian, "人"))
     }
 
@@ -122,15 +119,13 @@ class HandwritingSessionUndoTest {
         delete(1)
         put(tianRead, "人")
         assertEquals("人", write(tianRead).candidates.first())
-        // the same ink again: this commit's own pick is all there is
         assertEquals(2, corrections(tian, "人"))
     }
 
-    // HW-23: 山 picked and deleted: not used, the order as before
+    // 山 picked and deleted: not used, the order as before
     @Test
     fun aDeletedPickIsNoUse() {
         val before = write(tianRead).candidates
-        // what was written dropped, the field as the host reads it
         session.apply(Action.Context("前", learnFlags = 0))
         put(tianRead, "山")
         delete(1)
@@ -138,7 +133,7 @@ class HandwritingSessionUndoTest {
         assertEquals(before, write(tianRead).candidates)
     }
 
-    // review F3124: 谈话 deleted, 谈 written again and deleted too: 谈 again is 谈话's first again
+    // 谈话 deleted, 谈 written again and deleted too: 谈 again is 谈话's first again
     @Test
     fun aPartRetypeDeletedLeavesTheSentenceToTypeAgain() {
         write(read("淡", "谈", step = 0.3))
@@ -152,7 +147,7 @@ class HandwritingSessionUndoTest {
         assertEquals(1, uses(code("淡", "谈"), "谈"))
     }
 
-    // review F3110: a deleted commit's correction of one before it is no character of its own
+    // a deleted commit's correction of one before it is no character of its own
     @Test
     fun aDeletedCorrectionIsNoCharacterTypedAgain() {
         put(tianRead, "天")
@@ -167,7 +162,7 @@ class HandwritingSessionUndoTest {
         assertEquals(1, uses(code("话", "山"), "话"))
     }
 
-    // review F2655 S: 谈话 deleted, written again as 谈, then 话: each a pick under its own deleted code
+    // 谈话 deleted, written again as 谈, then 话: each a pick under its own deleted code
     @Test
     fun aSentenceWrittenAgainACharacterAtATime() {
         write(read("淡", "谈", step = 0.3))
@@ -191,7 +186,6 @@ class HandwritingSessionUndoTest {
         assertTrue("高 山" in learner.used())
         delete(1)
         assertFalse("高 山" in learner.used())
-        // the 高 before it stands
         assertTrue("高" in learner.used())
     }
 

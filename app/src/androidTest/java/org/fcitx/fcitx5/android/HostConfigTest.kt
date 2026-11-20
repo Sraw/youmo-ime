@@ -19,10 +19,10 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.Timeout
 
-/** The engine's options as the settings pages save them: each page sends only what it shows. */
+/** Each settings page sends only the options it shows. */
 class HostConfigTest {
 
-    // as HostTest's: a broken engine interaction fails the run instead of hanging it
+    // a broken engine interaction fails the run instead of hanging it
     @get:Rule
     val timeout: Timeout = Timeout.seconds(30)
 
@@ -39,22 +39,16 @@ class HostConfigTest {
         @JvmStatic
         fun cleanup() = harness.stop()
 
-        /** 五笔, the engine's own table (a key of [InputMethodCatalog.TABLES]). */
         const val WUBI = "engine-wubi"
     }
 
-    /** A clean engine and event queue for each test: see [TestHost.beforeTest]. */
     @Before
     fun resetEngineAndDrainEvents() = harness.beforeTest()
 
     @After
     fun restoreEnabledIME() = harness.afterTest()
 
-    /**
-     * The addon keeps one page size for every input method: one saved through a table is pinyin's
-     * too. A save of the page size alone, through pinyin or a table, leaves every option it does
-     * not carry as it was: each settings page sends only what it shows.
-     */
+    /** The page size is one for all input methods; a save of it alone leaves every other option as it was. */
     @Test
     fun aTablesPageSharesThePageSizeWithPinyinAndKeepsItsOwnOptions(): Unit = runBlocking {
         suspend fun pinyin(key: String) = fcitx.imOptions(InputMethodCatalog.PINYIN)?.get(key).orEmpty()
@@ -62,10 +56,9 @@ class HostConfigTest {
         val pageSize = pinyin(EngineSettings.PAGE_SIZE)
         val chaizi = pinyin(EngineSettings.CHAIZI)
         val autoSelect = wubi(TableSettings.AUTO_SELECT)
-        // not the defaults, so a full load, which resets what it is not given, would show
+        // not the defaults, so a full load (which resets what it is not given) would show
         val chaiziSet = if (EngineSettings().chaizi) "False" else "True"
         val autoSelectSet = if (TableOptions.WUBI.autoSelect) "False" else "True"
-        // a size unlike the stored one, so the save is seen whatever was there
         val first = if (pageSize == "4") "6" else "4"
         fun pageSizeAlone(v: String) = mapOf(EngineSettings.PAGE_SIZE to v)
         try {

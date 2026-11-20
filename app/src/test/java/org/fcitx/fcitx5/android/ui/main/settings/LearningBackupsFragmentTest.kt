@@ -16,7 +16,7 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class LearningBackupsFragmentTest {
 
-    // review-uat-fixes S12: the words' export is the learning's copy, saved only once the warning is accepted
+    // the words' export is the learning's copy, saved only once the warning is accepted
     @Test
     fun aCopyIsSavedOnlyAfterTheWarningIsAccepted() {
         val saved = ArrayList<String>()

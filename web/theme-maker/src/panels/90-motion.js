@@ -1,4 +1,4 @@
-// 动效 (060-render-p3 §5.1 panel 9, §4.2): a key's state changes (`transition`), its press (`press-scale`,
+// 动效: a key's state changes (`transition`), its press (`press-scale`,
 // `press-sink`), the popups' appearing (`appear`) and a press's effect (`effect`: a ripple image, particles). The
 // properties and where each goes are MOTION's; whether this engine draws one is the engine's own answer (supported:
 // a style of it read with no "not supported" warning), so a stage that makes one work (A1–A4) shows here as drawn

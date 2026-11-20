@@ -22,10 +22,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * UAT cases of the keyboard with the voice pack (uat/12): where holding the space talks. No microphone
- * here (the permission not granted): a hold that would talk asks for it, which is how it shows.
- */
+/** Where holding the space talks. No microphone permission here: a hold that would talk asks for it, which is how it shows. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -36,7 +33,6 @@ class VoiceKeyboardUatTest {
     @After
     fun close() = h.close()
 
-    // the space as the keyboard shows it (the scene's key on the canvas)
     private val space: ShownKey
         get() = h.keyNamed("space")
 
@@ -54,7 +50,6 @@ class VoiceKeyboardUatTest {
     @Test
     @Uat("VO-11")
     fun aPasswordFieldHasNoVoice() {
-        // a plain field: the bar has the microphone, holding the space talks
         h.start()
         assertTrue(microphone()?.let { h.shown(it) } == true)
         hold(space)
@@ -63,11 +58,10 @@ class VoiceKeyboardUatTest {
         assertFalse(microphone()?.let { h.shown(it) } == true)
         hold(space)
         assertFalse(asked())
-        // a slow drag moves the cursor: the space not held for voice
         h.api.calls.clear()
         val s = space
         h.touch(s, h.at(s), h.at(s, ms = 600), h.at(s, dx = -20f, ms = 400), h.at(s, dx = -60f, ms = 400))
-        // the cursor moved (Left, 0xff51), and no space typed: a drag that typed one passed the old check
+        // no space typed: a drag that typed one passed the old check
         val sent = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
         assertTrue(h.api.calls.toString(), sent.any { "sym=65361," in it })
         assertFalse(h.api.calls.toString(), sent.any { "sym=32," in it || "char= ," in it })

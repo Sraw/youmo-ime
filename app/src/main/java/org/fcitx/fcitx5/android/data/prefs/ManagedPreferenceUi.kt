@@ -28,13 +28,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
 
     fun isEnabled() = enableUiOn?.invoke() ?: true
 
-    /**
-     * A choice of a few [levels], each setting the int preferences [keys] at once; itself stored
-     * nowhere: shown as the level nearest what they hold, so a value set by an older version
-     * shows as its nearest level and stays till the user picks one. With [follow] (a boolean
-     * preference's key and default), 跟随主题 first: picked, it is set and the keys go back to
-     * their defaults; a level picked unsets it.
-     */
+    /** Stored nowhere itself: shown as the level nearest the [keys]' values, so an older value stays till the user picks. */
     class Levels(
         @StringRes
         val title: Int,
@@ -46,25 +40,20 @@ abstract class ManagedPreferenceUi<T : Preference>(
         val follow: Pair<String, Boolean>? = null,
     ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
 
-        /** A level named [label]: [values] for the keys, in their order. */
         class Level(@StringRes val label: Int, vararg val values: Int)
 
-        // 跟随主题's place before the levels
         private val first = if (follow != null) 1 else 0
 
-        /** 跟随主题 is set ([follow]). */
         fun following(): Boolean = follow?.let { (name, default) -> store.getBoolean(name, default) } ?: false
 
-        /** 跟随主题 (0) where it is set, else the level nearest what the keys hold ([LevelPick]: as the keyboard reads 键盘高度's). */
         fun current(): Int = if (following()) {
             0
         } else {
             first + LevelPick.nearest(keys.map { (name, default) -> store.getInt(name, default) }, levels.map { it.values.toList() })
         }
 
-        /** Sets the keys to level [index] (0 跟随主题 where there is [follow]), the one shown too if [again]; false if there is none such. */
         fun pick(index: Int, again: Boolean = false): Boolean {
-            // the one shown as the page opens: not written over what is there
+            // the one shown as the page opens is not written over what is there
             if (!again && index == current()) return true
             if (follow != null && index == 0) {
                 store.edit {
@@ -84,8 +73,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
         override fun createUi(context: Context) = object : ListPreference(context) {
             override fun getPersistedString(defaultReturnValue: String?) = current().toString()
 
-            // the level read as it opens is never written back: the keys may change between that read and
-            // pick's own (the search's index makes these off the main thread while the keyboard is up)
+            // never written back as it opens: the search index builds these off the main thread while the keyboard may change them
             private var opening = false
 
             override fun onSetInitialValue(defaultValue: Any?) {
@@ -99,7 +87,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
 
             override fun persistString(value: String?) = opening || pick(value?.toIntOrNull() ?: -1)
 
-            // the user's pick of the level shown (an older value's nearest): setValue sees no change
+            // the user's pick of the shown level: setValue sees no change
             override fun callChangeListener(newValue: Any?): Boolean {
                 if (!super.callChangeListener(newValue)) return false
                 if (newValue == value) pick((newValue as? String)?.toIntOrNull() ?: -1, again = true)
@@ -120,13 +108,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
         }
     }
 
-    /**
-     * A choice of [labels] itself stored nowhere: shown as [current] reads it, and [pick] writing what it stands
-     * for, as many keys as that takes, in one edit (KeyboardStyles: a shape's style and what is under it). The
-     * one shown picked again by the user is written too: a default only shown (横屏键盘样式 by the width) is then
-     * stored; as the page opens it is not (a style not set stays so). Shown anew as any of [watched] changes
-     * elsewhere (the keyboard's toggles while the page is open).
-     */
+    /** Stored nowhere: [pick] writes its keys in one edit. Picking the shown one stores it (a width-derived default becomes set). */
     class Choice(
         @StringRes
         val title: Int,
@@ -141,8 +123,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
         override fun createUi(context: Context) = object : ListPreference(context) {
             override fun getPersistedString(defaultReturnValue: String?) = current(context).toString()
 
-            // the one read as it opens is never written back: what is stored may change between that read and
-            // persist's own (the search's index makes these off the main thread while the keyboard is up)
+            // never written back as it opens (see Levels.opening)
             private var opening = false
 
             override fun onSetInitialValue(defaultValue: Any?) {
@@ -156,14 +137,13 @@ abstract class ManagedPreferenceUi<T : Preference>(
 
             override fun persistString(value: String?) = opening || persist(value, again = false)
 
-            // the one shown as the page opens (onSetInitialValue) is not written; the user's pick of it is
             private fun persist(value: String?, again: Boolean): Boolean {
                 val index = value?.toIntOrNull()?.takeIf { it in labels.indices } ?: return false
                 if (again || index != current(context)) pick(context, index)
                 return true
             }
 
-            // setValue sees no change in the one shown: picked all the same
+            // setValue sees no change in the shown one: picked all the same
             override fun callChangeListener(newValue: Any?): Boolean {
                 if (!super.callChangeListener(newValue)) return false
                 if (newValue == value) persist(newValue as? String, again = true)
@@ -196,7 +176,6 @@ abstract class ManagedPreferenceUi<T : Preference>(
         }
     }
 
-    /** A line of text, nothing to set: where a setting has gone. */
     class Note(
         @StringRes
         val text: Int,
@@ -246,8 +225,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
         val confirm: Confirm<T>? = null,
     ) : ManagedPreferenceUi<ListPreference>(key, enableUiOn) {
         override fun createUi(context: Context): ListPreference = object : ListPreference(context), TakenEntry {
-            // a stored value the list does not offer shows as what it reads as: the default; one apart
-            // from another list's, as it reads ([Apart.read])
+            // a stored value the list does not offer shows as the default
             override fun getPersistedString(defaultReturnValue: String?): String? {
                 val stored = super.getPersistedString(defaultReturnValue)
                 if (stored == null) return null
@@ -261,8 +239,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
 
             override val takenNote: Int get() = apart?.note ?: 0
 
-            // the other list changed: this one's pick read again ([Apart.read]), its summary with it, and
-            // stored so; the keyboard reads the two as stored. Held here: the preferences hold it weakly
+            // stored as reread, as the keyboard reads them stored. Held here: the preferences hold it weakly
             private val otherChanged = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
                 if (changed == key) return@OnSharedPreferenceChangeListener
                 val now = getPersistedString(null) ?: return@OnSharedPreferenceChangeListener
@@ -279,8 +256,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
                 super.onDetached()
             }
 
-            // the user's pick of that default: setValue sees no change, and persistString would see it stored.
-            // A pick [confirm] asks about first: set once the dialog's OK is pressed, not before
+            // setValue sees no change on picking the default, and persistString would see it stored
             override fun callChangeListener(newValue: Any?): Boolean {
                 val ask = confirm?.takeIf { newValue != value && newValue == codec.encode(it.value) }
                 if (ask != null && newValue is String) {
@@ -309,18 +285,11 @@ abstract class ManagedPreferenceUi<T : Preference>(
         }
     }
 
-    /**
-     * A list kept apart from another's choice: [taken] the place the other holds (null for none),
-     * offered greyed out with [note]; [read] what a stored value reads as, the two stored in one
-     * place (an import, a backup) till the next start stores it so ([AppPrefs.dropRetired]). The
-     * list's pick is read again as the other changes.
-     */
+    /** [read] maps a stored value while both share one place (an import) till [AppPrefs.dropRetired] stores it. */
     class Apart<T>(val taken: () -> T?, @StringRes val note: Int, val read: (T) -> T = { it })
 
-    /** A list's [value], what it means said first ([title], [message]): picked only once that dialog's OK is pressed. */
     class Confirm<T>(val value: T, @StringRes val title: Int, @StringRes val message: Int)
 
-    /** A list preference whose dialog greys out [takenIndex] (-1 for none), noted [takenNote]. */
     interface TakenEntry {
         val takenIndex: Int
         @get:StringRes
@@ -338,7 +307,7 @@ abstract class ManagedPreferenceUi<T : Preference>(
         val special: Special? = null,
         enableUiOn: (() -> Boolean)? = null
     ) : ManagedPreferenceUi<EditTextPreference>(key, enableUiOn) {
-        /** A value with a name of its own (「无上限」): a button in the dialog in place of the default's, [message] above the box. */
+        /** A named value (「无上限」): a dialog button in place of the default's. */
         data class Special(val value: Int, @StringRes val label: Int, @StringRes val message: Int)
 
         override fun createUi(context: Context) = EditTextIntPreference(context).apply {

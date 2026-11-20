@@ -15,29 +15,22 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 
 /**
- * The androidengine addon's config, `conf/androidengine.conf`: the option table of
- * `androidengine.h:27-198` (`AndroidEngineConfig` and the pages over it) with fcitx's
- * `Configuration` semantics (`fcitx-config/configuration.cpp:109-139`, `option.h:434-443`). Reading
- * and saving the file, each input method's page, the page's partial save and the settings the
- * engine reads ([toSettings]) are all here; the host only moves text and trees.
- *
- * A value that does not read (a bad boolean, a number out of range or not one, a name not known)
- * falls back to its default, not to the nearest value. A key the table does not have is dropped at
- * the next save, as fcitx's `save()` writes only its options.
+ * `conf/androidengine.conf`: the `AndroidEngineConfig` option table with fcitx's `Configuration` semantics, its
+ * pages, partial saves and [toSettings]. A bad value falls back to its default, not the nearest; an unknown key
+ * is dropped at the next save, as fcitx's `save()` writes only its options.
  */
 class EngineOptions {
 
-    /** How a value is read: the canonical text of a value that reads, null for one that does not. */
     sealed interface Kind {
         fun read(value: String): String?
     }
 
-    /** `marshallfunction.cpp:21-32`: `True` or `False` exactly. */
+    /** `True` or `False` exactly. */
     data object Flag : Kind {
         override fun read(value: String) = value.takeIf { it == "True" || it == "False" }
     }
 
-    /** `Option<int, IntConstrain>`: `std::from_chars` (a leading `-`, digits, the rest ignored), then the range (`option.h:434-443`). */
+    /** `std::from_chars` (a leading `-`, digits, the rest ignored), then the range. */
     class Number(val range: IntRange) : Kind {
         override fun read(value: String): String? {
             var end = if (value.startsWith('-')) 1 else 0
@@ -46,7 +39,6 @@ class EngineOptions {
         }
     }
 
-    /** An enum by its names (`enum.h:53-63`). */
     class Names(val names: List<String>) : Kind {
         override fun read(value: String) = value.takeIf { it in names }
     }
@@ -54,17 +46,14 @@ class EngineOptions {
     class Option(val key: String, val kind: Kind, val default: String)
 
     /**
-     * A sub-configuration option (`Option<EngineFuzzyConfig>`, a table's `Option<EngineTableConfig>`).
-     * Its [options]' defaults are those of a fresh sub-configuration: what an item missing or bad in a
-     * group that is there falls back to, and what an item is written as implicit against. [defaults]
-     * are the option's own (`engineTable(hint)`): what the whole group is when the file has no
-     * `[group]`, and what the group is implicit against.
+     * A sub-configuration option. Its [options]' defaults are a fresh sub-config's (what a bad item falls back to);
+     * [defaults] are the option's own (`engineTable(hint)`), used when the file has no `[group]`.
      */
     class Group(val key: String, val options: List<Option>, val defaults: Map<String, String> = emptyMap()) {
         fun default(option: Option) = defaults[option.key] ?: option.default
     }
 
-    // androidengine.h's options, each written once and shared by the pages, as there
+    // each option written once and shared by the pages
     private val shuangpin = Option(EngineSettings.SHUANGPIN_PROFILE, Names(EngineSettings.SCHEMES.keys.toList()), EngineSettings.XIAOHE)
     private val pageSize = Option(EngineSettings.PAGE_SIZE, Number(EngineSettings.PAGE_SIZES), EngineSettings.DEFAULT_PAGE_SIZE.toString())
     private val prediction = Option(EngineSettings.PREDICTION, Flag, TRUE)
@@ -81,24 +70,22 @@ class EngineOptions {
         listOf(Option(EngineSettings.TYPOS, Flag, TRUE)) + FUZZY_KEYS.map { Option(it, Flag, FALSE) },
     )
 
-    // ENGINE_TABLE_OPTIONS: libime table's keys; the engine orders by use alike for Freq and Fast
+    // libime table's keys; the engine orders by use alike for Freq and Fast
     private val autoSelect = Option(TableSettings.AUTO_SELECT, Flag, TRUE)
     private val hint = Option(TableSettings.HINT, Flag, TRUE)
     private val orderPolicy = Option(TableSettings.ORDER_POLICY, Names(listOf(NO_ORDER, "Freq", "Fast")), NO_ORDER)
     private val tableOptions = listOf(autoSelect, hint, orderPolicy)
 
-    // the app's own, where a table has roots (仓颉, 五笔): what its keys show of them. Its preset's
-    // by default in a fresh group too: a group an older config has (anything of the table changed)
-    // then shows 仓颉's roots as a new install does
+    // the app's own (仓颉, 五笔): what keys show of roots; the preset's by default even in a fresh group
     private fun keyLabels(default: KeyLabels) = Option(TableSettings.KEY_LABELS, Names(KeyLabels.entries.map { it.key }), default.key)
 
-    // each table's group, named as androidengine.cpp lists them; engineTable(hint) of the preset
+    // each table's group, named as androidengine.cpp lists them
     private val tables: Map<String, Group> = InputMethodCatalog.TABLES.mapValues { (_, method) ->
         val options = if (method.options.roots != null) tableOptions + keyLabels(method.options.keyLabels) else tableOptions
         Group(method.group, options, mapOf(TableSettings.HINT to flag(method.options.hint)))
     }
 
-    /** `AndroidEngineConfig`'s options in order (its two `ExternalOption`s are never saved, `option.cpp:73`). */
+    /** In order; the two `ExternalOption`s are never saved. */
     private val entries: List<Any> = listOf(
         shuangpin, pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, fuzzy, englishSuggest, candidateReading,
         strokeSingles,
@@ -120,27 +107,19 @@ class EngineOptions {
         }
     }
 
-    /** The value at [path] (`PageSize`, `Fuzzy/L_N`, `Wubi/Hint`), null for a path the table has none at. */
+    /** At a path (`PageSize`, `Fuzzy/L_N`, `Wubi/Hint`); null where the table has none. */
     operator fun get(path: String): String? = values[path]
 
-    /** `AndroidEngineConfig::pageSize`, what the router pages punctuation's marks by. */
     val pageSizeValue: Int get() = values.getValue(pageSize.key).toInt()
 
-    /** `englishSuggest`: whether English offers words (`AndroidEngine::suggestsEnglish`). */
+    /** `AndroidEngine::suggestsEnglish`. */
     val suggestsEnglish: Boolean get() = values.getValue(englishSuggest.key) == TRUE
 
-    /**
-     * What the last [load] changed of 双拼's scheme as stored ([SchemeMigration]): null, nothing; else
-     * the config is to be written, and a dropped scheme told.
-     */
+    /** Non-null: the config is to be written, and a dropped scheme told. */
     var schemeMigrated: SchemeMigration.Outcome? = null
         private set
 
-    /**
-     * Reads [text], the file, as the addon does at start (`readAsIni` → `Configuration::load(raw)`,
-     * not partial): what it does not say is the default. 双拼's scheme then as 0.5 has them
-     * ([SchemeMigration]), [upgrade] whether the install is one from before 0.5 not yet settled.
-     */
+    /** As the addon does at start (not partial): what it does not say is the default. [upgrade]: from before 0.5, not yet settled. */
     fun load(text: String, upgrade: Boolean = false) {
         reset()
         val tree = IniFile.read(text)
@@ -149,7 +128,7 @@ class EngineOptions {
         schemeMigrated?.let { values[shuangpin.key] = it.name }
     }
 
-    // Configuration::load (configuration.cpp:109-124) over entries
+    // Configuration::load over entries
     private fun load(tree: ConfigTree, partial: Boolean) {
         for (entry in entries) {
             when (entry) {
@@ -157,7 +136,7 @@ class EngineOptions {
                     values[entry.key] = entry.kind.read(node.value) ?: entry.default
                 }
                 is Group -> tree.find(entry.key)?.let { node ->
-                    // not partial, Option::unmarshall starts from a fresh sub-configuration (option.h:435-438)
+                    // not partial, Option::unmarshall starts from a fresh sub-configuration
                     if (!partial) freshGroup(entry)
                     loadGroup(entry, node)
                 }
@@ -167,8 +146,7 @@ class EngineOptions {
 
     private fun freshGroup(group: Group) = group.options.forEach { values[path(group, it)] = it.default }
 
-    // a sub-configuration's own Configuration::load, partial or not as its caller's: an item
-    // missing keeps what is there (the fresh default, unless partial), a bad one resets to the fresh default
+    // an item missing keeps what is there, a bad one resets to the fresh default
     private fun loadGroup(group: Group, node: ConfigTree) {
         for (option in group.options) {
             val item = node.find(option.key) ?: continue
@@ -176,7 +154,7 @@ class EngineOptions {
         }
     }
 
-    /** The config as `Configuration::save` makes it (`configuration.cpp:126-139`), each item implicit at its default. */
+    /** `Configuration::save`, each item implicit at its default. */
     fun save(): ConfigTree = ConfigTree().also { tree ->
         for (entry in entries) {
             when (entry) {
@@ -198,14 +176,10 @@ class EngineOptions {
         }
     }
 
-    /** The file's text, as `safeSaveAsIni` writes it but for the description comments. */
+    /** As `safeSaveAsIni` writes it but for the description comments. */
     fun text(): String = IniFile.write(save())
 
-    /**
-     * The settings as the addon pushes them to the engine (`androidengine.cpp:473-491`): every
-     * value, defaults too, each table's group among them. The nine keys' letters are not the
-     * addon's (the app merges its own preference in).
-     */
+    /** Every value, defaults too; the nine keys' letters are the app's to merge in. */
     fun toSettings(): EngineSettings {
         fun flag(path: String) = values.getValue(path) == TRUE
         return EngineSettings(
@@ -223,7 +197,6 @@ class EngineOptions {
                 group.key to TableSettings(
                     autoSelect = flag(path(group, autoSelect)),
                     hint = flag(path(group, hint)),
-                    // Freq and Fast alike
                     orderByUse = values.getValue(path(group, orderPolicy)) != NO_ORDER,
                     keyLabels = values["${group.key}/${TableSettings.KEY_LABELS}"]?.let(KeyLabels::of),
                 )
@@ -234,11 +207,7 @@ class EngineOptions {
         )
     }
 
-    /**
-     * [im]'s page as `getConfigForInputMethod` gives it (`androidengine.cpp:421-450`): the options
-     * it shows under the same keys, a table's own at the top beside the shared ones; null for an
-     * input method the addon has no page for.
-     */
+    /** `getConfigForInputMethod`: a table's own at the top beside the shared ones; null without a page. */
     fun page(im: String): ConfigTree? {
         val tree = ConfigTree()
         val table = tables[im]
@@ -261,7 +230,7 @@ class EngineOptions {
                 }
             }
         }
-        // ENGINE_TABLE_OPTIONS on EngineTablePage: implicit against a fresh table config's defaults
+        // implicit against a fresh table config's defaults
         table?.options?.forEach { option ->
             tree[option.key].also {
                 it.value = values.getValue(path(table, option))
@@ -271,12 +240,7 @@ class EngineOptions {
         return tree
     }
 
-    /**
-     * [page], what the app saves of [im]'s page (only what it shows), loaded partially as
-     * `setConfigForInputMethod` does (`androidengine.cpp:452-470`): a table's own keys into its group,
-     * then every key the config has at its path; a bad value resets that option. False, nothing
-     * changed, for an input method with no page.
-     */
+    /** `setConfigForInputMethod`, partial: a table's keys into its group, a bad value resets; false without a page. */
     fun setPage(im: String, page: ConfigTree): Boolean {
         if (pageOf(im) == null) return false
         tables[im]?.let { loadGroup(it, page) }
@@ -284,7 +248,7 @@ class EngineOptions {
         return true
     }
 
-    // the entries of androidengine.h's page for [im]: EnginePinyinPage and the others
+    // EnginePinyinPage and the others
     private fun pageOf(im: String): List<Any>? = when (im) {
         InputMethodCatalog.PINYIN -> listOf(pageSize, prediction, emoji, chaizi, builtInPhrases, modelLevel, latinWords, candidateReading, strokeSingles, fuzzy)
         InputMethodCatalog.SHUANGPIN -> listOf(shuangpin, pageSize, prediction, emoji, modelLevel, fuzzy)
@@ -301,7 +265,7 @@ class EngineOptions {
         private const val FALSE = "False"
         private const val NO_ORDER = "No"
 
-        // EngineFuzzyConfig's order after NG_GN (androidengine.h:36-51)
+        // EngineFuzzyConfig's order after NG_GN
         private val FUZZY_KEYS = listOf(
             "V_U", "AN_ANG", "EN_ENG", "IAN_IANG", "IN_ING", "U_OU", "UAN_UANG", "C_CH", "F_H", "L_N", "L_R", "S_SH", "Z_ZH",
         )

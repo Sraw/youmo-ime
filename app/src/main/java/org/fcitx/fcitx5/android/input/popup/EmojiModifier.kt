@@ -54,7 +54,6 @@ object EmojiModifier {
         val modifiable = BooleanArray(codePoints.size) {
             UCharacter.hasBinaryProperty(codePoints[it], UProperty.EMOJI_MODIFIER_BASE)
         }
-        // make U+1F91D not modifiable if the whole sequence is special
         if (codePoints contentEquals SpecialCase2) {
             modifiable[2] = false
         }
@@ -97,7 +96,7 @@ object EmojiModifier {
         return paint.hasGlyph(emoji)
     }
 
-    /** [isValidEmoji] with a paint of its own, for another thread than the main one's (the engine's): a paint is not shared safely. */
+    /** A paint of its own, for another thread than the main one's: a paint is not shared safely. */
     fun validator(): (String) -> Boolean {
         val paint = TextPaint()
         return { isValidEmoji(it, paint) }

@@ -20,7 +20,7 @@ object SubtypeManager {
 
     private const val IM_KEYBOARD = InputMethodNames.KEYBOARD
 
-    // replaced whole, never changed in place: the main thread reads it while another thread syncs
+    // replaced whole, never changed in place: main reads it while another thread syncs
     @Volatile
     private var knownSubtypes: Map<String, InputMethodSubtype> = emptyMap()
 
@@ -28,20 +28,12 @@ object SubtypeManager {
         return knownSubtypes[inputMethod]
     }
 
-    /**
-     * The fcitx input method of one of our subtypes; null for one without (the system's, before
-     * [syncWith] has run on a fresh install), which says nothing of what the user picked: taking it
-     * for the keyboard opened every first field in English.
-     */
+    /** Null for a subtype without one (the system's, before [syncWith] on a fresh install): taking that for the keyboard opened every first field in English. */
     fun inputMethodOf(subtype: InputMethodSubtype): String? {
         return subtype.extraValue.ifEmpty { null }
     }
 
-    /**
-     * The order subtypes are registered in: the system takes the first for the current one until
-     * the user picks another, and the first field switches to it, so the keyboard first opened
-     * every fresh install in English. The keyboard goes last, the rest keep their order.
-     */
+    /** The system takes the first as current until the user picks: the keyboard goes last, so a fresh install does not open in English. */
     fun registrationOrder(enabled: Array<InputMethodEntry>): List<InputMethodEntry> =
         enabled.sortedBy { it.uniqueName == IM_KEYBOARD }
 
@@ -69,8 +61,7 @@ object SubtypeManager {
         knownSubtypes = known
         val imm = appContext.inputMethodManager
         val imiId = InputMethodUtil.componentName
-        // although this method has been marked as deprecated,
-        // dynamic subtypes have to be "registered" before they can be "enabled"
+        // deprecated, but dynamic subtypes must be "registered" before they can be "enabled"
         @Suppress("DEPRECATION")
         imm.setAdditionalInputMethodSubtypes(imiId, subtypes)
         imm.setExplicitlyEnabledInputMethodSubtypes(imiId, hashCodes)

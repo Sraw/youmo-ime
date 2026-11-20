@@ -1,4 +1,4 @@
-// 配色 (060-render-p3 §5.1 panel 1): the named colours by group and the theme's own, a picker or an expression
+// 配色: the named colours by group and the theme's own, a picker or an expression
 // each; the dark version's switch; colours worked out of the background picture.
 (function (root) {
   'use strict';

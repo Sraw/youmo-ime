@@ -10,11 +10,7 @@ import org.fcitx.fcitx5.android.engine.data.forEachNumberedLine
 import org.fcitx.fcitx5.android.engine.data.trimSeparators
 import java.io.BufferedReader
 
-/**
- * Streams an ARPA backoff language model, up to trigrams (what the engine scores with).
- * Checks the structure as it goes: the n-gram counts must match the `\data\` header, and a
- * missing backoff means 0, as ARPA specifies.
- */
+/** Streams an ARPA backoff model up to trigrams, checking the counts against `\data\`; a missing backoff is 0. */
 object ArpaReader {
 
     const val MAX_ORDER = 3

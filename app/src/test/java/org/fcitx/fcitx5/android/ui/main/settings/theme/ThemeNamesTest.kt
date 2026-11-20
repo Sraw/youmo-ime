@@ -22,7 +22,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** The name under each card of the theme list (the owner, 0.6.0-beta2): what it says and how it is laid. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN")
 class ThemeNamesTest {
@@ -33,7 +32,7 @@ class ThemeNamesTest {
     fun eachKindOfThemeIsNamedAsTheUserKnowsIt() {
         val builtin = ThemeManager.BuiltinThemes.associate { it.file to shown(it) }
         assertEquals(mapOf("monet" to "动态取色", "material" to "Material", "pixel" to "Pixel", "amoled-black" to "AMOLED 黑"), builtin)
-        // a pack by its file, both versions of 简蓝 one name
+        // a pack by its file, both versions one name
         assertEquals(setOf("简蓝"), ThemeManager.BuiltinPackThemes.filter { it.file == "简蓝" }.map(::shown).toSet())
         assertEquals("国风·天青", shown(ThemeManager.BuiltinPackThemes.single { it.file == "国风·天青" }))
         assertEquals("我的蓝", shown(TestThemes.MaterialLight.deriveCustomNoBackground("我的蓝")))
@@ -51,11 +50,10 @@ class ThemeNamesTest {
         assertSame(ui.root, ui.name.parent)
         assertSame(ui.root, ui.card.parent)
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_YES, ui.name.importantForAccessibility)
-        // the card above the name
         assertEquals(listOf(ui.card, ui.name), (0 until ui.root.childCount).map { ui.root.getChildAt(it) })
     }
 
-    // several themes named by UUIDs: 我的主题, 我的主题 2, 3 by their UUIDs' order, whatever the list's
+    // several UUID-named themes: 我的主题, 我的主题 2, 3 by UUID order, whatever the list's
     @Test
     fun severalUnnamedThemesAreNumberedTheSameWayInAnyOrder() {
         val ids = listOf("c0000000-0000-0000-0000-000000000000", "a0000000-0000-0000-0000-000000000000", "b0000000-0000-0000-0000-000000000000")
@@ -71,7 +69,7 @@ class ThemeNamesTest {
         assertEquals("我的主题 3", ui.name.text.toString())
     }
 
-    // the name row grows with the font size set (at 2.0 its 12 sp line does not fit 24 dp)
+    // at 2.0 its 12 sp line does not fit 24 dp
     @Test
     fun theNameRowGrowsWithTheFontScale() {
         val normal = ThemeNames.rowHeight(appContext)
@@ -80,7 +78,6 @@ class ThemeNamesTest {
         try {
             val large = ThemeNames.rowHeight(appContext)
             assertTrue("$normal < $large", normal < large)
-            // its line (24 sp at 2.0) and room
             assertTrue(themeNameView(appContext).textSize * 1.4f <= large)
             assertEquals(normalItem - normal + large, ResponsiveThemeListView(appContext).itemHeight)
         } finally {

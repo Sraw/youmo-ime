@@ -8,8 +8,8 @@ import org.fcitx.fcitx5.android.engine.platform.LogFile
 import java.io.IOException
 
 /**
- * Replaces [dest] with what [write] puts in [temp], whole or not at all, and leaves no [temp]
- * behind; a return out of [write] keeps [dest] as it was.
+ * Replaces [dest] with what [write] puts in [temp], whole or not at all, leaving no [temp]; returning out of
+ * [write] keeps [dest].
  *
  * @throws IOException if [dest] could not be replaced
  */

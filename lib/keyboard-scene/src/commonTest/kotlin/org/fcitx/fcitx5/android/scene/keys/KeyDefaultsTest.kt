@@ -119,7 +119,7 @@ class KeyDefaultsTest {
 
     @Test
     fun aThemesFirstIsItsSwipesTextAsItTypes() {
-        // a theme's `swipe-up=` as the scene reads it (060-s6-review M2): text typed as is, a key's, a code point's; an
+        // a theme's `swipe-up=` as the scene reads it: text typed as is, a key's, a code point's; an
         // action no list has offers no first
         assertEquals(Item("qq", Commit.AsIs), KeyDefaults.itemOf("commit:qq"))
         assertEquals(Item("!"), KeyDefaults.itemOf("key:!"))
@@ -153,13 +153,13 @@ class KeyDefaultsTest {
         assertEquals(listOf("哈哈"), texts(l))
         assertEquals(Item("哈哈", Commit.AsIs), l.first)
         assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts()))
-        // one that writes `<popup from="none"/>` has none, its swipe-up= or alt= aside (R26 F8345)
+        // one that writes `<popup from="none"/>` has none, its swipe-up= or alt= aside
         val none = Popup("none", null, emptyList(), emptyMap())
         assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts(popup = none, layoutFirst = "commit:哈哈")))
         assertNull(KeyDefaults.of(KeyId("full/q"), full, NodeFacts(text = "q", typing = true, popup = none, layoutFirst = "commit:qq")))
         // an action first names no item of a list: none
         assertNull(KeyDefaults.of(KeyId("mine/ha"), full, NodeFacts(layoutFirst = "sym:BackSpace")))
-        // nor a bare word of the vocabulary: an action, never its letters typed (L6 review M1)
+        // nor a bare word of the vocabulary: an action, never its letters typed
         for (word in listOf("ime-picker", "lang", "panel-back", "space-long-press", "caps")) {
             assertNull(KeyDefaults.of(KeyId("mine/globe"), full, NodeFacts(layoutFirst = word)), word)
             assertEquals(Item("", Commit.Action(word)), KeyDefaults.itemOf(word))

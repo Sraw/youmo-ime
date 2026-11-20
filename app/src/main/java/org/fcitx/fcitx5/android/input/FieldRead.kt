@@ -10,12 +10,7 @@ import android.view.inputmethod.InputConnection
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 
-/**
- * The field around the cursor as a run of deletions reads it ([ClearedText.deleting]): one round trip
- * where the editor gives its text around the selection at once ([sdk] 31 and up), its place from the
- * text's offset, or [tracked] (the selection the service follows) where the editor gives none; else a
- * read of each side and the selection. Null where the editor gives neither.
- */
+/** One round trip where the editor gives its text around the selection at once (API 31+), else a read of each side and the selection. */
 internal fun readAround(
     ic: InputConnection,
     tracked: Int,
@@ -35,9 +30,8 @@ internal fun readAround(
     )
 }
 
-// the text around the selection in one round trip (API 31): null where the editor gives none, or one
-// that does not hold together. Called only behind `sdk >= S`, which lint cannot see through (tests pass
-// the level): the suppression on these API 31 calls alone, not over any added to readAround
+// called only behind `sdk >= S`, which lint cannot see through (tests pass the level): the suppression on these
+// API 31 calls alone, not over any added to readAround
 @SuppressLint("NewApi")
 private fun readSurrounding(ic: InputConnection, tracked: Int, before: Int, after: Int): ClearedText.Read? {
     val around = ic.getSurroundingText(before, after, 0) ?: return null

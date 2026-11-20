@@ -20,11 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
-/**
- * A pack's theme as drawn is the instance's own: a copy equal to an older one (the system's colours set anew, the
- * packs listed again) draws its own theme, not the older one's kept, so a pack whose colours are `system()` follows
- * the wallpaper's colours.
- */
+/** A copy equal to an older one (system colours set anew) draws its own theme, so a pack of `system()` colours follows the wallpaper. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SceneThemesPackTest {
@@ -45,7 +41,6 @@ class SceneThemesPackTest {
         val look = ThemeManager.shownLook(old)
         assertSame(old.drawn, SceneThemes.of(old, look))
         val again = old.copy()
-        // equal, as the colours set anew make it, its theme read anew
         assertNotSame(old.drawn, again.drawn)
         assertSame(again.drawn, SceneThemes.of(again, look))
     }

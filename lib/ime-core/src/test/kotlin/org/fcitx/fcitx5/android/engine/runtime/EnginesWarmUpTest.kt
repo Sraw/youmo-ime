@@ -16,11 +16,7 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 
-/**
- * What [Engines] reads ahead of the first keys, handed to its warm-ups: pinyin's data and word
- * index as a field starts ([Engines.context]), English's keys and word index as its session is
- * first made.
- */
+/** What [Engines] reads ahead of the first keys: pinyin's data as a field starts, English's as its session is made. */
 class EnginesWarmUpTest : EnginesFixture() {
 
     // run when a test says, as a thread would run them some time later
@@ -37,11 +33,9 @@ class EnginesWarmUpTest : EnginesFixture() {
     fun pinyinsDataIsReadOffTheFcitxThreadOnceAsTheFirstFieldStarts() {
         val engines = Engines(::load, null, warmUps = warmUps)
         engines.context(InputMethodCatalog.T9, "")
-        // nothing read on the fcitx thread
         assertEquals(emptyList<String>(), loaded)
         assertEquals(1, later.size)
-        // and what is placed beside its candidates, not at the first key: the nine keys' emoji, and
-        // full pinyin's characters by their parts once a field starts there, the data not read again
+        // the nine keys' emoji and the parts' characters are read once a field starts, not at the first key
         engines.context(InputMethodCatalog.PINYIN, "你")
         assertEquals(2, later.size)
         engines.context(InputMethodCatalog.PINYIN, "")
@@ -61,7 +55,6 @@ class EnginesWarmUpTest : EnginesFixture() {
         assertEquals(
             listOf(
                 listOf(WarmUp.PINYIN_WORDS, WarmUp.CHAR_SYLLABLES, WarmUp.EMOJI),
-                // only what full pinyin adds to the nine keys'
                 listOf(WarmUp.PINYIN_WORDS, WarmUp.CHAR_SYLLABLES, WarmUp.CHAIZI, WarmUp.CHAR_READINGS),
             ),
             handed(),
@@ -76,7 +69,6 @@ class EnginesWarmUpTest : EnginesFixture() {
         val engines = Engines(::load, null, warmUps = warmUps)
         engines.context(InputMethodCatalog.ENGLISH, "")
         assertEquals(emptyList<Runnable>(), later)
-        // nor read on the fcitx thread instead
         assertEquals(emptyList<String>(), loaded)
         // a table ranks and learns by pinyin's words too (TableLanguage)
         engines.context(InputMethodCatalog.WUBI, "")
@@ -106,8 +98,6 @@ class EnginesWarmUpTest : EnginesFixture() {
         later.single().run()
     }
 
-    // review R11 F2726/F3111: 中英混输 asks English's words of each English word learned at the first
-    // key: a field started in 全拼 reads English then, if there is one learned and habits are on
     @Test
     fun aFieldStartedInFullPinyinWarmsEnglishUpOnlyForAWordLearned() {
         val none = Engines(::load, null, warmUps = warmUps)
@@ -123,7 +113,7 @@ class EnginesWarmUpTest : EnginesFixture() {
         assertTrue(learned.addEnglishWord("youmo"))
         learned.context(InputMethodCatalog.PINYIN, "", started = true)
         assertTrue(InputMethodCatalog.ENGLISH_DATA in loaded)
-        // its index made off the fcitx thread, with pinyin's: however many tasks that takes (F3227)
+        // its index made off the fcitx thread, with pinyin's: however many tasks that takes
         assertTrue(later.isNotEmpty())
         later.forEach { it.run() }
         // English typed after reads nothing more: its index was made there
@@ -148,8 +138,7 @@ class EnginesWarmUpTest : EnginesFixture() {
         assertThrows(IllegalStateException::class.java) { broken.type(InputMethodCatalog.PINYIN, "n") }
     }
 
-    // Engines over [assets] once a field started and English was typed in it, the warm-up run as it
-    // is handed over: what it cannot read must not escape its thread, which on Android ends the app
+    // what the warm-up cannot read must not escape its thread, which on Android ends the app
     private fun fieldStarted(assets: (String) -> ByteBuffer): Engines {
         val engines = Engines(assets, null, warmUps = inPlace)
         engines.context(InputMethodCatalog.PINYIN, "")

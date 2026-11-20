@@ -1,11 +1,5 @@
-// The theme maker's engine (060-render-p3 W1: lib/keyboard-scene's library, youmo-engine.js) against what the
-// JVM's engine and the app make: every snapshot's scene built through the library's facade is the snapshot
-// (lib/keyboard-scene's facade/shots.json says how each was asked for), a theme 3.0 made 4.0 is the JVM's, and
-// the library's painter draws on a 2D context what the app's ScenePainter draws on its canvas (testdata/paint.txt,
-// EnginePaintTest's), line for line.
+// The theme maker's engine against the JVM's snapshots and the app's drawing, which neither side's own tests can see.
 // Run: ./gradlew :lib:keyboard-scene:youmoEngine, then node --test web/theme-maker/test/engine.test.mjs
-// contract: the library's facade (YoumoEngine) and CanvasPainter against the JVM's snapshots and the app's
-// drawing, which neither side's own tests can see.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -18,17 +12,17 @@ const here = dirname(fileURLToPath(import.meta.url));
 const scene = join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src');
 const data = join(scene, 'commonTest', 'data');
 const testdata = join(here, 'testdata');
+const generated = join(here, '..', 'generated');
 const read = (...p) => readFileSync(join(...p), 'utf8');
-// a built-in layout as the library keeps it (lib/keyboard-scene's builtInFiles, packed): no comments, no indents, its lines kept
 const packed = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => '\n'.repeat(c.split('\n').length - 1)).replace(/^[ \t]+|[ \t]+$/gm, '');
 
-// Path2D is the browser's; an icon's path here is its name (the icons below), so a fill of one says which
+// Path2D is the browser's; an icon's path here is its name, so a fill of one says which
 globalThis.Path2D = class { constructor(d) { this.d = d; } };
 const E = createRequire(import.meta.url)(ENGINE).YoumoEngine;
 const fixed = E.fixedMeasurer();
 const shots = JSON.parse(read(data, 'facade', 'shots.json'));
 
-// a shot's theme as SnapshotTest's ThemeSource makes it (Kotlin's replace: every one; a function, so a `$` put in is text)
+// Kotlin's replace: every one; a function, so a `$` put in is text
 const themes = new Map();
 function theme(t) {
   const key = JSON.stringify(t);
@@ -52,7 +46,6 @@ function built(s) {
 
 test('every snapshot is what the library builds of its ask (the JVM wrote them, the library is held to them)', () => {
   const all = [...shots.shots, ...shots.popups];
-  // bar-*: T6a's BarSample scenes, built straight from the sample, not asked of the facade
   const names = all.map((s) => s.name + '.txt').sort();
   assert.deepEqual(names, readdirSync(join(data, 'snapshots')).filter((f) => !f.startsWith('bar-')).sort(), 'a shot for every snapshot, each once');
   const wrong = all.filter((s) => built(s).text() !== read(data, 'snapshots', s.name + '.txt')).map((s) => s.name);
@@ -68,7 +61,6 @@ test("a board's default marks are the app's (the JVM recorded them), its own lay
   const mapped = E.defaultMarks(own.layout, { '@': '＠' });
   assert.deepEqual(mapped.shortcuts['full/a:up'], { symbol: '＠' });
   assert.deepEqual(mapped.shortcuts['full/c:down'], { icon: 'content-copy' });
-  // nine's firsts are its digits, a keypad's (1's too, D7: DefaultMarksTest): keys, not marks typed, so no map changes them
   const nine = E.defaultMarks('nine', null);
   assert.deepEqual(nine.shortcuts['t9/1:up'], { symbol: '1' });
   assert.deepEqual(E.defaultMarks('nine', { '1': 'x', '2': 'x', ',': '，' }), nine);
@@ -98,7 +90,6 @@ test('a theme 3.0 is made 4.0 as the JVM makes it, its files named alike', () =>
   assert.equal(c.name, 'full');
   assert.equal(c.dark, true);
   assert.equal(c.files.map(([a, b]) => a + ' ' + b + '\n').join(''), read(data, 'facade', 'look-3.0-files.txt'));
-  // what it makes reads, and draws
   const t = E.readTheme(c.xml, null, null);
   assert.ok(t.ok, JSON.stringify(t.problems));
   assert.ok(E.buildScene('qwerty', t.theme, { width: 1080, height: 702, density: 2.625, dark: true }, fixed).ok);
@@ -119,12 +110,10 @@ test('a theme is written as the JVM writes it; a bad one is its problems with th
   assert.equal(bad.ok, false);
   assert.ok(bad.problems.length > 0 && bad.problems.every((p) => typeof p.line === 'number' && p.message));
   assert.equal(E.readTheme('', null, null).ok, false);
-  // system() colours from the page: a wrong one is a problem, not a throw
   assert.equal(E.readTheme(read(data, 'material-light.xml'), { light: { primary: 'red' } }, null).ok, false);
   assert.ok(E.readTheme(read(data, 'material-light.xml'), { light: { primary: '#ff0000' }, dark: {} }, null).ok);
 });
 
-// also: the built-in themes and layouts are what the build put in (lib/keyboard-scene builtInFiles)
 test("the app's layouts are the library's, a layout of a page's reads with its own fragments or the app's", () => {
   const dir = join(scene, 'commonMain', 'layouts');
   const files = readdirSync(dir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort();
@@ -134,14 +123,12 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.equal(E.layoutSource('nope'), null);
   assert.equal(E.layout('grouped-bottom'), null, 'a fragment is no board');
   assert.equal(E.layout('qwerty').id, 'qwerty');
-  // the app's themes (060-render-p3 T3's files, where there are any)
   const themesDir = join(scene, 'commonMain', 'themes');
   let themeFiles = [];
   try { themeFiles = readdirSync(themesDir).filter((f) => f.endsWith('.xml')).map((f) => f.slice(0, -4)).sort(); } catch (e) { /* none yet */ }
   assert.deepEqual([...E.themes()], themeFiles);
   for (const f of themeFiles) {
     assert.equal(E.themeSource(f), read(themesDir, f + '.xml'));
-    // each reads and builds in the library, each of its versions
     const t = E.readTheme(E.themeSource(f), null, null);
     assert.ok(t.ok, f + ': ' + JSON.stringify(t.problems));
     for (const v of t.theme.variants) assert.ok(E.buildScene('qwerty', t.theme, { width: 1080, height: 702, density: 2.625, dark: v === 'dark' }, fixed).ok, f + ' ' + v);
@@ -153,7 +140,6 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   const light = theme({ file: 'material-light.xml' });
   const env = { width: 1080, height: 702, density: 2.625 };
   assert.equal(E.buildScene(own.layout, light, env, fixed).scene.text(), E.buildScene('k14', light, env, fixed).scene.text());
-  // its own bottom row instead of the app's
   const fragment = read(dir, 'grouped-bottom.xml');
   const mine = E.readLayout(k14, { 'grouped-bottom': fragment });
   assert.ok(mine.ok);
@@ -161,8 +147,6 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.equal(missing.ok, false);
   assert.match(missing.problems[0].message, /nowhere/);
   assert.equal(E.readLayout(k14, { 'grouped-bottom': '<fragment' }).ok, false);
-  // as a theme pack's file of a board (主题只管外观, KeyData): a key's held and swiped the app's of its name, what is written
-  // of them and not taken told with its line; as written without the board
   const zhuyin = read(dir, 'zhuyin.xml');
   const swiped = zhuyin.replace('shortcut="zyfull/1"', 'shortcut="zyfull/1" swipe-up="commit:ㄅㄅ"');
   const asPack = E.readLayout(swiped, null, 'zhuyin');
@@ -173,13 +157,11 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.deepEqual(E.defaultMarks(asPack.layout, {}), E.defaultMarks('zhuyin', {}));
   assert.deepEqual(E.readLayout(swiped, null).ignored, []);
   assert.deepEqual(E.readLayout(zhuyin, null, 'zhuyin').ignored, [], 'written as the app has it: nothing');
-  // a pack's k14.xml writing based-on="k18" is the 14 keys' still: held as the app's k14, its corners the 14 keys'
   const as18 = E.readLayout(k14.replace('<keyboard ', '<keyboard based-on="k18" '), null, 'k14');
   assert.ok(as18.ok, JSON.stringify(as18.problems));
   assert.deepEqual(E.defaultMarks(as18.layout, {}), E.defaultMarks('k14', {}));
   assert.equal(E.buildScene(as18.layout, light, env, fixed).scene.text(), E.buildScene('k14', light, env, fixed).scene.text());
   assert.ok(E.replaces('grouped-bottom') && E.replaces('emoticon') && E.replaces('zhuyin') && !E.replaces('mine'));
-  // the boards the user picks among their own layouts: a pack's file of one is not stood for (061-custom-layout §11)
   for (const id of ['qwerty', 'k14', 'k18', 'nine', 'number', 'symbols']) assert.ok(!E.replaces(id), id);
   assert.equal(E.buildScene('nope', light, env, fixed).ok, false);
   assert.equal(E.buildScene('qwerty', light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
@@ -187,9 +169,8 @@ test("the app's layouts are the library's, a layout of a page's reads with its o
   assert.equal(E.buildPopup(light, env, { kind: 'nothing' }, fixed).ok, false);
 });
 
-// ------------------------------------------------------------------ the painter, on a context that writes down
 
-// one decimal, as EnginePaintTest writes (Kotlin's roundToLong: halves up)
+// Kotlin's roundToLong: halves up
 const fixedN = (v, places) => {
   const units = Math.floor(v * 10 ** places + 0.5);
   const sign = units < 0 ? '-' : '';
@@ -206,17 +187,9 @@ function argb(css) {
   throw new Error('a colour the painter does not write: ' + css);
 }
 
-/**
- * A 2D context that writes, as EnginePaintTest's canvas does, a line for each thing drawn, in the device's pixels:
- * a blurred thing is the shadow of what was drawn far off, so its place is the shadow's, its colour the shadow's,
- * its sigma the shadow's blur halved; glyphs stroked and then filled alike are one text with its stroke. Its canvas
- * makes layers (the painter's, a canvas of its document): what is drawn on one is written when it is laid on this,
- * as it is laid (a fill with a shape cut out of it a fill less that shape; at an alpha, its colour's that alpha; as
- * a shadow, the shadow's colour and blur, nothing cut out: Android's blur of the one shape).
- */
+/** A 2D context that writes, as EnginePaintTest's canvas does, a line for each thing drawn, in device pixels. */
 class RecordingContext {
   constructor(canvas = RecordingContext.page()) {
-    // a line is a string, or an entry ([line] writes it) that a layer laid can still change
     this.lines = [];
     this.canvas = canvas;
     this.s = this.fresh();
@@ -224,7 +197,6 @@ class RecordingContext {
     this.path = [];
   }
 
-  // the page's canvas: its size the shots' at most, layers made as a document makes canvases
   static page() {
     return { width: 4000, height: 4000, ownerDocument: { createElement: () => {
       const layer = { width: 0, height: 0 };
@@ -242,7 +214,6 @@ class RecordingContext {
     };
   }
 
-  // the state's members as a context's properties
   static {
     for (const k of ['fillStyle', 'strokeStyle', 'lineWidth', 'lineJoin', 'lineCap', 'miterLimit', 'font', 'letterSpacing', 'shadowColor', 'shadowBlur',
       'shadowOffsetX', 'shadowOffsetY', 'globalAlpha', 'globalCompositeOperation', 'textAlign', 'textBaseline']) {
@@ -250,7 +221,6 @@ class RecordingContext {
     }
   }
 
-  // the lines as EnginePaintTest writes them
   written() { return this.lines.map((l) => (typeof l === 'string' ? l : RecordingContext.line(l))); }
 
   static line(e) {
@@ -260,7 +230,6 @@ class RecordingContext {
       (e.rot !== 0 ? ' rot=' + e.rot : '');
   }
 
-  // a level's own clip is its own (a restore of it writes `unclip`)
   save() {
     this.stack.push(this.s);
     this.s = { ...this.s, m: [...this.s.m], clip: null };
@@ -287,7 +256,6 @@ class RecordingContext {
 
   map(x, y) { const [a, b, c, d, e, f] = this.s.m; return [a * x + c * y + e, b * x + d * y + f]; }
 
-  // a path's points in the device's pixels as they are added (a canvas's path is), by subpath
   beginPath() { this.path = []; }
   moveTo(x, y) { this.path.push([this.map(x, y)]); }
   lineTo(x, y) { if (!this.path.length) this.path.push([]); this.path.at(-1).push(this.map(x, y)); }
@@ -295,7 +263,6 @@ class RecordingContext {
   rect(x, y, w, h) { this.path.push([this.map(x, y), this.map(x + w, y), this.map(x + w, y + h), this.map(x, y + h)]); }
 
   arc(cx, cy, r, a0, a1) {
-    // its ends and every quarter it passes: its bounds
     const at = [a0, a1];
     for (let q = Math.ceil(a0 / (Math.PI / 2)); q * (Math.PI / 2) < a1; q++) at.push(q * (Math.PI / 2));
     for (const a of at) this.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
@@ -311,7 +278,6 @@ class RecordingContext {
 
   static moved(b, dx, dy) { return [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy]; }
 
-  // the shadow's way of drawing, where there is one: [colour, dx, dy, sigma]
   shadow() {
     if (this.s.shadowBlur <= 0) return null;
     return [argb(this.s.shadowColor), this.s.shadowOffsetX, this.s.shadowOffsetY, this.s.shadowBlur / 2];
@@ -329,7 +295,6 @@ class RecordingContext {
     if (a instanceof Path2D) return this.icon(a);
     assert.notEqual(a, 'evenodd', 'Path.op takes winding paths: the nonzero rule');
     const b = RecordingContext.bounds(this.path.flat());
-    // a shape cut out of what the layer has: the fill there less it
     if (this.s.globalCompositeOperation === 'destination-out') {
       const last = this.lines.at(-1);
       assert.ok(last && last.t === 'fill', 'a cut of nothing');
@@ -348,18 +313,15 @@ class RecordingContext {
     this.lines.push('stroke ' + RecordingContext.box(RecordingContext.bounds(this.path.flat())) + ' ' + argb(this.s.strokeStyle) + ' w=' + n(this.s.lineWidth * Math.hypot(a, b)));
   }
 
-  // an icon: its name (its one path's, below), its box the viewport's corners on the device
   icon(p) {
     const view = icons[p.d];
     const corners = [this.map(0, 0), this.map(view.vw, 0), this.map(view.vw, view.vh), this.map(0, view.vh)];
     this.lines.push('icon ' + p.d + ' ' + RecordingContext.box(RecordingContext.bounds(corners)) + ' ' + argb(this.s.fillStyle));
-    // where the viewport's top left went, beside the line (EnginePaintTest's format has its box alone): a square
-    // turned about its middle has the box it had, so a turn is seen only here
+    // EnginePaintTest's format has the box alone: a square turned about its middle keeps its box, so a turn shows only here
     (this.iconCorners ??= []).push(corners[0].map((v) => Math.round(v * 10) / 10 + 0));
   }
 
-  // a stroked text's line is its stroke's; the fill right after it must be the same text at the same place in the
-  // colour set before the stroke, or a fill gone wrong (moved, its colour left as another's) would pass unseen
+  // the fill right after a stroke must be the same text and place, or a fill gone wrong would pass unseen
   fillText(text, x, y) {
     const st = this.stroked;
     this.stroked = null;
@@ -376,7 +338,6 @@ class RecordingContext {
     this.text(text, x, y, argb(this.s.strokeStyle), ' stroke=' + n(this.s.lineWidth * Math.hypot(a, b)));
   }
 
-  // where Paint would have it: the painter moved it by half a letter's spacing (squeezed), along the text's line
   text(text, x, y, color, stroke) {
     const m = /^(\d+) ([\d.e-]+)px /.exec(this.s.font);
     const [a, b, c, d] = this.s.m;
@@ -393,12 +354,10 @@ class RecordingContext {
     this.lines.push({ t: 'text', text, x: px, y: py, w: m[1], size, sx, ls: spacing / Number(m[2]), color, stroke, blur, rot: Math.round(angle * 180 / Math.PI) });
   }
 
-  // a text's width, for the area a text's layer takes (the painter's textArea): no fonts here, a half em a letter
   measureText(text) { return { width: text.length * (parseFloat(this.s.font.split('px')[0].split(' ').at(-1)) || 10) / 2 }; }
 
   createLinearGradient() { return { addColorStop() {} }; }
 
-  // a layer laid: its lines here, moved as it is laid, in the shadow's colour and blur or at the alpha laid with
   drawImage(image, sx, sy, sw, sh, dx, dy) {
     const layer = image.getContext ? image.getContext('2d') : null;
     if (!(layer instanceof RecordingContext)) return this.lines.push('image');
@@ -412,7 +371,6 @@ class RecordingContext {
         Object.assign(e, { color: shadow[0], blur: shadow[3], less: null });
         RecordingContext.shift(e, ox + shadow[1], oy + shadow[2]);
       } else {
-        // drawn opaque there, laid at an alpha: that alpha its colour's
         assert.equal(e.color.slice(1, 3), 'ff', 'a layer drawn opaque');
         e.color = '#' + Math.round(this.s.globalAlpha * 255).toString(16).padStart(2, '0') + e.color.slice(3);
         RecordingContext.shift(e, ox, oy);
@@ -432,10 +390,7 @@ class RecordingContext {
   }
 }
 
-/**
- * Two lines alike: the same words, each number within a tenth and a little: the app draws in floats, the library in
- * doubles, so a number at a half of a tenth (42.95) may round either way.
- */
+/** The app draws in floats, the library in doubles, so a number at half a tenth (42.95) may round either way. */
 function sameLine(a, b) {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -446,8 +401,7 @@ function sameLine(a, b) {
   return x.every((v, i) => Math.abs(Number(v) - Number(y[i])) <= 0.1 + 1e-9);
 }
 
-// the app's icons by the scene's names (EnginePaintTest writes them): each here a path of its own name
-const icons = Object.fromEntries(Object.keys(JSON.parse(read(testdata, 'engine-icons.json'))).map((k) => [k, { vw: 24, vh: 24, paths: [{ d: k }] }]));
+const icons = Object.fromEntries(Object.keys(JSON.parse(read(generated, 'youmo-engine-icons.json'))).map((k) => [k, { vw: 24, vh: 24, paths: [{ d: k }] }]));
 
 test("the library's painter draws what the app's ScenePainter draws, line for line (testdata/paint.txt)", () => {
   const sections = read(testdata, 'paint.txt').split(/^== /m).filter(Boolean);
@@ -470,7 +424,6 @@ test("the library's painter draws what the app's ScenePainter draws, line for li
   assert.deepEqual(wrong, []);
 });
 
-// 061-toolbar-icons: the page's bar sample draws an icon as the app's bar does, by the painter's own op
 test('paintIcon draws a name of the icons given in its box and tint, turned about its middle; one not given draws nothing', () => {
   const ctx = new RecordingContext();
   assert.ok(E.paintIcon(ctx, { icons }, 'undo', 10, 4, 20, '#ff112233', 0).ok);
@@ -478,8 +431,6 @@ test('paintIcon draws a name of the icons given in its box and tint, turned abou
   const turned = new RecordingContext();
   assert.ok(E.paintIcon(turned, { icons }, 'toolbar-expand', 0, 0, 20, '#ff000000', -90).ok);
   assert.deepEqual(turned.written().filter((l) => l.startsWith('icon')), ['icon toolbar-expand 0.0,0.0,20.0,20.0 #ff000000']);
-  // turned: its box the same, its top left gone to the bottom left (a quarter turn back about the middle, as the
-  // app's canvas.rotate(-90f, cx, cy)); not turned, where it was (review R26 F8154)
   assert.deepEqual(turned.iconCorners, [[0, 20]]);
   assert.deepEqual(ctx.iconCorners, [[10, 4]]);
   const back = new RecordingContext();
@@ -492,9 +443,8 @@ test('paintIcon draws a name of the icons given in its box and tint, turned abou
   assert.equal(E.paintIcon({}, { icons }, 'undo', 0, 0, 20, '#ff000000', 0).ok, false, 'not a context');
 });
 
-// the icon page's groups: every name the engine draws in one at least, the bar's own fallback only where it differs
 test("the bar's icons block groups every icon the app draws, and the menu key's ⌄ turned", () => {
-  const bar = JSON.parse(read(testdata, 'bar-icons.json'));
+  const bar = JSON.parse(read(generated, 'youmo-bar-icons.json'));
   const all = new Set(Object.values(bar.groups).flat());
   assert.deepEqual([...all].sort(), Object.keys(icons).sort());
   assert.deepEqual(Object.keys(bar.groups), ['return', 'keys', 'commands', 'bar', 'panel']);
@@ -504,7 +454,6 @@ test("the bar's icons block groups every icon the app draws, and the menu key's 
 });
 
 test('a page with no icon or image for an op draws what it can: a nine-slice its fallback colour, nothing for the rest', () => {
-  // theme 3.0's space key an image over its key's colour (look-3.0.xml): that colour where the page has no image
   const t = E.readTheme(read(data, 'facade', 'look-3.0.xml'), null, null);
   assert.ok(t.ok, JSON.stringify(t.problems));
   const s = E.buildScene('qwerty', t.theme, { width: 1080, height: 702, density: 2.625, dark: true }, fixed);
@@ -519,7 +468,6 @@ test('a page with no icon or image for an op draws what it can: a nine-slice its
   assert.ok(lines.some((l) => l.startsWith('text')));
   const fallback = / else=(#[0-9a-f]{8})/.exec(face)[1];
   assert.ok(lines.some((l) => l.startsWith('fill ') && l.includes(' ' + fallback)), 'the fallback colour ' + fallback + ' filled');
-  // with the image: drawn, its nine pieces
   const some = new RecordingContext();
   assert.ok(E.paint(s.scene, some, { images: { 'full-space.png': { image: {}, width: 72, height: 72 } } }).ok);
   assert.equal(some.written().filter((l) => l === 'image').length, 9);
@@ -556,7 +504,6 @@ test("the facade's answers to values of the wrong type are problems, never a thr
   refused(E.paint(scene, {}, null), 'a context not one');
   refused(E.canvasMeasurer({}, null), 'a context to measure with not one');
   refused(E.convert30(null), 'a theme 3.0 not text');
-  // and a right one still is: the environment as text, a popup of kind none a problem of its own
   assert.ok(E.buildScene('qwerty', t, JSON.stringify(env), fixed).ok);
   assert.equal(E.buildPopup(t, env, { kind: 'nope' }, fixed).problems[0].message, 'no popup of kind "nope"');
   assert.ok(E.paint(scene, new RecordingContext(), { pressed: ['q'] }).ok);
@@ -576,13 +523,11 @@ test("the bar's sample and the app's views' looks for the maker's preview (M3): 
   assert.equal(E.buildBar(light, { width: 1080 }, fixed).ok, false, 'an environment without its height');
 });
 
-// 060-theme-sounds-icons: what the maker checks a sound by (SoundFile) and draws a theme's icon from (IconPath, its fill)
 test('readSound reads each of the three formats, and says why a file is not one', () => {
   const bytes = (n) => new Uint8Array(readFileSync(join(testdata, n)));
   assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('space.ogg', bytes('space.ogg')).info)), { format: 'ogg', channels: 2, rate: 48000, ms: 120 });
   assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('function.wav', bytes('function.wav')).info)), { format: 'wav', channels: 1, rate: 8000, ms: 100 });
   assert.equal(E.readSound('short.mp3', bytes('short.mp3')).info.rate, 22050);
-  // a bare ArrayBuffer, and a view into a larger buffer, read as the same bytes do
   const wav = { format: 'wav', channels: 1, rate: 8000, ms: 100 };
   assert.deepEqual(JSON.parse(JSON.stringify(E.readSound('function.wav', bytes('function.wav').buffer).info)), wav);
   const inner = bytes('function.wav'), outer = new Uint8Array(inner.length + 7);
@@ -601,7 +546,6 @@ test('readIcon gives each path its own colour (CSS order, alpha last) or null, a
   assert.equal(r.icon.paths[1].fill >>> 0, 0x80ff0000);
 });
 
-// 061-custom-layout L1: the page's layout check and writer are the JVM's (LayoutCheckTest, LayoutWriterTest)
 test('checkLayout answers as the app\'s import would, and writeLayout writes what the JVM writes', () => {
   const qwerty = read(scene, 'commonMain', 'layouts', 'qwerty.xml');
   const own = qwerty.replace('id="qwerty"', 'id="my-qwerty" based-on="qwerty"');
@@ -610,10 +554,8 @@ test('checkLayout answers as the app\'s import would, and writeLayout writes wha
   assert.equal(r.family, 'letters');
   assert.equal(r.minApp, '0.6.1', 'based-on= is 0.6.1\'s');
   assert.deepEqual(Array.from(r.pads), []);
-  // the commit: texts its base types (/ @ . .com) are not listed; another text on a base key is
   assert.deepEqual(Array.from(r.commits), []);
   assert.ok(!Array.from(r.warnings).some((w) => w.key === 'commits'));
-  // (.cn is the base's too: its .com key's list types it)
   const cn = E.checkLayout(own.replace('send="commit:.com"', 'send="commit:.io"'), '0.6.1', null);
   assert.deepEqual(Array.from(cn.commits), ['.io']);
   assert.ok(Array.from(cn.warnings).some((w) => w.key === 'commits'));
@@ -626,23 +568,18 @@ test('checkLayout answers as the app\'s import would, and writeLayout writes wha
   assert.equal(E.writeLayout(E.layout('k18')), read(data, 'writer', 'k18.layout'));
 });
 
-// a theme pack's layout made one of the user's (PackLayouts.convert, 061-custom-layout §2.3): the page's is the app's, the
-// text the JVM's own test holds (commonTest/data/convert)
 test("a pack's layout made one of the user's is the JVM's, byte for byte", () => {
   const k18 = read(data, 'mint-k17', 'layouts', 'k18.xml');
   const c = E.convertPackLayout('薄荷 17 键', { author: '小明', license: 'CC-BY-4.0' }, 'k18', k18, null, '0.6.1');
   assert.ok(c.ok, c.why);
   assert.equal(c.text, read(data, 'convert', 'k17-motion.layout'));
   assert.equal(c.name, '薄荷 17 键 · 17 键');
-  // its HJK on H's name a key of its own, its letters' (L6 verifier R-S1)
   assert.deepEqual(Object.assign({}, c.renames), { 'g18/h': c.id + '/hjk' });
   const named = E.convertPackLayout('薄荷', null, 'k18', k18.replace('shortcut="g18/q"', 'shortcut="mine"'), null, '0.6.1');
   assert.deepEqual(Object.assign({}, named.renames), { 'fn/mine': named.id + '/r1c1', 'g18/h': named.id + '/hjk' });
-  // a board a pack still stands for: not made one, why said
   const zhuyin = E.convertPackLayout('薄荷', null, 'zhuyin', E.layoutSource('zhuyin'), null, '0.6.1');
   assert.equal(zhuyin.ok, false);
   assert.ok(zhuyin.why);
-  // what it makes reads as a layout of the user's (readOwnLayout, as 外观 → 布局 reads it)
   const own = E.readOwnLayout(c.text);
   assert.ok(own.ok, JSON.stringify(own.problems));
 });

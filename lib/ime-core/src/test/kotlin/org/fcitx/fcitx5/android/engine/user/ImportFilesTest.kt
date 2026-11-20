@@ -13,6 +13,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -26,9 +27,7 @@ class ImportFilesTest {
         assertEquals(3.0, ImportFiles.frequency("'hang'xing 航星 3")!!, 0.0)
         assertEquals(0.0, ImportFiles.frequency("航星\thang'xing\t0")!!, 0.0)
         assertNull(ImportFiles.frequency("航星 hang'xing"))
-        // 3D is a word, not a count
         assertNull(ImportFiles.frequency("3D"))
-        // a word of digits, of no count (review R11 F3005)
         assertNull(ImportFiles.frequency("520 wu'er'ling"))
         assertEquals(7.0, ImportFiles.frequency("520 wu'er'ling 7")!!, 0.0)
     }
@@ -104,9 +103,7 @@ class ImportFilesTest {
             listOf(
                 listOf(0, 1) to listOf("鲸园" to 120, "京源" to null),
                 listOf(2, 3) to listOf("量子" to 7),
-                // a syllable the table has not: left out
                 listOf(2, 9) to listOf("两字" to 1),
-                // a count past 0x7fff: unsigned (review R11 F2937)
                 listOf(4) to listOf("略" to 40000),
             ),
             phrases = listOf(listOf(0, 3) to "鲸子"),
@@ -123,7 +120,6 @@ class ImportFilesTest {
     fun aFileOfNoSyllableTableReadsSogousOwn() {
         val bytes = scel(emptyList(), listOf(listOf(0, 1) to listOf("阿爱" to null)), header = 0x45)
         assertEquals(listOf(Word("阿爱", "a'ai", null)), read(bytes))
-        // as fcitx's scel2org5 has it: 449 of them, the last a digit
         val last = scel(emptyList(), listOf(listOf(448) to listOf("九" to null)))
         assertEquals("9", read(last).single().pinyin)
     }
@@ -136,13 +132,35 @@ class ImportFilesTest {
         assertThrows(IOException::class.java) { read(whole.copyOf(whole.size - 3)) }
     }
 
-    // review-G S6: a table of more syllables than pinyin has, or a count past 2^31, is no cell
-    // dictionary, said so; the counts here are of the syllables and the groups, not a word's
     @Test
     fun aCountTooLargeIsNoCellDictionary() {
         assertThrows(IOException::class.java) { read(scel((0 until 5000).map { "a" }, emptyList())) }
         val huge = scel(listOf("jing"), listOf(listOf(0) to listOf("京" to 1)))
         ByteBuffer.wrap(huge).order(ByteOrder.LITTLE_ENDIAN).putInt(0x120, Int.MIN_VALUE)
         assertThrows(IOException::class.java) { read(huge) }
+    }
+
+    // ScelGoldenTest: [Scel.writeTextDictionary] against what 0.3.2's native scel2org5 wrote for the same files (uat/fixtures/scel).
+    // contract: a file format and its fixtures, which mutation cannot see.
+
+    // found from wherever the test runs inside the repo, not only from lib/ime-core
+    private val dir = generateSequence(File("").absoluteFile) { it.parentFile }
+        .map { File(it, "uat/fixtures/scel") }.first { it.isDirectory }
+
+    private fun text(bytes: ByteArray) = StringBuilder().also { Scel.writeTextDictionary(bytes, it) }.toString()
+
+    @Test
+    fun everyFileGivesWhatScel2org5Wrote() {
+        for (name in listOf("extra", "sogou-75228", "sogou-15117")) {
+            val want = File(dir, "$name.txt").readText()
+            assertEquals(name, want, text(File(dir, "$name.scel").readBytes()))
+        }
+    }
+
+    @Test
+    fun theBrokenFilesFailAsIOException() {
+        for (name in listOf("truncated", "not-scel")) {
+            assertThrows(name, IOException::class.java) { text(File(dir, "$name.scel").readBytes()) }
+        }
     }
 }

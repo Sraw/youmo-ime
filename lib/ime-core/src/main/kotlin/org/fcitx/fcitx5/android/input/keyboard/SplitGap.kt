@@ -4,25 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-/**
- * The room between a split keyboard's halves (分体), where a stroke (笔画筛选) may start though no
- * key is there ([GlideTouch.down]'s inGap). Found from where the letters are, so a layout that
- * splits has it and one that does not has none: in a row of letters, the space between two of them
- * at least [MIN_WIDTH] of a key wide. The keys' own spacing is far narrower, and a function key
- * (⇧, ⌫) sits at a row's end, never between its letters.
- */
+/** The room between a split keyboard's halves, where a stroke may start: two same-row letters at least [MIN_WIDTH] of a key apart (key spacing is far narrower, function keys sit at row ends). */
 object SplitGap {
-    /**
-     * In key widths. SplitKeyboard.MIN_GAP is a share of the keyboard's width (0.12), not of a key's:
-     * a row of ten letters makes that about 1.2 keys, so half a key is well under the narrowest gap.
-     */
+    /** In key widths: SplitKeyboard.MIN_GAP (0.12 of the width) is about 1.2 keys on a ten-letter row. */
     const val MIN_WIDTH = 0.5f
 
-    /**
-     * Whether [x], [y] is between the halves: on none of the letters [boxes] (left, top, right,
-     * bottom of each in turn; several letters may share one, the nine keys'), with a letter of the
-     * same row (one whose height [y] is in) on each side, those two [MIN_WIDTH] of a [keyWidth] apart or more.
-     */
+    /** [boxes]: left, top, right, bottom of each letter (the nine keys' may share one). */
     fun contains(boxes: FloatArray, x: Float, y: Float, keyWidth: Float): Boolean {
         var left = Float.NEGATIVE_INFINITY
         var right = Float.POSITIVE_INFINITY

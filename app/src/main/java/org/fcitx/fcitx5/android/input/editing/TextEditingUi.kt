@@ -36,7 +36,7 @@ class TextEditingUi(
     private val ripple: Boolean,
     private val border: Boolean,
     private val radius: Float,
-    // the theme's `editing { fill }` (060-render-p3 T7b): every button's, drawn as a block; null, the keys' colours
+    // null, the keys' colours
     private val fill: Int? = null,
 ) : Ui {
 

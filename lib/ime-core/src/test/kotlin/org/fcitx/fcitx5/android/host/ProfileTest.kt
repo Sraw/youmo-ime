@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** [Profile]: `fcitx/inputmethodmanager.cpp:82-162,427-454`, `fcitx-config/iniparser.cpp:58-148`. */
+/** [Profile] against fcitx's `InputMethodManager` and `iniparser`. */
 class ProfileTest {
     private val available = setOf("engine-pinyin", "engine-wubi", "keyboard-us")
 
@@ -57,7 +57,7 @@ class ProfileTest {
 
     @Test
     fun `upstream Fcitx5's names read as the engine's, each listed once`() {
-        // a backup from upstream Fcitx5 for Android (SET-11): libime's pinyin, shuangpin and wbx
+        // a backup from upstream Fcitx5 for Android: libime's pinyin, shuangpin and wbx
         val upstream = "[Groups/0]\nName=默认\nDefault Layout=us\nDefaultIM=shuangpin\n" +
             "[Groups/0/Items/0]\nName=keyboard-us\n[Groups/0/Items/1]\nName=pinyin\n[Groups/0/Items/2]\nName=shuangpin\n" +
             "[Groups/0/Items/3]\nName=engine-pinyin\n[Groups/0/Items/4]\nName=wbx\n"
@@ -77,7 +77,7 @@ class ProfileTest {
 
     @Test
     fun `no file, or no valid group, is the default group`() {
-        // :142-162; a group without a name or a layout is skipped (:96-100), one left empty removed (:121-126)
+        // a group without a name or a layout is skipped, one left empty removed
         assertEquals(listOf("keyboard-us"), Profile.load(null, available, "Default").currentGroup().inputMethods)
         val bad = "[Groups/0]\nName=x\n[Groups/0/Items/0]\nName=engine-pinyin\n[Groups/1]\nDefault Layout=us\nName=y\n[Groups/1/Items/0]\nName=nope\n"
         assertEquals("D", Profile.load(bad, available, "D").currentGroup().name)
@@ -85,7 +85,7 @@ class ProfileTest {
 
     @Test
     fun `the order picks the current group, unknown names dropped, the rest after`() {
-        // setGroupOrder (:365-381)
+        // setGroupOrder
         val two = "[Groups/0]\nName=a\nDefault Layout=us\n[Groups/0/Items/0]\nName=keyboard-us\n" +
             "[Groups/1]\nName=b\nDefault Layout=us\n[Groups/1/Items/0]\nName=engine-pinyin\n[GroupOrder]\n0=zz\n1=b\n"
         val p = Profile.load(two, available, "D")
@@ -97,7 +97,7 @@ class ProfileTest {
 
     @Test
     fun `values are read by fcitx's rules`() {
-        // iniparser.cpp:63-69 (no trim around =), stringutils.cpp:390-425
+        // iniparser: no trim around =; stringutils unescape
         val values = Profile.read("  [S]  \nKey = v\n#Skip=1\nQ=\"a b\\\"c\"\nBad=\"a\"b\"\n")
         assertEquals(" v", values["S/Key "])
         assertEquals("a b\"c", values["S/Q"])
@@ -111,7 +111,7 @@ class ProfileTest {
 
     @Test
     fun `defaults are written as comments`() {
-        // configuration.cpp:126-139 implicit, iniparser.cpp:124-127
+        // Configuration::save implicit, written commented
         val text = Profile.default("Default").text()
         assertTrue(text.contains("# DefaultIM=\n"))
         assertTrue(text.contains("# Layout=\n"))

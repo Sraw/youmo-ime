@@ -8,19 +8,15 @@ package org.fcitx.fcitx5.android.input
 import android.annotation.SuppressLint
 import android.app.Dialog
 import android.content.pm.ActivityInfo
-import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.content.res.Resources
-import android.graphics.Color
 import android.graphics.Rect
-import android.graphics.drawable.Icon
 import android.hardware.input.InputManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Size
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
@@ -36,18 +32,10 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
 import android.widget.Toast
-import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
-import androidx.autofill.inline.UiVersions
-import androidx.autofill.inline.common.ImageViewStyle
-import androidx.autofill.inline.common.TextViewStyle
-import androidx.autofill.inline.common.ViewStyle
-import androidx.autofill.inline.v1.InlineSuggestionUi
-import androidx.core.os.ConfigurationCompat
-import androidx.core.os.LocaleListCompat
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineStart
@@ -87,6 +75,7 @@ import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ToolbarButton
+import org.fcitx.fcitx5.android.input.bar.ui.idle.InlineSuggestionsUi
 import org.fcitx.fcitx5.android.input.preedit.CodeRowStyle
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -124,13 +113,12 @@ import org.fcitx.fcitx5.android.input.keyboard.keyboardCompact
 import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.input.voice.VoiceAsk
+import org.fcitx.fcitx5.android.input.voice.VoiceAsking
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
-import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.pack.PackStatus
 import org.fcitx.fcitx5.android.scene.engine.section
 import org.fcitx.fcitx5.android.utils.InputMethodUtil
-import org.fcitx.fcitx5.android.utils.Locales
 import org.fcitx.fcitx5.android.utils.alpha
 import org.fcitx.fcitx5.android.utils.forceShowSelf
 import org.fcitx.fcitx5.android.utils.inputMethodManager
@@ -139,7 +127,6 @@ import org.fcitx.fcitx5.android.utils.monitorCursorAnchor
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.fcitx.fcitx5.android.utils.styledFloat
 import org.fcitx.fcitx5.android.utils.toast
-import splitties.dimensions.dp
 import timber.log.Timber
 
 class FcitxInputMethodService : LifecycleInputMethodService() {
@@ -159,8 +146,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private val navbarMgr = NavigationBarManager()
 
-    // a keyboard unplugged or switched off: the configuration is no help, on a device that reports a
-    // keyboard built in it stays the same (the emulator's)
+    // a keyboard unplugged: on a device reporting a built-in keyboard the configuration stays the same
     @VisibleForTesting
     internal val inputDeviceListener = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = Unit
@@ -174,12 +160,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         postFcitxJob {
             setCandidatePagingMode(if (isVirtualKeyboard) 0 else 1)
         }
-        // typed on in a field the touch keyboard was up in: not the cursor of the last field typed on;
-        // the same field's (the touch keyboard called up there and put away) keeps its drag (F1793)
+        // the same field keeps its floating cursor and drag
         if (!isVirtualKeyboard && cursorField !== startedWith) forgetCursor()
         val monitoring = currentInputConnection?.monitorCursorAnchor(!isVirtualKeyboard) == true
-        // typed on in a field the touch keyboard was up in: one that tells no cursor has the corner,
-        // as onStartInputView gives it, not the anchor of a field before
+        // a field that reports no cursor gets the corner, not the last field's anchor
         if (!isVirtualKeyboard && !monitoring) anchorToCorner()
         if (isVirtualKeyboard) {
             hideStatusIcon()
@@ -190,8 +174,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             navbarMgr.evaluate(it, isVirtualKeyboard)
         }
         if (isVirtualKeyboard) {
-            // back in a field started on the hardware keyboard (its button, a tap, the keyboard
-            // unplugged): its layout, Enter and password the field's, not the field's it was last up in
             if (inputViewStarted) currentInputEditorInfo?.let { inputView?.startInput(it, capabilityFlags) }
         }
     }
@@ -202,36 +184,28 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         shortcutsOn = { switchShortcuts },
     )
 
-    // onStartInputView's evaluation done, till onFinishInputView: the touch keyboard brought back
-    // since is started above, where onStartInputView does not start it itself
+    // true from onStartInputView to onFinishInputView: a touch keyboard brought back meanwhile is started here
     private var inputViewStarted = false
 
     private var capabilityFlags = CapabilityFlags.DefaultFlags
 
-    /** The touch keyboard's board placed anew (`SceneWindow.placement`): the navigation bar the theme's of it. */
     fun boardPlaced(placement: Set<String>) {
         window.window?.let { navbarMgr.place(it, placement) }
     }
 
     /**
-     * [id] said for a moment above the keyboard. Not a toast: one from an input method is dropped
-     * while its app may not post notifications, Android 13's default ("Suppressing toast … by user
-     * request"); one from no keyboard shown, as the settings' toasts are, still is.
+     * Said above the keyboard, not as a toast: Android 13 drops an IME's toasts while its app may not
+     * post notifications.
      */
-    fun say(@StringRes id: Int) = say(getString(id))
-
-    /**
-     * [message] said as [say] says, with 撤销 doing [undo] if there is one; [steady], kept as keys
-     * are typed and 2 s (a failure, [EngineNotices.failed]). With no keyboard shown to say it on, a
-     * toast (long, steady), and nothing to take back: [undo] lapses.
-     */
-    fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false) {
-        sayOnKeyboard(message, undo, steady)
+    fun say(@StringRes id: Int) {
+        say(getString(id))
     }
 
-    // [say]: whether it was said on the keyboard, else a toast if [toast] (EngineNotices' choose their own)
-    private fun sayOnKeyboard(message: String, undo: UndoChip.Undo?, steady: Boolean, toast: Boolean = true, ms: Long? = null): Boolean {
-        // the view shown, not the one the device mode picks: a key typed with ⋯ open flips that mode
+    /**
+     * With no keyboard shown, a toast if [toast] and [undo] lapses. Returns whether it was said on the keyboard.
+     */
+    fun say(message: String, undo: UndoChip.Undo? = null, steady: Boolean = false, toast: Boolean = true, ms: Long? = null): Boolean {
+        // the view shown, not the device mode's: a key typed with ⋯ open flips that mode
         val view = inputView?.takeIf { it.isShown } ?: candidatesView?.takeIf { it.isShown }
         val length = if (steady) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
         return when {
@@ -240,7 +214,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 undo?.lapsed?.invoke()
                 false
             }
-            // shown, but its window not yet (or no longer) on the screen: the chip lapsed [undo] (F3530)
             !view.say(message, undo, steady, ms) -> {
                 if (toast) toast(message, length)
                 false
@@ -249,26 +222,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    // what the engine says, said here while this keyboard runs
     private val engineSayer = object : EngineNotices.Sayer {
-        override fun say(message: String, steady: Boolean) = sayOnKeyboard(message, null, steady, toast = false)
-        override fun say(message: String, steady: Boolean, ms: Long?) = sayOnKeyboard(message, null, steady, toast = false, ms = ms)
+        override fun say(message: String, steady: Boolean) = this@FcitxInputMethodService.say(message, null, steady, toast = false)
+        override fun say(message: String, steady: Boolean, ms: Long?) = this@FcitxInputMethodService.say(message, null, steady, toast = false, ms = ms)
     }
 
-    /** nothing said out loud goes into a password, its characters shown or not */
     val inPasswordField get() = fieldPolicy.password
 
-    /** A password or a field asking for no learning (`IME_FLAG_NO_PERSONALIZED_LEARNING`): nothing of it kept. */
     val inSensitiveField get() = capabilityFlags.hasAny(CapabilityFlag.PasswordOrSensitive)
 
-    /**
-     * A URL's or an email's field, where what is typed is what is meant ([PendingInputPolicy]). Read
-     * on the main thread as a key is pressed: by the time fcitx gets to it, another field may have started.
-     */
+    /** Read on the main thread at key press: by the time fcitx handles it another field may have started. */
     val inAddressField: Boolean
         get() = currentInputEditorInfo?.let { AddressKeys.of(it.toEditorTraits()) != AddressKeys.NONE } == true
 
-    // the field's editor: what changes the field otherwise than a run of deletions ends the run (ClearedText.edited)
     private val fieldEditor = WatchedEditor(InputConnectionEditor { currentInputConnection }) { clearedText.edited() }
 
     private val editingSession = EditingSession(
@@ -281,35 +247,25 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }) else ({})
     )
 
-    /** The last commit's check ([CommitCheck.kept]: what the field dropped), for a test to read without the session. */
     @get:VisibleForTesting
     internal val commitCheck: CommitCheck get() = editingSession.commits
 
-    /** The IME's view of the cursor; owned by [editingSession]. */
     private val selection get() = editingSession.selection
 
-    // 编码行 输入框里: where the session's code goes, this input's (dev/design/061-code-in-field.md)
     private val codeInField = CodeInField()
 
-    // whether the views were last told the code is in the field ([codeInFieldNow])
     private var codePlaceTold = false
 
     /**
-     * Whether the session's code is in the field now (编码行 输入框里, [EditingSession.codeInField]): the
-     * code row and the candidate window draw none of it ([forStrip]). The views hear of a change
-     * through [InputView.codePlaceChanged] and [CandidatesView.codePlaceChanged], as they take the
-     * panel's events apart from the service and may have drawn it before the service wrote it.
+     * The views hear of a change through their codePlaceChanged: they take panel events apart from the
+     * service and may have drawn before the service wrote it.
      */
     val codeInFieldNow: Boolean get() = editingSession.codeInField
 
-    /**
-     * [panel] as the code row draws it: its code gone while that is in the field ([codeInFieldNow]),
-     * and what a field took and dropped ([keptLine]) said after it.
-     */
     fun forStrip(panel: HostEvent.InputPanel): HostEvent.InputPanel {
         val drawn = if (panel.code && codeInFieldNow) panel.copy(preedit = FormattedText.Empty) else panel
         val line = keptLine ?: return drawn
-        // first, for the row to tell a tap on it (CodeRowUi.notice); aux below after it as it was formatted
+        // first, for the row to tell a tap on it (CodeRowUi.notice)
         val aux = drawn.auxDown
         if (aux.isEmpty()) return drawn.copy(auxDown = FormattedText(arrayOf(line), intArrayOf(0), -1))
         val head = "$line  "
@@ -317,109 +273,27 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return drawn.copy(auxDown = FormattedText(arrayOf(head) + aux.strings, intArrayOf(0) + aux.flags, cursor))
     }
 
-    /**
-     * What was committed and did not go into the field ([CommitCheck.kept]; a WebView whose view lost
-     * the focus as the screen turned takes every write and drops it), as the code row says it: kept
-     * till the user writes it with a tap on that line ([writeKept]), types something else that goes
-     * in, or leaves the field or the keyboard. Null with nothing kept. Its end alone where it is long.
-     */
-    val keptLine: String?
-        get() {
-            val kept = keptShown.ifEmpty { return null }
-            var from = maxOf(0, kept.length - KEPT_SHOWN)
-            if (from > 0 && Character.isLowSurrogate(kept[from])) from++
-            return getString(R.string.commit_kept, if (from > 0) "…" + kept.substring(from) else kept)
-        }
+    val keptLine: String? get() = kept.line
 
-    // CommitCheck.kept as the views last drew it (main thread)
-    private var keptShown = ""
+    fun writeKept() = kept.write()
 
-    // the timer for the commit waiting is set: one at a time, set again for the time a later commit has left
-    private var judging = false
-
-    private val judgeCommit = Runnable {
-        judging = false
-        val commits = editingSession.commits
-        // set for a commit before the one waiting now (that one reported, another field's forgotten): not this one's time yet
-        if (commits.waitLeft() == 0L) editingSession.judgeCommit()
-        commitsChanged()
-    }
-
-    private val writeAsked = Runnable {
-        val commits = editingSession.commits
-        if (commits.toWrite && !commits.isWaiting) writeKept()
-    }
-
-    /**
-     * A commit about to be made while the kept text, asked for, waits for its post ([writeAsked]): written
-     * first, synchronously, so that it goes in before what is typed now (after it, the order would be
-     * reversed, and that commit landing would not let it go).
-     */
-    private fun keptFirst() {
-        val commits = editingSession.commits
-        if (!commits.toWrite || commits.isWaiting) return
-        mainHandler.removeCallbacks(writeAsked)
-        writeKept()
-    }
-
-    // a commit waits for its report, or what is kept changed (CommitCheck.changed)
-    private fun commitsChanged() {
-        val commits = editingSession.commits
-        // the kept line tapped while a commit waited, and that wait over (reported, judged, or the field acted on):
-        // written once the session is done with what ended it (a cursor report, a deletion), not in the middle of it
-        if (commits.toWrite && !commits.isWaiting) {
-            mainHandler.removeCallbacks(writeAsked)
-            mainHandler.post(writeAsked)
-        }
-        if (commits.isWaiting && !judging) {
-            judging = true
-            mainHandler.postDelayed(judgeCommit, commits.waitLeft())
-        }
-        if (commits.kept == keptShown) return
-        keptShown = commits.kept
+    private val kept = KeptCommits(this, editingSession, started = { startedWith != null }) { line ->
         inputView?.codePlaceChanged()
         candidatesView?.codePlaceChanged()
-        keptLine?.let(::announce)
+        line?.let(::announce)
     }
 
     /**
-     * Said aloud as the kept line appears, by the view that shows it: the row is no focus a screen reader
-     * follows. `announceForAccessibility` is deprecated from API 36 for describing the UI (a live region),
-     * which would speak the row's every code as it is typed.
+     * The row is no focus a screen reader follows. The deprecated announce is kept: a live region
+     * would speak every code as it is typed.
      */
     @Suppress("DEPRECATION")
     private fun announce(line: String) {
         listOfNotNull(inputView, candidatesView).firstOrNull { it.isAttachedToWindow && it.isShown }?.announceForAccessibility(line)
     }
 
-    /**
-     * The line of what did not go in was tapped: written where the cursor is now, unless something composes
-     * there. While a later commit waits for its report it is written once that one is judged: written now, it
-     * would join the one waiting and be kept after it, out of the order typed.
-     */
-    fun writeKept() {
-        val commits = editingSession.commits
-        // only while input is started: between onFinishInput and the next start the connection is a finished
-        // one, which takes the text and drops it. An ask is kept: the next start in the same field tells it
-        // again (moved), another field or the keyboard put away forgets it
-        if (startedWith == null) return
-        if (editingSession.composing.isNotEmpty()) {
-            // something composes by the time a wait ends: not written over it; the line stays, to tap again
-            commits.toWrite = false
-            return
-        }
-        if (commits.isWaiting) {
-            commits.toWrite = true
-            return
-        }
-        val text = commits.take()
-        // the session's commit alone: the first try was already told as typed (the journal, the context)
-        if (text.isNotEmpty()) editingSession.commitText(text)
-    }
-
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // the views told where the code is now, once it moved
     private fun syncCodePlace() {
         val now = codeInFieldNow
         if (now == codePlaceTold) return
@@ -428,13 +302,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesView?.codePlaceChanged()
     }
 
-    // the panel [placeCode] placed last (main thread)
     private var placedPanel = HostEvent.InputPanel.EMPTY
 
-    /**
-     * The panel's code into the field, or out of it, as [CodeInField] routes it: written while it is
-     * the field's, emptied as it ends; a write the field would not take floats it from then on.
-     */
+    /** A write the field would not take floats the code from then on. */
     private fun placeCode(panel: HostEvent.InputPanel) {
         placedPanel = panel
         val route = codeInField.route(
@@ -444,154 +314,119 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             othersComposing = editingSession.composing.isNotEmpty() && !editingSession.codeInField,
         )
         if (route == CodeInField.Route.FIELD) {
-            // not written: this code floats (where the field let it down, the session said so: fellBack)
             if (!editingSession.writeCode(panel.preedit) { it.toSpannedString(highlightColor) }) codeInField.floats()
         } else if (editingSession.codeInField) {
-            // the code ended (Backspace took its last letter, cleared) with no commit in its place, or
-            // turned to the strip: taken away when proven ours, else let go of, as leaving does
             editingSession.leaveComposition()
         }
         syncCodePlace()
     }
 
-    // the EditorInfo input last started with, null between fields: the screen turned, input restarts
-    // with it again, its selection the one the field started with (resetStateForNewConfiguration).
-    // Set on the main thread, read on fcitx's too (commitOverEngine)
+    // set on the main thread, read on fcitx's (commitOverEngine); on a screen turn input restarts with
+    // this same object
     @Volatile
     private var startedWith: EditorInfo? = null
 
-    // the field input last started in, kept through onFinishInput: what CommitCheck keeps is that field's
+    // kept through onFinishInput: CommitCheck keeps this field's drops
     private var commitsField: EditorInfo? = null
 
-    // what a field dropped is kept for that field: one that says it is another (its app, id, type,
-    // name or hint) is not offered it. A WebView's fields tell nothing apart, and a tap on the one
-    // that lost the focus starts input anew, so there it stays
+    // a field that says it is another (app, id, type, name or hint) is not offered the drops; WebView
+    // fields tell nothing apart, so there they stay
     private fun commitsStartIn(attribute: EditorInfo, sensitive: Boolean) {
-        // the same field started anew (the app's restartInput, its text set maybe): a commit waiting is not
-        // judged by what a read there finds, and what was kept before stays
+        // the same field restarted (restartInput): a waiting commit is not judged by what a read finds there
         if (commitsField?.voiceField() != attribute.voiceField()) editingSession.commits.forget() else editingSession.commits.moved()
         commitsField = attribute
-        // not read in a password or a field that asks not to be learned from, nor one of no type (no text of its own)
         editingSession.commits.on = !sensitive && !CapabilityFlags.isPassword(attribute) && !attribute.isTypeNull()
     }
 
-    /** The input started last, null between fields: the token a clear is kept under ([ClearedText]). */
     val startedField: EditorInfo? get() = startedWith
 
-    /** 清除's clears, to put back (恢复) in the input they were made in alone (review M1). */
     val clearedText = ClearedText()
 
-    /** [block]'s changes to the field (a copy's selection and back) ending no run of deletions. */
     fun <T> quietly(block: () -> T): T = fieldEditor.quietly(block)
 
-    // the field the floating window's cursor and drag are of, last typed on with the hardware keyboard
     private var cursorField: EditorInfo? = null
 
-    // what commitOverEngine put in last ([PostedCommit.committed]), forgotten with its field: the next may take its place
     private val lastPosted = LastPosted()
 
     val currentInputSelection: CursorRange
         get() = selection.latest
 
-    /** The arrow keys, ahead of the editor's cursor reports. */
     private val arrowKeys = ArrowKeys(editingSession.selection)
-
-    private fun resetComposingState() = editingSession.resetComposingState()
 
     private var highlightColor: Int = DefaultHighlightColor
 
     private val prefs = AppPrefs.getInstance()
-    private val inlineSuggestions by prefs.keyboard.inlineSuggestions
-    private val ignoreSystemCursor by prefs.advanced.ignoreSystemCursor
     private val autoPairs by prefs.keyboard.autoPairs
     private val switchShortcuts by prefs.candidates.switchShortcuts
 
-    /** What was written in each app, the engine's context where a field has none of its own. */
     private val contextMemory = ContextMemory(keep = ContextChars)
 
     private val fieldPolicy = FieldPolicy(contextMemory)
 
-    // onFinishInputView's focus out dropped the engine's context, and no onStartInput told it since
+    // onFinishInputView's focus out dropped the engine's context; no onStartInput since
     private var contextDropped = false
 
-    // read by the keyboards alone (the bar's number row among them): they are made anew, the rest of the view
-    // kept (InputView.remakeKeyboards)
+    // read by the keyboards alone: they are remade, the rest of the view kept (InputView.remakeKeyboards)
     private val remakeKeyboardsPrefs: Array<ManagedPreference<*>> = arrayOf(
-        // drawn on 九键's keys, and in their long press
         prefs.keyboard.t9Letters,
-        // each input method's keyboard (ImKeyboards), and the code row's height on it (KawaiiBarComponent.preeditHeight),
-        // set anew as the input method is told again
         prefs.keyboard.pinyinKeyboard,
         prefs.keyboard.shuangpinKeyboard,
         prefs.keyboard.englishKeyboard,
-        // the layout of the user's each chose, the tables' one (061-custom-layout §5.2)
         prefs.keyboard.pinyinKeyboardLayout,
         prefs.keyboard.shuangpinKeyboardLayout,
         prefs.keyboard.englishKeyboardLayout,
         prefs.keyboard.tableKeyboardLayout,
-        // the number keyboard's (FieldPad.numbers, read as the input starts again); the symbol panel's is asked as it opens
+        // the symbol panel's layout is read as it opens, not here
         prefs.keyboard.numberKeyboardLayout,
-        // every key's marks laid out anew, those no swipe marks too; was a theme setting's
         prefs.keyboard.swipeUpPosition,
         prefs.keyboard.swipeDownPosition,
-        // the letters' faces (拼音键字母大小写): every keyboard made anew, its env read as it is now
         prefs.keyboard.letterCase,
     )
 
-    // the animations' setting is read across the view, the bar's and the panels' too
     private val recreateInputViewPrefs: Array<ManagedPreference<*>> = arrayOf(
         prefs.advanced.disableAnimation,
     )
 
-    // 跟随主题 too: a level whose numbers are stored already changes only it, and the theme's height may be 紧凑
     private val keyboardHeightPrefs = with(prefs.keyboard) {
         listOf(keyboardHeightPercent, keyboardHeightPercentLandscape, keyboardHeightFollowTheme)
     }
 
-    // whether the keyboard was made with the text pack ready (else under PackGateView): made anew when that changes
+    // made under PackGateView without it: remade when that changes
     private var textBuilt = false
 
-    // whether it was made with the voice pack: the space's hold to talk, its microphone badge, with it only
     private var voiceBuilt = false
 
     private fun replaceInputView(theme: Theme, start: Boolean = false): InputView = SceneTrace.section("replaceInputView") {
         compactBuilt = keyboardCompact()
-        // every view made, a turn's too: the style a change is told from by the shape it was made on
         screenBuilt = KeyboardArea.screen(this).also { styleBuilt = KeyboardStyles.of(it) }
         readingBuilt = EngineState.candidateReading.value
         val newInputView = SceneTrace.section("new InputView") { InputView(this, fcitx, theme) }
-        // no text pack (or not one this app reads): the keyboard cannot type, and says so over all of it
         val text = PackStore.status(PackKind.TEXT)
         textBuilt = text is PackStatus.Ready
         voiceBuilt = PackStore.ready(PackKind.VOICE)
         if (!textBuilt) newInputView.overKeys(PackGateView(this, theme, text), underBar = false)
-        // a hold to talk on the old view ended as leaving the field ends it, what was heard typed,
-        // before detaching it sends the hold a cancel that would drop it
+        // end the hold first: detaching sends it a cancel that would drop what was heard
         endVoiceHold()
         SceneTrace.section("setInputView") {
             setInputView(newInputView)
             inputDeviceMgr.setInputView(newInputView)
         }
         inputView = newInputView
-        // rebuilt in a field already started (floating toggled from the keyboard): its editor info,
-        // as onStartInputView would give it. Not when onStartInputView follows (onCreateInputView, a
-        // language picked anew): it starts the view itself, and twice would start input twice
+        // rebuilt in a started field (floating toggled): start it as onStartInputView would. Not when
+        // onStartInputView follows: twice would start input twice
         if (start && inputViewStarted && inputDeviceMgr.isVirtualKeyboard) {
             currentInputEditorInfo?.let { SceneTrace.section("startInput") { newInputView.startInput(it, capabilityFlags) } }
         }
         newInputView
     }
 
-    // the input view about to be thrown away while a hold to talk is on it: as another field
     private fun endVoiceHold() {
         inputView?.hold?.inputEnded(BaseInputView.Hold.InputEnd.LEFT)
     }
 
     private fun replaceCandidateView(theme: Theme): CandidatesView = SceneTrace.section("replaceCandidateView") {
         val newCandidatesView = CandidatesView(this, fcitx, theme)
-        // replace CandidatesView manually
         contentView.removeView(candidatesView)
-        // put CandidatesView directly under content view
         contentView.addView(newCandidatesView)
         inputDeviceMgr.setCandidatesView(newCandidatesView)
         candidatesView = newCandidatesView
@@ -604,61 +439,40 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceCandidateView(theme)
     }
 
-    /**
-     * Before the views are made anew for [why]: what was typed ended where [ViewRebuild.endsComposition]
-     * ([endComposition]). The new views show the caches as they are, then the end's events empty
-     * their code row and bar.
-     */
     private fun rebuilding(why: ViewRebuild) {
         if (why.endsComposition) SceneTrace.section("endComposition") { endComposition() }
     }
 
     /**
-     * What was typed ended as leaving the field ends it: pinyin's code dropped, the field's composing
-     * text (English's word, handwriting's) committed where it is, the engine reset (focusOutIn). The
-     * field stays, so no input restarts to tell the engine its context, which the reset dropped:
-     * told here, after it in fcitx's queue. Of two in a row (dark mode: [onConfigurationChanged] and
-     * the theme's rebuild, in whichever order the system calls them) the last tell so comes after
-     * the last reset, and the next word keeps its 前文.
+     * The engine reset (focusOutIn) dropped its context and no input restarts, so it is told again
+     * here, after the reset in fcitx's queue. Two rebuilds in a row (dark mode) still end with a tell.
      */
     private fun endComposition() {
-        // no field: nothing typed, nothing to tell, and focusOutIn would focus a context in none
         if (!currentInputStarted) {
             postFcitxJob { reset() }
             return
         }
-        // the field's composing text kept there as text, as onFinishInputView does: with
-        // ClientUnfocusCommit fcitx drops its client preedit on focus out rather than commit it.
-        // Voice's tail still to come is taken away instead: the talk types it once, as the old
-        // view's end tells it (left as text here, it would be typed twice). The code in the field
-        // is taken away, proven ours, else left as text (EditingSession.leaveComposition)
+        // with ClientUnfocusCommit fcitx drops its client preedit on focus out, so the session commits it.
+        // Voice's tail is taken away instead: the old view's end types it once
         editingSession.leaveComposition()
         syncCodePlace()
         postFcitxJob { focusOutIn() }
         if (currentInputEditorInfo?.isTypeNull() == false) tellContext()
     }
 
-    /**
-     * 联想's × (0.6.1): the predictions shown put away, the 联想 setting as it was; the engine keeps its
-     * context, nothing to tell again (review 061-small M1). Nothing where none showed by then (a key typed since the tap).
-     */
     fun dropPredictions() {
         postFcitxJob { dropPredictions() }
     }
 
     /**
-     * The app bound and its field focused again in a fcitx started anew under them (a pack imported,
-     * PackStore), as [onBindInput] and [onStartInput] did in the one before: the input context made
-     * (activate), the field's capabilities, the focus that picks the input method (without them the
-     * space reads （不可用） till another app), then its text before the cursor. Queued: the jobs wait
-     * for the new fcitx to be ready.
+     * After fcitx restarts under the app (a pack imported), redo what onBindInput and onStartInput did:
+     * without the focus the space reads （不可用） till another app. Queued until the new fcitx is ready.
      */
     private fun refocus() {
         val binding = currentInputBinding ?: return
         val uid = binding.uid
         val pkgName = pkgNameCache.forUid(uid)
         val info = currentInputEditorInfo
-        // a raw-key field's (TYPE_NULL) capabilities set too, as onStartInput sets every field's; only the focus is a text field's
         val started = currentInputStarted && info != null
         val field = info != null && started && !info.isTypeNull()
         val flags = capabilityFlags
@@ -670,22 +484,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (field) tellContext()
     }
 
-    /**
-     * The screen the input view was last made on (replaceInputView; its FloatingController's, read at the same
-     * time), whose shape's style the keyboard's toggles write, and that style as it was then.
-     */
     internal var screenBuilt: KeyboardArea.Screen? = null
         private set
     private var styleBuilt: KeyboardStyleState? = null
 
-    /** The bar's button TalkBack's focus goes back to in the view made anew for a style (§3.6), set by its toggle. */
     internal var focusAfterStyleRebuild: ToolbarButton? = null
 
-    /**
-     * A shape's style changed (061-wide-keyboard-style §3.5): the other shape's, nothing; floating or split into or
-     * out of, the views made anew keeping what is typed, from wherever (the keyboard's toggles, the handle, the
-     * settings page); 普通 and 单手, InputView slides the board itself.
-     */
     @Keep
     private val keyboardStyleListener = ManagedPreference.OnChangeListener<String> { key, _ ->
         val landscape = screenBuilt?.landscape ?: return@OnChangeListener
@@ -706,8 +510,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         replaceInputView(ThemeManager.activeTheme, start = true)
     }
 
-    // a setting only the keys read: the keyboards made anew in the view there is, not the whole view
-    // (060-render-perf-2 #1, half its time was the bar's and the rest's)
     @Keep
     private val remakeKeyboardsListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         val view = inputView ?: return@OnChangeListener
@@ -718,14 +520,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    // 紧凑 as the views were last made: its keys' text and marks are set as they are made (keyboardCompact)
     private var compactBuilt = keyboardCompact()
 
-    // 候选词注音 as the input view was made with it: made anew only for another
     private var readingBuilt = EngineState.candidateReading.value
 
-    // 键盘高度 into or out of 紧凑 makes the keys anew; another level only resizes them (InputView).
-    // A level sets both of its numbers in one edit, so each call sees both
+    // 紧凑 in or out remakes the keys; another level only resizes. A level sets both numbers in one edit
     @Keep
     private val keyboardHeightListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         val compact = keyboardCompact()
@@ -733,6 +532,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         rebuilding(ViewRebuild.SETTING)
         replaceInputView(ThemeManager.activeTheme, start = true)
     }
+
+    private val watchedPrefs: List<Pair<ManagedPreference<*>, ManagedPreference.OnChangeListener<Any>>> =
+        recreateInputViewPrefs.map { it to recreateInputViewListener } + remakeKeyboardsPrefs.map { it to remakeKeyboardsListener } +
+            keyboardHeightPrefs.map { it to keyboardHeightListener }
+    private val keyboardStylePrefs = listOf(ThemeManager.prefs.keyboardStylePortrait, ThemeManager.prefs.keyboardStyleLandscape)
 
     @Keep
     private val recreateCandidatesViewListener = ManagedPreferenceProvider.OnChangeListener {
@@ -747,11 +551,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * Post a fcitx operation to [jobs] to be executed
-     *
-     * Unlike `fcitx.runOnReady` or `fcitx.launchOnReady` where
-     * subsequent operations can start if the prior operation is not finished (suspended),
-     * [postFcitxJob] ensures that operations are executed sequentially.
+     * Unlike `fcitx.runOnReady`/`launchOnReady`, where the next operation may start while one is
+     * suspended, jobs posted here run strictly in order.
      */
     fun postFcitxJob(block: suspend HostApi.() -> Unit): Job {
         val job = fcitx.lifecycleScope.launch(start = CoroutineStart.LAZY) {
@@ -766,14 +567,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             codeInField.fallBack()
             syncCodePlace()
         }
-        editingSession.commits.changed = ::commitsChanged
-        // the clock the handler's delays are in
+        editingSession.commits.changed = kept::changed
         editingSession.commits.clock = SystemClock::uptimeMillis
         EngineNotices.sayer = engineSayer
-        pickedLocalesChanged()
-        // the punctuation keys the last run started with, read off this thread before the keyboard is made
+        appLanguage?.pickedChanged()
         PunctuationStartKeys.preload(this)
-        // the user's layouts, listed off this thread: what each input start asks (KeyboardPicker.offers) reads no file
+        // listed off the main thread: an input start (KeyboardPicker.offers) reads no file
         CustomKeyboards.relist()
         fcitx = HostDaemon.connect(javaClass.name)
         lifecycleScope.launch {
@@ -784,10 +583,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 handleFcitxEvent(it)
             }
         }
-        // 候选词注音 is the host's config, set on the fcitx thread: the bar's height goes by it (KawaiiBarComponent.heightDp).
-        // What is typed stays (the handwriting pad's 注 sets it mid-sentence): the engine shows it annotated anew
-        // Against the style the view was made with, not the flow's first value: the engine's first configure
-        // after a start sets the style kept, which the view made since already has
+        // 候选词注音 is set on the fcitx thread; the bar's height follows it. Compared with the style the view was
+        // made with, not the flow's first value: the engine's first configure sets the kept style
         lifecycleScope.launch {
             EngineState.candidateReading.collect {
                 if (inputView == null || it == readingBuilt) return@collect
@@ -795,9 +592,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 replaceInputView(ThemeManager.activeTheme, start = true)
             }
         }
-        // a pack imported (or gone): fcitx was restarted on the new files (PackStore), and has no
-        // focused context; a pack's readiness changed, the keyboard made anew, with or without
-        // the gate over it, holding the space to talk or not
         lifecycleScope.launch {
             var generation = PackStore.state.value.generation
             PackStore.state.collect {
@@ -812,18 +606,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         pkgNameCache = PackageNameCache(this)
         getSystemService(InputManager::class.java).registerInputDeviceListener(inputDeviceListener, null)
-        recreateInputViewPrefs.forEach {
-            it.registerOnChangeListener(recreateInputViewListener)
-        }
-        remakeKeyboardsPrefs.forEach {
-            it.registerOnChangeListener(remakeKeyboardsListener)
-        }
+        watchedPrefs.forEach { (pref, listener) -> pref.registerOnChangeListener(listener) }
+        keyboardStylePrefs.forEach { it.registerOnChangeListener(keyboardStyleListener) }
         prefs.candidates.registerOnChangeListener(recreateCandidatesViewListener)
-        keyboardHeightPrefs.forEach { it.registerOnChangeListener(keyboardHeightListener) }
         ThemeManager.addOnChangedListener(onThemeChangeListener)
-        ThemeManager.prefs.keyboardStylePortrait.registerOnChangeListener(keyboardStyleListener)
-        ThemeManager.prefs.keyboardStyleLandscape.registerOnChangeListener(keyboardStyleListener)
-        // a fcitx not ready yet syncs them itself once it is, in the app's language as here
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             fcitx.runIfReady {
                 SubtypeManager.syncWith(enabledIme(), this@FcitxInputMethodService)
@@ -832,7 +618,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         super.onCreate()
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
-        // the system's, as onConfigurationChanged is given: not the app's language over it
+        // the system's configuration, as onConfigurationChanged gets it, not the app-language one
         lastKnownConfig = Configuration(super.getResources().configuration)
     }
 
@@ -843,15 +629,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
             is HostEvent.Key -> event.let event@{
                 if (it.keyStates.virtual) {
-                    // KeyEvent from virtual keyboard
                     when (it.sym) {
                         FcitxKeyMapping.FcitxKey_BackSpace -> handleBackspaceKey()
                         FcitxKeyMapping.FcitxKey_Return -> handleReturnKey()
                         FcitxKeyMapping.FcitxKey_Left -> handleArrowKey(EditorKeyPolicy.Direction.Left)
                         FcitxKeyMapping.FcitxKey_Right -> handleArrowKey(EditorKeyPolicy.Direction.Right)
-                        // the space's slide up and down (SpaceCursor): a line, as the editor moves it
-                        FcitxKeyMapping.FcitxKey_Up -> handleLineKey(SpaceCursor.Line.Up)
-                        FcitxKeyMapping.FcitxKey_Down -> handleLineKey(SpaceCursor.Line.Down)
+                        FcitxKeyMapping.FcitxKey_Up -> sendLine(SpaceCursor.Line.Up, null)
+                        FcitxKeyMapping.FcitxKey_Down -> sendLine(SpaceCursor.Line.Down, null)
                         // a keyboard's own code handed back unhandled (no focused context): never text
                         else -> if (it.unicode > 0 && !KeyCodes.isInternal(it.unicode)) {
                             commitTyped(Character.toString(it.unicode))
@@ -862,17 +646,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 } else {
                     // KeyEvent from physical keyboard (or input method engine forwardKey)
                     clearedText.edited()
-                    // replay the original event if we still have it
                     if (keyEventRelay.replay(it.timestamp)) {
-                        // fcitx hands back the up of every key it took (the space that chose a word too):
-                        // moved there ended that commit's wait and forgot what it left, so on a hardware
-                        // keyboard every commit read before it and none was judged. An up that does change
-                        // the field is caught by its cursor report or by input started anew; a rewrite of
-                        // the same length at the same cursor is not, as for any app's own edit
+                        // fcitx hands back the up of every key it took: treating it as a move would forget every waiting
+                        // commit on a hardware keyboard. An up that changes the field shows in its cursor report
                         if (!it.up) editingSession.commits.moved()
                         return@event
                     }
-                    // no original event to replay: simulate one
                     when (val action = ForwardedKeys.decide(it.keySym.keyCode, it.up, it.unicode)) {
                         is ForwardedKeys.Action.SendKey -> {
                             val eventTime = SystemClock.uptimeMillis()
@@ -894,7 +673,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             is HostEvent.DeleteSurrounding -> {
                 handleDeleteSurrounding(event.before, event.after)
             }
-            // something typed: a run of deletions before it is over
             is HostEvent.InputPanel -> {
                 if (event.preedit.isNotEmpty()) clearedText.edited()
                 placeCode(event)
@@ -902,14 +680,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             is HostEvent.InputMethodChanged -> {
                 val im = event.im
                 hardwareKeyboard.inputMethodChanged(im)
-                // the session switched to knows nothing of the field yet: told it, after fcitx's reset of it (FieldPolicy).
-                // What it types is not a run's: a run ends. Not the same one focused again, as the screen turning has it (review L4)
+                // the new session knows nothing of the field: told after fcitx's reset of it (FieldPolicy). Not when
+                // the same one is refocused (screen turn)
                 if (fieldPolicy.inputMethodChanged(im)) {
                     clearedText.edited()
                     tellContext(started = true)
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    // (one not synced yet has no subtype: the status icon below is still updated)
                     val subtype = SubtypeManager.subtypeOf(im)
                     val had = inputMethodManager.currentInputMethodSubtype?.let(SubtypeManager::inputMethodOf)
                     // [^1]: notify system that input method subtype has changed
@@ -943,11 +720,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val deleting = selection.latest
         keepDeleted(deleting.isNotEmpty())
         contextMemory.backspace(deleting.start, deleting.end)
-        // a selection deleted, where a session takes one code point off what it knows (the app's
-        // Session.ERASED, or English's own Backspace) and the cursor report, predicted, tells it
-        // nothing: read now, for every input method, the selection still there, the text before
-        // it is what will be before the cursor
-        // (told as no selection: what it reads is the field once the selection is gone, review-1c M2)
+        // the cursor report is predicted and tells the session nothing, so read now, as with no selection:
+        // what it reads is the field once the selection is gone
         if (deleting.isNotEmpty()) tellContext(selected = false)
         fieldEditor.quietly {
             if (pairing) backspacePair()
@@ -958,9 +732,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * A deletion about to be made in the field, of the selection ([selection]) or else of one
-     * character before the cursor, kept to put back ([ClearedText.deleting]): not in a field kept from
-     * learning, nor in one taking key events alone (a terminal's), whose text is not what it shows.
+     * Not in a field kept from learning, nor one taking key events alone (a terminal), whose text is
+     * not what it shows.
      */
     private fun keepDeleted(selection: Boolean) {
         val field = startedWith ?: return
@@ -968,19 +741,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         clearedText.deleting(field, selection) { before, after -> readAround(before, after, selected = selection) }
     }
 
-    // the field around the cursor as a run reads it, on the main thread before the deletion ([readAround])
     private fun readAround(before: Int, after: Int, selected: Boolean): ClearedText.Read? {
         val ic = currentInputConnection ?: return null
         return readAround(ic, selection.latest.let { minOf(it.start, it.end) }, before, after, selected)
     }
 
-    /** An empty pair put in goes whole: its closing one here, the opening one as ever. */
     private fun backspacePair() {
         val quoteOpen = editingSession.pairs.quoteOpen
         editingSession.pairs.backspace()
-        // an empty “” gone: fcitx's punctuation does not take its “ back on Backspace, and would
-        // make the next quote a lone ”. Its context is read now, less the “: the key event sent
-        // next may not have landed by a read after it
+        // fcitx does not take back its “ on Backspace and would make the next quote a lone ”. Read now,
+        // less the “: the key event sent next may not have landed by a later read
         if (quoteOpen && !editingSession.pairs.quoteOpen) {
             postFcitxJob { reset(drop = true) }
             tellContext(before = {
@@ -990,7 +760,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    /** The text-editing panel's Backspace, a key event as ever: what it takes is not kept as context. */
     fun sendBackspaceKey() {
         val deleting = selection.latest
         keepDeleted(deleting.isNotEmpty())
@@ -998,16 +767,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
 
-    /**
-     * The field changed past the session (a shortcut's edits, the text-editing panel's cursor set): a commit
-     * waiting can no longer be read back, nor is the text before the cursor known ([CommitCheck.moved]).
-     */
     fun changedPastSession() = editingSession.commits.moved()
 
-    /**
-     * The text-editing panel's menu action, done by the editor: a selection a cut or a paste
-     * takes away is not kept as context any more than Backspace's.
-     */
     fun performContextMenuAction(id: Int) {
         fieldEditor.changing()
         editingSession.commits.moved()
@@ -1015,35 +776,26 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         currentInputConnection?.performContextMenuAction(id)
     }
 
-    /**
-     * Brackets and quotes typed in pairs, where the user wants it -- not in a password, where
-     * what is typed is all there is, nor where the editor takes key events only.
-     */
     private val pairing get() = fieldPolicy.pairs(autoPairs, rawKeys = currentInputEditorInfo.isTypeNull(), phone = phoneField)
 
-    // the field input started in last is a phone number's (onStartInput): read per commit and per Backspace (its 50 ms
-    // repeat too), not worth the traits made anew each time
+    // read per commit and per Backspace repeat: cheaper than remaking the traits each time
     private var phoneField = false
 
-    /** What the user typed, a key or the engine's commit: a bracket or quote may go in paired. */
     private fun commitTyped(text: String, cursor: Int = -1) {
-        // before the pairs read where it starts
-        keptFirst()
+        kept.first()
         if (cursor != -1 || !pairing || !editingSession.pairs.type(text)) {
-            // fcitx's punctuation may put a pair in itself, the cursor between
             val start = editingSession.commitStart
             commitText(text, cursor)
             if (pairing && start != null) editingSession.pairs.committed(text, cursor, start)
             return
         }
-        // paired or stepped over: either way the cursor is after [text]
         contextMemory.committed(text, now = SystemClock.elapsedRealtime())
-        voicePut(text)
+        voiceAsking.put(text)
     }
 
     private fun handleReturnKey() {
         clearedText.edited()
-        // the editor's action (a chat's send, its field cleared) or a key: a commit waiting is not read back after it
+        // a waiting commit is not read back after the editor's action (a chat's send clears the field)
         editingSession.commits.moved()
         when (val action = EditorKeyPolicy.onReturn(currentInputEditorInfo.toEditorTraits(packageName))) {
             EditorKeyPolicy.ReturnAction.SendEnter -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
@@ -1052,43 +804,29 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    // a slide's sample may send two lines at once: the editor applies keys later, so the second reads where the first was
+    // a slide may send two lines at once: the editor applies keys later, so the second reads where the first was
     private val lineRush = SpaceCursor.LineRush()
 
-    private fun handleLineKey(line: SpaceCursor.Line) {
-        sendLine(line, null)
-    }
-
-    /**
-     * 滑选's free end [head] a line, its [anchor] kept: the editor moves it on screen as it does the
-     * space's cursor, with shift held (its selection's end, so set from [anchor] to [head] first where
-     * [head] is the left end, unless [anchored]: lines on their way already left it so). Whether a line
-     * went: its report is the free end's new place.
-     */
+    /** The selection is first set from [anchor] to [head] where [head] is the left end, unless [anchored]. */
     fun extendLine(line: SpaceCursor.Line, anchor: Int, head: Int, anchored: Boolean = false): Boolean {
         currentInputConnection ?: return false
         if (head < anchor && !anchored) editingSession.selectFrom(anchor, head)
         return sendLine(line, CursorRange(anchor, head))
     }
 
-    /** The editor's reports of a selection not predicted (a line landing): 滑选's, while its lines are on their way. */
     var unpredictedSelection: ((CursorRange) -> Unit)? = null
 
-    // the space's cursor a line, or with [ends] (anchor, free end) 滑选's free end: none at the field's very
-    // start or end, where the key would move the focus away (SpaceCursor.sendable). What is read is the side
-    // of the cursor, or of a selection (its left end's before it, its right end's after it): a free end on the
-    // other side has the selection itself that way, a line surely there
+    // none at the field's very start or end, where the key would move the focus away (SpaceCursor.sendable)
     private fun sendLine(line: SpaceCursor.Line, ends: CursorRange?): Boolean {
         val ic = currentInputConnection ?: return false
         val up = line == SpaceCursor.Line.Up
         val facing = ends == null || (if (up) ends.end <= ends.start else ends.end >= ends.start)
         if (facing) {
             val now = SystemClock.uptimeMillis()
-            // only the side the line goes to is read: a binder call each, on the main thread
             val before = if (up) ic.getTextBeforeCursor(LINE_REACH, 0) else null
             val after = if (!up) ic.getTextAfterCursor(LINE_REACH, 0) else null
             val side = before ?: after
-            // only the rushed lines not landed yet: a read the editor already moved is not stale by those it applied
+            // only rushed lines not landed yet: a read is not stale by those the editor already applied
             val rushed = lineRush.unlanded(line, now, side)
             if (!SpaceCursor.sendable(line, before, after, rushed)) {
                 // the edge only while none of the rushed lines landed: read after them, it would skip lines
@@ -1104,22 +842,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return true
     }
 
-    // [code] with shift held, as a hardware keyboard's shift+arrow: the editor extends its selection's end
     private fun sendShifted(ic: InputConnection, code: Int) {
         editingSession.commits.moved()
         val t = SystemClock.uptimeMillis()
         val meta = KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
-        val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
-        fun key(action: Int, key: Int, state: Int) =
-            ic.sendKeyEvent(KeyEvent(t, t, action, key, 0, state, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags))
+        fun key(action: Int, key: Int, state: Int) = sendKeyEvent(ic, action, key, state, t, scancode = 0)
         key(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_SHIFT_LEFT, meta)
         key(KeyEvent.ACTION_DOWN, code, meta)
         key(KeyEvent.ACTION_UP, code, meta)
         key(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_SHIFT_LEFT, 0)
     }
 
-    // after the queued lines land: the field's start, or its end (where the editor's text ends; a copy of the
-    // whole text over binder, once, at the edge alone); with [anchor], 滑选's selection from it to there
     private fun moveToFieldEdge(ic: InputConnection, line: SpaceCursor.Line, anchor: Int? = null): Boolean {
         val end = if (line == SpaceCursor.Line.Up) 0
         else ic.getExtractedText(ExtractedTextRequest(), 0)?.let { x -> x.text?.let { x.startOffset + it.length } } ?: return false
@@ -1148,38 +881,27 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    /** What the address fields left are learned from (AddressStrip): kept here, as the bar is made anew with the view. */
+    /** Kept here because the bar is remade with the view. */
     val addressLearning = AddressLearning()
 
-    /**
-     * An address suggestion tapped (AddressStrip): [before] and [after] units either side of the
-     * cursor replaced by [text], the cursor [cursor] units into it. Only with nothing composed, which
-     * the bar shows it alone with.
-     */
     fun putAround(before: Int, after: Int, text: String, cursor: Int) {
         if (editingSession.composing.isNotEmpty()) return
-        // no keptFirst: the units around the cursor to replace were counted without the kept text; it is
-        // written after the replacement, as its wait ends (writeAsked)
+        // no keptFirst: the units to replace were counted without the kept text, written once its wait ends
         val at = if (cursor == text.length) -1 else cursor
         editingSession.replaceAround(before, after, text, at)
         contextMemory.committed(text, at, SystemClock.elapsedRealtime())
-        voicePut(text)
+        voiceAsking.put(text)
     }
 
     fun commitText(text: String, cursor: Int = -1) {
-        keptFirst()
-        // a long paste cut short: only what went in ends the field's text
+        kept.first()
         val landed = editingSession.commitText(text, cursor)
         contextMemory.committed(landed, if (landed.length == text.length) cursor else -1, SystemClock.elapsedRealtime())
-        voicePut(landed)
+        voiceAsking.put(landed)
         if (cursor == -1 && (landed.endsWith('=') || landed.endsWith('＝'))) offerCalculation()
     }
 
-    /**
-     * The result of the sum the `=` just put in ends ([Calculation]), for the bar: read off the
-     * field, however its digits got there. Not in a field that may not be read; the editor has the
-     * commit by the time it answers, its commands taken in order.
-     */
+    /** Read off the field, however its digits got there; the editor has the commit by then, its commands in order. */
     private fun offerCalculation() {
         val worked = CalculationOffer.read(
             fieldPolicy.sensitive,
@@ -1190,20 +912,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * [text] put in by the app itself, not the engine (a paste, a word from a long press): what
-     * the engine has typed goes in first, and the engine forgets what it committed, no longer
-     * before the cursor (English would put its space behind punctuation typed next, in [text]).
-     * With [replacing], [text] takes its place before the cursor: what the app put in just before
-     * (九键's 1 pressed again, 。 for ，), if it is still there; the field may have refused it, or
-     * the cursor moved. A password or a field that asks not to be learned from is not read to
-     * know: there it is known as what the app put in last, the editor having reported all it did
-     * and nothing else since ([PostedCommit.takeBack]). Not reported yet when [text] goes in,
-     * [replacing] stays: 1 pressed again before the editor reported the first types both, ，。.
-     * Posted, it waits for fcitx (starting, or reloading for the nine keys' letters): by then
-     * another field may have the focus, or none, and nothing goes in ([PostedCommit]). [voice]:
-     * a talk's text, gathered for 语音先问再记 ([VoiceAsk]). [typed]: a key's (a `KeyAction.CommitAction`: the
-     * symbol panel, a long press's item as it is, 九键's 1, the number keyboard), one character replacing nothing
-     * goes in as the engine's commit does ([commitTyped]), a bracket or quote paired; not a paste or a result.
+     * The engine's typed text goes in first, and the engine forgets its commit (else English would put its space
+     * behind punctuation in [text]). In a password [replacing] is known only from the editor's reports, so pressed
+     * again before the first report both stay. Posted behind fcitx: by then another field may have the focus.
      */
     fun commitOverEngine(text: String, replacing: String = "", voice: Boolean = false, typed: Boolean = false): Job {
         val address = inAddressField
@@ -1215,10 +926,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 return@postFcitxJob
             }
             commitAndReset(address)
-            // posted, never run in place: the engine's commit of what was typed comes to the main thread as an event
-            // posted when fcitx sent it, so this goes in after it. A job runs on Dispatchers.Default here, where it was
-            // posted anyway; Main pins the order wherever the job runs. The tests' jobs run on the main thread: one
-            // whose host calls answered before it waited ran this in place (Main.immediate), first: `.你` for 你.
+            // Main, never in place: must land after the engine's own commit event (in place it typed `.你` for 你)
             lifecycleScope.launch(Dispatchers.Main) {
                 if (!stillIn(asked, text)) {
                     if (voice) voiceAsk.landed(talk, inField = false)
@@ -1229,121 +937,29 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                     return@launch lastPosted.putIn(asked, field, selection)
                 }
                 voiceAsk.voice(talk) { lastPosted.putIn(asked, postedField, selection) }
-                voiceAsk.landed(talk, inField = true)?.let(::tellVoiceSaid)
+                voiceAsk.landed(talk, inField = true)?.let(voiceAsking::tell)
             }
         }
     }
 
-    // 语音先问再记: a talk's text, gathered as it went in, and what else went in while the engine follows it
     private val voiceAsk = VoiceAsk()
 
-    /** A talk began ([VoiceSession.begin]): what it puts in is gathered. */
+    private val voiceAsking = VoiceAsking(this, voiceAsk, editingSession, sensitive = { fieldPolicy.sensitive }, started = { startedWith != null })
+
     fun voiceTalkBegan() = voiceAsk.began()
 
-    /** The talk is over ([VoiceSession]'s end): its text to the engine once all of it is in. */
     fun voiceTalkEnded() {
-        voiceAsk.ended()?.let(::tellVoiceSaid)
+        voiceAsk.ended()?.let(voiceAsking::tell)
     }
 
-    // a talk's [text], all in: the engine follows it as the user changes it, where it is to ask (the switch
-    // on, a field that learns), read before the cursor now that it is in (review R6); elsewhere it is not
-    // given voice's text at all, what it followed of another talk ended (review S6)
-    private fun tellVoiceSaid(text: String) {
-        val prefs = AppPrefs.getInstance().internal
-        val asks = prefs.voiceAskRemember.getValue() && !fieldPolicy.sensitive
-        voiceAsk.told(asks)
-        if (!asks) {
-            postFcitxJob { voiceEditsEnd() }
-            return
-        }
-        val before = currentInputConnection?.getTextBeforeCursor(ContextChars, 0)?.toString()
-        // the hint shown once: the engine not looking for it again (review S7)
-        val hinted = prefs.voiceAskHintShown.getValue()
-        postFcitxJob { voiceSaid(text, before, hinted) }
-    }
-
-    // [text] went in, not voice's: reported while the engine follows voice's text; typed while a talk goes on, the
-    // following ended (VO-47: the talk's text told once it is over, what it is changed in then not asked about)
-    private fun voicePut(text: String) {
-        when (voiceAsk.putIn(text)) {
-            VoiceAsk.Put.REPORT -> reportVoicePut(text)
-            VoiceAsk.Put.END -> postFcitxJob { voiceEditsEnd() }
-            VoiceAsk.Put.NONE -> Unit
-        }
-    }
-
-    // [text] went in while the engine follows voice's text: told, and what its edit asks shown once the field
-    // reads as the engine has it (review M6); the window shut, nothing more reported. The field read only while it is
-    // still the one [text] went in (the window not moved on: onFinishInput resets it) and not a password's (checklist 5:
-    // a field left meanwhile may be one); its code in it (061-code-in-field §7.9) not read as text
-    private fun reportVoicePut(text: String) {
-        val window = voiceAsk.current
-        postFcitxJob {
-            val reply = voicePutIn(text)
-            val ask = reply.ask
-            // the window open, nothing asked: nothing for the main thread (review N15)
-            if (reply.open && ask == null) return@postFcitxJob
-            val read = withContext(Dispatchers.Main) {
-                if (!reply.open) voiceAsk.shut(window)
-                val ic = currentInputConnection
-                if (ask == null || ic == null || !voiceFieldStill(window)) null
-                else editingSession.beforeCode(ic.getTextBeforeCursor(ContextChars, 0))?.toString() to
-                    editingSession.afterCode(ic.getTextAfterCursor(ContextChars, 0))?.toString()
-            } ?: return@postFcitxJob
-            val confirmed = voiceConfirm(read.first, read.second) ?: return@postFcitxJob
-            withContext(Dispatchers.Main) { if (voiceFieldStill(window)) askVoiceWord(confirmed) }
-        }
-    }
-
-    // the field voice's [window] was opened in still focused, and one that may be read
-    private fun voiceFieldStill(window: Int) = voiceAsk.current == window && startedWith != null && !fieldPolicy.sensitive
-
-    // 「让语音记住『徐婧』？」 with 记住; or, once, how to have a word remembered (Q3)
-    private fun askVoiceWord(ask: VoiceEdits.Ask) {
-        val prefs = AppPrefs.getInstance().internal
-        if (!prefs.voiceAskRemember.getValue()) return
-        if (ask.hint) {
-            if (prefs.voiceAskHintShown.getValue()) return
-            prefs.voiceAskHintShown.setValue(true)
-            say(R.string.voice_ask_hint)
-            return
-        }
-        prefs.voiceAskShown.setValue(prefs.voiceAskShown.getValue() + 1)
-        say(getString(R.string.voice_ask_remember, ask.word), UndoChip.Undo({ rememberVoiceWord(ask) }, action = R.string.voice_ask_remember_action))
-    }
-
-    // 记住 tapped: added by hand, said so with 撤销 (taking it off the added words, nothing forgotten). The
-    // word added drops the engine's sessions: the bar's 联想 of the old one reset away, not left to tap (review 16)
-    private fun rememberVoiceWord(ask: VoiceEdits.Ask) {
-        postFcitxJob {
-            val added = voiceRemember(ask)
-            // a commit, not a drop: tapped 记住 is no clearing, and text written meanwhile is the user's to keep
-            if (added) reset()
-            withContext(Dispatchers.Main) {
-                if (!added) return@withContext say(R.string.voice_ask_failed)
-                val taken = AppPrefs.getInstance().internal.voiceAskTaken
-                taken.setValue(taken.getValue() + 1)
-                say(getString(R.string.voice_ask_remembered, ask.word), UndoChip.Undo({
-                    taken.setValue(maxOf(0, taken.getValue() - 1))
-                    postFcitxJob { voiceForget(ask.word) }
-                }))
-            }
-        }
-    }
-
-    // whether input is in the field [text] was asked to go in ([PostedCommit.lands]): else it is dropped
     private fun stillIn(asked: PostedCommit, text: String): Boolean {
         if (asked.lands(startedWith)) return true
-        // its length alone: the debug log can be exported, and the text may be what the user typed
+        // its length alone: the debug log can be exported
         Timber.d("commitOverEngine: the field changed or finished, ${text.length} chars dropped")
         return false
     }
 
-    /**
-     * The field as commitOverEngine puts text in it ([LastPosted.putIn]): what the app put in just
-     * before is read to know, or, where the field is not to be read, as the editor's cursor report
-     * tells, its units deleted unread.
-     */
+    /** Where the field may not be read, what the app put in is known from the cursor report and deleted unread. */
     private val postedField = object : LastPosted.Field {
         override val sensitive: Boolean get() = fieldPolicy.sensitive
         override val composing: Boolean get() = editingSession.composing.isNotEmpty()
@@ -1361,15 +977,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         override fun commit(text: String) = commitText(text)
     }
 
-    // [postedField] for a key's character: committed as the engine's commit of it is, paired where brackets are
     private val typedField = object : LastPosted.Field by postedField {
         override fun commit(text: String) = commitTyped(text)
     }
 
-    /**
-     * What is typed put in as the input method would (its first candidate, or as composed), then
-     * fcitx reset. [address]: the field is one ([inAddressField]), as read when the key was pressed.
-     */
     // there should be a new fcitx API for this
     suspend fun HostApi.commitAndReset(address: Boolean) {
         val resolution = PendingInputPolicy.resolve(
@@ -1379,18 +990,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         )
         when (resolution) {
             PendingInputPolicy.Resolution.SelectFirstCandidate -> select(0)
-            // the engine's Enter while composing: what was typed, committed
             PendingInputPolicy.Resolution.CommitAsTyped -> sendKey(FcitxKeyMapping.FcitxKey_Return)
-            // This runs on fcitx's thread pool, and the composing state belongs to the main thread.
-            // Voice's composing text is not finished: the commit replaces it (finished, it was typed twice).
-            // The code in the field is not the text typed: taken away, as leaving it does
+            // on fcitx's thread pool; the composing state is the main thread's. Voice's is not finished (the
+            // commit replaces it); the code in the field is taken away
             PendingInputPolicy.Resolution.FinishComposing ->
                 withContext(Dispatchers.Main) {
-                    when (editingSession.kind) {
-                        EditingSession.Kind.TEXT -> finishComposing()
-                        EditingSession.Kind.CODE -> editingSession.leaveComposition()
-                        EditingSession.Kind.PROVISIONAL -> {}
-                    }
+                    if (!editingSession.provisional) editingSession.leaveComposition()
                     syncCodePlace()
                 }
             PendingInputPolicy.Resolution.None -> {}
@@ -1398,55 +1003,31 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         reset()
     }
 
-    /**
-     * A key the field acts on as it likes (Backspace, Enter, an arrow, a line): what a commit waiting for its
-     * report did can no longer be read back ([CommitCheck.moved]). So too [sendDownKeyEvent], [sendShifted],
-     * the editor's action and the cursor set here past the session.
-     */
     override fun sendDownUpKeyEvents(keyEventCode: Int) {
         editingSession.commits.moved()
         super.sendDownUpKeyEvents(keyEventCode)
     }
 
+    private fun sendKeyEvent(
+        ic: InputConnection?, action: Int, code: Int, metaState: Int, downTime: Long, eventTime: Long = downTime,
+        scancode: Int = ScancodeMapping.keyCodeToScancode(code),
+    ) {
+        val flags = KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
+        ic?.sendKeyEvent(KeyEvent(downTime, eventTime, action, code, 0, metaState, KeyCharacterMap.VIRTUAL_KEYBOARD, scancode, flags))
+    }
+
     private fun sendDownKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
         clearedText.edited()
         editingSession.commits.moved()
-        currentInputConnection?.sendKeyEvent(
-            KeyEvent(
-                eventTime,
-                eventTime,
-                KeyEvent.ACTION_DOWN,
-                keyEventCode,
-                0,
-                metaState,
-                KeyCharacterMap.VIRTUAL_KEYBOARD,
-                ScancodeMapping.keyCodeToScancode(keyEventCode),
-                KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
-            )
-        )
+        sendKeyEvent(currentInputConnection, KeyEvent.ACTION_DOWN, keyEventCode, metaState, eventTime)
     }
 
-    private fun sendUpKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) {
-        currentInputConnection?.sendKeyEvent(
-            KeyEvent(
-                eventTime,
-                SystemClock.uptimeMillis(),
-                KeyEvent.ACTION_UP,
-                keyEventCode,
-                0,
-                metaState,
-                KeyCharacterMap.VIRTUAL_KEYBOARD,
-                ScancodeMapping.keyCodeToScancode(keyEventCode),
-                KeyEvent.FLAG_SOFT_KEYBOARD or KeyEvent.FLAG_KEEP_TOUCH_MODE
-            )
-        )
-    }
+    private fun sendUpKeyEvent(eventTime: Long, keyEventCode: Int, metaState: Int = 0) =
+        sendKeyEvent(currentInputConnection, KeyEvent.ACTION_UP, keyEventCode, metaState, eventTime, SystemClock.uptimeMillis())
 
-    /** The backspace swipe's selection deleted: kept to put back, as a Backspace's deletion. */
     fun deleteSelection() {
         if (selection.latest.isNotEmpty()) keepDeleted(selection = true)
         fieldEditor.quietly { editingSession.deleteSelection() }
-        // the engine reset first: what is left is read, for what of its commits the selection took (U-03)
         tellContext(selected = false)
     }
 
@@ -1471,18 +1052,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         if (alt) sendUpKeyEvent(eventTime, KeyEvent.KEYCODE_ALT_LEFT)
     }
 
-    /** The backspace swipe's selection: what it deletes is more of a run of deletions, not a change ending it. */
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) =
         fieldEditor.quietly { editingSession.applySelectionOffset(offsetStart, offsetEnd) }
 
     fun cancelSelection() = editingSession.cancelSelection()
 
-    /** 滑选's selection, set from where it began ([org.fcitx.fcitx5.android.input.keyboard.SwipeSelection]): a cursor moved, as the user's own selecting. */
     fun select(start: Int, end: Int) = editingSession.select(start, end)
 
-    /** The field around the selection as 滑选 begins, for its characters, and where it read the cursor; none in a password, whose text is not read. */
-    // none either where its place is only the tracked cursor (FieldRead: below Android 12, or no offset
-    // given) and a selection predicted is not yet reported: the tracking may be behind the field read
+    // none where the read is placed by the tracked cursor (below Android 12) and a predicted selection is not yet reported
     fun readForSwipeSelect(): ClearedText.Read? {
         if (inPasswordField) return null
         val ic = currentInputConnection ?: return null
@@ -1490,53 +1067,23 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return readAround(ic, tracked, SwipeSelection.READ, SwipeSelection.READ, selected = selection.latest.isNotEmpty())?.takeIf { it.at >= 0 }
     }
 
-    /** The selection the editor last reported, none predicted since taken into account: what 滑选's steps past the field's known end wait for. */
     val reportedSelection: CursorRange
         get() = selection.current
 
-    /** Whether the editor reported every selection predicted: a report of 滑选's step past the known end is of that step, not an older one. */
     val selectionSettled: Boolean
         get() = selection.settled
 
-    // waiting in [whenSelectionSettled], each also posted to run at its time-out
-    private val settleWaiters = ArrayList<Runnable>()
-    private val settleTimeouts by lazy { Handler(Looper.getMainLooper()) }
+    private val settleWaiters = SettleWaiters { selection.settled }
 
     /**
-     * [block] run on the main thread once the editor reported every selection predicted (now, if it
-     * has), or [timeoutMs] on where it does not: 滑选 begun after what is typed is committed, its read
-     * of the field placed by the tracked cursor below Android 12, true only once that is reported.
+     * Or after [timeoutMs] where it never does. Below Android 12 滑选's read is placed by the tracked
+     * cursor, true only once reported.
      */
-    fun whenSelectionSettled(timeoutMs: Long, block: () -> Unit) {
-        if (selection.settled) return block()
-        val waiter = object : Runnable {
-            override fun run() {
-                if (settleWaiters.remove(this)) block()
-            }
-        }
-        settleWaiters += waiter
-        settleTimeouts.postDelayed(waiter, timeoutMs)
-    }
-
-    // the field ended or the service gone: no 滑选 begun for it later, nor the service held by the main looper
-    private fun dropSettleWaiters() {
-        if (settleWaiters.isEmpty()) return
-        settleTimeouts.removeCallbacksAndMessages(null)
-        settleWaiters.clear()
-    }
-
-    private fun wakeSettled() {
-        if (settleWaiters.isEmpty() || !selection.settled) return
-        for (waiter in settleWaiters.toList()) {
-            settleTimeouts.removeCallbacks(waiter)
-            waiter.run()
-        }
-    }
+    fun whenSelectionSettled(timeoutMs: Long, block: () -> Unit) = settleWaiters.add(timeoutMs, block)
 
     /**
-     * [range], set by 滑选 past the field's known end, no longer predicted where the editor never
-     * reported it (one past the end, which it ignores without a word): else [currentInputSelection]
-     * would stay on it, for Backspace and the next 滑选 to act on a selection there is not.
+     * The editor ignores a selection past the end without a report: else [currentInputSelection]
+     * would stay on it for Backspace and the next 滑选.
      */
     fun forgetSelection(range: CursorRange) {
         val reported = selection.current
@@ -1545,62 +1092,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     private lateinit var lastKnownConfig: Configuration
 
-    /** [Locales.picked], as the input view was last made in; null until [onCreate] (and while the
-     * service is constructed, should the framework read resources that early). Volatile, as is
-     * [localizedResources]: [getResources] is read off the main thread too, by a fcitx job's
-     * SubtypeManager.syncWith */
-    @Volatile
-    private var appLocales: LocaleListCompat? = null
+    // null while the service is constructed, should the framework read its resources that early
+    private val appLanguage: AppLanguage? = AppLanguage(this)
 
-    @Volatile
-    private var localizedResources: Resources? = null
-
-    /** The app's and the phone's languages as [appLocales] was read with, from Android 13 on. */
-    private var localesReadWith: Pair<LocaleListCompat, LocaleListCompat>? = null
-
-    /**
-     * The app's language, where the user picked one: an input method's window takes the
-     * display's configuration, the phone's language, even where Android 13 gives the app its
-     * own. The keyboard's views are made with this service, and read their strings here.
-     */
-    override fun getResources(): Resources {
-        val base = super.getResources()
-        val locales = appLocales
-        if (locales == null || locales.isEmpty) return base
-        // the locales alone over the base: the system keeps these resources up with any other
-        // change (orientation, dark mode), for those that hold on to them, the input window first
-        return localizedResources ?: createConfigurationContext(
-            Configuration().also { ConfigurationCompat.setLocales(it, locales) }
-        ).resources.also { localizedResources = it }
-    }
-
-    /** Whether the language picked for the app changed since the input view was made. */
-    private fun pickedLocalesChanged(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // reading the picked ones is a binder call there; they lead the app's configuration, so
-            // are read again only once it or the phone's changed
-            val languages = ConfigurationCompat.getLocales(applicationContext.resources.configuration) to
-                ConfigurationCompat.getLocales(Resources.getSystem().configuration)
-            if (languages == localesReadWith) return false
-            localesReadWith = languages
-        }
-        val picked = Locales.picked(this)
-        if (picked == appLocales) return false
-        appLocales = picked
-        localizedResources = null
-        return true
-    }
+    override fun getResources(): Resources = super.getResources().let { appLanguage?.resources(it) ?: it }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
-        // as a setting's rebuild: the field's composing text committed, not wiped from it. The context
-        // told there is told again if super restarts the input below: one more round trip, the last kept
+        // the field's composing text committed, not wiped. If super restarts input the context is told twice
         endComposition()
         /**
-         * skip keyboard|keyboardHidden changes, because we have [inputDeviceMgr]
-         * skip uiMode (system light/dark mode) changes, because we have [onThemeChangeListener]
-         * to replace InputView(s) when needed
-         * [android.inputmethodservice.InputMethodService.onConfigurationChanged] would call
-         * resetStateForNewConfiguration() which calls initViews() causes InputView(s) to be replaced again
+         * skip keyboard|keyboardHidden (we have [inputDeviceMgr]) and uiMode (we have
+         * [onThemeChangeListener]): super would call resetStateForNewConfiguration() -> initViews() and
+         * replace the views again
          * https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/inputmethodservice/InputMethodService.java#1984
          */
         val f = ActivityInfo.CONFIG_KEYBOARD or
@@ -1609,8 +1112,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         val diff = lastKnownConfig.diff(newConfig)
         Timber.d("onConfigurationChanged diff=$diff")
         /**
-         * perform `super.onConfigurationChanged` only when `newConfig` diff fall outside "skipped" flags
-         * we have to calculate the mask ourselves because nobody knows how `handledConfigChanges` works
+         * the mask is computed here: how `handledConfigChanges` works is unclear
          * https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/inputmethodservice/InputMethodService.java#1876
          */
         if (diff and f != diff) {
@@ -1627,7 +1129,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             styledColorOrDefault(android.R.attr.colorAccent, DefaultHighlightColor).alpha(0.4f)
         InputFeedbacks.syncSystemPrefs()
         InputFeedbacks.syncSounds()
-        // a failure said as the host started, before any keyboard showed (A4: the settings unreadable)
         EngineNotices.keyboardShown()
     }
 
@@ -1640,17 +1141,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun setInputView(view: View) {
         super.setInputView(view)
-        // input method layout has not changed in 11 years:
+        // expand inputArea to fullscreen; the layout has not changed in 11 years:
         // https://android.googlesource.com/platform/frameworks/base/+/ae3349e1c34f7aceddc526cd11d9ac44951e97b6/core/res/res/layout/input_method.xml
-        // expand inputArea to fullscreen
         contentView.findViewById<FrameLayout>(android.R.id.inputArea)
             .updateLayoutParams<ViewGroup.LayoutParams> {
                 height = ViewGroup.LayoutParams.MATCH_PARENT
             }
-        /**
-         * expand InputView to fullscreen, since [android.inputmethodservice.InputMethodService.setInputView]
-         * would set InputView's height to [ViewGroup.LayoutParams.WRAP_CONTENT]
-         */
+        // setInputView sets the height to WRAP_CONTENT
         view.updateLayoutParams<ViewGroup.LayoutParams> {
             height = ViewGroup.LayoutParams.MATCH_PARENT
         }
@@ -1667,25 +1164,22 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onComputeInsets(outInsets: Insets) {
         if (inputDeviceMgr.isVirtualKeyboard && inputView?.floatingRegion(floatingRegion) == true) {
-            // the app laid out as if there were no keyboard, only the keyboard's own place taking touches
+            // the app laid out as if there were no keyboard; only the keyboard's own place takes touches
             val h = decorView.height
             outInsets.apply {
                 contentTopInsets = h
                 visibleTopInsets = h
                 touchableInsets = Insets.TOUCHABLE_INSETS_REGION
                 touchableRegion.set(floatingRegion)
-                // the code strip floating over the app outside it (编码行) takes touches too
                 if (inputView?.codeStripRegion(codeStripRegion) == true) touchableRegion.union(codeStripRegion)
             }
         } else if (inputDeviceMgr.isVirtualKeyboard) {
             val keyboard = inputView?.keyboardView
             keyboard?.getLocationInWindow(inputViewLocation)
             outInsets.apply {
-                // the app laid out down to the keyboard's top, never moved as the strip comes and goes
                 contentTopInsets = inputViewLocation[1]
                 visibleTopInsets = inputViewLocation[1]
                 if (keyboard != null && inputView?.codeStripRegion(codeStripRegion) == true) {
-                    // above that top, touches reach the app but on the strip
                     touchableInsets = Insets.TOUCHABLE_INSETS_REGION
                     touchableRegion.set(0, inputViewLocation[1], decorView.width, decorView.height)
                     touchableRegion.union(codeStripRegion)
@@ -1714,14 +1208,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onEvaluateFullscreenMode() = false
 
-    // a hardware Backspace held: its press and auto-repeats, which stop as the keyboard's ⌫'s do (BackspaceHold)
     private var backspaceHold: BackspaceHold? = null
 
     private fun forwardKeyEvent(event: KeyEvent): Boolean {
         val sym = KeySym.fromKeyEvent(event)
         if (sym != null) {
             val up = event.action == KeyEvent.ACTION_UP
-            // let go, the hold is over: a press after never takes on one stopped
             if (event.keyCode == KeyEvent.KEYCODE_DEL && up) backspaceHold = null
             val hold = if (event.keyCode != KeyEvent.KEYCODE_DEL || up) {
                 null
@@ -1742,18 +1234,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return false
     }
 
-    // the key whose press was taken here, its repeats and release not to go to fcitx alone
+    // its repeats and release must not reach fcitx alone
     private val keyTaken = TakenKey()
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        // Shift+Delete on the candidate highlighted forgets it, as its long press does (U-82): taken
-        // while one is highlighted, the engine's answer too late for the key: with nothing to forget it
-        // does nothing, where Delete would have deleted beside a composition (review-E-ui N1)
+        // Shift+Delete forgets the highlighted candidate: taken while one is highlighted, since the engine's
+        // answer comes too late for the key
         val forgets = keyTaken.down(keyCode, repeat = event.repeatCount > 0) {
             keyCode == KeyEvent.KEYCODE_FORWARD_DEL && event.isShiftPressed && candidatesView?.forgetHighlighted() == true
         }
-        // told even when taken: the Delete ends a lone Shift tap, else letting go of Shift soon after
-        // the forget would switch 中/英 too
+        // told even when taken: else letting go of Shift soon after would switch 中/英
         val taken = hardwareKeyboard.down(
             keyCode, event.isCtrlPressed, event.isShiftPressed, others = event.isAltPressed || event.isMetaPressed,
             repeat = event.repeatCount > 0, timeMs = event.eventTime
@@ -1775,13 +1265,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         return forwardKeyEvent(event) || super.onKeyUp(keyCode, event)
     }
 
-    // Added in API level 14, deprecated in 29
-    // it's needed because editors still use it even on API 36
+    // deprecated in 29, but editors still use it on API 36
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun onViewClicked(focusChanged: Boolean) {
         super.onViewClicked(focusChanged)
-        // a tap on the field, the cursor put somewhere: Backspace starts another run. Editors that
-        // do not tell it (a WebView's, Compose's) leave the run as it is (review L5)
+        // Backspace starts another run. WebView and Compose editors do not report it
         if (!focusChanged) clearedText.moved()
         inputDeviceMgr.evaluateOnViewClicked(this)
     }
@@ -1820,27 +1308,21 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * When input method changes internally (eg. via language switch key or keyboard shortcut),
-     * we want to notify system that subtype has changed (see [^1]), then ignore the incoming
-     * [onCurrentInputMethodSubtypeChanged] callback.
-     * Input method should only be changed when user changes subtype in system input method picker
-     * manually.
+     * An input method change made inside fcitx is told to the system (see [^1]) and the echoing
+     * [onCurrentInputMethodSubtypeChanged] ignored: only the system picker changes the input method.
      */
     private val subtypeEchoes = SubtypeEchoes()
 
     /**
-     * Tells the system the subtype fcitx is on. fcitx events come at any time, also after the
-     * system disabled this keyboard (in its settings, or a test restoring the device's), and the
-     * system refuses the switch then: not to throw on the main looper, the refusal is logged and
-     * the echo awaited for it forgotten.
+     * The system refuses the switch after it disabled this keyboard (its settings, a test restoring the
+     * device's): logged, not thrown on the main looper, and the awaited echo forgotten.
      */
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private fun tellSubtype(im: String, subtype: InputMethodSubtype) {
         try {
             switchInputMethod(InputMethodUtil.componentName, subtype)
         } catch (expected: RuntimeException) {
-            // the system's refusal comes back as a plain RuntimeException, a dead system as one too;
-            // named `expected` as detekt's TooGenericExceptionCaught allows a caught one so named
+            // a plain RuntimeException; named `expected` as detekt's TooGenericExceptionCaught allows
             Timber.w(expected, "IMChangeEvent: the system refused the switch to im=$im")
             subtypeEchoes.refused(im)
         }
@@ -1850,8 +1332,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         super.onCurrentInputMethodSubtypeChanged(newSubtype)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             val im = SubtypeManager.inputMethodOf(newSubtype) ?: return
-            // don't change input method if this "subtype change" was our notify to system
-            // see [^1]
             val echo = subtypeEchoes.isEcho(im)
             Timber.d("onCurrentInputMethodSubtypeChanged: im=$im, echo=$echo")
             if (echo) return
@@ -1862,23 +1342,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
-        // the screen turned (resetStateForNewConfiguration): input restarts with the EditorInfo the
-        // field first started with, its initial selection and text that start's (CursorTracker.startInput)
+        // the screen turned (resetStateForNewConfiguration): input restarts with the first start's EditorInfo
         val again = restarting && attribute === startedWith
-        // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
-        // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
-        // right cursor position, try to workaround this would simply introduce more bugs.
+        // initialSel{Start,End} is outdated: the client app's job, a workaround would add bugs
         selection.startInput(again, attribute.initialSelStart, attribute.initialSelEnd)
         val flags = CapabilityFlags.forField(attribute, packageName)
         val sensitive = flags.hasAny(CapabilityFlag.PasswordOrSensitive)
-        // input restarting (the screen turned, resetStateForNewConfiguration, or the app's own
-        // restartInput) has no onFinishInputView, and the focus out below drops the engine's input: the
-        // editor's preedit (English's word, handwriting's characters, the text itself) is text from now on.
-        // Voice's text still to come, in the same field, is taken away instead: its talk goes on, and
-        // composes it anew (or, the app having taken it, does not type it again)
-        // The code in the field: taken away proven ours on the input method's own restart, else let go
-        // of and the field's code floats from now on (dev/design/061-code-in-field.md §6.4)
+        // a restart has no onFinishInputView and the focus out below drops the engine's input: the editor's
+        // preedit becomes text. Voice's tail is taken away (its talk composes it anew); the code in the field
+        // is taken away when proven ours, else it floats from now on
         if (restarting) {
             when (editingSession.kind) {
                 EditingSession.Kind.PROVISIONAL ->
@@ -1887,16 +1360,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 EditingSession.Kind.TEXT -> currentInputConnection?.finishComposingText()
             }
         }
-        // restarted, the same field: what it had of the floating window stays its
         if (restarting && cursorField === startedWith) cursorField = attribute
         startedWith = attribute
         commitsStartIn(attribute, sensitive)
-        // another field's clears are never put back here, nor kept once it is left; the screen turned is the same input
+        // clears are never put back in another field; a screen turn is the same input
         if (!again) clearedText.forget()
-        // what commitOverEngine put in last, a paste into a password maybe, is not kept: the reset above
-        // keeps it from being taken back anyway
         lastPosted.forget()
-        resetComposingState()
+        editingSession.resetComposingState()
         val traits = attribute.toEditorTraits()
         phoneField = traits.number == NumberKind.PHONE
         codeInField.startInput(traits, restarting)
@@ -1906,8 +1376,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         editingSession.pairs.forget()
         arrowKeys.forget()
         contextReads.forget()
-        // nothing of a password or a field that asks not to be learned from is kept. Another field:
-        // what was written before is no longer the engine's to take back (U-03)
         val started = fieldPolicy.focusAnother(
             ContextMemory.field(
                 attribute.packageName, attribute.fieldId, attribute.inputType, attribute.fieldName, attribute.hintText
@@ -1919,7 +1387,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
-        wakeSettled()
+        settleWaiters.wake()
         val isNullType = attribute.isTypeNull()
         if (!isNullType) hardwareKeyboard.fieldStarted()
         // wait until InputContext created/activated
@@ -1940,8 +1408,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         contextDropped = false
         if (!isNullType) {
-            // an editor that gives no initial text may still answer the connection. The initial
-            // text is the field's as it started: after a turn the first start's, so the editor is asked
+            // an editor without initial text may still answer; after a turn the initial text is the first start's, so ask
             val initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !again
             tellContext(
                 before = {
@@ -1964,8 +1431,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
-        // the app's language picked anew in its settings: shown in it from now on
-        if (pickedLocalesChanged()) {
+        if (appLanguage?.pickedChanged() == true) {
             rebuilding(ViewRebuild.LANGUAGE)
             replaceInputViews(ThemeManager.activeTheme)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -1973,21 +1439,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             }
         }
         postFcitxJob { focus(true) }
-        // the touch keyboard coming up as this evaluates is started below, not in inputDeviceMgr's onChange
         inputViewStarted = false
         val virtual = inputDeviceMgr.evaluateOnStartInputView(info, this)
-        // the field as its view starts says what it is anew (a browser's): the code goes by the later
+        // a browser's field may say what it is anew here: the later wins
         info.toEditorTraits().let {
             codeInField.startInputView(it)
             editingSession.inlineCompletion = it.isUri || it.isEmail
         }
         inputViewStarted = true
         if (virtual) {
-            // because onStartInputView will always be called after onStartInput,
-            // editorInfo and capFlags should be up-to-date
-            inputView?.startInput(info, capabilityFlags, restarting)
+            // onStartInputView always follows onStartInput: editorInfo and capFlags are up to date
+            inputView?.startInput(info, capabilityFlags)
         } else {
-            // the same field restarted (a WebView after an edit) keeps its cursor and its drag
+            // a WebView restarted after an edit keeps its cursor and drag
             if (!restarting) forgetCursor()
             if (currentInputConnection?.monitorCursorAnchor() != true) anchorToCorner()
             showStatusIcon(StatusIconMapping.fromEntry(fcitx.runImmediately { inputMethodEntryCached }))
@@ -2008,24 +1472,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesEnd: Int
     ) {
         Timber.d("onUpdateSelection: old=[$oldSelStart,$oldSelEnd] new=[$newSelStart,$newSelEnd] cand=[$candidatesStart,$candidatesEnd]")
-        val update = editingSession.onCursorUpdate(
-            newSelStart, newSelEnd, candidatesStart, candidatesEnd, ignoreSystemCursor
-        )
+        val update = editingSession.onCursorUpdate(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         arrowKeys.cursorReported(newSelStart, newSelEnd)
-        // the user left a “” put in without typing its ”, or stepped over its ” with a “: fcitx's
-        // punctuation still counts the “ open, and would make the next quote a lone ”. Nothing
-        // composed is lost (the cursor left it, finished in place), and the context comes after:
-        // the update's, or told here where the update tells none (a reset drops it)
+        // fcitx still counts a “ left open (or stepped over) and would make the next quote a lone ”. The
+        // context comes after: the update's, or told here where it tells none
         val quoteReset = editingSession.quoteLeftOpen
         if (quoteReset) postFcitxJob { reset() }
         handleCursorUpdate(update)
         syncCodePlace()
-        // a report not predicted, so not this service's own commit
         if (update != EditingSession.CursorUpdate.None) inputView?.cursorMoved()
         if (update != EditingSession.CursorUpdate.None) unpredictedSelection?.invoke(CursorRange(newSelStart, newSelEnd))
         if (quoteReset && update == EditingSession.CursorUpdate.None) tellContextLater()
         inputView?.updateSelection(newSelStart, newSelEnd)
-        wakeSettled()
+        settleWaiters.wake()
     }
 
     private val contentSize = floatArrayOf(0f, 0f)
@@ -2055,44 +1514,14 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         candidatesView?.updateCursorAnchor(contentSize)
     }
 
-    private val anchorPosition = floatArrayOf(0f, 0f, 0f, 0f)
-
     override fun onUpdateCursorAnchorInfo(info: CursorAnchorInfo) {
-        val bounds = info.getCharacterBounds(0)
-        if (bounds != null) {
-            // anchor to start of composing span instead of insertion mark if available
-            val horizontal =
-                if (candidatesView?.layoutDirection == View.LAYOUT_DIRECTION_RTL) bounds.right else bounds.left
-            anchorPosition[0] = horizontal
-            anchorPosition[1] = bounds.bottom
-            anchorPosition[2] = horizontal
-            anchorPosition[3] = bounds.top
-        } else {
-            anchorPosition[0] = info.insertionMarkerHorizontal
-            anchorPosition[1] = info.insertionMarkerBottom
-            anchorPosition[2] = info.insertionMarkerHorizontal
-            anchorPosition[3] = info.insertionMarkerTop
-        }
         // avoid calling `decorView.getLocationOnScreen` repeatedly
         if (!decorLocationUpdated) {
             updateDecorLocation()
         }
-        if (anchorPosition.any(Float::isNaN)) {
-            // anchor candidates view to bottom-left corner in case CursorAnchorInfo is invalid
-            candidatesView?.updateCursorAnchor(contentSize)
-            return
-        }
-        // params of `Matrix.mapPoints` must be [x0, y0, x1, y1]
-        info.matrix.mapPoints(anchorPosition)
-        val (xOffset, yOffset) = decorLocation
-        anchorPosition[0] -= xOffset
-        anchorPosition[1] -= yOffset
-        anchorPosition[2] -= xOffset
-        anchorPosition[3] -= yOffset
-        candidatesView?.updateCursorAnchor(anchorPosition, contentSize)
+        candidatesView?.updateCursorAnchor(info, decorLocation, contentSize)
     }
 
-    /** Passes on to fcitx what a cursor report means for the composition. */
     private fun handleCursorUpdate(update: EditingSession.CursorUpdate) {
         when (update) {
             EditingSession.CursorUpdate.None -> {}
@@ -2106,20 +1535,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 tellContextLater()
             }
             is EditingSession.CursorUpdate.MovePreeditCursor -> {
-                // the code in the field as the tap moved the cursor (this thread's): only then is a hop back here
-                // worth the keys queued behind it on fcitx's
+                // only then is a hop back here worth the keys queued behind it on fcitx's thread
                 val codeInField = editingSession.codeInField
                 postFcitxJob {
-                    // onUpdateSelection can lag behind when the user types quickly enough, eg. long
-                    // press backspace; only the latest report moves the cursor
+                    // onUpdateSelection lags behind fast typing (long-press backspace): only the latest report moves the cursor
                     if (update.updateIndex != editingSession.cursorUpdateIndex) return@postFcitxJob
                     Timber.d("handleCursorUpdate: move fcitx cursor to ${update.codePointPosition}")
                     moveCursor(update.codePointPosition)
                     if (!codeInField) return@postFcitxJob
-                    // the code in the field: its cursor where the engine has it, a tap it did not take (in
-                    // what is chosen, 你 of 你hao) put back (061-code-in-field §4.3)
                     withContext(Dispatchers.Main) {
-                        // the panel placed last, on this thread: one taken on fcitx's may be a key behind it
+                        // the panel placed last, on this thread: one taken on fcitx's may be a key behind
                         val panel = placedPanel
                         if (panel.code && editingSession.codeInField) editingSession.writeCode(panel.preedit) { it.toSpannedString(highlightColor) }
                     }
@@ -2132,19 +1557,13 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
     }
 
-    // the code in the field is no context (061-code-in-field §7.9): what was there before it is
     private val textBeforeCursor = { editingSession.beforeCode(currentInputConnection?.getTextBeforeCursor(ContextChars, 0)) }
-    // as much as a context holds: what the engine checks its commits by after the cursor (U-03), and whether anything follows it
     private val textAfterCursor = { editingSession.afterCode(currentInputConnection?.getTextAfterCursor(Action.Context.HOST_CHARS, 0)) }
 
-    // context reads asked for: one still queued behind a newer, or from a field since left, is not made
+    // a read queued behind a newer one, or from a field since left, is not made
     private val contextReads = ContextReads()
 
-    /**
-     * What the engine's input follows, after fcitx is done with what was there: not read at all
-     * in a password or other sensitive field, where the engine learns nothing either. See
-     * [FieldPolicy.context].
-     */
+    /** Not read at all in a password or other sensitive field. See [FieldPolicy.context]. */
     private fun tellContext(
         before: () -> CharSequence? = textBeforeCursor,
         after: () -> CharSequence? = textAfterCursor,
@@ -2157,7 +1576,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         postFcitxJob { tell(context, learning) }
     }
 
-    // [read] asked of the editor once, however often its answer is wanted: each ask is a round trip
     private fun readOnce(read: () -> CharSequence?): () -> CharSequence? {
         var asked = false
         var text: CharSequence? = null
@@ -2171,9 +1589,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * [tellContext] for a cursor report, read once fcitx gets to it rather than on the report, so
-     * that of a burst (a held arrow or Backspace, keys typed ahead of a slow editor) the last alone
-     * waits on the editor. Told in that job, it still comes before any key queued after the report.
+     * Read once fcitx gets to it, so of a burst (held arrow or Backspace) only the last waits on the
+     * editor; still ahead of any key queued after the report.
      */
     private fun tellContextLater() {
         val read = contextReads.ask()
@@ -2191,9 +1608,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private fun updateComposingText(text: FormattedText) {
-        // the engine's empty preedit (a reset before voice's commit) leaves voice's text for the commit to replace
+        // an empty preedit (a reset before voice's commit) leaves voice's text for the commit to replace
         if (text.isEmpty() && editingSession.kind != EditingSession.Kind.TEXT) return
-        // the engine's own preedit in the app now (English's word): the code there before is taken away first
         if (editingSession.codeInField) {
             editingSession.leaveComposition()
             syncCodePlace()
@@ -2201,50 +1617,29 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         editingSession.updateComposingText(text) { it.toSpannedString(highlightColor) }
     }
 
-    /**
-     * Voice may compose here ([composeVoice]): nothing composing in the field (English's word,
-     * handwriting's), not a password, not a field of raw keys (TYPE_NULL: it has no composing text).
-     */
     val voiceComposes get() = editingSession.composingText.isEmpty() && !inPasswordField &&
         currentInputEditorInfo?.isTypeNull() == false
 
-    /** What composes in the field is voice's, or nothing does: not the engine's (another finger typing meanwhile). */
     val voiceOwnsComposing get() = editingSession.composingText.isEmpty() || editingSession.provisional
 
-    /**
-     * Whether [now] is the field [said] was, though input restarted in it (a new EditorInfo): the
-     * same app, view id and what it says of itself ([VoiceCommit.sameField]).
-     */
     fun sameField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
         VoiceCommit.sameField(said.voiceField(), now.voiceField(), said === now)
 
     private fun EditorInfo.voiceField() =
         VoiceCommit.Field(packageName, fieldId, inputType, fieldName, hintText?.toString())
 
-    /**
-     * Voice's composing text taken from the field by anything but voice ([EditingSession.provisionalTaken]):
-     * [taken] told how ([EditingSession.Taken]). One talk at a time; null when it ends.
-     */
     fun watchVoice(taken: ((how: EditingSession.Taken) -> Unit)?) {
         editingSession.provisionalTaken = taken
     }
 
-    /**
-     * Tap to talk's step as it is said: [type] typed ([commitVoice], if any), then [composing] composes
-     * after it ([composeVoice]); one batch, so the app sees one change, not the tail gone a moment.
-     */
+    /** One batch, so the app sees one change, not the tail gone for a moment. */
     fun voiceHeard(type: String, composing: String) = fieldEditor.batchEdit {
         if (type.isNotEmpty()) commitVoice(type)
         composeVoice(composing)
     }
 
-    /**
-     * What voice has heard so far as the field's composing text, replaced as it grows, empty to
-     * take it away; the text itself, as English's word is (specs/pitfalls.md). Its commit, through
-     * fcitx, replaces it.
-     */
+    /** The text itself, as English's word is (specs/pitfalls.md); its commit through fcitx replaces it. */
     fun composeVoice(text: String) {
-        // the engine's preedit came meanwhile (another finger typing): it is left alone
         if (editingSession.composingText.isNotEmpty() && !editingSession.provisional) return
         editingSession.updateComposingText(
             if (text.isEmpty()) FormattedText.Empty else FormattedText(arrayOf(text), intArrayOf(0), -1),
@@ -2253,14 +1648,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     /**
-     * Voice's [text] typed at once, in place of what voice composes, not through fcitx (tap to
-     * talk: the settled part as it is said; what was heard as the field is left). Posted, it would
-     * land after the tail composed next, or after the field's connection went. An engine's preedit
-     * (the talk started over one, so voice composed nothing) is finished in place first, as leaving
-     * the field would.
+     * Not through fcitx: posted, it would land after the tail composed next or after the connection
+     * went. An engine's preedit is finished in place first.
      */
     fun commitVoice(text: String) {
-        // the code in the field (a talk over a code typed) is taken away, not typed: it floats on, the engine's
         if (editingSession.codeInField) {
             editingSession.leaveComposition(fallBack = true)
         } else if (editingSession.composing.isNotEmpty() && !editingSession.provisional) {
@@ -2269,96 +1660,34 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         voiceAsk.voice(voiceAsk.talkNow) { commitText(text) }
     }
 
-    /**
-     * Finish composing text and leave cursor position as-is.
-     * Also updates internal composing state of [FcitxInputMethodService].
-     */
     fun finishComposing() = editingSession.finishComposition()
 
-    @SuppressLint("RestrictedApi")
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
-        // ignore inline suggestion when disabled by user || using physical keyboard with floating candidates view
-        if (!inlineSuggestions || !inputDeviceMgr.isVirtualKeyboard) return null
-        val theme = ThemeManager.activeTheme
-        val chipDrawable =
-            if (theme.isDark) R.drawable.bkg_inline_suggestion_dark else R.drawable.bkg_inline_suggestion_light
-        val chipBg = Icon.createWithResource(this, chipDrawable).setTint(theme.keyTextColor)
-        val style = InlineSuggestionUi.newStyleBuilder()
-            .setSingleIconChipStyle(
-                ViewStyle.Builder()
-                    .setBackgroundColor(Color.TRANSPARENT)
-                    .setPadding(0, 0, 0, 0)
-                    .build()
-            )
-            .setChipStyle(
-                ViewStyle.Builder()
-                    .setBackground(chipBg)
-                    .setPadding(dp(10), 0, dp(10), 0)
-                    .build()
-            )
-            .setTitleStyle(
-                TextViewStyle.Builder()
-                    .setLayoutMargin(dp(4), 0, dp(4), 0)
-                    .setTextColor(theme.keyTextColor)
-                    .setTextSize(14f)
-                    .build()
-            )
-            .setSubtitleStyle(
-                TextViewStyle.Builder()
-                    .setTextColor(theme.altKeyTextColor)
-                    .setTextSize(12f)
-                    .build()
-            )
-            .setStartIconStyle(
-                ImageViewStyle.Builder()
-                    .setTintList(ColorStateList.valueOf(theme.altKeyTextColor))
-                    .build()
-            )
-            .setEndIconStyle(
-                ImageViewStyle.Builder()
-                    .setTintList(ColorStateList.valueOf(theme.altKeyTextColor))
-                    .build()
-            )
-            .build()
-        val styleBundle = UiVersions.newStylesBuilder()
-            .addStyle(style)
-            .build()
-        val spec = InlinePresentationSpec
-            .Builder(Size(0, 0), Size(Int.MAX_VALUE, Int.MAX_VALUE))
-            .setStyle(styleBundle)
-            .build()
-        return InlineSuggestionsRequest.Builder(listOf(spec))
-            .setMaxSuggestionCount(InlineSuggestionsRequest.SUGGESTION_COUNT_UNLIMITED)
-            .build()
+        if (!inputDeviceMgr.isVirtualKeyboard) return null
+        return InlineSuggestionsUi.request(this, ThemeManager.activeTheme)
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
-        if (!inlineSuggestions || !inputDeviceMgr.isVirtualKeyboard) return false
+        if (!inputDeviceMgr.isVirtualKeyboard) return false
         return inputView?.handleInlineSuggestions(response) == true
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
-        // the keyboard put away: what a field dropped is no longer offered
         editingSession.commits.forget()
         decorLocationUpdated = false
         inputViewStarted = false
         inputDeviceMgr.onFinishInputView()
         inputView?.finishInput(finishingInput)
         currentInputConnection?.apply {
-            // voice's text still to come is taken away, not left as text: its talk types it (as
-            // the keyboard hides, once recognized), or drops it
-            // the code in the field is taken away, proven ours, else left as text (061-code-in-field §4.3)
-            when (editingSession.kind) {
-                EditingSession.Kind.PROVISIONAL -> editingSession.updateComposingText(FormattedText.Empty)
-                EditingSession.Kind.CODE -> editingSession.leaveComposition()
-                EditingSession.Kind.TEXT -> finishComposingText()
-            }
+            // voice's tail is taken away, not left as text: its talk types or drops it. The field's own
+            // composing region is let go too, whatever the session holds
+            if (editingSession.kind == EditingSession.Kind.TEXT) finishComposingText() else editingSession.leaveComposition()
             monitorCursorAnchor(false)
         }
-        resetComposingState()
+        editingSession.resetComposingState()
         syncCodePlace()
         postFcitxJob { focusOutIn() }
         contextDropped = true
@@ -2368,13 +1697,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         Timber.d("onFinishInput")
-        // a talk going on with the keyboard hidden (onFinishInputView came before, no field left then):
-        // what was heard typed into its field now, the connection and EditorInfo still that field's
+        // a talk with the keyboard already hidden: what was heard typed now, while the connection is that field's
         inputView?.hold?.inputEnded(BaseInputView.Hold.InputEnd.LEFT)
-        // voice's text still to come is taken from the field it was in, before its connection goes
-        // (the framework would finish it there, kept as text)
+        // before the connection goes (the framework would keep it as text)
         if (editingSession.provisional) editingSession.updateComposingText(FormattedText.Empty)
-        // the code too, before its connection goes: taken away proven ours, else left as text
         if (editingSession.codeInField) editingSession.leaveComposition()
         codeInField.finishInput()
         syncCodePlace()
@@ -2384,14 +1710,12 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         capabilityFlags = CapabilityFlags.DefaultFlags
         startedWith = null
         clearedText.forget()
-        // not the finished field's EditorInfo kept; the same field's touch keyboard put away finishes no input (F1793)
+        // the same field's touch keyboard put away finishes no input
         cursorField = null
         lastPosted.forget()
-        // a read queued in the field, a password's maybe, is not made once the policy forgot it
         contextReads.forget()
         fieldPolicy.finish()
-        dropSettleWaiters()
-        // voice's text in the field left no longer followed
+        settleWaiters.drop()
         voiceAsk.reset()
         postFcitxJob { voiceEditsEnd() }
     }
@@ -2408,25 +1732,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onDestroy() {
         if (EngineNotices.sayer === engineSayer) EngineNotices.sayer = null
-        mainHandler.removeCallbacks(judgeCommit)
-        mainHandler.removeCallbacks(writeAsked)
+        kept.cancel()
         getSystemService(InputManager::class.java).unregisterInputDeviceListener(inputDeviceListener)
-        recreateInputViewPrefs.forEach {
-            it.unregisterOnChangeListener(recreateInputViewListener)
-        }
-        remakeKeyboardsPrefs.forEach {
-            it.unregisterOnChangeListener(remakeKeyboardsListener)
-        }
+        watchedPrefs.forEach { (pref, listener) -> pref.unregisterOnChangeListener(listener) }
+        keyboardStylePrefs.forEach { it.unregisterOnChangeListener(keyboardStyleListener) }
         prefs.candidates.unregisterOnChangeListener(recreateCandidatesViewListener)
-        keyboardHeightPrefs.forEach { it.unregisterOnChangeListener(keyboardHeightListener) }
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
-        ThemeManager.prefs.keyboardStylePortrait.unregisterOnChangeListener(keyboardStyleListener)
-        ThemeManager.prefs.keyboardStyleLandscape.unregisterOnChangeListener(keyboardStyleListener)
         InputFeedbacks.releaseSounds()
-        // the last field learned from as the service goes (another keyboard picked, the system stopping it): not at a hide or
-        // a bar made anew, the same field maybe to come back to. A process killed outright still loses it
+        // learned as the service goes, not at a hide: the same field may come back. A killed process loses it
         addressLearning.end(AddressStore.forgotten)?.let(AddressStore::learn)
-        dropSettleWaiters()
+        settleWaiters.drop()
         super.onDestroy()
         // Fcitx might be used in super.onDestroy()
         HostDaemon.disconnect(javaClass.name)
@@ -2455,21 +1770,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     @Suppress("ConstPropertyName")
     companion object {
-        // code units of a kept text the code row shows, its end
-        private const val KEPT_SHOWN = 24
-        /** How far before or after the cursor a line key looks for a newline. */
         private const val LINE_REACH = 256
 
         const val DefaultHighlightColor = 0x008577  // material_deep_teal_500
-        // what the engine reads of the text before the cursor: its last two words, and what the
-        // reranker has room for
         const val ContextChars = Action.Context.HOST_CHARS
-        // a sum the bar works out: longer than any typed on a phone, short to read
         const val CALCULATION_CHARS = 128
     }
 }
 
-// every flag of [c] passed on: each defaults to false at engineContext, so one left out is silently off (F3198)
+// every flag passed: each defaults to false at engineContext, so one left out is silently off
 internal suspend fun HostApi.tell(c: Action.Context, learning: Boolean) =
     engineContext(
         c.before, learning, cleared = c.cleared, learnFlags = c.learnFlags ?: 0, started = c.started,

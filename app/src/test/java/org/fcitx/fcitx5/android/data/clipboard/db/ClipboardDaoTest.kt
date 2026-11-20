@@ -18,11 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * A purge takes only the rows its undo snackbar showed, so a row another delete marked in the
- * meantime can still be undone; entries past the history limit, which no undo offers back, go
- * outright rather than waiting, marked, for a purge.
- */
+/** A purge takes only the rows its snackbar showed; rows past the history limit go outright. */
 @RunWith(RobolectricTestRunner::class)
 class ClipboardDaoTest {
 
@@ -66,7 +62,7 @@ class ClipboardDaoTest {
 
     @Test
     fun theLastKeptGoesByWhenLastCopied() = runTest {
-        // copied at 100, 200, 300 and 500, and the second again at 450: room for 3 keeps it, the third and the fourth
+        // copied at 100, 200, 300, 500, the second again at 450: room for 3 keeps it, the third and fourth
         add("a", timestamp = 100L)
         val copiedAgain = add("b", timestamp = 200L)
         add("c", timestamp = 300L)
@@ -75,7 +71,7 @@ class ClipboardDaoTest {
         add("pinned", timestamp = 900L, pinned = true)
         dao.markAsDeleted(add("deleted", timestamp = 800L))
         assertEquals(300L, dao.unpinnedTimestampAt(2))
-        // room for 5: none is outdated
+        // room for 5: none outdated
         assertNull(dao.unpinnedTimestampAt(4))
     }
 
@@ -111,8 +107,7 @@ class ClipboardDaoTest {
         assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
         dao.updateTimeIfUnpinned(p2, 6000L)
         assertEquals(listOf("p1", "p2", "b", "a", "c"), order())
-        // a limit of two keeps the two used last, as ClipboardManager.removeOutdated finds them: b and a;
-        // it drops the least recently used, c, not b
+        // least recently used goes first: c, not b
         val last = lastKept(2, 0L) { dao.unpinnedTimestampAt(it) }
         assertEquals(3000L, last)
         dao.deleteUnpinnedEarlierThan(last!!)

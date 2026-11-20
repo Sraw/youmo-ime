@@ -54,9 +54,7 @@ class VoiceDataPluginTest {
         return task
     }
 
-    // the pinned release is the offline model, which the streaming recognizer cannot load
-    // (sherpa-onnx ends the process), so the downloads alone build no APK until the streaming one is
-    // released; the linking is held by the local directory's test below
+    // the pinned release is the offline model the streaming recognizer cannot load, so downloads alone build no APK
     @Test
     fun withoutTheLocalDirectoryTheBuildSaysWhereTheModelsComeFrom() {
         val task = task(null, folder.newFile("voice-pack-v9.sha256"))
@@ -90,8 +88,7 @@ class VoiceDataPluginTest {
         assertTrue(folder.root.resolve("voice-assets/voice/polish-tagger.ort").isFile)
     }
 
-    // youmo.voiceModelDir is a machine's own: pointed at another version's models (another tagger
-    // than the version's), the build fails rather than pack them under this version
+    // youmo.voiceModelDir pointed at another version's models fails the build rather than pack them
     @Test
     fun aDirectoryNotTheListedVersionsBuildsNoPack() {
         val rows = listOf<Pair<String, (File, File) -> Unit>>(
@@ -118,8 +115,7 @@ class VoiceDataPluginTest {
         assertTrue(failed.joinToString("\n"), failed.isEmpty())
     }
 
-    // gradle/voice-pack-v<voice.version>.sha256 is what the build holds the directory to: the pack's
-    // version has one (a version raised without writing it fails every voice pack build)
+    // the build holds the directory to gradle/voice-pack-v<voice.version>.sha256, which each version must have
     @Test
     fun theVoicePacksVersionHasItsListing() {
         val root = File(System.getProperty("user.dir")).let { generateSequence(it) { d -> d.parentFile }.first { d -> d.resolve("app/packs.properties").isFile } }

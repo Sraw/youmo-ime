@@ -12,8 +12,7 @@ import kotlin.math.ln
 
 class RerankerTest {
 
-    // 32 leaves room for the context before ROOM's positions of reading (8 left none); reading
-    // it costs a position, so the tests of the order are not held to BUDGET
+    // 32 leaves room for the context; reading it costs a position, so these are not held to BUDGET
     private val model = TinyModel(window = 32).load()
 
     // the least fluent first, as though the decoder got it wrong

@@ -20,11 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * UAT cases of tapping the bar's microphone to talk (uat/12 VO-30, VO-31) where the talk ends
- * otherwise than by a stop: another field, input restarted, the keyboard hidden or its view thrown
- * away, the recognizer not coming back, nothing said. After each, the microphone closed once.
- */
+/** A tapped talk that ends otherwise than by a stop; after each, the microphone closed once. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -39,14 +35,12 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         tapMic()
         voice.heard("你好，")
         h.advance(100)
-        // another field tapped while it talks
         h.start()
         h.advance(500)
         assertEquals("你好", first.text.toString())
         assertEquals("", text())
         assertFalse(talking)
         assertNull(mask())
-        // what was still to be heard does not come late into the new field
         voice.release()
         h.advance(500)
         assertEquals("", text())
@@ -72,7 +66,6 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         assertEquals(-1 to -1, composing())
         assertEquals(1, voice.finishes)
         assertEquals(0, voice.closes)
-        // recognized: what is left typed straight into the field, once
         voice.release()
         h.advance(100)
         assertEquals("今天天气，很好，我们走吧", text())
@@ -95,13 +88,11 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         h.hide()
         h.advance(100)
         assertEquals("今天天气，", first.text.toString())
-        // another field before it is recognized: what was heard goes into the first as it is left
         h.start()
         h.advance(100)
         assertEquals("今天天气，很好，", first.text.toString())
         assertEquals("", text())
         assertFalse(talking)
-        // what was still to be heard does not come late, into either
         voice.release()
         h.advance(500)
         assertEquals("今天天气，很好，", first.text.toString())
@@ -122,7 +113,6 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         voice.said += "我们走吧"
         tapMic()
         assertEquals(1, voice.finishes)
-        // being recognized as it is hidden: what composed taken away, not stopped again
         h.hide()
         h.advance(100)
         assertEquals("今天天气，", text())
@@ -147,7 +137,6 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         h.advance(100)
         val mask = mask()!!
         assertTrue(mask.isAttachedToWindow)
-        // the keyboard's view thrown away under it (a theme changed): as the field left
         (mask.parent as ViewGroup).removeView(mask)
         h.advance(100)
         assertEquals("今天天气，很好", text())
@@ -169,7 +158,7 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         voice.heard("很好，")
         h.advance(100)
         assertEquals("今天天气，很好，", text())
-        // the app restarts input in it (a WebView's field, an app's restartInput): a new EditorInfo
+        // a WebView's field, an app's restartInput: a new EditorInfo
         h.restart()
         h.advance(100)
         assertTrue(talking)
@@ -196,7 +185,6 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         voice.held = true
         voice.stuck = true
         tapMic()
-        // the recognizer never back, the tail cut no matter: 15 s and given up
         tapMic()
         h.advance(15_100)
         assertEquals("今天天气，很好，", text())
@@ -230,7 +218,6 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         allowMicrophone()
         h.start(MULTI_LINE)
         tapMic()
-        // nothing settled, nothing typed as it was said: what composes is still what was said
         voice.hearing("我们走吧")
         h.advance(100)
         voice.held = true
@@ -253,7 +240,6 @@ class VoiceTapFieldUatTest : VoiceTapUat() {
         tapMic()
         h.advance(VoiceTap.QUIET_MS / 2)
         voice.hearing("你好")
-        // counted from the last thing heard
         h.advance(VoiceTap.QUIET_MS - 1000)
         assertTrue(talking)
         assertEquals(0, voice.finishes)

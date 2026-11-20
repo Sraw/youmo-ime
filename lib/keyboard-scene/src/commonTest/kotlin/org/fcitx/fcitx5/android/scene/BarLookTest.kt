@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.theme
+import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.CandidateLook
@@ -27,17 +29,9 @@ import kotlin.test.assertTrue
 class BarLookTest {
     private val source = testData("material-light.xml")
 
-    private fun withStyle(vararg style: String) = source.replace("</theme>", style.joinToString("\n", postfix = "\n</theme>"))
-
-    private fun theme(vararg style: String): Theme = ThemeReader.theme(withStyle(*style)).ok()
-
     private fun look(t: Theme = Fixtures.materialLight, scenes: Set<String> = emptySet()) = BarLook.of(Cascades(t), scenes)
 
-    private fun warnings(vararg style: String): List<String> {
-        val t = ThemeReader.theme(withStyle(*style))
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
+    private fun warnings(vararg style: String) = Fixtures.warnings(withStyle(*style))
 
     private fun argb(v: Long) = Argb(v.toInt())
 

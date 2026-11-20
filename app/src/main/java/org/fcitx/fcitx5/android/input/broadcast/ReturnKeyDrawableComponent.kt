@@ -17,26 +17,18 @@ import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
 
-/**
- * How the Return key looks and what it is announced as. Both come from the same decision as
- * what the key does ([EditorKeyPolicy.onReturn]), so the icon and the TalkBack label cannot
- * name a different action from the one a press performs.
- */
+/** From the same decision as what the key does ([EditorKeyPolicy.onReturn]), so the icon and label cannot name another action. */
 data class ReturnKeyAppearance(
     @DrawableRes val icon: Int,
     @StringRes val labelRes: Int,
-    /** The editor's own name for its action (`EditorInfo.actionLabel`), when it gave one. */
     val customLabel: CharSequence? = null,
-    /** Something is typed: Return commits it (a table's keyboard says so, 确定). */
     val composing: Boolean = false,
 ) {
     fun label(context: Context): CharSequence = customLabel ?: context.getString(labelRes)
 
     companion object {
-        /** A plain Return: inserts a newline, or commits the composition while composing. */
         val Enter = ReturnKeyAppearance(R.drawable.ic_baseline_keyboard_return_24, R.string.a11y_key_enter)
 
-        /** Return while something is typed: [Enter], committing it. */
         val Composing = Enter.copy(composing = true)
     }
 }
@@ -67,8 +59,7 @@ class ReturnKeyDrawableComponent :
                 EditorKeyPolicy.ReturnAction.SendEnter -> ReturnKeyAppearance.Enter
                 is EditorKeyPolicy.ReturnAction.PerformEditorAction ->
                     if (traits.customActionId != null) {
-                        // an action the editor named itself: say its name; the icon is still
-                        // the closest generic one, as it has always been
+                        // the icon is still the closest generic one
                         val generic = traits.imeAction?.let(::appearanceOfAction) ?: ReturnKeyAppearance.Enter
                         generic.copy(customLabel = info.actionLabel)
                     } else {
@@ -93,7 +84,6 @@ class ReturnKeyDrawableComponent :
     }
 
     fun updateDrawableOnPreedit(preeditEmpty: Boolean) {
-        // while composing, Return commits the composition whatever the editor's action is
         val new = if (preeditEmpty) actionAppearance else ReturnKeyAppearance.Composing
         if (appearance == new) return
         appearance = new

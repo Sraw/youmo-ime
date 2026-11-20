@@ -8,22 +8,14 @@ import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.english.EnglishUser
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 
-/**
- * The English words the user committed, for [Engines], as [UserLexicon] has pinyin's: what
- * [EnglishUser] reads of the learning record ([log], opened as English is first typed or its words
- * listed). It lists, adds and forgets those words for the English page's word list. Run on the
- * fcitx thread, as [Engines] is.
- */
+/** The user's committed English words for the English settings list, read via [EnglishUser] from the learning record ([log], opened on first use). On the fcitx thread. */
 internal class EnglishLexicon(private val log: () -> LearnLog) {
 
     private var englishUser: EnglishUser? = null
 
     fun user(): EnglishUser = englishUser ?: EnglishUser(log).also { englishUser = it }
 
-    /**
-     * Each word typed lately or kept (added, or never corrected), the most typed first: added ones
-     * [UserWord.Kind.ADDED], the rest [UserWord.Kind.LEARNED]; [UserWord.neverCorrected] those not corrected.
-     */
+    /** Words typed lately or kept, most typed first; added ones [UserWord.Kind.ADDED], the rest [UserWord.Kind.LEARNED]. */
     fun words(): List<UserWord> {
         val user = user()
         val kept = user.neverCorrectedWords
@@ -43,7 +35,7 @@ internal class EnglishLexicon(private val log: () -> LearnLog) {
 
     fun restoreCorrection(texts: Collection<String>) = user().restoreCorrection(texts)
 
-    /** After the record was closed: [user] reads it again as it is opened anew. */
+    /** After the record closed: [user] rereads it when reopened. */
     fun closed() {
         englishUser = null
     }

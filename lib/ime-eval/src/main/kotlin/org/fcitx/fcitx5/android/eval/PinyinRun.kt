@@ -29,11 +29,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordPack
 
-/**
- * Runs our own pinyin engine over an evaluation set on the host, a letter at a time as a user
- * types, timing each letter. Latencies are host JVM ones: good for comparing runs on the same
- * number of threads, not devices.
- */
+/** Our pinyin engine over an evaluation set on the host, a letter at a time, timed; latencies compare only between host runs on as many threads. */
 class PinyinRun(
     data: PinyinData,
     private val segmenter: Segmenter = PinyinSegmenter(),
@@ -43,18 +39,10 @@ class PinyinRun(
     private val sentenceCount: Int = PinyinDecoder.DEFAULT_SENTENCES,
     /** A fixed prior per layer, `name=value,...` ([LayerPrior.parse]), the [pack]'s layer among them; on top of the model. */
     layers: String? = null,
-    /** A word pack listed as the user's, its words in its layer. */
     pack: WordPack? = null,
-    /**
-     * Makes the reranker of a sample's keys. A fresh one per sample, as a reranker keeps what it
-     * read for the next input: a sample's result would hang on the one before it, and so on how the
-     * samples are dealt to threads.
-     */
+    /** A fresh reranker per sample: one keeps what it read, so a sample's result would hang on the one before and on threading. */
     private val reranker: (() -> SentencePicker)? = null,
-    /**
-     * Makes what weighs the readings of the whole input once more, as the user pauses before
-     * picking, where and for as long as [PinyinSession] lets it; not timed.
-     */
+    /** Weighs the whole input's readings again as the user pauses, as [PinyinSession] lets it; not timed. */
     private val refiner: (() -> SentenceRefiner)? = null,
     /** The dictionaries the user merged, compiled: their words offered as the app's user model offers them. */
     merged: DictionaryFile? = null,
@@ -100,8 +88,7 @@ class PinyinRun(
     private val coarseCandidates = CoarseCandidates(coarse, data, user)
 
     fun run(samples: List<Sample>): List<RunResult> {
-        // the JIT compiles the hot loops during the first rounds, for all threads alike: a few
-        // samples warm it up, whatever the size of the set
+        // the JIT compiles the hot loops during the first rounds, for all threads alike
         repeat(WARMUP_ROUNDS) { samples.take(WARMUP_SAMPLES).forEach { Typing().type(it.input, it.context) } }
         return samples.map { sample ->
             val typing = Typing()
@@ -114,11 +101,7 @@ class PinyinRun(
         }
     }
 
-    /**
-     * Whole-input readings first, then the words the input may start with, as a candidate list
-     * shows them; typed after [context], the text the app has before it, as in a session. Once
-     * the user [paused], as the [refiner] has them.
-     */
+    /** Whole-input readings, then the words the input may start with, typed after [context]; once [paused], as the [refiner] has them. */
     fun candidates(input: String, context: String = "", paused: Boolean = false): List<String> {
         val typing = Typing()
         val shown = typing.type(input, context)
@@ -139,8 +122,7 @@ class PinyinRun(
         private val picker = reranker?.invoke()
         private val refine = refiner?.invoke()
 
-        // of the input read last: what the rerankers read before it, the decoder's readings in its
-        // order, its words, the picker's pick, and whether a pause weighs the readings again
+        // of the input read last: the rerankers' context, the decoder's readings, its words and the pick
         private var before = ""
         private var sentences: List<Candidate> = emptyList()
         private var readings: List<String> = emptyList()
@@ -165,10 +147,7 @@ class PinyinRun(
             return shown(picked)
         }
 
-        /**
-         * What is shown once the user pauses after the input read last: the [refiner]'s pick first,
-         * if it makes one within the slices and budget the session gives it, else the picker's.
-         */
+        /** What is shown once the user pauses: the [refiner]'s pick first if it makes one within the session's slices and budget, else the picker's. */
         fun pause(): List<String> {
             val r = refine?.takeIf { refines } ?: return shown(picked)
             repeat(r.slices) {
@@ -183,8 +162,7 @@ class PinyinRun(
             val ordered = if (first == 0) sentences else listOf(sentences[first]) + sentences.filterIndexed { i, _ -> i != first }
             // those past the decoder's usual few are there to be weighed, not shown
             val listed = (ordered.take(PinyinDecoder.DEFAULT_SENTENCES) + words).distinctBy { it.text }
-            // as the app lists them, on a page of its default size: those with a coarse word the
-            // user never typed that the first page would show wait past it
+            // as the app lists them: a coarse word the user never typed waits past the first page
             return coarseCandidates.order(listed, EngineSettings.DEFAULT_PAGE_SIZE).take(CANDIDATES).map { it.text }
         }
     }

@@ -11,20 +11,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.Typo
 import java.util.zip.CRC32
 
-/**
- * Makes input with one syllable typed as a user who mixes up two sounds or slips would type it,
- * from the [ExactReading] of each sample: for each [Fuzzy] pair, the syllable's partner where
- * that is a syllable (`zong` for zhong, tagged `fuzzy-z_zh`), and for each [Typo] the engine
- * forgives, the slip (`zhagn`, `typo-gn`). And, tagged [KEY], one letter anywhere in the input
- * slipped onto a key next to it ([KeyNeighbours]), whatever it then spells: `nihap`, but also
- * `nigao`. Which syllable or letter of a sample is changed, and to what, is chosen by hash, so
- * the set is the same on every run.
- *
- * In 双拼 ([generate] with a scheme) the same kinds, typed in the scheme: a [Fuzzy] partner's keys,
- * [Typo.V] as ü's own key after j, q, x, y (`jv` for ju in 小鹤, the one slip 双拼 reads), and a
- * key slipped onto its neighbour on the QWERTY keyboard 双拼 is typed on. Samples with no exact
- * reading, or a syllable the scheme has no keys for, are left out, as [ShuangpinSet] leaves them.
- */
+/** Input with one syllable mixed up ([Fuzzy]) or slipped ([Typo], [KEY]), chosen by hash so the set is the same every run. */
 object SlipSet {
 
     const val FUZZY = "fuzzy-"
@@ -35,8 +22,7 @@ object SlipSet {
         val out = LinkedHashMap<String, Sample>()
         for (sample in samples) {
             syllableSlips(sample).forEach { out.getOrPut(it.input) { it } }
-            // any letter may slip: the reading is not needed. Last, so where one comes out as a
-            // syllable slip did, that one stays
+            // any letter may slip; last, so where one matches a syllable slip, that one stays
             keySlip(sample)?.let { out.getOrPut(it.input) { it } }
         }
         return out.values.toList()
@@ -69,8 +55,7 @@ object SlipSet {
                 fuzzy(rule, i, f)?.let { scheme.encode(Syllables.id(it)) }
             }
         } + (TYPO + Typo.V.name.lowercase() to { scheme: ShuangpinScheme, i: String, f: String ->
-            // ü's own key for the u these initials spell it as, what ShuangpinSegmenter reads with typos: the
-            // key of lü's or lüe's final, after this syllable's initial key (no lüan, so no key for üan)
+            // ü's own key for the u these initials spell it as, as ShuangpinSegmenter reads it with typos
             Typo.V.of(i, f)?.let { slipped ->
                 val own = scheme.encode(Syllables.id("l" + slipped.substring(i.length)).takeIf { it >= 0 } ?: return@let null)
                 val code = scheme.encode(Syllables.id(i + f))

@@ -6,28 +6,21 @@ package org.fcitx.fcitx5.android.engine.rerank
 
 import java.nio.ByteBuffer
 
-/**
- * A weight matrix of [rows] × [columns], row-major: int8 with a scale per row as the model file
- * stores it (a quarter of the memory of floats), multiplied by a [MatrixKernel], or floats.
- */
+/** A row-major weight matrix: int8 with per-row scale as stored (a quarter of floats' memory) via a [MatrixKernel], or floats. */
 internal sealed class Matrix(val rows: Int, val columns: Int) {
 
-    /** `x · row r`. */
     abstract fun dot(x: FloatArray, r: Int): Float
 
-    /** `y[r] = x · row r` for every row. */
     abstract fun times(x: FloatArray, y: FloatArray)
 
-    /** Row [r] as floats, into [out]. */
     abstract fun row(r: Int, out: FloatArray)
 
-    /** `y[o] = x · row o + bias[o]` for every row. */
     fun apply(x: FloatArray, bias: FloatArray, y: FloatArray) {
         times(x, y)
         for (o in 0 until rows) y[o] += bias[o]
     }
 
-    /** The same weights as floats: four times the memory, no conversion per use. */
+    /** As floats: four times the memory, no per-use conversion. */
     abstract fun unpacked(): Matrix
 
     private class Quantized(
@@ -62,17 +55,14 @@ internal sealed class Matrix(val rows: Int, val columns: Int) {
     }
 
     /**
-     * Held a column to an array: [times] then adds a column at a time into every row's sums, a
-     * loop the JIT vectorises, where a row at a time is one long chain of float additions it may
-     * not reorder (five times faster on HotSpot, three for the token table, which is bound by
-     * memory). Arrays of their own, as a loop over two parts of one array is not vectorised: they
-     * might overlap. Each row's eight sums still take its columns in [dotF]'s order, so every
-     * result is [dotF]'s to the bit.
+     * Stored column-major so [times] adds a column at a time into all rows' sums, which the JIT vectorises (a row
+     * at a time is one float chain it may not reorder). Separate arrays, since a loop over two parts of one array
+     * may overlap and is not vectorised. Each row still sums in [dotF]'s order, so results match it bit for bit.
      */
     private class Floats(rows: Int, columns: Int, f: FloatArray) : Matrix(rows, columns) {
         private val cols = Array(columns) { c -> FloatArray(rows) { r -> f[r * columns + c] } }
 
-        // each thread's eight sums of every row (ime-eval scores on several with one model)
+        // per thread (ime-eval scores on several threads with one model)
         private val sums = ThreadLocal.withInitial { Array(LANES) { FloatArray(rows) } }
 
         override fun dot(x: FloatArray, r: Int): Float {
@@ -97,7 +87,7 @@ internal sealed class Matrix(val rows: Int, val columns: Int) {
 
         override fun times(x: FloatArray, y: FloatArray) {
             val sums = sums.get()
-            // a local bound: the loops below are vectorised only over one the JIT knows is fixed
+            // a local bound: the JIT vectorises only over one it knows is fixed
             val n = rows
             for (lane in sums) java.util.Arrays.fill(lane, 0f)
             val end = columns - columns % LANES

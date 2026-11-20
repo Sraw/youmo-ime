@@ -8,39 +8,15 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Companion.SEPARATOR
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 
 /**
- * Cuts full pinyin into a [SyllableGraph]. Unlike libime, which takes the longest syllable and
- * patches ambiguity with special cases, this keeps every cut and leaves the choice to the
- * language model; the graph stays small because edges only go forward and a syllable is at most
- * six letters.
+ * Cuts full pinyin into a [SyllableGraph]. Unlike libime's longest match with special cases, it keeps
+ * every cut and lets the language model choose; edges only go forward and syllables are at most six
+ * letters, so the graph stays small. Per position an edge for: every syllable spelt there (`xian` and
+ * `xi`); with `neighbours`, syllables spelt with one letter slipped ([SlipCost]); an initial alone (简拼),
+ * also before a consonant (`ng` for 那个) but not a vowel; syllables still being typed at the end or
+ * before a separator; failing all, one character as typed.
  *
- * From each position the graph gets an edge for:
- * - every syllable the text there spells, of any length (`xian` and `xi`);
- * - with `neighbours`, every syllable it spells with a letter slipped onto the key next to it
- *   (`hap` for hao), costing as [SlipCost] has it by where the key was tapped; with no place (a
- *   hardware key), only where it spells nothing as typed, nor is consonants alone, 简拼 (`kw` is
- *   no slip for ke there: 你看完了 typed `nikwl`); none in input of consonants alone (`wxhn` is no
- *   slip for wxun; 061-neighbour-correction §4.5, §4.6);
- * - the initial alone (简拼) where no longer syllable starts (`n` in `nh`), and also where one
- *   does if a consonant follows (`n` in `ng` for 那个, `ng` being a syllable too), but not if a
- *   vowel does (`n` in `nihao`). `a`, `e` and `o` stand for the syllables they start only
- *   where no longer syllable starts (`ag` 爱国, but not `an` 爱你). Where `zh` stands alone
- *   and no vowel follows, so does `z` (`zhrm` for 中华人民; not in `zho`);
- * - syllables the text there may still become: at the end of the input (`zho` for zhong, `zhan`
- *   for zhang), or before a separator if the text is no syllable yet (`zho'`; `xi'` is closed);
- * - failing all of those, one character as typed (not where a slip starts: `uan` is yan, not
- *   `u` then an; the character alone would cost more than the slip).
- *
- * Build one per settings change; [segment] is then cheap enough for every key press.
- *
- * Upper-case letters are the Latin-letter syllables (`A` in A股), so a caller wanting pinyin
- * from input that auto-capitalisation touched must lower-case it first.
- *
- * With [latin], where the input spells one of its words (`iphone`, `app`) each of its letters
- * also gets an edge as its letter syllable ([Kind.LETTER]): the dictionary has the word so
- * spelt, and the model weighs it against the pinyin the same letters read as. With hundreds of
- * two-letter words (OK, PC) that is most letters of most input, every position one to read
- * words from: measured, the first candidates stay as they were and a key costs ~0.2 ms more.
- * [userLatin], the user's (English's learned words, U-31 §3), the same way: the user model has them.
+ * Upper-case letters are Latin-letter syllables, so lower-case auto-capitalised input first. With
+ * [latin] / [userLatin], letters of a Latin word typed (`iphone`) also get [Kind.LETTER] edges.
  */
 class PinyinSegmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
@@ -51,10 +27,10 @@ class PinyinSegmenter(
     private val slipCost: SlipCost = SLIP,
 ) : Segmenter {
 
-    // the settings' own, shared by the sessions made with them (SettingsMemo)
+    // the settings' own, shared by sessions made with them (SettingsMemo)
     private val index = SpellingIndex.of(fuzzy, typos, neighbours)
 
-    /** What a slip read where no touch says its place costs ([SlipCost.fixed]): ime-eval's tune prints it (R26 F8473). */
+    /** A slip's cost with no touch place ([SlipCost.fixed]); printed by ime-eval's tune. */
     val slipFixed: Float get() = slipCost.fixed
 
     override fun segment(input: String): SyllableGraph = segment(input, null, null)
@@ -69,7 +45,7 @@ class PinyinSegmenter(
         }
     }
 
-    // where a Latin word is typed, each of its letters: true
+    // true at each letter of a typed Latin word
     private fun lettersOfWords(input: String): BooleanArray? {
         var marks: BooleanArray? = null
         val mark = { at: Int, length: Int ->
@@ -83,7 +59,6 @@ class PinyinSegmenter(
         return marks
     }
 
-    /** Adds the edges leaving [at]: a walk down the spelling trie along the input. */
     private fun walk(input: String, at: Int, edges: GraphEdges, slips: Boolean, touches: Array<Touch?>?) {
         var node = index.root
         var longestSyllable = 0
@@ -103,9 +78,8 @@ class PinyinSegmenter(
             }
             val alone = index.initial(node)
             val more = index.extensions(node)
-            // no syllable for the rules below: what an initial stands for is read beside a slip.
-            // Nor where the text may still become one: `zho` on the way to zhong is no zhi, nor
-            // `zh` before `o`.
+            // no syllable for the rules below: an initial's reading goes beside a slip; nor where the text may still
+            // become one (`zho` toward zhong is no zhi)
             if (slips && !growing(input, at + length, node, alone != null || more != null)) {
                 index.slip(node)?.let { slipped(input, at, length, it, full, touches, edges) }
             }
@@ -126,13 +100,7 @@ class PinyinSegmenter(
         }
     }
 
-    /**
-     * Adds the edge of [m], the syllables the [length] keys at [at] spell with one of them slipped,
-     * those [full] (what they spell as typed) has left out: each as [SlipCost] weighs where its
-     * slipped key was tapped, the key it is read as one of those around it; with no place, the
-     * 0.6.0 rule (a key next to it on QWERTY, [KeyNeighbours], and only keys that spell nothing).
-     * Keys that spell a syllable as typed, or are consonants alone (简拼), are legal (§4.5).
-     */
+    /** Adds an edge of [m], syllables the keys at [at] spell with one slipped that [full] lacks, priced by tap place ([SlipCost]); without a place, only QWERTY neighbours of keys that spell nothing. */
     private fun slipped(input: String, at: Int, length: Int, m: SyllableMatches, full: SyllableMatches?, touches: Array<Touch?>?, edges: GraphEdges) {
         var legal = full != null
         if (!legal) legal = (at until at + length).none { input[it] in VOWELS }
@@ -154,7 +122,7 @@ class PinyinSegmenter(
         edges.add(at, length, Kind.SYLLABLE, SyllableMatches(ids.copyOf(n), flags.copyOf(n)), slip = slips.build())
     }
 
-    // the likeliest slip by which the [length] keys at [at] spell [spelling], added to [slips]; false where none is read
+    // the likeliest slip of the keys at [at] onto [spelling], added to [slips]; false if none
     private fun slip(input: String, at: Int, length: Int, spelling: String, legal: Boolean, touches: Array<Touch?>?, slips: Slips.Builder): Boolean {
         var best = Float.NaN
         var bestAt = -1
@@ -180,7 +148,6 @@ class PinyinSegmenter(
         return !best.isNaN()
     }
 
-    /** Whether text spelled up to [node], ending at [end], [spells] the start of a syllable still being typed. */
     private fun growing(input: String, end: Int, node: Int, spells: Boolean): Boolean {
         if (!spells) return false
         if (mayGoOn(input, end, true)) return true
@@ -191,18 +158,14 @@ class PinyinSegmenter(
     private companion object {
         const val VOWELS = "aeiouv"
 
-        // the loosest floor that turns no sentence typed on target (a tap in the key's middle, σ 0.15, both halves
-        // × seeds 1–3) wrong, the user's 11-16 rule: over -2 `deo` with o by i read 得 (dei); a slip that also spells
-        // as typed costs -2 more, so none is read (061-neighbour-18key-impl-report §5)
+        // the loosest floor that turns no on-target sentence wrong (σ 0.15); over -2 `deo` read 得. A slip that also
+        // spells as typed costs -2 more, so none is read
         val SLIP = SlipCost(floor = -1.75f)
 
         val ONE = booleanArrayOf(false)
         val BOTH = booleanArrayOf(false, true)
 
-        /**
-         * Where the [length] keys of [input] at [at] differ from [spelling] (its final ve as ue
-         * where [ue]) at one letter alone: that place; -1 where they differ at none or more.
-         */
+        /** The one place where the keys at [at] differ from [spelling] (ve as ue where [ue]); -1 if none or more. */
         fun oneOff(input: String, at: Int, length: Int, spelling: String, ue: Boolean): Int {
             if (spelling.length != length) return -1
             var diff = -1
@@ -217,20 +180,16 @@ class PinyinSegmenter(
 
         val LETTERS = Array(26) { SyllableMatches(intArrayOf(LatinWords.syllable('a' + it)), intArrayOf(0)) }
 
-        /** A vowel at [at]: what comes before it is the start of a syllable, not an initial alone. */
+        /** What precedes a vowel starts a syllable, not an initial alone. */
         fun startsSyllable(input: String, at: Int) = at < input.length && input[at] in VOWELS
 
-        /** A consonant initial of [length] at [at], with a consonant after it. */
         fun beforeConsonant(input: String, at: Int, length: Int) =
             input[at] !in VOWELS && input[at + length] !in VOWELS
 
-        /** Whether one of these is a syllable as typed, or its fuzzy partner: not only a slip (`zhon` for zhong). */
+        /** Not only a slip: a syllable as typed, or its fuzzy partner. */
         fun SyllableMatches.anyWhole() = (0 until size).any { flags(it) and SyllableMatches.TYPO == 0 }
 
-        /**
-         * Whether text ending at [at] may still become a longer syllable: at the end of the input,
-         * or before a separator if it is [unfinished]; a separator after a whole syllable closes it.
-         */
+        /** Text ending at [at] may still grow: at the input's end, or before a separator if [unfinished]. */
         fun mayGoOn(input: String, at: Int, unfinished: Boolean) =
             at == input.length || unfinished && input[at] == SEPARATOR
     }

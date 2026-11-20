@@ -7,26 +7,11 @@ package org.fcitx.fcitx5.android.input.editing
 import org.fcitx.fcitx5.android.input.UnicodePunctuation
 
 /**
- * Brackets and quotes typed in pairs, as an editor for code does: an opening one typed puts its
- * closing one after it, the cursor between them. Typing the closing one there steps over it
- * rather than adding a second; a Backspace right after the opening one, the pair still empty,
- * takes the closing one too.
- *
- * Only where it reads as starting something: before the end of the text, a space or punctuation,
- * not before a word (`(` before `abc` is a bracket put round it, closed later). An ASCII `"` (or
- * a full-width `＂`) after a word or punctuation is a closing one (`say "hi"`), `'` never pairs (`don't`); only
- * where the editor says what is after the cursor, or nothing put in could be stepped over.
- *
- * The closing ones put in are remembered, the innermost last, till the cursor goes anywhere this
- * did not put it ([EditingSession.onCursorUpdate] calls [forget]) or text is deleted other than by
- * Backspace or before the cursor inside the innermost pair ([deletedBefore]): only those step over
- * or go with their opening one, so a closing bracket typed before one the user wrote is typed.
- * [EditingSession.pairs] is the one of an editor.
- *
- * fcitx's punctuation turns `"` into “ or ” by the quotes it saw open, so either of them typed
- * alone at a ” put in steps over it: fcitx reset (the screen turned) may have taken the ” for an “.
- * It then counts that “ open, so [quoteOpen] holds till the next cursor report, for the service
- * to reset fcitx there as when a pair is left.
+ * Brackets and quotes typed in pairs, as a code editor does: the opening one adds its closer, typing the closer
+ * steps over it, Backspace in an empty pair takes both. Only before a space, punctuation or the end; an ASCII `"`
+ * after a word closes, `'` never pairs. Closers put in are remembered till the cursor goes elsewhere ([forget]).
+ * fcitx turns `"` into “ or ” by the quotes it saw, so either steps over a ” put in; it then counts that “ open,
+ * so [quoteOpen] holds till the next cursor report for the service to reset fcitx.
  */
 class AutoPairs internal constructor(
     private val session: EditingSession,
@@ -34,25 +19,17 @@ class AutoPairs internal constructor(
     private val checkThread: () -> Unit,
 ) {
 
-    /** A closing one put in, and where the cursor was right after its opening one. */
     private class OpenPair(val closer: Char, val opened: Int)
 
     private val pairs = ArrayList<OpenPair>()
 
-    /** A ” or ’ stepped over with “ or ‘, its cursor report still to come; see [cursorReported]. */
+    /** Its cursor report still to come; see [cursorReported]. */
     private var steppedOverWithOpener = false
 
-    /**
-     * Whether fcitx counts a “ or ‘ open: one put in here, till its ” or ’ is typed, or one typed
-     * to step over a ” or ’, till the cursor report after it.
-     */
+    /** One put in here till its closer is typed, or one typed to step over a closer till the next report. */
     val quoteOpen: Boolean get() = steppedOverWithOpener || pairs.any { it.closer in QUOTE_CLOSERS }
 
-    /**
-     * [text] typed, a character the user means to insert: true if it was handled here, as a
-     * pair or a step over a closing one (of more than one character, over its first, the rest
-     * committed after it); false if the caller commits it as usual.
-     */
+    /** True if handled here as a pair or a step over (of a longer text, over its first, the rest committed after). */
     fun type(text: String): Boolean {
         checkThread()
         if (text.isEmpty() || !plainCursor()) return false
@@ -81,9 +58,7 @@ class AutoPairs internal constructor(
         return true
     }
 
-    // [text], its first a closing one put in right after the cursor, and more (English's `) `, the
-    // space it puts after it): the closing one stepped over, the rest committed after it. That one
-    // itself, not “ for ”: what starts with “ (a phrase, a candidate) is no quote key fcitx turned
+    // English's `) `: the closer stepped over, the rest committed. Not “ for ”: a phrase starting with “ is no quote key
     private fun stepsOverFirst(text: String): Boolean {
         val top = pairs.lastOrNull()?.closer ?: return false
         if (text[0] != top) return false
@@ -94,20 +69,13 @@ class AutoPairs internal constructor(
         return true
     }
 
-    /**
-     * [text] committed with the cursor after its first [cursor] units: a pair put in by fcitx
-     * itself (its punctuation's 成对输入), remembered as one put in here.
-     */
+    /** A pair fcitx put in itself (成对输入), remembered as one put in here. */
     fun committed(text: String, cursor: Int, start: Int) {
         checkThread()
         if (cursor == 1 && text.length == 2 && PAIRS[text[0]] == text[1]) pairs += OpenPair(text[1], start + 1)
     }
 
-    /**
-     * Backspace pressed, about to delete the character before the cursor: if that is the opening
-     * one of an empty pair put in here, the closing one after the cursor is deleted first.
-     * The caller then deletes as ever, the opening one, with a key event as Backspace is.
-     */
+    /** Before the caller's Backspace: an empty pair's closer is deleted first. */
     fun backspace() {
         checkThread()
         val top = pairs.lastOrNull() ?: return
@@ -120,26 +88,19 @@ class AutoPairs internal constructor(
         editor.deleteSurroundingText(0, 1, inCodePoints = true)
     }
 
-    /** The pairs put in are no longer where the cursor is: none steps over or goes with Backspace. */
     fun forget() {
         checkThread()
         pairs.clear()
     }
 
-    /**
-     * [units] deleted right before the cursor at [cursor], none after it: the pairs stay where all
-     * of it is inside the innermost one (English's space taken back before a `)`); else forgotten.
-     */
+    /** The pairs stay where all of it is inside the innermost (English's space taken back before a `)`). */
     internal fun deletedBefore(cursor: Int, units: Int) {
         checkThread()
         val top = pairs.lastOrNull() ?: return
         if (cursor - units < top.opened) pairs.clear()
     }
 
-    /**
-     * A cursor report reached [EditingSession.onCursorUpdate]. A step over with “ no longer
-     * counts as [quoteOpen] after it: the service, seeing that fall, resets fcitx's count.
-     */
+    /** A step over with “ stops counting as [quoteOpen]: the service, seeing that fall, resets fcitx's count. */
     internal fun cursorReported() {
         checkThread()
         steppedOverWithOpener = false
@@ -148,10 +109,10 @@ class AutoPairs internal constructor(
     // nothing composing (a preedit is fcitx's to commit) and no selection (typing replaces it)
     private fun plainCursor() = editor.isAvailable && session.composing.isEmpty() && session.selection.latest.isEmpty()
 
-    // ❛❜❝❞ are symbols to Unicode, not punctuation: a bracket or quote of the pairs' is one here all the same
+    // ❛❜❝❞ are symbols to Unicode, not punctuation
     private fun punctuation(c: Char) = c in UnicodePunctuation || c in PAIRS || c in OPENERS
 
-    // what a quote after it closes: a word (`say "hi"`), or what ends one (`"Stop."`)
+    // a word (`say "hi"`), or what ends one (`"Stop."`)
     private fun quoteCloses(before: CharSequence?): Boolean {
         if (before.isNullOrEmpty()) return false
         val last = Character.codePointBefore(before, before.length)
@@ -160,13 +121,12 @@ class AutoPairs internal constructor(
     }
 
     companion object {
-        /** Opening ones to their closing ones. */
         val PAIRS = mapOf(
             '(' to ')', '[' to ']', '{' to '}', '"' to '"',
             '（' to '）', '【' to '】', '〔' to '〕', '［' to '］', '｛' to '｝',
             '「' to '」', '『' to '』', '《' to '》', '〈' to '〉',
             '“' to '”', '‘' to '’',
-            // the symbol panel's (0.6.1): « and ‹ taken as opening, as in French and Chinese text
+            // « and ‹ taken as opening, as in French and Chinese text
             '〖' to '〗', '〘' to '〙', '❨' to '❩', '❲' to '❳', '❴' to '❵', '⟨' to '⟩',
             '❛' to '❜', '❝' to '❞', '«' to '»', '‹' to '›',
             // as `"`: opening or closing by what is before it
@@ -175,7 +135,7 @@ class AutoPairs internal constructor(
         private val OPENERS = PAIRS.entries.associate { (open, close) -> close to open }
         private val QUOTE_CLOSERS = setOf('”', '’')
 
-        // what fcitx may make of the one quote key, either way: to the closing one
+        // what fcitx may make of the one quote key, either way
         private val QUOTES = mapOf('“' to '”', '‘' to '’')
 
         private val ENDING = setOf(Character.END_PUNCTUATION, Character.FINAL_QUOTE_PUNCTUATION, Character.OTHER_PUNCTUATION)

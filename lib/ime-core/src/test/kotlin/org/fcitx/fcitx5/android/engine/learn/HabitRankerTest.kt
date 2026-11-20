@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.engine.learn.HabitRanker.Tier
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** [HabitRanker], the spec's examples (impl/design-1b.md §1, §6): what the record says, the order shown. */
+/** [HabitRanker], the spec's examples: what the record says, the order shown. */
 class HabitRankerTest {
 
     /** The record, as ranking reads it: set by the test, nothing learned by itself. */
@@ -52,8 +52,6 @@ class HabitRankerTest {
 
     private fun order(code: Code, prev: String, vararg items: Item<String>) = rank(code, prev, *items).map { it.value }
 
-    // U-45: 点了 corrected to twice under dl, used more than 带来, is first after any word; 打了 corrected
-    // to twice after 我 is first there alone
     @Test
     fun aWordCorrectedToTwiceIsFirstAcrossTheWordsBeforeAndAFirstAfterOneOnlyThere() {
         val items = arrayOf(item("带来"), item("点了"), item("打了"))
@@ -70,7 +68,6 @@ class HabitRankerTest {
         assertEquals(listOf("点了", "打了", "带来"), order(dl, "他", *items))
     }
 
-    // F2739: V, the decoder's own first, is told wherever it was ranked
     @Test
     fun theOriginalFirstIsToldWhereverItIsRanked() {
         val items = arrayOf(item("带来"), item("点了"))
@@ -79,7 +76,7 @@ class HabitRankerTest {
         assertEquals(listOf("点了" to false, "带来" to true), rank(dl, "", *items).map { it.value to it.original })
     }
 
-    // U-10: 得 picked once over 的 under de goes before the words not used there, not first
+    // 得 picked once over 的 under de goes before the words not used there, not first
     @Test
     fun aSingleStrayPickGoesSecond() {
         view.used(de, "得", 1, corrected = 1)
@@ -96,7 +93,7 @@ class HabitRankerTest {
         assertEquals(listOf("先", "西安", "现"), order(xian, "", item("先"), item("现"), item("西安")))
     }
 
-    // zhidao and C30: 指导 corrected to twice after 我 only; after 他 the decoder's 知道, used more, stays
+    // zhidao: 指导 corrected to twice after 我 only; after 他 the decoder's 知道, used more, stays
     @Test
     fun aWordCorrectedToLessThanItsFirstIsUsedIsNotFirstAcross() {
         val zhidao = Code(Kinds.FULL, "zhidao")
@@ -108,7 +105,7 @@ class HabitRankerTest {
         assertEquals(listOf("知道", "指导", "直到"), order(zhidao, "他", *items))
     }
 
-    // M4: the pin in front, the rest as they would be, a place down, each its own tier
+    // the pin in front, the rest as they would be, a place down, each its own tier
     @Test
     fun aPinGoesInFrontTheRestKeepTheirOrderAndTiers() {
         view.firsts[dl to ""] = Words.of("点了")
@@ -117,12 +114,10 @@ class HabitRankerTest {
         val ranked = rank(dl, "", item("带来"), item("点了"), item("打了"))
         assertEquals(listOf("打了", "点了", "带来"), ranked.map { it.value })
         assertEquals(listOf(Tier.PINNED, Tier.FIRST_HERE, Tier.DICTIONARY), ranked.map { it.tier })
-        // pinned again: the last pin is the one
         view.pins[dl] = Words.of("带来")
         assertEquals(listOf("带来", "点了", "打了"), order(dl, "", item("带来"), item("点了"), item("打了")))
     }
 
-    // S6: a pin or a first not among the items (blocked, or not read) is none
     @Test
     fun aPinOrFirstNotAmongTheItemsFallsThrough() {
         view.pins[dl] = Words.of("大连")
@@ -130,7 +125,7 @@ class HabitRankerTest {
         assertEquals(listOf("带来", "点了"), order(dl, "", item("带来"), item("点了")))
     }
 
-    // U-27: letters are never put first by the habits; V kept as letters gives way only to the user's first there
+    // letters are never put first by the habits; V kept as letters gives way only to the user's first there
     @Test
     fun lettersAreNeverPutFirst() {
         val app = Code(Kinds.FULL, "app")
@@ -139,13 +134,12 @@ class HabitRankerTest {
         assertEquals(listOf("app", "APP", "阿婆"), order(app, "", item("app", letters = true), item("APP", letters = true), item("阿婆")))
         view.firsts[app to ""] = Words.of("阿婆")
         assertEquals("阿婆", order(app, "", item("app", letters = true), item("APP", letters = true), item("阿婆")).first())
-        // not across the words before, though
         view.firsts.clear()
         view.used(app, "阿婆", 5, corrected = 3)
         assertEquals("app", order(app, "", item("app", letters = true), item("阿婆")).first())
     }
 
-    // U-10, S3: used as often, the word first used under the code first; then the decoder's order
+    // used as often, the word first used under the code first; then the decoder's order
     @Test
     fun equalUsesGoByFirstUseThenTheDecodersOrder() {
         view.used(de, "得", 2, first = 9)
@@ -173,7 +167,6 @@ class HabitRankerTest {
         )
     }
 
-    // D24: the imports by their batch and place, not the decoder's order; none spelt as the code: after the dictionary's all (review-1b N1)
     @Test
     fun importsGoByTheirOrderAndAfterEveryDictionaryWordIfNoneIsSpeltAsTheCode() {
         val code = Code(Kinds.FULL, "wxm")
@@ -184,7 +177,6 @@ class HabitRankerTest {
         assertEquals(listOf(Tier.DICTIONARY, Tier.DICTIONARY, Tier.IMPORTED, Tier.IMPORTED), ranked.map { it.tier })
     }
 
-    // review-G S1: an imported word the decoder had first is never V either, so never first by that (D23)
     @Test
     fun anImportedItemTheDecoderHadFirstIsNotTheOriginalFirst() {
         val code = Code(Kinds.FULL, "wxm")
@@ -193,13 +185,12 @@ class HabitRankerTest {
         assertEquals(Tier.IMPORTED, ranked[1].tier)
     }
 
-    // V is the first the decoder had: an item put in is never V
     @Test
     fun anItemPutInIsNeverTheOriginalFirst() {
         assertEquals(listOf("点了", "带来"), order(dl, "", item("带来", injected = true), item("点了")))
     }
 
-    // U-20 (D32 B): words read so, two syllables each
+    // words read so, two syllables each
     private fun read(text: String, reading: String) = Item(text, Words.of(text, reading))
 
     private val fh = Code(Kinds.FULL, "fh")
@@ -207,7 +198,6 @@ class HabitRankerTest {
         read("发挥", "fa hui"), read("符合", "fu he"), read("返回", "fan hui"), read("防护", "fang hu"), read("奉化", "feng hua"),
     )
 
-    // 奉化 used twice spelt in full goes third under fh; the first two stay
     @Test
     fun aWordUsedTwiceSpeltInFullGoesThirdUnderItsInitials() {
         view.spelled[Kinds.FULL to "奉化"] = Habits.Spelled(1, 0)
@@ -218,13 +208,12 @@ class HabitRankerTest {
         assertEquals(listOf("发挥", "符合", "奉化"), order(fh, "", fhItems[0], fhItems[1], fhItems[4]))
     }
 
-    // used under fh itself it goes by U-02 there (twice picked: first); the full spelling's count no matter
+    // used under fh itself it goes by its uses there (twice picked: first); the full spelling's count no matter
     @Test
     fun usedUnderTheInitialsItGoesByThem() {
         view.spelled[Kinds.FULL to "奉化"] = Habits.Spelled(2, 0)
         view.used(fh, "奉化", 2, corrected = 2)
         assertEquals("奉化", order(fh, "", *fhItems).first())
-        // 知道 used under zd stays first over 指导 used spelt in full
         val zd = Code(Kinds.FULL, "zd")
         val items = arrayOf(read("知道", "zhi dao"), read("指导", "zhi dao"), read("制度", "zhi du"), read("战斗", "zhan dou"), read("站点", "zhan dian"))
         view.spelled[Kinds.FULL to "指导"] = Habits.Spelled(9, 0)
@@ -240,7 +229,6 @@ class HabitRankerTest {
         view.spelled[Kinds.FULL to "点了"] = Habits.Spelled(0, 1)
         assertEquals(listOf("电量", "点了", "点亮", "店里"), order(dianl, "", *items))
         assertEquals(1, order(Code(Kinds.FULL, "dianle"), "", *items).indexOf("点了"))
-        // under the initials themselves no floor: U-02 there
         assertEquals(3, order(dl, "", *items).indexOf("点了"))
         view.spelled.clear()
         assertEquals(3, order(dianl, "", *items).indexOf("点了"))
@@ -271,8 +259,6 @@ class HabitRankerTest {
         }
     }
 
-    // under a part both: the floored words second and on, the lifted after them (R14 F3742); a word
-    // both corrected to and used in full is floored (F3752); each moved shows why (F3736)
     @Test
     fun underAPartTheFlooredGoFirstAndEachMovedShowsWhy() {
         val items = arrayOf(read("电量", "dian liang"), read("点亮", "dian liang"), read("店里", "dian li"), read("点了", "dian le"), read("电力", "dian li"))
@@ -283,14 +269,14 @@ class HabitRankerTest {
         val ranked = rank(dianl, "", *items)
         assertEquals(listOf("电量", "点了", "电力", "店里", "点亮"), ranked.map { it.value })
         assertEquals(listOf(Tier.DICTIONARY, Tier.FLOORED, Tier.FLOORED, Tier.LIFTED, Tier.DICTIONARY), ranked.map { it.tier })
-        // one already at its place shows the rule too, so kept holds it (F3762); one higher keeps its own
+        // one already at its place shows the rule too, so kept holds it; one higher keeps its own
         view.spelled.clear()
         view.spelled[Kinds.FULL to "店里"] = Habits.Spelled(3, 0)
         view.spelled[Kinds.FULL to "点亮"] = Habits.Spelled(3, 0)
         val held = rank(dianl, "", *items)
         assertEquals(Tier.LIFTED, held.first { it.value == "店里" }.tier)
         assertEquals(Tier.DICTIONARY, held.first { it.value == "点亮" }.tier)
-        // one used here at the floor's place keeps the reason it was used here (F3771)
+        // one used here at the floor's place keeps the reason it was used here
         view.spelled.clear()
         view.spelled[Kinds.FULL to "点了"] = Habits.Spelled(0, 1)
         view.used(dianl, "电量", 3)
@@ -300,8 +286,7 @@ class HabitRankerTest {
         assertEquals(Tier.USED, used[1].tier)
     }
 
-    // 双拼's typed words read by keys alone (061-sp-abbrev §3.3), a row of its table each: V the decoder's first,
-    // D1 D2 the dictionary's after it, A1 to A4 typed words read alone, in the decoder's order
+    // V the decoder's first, D1 D2 the dictionary's, A1 to A4 typed words read alone
     @Test
     @Uat("SP-55")
     fun wordsTypedReadAloneGoBeforeOrAfterTheFirstByHowTheCodeReads() {
@@ -340,7 +325,7 @@ class HabitRankerTest {
                 used(half, d2, 1)
             },
             Case("the gate (a typed word half typed): V A1 A2 A3", half, listOf(v, a1, a2, a3, d1, d2, a4), gate = true),
-            // code review SHOULD-1 (ce8e9f5f5): V a typed word read alone was put behind the decoder's second
+            // V a typed word read alone was once put behind the decoder's second
             Case("V itself a typed word, whole: first still, two more after it", whole, listOf(v, a1, a2, d1, d2, a3, a4), mapOf(v to Tier.ALONE),
                 items = listOf(Item(vItem.value, vItem.words, alone = true), d1Item, d2Item) + typed),
             Case("V itself a typed word, the gate: first still", half, listOf(v, a1, a2, d1, d2, a3, a4), mapOf(v to Tier.ALONE),
@@ -357,7 +342,7 @@ class HabitRankerTest {
                 spelled[sp to a3] = Habits.Spelled(2, 0)
                 spelled[sp to d2] = Habits.Spelled(2, 0)
             },
-            // R27 F8535: the fourth was lifted to third, ahead of the second and third read alone; §3.3 ranks it as one of them
+            // the fourth was once lifted to third, ahead of the second and third read alone; it ranks as one of them
             Case("a fourth typed word used spelt in full twice: where it was, not lifted", half, listOf(a1, v, a2, a3, d1, d2, a4), mapOf(a4 to Tier.DICTIONARY)) {
                 spelled[sp to a4] = Habits.Spelled(2, 0)
             },

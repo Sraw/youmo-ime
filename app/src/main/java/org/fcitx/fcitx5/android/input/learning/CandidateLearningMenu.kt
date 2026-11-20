@@ -19,34 +19,23 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.utils.clipboardManager
 
-/**
- * A long press on a candidate of the engine's input methods (U-82): the menu the engine gives
- * ([LearningMenu]), worded here, the app's own and in its language rather than the addon's.
- * Blocking asks first in the same popup, which says where it reaches; 为什么排在这 shows the
- * reason in it, with 复制给开发者. Each act is said by [done] (the undo chip: its message and the
- * token that takes it back), to be taken back.
- */
+/** Worded here, in the app's language rather than the addon's. Each act is said by [done], to be taken back. */
 class CandidateLearningMenu(
     private val context: Context,
     private val fcitx: HostConnection,
     private val scope: CoroutineScope,
     private val done: (message: String, token: Long) -> Unit,
 ) {
-    /** A line of the popup, shown as [label]; [pick] gives the lines to show in its place, or null to close it. Not [enabled]: a line to read. */
+    /** [pick] null closes it. Not [enabled]: a line to read. */
     class Line(val label: CharSequence, val enabled: Boolean = true, val pick: () -> List<Line>? = { null })
 
-    /**
-     * The lines for the candidate [text] at [index] (counted from the page shown if [paged]), or
-     * null where the engine has no menu for it: not one of its input methods, or nothing to do
-     * with it (a field that learns nothing).
-     */
+    /** Null where the engine has no menu: not one of its input methods, or a field that learns nothing. */
     suspend fun lines(index: Int, text: String, paged: Boolean): List<Line>? =
         linesOf(fcitx.runOnReady { learning(menuOf(index, text, paged)) }, index, text, paged)
 
-    /** The op asking the engine for the menu [lines] shows: for a caller asking it with more in one round trip. */
+    /** For a caller asking it with more in one round trip. */
     fun menuOf(index: Int, text: String, paged: Boolean): LearningOp = LearningMenu.onCandidate(LearningOp.Menu(index, text), paged)
 
-    /** [lines] of the engine's answer to [menuOf]. */
     fun linesOf(menu: LearningResult, index: Int, text: String, paged: Boolean): List<Line>? {
         if (menu !is LearningResult.Menu || menu.items.isEmpty()) return null
         return LearningMenu.rows(menu).map { row ->
@@ -54,8 +43,7 @@ class CandidateLearningMenu(
             val op = LearningMenu.op(row, index, menu.text, paged)
             when {
                 op == null -> Line(context.getString(R.string.learning_why)) { why(menu.why, index, text, paged) }
-                // the confirmation never where the finger that picked the row still is (C18: a slow
-                // double tap blocks nothing): the reach, a cancel, then it (review-E-ui S1)
+                // never where the finger that picked the row still is: a slow double tap blocked
                 LearningMenu.confirms(row) -> Line(label(row)) {
                     listOf(
                         Line(context.getString(scope(menu.scope), text), enabled = false),
@@ -68,7 +56,7 @@ class CandidateLearningMenu(
         }
     }
 
-    /** Shift+Delete on the candidate (U-82): its 删除 or 忘掉学到的, as the menu's. Whether it had one. */
+    /** As the menu's. Whether it had one. */
     suspend fun forget(index: Int, text: String, paged: Boolean): Boolean {
         val menu = fcitx.runOnReady { learning(LearningMenu.onCandidate(LearningOp.Menu(index, text), paged)) }
         if (menu !is LearningResult.Menu) return false
@@ -117,7 +105,7 @@ class CandidateLearningMenu(
         scope.launch {
             when (val result = fcitx.runOnReady { learning(op) }) {
                 is LearningResult.Done -> done(said(row, text), result.undo)
-                // the list changed under the menu: nothing done, and said so (review-E-ui N7)
+                // the list changed under the menu: nothing done, and said so
                 else -> done(context.getString(R.string.learning_not_done), LearningResult.NO_UNDO)
             }
         }

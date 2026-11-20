@@ -7,12 +7,7 @@ package org.fcitx.fcitx5.android.engine.glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import kotlin.math.sqrt
 
-/**
- * Where the keyboard's letter keys are, for a glide ([GlidePath]): each letter's key centres, x in
- * key widths to the right, y down in [ROW_HEIGHT]s a row, as the app measures the keys shown
- * ([QWERTY] lays them out as most phones do). A letter may have two keys (the split keyboard's G
- * and V, on both halves); one with none is no glide's.
- */
+/** Letter key centres: x in key widths, y in [ROW_HEIGHT]s, as the app measures the shown keys; a letter may have two keys (split keyboard). */
 class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
 
     constructor(centres: Map<Char, Pair<Float, Float>>) : this(centres.toList())
@@ -29,16 +24,14 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
         }
     }
 
-    // each letter's keys as one id, letters on the same keys alike: the nine keys' a, b and c all on 2
+    // letters on the same keys share an id: the nine keys' a, b and c all on 2
     private val key = IntArray(LETTERS) { i -> (0..i).first { j -> x[j].contentEquals(x[i]) && y[j].contentEquals(y[i]) } }
 
-    /** Whether some letters share a key, as on the nine keys: pinyin hands such a glide to its nine keys' session (KeyboardPair). */
+    /** Letters share keys, as on the nine keys: pinyin hands such a glide to its nine-key session (KeyboardPair). */
     val sharesKeys: Boolean = (0 until LETTERS).any { i -> x[i].isNotEmpty() && key[i] != i }
 
-    /** Whether [a] and [b] are on the same keys, as the nine keys' letters are: a glide goes from one to the other without moving. */
     fun sameKey(a: Char, b: Char): Boolean = a in this && b in this && key[index(a)] == key[index(b)]
 
-    /** [c]'s first key's centre: its only one but on a split keyboard. */
     fun centre(c: Char): Pair<Float, Float> {
         require(c in this) { "no key for '$c' in the layout" }
         return x[index(c)][0] to y[index(c)][0]
@@ -46,7 +39,6 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
 
     operator fun contains(c: Char): Boolean = index(c) >= 0 && x[index(c)].isNotEmpty()
 
-    /** How far [px], [py] is from [c]'s nearest key; infinite where it has none. */
     fun distance(c: Char, px: Float, py: Float): Float {
         val i = index(c)
         if (i < 0) return Float.POSITIVE_INFINITY
@@ -59,7 +51,6 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
         return sqrt(best)
     }
 
-    /** [c]'s key nearest [px], [py]: its centre into [out] at [at] (x, then y). */
     fun nearest(c: Char, px: Float, py: Float, out: FloatArray, at: Int) {
         val i = index(c)
         var best = Float.POSITIVE_INFINITY
@@ -80,10 +71,9 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
     companion object {
         const val LETTERS = 26
 
-        /** A row's height in key widths, keys 1.4 times as tall as wide: what [GlidePath]'s radii are measured in. */
+        /** Row height in key widths (keys 1.4 times as tall as wide): [GlidePath]'s radii unit. */
         const val ROW_HEIGHT = 1.4f
 
-        /** The keys rows of [rows], each a key wide, a row apart, each row moved right by its [indents] (in key widths). */
         fun rows(
             rows: List<String> = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm"),
             indents: List<Float> = listOf(0f, 0.5f, 1.5f),
@@ -93,10 +83,8 @@ class GlideLayout(keys: List<Pair<Char, Pair<Float, Float>>>) {
             }
         )
 
-        /** QWERTY's on a phone upright. */
         val QWERTY = rows()
 
-        /** The nine keys' (九键): each digit key's [letters] on it, three keys a row from 1. */
         fun nineKeys(letters: NineKeyLetters = NineKeyLetters.STANDARD): GlideLayout = GlideLayout(
             ('2'..'9').flatMap { d ->
                 val k = d - '1'

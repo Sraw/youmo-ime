@@ -20,7 +20,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Handwriting's characters with all their readings, and the card of one looked up (UAT HW-27, HW-29, HW-40, HW-51, PY-131). */
+/** Handwriting's characters with all their readings, and the card of one looked up. */
 class EnginesHandwritingReadingsTest : EnginesFixture() {
 
     init {
@@ -43,7 +43,6 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         assertEquals(listOf("行", "江"), one.candidates)
         assertEquals(listOf(listOf("xíng/háng…"), listOf("jiāng")), one.readings)
         assertEquals(listOf("xíng/háng…"), e.candidates(PINYIN, 0, 1).single().readings)
-        // after 银: 银行's háng first
         val e2 = engines(ReadingStyle.ZHUYIN)
         e2.write(0, "银")
         val two = e2.write(1, "行")
@@ -51,7 +50,7 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         assertEquals(listOf(listOf("ㄏㄤˊ/ㄒㄧㄥˊ…")), two.readings)
     }
 
-    // 061-handwriting-toolbar §3.5: all the readings are handwriting's while it shows, not pinyin's own looked up
+    // all the readings are handwriting's while it shows, not pinyin's own looked up
     @Test
     @Uat("HW-51")
     fun aCharacterPinyinLooksUpAfterWritingShowsOneReading() {
@@ -71,7 +70,6 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         e.write(0, "行")
         val next = e.onEvent(PINYIN, EngineEvent.PICK, 0)
         assertEquals("行", next.commit)
-        // offered after it, nothing written: one reading each
         assertTrue(next.toString(), next.candidates.isNotEmpty())
         assertTrue(next.toString(), next.readings.all { it.size <= 1 && it.none { r -> '/' in r } })
         val typed = engines(ReadingStyle.PINYIN).type(PINYIN, "xing")
@@ -95,7 +93,6 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         val again = e.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.RECALL)
         assertEquals("银行", again.preedit)
         assertEquals(listOf(listOf("háng/xíng…")), again.readings)
-        // another setting: what was typed goes
         e.settings = e.settings.copy(pageSize = e.settings.pageSize + 1)
         assertEquals("", e.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.RECALL).preedit)
     }
@@ -111,7 +108,6 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         // charinfo.data's, the mainland's (its last a 竖钩), over the stroke table's first (a 折)
         assertEquals("丿丿丨一一亅", card?.orderShown())
         assertEquals("氵", e.charCard(PINYIN, 1, "江")?.radical)
-        // not what is there now, or no such candidate
         assertNull(e.charCard(PINYIN, 0, "江"))
         assertNull(e.charCard(PINYIN, 5, "行"))
         // what may follow: no card at once, its reading line (a word card's or a character's behind it)
@@ -119,7 +115,6 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         val followed = e.candidates(PINYIN, 0, 1).single().text
         assertNull(e.charCard(PINYIN, 0, followed))
         assertTrue(e.card(PINYIN, 0, followed).toString(), e.card(PINYIN, 0, followed).let { it is CandidateCard.Char || it is CandidateCard.Word })
-        // pinyin's: by its parts or strokes, not as typed
         val p = engines(ReadingStyle.OFF)
         val parts = p.type(PINYIN, "ushuigong")
         assertEquals("ㄐㄧㄤ", p.charCard(PINYIN, parts.candidates.indexOf("江"), "江")?.readings?.single()?.zhuyin)
@@ -128,13 +123,12 @@ class EnginesHandwritingReadingsTest : EnginesFixture() {
         assertNotNull(byStrokes.toString(), q.charCard(PINYIN, byStrokes.candidates.indexOf("行"), "行"))
         val r = engines(ReadingStyle.OFF)
         val typed = r.type(PINYIN, "xing")
-        // as typed: its reading line, the card behind it
         assertNull(r.charCard(PINYIN, typed.candidates.indexOf("行"), "行"))
         assertTrue(r.card(PINYIN, typed.candidates.indexOf("行"), "行") is CandidateCard.Char)
         assertNull(engines(ReadingStyle.OFF).charCard(PINYIN, 0, "行"))
     }
 
-    // the paged window's index, from the page shown (review 051-hw-reading M2)
+    // the paged window's index, from the page shown
     @Test
     @Uat("HW-29")
     fun aCardOnTheSecondPageIsOfItsCharacter() {

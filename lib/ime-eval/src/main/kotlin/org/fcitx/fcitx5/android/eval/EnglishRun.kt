@@ -16,24 +16,7 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import java.util.Locale
 import kotlin.random.Random
 
-/**
- * English typed as a user types it into the app: each sentence a word at a time into one session,
- * the letters as written, an apostrophe left out where that is no word (dont for don't, which the
- * session is to put back; not its for it's), then space, or the punctuation after the word, which
- * the session follows with a space. With [noise], each key may slip ([slip]). What space commits is measured against the word meant, as are the candidates the
- * word typed shows and the words offered before it ([Snapshot.predicting]). A word committed
- * wrong is put right before the next, as the user would: a backspace, then the text meant, so the
- * next word follows the text meant. As in the app, the backspace takes back only a correction space
- * made, and the word typed, a slip too, is then the user's for the rest of the sentence; after a
- * correction punctuation made, or a word committed as typed, it takes nothing back, and what was
- * counted of the word stays counted.
- *
- * With a [hand] each key is tapped with a place ([TouchSim], `qwerty` or `nine`): a key typed as
- * meant lands in its own box, one slipped in the key it slipped to, aimed at the key meant; the
- * session is given the place unless [readsTouch] is off (as 0.6.1 before 061-neighbour-english, which read none).
- * [oneSlip] in [run]: a key of each word slips, landing where the hand's spread takes it in a key
- * next to it (TouchSim's `slip`), in place of [slip]'s.
- */
+/** English typed a word at a time with slips ([noise]) and tap places ([hand]); a wrong commit is put right before the next. */
 internal class EnglishRun(
     private val data: EnglishData,
     private val costs: TypingCosts = TypingCosts(),
@@ -121,7 +104,7 @@ internal class EnglishRun(
             var shown: Snapshot? = null
             for ((i, tap) in tapped.withIndex()) {
                 val c = tap.first
-                // not read: as 0.6.1 before, no place given
+                // not read: no place given
                 val touch = tap.second?.takeIf { readsTouch }
                 // a digit tapped() put for a letter is a key slipped to; one the text has is typed as a digit
                 shown = session.apply(if (nineKeys) nineKey(c, touch, aimed[i].second.isUpperCase(), slid = c != aimed[i].first) else Action.Key(c, touch = touch))
@@ -141,8 +124,7 @@ internal class EnglishRun(
             meant.append(token).append(' ')
             offered = if (after.predicting) after.candidates else emptyList()
             if (committed != word) {
-                // a backspace first, as the user's: right after a correction it takes it back, and
-                // what was counted of it with it; then the text meant, as much as the host reads of it
+                // a backspace first, as the user's: right after a correction it takes it back, and what was counted of it
                 session.apply(Action.Backspace)
                 session.apply(Action.Context(meant.takeLast(Action.Context.HOST_CHARS).toString()))
                 offered = emptyList()
@@ -159,9 +141,7 @@ internal class EnglishRun(
 
     private fun offeredBy(session: EnglishSession) = session.candidates(0, EnglishSession.SUGGESTED + 1).map { it.text }
 
-    // [c] as the nine keys type it: a letter its key, Shift on for a capital, a key [slid] to its digit, Shift on where
-    // it was meant for one ([upper]); anything else as itself (1's apostrophe, a digit of the text's own, as 0.6.0
-    // typed it: told by the tap, not the character, review F8255)
+    // [c] as the nine keys type it: Shift for a capital, a key [slid] to its digit; anything else as itself
     private fun nineKey(c: Char, touch: Touch?, upper: Boolean, slid: Boolean): Action {
         if (slid) return Action.NineKey(c, upper, touch)
         val digit = digitOf(c)
@@ -173,11 +153,7 @@ internal class EnglishRun(
     // [keys] as the nine keys' digits: a word slipped there is one whose digits differ
     private fun nineKey(keys: String) = if (nineKeys) keys.map { digitOf(it) ?: it }.joinToString("") else keys
 
-    /**
-     * The keys [aimed] (each typed, and the key meant) tapped: each with a place where there is a
-     * [board] (on the nine keys, the digit; a slipped letter, the digit it landed on); [oneSlip], one
-     * key of the word landing in a key next to its own instead.
-     */
+    /** The keys [aimed] (typed, meant) tapped, with a place where there is a [board]; [oneSlip] lands one key next to its own. */
     private fun tapped(aimed: List<Pair<Char, Char>>, taps: java.util.Random, oneSlip: Boolean): List<Pair<Char, Touch?>> {
         val board = board ?: return aimed.map { it.first to null }
         fun key(c: Char): Char? = (if (nineKeys) digitOf(c) else c.lowercaseChar())?.takeIf { it in board.keys }
@@ -202,11 +178,7 @@ internal class EnglishRun(
         private const val TAP_SEED = 1_000_003L
         private val PUNCTUATION = charArrayOf(',', '.', '!', '?', ';', ':')
 
-        /**
-         * [keys] with each key slipping at the rate [noise]: a key beside it in its place, half
-         * the slips; left out, one beside it typed after it, or swapped with the next, the rest.
-         * Never all left out.
-         */
+        /** [keys] each slipping at the rate [noise]: half to a key beside it, the rest left out, doubled or swapped; never all left out. */
         fun slip(keys: String, noise: Double, random: Random): String = slipAimed(keys, noise, random).joinToString("") { it.first.toString() }
 
         /** [slip]'s keys, each with the key meant: a key beside it typed in its place or after it, aimed at it. */

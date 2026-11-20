@@ -4,128 +4,18 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.graphics.Typeface
 import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
-import org.fcitx.fcitx5.android.data.InputFeedbacks
 
 open class KeyDef(
-    val appearance: Appearance,
     val behaviors: Set<Behavior>,
     val popup: Array<Popup>? = null,
-    /**
-     * The key's name in a theme, its board's prefix left off ([KeyNames][org.fcitx.fcitx5.android.input.theme.KeyNames]):
-     * its place (`q`, `2`, `r1c3`) or its role (`backspace`); null for a key a theme does not style by itself.
-     */
+    /** Its board's prefix left off: its place (`q`, `2`, `r1c3`) or its role (`backspace`); null for one a theme does not style by itself. */
     val name: String? = null,
-    /**
-     * What the key's swipe shortcuts are stored under ([org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts]):
-     * a character key's `form/key` (`full/a`), a function key's own name (`space`); null for a key
-     * with none, as on the panels' keyboards.
-     */
+    /** A character key's `form/key` (`full/a`), a function key's own name (`space`); null for none (the panels' keyboards). */
     val shortcut: String? = null,
 ) {
-    /** Whether the key's swipes go both ways (the cursor sideways, the shortcuts up and down), each locked to its axis. */
+    /** The cursor sideways, the shortcuts up and down, each locked to its axis. */
     open val swipesBothWays: Boolean get() = false
-
-    sealed class Appearance(
-        val percentWidth: Float,
-        val variant: Variant,
-        val border: Border,
-        val margin: Boolean,
-        val viewId: Int,
-        val soundEffect: InputFeedbacks.SoundEffect,
-        /**
-         * Accessibility label for this key, or `0` for none.
-         *
-         * Keys that show text are already announced by their [Text.displayText]; this is for
-         * icon-only keys, which are otherwise anonymous both to screen readers and to any
-         * tooling that walks the accessibility tree.
-         */
-        @StringRes val contentDescription: Int
-    ) {
-        enum class Variant {
-            Normal, AltForeground, Alternative, Accent
-        }
-
-        enum class Border {
-            Default, On, Off, Special
-        }
-
-        open class Text(
-            val displayText: String,
-            val textSize: Float,
-            /**
-             * `Int` constants in [Typeface].
-             * Can be `NORMAL`(default), `BOLD`, `ITALIC` or `BOLD_ITALIC`
-             */
-            val textStyle: Int = Typeface.NORMAL,
-            percentWidth: Float = 0.1f,
-            variant: Variant = Variant.Normal,
-            border: Border = Border.Default,
-            margin: Boolean = true,
-            viewId: Int = -1,
-            soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard,
-            @StringRes contentDescription: Int = 0
-        ) : Appearance(
-            percentWidth, variant, border, margin, viewId, soundEffect, contentDescription
-        )
-
-        class AltText(
-            displayText: String,
-            val altText: String,
-            textSize: Float,
-            /**
-             * `Int` constants in [Typeface].
-             * Can be `NORMAL`(default), `BOLD`, `ITALIC` or `BOLD_ITALIC`
-             */
-            textStyle: Int = Typeface.NORMAL,
-            percentWidth: Float = 0.1f,
-            variant: Variant = Variant.Normal,
-            border: Border = Border.Default,
-            margin: Boolean = true,
-            viewId: Int = -1,
-            @StringRes contentDescription: Int = 0
-        ) : Text(
-            displayText, textSize, textStyle, percentWidth, variant, border, margin, viewId,
-            contentDescription = contentDescription
-        )
-
-        class Image(
-            @DrawableRes
-            val src: Int,
-            percentWidth: Float = 0.1f,
-            variant: Variant = Variant.Normal,
-            border: Border = Border.Default,
-            margin: Boolean = true,
-            viewId: Int = -1,
-            soundEffect: InputFeedbacks.SoundEffect = InputFeedbacks.SoundEffect.Standard,
-            @StringRes contentDescription: Int = 0
-        ) : Appearance(
-            percentWidth, variant, border, margin, viewId, soundEffect, contentDescription
-        )
-
-        class ImageText(
-            displayText: String,
-            textSize: Float,
-            /**
-             * `Int` constants in [Typeface].
-             * Can be `NORMAL`(default), `BOLD`, `ITALIC` or `BOLD_ITALIC`
-             */
-            textStyle: Int = Typeface.NORMAL,
-            @DrawableRes
-            val src: Int,
-            percentWidth: Float = 0.1f,
-            variant: Variant = Variant.Normal,
-            border: Border = Border.Default,
-            margin: Boolean = true,
-            viewId: Int = -1,
-            @StringRes contentDescription: Int = 0
-        ) : Text(
-            displayText, textSize, textStyle, percentWidth, variant, border, margin, viewId,
-            contentDescription = contentDescription
-        )
-    }
 
     sealed class Behavior {
         class Press(
@@ -155,19 +45,15 @@ open class KeyDef(
         class AltPreview(content: String, val alternative: String) : Preview(content)
 
         sealed class Keyboard : Popup() {
-            /** A key of no name's built-in list of [label] (KeyDefaults.preset); [caps]: Shift on, a letter's in capitals as its face. */
+            /** [caps]: Shift on, a letter's in capitals as its face. */
             data class Preset(val label: String, val transformPunctuation: Boolean = true, val caps: Boolean = false) :
                 Keyboard()
 
             /**
-             * [items], typed as keys (one character) or committed (longer); those from [symbolsFrom]
-             * are symbols set apart: rows of their own above the rest, each shown as Chinese
-             * punctuation maps it, typed as a key the engine maps. [asIs]: every item is committed as
-             * it is, never a key (none set apart then: nothing would map them). [inRow]: the items
-             * before the symbols in one row, the one at [inRow] (the key's own) under the finger first
-             * and the rest round it as listed, as the full keyboard's (060-edge-popup); -1, the first.
-             * [actions]: what each item types where its own differs from a key's (a theme's group's digit corner, a
-             * keypad's: KeyOutput.Keypad), one for each item; null, each as [asIs] says.
+             * Those from [symbolsFrom] are symbols set apart, rows of their own above, shown as Chinese punctuation
+             * maps them. [asIs]: every item committed as it is, never a key. [inRow]: the items before the symbols in
+             * one row, the one at [inRow] under the finger first; -1, the first. [actions]: where an item's own differs
+             * from a key's (a keypad's digit); null, each as [asIs] says.
              */
             class Explicit(
                 val items: Array<String>,
@@ -183,14 +69,9 @@ open class KeyDef(
                 }
             }
 
-            /**
-             * A named key's long press as the resolver has it now (060-keys-unify §1.3): each item typed as
-             * [actions] says (its KeyOutput's, the key's placeholders the keyboard's), shown as [labels]; those from [split] set apart, [inRow] under the finger first
-             * as [Explicit]'s. Made as it opens ([BaseKeyboard.onPopupAction]); wired as [Named].
-             */
+            /** Made as it opens ([BaseKeyboard.onPopupAction]); wired as [Named]. */
             class Resolved(val actions: List<KeyAction>, val labels: List<String>, val split: Int, val inRow: Int, val focus: Int = -1) : Keyboard()
 
-            /** A named key's long press, the resolver's made as it opens: what [BaseKeyboard.wire] wires. */
             data class Named(val name: String) : Keyboard()
         }
 

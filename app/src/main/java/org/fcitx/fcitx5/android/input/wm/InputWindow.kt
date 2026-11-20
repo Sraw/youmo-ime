@@ -77,10 +77,9 @@ sealed class InputWindow : Dependent {
             return null
         }
 
-        /** Where the title's ← goes: the keyboard when null; a panel opened from another, back to that one. */
+        /** The keyboard when null. */
         open val returnTo: (() -> InputWindow)? = null
 
-        /** What ← is said to do, for [returnTo]. */
         @get:StringRes
         open val returnLabel: Int = R.string.back_to_keyboard
 

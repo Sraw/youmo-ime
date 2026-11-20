@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.KeyState
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.ScancodeMapping
@@ -25,67 +26,55 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import timber.log.Timber
 
-// [KeyDef.shortcut]'s form: a function key's bare (`comma`), any other's whole (`full/q`), KeyId.of reading either
-// back as the one name. Kept bare because KeyDef.shortcut is the views' form too (TextKeyboard.layout & co., which
-// the wiring tests compare the scene's keys with); every reader of it asks KeyId.of, never compares the text
+// a function key's bare (`comma`), any other's whole (`full/q`): every reader asks KeyId.of, never compares the text
 private fun viewName(name: String): String = KeyId.of(name).let { if (it.isFunction) it.key else it.name }
 
-/**
- * A key of the scene as BaseKeyboard wires it, made from its layout's node (060-render-p2 U4 B):
- * what it does is the layout's ([behavior]), the old keys' KeyDef its form only, so the one wiring
- * (sound, the space's and backspace's swipes, press, long press, swipes, popups) serves both. No
- * view is made of it: its appearance is none.
- */
+val NumLockState = KeyStates(KeyState.NumLock, KeyState.Virtual)
+
+/** Made from its layout's node, in KeyDef's form, which the wiring reads. */
 class SceneKeyDef(
     val behavior: SceneBehavior,
     behaviors: Set<Behavior>,
     popup: Array<Popup>?,
-    /** What the layout's `action:<name>` sends on this key, the keyboard's own ([Table.action]): its long press's items' too. */
+    /** The keyboard's own ([Table.action]): its long press's items' too. */
     val placeholder: (String) -> KeyAction? = { null },
-) : KeyDef(Appearance.Text("", 0f), behaviors, popup, name = behavior.id, shortcut = behavior.shortcut?.let(::viewName)) {
+) : KeyDef(behaviors, popup, name = behavior.id, shortcut = behavior.shortcut?.let(::viewName)) {
 
     override val swipesBothWays: Boolean get() = behavior.bothWays
 
-    /** Its class of sound (layout-1's sound=, else its kind: SoundKey.of), as SpaceKey's, BackspaceKey's and ReturnKey's were theirs. */
     val sound: SoundKey get() = behavior.sound
 
-    /** The system's click it plays where no theme's sound does: its sound= alone (SceneBehavior.systemSound). */
+    /** Where no theme's sound plays: its sound= alone. */
     val systemSound: SoundKey get() = behavior.systemSound
 
-    /** The space: its sideways swipe moves the cursor (BaseKeyboard.wireSpace). */
+    /** Its sideways swipe moves the cursor. */
     val isSpace: Boolean get() = behavior.role == "space"
 
-    /** Backspace: its sideways swipe selects what it deletes (BaseKeyboard.wireBackspace). */
+    /** Its sideways swipe selects what it deletes. */
     val isBackspace: Boolean get() = behavior.role == "backspace"
 
-    /**
-     * What a keyboard adds to the layout's words (060-render-p2 U4 B), each for the key of [KeyNode];
-     * null where it has none: its `action:` placeholders, and a group key's (`letters=`, 060-render-v2 §15)
-     * code, as the engine reads the keyboard's groups (SceneGroups).
-     */
+    /** What a keyboard adds to the layout's words for a key; null where it has none. */
     interface Table {
         fun action(name: String, node: KeyNode): KeyAction? = null
-        /** A tap on the key of [letters]: its group's code (a tap's place added as it is pressed). */
+        /** A tap's place is added as it is pressed. */
         fun group(letters: String, node: KeyNode): KeyAction? = null
 
-        /** What a hold of the key of [node] sends as it repeats, its press being [press]: the press again, but where the keyboard tells the two apart (the emoji search's ⌫). */
+        /** The press again, but where the keyboard tells the two apart (the emoji search's ⌫). */
         fun repeat(press: KeyAction, node: KeyNode): KeyAction = press
 
         /**
-         * What of [node] this table's answers are made from besides what its layout says it does ([SceneBehavior]: its
-         * actions, its letters, its name), null for nothing: a key made is kept for a node only while this is the same
-         * (SceneKeys). 注音's code is its key's face's, which a `<variant>` or another layout of the same ids changes.
+         * A key made is kept for a node only while this is the same: 注音's code is its face's, which a
+         * `<variant>` or another layout of the same ids changes. Null for nothing besides the layout's.
          */
         fun reads(node: KeyNode): Any? = null
 
-        /** The bubble over the key of [node] as it is pressed, over the face the layout gives it; null: the face's. */
+        /** Null: the face's. */
         fun bubble(node: KeyNode): String? = null
-        /** A menu item's words as shown for the layout's [label] (handwriting's `reading_off`: the settings' wording). */
+        /** Handwriting's `reading_off`: the settings' wording. */
         fun menuLabel(label: String): String = label
     }
 
     companion object {
-        /** [node]'s key: what its layout says it does ([SceneBehavior.of]), [table] the keyboard's placeholders. */
         fun of(node: KeyNode, table: Table): SceneKeyDef = of(SceneBehavior.of(node), node, table)
 
         fun of(b: SceneBehavior, node: KeyNode, table: Table): SceneKeyDef {
@@ -97,7 +86,7 @@ class SceneKeyDef(
                 }
             }
             val behaviors = buildSet {
-                // the press resolved once: a group's or a placeholder's table asked (and a missing one logged) once
+                // resolved once: a group's or a placeholder's table asked (and a missing one logged) once
                 val press = act(b.press)
                 press?.let { add(Behavior.Press(it)) }
                 act(b.longPress)?.let { add(Behavior.LongPress(it)) }
@@ -109,20 +98,14 @@ class SceneKeyDef(
             return SceneKeyDef(b, behaviors, popups.toTypedArray().takeIf { it.isNotEmpty() }) { name -> table.action(name, node) }
         }
 
-        /**
-         * [b] on [board], whose layout may say its keys pop up no preview ([Scene.preview]) and no long
-         * press's keys ([Scene.popups]): the number pad's (layout-1's `preview="off" popups="off"`, rules
-         * C §7). A menu the layout writes on a key is the key's own and stays: the number pad's Return
-         * offers Emoji as every Return does (rules C 疑问 8, the old pad's swallowed it: 060-render-p2 §5.3).
-         */
+        /** A menu the layout writes on a key is the key's own and stays: the number pad's Return offers Emoji too. */
         fun onBoard(b: SceneBehavior, board: Scene?): SceneBehavior = when {
             board == null || (board.preview && board.popups) -> b
             else -> b.copy(bubble = b.bubble.takeIf { board.preview }, popup = b.popup.takeIf { board.popups })
         }
 
-        // KeyDefaults.grouped as the popup's keys: its row (Q W 1 q w), the symbols above, the first under the finger;
-        // each typed as its item says, as a named key's (KeyResolving): a digit corner a keypad's, its candidate picked
-        // while typing (D7), [placeholder] the keyboard's `action:` (an item no build reads typed as a key)
+        // its row (Q W 1 q w), the symbols above, the first under the finger; a digit corner a keypad's, its
+        // candidate picked while typing; an item no build reads typed as a key
         private fun grouped(letters: String, corner: String?, placeholder: (String) -> KeyAction?): Popup.Keyboard.Explicit {
             val list = KeyDefaults.grouped(letters, corner)
             val items = list.row + list.symbols
@@ -130,24 +113,19 @@ class SceneKeyDef(
             return Popup.Keyboard.Explicit(items.map { it.text }.toTypedArray(), symbolsFrom = list.row.size, inRow = list.focus, actions = actions)
         }
 
-        /** What [b]'s bubble shows over the key of [node]: [table]'s, else its face's; null with no bubble. */
         fun bubbleOf(b: SceneBehavior, node: KeyNode, table: Table): String? = b.bubble?.let { table.bubble(node) ?: it.content }
 
-        // its bubble, long press and menu: each as the old keys' KeyDef had it
         private fun popupsOf(b: SceneBehavior, node: KeyNode, table: Table, act: (SceneAction?) -> KeyAction?): List<Popup> = buildList {
             b.bubble?.let {
                 val content = bubbleOf(b, node, table)!!
-                // a named key's swipe shows what the resolver swipes it to ([KeySwipes.preview] asks swipeText): its corner
-                // empty (SceneBehavior.cornerOf, 060-keys-unify M6); the layout's corner only for a key of no name
+                // a named key's swipe shows what the resolver swipes it to: its corner empty; the layout's only for a key of no name
                 add(it.corner?.let { c -> Popup.AltPreview(content, c) } ?: Popup.Preview(content))
             }
-            // a named key's long press is the resolver's, wired by its name (BaseKeyboard.wire, 060-keys-unify S6): the
-            // layout's popup only says which default list it has (KeyDefaults), the keyboard makes none of its own
+            // a named key's long press is the resolver's, wired by its name: the layout's popup only says which default list
             if (node.shortcut == null) when (val p = b.popup) {
                 is SceneBehavior.LongPopup.Preset -> add(Popup.Keyboard.Preset(p.label, p.transformPunctuation))
                 is SceneBehavior.LongPopup.Listed -> add(Popup.Keyboard.Explicit(p.items.toTypedArray(), asIs = p.asIs))
-                // a theme's own group of no name (a 17 keys' written without shortcut=): the built-in list of its letters,
-                // the corner it swipes first, none the user can change
+                // a theme's own group of no name: the built-in list of its letters, none the user can change
                 is SceneBehavior.LongPopup.Letters -> add(grouped(p.letters, b.swipe?.let(SceneBehavior::typed)) { name -> table.action(name, node) })
                 // made by a key's name alone (a nine key's, 注音九键's group): a key of none has no long press
                 is SceneBehavior.LongPopup.Composed -> Timber.w("scene key %s: a long press made by name on a key of none", b.id)
@@ -161,14 +139,12 @@ class SceneKeyDef(
             }
         }
 
-        // the keypad's , and = (FcitxKeyMapping has neither): NumberKeyboard's KEYPAD
+        // FcitxKeyMapping has neither
         private const val KP_SEPARATOR = 0xffac
         private const val KP_EQUAL = 0xffbd
 
-        // the keypad's keysyms the layouts name (sym:), sent with NumLock on as the number pad's keys were
-        // (NumPadKey): the input method types its digit or sign, not a punctuation of its own (，for ,).
-        // Only these: a name is not looked at for its KP_ (xsd README 7). A typing keyboard's corner digit
-        // is keypad: (no NumLock)
+        // sent with NumLock on as the number pad's keys were: the input method types its digit or sign, not a
+        // punctuation of its own (，for ,). A name is not looked at for its KP_; a typing keyboard's corner digit is keypad: (no NumLock)
         private val KEYPAD = mapOf(
             "KP_Add" to FcitxKeyMapping.FcitxKey_KP_Add,
             "KP_Subtract" to FcitxKeyMapping.FcitxKey_KP_Subtract,
@@ -179,10 +155,9 @@ class SceneKeyDef(
             "KP_Equal" to KP_EQUAL,
         ) + (0..9).associate { "KP_$it" to FcitxKeyMapping.FcitxKey_KP_0 + it }
 
-        // the digits' own keysyms (XK_0…XK_9, their names the digits), not the keypad's: the number row's, as its keys sent them
+        // not the keypad's: the number row's, as its keys sent them
         private val DIGITS = ('0'..'9').associate { it.toString() to it.code }
 
-        // the keysyms the layouts name (sym:), FcitxKeyMapping's by their names
         private val SYMS = mapOf(
             "BackSpace" to FcitxKeyMapping.FcitxKey_BackSpace,
             "space" to FcitxKeyMapping.FcitxKey_space,
@@ -190,7 +165,7 @@ class SceneKeyDef(
             "Escape" to FcitxKeyMapping.FcitxKey_Escape,
         ) + KEYPAD + DIGITS
 
-        // the app's words (layout-1's bare actions), as the old keys did them (KeyDefPreset)
+        // layout-1's bare actions
         private val COMMANDS: Map<String, KeyAction> = mapOf(
             "lang" to KeyAction.LangSwitchAction,
             "ime-picker" to KeyAction.ShowInputMethodPickerAction,
@@ -205,14 +180,11 @@ class SceneKeyDef(
             "lookup" to KeyAction.SymAction(KeySym(UNICODE + Keyboard.LOOKUP), KeyStates.Virtual),
         )
 
-        // a letter's scancode is its capital's (ScancodeMapping knows those alone): the keyboard sends it in Shift's case
+        // ScancodeMapping knows capitals alone: the keyboard sends it in Shift's case
         private fun scancodeOf(text: String): Int =
             ScancodeMapping.charToScancode(text[0].let { c -> if (text.length == 1 && c in 'a'..'z') c.uppercaseChar() else c })
 
-        /**
-         * The app's action for the layout's [a] (the `action:` table, 060-render-p2 U4 B), [placeholder]
-         * the keyboard's own `action:<name>`; null for what the app has none of (logged: the key does nothing).
-         */
+        /** Null for what the app has none of (logged: the key does nothing). */
         fun action(a: SceneAction, placeholder: (String) -> KeyAction?): KeyAction? = when (a) {
             is SceneAction.Key -> KeyAction.HostKeyAction(a.text, scancodeOf(a.text))
             is SceneAction.Sym -> SYMS[a.name]?.let { KeyAction.SymAction(KeySym(it), if (a.name in KEYPAD) NumLockState else KeyStates.Virtual) }
@@ -226,11 +198,11 @@ class SceneKeyDef(
             is SceneAction.EmojiSearch -> KeyAction.EmojiSearchAction(a.arg == "on")
             is SceneAction.Command -> COMMANDS[a.name]
             is SceneAction.Placeholder -> placeholder(a.name)
-            // the keyboard's (Table.group): the engine's codes are its groups'
+            // the engine's codes are its groups'
             is SceneAction.Group -> null
         }.also { if (it == null) Timber.w("scene key: no action for %s", a) }
 
-        // picker: alone, the page shown last (ReturnKey's menu)
+        // alone, the page shown last
         private fun picker(name: String?): KeyAction? = if (name == null) {
             KeyAction.PickerSwitchAction()
         } else {

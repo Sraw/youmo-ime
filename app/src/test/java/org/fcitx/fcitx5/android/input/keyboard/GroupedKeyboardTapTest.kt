@@ -35,11 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * A 14-key tap sends where across the key the finger came down (design k14-tap-position §1.4,
- * review M1, M2): driven by real touches, as a finger's, never by performClick, which no touch
- * makes.
- */
+/** A 14-key tap sends where across the key it came down: real touches, never performClick, which no touch makes. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class GroupedKeyboardTapTest {
@@ -47,10 +43,8 @@ class GroupedKeyboardTapTest {
     private val context = RuntimeEnvironment.getApplication()
     private val sent = ArrayList<KeyAction>()
 
-    // where each code sent was tapped and the keys around it (061-neighbour-correction): kept apart, [sent] the codes alone
     private val touches = ArrayList<Touch?>()
 
-    // the keys' timers run in the view tree's lifecycle
     private class Owner : LifecycleOwner {
         override val lifecycle = LifecycleRegistry(this)
     }
@@ -66,10 +60,8 @@ class GroupedKeyboardTapTest {
         laidOut(1080, 800)
     }
 
-    // made by each test ([drawn], or its own): none made for a test only to be made again
     private lateinit var keyboard: GroupedKeyboard
 
-    // the keyboard made again, nothing sent yet
     private fun drawn(check: () -> Unit) {
         keyboard = grouped()
         sent.clear()
@@ -78,7 +70,6 @@ class GroupedKeyboardTapTest {
 
     private fun key(face: String) = keyboard.shownKey(face)
 
-    // a test's layouts under [key]
     private fun source(key: String, read: (String) -> String?) = object : LayoutSource {
         override val key = key
 
@@ -89,11 +80,9 @@ class GroupedKeyboardTapTest {
 
     private fun tap(c: Char, at: Float) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(c, at)), KeyStates.Virtual)
 
-    // a touch on [key]: down at [x] across it ([down] its height down it), then each move by (dx, dy) from there, then
-    // up where the last left it; to the keyboard (whose touches go to the scene's keys) at the key's place
+    // down at [x] across [key] ([down] its height down), each move by (dx, dy), up where the last left it
     private fun touch(key: ShownKey, x: Float, vararg moves: Pair<Float, Float>, down: Float = 0.5f) {
         key as SceneShownKey
-        // the bounds the canvas's own (no window here): its place in the keyboard added
         val (view, left, top) = Triple(keyboard, key.canvas.left + key.bounds.left, key.canvas.top + key.bounds.top)
         val y = top + key.height * down
         var time = 1_000L
@@ -123,10 +112,8 @@ class GroupedKeyboardTapTest {
         assertEquals(listOf<KeyAction>(tap(g14Code('b'), 0.25f)), sent)
     }
 
-    // 060-render-p3 T9b (review L5): every one of the 14 keys sends what it did before T9a and T9b, wherever down
-    // the key the finger came, at five places across: the characters as written down then (TAPS from U+F0200,
-    // 17 places a code; L and M, of one letter, their code from U+F8DA on alone then, their place too since
-    // 061-neighbour-18key, for a slip from them), not as Keyboard reckons them now
+    // every key sends what it did before, at five places across: the characters as written down then, not as Keyboard
+    // reckons them now
     @Test
     fun theFourteenKeysTapsAreTheSameWhereverDownTheKey() = drawn {
         val across = listOf(0.1f, 0.25f, 0.5f, 0.75f, 0.9f)
@@ -140,8 +127,7 @@ class GroupedKeyboardTapTest {
         }
     }
 
-    // 061-neighbour-correction: a tap carries where it fell, from the key's centre in its size, and the
-    // group keys around it by their codes; a click no touch made (TalkBack), none
+    // a tap carries where it fell and the group keys around it; a click no touch made (TalkBack), none
     @Test
     @Uat("PY-141")
     fun aTapCarriesWhereItFellAndTheKeysAroundIt() = drawn {
@@ -151,7 +137,6 @@ class GroupedKeyboardTapTest {
         val touch = touches.single()!!
         assertEquals(0.25f, touch.dx, 0.02f)
         assertEquals(-0.25f, touch.dy, 0.02f)
-        // CV left, M right, GH and JK above
         assertEquals(setOf(g14Code('c'), g14Code('m'), g14Code('g'), g14Code('j')), touch.near.map { it.char }.toSet())
         assertTrue(touch.near(g14Code('m'))!!.nx > 0f)
         touches.clear()
@@ -159,9 +144,7 @@ class GroupedKeyboardTapTest {
         assertEquals(listOf<Touch?>(null), touches)
     }
 
-    // 061-neighbour-groups: on each grouped keyboard as KeyboardWindow makes it, the keys around a tap are the codes the
-    // engine reads its keys by, whatever each is sent as (pinyin's 18 keys' and 双拼's 14 keys' past the BMP, read back
-    // by Keyboard.keyedChar): BN's has M's, and BN is B's
+    // the keys around a tap are the codes the engine reads, whatever each is sent as (past the BMP, read back by Keyboard.keyedChar)
     @Test
     @Uat("PY-142", "SP-48", "SP-49")
     fun everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem() {
@@ -194,16 +177,14 @@ class GroupedKeyboardTapTest {
 
     @Test
     fun aSwipeTheOtherWayIsATapWhereTheFingerCameDown() = drawn {
-        // down, past the threshold, where BN has no shortcut: KeySwipe's Tap, with where it came down (as a tap's,
-        // what neighbour correction reads)
+        // past the threshold where BN has no shortcut: KeySwipe's Tap, with where it came down
         val bn = key("BN")
         touch(bn, bn.width * 0.75f, 0f to bn.height.toFloat() / 2 + 1, 0f to bn.height.toFloat() / 2 + 1)
         assertTrue(sent.toString(), sent.isNotEmpty() && sent.all { it == tap(g14Code('b'), 0.75f) })
-        // and where it fell goes with it: a slip read as a key beside it (061-neighbour-correction)
         assertEquals(0.25f, touches.last()!!.dx, 0.02f)
     }
 
-    // 060-render-v2 §15 按落点加权: whether a tap leans is its layout's (lean=), whichever draws the keys
+    // whether a tap leans is its layout's (lean=), whichever draws the keys
     @Test
     fun aGroupItsLayoutLeansNotSendsItsCodeAlone() {
         val builtIn = SceneLayouts.source
@@ -217,7 +198,6 @@ class GroupedKeyboardTapTest {
                 touch(bn, bn.width * 0.75f)
                 assertEquals(listOf<KeyAction>(code(g14Code('b'))), sent)
                 sent.clear()
-                // the others as they were
                 val cv = key("CV")
                 touch(cv, cv.width * 0.75f)
                 assertEquals(listOf<KeyAction>(tap(g14Code('c'), 0.75f)), sent)
@@ -227,9 +207,8 @@ class GroupedKeyboardTapTest {
         }
     }
 
-    // 060-render-v2 §15, 060-render-p3 T9b: groups a layout writes that are not the keyboard's (G14), on a keyboard
-    // that types none of its own (made here as 双拼's is: ownGroups off), make no codes of their own: logged, and the
-    // keyboard's groups typed, its codes, record and leaning as ever (GroupedKeyboardOwnGroupsTest: pinyin's own)
+    // groups a layout writes that are not the keyboard's, on a keyboard of no own groups (双拼's): logged, the
+    // keyboard's groups typed as ever
     @Test
     fun aLayoutsOtherGroupsAreLoggedAndTheKeyboardsKept() {
         val builtIn = SceneLayouts.source
@@ -259,18 +238,16 @@ class GroupedKeyboardTapTest {
 
     @Test
     fun aKeyOfOneLetterHasItsPlaceAndAClickNoTouchMadeSendsTheCode() = drawn {
-        // M's place weighs nothing of M's own, only a slip from it onto BN's halves (T9Segmenter)
+        // M's place weighs nothing of its own, only a slip from it onto BN's halves (T9Segmenter)
         val m = key("M")
         touch(m, m.width * 0.9f)
         assertEquals(listOf<KeyAction>(KeyAction.SymAction(KeySym(UNICODE + Keyboard.tapKey(g14Code('m'), 0.9f)), KeyStates.Virtual)), sent)
         sent.clear()
-        // TalkBack's double tap clicks with no touch
         key("BN").click()
         assertEquals(listOf<KeyAction>(code(g14Code('b'))), sent)
     }
 
-    // a node a scene made anew does other than it did gets a key of its own: the old key's gestures cancelled,
-    // its long press pending never fires (the old key's gestures were left running)
+    // a node a scene made anew does other than it did gets a key of its own: the old key's long press never fires
     @Test
     fun aKeyANodeNoLongerDoesAsHasItsGesturesCancelled() {
         keyboard = grouped()
@@ -279,7 +256,7 @@ class GroupedKeyboardTapTest {
         val box = android.graphics.Rect(0, 0, 100, 100)
         var fired = 0
         val n = canvas.scene!!.keys.first { it.id == "space" }
-        // first, the same press on a key not replaced fires: the long press is wired here at all
+        // first the same press on a key not replaced fires: the long press is wired at all
         val control = SceneKeys(keyboard) { key, _ -> key.onLongClick { fired++; true } }
         control.byNodes(canvas, object : SceneKeyDef.Table {}) { }
         val down = android.os.SystemClock.uptimeMillis()
@@ -293,7 +270,6 @@ class GroupedKeyboardTapTest {
         val keys = SceneKeys(keyboard) { key, _ -> key.onLongClick { fired++; true } }
         keys.byNodes(canvas, object : SceneKeyDef.Table {}, replaced::add)
         val old = keys.of(n)!!
-        // the same node again: the same key
         assertTrue(old === keys.of(n))
         old.touch(box, MotionEvent.ACTION_DOWN, 50f, 50f, 0, android.os.SystemClock.uptimeMillis())
         val other = KeyNode(
@@ -308,8 +284,7 @@ class GroupedKeyboardTapTest {
     }
 
     private companion object {
-        // each key's character at 0.1, 0.25, 0.5, 0.75 and 0.9 across, as e3d3edbfd sent them (L and M as
-        // 061-neighbour-18key: TAPS' l and m)
+        // each key's character at 0.1, 0.25, 0.5, 0.75 and 0.9 across, as e3d3edbfd sent them
         val FOURTEEN_TAPS = listOf(
             "QW" to listOf(0xF0312, 0xF0314, 0xF0318, 0xF031C, 0xF031E),
             "ER" to listOf(0xF0246, 0xF0248, 0xF024C, 0xF0250, 0xF0252),

@@ -14,10 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
-/**
- * Of the pages whose saves outlive them, only some caught a failed save; in the others it went
- * uncaught and took the app down.
- */
+/** Of the pages whose saves outlive them, only some caught a failed save; the others took the app down. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class OutlivingPageTest {
 
@@ -33,7 +30,6 @@ class OutlivingPageTest {
     fun aBugIsNoFailureAndGoesOn() = runTest {
         val failures = mutableListOf<Throwable>()
         val thrown = runCatching { reportingFailure({ failures += it }) { error("a bug") } }.exceptionOrNull()
-        // to the crash handler, not a toast
         assertTrue(thrown.toString(), thrown is IllegalStateException)
         assertEquals(emptyList<Throwable>(), failures)
     }

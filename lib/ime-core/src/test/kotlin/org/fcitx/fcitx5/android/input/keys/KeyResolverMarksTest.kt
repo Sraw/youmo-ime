@@ -26,7 +26,7 @@ import java.util.Calendar
 import java.util.GregorianCalendar
 import java.util.TimeZone
 
-// a key's items marked 使用变量 (061-text-variables §2.3, M4) and 不转中文标点 (061-no-cn-punct §2.2)
+// a key's items marked 使用变量 and 不转中文标点
 class KeyResolverMarksTest {
 
     private class Clock(var at: Long) : LearnClock {
@@ -91,7 +91,7 @@ class KeyResolverMarksTest {
         assertEquals(Item("a"), d.first)
     }
 
-    // M4: past midnight, the item of variables types the new date; the plain 14 types 14
+    // past midnight, the item of variables types the new date; the plain 14 types 14
     @Test
     fun outputFillsInAgainAsPicked() {
         val clock = Clock(at(14, 23, 59))
@@ -141,7 +141,7 @@ class KeyResolverMarksTest {
         assertEquals(MarkContent.Empty, r.resolve(KeyId("full/e"), KeyState()).downMark)
     }
 
-    // 061-no-cn-punct §2.2: as it is, whatever the default's commit
+    // as it is, whatever the default's commit
     @Test
     fun anItemAsIsIsTypedAsItIs() {
         val clock = Clock(at(14, 9, 5))
@@ -159,8 +159,7 @@ class KeyResolverMarksTest {
         assertEquals(Item(".", Commit.AsIs), r.resolve(comma, zh.copy(caps = true)).first)
     }
 
-    // 061-no-cn-punct S4: where the engine converts no punctuation (English, punctuation off) the mark changes nothing:
-    // typed as the key, as unmarked, so English's space after `.` is as ever
+    // where the engine converts no punctuation the mark changes nothing: typed as the key, English's space after `.` as ever
     @Test
     fun anItemAsIsIsTheKeyWhereNothingIsConverted() {
         val clock = Clock(at(14, 9, 5))

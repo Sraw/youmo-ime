@@ -20,12 +20,7 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.resources.styledDrawable
 
-/**
- * A group card (dev/design/061-settings-cards.md §2.2, §3.1): a body to tap and look into — the group's
- * name, a line or two of what it holds, a row of its characters — and a [CheckStrip] across its foot
- * that checks the whole group. [view] goes in a [CardGrid]. Two nodes, read one after the other: the
- * body, a button saying [bind]'s `said`, then the strip, whose saying, state and count the owner sets.
- */
+/** A body to tap and look into, and a [CheckStrip] checking the whole group; two accessibility nodes, body then strip. */
 class GroupCard(ctx: Context) {
 
     val view: MaterialCardView = settingsCard(ctx)
@@ -55,7 +50,7 @@ class GroupCard(ctx: Context) {
 
     val strip = CheckStrip(ctx, edgeDp = EDGE_DP)
 
-    /** A tap on the body: look into the group; never a change. */
+    /** Never a change. */
     var onOpen: (() -> Unit)? = null
 
     private var openLabel: CharSequence? = null
@@ -82,7 +77,7 @@ class GroupCard(ctx: Context) {
             addView(samples, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = ctx.dp(4) })
             setOnClickListener { onOpen?.invoke() }
         }
-        // the body says it all: what is in it is not read again piece by piece (§2.8)
+        // the body says it all: its parts are not read again
         listOf(title, name, arrow, about, samples).forEach { it.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
         ViewCompat.setAccessibilityDelegate(body, object : AccessibilityDelegateCompat() {
             override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfoCompat) {
@@ -102,15 +97,12 @@ class GroupCard(ctx: Context) {
         })
     }
 
-    /** Read after [card], the one before it: its strip, then this body. */
+    /** Its strip, then this body. */
     fun readAfter(card: GroupCard) {
         body.accessibilityTraversalAfter = card.strip.id
     }
 
-    /**
-     * The group's [name], what it holds ([about]), a few of its characters ([samples]; none, no row),
-     * the body read as [said], a tap on it read as [open].
-     */
+    /** [samples] empty: no row. */
     fun bind(name: CharSequence, about: CharSequence, samples: List<String>, said: CharSequence, open: CharSequence) {
         this.name.text = name
         this.about.text = about

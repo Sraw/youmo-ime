@@ -55,7 +55,6 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** UAT cases of the floating keyboard in uat/05: docking, the zone, the handle, its corners and notices. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -74,7 +73,6 @@ class FloatingUatTest {
         }
     }
 
-    // 悬浮 as the shape the test is in has it
     private val floating get() = KeyboardStyles.floating(h.service)
     private val screenW get() = h.service.resources.displayMetrics.widthPixels
     private val screenH get() = h.service.resources.displayMetrics.heightPixels
@@ -83,7 +81,6 @@ class FloatingUatTest {
     private fun grip(): View = KeyboardHarness.find<FloatingHandle>(h.inputView)!!.also { check(h.shown(it)) }
     private fun keys() = h.box(h.board)
 
-    // the strip of accent across the bottom while a drag is in the docking zone
     private fun dockMark(): View? = KeyboardHarness.all(h.inputView.rootView).firstOrNull {
         it.javaClass == View::class.java && it.background is GradientDrawable && it.isShown && it.alpha > 0f && it.width > screenW * 0.9
     }
@@ -103,9 +100,7 @@ class FloatingUatTest {
         assertFalse("${keys()}", floatingNow())
     }
 
-    // Robolectric does not lay the shown keyboard out again on a rotation (onConfigurationChanged
-    // leaves its window as it was): the service made anew in the turned screen, its place read
-    // from where it was left, as a rotation's new input view reads it
+    // Robolectric does not lay the shown keyboard out again on a rotation: the service made anew in the turned screen
     @Test
     @Uat("TB-23")
     fun leftInACornerItIsThereNextTimeAndAfterARotation() {
@@ -128,8 +123,7 @@ class FloatingUatTest {
         h.inTheCorner("shown again")
         assertTrue("same place: ${keys()} $at", abs(keys().left - at.left) <= 2 && abs(keys().top - at.top) <= 2)
         h.close()
-        // 横屏 its own place (061-floating-resize §2.6, the user's ②): never placed there, the one place 0.6.0 kept, here
-        // none, so the bottom; left at the top right there, the top left is 竖屏's still
+        // 横屏 has its own place: never placed there, the bottom; 竖屏's is still the top left
         try {
             RuntimeEnvironment.setQualifiers("+land")
             KeyboardHarness().use { k ->
@@ -162,14 +156,12 @@ class FloatingUatTest {
         }
     }
 
-    // the floating keyboard is cut to its outline as the device draws it (a software draw does not
-    // clip, so the outline is read rather than a pixel)
+    // a software draw does not clip, so the outline is read rather than a pixel
     private fun cornerRadius(k: KeyboardHarness): Float {
         val card = KeyboardHarness.all(k.inputView.rootView).first { it.outlineProvider?.javaClass?.name?.contains("FloatingCorners") == true }
         return Outline().also { card.outlineProvider.getOutline(card, it) }.radius
     }
 
-    // the keyboard's background as its scene draws it behind the keys (`@floating keyboard`'s radius): its corners
     private fun drawnRadius(k: KeyboardHarness): Double {
         val scene = checkNotNull(KeyboardHarness.boardCanvas(k.inputView)?.scene)
         val back = scene.base.filterIsInstance<Op.Fill>().first()
@@ -182,10 +174,8 @@ class FloatingUatTest {
         prefs.setStyle(KeyboardStyle.FLOATING)
         h.start()
         assertTrue("rounded by default", cornerRadius(h) > 0f)
-        // the background drawn behind the keys as round (R20 F6557)
         assertTrue("drawn rounded by default", drawnRadius(h) > 0.0)
         h.close()
-        // a theme of square keys (the edit page's 直角)
         val light = TestThemes.PixelLight.look
         val square = KeyboardHarness(Theme.Custom("square", false, light.copy(keys = light.keys.copy(radiusDp = 0))))
         try {
@@ -208,7 +198,6 @@ class FloatingUatTest {
         assertTrue("above the bottom ${keys()}", h.box(grip()).bottom <= screenH)
         h.move(screenW / 2f, screenH - 150 * dp, lift = true)
         assertTrue(floating)
-        // up left, then into the zone and let go there
         h.drag(grip(), 0f, 0f)
         val at = keys()
         h.drag(grip(), screenW / 2f, screenH.toFloat())
@@ -310,12 +299,9 @@ class FloatingUatTest {
         assertTrue(undone)
     }
 
-    // ------------------------------------------------------------------ resized (061-floating-resize)
-
     private fun resizer(): FloatingHandle.MirroredIcon = checkNotNull(KeyboardHarness.find<FloatingHandle>(h.inputView)!!.resizeButton).also { check(h.shown(it)) }
 
-    // the resize button dragged along the keyboard's diagonal, out (left and down, or left and [up] as it grows up) by
-    // [by] of it, in for less than 0
+    // dragged along the keyboard's diagonal, out by [by] of it (left and down, or [up]), in for less than 0
     private fun KeyboardHarness.resize(by: Float, up: Boolean = false) {
         val k = box(keyboard)
         val b = box(checkNotNull(KeyboardHarness.find<FloatingHandle>(inputView)!!.resizeButton))
@@ -324,7 +310,7 @@ class FloatingUatTest {
         relayout()
     }
 
-    // dragged up from the bottom, where it first floats: room under it to grow into, its top right staying
+    // room under it to grow into, its top right staying
     private fun KeyboardHarness.upFromTheBottom() {
         val g = box(KeyboardHarness.find<FloatingHandle>(inputView)!!)
         drag(g, g.exactCenterX(), service.resources.displayMetrics.heightPixels * 0.55f)
@@ -351,12 +337,10 @@ class FloatingUatTest {
         assertTrue("bigger: $board -> ${keys()}", k > 1.08f)
         assertEquals("its top right stays: $at -> $now", at.right.toFloat(), now.right.toFloat(), 2f)
         assertEquals("its top right stays: $at -> $now", at.top.toFloat(), now.top.toFloat(), 2f)
-        // the keys, their gaps and the keyboard's corners all as much bigger: their shape kept
         assertEquals("keys as much taller", board.height() * k, keys().height().toFloat(), 3f)
         assertEquals("q as much wider", q.width() * k, h.key("q").bounds.width().toFloat(), 2f)
         assertEquals("q as much taller", q.height() * k, h.key("q").bounds.height().toFloat(), 2f)
         assertEquals("corners as much rounder", corner * k, cornerRadius(h), 2f)
-        // the bar over them only wider (the user's Q6)
         assertEquals(bar.height(), h.box(h.bar).height())
         assertEquals(keys().width().toFloat(), h.box(h.bar).width().toFloat(), 2f)
         h.resize(-0.2f)
@@ -378,7 +362,6 @@ class FloatingUatTest {
         assertEquals("its bottom right stays: $at -> $now", at.right.toFloat(), now.right.toFloat(), 2f)
         assertEquals("its bottom right stays: $at -> $now", at.bottom.toFloat(), now.bottom.toFloat(), 2f)
         assertTrue("up: $at -> $now", now.top < at.top - 10)
-        // kept at the bottom: the next resize grows up again
         h.resize(-0.05f, up = true)
         assertEquals(at.bottom.toFloat(), h.box(h.keyboard).bottom.toFloat(), 2f)
     }
@@ -402,11 +385,9 @@ class FloatingUatTest {
         assertEquals("its top right stays: $at -> $now", at.top.toFloat(), now.top.toFloat(), 2f)
     }
 
-    // the resize button's ⤢ drawn mirrored, as ⤡
     private fun mirrored() = resizer().mirrored
 
-    // the resize button's arrow along the way it grows now, set as it is placed, dragged or resized (the user's call,
-    // 2026-11-15): at the bottom, where it first floats, up and left (⤡: mirrored); up mid-screen down and left (⤢)
+    // the arrow along the way it grows now: at the bottom up and left (⤡, mirrored); mid-screen down and left (⤢)
     @Test
     @Uat("TB-58")
     fun theResizeArrowPointsTheWayItGrows() {
@@ -417,13 +398,12 @@ class FloatingUatTest {
         assertFalse("mid-screen: ⤢", mirrored())
         h.resize(0.05f)
         assertFalse("resized, still mid-screen: ⤢", mirrored())
-        // as it is dragged: down to the lowest, the finger still down (lifted there it docks)
+        // down to the lowest, the finger still down (lifted there it docks)
         val g = h.box(grip())
         h.drag(grip(), g.exactCenterX(), screenH.toFloat(), lift = false)
         assertTrue("dragged down to the bottom: ⤡", mirrored())
     }
 
-    // the strip on top, the mirror of it: at the bottom up and left (⤡), at the top down and left (⤢)
     @Test
     @Uat("TB-58")
     fun theResizeArrowWithTheStripOnTop() {
@@ -456,7 +436,6 @@ class FloatingUatTest {
             k.after(500)
             assertEquals("shown again, as resized", resized, k.widthDp(), 1f)
             assertEquals("and where it was", at.left.toFloat(), k.box(k.board).left.toFloat(), 2f)
-            // docked by its button and floated again by the menu's: its size is the user's still
             k.tap(k.described(k.service.getString(R.string.floating_keyboard_dock)))
             k.after(1000)
             k.relayout()
@@ -470,7 +449,6 @@ class FloatingUatTest {
         }
     }
 
-    // 竖屏 and 横屏 each their own size, as their own place (the user's ②)
     @Test
     @Uat("TB-60")
     fun uprightAndTurnedEachTheirOwnSize() {
@@ -517,7 +495,7 @@ class FloatingUatTest {
             k.start()
             k.box(k.board).width() / dp
         }
-        // a buzz at either end: one long enough to be still going as the test looks
+        // a buzz long enough to be still going as the test looks
         prefs.set(AppPrefs.getInstance().keyboard.hapticOnKeyPress, InputFeedbackMode.Enabled)
         prefs.set(AppPrefs.getInstance().keyboard.buttonPressVibrationMilliseconds, BUZZ_MS)
         val vibrator = shadowOf(h.service.getSystemService(Vibrator::class.java))
@@ -530,7 +508,6 @@ class FloatingUatTest {
         assertTrue("a buzz at the least", vibrator.isVibrating)
         h.after(BUZZ_MS * 2L)
         assertFalse(vibrator.isVibrating)
-        // the strip's three still on it
         val strip = h.box(grip())
         assertTrue(h.box(resizer()).right <= strip.exactCenterX())
         // out as far as a finger goes: stopped at the screen's left, not pushed past it nor along
@@ -541,9 +518,8 @@ class FloatingUatTest {
         assertTrue("a buzz at the most", vibrator.isVibrating)
     }
 
-    // the floating keyboard's bar in slots of one width (the user's call, 2026-11-15), at its width and at the narrowest
-    // it is resized to: open, the toolbar's in the slots between, ⋯ last and in view; the ones with no slot first in
-    // ⋯'s panel, in order, none scrolled, and tapped there as on the bar
+    // the bar in slots of one width at its width and at the narrowest: ⋯ last and in view, the ones with no slot first
+    // in ⋯'s panel, in order
     @Test
     @Uat("TB-22", "TB-68")
     fun theToolbarsOverflowIsInMoresPanelFloatingAndResizedToTheLeast() {
@@ -576,14 +552,11 @@ class FloatingUatTest {
         assertEquals(FloatingKeyboard.MIN_RESIZE_DP.toFloat(), h.widthDp(), 1f)
         val at260 = overflowInMore("260 dp")
         assertTrue("fewer slots, more in ⋯: $at300 $at260", at260.size > at300.size && s(R.string.text_editing) in at260)
-        // 文本编辑 from the panel: its panel opens over the keyboard, as from the bar
         ToolbarSpacingUatTest.openFromToolbar(h, R.string.text_editing)
         h.waitFor("the text editing panel") { h.relayout(); has(R.string.clipboard) }
     }
 
-    // every one at the bar's right there at the floating keyboard's width and at the narrowest it is resized to,
-    // narrower with the bar, none left out (TB-57); they and the menu key never move nor change width as the toolbar
-    // opens and shuts (the user's call, 2026-11-15)
+    // none left out at the narrowest; they and the menu key never move nor change width as the toolbar opens and shuts
     @Test
     @Uat("TB-22", "TB-57")
     fun theBarsEndsAreAllThereAndStayFloatingAndResizedToTheLeast() {
@@ -598,8 +571,7 @@ class FloatingUatTest {
         assertTrue("a finger's least: $cells", cells.all { it.second.width() >= 28 * dp - 1 })
     }
 
-    // a symbol's or an emoji's cell in a panel the size its grid gives it, the keyboard resized or not (only the keys
-    // are, 061-floating-resize §2.2)
+    // only the keys are resized
     @Test
     fun aPanelsCellIsItsOwnSizeResizedOrNot() {
         prefs.setStyle(KeyboardStyle.FLOATING)
@@ -617,7 +589,7 @@ class FloatingUatTest {
         assertTrue(before.sameAs(cell()))
     }
 
-    // pressed while it still grows from the docked keyboard (scaled): let be, its bounds not yet its own
+    // pressed while it still grows from the docked keyboard: let be, its bounds not yet its own
     @Test
     fun aResizeBegunWhileItStillGrowsFromTheDockedOneIsLetBe() {
         prefs.setStyle(KeyboardStyle.FLOATING)
@@ -639,7 +611,6 @@ class FloatingUatTest {
         val am = h.service.getSystemService(AccessibilityManager::class.java)
         shadowOf(am).setEnabled(true)
         prefs.setStyle(KeyboardStyle.FLOATING)
-        // where it first floats, at the bottom: bigger all the same (it grows up there)
         h.start()
         val button = resizer()
         assertEquals(h.service.getString(R.string.floating_keyboard_resize), button.contentDescription)
@@ -665,15 +636,12 @@ class FloatingUatTest {
         assertFalse("at the least already", act(R.string.floating_keyboard_smaller))
         assertTrue("${said()}", h.service.getString(R.string.floating_keyboard_smallest) in said())
         assertFalse("${said()}", h.service.getString(R.string.floating_keyboard_biggest) in said())
-        // bigger till it stops: 已是最大 said only there
         repeat(20) { act(R.string.floating_keyboard_bigger) }
         assertFalse("at the most already", act(R.string.floating_keyboard_bigger))
         assertTrue("${said()}", h.service.getString(R.string.floating_keyboard_biggest) in said())
-        // as wide as goes from its bottom right: to the screen's left
         assertTrue("as wide as goes: ${h.box(h.keyboard)}", h.box(h.keyboard).left <= 2 && h.widthDp() > first * 1.1f)
     }
 
-    // resized while typing: the keys made again at the size, the input view not, nothing typed lost (§2.5)
     @Test
     @Uat("TB-62")
     fun resizedWhileTypingWhatIsTypedStays() {
@@ -695,7 +663,6 @@ class FloatingUatTest {
     }
 
     private companion object {
-        // a buzz long enough to be still going as a test looks
         const val BUZZ_MS = 5000
     }
 }

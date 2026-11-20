@@ -36,20 +36,17 @@ import org.fcitx.fcitx5.android.scene.theme.Argb
 import timber.log.Timber
 
 /**
- * One key drawn by the engine on its own (060-render-p2 S6): a scene of a board of that key only, its
- * size the view's, in the keyboard's theme and the environment the view is in. The symbol grid's cells
- * and the settings' key caps, which were key views each. No board under it: it sits on what is under
- * the view. A scene not made is logged and nothing drawn (never a key view instead). A grid's cell
- * ([ownSize]) is the size its attrs give, not the keyboard's 紧凑 or floating; a key cap is as the keyboard.
+ * One key drawn by the engine on its own, a board of that key only: the symbol grid's cells and the
+ * settings' key caps. No board under it. A scene not made is logged and nothing drawn (never a key view).
+ * A grid's cell ([ownSize]) is the size its attrs give, not the keyboard's 紧凑 or floating.
  */
 @SuppressLint("ViewConstructor")
 open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boolean = false) : CustomGestureView(context) {
 
     private val given = theme
 
-    // what the cell draws in: the built-in where the engine makes nothing of the theme or the keyboard
-    // shown refused its keys' scene, as the keys are (U8), asked as the cell draws: the keys falling
-    // back after it was made (or no longer), its scene made again in theirs
+    // the built-in where the engine makes nothing of the theme or the keyboard shown refused its keys' scene,
+    // asked as the cell draws: the keys falling back after it was made (or no longer), its scene made again
     private inner class DrawnIn(val theme: Theme) {
         val shownLook = ThemeManager.shownLook(theme)
         val fonts = SceneFonts.of(theme, shownLook)
@@ -71,7 +68,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         }
     private val theme get() = now.theme
 
-    /** The theme the cell draws in now: a test's, that it follows the keys. */
+    /** A test's, that it follows the keys. */
     @VisibleForTesting
     internal val drawsIn: String get() = theme.name
     private val look get() = now.shownLook
@@ -79,7 +76,6 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
     private val sceneTheme get() = now.sceneTheme
     private val painter get() = now.painter
 
-    /** The key: its face, its words, its marks' names. */
     var attrs: KeyAttrs = KeyAttrs()
         set(value) {
             if (field == value) return
@@ -87,7 +83,6 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             dropScene()
         }
 
-    /** The key's states (selected, disabled, locked) as the scene shows them. */
     var states: Set<KeyState> = emptySet()
         set(value) {
             if (field == value) return
@@ -95,7 +90,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             dropScene()
         }
 
-    /** The marks a shortcut name of [attrs] reaches (the settings' caps): none by default. */
+    /** The settings' caps: none by default. */
     var marks: MarkSettings = SceneEnvs.NO_MARKS
         set(value) {
             if (field == value) return
@@ -103,10 +98,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             dropScene()
         }
 
-    /**
-     * The key's own words at this of their alpha, its face and marks as they are (the settings' cap of a key
-     * whose long press is off, as its key view faded its label alone): the cell's, not a scene state.
-     */
+    /** Its words alone faded (the settings' cap of a key whose long press is off): the cell's, not a scene state. */
     var labelAlpha: Double = 1.0
         set(value) {
             if (field == value) return
@@ -115,9 +107,8 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         }
 
     /**
-     * The keyboard's key height, px, this cell stands for (a settings cap): the key made at the keyboard's
-     * size and drawn shrunk to the cell, words, marks and all, so its marks are kept or given way as there
-     * and its label is the keyboard's times the cell's height over this (060-pending-decisions); 0: as the cell is.
+     * Px; the key made at the keyboard's size and drawn shrunk to the cell, so its marks are kept or given way
+     * as there; 0: as the cell is.
      */
     var keyboardKeyHeight: Int = 0
         set(value) {
@@ -126,25 +117,20 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             dropScene()
         }
 
-    /**
-     * The keyboard whose key this cell is (a settings cap, 060-render-p2 S7a): its [Board.layout] made at the
-     * keys' size there ([Board.width] × [Board.height], KeyboardArea) and the key of [Board.shortcut] drawn
-     * shrunk to the cell, so its label, its marks kept and given way are the keyboard's own; [attrs] unused. Null: [attrs]'s key alone.
-     */
+    /** A settings cap: the keyboard's layout made at its keys' size and its key drawn shrunk; [attrs] unused. Null: [attrs]'s key alone. */
     data class Board(
         val layout: String,
         val shortcut: String,
         val width: Int,
         val height: Int,
         val alts: Map<String, String> = emptyMap(),
-        /** 拼音键字母大小写, its letters' faces as the keyboard's (a pinyin board's: English's never drawn here). */
+        /** A pinyin board's: English's never drawn here. */
         val letterCase: LetterCase = LetterCase.Shift,
-        /** The keyboard floating at this text scale, or split, where the cap stands for it so (SwipeFates.size); null: as [SceneEnvs.of] has it. */
+        /** Null: as [SceneEnvs.of] has it. */
         val floating: Double? = null,
         val split: Boolean = false,
-        /** The keyboard upright as 横屏 or not (KeyboardArea.Screen.landscape): a foldable's inner screen and a tablet are. */
+        /** A foldable's inner screen and a tablet are. */
         val landscape: Boolean = false,
-        /** The floating keyboard resized: all of it drawn as much bigger or smaller (SceneEnvs.of's density). */
         val resize: Double = 1.0,
     )
 
@@ -155,7 +141,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             dropScene()
         }
 
-    /** An outline in this colour along the key's face, its corners the face's (the key being edited); none if null. */
+    /** The key being edited; none if null. */
     var outline: Argb? = null
         set(value) {
             if (field == value) return
@@ -169,7 +155,7 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
 
     init {
         setWillNotDraw(false)
-        // a cell's own id: what a popup's KeyRef names it by (View.keyRef)
+        // what a popup's KeyRef names it by (View.keyRef)
         if (id == View.NO_ID) id = View.generateViewId()
     }
 
@@ -179,12 +165,12 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         invalidate()
     }
 
-    /** The scene as the cell is now: made again for a change or another size; null where it could not be made. */
+    /** Null where it could not be made. */
     @get:VisibleForTesting
     val scene: Scene?
         get() {
             if (width <= 0 || height <= 0) return null
-            // the theme as the keys draw now: one changed drops the scene made
+            // one changed drops the scene made
             now
             if (made != null && madeFor == (width to height)) return made
             if (failed && madeFor == (width to height)) return null
@@ -194,15 +180,14 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
             return made
         }
 
-    /** The cell's key in [scene]. */
-    // a board's key by its shortcut, none where the board has no such key (logged in onBoard; nothing drawn, no other key in its stead)
+    // none where the board has no such key (logged in onBoard; no other key in its stead)
     val keyNode: KeyNode? get() = scene?.keys?.let { keys -> board?.let { b -> keys.firstOrNull { it.shortcut == b.shortcut && it.copy == 0 } } ?: keys.firstOrNull().takeIf { board == null } }
 
     private fun build(): Scene? {
         val t = sceneTheme ?: return null.also { Timber.e("key cell: theme %s not converted; nothing drawn", theme.name) }
         board?.let { return onBoard(t, it) }
-        // a grid's cell the text the size [attrs] gives it, not the keyboard's 紧凑 or floating scale (the cells'
-        // key views never took either), nor its resize; a key cap as the keyboard is, its marks' corners as there
+        // a grid's cell the size [attrs] gives it, not the keyboard's 紧凑, floating or resize (its key views never took
+        // either); a key cap as the keyboard is
         val env = SceneEnvs.of(
             this, look, theme.isDark, (width / shrink).roundToInt(), (height / shrink).roundToInt(), Input(), texts = Texts(), marks = marks,
             resized = !ownSize,
@@ -222,14 +207,14 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         }
     }
 
-    // the key style settings over a pack's keys, as the keyboard has them (SceneBoard)
+    // as the keyboard has them (SceneBoard)
     private fun overPack() = (theme as? Theme.Pack)?.let { ThemeManager.keyStyleShown.overPack }
 
-    // the whole keyboard of [b], as it is docked (the marks the page's)
+    // as it is docked (the marks the page's)
     private fun onBoard(t: org.fcitx.fcitx5.android.scene.theme.Theme, b: Board): Scene? {
         val layout = SceneLayouts.board(context, b.layout) ?: return null
         val env = SceneEnvs.of(this, look, theme.isDark, b.width, b.height, Input(), texts = Texts(alts = b.alts, letterCase = b.letterCase), marks = marks)
-            // the keyboard upright, the page turned or not (KeyCaps.board's size); a user's layout's styles its base's too, as there
+            // a user's layout's styles its base's too, as there
             .copy(board = layout.id, base = layout.stylesOf, keyStyle = overPack(), landscape = b.landscape)
             .let { if (b.floating != null || b.split) it.copy(floating = b.floating ?: it.floating, split = b.split, density = it.density * b.resize) else it }
         return when (val s = SceneBuilder(t, env, measurer, cascades = SceneThemes.cascades(t)).build(layout.layout, layout.fragments)) {
@@ -252,7 +237,6 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val saved = canvas.save()
-        // a board's key: its face centred in the cell
         if (board != null) keyNode?.bounds?.let { k ->
             canvas.translate(((width - k.width * shrink) / 2 - k.left * shrink).toFloat(), ((height - k.height * shrink) / 2 - k.top * shrink).toFloat())
         }
@@ -261,22 +245,19 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
         canvas.restoreToCount(saved)
     }
 
-    // the drawing's scale: the cell's height over the keyboard key's it stands for, 1 where none
-    // (a board's key: the whole key within the cell)
+    // 1 where none (a board's key: the whole key within the cell)
     private val shrink: Double
         get() {
             if (board != null) return keyNode?.bounds?.takeIf { it.hasSize }?.let { minOf(width / it.width, height / it.height) } ?: 1.0
             return if (keyboardKeyHeight <= 0 || height <= 0) 1.0 else height.toDouble() / keyboardKeyHeight
         }
 
-    /** What the cell draws: its key's ops, its label at [labelAlpha], its [outline] over the face. */
     @VisibleForTesting
     fun drawn(): List<Op> {
         val k = keyNode ?: return emptyList()
         val ops = k.ops(isPressed).let { ops ->
             if (labelAlpha == 1.0) ops
-            // the label's every piece (a mixed-font label is several texts), its outline and shadow with it;
-            // never a mark that happens to read as the label
+            // a mixed-font label is several texts; never a mark that happens to read as the label
             else ops.map {
                 if (it is Op.Text && it.part == Part.Label.xml) {
                     it.copy(
@@ -293,12 +274,12 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
 
     private fun Argb.times(a: Double) = Argb((value and RGB) or ((alpha * a).roundToInt() shl ALPHA_SHIFT))
 
-    /** The face's height as drawn in the cell, px: a settings page's caps of one row the same (tests). */
+    /** Px: a settings page's caps of one row the same (tests). */
     internal val faceHeight: Double get() = keyNode?.bounds?.takeIf { it.hasSize }?.let { it.height * shrink } ?: height.toDouble()
 
     private val at = IntArray(2)
 
-    /** Where the key's face is, in the window: what a popup over it aligns with (across its face, as [KeyboardCanvasView.popupBounds]). */
+    /** In the window, across its face as [KeyboardCanvasView.popupBounds]. */
     val bounds: Rect
         get() {
             getLocationInWindow(at)

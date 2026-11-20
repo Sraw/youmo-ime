@@ -4,31 +4,19 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import java.nio.ByteBuffer
 
-/** [Penalties.tap] on the graph's [against][org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.against] (design k14-tap-position §2.3). */
+/** [Penalties.tap] on the graph's [against][org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.against]. */
 class PinyinDecoderTapsTest {
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
     // 不好 0.7 above 你好, as the model has them (−4.45 to −5.15)
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("不好", -3f, 0f)
-                .unigram("你好", -3.75f, 0f)
-                .entry("不好", syl("bu", "hao"))
-                .entry("你好", syl("ni", "hao"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("不好", "bu hao", -3f),
+        Triple("你好", "ni hao", -3.75f),
     )
 
     private val segmenter = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14)
@@ -40,7 +28,6 @@ class PinyinDecoderTapsTest {
     @Test
     fun tapsOnTheLettersHalvesTurnTheFirstReading() {
         assertEquals("不好", first(null).text)
-        // n, i, h right; a, o left
         assertEquals("你好", first(floatArrayOf(0.75f, 0.75f, 0.75f, 0.25f, 0.25f)).text)
         assertEquals("不好", first(floatArrayOf(0.25f, 0.25f, 0.75f, 0.25f, 0.25f)).text)
     }

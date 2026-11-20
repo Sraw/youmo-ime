@@ -73,10 +73,6 @@ import org.robolectric.annotation.GraphicsMode
 import timber.log.Timber
 import kotlin.math.roundToInt
 
-/**
- * The 26 keys drawn by the scene engine: one view drawing them, the keys found by the scene's hit
- * areas, a press swapping one key's node, a screen reader's node a key.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
@@ -98,7 +94,6 @@ class KeyboardCanvasViewTest {
         val c = h.canvas()!!
         val scene = c.scene!!
         assertEquals(26, scene.keys.count { it.id.length == 1 })
-        // a touch finds every key where it is drawn; its cell and a popup's place over it found
         for (k in scene.keys) {
             assertSame(k.id, k, c.keyAt(k.anchor.x.toFloat(), k.anchor.y.toFloat()))
             val ref = KeyRef.scene(k.id, k.copy)
@@ -123,10 +118,8 @@ class KeyboardCanvasViewTest {
         assertSame(w0, c.shownNode("w"))
         c.press("q", down = false)
         h.idle()
-        // the face let go is the one it had, still recorded
         assertSame(q0, c.shownNode("q"))
         assertTrue(q0.hasDisplayList())
-        // Shift relabels the letters: their nodes anew, the rest kept
         val space = c.shownNode("space")
         h.tap(h.keyView("shift"))
         assertNotSame(q0, c.shownNode("q"))
@@ -151,17 +144,14 @@ class KeyboardCanvasViewTest {
         val shift = nodes[keys.indexOfFirst { it.id == "shift" }]
         assertEquals(c.context.getString(R.string.a11y_key_shift), shift.contentDescription.toString())
         assertEquals(c.resources.getResourceName(R.id.button_caps), shift.viewIdResourceName)
-        // a key's own click, through its node
         h.api.calls.clear()
         assertTrue(provider.performAction(keys.indexOfFirst { it.id == "w" }, AccessibilityNodeInfo.ACTION_CLICK, null))
         h.idle()
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
     }
 
-    // a theme the engine refuses (more single keys than a 3.0 file brings, each a pressed colour of its own: more
-    // styles than LookTheme.MAX_STYLES; a file's odd name no longer, LookTheme renames it): 060-render-p2 U8, the
-    // built-in theme of its lightness drawn, logged; never the views again (they go in S8). Its keys
-    // the built-in theme's as that theme draws them, touched and read as ever
+    // a theme the engine refuses (more styles than LookTheme.MAX_STYLES): the built-in theme of its lightness drawn,
+    // logged, its keys touched and read as ever
     @Test
     fun aThemeNotConvertedTheBuiltInOneOfItsLightness() {
         val logged = mutableListOf<String>()
@@ -172,7 +162,6 @@ class KeyboardCanvasViewTest {
         }
         Timber.plant(tree)
         try {
-            // the app's own (its look the object the fallback paints in)
             for (builtIn in listOf(ThemeManager.builtin("pixel#light"), ThemeManager.builtin("pixel#dark"))) {
                 val look = builtIn.look
                 val many = (0..LookTheme.MAX_STYLES / 2).associate { i -> "b$i/k" to KeyOverride(null, KeyPressed.Color(i), KeyLabel.Show) }
@@ -188,17 +177,15 @@ class KeyboardCanvasViewTest {
                     assertNotNull(scene)
                     assertEquals(builtIn.name, drawn, scene!!.base to scene.keys.map { k -> k.id to k.faces })
                     assertTrue(logged.toString(), logged.any { "broken" in it && builtIn.name in it })
-                    // painted in the built-in's look, its fonts: none of the broken theme's
                     assertSame(ThemeManager.shownLook(builtIn), c.paintedIn)
-                    // the broken theme read once, logged once: not again each scene asked (Shift, Return)
+                    // read once, logged once: not again each scene asked (Shift, Return)
                     repeat(3) {
                         c.invalidateScene()
                         assertNotNull(c.scene)
                     }
                     assertEquals(logged.toString(), 1, logged.count { it.startsWith("scene theme broken") })
                     assertEquals(logged.toString(), 1, logged.count { "no scene of theme broken" in it })
-                    // a frame of the keys in the built-in's fonts lets go of none of the broken theme's
-                    // files (its candidates', its picture): its font not read again after it
+                    // a frame in the built-in's fonts lets go of none of the broken theme's files: its font not read again
                     val own = ThemeManager.shownLook(broken)
                     val font = own.text.keyFont!!
                     val real = ThemeAssets.decoder
@@ -216,7 +203,6 @@ class KeyboardCanvasViewTest {
                         ThemeAssets.decoder = real
                     }
                     h.idle()
-                    // the canvas kept
                     assertSame(c, h.canvas())
                     h.api.calls.clear()
                     h.tap(h.key("q"))
@@ -229,8 +215,7 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // no scene at all (the built-in theme's refused too, Host.scene null): nothing drawn, nothing for a
-    // reader, logged; no other drawing. Asked again once what the keyboard shows changes
+    // no scene at all (the built-in refused too): nothing drawn, nothing for a reader, logged; asked again once what shows changes
     @Test
     fun nothingMadeNothingDrawn() {
         val logged = mutableListOf<String>()
@@ -259,7 +244,6 @@ class KeyboardCanvasViewTest {
             assertTrue(IntArray(400 * 200).also { bitmap.getPixels(it, 0, 400, 0, 0, 400, 200) }.all { it == 0 })
             assertNull(c.keyAt(200f, 100f))
             assertEquals(1, asked)
-            // not asked again each frame; asked again as the keyboard changes
             c.draw(Canvas(bitmap))
             assertEquals(1, asked)
             c.invalidateScene()
@@ -270,12 +254,9 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // what the env keeps (TextKeyboard's names, marks' settings, alts: by their inputs) follows each of
-    // them: every setting a letter's corner or marks are made of changed in turn, the scene asked again
-    // draws q (its corner, its marks, where they are) otherwise; a kept value missing an input would not
+    // every setting a letter's corner or marks are made of changed in turn: a kept value missing an input would draw q unchanged
     @Test
     fun theKeptCornersAndMarksFollowEverySettingTheyAreMadeOf() {
-        // q's texts and icons as its face draws them, and where
         fun q(h: KeyboardHarness): List<String> {
             h.idle()
             val c = h.canvas()!!
@@ -288,12 +269,11 @@ class KeyboardCanvasViewTest {
                 }
             }
         }
-        // q's texts as [text, x, baseline, size]; its corner the one drawn at the corner's size (the letter's is
-        // larger, a table's roots smaller), which the first step's known corner tells
+        // [text, x, baseline, size]; the corner is the one drawn at the corner's size
         fun texts(ops: List<String>) = ops.filter { it.startsWith("text ") }.map { it.removePrefix("text ").split(" ") }
         var cornerSize = ""
         fun corner(ops: List<String>) = texts(ops).single { it[3] == cornerSize }
-        // é, not a symbol: under Shift the long press's list is upper-cased, É, which a corner kept from before Shift is not
+        // é: under Shift the long press's list is upper-cased, É, which a corner kept from before Shift is not
         harness().use { h ->
             var was = q(h)
             fun changed(what: String, change: () -> Unit) {
@@ -305,7 +285,7 @@ class KeyboardCanvasViewTest {
             val keyboard = AppPrefs.getInstance().keyboard
             changed("q's long press the user's") { prefs.setList("full/q", listOf("é", "1"), first = "é") }
             cornerSize = texts(was).single { it[0] == "é" }[3]
-            // the change of the lists only redraws (BaseKeyboard.onKeyListsChanged); the keyboard shown now, the same one
+            // a list change only redraws (BaseKeyboard.onKeyListsChanged)
             changed("the punctuation mapped") { h.textKeyboard().onPunctuationUpdate(mapOf("é" to "ω")) }
             assertEquals(was.toString(), "ω", corner(was)[0])
             changed("a shortcut on q") {
@@ -313,19 +293,15 @@ class KeyboardCanvasViewTest {
             }
             changed("the first down, no swipe up") { prefs.setLayers(SwipeLayersChoice.SymbolDownOnly) }
             changed("the symbol elsewhere") { prefs.set(keyboard.swipeDownPosition, KeyMarkPosition.BottomLeft) }
-            // the setting makes the keyboards anew (its other changes go with them): the corner's place is what
-            // tells the marks' kept spots followed it, left of the letter and below it
             val letter = texts(was).single { it[0] == "q" }
             val at = corner(was)
             assertTrue(was.toString(), at[1].toInt() < letter[1].toInt() && at[2].toInt() > letter[2].toInt())
-            // Shift: the letter changes whatever the corner does; the corner is what tells the alts kept followed it
             val before = corner(was)[0]
             h.tap(h.keyView("shift"))
             val shifted = corner(q(h))[0]
             assertEquals("É", shifted)
             assertNotEquals(before, shifted)
         }
-        // a table's roots over the letters and not: the corner the letter itself, then the swipe again
         harness(WUBI).use { h ->
             try {
                 EngineState.tableKeyboardState.value = wubi(KeyLabels.NONE)
@@ -342,8 +318,7 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // the keys a finger finds are the keys shown: as each state shows and hides keys, each of the scene's
-    // keys found where it is
+    // as each state shows and hides keys, each scene key is found where it is
     @Test
     fun theScenesKeysAreFoundWhereShownInEveryState() = harness(WUBI).use { h ->
         val c = h.canvas()!!
@@ -380,14 +355,12 @@ class KeyboardCanvasViewTest {
             h.api.inputMethodEntryCached = KeyboardHarness.PINYIN
             h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
             check("pinyin")
-            // (a view hidden no longer hides its key: the 26 keys are wired from qwerty.xml's nodes, U4 B, the layout says what is shown)
         } finally {
             told(null)
         }
     }
 
-    // pinyin's first key typed and its word committed in a plain field (Return ⏎ either way): the scene
-    // kept, none made in the frame (a table's 确定 is another scene: made)
+    // a word typed and committed: the scene kept (a table's 确定 is another scene: made)
     @Test
     fun typingKeepsTheScene() = harness().use { h ->
         val c = h.canvas()!!
@@ -400,7 +373,6 @@ class KeyboardCanvasViewTest {
         board.onReturnDrawableUpdate(ReturnKeyAppearance.Enter)
         assertSame(before, c.scene)
         assertEquals(made, board.scenesMade)
-        // something shown changed: made again
         h.api.inputMethodEntryCached = WUBI
         h.emit(HostEvent.InputMethodChanged(WUBI))
         h.idle()
@@ -411,7 +383,7 @@ class KeyboardCanvasViewTest {
         assertEquals(tables + 1, board.scenesMade)
     }
 
-    // a text measured once at a font and size, then kept; the least recently asked let go past the limit
+    // measured once at a font and size, then kept; the least recently asked let go past the limit
     @Test
     fun aTextMeasuredOnce() {
         val m = AndroidTextMeasurer(SceneFonts(org.fcitx.fcitx5.android.data.theme.TestThemes.PixelLight.look))
@@ -426,7 +398,6 @@ class KeyboardCanvasViewTest {
         assertEquals(4 + AndroidTextMeasurer.KEPT, m.measured)
     }
 
-    // a table's roots over the letters, its 拼 key in Shift's place, drawn by the scene as its views show them
     @Test
     fun aTablesRootsAndKeys() = harness(WUBI).use { h ->
         val c = h.canvas()!!
@@ -443,11 +414,9 @@ class KeyboardCanvasViewTest {
             assertTrue(lines.toString(), wubi.label(two)!!.split('\n').all { it in lines })
             assertNotNull(c.keyAt("lookup"))
             assertNull(c.keyAt("shift"))
-            // its names: one each, the letter in the corner still
             EngineState.tableKeyboardState.value = wubi.copy(labels = KeyLabels.NAMES)
             h.idle()
             assertEquals(wubi.copy(labels = KeyLabels.NAMES).label('g'), c.keyAt("g")?.label)
-            // none: the letters, their corners their swipes again
             EngineState.tableKeyboardState.value = wubi.copy(labels = KeyLabels.NONE)
             h.idle()
             assertEquals("g", c.keyAt("g")?.label)
@@ -457,7 +426,6 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // the user's own long press first on a letter: its corner, the preset's where the user set none
     @Test
     fun aCornerIsTheUsersLongPressFirst() {
         prefs.setList("full/w", listOf("%"), first = "%")
@@ -468,7 +436,6 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // two fingers down on two keys: both shown pressed, each let go alone
     @Test
     fun twoFingersTwoKeysPressed() = harness().use { h ->
         val c = h.canvas()!!
@@ -491,7 +458,6 @@ class KeyboardCanvasViewTest {
         assertTrue(c.shownPressed("q"))
         send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2)
         assertTrue(c.shownPressed("q") && c.shownPressed("p"))
-        // each its own node: a press swaps that key's alone
         assertNotSame(c.shownNode("q"), c.shownNode("p"))
         send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2)
         assertTrue(c.shownPressed("q"))
@@ -500,7 +466,6 @@ class KeyboardCanvasViewTest {
         assertFalse(c.shownPressed("q"))
     }
 
-    // Shift's state told to a screen reader on its node, as its view's was
     @Test
     fun shiftsStateToldToAScreenReader() = harness().use { h ->
         val c = h.canvas()!!
@@ -518,12 +483,11 @@ class KeyboardCanvasViewTest {
         val told = events.filter { it.contentChangeTypes and AccessibilityEventCompat.CONTENT_CHANGE_TYPE_STATE_DESCRIPTION != 0 }
         assertEquals(events.toString(), 1, told.size)
         val node = c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(shift)!!
-        // the compat's: a node's own stateDescription is API 30's, not Android 10's
+        // the compat's: a node's own stateDescription is API 30's
         assertEquals(c.context.getString(R.string.a11y_state_shift_once), AccessibilityNodeInfoCompat.wrap(node).stateDescription?.toString())
     }
 
-    // the board's picture is the view's under the keyboard (ThemePictureDrawable.board): not laid a second
-    // time under the keys, where a picture with alpha would come out darker than theme 3.0 drew it
+    // the board's picture is under the keyboard (ThemePictureDrawable.board): laid again under the keys, one with alpha would come out darker
     @Test
     fun theBoardsPictureIsNotDrawnTwice() {
         val board = pictured().let { Theme.Custom(it.name, it.isDark, it.look.copy(base = BoardBase.Picture)) }
@@ -531,15 +495,12 @@ class KeyboardCanvasViewTest {
             val scene = h.canvas()!!.scene!!
             assertTrue(scene.base.any { it is Op.Picture })
             assertTrue(scene.under(drawsBase = true).none { it is Op.Picture })
-            // a picture after it (a split row's middle filled by `split-gap`): not the board's, and stays
             val blank = Op.Picture(Shape.Rect(Box(0.0, 0.0, 40.0, 40.0)), 0.0, 90.0)
             val padded = Scene(scene.width, scene.height, scene.base + blank, scene.keys, scene.slots)
             assertEquals(listOf(blank), padded.under(drawsBase = true).filterIsInstance<Op.Picture>())
         }
     }
 
-    // the view moved over the picture (one-handed to the other side): the keys showing it recorded
-    // again where they are now, the others kept
     @Test
     fun aKeyShowingThePictureRecordedAgainWhenTheViewMoves() {
         KeyboardHarness(pictured()).start().use { h ->
@@ -557,8 +518,7 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // a frame drawn while the picture is still being decoded missed it (drawn again once in); one
-    // drawn after it did not read (no such file) misses nothing: it will never come, no frame waits on it
+    // a frame drawn while the picture decodes missed it (drawn again once in); one that never reads misses nothing
     @Test
     fun missedOnlyWhileThePictureIsComing() {
         val held = ArrayList<Runnable>()
@@ -580,20 +540,18 @@ class KeyboardCanvasViewTest {
         }
     }
 
-    // a finger down in the room before A (the row's indent), outside A's view: A's, its swipe and its long press as on A
+    // a finger in the row's indent before A, outside A's view, is A's
     @Test
     fun theIndentBeforeAIsAs() = harness().use { h ->
         val a = h.keyView("a")
         val dp = h.service.resources.displayMetrics.density
         val board = h.textKeyboard()
         val aBox = h.box(a)
-        // the indent: left of A's view, inside the board
         assertTrue(aBox.left - h.box(board).left > 4 * dp)
         val x = -2 * dp
         h.api.calls.clear()
         h.touch(a, KeyboardHarness.Touch(x, a.height / 2f), KeyboardHarness.Touch(x, a.height / 2f - 30 * dp, 16), KeyboardHarness.Touch(x, a.height / 2f - 60 * dp, 16))
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey(key=@,") })
-        // held there: A's long press
         val f = h.finger(a, KeyboardHarness.Touch(x, a.height / 2f))
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
         val popup = h.popupChoices().map { it.text }
@@ -603,7 +561,7 @@ class KeyboardCanvasViewTest {
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 
-    // the light theme with a picture (a file that is not there: it never reads) shown through the function keys
+    // a file that is not there: it never reads
     private fun pictured(): Theme.Custom {
         val light = org.fcitx.fcitx5.android.data.theme.TestThemes.PixelLight.look
         return Theme.Custom(
@@ -617,7 +575,7 @@ class KeyboardCanvasViewTest {
 
     private fun wubi(labels: KeyLabels, on: Boolean = false) = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), on, labels, TableRoots.WUBI86)
 
-    // a theme's fall back logged once a look, the last 16 kept: a set no theme switching grows past that
+    // the last 16 kept: no theme switching grows the set past that
     @Test
     fun aFallBackIsLoggedOnceALookTheLastSixteenKept() {
         val look = ThemeManager.shownLook(TestThemes.PixelLight)
@@ -625,13 +583,11 @@ class KeyboardCanvasViewTest {
         assertTrue(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
         assertFalse(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
         for (n in names.drop(1)) assertTrue(n, org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(n, look))
-        // the first let go of: logged again
         assertTrue(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[0], look))
         assertFalse(org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard.firstFallBack(names[16], look))
     }
 
-    // a harness closed lets go of its input method's window: Robolectric keeps every dialog shown till the
-    // test ends (ShadowDialog.shownDialogs), and the window holds the whole service (the S4a review's OOM)
+    // Robolectric keeps every dialog shown till the test ends (ShadowDialog.shownDialogs), and the window holds the whole service
     @Test
     fun aHarnessClosedLetsGoOfItsWindow() {
         val windows = (0 until 3).map {
@@ -647,7 +603,7 @@ class KeyboardCanvasViewTest {
     companion object {
         const val PORTRAIT = "w393dp-h851dp-port-440dpi"
 
-        private val WUBI = org.fcitx.fcitx5.android.core.InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+        private val WUBI = org.fcitx.fcitx5.android.core.InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
 
     }
 }

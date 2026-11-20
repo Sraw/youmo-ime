@@ -21,37 +21,25 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.CRC32
 
 /**
- * The words of a merged [DictionaryFile] coded for one table, as [CodedWords] codes the few the
- * user added: those of two characters or more, each text once under its code, none the table has
- * so. 0.3.1 coded them into a TreeMap per table, about 250 MB for rime-frost's 1.9 million words,
- * on a thread that did not catch an OutOfMemoryError; here they are sorted on disk a run at a time
- * ([RUN] in the heap) and the result is mapped, so a table costs the heap nothing for them.
+ * A merged [DictionaryFile]'s words coded for one table (two characters or more, none the table has so), sorted
+ * on disk a run at a time ([RUN] in the heap) and mapped: a TreeMap per table was ~250 MB for rime-frost.
  *
- * The file: a header ([MAGIC], [VERSION], the key it was built for, the code width, the count),
- * then the records sorted by code length, code, then place, each the code padded with `\u0000`
- * to the width and the word's place in the dictionary file, then a CRC32 of the records. By
- * length first, so a table session reads the words of a prefix a code length at a time, as it
- * shows them with codes sorted by length, and only as far as it shows ([longer]): a letter of
- * 五笔 leads to some 80,000 of rime-frost's words, which 22 MB a key made (and dropped) whole.
- * Built again whenever the key differs (another table's data, another merged file): it is a
- * cache, never migrated.
+ * File: a header ([MAGIC], [VERSION], key, code width, count), then records sorted by code length, code, place
+ * (the code NUL-padded to the width, then the place), then a CRC32. Length first, so a session reads a prefix's
+ * words a length at a time and only as far as it shows ([longer]): a 五笔 letter leads to ~80,000 words. A cache,
+ * rebuilt whenever the key differs, never migrated.
  */
 class CodedIndex private constructor(private val records: ByteBuffer, private val width: Int, val size: Int) {
 
     private val recordBytes = width * 2 + 4
 
-    /** The words under codes starting with [prefix], code and text, read from [dictionary], by code. */
     fun words(prefix: String, dictionary: DictionaryFile): List<Pair<String, String>> =
         if (prefix.isEmpty()) emptyList() else (exact(prefix, dictionary) + longer(prefix, byLength = false, dictionary)).toList()
 
-    /** The words under [code] itself, by place. */
     fun exact(code: String, dictionary: DictionaryFile): List<Pair<String, String>> =
         if (code.isEmpty() || code.length > width) emptyList() else run(code.length, code, dictionary).toList()
 
-    /**
-     * The words under codes that start with [prefix] and are longer, read as they are asked for:
-     * by length, then code ([byLength]), or by code alone.
-     */
+    /** The words under codes longer than [prefix] and starting with it, lazily: by length then code ([byLength]), or by code. */
     fun longer(prefix: String, byLength: Boolean, dictionary: DictionaryFile): Sequence<Pair<String, String>> {
         if (prefix.isEmpty()) return emptySequence()
         val runs = (prefix.length + 1..width).map { run(it, prefix, dictionary) }
@@ -61,10 +49,8 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
     fun leadsAnywhere(prefix: String): Boolean =
         prefix.isNotEmpty() && (prefix.length..width).any { length -> lowerBound(length, prefix).let { it < size && compare(it, length, prefix) == 0 } }
 
-    /** Whether [text] is here under [code] exactly. */
     fun has(code: String, text: String, dictionary: DictionaryFile): Boolean = exact(code, dictionary).any { it.second == text }
 
-    // the records of codes [length] long starting with [prefix], in order
     private fun run(length: Int, prefix: String, dictionary: DictionaryFile): Sequence<Pair<String, String>> = sequence {
         var i = lowerBound(length, prefix)
         while (i < size && compare(i, length, prefix) == 0) {
@@ -75,8 +61,7 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         }
     }
 
-    // [runs], each in code order, merged so: a code's words by place, as they are in its run. A
-    // scan of the heads, not a heap as [Runs.merge]: one run per code length, a few at most
+    // merged by code, a code's words by place: a scan of the heads, one run per code length, a few at most
     private fun byCode(runs: List<Sequence<Pair<String, String>>>): Sequence<Pair<String, String>> = sequence {
         val heads = runs.map { it.iterator() }.filter { it.hasNext() }.map { it to it.next() }.toMutableList()
         while (heads.isNotEmpty()) {
@@ -99,7 +84,6 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
 
     private fun code(i: Int): String = String(CharArray(length(i)) { char(i, it) })
 
-    // the record against codes [length] long that start with [prefix]: 0 for one of them
     private fun compare(i: Int, length: Int, prefix: String): Int {
         val n = length(i)
         if (n != length) return n.compareTo(length)
@@ -126,21 +110,16 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         internal const val VERSION = 2
         private const val PAD = '\u0000'
 
-        // records sorted in the heap at a time: a few MB of them
         internal const val RUN = 1 shl 17
         private const val BUFFER = 1 shl 16
         private const val STOP_CHECK = 4096
 
-        /** No words: what a build stopped early returns, dropped by its caller. */
+        /** No words: what a build stopped early returns. */
         val NONE = CodedIndex(ByteBuffer.allocate(0), 1, 0)
 
-        /**
-         * The index at [file] if it was built for [key] and reads whole; null if it is not there,
-         * is of another key, or is damaged (built again then). Read through once for its CRC:
-         * off the input thread.
-         */
+        /** The index at [file] if built for [key] and whole; null otherwise (rebuilt then). Reads it all for the CRC: off the input thread. */
         fun open(file: LogFile, key: String): CodedIndex? = try {
-            // mapped once: the header, the records and their CRC of the one file, not of another put in its place meanwhile
+            // mapped once, so the header, records and CRC are all of the same file
             val all = file.map()
             val header = DataInputStream(Bytes(all.duplicate()))
             if (header.readInt() != MAGIC || header.readInt() != VERSION || header.readUTF() != key) return null
@@ -157,12 +136,10 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
             null
         }
 
-        // [buffer]'s bytes from its position, as a stream: open reads the header so (EOFException past its end)
         private class Bytes(private val buffer: ByteBuffer) : InputStream() {
             override fun read(): Int = if (buffer.hasRemaining()) buffer.get().toInt() and 0xff else -1
         }
 
-        // [length] bytes of [all] from [start], as a buffer of their own: what open maps of the file
         private fun slice(all: ByteBuffer, start: Int, length: Int): ByteBuffer {
             val part = all.duplicate()
             // through Buffer: ByteBuffer's own position(int) and limit(int) are past Android's API floor
@@ -171,16 +148,10 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
             return part.slice()
         }
 
-        /**
-         * [dictionary]'s words coded by [table] into [dest] for [key], replaced whole or not at
-         * all, and opened; null if [wanted] said to stop (nothing written then). Bounded: [RUN]
-         * records in the heap, the rest in runs on disk beside [dest], deleted after. [key] is
-         * ASCII (a stamp), as the header's size counts it: another is refused at the write.
-         */
+        /** Codes [dictionary] by [table] into [dest] for [key], replaced whole, and opens it; null if [wanted] said stop. [RUN] records in the heap, runs on disk beside [dest]. [key] must be ASCII. */
         @Throws(IOException::class)
         fun build(table: TableDictionary, dictionary: DictionaryFile, dir: UserFiles, name: String, key: String, wanted: () -> Boolean = { true }): CodedIndex? =
-            // one build of [name] at a time: a newer file's, started while an older one still writes
-            // (each on its own warm-up thread), shared the work dir and temporary, and each deleted the other's
+            // one build of [name] at a time: two warm-up threads once shared the work dir and deleted each other's files
             synchronized(building.computeIfAbsent(dir.file(name).toString()) { Any() }) { buildAlone(table, dictionary, dir, name, key, wanted) }
 
         private val building = ConcurrentHashMap<String, Any>()
@@ -204,13 +175,12 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
             }
         }
 
-        // [dir] made anew, empty: a killed build's runs left there are not read into this one
+        // made anew, so a killed build's runs are not read into this one
         private fun emptyDir(dir: UserFiles): UserFiles {
             if (!dir.deleteAll() || !dir.mkdirs()) throw IOException("could not make $dir")
             return dir
         }
 
-        // each text of two characters or more coded once into [runs]; false if [wanted] said to stop
         private fun code(table: TableDictionary, dictionary: DictionaryFile, runs: Runs, wanted: () -> Boolean): Boolean {
             for (place in 0 until dictionary.size) {
                 if (place % STOP_CHECK == 0 && !wanted()) return false
@@ -223,7 +193,7 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         }
 
         private fun write(temp: LogFile, key: String, runs: Runs) {
-            // writeUTF's modified UTF-8 is UTF-8 only for ASCII without NUL, as open reads its length (review NIT 13)
+            // writeUTF's modified UTF-8 is UTF-8 only for ASCII without NUL, as open reads its length
             require(key.all { it.code in 1..0x7f }) { "key $key" }
             temp.delete()
             val width = maxOf(runs.width, 1)
@@ -253,10 +223,10 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         // magic, version, the key as writeUTF writes it (ASCII: a length, a byte a char), width, count
         private fun headerSize(key: String) = Int.SIZE_BYTES * 4 + Short.SIZE_BYTES + key.length
 
-        // CRC32.update(ByteBuffer) is API 26; minSdk is 29 (review F3268)
+        // CRC32.update(ByteBuffer) is API 26; minSdk is 29
         private fun crc32(buffer: ByteBuffer): Long = CRC32().apply { update(buffer) }.value
 
-        // one record per text: the first place of it, its other readings coded the same
+        // one record per text: its first place, its other readings coded the same
         private fun firstOfText(dictionary: DictionaryFile, text: String, place: Int): Boolean {
             var first = true
             dictionary.forEachOfText(text) { if (it < place) first = false }
@@ -264,7 +234,6 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
         }
     }
 
-    // (code, place) records sorted on disk a run at a time, then merged
     private class Runs(private val dir: UserFiles) {
         private val files = ArrayList<LogFile>()
         private val codes = arrayOfNulls<String>(RUN)
@@ -308,7 +277,7 @@ class CodedIndex private constructor(private val records: ByteBuffer, private va
                     if (r.next()) heads += r else r.close()
                 }
             } finally {
-                // stopped early (a newer file wanted) or failed: the runs' descriptors let go now
+                // stopped early or failed: the runs' descriptors let go now
                 heads.forEach { it.close() }
             }
         }

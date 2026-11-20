@@ -48,7 +48,6 @@ class ReplaceFileTest {
             }
         }
         decline()
-        // a directory where the file goes: the rename fails
         val dir = File(folder.root, "d").apply { mkdir() }
         assertThrows(IOException::class.java) { replaceFile(dir, temp) { it.writeText("x") } }
         assertEquals("old", dest.readText())

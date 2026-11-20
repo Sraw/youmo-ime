@@ -75,53 +75,40 @@ import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import timber.log.Timber
 
-/**
- * 外观 → 布局 (061-custom-layout §4.3): the layouts by what they are (字母键盘, 数字键盘, 符号面板), the app's first, then
- * the user's own, each a card of its keys in little in the theme in use. A card tapped shows in the preview above (no
- * setting changed), one of the user's of letters offering 用在… (the input methods it may be typed on, ticked where they
- * use it); one of the user's long pressed: 信息, 导出, 删除. **+**: import a `.layout` file, or open the layout maker in
- * the browser. Under each of the user's, 「用在：拼音、英文」: the input methods whose keyboard it is (L3, §4.3). The number
- * keyboard's and the symbol panel's are one choice each (L5, §7, §8): a card of theirs tapped offers 数字键盘用这个 (the
- * app's one too, to go back to it), the one in use says 「用在：数字键盘」.
- */
+/** A tap previews (no setting changed); a long press offers 信息, 导出, 删除; **+** imports or opens the web maker. */
 class LayoutListFragment : Fragment() {
 
-    /** A row of the list: a section's title, or a layout's card. */
     sealed interface Item {
         class Header(val title: Int) : Item
 
-        /** A layout: the app's ([entry] null) or the user's; [scene] what the preview draws, null where it does not read. */
+        /** [entry] null for the app's; [scene] null where it does not read. */
         class Card(
             val id: String,
             val name: String,
             val entry: CustomLayouts.Entry?,
             val scene: SceneLayout?,
             val cells: List<LayoutThumbnail.Cell>,
-            /** The input methods (ImKeyboards.slot) whose keyboard it is. */
             val usedBy: List<String> = emptyList(),
-            /** The panel it is for (a number board's, the symbols'; the app's too); null for letters. */
             val panel: PanelLayouts.Panel? = null,
-            /** Whether [panel] uses it; [unread]: chosen, not drawn (its file refused as it is read: the app's drawn meanwhile). */
+            /** [unread]: chosen but its file refused on reading, so the app's is drawn meanwhile. */
             val panelUsed: Boolean = false,
             val unread: Boolean = false,
-            /** The app's, used as the layout chosen for [panel] is no card of it (§4.4). */
+            /** The app's, used because the layout chosen for [panel] is no card of it. */
             val missing: Boolean = false,
         ) : Item
     }
 
     private lateinit var importLauncher: ActivityResultLauncher<String>
     private lateinit var exportLauncher: ActivityResultLauncher<String>
-    // the id of the layout whose file the saver is asked for: kept with the page, which may be made anew meanwhile
+    // kept with the page, which may be recreated meanwhile
     private var beingExported: String? = null
     private var reloading: Job? = null
 
     private val adapter = Adapter()
 
-    /** The cards and headers listed now, as the page shows them. */
     @get:VisibleForTesting
     internal val shownItems: List<Item> get() = adapter.items
 
-    // the list of the view now, let go of with it
     private var grid: RecyclerView? = null
 
     @Keep
@@ -132,7 +119,7 @@ class LayoutListFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         beingExported = savedInstanceState?.getString(BEING_EXPORTED)
-        // the picker shows every file (.layout has no MIME type of its own): what is in it decides (§2.1)
+        // .layout has no MIME type, so the picker shows every file: the content decides
         importLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             if (uri != null) importLayout(uri)
         }
@@ -167,7 +154,7 @@ class LayoutListFragment : Fragment() {
             setImageDrawable(ctx.getDrawable(R.drawable.ic_baseline_plus_24))
             contentDescription = ctx.getString(R.string.layout_add)
             setOnClickListener { addLayout() }
-            // the page reaches under the navigation bar (edge to edge): the button kept above it, as BaseDynamicListUi's
+            // edge to edge: the button kept above the navigation bar
             ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
                 v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
                     bottomMargin = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom + ctx.dp(FAB_MARGIN_DP)
@@ -187,14 +174,13 @@ class LayoutListFragment : Fragment() {
 
     override fun onDestroyView() {
         ThemeManager.removeOnChangedListener(onThemeChangeListener)
-        // the adapter outlives the view (外观 kept on the back stack): the old list no observer of it, held and told of each reload
+        // the adapter outlives the view (外观 stays on the back stack): detach so the old list is not held and told of reloads
         grid?.adapter = null
         grid = null
         super.onDestroyView()
     }
 
-    // the cards read off the main thread: the app's few boards and each file of the user's read once (CustomLayouts.list);
-    // a reload asked for again (an import, then a delete) is the one shown, not the slower of the two
+    // a reload asked again is the one shown, not the slower of the two
     private fun reload() {
         val ctx = requireContext().applicationContext
         reloading?.cancel()
@@ -206,10 +192,9 @@ class LayoutListFragment : Fragment() {
     }
 
     private fun items(ctx: Context): List<Item> {
-        // opened as the app starts after an upgrade or a restore: the packs' boards listed and chosen first, not missed
+        // opened as the app starts after an upgrade or restore: the packs' boards listed first, not missed
         ThemeLayoutsToList.awaitStart()
         val prefs = AppPrefs.getInstance().keyboard
-        // each panel's choice: the app's ("") used where none of the user's is
         val panels = prefs.panelLayouts()
         val chosen = prefs.imKeyboards()
         val own = CustomLayouts.list(context = ctx).map { e ->
@@ -219,8 +204,7 @@ class LayoutListFragment : Fragment() {
             val unread = panel != null && used && PanelLayouts.unread(panel, e.id, CustomKeyboards.choice(e.id))
             Item.Card(e.id, e.name, e, scene, e.cells, ImKeyboards.usedBy(chosen, e.id), panel, used, unread)
         }
-        // the app's: the panel's where none of the user's is chosen, or the one chosen is no card of the panel's (its file
-        // gone, a backup restored without it; another family's now): said so (L5 review S1)
+        // the app's: where none is chosen, or the chosen one is no card of it (file gone, another family now): said so
         fun builtIn(id: String): Item.Card? {
             val scene = SceneLayouts.parseBuiltIn(ctx, id) ?: return null
             val cells = runCatching { LayoutThumbnail.cells(scene.layout, scene.fragments) }.getOrDefault(emptyList())
@@ -233,7 +217,7 @@ class LayoutListFragment : Fragment() {
         val out = ArrayList<Item>()
         out += Item.Header(R.string.layout_section_letters)
         out += LETTERS.mapNotNull(::builtIn)
-        // one that does not read is listed here, to be deleted
+        // an unreadable one is listed here, to be deleted
         out += section { it == null || it in LETTER_FAMILIES }
         out += Item.Header(R.string.layout_section_number)
         out += listOfNotNull(builtIn("number"))
@@ -244,16 +228,12 @@ class LayoutListFragment : Fragment() {
         return out
     }
 
-    // a layout of one's own as the keyboard will draw it: the app's keys' long press and swipes on the app's names
-    // (KeyData.Own), its keys' data and styles of its own based-on, the app's board drawn in its place of its own family
-    // (CustomLayoutSource.fallback; R26 F8117, as SceneLayouts reads it). Made on IO: [context] given, never the
-    // fragment's, which the page may have left by then (R26 F8135: requireContext there threw)
+    // as the keyboard will draw it. Made on IO with [context] given, never the fragment's, which may be gone (requireContext threw)
     private fun scene(context: Context, id: String, layout: Layout, fragments: Map<String, org.fcitx.fcitx5.android.scene.layout.Fragment>): SceneLayout {
         val basedOn = layout.basedOn
         val fallback = runCatching { CustomKeyboards.baseOf(layout) }.getOrNull() ?: id
         val held = runCatching { KeyData.of(id, layout, fragments, KeyData.Mode.Own, basedOn, shape = fallback) }.getOrNull()
-        // its keys of the app's names the app's keys, as the keyboard has them, should a preview read them: made off the
-        // main thread (the list is read on IO), so read anew, not through the keyboards' main-thread cache
+        // read anew, not through the keyboards' main-thread cache: this runs on IO
         val ctx = context.applicationContext
         val app: (String) -> SceneLayout? = { b -> SceneLayouts.parseBuiltIn(ctx, b) }
         return if (held != null) {
@@ -270,12 +250,11 @@ class LayoutListFragment : Fragment() {
 
     private fun importLayout(uri: android.net.Uri) {
         val ctx = requireContext()
-        // the theme in use for the blank keys' warning: made here, SceneThemes keeps its own on the main thread
+        // made here, SceneThemes keeps its own on the main thread
         val active = ThemeManager.activeTheme
         val sceneTheme = SceneThemes.of(active, ThemeManager.shownLook(active))
         lifecycleScope.withLoadingDialog(ctx) {
-            // what goes wrong is said, never the app's crash: the file's provider (an IOException, a SecurityException of
-            // a grant gone) or a file made to throw the reader (CustomLayouts catches what it knows to)
+            // any failure is said, never a crash: the provider (IOException, SecurityException) or a file made to throw the reader
             val opened = runCatching {
                 withContext(Dispatchers.IO) {
                     ctx.contentResolver.openInputStreamOrThrow(uri).use {
@@ -296,7 +275,7 @@ class LayoutListFragment : Fragment() {
                         .setPositiveButton(android.R.string.ok, null).show()
                     is LayoutImport.Verdict.TooMany -> ctx.importErrorDialog(R.string.layout_import_too_many, v.max)
                     is LayoutImport.Verdict.Ok -> {
-                        // its fragments read and its keys' data held off the main thread
+                        // fragments read and key data held off the main thread
                         val layout = v.layout
                         val preview = withContext(Dispatchers.IO) {
                             runCatching { CustomLayouts.fragments(layout, ctx)?.let { scene(ctx, layout.id, layout, it) } }.getOrNull()
@@ -308,7 +287,6 @@ class LayoutListFragment : Fragment() {
         }
     }
 
-    // §4.2 step 3, 4: the layout drawn in the theme in use ([preview]), what it is; taken on 导入
     private fun confirm(ctx: Context, text: String, ok: LayoutImport.Verdict.Ok, preview: SceneLayout?) {
         val layout = ok.layout
         val name = LayoutTexts.shown(layout.name, layout.id)
@@ -322,7 +300,7 @@ class LayoutListFragment : Fragment() {
                         }
                         ctx.toast(ctx.getString(R.string.layout_imported, name))
                         reload()
-                        // §4.2 step 5: on what now, where it may be (one: asked of it; more: ticked); later, the keyboard options
+                        // one: asked of it; more: ticked
                         read?.let { askUse(ctx, it, ask = true) }
                     } catch (e: IOException) {
                         ctx.importErrorDialog(e)
@@ -335,9 +313,8 @@ class LayoutListFragment : Fragment() {
 
     private fun select(card: Item.Card) {
         (parentFragment as? ThemeFragment)?.previewLayout(card.scene)
-        // one that does not read is only to be deleted (its long press)
+        // an unreadable one can only be deleted (long press)
         if (card.entry != null && card.entry.layout == null) return
-        // the number keyboard's, the symbols': 数字键盘用这个, the app's one too
         card.panel?.let { panel ->
             val view = view ?: return
             Snackbar.make(view, card.name, Snackbar.LENGTH_LONG)
@@ -347,7 +324,6 @@ class LayoutListFragment : Fragment() {
                 .show()
             return
         }
-        // the user's of letters: 用在… under the preview, the input methods it may be typed on
         val entry = card.entry ?: return
         if (entry.family !in LETTER_FAMILIES) return
         val view = view ?: return
@@ -358,7 +334,7 @@ class LayoutListFragment : Fragment() {
                     val (read, problems) = withContext(Dispatchers.IO) { CustomKeyboards.choice(entry.id) to CustomKeyboards.problems(entry.id) }
                     when {
                         read == null -> Unit
-                        // refused under this version's rules (one let in by an older build, restored): why, not 「没有输入法能用」
+                        // refused under this version's rules (let in by an older build, restored): why, not 「没有输入法能用」
                         !read.drawn -> ctx.toast(ctx.getString(R.string.layout_use_refused, read.name, problems.firstOrNull()?.let { LayoutTexts.finding(ctx, it) }.orEmpty()))
                         else -> askUse(ctx, read, ask = false)
                     }
@@ -367,10 +343,7 @@ class LayoutListFragment : Fragment() {
             .show()
     }
 
-    /**
-     * [panel] set to layout [id] of the user's ("": the app's), [name] (§4.3: a single choice), said so; one refused under
-     * this version's rules is not set, why said.
-     */
+    /** [id] "" is the app's. A layout refused under this version's rules is not set; why is said. */
     private fun usePanel(ctx: Context, panel: PanelLayouts.Panel, id: String, name: String) = lifecycleScope.launch {
         if (id.isNotEmpty()) {
             val (read, problems) = withContext(Dispatchers.IO) { CustomKeyboards.choice(id) to CustomKeyboards.problems(id) }
@@ -388,16 +361,11 @@ class LayoutListFragment : Fragment() {
         reload()
     }
 
-    /**
-     * 用在… of [layout] (§4.3): the input methods it may be typed on, each ticked where its keyboard is it; set as ticked on
-     * OK, one unticked back on its base (§4.4). [ask]: just imported (§4.2 step 5), one input method asked of by name, none
-     * ticked. Nothing where none may use it (a refused one, one 双拼 alone cannot type on and so on).
-     */
+    /** Set on OK, an unticked one back on its base. [ask]: just imported, none ticked. */
     private fun askUse(ctx: Context, layout: CustomChoice, ask: Boolean) {
-        // a number board, a symbols one: 现在就用作数字键盘吗？ (§4.2 step 5)
         PanelLayouts.Panel.of(layout.family)?.let { panel ->
             if (!ask || PanelLayouts.drawn(panel, layout) == null) return
-            // one replacing the panel's choice (or a file of it come back) is used as it is: said, not asked of
+            // already the panel's choice: said, not asked
             if (AppPrefs.getInstance().keyboard.panelLayout(panel).getValue() == layout.id) {
                 ctx.toast(ctx.getString(R.string.layout_panel_uses, panelName(ctx, panel), layout.name))
                 return
@@ -446,7 +414,6 @@ class LayoutListFragment : Fragment() {
     private fun actions(card: Item.Card) {
         val entry = card.entry ?: return
         val ctx = requireContext()
-        // one that does not read: deleted, nothing else
         val items = if (entry.layout == null) {
             arrayOf(ctx.getString(R.string.theme_info), ctx.getString(R.string.delete))
         } else {
@@ -475,8 +442,7 @@ class LayoutListFragment : Fragment() {
             return
         }
         lifecycleScope.withLoadingDialog(ctx) {
-            // as it was taken (an import's or a restore's): the check of a theme pack's made one (§3.2), what it can be
-            // used for; its text read again (the list keeps none)
+            // as taken (import or restore): the text read again (the list keeps none)
             val report = withContext(Dispatchers.IO) {
                 CustomLayouts.text(entry.file)?.let { text ->
                     runCatching { LayoutCheck.check(text, CustomLayouts.sources, LayoutImport.appVersion(null), strict = false) }.getOrNull()
@@ -490,11 +456,9 @@ class LayoutListFragment : Fragment() {
         val ctx = requireContext()
         val prefs = AppPrefs.getInstance().keyboard
         val scheme = EngineState.shuangpinScheme
-        // §4.4: the input methods using it back on its base where they have it, else the full keyboard, said first; the
-        // files read off the main thread
+        // input methods using it go back to its base where they have it, else the full keyboard, said first
         val (chosen, read) = withContext(Dispatchers.IO) { prefs.imKeyboards() to CustomKeyboards.choice(entry.id) }
         val after = ImKeyboards.afterDelete(chosen, entry.id, read, scheme)
-        // the number keyboard, the symbol panel using it: back on the app's
         val panels = PanelLayouts.usedBy(prefs.panelLayouts(), entry.id)
         val separator = ctx.getString(R.string.layout_list_separator)
         val message = if (panels.isNotEmpty()) {
@@ -515,7 +479,7 @@ class LayoutListFragment : Fragment() {
                 lifecycleScope.launch {
                     val gone = withContext(Dispatchers.IO) { CustomLayouts.delete(entry.id) }
                     if (!gone) ctx.toast(ctx.getString(R.string.layout_not_deleted, entry.name))
-                    // the preferences as it is gone, asked again (a keyboard chosen meanwhile kept): the input view made anew
+                    // preferences re-asked once it is gone (a keyboard chosen meanwhile kept): the input view remade
                     if (gone) {
                         CustomKeyboards.forget(entry.id)
                         ImKeyboards.afterDelete(prefs.imKeyboards(), entry.id, null, scheme).keys.forEach { slot ->
@@ -531,7 +495,6 @@ class LayoutListFragment : Fragment() {
             .show()
     }
 
-    // an input method's name as the layouts say it (LayoutTexts), by ImKeyboards.slot
     private fun imName(ctx: Context, slot: String): String = ctx.getString(
         when (slot) {
             InputMethodCatalog.PINYIN -> R.string.layout_im_pinyin
@@ -541,7 +504,6 @@ class LayoutListFragment : Fragment() {
         },
     )
 
-    // 用在：… under [card]: the panel it is used for (读不出 / the one chosen gone, the app's meanwhile), the input methods
     private fun usedBy(ctx: Context, card: Item.Card): String? {
         if (card.panel != null) {
             if (!card.panelUsed) return null
@@ -556,11 +518,10 @@ class LayoutListFragment : Fragment() {
         return ctx.getString(R.string.layout_used_by, card.usedBy.joinToString(ctx.getString(R.string.layout_list_separator)) { imName(ctx, it) })
     }
 
-    // a panel's name as a sentence says it (English's not its section's title: 「the number keyboard」)
+    // as a sentence says it (English's not its section title: 「the number keyboard」)
     private fun panelName(ctx: Context, panel: PanelLayouts.Panel): String =
         ctx.getString(if (panel == PanelLayouts.Panel.NUMBER) R.string.layout_panel_number else R.string.layout_panel_symbols)
 
-    // [title] and [text], [preview] drawn above it in the theme in use; the text scrolls
     private fun dialog(ctx: Context, title: String, text: String, preview: SceneLayout?): AlertDialog.Builder {
         val padding = ctx.dp(DIALOG_PADDING_DP)
         val body = LinearLayout(ctx).apply {
@@ -576,7 +537,6 @@ class LayoutListFragment : Fragment() {
         return AlertDialog.Builder(ctx).setTitle(title).setView(ScrollView(ctx).apply { addView(body) })
     }
 
-    /** The cards in as many columns as fit, a section's title across them all. */
     private inner class Grid(context: Context) : RecyclerView(context) {
         private val itemWidth = context.dp(CARD_WIDTH_DP)
         private val minMargin = context.dp(CARD_MARGIN_DP)
@@ -620,7 +580,7 @@ class LayoutListFragment : Fragment() {
             }
             val ui = ThemeThumbnailUi(ctx)
             val row = ThemeNames.rowHeight(ctx)
-            // 「用在：拼音、英文」 under the name, a line of its own (the name's row is one line): every card as high
+            // a line of its own: every card as high
             val usedBy = TextView(ctx).apply {
                 textSize = USED_BY_SP
                 maxLines = 1
@@ -645,7 +605,7 @@ class LayoutListFragment : Fragment() {
                     val ctx = root.context
                     val theme = ThemeManager.activeTheme
                     setTheme(theme)
-                    // the theme's look over the layout's keys; nothing of the theme's own marks
+                    // the theme's look over the layout's keys; none of the theme's own marks
                     dynamicIcon.visibility = View.GONE
                     keys.background = ThemeThumbnailKeys(ThemeManager.shownLook(theme), ctx.resources.displayMetrics.density, ctx.dp(THUMBNAIL_BAR_DP).toFloat(), item.cells)
                     name.text = if (item.entry != null && item.entry.layout == null) ctx.getString(R.string.layout_unreadable, item.name) else item.name
@@ -661,7 +621,6 @@ class LayoutListFragment : Fragment() {
         }
     }
 
-    /** Where the cards are read: IO, a test's own to run them to their end (R26 F8490). */
     @VisibleForTesting
     internal object Hooks {
         var cardsRead: CoroutineDispatcher = Dispatchers.IO
@@ -671,14 +630,13 @@ class LayoutListFragment : Fragment() {
         const val HEADER = 0
         const val CARD = 1
         const val BEING_EXPORTED = "being_exported"
-        // not application/xml: the system file saver would add .xml to the name (UAT ST-150)
+        // not application/xml: the system file saver would add .xml to the name
         const val MIME = "application/octet-stream"
 
-        // the boards of the letters' section, as the keyboard options list them
         val LETTERS = listOf("qwerty", "k18", "k14", "nine")
         val LETTER_FAMILIES = setOf("letters", "grouped", "nine")
 
-        // as a theme's card (ResponsiveThemeListView, ThemeThumbnailUi)
+        // as a theme's card
         const val CARD_WIDTH_DP = 128
         const val CARD_HEIGHT_DP = 92
         const val CARD_MARGIN_DP = 16

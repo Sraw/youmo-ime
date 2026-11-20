@@ -73,13 +73,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordLists
 
-/**
- * Makes the session of each input method as [settings] and the user's habits have it ([Engines]
- * keeps them, made at first use, made anew after [invalidate]): from [assets], the user's words
- * ([lexicon]), the tables, what was learned ([learner]) and English's words. What handwriting and the
- * tables read by is one [ChineseLanguage] for a user model, and the coarse words one for the words
- * added by hand, shared by every session made with them. On the engines' thread.
- */
+/** Makes each input method's session from [settings] and the user's habits, from [assets], [lexicon], tables, [learner] and English. Handwriting and tables share one [ChineseLanguage] per user model and one coarse-word list per set of added words. On the engines' thread. */
 internal class SessionFactory(
     private val assets: EngineAssets,
     private val lexicon: UserLexicon,
@@ -87,11 +81,11 @@ internal class SessionFactory(
     private val learner: LearningFacade,
     private val english: EnglishLexicon,
     private val settings: () -> EngineSettings,
-    // the English words learned, as 中英混输 spells them before a key of 全拼's (LatinSync)
+    // English's learned words as 中英混输 spells them (LatinSync)
     private val latinWords: UserLatinWords,
-    // English's data, its warm-up started if it was not (FieldContext)
+    // English's data, warming up if not yet (FieldContext)
     private val englishData: () -> EnglishData?,
-    // the latest piece of handwriting a session dropped ended ([HandwritingSession.latestPiece])
+    // the latest handwriting piece a dropped session ended ([HandwritingSession.latestPiece])
     private val inkEndedBefore: () -> Int,
     private val uptimeMillis: () -> Long,
     private val learnClock: LearnClock,
@@ -99,42 +93,34 @@ internal class SessionFactory(
 ) {
     private val simplified by lazy(LazyThreadSafetyMode.NONE) { simplifier() }
 
-    /** 候选词注音's readings (Engines), made at the first asked for; pinyin's polyphone by its parts is blocked in the one they show. */
+    /** 候选词注音's readings, made on first ask; pinyin blocks a polyphone by its parts in the reading shown. */
     val candidateReadings by lazy(LazyThreadSafetyMode.NONE) {
         CandidateReadings(assets.pinyinData, assets.pinyinData.tones, { simplified.simplify(it) }) { assets.charSyllables }
     }
 
-    // the coarse words of pinyin's vocabulary but those the user added, one for handwriting and every
-    // table: made again once the sessions are dropped (a word added drops them; a long press's delete
-    // of one does not, and these stay as they were, as they always did)
+    // pinyin's coarse words minus the user's added words, one for handwriting and every table; remade when sessions
+    // drop (adding a word drops them; a long-press delete does not)
     private var coarseWords: CoarseWords? = null
 
-    // the coarse words made last, and the added words they leave out: a pinyin session made with the
-    // same added words takes them, the very words it would make itself (a long press's delete of a
-    // word added by hand keeps the sessions: one made after makes its own, as it always did)
+    // the last coarse words and the added words they exclude: a pinyin session with the same added words reuses them
     internal var lastCoarse: CoarseWords? = null
         private set
     private var lastCoarseAdded: Set<String>? = null
 
-    // handwriting's and the tables' language, for the user model it was made with
+    // handwriting's and tables' language, for the user model it was made with
     private var language: ChineseLanguage? = null
 
-    /**
-     * How many [ChineseLanguage] and [CoarseWords] were made since these engines were: between two
-     * [invalidate]s, one language per user model and one list per set of words added by hand. Read
-     * by the tests alone (EnginesSessionFactoryTest), which count what is made, not only what is kept.
-     */
+    /** [ChineseLanguage]s and [CoarseWords] made: one language per user model and one list per added-words set between [invalidate]s. For EnginesSessionFactoryTest. */
     internal var languagesMade = 0
     internal var coarseMade = 0
     internal var lookUpsMade = 0
 
-    // each table's 拼 key, on or off: kept while the engine is, over the sessions made anew
+    // each table's 拼 key state, kept across remade sessions
     private val lookUpModes = HashMap<String, TableSession.LookUpMode>()
 
-    /** Whether table [im]'s 拼 key is on ([TableSession.LookUpMode]). */
     fun lookUpMode(im: String): TableSession.LookUpMode = lookUpModes.getOrPut(im) { TableSession.LookUpMode() }
 
-    /** What the sessions share made anew at the next need: the user's words or the settings changed. */
+    /** Remakes shared state at next need: user words or settings changed. */
     fun invalidate() {
         coarseWords = null
         lastCoarse = null
@@ -142,14 +128,13 @@ internal class SessionFactory(
         language = null
     }
 
-    // each of [glides] made a GlideSession or an EnglishSession, which Engines.glide reads the glide for;
-    // each that [filtersByStrokes] wrapped in a StrokeFilter, which filters what is shown; each that
-    // [writesOnKeys] wrapped, last, in an InkOver, whose handwriting's candidates are none to filter
+    // [glides] get a GlideSession or EnglishSession (Engines.glide reads them); [filtersByStrokes] a StrokeFilter;
+    // [writesOnKeys], outermost, an InkOver, whose handwriting candidates are not filtered
     fun make(im: String): Session = made(im)
         .let { if (filtersByStrokes(im)) StrokeFilter(it, assets::strokes, settings().pageSize, singles = settings().strokeSingles) { cp, drawn -> assets.charInfo.orderStartsWith(cp, drawn) } else it }
         .let { if (writesOnKeys(im)) InkOver(it, ::handwritingSession) else it }
 
-    /** Handwriting's session, as an [InkOver] writes with (and ime-eval measures alone). */
+    /** Handwriting's session as an [InkOver] writes with (and ime-eval measures alone). */
     fun handwritingSession(): HandwritingSession {
         val s = settings()
         // read as pinyin reads a sentence: its words, the user's among them, and their counts
@@ -183,24 +168,18 @@ internal class SessionFactory(
                 )
                 GlideSession(looked, syllableBoundary, blocked = glideHeldBack(), heldBack = heldBack(pinyin), blockOther = ::blockOtherReading) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
-            // the 14 keys: no glide, nor 笔画查字 (u is on UI, no stroke key of its own). 简拼 only where nothing
-            // else is read, as on the nine keys. Top-1, both models on, the same samples (one exact reading each, so
-            // no 简拼 among them; 2026-10-25): full pinyin / 14 keys / nine keys 97.0 / 94.6 / 88.8% on pinyin.tsv's
-            // 429, 73.4 / 61.3 / 53.6% on chat's held-out 983. g14 and g14-strict alike there; strict is faster
+            // the 14 keys: no glide nor 笔画查字 (u shares UI, no stroke key); 简拼 only where nothing else reads, as on nine keys
             PINYIN_KEYS -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G14, neighbours = s.typos), spell = true))
-            // the 18 keys: 双拼's groups (I1 Q4: G18 first, measured; another grouping if it falls short), ; no
-            // letter of pinyin's; as the 14 keys otherwise, learned under qk:<G18's tag>
+            // the 18 keys: 双拼's G18 groups (; is no pinyin letter); otherwise as the 14 keys, learned under qk:<G18's tag>
             PINYIN_KEYS18 -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = NineKeyLetters.G18, neighbours = s.typos), spell = true))
-            // a layout's own groups (a theme's 17 keys, 060-render-p3 T9b): as the 14 keys, learned under qk:<their tag>;
-            // its keyboard the one in use, its codes read by it (typedLetter). None told (Engines swallows their codes
-            // then): G14's, which reads none of them
+            // a layout's own groups: as the 14 keys, learned under qk:<their tag>, its keyboard the one in use; none told
+            // (Engines swallows their codes then): G14's, which reads none of them
             PINYIN_KEYS_OWN -> {
                 val own = s.ownKeyboard?.also(NineKeyLetters::inUse) ?: NineKeyLetters.G14
                 ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = own, neighbours = s.typos), spell = true))
             }
-            // pinyin in zhuyin (design 051 §3.3): the nine keys' way with symbols for letters, a tone a separator
-            // the decoder weighs; learned under zy:nine and zy:dachen, apart from pinyin's keyboards. Both read slipped
-            // keys (061-neighbour-groups; 注音九键 since the user's 11-16)
+            // zhuyin: the nine keys' way with symbols for letters and a tone as separator; learned under zy:nine and
+            // zy:dachen, apart from pinyin's keyboards; both read slipped keys
             ZHUYIN_NINE -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.NINE, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_NINE))
             ZHUYIN -> ForgetsInTables(pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = assets.pinyinData.tones::allows, neighbours = s.typos), spell = true, kind = Kinds.ZHUYIN_DACHEN))
             ENGLISH -> {
@@ -210,8 +189,8 @@ internal class SessionFactory(
                     phrases = EnglishPhrases(phraseBook(), learnClock::calendar), blocks = lexicon.englishBlocks,
                 )
             }
-            // 简拼 only where the digits read nothing else: as common on the evaluation set, and faster
-            // glided as full pinyin, over the digits' keys: each letter typed as itself, as one chosen from a key's long press
+            // 简拼 only where the digits read nothing else: as accurate and faster; glided as full pinyin over the digits'
+            // keys, each letter typed as itself
             T9 -> {
                 val pinyin = pinyinSession(T9Segmenter(s.fuzzy, abbreviations = false, letters = s.nineKeys, neighbours = s.typos), spell = true)
                 GlideSession(
@@ -224,8 +203,8 @@ internal class SessionFactory(
                     blockOther = ::blockOtherReading,
                 ) { g, n -> pinyinGlide.decode(g.path, g.layout, n) }
             }
-            // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; a slipped key read where tapped, no
-            // other typo (061-neighbour-groups); learned under spk: (CommitRecorder)
+            // the 18, 14 and nine keys: as pinyin's 14 keys, no glide nor 笔画查字; slips read by tap, no other typo;
+            // learned under spk: (CommitRecorder)
             SHUANGPIN_KEYS18, SHUANGPIN_KEYS14, SHUANGPIN_NINE ->
                 ForgetsInTables(pinyinSession(GroupedShuangpinSegmenter(s.scheme, KeyboardPair.lettersOf(im), s.fuzzy, neighbours = s.typos), spell = true, kind = Kinds.shuangpin(s.shuangpin)))
             SHUANGPIN -> {
@@ -247,10 +226,8 @@ internal class SessionFactory(
         val method = TABLES[im] ?: throw IllegalArgumentException("no input method $im")
         val table = tables.table(im)
         val options = tableOptions(method, s).copy(pageSize = s.pageSize)
-        // looking a character up by pinyin learns as full pinyin does (U-28), the table's codes untouched;
-        // no phrases, emoji nor 联想 there: what it shows is to be typed by its code. Habits off, as
-        // pinyin's own session: nothing learned, nor read of what was (U-93). Every table's: its 拼 key
-        // looks up where no key of its codes does; made as it first looks up, most tables never do
+        // pinyin lookup in a table learns as full pinyin does, leaving codes alone; no phrases, emoji or 联想 (the
+        // result is to be typed by code); habits off as pinyin's own. Made on first lookup: most tables never do
         val lookUp = {
             lookUpsMade++
             val user = sessionUser()
@@ -264,28 +241,25 @@ internal class SessionFactory(
         val language = tableLanguage(im)
         val glide = TableGlide(
             table.dictionary, { text -> language.words.logProb(text) }, PinyinGlide.WEIGHTS,
-            // the table's blocks too: a word blocked under a code scores -inf from then on (U-28);
-            // keyed on which state as well: a replay or clear makes a new one counting from 0 (by its id, not
-            // holding it: F3216)
+            // the table's blocks too (a word blocked under a code scores -inf); keyed by state id too, since a replay or
+            // clear makes a new state counting from 0
             version = { language.user?.let { it to it.changes } to learner.learnLog().state.let { it.id to it.tableBlocksVersion } },
-            // the words counted, scored anew a glide: their scores move with every word learned
+            // learned words rescored per glide: scores move with every word learned
             learned = { text -> language.user?.typed(text) == true },
-            // the table's own blocks, under a code, alone: a block in pinyin hides none of them (U-28 C12); and
-            // 生僻字屏蔽's characters, held back everywhere
+            // only the table's own code blocks (a pinyin block hides none of them), plus 生僻字屏蔽 everywhere
             blocked = { code, text -> text in learner.openHabits().blockedUnder(Code(Kinds.table(im), code)) || language.held(text) },
         )
-        // a glide after a code typed picks its first candidate: the next code is the glide's
+        // a glide after a typed code picks its first candidate: the next code is the glide's
         return GlideSession(
             TableSession(
                 table.dictionary, options, MadeOnUse { ForgetsInTables(lookUp()) }, if (learner.useHabits) table.saved else SavedPhrases(table.dictionary, im, { null }), sharedWords(table, im), language, uptimeMillis,
                 phrases = phraseBook(), clock = learnClock::calendar, lookUpMode = lookUpMode(im),
-                // a tap's slip read where the key would lead nowhere (an empty code, or 顶字 at the key's edge):
-                // 纠正错拼和按偏的键, every keyboard's one setting (Q3)
+                // a slip read where the key would lead nowhere (empty code, 顶字 at the key's edge): the shared typo setting
                 slips = if (s.typos) TableSlips.SLIPS else null,
             ),
             between = Action.Pick(0),
             blocked = glideHeldBack { false },
-            // under its code, as the table blocks its own (U-28)
+            // under its code, as the table blocks its own
             blockOther = { r -> { learner.openHabits().blockUnder(Code(Kinds.table(im), r.keys), r.word, on = true) } },
         ) { g, n -> glide.decode(g.path, g.layout, n) }
     }
@@ -293,40 +267,36 @@ internal class SessionFactory(
     // read when first glided: most never glide pinyin
     private val pinyinGlide by lazy { PinyinGlide(assets.pinyinData, user = ::glideUser) }
 
-    // a pinyin glide's other reading's word blocked as it reads, as a long press on it in the list would
-    // (the session kept: the host fetches its candidates next); none where it does not read so: not offered (review L3)
+    // blocks a pinyin glide's other reading as a long press would (the session kept: the host fetches candidates
+    // next); null where it does not read so: not offered
     private fun blockOtherReading(r: GlideReading): (() -> Unit)? =
         WordLists.entry(r.word, r.pinyin)?.let { entry -> { lexicon.block(entry) } }
 
-    // a character blocked under strokes is filed as a table's block under its code (U-28), the record's whatever the habits
+    // a stroke-lookup block is filed as a table block under its code, recorded whatever the habits
     private fun strokeCode(strokes: String) = Code(Kinds.table(StrokeLookup.BLOCK_TABLE), strokes)
 
-    // the user's words in a glide's readings, as the sessions score them: added, learned, blocked
+    // the user's words in a glide's readings, scored as the sessions score them
     private fun glideUser(): PinyinGlide.User {
-        // as installed while habits are off (U-93), as the sessions
+        // as installed while habits are off, as the sessions
         val user = sessionUser()
         val scorer = lexicon.prior().scorer(UserScorer(assets.pinyinData.model, user))
         val context = scorer.context(NO_WORD, NO_WORD)
         return PinyinGlide.User(user to user.changes, { word -> scorer.scoreAfter(context, word) }, user, { word -> user.count(word) > 0f }, user::blocked)
     }
 
-    // what a pinyin's glide after something typed goes on after
+    // what a pinyin glide after typed input continues after
     private val syllableBoundary = Action.Key(PinyinGlide.SEPARATOR)
 
-    // a glide's word the session held back, committed all the same: recorded as learning records a pick
+    // a glide's word the session held back, committed anyway: recorded as a pick
     private fun heldBack(pinyin: PinyinSession): (GlideReading, () -> String) -> Unit = { r, first -> pinyin.heldBack(r.word, r.pinyin, first) }
 
-    // what a glide's other readings leave out: the words blocked, and the coarse ones but those the
-    // user added, as the decoders hold them back (CoarseWords); [blocked] as the session blocks
+    // what glide alternatives leave out: blocked words and coarse ones not added by the user, as the decoders do
     private fun glideHeldBack(blocked: (String) -> Boolean = lexicon::withheld): (String) -> Boolean {
         val coarse = (CoarseWords.LIST - addedNow()).toHashSet()
         return { blocked(it) || it in coarse }
     }
 
-    /**
-     * What a table shares with the other Chinese input methods: the word model with the user's words,
-     * the one user model, 联想 as the setting has it, the sentence models of the 性能档位.
-     */
+    /** What a table shares with the other Chinese input methods: word model with the user's words, the user model, 联想 and the 性能档位's sentence models. */
     private fun tableLanguage(im: String): TableLanguage {
         val language = language()
         val data = language.data
@@ -344,17 +314,13 @@ internal class SessionFactory(
             habits = learner.habitsNow(),
             kind = Kinds.table(im),
             simplify = { simplified.simplify(it) },
-            // the record's own, not the habits a session is made with (U-93 keeps the blocks)
+            // the record's own, not the session's habits (habits off keeps the blocks)
             blockedUnder = learner.openHabits()::blockedUnder,
             held = lexicon.gate()::holds,
         )
     }
 
-    /**
-     * The one [ChineseLanguage] for the user model the sessions read now ([sessionUser]): made with the
-     * first of handwriting's and the tables' sessions after [invalidate], or after the model was made
-     * anew, and shared by the rest.
-     */
+    /** The one [ChineseLanguage] for the current user model ([sessionUser]), made by the first handwriting or table session after [invalidate] or a model change, shared by the rest. */
     internal fun language(): ChineseLanguage {
         val data = assets.pinyinData
         val user = sessionUser()
@@ -366,7 +332,7 @@ internal class SessionFactory(
         }
     }
 
-    // the coarse words but those the user added now, made once for the same added words
+    // coarse words minus the current added words, made once per added-words set
     private fun coarse(): CoarseWords {
         val added = addedNow()
         lastCoarse?.takeIf { lastCoarseAdded == added }?.let { return it }
@@ -378,10 +344,7 @@ internal class SessionFactory(
         }
     }
 
-    /**
-     * A session of one of the pinyins, alike but for how [segmenter] reads the keys; the built-in
-     * phrases as set, under their keys on full pinyin's keyboards ([kind] full: the 26, 14 and nine keys) alone.
-     */
+    /** A pinyin-family session differing only in [segmenter]; built-in phrases only on full pinyin's keyboards ([kind] full: 26, 14 and nine keys). */
     private fun pinyinSession(
         segmenter: Segmenter,
         spell: Boolean,
@@ -400,15 +363,10 @@ internal class SessionFactory(
         )
     }
 
-    /**
-     * [pinyin], what a long press forgets there forgotten in every table too, as [TableRegistry.shared] has it:
-     * a phrase an older build saved there (U-84). Offered only where something was learned of it (PY-33);
-     * what the record has of it, a table's picks too, the pinyin forgets itself. A table's lookup is
-     * pinyin wrapped so (review C N3).
-     */
+    /** [pinyin] whose long-press forget also forgets in every table ([TableRegistry.shared]) a phrase an older build saved there. Table lookups are wrapped so too. */
     private inner class ForgetsInTables(private val pinyin: Session) : Session by pinyin {
         override fun apply(action: Action): Snapshot {
-            // the rest of a whole phrase (U-73) forgets its count alone: a table's word of its text stays
+            // a whole phrase's rest forgets its count alone: a table's word of the text stays
             val forgotten = if (action is Action.Forget && Offer.FORGET in pinyin.offers(action.index) && pinyin.why(action.index)?.whole.isNullOrEmpty()) {
                 pinyin.candidates(action.index, 1).firstOrNull()
             } else {
@@ -418,10 +376,7 @@ internal class SessionFactory(
         }
     }
 
-    /**
-     * The session [make] makes, made when first told a key or a context: a table's lookup, which most
-     * tables never use. Till then it has nothing to show, and keeps its learning and field's flags for it.
-     */
+    /** A session made when first told a key or context (a table's lookup, which most never use); till then it shows nothing and keeps its learning and field flags. */
     private class MadeOnUse(make: () -> Session) : Session {
         private var flags: Int? = null
         private val lazySession = lazy {
@@ -432,7 +387,6 @@ internal class SessionFactory(
         }
         private val session: Session by lazySession
 
-        // the session once it is made, null till then
         private val made: Session? get() = if (lazySession.isInitialized()) lazySession.value else null
 
         override var learning = true
@@ -463,68 +417,60 @@ internal class SessionFactory(
         override val rereads get() = made?.rereads ?: false
     }
 
-    // the user's words a table offers, and the blocks it keeps; while habits are off (U-93) the blocks
-    // and the dictionaries turned on alone, as pinyin's fresh model keeps them (review F3412)
+    // the user's words and blocks a table offers; habits off: only blocks and enabled dictionaries, as pinyin's fresh model
     private fun sharedWords(table: TableRegistry.Table, im: String): SharedWords {
         val shared = if (learner.useHabits) tables.shared(table, im) else tables.dictionariesOnly(table, im)
         shared.prepare()
         return shared
     }
 
-    // the custom phrases every session but handwriting offers: the built-in ones alone while habits are off (U-93)
+    // custom phrases for every session but handwriting: built-ins alone while habits are off
     private fun phraseBook() = if (learner.useHabits) lexicon.added.phrases() else lexicon.added.freshPhrases()
 
-    // the user's, as their phrases: none where their habits are not used (U-93's 借手机), nor in zhuyin, whose
-    // keys are no pinyin the user knows the words by (060-common-words §3: 全拼, 双拼 and their keyboards)
+    // none with habits off (借手机), nor in zhuyin, whose keys are not the pinyin the user keys words by
     private fun commonWords(kind: String) =
         if (learner.useHabits && kind != Kinds.ZHUYIN_NINE && kind != Kinds.ZHUYIN_DACHEN) lexicon.added.commonWords() else CommonWordBook.none()
 
-    // the words added by hand, as the sessions offer them: none while habits are off (U-93)
+    // none while habits are off
     private fun addedNow(): Set<String> = if (learner.useHabits) lexicon.addedTexts() else emptySet()
 
-    // the user's words the sessions read: as installed, but for the blocks and the predictions turned off, while habits are off (U-93)
+    // as installed except blocks and turned-off predictions while habits are off
     private fun sessionUser(): UserModel = if (learner.useHabits) {
         lexicon.user()
     } else {
         lexicon.freshUser().also { it.predictionsOff = learner::predictionOff }
     }
 
-    /** The emoji a word stands for, as the Chinese input methods offer them: none, the setting off. */
+    /** None with the setting off. */
     private fun emoji(): (String) -> List<String> = if (settings().emoji) assets::emojiOf else { _ -> emptyList() }
 
-    /** The built-in phrases' texts a word stands for, as the tables offer them, at learning's time: none, the setting off; the user's edits to them left out while habits are off, as [phraseBook] (U-93). */
+    /** Built-in phrase texts for tables at learning time; none with the setting off; user edits left out while habits are off. */
     private fun wordPhrases(): (String) -> List<String> {
         if (!settings().builtInPhrases) return { _ -> emptyList() }
-        // the session's book, as the one it was made with (habits switched, or the phrases read anew, drop the
-        // sessions): chosen at its first word, not made anew for every candidate while habits are off
+        // the book the session was made with (switching habits or rereading phrases drops sessions): picked at its first word
         val book by lazy(LazyThreadSafetyMode.NONE) { phraseBook() }
         return { word -> book.builtInsOf(word, learnClock::calendar) }
     }
 
-    /** The characters by their parts' pinyin, as full pinyin offers them, but those blocked or held back: none, the setting off. */
+    /** Characters by parts' pinyin, minus blocked or held-back ones; none with the setting off. */
     private fun chaizi(): PartsLookup = if (!settings().chaizi) PartsLookup { emptyList() } else object : PartsLookup {
         override fun of(letters: String) = assets.chaiziOf(letters).filterNot { lexicon.withheld(it.first) }
 
-        // a polyphone's reading as 候选词注音 draws it, blocked in that one
+        // a polyphone blocked in the reading 候选词注音 draws
         override fun shownIn(text: String, before: String, hint: String?) = candidateReadings.oneOf(text, before, hint)?.let { Syllables.spelling(it.syllable) }
     }
 
-    /**
-     * The one reranker over the model, for every session: they all run on the fcitx thread, one
-     * input typed at a time, and what it ran for one input is started over for another's.
-     */
+    /** One reranker for all sessions: all run on the fcitx thread, one input at a time, restarting for another input. */
     private fun reranker(): Reranker? = if (settings().modelLevel >= ModelLevel.MEDIUM) assets.sentenceModel.reranker(Reranker.LIMIT) else null
 
-    /** As [reranker], over the larger model, which weighs the readings again while the user pauses. */
+    /** Over the larger model, reweighing while the user pauses. */
     private fun refiner(): SentenceRefiner? = if (settings().modelLevel == ModelLevel.HIGH) assets.lateRefiner else null
 }
 
 /**
- * What handwriting and a table read by, as pinyin does (specs/engine.md), one for the sessions made
- * with the same user model: pinyin's [data], the one [user] model, the word model with the user's
- * words ([scorer]), the coarse words held back ([coarse], one for them all), and 联想 ([predictor]).
- * What changes in it as it is read is a cache of the same answers (CoarseWords' merge, keyed by the
- * user model's words) or read at once by the asker (Predictor's `after`), so the sessions share it.
+ * What handwriting and tables read by, as pinyin does: [data], the [user] model, the word model with the user's
+ * words ([scorer]), the shared [coarse] words and 联想 ([predictor]); one per user model. Its mutable parts are
+ * caches of the same answers or read at once by the asker, so sessions can share it.
  */
 internal class ChineseLanguage(
     val data: PinyinData,
@@ -536,13 +482,13 @@ internal class ChineseLanguage(
 ) {
     val scorer = prior.scorer(UserScorer(data.model, user))
 
-    // a word's reading as it is learned: as the user typed it, else the dictionary's likeliest. The
-    // coarse words hold back only what is predicted, not a reading: one predictor for both
+    // a learned word's reading: as typed, else the dictionary's likeliest; coarse words hold back predictions only,
+    // so one predictor serves both
     val readings = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse, charReadings = charReadings)
 
     // what may follow, as pinyin offers it: the same setting
     val predictor = readings.takeIf { prediction }
 }
 
-// [method]'s options as [s] sets them: what 与 X 同码 checks is what the session offers
+// as [s] sets them: 与 X 同码 checks what the session offers
 internal fun tableOptions(method: TableMethod, s: EngineSettings): TableOptions = s.tables[method.group]?.applyTo(method.options) ?: method.options

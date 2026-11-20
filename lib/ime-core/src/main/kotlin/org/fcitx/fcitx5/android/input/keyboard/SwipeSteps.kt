@@ -4,32 +4,23 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-/**
- * A finger's distance along one axis as whole steps of a threshold, the remainder carried so a slow
- * drag still adds up. A key's swipe counts its steps with it ([KeyGestureRecognizer]: the backspace's
- * selection, the space's cursor, the vertical swipes), and 滑选 its sideways steps ([SwipeSelection]),
- * the backspace's threshold, so a character there is as far as one deleted.
- */
+/** Whole steps of a threshold along an axis, the remainder carried so a slow drag adds up; 滑选 uses the backspace's threshold, so a character there is as far as one deleted. */
 class SwipeSteps {
-    /** Where the finger was at the last sample. */
+    /** At the last sample. */
     var last = -1f
 
     private var unconsumed = 0f
 
-    /** The steps since [start] (or [reset]), signed. */
+    /** Signed. */
     var total = 0
         private set
 
-    /** A drag beginning at [at]: nothing carried, no steps yet. */
     fun start(at: Float) {
         reset()
         last = at
     }
 
-    /**
-     * How many whole [threshold]s the finger crossed from [last] to [current], carrying the
-     * remainder forward; [last] is left where it was (the recognizer moves it itself).
-     */
+    /** [last] is left where it was (the recognizer moves it itself). */
     fun consume(current: Float, threshold: Float): Int {
         val moved = current - last + unconsumed
         unconsumed = moved % threshold
@@ -38,7 +29,6 @@ class SwipeSteps {
         return count
     }
 
-    /** [consume], then [last] moved to [current]. */
     fun step(current: Float, threshold: Float): Int = consume(current, threshold).also { last = current }
 
     fun reset() {
@@ -47,16 +37,12 @@ class SwipeSteps {
     }
 }
 
-/**
- * A finger's vertical steps once its touch has taken a sideways one, none before: the space's cursor
- * lines ([KeyGestureRecognizer.crossStepY]) and 滑选's ([SwipeSelection.lineSent]), so a swipe's own drift
- * up or down, or the one that reached 滑选, moves no line.
- */
+/** Vertical steps only once a sideways one was taken, so a swipe's own drift moves no line. */
 class CrossSteps {
     private val steps = SwipeSteps()
     private var crossing = false
 
-    /** The vertical steps of [threshold] to [at], [sideways] the steps sideways this sample took. */
+    /** [sideways]: the steps sideways this sample took. */
     fun step(at: Float, sideways: Int, threshold: Float): Int {
         if (threshold <= 0f) return 0
         if (!crossing) {

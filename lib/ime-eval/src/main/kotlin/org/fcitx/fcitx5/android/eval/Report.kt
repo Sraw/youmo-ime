@@ -31,11 +31,7 @@ object Report {
         return render(header, rows)
     }
 
-    /**
-     * The samples a run has first that its baseline had not, and the reverse, with how likely so
-     * uneven a split is by chance: `p` under 0.05 is a change, above it as likely noise. `p` is
-     * not rounded, as a gate compares it: 0.00834 rounded to 0.0083 reads as under 0.05 / 6.
-     */
+    /** The samples a run has first that its baseline had not and the reverse, with `p` unrounded, as a gate compares it. */
     fun flips(flips: List<Flips>): String = render(
         listOf("group", "n", "won", "lost", "p"),
         flips.map { listOf(it.group, it.samples.toString(), it.won.toString(), it.lost.toString(), it.p.toString()) },

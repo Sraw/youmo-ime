@@ -73,13 +73,7 @@ import org.fcitx.fcitx5.android.utils.toast
 import splitties.dimensions.dp
 import timber.log.Timber
 
-/**
- * 生僻字屏蔽 (dev/design/061-rare-char-block.md §6; 061-settings-cards.md §3): the switch, a search, and a
- * card for each of the four groups. A card's body opens its group's grid in the cards' place, back
- * returns to them; its strip holds the whole group back or lets it through. In the grid cells are held
- * back or let through one by one, or by a drag. Changes stay on the page and are saved as it is left
- * ([onStop]), the engine then reading them; a later version's file is shown, not changed.
- */
+/** Changes stay on the page and are saved on [onStop]; a later version's file is shown, not changed. */
 class RareCharsFragment : Fragment(), SearchAnchors {
 
     private val mainViewModel: MainViewModel by activityViewModels()
@@ -104,11 +98,9 @@ class RareCharsFragment : Fragment(), SearchAnchors {
 
     private var page: Page? = null
     private var layout = RareLayout(emptyList())
-    // what the search found in each group, for its section's title
     private var found = emptyMap<Level, Int>()
     private var drag: DragRange? = null
-    // a finger on the list now, as its touch listener saw: a long press with none (a screen reader's, a held Enter) is
-    // no drag, which only a lift ends (R26 F8161)
+    // a long press with no finger down (a screen reader's, a held Enter) is no drag, which only a lift ends
     private var fingerDown = false
     private val adapter = CellAdapter()
     private val number = NumberFormat.getIntegerInstance()
@@ -120,7 +112,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         val ctx = requireContext()
         val pad = ctx.dp(16)
         val config = resources.configuration
-        // at most 600 dp wide, in the middle (§2.10)
         val widthDp = minOf(config.screenWidthDp, MAX_WIDTH_DP)
         switch = MaterialSwitch(ctx).apply {
             setText(R.string.rare_chars_switch)
@@ -130,7 +121,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
                 val page = page ?: return@setOnCheckedChangeListener
                 if (page.edits.choice.on == on) return@setOnCheckedChangeListener
                 page.edits.setOn(on)
-                // not a step of its own: ↶, or the snackbar's 撤销, would turn it back with the step before
+                // not a step of its own: ↶ or 撤销 would turn it back with the step before
                 dropUndo()
                 snackbar?.dismiss()
                 showState()
@@ -201,7 +192,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         }
     }
 
-    /** The four group cards, as many across as fit [widthDp] (§3.1), in a scroll of their own. */
     private fun groupCards(ctx: Context, widthDp: Int, fontScale: Float): ScrollView {
         val pad = ctx.dp(16)
         val grid = CardGrid(ctx, CardColumns.columns(widthDp.toFloat(), fontScale, CardColumns.GROUP_MIN_DP, CardColumns.GROUP)).apply {
@@ -213,7 +203,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
             val card = GroupCard(ctx)
             card.onOpen = { open(level) }
             card.strip.onCheck = { checkGroup(level) }
-            // where the settings search lands (§7.4)
             card.view.tag = GROUP + level.name
             before?.let(card::readAfter)
             before = card
@@ -228,7 +217,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         }
     }
 
-    /** The opened group's strip, fixed above its grid, and what is said of the group under it (§3.2). */
     private fun groupHead(ctx: Context): LinearLayout {
         val pad = ctx.dp(16)
         headStrip = CheckStrip(ctx, edgeDp = 16).apply { onCheck = { viewModel.opened?.let(::checkGroup) } }
@@ -249,15 +237,12 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         }
     }
 
-    /** The grid of cells, as many across as fit [widthDp] less the letters. */
     private fun cellList(ctx: Context, widthDp: Int, heightDp: Int, fontScale: Float): RecyclerView {
         val columns = RareCharCell.columns(widthDp - SCROLLER_DP, fontScale)
         return RecyclerView(ctx).apply {
             setHasFixedSize(true)
             itemAnimator = null
-            // a letter's jump lays out a whole new screen of cells: the default pool keeps 5 a type and the
-            // rest were made anew each jump (gfxinfo, 2026-11-14: 60% janky frames dragging the letters).
-            // A screen's worth and two rows more
+            // a letter jump lays out a whole new screen: the default pool of 5 had cells remade each jump, janking the drag
             recycledViewPool.setMaxRecycledViews(
                 RareLayout.Kind.CELL.ordinal,
                 columns * (RareCharCell.rows(heightDp, fontScale) + 2),
@@ -293,7 +278,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
                 val tint = requireContext().styledColor(android.R.attr.colorControlNormal)
                 menu.item(R.string.undo, R.drawable.ic_baseline_undo_24, tint, showAsAction = true) { undoLast() }.apply {
                     isEnabled = can && viewModel.undo != null
-                    // a toolbar's disabled icon is drawn as it is: grayed here
+                    // a toolbar draws a disabled icon as is: grayed here
                     icon = icon?.mutate()?.apply { alpha = if (isEnabled) OPAQUE else DISABLED_ICON_ALPHA }
                 }
                 menu.add(R.string.rare_chars_reset).setEnabled(can).setOnMenuItemClickListener {
@@ -308,7 +293,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
 
     override fun onResume() {
         super.onResume()
-        // after the navigation's own title, which a page made again (a turn) is given too
+        // after the navigation's own title, which a recreated page is given too
         showTitle()
     }
 
@@ -336,11 +321,10 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         }
         showScreen()
         showState()
-        // the table read, or none to read: a search result's group card can be pointed at, if it is shown
         if (state !is State.Loading) SearchHighlight.ready(this)
     }
 
-    // the four cards shown again if a group's grid is open; never into a grid (§4.12)
+    // never into a grid
     override fun reveal(id: String, found: (View) -> Unit) {
         if (viewModel.opened != null) closeGroup()
         if (id == SWITCH) return found(switch)
@@ -348,10 +332,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         if (cardScroll.isVisible) cards[level]?.view?.let(found)
     }
 
-    /**
-     * Which of the page's three shows: the cards, the search's cells, or a group's grid under its
-     * strip (§3.1–§3.3); the title and back as it has them.
-     */
     private fun showScreen() {
         val ready = page != null
         val opened = viewModel.opened
@@ -373,7 +353,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         mainViewModel.setToolbarTitle(getString(viewModel.opened?.let(::groupName) ?: R.string.rare_chars))
     }
 
-    /** The switch, the note under it and why the page cannot be changed, the cards and strips, as the edits now are. */
     private fun showState() {
         val page = page
         val on = page?.edits?.choice?.on == true
@@ -382,7 +361,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         note.text = if (on) getString(R.string.rare_chars_note, getString(R.string.rare_chars_held, number.format(page.edits.heldCount()))) else getString(R.string.rare_chars_note_off)
         warning.visibility = if (page?.readOnly == true) View.VISIBLE else View.GONE
         if (page?.readOnly == true) warning.setText(if (page.unreadable) R.string.rare_chars_unreadable else R.string.rare_chars_newer)
-        // off, the grid grayed but there to look at (§6.2)
         list.alpha = if (on || page == null) 1f else OFF_ALPHA
         if (page != null) {
             val samples = CardColumns.samples(resources.configuration.screenHeightDp.toFloat())
@@ -401,10 +379,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         adapter.notifyItemRangeChanged(0, adapter.itemCount, PAYLOAD_STATE)
     }
 
-    /**
-     * A group's strip, [held] of its cells held: 「已屏蔽 held/all」, its box, what it reads out; off or
-     * read-only, faded and inert (§2.5: the switch off 50%, a later version's file 38%).
-     */
     private fun showStrip(strip: CheckStrip, page: Page, level: Level, held: Int) {
         val total = page.total(level)
         val box = when (held) {
@@ -429,7 +403,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         strip.setUsable(editable(page), if (page.readOnly) CheckStrip.DISABLED_ALPHA else OFF_ALPHA)
     }
 
-    /** The opened group's fixed strip, and under it what has no cell, what the phone cannot draw, and that off it is only to look at (§3.2). */
     private fun showHead(page: Page, level: Level) {
         showStrip(headStrip, page, level, page.edits.heldIn(level))
         val unread = page.grid.unread[Level.GRID.indexOf(level)]
@@ -445,7 +418,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
 
     private fun editable(page: Page) = !page.readOnly && page.edits.choice.on
 
-    /** [level]'s group, every cell of it, held back, or let through where it all is (§2.4: some → all). */
     private fun checkGroup(level: Level) {
         val page = page ?: return
         if (!editable(page)) return
@@ -453,12 +425,11 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         changed(page, before, page.edits.setGroup(level, page.edits.box(level) != Box.ALL))
     }
 
-    /** [level]'s grid in the cards' place, where it was left (§3.2). */
     @VisibleForTesting
     internal fun open(level: Level) {
         val page = page ?: return
         if (viewModel.opened != null) return
-        // the search hidden with the keyboard on it: put away, or what is typed goes on searching unseen (R26 F8184)
+        // with the keyboard on the hidden search, typing would go on searching unseen
         searchLayout.letGoOfFocusedField()
         viewModel.opened = level
         relayout(page)
@@ -467,7 +438,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         showState()
     }
 
-    /** Back to the cards from a group's grid, its place kept. */
     private fun closeGroup() {
         val page = page ?: return
         keepScroll()
@@ -478,7 +448,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         showState()
     }
 
-    // the opened group's first row shown and its offset
     private fun keepScroll() {
         val level = viewModel.opened ?: return
         val manager = list.layoutManager as GridLayoutManager
@@ -492,9 +461,8 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         (list.layoutManager as GridLayoutManager).scrollToPositionWithOffset(at.coerceIn(0, maxOf(0, layout.size - 1)), offset)
     }
 
-    /** The rows anew: the opened group's alone, or what the search finds; on the cards, none. */
     private fun relayout(page: Page) {
-        // the rows anew: a drag's positions are the old rows' (R26 F8161)
+        // a drag's positions are the old rows'
         drag = null
         val query = viewModel.query
         val opened = viewModel.opened
@@ -519,7 +487,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
             }
         }
         layout = RareLayout(groups)
-        // the letters only in a group's grid: one group's, no guessing which (§3.2)
         scroller.letters = if (opened != null) layout.letters else emptyList()
         adapter.notifyDataSetChanged()
     }
@@ -529,7 +496,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         message.visibility = View.VISIBLE
     }
 
-    /** A step taken, [undo] takes it back: from the title bar's ↶, and from the snackbar, the cells changed told. */
     private fun changed(page: Page, before: Int, undo: RareEdits.Undo) {
         stepTaken(undo)
         val after = held(page)
@@ -544,7 +510,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         }.also { it.show() }
     }
 
-    // the last step, the one ↶ takes back (§2.4: the strips, a drag, a cell, 恢复默认)
     private fun stepTaken(undo: RareEdits.Undo) {
         viewModel.undo = undo
         requireActivity().invalidateMenu()
@@ -556,7 +521,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         activity?.invalidateMenu()
     }
 
-    /** The title bar's ↶: the last step taken back, a step its snackbar offered too. */
     @VisibleForTesting
     internal fun undoLast() {
         val page = page ?: return
@@ -566,7 +530,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         if (page.edits.undo(undo)) showState()
     }
 
-    // the cells held, on or off: what a change made is counted by
     private fun held(page: Page) = Level.GRID.sumOf { page.edits.heldIn(it) }
 
     @VisibleForTesting
@@ -595,18 +558,15 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         super.onStop()
     }
 
-    /** The page's changes laid over the file as it is now, the engine then reading it; none, nothing done (§6.2). */
     private fun save() {
         val page = page ?: return
-        // a step before a save is no more to take back (RareEdits.undo): ↶ grayed at once, whatever is saved
+        // no undo past a save: ↶ grayed at once
         dropUndo()
         if (page.readOnly || page.edits.changes.isEmpty()) return
         val before = RareCharsViewModel.saving
         // outlives the page, whose scope leaving cancels
         val saved = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
-            // the last stop's save still writing: its changes taken off first (RareEdits.saved), or they are sent again
-            // and this one's saved drops as many, changes made after it among them, never written (R26 F8376). At
-            // once where there is none
+            // the last stop's save still writing: its changes are taken off first, else they are sent again and later ones dropped
             before?.join()
             if (page.edits.changes.isEmpty()) return@async false
             val changes = page.edits.changes.toList()
@@ -616,7 +576,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
                 true
             } catch (e: IOException) {
                 Timber.w(e, "rare characters")
-                // not saved: the changes stay, tried again at the next stop
+                // not saved: the changes stay, retried at the next stop
                 if (e is RareCharsManager.Newer) appContext.toast(R.string.rare_chars_newer) else appContext.toast(e)
                 false
             }
@@ -632,7 +592,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
 
     private inner class CellAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-        // the cells' paints, one set for the grid
         private var paints: RareCharCell.Paints? = null
 
         init {
@@ -653,7 +612,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
             val ctx = parent.context
             val view = when (RareLayout.Kind.entries[viewType]) {
                 RareLayout.Kind.CELL -> RareCharCell(ctx, paints ?: RareCharCell.Paints(ctx).also { paints = it })
-                // a search's section: its group and how many found, no box (§3.3)
                 RareLayout.Kind.HEAD -> TextView(ctx).apply {
                     textSize = NOTES_SP
                     setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurfaceVariant))
@@ -710,7 +668,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         val page = page ?: return
         val position = holder.bindingAdapterPosition
         if (!editable(page) || position == RecyclerView.NO_POSITION) return
-        // one cell, seen changing under the finger: no snackbar (§6.2), but a step ↶ takes back (§2.4)
+        // one cell, seen changing under the finger: no snackbar, but a step ↶ takes back
         stepTaken(page.edits.toggle(layout.cell(position)))
         showState()
     }
@@ -730,10 +688,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         return true
     }
 
-    /**
-     * The drag begun by a long press (§6.2): the finger's cell each move, the list scrolled at its
-     * edges; lifted, the cells it covered changed at once, one undo for them all.
-     */
+    /** Begun by a long press; on lift, all covered cells change, one undo. */
     private inner class DragListener : RecyclerView.OnItemTouchListener {
 
         private var y = 0f
@@ -748,7 +703,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
                     y > list.height - edge -> list.context.dp(SCROLL_DP)
                     else -> 0
                 }
-                // at the list's end it stops (a move starts it again): else on and on, a frame at a time, till the lift
+                // stop at the end (a move restarts it): else it runs a frame at a time till the lift
                 if (by == 0 || !list.canScrollVertically(by)) return
                 list.scrollBy(0, by)
                 moveTo(x, y)
@@ -756,7 +711,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
             }
         }
 
-        // the event the list is taken over by is not handed to onTouchEvent too: handled here
+        // the event the list is taken over by is not also handed to onTouchEvent: handled here
         override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> fingerDown = true
@@ -800,7 +755,6 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         }
     }
 
-    /** The finger at ([x], [y]) in the list: the cell under it the drag's end. */
     @VisibleForTesting
     internal fun moveTo(x: Float, y: Float) {
         val range = drag ?: return
@@ -822,8 +776,7 @@ class RareCharsFragment : Fragment(), SearchAnchors {
         private const val OPAQUE = 255
         private const val DISABLED_ICON_ALPHA = 97 // 38%
 
-        // where a settings search lands (dev/design/061-settings-search.md §4.12): the switch, a group's card; ↶ and
-        // ⋮'s 恢复默认 have no View, said where they are
+        // ↶ and ⋮'s 恢复默认 have no View, said where they are
         private const val SWITCH = "view:rare/switch"
         private const val GROUP = "view:rare/group/"
 

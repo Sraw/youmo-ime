@@ -23,7 +23,6 @@ class EngineAssetsHomophonesTest : EnginesFixture() {
 
     private val data = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
-        // log10, as COMMON_WORD (-5.5): 公式 common, 攻势 not
         .unigram("公式", -4.7f, 0f).entry("公式", syl("gong", "shi"))
         .unigram("攻势", -6f, 0f).entry("攻势", syl("gong", "shi"))
         .apply {

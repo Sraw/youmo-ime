@@ -23,7 +23,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** uat/05's TB-50: entries pasted from the clipboard panel move first, once it closes. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -67,7 +66,6 @@ class ClipboardOrderUatTest {
         h.after(500)
         assertEquals(listOf("钉", "丙", "乙", "甲"), order())
         h.tap(h.described(s(R.string.back_to_keyboard)))
-        // the last pasted first of the unpinned, the pinned in its place
         h.waitFor("moved") { order() == listOf("钉", "乙", "甲", "丙") }
     }
 

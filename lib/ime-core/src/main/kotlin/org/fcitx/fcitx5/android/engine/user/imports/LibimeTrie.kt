@@ -7,15 +7,11 @@ package org.fcitx.fcitx5.android.engine.user.imports
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 
 /**
- * libime's `DATrie` (cedar's double array with tails) as it saves one, only walked for its keys:
- * nothing is looked up in it. A value is its raw 32 bits, what they mean up to the file.
+ * libime's `DATrie` (cedar's double array with tails) as saved, only walked for its keys.
  *
- * A file is not trusted to be a tree. A node is a child only of the one its check names, so
- * with the root never a child each is walked once; tails, which keys could share, are read no
- * more than their length all told, as in any trie cedar saves. Keys share their paths too, so a
- * long path to many leaves would hand out its length for each: the keys handed out come to no
- * more than a few times the trie's size. A crafted file cannot make it walk, keep, or hand out
- * much more than it holds.
+ * The file is not trusted to be a tree: a node is a child only of the one its check names, tails are read no more
+ * than their length, and keys handed out are capped at a few times the file size, so a crafted file cannot make it
+ * walk or allocate much more than it holds.
  */
 internal class LibimeTrie private constructor(
     private val tail: ByteArray,
@@ -26,11 +22,9 @@ internal class LibimeTrie private constructor(
 ) {
 
     fun interface Visitor {
-        /** A key: the first [length] bytes of [key], which is reused for the next. */
         fun visit(key: ByteArray, length: Int, value: Int)
     }
 
-    /** Each key and its value, in the trie's order (by byte). */
     fun forEach(visitor: Visitor) {
         if (base.isEmpty()) return
         tailRead = 0
@@ -58,10 +52,8 @@ internal class LibimeTrie private constructor(
         if (from == 0 && label == 0) return
         while (true) {
             val to = node(b xor label, from)
-            // a key no dictionary has: before the stack runs out
             if (depth >= MAX_DEPTH) throw DataFormatException("libime trie deeper than $MAX_DEPTH")
             if (label == 0) {
-                // a key ends here: the value is the node's base
                 visit(visitor, key, depth, base[to])
             } else {
                 if (depth + 1 >= key.size) key = key.copyOf(key.size * 2)
@@ -76,7 +68,6 @@ internal class LibimeTrie private constructor(
         }
     }
 
-    /** A key whose rest is in the tail from [at], NUL-ended, its value after it. */
     private fun tailKey(at: Int, depth: Int, keyBuffer: ByteArray, visitor: Visitor) {
         var key = keyBuffer
         var i = at
@@ -89,7 +80,7 @@ internal class LibimeTrie private constructor(
         visit(visitor, key, length, le32(tail, i + 1))
     }
 
-    // cedar's marks for a key erased, or a node kept with none, are no value to read
+    // cedar's marks for an erased key or an empty node are no value
     private fun visit(visitor: Visitor, key: ByteArray, length: Int, value: Int) {
         if (value in NO_VALUES) return
         keyBytes += length
@@ -107,21 +98,18 @@ internal class LibimeTrie private constructor(
     }
 
     companion object {
-        // keys branch near their start, their rest kept in the tail
         private const val MAX_DEPTH = 1024
 
-        // the 电报码 table libime ships hands out a third of its tries' size in keys, the zhwiki and
-        // moegirl dictionaries 0.6 of theirs: room to spare
+        // libime's 电报码 table hands out a third of its size in keys, zhwiki and moegirl 0.6: room to spare
         private const val KEYS_PER_BYTE = 4L
 
         // NO_VALUE and NO_PATH: -1 and -2 in an integer trie, NaN 1 and 2 in a float one
         private val NO_VALUES = intArrayOf(-1, -2, 0x7fc00001, 0x7fc00002)
 
-        /** The trie at [input]'s position, which is left past it. */
         fun read(input: BigEndianInput): LibimeTrie {
             val tailLength = input.u32()
             val size = input.u32()
-            // the node, sibling/child and block arrays: 8 + 2 + 20 / 256 bytes a node
+            // node, sibling/child and block arrays: 8 + 2 + 20 / 256 bytes a node
             if (tailLength < 0 || size < 0 || tailLength.toLong() + size * 10L > input.remaining) {
                 throw DataFormatException("libime trie of $size nodes past the end")
             }
@@ -151,7 +139,6 @@ internal class LibimeTrie private constructor(
     }
 }
 
-/** What libime marshals: big-endian numbers, strings as a length and their bytes. */
 internal class BigEndianInput(private val data: ByteArray, private var pos: Int = 0) {
 
     val remaining get() = data.size - pos
@@ -182,6 +169,5 @@ internal class BigEndianInput(private val data: ByteArray, private var pos: Int 
         pos += n
     }
 
-    /** libime's `marshallString`: a 32-bit length, then UTF-8. */
     fun string(): String = String(bytes(u32()), Charsets.UTF_8)
 }

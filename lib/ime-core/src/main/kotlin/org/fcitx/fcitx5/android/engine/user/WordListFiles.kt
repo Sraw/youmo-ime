@@ -11,43 +11,25 @@ import java.io.InputStreamReader
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
 
-/** How a word list file is read: the user dictionary's export told, a text file put into the base. */
 object WordListFiles {
 
-    /**
-     * The export's first line, never translated: an export made in one language is told in any
-     * other. The translated header follows it.
-     */
+    /** The export's first line, never translated, so an export is recognised in any language; the translated header follows. */
     const val EXPORT_MARK = "# youmo-words 1"
 
-    /**
-     * Before a learned word in the export, apart from it (`~ 拟好 ni'hao 3.0`), as `!` before a
-     * blocked one: no other input method's list starts a line so, and apart, an older version
-     * reads the line as two words, so not at all (not a word `~拟好`).
-     */
+    /** Before a learned word in the export, apart (`~ 拟好 ni'hao 3.0`): no other list starts a line so, and an older version reads two words, so nothing. */
     const val LEARNED_MARK = "~"
 
-    /**
-     * Before an English word blocked in the user's export (`!@en the`): it has no reading, and a
-     * line of letters alone reads as pinyin (WordLists.line). The import blocks it in English's list.
-     */
+    /** Before an English word blocked in the export (`!@en the`): a line of letters alone would read as pinyin. */
     const val ENGLISH_BLOCK_MARK = "!@en "
 
-    /** The first lines of an export: [EXPORT_MARK], then [header], the translated one. */
-    fun exportHead(header: String) = "$EXPORT_MARK\n$header\n"
-
-    // the first line of exports made before EXPORT_MARK, one per language shipped (en, zh-CN, zh-TW)
+    // exports before EXPORT_MARK, one header per language shipped
     private val OLD_HEADERS = setOf(
         "# Youmo IME user dictionary: a word a line, its pinyin after it; a ! before a word blocks it",
         "# 幽默输入法用户词库：一行一个词，词后面是拼音；! 开头的是屏蔽的词",
         "# 幽默輸入法使用者詞庫：一行一個詞，詞後面是拼音；! 開頭的是封鎖的詞",
     )
 
-    /**
-     * The charset of the word list [open] reads, by [WordLists.decode]'s rules: UTF-16 by its byte
-     * order mark, UTF-8 if the whole of it reads so, else GB18030. Told by reading it through
-     * rather than whole: a base dictionary runs to many megabytes.
-     */
+    /** The charset of [open]'s word list by [WordLists.decode]'s rules, read through rather than whole (base dictionaries are megabytes). */
     fun charset(open: () -> InputStream): Charset {
         val head = ByteArray(2)
         val n = open().use { input -> input.read(head) }
@@ -63,18 +45,9 @@ object WordListFiles {
         }
     }
 
-    /**
-     * [line] of a text file imported into the base dictionary, in libime's format: as it is if it
-     * is one already (its cost kept), else read as the user dictionary reads a word list
-     * ([WordLists.line]: `you mo 幽默`, a Sogou export's `'you'mo 幽默 1`) and written so. Null for
-     * a line neither reads, a word with no pinyin (the base has nothing to guess it from) or a
-     * blocked one: the base cannot block. A learned word ([LEARNED_MARK]) is read only in the
-     * user's [export], as the user dictionary's import reads it; in another list, none.
-     */
+    /** [line] of a file imported into the base, in libime's format: kept if already so, else read as a word list line; null for a line without pinyin or a blocked one. A learned word is read only in the user's [export]. */
     fun baseLine(line: String, export: Boolean = false): String? {
-        // the byte order mark, read as a character in UTF-8 and UTF-16 alike
         val bare = line.removePrefix("\uFEFF")
-        // a learned word of the user's export: the word, its count no cost
         val learned = bare.trimStart().startsWith(LEARNED_MARK)
         if (learned && !export) return null
         val plain = if (learned) bare.trimStart().removePrefix(LEARNED_MARK) else bare
@@ -85,7 +58,6 @@ object WordListFiles {
         return "${escapeValue(entry.text)} ${entry.apostrophed()} 0"
     }
 
-    /** [lines], a text file, as [baseLine] reads them: an export ([EXPORT_MARK] its first line not blank) with its learned words. */
     fun baseLines(lines: Sequence<String>): Sequence<String> {
         var export: Boolean? = null
         return lines.mapNotNull { line ->
@@ -94,45 +66,26 @@ object WordListFiles {
         }
     }
 
-    /**
-     * The lines of [head], the start of a file, decoded up to its last whole line: a character cut
-     * in two would read UTF-8 as GB18030 and garble the rest; UTF-16 (by its byte order mark) to a
-     * whole code unit, its newline being two bytes.
-     */
+    /** The lines of [head] up to its last whole line: a cut character would read UTF-8 as GB18030; UTF-16 to a whole code unit. */
     private fun headLines(head: ByteArray): Sequence<String> {
         val utf16 = WordLists.bomCharset(head, head.size) != null
         val end = if (utf16) head.size and 1.inv() else head.lastIndexOf('\n'.code.toByte()) + 1
         return WordLists.decode(if (end > 0) head.copyOf(end) else head).lineSequence()
     }
 
-    /** [line] without a byte order mark and the spaces around it; null for one with nothing else. */
     private fun header(line: String) = line.removePrefix("\uFEFF").trim().takeIf { it.isNotEmpty() }
 
-    /**
-     * Whether a file is an export, told line by line from its start: null for [line] with nothing
-     * but a byte order mark or spaces (the answer comes from a later one), else whether it is
-     * [EXPORT_MARK] (or, [old], also an older export's header). The one rule [baseLines], the user
-     * dictionary's import and [isOwnExport] tell an export by: its first non-blank line.
-     */
+    /** Whether a file is an export, by its first non-blank line; null for a blank [line]. The one rule [baseLines], the import and [isOwnExport] share. */
     internal fun exportMark(line: String, old: Boolean = false): Boolean? =
         header(line)?.let { it == EXPORT_MARK || (old && it in OLD_HEADERS) }
 
-    /**
-     * Whether [head], a file's start, begins with an export's header: its first non-blank line (as
-     * [baseLines] and the user dictionary's import tell an export) is [EXPORT_MARK] or an older
-     * export's header. A `!` line tells nothing here.
-     */
+    /** Whether [head]'s first non-blank line is [EXPORT_MARK] or an older export's header. */
     fun isOwnExport(head: ByteArray): Boolean = isOwnExport(headLines(head))
 
     private fun isOwnExport(lines: Sequence<String>) = lines.firstNotNullOfOrNull { exportMark(it, old = true) } == true
 
-    /**
-     * Whether [head], the start of a file, is the user dictionary's export: [isOwnExport], or it has
-     * a blocked word (`!`), which no other list has and which the base, should it be imported there,
-     * would drop.
-     */
+    /** Whether [head] is the user dictionary's export: [isOwnExport], or a `!` line, which no other list has and the base would drop. */
     fun isUserExport(head: ByteArray): Boolean {
-        // decoded once: both questions read the same lines
         val lines = headLines(head).toList().asSequence()
         return isOwnExport(lines) || lines.any { it.removePrefix("\uFEFF").trimStart().startsWith("!") }
     }

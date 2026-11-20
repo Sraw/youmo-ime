@@ -12,11 +12,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Cursor, selection and composing arithmetic -- the part of an IME that is hardest to get
- * right and, until this was extracted from `FcitxInputMethodService`, could only be exercised
- * by typing on a device and watching for the cursor to jump.
- */
 class EditingSessionTest {
 
     private fun session(text: String = "", cursor: Int = text.length): Pair<EditingSession, FakeEditor> {
@@ -28,13 +23,10 @@ class EditingSessionTest {
 
     private fun formatted(text: String) = FormattedText(arrayOf(text), intArrayOf(0), -1)
 
-    /** Puts the session into the state it would be in mid-composition. */
     private fun EditingSession.compose(text: String, start: Int) {
         setComposingText(formatted(text))
         composing.update(start, start + text.length)
     }
-
-    // region commitText into an empty buffer
 
     @Test
     fun committingIntoAnEmptyBufferInsertsTheText() {
@@ -66,10 +58,6 @@ class EditingSessionTest {
         s.commitText("ab")
         assertTrue("anchored on latest, not current", s.selection.latest.rangeEquals(12))
     }
-
-    // endregion
-
-    // region commitText with an explicit cursor
 
     @Test
     fun anExplicitCursorPlacesTheCaretInsideTheCommittedText() {
@@ -110,10 +98,6 @@ class EditingSessionTest {
         s.commitText("abc", cursor = 0)
         assertTrue(s.selection.latest.rangeEquals(0))
     }
-
-    // endregion
-
-    // region commitText of a text too long for one call (CommitPieces)
 
     private val pauses = mutableListOf<Long>()
 
@@ -269,10 +253,6 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(5))
     }
 
-    // endregion
-
-    // region commitText while composing
-
     @Test
     fun committingDifferentTextReplacesTheComposingRegion() {
         val (s, e) = session("", cursor = 0)
@@ -286,11 +266,7 @@ class EditingSessionTest {
         assertEquals("commitText(你, 1)", e.calls.last())
     }
 
-    /**
-     * When the commit is character-for-character what is already composing, the text is left
-     * alone and the composition is simply finished. Re-committing it would make the editor
-     * redraw and can drop spans other IMEs or the app put there.
-     */
+    /** Committing what is composing only finishes it: re-committing redraws and can drop spans. */
     @Test
     fun committingTheSameTextOnlyFinishesTheComposition() {
         val (s, e) = session("你好", cursor = 2)
@@ -317,18 +293,13 @@ class EditingSessionTest {
         assertTrue(e.calls.contains("finishComposingText()"))
     }
 
-    /**
-     * A move the editor has not reported yet is where the caret is going, so this branch
-     * compares with the latest prediction, as every other path does. With the confirmed cursor
-     * (2, the target) no move was sent, and the pending move to 0 left the caret inside the
-     * committed text.
-     */
+    /** A pending move is where the caret is going: compared with the latest prediction, not the confirmed cursor. */
     @Test
     fun finishingAnIdenticalCompositionMovesTheCursorOnFromAPendingMove() {
         val (s, e) = session("你好", cursor = 2)
         s.compose("你好", start = 0)
         s.selection.resetTo(2)
-        // a preedit cursor move (updateComposingText), sent but not reported yet
+        // a preedit cursor move, sent but not reported yet
         s.selection.predict(0)
         e.setSelection(0, 0)
 
@@ -357,10 +328,6 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(4))
     }
 
-    // endregion
-
-    // region deleteSelection
-
     @Test
     fun deletingASelectionRemovesItAndCollapsesTheCursor() {
         val (s, e) = session("abcdef", cursor = 0)
@@ -381,7 +348,6 @@ class EditingSessionTest {
         assertTrue("the editor was not touched", e.calls.isEmpty())
     }
 
-    /** A commit replaces the composing region, not the selection, so the composition goes first. */
     @Test
     fun deletingASelectionWhileComposingDeletesTheSelection() {
         val (s, e) = session("abcnihao", cursor = 8)
@@ -395,10 +361,6 @@ class EditingSessionTest {
         assertEquals("in one batch", 1, e.maxBatchDepth)
         assertTrue(s.selection.latest.rangeEquals(e.selectionStart, e.selectionEnd))
     }
-
-    // endregion
-
-    // region applySelectionOffset
 
     @Test
     fun extendingTheSelectionToTheRight() {
@@ -431,7 +393,6 @@ class EditingSessionTest {
         },
     )
 
-    /** An offset that would turn the range inside out is dropped, not applied backwards. */
     @Test
     fun anInvertingOffsetIsIgnored() {
         val (s, e) = session("abcdef", cursor = 0)
@@ -441,7 +402,7 @@ class EditingSessionTest {
         assertTrue("the editor was not touched", e.calls.isEmpty())
     }
 
-    /** A zero offset re-asserts the current range to the editor rather than being skipped. */
+    /** A zero offset re-asserts the range to the editor rather than being skipped. */
     @Test
     fun offsettingByZeroStillSetsTheSelection() {
         val (s, e) = session("abc", cursor = 1)
@@ -450,11 +411,6 @@ class EditingSessionTest {
         assertEquals(listOf("setSelection(1, 2)"), e.calls)
     }
 
-    // endregion
-
-    // region select
-
-    // 滑选's: where it says, the start held at 0, never inside out
     @Test
     fun selectSetsTheRangeAsGiven() = assertRows(
         "as given" to {
@@ -484,8 +440,7 @@ class EditingSessionTest {
         },
     )
 
-    // 滑选's line: the selection set from its anchor, the other way round where the free end is the left
-    // one, as the editor extends its selection's end; predicted so, its report of that order taken
+    // the other way round where the free end is the left one, as the editor extends its selection's end
     @Test
     fun selectFromSetsTheAnchorFirst() = assertRows(
         "the free end left of the anchor: set and predicted reversed" to {
@@ -497,7 +452,7 @@ class EditingSessionTest {
         "the report of it is the prediction, not a move of the editor's own" to {
             val (s, _) = session("abcdef", cursor = 4)
             s.selectFrom(4, 1)
-            assertEquals(EditingSession.CursorUpdate.None, s.onCursorUpdate(4, 1, -1, -1, ignoreSystemCursor = false))
+            assertEquals(EditingSession.CursorUpdate.None, s.onCursorUpdate(4, 1, -1, -1))
         },
         "no editor, nothing predicted" to {
             val (s, e) = session("abc", cursor = 1)
@@ -507,8 +462,6 @@ class EditingSessionTest {
             assertTrue(e.calls.isEmpty())
         },
     )
-
-    // region cancelSelection
 
     @Test
     fun cancellingASelectionCollapsesItToTheEnd() {
@@ -527,10 +480,6 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    // endregion
-
-    // region deleteSurrounding
-
     @Test
     fun deletingAroundTheCursorPredictsWhereItGoes() = assertRows(
         "deleting before the cursor moves the predicted cursor back" to {
@@ -543,7 +492,6 @@ class EditingSessionTest {
             assertEquals("abef", e.text)
             assertTrue(s.selection.latest.rangeEquals(2))
         },
-        // Deleting after the cursor does not move it, so nothing is predicted.
         "deleting after the cursor leaves the prediction alone" to {
             val (s, e) = session("abcdef", cursor = 2)
             s.selection.resetTo(2)
@@ -556,10 +504,6 @@ class EditingSessionTest {
         },
     )
 
-    /**
-     * One press should remove a whole emoji, not half a surrogate pair. The session's job is to
-     * forward the caller's choice of unit to the editor unchanged.
-     */
     @Test
     fun theDeletionUnitIsForwardedToTheEditor() {
         val (s, e) = session("abc", cursor = 3)
@@ -574,11 +518,7 @@ class EditingSessionTest {
         )
     }
 
-    /**
-     * The editor reports positions in UTF-16 units, so a deletion counted in code points must
-     * still be predicted in units. Deleting one emoji moves the cursor back two, and predicting
-     * one made the editor's report look like an external cursor move (it used to).
-     */
+    /** Deleting one emoji in code points moves the cursor back two units. */
     @Test
     fun deletingByCodePointsPredictsTheUnitsActuallyRemoved() {
         val wave = String(Character.toChars(0x1F44B)) // two UTF-16 units
@@ -603,7 +543,6 @@ class EditingSessionTest {
         assertTrue("five units for two emoji and a letter", s.selection.latest.rangeEquals(1))
     }
 
-    /** Asking for more code points than exist deletes to the start, and predicts exactly that. */
     @Test
     fun deletingMoreCodePointsThanExistStopsAtTheStart() {
         val (s, e) = session("ab", cursor = 2)
@@ -612,10 +551,7 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(0))
     }
 
-    /**
-     * An editor that will not show its text leaves no way to measure, so the old one-unit-per-
-     * code-point guess stands. Right for everything outside the astral planes.
-     */
+    /** An editor that hides its text: one unit per code point is guessed. */
     @Test
     fun anEditorHidingItsTextFallsBackToOneUnitPerCodePoint() {
         val wave = String(Character.toChars(0x1F44B))
@@ -626,10 +562,7 @@ class EditingSessionTest {
         assertTrue("but with nothing to measure, one unit was guessed", s.selection.latest.rangeEquals(2))
     }
 
-    /**
-     * Returning less text than the cursor position allows means the editor held some back,
-     * not that the text starts there. Counting what came back would under-predict.
-     */
+    /** Less text than the cursor allows means the editor held some back: counting it would under-predict. */
     @Test
     fun anEditorRevealingTooLittleAlsoFallsBack() {
         val (s, e) = session("abcdef", cursor = 4)
@@ -645,7 +578,6 @@ class EditingSessionTest {
         assertFalse(e.calls.any { it.startsWith("textBeforeCursor") })
     }
 
-    /** Malformed text is refused by the editor, so no move is predicted. */
     @Test
     fun anUnpairedSurrogateBeforeTheCursorPredictsNoMove() {
         val low = String(Character.toChars(0x1F44B))[1]
@@ -655,10 +587,7 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(2))
     }
 
-    /**
-     * With a composition, the editor deletes before the composing region -- composing text is
-     * never deleted -- so that is where the code points are measured, not at the cursor.
-     */
+    /** Composing, the editor deletes before the composing region, so code points are measured there. */
     @Test
     fun deletingByCodePointsMeasuresFromTheCompositionNotTheCursor() {
         val wave = String(Character.toChars(0x1F44B))
@@ -675,7 +604,6 @@ class EditingSessionTest {
         assertTrue(s.selection.consume(e.selectionStart, e.selectionEnd))
     }
 
-    /** A deletion before the composition moves the composition too. */
     @Test
     fun deletingBeforeACompositionMovesIt() {
         val (s, e) = session("abcd", cursor = 4)
@@ -690,7 +618,6 @@ class EditingSessionTest {
         assertTrue(s.composing.rangeEquals(e.composingStart, e.composingEnd))
     }
 
-    /** Text either side goes; a selection in the middle survives, shifted left. */
     @Test
     fun deletingAroundASelectionShiftsIt() {
         val (s, e) = session("abcdef", cursor = 0)
@@ -704,16 +631,11 @@ class EditingSessionTest {
         assertTrue(s.selection.consume(e.selectionStart, e.selectionEnd))
     }
 
-    /** Typed as the service types it: the pairs first, else committed. */
     private fun EditingSession.type(text: String) {
         for (c in text) if (!pairs.type(c.toString())) commitText(c.toString())
     }
 
-    /**
-     * After the cursor, the closing one put in may be what went: the pairs are forgotten, even
-     * when what went before the cursor stayed inside the pair, and a `)` typed before one the
-     * user wrote is typed, not stepped over.
-     */
+    /** After the cursor, the closing one put in may be what went: the pairs are forgotten. */
     @Test
     fun aDeletionAfterTheCursorForgetsThePairs() {
         val (s, e) = session(")", cursor = 0)
@@ -730,10 +652,7 @@ class EditingSessionTest {
         assertEquals(2, f.selectionStart)
     }
 
-    /**
-     * Composing, the editor deletes before the composition, not before the cursor: the opening
-     * one can go, wherever the cursor is, so the pairs are forgotten.
-     */
+    /** Composing, the editor deletes before the composition, so the opening one can go: pairs forgotten. */
     @Test
     fun aDeletionWhileComposingForgetsThePairs() {
         val (s, e) = session()
@@ -747,13 +666,8 @@ class EditingSessionTest {
         assertEquals(2, e.selectionStart)
     }
 
-    // endregion
-
-    // region backspace
-
     private val optedIn = EditorTraits(acceptsDeleteSurrounding = true)
 
-    /** Almost every editor gets a key event: the only thing all of them understand. */
     @Test
     fun anOrdinaryEditorGetsAKeyEvent() {
         val (s, e) = session("abc", cursor = 3)
@@ -762,11 +676,7 @@ class EditingSessionTest {
         assertTrue("the key event is still predicted to delete one", s.selection.latest.rangeEquals(2))
     }
 
-    /**
-     * A key event deletes whatever the editor considers one character, which can't be known
-     * without a round trip per press. The prediction stays at one unit, and the editor is not
-     * asked -- Backspace auto-repeats, so that round trip would be paid many times a second.
-     */
+    /** A key event's prediction stays at one unit: asking the editor would cost a round trip per auto-repeat. */
     @Test
     fun aKeyEventBackspaceDoesNotAskTheEditorForText() {
         val wave = String(Character.toChars(0x1F44B))
@@ -803,7 +713,6 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(1))
     }
 
-    /** At the very start there is nothing to delete; the key event lets the editor decide. */
     @Test
     fun atTheStartEvenAnOptedInEditorGetsAKeyEvent() {
         val (s, e) = session("abc", cursor = 0)
@@ -812,7 +721,6 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    /** An opted-in editor that hides its text still loses a whole emoji; the guess is one unit. */
     @Test
     fun anOptedInEditorHidingItsTextFallsBackToOneUnit() {
         val wave = String(Character.toChars(0x1F44B))
@@ -823,10 +731,7 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(2))
     }
 
-    /**
-     * A code-point deletion would refuse an unpaired surrogate and leave it stuck, so an
-     * opted-in editor gets a key event for it instead, which does remove it.
-     */
+    /** A code-point deletion would refuse an unpaired surrogate, so it goes as a key event. */
     @Test
     fun anOptedInBackspaceOnMalformedTextFallsBackToAKeyEvent() {
         val low = String(Character.toChars(0x1F44B))[1]
@@ -836,14 +741,12 @@ class EditingSessionTest {
         assertFalse(e.calls.any { it.startsWith("delete") })
     }
 
-    /** A TYPE_NULL editor takes raw keys only, whatever it asked for. */
     @Test
     fun aRawKeyEditorGetsAKeyEventEvenIfOptedIn() {
         val (s, _) = session("abc", cursor = 3)
         assertFalse(s.backspace(optedIn.copy(isRawKeyInput = true)))
     }
 
-    /** With no connection a direct edit would be dropped; fall back to the key event. */
     @Test
     fun withNoEditorAnOptedInBackspaceFallsBackToAKeyEvent() {
         val (s, e) = session("abc", cursor = 3)
@@ -852,7 +755,6 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    /** fcitx only passes Backspace on with no preedit; a composition left over is stale. */
     @Test
     fun backspaceFinishesALeftoverCompositionAndDeletesBeforeTheCursor() {
         val (s, e) = session("abnihao", cursor = 7)
@@ -875,10 +777,6 @@ class EditingSessionTest {
         assertEquals(listOf("finishComposingText()"), e.calls)
         assertTrue(s.composing.isEmpty())
     }
-
-    // endregion
-
-    // region composing state
 
     @Test
     fun finishingTheCompositionLeavesTheTextAndForgetsTheRange() {
@@ -903,10 +801,7 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    /**
-     * Every mutating entry point reports in, so a debug build can catch a wrong-thread caller:
-     * the session's own, and those of its [EditingSession.pairs].
-     */
+    /** Every mutating entry point, the pairs' too, calls checkThread. */
     @Test
     fun everyMutatingEntryPointChecksTheThread() {
         var checks = 0
@@ -925,7 +820,7 @@ class EditingSessionTest {
             put("deleteSurrounding") { deleteSurrounding(1, 0, inCodePoints = false) }
             put("replaceAround") { replaceAround(1, 0, "x") }
             put("backspace") { backspace(EditorTraits()) }
-            put("onCursorUpdate") { onCursorUpdate(3, 3, -1, -1, ignoreSystemCursor = false) }
+            put("onCursorUpdate") { onCursorUpdate(3, 3, -1, -1) }
             put("updateComposingText") { updateComposingText(formatted("ni")) }
             put("provisionalRestarted") { provisionalRestarted(sameField = true, 3, 3) }
             put("writeCode") { writeCode(formatted("ni")) }
@@ -941,9 +836,8 @@ class EditingSessionTest {
             put("cursorReported") { cursorReported() }
             put("deletedBefore") { deletedBefore(cursor = 3, units = 1) }
         }
-        // a new public method must be added above, with a call, or to queries if it changes nothing; this names one in neither
-        // the listeners and the field's kind, set once by their owner; the context reads that leave the
-        // code out: the editor untouched
+        // a new public method must be added above, with a call, or to queries if it changes nothing
+        // queries: the listeners, the field's kind, and the context reads; the editor untouched
         val queries = setOf("setProvisionalTaken", "setCodeFellBack", "setInlineCompletion", "beforeCode", "afterCode")
         val pairQueries = emptySet<String>()
         assertEquals("EditingSession methods not listed", emptyList<String>(), unlisted(EditingSession::class.java, calls.keys + queries))
@@ -960,7 +854,6 @@ class EditingSessionTest {
         }
     }
 
-    /** The public methods of [type], a property's getters (`getX`, `isX`) aside, that are not in [listed]. */
     private fun unlisted(type: Class<*>, listed: Set<String>): List<String> = type.declaredMethods
         .filter { java.lang.reflect.Modifier.isPublic(it.modifiers) && !it.isSynthetic }
         // an internal method's name has its module after a '$'
@@ -978,16 +871,12 @@ class EditingSessionTest {
         assertEquals(FormattedText.Empty, s.composingText)
     }
 
-    // endregion
-
-    // region cursor reports (onUpdateSelection)
-
-    private fun EditingSession.report(start: Int, end: Int = start, composing: Pair<Int, Int> = -1 to -1, ignore: Boolean = false) =
-        onCursorUpdate(start, end, composing.first, composing.second, ignoreSystemCursor = ignore)
+    private fun EditingSession.report(start: Int, end: Int = start, composing: Pair<Int, Int> = -1 to -1) =
+        onCursorUpdate(start, end, composing.first, composing.second)
 
     private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
 
-    // the cursor left it (a tap or an arrow), the editor's span there or not: taken away, the cursor kept where it went
+    // the cursor left it (a tap or an arrow), the editor's span there or not: taken away, the cursor kept
     @Test
     fun aProvisionalCompositionTheCursorLeft() = assertRows(
         "the cursor moved past it: still there, taken away" to {
@@ -1026,7 +915,6 @@ class EditingSessionTest {
             assertEquals("ab", e.text)
         },
         "the cursor moved before it: taken away, the cursor where it went" to {
-            // voice's text still to come, composing after "ab"; the user taps before "a"
             val (s, e) = session("ab", cursor = 2)
             s.updateComposingText(formatted("你好"), provisional = true)
             assertEquals("ab你好", e.text)
@@ -1042,7 +930,6 @@ class EditingSessionTest {
             val (s, e) = session("ab", cursor = 1)
             s.updateComposingText(formatted("你好"), provisional = true)
             assertEquals("a你好b", e.text)
-            // after "b": two places on once the composition is gone
             e.setSelection(4, 4)
             assertEquals(EditingSession.CursorUpdate.None, s.report(4))
             assertEquals("ab", e.text)
@@ -1074,7 +961,6 @@ class EditingSessionTest {
             assertEquals(listOf(EditingSession.Taken.GONE), told)
             assertFalse(s.provisional)
             assertTrue(s.composing.isEmpty())
-            // nothing left to take away: the field read, not edited, its composing region let go
             assertEquals(listOf("textAfterCursor(4)", "finishComposingText()"), e.calls)
         },
         "all of it composing, the field cleared: the cursor at its start" to {
@@ -1124,7 +1010,6 @@ class EditingSessionTest {
             assertEquals(2, e.selectionStart)
             assertEquals(listOf(EditingSession.Taken.AWAY), told)
             assertFalse(s.provisional)
-            // the cursor's report that brings is the prediction, not the user's move
             assertTrue(s.selection.latest.rangeEquals(2))
             assertEquals(EditingSession.CursorUpdate.None, s.report(2))
             assertTrue(s.selection.current.rangeEquals(2))
@@ -1150,7 +1035,6 @@ class EditingSessionTest {
             assertEquals("", e.text)
             assertEquals(listOf(EditingSession.Taken.GONE), told)
             assertTrue(e.calls.none { it.startsWith("set") || it.startsWith("commit") })
-            // the editor's composing region, if it kept one over the app's text, let go
             assertTrue("finishComposingText()" in e.calls)
         },
         "the same field, the cursor further from it than is read: still there, taken away, nothing that far read" to {
@@ -1162,7 +1046,7 @@ class EditingSessionTest {
             s.provisionalRestarted(sameField = true, 4 + far.length, 4 + far.length)
             assertEquals("ab$far", e.text)
             assertFalse(s.provisional)
-            // R20 F5987: no read across the IPC of maybe the whole document
+            // no read across the IPC of maybe the whole document
             assertTrue(e.calls.toString(), e.calls.none { it.startsWith("textBeforeCursor(") && it.removePrefix("textBeforeCursor(").removeSuffix(")").toInt() > 4096 })
         },
         "the same field, its selection unknown: left as text, told so, not as the app's" to {
@@ -1203,7 +1087,6 @@ class EditingSessionTest {
         s.commitText("你好世界")
         assertEquals("ab你好世界", e.text)
         assertFalse(s.provisional)
-        // the engine's composition is not provisional
         s.updateComposingText(formatted("ni"))
         assertFalse(s.provisional)
     }
@@ -1240,7 +1123,6 @@ class EditingSessionTest {
         },
     )
 
-    /** An InputFilter may also have changed the text, so the old range means nothing then. */
     @Test
     fun anUnexpectedReportDoesNotRestoreTheComposingSpan() {
         val (s, e) = session("nihao", cursor = 5)
@@ -1256,15 +1138,10 @@ class EditingSessionTest {
             assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(2))
             assertTrue("the report is the new truth", s.selection.latest.rangeEquals(2))
         },
-        // the engine is told as for a cursor: what English committed may no longer be before it
         "the user selecting with nothing composed resets fcitx" to {
             val (s, _) = session("hello world", cursor = 11)
             assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(6, 11))
             assertTrue(s.selection.latest.rangeEquals(6, 11))
-        },
-        "the ignore system cursor setting still resets fcitx with nothing composed" to {
-            val (s, _) = session("abc", cursor = 3)
-            assertEquals(EditingSession.CursorUpdate.ResetIfNotEmpty, s.report(1, ignore = true))
         },
     )
 
@@ -1296,23 +1173,6 @@ class EditingSessionTest {
         s.setComposingText(preedit("nihao", cursor = 2))
         s.composing.update(0, 5)
         assertEquals(EditingSession.CursorUpdate.None, s.report(2))
-    }
-
-    @Test
-    fun theIgnoreSystemCursorSettingKeepsFcitxsCursorWhereItIs() {
-        val (s, _) = session("nihao", cursor = 5)
-        s.compose("nihao", start = 0)
-        assertEquals(EditingSession.CursorUpdate.None, s.report(2, ignore = true))
-        assertTrue("the report is still tracked", s.selection.latest.rangeEquals(2))
-    }
-
-    /** The setting only concerns taps inside the preedit; the rest of a report is acted on. */
-    @Test
-    fun theIgnoreSystemCursorSettingStillFinishesACompositionLeftBehind() {
-        val (s, e) = session("abnihao", cursor = 7)
-        s.compose("nihao", start = 2)
-        assertEquals(EditingSession.CursorUpdate.FocusOutIn, s.report(0, ignore = true))
-        assertEquals(listOf("finishComposingText()"), e.calls)
     }
 
     @Test
@@ -1356,18 +1216,14 @@ class EditingSessionTest {
         assertEquals(before + 2, s.cursorUpdateIndex)
     }
 
-    /** What the service resets fcitx's count of open quotes for: else the next quote is a lone ”. */
     @Test
     fun aReportSaysWhenItLeftAQuoteFcitxCountsOpenWithNothingComposed() {
         val (s, _) = session()
         assertTrue(s.pairs.type("“"))
-        // the pair's own report: the cursor still between them
         s.report(1)
         assertFalse(s.quoteLeftOpen)
-        // the user taps before it: left open
         s.report(0)
         assertTrue(s.quoteLeftOpen)
-        // said of that report alone
         s.report(0)
         assertFalse(s.quoteLeftOpen)
         // a ” stepped over with “, reported with nothing composed: fcitx still counts that “ open
@@ -1377,7 +1233,7 @@ class EditingSessionTest {
         assertTrue(o.pairs.type("“"))
         o.report(2)
         assertTrue(o.quoteLeftOpen)
-        // a ” stepped over with “, the report coming once something is composed: a reset would drop it
+        // the report coming once something is composed: a reset would drop it
         val (c, _) = session()
         c.pairs.type("“")
         c.report(1)
@@ -1388,11 +1244,6 @@ class EditingSessionTest {
         assertFalse(c.quoteLeftOpen)
     }
 
-    // endregion
-
-    // region preedit (updateComposingText)
-
-    /** The session's prediction and composing range must be what the editor ended up with. */
     private fun assertInStep(s: EditingSession, e: FakeEditor) {
         assertTrue("predicted ${s.selection.latest}, editor at ${e.selectionStart}",
             s.selection.latest.rangeEquals(e.selectionStart, e.selectionEnd))
@@ -1441,7 +1292,6 @@ class EditingSessionTest {
         assertInStep(s, e)
     }
 
-    /** fcitx sends -1 when the preedit has no cursor; there is nowhere to move to. */
     @Test
     fun theSamePreeditWithNoCursorLeavesTheCursorAlone() {
         val (s, e) = session("", cursor = 0)
@@ -1513,7 +1363,6 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(2))
     }
 
-    /** The whole round trip: compose, have the editor report back, commit. */
     @Test
     fun typingAWordStaysInStepWithTheEditorsReports() {
         val (s, e) = session("", cursor = 0)
@@ -1527,15 +1376,7 @@ class EditingSessionTest {
         assertInStep(s, e)
     }
 
-    // endregion
-
-    // region no editor
-
-    /**
-     * Between input sessions there is no connection. Operations that predict a cursor move must
-     * not do so when the editor call is going to be dropped, or the IME is left expecting a
-     * report that never comes.
-     */
+    /** Without a connection, nothing may be predicted: the report would never come. */
     @Test
     fun withNoEditorACommitChangesNothing() {
         val (s, e) = session("ni", cursor = 2)
@@ -1587,7 +1428,6 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    /** The key event the caller falls back to is dropped too, so no move may be expected. */
     @Test
     fun withNoEditorABackspacePredictsNothing() {
         val (s, e) = session("abc", cursor = 3)
@@ -1606,16 +1446,10 @@ class EditingSessionTest {
         assertTrue(e.calls.isEmpty())
     }
 
-    // endregion
-
-    // region sequences
-
-    /** Type pinyin, pick a candidate, keep typing: the cursor must track through all of it. */
     @Test
     fun composingThenCommittingThenTypingKeepsTheCursorConsistent() {
         val (s, e) = session("", cursor = 0)
 
-        // the service has shown "nihao" as composing text; the editor holds it as a region
         s.compose("nihao", start = 0)
         e.setComposingText("nihao")
         s.selection.consume(5)
@@ -1630,7 +1464,6 @@ class EditingSessionTest {
         assertTrue(s.selection.latest.rangeEquals(3))
     }
 
-    /** The user taps elsewhere mid-composition; the session must follow, not drift. */
     @Test
     fun anExternalCursorMoveIsAbsorbed() {
         val (s, _) = session("hello world", cursor = 11)
@@ -1644,5 +1477,4 @@ class EditingSessionTest {
         assertTrue("the next commit anchors on the new position", s.selection.latest.rangeEquals(4))
     }
 
-    // endregion
 }

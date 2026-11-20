@@ -50,7 +50,6 @@ open class PreeditUi(
         override fun getDrawable() = drawable
     }
 
-    /** The code being typed as the theme has it (060-render-p3 T6b: `preedit`). */
     private val look: PreeditLook = SceneBar.of(ctx, theme).preedit
 
     private val cursorSpan by lazy {
@@ -71,7 +70,7 @@ open class PreeditUi(
     var visible = false
         private set
 
-    // made when first asked for: a subclass's root is its own, which upView cannot be in as well
+    // a subclass's root is its own, which upView cannot be in as well
     override val root: View by lazy {
         verticalLayout {
             add(upView, lParams())
@@ -79,10 +78,9 @@ open class PreeditUi(
         }
     }
 
-    /** The line above and the line below, made of the preedit's line ([above]) and aux below ([below]). */
     protected open fun lines(above: SpannedString, below: SpannedString): Pair<CharSequence, CharSequence> = above to below
 
-    /** Where in the line above the cursor is drawn, -1 for none. */
+    /** -1 for none. */
     protected var cursorShown = -1
         private set
 
@@ -146,14 +144,12 @@ open class PreeditUi(
         }
     }
 
-    /** Where the theme's underline goes under the code (its width and colour the view's). */
     class ThemedUnderline
 
     /**
-     * The code's text, the theme's underline ([PreeditLook.Underline]) drawn under each [ThemedUnderline]:
-     * no public API sets an underline's colour or thickness (`TextPaint.underlineColor` and
-     * `underlineThickness` are hidden at every API level; `UnderlineSpan` takes the text's colour and the
-     * font's thickness), so the view draws the line, where the font puts its own (`Paint.underlinePosition`, API 29).
+     * No public API sets an underline's colour or thickness (`TextPaint.underlineColor` and `underlineThickness`
+     * are hidden; `UnderlineSpan` takes the text's colour and the font's thickness), so the view draws the
+     * line, where the font puts its own (`Paint.underlinePosition`, API 29).
      */
     @SuppressLint("ViewConstructor")
     class PreeditTextView(context: Context, private val underline: PreeditLook.Underline?) : AppCompatTextView(context) {
@@ -173,16 +169,14 @@ open class PreeditUi(
             }
         }
 
-        /** A stretch of underline on [line], from [left] to [right] of the layout, px. */
+        /** Px of the layout. */
         data class Segment(val line: Int, val left: Float, val right: Float)
 
         companion object {
             /**
-             * [start] to [end]'s stretch on each line it is on, the code wrapped (the floating strip): a line it
-             * goes on past ends at the line's end edge, right or left by its paragraph's direction, not at the
-             * offset there, which is the next line's start; a span ending at a wrap draws nothing on the next line.
-             * The end edge is the line's text measured whole, the space it wrapped at too (getLineRight and
-             * getLineLeft leave a trailing space out, which the underline then stopped short of).
+             * A line it goes on past ends at the line's end edge (by its paragraph's direction), not at the offset
+             * there, which is the next line's start. The end edge is the line's text measured whole: getLineRight and
+             * getLineLeft leave a trailing space out, which the underline then stopped short of.
              */
             fun segments(layout: Layout, start: Int, end: Int): List<Segment> {
                 if (end <= start) return emptyList()

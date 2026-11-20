@@ -26,18 +26,9 @@ import org.fcitx.fcitx5.android.host.StatusEntry
 import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
-/**
- * The host as the app reaches it, one interface for each of its parts (typing, the input methods,
- * the engine's options, punctuation, the user's words, learning), and what it last told the app.
- *
- * Functions can be safely used in any coroutine, as the underlying operation is always dispatched
- * in fcitx thread.
- */
+/** Every call is dispatched to the fcitx thread, so any coroutine may call. */
 interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationApi, LexiconApi, LearningApi {
 
-    /**
-     * Subscribe this flow to receive event sent from fcitx
-     */
     val eventFlow: SharedFlow<HostEvent>
 
     val isReady: Boolean
@@ -46,35 +37,22 @@ interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationAp
 
     val statusAreaCached: List<StatusEntry>
 
-    /**
-     * What each punctuation key types now ([HostEvent.StatusArea.punctuation]): the last status's, or at the host's
-     * start (before a status) for its input method; null while no host has said (none started, or stopped).
-     */
+    /** Null while no host has said (none started, or stopped). */
     val punctuationCached: Map<String, String>?
 
-    /** Full width on, as the last status said ([HostEvent.StatusArea.fullWidth]); off before one. */
     val fullWidthCached: Boolean
 
     val clientPreeditCached: FormattedText
 
     val inputPanelCached: HostEvent.InputPanel
 
-    /**
-     * Something typed, as the host left it: a preedit in the field or on the panel (联想's words with nothing typed
-     * are not). The one test of it: the ⌫ swipe's (PreeditEmptyStateComponent mirrors these two on the main thread;
-     * HostCore.clearTyped asks the panel the same), a held ⌫'s repeats (BackspaceHold), what is typed put in first.
-     * Read in a fcitx job it is exact, every key before it handled; the main thread's mirror lags behind.
-     */
+    /** The one test of "something typed" (联想's words alone are not); exact in a fcitx job, while main's mirror lags. */
     val composingCached: Boolean get() = clientPreeditCached.isNotEmpty() || inputPanelCached.preedit.isNotEmpty()
 
-    /**
-     * The candidates last sent, for the touch keyboard's bar: a view made anew shows them as the
-     * engine has them (A2), not an empty bar under a half-typed code. [HostEvent.Candidates.EMPTY]
-     * once a page ([pagedCached]) was sent since.
-     */
+    /** So a remade view shows the engine's candidates, not an empty bar; EMPTY once a page ([pagedCached]) was sent since. */
     val candidatesCached: HostEvent.Candidates
 
-    /** The page last sent, for the hardware keyboard's window; [HostEvent.Paged.EMPTY] once a bulk list was sent since. */
+    /** For the hardware keyboard's window; EMPTY once a bulk list was sent since. */
     val pagedCached: HostEvent.Paged
 
     suspend fun save()
@@ -82,10 +60,9 @@ interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationAp
     suspend fun reloadConfig()
 }
 
-/** What the keyboard sends and asks while the user types: keys, candidates, the field, the status area. */
 interface TypingApi {
 
-    /** [touch]: where a typing key's tap fell and the keys around it, carried to the engine with the key (061-neighbour-correction). */
+    /** [touch]: where a tap fell and its neighbours, carried with the key. */
     suspend fun sendKey(key: String, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1, touch: Touch? = null)
 
     suspend fun sendKey(c: Char, states: UInt = 0u, code: Int = 0, up: Boolean = false, timestamp: Int = -1)
@@ -94,30 +71,25 @@ interface TypingApi {
 
     suspend fun sendKey(sym: KeySym, states: KeyStates, code: Int = 0, up: Boolean = false, timestamp: Int = -1, touch: Touch? = null)
 
-    /**
-     * Picks the [idx]th candidate if it still shows [text], what the user tapped: a list refined
-     * since may hold another word there, and false is returned. A null [text] (a key's pick) is
-     * not checked.
-     */
+    /** False if a refine moved another word to [idx]; a null [text] (a key's pick) is not checked. */
     suspend fun select(idx: Int, text: String? = null): Boolean
     suspend fun isEmpty(): Boolean
 
-    /** The input ended (what handwriting wrote put in), or with [drop] what is typed dropped, nothing put in. */
+    /** [drop] drops what is typed instead of committing it. */
     suspend fun reset(drop: Boolean = false)
 
-    /** 联想's predictions shown dropped (the bar's ×), the 联想 setting as it was; false where none show. */
+    /** False where none show; the 联想 setting stays. */
     suspend fun dropPredictions(): Boolean
 
-    /** What is typed dropped, nothing committed (清除), with the [keyboard] of its input method; null with nothing typed. */
+    /** Null with nothing typed. */
     suspend fun clearTyped(keyboard: (im: String) -> Any?): HostCore.Retyping?
 
-    /** What [clearTyped] dropped typed again, on [keyboard] the one it was typed with; false when it cannot be. */
     suspend fun retype(typing: HostCore.Retyping, keyboard: Any?): Boolean
     suspend fun moveCursor(position: Int)
 
     suspend fun triggerQuickPhrase()
 
-    /** What quick input's candidate [index] is, for the card its long press opens; null for ＋添加, or none shown. */
+    /** Null for ＋添加, or none shown. */
     suspend fun quickPhraseAt(index: Int): QuickPhraseBook.Found?
     suspend fun triggerUnicode()
 
@@ -135,20 +107,13 @@ interface TypingApi {
 
     suspend fun getCandidateActions(idx: Int): Array<CandidateAction>
 
-    /** Does nothing once the [idx]th candidate no longer shows [text], the one long-pressed: see [select]. */
+    /** Does nothing once candidate [idx] no longer shows [text]: see [select]. */
     suspend fun triggerCandidateAction(idx: Int, actionIdx: Int, text: String)
 
     suspend fun setCandidatePagingMode(mode: Int)
     suspend fun offsetCandidatePage(delta: Int)
 
-    /**
-     * Tells the engine [before], the text before the cursor, where the user put the cursor other
-     * than by typing (a field focused, a tap): what they type next follows it. [learning] off in a
-     * field that asks not to be learned from, told "" (not known) there. [cleared]: [before] is
-     * what was written in a field now empty (Action.Context.cleared). [started], [after] and
-     * [selected] as Action.Context has them: another field started, the text after the cursor
-     * where read, text selected; [said], the editor answered [before] itself (Action.Context.said).
-     */
+    /** For a cursor moved other than by typing; told "" where [learning] is off. The rest as Action.Context has them. */
     suspend fun engineContext(
         before: String,
         learning: Boolean = true,
@@ -160,28 +125,17 @@ interface TypingApi {
         said: Boolean = false,
     )
 
-    /**
-     * What was written on the letter keys (the toolbar's 手写) read of its [piece], shown by the Ink key that
-     * carries it: see [Engines.ink]. Whether the Ink key was sent: not where handwriting cannot load or the
-     * input method writes on no keys (EngineBridge.sendInk).
-     */
+    /** False where handwriting cannot load or the input method writes on no keys. */
     suspend fun offerInk(reading: InkReading, piece: Int): Boolean
 
-    /**
-     * A glide across the letters, read as the current input method reads it and carried by the
-     * Glide key that commits its word: see [Engines.glide]. Whether the key was sent: not where the
-     * input method does not glide (InputMethodCatalog.glides), cannot load or cannot read the path.
-     */
+    /** False where the input method does not glide, cannot load or cannot read the path. */
     suspend fun offerGlide(glide: Glide): Boolean
 
-    /** The letter keys' handwriting's [piece] finished, told by the Ink key that carries it: see [Engines.ink]; taken as [offerInk]. */
     suspend fun inkFinished(piece: Int): Boolean
 
-    /** The keys no letter the table input method [im] reads now, as its session has them: see [Engines.tableKeys]. */
     suspend fun tableKeys(im: String): Set<Char>
 }
 
-/** The input methods: which there are, which the user enabled, the one in use. */
 interface InputMethodsApi {
 
     suspend fun availableIme(): Array<InputMethodEntry>
@@ -196,145 +150,93 @@ interface InputMethodsApi {
     suspend fun currentIme(): InputMethodEntry
 }
 
-/**
- * An input method's options (its settings page): each by its path (`Fuzzy/Name` under a group) to
- * its value as fcitx's INI writes it.
- */
+/** Options are keyed by path (`Fuzzy/Name`), valued as fcitx's INI writes them. */
 interface EngineSettingsApi {
 
-    /** [im]'s options, every one with its value; null for an input method with none. */
+    /** Null for an input method with none. */
     suspend fun imOptions(im: String): Map<String, String>?
 
-    /**
-     * Sets those of [values] [im] has, the rest kept as they are: a page that shows only some
-     * passes only those (InputMethodSettings.only), so it never writes back what another changed.
-     */
+    /** Only those given are set, so a page never writes back what another changed. */
     suspend fun setImOptions(im: String, values: Map<String, String>)
 }
 
-/**
- * The punctuation map of a language, read only: only zh_CN has one, and no page edits it since 0.6.1
- * (one edited before is deleted, PunctuationMaps.dropEdited), so there is no way to save one.
- */
+/** Read only: no page edits it any more. */
 interface PunctuationApi {
 
-    /** [lang]'s map in order; empty for a language with none. */
     suspend fun punctuationMap(lang: String): List<PunctuationMapEntry>
 }
 
-/** The engine's words: the user's own, added, blocked, imported, and the dictionary's readings of them. */
 interface LexiconApi {
 
-    /** Reads again what the user added to the engine's input methods: custom phrases, dictionaries. */
     suspend fun reloadEngine()
 
-    /** The words the user added, made as they typed, and blocked: see [Engines.userWords]. */
     suspend fun userWords(): List<UserWord>
 
-    /** The user's words of [kind] alone: see [Engines.userWords]. */
     suspend fun userWords(kind: UserWord.Kind): List<UserWord>
 
-    /** How many words of each kind the user has: see [Engines.userWordCounts]. */
     suspend fun userWordCounts(): Map<UserWord.Kind, Int>
 
-    /** The words of [texts] the tables among [ims] cannot take: see [Engines.sameCodes]. */
     suspend fun sameCodes(texts: List<String>, ims: List<String>): Map<String, List<Pair<String, String>>>
 
-    /** Where each of [texts] splits into words: see [Engines.wordBoundaries]. */
     suspend fun wordBoundaries(texts: List<String>): Map<String, IntArray>
 
-    /** How likely each of [texts] is: see [Engines.logProbs]. */
     suspend fun logProbs(texts: List<String>): FloatArray
 
-    /** The user's [words] for voice input's homophones: see [Engines.voiceHomophones]. */
     suspend fun voiceHomophones(words: List<UserWord>): VoiceHomophones
 
-    /** Whether each of [spans] may become its word: see [Engines.voiceHomophonesAllowed]. */
     suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>): BooleanArray
 
-    /** Those of [texts] with a character 生僻字屏蔽 holds back: see [Engines.rareHeld]. */
     suspend fun rareHeld(texts: Collection<String>): Set<String>
 
-    /** 生僻字屏蔽's grid, copied off the data: see [Engines.rareGrid]. */
     suspend fun rareGrid(): RareGrid?
 
-    /** How the dictionary reads [text], for the user to check: see [Engines.pinyinOf]. */
     suspend fun pinyinOf(text: String): String?
 
-    /** How the dictionary reads each of [texts], for a list of words alone imported: see [Engines.pinyinsOf]. */
     suspend fun pinyinsOf(texts: List<String>): Map<String, String?>
 
-    /**
-     * What the menu of candidate [index] (of the page shown if [paged]) of the input method shown heads with, if it
-     * still shows [text]: a character looked up its card, any other with a Han character in it its reading line and
-     * card (see [Engines.card]); null for any other, or an input method not the engine's.
-     */
+    /** Null if candidate [index] no longer shows [text], or has no Han character, or the input method is not the engine's. */
     suspend fun candidateCard(index: Int, text: String, paged: Boolean): CandidateCard?
 
-    /** The card of [char], [reading] first: a word card's character tapped (see [Engines.charCardOf]). */
     suspend fun charCardOf(char: String, reading: CardReading?): CharCard?
 
-    /** Adds [text] read as [pinyin]; false if it does not read so. */
+    /** False if it does not read so. */
     suspend fun addUserWord(text: String, pinyin: String): Boolean
 
-    /** Voice's text put in, [before] the cursor read after, [hinted] the once-only hint shown: see [Engines.voiceSaid]. */
     suspend fun voiceSaid(text: String, before: String?, hinted: Boolean)
 
-    /** What the app put in the field, while voice's text is followed: see [Engines.voicePutIn]. */
     suspend fun voicePutIn(text: String): VoiceEdits.Reply
 
-    /** The field read as the prompt is to show: see [Engines.voiceConfirm]. */
     suspend fun voiceConfirm(before: String?, after: String?): VoiceEdits.Ask?
 
-    /** Voice's text followed no more: see [Engines.voiceEditsEnd]. */
     suspend fun voiceEditsEnd()
 
-    /** The prompt's 「记住」: see [Engines.voiceRemember]. */
     suspend fun voiceRemember(ask: VoiceEdits.Ask): Boolean
 
-    /** Its 撤销: see [Engines.voiceForget]. */
     suspend fun voiceForget(word: String)
 
-    /** Blocks [text] read as [pinyin], never offered again; false if it does not read so. */
+    /** False if it does not read so. */
     suspend fun blockUserWord(text: String, pinyin: String): Boolean
 
-    /** Takes [words] off their lists: see [Engines.removeWords]. */
     suspend fun removeUserWords(words: List<UserWord>)
 
-    /** The English words the user typed: see [Engines.englishWords]. */
     suspend fun englishWords(): List<UserWord>
 
-    /** Makes [text] an English word of the user's; false if it is none: see [Engines.addEnglishWord]. */
     suspend fun addEnglishWord(text: String): Boolean
 
-    /** Forgets the English words [texts]: see [Engines.forgetEnglishWords]. */
     suspend fun forgetEnglishWords(texts: List<String>)
 
-    /**
-     * The words of a list the user imports, a word a line, from the file named [fileName]: the
-     * user's own export added back, another's imported as a batch: see [Engines.importWords].
-     * [lines] are read as the engine takes them, on fcitx's thread: those of a local file, not of a
-     * provider's stream, whose slowness would hold up the keyboard.
-     */
+    /** [lines] are read on fcitx's thread: give a local file, not a provider's stream, whose slowness would hold up the keyboard. */
     suspend fun importUserWords(lines: Sequence<String>, fileName: String): Engines.Imported
 
-    /** The lists imported, oldest first: see [Engines.importBatches]. */
     suspend fun importBatches(): List<ImportLayer.Batch>
 
-    /** Undoes the list imported as [batch]: see [Engines.dropImport]. */
     suspend fun dropImport(batch: Int): Int?
 
-    /** Puts back the list [dropImport] took as [batch] (撤销): see [Engines.restoreImport]. */
     suspend fun restoreImport(batch: Int): Boolean
 }
 
-/** What was learned: see [learning]. */
 interface LearningApi {
 
-    /**
-     * What the user asks of what was learned (PLAN §2.8, Engines.learning), of the input method in
-     * use. A long press's act goes as the menu's always did, the list it leaves shown; one that
-     * changes what is shown otherwise (taken back, cleared, habits on or off) has it shown anew.
-     */
+    /** A long press's act leaves its list shown; one that changes what is shown otherwise has it shown anew. */
     suspend fun learning(op: LearningOp): LearningResult
 }

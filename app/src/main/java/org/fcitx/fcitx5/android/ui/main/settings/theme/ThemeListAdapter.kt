@@ -15,13 +15,12 @@ import splitties.views.dsl.core.Ui
 abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHolder>() {
     class ViewHolder(val ui: Ui) : RecyclerView.ViewHolder(ui.root)
 
-    // a built-in theme of two versions one card (ThemeCards)
+    // a two-version built-in theme is one card (ThemeCards)
     private var cards = ThemeCards(emptyList())
 
-    /** The cards' themes as shown, in the list's order. */
     val entries: MutableList<Theme> get() = cards.shown
 
-    // the cards marked; a mark is shown on its card while the version marked is the one shown
+    // a mark shows on its card while the version marked is the one shown
     private var activeIndex = -1
     private var lightIndex = -1
     private var darkIndex = -1
@@ -38,7 +37,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         notifyItemRangeInserted(OFFSET, entries.size)
     }
 
-    /** The list made again of [themes] (a pack imported: its versions one card); the marks set again after ([setSelectedThemes]). */
+    /** The marks are set again after ([setSelectedThemes]). */
     @SuppressLint("NotifyDataSetChanged")
     fun resetThemes(themes: List<Theme>) {
         cards = ThemeCards(themes)
@@ -48,10 +47,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         notifyDataSetChanged()
     }
 
-    /**
-     * Marks [active], and [light] and [dark] where the theme follows the system's: each card one of them
-     * is on shows its version (the one in use last, of a pair both slots have).
-     */
+    /** Each marked card shows the version in use (the last used, where both slots have the pair). */
     fun setSelectedThemes(active: Theme, light: Theme? = null, dark: Theme? = null) {
         val before = listOf(activeIndex, lightIndex, darkIndex)
         listOf(light, dark, active).forEach(cards::show)
@@ -86,7 +82,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
 
     fun removeTheme(name: String) = removeAt(entries.indexOfFirst { it.name == name })
 
-    /** The card of [theme] itself removed: a pack and a 3.0 theme of the same name are two cards. */
+    /** A pack and a 3.0 theme of the same name are two cards. */
     fun removeTheme(theme: Theme) = removeAt(
         entries.indexOfFirst {
             it == theme || (it is Theme.Versioned && theme is Theme.Versioned && it::class == theme::class && it.file == theme.file)
@@ -103,7 +99,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         darkIndex = indexAfterRemoval(index, darkIndex)
     }
 
-    // [changed] a 我的主题 added or gone: the others' numbers (ThemeNames.shown) shown anew
+    // a 我的主题 added or gone renumbers the others
     private fun renumber(changed: Theme) {
         if (!ThemeNames.numbered(changed)) return
         entries.forEachIndexed { i, t -> if (t !== changed && ThemeNames.numbered(t)) notifyItemChanged(i + OFFSET) }
@@ -137,7 +133,6 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
         }
     }
 
-    /** The card at [position] shows its other version (浅/深), its mark if that one has one. */
     internal fun switchVersion(position: Int) {
         if (position >= OFFSET && cards.switch(position - OFFSET)) notifyItemChanged(position)
     }
@@ -166,7 +161,7 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
                 root.setOnLongClickListener {
                     when {
                         theme is Theme.Custom || theme is Theme.Pack -> onThemeActions(theme)
-                        // Monet's: its look the wallpaper's colours now, its key style with them: a fixed copy
+                        // Monet's look follows the wallpaper: export a fixed copy
                         theme is Theme.Builtin && theme.followsSystem -> onExportTheme(theme.toCustom())
                         else -> return@setOnLongClickListener false
                     }
@@ -191,9 +186,8 @@ abstract class ThemeListAdapter : RecyclerView.Adapter<ThemeListAdapter.ViewHold
 
     abstract fun onThemeInfo(theme: Theme)
 
-    /** A theme of the user's (a 3.0 one, a pack) long pressed: what it is (信息), export it or delete it. */
     private fun ThemeThumbnailUi.onThemeActions(theme: Theme) {
-        // a built-in pack (BuiltinPacks) is the app's: shown and exported, not deleted
+        // a built-in pack is the app's: not deleted
         val actions = listOfNotNull(
             ctx.getString(R.string.theme_info), ctx.getString(R.string.export),
             ctx.getString(R.string.delete).takeUnless { theme is Theme.Pack && theme.builtin },

@@ -16,13 +16,8 @@ import org.fcitx.fcitx5.android.scene.theme.SystemColors
 // https://material-foundation.github.io/material-theme-builder/
 
 /**
- * The system's colours a theme's `system(name, fallback)` takes (ColorExpr.SYSTEM_NAMES): the Monet
- * theme's (monet.xml), and any other's.
- *
- * - Android 14 on: Material's roles (`system_primary_light`…) and the palette's tones.
- * - Android 12 and 13 have no roles: each is the palette's tone 0.5's ThemeMonet took for it there, an
- *   approximation (the comments: the tone the role is); the tones as they are.
- * - Before: none, every colour its fallback (monet.xml's: 0.5's static colours there, MD3 of #769CDF).
+ * The colours `system(name, fallback)` takes. Android 14+: Material's roles and palette tones; 12–13 have no roles,
+ * so each approximates a tone (noted per line); before 12, every colour is its fallback.
  */
 object ThemeMonet {
 
@@ -72,11 +67,7 @@ object ThemeMonet {
             "on-surface-variant" to android.R.color.system_on_surface_variant_dark,
         )
 
-    // 0.5's: monet.xml's light bar is the highest container, its dark one the high. 0.5 had no light high
-    // and no dark highest; every role is here all the same (any theme's system() may name one, and would
-    // get its fallback on 12 and 13 alone), each the palette's tone nearest Material's for it between
-    // its neighbours: the light high (92) the 90 of neutral1, darker than the container's 95 and of the
-    // grey the container is; the dark highest (22) the 20 of neutral2, lighter than the high, of its grey
+    // monet.xml's light bar is the highest container, its dark one the high; the rest are the nearest tones
     private val APPROXIMATE_LIGHT
         @RequiresApi(Build.VERSION_CODES.S)
         get() = mapOf(

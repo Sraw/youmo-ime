@@ -28,7 +28,7 @@ object Icons {
     )
 
     /**
-     * The bar's own, a name for each thing done that no command does (061-toolbar-icons §2.2; the bar's buttons
+     * The bar's own, a name for each thing done that no command does (the bar's buttons
      * doing a command's job go by the command's name): the menu key's two states, the toolbar's buttons, the
      * candidate bar's and the floating keyboard's strip's. Keys may name them too.
      */

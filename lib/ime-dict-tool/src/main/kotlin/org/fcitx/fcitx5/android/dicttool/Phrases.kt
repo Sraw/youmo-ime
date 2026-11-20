@@ -4,19 +4,12 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
-/**
- * What tells a phrase or a fragment of a word from a word among the candidates of `words`, which
- * pmi and entropy let through as readily (的事情, 一个人, 务员): a function character at either
- * end (a verb's 了/过 excepted: 哭了, 累了 are typed as one), 的 anywhere, or most of its count
- * inside one longer candidate ([saw] every candidate first).
- */
+/** What tells a phrase or a fragment from a word among `words`' candidates: a function character at an end, 的, or most of its count inside a longer one. */
 internal class Phrases(private val known: (String, Int, Int) -> Boolean) {
     // the most any one candidate a character longer counts, by the candidate it contains
     private val longest = HashMap<String, Int>()
 
-    // by the run a character shorter: how often a word the dictionary has runs into it from the
-    // character before (洛阳 into 阳市, 巷子 into 子里), and out of it into the character after.
-    // Each such word alone is a fraction of the run (洛阳市, 贵阳市, 沈阳市 ...), together most of it
+    // how often a word the dictionary has runs into this run from the character before (洛阳 into 阳市), and out of it
     private val crossedIn = HashMap<String, Int>()
     private val crossedOut = HashMap<String, Int>()
 

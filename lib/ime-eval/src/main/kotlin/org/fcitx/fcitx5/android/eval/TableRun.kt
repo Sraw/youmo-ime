@@ -12,17 +12,7 @@ import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.fcitx.fcitx5.android.engine.table.TableSession
 import java.util.Locale
 
-/**
- * A table input method typed by someone who knows every code in it. Text is cut into the words
- * the table has so as to take the fewest keys, each word typed by whichever of its codes costs
- * the fewest: the code, a page turn per page, and a pick unless the engine commits it by itself.
- * A first candidate needs no pick when the next word's first key commits it (顶字). Each word is
- * typed afresh, so what the engine learns from picks plays no part: this measures the table and
- * the engine's rules, not a user's history.
- *
- * [entries] types the table's own entries by their own codes: how often an entry is first, on
- * the first page, or cannot be reached (another candidate commits itself first).
- */
+/** A table typed by someone who knows every code: fewest keys, cheapest code, typed afresh. */
 class TableRun(private val table: CodeTable, private val options: TableOptions) {
 
     private val dictionary = TableDictionary(table)
@@ -43,7 +33,6 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
     /** How one code went: [keys] pressed, [first] the word came first, [auto] it committed itself. */
     data class Typed(val keys: Int, val first: Boolean, val auto: Boolean)
 
-    /** Totals over some text. */
     data class Outcome(
         val chars: Int,
         val missing: Int,
@@ -137,8 +126,7 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
         val at = IntArray(text.codePointCount(0, text.length) + 1)
         for (k in 1 until at.size) at[k] = text.offsetByCodePoints(at[k - 1], 1)
         val n = at.size - 1
-        // the fewest keys to type the first j characters, a character the table lacks weighing
-        // more than any word, and what the last step there typed (null: a missing character)
+        // the fewest keys to type the first j characters (a missing character weighing more than any word)
         val cost = LongArray(n + 1)
         val step = arrayOfNulls<Pair<String, Typed>>(n + 1)
         val from = IntArray(n + 1)
@@ -188,10 +176,7 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
         return Outcome(cut.at.size - 1, missing, words, keys, first, auto, spared, nanos, actions, slowest)
     }
 
-    /**
-     * A word of some text as [type] types it: by [code], as [typed] went, committed by the next word's first key [next] (顶字) or not (null);
-     * [follow] the next word's first key whatever commits this one (null: the last word).
-     */
+    /** A word as [type] types it: by [code], committed by the next word's first key [next] (顶字) or not; [follow] that key whatever commits it. */
     data class Planned(val word: String, val code: String, val typed: Typed, val next: Char?, val follow: Char? = next)
 
     /** The words of [text] the table has, cut and typed as [type] does it. */
@@ -213,24 +198,14 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
     private fun spares(typed: Pair<String, Typed>, word: String, next: Char) =
         typed.second.first && !typed.second.auto && commitsOnTo(typed.first, word, next)
 
-    /**
-     * The words of [text], cut as [type] cuts it, whose cheapest code is more than one entry's (a
-     * 重码 to pick from: the longer codes it leads to are none) and longer than the options'
-     * [TableOptions.noSortInputLength] (a code no longer stays in the table's order whatever ranks
-     * it, first in every row: 五笔's 一、二级简码), each typed into a fresh session
-     * after the text before it: how many there are, and how often the word comes first with each of
-     * [languages] (null: the table's order). A language with a refiner is given the slices a pause
-     * gives it.
-     */
+    /** The words of [text] with a 重码 code longer than [TableOptions.noSortInputLength]: how often each of [languages] puts them first. */
     fun homographs(text: String, languages: List<TableLanguage?>): Pair<Int, IntArray> {
         val cut = cut(text)
         val path = cut.path
         var n = 0
         val first = IntArray(languages.size)
         for (k in 1 until path.size) {
-            // a word the table lacks, or one its code commits by itself: nothing to pick; one entry of the
-            // code's length, the rest longer codes it leads to: first in every row, no 重码
-            // and a code too short to be sorted: the table's order, whatever the language
+            // nothing to pick: a word missing or committing itself, one with no 重码, or a code too short to be sorted
             val (code, _) = cut.step[path[k]]?.takeUnless {
                 it.second.auto || table.exactRange(it.first).count() < 2 || it.first.length <= options.noSortInputLength
             } ?: continue

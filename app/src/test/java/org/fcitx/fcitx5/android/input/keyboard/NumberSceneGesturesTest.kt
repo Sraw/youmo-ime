@@ -30,12 +30,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The number pads drawn by the scene (060-render-p2 S4b, U4 B): on each of the seven pads, every key's
- * tap, swipes and long press, the space's and backspace's sideways swipes, backspace held, a tap on
- * each blank place, what reaches the engine and the field, each key wired from number.xml's node, held
- * to the committed record ([GestureSnapshot]); no key pops a bubble as it is pressed and a blank place
- * sends nothing, checked as they run. Return's long press offers Emoji (rules C 疑问 8, 060-render-p2
- * §5.3; [returnsLongPressOffersEmojiOnTheCanvasAlone]).
+ * On each of the seven pads: every key's gestures, ⌫ held, a tap on each blank place, held to the committed record
+ * ([GestureSnapshot]); no key pops a bubble, a blank sends nothing; Return's long press offers Emoji.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -56,67 +52,29 @@ class NumberSceneGesturesTest {
         }
     }
 
-    // a bubble or a long press's keys up now: a view's, or the engine's (PopupSceneView)
     private fun KeyboardHarness.poppedUp(): Boolean =
         KeyboardHarness.all(inputView).any { it is PopupSceneView && it.isShown }
 
-    // what a finger does on each key of the pad of [inputType]: the keys that put another keyboard up
-    // (返回, 符) left to [theSwitchingKeysSwitch], as they would take the rest away
+    // 返回 and 符 left to [theSwitchingKeysSwitch]: they would take the rest away
     private fun gestures(inputType: Int): List<String> = harness(inputType).use { h ->
         val ids = h.keys().mapNotNull { it.id }.filter { it !in SWITCHING }
         assertTrue(ids.toString(), ids.size >= MOST_KEYS_AT_LEAST)
         val out = mutableListOf("keys $ids")
-        fun sent(what: String) {
-            out += "$what: " + h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") } +
-                " field ${h.field.text}|${h.field.selectionStart},${h.field.selectionEnd}"
-            h.api.calls.clear()
+        // ⌫ last: its swipe up clears the field the others' swipes act on
+        h.recordGestures(out, ids.sortedBy { it == "backspace" }, held = { it != "backspace" && it != "enter" }) {
+            assertFalse("$it pressed shows a popup", h.poppedUp())
         }
-        // ⌫ last (top right since 0.6.1): its swipe up clears the field the others' swipes act on
-        for (id in ids.sortedBy { it == "backspace" }) {
-            val k = { h.keyNamed(id) }
-            // no bubble as it is pressed (preview="off")
-            h.press(k())
-            assertFalse("$id pressed shows a popup", h.poppedUp())
-            h.release()
-            sent("$id tap")
-            h.swipe(k(), 0f, -k().bounds.height().toFloat())
-            sent("$id up")
-            h.swipe(k(), 0f, k().bounds.height().toFloat())
-            sent("$id down")
-            if (id == "space" || id == "backspace") {
-                // sideways: the cursor moved, or the text before it selected to delete
-                h.swipe(k(), -k().bounds.width() * 2f, 0f)
-                sent("$id left")
-                h.swipe(k(), k().bounds.width() * 2f, 0f)
-                sent("$id right")
-            }
-            // Return's long press: the one meant to differ, below
-            if (id != "backspace" && id != "enter") {
-                out += "$id long press: " + h.longPress(k())
-                sent("$id long press")
-            }
-        }
-        // the blank places: no press, nothing typed (the views' BlankKey, number.xml's <gap>)
         for ((name, at) in blanks(h)) {
             h.press(at)
             h.release()
             assertTrue("blank $name: ${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") || it.startsWith("commit") })
-            sent("blank $name tap")
+            h.sent(out, "blank $name tap")
         }
-        // ⌫ held: deletes over and over, at least MIN_REPEATS times; the record keeps what it sends, not
-        // how many (that depends on where in a frame the press fell; R20 F6506)
-        h.press(h.keyNamed("backspace"))
-        h.after(HOLD_MS)
-        h.release()
-        val deletes = h.api.calls.filter { it.startsWith("sendKey") }
-        assertTrue("${deletes.size} deletes", deletes.size >= MIN_REPEATS)
-        out += "backspace held: ${deletes.distinct()}"
-        h.api.calls.clear()
+        h.backspaceHeld(out, HOLD_MS, MIN_REPEATS)
         out
     }
 
-    // where the pad has no key, by the keys around: the column left of the digits, the place right of
-    // 9 (⌫'s before 0.6.1), the bottom row's three; only those a key does not cover there (the full pad has none)
+    // where the pad has no key, by the keys around (the full pad has none)
     private fun blanks(h: KeyboardHarness): List<Pair<String, android.graphics.Rect>> {
         val keys = h.keys()
         fun of(id: String) = h.keyNamed(id).bounds
@@ -126,7 +84,7 @@ class NumberSceneGesturesTest {
             "left 4" to of("4").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
             "left 7" to of("7").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
             "right 9" to of("9").let { b -> android.graphics.Rect(b.right, b.top, of("space").right, b.bottom) },
-            // the bottom row's places as wide as number.xml's (0.6.1: 符 16 返回 14 | 8 | 0 22 | 12 | 10 | ⏎ 18)
+            // as wide as number.xml's: 符 16 返回 14 | 8 | 0 22 | 12 | 10 | ⏎ 18
             "left 0" to of("0").let { b -> android.graphics.Rect(of("back").right, b.top, b.left, b.bottom) },
             "right 0" to of("0").let { b -> android.graphics.Rect(b.right, b.top, b.right + b.width() * 12 / 22, b.bottom) },
             "left enter" to of("enter").let { b -> android.graphics.Rect(b.left - of("0").width() * 10 / 22, b.top, b.left, b.bottom) },
@@ -138,13 +96,11 @@ class NumberSceneGesturesTest {
         override val bounds get() = at
     })
 
-    // every pad's keys as recorded, one row a pad (each its own harness)
     @Test
     fun everyPadsKeysDoWhatTheyDid() = assertRows(FIELDS.entries, { (pad, _) -> "$pad" }) { (pad, inputType) ->
         GestureSnapshot.check("number-$pad", gestures(inputType))
     }
 
-    // 返回 back to the letters, 符 the symbols' page, on every pad; neither types anything
     @Test
     fun theSwitchingKeysSwitch() = assertRows(FIELDS.entries, { (pad, _) -> "$pad" }) { (_, inputType) ->
         for (id in listOf("back", "symbols")) {
@@ -157,7 +113,6 @@ class NumberSceneGesturesTest {
         }
     }
 
-    // Return says the field's action (搜索, 完成…), the scene made again as it changes
     @Test
     fun returnSaysTheFieldsAction() {
         val actions = listOf(EditorInfo.IME_ACTION_SEARCH, EditorInfo.IME_ACTION_DONE, EditorInfo.IME_ACTION_GO, EditorInfo.IME_ACTION_NEXT, 0)
@@ -170,7 +125,6 @@ class NumberSceneGesturesTest {
         assertTrue(said.toString(), said.toSet().size >= 4)
     }
 
-    // the field's action told while the pad is up: the scene made again with it, not the one drawn before
     @Test
     fun returnRedrawsWhenTheActionChanges() = harness(InputType.TYPE_CLASS_NUMBER).use { h ->
         val board = KeyboardHarness.find<NumberKeyboard>(h.inputView)!!
@@ -186,13 +140,11 @@ class NumberSceneGesturesTest {
         assertNotEquals(enter, h.keyNamed("enter").description)
     }
 
-    // rules C 疑问 8 (060-render-p2 §5.3): Return offers Emoji as every Return does, picked as the finger
-    // lifts on it (the views' pad swallowed the menu with its previews)
+    // picked as the finger lifts on it (the views' pad swallowed the menu with its previews)
     @Test
     fun returnsLongPressOffersEmojiOnTheCanvasAlone() {
         for ((pad, inputType) in FIELDS) {
             harness(inputType).use { h ->
-                // the menu's cells are icons, read by their names (the edit menu's are: SwipePopupScreenshotTest)
                 val before = h.shownIcons().toSet()
                 val enter = h.keyNamed("enter")
                 val finger = h.finger(enter, h.at(enter))
@@ -204,7 +156,6 @@ class NumberSceneGesturesTest {
                 finger.up(KeyboardHarness.Touch(to.exactCenterX() - enter.bounds.left, to.exactCenterY() - enter.bounds.top))
                 h.idle()
                 assertTrue("$pad", KeyboardHarness.find<PickerLayout>(h.inputView)?.isShown == true)
-                // a menu's pick, no Return typed
                 assertTrue("$pad: ${h.api.calls}", h.api.calls.none { it.startsWith("sendKey") })
             }
         }
@@ -213,7 +164,6 @@ class NumberSceneGesturesTest {
     private companion object {
         val SWITCHING = setOf("back", "symbols")
 
-        // each pad by the field that shows it (NumberPad.of)
         val FIELDS = mapOf(
             NumberPad.FULL to InputType.TYPE_CLASS_NUMBER,
             NumberPad.DIGITS to (InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD),
@@ -224,12 +174,10 @@ class NumberSceneGesturesTest {
             NumberPad.DATETIME to (InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_NORMAL),
         )
 
-        // the digits, space, backspace and Return at least; which ones, the record says
         const val MOST_KEYS_AT_LEAST = 13
 
         const val TEXT = "12 34"
 
-        // ⌫ held this long repeats: some deletes at least
         const val HOLD_MS = 1500L
         const val MIN_REPEATS = 3
     }

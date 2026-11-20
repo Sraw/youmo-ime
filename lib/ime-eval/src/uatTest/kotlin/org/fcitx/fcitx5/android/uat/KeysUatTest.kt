@@ -10,10 +10,7 @@ import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * uat/02-keyboard.md, what the engine makes of the keys: English letters and Shift, space and
- * return over pinyin, letters before @ in an email field. The keys' views are KeyboardUatTest's.
- */
+/** uat/02-keyboard.md, what the engine makes of the keys; the keys' views are KeyboardUatTest's. */
 class KeysUatTest {
 
     @Test
@@ -55,8 +52,7 @@ class KeysUatTest {
     @Test
     @Uat("KB-24")
     fun anEmailFieldsLettersBeforeAtAreCommittedAsTyped() = with(EngineReplay(field = EngineReplay.Field.EMAIL)) {
-        // the address keys (@, .com) as the service's commitOverEngine has them: what is typed first, as its policy says
-        // (applied by hand: the service's wiring is CommonKeyActionListenerTest's, the policy's cases PendingInputPolicyTest's)
+        // the address keys as commitOverEngine has them, the pending input resolved by its policy (applied by hand here)
         fun addressKey(key: String) {
             if (PendingInputPolicy.resolve("zh_CN", hasPreedit = preedit.isNotEmpty(), address = true) == PendingInputPolicy.Resolution.CommitAsTyped) enter()
             commit(key)

@@ -18,11 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/13-words.md WD-50–WD-54: 生僻字屏蔽 (dev/design/061-rare-char-block.md) over the app's own data.
- * The page writes `pinyin/rarechars.txt` and reloads the engine; here [UatEngines.rareChars] is that
- * file. The real levels' table is checked where the design names its edges.
- */
+/** uat/13-words.md WD-50–WD-54: 生僻字屏蔽 over the app's data, [UatEngines.rareChars] standing for the page's file. */
 class RareCharsUatTest {
 
     private val levels: CharLevels by lazy { CharLevels.load(UatEngines.data(InputMethodCatalog.CHAR_LEVELS_DATA), verify = true) }
@@ -165,11 +161,7 @@ class RareCharsUatTest {
 
     private fun outOrExt(text: String) = text.codePoints().anyMatch { levels.of(it) == Level.OUT || levels.of(it) == Level.EXT }
 
-    /**
-     * Every Chinese input method listed, each of its keyboards, with every group held: no candidate,
-     * prediction, sentence or text put in has a character of the groups (design §8's contract over
-     * the real data). What is not filtered by design kept out: the phrases, emoji.
-     */
+    /** Every Chinese input method and keyboard with every group held: no candidate, prediction or text has their characters. */
     @Test
     @Uat("WD-50", "WD-53", "WD-54")
     fun withEveryGroupHeldNoListedChineseInputMethodOffersOne() {

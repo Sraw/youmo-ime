@@ -17,22 +17,15 @@ import java.util.zip.DataFormatException
 import java.util.zip.Inflater
 
 /**
- * A skin's ZIP (`.bds`, `.bdi`, `.ssf`, `.flex`, `.zip`) unpacked in memory, never to a disk: a name in it is only ever a key
- * ([org.fcitx.fcitx5.android.scene.skin.SkinFiles]), and one that would lead out of a folder (`..`, `/x`, `C:`) is
- * refused, not cleaned. Read by its central directory, or, where that is broken (skin makers' tools write odd
- * ZIPs), entry by entry from the start. Held to [SkinLimits]: the file, the files' count, each one unpacked and all,
- * and a file unpacked past [SkinLimits.MAX_RATIO] times its packed size (a bomb), each counted as it inflates, not
- * by what the ZIP says. Encrypted entries and methods other than stored and deflated are refused.
+ * A skin's ZIP unpacked in memory: names are only keys, and one leading out of a folder (`..`, `/x`, `C:`) is refused,
+ * not cleaned. Read by its central directory, else entry by entry (skin tools write odd ZIPs). Held to [SkinLimits],
+ * counted as it inflates, not by what the ZIP says. Encrypted entries and methods but stored/deflated are refused.
  */
 object SkinZip {
-    /** [input] read to its end within [SkinLimits.MAX_ARCHIVE_BYTES], then [read]. */
+    /** Read to its end within [SkinLimits.MAX_ARCHIVE_BYTES]. */
     fun read(input: InputStream): Map<String, ByteArray> = read(bytes(input))
 
-    /**
-     * A skin file [fileName]'s files: a lone YAML theme (Trime's) as itself, held to [SkinLimits.MAX_TEXT_BYTES]; a
-     * ZIP holding one FlorisBoard `.flex` and no extension of its own (a download) as that one's; any other ZIP as [read].
-     * [budget]: the bytes unpacked in all, the outer ZIP's files and the inner's together.
-     */
+    /** A lone YAML theme (Trime's) as itself; a ZIP holding one `.flex` and nothing of its own as that one's. [budget]: outer and inner together. */
     fun readSkin(input: InputStream, fileName: String, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         val b = bytes(input)
         val name = fileName.substringAfterLast('/')
@@ -41,8 +34,7 @@ object SkinZip {
             return mapOf(name to b)
         }
         val entries = read(b, budget)
-        // what macOS's Finder adds to a ZIP it makes (`__MACOSX/`, `._name`) is no file of the skin's: `__MACOSX/._a.flex`
-        // is not a second .flex (the same rule as SkinConverter's, which this module cannot reach)
+        // macOS Finder's `__MACOSX/` and `._name` are no files of the skin's (the same rule as SkinConverter's)
         val files = entries.keys.filterNot { it.startsWith("__MACOSX/") || it.substringAfterLast('/').startsWith("._") }
         val flex = files.filter { it.endsWith(".flex", ignoreCase = true) }
         val own = files.any { it.substringAfterLast('/') == "extension.json" }
@@ -63,12 +55,11 @@ object SkinZip {
         return out.toByteArray()
     }
 
-    /** [b]'s files by name (`/`-separated, no directories), the first of a name twice; at least one; all within [budget] bytes. */
+    /** `/`-separated, no directories, the first of a name twice; at least one. */
     fun read(b: ByteArray, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         if (b.size > SkinLimits.MAX_ARCHIVE_BYTES) fail(Reason.TOO_BIG)
         if (b.size >= 4 && String(b, 0, 4, Charsets.ISO_8859_1) == "Skin") fail(Reason.SOGOU_ENCRYPTED)
-        // the directory found from the end, whatever is before the first entry (a self-extractor's code); a scan from
-        // the start only where it begins as a ZIP does
+        // the directory found from the end, whatever comes first (a self-extractor's code); a scan from the start only if it begins as a ZIP
         val entries = central(b) ?: run {
             if (u32(b, 0) != LOCAL) fail(Reason.NOT_ZIP)
             local(b, budget)
@@ -90,8 +81,7 @@ object SkinZip {
     // [inflated]: a local scan's entry whose size comes after its data, inflated already to find where it ends
     private class Entry(val name: String, val flags: Int, val method: Int, val data: Int, val packed: Int, val inflated: ByteArray? = null)
 
-    // the central directory's entries, or null where there is none to read (a local scan's turn), one that says none
-    // too (a tool's that left it empty)
+    // null where there is none to read, or one that says none (a tool left it empty)
     private fun central(b: ByteArray): List<Entry>? {
         val end = (b.size - END_SIZE downTo maxOf(0, b.size - END_SIZE - MAX_COMMENT)).firstOrNull { u32(b, it) == END } ?: return null
         val count = u16(b, end + END_COUNT)
@@ -137,8 +127,7 @@ object SkinZip {
             var packed = u32(b, p + LOC_PACKED)
             var inflated: ByteArray? = null
             if (flags and DESCRIPTOR != 0) {
-                // sizes after the data: a deflated stream ends itself, a stored one cannot be found; inflated once,
-                // here, its bytes kept
+                // sizes after the data: a deflated stream ends itself, a stored one cannot be found
                 if (method != DEFLATED) fail(Reason.NOT_ZIP)
                 if (flags and ENCRYPTED != 0) fail(Reason.ENCRYPTED, name)
                 val (bytes, used) = inflate(b, data, b.size - data, null, minOf(SkinLimits.MAX_ENTRY_BYTES, budget - held), name)
@@ -170,8 +159,7 @@ object SkinZip {
         }
     }
 
-    // [len] bytes at [at] inflated within [cap]: the bytes and how many were read. [packed]: the entry's packed size,
-    // the ratio's base; none (a local scan's, size unknown), the bytes read so far, and the stream must end
+    // [packed] is the ratio's base; none (a local scan's), the bytes read so far, and the stream must end
     private fun inflate(b: ByteArray, at: Int, len: Int, packed: Long?, cap: Long, name: String): Pair<ByteArray, Long> {
         val inf = Inflater(true)
         try {
@@ -199,7 +187,7 @@ object SkinZip {
         }
     }
 
-    // a name as UTF-8 (flagged so, or reading as such), else GB18030 (Chinese tools' ZIPs); one leading out refused
+    // UTF-8 if flagged or valid, else GB18030 (Chinese tools' ZIPs); one leading out refused
     private fun name(b: ByteArray, at: Int, len: Int, flags: Int): String {
         val raw = b.copyOfRange(at, at + len)
         val text = if (flags and UTF8 != 0) String(raw, Charsets.UTF_8) else strictUtf8(raw) ?: String(raw, GB18030)
@@ -221,7 +209,6 @@ object SkinZip {
 
     private fun fail(reason: Reason, detail: String = "", cause: Throwable? = null): Nothing = throw SkinError(reason, detail, cause)
 
-    /** GB18030, what Chinese skins' texts and names are where they are not UTF-8. */
     val GB18030: Charset = Charset.forName("GB18030")
 
     private fun u16(b: ByteArray, at: Int) = if (at + 2 > b.size) 0 else (b[at].toInt() and BYTE) or (b[at + 1].toInt() and BYTE shl BITS)

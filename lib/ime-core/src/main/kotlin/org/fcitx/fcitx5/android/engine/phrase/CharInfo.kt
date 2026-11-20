@@ -11,13 +11,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import java.nio.ByteBuffer
 
-/**
- * A character's radical, its strokes and its parts, for its card (`engine/charinfo.data`,
- * ime-dict-tool's `charinfo`): Unihan's kRSUnicode and kTotalStrokes (Unicode License v3) with
- * CJKRadicals.txt, the open 汉语拆字字典 (kfcd/chaizi, CC BY 3.0), rime-stroke for a character
- * Unihan counts no strokes of, and the mainland's stroke orders this project keeps (lexicon/stroke-order.tsv,
- * first taken from cnchar, MIT). How each is chosen: [CharInfoBuilder].
- */
+/** A character's radical, strokes, parts and stroke order, for its card (`engine/charinfo.data`; sources and choices in [CharInfoBuilder]). */
 class CharInfo private constructor(
     private val chars: BitPacked,
     private val radicals: BitPacked,
@@ -30,13 +24,7 @@ class CharInfo private constructor(
     private val orderStart: BitPacked,
     private val orders: BitPacked,
 ) {
-    /**
-     * Of one character: its [radical] as the mainland writes it (江 氵, 说 讠), its [strokes] (0 if
-     * not known), and the [parts] it is made of, the radical's among them where one is (氵 工); null
-     * for a character not taken apart (乾, and those of one part: 一 乙); its stroke [order] as the
-     * mainland writes it, each stroke's shape (行 P P S H H SG), null where not known (a traditional or
-     * rare character).
-     */
+    /** [radical] as the mainland writes it (江 氵); [strokes] 0 if unknown; [parts] null if not decomposed; [order] stroke shapes, null if unknown. */
     data class Entry(val radical: String, val strokes: Int, val parts: List<String>?, val order: List<StrokeShape>? = null)
 
     init {
@@ -54,7 +42,7 @@ class CharInfo private constructor(
         return if (i < table.size && table[i] == codePoint) i else -1
     }
 
-    /** What is known of [codePoint]; null for one Unihan gives no radical (no Han character). */
+    /** Null for one without a Unihan radical (not Han). */
     fun of(codePoint: Int): Entry? {
         val i = find(chars, codePoint)
         if (i < 0) return null
@@ -65,20 +53,14 @@ class CharInfo private constructor(
         return Entry(String(Character.toChars(radicals[radical[i]])), strokes[i], partList, order)
     }
 
-    /**
-     * [codePoint]'s stroke order as the mainland writes it, a kind a stroke in [StrokeShape.keys]' letters (行 ppshhs);
-     * null where not known: the order ime-eval's stroke run draws.
-     */
+    /** The mainland stroke order in [StrokeShape.keys] letters (行 ppshhs); null if unknown. */
     fun orderKeys(codePoint: Int): String? {
         val o = find(orderChars, codePoint)
         if (o < 0) return null
         return StrokeShape.keys((orderStart[o] until orderStart[o + 1]).map { StrokeShape.entries[orders[it]] })
     }
 
-    /**
-     * Whether [codePoint]'s stroke order as the mainland writes it starts with [keys] ([StrokeShape.keys]' letters), null
-     * where not known: what 笔画筛选 goes by (StrokeFilter), compared in place, as it asks up to 2000 candidates a stroke.
-     */
+    /** Whether the stroke order starts with [keys]; null if unknown. Compared in place: 笔画筛选 asks up to 2000 candidates per stroke. */
     fun orderStartsWith(codePoint: Int, keys: CharSequence): Boolean? {
         val o = find(orderChars, codePoint)
         if (o < 0) return null
@@ -88,10 +70,8 @@ class CharInfo private constructor(
         return true
     }
 
-    /** How many characters it knows. */
     val size: Int get() = chars.size
 
-    /** How many it knows the parts of. */
     val taken: Int get() = partChars.size
 
     internal object Section {
@@ -108,10 +88,10 @@ class CharInfo private constructor(
     }
 
     companion object {
-        /** Layout of the sections; bump on any change to it (3: a stroke's shape, not its kind). */
+        /** Section layout; bump on any change (3: a stroke's shape, not its kind). */
         const val VERSION = 3
 
-        /** None known: an app without the file. */
+        /** An app without the file. */
         val EMPTY: CharInfo by lazy { load(ByteBuffer.wrap(CharInfoBuilder().build().toByteArray())) }
 
         fun load(buffer: ByteBuffer, verify: Boolean = true): CharInfo {

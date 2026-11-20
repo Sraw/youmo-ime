@@ -6,51 +6,21 @@ package org.fcitx.fcitx5.android.input.editing
 
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 
-/**
- * A text buffer that behaves like an editor, for testing [EditingSession].
- *
- * Models AOSP's `BaseInputConnection` over an `Editable`, which is what a plain `EditText` gives
- * an input method: a [StringBuilder], a selection (kept as given, so it may be reversed) and a
- * composing region. It records the calls so a test can assert on *how* the editor was driven,
- * not only on the resulting text.
- *
- * Faithfulness is not taken on trust: `InputEditorContractTest` in `:app` runs the same
- * scenarios against this and against the real `BaseInputConnection` under Robolectric, and
- * requires identical results.
- */
+/** An editor for testing [EditingSession]: AOSP's `BaseInputConnection` over an `Editable`, recording its calls; `InputEditorContractTest` in `:app` holds it to the real one. */
 class FakeEditor(
     initial: String = "",
     cursor: Int = initial.length,
-    /**
-     * `commitText`/`setComposingText` place the cursor in the old text, clamped to it, and let
-     * the edit carry it along (read from AOSP's `replaceTextInternal`). Newer versions (seen at
-     * API 35, not at API 29, the minSdk: InputEditorContractTest holds both under Robolectric; 30-34 not
-     * checked) then put it back for
-     * `newCursorPosition == 0` at a collapsed cursor, so it ends up before the new text rather
-     * than carried after it.
-     */
+    /** `commitText`/`setComposingText` clamp the cursor into the old text and carry it; API 35 (not 29) then puts it back before the new text for `newCursorPosition == 0` at a collapsed cursor. */
     private val reselectsZeroAfterInsert: Boolean = true,
 ) : InputEditor {
 
-    /**
-     * Set to false to model the gap between input sessions, when there is no connection: as
-     * `InputConnectionEditor` does then, every call is dropped, a read giving null. It is still
-     * recorded in [calls], so a test can tell what was attempted.
-     */
+    /** False models no connection: every call dropped, a read null, still recorded in [calls]. */
     override var isAvailable: Boolean = true
 
-    /**
-     * Reads answer, writes are dropped: a WebView that lost its view's focus while the keyboard stayed up
-     * (the screen turned, its view no height for a moment). The connection is the served one still, every
-     * write is taken (`commitText` true) and does nothing, no selection is reported, and a read gives the
-     * text as it was. Each call is still recorded in [calls].
-     */
+    /** Reads answer, writes are dropped and still return true: a WebView that lost focus while the keyboard stayed up. */
     var dropsWrites: Boolean = false
 
-    /**
-     * How much text before the cursor this editor is willing to reveal; null models an editor
-     * that reveals none (`getTextBeforeCursor` returning null). Real editors cap it too.
-     */
+    /** How much text before the cursor this editor reveals; null reveals none. */
     var revealLimit: Int? = Int.MAX_VALUE
 
     private val buffer = StringBuilder(initial)
@@ -58,11 +28,7 @@ class FakeEditor(
     // who put each character of [buffer] there: [APP] or [KEYBOARD]
     private val owner = StringBuilder(APP.toString().repeat(initial.length))
 
-    /**
-     * Who put each character of [text] there, one per character: [APP] (the initial text, the app's
-     * edits) or [KEYBOARD] (what the input method's calls put in). Characters alike are told apart by
-     * it: a test asserts that the keyboard deleted none of the app's, whatever they are.
-     */
+    /** Who put each character there, [APP] or [KEYBOARD], so a test can assert the keyboard deleted none of the app's. */
     val owners: String get() = owner.toString()
 
     /** Selection anchor and focus, as set; `start > end` is possible, as in `Selection`. */
@@ -96,11 +62,7 @@ class FakeEditor(
         composingEnd = -1
     }
 
-    /**
-     * The app's own edit, not the keyboard's: the whole text set to [text] (a chat's box emptied
-     * as it sends), the cursor at its end, no composing span left (as `TextView.setText`). Not
-     * recorded in [calls].
-     */
+    /** The app sets the whole text (as `TextView.setText`), cursor at its end, no composing span; not recorded. */
     fun appSetsText(text: String) {
         buffer.setLength(0)
         buffer.append(text)
@@ -111,14 +73,7 @@ class FakeEditor(
         clearComposing()
     }
 
-    /**
-     * The app's own edit of [from, to) to [text] (a `TextWatcher`'s, a formatter's), as an `Editable`'s
-     * `replace` moves its spans (held to it by InputEditorContractTest.appEdits): the composing span,
-     * exclusive at both ends, takes in nothing inserted at either end; its start inside the range goes
-     * to the new text's end, its end inside it to the new text's start, and a span left empty goes. The
-     * selection inside the range lands in proportion in the new text (`SpannableStringBuilder`'s
-     * adjustment). Not recorded in [calls].
-     */
+    /** The app's own edit of [from, to), moving spans as an `Editable`'s `replace` does (InputEditorContractTest.appEdits); not recorded. */
     fun appReplace(from: Int, to: Int, text: String) {
         val length = text.length
         buffer.replace(from, to, text)
@@ -151,17 +106,10 @@ class FakeEditor(
     /** The app's: [start]..[end] selected (a double tap, a drag, a select-all), as [reportSelection]. */
     fun appSelect(start: Int, end: Int = start) = reportSelection(start, end)
 
-    /**
-     * The app's rewrite of what the keyboard puts in (an `InputFilter`: upper-cased, cut to a length),
-     * applied to the whole text after each [commitText] and [setComposingText]; null for none. The
-     * selection and the composing span are kept, cut to the new length (a span left empty goes).
-     */
+    /** The app's rewrite (an `InputFilter`) after each [commitText] and [setComposingText]; spans kept, cut to the new length. */
     var rewriter: ((String) -> String)? = null
 
-    /**
-     * Whether the editor gives its composing region at once ([composingRegion], Android 13's
-     * `takeSnapshot`); false: it cannot tell, as before Android 13.
-     */
+    /** Whether the editor gives its composing region at once (Android 13's `takeSnapshot`). */
     var snapshots = false
 
     override fun composingRegion(): CursorRange? {
@@ -170,17 +118,12 @@ class FakeEditor(
         return CursorRange(composingStart, composingEnd)
     }
 
-    /**
-     * Runs [rewriter] on the text. Owners are kept by position: this fits a rewriter that only
-     * changes the tail (a field that appends, trims or clears); one that rewrites the middle would
-     * leave the old owners on the new text (R26 F8353).
-     */
+    /** Owners are kept by position, so this fits a rewriter that only changes the tail. */
     private fun rewrite() {
         val r = rewriter ?: return
         val new = r(buffer.toString())
         buffer.setLength(0)
         buffer.append(new)
-        // what is left keeps its owner; anything longer is the app's
         owner.setLength(minOf(owner.length, new.length))
         while (owner.length < new.length) owner.append(APP)
         selectionStart = selectionStart.coerceAtMost(new.length)
@@ -191,11 +134,7 @@ class FakeEditor(
         }
     }
 
-    /**
-     * Where a cursor at [p] ends up after [from, to) is replaced by [length] characters. This is
-     * how the selection spans of an `Editable` move: before the range they stay, after it they
-     * shift, and inside it they land at the end of the new text.
-     */
+    /** Where a cursor at [p] lands after [from, to) is replaced by [length] chars, as `Editable` spans move. */
     private fun shift(p: Int, from: Int, to: Int, length: Int): Int = when {
         p < from -> p
         p > to -> p - (to - from) + length
@@ -230,10 +169,7 @@ class FakeEditor(
         }
     }
 
-    /**
-     * Whether a [commitText] of this text fails: false returned and nothing changed, as a binder call
-     * that did not fit the editor's buffer. Asked once a call, so it can fail a few times and then not.
-     */
+    /** Whether a [commitText] of this text fails, as a binder call too big for the editor's buffer; asked once a call. */
     var commitFails: (String) -> Boolean = { false }
 
     override fun commitText(text: String, newCursorPosition: Int): Boolean {
@@ -305,11 +241,7 @@ class FakeEditor(
         return buffer.substring(a - n, a)
     }
 
-    /**
-     * Deletes around the selection -- widened to take in the composing region, so composing
-     * text itself is never deleted -- and never the selection itself.
-     * Like a real editor, it works the widening out from its own composing region.
-     */
+    /** Deletes around the selection widened to the composing region, so composing text is never deleted. */
     override fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean) {
         calls += "deleteSurroundingText($before, $after, inCodePoints=$inCodePoints)"
         if (!isAvailable || dropsWrites) return
@@ -326,7 +258,6 @@ class FakeEditor(
             start = codePointsBackward(a, before) ?: return
             end = codePointsForward(b, after) ?: return
         } else {
-            // negative lengths are ignored, not an error
             start = if (before > 0) (a - before).coerceAtLeast(0) else a
             end = if (after > 0) (b + after).coerceAtMost(buffer.length) else b
         }

@@ -1,3 +1,0 @@
-E scel2org5.cpp:568] Invalid header
-FORTIFY: pthread_mutex_lock called on a destroyed mutex
-Aborted (core dumped) 

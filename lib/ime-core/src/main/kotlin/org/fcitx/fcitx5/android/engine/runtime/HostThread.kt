@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
-/**
- * Whether [Engines] is called on the thread that made it, as made with it (review B 3.1): everything
- * there is the fcitx thread's, unlocked, and nothing but this holds it. A call off it is [told], if
- * given (the debug build); with none, nothing is checked. Held from the start rather than taken by the
- * first call, so a stray first call elsewhere is the one told, not every call after it.
- */
+/** Checks [Engines] is called on its creating thread (everything there is unlocked); a call off it is [told], if given. Fixed at creation, so a stray first call is the one reported. */
 internal class HostThread(private val told: ((String) -> Unit)?) {
     private val host: Thread = Thread.currentThread()
 
@@ -20,10 +15,10 @@ internal class HostThread(private val told: ((String) -> Unit)?) {
     }
 
     companion object {
-        /** Set by this module's test task (its build): there a call off the host thread throws. */
+        /** Set by this module's test task: there a call off the host thread throws. */
         const val STRICT = "youmo.engines.hostThreadStrict"
 
-        /** What a call off the host thread does by default: throws in this module's tests, unchecked elsewhere. */
+        /** Throws in this module's tests, unchecked elsewhere. */
         fun ofTests(): ((String) -> Unit)? =
             if (System.getProperty(STRICT) == "true") { message -> throw IllegalStateException(message) } else null
     }

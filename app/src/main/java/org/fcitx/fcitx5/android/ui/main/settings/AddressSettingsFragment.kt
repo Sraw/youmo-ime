@@ -34,11 +34,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 import org.fcitx.fcitx5.android.utils.lazyRoute
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 
-/**
- * 「通用输入 → 网址和邮箱」: the address suggestions' two lists of endings, each a page of its own
- * ([AddressSuffixesFragment]), whether the email addresses typed are remembered, and those remembered,
- * each forgotten with a tap, or all at once. What the endings counted stays: it only orders them.
- */
+/** What the endings counted stays: it only orders them. */
 class AddressSettingsFragment : PaddingPreferenceFragment() {
 
     private val remember = AppPrefs.getInstance().keyboard.rememberAddresses
@@ -92,7 +88,6 @@ class AddressSettingsFragment : PaddingPreferenceFragment() {
 
     override fun onResume() {
         super.onResume()
-        // back from a list
         val lists = AddressStore.lists()
         email.summary = lists.email.joinToString("  ") { AddressLists.EMAIL_MARK + it }
         url.summary = lists.url.joinToString("  ")
@@ -147,7 +142,7 @@ class AddressSettingsFragment : PaddingPreferenceFragment() {
     }
 
     companion object : SearchablePage {
-        // the rows settings search points at: this page's own, not stored
+        // the rows settings search points at: not stored
         const val EMAIL_KEY = "address_email_suffixes_row"
         const val URL_KEY = "address_url_suffixes_row"
         const val REMEMBER_KEY = "address_remember_row"
@@ -157,7 +152,7 @@ class AddressSettingsFragment : PaddingPreferenceFragment() {
             Triple(R.string.email_suffixes, EMAIL_KEY, 0),
             Triple(R.string.url_suffixes, URL_KEY, 0),
             Triple(R.string.remember_addresses, REMEMBER_KEY, R.string.remember_addresses_summary),
-            // 全部清空's row is in it only while an address is remembered: found by the group's result
+            // 全部清空 exists only while an address is remembered: found by the group's result
             Triple(R.string.remembered_addresses, REMEMBERED_KEY, R.string.forget_all_addresses),
         ).map { (title, key, summary) ->
             PageEntry(context.getString(title), SearchHighlight.PREF + key, summary = if (summary == 0) "" else context.getString(summary))
@@ -165,10 +160,7 @@ class AddressSettingsFragment : PaddingPreferenceFragment() {
     }
 }
 
-/**
- * One of the two lists of endings ([AddressLists]), [SettingsRoute.AddressSuffixes]'s: added to,
- * swiped away, dragged into another order, saved as each change is made; put back as it came from the menu.
- */
+/** Saved as each change is made. */
 class AddressSuffixesFragment : Fragment(), OnItemChangedListener<String> {
 
     private val viewModel: MainViewModel by activityViewModels()
@@ -177,7 +169,7 @@ class AddressSuffixesFragment : Fragment(), OnItemChangedListener<String> {
 
     private val isEmail get() = args.kind == EMAIL
 
-    // internal: the tests drag one as the touch helper would (swapItem)
+    // internal: tests drag as the touch helper would (swapItem)
     internal lateinit var ui: BaseDynamicListUi<String>
 
     override fun onCreateView(inflater: android.view.LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {

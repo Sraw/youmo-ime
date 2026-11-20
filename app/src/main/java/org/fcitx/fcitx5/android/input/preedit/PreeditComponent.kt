@@ -21,7 +21,7 @@ import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
 import splitties.views.horizontalPadding
 
-/** The code row; [floats]: in the strip over the app ([FloatingCodeStrip]), not embedded in the keyboard. */
+/** [floats]: in the strip over the app, not embedded in the keyboard. */
 class PreeditComponent(private val floats: Boolean = false) : TypedComponent<PreeditComponent>(), Dependent, InputBroadcastReceiver,
     ManagedHandler by managedHandler() {
 
@@ -32,45 +32,37 @@ class PreeditComponent(private val floats: Boolean = false) : TypedComponent<Pre
 
     val ui by lazy {
         CodeRowUi(context, theme, wrap = floats, setupTextView = {
-            // in dp: the row's height is fixed, and a large font scale would cut it off. A little
-            // larger floating, where the strip is taller (CodeRowHeight.FLOAT_DP)
+            // in dp: the row's height is fixed, and a large font scale would cut it off
             setTextSize(TypedValue.COMPLEX_UNIT_DIP, if (floats) 15f else 14f)
             horizontalPadding = dp(8)
             isSingleLine = true
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
         }).apply {
-            // on InputView's barBackground, with the bar: one taller bar (or on the strip's own). A tap puts the cursor in
-            // the code, for a key missed in the middle of it to be typed or deleted there; queued
-            // after the keys typed before it, which go in where the cursor was. The place is one in
-            // the code tapped on: a key still queued that changed the code leaves it nowhere meant
+            // queued after the keys typed before it, which go in where the cursor was: a key still queued that changed the
+            // code leaves the place nowhere meant
             onTap = { at ->
                 val tapped = shown
                 service.postFcitxJob { if (inputPanelCached.preedit.toString() == tapped) moveCursor(at) }
             }
             // a syllable taken goes as 九键's column's does, through the keys' listener
-            // the line of what a field dropped (FcitxInputMethodService.keptLine): a tap writes it
             onNotice = { service.writeKept() }
             syllables.onPick = { commonKeyActionListener.listener.onKeyAction(it, KeyActionListener.Source.Keyboard) }
             syllables.onShownChanged = { onShown?.invoke() }
         }
     }
 
-    // the code on the row, as a tap on it found it
     private var shown = ""
 
-    // the panel last shown, drawn again as the code moves into the field or out of it
+    // drawn again as the code moves into the field or out of it
     private var last: HostEvent.InputPanel? = null
 
-    /**
-     * Told once the row is drawn and as its syllables come or go: InputView's floating strip is there
-     * while either is (with the code in the app's field, 编码行 输入框里, the syllables alone may be).
-     */
+    /** With the code in the app's field the syllables alone may be there. */
     var onShown: (() -> Unit)? = null
 
     override fun onInputPanelUpdate(data: HostEvent.InputPanel) {
         last = data
-        // the code in the app's field (编码行 输入框里) is not drawn here too: aux and the syllables are
+        // the code in the app's field is not drawn here too: aux and the syllables are
         val drawn = service.forStrip(data)
         shown = drawn.preedit.toString()
         ui.notice = service.keptLine?.length ?: 0
@@ -78,9 +70,8 @@ class PreeditComponent(private val floats: Boolean = false) : TypedComponent<Pre
         onShown?.invoke()
     }
 
-    /** The code moved into the field or out of it (FcitxInputMethodService.codeInFieldNow): the row drawn anew. */
     fun codePlaceChanged() {
-        // with no panel yet (nothing typed since the view was made) the kept line alone may be to draw
+        // with nothing typed since the view was made the kept line alone may be to draw
         (last ?: HostEvent.InputPanel.EMPTY.takeIf { service.keptLine != null })?.let(::onInputPanelUpdate)
     }
 }

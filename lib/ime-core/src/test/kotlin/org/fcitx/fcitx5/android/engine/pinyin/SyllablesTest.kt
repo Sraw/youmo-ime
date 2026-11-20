@@ -20,8 +20,6 @@ class SyllablesTest {
 
     @Test
     fun theIdsAreFrozen() {
-        // Compiled data stores these ids. If this fails, the list was reordered or trimmed:
-        // only appending is allowed, and appending leaves these values as they are.
         assertEquals(0, Syllables.id("a"))
         assertEquals(Syllables.id("zuo") + 1, Syllables.id("A"))
         assertEquals(FROZEN_CHECKSUM, Syllables.checksum(FROZEN_COUNT))

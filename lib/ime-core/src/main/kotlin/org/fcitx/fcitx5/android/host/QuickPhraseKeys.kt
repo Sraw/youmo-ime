@@ -7,22 +7,12 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 
-/**
- * A key typed in quick input as the characters a quick phrase's key may have there, as the custom
- * phrases read keys of letter groups: a key of several letters is any of them, so the nine keys'
- * 4 finds `gh` as ghi do. [shown] is what the code row shows for it.
- */
+/** A key of several letters is any of them, as custom phrases read letter groups (the nine keys' 4 finds `gh`); [shown] is the code row's. */
 class QuickPhraseKey(val shown: Int, val can: Set<Int>)
 
 object QuickPhraseKeys {
 
-    /**
-     * What [codePoint] typed stands for, [nine] the user's nine keys' letters (the pinyin and
-     * English nine keys'): their digit keys their letters and the digit itself, shown as the digit;
-     * 九键双拼's the same with its fixed letters; a 14 or 18 keys' code, or a tap on one, its key's
-     * letters, shown as [Keyboard.typedLetter] has it (the tapped half's); a letter typed as itself
-     * that letter; any other character itself. Null: a keyboard's code that types nothing here.
-     */
+    /** Digit keys stand for their letters and the digit, shown as the digit; a 14/18 key's code or tap its letters, shown as [Keyboard.typedLetter]; null: types nothing here. */
     @Suppress("ReturnCount")
     fun of(codePoint: Int, nine: NineKeyLetters): QuickPhraseKey? {
         digitOf(codePoint)?.let { d -> return digit(d, nine.letters(d)) }

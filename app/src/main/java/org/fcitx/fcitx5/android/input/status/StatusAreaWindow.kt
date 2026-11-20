@@ -67,10 +67,9 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
 
     private val service by manager.inputMethodService()
 
-    // what fcitx last offered, for the entries to be shown again as one of the app's changes
     private var hostEntries = emptyList<StatusEntry>()
 
-    // the host's statuses told so far (onStatusAreaUpdate): one told while the panel's own read was on its way is the newer
+    // one told while the panel's own read was on its way is the newer
     private var statusesTold = 0
 
     private val staticEntries by lazy {
@@ -122,8 +121,7 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         }
     }
 
-    // learning stopped reaching the disk (a write refused, the record not opened again): said on
-    // top of the panel while it lasts, as on top of 用户词库 (R25 decode-1)
+    // learning stopped reaching the disk: said on top of the panel while it lasts
     private val notSaving by lazy {
         context.textView {
             setText(R.string.learning_not_saving)
@@ -163,16 +161,14 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
                 active = actions.oneHanded
             )
         )
-        // where the input method on has keyboards to choose from (I1 Q1)
         val keyboards = if (!actions.keyboardsOffered) emptyArray() else arrayOf(
             StatusAreaEntry.Android(context.getString(R.string.status_keyboard), KeyboardChoice)
         )
-        // the toolbar's with no slot on the bar, first, in its order (the user's call, 2026-11-15: none scrolled); the
-        // panel's own already here below
+        // the toolbar's with no slot on the bar, first, in its order (none scrolled); the panel's own already below
         val overflow = bar.overflow.filter { it !in PanelActions.OWN }.map {
             val label = context.getString(ToolbarButtonLooks.of(it).label)
             val available = bar.available(it)
-            // 手写 where it does not write greyed and said so, as on the bar
+            // greyed and said so, as on the bar
             val said = if (available || it != ToolbarButton.Handwriting) label else context.getString(R.string.handwriting_unavailable, label)
             StatusAreaEntry.Bar(it, said, active = bar.lit(it), available = available)
         }
@@ -235,16 +231,14 @@ class StatusAreaWindow : InputWindow.ExtendedInputWindow<StatusAreaWindow>(),
         val told = statusesTold
         fcitx.launchOnReady {
             val data = it.statusArea()
-            // only whether it saves, not the overview (the record's state and every list of the user's words
-            // counted, on the fcitx thread, before the panel showed anything: R25r2 F7897); asked each time the
-            // panel opens. One that fails leaves the notice off, the panel shown
+            // only whether it saves, not the overview (every list of the user's words counted on the fcitx thread before
+            // the panel showed anything). One that fails leaves the notice off, the panel shown
             val saving = runCatching { (it.learning(LearningOp.Saving) as? LearningResult.Saving)?.saving }
                 .onFailure { e -> if (e is CancellationException) throw e else Timber.w(e, "status panel: whether learning saves not read") }
                 .getOrNull() ?: true
             imeScope.launch {
                 notSaving.isVisible = !saving
-                // a status the host sent after this read (the field focused as the panel opened) came first: the read is
-                // the older, and shown last it stayed, the input method's toggles missing till the next status
+                // a status sent after this read came first: shown last, the stale read left the toggles missing till the next status
                 show(if (statusesTold == told) data else hostEntries)
             }
         }

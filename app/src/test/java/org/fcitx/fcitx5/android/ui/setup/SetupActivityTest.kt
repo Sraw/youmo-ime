@@ -15,11 +15,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Setup comes back till the keyboard is set up, unless the user skipped it. Shown once was enough to
- * keep it away before: a user who left it for the system's settings, where a tap on the keyboard's
- * name opens the app's own settings over it, came back to the app with nothing to select the keyboard.
- * (The activity needs the app's resources, which these tests go without: whether it comes back is
- * tested here; that skip and back keep it away, in SetupActivityDeviceTest.)
+ * Setup returns till the keyboard is set up unless skipped; once shown used to be enough, stranding a user who left for
+ * the system settings. Skip and back are in SetupActivityDeviceTest (the activity needs resources).
  */
 @RunWith(RobolectricTestRunner::class)
 class SetupActivityTest {
@@ -29,7 +26,7 @@ class SetupActivityTest {
         SetupActivity.skipped = false
     }
 
-    // the flag is the process's: a test after this one must not find it skipped
+    // the flag is the process's: a later test must not find it skipped
     @After
     fun forget() {
         SetupActivity.skipped = false
@@ -41,7 +38,7 @@ class SetupActivityTest {
         assertFalse(SetupActivity.shouldShowUp())
     }
 
-    /** Robolectric's phone has no keyboard enabled: each time MainActivity asks, the setup is due again. */
+    /** Robolectric's phone has no keyboard enabled. */
     @Test
     @Config(application = FcitxApplication::class)
     fun notSetUpItComesBackEachTimeTillSkipped() {

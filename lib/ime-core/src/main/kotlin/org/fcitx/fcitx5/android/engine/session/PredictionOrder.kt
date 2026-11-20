@@ -18,25 +18,15 @@ import org.fcitx.fcitx5.android.engine.learn.rankView
 import org.fcitx.fcitx5.android.engine.user.Continuations
 
 /**
- * 联想 in the user's order (U-70, PLAN §2.7), for every input method that offers it: the
- * [predictor]'s best [RANKED] after the word before are the original order, ranked by
- * [HabitRanker] under that word's code ([code]) and after it, nothing before it counting. A word
- * picked there that is no longer among them is put in, so one picked once stays ahead of those
- * never picked.
- *
- * 联想 has no keys: its words go by their text alone ([words]), and are filed so, whatever input
- * method offered them. So one list is learned for them all, and a pick moves neither pinyin's
- * order nor the decoder's counts, as a table's or handwriting's words do not (review-C S1).
+ * 联想 in the user's order, for every input method: the [predictor]'s best [RANKED] after the word before, ranked
+ * by [HabitRanker] under that word's code; a word picked there that dropped out is put back in. Filed by text
+ * alone, so one list is learned for all input methods, and a pick moves neither pinyin's order nor the decoder's counts.
  */
 class PredictionOrder(
     private val predictor: Predictor,
-    /** The id of a text, the model's word of it else the user's: a word picked here is filed by its text alone. */
     private val idOf: (String) -> Int,
 ) {
-    /**
-     * What is offered [after] a word: [candidates] in order, each with its tier ([ranks]); those
-     * that are the rest of a whole phrase ([phrases], U-73) with it.
-     */
+    /** What is offered [after] a word: [candidates] in order with their [ranks]; [phrases] those that are a whole phrase's rest. */
     class Offer(
         val after: String,
         val candidates: List<Candidate>,
@@ -48,12 +38,7 @@ class PredictionOrder(
         }
     }
 
-    /**
-     * What may follow [prev] (after [prev2]; see [Predictor.predict] for [tail] and [learnedAfter]), as [habits] rank it:
-     * the rest of the whole phrases [continued] first (D-C3), most used first, then the words as U-70 ranks them, but
-     * for one it put first (picked twice running there) which stays in front. After no word of the model's
-     * ([prev] [NO_WORD]: the user's new word, a rare one) the phrases alone, after [last], the word put in last.
-     */
+    /** What may follow [prev], as [habits] rank it: whole phrases' rests first, then the words, unless one is pinned or put first; after no model word, the phrases alone after [last]. */
     fun offer(
         habits: Habits,
         prev2: Int,
@@ -66,14 +51,12 @@ class PredictionOrder(
         val phrases = continued.associateBy { Candidate(it.rest, 0, 0f, IntArray(0), IntArray(0)) }
         if (prev == NO_WORD) return if (phrases.isEmpty() || last.isEmpty()) Offer.NONE else phrasesAlone(habits, last, phrases)
         val rests = continued.mapTo(HashSet()) { it.rest }
-        // a word of the same text as a phrase's rest: once, as the phrase
         val offered = predictor.predict(prev2, prev, RANKED, learnedAfter, tail).filter { it.text !in rests }
-        // the word as put in (你好, not its 好): the habits, 不再联想 and 为什么 filed under it (review-uat-fixes S11)
+        // the word as put in (你好, not its 好): the habits and turn-offs are filed under it
         val after = predictor.after
         val code = code(after)
         val present = offered.mapTo(HashSet()) { it.text }.apply { addAll(rests) }
-        // picked here once and gone from the best since (they moved on): back among them
-        // after the word as put in too: candidate() files its 不再联想 check under the word it is given (F2651)
+        // picked here once and gone from the best since: back among them
         val learned = if (learnedAfter == NO_WORD) prev else learnedAfter
         val back = habits.used(code).mapNotNull { w ->
             if (!present.add(w.text)) null else idOf(w.text).takeIf { it != NO_WORD }?.let { predictor.candidate(learned, it) }
@@ -83,19 +66,16 @@ class PredictionOrder(
         val view = view(habits)
         val byHabit = HabitRanker.rank(items, code, after, view)
         val whole = ranked(phrases.keys, code, view)
-        // the phrases in front of the words (D-C3), but for a word the user put first here (U-70: picked twice running) or pinned
         val ahead = byHabit.firstOrNull()?.takeIf { it.tier == HabitRanker.Tier.PINNED || it.tier == HabitRanker.Tier.FIRST_HERE }
         val ranked = listOfNotNull(ahead) + whole + byHabit.drop(if (ahead == null) 0 else 1)
         return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value }, phrases)
     }
 
-    // the phrases (U-73) after a word the model has not, filed after it as put in: a pick of one is learned there
     private fun phrasesAlone(habits: Habits, after: String, phrases: Map<Candidate, Continuations.Found>): Offer {
         val ranked = ranked(phrases.keys, code(after), view(habits))
         return Offer(after, ranked.map { it.value }, ranked.associateBy { it.value }, phrases)
     }
 
-    // the phrases' rests in the order found (most used first), each with its uses here
     private fun ranked(rests: Collection<Candidate>, code: Code, view: HabitRanker.View) =
         rests.map { c -> HabitRanker.Ranked(item(c, injected = false), HabitRanker.Tier.DICTIONARY, view.uses(code, words(c.text))) }
 
@@ -105,16 +85,14 @@ class PredictionOrder(
     private fun view(habits: Habits) = habits.rankView(imports = false)
 
     companion object {
-        /** The predictions ranked: two pages and more; one never in them is seldom picked (impl/streams/H-predict.md). */
+        /** Two pages and more; one never in them is seldom picked. */
         const val RANKED = 30
 
-        /** The code of what is offered after the word [after]: the word itself, its text. */
         fun code(after: String) = Code(Kinds.PREDICTION, after)
 
-        /** A prediction of [text] as learned: by its text, of no reading. */
         fun words(text: String) = Words.of(text)
 
-        /** The record of [text] picked [after] the word it follows, [first] shown first (none: not known), as a session files it. */
+        /** The record of [text] picked [after] the word it follows, [first] shown first. */
         fun row(text: String, after: String, first: String): Row {
             val corrected = if (first.isNotEmpty() && first != text) Row.CORRECTED else 0
             // the model's word or the user's: never one to form

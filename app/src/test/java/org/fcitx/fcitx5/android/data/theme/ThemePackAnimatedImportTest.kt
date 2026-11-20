@@ -22,11 +22,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * A pack whose animated picture is past ThemeAssetLimits.MAX_ANIMATED_SIDE (720: decoding goes with the
- * pixels, 060-render-perf 动效) imports with the warning that it is drawn still; one at the limit plays, untold.
- * Apart from ThemePackImportTest for its size (detekt LargeClass).
- */
+/** An animated picture past MAX_ANIMATED_SIDE imports with a warning that it is drawn still; one at the limit plays. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemePackAnimatedImportTest {
@@ -34,7 +30,7 @@ class ThemePackAnimatedImportTest {
     private val dir get() = ThemeFilesManager.themeDir
     private val real = ThemeFilesManager.probe
 
-    // the animated WebP's size from its header, the still cut any, off Android
+    // the animated WebP's size from its header, off Android
     private object WebpProbe : ThemeFilesManager.AssetProbe {
         override fun imageSize(file: File) = AnimatedWebp.header(file)?.let { it.width to it.height } ?: (1080 to 720)
         override fun fontReads(file: File) = false
@@ -74,12 +70,12 @@ class ThemePackAnimatedImportTest {
     @Test
     fun anAnimatedPictureWiderThanItsLimitIsToldItIsDrawnStill() {
         assertEquals(emptyList<String>(), warnings(ThemeAssetLimits.MAX_ANIMATED_SIDE, 480))
-        // 1080 wide (a phone's keyboard): past the 720 a side it plays at, shown still and told
+        // 1080 wide: past 720, shown still and told
         val still = appContext.getString(R.string.theme_pack_animated_still, "4", "720", "300", "20")
         assertEquals(listOf(still), warnings(1080, 720))
     }
 
-    // an animated WebP's header (VP8X, ANIM, [frames] ANMF of 50 ms), w×h
+    // VP8X, ANIM, [frames] ANMF of 50 ms
     private fun animatedWebp(w: Int, h: Int, frames: Int = 2): ByteArray {
         val out = ByteArrayOutputStream()
         fun le(o: ByteArrayOutputStream, v: Int, n: Int) = repeat(n) { o.write((v shr (8 * it)) and 0xff) }

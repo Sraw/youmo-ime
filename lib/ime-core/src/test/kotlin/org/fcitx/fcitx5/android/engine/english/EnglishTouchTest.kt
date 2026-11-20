@@ -11,7 +11,7 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Where a key was tapped, read by the full keyboard's English (061-neighbour-english). */
+/** Where a key was tapped, read by the full keyboard's English. */
 class EnglishTouchTest {
 
     private val data = EnglishDecoderTest.data()
@@ -23,7 +23,6 @@ class EnglishTouchTest {
     private fun hwllo(w: Touch?): String {
         val s = EnglishSession(data, maxCorrection = 2f)
         s.apply(Action.Key('h'))
-        // a key typed and taken back: the places stay with their keys
         s.apply(Action.Key('x', touch = onW(0.45f)))
         s.apply(Action.Backspace)
         s.apply(Action.Key('w', touch = w))
@@ -41,8 +40,7 @@ class EnglishTouchTest {
         assertEquals("hwllo ", hwllo(onW(0f)))
     }
 
-    // Stebe after "I met ", b tapped [b] (none: no place), with the default correction (R26 F8418): b's edge by v a
-    // slip, Steve; no place, a key beside, Steve; b's middle, as typed
+    // Stebe after "I met ", b tapped at [b] (null: no place)
     private fun stebe(b: Touch?): String {
         val s = EnglishSession(data)
         s.apply(Action.Context("I met "))

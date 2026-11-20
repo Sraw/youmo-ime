@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-// The grouped keyboards' codes are private use characters, blank in source: tests write them
-// through these, by letter or digit, never as literals.
+// The grouped keyboards' codes are private use, blank in source: write them through these, never as literals.
 
 /** The 14 keys' code for the key whose first letter is [first] (its block's place: a letter on no key's first is no key's code). */
 fun g14Code(first: Char): Char = (NineKeyLetters.G14_BLOCK.first + (first - 'a')).toChar()

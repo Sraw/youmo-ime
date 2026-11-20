@@ -9,11 +9,7 @@ import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import java.util.Calendar
 
-/**
- * The time the keys' date and time variables are filled in with (061-text-variables): one clock for the long press
- * (KeyResolver), the corners, a swipe's preview and what it types, so they agree on the minute; the device's, or a
- * test's ([clock], read at each ask, so resolvers made before it is set read it too).
- */
+/** One clock for the long press, the corners, a swipe's preview and what it types, so they agree on the minute. */
 object KeyClock : LearnClock {
     @VisibleForTesting
     @Volatile

@@ -31,9 +31,7 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
 
-// a pack imported through the store (F6301, F5988): the host restarted only for the text pack (it reads no
-// voice pack, and a restart loses what is being composed); the state counted after the restart returns, so
-// what the keyboard queues on it waits for the new host; the replaced generation deleted once nothing reads it
+// only the text pack restarts the host (a restart loses composing); state counted after restart; old generation deleted once unread
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PackStoreChangedTest {
@@ -55,10 +53,9 @@ class PackStoreChangedTest {
                 val result = runBlocking { PackStore.import(TestShelves.pack(kind, version = 2).inputStream()) }
                 assertTrue("$kind $result", result is ImportResult.Imported)
                 assertEquals("$kind: the host restarted", if (kind == PackKind.TEXT) 1 else 0, countedAtRestart.size - restartsBefore)
-                // the restart sees the state not yet counted
                 if (kind == PackKind.TEXT) assertEquals(before, countedAtRestart.last())
                 assertEquals(kind.toString(), before + 1, PackStore.state.value.generation)
-                // swept at once: the voice pack's readers look again, the host up anew on the text pack's
+                // swept at once: voice readers look again, the host is up anew on the text pack's
                 assertFalse("$kind: $replaced", replaced.exists())
                 assertTrue(kind.toString(), shelf.dir(kind)!!.exists())
             }
@@ -69,9 +66,7 @@ class PackStoreChangedTest {
         }
     }
 
-    // the text pack imported but the host not up anew (its restart failing or throwing): the state counted
-    // all the same, the replaced generation kept (the old host may still read it), left for the next start;
-    // the start's tidy, run after an import has begun, leaves it too
+    // host restart failing: state counted anyway, old generation kept for the old host and left for the next start's tidy
     @Test
     fun aRestartThatFailsCountsAndKeepsTheReplacedGeneration() {
         val restart = PackStore.restartHost
@@ -101,14 +96,13 @@ class PackStoreChangedTest {
             assertTrue("$replaced", replaced.exists())
             PackStore.tidyAtStart(shelf)
             assertTrue("the start's tidy after an import: $replaced", replaced.exists())
-            // what the start's tidy deletes with no import begun
             PackStore.tidyAtStart(shelf) { false }
             assertFalse("$replaced", replaced.exists())
         } finally {
             root.deleteRecursively()
         }
     }
-    // pending L8: an older pack over a newer one asked first, nothing copied before; kept unless the answer is yes
+    // an older pack over a newer one is asked first, nothing copied before; kept unless the answer is yes
     @Test
     fun anOlderPackReplacesTheNewerOneOnlyWhereTheAnswerIsYes() {
         val root = Files.createTempDirectory("packs").toFile()
@@ -132,11 +126,10 @@ class PackStoreChangedTest {
             val taken = import(true) as ImportResult.Imported
             assertEquals(1 to 2, taken.manifest.version to taken.replaced!!.version)
             assertEquals(listOf(1 to 2, 1 to 2), asked)
-            // a newer one, or none there: not asked
             val newer = File(root, "new.youmopack").apply { writeBytes(TestShelves.pack(PackKind.TEXT, version = 3)) }
             assertTrue(runBlocking { PackStore.import(resolver, Uri.fromFile(newer)) { _, _ -> error("asked") } } is ImportResult.Imported)
             PackStore.useShelf(PackShelf(File(root, "empty"), listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() })
-            // none there: the file opened once, so a provider that gives its stream only once is read all the same
+            // a provider that gives its stream only once must still be read
             val oneShot = Uri.parse("content://packs.test/old.youmopack")
             var opened = 0
             shadowOf(resolver).registerInputStreamSupplier(oneShot) {
@@ -144,7 +137,6 @@ class PackStoreChangedTest {
             }
             val once = runBlocking { PackStore.import(resolver, oneShot) { _, _ -> error("asked") } }
             assertTrue("$once", once is ImportResult.Imported)
-            // what the bug was: a second open of a file whose provider gives it once
             assertEquals(1, opened)
         } finally {
             PackStore.restartHost = restart
@@ -153,9 +145,7 @@ class PackStoreChangedTest {
         }
     }
 
-    // UAT 0.6.1 (ST-82): an older pack this build cannot use was offered first as the newer one's replacement,
-    // and only after 替换 refused as needing a newer one; refused at once now, nothing asked, nothing copied.
-    // An older one it can use is still asked about
+    // an older pack this build cannot use is refused at once, not asked; one it can use is still asked about
     @Test
     fun anOlderPackThisBuildCannotUseIsRefusedWithoutAsking() {
         val root = Files.createTempDirectory("packs").toFile()
@@ -189,16 +179,13 @@ class PackStoreChangedTest {
         }
     }
 
-    // 0.6.1's test builds took voice pack v3, which 0.6.1 went back on (its v2 is 0.6.0's): a v3 kept from them is
-    // of the format this build reads and not below its minVersion, so it stays in use, the page saying v3, nothing
-    // failing; the released v2 over it is an older pack over a newer one, asked about, and 替换 makes it the one used
+    // a kept v3 voice pack from test builds stays in use; the released v2 over it is asked about as older, and 替换 uses it
     @Test
     @Uat("ST-82")
     fun aTestBuildsVoicePackV3StaysInUseTillTheReleasedV2ReplacesIt() {
         val dir = Files.createTempDirectory("packs").toFile()
         val format = BuildConfig.PACK_VOICE_FORMAT
         val app = TestShelves.requirements + (PackKind.VOICE to PackRequirement(format, BuildConfig.PACK_VOICE_MIN_VERSION))
-        // the v3 imported under the test build, which took voice packs from v3; then this app's start
         val beta = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements + (PackKind.VOICE to PackRequirement(format, 3))).apply { load() }
         assertTrue(beta.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
         assertTrue(beta.import(TestShelves.pack(PackKind.VOICE, version = 3, format = format).inputStream()) is ImportResult.Imported)

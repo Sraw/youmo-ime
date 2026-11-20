@@ -6,8 +6,6 @@ package org.fcitx.fcitx5.android.core
 
 import android.view.KeyEvent
 
-// KeyStates itself is in ime-core; what needs Android's key events is here
-
 val KeyStates.metaState: Int get() {
     var metaState = 0
     if (alt) metaState = metaState or KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
@@ -19,24 +17,17 @@ val KeyStates.metaState: Int get() {
     return metaState
 }
 
-/**
- * [metaState] for an event of [keyCode] made up from these states, fcitx's ([fromKeyEvent]): a
- * modifier key's own bit back on as it goes down and off as it comes up ([up]), as Android has it,
- * so that an editor's sticky meta state follows. The states have no sides: the bit goes off with
- * either key of a pair while the other may still be held, and is always the left key's.
- */
+/** A modifier's own bit on as it goes down and off as it comes up, as Android has it; states have no sides, so always the left key's. */
 fun KeyStates.metaStateOf(keyCode: Int, up: Boolean): Int {
     val own = ownModifier(keyCode)?.first ?: return metaState
     return KeyStates(if (up) states - own else states + own).metaState
 }
 
 fun KeyStates.Companion.fromKeyEvent(event: KeyEvent): KeyStates {
-    // drop modifier state when using combination keys to input number/symbol on some phones
-    // because fcitx doesn't recognize selection key with modifiers (eg. Alt+Q for 1)
-    // in which case event.getNumber().toInt() == event.getUnicodeChar()
-    // ... but some keys can have event.getNumber() return 0, need to check displayLabel as well
+    // some phones type a number/symbol with modifiers (Alt+Q for 1), which fcitx does not take as a selection key: drop
+    // them where getNumber() == getUnicodeChar(); getNumber() may be 0, so displayLabel is checked too
     val unicode = event.unicodeChar
-    // skip ' ', because it would produce same unicodeChar regardless of the modifier
+    // ' ' is the same unicodeChar whatever the modifier
     if (unicode != 0 && unicode != ' '.code) {
         val char = unicode.toChar()
         if (char == event.number || event.displayLabel.uppercaseChar() != char.uppercaseChar()) {
@@ -52,10 +43,8 @@ fun KeyStates.Companion.fromKeyEvent(event: KeyEvent): KeyStates {
         if (isNumLockOn) states += KeyState.NumLock
         if (isMetaPressed) states += KeyState.Meta
     }
-    // fcitx reads a key's state as X11 has it, as it was before the key: a modifier key's
-    // own bit off as it goes down, on as it comes up. Android has it the other way round,
-    // and a lone Shift's release never matched its press: no modifier-only hotkey could fire
-    // (the other side's key of the pair held down keeps the bit on, as in X11)
+    // fcitx reads a modifier's own bit as X11 does (off as it goes down), Android the other way round; else a lone
+    // Shift's release never matched its press and no modifier-only hotkey fired
     ownModifier(event.keyCode)?.let { (state, otherSide) ->
         states = when {
             event.action == KeyEvent.ACTION_UP -> states + state
@@ -63,13 +52,11 @@ fun KeyStates.Companion.fromKeyEvent(event: KeyEvent): KeyStates {
             else -> states - state
         }
     }
-    // Android's Meta is X11's Super (Mod4), what fcitx's hotkeys name (Super+` and Super+; for quick
-    // input); Meta alone fcitx's Key::normalize drops, so Meta+` was a plain `
+    // Android's Meta is X11's Super, which fcitx's hotkeys name; Meta alone Key::normalize drops
     if ((states and KeyState.Meta.state) != 0u) states += KeyState.Super
     return KeyStates(states)
 }
 
-/** A modifier key's own state, and the meta flag of the other side's key of its pair. */
 private fun ownModifier(keyCode: Int): Pair<KeyState, Int>? = when (keyCode) {
     KeyEvent.KEYCODE_SHIFT_LEFT -> KeyState.Shift to KeyEvent.META_SHIFT_RIGHT_ON
     KeyEvent.KEYCODE_SHIFT_RIGHT -> KeyState.Shift to KeyEvent.META_SHIFT_LEFT_ON

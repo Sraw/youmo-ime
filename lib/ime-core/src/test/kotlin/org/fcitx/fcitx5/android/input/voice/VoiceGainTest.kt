@@ -53,7 +53,7 @@ class VoiceGainTest {
     @Test
     @Uat("VO-24")
     fun sameAsTheMeasuredOneSampleForSample() {
-        // resources/voice/gain_golden.py (tailquiet's Gain2): each parameter changed alone changes it.
+        // resources/voice/gain_golden.py (Gain2): each parameter changed alone changes it.
         // contract: a fixture generated from the measured Python gain, which mutation cannot see.
         val bytes = javaClass.getResourceAsStream("/voice/gain-golden.bin")!!.use { it.readBytes() }
         val all = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
@@ -100,9 +100,7 @@ class VoiceGainTest {
         assertEquals(0.01f, one[0], 1e-7f)
     }
 
-    // env falls 3 dB a second of samples once the loud has left the span: the gain rises with it. A
-    // half window too: VoiceListener hands a short read on as it came (copyOf(n)), and whole windows
-    // alone could not tell a fall per sample from one per window
+    // env falls 3 dB a second once the loud left the span; a half window too, as VoiceListener hands short reads on
     @Test
     fun afterLoudTheGainComesBackAtThreeDbASecond() = assertRows(
         "whole windows" to {

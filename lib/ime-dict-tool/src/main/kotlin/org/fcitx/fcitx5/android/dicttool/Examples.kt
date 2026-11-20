@@ -4,16 +4,7 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
-/**
- * A few sentences each of [words] uses, for whoever decides whether it is a word
- * (dev/TRAINING-PLAN.md 12.5): a candidate alone says little of what it is, three sentences most
- * of it. Pages go in through [page]; [sentences] has what was found.
- *
- * A sentence is what lies between two ends ([ENDS]), [MIN_SENTENCE] to [MAX_SENTENCE] characters,
- * and is taken for a word only once, the first [perWord] different ones in the pages' order.
- * Words of two or three characters are found by a key of their chars; longer ones by the key of
- * their first three, then compared whole: three chars fit a [LongIndex] key, which is never negative.
- */
+/** The first [perWord] different sentences each of [words] is used in, for whoever decides whether it is a word. */
 class Examples(words: Collection<String>, private val perWord: Int = PER_WORD) {
 
     // an index and lists beside it rather than maps of boxed keys: each char of every page is looked up

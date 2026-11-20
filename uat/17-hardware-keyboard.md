@@ -286,7 +286,7 @@ Android 10（API 29，youmo29）没有 `uinput` 命令，脚本在那里改用�
 - **前提**：同 HK-43，屏幕键盘显示着 14 键。
 - **操作**：在屏幕 14 键上点 BN UI GH AS OP（各点在 n、i、h、a、o 那一半，这串键也是「不好」）、空格；按实体键盘的 Esc（联想还在时）；按 n i，按 2。
 - **预期**：「你好」上屏，后面出联想；Esc 之后框里还是「你好」；n i 按全拼读，打字时按 2 选第 2 个候选上屏。Esc 的先后（有联想时第一下先关联想，同 HK-03；之后的才交给应用）只在 JVM 上查，设备上看不到。
-- **JVM**：`KeyboardPairTest.withNothingTypedEscapeAndDigitsAreTheAppsAfterTheFourteenKeysToo`（没打字、也没有联想时，实体键盘的 Esc 交给应用、数字照样选候选）；`EnginesKeys14Test.anEscapeClosesThePredictionsOfTheFourteenKeysFirst`（有联想时 Esc 先关联想）；设备上 Esc 只是冒烟（实体键一按触屏键盘就收起，看不到联想；网页框里 Esc 也不改字），只查「你好」后出现联想、按 2 选第 2 个候选。
+- **JVM**：`KeyboardPairTest.withNothingTypedEscapeAndDigitsAreTheAppsAfterTheFourteenKeysToo`（没打字、也没有联想时，实体键盘的 Esc 交给应用、数字照样选候选）；`EnginesImKeyboardsTest.anEscapeClosesThePredictionsOfTheFourteenKeysFirst`（有联想时 Esc 先关联想）；设备上 Esc 只是冒烟（实体键一按触屏键盘就收起，看不到联想；网页框里 Esc 也不改字），只查「你好」后出现联想、按 2 选第 2 个候选。
 
 ### HK-45 [P1] 双拼 18 键时实体键盘按全键盘双拼打
 - **前提**：B0-实体，添加"双拼"，**方案** 改成"微软"，**键盘** 改成「18 键」，回测试页点「普通文本」框，换到双拼。

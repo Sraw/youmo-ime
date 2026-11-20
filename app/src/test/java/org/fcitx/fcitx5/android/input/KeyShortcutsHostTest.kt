@@ -8,16 +8,12 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.text.InputType
 import android.view.MotionEvent
-import android.view.View
 import android.view.inputmethod.EditorInfo
-import java.io.File
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.KotlinHost
-import org.fcitx.fcitx5.android.core.ScriptedEngine
-import org.fcitx.fcitx5.android.core.keyboardOn
-import org.fcitx.fcitx5.android.core.startedHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -43,13 +39,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.fcitx.fcitx5.android.until as waitUntil
 
-/**
- * The swipes' shortcuts carried out (051-c §4): 清除 and 恢复 on backspace (up and down by default),
- * v's 粘贴 while pinyin is typed, through a real [KotlinHost] on a scripted engine, the field an app's.
- * What the main thread and the host's each do, in the order they do it, as on a device.
- */
+/** The swipe shortcuts (清除, 恢复, 粘贴) through a real [KotlinHost] on a scripted engine: main and host threads in device order. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -58,45 +49,23 @@ class KeyShortcutsHostTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private lateinit var home: File
-    private lateinit var fcitx: KotlinHost
-    private lateinit var h: KeyboardHarness
+    @get:Rule(order = 1)
+    val host = HostKeyboardRule("shortcuts-host")
+    private val h get() = host.h
+    private val fcitx get() = host.fcitx
 
     private fun start(prefill: String = "") {
-        home = File(appContext.filesDir, "shortcuts-host").apply { deleteRecursively() }
-        fcitx = startedHost(ScriptedEngine(home))
-        h = keyboardOn(fcitx)
+        host.up()
         h.start(prefill = { it.setText(prefill); it.setSelection(prefill.length) })
     }
 
     @After
     fun tearDown() {
         AppPrefs.getInstance().keyboard.pinyinKeyboard.let { it.setValue(it.defaultValue) }
-        if (::h.isInitialized) h.close()
-        if (::fcitx.isInitialized) fcitx.stop()
-        if (::home.isInitialized) home.deleteRecursively()
-    }
-
-    private fun until(what: String, done: () -> Boolean) = waitUntil(
-        what,
-        { "field [${h.field.text}] preedit [${fcitx.inputPanelCached.preedit}]" },
-        step = { h.idle() },
-        done = done,
-    )
-
-    // what the main thread posted to the host done, and what it told back shown
-    private fun synced() {
-        var done = false
-        h.service.postFcitxJob { done = true }
-        until("the host's queue done") { done }
-        h.idle()
     }
 
     private val backspace: ShownKey get() = h.keyNamed("backspace")
 
-    private val preedit get() = fcitx.inputPanelCached.preedit.toString()
-
-    // past the swipe's threshold and lifted: the key's shortcut that way
     private fun swipe(v: ShownKey, up: Boolean) {
         val finger = h.finger(v, h.at(v))
         val way = if (up) -1f else 1f
@@ -105,42 +74,39 @@ class KeyShortcutsHostTest {
     }
 
     private fun type(keys: String) {
-        val was = preedit
+        val was = host.preedit
         keys.forEach { h.tap(h.key(it.toString())) }
-        until("$keys typed") { preedit == was + keys }
+        host.until("$keys typed") { host.preedit == was + keys }
     }
 
     @Test
     fun backspaceSwipedUpClearsWhatIsBeforeTheCursorAndDownPutsItBack() {
         start("你好世界")
         swipe(backspace, up = true)
-        until("the field cleared") { h.field.text.isEmpty() }
+        host.until("the field cleared") { h.field.text.isEmpty() }
         swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "你好世界" }
+        host.until("put back") { h.field.text.toString() == "你好世界" }
         assertEquals(4, h.field.selectionStart)
     }
 
-    // R25r3 F7921 (R25 F7834, the app's side): the cursor put at the field's start and 清除 swiped before the editor's
-    // report of it is in (the service has it after 界 still); the clear taken back leaves the cursor where the editor
-    // reports it then, before the text, not where the lagging report had it as the clear was made (after it). The
-    // runner passing the plan's own steps (EditPlan.Cleared.restore) left it at 4
+    // the cursor moved to the start and 清除 swiped before the editor reports it: the undo leaves the cursor where the
+    // editor then reports it, not where the stale report had it
     @Test
     @Uat("KB-62")
     fun aClearMadeBeforeTheCursorsReportIsInIsPutBackWithTheCursorWhereItIsReportedThen() {
         start("你好世界")
-        synced()
+        host.synced()
         h.selectionLags = true
         h.field.setSelection(0)
         assertEquals("4..4", tracked())
         swipe(backspace, up = true)
-        until("the field cleared") { h.field.text.isEmpty() }
-        // the report in
+        host.until("the field cleared") { h.field.text.isEmpty() }
         h.selectionLags = false
-        synced()
+        host.synced()
         assertEquals("0..0", tracked())
         swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "你好世界" }
-        synced()
+        host.until("put back") { h.field.text.toString() == "你好世界" }
+        host.synced()
         assertEquals(0, h.field.selectionStart)
         assertEquals(0, h.field.selectionEnd)
     }
@@ -150,60 +116,56 @@ class KeyShortcutsHostTest {
         start()
         type("nihao")
         swipe(backspace, up = true)
-        until("nothing typed") { preedit.isEmpty() }
+        host.until("nothing typed") { host.preedit.isEmpty() }
         assertEquals("nothing committed", "", h.field.text.toString())
         swipe(backspace, up = false)
-        until("typed again") { preedit == "nihao" }
+        host.until("typed again") { host.preedit == "nihao" }
         assertEquals("", h.field.text.toString())
     }
 
-    // review S1: pinyin typed since the clear is not dropped by putting the clear back
+    // pinyin typed since the clear is not dropped by putting the clear back
     @Test
     fun nothingIsPutBackOverWhatIsTypedSince() {
         start()
         type("ni")
         swipe(backspace, up = true)
-        until("ni cleared") { preedit.isEmpty() }
+        host.until("ni cleared") { host.preedit.isEmpty() }
         type("hao")
         swipe(backspace, up = false)
-        synced()
-        assertEquals("hao", preedit)
+        host.synced()
+        assertEquals("hao", host.preedit)
         // nor once hao is cleared in its turn: ni was typed over
         swipe(backspace, up = true)
-        until("hao cleared") { preedit.isEmpty() }
+        host.until("hao cleared") { host.preedit.isEmpty() }
         swipe(backspace, up = false)
-        until("hao typed again") { preedit == "hao" }
+        host.until("hao typed again") { host.preedit == "hao" }
         h.tap(h.key("a"))
-        until("a typed") { preedit == "haoa" }
+        host.until("a typed") { host.preedit == "haoa" }
         swipe(backspace, up = false)
-        synced()
-        assertEquals("haoa", preedit)
+        host.synced()
+        assertEquals("haoa", host.preedit)
     }
 
-    // the keyboard changed since (the full keys for the 14): what the one before typed is no code
-    // of this one's, and would reach the field as letters with this one's next key. Its clear is
-    // dropped, as the change itself drops what is typed; a text clear stays
+    // what another keyboard typed is no code of this one's and would reach the field as letters: that clear is dropped
     @Test
     fun pinyinClearedIsNotTypedAgainOnAnotherKeyboard() {
         start("你好")
         type("ni")
         swipe(backspace, up = true)
-        until("ni cleared") { preedit.isEmpty() }
+        host.until("ni cleared") { host.preedit.isEmpty() }
         swipe(backspace, up = true)
-        until("text cleared") { h.field.text.isEmpty() }
+        host.until("text cleared") { h.field.text.isEmpty() }
         AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14)
         h.idle()
         swipe(backspace, up = false)
-        until("the text put back") { h.field.text.toString() == "你好" }
+        host.until("the text put back") { h.field.text.toString() == "你好" }
         swipe(backspace, up = false)
-        synced()
-        assertEquals("", preedit)
+        host.synced()
+        assertEquals("", host.preedit)
         assertEquals("你好", h.field.text.toString())
     }
 
-    // review2: a clear on its way as another field starts (the host's part done, the main thread's
-    // not yet) does nothing there: it was the first's. The main thread's part run as the listener runs
-    // it, with the field it was asked in, once the second has started: no thread's timing in it
+    // a clear under way as another field starts does nothing there; the main thread's part is run by hand, so no timing is involved
     @Test
     fun aClearUnderWayIsNotMadeInAFieldStartedSince() {
         start("给 A 的话")
@@ -212,55 +174,55 @@ class KeyShortcutsHostTest {
         val runner = KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { false }
         runner.clear(null, asked)
         runner.clear(HostCore.Retyping(InputMethodCatalog.PINYIN, emptyList()), asked)
-        synced()
+        host.synced()
         assertEquals("给 B 的话", h.field.text.toString())
-        // in its own field it clears
         runner.clear(null, h.service.startedField)
-        synced()
+        host.synced()
         assertEquals("", h.field.text.toString())
     }
 
-    // review2: the screen turned restarts input with the same EditorInfo, the same input: its clear
-    // stays. Finished, then started so again, it is gone (onFinishInput forgets, review M1)
+    // rotation restarts the same input, so its clear stays; finished and started again, it is gone
     @Test
     fun aClearOutlastsTheScreenTurningButNotTheInputFinishing() {
         start("你好")
         swipe(backspace, up = true)
-        until("cleared") { h.field.text.isEmpty() }
+        host.until("cleared") { h.field.text.isEmpty() }
         h.turn()
         swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "你好" }
+        host.until("put back") { h.field.text.toString() == "你好" }
         swipe(backspace, up = true)
-        until("cleared again") { h.field.text.isEmpty() }
+        host.until("cleared again") { h.field.text.isEmpty() }
         h.service.onFinishInput()
         h.turn()
         swipe(backspace, up = false)
-        synced()
+        host.synced()
         assertEquals("", h.field.text.toString())
     }
 
-    // R25 device pass, KB-88: an app that gives nothing before its cursor (the testbed's null_before). The runner
-    // read no field at all where either side was not given, so the swipe did nothing and said nothing; what
-    // is after the cursor goes and comes back, the cursor where it was
+    // an app that gives nothing before its cursor: what is after goes and comes back, the cursor kept. The mirror too
     @Test
     @Uat("KB-88")
-    fun whereNothingBeforeTheCursorIsGivenWhatIsAfterItIsClearedAndPutBackAtTheCursor() {
-        start("abc def")
-        h.field.setSelection(3)
-        synced()
-        h.nothingBeforeGiven = true
-        swipe(backspace, up = true)
-        until("what is after the cursor cleared") { h.field.text.toString() == "abc" }
-        assertTrue(said().toString(), appContext.getString(R.string.field_cleared) in said())
-        swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "abc def" }
-        assertEquals("3..3", selected())
+    fun whereOneSideOfTheCursorIsNotGivenTheOtherIsClearedAndPutBackAtTheCursor() {
+        fun cleared(before: Boolean, left: String) = {
+            host.down()
+            start("abc def")
+            h.field.setSelection(3)
+            host.synced()
+            if (before) h.nothingBeforeGiven = true else h.nothingAfterGiven = true
+            swipe(backspace, up = true)
+            host.until("the other side cleared") { h.field.text.toString() == left }
+            if (before) assertTrue(said().toString(), appContext.getString(R.string.field_cleared) in said())
+            swipe(backspace, up = false)
+            host.until("put back") { h.field.text.toString() == "abc def" }
+            assertEquals("3..3", selected())
+        }
+        assertRows(
+            "nothing given before it: what is after it" to cleared(before = true, left = "abc"),
+            "nothing given after it: what is before it" to cleared(before = false, left = " def"),
+        )
     }
 
-    // KB-88 review: what is typed cleared in such a field. Put back while nothing was typed since (the clear's own
-    // dropping of what was typed is no edit: nothing forgets the clear between the host's part and its keeping);
-    // not once a word was committed, which the field, giving nothing before its cursor, reads the same after
-    // (kept whole it was typed again after the word)
+    // put back while nothing was typed since; not once a word was committed, which such a field reads the same after
     @Test
     @Uat("KB-88")
     fun whereNothingBeforeTheCursorIsGivenWhatIsTypedIsPutBackUnlessSomethingWasCommittedSince() {
@@ -268,41 +230,25 @@ class KeyShortcutsHostTest {
         h.nothingBeforeGiven = true
         type("nihao")
         swipe(backspace, up = true)
-        until("nothing typed") { preedit.isEmpty() }
-        synced()
+        host.until("nothing typed") { host.preedit.isEmpty() }
+        host.synced()
         swipe(backspace, up = false)
-        until("typed again") { preedit == "nihao" }
+        host.until("typed again") { host.preedit == "nihao" }
         assertEquals("", h.field.text.toString())
 
         swipe(backspace, up = true)
-        until("nothing typed") { preedit.isEmpty() }
-        synced()
+        host.until("nothing typed") { host.preedit.isEmpty() }
+        host.synced()
         h.service.commitOverEngine("啊")
-        until("committed") { h.field.text.toString() == "啊" }
+        host.until("committed") { h.field.text.toString() == "啊" }
         swipe(backspace, up = false)
-        synced()
-        assertEquals("", preedit)
+        host.synced()
+        assertEquals("", host.preedit)
         assertEquals("啊", h.field.text.toString())
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_restore) in said())
     }
 
-    // the mirror: an app that gives nothing after its cursor. What is before it goes and comes back, what is after it untouched
-    @Test
-    @Uat("KB-88")
-    fun whereNothingAfterTheCursorIsGivenWhatIsBeforeItIsClearedAndPutBack() {
-        start("abc def")
-        h.field.setSelection(3)
-        synced()
-        h.nothingAfterGiven = true
-        swipe(backspace, up = true)
-        until("what is before the cursor cleared") { h.field.text.toString() == " def" }
-        swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "abc def" }
-        assertEquals("3..3", selected())
-    }
-
-    // the same app with nothing after its cursor either gives "" there, not null: nothing read to clear, and
-    // the field is no empty one (review S2), so a copy takes it whole and never says there is nothing to copy
+    // nothing on either side gives "" there, not null: the field is no empty one, so a copy takes it whole
     @Test
     @Uat("KB-88")
     fun whereNothingBeforeTheCursorIsGivenAFieldWithNothingAfterItIsNotTakenForAnEmptyOne() {
@@ -312,86 +258,77 @@ class KeyShortcutsHostTest {
         start("abc")
         h.nothingBeforeGiven = true
         swipe(backspace, up = true)
-        synced()
+        host.synced()
         assertEquals("abc", h.field.text.toString())
         swipe(h.key("c"), up = false)
-        until("the field copied whole") { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "abc" }
+        host.until("the field copied whole") { clipboard.primaryClip?.getItemAt(0)?.text?.toString() == "abc" }
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_copy) !in said())
     }
 
-    // what the notice over the keyboard says now
     private fun said(): List<String> = org.robolectric.Shadows.shadowOf(appContext as android.app.Application).latestPopupWindow
         ?.contentView?.let { v -> KeyboardHarness.all(v).filterIsInstance<android.widget.TextView>().map { it.text.toString() }.toList() }.orEmpty()
 
-    // review2: a field that asks for no learning keeps nothing of a clear, as a password does
+    // a no-learning field keeps nothing of a clear, as a password does
     @Test
     fun aFieldKeptFromLearningIsClearedWithNothingToPutBack() {
-        home = File(appContext.filesDir, "shortcuts-host").apply { deleteRecursively() }
-        fcitx = startedHost(ScriptedEngine(home))
-        h = keyboardOn(fcitx)
+        host.up()
         h.start(imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING, prefill = { it.setText("秘密"); it.setSelection(2) })
         swipe(backspace, up = true)
-        until("cleared") { h.field.text.isEmpty() }
+        host.until("cleared") { h.field.text.isEmpty() }
         swipe(backspace, up = false)
-        synced()
+        host.synced()
         assertEquals("", h.field.text.toString())
     }
 
-    // review M1: another field, as empty as the clear left the first, gets nothing of it
     @Test
     fun aClearIsNeverPutBackInAnotherField() {
         start("给 A 的话")
         swipe(backspace, up = true)
-        until("cleared") { h.field.text.isEmpty() }
+        host.until("cleared") { h.field.text.isEmpty() }
         h.start(fieldId = 2)
         swipe(backspace, up = false)
-        synced()
+        host.synced()
         assertEquals("", h.field.text.toString())
     }
 
-    // 051-c §1.4: what is typed goes in first, then the shortcut runs
     @Test
     fun vSwipedDownWhilePinyinIsTypedCommitsItThenPastes() {
         start()
         appContext.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(null, "X"))
         type("nihao")
         swipe(h.key("v"), up = false)
-        until("committed, then pasted") { h.field.text.endsWith("X") && preedit.isEmpty() }
+        host.until("committed, then pasted") { h.field.text.endsWith("X") && host.preedit.isEmpty() }
         assertEquals("你好X", h.field.text.toString())
     }
 
-    // a key's shortcut set to 快速输入 opens it as 符's long press and the bar's button do, what is
-    // typed put in first
+    // opens it as 符's long press and the bar's button do
     @Test
     fun aShortcutOfQuickInputOpensItAfterWhatIsTyped() {
         prefs.setShortcuts(KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.QuickInput)))
         start()
         type("nihao")
         swipe(h.key("q"), up = false)
-        until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
-        assertEquals("", preedit)
+        host.until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
+        assertEquals("", host.preedit)
     }
 
-    // 快速输入 run by the runner (a menu's, not a key's swipe) as the others open it: what is typed put in first, not
-    // left as the keyword's start (where the full keyboard's Shift would still be 分词)
+    // not left as the keyword's start, where the full keyboard's Shift would still be 分词
     @Test
     fun quickInputRunOpensItAfterWhatIsTyped() {
         start()
         type("nihao")
         KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.QuickInput))
-        until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
-        assertEquals("", preedit)
+        host.until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
+        assertEquals("", host.preedit)
     }
 
-    // 滑选 on q: up past the threshold, then sideways to each of [dxs] (dp from the key's middle; a
-    // character each 10 dp, the backspace's selection's step), lifted at the last
+    // up past the threshold, then sideways to each of [dxs] (dp from the key's middle; 10 dp a character), lifted at the last
     private fun swipeSelect(vararg dxs: Float, on: ShownKey? = null, then: (Int) -> Unit = {}) {
         val k = on ?: h.key("q")
         val finger = swipeSelectHeld(k, *dxs, then = then)
         finger.up(h.at(k, dx = dxs.last(), dy = -60f))
     }
 
-    // as [swipeSelect], the finger left down
     private fun swipeSelectHeld(k: ShownKey, vararg dxs: Float, then: (Int) -> Unit = {}): KeyboardHarness.Finger {
         val finger = h.finger(k, h.at(k))
         for (i in 1..6) finger.move(h.at(k, dy = -10f * i, ms = 16))
@@ -402,31 +339,29 @@ class KeyShortcutsHostTest {
         return finger
     }
 
-    // 滑选 in q's up slot (its long press's first by default)
     private fun swipeSelectOnQ() =
         prefs.set(AppPrefs.getInstance().internal.keySwipes, SwipeSlots.Default.with("full/q", up = true, SwipeSlot.Command(KeyCommand.SwipeSelect)).serialize())
 
     private fun selected() = "${h.field.selectionStart}..${h.field.selectionEnd}"
 
-    // KB-69: left grows the selection from the cursor a character a step, right shrinks it and
-    // past the cursor grows it the other way; lifted, it stays, nothing typed
+    // left grows the selection a character a step, right shrinks it and past the cursor grows it the other way
     @Test
     @Uat("KB-69")
     fun swipeSelectSelectsFromTheCursorAsTheFingerMovesSideways() {
         swipeSelectOnQ()
         start()
         h.start(prefill = { it.setText("hello world"); it.setSelection(5) })
-        synced()
+        host.synced()
         swipeSelect(-31f, 21f) { i ->
-            if (i == 0) until("llo selected") { selected() == "2..5" }
+            if (i == 0) host.until("llo selected") { selected() == "2..5" }
         }
-        until("past the cursor: \" w\" selected") { selected() == "5..7" }
-        synced()
+        host.until("past the cursor: \" w\" selected") { selected() == "5..7" }
+        host.synced()
         assertEquals("nothing typed", "hello world", h.field.text.toString())
         assertEquals("lifted, it stays", "5..7", selected())
     }
 
-    // KB-69: what is typed is committed first, as for any shortcut; the steps moved meanwhile are taken
+    // the steps moved meanwhile are taken
     @Test
     @Uat("KB-69")
     fun swipeSelectCommitsWhatIsTypedFirst() {
@@ -434,65 +369,62 @@ class KeyShortcutsHostTest {
         start()
         type("nihao")
         swipeSelect(-21f)
-        until("committed, then selected") { h.field.text.toString() == "你好" && selected() == "0..2" }
-        assertEquals("", preedit)
+        host.until("committed, then selected") { h.field.text.toString() == "你好" && selected() == "0..2" }
+        assertEquals("", host.preedit)
     }
 
-    // KB-69: an emoji (a family, ZWJ) is one character
+    // an emoji (a family, ZWJ) is one character
     @Test
     @Uat("KB-69")
     fun swipeSelectStepsOverAnEmojiWhole() {
         swipeSelectOnQ()
         val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
         start("a$family")
-        synced()
+        host.synced()
         swipeSelect(-11f)
-        until("the family selected") { selected() == "1..${1 + family.length}" }
+        host.until("the family selected") { selected() == "1..${1 + family.length}" }
     }
 
-    // begun right after what is typed is committed, before the editor reports it: the field is still
-    // read, so an emoji before what was typed is stepped over whole
+    // begun before the editor reports the commit: the field is still read, so the emoji is stepped over whole
     @Test
     fun swipeSelectRightAfterPinyinStillStepsOverAnEmojiWhole() {
         swipeSelectOnQ()
         val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
         start(family)
-        synced()
+        host.synced()
         type("nihao")
         swipeSelect(-31f)
-        until("你好 and the family selected") { h.field.text.toString() == "${family}你好" && selected() == "0..${family.length + 2}" }
+        host.until("你好 and the family selected") { h.field.text.toString() == "${family}你好" && selected() == "0..${family.length + 2}" }
     }
 
-    // the touch taken by the system: the selection stays; the key's next touch is a touch of its own, a tap a tap
+    // the touch taken by the system: the selection stays; the next touch is a touch of its own
     @Test
     fun swipeSelectCancelledKeepsTheSelectionAndTheNextTouchIsATap() {
         swipeSelectOnQ()
         start("hello")
-        synced()
+        host.synced()
         val q = h.key("q")
         val finger = swipeSelectHeld(q, -11f, -21f)
-        until("lo selected") { selected() == "3..5" }
+        host.until("lo selected") { selected() == "3..5" }
         finger.send(MotionEvent.ACTION_CANCEL, h.at(q, dx = -21f, dy = -60f))
-        synced()
+        host.synced()
         assertEquals("cancelled, it stays", "3..5", selected())
-        // typed, not taken for 滑选 again
         type("q")
     }
 
-    // the bubble says 滑选 till the lift, the finger drifting back down onto the key too
     @Test
     fun swipeSelectsBubbleStaysAsTheFingerDriftsBack() {
         swipeSelectOnQ()
         start("hello")
-        synced()
+        host.synced()
         val q = h.key("q")
         val finger = swipeSelectHeld(q, -11f)
         finger.move(h.at(q, dx = -11f, dy = 0f, ms = 16))
         val shown = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
         assertTrue("滑选 in $shown", "滑选" in shown)
         finger.up(h.at(q, dx = -11f))
-        synced()
-        assertEquals("no q typed", "", preedit)
+        host.synced()
+        assertEquals("no q typed", "", host.preedit)
         assertEquals("hello", h.field.text.toString())
     }
 
@@ -503,69 +435,66 @@ class KeyShortcutsHostTest {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD,
             prefill = { it.setText("secret"); it.setSelection(6) },
         )
-        synced()
+        host.synced()
     }
 
     private fun tracked() = h.service.currentInputSelection.let { "${it.start}..${it.end}" }
 
-    // a password's text is not read: units. Past its end a step the editor ignores; the finger's steps
-    // after it kept, the selection follows the finger back
+    // a password's text is not read: units. A step past its end the editor ignores, and the selection follows the finger back
     @Test
     fun swipeSelectInAPasswordGoesByUnitsAndFollowsTheFingerBackFromItsEnd() {
         passwordSecret()
         swipeSelect(-21f)
-        until("et selected") { selected() == "4..6" }
-        synced()
+        host.until("et selected") { selected() == "4..6" }
+        host.synced()
         h.field.setSelection(6)
-        synced()
-        // begun before the finger moves on: right a step (ignored), another, back two, back two more: a step left of the end
-        swipeSelect(0f, 11f, 21f, 9f, -11f) { if (it == 0) synced() }
-        until("t selected") { selected() == "5..6" }
-        synced()
+        host.synced()
+        // right a step (ignored), another, back two, back two more: a step left of the end
+        swipeSelect(0f, 11f, 21f, 9f, -11f) { if (it == 0) host.synced() }
+        host.until("t selected") { selected() == "5..6" }
+        host.synced()
         assertEquals("secret", h.field.text.toString())
         assertEquals("nothing predicted the editor did not take", "5..6", tracked())
     }
 
-    // lifted on a step past the end the editor ignored: no selection is left predicted that is not
-    // there, for the next 滑选 and Backspace to act on
+    // no selection left predicted that is not there, for the next 滑选 and Backspace to act on
     @Test
     fun swipeSelectLiftedPastAPasswordsEndLeavesNothingPredicted() {
         passwordSecret()
-        swipeSelect(0f, 11f, 21f) { if (it == 0) synced() }
-        synced()
+        swipeSelect(0f, 11f, 21f) { if (it == 0) host.synced() }
+        host.synced()
         assertEquals("6..6", selected())
         assertEquals("the editor's, not the step it ignored", "6..6", tracked())
-        swipeSelect(0f, -11f) { if (it == 0) synced() }
-        until("t selected") { selected() == "5..6" }
+        swipeSelect(0f, -11f) { if (it == 0) host.synced() }
+        host.until("t selected") { selected() == "5..6" }
         h.tap(backspace)
-        until("the t deleted") { h.field.text.toString() == "secre" }
+        host.until("the t deleted") { h.field.text.toString() == "secre" }
     }
 
-    // a touch whose last step went right where the field's end is not known (a password), the editor
-    // having taken it: the next goes on from the same anchor
+    // where the field's end is not known (a password), the next goes on from the same anchor
     @Test
     fun swipeSelectAfterATouchEndingRightKeepsItsAnchor() {
         passwordSecret()
         h.field.setSelection(3)
-        synced()
-        swipeSelect(0f, 11f, 21f) { synced() }
-        until("ret's re selected") { selected() == "3..5" }
-        synced()
-        swipeSelect(0f, -11f) { if (it == 0) synced() }
-        until("back to r, the anchor kept") { selected() == "3..4" }
+        host.synced()
+        swipeSelect(0f, 11f, 21f) { host.synced() }
+        host.until("ret's re selected") { selected() == "3..5" }
+        host.synced()
+        swipeSelect(0f, -11f) { if (it == 0) host.synced() }
+        host.until("back to r, the anchor kept") { selected() == "3..4" }
     }
 
-    // the steps moved before it begins (the host still busy) taken together as it begins, past the end too
+    // the steps before it begins (the host still busy) taken together, past the end too
     @Test
     fun swipeSelectsStepsBeforeItBeginsAreTakenTogether() {
         passwordSecret()
         swipeSelect(11f, 21f, 9f, -11f)
-        until("t selected") { selected() == "5..6" }
-        synced()
+        host.until("t selected") { selected() == "5..6" }
+        host.synced()
         assertEquals("5..6", tracked())
     }
 
-    // 滑选 run by a tap (a theme's key of `shortcut swipe_select`) or from elsewhere: nothing, nothing committed
+    // a theme's key of `shortcut swipe_select`: nothing, nothing committed
     @Test
     fun swipeSelectTappedOrRunElsewhereDoesNothing() {
         start("hello")
@@ -573,13 +502,13 @@ class KeyShortcutsHostTest {
         val board = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
         board.keyActionListener!!.onKeyAction(KeyAction.ShortcutAction(KeyShortcut.Command(KeyCommand.SwipeSelect)), KeyActionListener.Source.Keyboard)
         KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.SwipeSelect))
-        synced()
-        assertEquals("still typed", "nihao", preedit)
+        host.synced()
+        assertEquals("still typed", "nihao", host.preedit)
         assertEquals("nothing committed", "hello", h.field.text.toString())
         assertEquals("nothing selected", "5..5", selected())
     }
 
-    // on space or backspace: their own sideways swipes (the cursor, the selection deleted) not run
+    // their own sideways swipes (the cursor, the selection deleted) not run
     @Test
     fun swipeSelectOnSpaceOrBackspaceMovesNoCursorAndDeletesNothing() {
         val select = SwipeSlot.Command(KeyCommand.SwipeSelect)
@@ -589,90 +518,86 @@ class KeyShortcutsHostTest {
                 .with(SwipeSlots.functionKey("backspace"), up = true, select).serialize(),
         )
         start("hello world")
-        synced()
+        host.synced()
         swipeSelect(-21f, on = h.keyNamed("space"))
-        until("ld selected") { selected() == "9..11" }
-        synced()
+        host.until("ld selected") { selected() == "9..11" }
+        host.synced()
         assertEquals("hello world", h.field.text.toString())
         h.field.setSelection(5)
-        synced()
+        host.synced()
         swipeSelect(-21f, on = backspace)
-        until("lo selected") { selected() == "3..5" }
-        synced()
+        host.until("lo selected") { selected() == "3..5" }
+        host.synced()
         assertEquals("nothing deleted", "hello world", h.field.text.toString())
         assertEquals("3..5", selected())
     }
 
     private fun backspaces(n: Int, leaving: String) {
         repeat(n) { h.tap(backspace) }
-        until("deleted to [$leaving]") { h.field.text.toString() == leaving }
+        host.until("deleted to [$leaving]") { h.field.text.toString() == leaving }
     }
 
-    // KB-64: Backspaces one after another put back whole, the cursor where it was
     @Test
     fun backspacesOneAfterAnotherArePutBackWholeBySwipingDown() {
         start("你好世界")
         backspaces(3, leaving = "你")
         swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "你好世界" }
+        host.until("put back") { h.field.text.toString() == "你好世界" }
         assertEquals(4, h.field.selectionStart)
     }
 
-    // something committed after them: a run is over, not put back over it
     @Test
     fun aRunIsNotPutBackOnceSomethingIsCommitted() {
         start("你好世界")
         backspaces(2, leaving = "你好")
         h.service.commitOverEngine("啊")
-        until("committed") { h.field.text.toString() == "你好啊" }
+        host.until("committed") { h.field.text.toString() == "你好啊" }
         swipe(backspace, up = false)
-        synced()
+        host.synced()
         assertEquals("你好啊", h.field.text.toString())
     }
 
-    // review L3: a copy changes nothing of the field, the cursor back where it was: the run goes on
+    // a copy changes nothing of the field: the run goes on
     @Test
     fun aCopyBetweenBackspacesEndsNoRun() {
         prefs.setShortcuts(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)))
         start("你好世界")
         backspaces(1, leaving = "你好世")
         swipe(h.key("c"), up = false)
-        until("copied") { appContext.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString() == "你好世" }
+        host.until("copied") { appContext.getSystemService(ClipboardManager::class.java).primaryClip?.getItemAt(0)?.text?.toString() == "你好世" }
         backspaces(1, leaving = "你好")
         assertEquals(2, h.field.selectionStart)
         swipe(backspace, up = false)
-        until("both put back") { h.field.text.toString() == "你好世界" }
+        host.until("both put back") { h.field.text.toString() == "你好世界" }
     }
 
-    // 0.6.0 #4: a copy or cut with nothing selected in an empty field leaves the clipboard as it was
     @Test
     fun aCopyOrCutOfAnEmptyFieldKeepsTheClipboard() {
         prefs.setShortcuts(KeyShortcuts.Empty.with("full/c", KeyShortcut.Command(KeyCommand.Copy)).with("full/x", KeyShortcut.Command(KeyCommand.Cut)))
         val clipboard = appContext.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, "旧的"))
         start("")
-        // each said (the empty field's branch run, not a swipe that never reached the command)
+        // each said: the empty field's branch ran, not a swipe that never reached the command
         swipe(h.key("c"), up = false)
-        synced()
+        host.synced()
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_copy) in said())
         swipe(h.key("x"), up = false)
-        synced()
+        host.synced()
         assertTrue(said().toString(), appContext.getString(R.string.nothing_to_cut) in said())
         assertEquals("旧的", clipboard.primaryClip?.getItemAt(0)?.text?.toString())
     }
 
-    // review L4: the screen turned is the same input, its engine focused again: the run is kept
+    // rotation is the same input: the run is kept
     @Test
     fun aRunOutlastsTheScreenTurning() {
         start("你好世界")
         backspaces(2, leaving = "你好")
         h.turn()
-        synced()
+        host.synced()
         swipe(backspace, up = false)
-        until("put back") { h.field.text.toString() == "你好世界" }
+        host.until("put back") { h.field.text.toString() == "你好世界" }
     }
 
-    // review L5: a tap on the field puts the cursor somewhere: what is deleted after it is a run of its own
     @Test
     fun aTapOnTheFieldStartsAnotherRun() {
         start("abc")
@@ -682,22 +607,21 @@ class KeyShortcutsHostTest {
         h.idle()
         backspaces(1, leaving = "b")
         swipe(backspace, up = false)
-        until("the second put back") { h.field.text.toString() == "ab" }
+        host.until("the second put back") { h.field.text.toString() == "ab" }
         assertEquals(1, h.field.selectionStart)
     }
 
-    // review G: a cut and a paste are the editor's (the context menu), changing the field: the run is
-    // over, though the paste leaves it reading as the run did
+    // a cut and a paste are the editor's: the run is over, though the field reads as the run left it
     @Test
     fun aRunIsNotPutBackAfterACutAndAPaste() {
         start("你好世界")
         backspaces(1, leaving = "你好世")
         swipe(h.key("x"), up = false)
-        until("cut") { h.field.text.isEmpty() }
+        host.until("cut") { h.field.text.isEmpty() }
         swipe(h.key("v"), up = false)
-        until("pasted") { h.field.text.toString() == "你好世" }
+        host.until("pasted") { h.field.text.toString() == "你好世" }
         swipe(backspace, up = false)
-        synced()
+        host.synced()
         assertEquals("你好世", h.field.text.toString())
     }
 }

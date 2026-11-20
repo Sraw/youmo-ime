@@ -51,8 +51,6 @@ class EnglishPhrasesTest {
         }
     }
 
-    // which candidates are phrases is known of the list place made alone: an equal one the session
-    // built anew (a prediction, a correction tapped back) has none
     @Test
     fun aListEqualButNotTheOnePlaceMadeHasNoPhrase() {
         val p = phrases("qm,1=张三\n")

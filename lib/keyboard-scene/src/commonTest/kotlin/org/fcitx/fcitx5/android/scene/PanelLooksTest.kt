@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.problems
+import org.fcitx.fcitx5.android.scene.Fixtures.warnings
+import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Pads
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
@@ -24,19 +27,9 @@ import kotlin.test.assertTrue
 class PanelLooksTest {
     private val source = testData("material-light.xml")
 
-    private fun withStyle(style: String) = source.replace("</theme>", "$style\n</theme>")
-
     private fun theme(s: String): Theme = ThemeReader.theme(s).ok()
 
     private fun looks(t: Theme = Fixtures.materialLight) = PanelLooks(Cascades(t))
-
-    private fun warnings(s: String): List<String> {
-        val t = ThemeReader.theme(s)
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
-
-    private fun problems(s: String) = ThemeReader.theme(s).problems().map { it.message }
 
     private fun argb(v: Long) = Argb(v.toInt())
 
@@ -201,7 +194,7 @@ class PanelLooksTest {
             listOf("ink-width= on qwerty/q does nothing: it is the handwriting ink's (handwriting/pad)"),
             warnings(withStyle("<style select=\"qwerty/q, handwriting/pad, key.pen\" ink-width=\"2dp\"/>")),
         )
-        // the handwriting keyboard gone (061-handwriting-toolbar §7): its rules select nothing but the pad's ink, its grid not drawn
+        // the handwriting keyboard gone: its rules select nothing but the pad's ink, its grid not drawn
         val gone = "does nothing: handwriting is written over the letters, only its pad's ink-color= and ink-width= are read"
         assertEquals(
             listOf("fill= on the handwriting keyboard $gone", "ink-width= on the handwriting keyboard $gone"),
@@ -222,7 +215,7 @@ class PanelLooksTest {
         )
     }
 
-    // the ink of handwriting over the letters (061-handwriting-toolbar §7): the pad's style, the app's where none is set
+    // the ink of handwriting over the letters: the pad's style, the app's where none is set
     @Test
     fun theInkOverTheLettersIsThePadsStyle() {
         assertEquals(PanelLooks.Pad(null, null), looks().pad(emptySet()))
@@ -280,7 +273,7 @@ class PanelLooksTest {
         assertTrue("  ink #ffff0000 ${SceneText.n(6.0 * d)}" in SceneText.of(scene))
     }
 
-    // the pad's ink is the pad's alone (R26 F8356): a slot of another kind beside it, and the letters' board, which
+    // the pad's ink is the pad's alone: a slot of another kind beside it, and the letters' board, which
     // handwriting is written over now, draw none whatever `handwriting/pad` sets
     @Test
     fun noSlotButThePadHasInk() {

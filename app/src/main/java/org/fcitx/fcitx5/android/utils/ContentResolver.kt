@@ -20,11 +20,8 @@ fun ContentResolver.queryFileName(uri: Uri): String? =
         query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst() && !it.isNull(0)) it.getString(0) else null
         }?.ifEmpty { null }
-            // a file:// uri has no provider to ask, and some providers no display name (or an empty
-            // one): without a name the callers gave up silently, so the path's last segment stands in
-            // for it (a MediaStore id then fails their check for the file's kind, with an error shown)
+            // file:// and some providers give no display name: the path's last segment stands in
             ?: uri.lastPathSegment
         )
-        // callers write a temporary file by this name: a provider's name, or a segment with an
-        // encoded slash (..%2Fx), must not reach outside their directory
+        // callers write a temp file by this name: no encoded slash (..%2Fx) may reach outside their directory
         ?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != "." && it != ".." }

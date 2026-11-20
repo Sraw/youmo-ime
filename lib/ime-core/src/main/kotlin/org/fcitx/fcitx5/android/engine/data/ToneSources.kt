@@ -7,18 +7,9 @@ package org.fcitx.fcitx5.android.engine.data
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
 
-/**
- * The tone sources [PinyinDataBuilder.charTone] and [PinyinDataBuilder.wordTones] take, as text:
- * Unihan's readings as mozillazg/pinyin-data lists them (`U+597D: hǎo,hào  # 好`), its sister
- * phrase-pinyin-data's words (`爱好: ài hào`), and `lexicon/tones.tsv`, the readings this project
- * puts right (`word<TAB>reading<TAB>date<TAB>note`, the reading's syllables marked, spaces between).
- *
- * A reading with a syllable the engine does not type (ê̄, a Latin letter) is left out, not an error:
- * the downloaded lists have a few, and nothing could be typed to reach them anyway.
- */
+/** Tone sources as text: pinyin-data (`U+597D: hǎo,hào`), phrase-pinyin-data (`爱好: ài hào`), `lexicon/tones.tsv`; an untypable syllable (ê̄) is skipped. */
 object ToneSources {
 
-    /** Each character's readings, in the order its line lists them: [add] code point, syllable, tone. */
     fun chars(lines: Sequence<String>, source: String, add: (Int, Int, Int) -> Unit) = lines.forEachIndexed { i, line ->
         val body = line.substringBefore('#').trim()
         if (body.isEmpty()) return@forEachIndexed
@@ -31,7 +22,7 @@ object ToneSources {
         }
     }
 
-    /** Each word's reading: [add] word, syllables, tones; a word whose reading is not one a character is left out. */
+    /** A word without one syllable per character is skipped. */
     fun phrases(lines: Sequence<String>, source: String, add: (String, IntArray, ByteArray) -> Unit) = lines.forEachIndexed { i, line ->
         val body = line.substringBefore('#').trim()
         if (body.isEmpty()) return@forEachIndexed
@@ -39,7 +30,7 @@ object ToneSources {
         word(body.substring(0, colon).trim(), body.substring(colon + 1), add)
     }
 
-    /** lexicon/tones.tsv; unlike a downloaded list, a line that reads no syllable a character is an error. */
+    /** Unlike downloaded lists, a line without one syllable per character is an error. */
     fun curated(lines: Sequence<String>, source: String, add: (String, IntArray, ByteArray) -> Unit) = lines.forEachIndexed { i, line ->
         if (line.isBlank() || line.startsWith('#')) return@forEachIndexed
         val f = line.split('\t').map { it.trim() }
@@ -47,7 +38,7 @@ object ToneSources {
         if (!word(f[0], f[1], add)) throw SourceException(source, i + 1, "\"${f[1]}\" is not a syllable a character of ${f[0]}")
     }
 
-    /** A reading written as [Misreadings.reading] has it (`bō rě`), as [phrases] reads one. */
+    /** A reading as [Misreadings.reading] writes it (`bō rě`). */
     fun word(word: String, reading: String, add: (String, IntArray, ByteArray) -> Unit): Boolean {
         val read = reading.trim().split(' ').filter { it.isNotEmpty() }.map { syllable(it) ?: return false }
         if (read.isEmpty() || read.size != word.codePointCount(0, word.length)) return false

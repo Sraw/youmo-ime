@@ -20,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.GraphicsMode
 
-// a gradient drawn in Skia's pixels: a paint's alpha scales its shader's, so the paint under it must be opaque
+// a paint's alpha scales its shader's, so the paint under a gradient must be opaque
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ScenePainterGradientTest {
@@ -40,13 +40,12 @@ class ScenePainterGradientTest {
         assertEquals(0xFF336699.toInt(), b.getPixel(SIZE / 2, SIZE / 2))
     }
 
-    // 180deg: top to bottom, red at the top, blue at the bottom; a translucent stop keeps its own alpha
     @Test
     fun aGradientGoesFromItsFirstStopToItsLast() {
         val red = Argb(0xFFFF0000.toInt())
         val blue = Argb(0x800000FF.toInt())
         val b = drawn(Op.Gradient(Shape.Rect(Box(0.0, 0.0, SIZE.toDouble(), SIZE.toDouble())), 180.0, listOf(red to 0.0, blue to 1.0)))
-        // the first and last rows' pixel centres are half a pixel in: the ends' colours, near enough
+        // the ends' rows' pixel centres are half a pixel in: near enough
         near(0xFFFF0000.toInt(), b.getPixel(SIZE / 2, 0))
         near(0x800000FF.toInt(), b.getPixel(SIZE / 2, SIZE - 1))
     }

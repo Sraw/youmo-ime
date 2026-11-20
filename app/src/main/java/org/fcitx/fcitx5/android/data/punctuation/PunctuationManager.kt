@@ -8,10 +8,10 @@ import org.fcitx.fcitx5.android.core.HostApi
 
 object PunctuationManager {
 
-    // what load read, by language: the keyboard reloads the table on every focus, over JNI
+    // the keyboard reloads the table on every focus, over JNI
     private val kept = HashMap<String, List<PunctuationMapEntry>>()
 
-    // moved by every forget: a read it overlapped may hold the old table, and is not kept
+    // bumped by every forget: an overlapping read may hold the old table, and is not kept
     private var changes = 0
 
     suspend fun load(fcitx: HostApi, lang: String): List<PunctuationMapEntry> {
@@ -22,16 +22,13 @@ object PunctuationManager {
         return entries
     }
 
-    /** Drops what [load] kept, for when fcitx reads its tables again: it starts or reloads its config. */
+    /** For when fcitx rereads its tables: it starts or reloads its config. */
     fun forget() = synchronized(this) {
         changes++
         kept.clear()
     }
 
-    /**
-     * [fcitx] as the daemon hands it to its connections: any reload of its config reads the
-     * tables again, so what [load] kept goes with it.
-     */
+    /** Any config reload rereads the tables, so what [load] kept goes with it. */
     fun forgettingOnReload(fcitx: HostApi): HostApi = object : HostApi by fcitx {
         override suspend fun reloadConfig() {
             fcitx.reloadConfig()
@@ -39,7 +36,7 @@ object PunctuationManager {
         }
     }
 
-    /** Runs [start], which starts fcitx: it reads its tables as it starts, so what [load] kept goes. */
+    /** Fcitx reads its tables as it starts, so what [load] kept goes. */
     inline fun starting(start: () -> Unit) {
         start()
         forget()

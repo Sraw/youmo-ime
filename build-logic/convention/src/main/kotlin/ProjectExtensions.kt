@@ -39,17 +39,12 @@ val Project.buildToolsVersion
 
 val Project.buildVersionName
     get() = ep("BUILD_VERSION_NAME", "buildVersionName") {
-        // the app's releases are tagged v<version>; the data releases' tags (engine-data-*, words-* ...)
-        // and upstream fcitx5-android's bare ones (0.1.3), which a clone that fetched it has, are not
+        // only the app's v<version> tags, not the data releases' or upstream's bare ones
         val described = runCmd("git describe --tags --long --match v[0-9]*", "")
         appVersionName(described, Versions.baseVersionName)
     }
 
-/**
- * The version [described] names, as `git describe --long` gives it (`v<version>-<commits>-g<hash>`):
- * `0.1.0` at the tag, `0.1.0-5-gabc1234` past it. With no tag (a source archive, a fork without the
- * tags), [base] marked `-untagged`: bare, it would read on the About page as the release of that name.
- */
+/** The version `git describe --long` names (`v0.1.0-5-gabc1234`); with no tag, [base] marked `-untagged`. */
 internal fun appVersionName(described: String, base: String): String {
     val (version, commits, hash) = DESCRIBED.matchEntire(described)?.destructured ?: return "$base-untagged"
     return if (commits == "0") version else "$version-$commits-g$hash"
@@ -72,8 +67,7 @@ val Project.buildTimestamp
 val Project.buildAbiOverride: String?
     get() = epn("BUILD_ABI", "buildABI")
 
-// A test build's <profileable shell="true">, for simpleperf on an unrooted phone; never a release's:
-// said aloud, so a BUILD_PROFILEABLE left in the environment is seen before a release is built with it
+// A test build's <profileable shell="true"> for simpleperf; said aloud, so a leftover BUILD_PROFILEABLE is seen before a release
 val Project.buildProfileable: Boolean
     get() = (epn("BUILD_PROFILEABLE", "buildProfileable") == "true").also {
         if (it) logger.warn("buildProfileable: this build is profileable from the shell (a test build's; never a release's)")
@@ -108,8 +102,7 @@ fun Project.materializeSignKey(): File? {
         try {
             // Mime: `base64` without -w0 wraps its output in lines
             file.writeBytes(Base64.Mime.decode(it))
-            // kept till the daemon exits, up to org.gradle.daemon.idletimeout after the last build: deleted as
-            // the build ends, it would be gone for the daemon's next build that reuses the configuration cache
+            // kept till the daemon exits: deleted as the build ends, it would be gone for a configuration-cached build
             file.deleteOnExit()
             signKeyTempFile = it to file
             return file

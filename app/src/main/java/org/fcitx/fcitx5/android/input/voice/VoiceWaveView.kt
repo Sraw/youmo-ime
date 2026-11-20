@@ -15,11 +15,7 @@ import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sin
 
-/**
- * Bars that rise and fall with how loud the microphone hears it ([level]), each a little out of
- * step with the next, as WeChat's and Sogou's keyboards show listening; while not [active], a slow
- * low swell, there but still. Drawn a frame at a time while shown, nothing otherwise.
- */
+/** Drawn a frame at a time while shown, nothing otherwise. */
 class VoiceWaveView(context: Context) : View(context) {
 
     var color: Int
@@ -29,7 +25,6 @@ class VoiceWaveView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** hearing, the bars follow [level]; else they settle and rest, not redrawn */
     var active = false
         set(value) {
             field = value
@@ -39,16 +34,13 @@ class VoiceWaveView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
 
-    // the level heard, eased towards so the bars move rather than jump
     private var target = 0f
     private var shown = 0f
-    // the last frame's uptime: the easing by the time gone, not the frame (a 120 Hz screen's twice as many)
+    // the easing by the time gone, not the frame (a 120 Hz screen's twice as many)
     private var lastFrame = 0L
 
-    // the middle bars the tallest
     private val shape = FloatArray(BARS) { i -> 1f - 0.55f * abs(i - (BARS - 1) / 2f) / ((BARS - 1) / 2f) }
 
-    /** how loud, 0 to 1 */
     fun level(level: Float) {
         target = level.coerceIn(0f, 1f)
     }
@@ -62,7 +54,6 @@ class VoiceWaveView(context: Context) : View(context) {
         val bar = width / (BARS * 2f - 1f)
         val mid = height / 2f
         for (i in 0 until BARS) {
-            // each bar its own phase: a wave running across, faster and larger the louder
             val wave = (sin(2 * PI * (t * (SWELL_HZ + shown * TALK_HZ) - i * PHASE)).toFloat() + 1f) / 2f
             val rest = REST * (0.6f + 0.4f * wave)
             val h = (rest + shape[i] * shown * (0.55f + 0.45f * wave)).coerceAtMost(1f) * height
@@ -70,7 +61,7 @@ class VoiceWaveView(context: Context) : View(context) {
             rect.set(x, mid - maxOf(h, bar) / 2f, x + bar, mid + maxOf(h, bar) / 2f)
             canvas.drawRoundRect(rect, bar / 2f, bar / 2f, paint)
         }
-        // at rest, nothing moves: no frame drawn for nothing while it sits paused
+        // at rest, no frame drawn for nothing
         if (isShown && (active || shown > SETTLED)) postInvalidateOnAnimation()
     }
 

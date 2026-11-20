@@ -17,8 +17,7 @@ class CharRanksTest {
 
     private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
-    // more characters of ji than the words were cut at, all commoner than 觉 of jiao, which
-    // ji'ao (几奥) reads better as a whole too
+    // more characters of ji than the words were cut at, all commoner than 觉 of jiao
     private val ji = (0 until PinyinDecoder.DEFAULT_WORDS + 6).map { (0x4E00 + it).toChar().toString() }
     private val data = PinyinData.load(
         ByteBuffer.wrap(
@@ -45,8 +44,7 @@ class CharRanksTest {
     // a character not listed has no score of the decoder's: they were shown in the order of a hash map
     @Test
     fun theMissingShownAreTheCommonestByTheModel() {
-        // commonest itself, not through measure: decoding every word a reading starts with
-        // (words = Int.MAX_VALUE), the decoder leaves no character of data like this out
+        // decoding every word a reading starts with leaves no character out
         val charRanks = CharRanks(data)
         // 鑫 the model lacks: its unknown word's score, the last
         assertEquals(listOf("奥", ji[5], "觉", "鑫"), charRanks.commonest(listOf("觉", "鑫", ji[5], "奥")))

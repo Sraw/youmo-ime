@@ -57,8 +57,6 @@ import org.fcitx.fcitx5.android.input.bar.ui.TitleUi
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
-import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
-import org.fcitx.fcitx5.android.input.candidates.expanded.window.FlexboxExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
@@ -122,17 +120,17 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private val panelActions by lazy { PanelActions(context, service, fcitx, imeScope, windowManager) }
 
-    // what fcitx last offered for the ⋯ panel: 简繁 is one of them, where the input method has it
+    // 简繁 is one of them, where the input method has it
     private var statusEntries: List<StatusEntry> = emptyList()
 
     @Keep
     private val onToolbarButtonsUpdateListener = ManagedPreference.OnChangeListener<String> { _, _ -> arrangeButtons() }
 
-    // set elsewhere too (the ⋯ panel, the one-handed keyboard's full-width button): the buttons lit as it is
+    // set elsewhere too (the ⋯ panel, the one-handed full-width button): the buttons lit as it is
     @Keep
     private val onToggleUpdateListener = ManagedPreference.OnChangeListener<Any> { _, _ -> showToggles() }
 
-    // the toolbar's 手写 (061-handwriting-toolbar): flipped here, read by the keyboard (BaseKeyboard)
+    // flipped here, read by the keyboard (BaseKeyboard)
     private val handwritingOpen = prefs.internal.handwritingOpen
 
     @Keep
@@ -142,11 +140,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     private val clipboardSuggestion = prefs.clipboard.clipboardSuggestion
-    private val clipboardItemTimeout = prefs.clipboard.clipboardItemTimeout
     private val clipboardMaskSensitive by prefs.clipboard.clipboardMaskSensitive
-    private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
-    private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
-    private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
     private val calculationReplacesSum by prefs.keyboard.calculationReplacesSum
 
     private var clipboardTimeoutJob: Job? = null
@@ -155,7 +149,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private var isClipboardFresh: Boolean = false
 
-    // the sum just written, its result offered while the cursor stays at its end
     private var calculation: CalculationOffer? = null
     private var isInlineSuggestionPresent: Boolean = false
     private var isCapabilityFlagsPassword: Boolean = false
@@ -164,8 +157,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private var numberRowMode = IdleUiPolicy.NumberRowMode.Auto
 
-    // the entry the clipboard suggestion shows, as its listener was told: picked or edited, this one (the global
-    // lastEntry may be set after the listeners are told, or be another's by then)
+    // the global lastEntry may be set after the listeners are told, or be another's by then
     private var shownEntry: ClipboardEntry? = null
 
     @Keep
@@ -200,21 +192,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             }
         }
 
-    @Keep
-    private val onClipboardTimeoutUpdateListener =
-        ManagedPreference.OnChangeListener<Int> { _, _ ->
-            when (idleUi.currentState) {
-                IdleUiPolicy.Display.Clipboard -> {
-                    // renew timeout when clipboard suggestion is present
-                    launchClipboardTimeoutJob()
-                }
-                else -> {}
-            }
-        }
-
-    // the first start after an older build (0.3.1's or 0.3.2's dictionaries, converted, or a kill's owed
-    // upgrade) compiles its dictionaries (a minute for 1.9 million words):
-    // typing goes on without them meanwhile, the idle bar says how far, and a notice when they are in
+    // the first start after an older build compiles its dictionaries (a minute for 1.9 million words):
+    // typing goes on without them, the idle bar says how far, a notice when they are in
     private fun showDictionaryUpgrade(ui: IdleUi) {
         imeScope.launch {
             MergedDictionary.work.collect { work ->
@@ -224,7 +203,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
         imeScope.launch {
             MergedDictionary.done.collect { (kind, ok) ->
-                // a failure stays, as failures do (design rule 4); a success is a plain line
+                // a failure stays, as failures do; a success is a plain line
                 if (kind == MergedDictionary.Kind.UPGRADE) {
                     if (ok) service.say(R.string.dict_upgraded)
                     else service.say(service.getString(R.string.dict_upgrade_failed), steady = true)
@@ -235,11 +214,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     private fun launchClipboardTimeoutJob() {
         clipboardTimeoutJob?.cancel()
-        val timeout = clipboardItemTimeout.getValue() * 1000L
-        // never transition to ClipboardTimedOut state when timeout < 0
-        if (timeout < 0L) return
         clipboardTimeoutJob = imeScope.launch {
-            delay(timeout)
+            delay(CLIPBOARD_ITEM_TIMEOUT_MS)
             isClipboardFresh = false
             clipboardTimeoutJob = null
             evalIdleUiState()
@@ -254,8 +230,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 isInlineSuggestionPresent = isInlineSuggestionPresent,
                 isPasswordField = isCapabilityFlagsPassword,
                 isNumberLayout = isKeyboardLayoutNumber,
-                // nothing of the toolbar's to show: never opened (ToolbarConfig.Layout.moreOnly)
-                expandToolbarByDefault = expandToolbarByDefault && !idleUi.moreOnly,
+                // nothing of the toolbar's to show (ToolbarConfig.Layout.moreOnly)
                 isToolbarManuallyToggled = isToolbarManuallyToggled && !idleUi.moreOnly,
                 isCalculationPresent = calculation != null,
             )
@@ -275,9 +250,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
-    // Combined gesture. Where the number row is allowed, the direction is the angle from the
-    // button's centre: within 45° of down hides the keyboard, any other (left, right or up) shows
-    // the number row. Elsewhere a swipe mostly down hides the keyboard.
+    // Where the number row is allowed, the angle from the button's centre decides: within 45° of down
+    // hides the keyboard, any other shows the number row. Elsewhere a swipe mostly down hides it.
     private val swipeHideKeyboardCallback = CustomGestureView.OnGestureListener { v, e ->
         require(v is ToolButton)
         val numberRowAvailable = isCapabilityFlagsPassword && !isKeyboardLayoutNumber
@@ -296,7 +270,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     angle = if (angle in -45f..45f) {
                         angle.coerceIn(-10f, 10f)
                     } else abs(angle).coerceIn(90f - 10f, 90f + 10f) * dir
-                    // the app's ▾ points where the swipe goes; a theme's icon is no arrow to turn (061-toolbar-icons)
+                    // a theme's icon is no arrow to turn
                     if (!v.themed) v.iconRotation = angle
                 }
                 CustomGestureView.GestureType.Up -> {
@@ -327,7 +301,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
-    // in an email's or a URL's field, the bar's suggestions where it is empty else
     private val addressStrip by lazy { AddressStrip(context, theme, service) }
 
     private val idleUi: IdleUi by lazy {
@@ -336,21 +309,21 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             menuButton.setOnClickListener {
                 // 清掉最近's spans, anchored to a button going away
                 panelActions.dismiss()
-                // ⋯ itself, over a clipboard suggestion too (ToolbarConfig.Layout.moreOnly)
+                // ⋯ itself, over a clipboard suggestion too
                 if (idleUi.moreOnly) return@setOnClickListener windowManager.attachWindow(StatusAreaWindow())
                 when (idleUi.currentState) {
                     IdleUiPolicy.Display.Empty -> {
-                        isToolbarManuallyToggled = !expandToolbarByDefault
+                        isToolbarManuallyToggled = true
                         evalIdleUiState(fromUser = true)
                     }
                     IdleUiPolicy.Display.Toolbar -> {
-                        isToolbarManuallyToggled = expandToolbarByDefault
+                        isToolbarManuallyToggled = false
                         evalIdleUiState(fromUser = true)
                     }
                     else -> {
-                        isToolbarManuallyToggled = !expandToolbarByDefault
-                        // expanded by hand over the clip's suggestion: let go, or the next evaluation would take the
-                        // toolbar back to it; one under a calculation or the number row, not yet seen, kept
+                        isToolbarManuallyToggled = true
+                        // let go, or the next evaluation would take the toolbar back to it; one under a calculation or the
+                        // number row, not yet seen, kept
                         if (idleUi.currentState == IdleUiPolicy.Display.Clipboard) {
                             isClipboardFresh = false
                             clipboardTimeoutJob?.cancel()
@@ -364,12 +337,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     launchClipboardTimeoutJob()
                 }
             }
-            // every button's tap as it is made (tap)
             onButtonMade = { button, made ->
                 val action: ((View) -> Unit)? = when (button) {
                     // set where it is made, in IdleUi
                     ToolbarButton.Emoji -> null
-                    // its tap and its swipe, both the hide's
                     ToolbarButton.Hide -> {
                         made.apply {
                             setOnClickListener(hideKeyboardCallback)
@@ -425,15 +396,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 swipeEnabled = true
                 swipeThresholdY = dp(heightDp(context).toFloat())
                 onGestureListener = swipeDownExpandCallback
-                // with candidates or predictions shown the bar has no ⌄ of its own: this one hides
-                // the keyboard when held, as the swipe down does
+                // with candidates shown the bar has no ⌄ of its own: this one hides the keyboard when held
                 setOnLongClickListener {
                     service.requestHideSelf(0)
                     true
                 }
             }
             dropPredictionsButton.setOnClickListener { service.dropPredictions() }
-            // lit, as it is there only while handwriting is on: a tap turns it off (the user's Q4)
+            // there only while handwriting is on: a tap turns it off
             handwritingButton.setOnClickListener { flipHandwriting() }
             handwritingButton.setOn(true)
         }
@@ -466,12 +436,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     // set expand candidate button to create expand candidate
     private fun setExpandButtonToAttach() {
         candidateUi.expandButton.setOnClickListener {
-            windowManager.attachWindow(
-                when (expandedCandidateStyle) {
-                    ExpandedCandidateStyle.Grid -> GridExpandedCandidateWindow()
-                    ExpandedCandidateStyle.Flexbox -> FlexboxExpandedCandidateWindow()
-                }
-            )
+            windowManager.attachWindow(GridExpandedCandidateWindow())
         }
         candidateUi.expandButton.setIcon(BarIcons.CANDIDATES_EXPAND)
         candidateUi.expandButton.contentDescription = context.getString(R.string.expand_candidates_list)
@@ -503,16 +468,15 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         view.displayedChild = index
     }
 
-    /** [button]'s view where the user sees it now (the toolbar shown, the button on it); null where not. */
     fun shownButton(button: ToolbarButton): View? = idleUi.madeButton(button)?.takeIf {
         view.currentView === idleUi.root && idleUi.onScreen(button) && it.isShown
     }
 
-    /** The button TalkBack's focus was last moved to ([focusForTalkBack]), for tests: the move itself only works with TalkBack on. */
+    /** The move itself only works with TalkBack on. */
     @VisibleForTesting
     internal var talkBackFocused: View? = null
 
-    /** TalkBack's focus on [button] once the bar is laid out, where it is shown (the view made anew for a style, §3.6). */
+    /** Once the bar is laid out (the view remade for a style). */
     fun focusForTalkBack(button: ToolbarButton) {
         view.post {
             val b = shownButton(button) ?: return@post
@@ -522,12 +486,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     override val view by lazy {
-        // its colour is InputView's barBackground's, under the row above it too
+        // its colour is InputView's barBackground's
         ViewAnimator(context).apply {
             add(idleUi.root, lParams(matchParent, matchParent))
             add(candidateUi.root, lParams(matchParent, matchParent))
             add(titleUi.root, lParams(matchParent, matchParent))
-            // the input view replaced (a theme, a layout setting): 清掉最近's spans go with it
+            // the input view replaced: 清掉最近's spans go with it
             addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) = Unit
                 override fun onViewDetachedFromWindow(v: View) = panelActions.dismiss()
@@ -539,17 +503,14 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         showDictionaryUpgrade(idleUi)
         ClipboardManager.lastEntry?.let {
             val now = System.currentTimeMillis()
-            val clipboardTimeout = clipboardItemTimeout.getValue() * 1000L
-            // below 0: it never times out
-            if (clipboardTimeout < 0L || now - it.timestamp < clipboardTimeout) {
+            if (now - it.timestamp < CLIPBOARD_ITEM_TIMEOUT_MS) {
                 onClipboardUpdateListener.onUpdate(it)
             }
         }
         ClipboardManager.addOnUpdateListener(onClipboardUpdateListener)
         clipboardSuggestion.registerOnChangeListener(onClipboardSuggestionUpdateListener)
-        clipboardItemTimeout.registerOnChangeListener(onClipboardTimeoutUpdateListener)
         toolbarButtons.registerOnChangeListener(onToolbarButtonsUpdateListener)
-        // lit as the shape's style is: 普通 and 单手 slid, not made anew
+        // 普通 and 单手 slid, not remade
         ThemeManager.prefs.keyboardStylePortrait.registerOnChangeListener(onToggleUpdateListener)
         ThemeManager.prefs.keyboardStyleLandscape.registerOnChangeListener(onToggleUpdateListener)
         prefs.internal.useHabits.registerOnChangeListener(onToggleUpdateListener)
@@ -558,7 +519,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         arrangeButtons()
     }
 
-    /** The keyboards made anew under the bar (InputView.remakeKeyboards): its toolbar as a new bar's, folded or not as set. */
+    /** Its toolbar as a new bar's, folded or not as set. */
     fun keyboardsRemade() {
         idleUi.remakeNumberRow()
         panelActions.dismiss()
@@ -568,7 +529,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         panelActions.dismiss()
-        isCapabilityFlagsPassword = toolbarNumRowOnPassword && capFlags.has(CapabilityFlag.Password)
+        isCapabilityFlagsPassword = capFlags.has(CapabilityFlag.Password)
         isInlineSuggestionPresent = false
         calculation = null
         numberRowMode = IdleUiPolicy.NumberRowMode.Auto
@@ -583,25 +544,23 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
     override fun onFinishInput() = addressStrip.finish()
 
-    // a button's tap, the `when` exhaustive so that a new button cannot go without one; the emoji's and the hide's
-    // set as they are made (IdleUi, onButtonMade), here for ⋯'s panel
+    // exhaustive, so a new button cannot go without one; the emoji's and the hide's are set as made (onButtonMade)
     private fun tap(button: ToolbarButton): (View) -> Unit = when (button) {
         ToolbarButton.Emoji -> { _ ->
             commonKeyActionListener.listener.onKeyAction(KeyAction.PickerSwitchAction(), KeyActionListener.Source.Keyboard)
         }
         ToolbarButton.Hide -> { v -> hideKeyboardCallback.onClick(v) }
         ToolbarButton.Voice -> { _ -> commonKeyActionListener.voiceTap() }
-        // greyed where it does not write (English, a password field), its tap saying so (the user's call, 2026-11-15)
+        // greyed where it does not write (English, a password field), its tap saying so
         ToolbarButton.Handwriting -> { _ -> if (handwritingOffered()) flipHandwriting() else service.say(R.string.handwriting_not_here) }
         ToolbarButton.Undo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true) }
         ToolbarButton.Redo -> { _ -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true) }
         ToolbarButton.CursorMove -> { _ -> windowManager.attachWindow(TextEditingWindow()) }
         ToolbarButton.Clipboard -> { _ -> windowManager.attachWindow(ClipboardWindow()) }
         ToolbarButton.More -> { _ -> windowManager.attachWindow(StatusAreaWindow()) }
-        // the ⋯ panel's, as there (PanelActions)
         ToolbarButton.TradSimp -> { _ -> tradSimpEntry()?.let(panelActions::activate) }
         ToolbarButton.Floating -> { _ -> panelActions.toggleFloating() }
-        // the keyboard resized where it is (InputView), not taken back to its letters
+        // resized where it is, not taken back to its letters
         ToolbarButton.OneHanded -> { _ -> panelActions.toggleOneHanded(fromBar = true) }
         ToolbarButton.Habits -> { _ -> panelActions.toggleHabits() }
         ToolbarButton.ClearRecent -> { v -> panelActions.clearRecent(v) }
@@ -614,35 +573,31 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
     }
 
-    /** The toolbar's buttons with no slot on the bar, in order: ⋯'s panel offers them (StatusAreaWindow). */
+    /** ⋯'s panel offers them (StatusAreaWindow). */
     val overflow: List<ToolbarButton> get() = idleUi.overflow
 
-    /** Whether [button] does anything here: 手写 not where it does not write; in ⋯'s panel greyed as on the bar. */
+    /** 手写 not where it does not write; greyed in ⋯'s panel as on the bar. */
     fun available(button: ToolbarButton) = button != ToolbarButton.Handwriting || handwritingOffered()
 
-    /** Whether [button] is on: 手写 while writing; in ⋯'s panel lit as on the bar. */
     fun lit(button: ToolbarButton) = button == ToolbarButton.Handwriting && handwritingOffered() && handwritingOpen.getValue()
 
-    /** [button] tapped in ⋯'s panel, where the bar had no slot for it: as on the bar, [anchor] the panel's cell. */
+    /** [anchor]: the panel's cell. */
     fun press(button: ToolbarButton, anchor: View) = tap(button)(anchor)
 
     private fun tradSimpEntry() = statusEntries.firstOrNull { it.name == PanelActions.TRAD_SIMP }
 
-    /** 切简繁 as the bar's button does it: a key's shortcut (KeyShortcutRunner). */
+    /** A key's shortcut (KeyShortcutRunner). */
     fun tradSimp() {
         tradSimpEntry()?.let(panelActions::activate)
     }
 
-    /** The keyboard picker over the bar: a key's shortcut (KeyShortcutRunner). */
+    /** A key's shortcut (KeyShortcutRunner). */
     fun chooseKeyboard() = panelActions.chooseKeyboard(view)
 
-    // the preference as last parsed, with what it read: arranged on every start and input method
+    // arranged on every start and input method
     private var parsed: Pair<String, ToolbarConfig>? = null
 
-    /**
-     * The buttons the user chose ([ToolbarConfig]), of those of use here. Not again as the 双拼 scheme
-     * changes: that changes which keyboards are offered, never whether any are ([ImKeyboards.choices]).
-     */
+    /** Not again as the 双拼 scheme changes: that changes which keyboards are offered, never whether any are. */
     private fun arrangeButtons() {
         val situation = ToolbarConfig.Situation(
             // nothing said out loud goes into a password
@@ -657,29 +612,27 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             ?: ToolbarConfig.parse(stored).also { parsed = stored to it }
         val moreOnly = idleUi.moreOnly
         idleUi.arrange(config.layout(situation))
-        // the toolbar shut as the menu key becomes ⋯, its state back as it is the menu key again
         if (idleUi.moreOnly != moreOnly) evalIdleUiState()
         showToggles()
         showCandidateHandwriting()
     }
 
-    // the input method as last told (onImeUpdate), till then the one cached
     private var imName: String? = null
 
     // English types its keys and a password's are never written (HandwritingMode.offered)
     private fun handwritingOffered() =
         HandwritingMode.offered(imName ?: fcitx.runImmediately { inputMethodEntryCached }.uniqueName, service.inPasswordField)
 
-    // turned off, the character being written ends and what it read stays typed (the keyboard's listener)
+    // turned off, the character being written ends and what it read stays typed
     private fun flipHandwriting() = handwritingOpen.setValue(!handwritingOpen.getValue())
 
-    // the candidate bar's 手写, left of ⌄: there while handwriting is on where the toolbar offers it
+    // left of ⌄, while handwriting is on where the toolbar offers it
     private fun showCandidateHandwriting() {
         candidateUi.handwritingButton.visibility =
             if (handwritingOpen.getValue() && handwritingOffered()) View.VISIBLE else View.GONE
     }
 
-    // lit while on, as in the ⋯ panel; a button not made yet is lit as it is made
+    // a button not made yet is lit as it is made
     private fun showToggles() = idleUi.madeButtons.forEach { (button, view) -> showToggle(button, view) }
 
     private fun showToggle(button: ToolbarButton, view: ToolButton) {
@@ -688,14 +641,12 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
             ToolbarButton.Handwriting -> {
                 val offered = handwritingOffered()
                 view.setOn(offered && handwritingOpen.getValue())
-                // greyed (IdleUi), and said so
                 view.contentDescription =
                     context.getString(R.string.handwriting).let { if (offered) it else context.getString(R.string.handwriting_unavailable, it) }
             }
             ToolbarButton.Floating -> view.setOn(panelActions.floating)
             ToolbarButton.Habits -> {
                 view.setOn(!panelActions.habitsOn, checkable = false)
-                // named for what a tap does, as the panel's entry
                 view.contentDescription =
                     context.getString(if (panelActions.habitsOn) R.string.learning_habits_off else R.string.learning_habits_on)
             }
@@ -708,7 +659,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         }
     }
 
-    // 键盘 is there for an input method with keyboards to choose from
     override fun onImeUpdate(ime: InputMethodEntry) {
         imName = ime.uniqueName
         arrangeButtons()
@@ -719,7 +669,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         arrangeButtons()
     }
 
-    /** [worked]'s result offered till the cursor leaves [at], the end of the sum's `=`. */
+    /** Offered till the cursor leaves [at], the end of the sum's `=`. */
     fun offerCalculation(worked: Calculation.Worked, at: Int) {
         calculation = CalculationOffer(worked, at)
         idleUi.calculationUi.text.text = "= ${worked.result}"
@@ -829,56 +779,41 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     }
 
     companion object {
-        /**
-         * The bar's height in dp, from 候选字号 (a preference read, so read once a view) and the theme's
-         * `bar height=` ([SceneBar.heightPercent]); the input view is made anew when either changes.
-         */
+        /** 候选字号 is a preference read, so read once a view; the input view is remade when either changes. */
         fun heightDp(context: Context = appContext, percent: Double = SceneBar.heightPercent(context)): Int =
             CandidateBarHeight.dp(ThemeManager.prefs.candidateTextSize.getValue(), EngineState.candidateReading.value, percent)
 
-        /** A candidate's side padding in dp, from 候选字号 ([CandidateSpacing]). */
         fun candidatePaddingDp(): Int = CandidateSpacing.paddingDp(ThemeManager.prefs.candidateTextSize.getValue())
 
-        /** A bar button's width in dp: the bar's height, never under [MIN_TOUCH_DP]. */
         fun buttonWidthDp(context: Context = appContext): Int = maxOf(heightDp(context), MIN_TOUCH_DP)
 
         /**
-         * The row above the bar where the code being typed shows ([PreeditComponent]), in dp, for
-         * input method [im]: the keyboard's own, as 搜狗's, so it covers nothing of the app; there
-         * whether or not one is typed, so the keyboard keeps its height while typing. Tall enough to
-         * tap where [im] shows the syllable strip, thin elsewhere ([CodeRowHeight]); the input view
-         * sets it anew as the input method changes and as its keyboards are made anew for a keyboard setting.
-         * None floating over the app (编码行 浮在键盘上方, [codeRowFloats]): the strip is outside the keyboard.
+         * The keyboard's own row, as 搜狗's, so it covers nothing of the app; there whether or not a code is
+         * typed, so the keyboard keeps its height. Tall where [im] shows the syllable strip, thin elsewhere.
+         * None when the row floats ([codeRowFloats]).
          */
         fun preeditHeight(im: String?): Int = CodeRowHeight.keyboardDp(codeLayout(im), codeRowFloats())
 
-        /** The floating code strip's height in dp on [im]'s keyboard ([CodeRowHeight.stripDp]). */
         fun stripHeight(im: String?): Int = CodeRowHeight.stripDp(codeLayout(im))
 
-        /** Whether [im]'s keyboard shows the code row's syllables ([CodeRowHeight.showsStrip]). */
         fun showsStrip(im: String?): Boolean = CodeRowHeight.showsStrip(codeLayout(im))
 
-        /**
-         * Whether the code row is out of the keyboard (编码行 浮在键盘上方, or 输入框里 with the strip for what
-         * stays out of the field), a preference read: the input view is made anew as it changes.
-         */
+        /** Also 输入框里, whose strip holds what stays out of the field. A preference read: the view is remade as it changes. */
         fun codeRowFloats(): Boolean = ThemeManager.prefs.codeRow.getValue() != CodeRowStyle.Embedded
 
         private fun codeLayout(im: String?) =
             ImKeyboards.layoutOf(im.orEmpty(), AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
 
-        /** The embedded row's height for [im] with each input method's keyboard as [chosen] has it, 双拼's under [scheme]; floating or not. */
         fun preeditHeight(im: String?, chosen: ImKeyboards.Chosen, scheme: ShuangpinScheme): Int =
             CodeRowHeight.dp(ImKeyboards.layoutOf(im.orEmpty(), chosen, scheme))
 
-        /** The bar's buttons are never narrower than this, in dp, however short 候选字号 makes the bar. */
+        /** However short 候选字号 makes the bar. */
         const val MIN_TOUCH_DP = 40
 
-        /**
-         * The bar's button icons, in dp, fixed: in the button's 10 dp padding an icon shrank with
-         * the bar, to about 8 dp at 候选字号 14 (a 28 dp bar).
-         */
+        /** Fixed: in the button's 10 dp padding an icon shrank with the bar, to about 8 dp at 候选字号 14. */
         const val ICON_DP = 20
+
+        private const val CLIPBOARD_ITEM_TIMEOUT_MS = 30_000L
     }
 
     fun onKeyboardLayoutSwitched(isNumber: Boolean) {
@@ -888,6 +823,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
 
 }
 
-/** The clipboard suggestion's first 42 characters, an emoji never cut in two. */
+/** An emoji never cut in two. */
 internal fun clipboardPreview(text: String): String =
     text.substring(0, text.offsetByCodePoints(0, min(42, text.codePointCount(0, text.length))))

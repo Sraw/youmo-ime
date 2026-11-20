@@ -15,10 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * What a theme imported says (ThemeListFragment.importedNotice): one toast, as a second takes the place of the first
- * (showBriefly). R26 F8137: an older format's theme under a name taken said only its new name, 「已迁移」 hidden at once.
- */
+/** One toast, as a second takes the place of the first: an older format's theme under a taken name hid 「已迁移」 at once. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeImportedNoticeTest {

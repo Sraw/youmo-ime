@@ -27,10 +27,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
 
-/**
- * 候选词注音 off: a misreading's hint (角色 jué sè) above the candidate, as the setting's pinyin is, in the
- * bar's own height, the candidate's characters where its plain neighbours' are (the user, 2026-11-02).
- */
+/** 候选词注音 off: a misreading's hint above the candidate in the bar's own height, the characters where the plain ones are. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -59,7 +56,6 @@ class CandidateHintsUatTest {
         h.api.candidates = words.map { (w, r) -> CandidateWord("", w, "", readings = r) }.toTypedArray()
         h.emit(HostEvent.Candidates(words.size, h.api.candidates.toList()))
         h.relayout()
-        // the bar keeps its height, and the hinted words stand where the plain ones do
         assertEquals("$sp sp", h.service.dp(CandidateBarHeight.dp(sp)), bar.height)
         val hinted = textOf(h.inputView, "角色")!!
         val plain = textOf(h.inputView, "脚色")!!
@@ -75,7 +71,6 @@ class CandidateHintsUatTest {
     fun portrait() {
         for (dark in listOf(false, true)) shown(20, dark, "hint_20sp_port_" + if (dark) "dark" else "light")
         shown(28, false, "hint_28sp_port_light")
-        // the smallest size: the reading at its floor
         shown(14, false, "hint_14sp_port_light")
     }
 

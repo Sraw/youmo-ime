@@ -78,8 +78,7 @@ class UnitTestResourcesPluginTest {
         assertEquals("org.example", config.getProperty("android_custom_package"))
     }
 
-    // F3789: a build of every ABI links one .ap_ and merges one manifest per split; write() took
-    // them with `single`, which threw there. Any pair will do, but the same one every time
+    // a build of every ABI links one .ap_ and merges one manifest per split: any pair will do, but the same one every time
     @Test
     fun severalAbiSplitsWriteTheSamePairEveryTime() {
         val project = ProjectBuilder.builder().withProjectDir(tmp.newFolder("p")).build()

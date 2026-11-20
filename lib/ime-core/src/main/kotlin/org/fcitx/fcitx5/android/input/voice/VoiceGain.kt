@@ -11,20 +11,10 @@ import kotlin.math.min
 import kotlin.math.pow
 
 /**
- * Lifts quiet speech before the VAD and the recognizer, window by window in place. VOICE_RECOGNITION
- * has no AGC (CDD 5.4.2): speech said softly comes in at -50 to -60 dBFS, where silero never fires.
- * Speech at its usual level (-30 dBFS or louder) passes as it came, but for its first two windows
- * (~64 ms) after a quiet stretch: the 3rd loudest is still the quiet, so they are lifted up to the
- * peak limit before the gain drops to 0 dB (measured with it: no cost to recognition).
- *
- * The level is the [RANK]rd loudest window of the last [SPAN] (some 1 s), so a click of a window or
- * two does not hold the gain down (the plain envelope dropped it to 0 dB after one); the first
- * [SKIP] windows with sound (the microphone's start-up pop) are left out. It falls at most [DECAY_DB_S] a second.
- * Only lifts, never clips: the gain is held so each window's peak stays under [PEAK].
- *
- * Sample for sample the measured one (`Gain2` of voice-eval's tailquiet/tq.py, VoiceGainTest's
- * golden sample) from the first window with sound on; `Gain2` counts the skip from the first window
- * even when it is all zeroes, so the two differ on an input that opens in digital silence. One per microphone opening: it does not carry over from one hold to the next.
+ * Lifts quiet speech before the VAD and recognizer, in place: VOICE_RECOGNITION has no AGC, and soft speech at -50 to
+ * -60 dBFS never fires silero. The level is the [RANK]rd loudest of the last [SPAN] windows, so a click does not hold
+ * the gain down; the first [SKIP] sounding windows (start-up pop) are left out; it falls at most [DECAY_DB_S]; it only
+ * lifts, never past [PEAK]. Matches voice-eval's `Gain2` sample for sample from the first sounding window. One per opening.
  */
 class VoiceGain(private val sampleRate: Int) {
 
@@ -33,24 +23,21 @@ class VoiceGain(private val sampleRate: Int) {
     }
 
     private var seen = 0
-    // the last [SPAN] windows' levels, a ring: no boxing or sorting a window on the capture thread
+    // a ring: no boxing or sorting a window on the capture thread
     private val recent = DoubleArray(SPAN)
     private var recentCount = 0
     private var recentNext = 0
     private var env: Double? = null
 
-    /** the gain the last window ended on, as a factor */
+    /** As a factor. */
     var gain = 1.0
         private set
 
-    /** the highest [env] so far, dBFS; null before there is one: the debug log's */
+    /** dBFS; null before there is one: the debug log's. */
     var envPeak: Double? = null
         private set
 
-    /**
-     * the gain of the window [envPeak] was set in, as a factor: the debug log's. Not the highest
-     * gain, which digital silence before a clip (an emulator's) always drives to the maximum
-     */
+    /** The debug log's; not the highest gain, which digital silence before a clip drives to the maximum. */
     var peakGain = 1.0
         private set
 
@@ -60,8 +47,7 @@ class VoiceGain(private val sampleRate: Int) {
         var atPeak = false
         var peak = 0f
         for (s in samples) peak = max(peak, abs(s))
-        // counted from the microphone's first sound: a HAL warming up hands back zeroes, which used
-        // up the skip and left the start-up pop to be lifted the full 20 dB
+        // counted from the first sound: a HAL warming up hands back zeroes, which used up the skip and left the pop lifted
         if (seen > 0 || peak > 0f) seen++
         if (seen > SKIP) {
             recent[recentNext] = db(samples)
@@ -97,7 +83,7 @@ class VoiceGain(private val sampleRate: Int) {
         if (atPeak) peakGain = g
     }
 
-    // the [RANK]rd (3rd) highest of [recent], as sorting them would have it, ties counted apart
+    // as sorting them would have it, ties counted apart
     private fun third(): Double {
         var a = Double.NEGATIVE_INFINITY
         var b = Double.NEGATIVE_INFINITY

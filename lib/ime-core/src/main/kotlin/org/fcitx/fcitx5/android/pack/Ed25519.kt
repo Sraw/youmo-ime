@@ -8,14 +8,9 @@ import java.math.BigInteger
 import java.security.MessageDigest
 
 /**
- * Ed25519 signatures checked (RFC 8032 §5.1.7), the resource packs' ([PackManifest]): Android 10's
- * security providers have no Ed25519 (Conscrypt's came with Android 14), and nothing else the app
- * links does. Verification only, on public data: no secret is handled, so constant time does not
- * matter, and BigInteger is fast enough for a signature or two an import (a few ms).
- *
- * Strict where RFC 8032 says to be: an encoding of y not below p, S not below L, a point not on the
- * curve are refused. The check is the cofactorless one, `[S]B = R + [k]A`, as the JDK's (Java 15+)
- * makes it, which signs the packs at build time; the tests hold the two to each other.
+ * Ed25519 verification (RFC 8032 §5.1.7) for resource packs: Android 10's providers have none (Conscrypt's came with
+ * Android 14). Public data only, so no constant time; BigInteger takes a few ms. Strict encodings (y < p, S < L, on
+ * curve); cofactorless `[S]B = R + [k]A`, as the JDK that signs the packs checks.
  */
 object Ed25519 {
 
@@ -33,7 +28,7 @@ object Ed25519 {
     // sqrt(-1) = 2^((p-1)/4)
     private val SQRT_M1: BigInteger = TWO.modPow(P.subtract(BigInteger.ONE).shiftRight(2), P)
 
-    /** A point in extended coordinates (x = X/Z, y = Y/Z, xy = T/Z). */
+    /** Extended coordinates (x = X/Z, y = Y/Z, xy = T/Z). */
     private class Point(val x: BigInteger, val y: BigInteger, val z: BigInteger, val t: BigInteger)
 
     private val IDENTITY = Point(BigInteger.ZERO, BigInteger.ONE, BigInteger.ONE, BigInteger.ZERO)
@@ -44,7 +39,7 @@ object Ed25519 {
         checkNotNull(recover(y, 0)) { "Ed25519's base point" }
     }
 
-    /** Whether [signature] is [publicKey]'s over [message]; false for anything malformed. */
+    /** False for anything malformed. */
     fun verify(publicKey: ByteArray, message: ByteArray, signature: ByteArray): Boolean {
         if (publicKey.size != KEY_SIZE || signature.size != SIGNATURE_SIZE) return false
         val a = decode(publicKey) ?: return false

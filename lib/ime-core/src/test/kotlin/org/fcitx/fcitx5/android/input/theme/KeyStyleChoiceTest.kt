@@ -80,13 +80,11 @@ class KeyStyleChoiceTest {
         }
     }
 
-    // 纵向 很紧凑: 横向 紧凑's 2 dp, upright and on its side, so the gaps are alike both ways; at the keyboard
-    // height 紧凑 shrunk as any level is, to 1 dp (40% of 2, a gap kept); over a pack the same level
+    // 纵向 很紧凑 is 横向 紧凑's 2 dp both ways; at height 紧凑 shrunk to 1 dp; over a pack the same
     @Test
     fun upAndDownVeryCompactIsAsTightAsAcrossCompact() {
         val v = KeyStyleChoice.V_VERY_COMPACT
-        // its documented 2 dp both ways, tighter than 紧凑 (R26 F8396: was H_COMPACT == v, the two axes' constants
-        // pinned to each other rather than to what they are)
+        // its documented 2 dp both ways, pinned to the value, not to H_COMPACT
         assertEquals(KeyStyleChoice.Spacing(2, 2), v)
         assertTrue(v.portrait < KeyStyleChoice.V_COMPACT.portrait && v.landscape < KeyStyleChoice.V_COMPACT.landscape)
         val gap = KeyStyleChoice(null, KeyStyleChoice.H_COMPACT, v, null).applyTo(look).keys.gap

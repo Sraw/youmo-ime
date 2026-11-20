@@ -5,17 +5,9 @@
 package org.fcitx.fcitx5.android.input.floating
 
 /**
- * The floating keyboard dragged up and down, and brought to the bottom to dock it, as Gboard's: its
- * lowest place is above a strip kept for the docking zone's mark, and a drag that takes it there is
- * in the zone; let go there, it docks ([FloatingKeyboard]), moved back up first, it floats on. Where
- * it already was at the bottom when the drag began (it first floats there), only a push on down of
- * [slop] takes it in: a drag along the bottom only moves it across.
- *
- * Grabbed from the docked keyboard (始终显示悬浮条) the finger can start below its lowest place (the
- * docked grip is lower than the floating one goes): that [start]s as slack, taken up first as the
- * finger comes up, as a push is, so the grip comes under the finger and stays there; the slack is no
- * push into the zone, only a push on down past the highest the finger came back up to within it
- * (where it began, if it never came up) is.
+ * Dragging the floating keyboard, and docking at the bottom (as Gboard): its lowest place leaves room for the zone's
+ * mark; let go in the zone, it docks. Starting at the bottom, only a further push of [slop] enters it. Grabbed from the
+ * docked keyboard the finger may start lower than it goes: [start]'s slack is taken up first and is no push.
  */
 class FloatingDrag(private val slop: Float) {
 
@@ -28,11 +20,9 @@ class FloatingDrag(private val slop: Float) {
     // of [pushed], what the finger began below its lowest place: given back, but no push into the zone
     private var slack = 0f
 
-    /** In the docking zone: let go now, it docks. */
     var inZone = false
         private set
 
-    /** A new drag, nothing pushed yet, or the finger [slack] below where it can go. */
     fun start(slack: Float = 0f) {
         this.slack = slack.coerceAtLeast(0f)
         pushed = this.slack
@@ -40,11 +30,7 @@ class FloatingDrag(private val slop: Float) {
         inZone = false
     }
 
-    /**
-     * The keyboard's top after the finger moved [dy] with it at [top], [maxTop] the lowest it goes:
-     * a push past it counted, and given back first as the finger comes up again. [inZone] then says
-     * whether it is in the zone; the caller compares it with its own reading before the move.
-     */
+    /** A push past [maxTop] is counted, given back first as the finger comes up. The caller compares [inZone] with before. */
     fun move(top: Float, dy: Float, maxTop: Float): Float {
         var at = top
         if (pushed > 0f) {
@@ -61,10 +47,7 @@ class FloatingDrag(private val slop: Float) {
             pushed += at - maxTop
             at = maxTop
         }
-        // up by the slop, not a pixel: the handle passes raw moves, and a finger wobbling a few
-        // pixels while dragging along the bottom would arm the dock (a place kept as a share also
-        // comes back a fraction off). Where the keyboard is shown, not past the top: one as tall as
-        // the room (maxTop 0) never goes above its lowest place
+        // by the slop, not a pixel: raw moves wobble along the bottom (a saved share also comes back a fraction off)
         if (at.coerceAtLeast(0f) < maxTop - slop) above = true
         inZone = at >= maxTop && (above || pushed - slack >= slop)
         return at.coerceAtLeast(0f)

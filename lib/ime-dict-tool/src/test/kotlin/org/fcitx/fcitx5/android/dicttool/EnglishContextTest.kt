@@ -12,11 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/**
- * The engine reads the words before the cursor (EnglishDecoder.context) as the pages' were counted
- * (EnglishVocabulary.Words.id): a spelling the data lacks is the word it was counted as, so what
- * follows it is scored as the model learned it. Slips the pages had are not in the data, nor here.
- */
+/** The engine reads the words before the cursor as the pages' were counted: a spelling the data lacks is the word it was counted as. */
 class EnglishContextTest {
 
     @Test

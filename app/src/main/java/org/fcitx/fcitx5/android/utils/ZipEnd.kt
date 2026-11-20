@@ -10,11 +10,8 @@ import java.io.IOException
 import java.io.RandomAccessFile
 
 /**
- * How many entries a zip's end record says it has (zip64's where the classic one is full), read off the
- * file's end alone, its central directory never loaded: `ZipFile` read that whole, and a malicious one
- * could run out of memory, which no restore's catch takes (review 061-small S3). Null where there is no
- * end record, or it does not hold together: its directory reaching past where it ends, fewer bytes than
- * its entries' headers take, more than one disk. A restore takes null for no backup.
+ * Read off the file's end alone: `ZipFile` loads the whole central directory, and a malicious one could run out of
+ * memory. Null where there is no consistent end record; a restore takes null for no backup.
  */
 object ZipEnd {
 
@@ -37,19 +34,17 @@ object ZipEnd {
         val total = u16(tail, at + 10).toLong()
         val size = u32(tail, at + 12)
         val offset = u32(tail, at + 16)
-        // a field full: zip64's record says (its disks too), where there is one or all three are full; a
-        // classic zip of exactly 65 535 entries, say, has neither and is read as it is
+        // a full field defers to zip64's record if any; a classic zip of exactly 65 535 entries has none and reads as is
         val full = listOf(total == FULL16, size == FULL32, offset == FULL32)
         if (full.any { it } && (full.all { it } || locatorAt(f, endAt))) return zip64(f, endAt)
         if (u16(tail, at + 4) != 0 || u16(tail, at + 6) != 0) return null
         return held(onDisk, total, size, offset, endAt)
     }
 
-    // whether zip64's locator is just before the classic record
     private fun locatorAt(f: RandomAccessFile, endAt: Long) =
         endAt >= LOCATOR_SIZE && u32(read(f, endAt - LOCATOR_SIZE, LOCATOR_SIZE), 0) == LOCATOR
 
-    // the zip64 end record its locator, just before the classic record, points to
+    // pointed to by its locator, just before the classic record
     private fun zip64(f: RandomAccessFile, endAt: Long): Long? {
         if (!locatorAt(f, endAt)) return null
         val recordAt = u64(read(f, endAt - LOCATOR_SIZE, LOCATOR_SIZE), 8)
@@ -60,7 +55,7 @@ object ZipEnd {
         return held(u64(r, 24), u64(r, 32), u64(r, 40), u64(r, 48), recordAt)
     }
 
-    // [total] where the directory lies before [dirEnd] and has room for that many headers, on one disk
+    // on one disk, before [dirEnd], with room for that many headers
     private fun held(onDisk: Long, total: Long, size: Long, offset: Long, dirEnd: Long): Long? =
         total.takeIf {
             onDisk == total && total >= 0 && size >= 0 && offset >= 0 && offset <= dirEnd - size &&

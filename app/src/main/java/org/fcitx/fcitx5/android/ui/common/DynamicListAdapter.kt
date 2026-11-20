@@ -206,10 +206,7 @@ abstract class DynamicListAdapter<T>(
         mainViewModel?.toolbarButton?.value = ButtonMode.EDIT
     }
 
-    /**
-     * Adds [items] at the end, drawn as one insertion: thousands of them one by one hold the main thread. The user's add:
-     * the list page offers an undo of the whole batch, so a page showing what it read from its file uses [showAll].
-     */
+    /** One insertion: thousands one by one hold the main thread. Undoable as a batch; a page showing its file uses [showAll]. */
     fun addItems(items: List<T>) {
         if (items.isEmpty()) return
         val start = _entries.size
@@ -219,10 +216,7 @@ abstract class DynamicListAdapter<T>(
         mainViewModel?.toolbarButton?.value = ButtonMode.EDIT
     }
 
-    /**
-     * Shows [items] in place of all those listed, as their file has them read anew: no change of
-     * the user's, so none told to the listener (nothing to save, nothing to undo).
-     */
+    /** Not the user's change, so the listener is not told (nothing to save or undo). */
     fun showAll(items: List<T>) {
         _entries.clear()
         _entries.addAll(items)
@@ -231,7 +225,7 @@ abstract class DynamicListAdapter<T>(
         mainViewModel?.toolbarButton?.value = if (entries.isEmpty()) ButtonMode.NONE else ButtonMode.EDIT
     }
 
-    /** Removes the [count] items from [start], drawn as one removal: the undo of [addItems]. */
+    /** The undo of [addItems]. */
     fun removeItems(start: Int, count: Int) {
         if (count == 0) return
         val range = _entries.subList(start, start + count)

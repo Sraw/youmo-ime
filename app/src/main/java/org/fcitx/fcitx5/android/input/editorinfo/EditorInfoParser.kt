@@ -23,8 +23,6 @@ object EditorInfoParser {
     private val EDITOR_INFO_MEMBER = EditorInfo::class.java.declaredFields
         .filter { !it.isStatic() }
 
-    ////////// EditorInfo constants
-
     private val EDITOR_INFO_STATIC = EditorInfo::class.java.declaredFields
         .filter { it.isStatic() }
 
@@ -33,8 +31,6 @@ object EditorInfoParser {
 
     private val IME_FLAG = EDITOR_INFO_STATIC
         .filter { it.name.startsWith("IME_FLAG_") }
-
-    ////////// InputType constants
 
     private val INPUT_TYPE_STATIC = InputType::class.java.declaredFields
         .filter { it.isStatic() }
@@ -47,8 +43,6 @@ object EditorInfoParser {
 
     private val TYPE_VARIATION = INPUT_TYPE_STATIC
         .filter { it.name.contains("_VARIATION_") }
-
-    ////////// TextUtils constants
 
     private val CAP_MODE = TextUtils::class.java.declaredFields
         .filter { it.isStatic() && it.name.startsWith("CAP_MODE_") }

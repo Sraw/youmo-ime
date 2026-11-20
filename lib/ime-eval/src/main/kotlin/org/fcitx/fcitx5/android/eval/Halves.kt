@@ -6,11 +6,7 @@ package org.fcitx.fcitx5.android.eval
 
 import java.util.zip.CRC32
 
-/**
- * Splits an evaluation set in two, so that what is tuned on one half is judged on the other.
- * By the expected text, not the input: a sentence and the sets derived from it (its 双拼, its
- * slips) land in the same half, and tuning never sees the answer to what it is judged on.
- */
+/** Splits a set in two by expected text, so a sentence and the sets derived from it land in the same half. */
 object Halves {
 
     const val TUNE = "tune"

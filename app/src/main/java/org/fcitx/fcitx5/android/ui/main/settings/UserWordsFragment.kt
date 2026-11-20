@@ -43,15 +43,8 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.setPaddingDp
 
 /**
- * The user dictionary at a glance: how many words each of its lists holds, a page of its own
- * for each (see [UserWordListFragment]: a list may run to thousands), and the whole of it
- * exported as a learning backup (U-100: the words, imported ones, pins, blocks and the order
- * learned, as 另存一份 saves it); it is imported back where every dictionary is imported, the
- * dictionaries' page merging it as a backup restored ([PinyinDictionaryFragment]).
- *
- * At its top the switch of U-93 (the same as ⋯'s); the pins and the predictions turned off have
- * pages of their own ([LearnedItemsFragment]), and 清空学到的 (U-86) asks with what goes and
- * what stays.
+ * The user dictionary at a glance: counts per list, a page per list ([UserWordListFragment]), and an export as a
+ * learning backup (imported back on the dictionaries' page). 清空学到的 says what goes and what stays.
  */
 class UserWordsFragment : PaddingPreferenceFragment() {
 
@@ -77,7 +70,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     private lateinit var exportLauncher: ActivityResultLauncher<String>
 
-    // what is learned not reaching the disk now (LearnLog.saving): said at the top for as long as it lasts (decode-4)
+    // learning not reaching the disk now (LearnLog.saving): said at the top while it lasts
     private lateinit var notSaving: Preference
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,7 +104,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             }
         }
         screen.addPreference(habits)
-        // U-106, beside U-93 (review-DE-design D-S7): the engine told, which makes the backups
+        // the engine makes the backups, so it is told
         backups = SwitchPreferenceCompat(ctx).apply {
             key = AUTO_BACKUP_KEY
             isPersistent = false
@@ -126,7 +119,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             }
         }
         screen.addPreference(backups)
-        // 语音先问再记 (Q4): read by the keyboard as a talk's text goes in, nothing to tell the engine
+        // read by the keyboard as a talk's text goes in: nothing to tell the engine
         voiceAsks = SwitchPreferenceCompat(ctx).apply {
             key = VOICE_ASK_KEY
             isPersistent = false
@@ -163,11 +156,11 @@ class UserWordsFragment : PaddingPreferenceFragment() {
                 }
                 words.addPreference(this)
             }
-            // U-72: the predictions turned off right after the blocked words, as they go with them
+            // the turned-off predictions right after the blocked words, as they go with them
             if (kind == UserWord.Kind.BLOCKED) addListed(LearningOp.Listed.NO_PREDICT)
         }
         addListed(LearningOp.Listed.PINS)
-        // English's learned words, a page of their own: the one the English settings open
+        // the page the English settings open
         words.addPreference(R.string.english_words, key = ENGLISH_KEY) {
             navigateWithAnim(SettingsRoute.UserWordList(UserWord.Kind.LEARNED.name, english = true))
         }
@@ -189,11 +182,11 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     override fun onResume() {
         super.onResume()
-        // turned off or on in ⋯ meanwhile
+        // changed in ⋯ meanwhile
         habits.isChecked = useHabits.getValue()
         backups.isChecked = autoBackup.getValue()
         voiceAsks.isChecked = voiceAsk.getValue()
-        // back from a list: counted again
+        // back from a list: recounted
         refreshCounts()
     }
 
@@ -208,10 +201,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
         }
     }
 
-    /**
-     * U-86: what goes and what stays, and 「全部清空」 unticked, which says the blocked words come
-     * back: counted first, never a 0 that is only not counted yet (review-E-ui N4).
-     */
+    /** Says what goes and stays, and that unticked 「全部清空」 brings blocked words back: counted first, never a not-yet 0. */
     private fun confirmClear() {
         lifecycleScope.launch {
             val counts = viewModel.fcitx.runOnReady { userWordCounts() }
@@ -238,14 +228,14 @@ class UserWordsFragment : PaddingPreferenceFragment() {
             .setPositiveButton(R.string.learning_clear_do) { _, _ -> clear(all.isChecked) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
-        // ticked, what stays is listed no more as kept: it goes too (the user, 2026-10-22)
+        // ticked, what stays goes too
         all.setOnCheckedChangeListener { _, ticked -> dialog.setMessage(getString(clearMessage(ticked))) }
     }
 
     private fun clear(all: Boolean) {
         val ctx = requireContext()
         lifecycleScope.withLoadingDialog(ctx) {
-            // works locked too (the record in memory then): what fails is the disk (review-E-ui S6)
+            // works locked too (the record in memory then): only the disk can fail
             // not on disk (locked since boot) is not now, as ⋯'s 清掉最近 says it (PanelActions)
             ctx.toast(viewModel.fcitx.runOnReady { clearAndTell(LearningOp.ClearLearned(all)) })
             refreshCounts()
@@ -254,7 +244,7 @@ class UserWordsFragment : PaddingPreferenceFragment() {
 
     private fun count(n: Int) = resources.getQuantityString(R.plurals.word_count, n, n)
 
-    // all of it, as a backup (WD-10): a word list would carry neither the imports nor the order learned
+    // a backup: a word list would carry neither imports nor learning order
     private fun export(uri: Uri) = restore.saveCopy(uri, R.string.export_words_done)
 
     companion object : SearchablePage {
@@ -295,11 +285,11 @@ class UserWordsFragment : PaddingPreferenceFragment() {
     }
 }
 
-/** The words 「全部清空」 unticked brings back (F2730): the blocked words, and the tables' blocks [tableBlocks] listed. */
+/** The blocked words and the listed table blocks. */
 internal fun blockedThatReturn(counts: Map<UserWord.Kind, Int>, tableBlocks: LearningResult?): Int =
     (counts[UserWord.Kind.BLOCKED] ?: 0) + ((tableBlocks as? LearningResult.Listed)?.items?.size ?: 0)
 
-/** What 清空学到的 says it clears and keeps: [all] (全部清空 ticked) keeps the custom phrases alone. */
+/** [all] (全部清空 ticked) keeps the custom phrases alone. */
 @StringRes
 internal fun clearMessage(all: Boolean): Int =
     if (all) R.string.learning_clear_all_message else R.string.learning_clear_learned_message

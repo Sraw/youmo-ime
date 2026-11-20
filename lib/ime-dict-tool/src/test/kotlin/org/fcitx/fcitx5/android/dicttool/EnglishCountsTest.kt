@@ -50,8 +50,6 @@ class EnglishCountsTest {
         assertTrue(model.p2(pm, est) > 2 * model.p1(est))
     }
 
-    // the same where a word the model lacks breaks the run: pm EST only ever after ten or nine, each
-    // seen once and left out of the eight words kept
     @Test
     fun aRunAfterAWordTheModelLacksIsCountedFromAStartToo() {
         val (words, model) = counted(listOf("We meet at ten pm EST.", "We meet at nine pm EST.", "I am here.", "I am here."), size = 8)
@@ -96,8 +94,7 @@ class EnglishCountsTest {
 
     @Test
     fun aSpellingWithAnApostropheOfAnyOtherGroupIsHeldToATenthOfItsCommonest() {
-        // th'e beside the's 300: a thirtieth as common, over a hundredth yet under a tenth, is none, as
-        // the tenth would have it and a hundredth would not; once is none too
+        // a thirtieth as common is no slip, nor is once
         for (times in listOf(1, 10)) {
             val the = vocabulary("the" to 300, "th'e" to times).words(100)
             assertFalse(the.list.toString(), "th'e" in the.list)
@@ -134,8 +131,7 @@ class EnglishCountsTest {
 
     @Test
     fun aSentencesFirstWordIsCountedAsTheSpellingsItMayBeInTheirShares() {
-        // The first in five sentences, the elsewhere ten times: the 15, ahead of dog's 13; Apple's
-        // eight firsts shared 30 to 10 with apple
+        // a sentence's first shared out as the word is elsewhere
         val vocabulary = vocabulary(
             "the" to 10, "dog" to 13, "Apple" to 30, "apple" to 10,
             first = List(5) { "The" } + List(8) { "Apple" },

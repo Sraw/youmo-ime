@@ -5,10 +5,9 @@
 package org.fcitx.fcitx5.android.engine.lattice
 
 /**
- * The word ids a pass has seen, each once: a `HashSet<Int>` without its boxes. The decoder's
- * passes over the arcs from the start ran one a key, boxing an id per arc (S15 A8.3: a fifth of
- * the nine keys' bytes a key). Open addressing; [clear] is a new stamp, not a fill, so a pass
- * costs its words, not the table. One pass at a time: a decoder's, on its thread.
+ * Word ids a pass has seen, each once: a `HashSet<Int>` without boxing (the decoder's per-key passes boxed
+ * an id per arc). Open addressing; [clear] bumps a stamp instead of filling, so a pass costs its words, not
+ * the table. One pass at a time, on its decoder's thread.
  */
 internal class SeenWords {
     private var words = IntArray(INITIAL)
@@ -16,7 +15,6 @@ internal class SeenWords {
     private var stamp = 1
     private var size = 0
 
-    /** Forgets every word seen. */
     fun clear() {
         size = 0
         if (++stamp == Int.MAX_VALUE) {

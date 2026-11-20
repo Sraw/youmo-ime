@@ -17,10 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.fcitx.fcitx5.android.host.KeyStates as HostKeyStates
 
-/**
- * uat/03-t9.md: each case from B0-九键. Its English (中/英) is English fed the nine keys' own
- * characters ([Keyboard.nineKey], [Keyboard.nineLetter]), as T9Keyboard sends them.
- */
+/** uat/03-t9.md, each case from B0-九键; English fed the nine keys' characters as T9Keyboard sends them. */
 class NineKeysUatTest {
 
     private fun EngineReplay.nine(digits: String) {
@@ -199,13 +196,7 @@ class NineKeysUatTest {
         assertTrue("fengh $part", "奉化" in part.take(3))
     }
 
-    // ------------------------------------------------------------------ 连按, on the replay's clock
-
-    /**
-     * The digit keys under 连按 at [timeout] ms (连按选字母 中 is T9MultiTap.Medium's 600), as
-     * T9Keyboard.resolve reads a press at its time: the digit, or the same key pressed again soon its
-     * next letter (Keyboard.letterKey, again). The time is the replay's [HostReplay.clock].
-     */
+    /** The digit keys under 连按 at [timeout] ms, read as T9Keyboard.resolve does on the replay's [HostReplay.clock]. */
     private class Presses(val replay: HostReplay, timeout: Long = 600) {
         private val tap = MultiTap(timeout)
 
@@ -244,7 +235,7 @@ class NineKeysUatTest {
         pick("广告")
         expectText("广告")
         focus("")
-        // quickly: h, the h characters, not two keys' 广告 (learned) or 哈哈 (the user's 2026-10-19 gg)
+        // quickly: h, the h characters, not two keys' 广告 (learned) or 哈哈 (the user's gg)
         keys.presses("44", QUICK)
         assertEquals("4 4 quickly 「$preedit」", "h", preedit.replace("'", "").replace(" ", ""))
         val hWords = candidates.take(8)
@@ -262,9 +253,7 @@ class NineKeysUatTest {
         assertEquals(seven, preedit to candidates.take(6))
     }
 
-    // typed a letter at a time (九键英文 连按, and always where English suggests nothing), each
-    // letter is the keyboard's own commit (resolveEnglish's CommitAction, NineKeysTapUatTest): the
-    // engine only told of the field's text, which it offers nothing for
+    // typed a letter at a time, each letter is the keyboard's own commit: the engine only told of the field's text
     @Test
     @Uat("T9-33", "T9-44")
     fun lettersTypedAtATimeLeaveEnglishNothingToOffer() {

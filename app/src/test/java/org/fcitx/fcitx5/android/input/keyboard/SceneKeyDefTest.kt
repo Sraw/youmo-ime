@@ -37,11 +37,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * The app's side of a layout's words (060-render-p2 U4 B): the `action:` table ([SceneKeyDef.action]),
- * a key's KeyDef made of its node with the keyboard's own words ([SceneKeyDef.Table]), and where the
- * layouts are read from ([SceneLayouts]).
- */
+/** The `action:` table ([SceneKeyDef.action]), a key's KeyDef made of its node ([SceneKeyDef.Table]), and where layouts are read from ([SceneLayouts]). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SceneKeyDefTest {
@@ -62,7 +58,7 @@ class SceneKeyDefTest {
             SceneAction.Key("'") to KeyAction.HostKeyAction("'"),
             SceneAction.Sym("BackSpace") to sym(FcitxKeyMapping.FcitxKey_BackSpace),
             SceneAction.Sym("Return") to sym(FcitxKeyMapping.FcitxKey_Return),
-            // the number pad's: the keypad's with NumLock, as its NumPadKeys sent them
+            // the number pad's: the keypad's with NumLock, as NumPadKeys sent them
             SceneAction.Sym("KP_Add") to keypad(FcitxKeyMapping.FcitxKey_KP_Add),
             SceneAction.Sym("KP_0") to keypad(FcitxKeyMapping.FcitxKey_KP_0),
             SceneAction.Sym("KP_9") to keypad(FcitxKeyMapping.FcitxKey_KP_9),
@@ -87,7 +83,7 @@ class SceneKeyDefTest {
             SceneAction.Placeholder("zhuyin") to KeyAction.CommitAction("ㄅ"),
         )
         words.forEach { (word, action) -> assertEquals("$word", action, SceneKeyDef.action(word) { placeholders[it] }) }
-        // what the app has none of: nothing (logged), the key doing nothing; a group's code is the keyboard's (Table.group)
+        // what the app has none of: nothing (logged); a group's code is the keyboard's (Table.group)
         val none = listOf(
             SceneAction.Sym("Hyper_L"), SceneAction.Picker("Nope"), SceneAction.Shortcut("nope"),
             SceneAction.Command("launch"), SceneAction.Placeholder("tone-9"),
@@ -96,8 +92,7 @@ class SceneKeyDefTest {
         none.forEach { assertNull("$it", SceneKeyDef.action(it) { name -> placeholders[name] }) }
     }
 
-    // qwerty.xml's letters send lowercase; each keeps its letter's scancode (Linux KEY_Q 16, KEY_A 30, KEY_M 50),
-    // ScancodeMapping knowing capitals alone
+    // each lowercase letter keeps its scancode (Linux KEY_Q 16, KEY_A 30, KEY_M 50): ScancodeMapping knows capitals alone
     @Test
     fun aLowercaseSendKeepsItsLettersScancode() {
         mapOf("q" to 16, "Q" to 16, "a" to 30, "m" to 50).forEach { (send, code) ->
@@ -107,13 +102,11 @@ class SceneKeyDefTest {
         }
     }
 
-    // a board that pops up no preview nor a long press's keys (number.xml's preview="off" popups="off"): its
-    // keys none of those, a menu written on a key its own still (rules C 疑问 8: the number pad's Return)
+    // preview="off" popups="off": no bubble nor long press keys, a menu written on a key still its own (the number pad's Return)
     @Test
     fun aBoardsPopupsOffTakeTheBubbleAndTheLongPressNotTheMenu() {
         fun board(preview: Boolean, popups: Boolean) = Scene(1.0, 1.0, emptyList(), emptyList(), emptyList(), preview = preview, popups = popups)
         val all = nodes().values.map(SceneBehavior::of)
-        // the 14 keys' have each: a letter's bubble and long press, Return's menu
         assertTrue(all.any { it.bubble != null } && all.any { it.popup != null } && all.any { it.menu.isNotEmpty() })
         for (b in all) {
             assertSame(b, SceneKeyDef.onBoard(b, null))
@@ -124,26 +117,23 @@ class SceneKeyDefTest {
         }
     }
 
-    // a key's preview="on" on a board of preview="off": no bubble, the board's word the last (060-render-p2 S4d M1)
+    // a key's preview="on" on a board of preview="off": no bubble, the board's word the last
     @Test
     fun aKeysPreviewOnGivesWayToItsBoardsOff() {
         val keyboard = ZhuyinKeyboard(context, TestThemes.PixelLight, nine = true).laidOut()
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
-        // ?: a function key with preview="on"
         val question = SceneBehavior.of(canvas.scene!!.keys.single { it.id == "r2c5" })
         assertEquals(SceneBehavior.Bubble("?", ""), question.bubble)
         val off = Scene(1.0, 1.0, emptyList(), emptyList(), emptyList(), preview = false, popups = true)
         assertNull(SceneKeyDef.onBoard(question, off).bubble)
     }
 
-    // the 14 keys' nodes, from the canvas a GroupedKeyboard draws with the switch on
     private fun nodes(): Map<String, KeyNode> {
         val keyboard = GroupedKeyboard(context, TestThemes.PixelLight).laidOut()
         val canvas = KeyboardHarness.all(keyboard).filterIsInstance<KeyboardCanvasView>().single()
         return canvas.scene!!.keys.associateBy { it.id }
     }
 
-    // a group's tap and long press asked of the keyboard by its letters; none it has: nothing wired
     @Test
     fun aGroupsTapIsTheKeyboardsItsLongPressTheResolvers() {
         val qw = nodes().getValue("r1c1")
@@ -155,14 +145,13 @@ class SceneKeyDefTest {
         val def = SceneKeyDef.of(qw, table)
         assertEquals(listOf("group qw r1c1"), asked)
         assertEquals(code, def.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
-        // its swipe by its name too (KeySwipes asks the keyboard's resolver): the layout writes none (060-keys-unify S6)
+        // its swipe by its name too (KeySwipes asks the resolver): the layout writes none
         assertTrue(def.behaviors.none { it is KeyDef.Behavior.Swipe })
-        // named (g14/qw): its long press the resolver's (KeyDefaults by its name), none made here
+        // named (g14/qw): its long press the resolver's, none made here
         assertTrue(def.popup.orEmpty().none { it is KeyDef.Popup.Keyboard })
         val preview = def.popup.orEmpty().filterIsInstance<KeyDef.Popup.AltPreview>().single()
         assertEquals("QW", preview.content)
         assertEquals("g14/qw", def.shortcut)
-        // a keyboard with no groups: no tap, no long press, the rest as written
         val bare = SceneKeyDef.of(qw, object : SceneKeyDef.Table {})
         assertTrue(bare.behaviors.none { it is KeyDef.Behavior.Press })
         assertTrue(bare.popup.orEmpty().none { it is KeyDef.Popup.Keyboard })
@@ -185,7 +174,6 @@ class SceneKeyDefTest {
         assertEquals(KeyAction.HostKeyAction("'"), k.getValue("apostrophe").behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
     }
 
-    // a source of layouts that counts what it is asked for: [text] its layouts, [key] what they are kept under
     private class Counted(override val key: String, val text: (String) -> String?) : LayoutSource {
         val asked = mutableListOf<String>()
 
@@ -204,8 +192,7 @@ class SceneKeyDefTest {
         }
     }
 
-    // the layouts are read once a process from each source, by the source's key and the layout's id; one
-    // the source has none of, or that does not read, is the app's own (one step back); neither: none
+    // read once a process from each source, by its key and the layout's id; one missing or unreadable falls back to the app's own
     @Test
     fun aLayoutReadOnceFromEachSourceTheAppsOwnWhereTheSourcesDoesNotRead() {
         for (id in listOf("qwerty", "k14", "k18")) assertNotNull(id, SceneLayouts.of(context, id))
@@ -214,40 +201,34 @@ class SceneKeyDefTest {
         val app = Counted(BuiltInLayouts.KEY, builtIn::text)
         val pack = Counted("pack") { id -> if (id == "k14") "<keyboard/>" else builtIn.text(id) }
         sources(pack, app) {
-            // the pack's k14 does not read: the app's, read once each
             val k14 = SceneLayouts.of(context, "k14")!!
             assertTrue(k14.layout.parts.isNotEmpty())
             assertEquals(k14, SceneLayouts.of(context, "k14"))
             assertEquals(listOf("k14"), pack.asked)
             assertEquals(listOf("k14", "grouped-bottom"), app.asked)
-            // the pack's k18: its own
             assertNotNull(SceneLayouts.of(context, "k18"))
             assertEquals(listOf("k14", "k18", "grouped-bottom"), pack.asked)
             assertEquals(listOf("k14", "grouped-bottom"), app.asked)
-            // neither has it
             assertNull(SceneLayouts.of(context, "not-moved"))
             assertNull(SceneLayouts.of(context, "not-moved"))
             assertEquals(listOf("k14", "k18", "grouped-bottom", "not-moved"), pack.asked)
             assertEquals(listOf("k14", "grouped-bottom", "not-moved"), app.asked)
-            // the pack's read again, the app's kept (P3: a theme pack changed)
             SceneLayouts.invalidate("pack")
             SceneLayouts.of(context, "k14")
             SceneLayouts.of(context, "k18")
             assertEquals(listOf("k14", "k18", "grouped-bottom", "not-moved", "k14", "k18", "grouped-bottom"), pack.asked)
             assertEquals(listOf("k14", "grouped-bottom", "not-moved"), app.asked)
-            // all of them read again
             SceneLayouts.invalidate()
             SceneLayouts.of(context, "k14")
             assertEquals(listOf("k14", "grouped-bottom", "not-moved", "k14", "grouped-bottom"), app.asked)
         }
-        // a source that throws: none from it; the app's own the one step back, its own key's no step at all
+        // a source that throws: none from it; the app's own the one step back
         sources(Counted("throws") { error("no file") }, app) { assertNotNull(SceneLayouts.of(context, "k18")) }
         sources(Counted(BuiltInLayouts.KEY) { error("no file") }, Counted(BuiltInLayouts.KEY, builtIn::text)) { assertNull(SceneLayouts.of(context, "k18")) }
         assertTrue(BuiltInLayouts.has("k14") && BuiltInLayouts.has("qwerty") && !BuiltInLayouts.has("not-moved"))
     }
 
-    // a keyboard moved to the scene (the app has its layout) whose layout does not read draws nothing with
-    // the canvas on: the canvas over it, not one key, no view of a key shown (U8; review S4a #1), logged once
+    // a moved keyboard whose layout does not read draws nothing: not one key, no view of a key shown, logged once
     @Test
     fun aMovedKeyboardWhoseLayoutDoesNotReadDrawsNothing() {
         val logged = mutableListOf<String>()
@@ -263,7 +244,6 @@ class SceneKeyDefTest {
                     GroupedKeyboard(context, TestThemes.PixelLight).laidOut(),
                     GroupedKeyboard(context, TestThemes.PixelLight, NineKeyLetters.G18).laidOut(),
                     TextKeyboard(context, TestThemes.PixelLight).laidOut(),
-                    // made again: read once all the same
                     TextKeyboard(context, TestThemes.PixelLight).laidOut(),
                     // a theme not the built-in: no scene is no theme's fault, the built-in's not tried (no warning)
                     TextKeyboard(context, TestThemes.MaterialLight).laidOut(),
@@ -273,8 +253,7 @@ class SceneKeyDefTest {
                     assertEquals(View.VISIBLE, canvas.visibility)
                     assertTrue(KeyboardHarness.keysOf(k).isEmpty())
                 }
-                // each layout's two readings, logged once a process (the canvas's own "no scene" a keyboard aside);
-                // no theme blamed, no built-in theme tried for it
+                // each layout's two readings logged once a process; no theme blamed
                 assertEquals(logged.toString(), 2 * 3, logged.count { it.startsWith("scene layout") })
                 assertTrue(logged.toString(), logged.none { "of theme" in it })
             }

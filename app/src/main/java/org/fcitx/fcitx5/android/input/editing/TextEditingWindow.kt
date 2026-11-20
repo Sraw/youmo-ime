@@ -10,8 +10,6 @@ import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CapabilityFlag
 import org.fcitx.fcitx5.android.core.CapabilityFlags
-import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
@@ -32,22 +30,18 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
     private val windowManager: InputWindowManager by manager.must()
     private val theme by manager.theme()
 
-    private val hapticOnRepeat by AppPrefs.getInstance().keyboard.hapticOnRepeat
-
     private val buttonRipple get() = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
     private val buttonBorder get() = ThemeManager.shownLook(theme).keys.blocks
 
-    // the theme's (060-render-p3 T7b); not set, as its own setting had it: its dp a number of pixels (8 beside the keys' 4 dp)
+    // not set, as its own setting had it: its dp a number of pixels
     private val buttons get() = ScenePanels.editing(context, theme)
 
     private var hasSelection = false
 
     /**
-     * How much is selected: the tracked selection's, or, where it says none, the editor's own
-     * selected text's (the report may lag a select-all just made). getSelectedText's null is none
-     * (its contract: "null if no text is selected"), as an editor without it or the binder's timeout
-     * cannot be told from that. A binder call on the main thread, the framework's 2 s at worst, only
-     * on a tap of cut or copy with the tracked selection collapsed.
+     * Where the tracked selection says none, the editor's own (the report may lag a select-all). getSelectedText's
+     * null is none, as an editor without it or the binder's timeout cannot be told apart. A binder call on the
+     * main thread (2 s at worst), only on cut or copy with the tracked selection collapsed.
      */
     private fun selectedLength(start: Int, end: Int): Int =
         if (start != end) maxOf(start, end) - minOf(start, end)
@@ -71,10 +65,7 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
             fun CustomGestureView.onClickWithRepeating(block: () -> Unit) {
                 setOnClickListener { block() }
                 repeatEnabled = true
-                onRepeatListener = {
-                    block()
-                    if (hapticOnRepeat) InputFeedbacks.hapticFeedback(this)
-                }
+                onRepeatListener = { block() }
             }
 
             leftButton.onClickWithRepeating { sendDirectionKey(KeyEvent.KEYCODE_DPAD_LEFT) }
@@ -103,14 +94,13 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
             }
             cutButton.setOnClickListener {
                 val range = service.currentInputSelection
-                // the panel's cut and copy take the selection alone: with none, the clipboard kept,
-                // 选择 left as it was (it shows the state; nothing done changes it)
+                // cut and copy take the selection alone: with none, the clipboard kept, 选择 left as it was
                 val selected = selectedLength(range.start, range.end)
                 if (selected == 0) return@setOnClickListener service.say(R.string.nothing_to_cut)
                 // deactivate select button after operation
                 userSelection = false
                 service.performContextMenuAction(android.R.id.cut)
-                // said where something is cut, the tracked selection lagging or not
+                // the tracked selection lagging or not
                 if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_cut)
             }
             copyButton.setOnClickListener {
@@ -119,14 +109,11 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
                 if (selected == 0) return@setOnClickListener service.say(R.string.nothing_to_copy)
                 userSelection = false
                 ic.performContextMenuAction(android.R.id.copy)
-                // 选择 off after a copy: the selection gone, >| moves the cursor and 粘贴 inserts at it
-                // only a selection is collapsed: a cursor alone stays where the editor has it, the
-                // tracked one may lag; 选择 on with nothing selected sends no selection update
+                // only a selection is collapsed: a cursor alone stays where the editor has it, the tracked one may lag;
+                // 选择 on with nothing selected sends no selection update
                 val range = service.currentInputSelection
-                // the copy shows nowhere else (the bar's hint is behind this window): say so; not in a
-                // hidden password, whose editor copies nothing (a shown one copies, so it is said)
-                // The tracked selection lagging (collapsed though text is selected): said all the
-                // same, the selection left as the editor has it, its end not known here
+                // the bar's hint is behind this window: say so; not in a hidden password, whose editor copies nothing. The
+                // tracked selection lagging: said all the same, the selection left as the editor has it
                 val collapseAt = cursorAfterCopy(range.start, range.end)
                 if (collapseAt != null) {
                     ic.setSelection(collapseAt, collapseAt)
@@ -171,20 +158,14 @@ class TextEditingWindow : InputWindow.ExtendedInputWindow<TextEditingWindow>(),
 }
 
 /**
- * Whether |< and >| send Home / End with Ctrl (TB-06): a bare Home / End moves only to the edge of
- * the line in a multi-line field, as a text view reads them; with Ctrl it is the field. A raw-key
- * field (TYPE_NULL, a terminal) gets them bare: Ctrl+Home there is `ESC[1;5H`, which a shell
- * seldom binds and echoes, while a bare Home goes to the line's start.
+ * A bare Home / End moves only to the line's edge in a multi-line field; with Ctrl it is the field. A
+ * raw-key field (TYPE_NULL, a terminal) gets them bare: Ctrl+Home there is `ESC[1;5H`, which a shell
+ * seldom binds and echoes.
  */
 internal fun fieldEdgeCtrl(rawKeyInput: Boolean): Boolean = !rawKeyInput
 
-/**
- * Whether a copy or cut is said: not in a password whose characters are hidden, which
- * TextView refuses to copy; a shown (visible-password) one copies fine, though inPasswordField
- * counts it too.
- */
+/** Not in a password whose characters are hidden, which TextView refuses to copy; inPasswordField counts a shown one too. */
 internal fun copyIsSaid(info: EditorInfo?): Boolean =
     info == null || !CapabilityFlags.fromEditorInfo(info).has(CapabilityFlag.Password)
 
-/** Where a copy leaves the cursor: at the end of what was selected; null, nothing selected. */
 internal fun cursorAfterCopy(start: Int, end: Int): Int? = if (start == end) null else maxOf(start, end)

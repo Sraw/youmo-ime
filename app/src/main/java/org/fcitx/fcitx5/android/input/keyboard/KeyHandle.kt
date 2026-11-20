@@ -11,44 +11,32 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView.Event
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 
-/**
- * A key as its keyboard wires it (BaseKeyboard's wire, 060-render-p2 S1): what its touch does,
- * a key the scene draws (canvas/SceneTouch's SceneKey).
- */
 interface KeyHandle : KeyGesture.Key {
-    /** Which key it is, to a popup ([org.fcitx.fcitx5.android.input.popup.PopupAction.key]). */
     val ref: KeyRef
 
-    /**
-     * Where a popup over it is placed, in the window: the face across, to the cell's foot down.
-     * Null for a scene's key the scene drawn last has not: no popup over it.
-     */
+    /** The face across, to the cell's foot down. Null for a scene's key the scene drawn last has not. */
     val bounds: Rect?
 
-    /** Where its bubble goes over it, as [bounds]: a key across rows' its first row's, the bubble over its top, not its foot. */
+    /** A key across rows' its first row's: the bubble over its top, not its foot. */
     val previewBounds: Rect? get() = bounds
 
-    /** Its touch: the gesture's settings and where the finger is. */
     val keyGesture: KeyGesture
 
-    /** Told each step of its gesture ([KeyGesture.Key.onGesture]): whether it consumed it. */
     var gestureListener: ((KeyHandle, Event) -> Boolean)?
 
     fun onClick(listener: (KeyHandle) -> Unit)
 
-    /** Its long press timed from now on: the listener says whether it took the touch. */
     fun onLongClick(listener: (KeyHandle) -> Boolean)
     fun onRepeat(listener: (KeyHandle) -> Unit)
     fun onDoubleTap(listener: (KeyHandle) -> Unit)
 }
 
-/** Where a key is in its keyboard: glide typing's letters ([GlideInput]). */
 fun interface KeyPlace {
-    /** Its touch area in [keyboard]'s pixels, into [out]; empty where it is nowhere now. */
+    /** Empty where it is nowhere now. */
     fun place(keyboard: ViewGroup, out: Rect)
 }
 
-/** Where [canvas]'s scene drawn last has the key [ref], in the keyboard's pixels (nowhere before it is drawn); the key told by [ref]. */
+/** Nowhere before it is drawn. */
 class ScenePlace internal constructor(val ref: KeyRef, private val canvas: () -> KeyboardCanvasView?) : KeyPlace {
     override fun place(keyboard: ViewGroup, out: Rect) {
         val c = canvas()
@@ -56,16 +44,13 @@ class ScenePlace internal constructor(val ref: KeyRef, private val canvas: () ->
     }
 }
 
-/** A finger's key, for the rest of its touch (BaseKeyboard's routing): a key the scene draws. */
 internal interface TouchTarget {
     val ref: KeyRef
 
-    /** A disabled key takes no touch (a blank one). */
     val enabled: Boolean
 
-    /** Finger [pointerIndex] of [event] to the key, as [action] (a [MotionEvent]'s masked action). */
     fun send(event: MotionEvent, action: Int, pointerIndex: Int)
 
-    /** Its touch taken away (the keyboard's cancelled or a new one began): nothing typed. */
+    /** Nothing typed. */
     fun cancel()
 }

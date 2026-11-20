@@ -23,7 +23,7 @@ class RecentItemsTest {
         assertEquals(listOf(2L, 3L, 9L), recent.storedTimes)
     }
 
-    // U-67, U-93: while the habits are off none is shown nor kept; on again, those from before are back
+    // while the habits are off none is shown nor kept; on again, those from before are back
     @Test
     fun withTheHabitsOffNoneIsShownNorKept() {
         val recent = RecentItems(5)
@@ -33,7 +33,7 @@ class RecentItemsTest {
         assertEquals(listOf("a"), recent.shown(habits = true))
     }
 
-    // U-88, U-86: cleared with the rest of what was learned, from a time on or all
+    // cleared with the rest of what was learned, from a time on or all
     @Test
     fun thoseUsedSinceATimeAreCleared() {
         val recent = RecentItems(5)

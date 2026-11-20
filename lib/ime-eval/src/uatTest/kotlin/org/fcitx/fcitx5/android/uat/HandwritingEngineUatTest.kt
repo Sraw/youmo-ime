@@ -17,11 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/09-handwriting.md, what the engine makes of what was written: the sentence read with the
- * app's model, space, picks, ⌫, punctuation, 联想 and learning. A character's readings are given
- * as the recognizer hands them (its own reading of strokes is its tests' and the device's HW-03).
- */
+/** uat/09-handwriting.md, what the engine makes of what was written; readings given as the recognizer hands them. */
 class HandwritingEngineUatTest {
 
     private val da = arrayOf("大", "太", "犬")
@@ -40,8 +36,7 @@ class HandwritingEngineUatTest {
         assertEquals(-1 to -1, editor.composingStart to editor.composingEnd)
     }
 
-    // chttrans re-sends the composing text (chttrans.cpp:214-215): what is written and not yet in
-    // shows traditional at the toggle, with nothing more written; it goes in as shown
+    // chttrans re-sends the composing text: what is written shows traditional at the toggle and goes in as shown
     @Test
     @Uat("HW-26")
     fun aCharacterNotYetInIsShownTraditionalAtTheToggle() = with(HostReplay(im = InputMethodCatalog.PINYIN)) {
@@ -92,9 +87,7 @@ class HandwritingEngineUatTest {
     @Uat("HW-08")
     fun punctuationPutsTheSentenceInFirst() = with(replay()) {
         write(*ren)
-        // the pad's 。 is a commit over the engine (commitOverEngine): what is written first, as its policy says.
-        // The policy is applied by hand here; the service's wiring of it is CommonKeyActionListenerTest's
-        // (app tests), the policy's own cases PendingInputPolicyTest's: this holds the engine's half
+        // the pad's 。 commits over the engine, what is written first as its policy says; the policy applied by hand here
         assertEquals(PendingInputPolicy.Resolution.SelectFirstCandidate, PendingInputPolicy.resolve("zh_CN", hasPreedit = preedit.isNotEmpty()))
         pickAt(0)
         commit("。")
@@ -162,7 +155,7 @@ class HandwritingEngineUatTest {
         checkNotNull((engines.card(InputMethodCatalog.PINYIN, i, written[0]) as? CandidateCard.Looked)?.card)
     }
 
-    // a reading's words a dictionary's, not the model's others: 荣和, 去呢, 弦数 are two words run together (the user, 2026-11-02)
+    // a reading's words a dictionary's, not the model's others: 荣和, 去呢, 弦数 are two words run together
     @Test
     @Uat("HW-29")
     fun aCardsWordsAreADictionarys() {
@@ -180,8 +173,7 @@ class HandwritingEngineUatTest {
         assertTrue(words.toString(), words.none { it in setOf("荣和", "去呢", "弦数") })
     }
 
-    // the mainland's stroke order (the user, 2026-11-02), where rime-stroke's first is not: 行 ppshhz,
-    // 出 szszs, 必 nznnp, 我 phzhznp; each stroke by its shape (the user, 2026-11-02): 行's last a 竖钩
+    // the mainland's stroke order where rime-stroke's differs, each stroke by its shape
     @Test
     @Uat("HW-29")
     fun aCardsStrokeOrderIsTheMainlands() {
@@ -198,8 +190,7 @@ class HandwritingEngineUatTest {
         assertEquals("丨乛一丨乛一一乛丶丿一", card("國", "口").orderShown())
     }
 
-    // the turning strokes each their own shape (《GB13000.1字符集汉字折笔规范》), not one 折: cnchar writes
-    // 九 乙's 横折弯钩 as 风's 横斜钩, and 横撇 as 横钩, 竖折 as 竖弯, told apart by the part they are in
+    // the turning strokes each their own shape (GB13000.1 折笔规范), not one 折, told apart by the part they are in
     @Test
     @Uat("HW-29")
     fun aCardsTurningStrokesEachTheirShape() {
@@ -211,11 +202,7 @@ class HandwritingEngineUatTest {
         assertEquals(shown, shown.mapValues { (c, _) -> card(c, "口").orderShown() })
     }
 
-    // every example character of the standard's table of turning strokes (GF 2001-2001, 《GB13000.1字符集
-    // 汉字折笔规范》, its 25 shapes: http://www.moe.gov.cn/ewebeditor/uploadfile/2015/01/12/20150112170016626.pdf)
-    // has its shape: a rule wrong for a whole part shows here. Not here: 為 夗 朮 卍 卐 亞 吳 奊 夨 (none of the
-    // mainland's simplified ones: rime-stroke's five kinds), 撇钩's 乄. The card writes 楷体 as taught; the
-    // standard analyses 宋体, and where 宋体 alone has a shape, it is not followed: those, each with its stroke
+    // every example character of GF 2001-2001's table that 宋体 shapes, each with its stroke
     @Test
     @Uat("HW-29")
     fun theStandardsExamplesEachTheirTurningStroke() {

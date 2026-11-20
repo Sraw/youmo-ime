@@ -38,11 +38,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
-/**
- * The imported dictionaries compiled into one file: how far a compile is, a cancel, a failure told
- * and retried, what a killed one left swept, a fresh start's file mapped at once and one damaged
- * made again, an upgrade told from an update, and a source gone mid-compile no failure.
- */
 class MergedDictionaryTest {
 
     @get:Rule
@@ -50,21 +45,18 @@ class MergedDictionaryTest {
 
     private val dictionaries get() = File(folder.root, "dictionaries").apply { mkdirs() }
 
-    // a dictionary as this build keeps it, gzip'd
     private fun source(name: String, text: String, on: Boolean = true) =
         File(dictionaries, SourceNames.fileName(name, on)).apply { GZIPOutputStream(outputStream()).use { it.write(text.toByteArray()) } }
 
-    // one as 0.3.2 and older kept it
+    // as 0.3.2 and older kept it
     private fun text(name: String, text: String, on: Boolean = true) = File(dictionaries, SourceNames.textName(name, on)).apply { writeText(text) }
 
     private fun gunzip(file: File) = GZIPInputStream(file.inputStream()).use { it.readBytes().decodeToString() }
 
-    // compiled and told as a compile of its own (an engine's start), not an import's
+    // compiled and told as an engine start's compile, not an import's
     private fun refreshed() = MergedDictionary.retry(dictionaries)!!.get()
 
-    // compiled as at an engine's start, after one a check ([MergedDictionary.current]) may have queued:
-    // refresh is null while that one waits, so asked again once it starts, this one after it (F3696);
-    // a loop, not generateSequence, which ends at the first null rather than skipping it
+    // refresh is null while a queued compile waits; a loop, as generateSequence ends at the first null
     private fun checked(): Any? {
         val until = System.nanoTime() + 10_000_000_000
         while (System.nanoTime() < until) {
@@ -74,7 +66,6 @@ class MergedDictionaryTest {
         error("no refresh queued in 10 s")
     }
 
-    // the one object, as at the process's start for each test: nothing inherited (opened, failed, swept) from another (review)
     @Before
     fun fresh() {
         MergedDictionary.reset()
@@ -89,20 +80,19 @@ class MergedDictionaryTest {
         MergedDictionary.reset()
     }
 
-    /** A table row from a clean start, one failed leaving nothing to the next (F3697). */
+    /** A table row from a clean start: a failed one leaves nothing to the next. */
     @Suppress("TooGenericExceptionCaught")
     private fun cleanRow(row: () -> Unit) {
         try {
             row()
             done()
         } catch (e: Throwable) {
-            // done() throwing on what a failed row left must not hide the row's own failure (F3708)
+            // done() throwing must not hide the row's own failure
             runCatching { done() }.exceptionOrNull()?.let(e::addSuppressed)
             throw e
         }
     }
 
-    // a compile killed halfway (the app killed, the phone off) leaves its work and its file half written
     @Test
     fun whatAKilledCompileLeftIsGoneAfterTheNext() {
         File(dictionaries, ".${MergedDictionary.FILE}.build/run0").apply { parentFile!!.mkdirs() }.writeText("half")
@@ -111,8 +101,7 @@ class MergedDictionaryTest {
         File(dictionaries, "gone.txt.tmp").apply { writeText("half"); setLastModified(OLD) }
         File(dictionaries, "gone${SourceNames.TMP}").apply { writeText("half"); setLastModified(OLD) }
         File(dictionaries, "gone${SourceNames.CONVERT_TMP}").apply { writeText("half"); setLastModified(OLD) }
-        // one this process writes (an import's, on the page's thread) is never swept (RN4): its time past the
-        // process's start whatever the clock's grain, not left to the order the tests run in (F3609)
+        // one this process writes is never swept, whatever the clock's grain
         File(dictionaries, "importing${SourceNames.TMP}").apply { writeText("half"); setLastModified(System.currentTimeMillis() + 60_000) }
         source("mine", "你好 ni'hao 0.0\n")
         MergedDictionary.refreshNow(dictionaries)
@@ -120,8 +109,6 @@ class MergedDictionaryTest {
         assertEquals(listOf("importing${SourceNames.TMP}", MergedDictionary.FILE, "mine.txt.gz"), dictionaries.list()!!.sorted())
     }
 
-    // a compile tells how far it is, stage by stage, to its end; cancelled, the file there is
-    // what it was, nothing of it left about; a word the base has is kept out of the trie
     @Test
     fun aCompileTellsHowFarAndACancelLeavesTheFileAsItWas() {
         MergedDictionary.base = { MergedDictionary.Base("test base") { { text, _ -> text == "你好" } } }
@@ -145,8 +132,7 @@ class MergedDictionaryTest {
         assertNull(MergedDictionary.work.value)
     }
 
-    // a cancel pressed before the import's compile started (its file still being written, or
-    // another compile running ahead of it) stops that one, and no other (review M1)
+    // cancelled before the import's compile started
     @Test
     fun aCancelStopsItsOwnCompileEvenBeforeItStartsAndNoOther() {
         source("mine", "你好 ni'hao 0.0\n")
@@ -156,15 +142,13 @@ class MergedDictionaryTest {
         val cancelled = runCatching { MergedDictionary.refreshNow(dictionaries, AtomicBoolean(true)) }.exceptionOrNull()
         assertTrue(cancelled is CancellationException)
         assertTrue(before.contentEquals(File(dictionaries, MergedDictionary.FILE).readBytes()))
-        // another's cancel, set while this one runs, leaves this one be
+        // another's cancel leaves this one be
         val other = AtomicBoolean()
         MergedDictionary.told = { other.set(true) }
         MergedDictionary.refreshNow(dictionaries)
         assertEquals(2, MergedDictionary.current(dictionaries).file!!.size)
     }
 
-    // a compile that failed is told failed again, not compiled again, until retried (the 词库
-    // page opened, as the notice says); the engine is told the dictionaries are pending meanwhile (review M3)
     @Test
     fun aFailedCompileIsToldAndCompiledAgainWhenRetried() {
         var fail = true
@@ -174,11 +158,10 @@ class MergedDictionaryTest {
         val listening = scope.launch { MergedDictionary.done.collect { ended += it } }
         try {
             source("mine", "你好 ni'hao 0.0\n")
-            // an import's compile: its failure thrown to the import, which tells it; none in [done] (one dialog, review)
+            // an import's compile: its failure thrown to the import; none in [done]
             assertTrue(runCatching { MergedDictionary.refreshNow(dictionaries) }.exceptionOrNull() is IOException)
             assertTrue(MergedDictionary.pending(dictionaries))
             fail = false
-            // not compiled again till retried, and an import asking for it fails rather than "succeed" uncompiled
             assertTrue(runCatching { MergedDictionary.refreshNow(dictionaries) }.exceptionOrNull() is IOException)
             assertNull(MergedDictionary.current(dictionaries).file)
             // nor at the next start, quietly: the same input fails the same way
@@ -200,8 +183,7 @@ class MergedDictionaryTest {
         }
     }
 
-    // at a fresh start the file there of the dictionaries as they are is mapped at once, no compile
-    // queued to reload the engine mid-typing (review S1)
+    // no compile queued to reload the engine mid-typing
     @Test
     fun aFreshStartMapsTheFileThereAtOnce() {
         var made = 0
@@ -217,11 +199,7 @@ class MergedDictionaryTest {
         assertEquals(0, made)
     }
 
-    // the first compile of what an older build left is an upgrade, told so by what it finds: a text
-    // to convert, a file of the format before, an upgrade owed; kept ones with none made yet (all
-    // turned off, then one on), a damaged file of this format, a file there already, or an import's
-    // compile is an update, whatever the files' times (review, F3409, F3644). Each row: why, the
-    // files' time, how it is compiled, and what is beside
+    // an upgrade is told by what it finds (a text to convert, an old-format file, an upgrade owed), whatever the times
     @Test
     fun anUpgradeIsToldFromAnUpdate() {
         class Row(
@@ -234,18 +212,18 @@ class MergedDictionaryTest {
             val beside: Beside? = null,
         )
         val rows = listOf(
-            // 0.3.1's or 0.3.2's, whatever its time (setLastModified fails on sdcardfs) (F3606)
+            // whatever its time (setLastModified fails on sdcardfs)
             Row("a text converted", MergedDictionary.Kind.UPGRADE, modified = 3_000_000, asText = true),
             Row("a file of the format before, the sources kept", MergedDictionary.Kind.UPGRADE, modified = 3_000_000, beside = Beside.FORMAT_BEFORE),
-            // made again as it was before this change, by openOrDelete: no upgrade to tell of (F3599)
+            // rebuilt by openOrDelete: no upgrade to tell of
             Row("a damaged file of this format", MergedDictionary.Kind.UPDATE, modified = 1_000_000, beside = Beside.DAMAGED),
-            // converted, then killed before the compile was done: nothing left to tell it by but the mark (F3601)
+            // killed before the compile: nothing left to tell it by but the mark
             Row("an upgrade a kill left owed", MergedDictionary.Kind.UPGRADE, modified = 3_000_000, beside = Beside.OWED),
-            // a converted gzip keeps its text's old time: no upgrade told by it once all were turned off (F3644)
+            // a converted gzip keeps its text's old time: no upgrade told by it
             Row("kept ones, none made yet", MergedDictionary.Kind.UPDATE, modified = 1_000_000),
             Row("a file there already", MergedDictionary.Kind.UPDATE, modified = 1_000_000, fileThere = true),
             Row("an import's compile", MergedDictionary.Kind.UPDATE, modified = 1_000_000, forImport = true),
-            // its conversion made the marker, its compile is done: none left for the next start to tell an upgrade by (F4099)
+            // its conversion made the marker, its compile is done: none left for the next start
             Row("an import's compile converting a text", MergedDictionary.Kind.UPDATE, modified = 1_000_000, forImport = true, asText = true),
         )
         assertRows(rows, { it.why }) { row ->
@@ -280,15 +258,12 @@ class MergedDictionaryTest {
 
     private enum class Beside { FORMAT_BEFORE, DAMAGED, OWED }
 
-    // contract: DataFile's header as 0.3.1/0.3.2 wrote it (magic, container version 2, kind 4 = user
-    // dictionary, sections, the kind's version), nothing after. Literals, not DataFile's constants: a
-    // container bumped later must still read a real 0.3.2 merged.ymd as the format before (F4190)
+    // DataFile's header as 0.3.1/0.3.2 wrote it. Literals, not DataFile's constants: a later bump must still read a real file
     private fun header(formatVersion: Int): ByteArray =
         ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN).put("FCITXIME".toByteArray()).putInt(2)
             .putInt(4).putInt(0).putInt(formatVersion).array()
 
-    // converted, then killed (here cancelled) before its compile was done: an upgrade still at the next
-    // start, shown and told, though no text nor file of the format before is left to tell it by (F3601, F3637)
+    // killed after converting: no text nor old-format file is left to tell the upgrade by
     @Test
     fun anUpgradeKilledAfterItsConversionIsToldAtTheNextStart() {
         text("old", "你好 ni'hao 0.0\n")
@@ -312,8 +287,7 @@ class MergedDictionaryTest {
         assertEquals(listOf(MergedDictionary.Kind.UPGRADE to true), ended.toList())
     }
 
-    // a file mapped unchecked at a fresh start that fails its check on the compile thread is
-    // dropped, deleted and made again, the engine told (review)
+    // mapped unchecked, failing its check on the compile thread: deleted, rebuilt, the engine told
     @Test
     fun aDamagedFileIsMadeAgain() {
         source("mine", "你好 ni'hao 0.0\n搭子 da'zi 0.0\n")
@@ -331,15 +305,13 @@ class MergedDictionaryTest {
         MergedDictionary.made = { made++ }
         MergedDictionary.base = { null }
         MergedDictionary.current(dictionaries)
-        // the check, then the compile it queued, are done before this one
         MergedDictionary.refreshNow(dictionaries)
         assertTrue(made > 0)
         assertNotNull(DictionaryFile.open(JvmFile(dest)))
         assertEquals(2, MergedDictionary.current(dictionaries).file!!.size)
     }
 
-    // the text pack's base read once a text pack: again when another is imported, even before
-    // PackStore counts it; not when the voice pack is (review M6)
+    // read again when another text pack is imported, even before PackStore counts it; not for a voice pack
     @Test
     fun theTextPacksBaseIsReadOnceATextPack() {
         val reading = MergedDictionary.readPackBase
@@ -350,12 +322,10 @@ class MergedDictionaryTest {
             val first = MergedDictionary.packBase()
             assertSame(first, MergedDictionary.packBase())
             assertEquals(1, reads)
-            // the voice pack beside it, PackStore's count up: the same text pack, not read again
             assertTrue(shelf.import(TestShelves.pack(PackKind.VOICE).inputStream()) is ImportResult.Imported)
             PackStore.useShelf(shelf)
             assertSame(first, MergedDictionary.packBase())
             assertEquals(1, reads)
-            // another text pack, PackStore not told yet: read again
             assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) is ImportResult.Imported)
             assertEquals("read 2", MergedDictionary.packBase()?.fingerprint)
         } finally {
@@ -364,7 +334,6 @@ class MergedDictionaryTest {
         }
     }
 
-    // a file of another base dictionary (an update's) is used meanwhile, said stale, till its compile is in
     @Test
     fun aFileOfAnotherBaseIsStaleTillCompiledAgain() {
         MergedDictionary.base = { MergedDictionary.Base("one") { { _, _ -> false } } }
@@ -379,8 +348,7 @@ class MergedDictionaryTest {
         assertFalse(MergedDictionary.current(dictionaries).stale)
     }
 
-    // a source turned off or deleted while it was compiled is no failure: not kept as failed, not
-    // told, and the compile queued after it makes the file of those left (review)
+    // not kept as failed, not told, and the compile queued after makes the file of those left
     @Test
     fun aSourceGoneMidCompileIsNoFailure() {
         source("a", "你好 ni'hao 0.0\n")
@@ -401,9 +369,7 @@ class MergedDictionaryTest {
         }
     }
 
-    // 0.3.2's texts and its file (another format, refused): the file deleted, the texts gzip'd on or
-    // off as they were, compiled, told an upgrade though their times cannot tell (setLastModified
-    // fails on sdcardfs: none known here), the conversion shown first
+    // 0.3.2's texts and refused file: the file deleted, texts gzip'd, told an upgrade though times cannot tell
     @Test
     fun anOlderBuildsTextsAreConvertedAndItsFileMadeAgainAsAnUpgrade() {
         text("on", "你好 ni'hao 0.0\n𠀀 ni 0.0\n")
@@ -422,8 +388,7 @@ class MergedDictionaryTest {
             listening.cancel()
             watching.cancel()
         }
-        // the bar not emptied between the conversion and the compile, the page not rebuilt there (F3597).
-        // Best effort: a StateFlow's collector may miss a null at once overwritten, never see one not set (F3655)
+        // the bar not emptied between conversion and compile. Best effort: a StateFlow collector may miss a null
         assertFalse(null in works.dropWhile { it == null }.dropLastWhile { it == null })
         assertEquals(listOf(MergedDictionary.FILE, "off.txt.gz.disable", "on.txt.gz"), dictionaries.list()!!.sorted())
         assertEquals("你好 ni'hao 0.0\n𠀀 ni 0.0\n", gunzip(File(dictionaries, "on.txt.gz")))
@@ -437,8 +402,7 @@ class MergedDictionaryTest {
         assertNull(MergedDictionary.work.value)
     }
 
-    // texts alone, no file and no page opened (0.3.1's, a kill after the file's delete, a 0.3.2
-    // backup restored on a fresh install): the engine's start alone has them pending and converted (RM1)
+    // no file and no page opened (0.3.1's, a kill after the delete, a 0.3.2 backup on a fresh install)
     @Test
     fun textsAloneArePendingAndConvertedFromTheEnginesStart() {
         text("mine", "你好 ni'hao 0.0\n")
@@ -448,15 +412,14 @@ class MergedDictionaryTest {
         val seen = MergedDictionary.current(dictionaries)
         assertNull(seen.file)
         assertEquals("mine.txt", seen.token)
-        // queued by current(): this one runs after it, an import's (an UPDATE), with nothing left to convert
+        // queued by current(): this import's UPDATE runs after it with nothing left to convert
         MergedDictionary.refreshNow(dictionaries)
         assertTrue(MergedDictionary.Work(MergedDictionary.Kind.UPGRADE, MergedDictionary.Step.CONVERT, 0) in told)
         assertFalse(MergedDictionary.pending(dictionaries))
         assertEquals(1, MergedDictionary.current(dictionaries).file!!.size)
     }
 
-    // only texts off converted, the file of those on as it was: the upgrade told done all the same, not
-    // left at 正在升级 (F3597)
+    // not left at 正在升级
     @Test
     fun anUpgradeOfTextsOffAloneIsToldDone() {
         source("on", "你好 ni'hao 0.0\n")
@@ -473,7 +436,6 @@ class MergedDictionaryTest {
         assertEquals(listOf(MergedDictionary.FILE, "off.txt.gz.disable", "on.txt.gz"), dictionaries.list()!!.sorted())
     }
 
-    // a backup's texts restored beside the file there: it is used meanwhile, not none till they are converted (F3604)
     @Test
     fun theFileThereIsUsedWhileRestoredTextsConvert() {
         source("kept", "你好 ni'hao 0.0\n")
@@ -485,27 +447,24 @@ class MergedDictionaryTest {
         assertEquals(2, MergedDictionary.current(dictionaries).file!!.size)
     }
 
-    // a kept dictionary whose gzip is damaged (no gzip at all, or cut short): skipped, the others
-    // compiled, the page told which; no longer a failure of the whole compile, every imported word
-    // gone with it, and retrying does not hide it (F3593)
+    // no gzip at all, or cut short: the page told which, and retrying does not hide it
     @Test
     fun aDamagedGzipIsSkippedNotTheWholeCompile() {
         source("good", "你好 ni'hao 0.0\n")
         File(dictionaries, "bad.txt.gz").writeText("no gzip")
-        // 3125 words of five 妮-like characters: enough that half the gzip holds whole lines
+        // enough that half the gzip holds whole lines
         val ni = "你妮泥尼拟"
         val words = (0 until 3125).map { n -> (0 until 5).map { ni[n / pow5[it] % 5] }.joinToString("") }
         val whole = source("cut", words.joinToString("") { "$it ni'ni'ni'ni'ni 0.0\n" }).readBytes()
         File(dictionaries, "cut.txt.gz").writeBytes(whole.copyOf(whole.size / 2))
         refreshed()
         assertEquals(1, MergedDictionary.sourceWords(dictionaries)["good"])
-        // what was read of it before the damage kept
         assertTrue(MergedDictionary.sourceWords(dictionaries).toString(), (MergedDictionary.sourceWords(dictionaries)["cut"] ?: 0) > 0)
         assertEquals(setOf("bad", "cut"), MergedDictionary.unreadable(dictionaries))
         assertFalse(File(dictionaries, ".merged.failed").exists())
         MergedDictionary.retry(dictionaries)!!.get()
         assertEquals(setOf("bad", "cut"), MergedDictionary.unreadable(dictionaries))
-        // deleted and imported again, as the page says: its words in, no longer named (F3652)
+        // deleted and imported again, as the page says: its words in, no longer named
         File(dictionaries, "bad.txt.gz").delete()
         source("bad", "搭子 da'zi 0.0\n")
         refreshed()
@@ -513,9 +472,7 @@ class MergedDictionaryTest {
         assertEquals(1, MergedDictionary.sourceWords(dictionaries)["bad"])
     }
 
-    // a text whose gzip could not be written (the disk full; here a directory where its tmp goes):
-    // kept as it was, named as not converted for want of space, never as unreadable (whose page says
-    // to delete it); not tried again till the page opens, which converts it once there is room (F3645)
+    // disk full: named as not converted for want of space, never unreadable (whose page says delete it); retried on the page
     @Test
     fun aTextNotConvertedForSpaceIsKeptAndNotCalledUnreadable() {
         text("big", "你好 ni'hao 0.0\n")
@@ -536,31 +493,28 @@ class MergedDictionaryTest {
         MergedDictionary.current(dictionaries)
         MergedDictionary.refresh(dictionaries)?.get()
         assertTrue(File(dictionaries, "big.txt").exists())
-        // noted, not converted till the page opens; its words still owed, so pending meanwhile: a word
-        // only it has is not forgotten as none of theirs (F3677, which F3668's skip had undone)
+        // its words still owed, so pending
         assertTrue(MergedDictionary.pending(dictionaries))
-        // the page opened: converted. Not for room made here: the conversion's finally already took the
-        // directory off the tmp's place; the note alone kept it from being tried again till the retry (F3670)
+        // the page opened: converted; only the note kept it from being retried
         refreshed()
         assertEquals(emptySet<String>(), MergedDictionary.unconverted(dictionaries))
         assertEquals(mapOf("big" to 1), MergedDictionary.sourceWords(dictionaries))
     }
 
-    // where a kill or a restore leaves a dictionary: each row the files there, and what is left (M2, RN3, RN4)
     @Test
     fun aDictionaryIsWholeAfterAKillOrARestore() {
         class Row(val why: String, val files: Map<String, String>, val times: Map<String, Long>, val left: Map<String, String>)
         val rows = listOf(
             // killed between the rename and the text's delete; or a downgrade's import of its name
             Row("text and kept", mapOf("a.txt" to "new", "a.txt.gz" to "old"), emptyMap(), mapOf("a.txt.gz" to "new")),
-            // a 0.3.2 backup restored over one kept on, the text off
+            // an old backup restored over one kept on, the text off
             Row("text off over kept on", mapOf("a.txt.disable" to "new", "a.txt.gz" to "old"), emptyMap(), mapOf("a.txt.gz.disable" to "new")),
             // a backup restored over the other state: the newer
             Row("kept on and off", mapOf("a.txt.gz" to "old", "a.txt.gz.disable" to "new"), mapOf("a.txt.gz" to 1_000_000L, "a.txt.gz.disable" to 2_000_000L), mapOf("a.txt.gz.disable" to "new")),
             Row("kept on and off, one time", mapOf("a.txt.gz" to "on", "a.txt.gz.disable" to "off"), mapOf("a.txt.gz" to 1_000_000L, "a.txt.gz.disable" to 1_000_000L), mapOf("a.txt.gz" to "on")),
             // a conversion killed halfway, in a process before
             Row("its tmp left", mapOf("a.txt" to "new", "a${SourceNames.CONVERT_TMP}" to "half"), mapOf("a${SourceNames.CONVERT_TMP}" to OLD), mapOf("a.txt.gz" to "new")),
-            // 0.3.2's backup of the other state restored over its texts: the newer, the on one at one time, never the off one always (F3596)
+            // the newer, the on one on a tie, never always the off one
             Row("texts on and off", mapOf("a.txt" to "new", "a.txt.disable" to "old"), mapOf("a.txt" to 2_000_000L, "a.txt.disable" to 1_000_000L), mapOf("a.txt.gz" to "new")),
             Row("texts on and off, one time", mapOf("a.txt" to "on", "a.txt.disable" to "off"), mapOf("a.txt" to 1_000_000L, "a.txt.disable" to 1_000_000L), mapOf("a.txt.gz" to "on")),
         )
@@ -579,14 +533,14 @@ class MergedDictionaryTest {
         }
     }
 
-    // turned off and deleted, by name, while their texts were converted: as the page asked, not undone by the commit (RS1)
+    // by name: as the page asked, not undone by the commit
     @Test
     fun aTextTurnedOrDeletedAsItIsConvertedStaysSo() {
         text("a", "你好 ni'hao 0.0\n")
         text("b", "搭子 da'zi 0.0\n")
         val once = AtomicBoolean()
         MergedDictionary.told = {
-            // a read, not yet committed: its rename keeps its length and time
+            // read, not yet committed: its rename keeps its length and time
             if (it.stage == MergedDictionary.Step.CONVERT && it.percent > 0 && once.compareAndSet(false, true)) {
                 assertTrue(ImportedDictionaries.turn(dictionaries, "a", false))
                 assertTrue(ImportedDictionaries.delete(dictionaries, "b"))
@@ -596,9 +550,7 @@ class MergedDictionaryTest {
         assertEquals(listOf("a.txt.gz.disable"), dictionaries.list()!!.sorted())
     }
 
-    // a text that cannot be read: skipped, the others converted and compiled, the upgrade told failed
-    // and the page told which; not converted again at each start or reload, each time told again (F3592);
-    // the pass's guard (design §4 Commit: "not here for ever") ends it, then the 词库 page's retry converts it
+    // the upgrade told failed and the page told which; not reconverted each start, then the page's retry converts it
     @Test(timeout = 20_000)
     fun aTextThatCannotBeReadIsSkippedNamedAndNotTriedAgain() {
         val locked = text("locked", "你好 ni'hao 0.0\n")
@@ -614,13 +566,12 @@ class MergedDictionaryTest {
             assertEquals(mapOf("fine" to 1), MergedDictionary.sourceWords(dictionaries))
             assertEquals(listOf("fine.txt.gz", "locked.txt"), dictionaries.list()!!.filter { !MergedDictionary.isCompiled(File(dictionaries, it)) }.sorted())
             assertNull(MergedDictionary.work.value)
-            // the engine's next start: the file of those converted at once, nothing converted again, nothing told
+            // the engine's next start: nothing reconverted, nothing told
             fresh()
             MergedDictionary.told = { told += it }
             assertNotNull(MergedDictionary.current(dictionaries).file)
-            // its words owed till it is read: pending (F3677, F3684)
             assertTrue(MergedDictionary.pending(dictionaries))
-            // the engine's start, which tells its end in done (an import's never does) (F3651)
+            // the engine's start tells its end in done (an import's never does)
             checked()
             assertTrue(told.none { it.stage == MergedDictionary.Step.CONVERT })
             assertEquals(1, ended.size)
@@ -635,8 +586,7 @@ class MergedDictionaryTest {
         }
     }
 
-    // a cancel during the conversion keeps what it noted: the text that could not be read is still named,
-    // not tried again at the next start (F4043). "locked" sorts first, so it is tried before "mine" is read
+    // not tried again at the next start. "locked" sorts first, so it is tried before "mine" is read
     @Test(timeout = 20_000)
     fun aConversionCancelledKeepsTheUnreadableNamed() {
         val locked = text("locked", "你好 ni'hao 0.0\n")
@@ -652,9 +602,7 @@ class MergedDictionaryTest {
         }
     }
 
-    // a text converted whose delete was refused (F3660), as a later start finds it: noted in `.merged.left`
-    // beside its gzip. Not pending, not converted again, no upgrade told; its delete tried again,
-    // the note dropped once it is gone. Turned with its gzip (they are turned together), the same (F3686)
+    // noted in `.merged.left`: not pending, no upgrade told, the delete retried and the note dropped once it is gone
     @Test
     fun aTextLeftAfterItsConversionIsDeletedAgainNotConverted() {
         val ended = Collections.synchronizedList(ArrayList<Pair<MergedDictionary.Kind, Boolean>>())
@@ -663,9 +611,8 @@ class MergedDictionaryTest {
         val listening = CoroutineScope(Dispatchers.Unconfined).launch { MergedDictionary.done.collect { ended += it } }
         try {
             val rows = listOf(
-                // as the conversion left it
                 false to "on",
-                // turned off on the page before the compile that deletes it: its gzip turned with it (F3686)
+                // turned off before the compile that deletes it
                 true to "turned off",
             )
             assertRows(rows, { it.second }) { (turned, _) ->
@@ -676,7 +623,6 @@ class MergedDictionaryTest {
                         val left = text("frost", "你好 ni'hao 0.0\n")
                         File(dictionaries, ".merged.left").writeText(LegacyTextConversion.leftKey(left) + "\n")
                         if (turned) assertTrue(ImportedDictionaries.turn(dictionaries, "frost", false))
-                        // its words are in the gzip, compiled: nothing owed (F3684)
                         assertFalse(MergedDictionary.pending(dictionaries))
                         MergedDictionary.current(dictionaries)
                         checked()
@@ -696,17 +642,16 @@ class MergedDictionaryTest {
         }
     }
 
-    // a text noted left whose gzip of its own state is not there: the note dropped, the text converted
-    // like any other, an upgrade told; its gzip of the other state replaced, the text's state kept (F3674, F3675, F3691)
+    // the note dropped, the text converted like any other, an upgrade told; the text's state kept
     @Test
     fun aTextLeftWithoutItsGzipIsConvertedAgain() {
         val ended = Collections.synchronizedList(ArrayList<Pair<MergedDictionary.Kind, Boolean>>())
         val listening = CoroutineScope(Dispatchers.Unconfined).launch { MergedDictionary.done.collect { ended += it } }
         try {
             val rows = listOf(
-                // deleted outside the page (the page deletes both or neither, F3686)
+                // deleted outside the page (the page deletes both or neither)
                 false to "its gzip deleted",
-                // only the other state's there: a newer backup restored over it
+                // a newer backup restored over it
                 true to "its gzip in the other state",
             )
             assertRows(rows, { it.second }) { (otherThere, _) ->
@@ -728,7 +673,7 @@ class MergedDictionaryTest {
         }
     }
 
-    // backups leave out what is made from the dictionaries, a conversion's tmp too, not the dictionaries (S5). Each row: a file, whether it is left out
+    // a conversion's tmp is left out too
     @Test
     fun aBackupHasTheDictionariesNotWhatIsMadeOfThem() {
         val rows = listOf(
@@ -739,12 +684,11 @@ class MergedDictionaryTest {
             "a${SourceNames.CONVERT_TMP}" to true,
             "a.txt.tmp" to true,
             MergedDictionary.FILE to true,
-            // a failure's, the unreadable and the unconverted noted, an upgrade owed: this phone's, not the next's (F3592, F3601, F3645)
+            // these notes are this phone's, not the next's
             ".merged.failed" to true,
             ".merged.unreadable" to true,
             ".merged.unwritten" to true,
             ".merged.upgrading" to true,
-            // a text left after its conversion, its delete refused: this phone's refusal (F3660, F3678)
             ".merged.left" to true,
         )
         assertRows(rows, { it.first }) { (name, compiled) ->
@@ -755,7 +699,7 @@ class MergedDictionaryTest {
     private companion object {
         val pow5 = intArrayOf(1, 5, 25, 125, 625)
 
-        // a time before this process's start: what a process killed before left
+        // before this process's start: what a killed process left
         const val OLD = 1_000_000L
     }
 }

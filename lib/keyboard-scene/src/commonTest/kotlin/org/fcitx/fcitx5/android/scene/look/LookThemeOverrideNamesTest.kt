@@ -40,7 +40,7 @@ class LookThemeOverrideNamesTest {
         assertFalse("*/Shift" in text || "*/f1" in text || "q".repeat(33) in text, text)
     }
 
-    // R20 F6611: a 3.0 file named as theme 4 reads no file (dots alone, a control character) is renamed
+    // a 3.0 file named as theme 4 reads no file (dots alone, a control character) is renamed
     // so it does: the theme written reads, its pictures among it
     @Test
     fun aFileNamedDotsAloneOrWithAControlCharacterIsRenamedReadable() {

@@ -7,11 +7,7 @@ package org.fcitx.fcitx5.android.host
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * punctuation.conf and chttrans.conf read and written as fcitx does (`ca/punctuation/punctuation.h:36-46`,
- * `ca/chttrans/chttrans.h:46-66`; bools by `fcitx-config/marshallfunction.cpp:21-32`, lists by
- * `marshallfunction.h:70-88`), the rest of each file kept.
- */
+/** punctuation.conf and chttrans.conf read and written as fcitx's marshall functions do, the rest of each file kept. */
 class ModuleConfigsTest {
 
     @Test

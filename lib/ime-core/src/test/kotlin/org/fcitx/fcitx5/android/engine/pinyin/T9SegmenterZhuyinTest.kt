@@ -32,7 +32,6 @@ class T9SegmenterZhuyinTest {
     @Test
     fun dachenReadsEachSyllableByItsSymbolsAndATone() {
         val graph = dachen.segment(dachen("ㄋㄧˇㄏㄠˇ"))
-        // ㄋ alone is 嗯's n as well
         assertEquals(setOf("n", "ni"), graph.syllablesFrom(0))
         val ni = graph.edgeOf(0, "ni")
         assertEquals(3, graph.to(ni))
@@ -40,10 +39,8 @@ class T9SegmenterZhuyinTest {
         assertEquals(setOf("hao"), graph.syllablesFrom(3))
         assertEquals(3, graph.tone(graph.edgeOf(3, "hao")))
         assertEquals(dachen("ㄋㄧ"), graph.text(ni))
-        // no tone typed: none
         val bare = dachen.segment(dachen("ㄓㄨㄥ"))
         assertEquals(0, bare.tone(bare.edgeOf(0, "zhong")))
-        // ㄓ alone is zhi whole, and the start of zhong
         val zh = dachen.segment(dachen("ㄓ"))
         assertTrue(zh.syllablesFrom(0).contains("zhi"))
         assertTrue(zh.syllablesFrom(0, Kind.EXTENDED).contains("zhong"))
@@ -55,7 +52,6 @@ class T9SegmenterZhuyinTest {
         assertTrue(graph.syllablesFrom(0).contains("ni"))
         val ni = graph.edgeOf(0, "ni")
         assertTrue(graph.syllablesFrom(graph.to(ni)).contains("hao"))
-        // ㄇㄋㄜ then ㄔㄘㄣㄧ: mi and ni alike
         assertTrue(graph.syllablesFrom(0).contains("mi"))
     }
 
@@ -100,7 +96,6 @@ class T9SegmenterZhuyinTest {
         assertNull(T9Segmenter().spaceTone)
     }
 
-    // a custom phrase's key is pinyin's letters: zhuyin typed finds it (design 051 §3.3)
     @Test
     fun zhuyinTypedReadsAsAPhrasesPinyinKey() {
         fun keys(typed: String, on: T9Segmenter) = PhraseKeys.of(typed, on.letters, ways = on::phraseWays)!!
@@ -116,13 +111,10 @@ class T9SegmenterZhuyinTest {
     fun theBarsSyllablesAndInitialsAreShownInZhuyin() {
         assertEquals("ㄋㄧ", nine.shownOffered("ni"))
         assertEquals("ㄓㄨㄥ", nine.shownOffered("zhong"))
-        // initials, r's ㄖ not 儿's ㄦ, m's ㄇ not 呣's
         assertEquals("ㄓ", nine.shownOffered("zh"))
         assertEquals("ㄖ", nine.shownOffered("r"))
         assertEquals("ㄇ", nine.shownOffered("m"))
-        // not a syllable nor an initial: as it is
         assertEquals("xyz", nine.shownOffered("xyz"))
-        // pinyin's nine keys: as offered
         val pinyin = T9Segmenter(abbreviations = false, letters = NineKeyLetters.STANDARD)
         assertEquals("ni", pinyin.shownOffered("ni"))
         assertEquals("r", pinyin.shownOffered("r"))
@@ -137,7 +129,6 @@ class T9SegmenterZhuyinTest {
         assertTrue(shown, shown.endsWith("ˇ"))
         assertFalse(shown, shown.any { it in 'a'..'z' })
         assertEquals("ㄖ", nine.asTyped("r"))
-        // pinyin's nine keys unchanged
         val pinyin = T9Segmenter(abbreviations = false, letters = NineKeyLetters.STANDARD)
         assertEquals(NineKeyLetters.STANDARD.asTyped("mi'"), pinyin.asTyped("mi'"))
     }

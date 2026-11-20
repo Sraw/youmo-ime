@@ -21,7 +21,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import kotlin.math.roundToInt
 
-/** 061-landscape-height §5.2: the keys worked out again only where the room laid out moved by more than a dp, once a frame. */
+/** The keys are recomputed only where the laid-out room moved by more than a dp, once a frame. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w851dp-h393dp-land-440dpi")
 class DockedRoomTest {
@@ -29,14 +29,13 @@ class DockedRoomTest {
     private val ctx get() = RuntimeEnvironment.getApplication()
     private fun dp(v: Double) = (v * ctx.resources.displayMetrics.density).roundToInt()
 
-    // in a window, as the input view is: a view not attached runs nothing it posts
+    // a view not attached runs nothing it posts
     private val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
     private val view = FrameLayout(activity).also { activity.setContentView(FrameLayout(activity).apply { addView(it, FrameLayout.LayoutParams(100, 1)) }) }
     private val kept = View(activity).also { view.addView(it, FrameLayout.LayoutParams(1, 1)) }
     private var relayouts = 0
     private var docked = true
 
-    // the keys worked out again: in the room as it is then (InputView.updateKeyboardSize takes it)
     private val room: DockedRoom = DockedRoom(view, kept, { docked }) {
         relayouts++
         room.take()
@@ -55,7 +54,7 @@ class DockedRoomTest {
         assertNull(room.take())
         laidOut(dp(300.0))
         frame()
-        // the first layout: worked out in the prediction, so once again in the room laid out
+        // the first layout: computed in the prediction, so once again in the room laid out
         assertEquals(1, relayouts)
         assertEquals(dp(300.0), room.take())
         frame()
@@ -89,8 +88,7 @@ class DockedRoomTest {
         assertEquals(1, relayouts)
     }
 
-    // the input view replaced between the post and its frame (detached, its listeners gone): nothing of it laid out again
-    // (R26 F8411, F8486)
+    // the input view replaced between the post and its frame: nothing of it laid out again
     @Test
     fun aViewDetachedBeforeTheFrameIsNotLaidOutAgain() {
         laidOut(dp(300.0))

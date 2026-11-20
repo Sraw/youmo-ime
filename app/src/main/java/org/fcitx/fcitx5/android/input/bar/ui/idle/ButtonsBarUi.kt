@@ -13,13 +13,9 @@ import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
 
-/**
- * The open toolbar: its buttons in the bar's slots after the menu key, ⋯ last, none scrolled (the ones with no slot are
- * in ⋯'s panel: ToolbarConfig.Layout.slots, IdleUi).
- */
 class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
 
-    /** Each button's slot, px: the menu key's and the right's the same (IdleUi). */
+    /** The menu key's and the right's the same (IdleUi). */
     var cellPx = 0
         set(value) {
             if (value == field) return
@@ -38,8 +34,7 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         gravity = Gravity.CENTER_VERTICAL
     }
 
-    // as tall as the bar (候选字号), [cellPx] wide; the icon its size all the same
-    /** [toolButtons] in this order, ⋯ the last of them, none of them in another parent. */
+    /** None of them in another parent. */
     fun show(toolButtons: List<ToolButton>) {
         root.removeAllViews()
         val height = ctx.dp(KawaiiBarComponent.heightDp(ctx))

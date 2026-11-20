@@ -6,11 +6,9 @@ package org.fcitx.fcitx5.android.engine.glide
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.CodeTable
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -31,25 +29,13 @@ import java.nio.ByteBuffer
 
 class GlideSessionTest {
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
     // niao likelier than ni'hao: a clean path over n-i-h-a-o reads 鸟 first
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("鸟", -2f, 0f)
-                .unigram("尿", -3f, 0f)
-                .unigram("你好", -3f, 0f)
-                .unigram("好", -2.5f, 0f)
-                .unigram("你", -2f, 0f)
-                .entry("鸟", syl("niao"))
-                .entry("尿", syl("niao"))
-                .entry("你好", syl("ni", "hao"))
-                .entry("好", syl("hao"))
-                .entry("你", syl("ni"))
-                .build().toByteArray()
-        )
+    private val data = pinyinDataOf(
+        Triple("鸟", "niao", -2f),
+        Triple("尿", "niao", -3f),
+        Triple("你好", "ni hao", -3f),
+        Triple("好", "hao", -2.5f),
+        Triple("你", "ni", -2f),
     )
 
     private val decoder = PinyinGlide(data, GlidePath.Weights(corner = 0f))
@@ -95,7 +81,6 @@ class GlideSessionTest {
         assertEquals(s.candidates, session.candidates(0, s.candidates.size).map { it.text })
         assertEquals(listOf("你好", "尿"), session.candidates(1, 2).map { it.text })
         assertEquals("尿", session.candidates(2, 5).first().text)
-        // all, the other among them once
         val all = session.candidates(0, 100).map { it.text }
         assertEquals(all.size, s.total)
         assertEquals(1, all.count { it == "你好" })
@@ -116,7 +101,6 @@ class GlideSessionTest {
         glide("nihao")
         assertEquals("你好", session.apply(Action.Select(1)).commit)
         glide("nihao")
-        // past the others: the session's own
         assertEquals("尿", session.apply(Action.Pick(2)).commit)
     }
 
@@ -152,10 +136,8 @@ class GlideSessionTest {
         val first = glide("nihao")
         assertEquals("你好", first.candidates[1])
         val next = session.apply(Action.NextPage)
-        // after the first page, the other among it
         assertEquals(first.candidates.size, next.first)
         assertEquals(next.candidates, session.candidates(next.first, next.candidates.size).map { it.text })
-        // a digit picks of the page shown
         assertEquals(next.candidates[0], session.apply(Action.Select(0)).commit)
     }
 
@@ -220,8 +202,7 @@ class GlideSessionTest {
     fun anOfferPastTheOthersIsOfTheSessionsWord() {
         tableGlided(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
         session.apply(Action.Block(2))
-        // 妤, the session's second, blocked: not the other reading's 你, nor 姓 after it; the code
-        // still typed goes as its first, the glide's after it
+        // 妤 blocked: not the other reading's 你 nor 姓; the code still typed goes first
         val again = tableGlided(GlideReading("vbg", "好", 0f), GlideReading("wqiy", "你", -1f))
         assertEquals(listOf("好", "你", "姓"), again.candidates)
     }
@@ -240,8 +221,7 @@ class GlideSessionTest {
 
     @Test
     fun anEmojiInPlaceOfAWordPastTheBmpTakesItsCodePointsFromWhatIsFollowed() {
-        // as TableSession does for an emoji picked in place of a word it committed itself: the
-        // word's code points deleted (Snapshot.deleteBefore), 𠀾 two UTF-16 units of one
+        // as TableSession swaps an emoji for a word it committed: the word's code points deleted, 𠀾 two UTF-16 units of one
         var swap = false
         val inner = object : Session by tableSession {
             override fun apply(action: Action) = tableSession.apply(action).let {
@@ -258,7 +238,6 @@ class GlideSessionTest {
         tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "奻", -1f))
         session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         session.apply(Action.Pick(1))
-        // what follows is after the emoji, none of the word left
         assertEquals("📢奻", followed)
     }
 
@@ -280,15 +259,12 @@ class GlideSessionTest {
         val looked = StrokeLookup(pinyin, { Strokes(table) { 0f } }, follow = pinyin::follow)
         session = GlideSession(looked, boundary) { g, n -> decoder.decode(g.path, g.layout, n) }
         session.apply(Action.Key(StrokeLookup.KEY))
-        // strokes no character starts with
         assertTrue(session.apply(Action.Key('h')).candidates.isEmpty())
         val s = glide("hao")
         assertEquals("", s.commit)
         assertEquals("好", s.candidates.first())
     }
 
-    // review-int-runtime S2: the others' places are no candidates of the session's; what it says of
-    // its own, and its list read again, a place on past them
     @Test
     fun whyAndTheListReadAgainAreTheSessionsShiftedPastTheOthers() {
         val inner = object : Session by tableSession {
@@ -302,8 +278,7 @@ class GlideSessionTest {
         assertEquals(s.candidates, session.reread()!!.candidates)
     }
 
-    // 候选词注音 and the character card ask of a place in the list shown: the others' places read
-    // nothing (their keys are not what the session read), the session's own its reading, shifted past them
+    // the others' places read nothing; the session's own its reading, shifted past them
     @Test
     @Uat("PY-50")
     fun readingsAndLookupsAreTheSessionsShiftedPastTheOthers() {

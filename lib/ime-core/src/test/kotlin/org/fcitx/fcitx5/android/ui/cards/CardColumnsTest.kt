@@ -15,13 +15,13 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The cards' columns, name size and samples (dev/design/061-settings-cards.md §2.3, §2.9, §3.1). */
+/** The cards' columns, name size and samples. */
 class CardColumnsTest {
 
     private fun choice(width: Int, scale: Float) = CardColumns.columns(width.toFloat(), scale, CHOICE_MIN_DP, CHOICE)
     private fun group(width: Int, scale: Float) = CardColumns.columns(width.toFloat(), scale, GROUP_MIN_DP, GROUP)
 
-    // §2.3's table: width, scale → columns, card width (dp), name sp
+    // width, scale → columns, card width (dp), name sp
     @Test
     fun `keyboard cards as the design's four cases have them`() {
         data class Case(val width: Int, val scale: Float, val columns: Int, val card: Int, val sp: Int)
@@ -40,7 +40,6 @@ class CardColumnsTest {
         }
     }
 
-    // R26 F8395: the columns' cases, a test each that differed only in width and scale, one table
     @Test
     fun `keyboard cards' columns`() = assertRows(
         "one row of eight from 696 dp" to {
@@ -66,7 +65,7 @@ class CardColumnsTest {
         assertEquals(13, CardColumns.nameSp(107f, 1.3f))
     }
 
-    // §2.9, §2.10: two columns on a phone, one at 1.5 or at 360 dp × 1.3, four from 584 dp
+    // two columns on a phone, one at 1.5 or at 360 dp × 1.3, four from 584 dp
     @Test
     fun `group cards`() = assertRows(
         "360 dp: two" to { assertEquals(2, group(360, 1.0f)) },

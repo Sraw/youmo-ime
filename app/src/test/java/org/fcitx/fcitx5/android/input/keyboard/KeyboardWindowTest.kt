@@ -30,17 +30,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/**
- * What TalkBack hears as the keyboard window ([SpaceKeyInputMethod]) shows one layout after another.
- * Going back from 九键 to the 26 keys, these were told 九键 first, in the window, so that the change
- * from it would be announced on them too: the user heard the input method they were leaving, then
- * the one they went to, at every switch between the two.
- */
+/** Going back from 九键, the 26 keys were told 九键 first, so TalkBack read the input method being left as well as the next. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KeyboardWindowTest {
 
-    /** The window's frame, keeping what its keyboards announce. */
     private class Frame(context: Context) : FrameLayout(context) {
         val announced = ArrayList<String>()
 
@@ -50,7 +44,6 @@ class KeyboardWindowTest {
         }
     }
 
-    // under the app, whose preferences the keys read, with placeholder strings, as NumberKeyboardTest
     private val context = PlaceholderStrings(RuntimeEnvironment.getApplication())
     private val frame = Frame(context)
     private val spaceKeys = SpaceKeyInputMethod()
@@ -62,7 +55,7 @@ class KeyboardWindowTest {
 
     // as KeyboardWindow's onImeUpdate and showLayout: the layout shown taken out, the next attached
     private fun show(keyboard: BaseKeyboard, inputMethod: String) {
-        spaceKeys.current = InputMethodEntry(inputMethod, inputMethod, "", "", "", "zh", "", false)
+        spaceKeys.current = InputMethodEntry(inputMethod, inputMethod, "", "", "zh")
         frame.removeAllViews()
         spaceKeys.attach(keyboard) { frame.addView(keyboard) }
     }
@@ -83,13 +76,12 @@ class KeyboardWindowTest {
         val numbers = NumberKeyboard(context, TestThemes.PixelDark)
         show(letters, InputMethodCatalog.PINYIN)
         show(numbers, InputMethodCatalog.PINYIN)
-        spaceKeys.current = InputMethodEntry(InputMethodCatalog.SHUANGPIN, InputMethodCatalog.SHUANGPIN, "", "", "", "zh", "", false)
+        spaceKeys.current = InputMethodEntry(InputMethodCatalog.SHUANGPIN, InputMethodCatalog.SHUANGPIN, "", "", "zh")
         spaceKeys.show(numbers)
         show(letters, InputMethodCatalog.SHUANGPIN)
         assertEquals(listOf(placeholder(R.string.im_shuangpin)), frame.announced)
     }
 
-    // each input method's keyboard its own choice (I1): pinyin's, 双拼's and English's apart
     @Test
     fun eachInputMethodShowsTheKeyboardChosenForIt() {
         val sp = ShuangpinScheme.ZIRANMA
@@ -112,7 +104,6 @@ class KeyboardWindowTest {
         assertEquals(GroupedKeyboard.Name18, shp(ImKeyboard.KEYS14, ShuangpinScheme.MICROSOFT))
         assertEquals(TextKeyboard.Name, en(ImKeyboard.FULL))
         assertEquals(T9Keyboard.EnglishName, en(ImKeyboard.NINE_KEYS))
-        // one input method's choice moves no other's
         val all = ImKeyboards.Chosen(ImKeyboard.NINE_KEYS, ImKeyboard.KEYS18, ImKeyboard.NINE_KEYS)
         assertEquals(TextKeyboard.Name, lettersOf(InputMethodCatalog.WUBI, all, sp))
         assertEquals(TextKeyboard.Name, lettersOf(InputMethodCatalog.ENGLISH, ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS), sp))
@@ -129,17 +120,14 @@ class KeyboardWindowTest {
 
     @Test
     fun theCodeRowsSyllablesHideWhereTheKeyboardOffersThemOrItsLayoutShowsNone() {
-        // the keyboard's own column (九键) owns them, whatever the layout
         assertTrue(syllablesOwned(true, CodeRowHeight.showsStrip(ImKeyboards.Layout.PINYIN_NINE)))
-        // a layout without the strip (the full keys) hides them, floating or embedded alike
         assertTrue(syllablesOwned(false, CodeRowHeight.showsStrip(ImKeyboards.Layout.TEXT)))
-        // the 14 and 18 keys, 双拼's nine keys (its 123 too): the strip shows
         for (layout in listOf(ImKeyboards.Layout.PINYIN14, ImKeyboards.Layout.PINYIN18, ImKeyboards.Layout.SHUANGPIN_NINE)) {
             assertFalse("$layout", syllablesOwned(false, CodeRowHeight.showsStrip(layout)))
         }
     }
 
-    // the tall row goes with the letters that put syllables on it: kept in step with lettersOf
+    // kept in step with lettersOf
     @Test
     fun theTallCodeRowGoesWithTheGroupedLetters() {
         val grouped = setOf(GroupedKeyboard.Name14, GroupedKeyboard.NamePinyin18, GroupedKeyboard.Name18, GroupedKeyboard.Name18Plain, GroupedKeyboard.NameShuangpin14, T9Keyboard.ShuangpinName, T9Keyboard.ShuangpinPlainName, ZhuyinKeyboard.NameNine)
@@ -148,8 +136,7 @@ class KeyboardWindowTest {
         }
     }
 
-    // quick input is typed in letters: the zhuyin keyboards, which send none, give way to
-    // the full keyboard while it lasts; the keyboards with letters of their own stay
+    // quick input is typed in letters: the zhuyin keyboards give way to the full keyboard while it lasts
     @Test
     fun quickInputShowsTheFullKeyboardInPlaceOfOnesWithoutLetters() {
         for (k in listOf(ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull)) {
@@ -160,8 +147,7 @@ class KeyboardWindowTest {
         }
     }
 
-    // quick input ended: the keyboard it stood in for, unless the letters changed meanwhile (onImeUpdate
-    // shows another input method's at once; this is the backstop): then the new ones, not 大千 under the nine keys
+    // unless the letters changed meanwhile (a backstop: onImeUpdate shows another input method's at once)
     @Test
     fun quickInputEndedShowsTheKeyboardStoodInForOrTheNewLetters() {
         fun row(why: String, stoodInFor: String, lettersThen: String, letters: String, expected: String) =
@@ -173,8 +159,7 @@ class KeyboardWindowTest {
         )
     }
 
-    // another input method chosen during quick input: the keyboard stood in for gives way to its letters
-    // as it would, shown (review Q1, the user's call 2026-11-02: the same as out of quick input)
+    // another input method chosen during quick input: its letters as it would, shown
     @Test
     fun theKeyboardStoodInForGivesWayAsItWouldShown() {
         fun outOfQuickInput(was: String, lettersThen: String, letters: String): Boolean {

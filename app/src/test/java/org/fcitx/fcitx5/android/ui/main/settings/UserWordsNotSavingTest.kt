@@ -20,11 +20,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.TimeUnit
 
-/**
- * 用户词库's page says, on top, that what is learned is not being saved while the engine's overview says so
- * (decode-4), and nothing while it saves: the page's half of WD-46, which only ⋯'s panel had a test of
- * (StatusAreaNotSavingTest; R25r2 F7824/F7849).
- */
+/** 用户词库 says at the top that learning is not being saved while the engine's overview says so, and nothing otherwise. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -33,13 +29,12 @@ class UserWordsNotSavingTest {
     @Before
     fun phone() = phoneStorage()
 
-    // whether the page, its counts read, shows the line
     private fun shownWith(saving: Boolean): Boolean = SettingsHarness().use { st ->
         st.api.learned = {
             if (it == LearningOp.Overview) LearningResult.Overview(0, 0, 0, 0, 0, habits = true, saving = saving) else LearningResult.Done()
         }
         st.open(SettingsRoute.UserWords)
-        // the overview asked for and its answer taken: not the line's absence before it was
+        // the answer taken, so the line's absence is not just from before it
         val asked = "learning(${LearningOp.Overview})"
         val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(WAIT_S)
         while (asked !in st.api.calls) {

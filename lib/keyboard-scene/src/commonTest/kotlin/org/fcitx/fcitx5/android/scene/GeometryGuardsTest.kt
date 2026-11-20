@@ -26,7 +26,7 @@ import kotlin.test.assertNull
 // squeeze, nothing spaced), each a case only its guard gets right
 class GeometryGuardsTest {
 
-    // R20 F6144: a gradient whose every stop is transparent draws nothing, as a transparent solid does
+    // a gradient whose every stop is transparent draws nothing, as a transparent solid does
     @Test
     fun aGradientOfNothingButTransparentIsNotDrawn() {
         val shape = Shape.Rect(Box(0.0, 0.0, 10.0, 10.0), listOf(0.0, 0.0, 0.0, 0.0))
@@ -36,14 +36,14 @@ class GeometryGuardsTest {
         assertNotNull(paint.fill(shape, Fill.Linear(90.0, listOf(clear to 0.0, ColorExpr.Literal(Argb(0xff000000.toInt())) to 1.0))))
     }
 
-    // R20 F6362: a frame's corners set unequal: the window rounded as its roundest corner
+    // a frame's corners set unequal: the window rounded as its roundest corner
     @Test
     fun aFramesUnequalCornersGiveItsRoundest() {
         val source = testData("material-light.xml").replace("</theme>", "<style select=\"frame\" radius=\"2dp 9dp 4dp 1dp\"/>\n</theme>")
         assertEquals(9.0, WindowLooks(Cascades(ThemeReader.theme(source).ok())).frame(emptySet()).radiusDp)
     }
 
-    // R20 F6248: squeezed again, the squeeze is on top of the one it had, not instead of it
+    // squeezed again, the squeeze is on top of the one it had, not instead of it
     @Test
     fun aTextSqueezedTwiceIsSqueezedByBoth() {
         val theme = Fixtures.materialLight
@@ -54,7 +54,7 @@ class GeometryGuardsTest {
         assertEquals(0.25, quarter.from(0.0, 0.0, Part.Label).texts.single().scaleX, 1e-9)
     }
 
-    // R20 F6357: letter spacing on no text at all leaves it as it is (no ink turned inside out)
+    // letter spacing on no text at all leaves it as it is (no ink turned inside out)
     @Test
     fun noTextSpacedIsNoTextAtAll() {
         assertEquals(FakeMeasurer.measure("", "sans", 400, 20.0), FakeMeasurer.measure("", "sans", 400, 20.0, 0.5))

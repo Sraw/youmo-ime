@@ -20,14 +20,12 @@ import org.fcitx.fcitx5.android.input.keyboard.PageStrokeTouch.Route
 import splitties.dimensions.dp
 
 /**
- * 展开候选's list, on which a finger draws 笔画筛选's strokes while [draws] says so (dev/design/061-stroke-on-candidate-page.md):
- * none of its own drag scrolling then, the page turned by the column's ↑↓ alone; a tap still picks, a long press still
- * opens the candidate's menu (the cell's own, 长按延迟's). What becomes of each event is [PageStrokeTouch]'s. A mouse,
- * a trackpad's two-finger swipe, a wheel and a touch while the list still moves are the list's as ever.
+ * While [draws] says so a finger draws 笔画筛选's strokes on 展开候选's list: no drag scrolling of its own then,
+ * a tap still picks, a long press still opens the menu. A mouse, a trackpad's two-finger swipe, a wheel and a
+ * touch while the list still moves are the list's as ever.
  */
 class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerView(context, attrs) {
 
-    /** The trail's colour (GlideInput's). */
     var trailColor: Int
         get() = paint.color
         set(value) {
@@ -35,30 +33,30 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
             paint.alpha = TRAIL_ALPHA
         }
 
-    /** Whether a finger down now draws, asked at each down. */
+    /** Asked at each down. */
     var draws: () -> Boolean = { false }
 
-    /** 笔画筛选灵敏度's distance, pixels: a stroke lifted short of it is nothing. */
+    /** Pixels: a stroke lifted short of it is nothing. */
     var lift: () -> Float = { 0f }
 
-    /** 长按延迟: a touch held so long first is the cell's long press. */
+    /** A touch held so long first is the cell's long press. */
     var longPressMillis: () -> Long = { 0L }
 
-    /** A stroke drawn: `h s p n z`. */
+    /** `h s p n z`. */
     var stroked: (Char) -> Unit = {}
 
     private val touch = PageStrokeTouch()
 
-    // this touch is the strokes' (decided at its down), and the list told a cancel of it already
+    // decided at its down, and the list told a cancel of it already
     private var drawing = false
     private var listCancelled = false
 
-    // the cell's touch slop (CustomGestureView's KeyGesture), the keys' start of a stroke (GlideInput's)
+    // the cell's touch slop, the keys' start of a stroke
     private val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
     private val start = dp(GlideInput.STROKE_START_DP)
 
-    // the list's items changed under a finger (a stroke filtered them, a page loaded in the middle): its tap picks nothing,
-    // the cell under it may be another candidate's now. Pages loaded at the end leave the cells as they were
+    // the items changed under a finger (a stroke filtered them, a page loaded): its tap picks nothing, the cell
+    // under it may be another candidate's now
     private var generation = 0
     private var downGeneration = 0
     private val changes = object : AdapterDataObserver() {
@@ -72,7 +70,6 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
         }
     }
 
-    // GlideInput's trail: its width, colour and alpha
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -82,7 +79,7 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
     }
     private val path = Path()
 
-    /** Whether the trail is drawn now, for a test. */
+    /** For a test. */
     val trailShown: Boolean get() = drawing && touch.shown
 
     override fun setAdapter(adapter: Adapter<*>?) {
@@ -135,7 +132,7 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
 
     private fun lifted(ev: MotionEvent, route: Route) {
         when (route) {
-            // the cell's lift (a long press's), unless it was a second finger's
+            // unless it was a second finger's
             Route.LIST -> if (ev.actionMasked == MotionEvent.ACTION_UP && !listCancelled) super.dispatchTouchEvent(ev) else cancelList(ev)
             Route.TAP -> {
                 cancelList(ev)
@@ -151,7 +148,7 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
         invalidate()
     }
 
-    // the cell under the down tapped there, as a tap on it clicks (KeyGesture.tap: the key's after a stroke lifted short)
+    // as a tap on it clicks (KeyGesture.tap: the key's after a stroke lifted short)
     private fun tapCell(x: Float, y: Float) {
         val cell = findChildViewUnder(x, y) as? CustomGestureView ?: return
         cell.keyGesture.tap(x - cell.left - cell.translationX, y - cell.top - cell.translationY)
@@ -165,7 +162,7 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
         cancel.recycle()
     }
 
-    // no drag of the list's own while a finger draws: the cells alone have its events (a down on no cell, none)
+    // the cells alone have its events (a down on no cell, none)
     override fun onInterceptTouchEvent(e: MotionEvent): Boolean = if (drawing) false else super.onInterceptTouchEvent(e)
 
     @SuppressLint("ClickableViewAccessibility")
@@ -188,8 +185,7 @@ class StrokePageRecyclerView(context: Context, attrs: AttributeSet?) : RecyclerV
         // MotionEvent.CLASSIFICATION_TWO_FINGER_SWIPE (API 34; getClassification is 29's): a trackpad's scroll
         const val TWO_FINGER_SWIPE = 3
 
-        // on the screen (a finger, a stylus): not a mouse's drag, not a trackpad's two-finger swipe (the list's
-        // scrolling as ever)
+        // not a mouse's drag, nor a trackpad's two-finger swipe
         fun finger(ev: MotionEvent) =
             ev.getToolType(0) != MotionEvent.TOOL_TYPE_MOUSE && ev.classification != TWO_FINGER_SWIPE
     }

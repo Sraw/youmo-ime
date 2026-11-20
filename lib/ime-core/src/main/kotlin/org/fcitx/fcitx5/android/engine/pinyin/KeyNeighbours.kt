@@ -4,17 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/**
- * The letters a finger may land on instead of the one meant, on the app's QWERTY keyboard: the
- * keys either side and those touching it in the rows above and below. The middle row is set in
- * half a key, the bottom row a whole key further (caps lock is a key and a half), so each bottom
- * key sits under one middle key alone: `n` under `j`, touching `b`, `m` and `j`.
- */
+/** Letters a finger may hit instead of the one meant on the app's QWERTY: either side and the touching keys above and below (rows offset half a key and a key and a half). */
 object KeyNeighbours {
 
     private val ROWS = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
 
-    // where each row's first key starts, in key widths
+    // each row's first key start, in key widths
     private val OFFSETS = doubleArrayOf(0.0, 0.5, 1.5)
 
     private val neighbours: Map<Char, String> = HashMap<Char, String>().apply {
@@ -33,6 +28,5 @@ object KeyNeighbours {
         }
     }
 
-    /** The letters around [c], or none for what is no letter on the keyboard. */
     fun of(c: Char): String = neighbours[c].orEmpty()
 }

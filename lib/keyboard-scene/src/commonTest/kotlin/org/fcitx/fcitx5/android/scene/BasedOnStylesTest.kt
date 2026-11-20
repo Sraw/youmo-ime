@@ -15,7 +15,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-// a layout of the user's styled as the board it is based on (061-custom-layout §10): `<board>/<key>`, `<board>/*` and
+// a layout of the user's styled as the board it is based on: `<board>/<key>`, `<board>/*` and
 // `@keyboard=<board>` select both its own id and its based-on
 class BasedOnStylesTest {
     private fun s(text: String) = Selector.parse(text)!!

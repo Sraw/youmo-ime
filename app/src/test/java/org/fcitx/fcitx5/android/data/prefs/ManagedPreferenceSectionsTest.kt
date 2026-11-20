@@ -49,7 +49,7 @@ class ManagedPreferenceSectionsTest {
         val second = switch(R.string.popup_on_key_press, "second", false)
 
         init {
-            section(R.string.section_candidates)
+            section(R.string.section_size)
         }
 
         val third = switch(R.string.show_lang_switch_key, "third", true)
@@ -68,7 +68,7 @@ class ManagedPreferenceSectionsTest {
         Sample(sp).createUi(screen)
         val top = screen.children()
         assertEquals(
-            listOf("loose", sectionKey(R.string.section_keys), sectionKey(R.string.section_candidates)),
+            listOf("loose", sectionKey(R.string.section_keys), sectionKey(R.string.section_size)),
             top.map { it.key }
         )
     }
@@ -80,13 +80,12 @@ class ManagedPreferenceSectionsTest {
         val keys = screen.findPreference<PreferenceCategory>(sectionKey(R.string.section_keys))!!
         assertEquals(placeholder(R.string.section_keys), keys.title)
         assertEquals(listOf("first", "second"), keys.children().map { it.key })
-        val rest = screen.findPreference<PreferenceCategory>(sectionKey(R.string.section_candidates))!!
+        val rest = screen.findPreference<PreferenceCategory>(sectionKey(R.string.section_size))!!
         assertEquals(listOf("third"), rest.children().map { it.key })
         // grouping moves preferences, never drops or duplicates them
         assertEquals(listOf("loose", "first", "second", "third"), screen.allKeys())
     }
 
-    // every preference after a section: what a category shown a section a page must be
     private class Sectioned(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.advanced, sp) {
         init {
             section(R.string.section_keys)
@@ -96,24 +95,24 @@ class ManagedPreferenceSectionsTest {
         val second = switch(R.string.popup_on_key_press, "second", false)
 
         init {
-            section(R.string.section_candidates)
+            section(R.string.section_size)
         }
 
         val third = switch(R.string.show_lang_switch_key, "third", true)
     }
 
-    // one category over two pages (the keys, the sound and vibration): each its section alone, untitled
+    // one category over two pages: each its section alone, untitled
     @Test
     fun aSectionAloneIsItsPreferencesWithoutItsTitle() {
         val keys = newScreen()
         Sectioned(sp).createUi(keys, R.string.section_keys)
         assertEquals(listOf("first", "second"), keys.children().map { it.key })
         val rest = newScreen()
-        Sectioned(sp).createUi(rest, R.string.section_candidates)
+        Sectioned(sp).createUi(rest, R.string.section_size)
         assertEquals(listOf("third"), rest.children().map { it.key })
     }
 
-    // one before the first section would be on neither page: grouping never drops a preference
+    // one before the first section would be on neither page
     @Test(expected = IllegalArgumentException::class)
     fun aSectionAloneOfACategoryWithPreferencesBeforeItsFirstIsRejected() {
         Sample(sp).createUi(newScreen(), R.string.section_keys)
@@ -127,7 +126,7 @@ class ManagedPreferenceSectionsTest {
     private class EmptySection(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.advanced, sp) {
         init {
             section(R.string.section_keys)
-            section(R.string.section_candidates)
+            section(R.string.section_size)
         }
     }
 

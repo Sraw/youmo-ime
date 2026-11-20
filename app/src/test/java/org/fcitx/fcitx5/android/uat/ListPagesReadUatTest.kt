@@ -43,10 +43,8 @@ import java.io.ByteArrayInputStream
 import java.time.Duration
 
 /**
- * UAT 0.6.1 (in 0.6.0 too, WD-65): a list page's read of its file went in as a batch the user added, so
- * opening 自定义短语 or 常用词 offered 「已添加 N 个项目 / 撤销」, and the undo deleted what was read, saved so
- * as the page was left. 常用词's import, the whole list put in again, offered the same, its undo deleting the
- * words there before the import too. What is read is shown, not added (`DynamicListAdapter.showAll`).
+ * A list page's read of its file once went in as a batch the user added: 「已添加 N 个项目 / 撤销」 offered on opening,
+ * its undo deleting what was read. What is read is shown, not added (`DynamicListAdapter.showAll`).
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -80,7 +78,7 @@ class ListPagesReadUatTest {
 
     private fun undoOffered() = shown().any { it == s(R.string.undo) }
 
-    // the page left, as going back to type: it saves then, and the engine reads it again
+    // the page left: it saves then, and the engine reads it again
     private fun <T> savedAs(read: () -> T): T {
         st.open(SettingsRoute.About)
         until("saved") { "reloadEngine()" in api.calls }
@@ -136,8 +134,7 @@ class ListPagesReadUatTest {
         }
     }
 
-    // UAT WD-37: an import's count was a toast besides the batch's own bar 「已添加 1 个项目」, unseen under it; the one
-    // bar says the count now, its undo taking back this import's rows alone. An import adding none has no bar: a toast
+    // the one bar says an import's count, its undo taking back this import's rows alone; an import adding none: a toast
     @Test
     @Uat("WD-37")
     fun anImportSaysItsCountOnTheUndoBarThatTakesBackOnlyIt() {
@@ -152,21 +149,19 @@ class ListPagesReadUatTest {
             until("said") { s(R.string.import_phrases_done, 1) in shown() }
             assertTrue(shown().toString(), s(R.string.added_n_items, 1) !in shown())
             assertEquals(toasts, ShadowToast.shownToastCount())
-            // a long bar's time and lines, for the over-limit text (~80 characters); its time read off the bar, which
-            // Robolectric never takes down on its own
+            // its time read off the bar, which Robolectric never takes down on its own
             val text = KeyboardHarness.all(activity.window.decorView).first { it.isShown && it is TextView && it.text.toString() == s(R.string.import_phrases_done, 1) } as TextView
             assertTrue("max lines ${text.maxLines}", text.maxLines >= 3)
             // the bar's layout class is protected: reached by name
             val layoutClass = Class.forName("com.google.android.material.snackbar.BaseTransientBottomBar\$SnackbarBaseLayout")
             val layout = generateSequence(text as View) { it.parent as? View }.first(layoutClass::isInstance)
             val bar = layoutClass.getDeclaredField("baseTransientBottomBar").apply { isAccessible = true }.get(layout)
-            // the duration set, not getDuration's: that is the accessibility manager's timeout for it, the same here for both
+            // the duration set, not getDuration's: that is the accessibility manager's timeout for it
             val duration = BaseTransientBottomBar::class.java.getDeclaredField("duration").apply { isAccessible = true }.getInt(bar)
             assertEquals(Snackbar.LENGTH_LONG, duration)
             KeyboardHarness.all(activity.window.decorView).first { it.isShown && it is TextView && it.text.toString() == s(R.string.undo) }.performClick()
             until("undone") { shown().none { "上海" in it } }
             assertTrue(shown().toString(), shown().any { "北京" in it })
-            // nothing new: no bar to say it on, so the toast
             val again = Uri.parse("content://phrases.test/again.txt")
             shadowOf(activity.contentResolver).registerInputStream(again, ByteArrayInputStream("bj,1=北京\n".toByteArray()))
             (st.page as PinyinCustomPhraseFragment).importPhrases(again)

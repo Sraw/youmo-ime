@@ -9,16 +9,12 @@ import org.fcitx.fcitx5.android.engine.reading.CharReadings
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicLongArray
 
-/**
- * The compiled pinyin data: one vocabulary shared by a syllable-keyed dictionary and an n-gram
- * language model, in a single [DataFile] so the three can never be mixed across builds.
- * Written by [PinyinDataBuilder].
- */
+/** One vocabulary shared by dictionary and n-gram model, in one [DataFile] so they cannot be mixed across builds. */
 class PinyinData private constructor(file: DataFile) {
 
     val meta: Map<String, String> = file.meta(Section.META)
 
-    // checked before anything else is read: every id in the file depends on the table
+    // checked first: every id in the file depends on it
     init {
         val count = meta[META_SYLLABLE_COUNT]?.toIntOrNull() ?: -1
         val checksum = meta[META_SYLLABLE_CHECKSUM]?.toLongOrNull() ?: -1
@@ -39,16 +35,14 @@ class PinyinData private constructor(file: DataFile) {
     )
     val model = NgramModel(file, meta.int(META_LM_VOCABULARY), meta.int(META_UNKNOWN))
 
-    /** Which layer of the dictionary each word is from: data naming one layer has no section for it. */
     val layers = (meta[META_LAYERS]?.split(',') ?: listOf(WordLayers.BASE)).let { names ->
-        // asked for, not looked for with has(): a damaged section table loses a section and passes its checksums
+        // asked for, not has(): a damaged section table loses a section and still passes its checksums
         WordLayers(names, if (names.size > 1) file.bitPacked(Section.WORD_LAYER) else null, vocabulary.size)
     }
 
-    /** The model's words by their text, made when first asked for, on whichever thread asks first (a table that learns, in the background): see [WordIndex]. */
+    /** Built on first use, on whichever thread asks first. */
     val wordIndex: WordIndex by lazy { WordIndex(vocabulary, model.vocabularySize) }
 
-    /** Which tone each character of a word has: see [ToneTable]. */
     val tones = ToneTable(
         file.bitPacked(Section.TONE_CHAR_KEYS),
         file.section(Section.TONE_CHAR),
@@ -58,7 +52,6 @@ class PinyinData private constructor(file: DataFile) {
         file.section(Section.TONE_TONES),
     )
 
-    /** Each character's readings in order, and words reading it each way: see [CharReadings]. */
     val charReadings = CharReadings(
         file.bitPacked(Section.READING_CHARS),
         file.bitPacked(Section.READING_START),
@@ -69,7 +62,6 @@ class PinyinData private constructor(file: DataFile) {
         vocabulary,
     )
 
-    /** Words often read wrongly, by word: see [Misreadings]. */
     val misreadings: Map<String, Misreadings> by lazy {
         meta.mapNotNull { (key, value) ->
             if (!key.startsWith(Misreadings.META_PREFIX)) return@mapNotNull null
@@ -120,7 +112,7 @@ class PinyinData private constructor(file: DataFile) {
     }
 
     companion object {
-        /** Layout of the sections below; bump on any change to it. 2: the trigram runs' starts in [EliasFano]; 3: [tones]; 4: [charReadings]. */
+        /** Bump on any layout change. */
         const val VERSION = 4
 
         internal const val META_SYLLABLE_COUNT = "syllables.count"
@@ -129,10 +121,6 @@ class PinyinData private constructor(file: DataFile) {
         internal const val META_UNKNOWN = "lm.unknown"
         internal const val META_LAYERS = "layers"
 
-        /**
-         * [verify]: check every section's checksum first (see [DataFile.open]).
-         * @throws DataFormatException if [buffer] is not pinyin data this build can read
-         */
         fun load(buffer: ByteBuffer, verify: Boolean = true): PinyinData =
             PinyinData(DataFile.open(buffer, DataFile.KIND_PINYIN, VERSION, verify))
 
@@ -141,48 +129,35 @@ class PinyinData private constructor(file: DataFile) {
     }
 }
 
-/**
- * The layers of the dictionary, by [names] (libime's words, a year's new words ...), and
- * the one each word is from: what a prior per layer ([org.fcitx.fcitx5.android.engine.lattice.LayerPrior])
- * goes by. A word in several layers is of the first, the oldest.
- */
+/** The dictionary's layers by [names] and each word's, for [org.fcitx.fcitx5.android.engine.lattice.LayerPrior]. A word in several is of the first. */
 class WordLayers internal constructor(val names: List<String>, private val packed: BitPacked?, val words: Int) {
     init {
         ensureFormat(names.isNotEmpty() && names.all { it.isNotEmpty() }) { "layer names ${names.joinToString(",")}" }
         ensureFormat(packed == null || packed.size == words) { "layers for ${packed?.size} of $words words" }
-        // here, not in layer(): that runs for every word scored, and must not fail on a key press
+        // here, not in layer(): that runs for every word scored and must not fail on a key press
         packed?.checkBelow("word layers", names.size)
     }
 
     val count: Int get() = names.size
 
-    /** Of a word not in the dictionary (the user's own, [NgramModel.NO_WORD]): the base. */
     fun layer(word: Int): Int = if (packed == null || word !in 0 until packed.size) 0 else packed[word]
 
     companion object {
-        /** The layer with no name given: libime's dictionary, the base dictionary. */
         const val BASE = "base"
 
-        /** The new words dictionary's layer: the curated words libime's lacks, as its pack names it. */
         const val NEW = "new"
     }
 }
 
-/** Word ids to text. Ids below [NgramModel.vocabularySize] are the model's own words. */
 class Vocabulary internal constructor(private val strings: StringTable) {
     val size: Int get() = strings.size
     fun word(id: Int): String = strings[id]
 
-    /** The UTF-16 length of word [id], and a char of it, without making a string of it. */
     fun length(id: Int): Int = strings.length(id)
     fun char(id: Int, at: Int): Char = strings.char(id, at)
 }
 
-/**
- * A trie over syllable ids. Nodes are numbered breadth-first from the root (0), so the children
- * of a node are a contiguous run of node ids, sorted by syllable; a node's words are the words
- * spelt by the syllables on the path to it, most probable first.
- */
+/** A trie over syllable ids, nodes breadth-first so children are a run sorted by syllable; words most probable first. */
 class PinyinDictionary internal constructor(
     vocabularySize: Int,
     private val syllables: BitPacked,
@@ -196,10 +171,9 @@ class PinyinDictionary internal constructor(
         val nodes = syllables.size
         ensureFormat(nodes >= 1 && childStart.size == nodes + 1 && wordStart.size == nodes + 1) { "dictionary arrays disagree on their sizes" }
         ensureFormat(weights.capacity() == words.size) { "dictionary weights disagree with its words" }
-        // breadth-first: the root's children come right after it, and every node but the root
-        // is exactly one node's child, so the child runs end at nodeCount
+        // breadth-first: every node but the root is exactly one node's child, so child runs end at nodeCount
         childStart.checkRuns("dictionary children", 1, nodes)
-        // children after their parent, so no path through the trie can loop back on itself
+        // children after their parent, so no path can loop
         for (node in 0 until nodes) ensureFormat(childStart[node] > node) { "dictionary node $node precedes its parent" }
         wordStart.checkRuns("dictionary words", 0, words.size)
         words.checkBelow("dictionary words", vocabularySize)
@@ -210,20 +184,17 @@ class PinyinDictionary internal constructor(
     val root: Int get() = 0
     val nodeCount: Int get() = syllables.size
 
-    /** The syllable on the edge into [node]; meaningless for the root. */
     fun syllable(node: Int): Int = syllables[node]
 
     fun firstChild(node: Int): Int = childStart[node]
     fun childCount(node: Int): Int = childStart[node + 1] - childStart[node]
 
-    /** The first child from [next], before [end], whose syllable is not before [syllable], [end] for none: a node's children walked along syllables in their order. */
     fun childFrom(next: Int, end: Int, syllable: Int): Int {
         var at = next
         while (at < end && syllables[at] < syllable) at++
         return at
     }
 
-    /** @return the child of [node] reached by [syllable], or -1 */
     fun child(node: Int, syllable: Int): Int {
         val from = childStart[node]
         val to = childStart[node + 1]
@@ -231,41 +202,27 @@ class PinyinDictionary internal constructor(
         return if (at < to && syllables[at] == syllable) at else -1
     }
 
-    /** @return the node spelt by [path] from the root, or -1 */
     fun find(path: IntArray): Int = path.fold(root) { node, s -> if (node < 0) -1 else child(node, s) }
 
     fun wordCount(node: Int): Int = wordStart[node + 1] - wordStart[node]
 
-    /** [index] must be below [wordCount]; it is not checked, and past it lie the next node's words. */
+    /** Unchecked: past [wordCount] lie the next node's words. */
     fun word(node: Int, index: Int): Int = words[wordStart[node] + index]
 
-    /** The log10 adjustment for this reading of [word]; 0 unless it is a polyphone's rarer reading */
+    /** log10 adjustment for this reading; 0 unless a polyphone's rarer reading. */
     fun weight(node: Int, index: Int): Float = weightTable[weights.get(wordStart[node] + index).toInt() and 0xff]
 
-    /**
-     * Where [node]'s words start, for [wordAt] and [weightAt] of its first, second, ... from there:
-     * [word] and [weight] without looking the node's start up for each.
-     */
     fun wordsOf(node: Int): Int = wordStart[node]
 
-    /** The word at [at], [wordsOf] a node plus an index below its [wordCount] (not checked, as [word]'s). */
     fun wordAt(at: Int): Int = words[at]
 
-    /** [weight] of the word at [at], as [wordAt]'s. */
     fun weightAt(at: Int): Float = weightTable[weights.get(at).toInt() and 0xff]
 }
 
 /**
- * A backoff n-gram model up to trigrams, stored as sorted arrays: each unigram points at the run
- * of its bigrams (sorted by next word), each bigram at the run of its trigrams (those starts in [EliasFano]). Scores are log10
- * probabilities, as in the ARPA file it was built from; bigram and trigram values are quantised
- * to a byte (see [Quantizer]).
- *
- * Words from [vocabularySize] up are dictionary words the model never saw; they score as the
- * model's unknown word. [NO_WORD] as a context means there is none (the start of input), and
- * shortens the history: with `prev == NO_WORD`, `prev2` is ignored. The first word thus scores
- * as its unigram, which is what libime gets from the same model: lm_sc.arpa has no `<s>`, and
- * KenLM gives a missing `<s>` no bigrams and a backoff of 0.
+ * Backoff trigram model as sorted arrays, log10, bigram and trigram values quantised to a byte. Ids from
+ * [vocabularySize] up score as the unknown word. A [NO_WORD] context is start of input and shortens the
+ * history, so the first word scores as its unigram, as libime does (lm_sc.arpa has no `<s>`).
  */
 class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, private val unknown: Int) {
 
@@ -282,7 +239,7 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
     private val triProb = file.section(PinyinData.Section.TRI_PROB)
     private val triProbTable = Quantizer.decodeTable(file.section(PinyinData.Section.TRI_PROB_CODEBOOK))
 
-    // every size before any value: a value read from a table of the wrong size could be out of bounds
+    // every size before any value: a value from a wrong-sized table could be out of bounds
     init {
         val v = vocabularySize.toLong()
         ensureFormat(v >= 1 && uniProb.capacity().toLong() == v * 4 && uniBackoff.capacity().toLong() == v * 4 && uniBigramStart.size.toLong() == v + 1) {
@@ -299,13 +256,10 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
 
     private fun known(word: Int) = if (word in 0 until vocabularySize) word else unknown
 
-    /** log10 P(word) */
     fun score(word: Int): Float = uniProb.getFloat(known(word) * 4)
 
-    /** log10 P of the unknown word: what a word the model lacks scores as, before any context. */
     val unknownScore: Float get() = uniProb.getFloat(unknown * 4)
 
-    /** log10 P(word | prev); a [NO_WORD] context is the unigram score */
     fun score(prev: Int, word: Int): Float {
         if (prev == NO_WORD) return score(word)
         val p = known(prev)
@@ -314,28 +268,18 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return if (bigram >= 0) biProbTable[biProb.get(bigram).toInt() and 0xff] else uniBackoff.getFloat(p * 4) + score(w)
     }
 
-    /** log10 P(word | prev2 prev) */
     fun score(prev2: Int, prev: Int, word: Int): Float = scoreAfter(context(prev2, prev), word)
 
-    /**
-     * The context (prev2, prev) looked up once, for [scoreAfter] of the many words that may
-     * follow it: prev, and the index of the bigram (prev2, prev) or -1 if the model lacks it.
-     */
+    /** (prev2, prev) looked up once for many [scoreAfter]s. */
     fun context(prev2: Int, prev: Int): Long {
         val bigram = if (prev2 == NO_WORD || prev == NO_WORD) -1 else bigram(known(prev2), known(prev))
         return (prev.toLong() shl Int.SIZE_BITS) or (bigram.toLong() and 0xffffffffL)
     }
 
-    /** The prev a [context] was made for. */
     fun prevOf(context: Long): Int = (context shr Int.SIZE_BITS).toInt()
 
-    /** log10 P(word | [context]), a value from [context] */
     fun scoreAfter(context: Long, word: Int): Float = scoreAfter(context, trigrams(context), word)
 
-    /**
-     * Where the trigrams after [context] are, a value for [scoreAfter]: an Elias-Fano lookup, which
-     * scoring every word after one context would repeat. Looked up once a context, as [context] is.
-     */
     fun trigrams(context: Long): Trigrams {
         val bigram = context.toInt()
         if (bigram < 0) return Trigrams.NONE
@@ -343,10 +287,6 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return Trigrams(run.start, run.end)
     }
 
-    /**
-     * The run of trigrams after a context, from [trigrams] for [scoreAfter]: typed, so that no other
-     * long is taken for one. Held in one long, [bits], which a decoder keeps in a [LongArray].
-     */
     @JvmInline
     value class Trigrams internal constructor(internal val bits: Long) {
 
@@ -356,12 +296,10 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         internal val end: Int get() = bits.toInt()
 
         companion object {
-            /** Of a context without its bigram, and of a scorer that looks nothing up. */
             val NONE = Trigrams(0, 0)
         }
     }
 
-    /** [scoreAfter], with [trigrams] this model's [trigrams] of [context]. */
     fun scoreAfter(context: Long, trigrams: Trigrams, word: Int): Float {
         val prev = prevOf(context)
         val bigram = context.toInt()
@@ -374,11 +312,7 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return biBackoffTable[biBackoff.get(bigram).toInt() and 0xff] + score(prev, word)
     }
 
-    /**
-     * Calls [visit] with every word the model saw after [context] (from [context]), in word order,
-     * each once, and its [scoreAfter]: those seen after prev, and those seen after both words.
-     * Nothing without a prev.
-     */
+    /** Calls [visit] with every word seen after [context], in word order, with its [scoreAfter]. */
     internal fun forEachAfter(context: Long, visit: WordVisitor) {
         val prev = prevOf(context)
         if (prev == NO_WORD) return
@@ -395,8 +329,7 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
             val bw = if (b < bEnd) biWord[b] else Int.MAX_VALUE
             val tw = if (t < tEnd) triWord[t] else Int.MAX_VALUE
             when {
-                // a word past the model, which only a damaged file has, is not handed on: skipped here,
-                // as checking them all at load would page in tens of MB at each first pinyin load
+                // a word past the model (only in a damaged file) is skipped here: checking at load would page in tens of MB
                 b < bEnd && bw >= vocabularySize -> b++
                 t < tEnd && tw >= vocabularySize -> t++
                 tw <= bw -> {
@@ -416,26 +349,19 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         fun visit(word: Int, score: Float)
     }
 
-    /** log10 backoff weight of [word] as a context; 0 when it has none */
     fun backoff(word: Int): Float = uniBackoff.getFloat(known(word) * 4)
 
-    /** log10 backoff weight of the context (prev, word); 0 for a bigram the model lacks, or a [NO_WORD] prev */
     fun backoff(prev: Int, word: Int): Float {
         if (prev == NO_WORD) return 0f
         val bigram = bigram(known(prev), known(word))
         return if (bigram >= 0) biBackoffTable[biBackoff.get(bigram).toInt() and 0xff] else 0f
     }
 
-    // bigram's answers by (prev, word): the decoder asks the same pairs again on every path of every
-    // key, each a binary search over the mapped table (S15 N1: a fifth to a third of a key, 九键's
-    // most). Direct mapped, a slot a long: prev + 1, word, the bigram's index + 1 (0: none), so a
-    // reader on another thread (ime-eval's) sees a slot whole or not at all. Only the file's answer
-    // is kept, never a score: what bigram gives is the same either way, and the file never changes.
-    // None for a model too big to pack so.
+    // direct-mapped bigram cache, one long per slot so another thread (ime-eval) sees a slot whole or not at all;
+    // the decoder repeats the same pairs on every path of every key
     private val bigrams: AtomicLongArray? =
         if (vocabularySize < 1 shl KEY_BITS && biWord.size < (1 shl VALUE_BITS) - 1) AtomicLongArray(1 shl CACHE_BITS) else null
 
-    /** @return the index of bigram (prev, word), or -1 */
     private fun bigram(prev: Int, word: Int): Int {
         val cache = bigrams ?: return search(prev, word)
         val key = ((prev + 1).toLong() shl (KEY_BITS + VALUE_BITS)) or (word.toLong() shl VALUE_BITS)
@@ -454,19 +380,16 @@ class NgramModel internal constructor(file: DataFile, val vocabularySize: Int, p
         return if (at < to && biWord[at] == word) at else -1
     }
 
-    /** How many of [bigram]'s slots hold an answer: for a test of the cache. */
     internal fun bigramsHeld(): Int = bigrams?.let { c -> (0 until c.length()).count { c.get(it) != 0L } } ?: 0
 
     companion object {
         const val NO_WORD = -1
 
-        // a slot: prev + 1 and word KEY_BITS each, the bigram's index + 1 below them
         private const val KEY_BITS = 20
         private const val VALUE_BITS = 24
         private const val VALUE_MASK = (1L shl VALUE_BITS) - 1
         private const val KEY_MASK = VALUE_MASK.inv()
 
-        // 32768 slots, 256 KB: a key's pairs, and the next key's mostly the same
         private const val CACHE_BITS = 15
         private const val HASH_A = -0x61c88647 // 0x9e3779b9
         private const val HASH_B = -0x7a143595 // 0x85ebca6b

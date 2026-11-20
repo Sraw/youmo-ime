@@ -27,13 +27,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 生僻字屏蔽's contract (dev/design/061-rare-char-block.md §8): a character held back is in no
- * candidate of any way to type Chinese, nor a prediction, nor what a code commits alone; let
- * through, back on the same engines, as a block is (the user model and the glide live over
- * invalidate()). The gate made directly holds back 的 and 是, which no choice can; the default
- * choice (扩展 B alone) holds 𤝰 (U+24770), two chars of a string: what goes by `Char` fails there.
- */
+/** 生僻字屏蔽's contract: a character held back is in no candidate, prediction or lone code's commit; let through, it is back on the same engines. 𤝰 is two chars, so what goes by `Char` fails. */
 class RareCharContractTest : EnginesFixture() {
 
     private val ext = String(Character.toChars(TestCharLevels.EXT)) // 𤝰
@@ -66,7 +60,6 @@ class RareCharContractTest : EnginesFixture() {
             .header("键码", "abcdefghijklmnopqrstuvwxy")
             .header("码长", "4")
             .rule("e2", "p11+p12+p21+p22")
-            // 龘 alone under its code; 大 and 𤝰 重码 under theirs
             .entry("dddd", out)
             .entry("ddda", "大")
             .entry("ddda", ext)
@@ -149,12 +142,11 @@ class RareCharContractTest : EnginesFixture() {
 
     private fun some(held: String, of: List<String>) = assertTrue("$held not in $of", of.any { held in it })
 
-    // every way to type Chinese the fixture has, none offering [held]. The strokes' table has 大 and 龘 alone (a
-    // character of the basic plane alone): [strokes] null for 𤝰, a check there that held whatever is held (R26 F8502)
+    // the strokes' table has only BMP characters, so [strokes] is null for 𤝰
     private fun Engines.offersNone(held: String, pinyin: String, strokes: String?, parts: String, code: String) {
         none(held, typed(PINYIN, pinyin))
         none(held, typed(SHUANGPIN, pinyin))
-        // the nine keys' digits of [pinyin], not those of da whatever it is (review F8351)
+        // the nine keys' digits of [pinyin], not those of da whatever it is
         none(held, nineKeys(pinyin.map(NineKeyLetters.STANDARD::key).joinToString("")))
         none(held, glided(pinyin))
         strokes?.let { none(held, typed(PINYIN, "u$it")) }
@@ -197,12 +189,10 @@ class RareCharContractTest : EnginesFixture() {
 
     @Test
     fun theDefaultChoiceHoldsBackExtensionBAndTheOutOfTableAsChosen() = engines().use { e ->
-        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
-        // off: 𤝰 and 龘 offered, 你𤝰 as a glide's other reading
+        // the steps of one scenario, in order, each on what the one before left
         some(ext, e.typed(PINYIN, "da"))
         some(out, e.typed(PINYIN, "da"))
         some(ext, e.glided("nihao"))
-        // turned on, 扩展 B alone: 𤝰 nowhere, 龘 and 大 still there
         file = "# youmo-rare-chars 1\non\t1\ngroups\tEXT\n"
         e.reload()
         e.offersNone(ext, "da", null, "dalong", "ddda")
@@ -220,7 +210,6 @@ class RareCharContractTest : EnginesFixture() {
         val s = e.type(WUBI, "dddd")
         assertEquals("", s.commit)
         assertEquals(emptyList<String>(), e.texts(WUBI))
-        // 龘 let through: back, the same engines
         file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\nallow\t$out\n"
         e.reload()
         some(out, e.typed(PINYIN, "da"))
@@ -228,12 +217,10 @@ class RareCharContractTest : EnginesFixture() {
         some(out, e.afterDa())
         e.onEvent(WUBI, EngineEvent.RESET, 0)
         assertEquals(out, e.type(WUBI, "dddd").commit)
-        // held again: gone again, keys and glide both
         file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
         e.reload()
         none(out, e.typed(PINYIN, "da"))
         none(out, e.glided("da"))
-        // off: both back
         file = "# youmo-rare-chars 1\non\t0\ngroups\tOUT EXT\n"
         e.reload()
         some(out, e.typed(PINYIN, "da"))
@@ -243,8 +230,7 @@ class RareCharContractTest : EnginesFixture() {
     @Test
     fun aTablesGlideAndTheUsersOwnWordLeaveOutWhatIsHeld() = engines().use { e ->
         e.addWord("大$ext", "da da")
-        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
-        // off: 𤝰 a glide over 五笔's ddda offers, 龘 one over dfgh, and the user's 大𤝰 typed
+        // the steps of one scenario, in order, each on what the one before left
         some(ext, e.tableGlided(WUBI, "ddda"))
         some(out, e.tableGlided(WUBI, "dfgh"))
         some("大$ext", e.typed(PINYIN, "dada"))
@@ -255,7 +241,6 @@ class RareCharContractTest : EnginesFixture() {
         none(ext, glided)
         some("大", glided)
         none(ext, e.typed(PINYIN, "dada"))
-        // the user's word kept, not offered
         assertTrue(e.userWords().any { it.text == "大$ext" })
         // OUT too: a glide over dfgh, 龘's code alone, goes on to the next code's 打, not to nothing
         file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
@@ -300,8 +285,6 @@ class RareCharContractTest : EnginesFixture() {
         e.reload()
         e.typed(PINYIN, "da")
         val made = e.rareHeldMade
-        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
-        // found once
         assertEquals(1, made)
         // settings changed twice (each makes the sessions anew): not again
         e.settings = e.settings.copy(pageSize = 7)
@@ -309,11 +292,9 @@ class RareCharContractTest : EnginesFixture() {
         e.settings = e.settings.copy(pageSize = 8)
         e.typed(PINYIN, "da")
         assertEquals(1, e.rareHeldMade)
-        // reloaded, the same file: not again
         e.reload()
         e.typed(PINYIN, "da")
         assertEquals(1, e.rareHeldMade)
-        // the choice changed: again
         file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
         e.reload()
         e.typed(PINYIN, "da")
@@ -327,26 +308,18 @@ class RareCharContractTest : EnginesFixture() {
         return texts(PINYIN)
     }
 
-    /**
-     * 0.6.1 测试版 1's report (dev/design/061-rare-switch-research.md): one choice for every keyboard, so
-     * going from the nine keys to the full one and the 18 keys, each a session of its own
-     * ([KeyboardPair]), with no reload between, holds back the same once a reload made the sessions anew,
-     * and it is found once.
-     */
+    /** One choice for every keyboard: switching keyboards holds back the same, found once. */
     @Test
     @Uat("WD-61")
     fun theChoiceOutlivesAKeyboardSwitch() = engines().use { e ->
-        // the steps of one scenario, in order, each on the file and engines the one before left (review F8119)
-        // off: 龘 on each keyboard (the sessions made now, before it is on)
+        // the steps of one scenario, in order, each on what the one before left
         some(out, e.nineKeys("32"))
         some(out, e.typed(PINYIN, "da"))
         some(out, e.keys18("da"))
-        // turned on while on the nine keys: 龘 and 𤝰 not there
         file = "# youmo-rare-chars 1\non\t1\ngroups\tOUT EXT\n"
         e.reload()
         none(out, e.nineKeys("32"))
         none(ext, e.nineKeys("32"))
-        // the full keyboard next, no reload: not there either
         none(out, e.typed(PINYIN, "da"))
         none(ext, e.typed(PINYIN, "da"))
         some("大", e.typed(PINYIN, "da"))
@@ -354,7 +327,6 @@ class RareCharContractTest : EnginesFixture() {
         none(out, e.keys18("da"))
         none(out, e.nineKeys("32"))
         none(out, e.typed(PINYIN, "da"))
-        // the words held found once for all the keyboards
         assertEquals(1, e.rareHeldMade)
     }
 

@@ -60,7 +60,6 @@ class CodeTableReaderTest {
 
     @Test
     fun libimesEnglishReadsAsTheChinese() {
-        // as libime's saveText writes a table back
         val table = read(
             """
             # made by libime
@@ -103,7 +102,6 @@ class CodeTableReaderTest {
             """,
         )
         assertEquals(listOf("工作", "工无"), reader.phrases)
-        // 无 has no code, so 工无 has none
         assertEquals(1, TableText.codePhrases(reader))
         assertEquals(listOf("工作"), reader.table().texts("abcd"))
         assertEquals(0, TableText.codePhrases(read("键码=a\n[数据]\na 工\n")))
@@ -138,8 +136,7 @@ class CodeTableReaderTest {
         )
         val added = add(
             reader,
-            // known; coded; no rule for three; coded; known; under the code of an entry (式子 is
-            // ac+dh, 样's); no code for 无; a single character
+            // known; coded; no rule for three; coded; known; under an entry's code; no code for 无; a single character
             listOf("工作", "内卷", "内卷儿", "作工", "工作", "式子", "工无", "工"),
         )
         assertEquals(3, added)
@@ -148,7 +145,6 @@ class CodeTableReaderTest {
         assertEquals(listOf("作工"), table.texts("cdab"))
         assertEquals(listOf("工作"), table.texts("abcd"))
         assertEquals(listOf("样", "式子"), table.texts("acdh"))
-        // no rules, no words
         assertEquals(0, add(read("键码=a\n[数据]\na 工\n"), listOf("工工")))
     }
 
@@ -175,9 +171,7 @@ class CodeTableReaderTest {
         )
         val added = add(
             reader,
-            // ccdd: cc led to ccda, ccd to it too, and comes after it; abba: aba led nowhere, 顶屏
-            // there; 内式 is ccce, and ccc led nowhere; efab is a pinyin spelling; 式卷 (cedd) and
-            // 式内 (cecc): ced and cec led nowhere
+            // each led nowhere at a shorter code, or (efab) is a pinyin spelling
             listOf("内卷", "工作", "内式", "子工", "式卷", "式内"),
         )
         assertEquals(1, added)
@@ -230,14 +224,12 @@ class CodeTableReaderTest {
         val added = TableText.addWords(reader, listOf("工作", "内卷"), { score[it] ?: Float.NEGATIVE_INFINITY }) { it == "内卷" }
         assertEquals(1, added.fresh)
         assertEquals(1, added.others)
-        // 攻错, the table's own, stays though a thirtieth of 工作, as do 恭, a character, 𠃌 (outside the BMP)
-        // and ——, which no count is of, the never seen last
+        // the table's own, characters, non-BMP and uncounted entries stay however rare
         assertEquals(0, added.dropped)
         val table = reader.table()
         assertEquals(listOf("工作", "攻错", "恭", "𠃌", "——"), table.texts("abcd"))
         // fresh, 内卷 counts ten times: before 内眷, which stays, alone beside the new word
         assertEquals(listOf("内卷", "内眷"), table.texts("efgh"))
-        // a shorter code as it was
         assertEquals(listOf("工", "共"), table.texts("ab"))
     }
 
@@ -245,9 +237,7 @@ class CodeTableReaderTest {
     fun valuesUnescapeAsFcitxEscapesThem() {
         assertEquals("a\nb\tc\"d\\e", unescapeValue("\"a\\nb\\tc\\\"d\\\\e\""))
         assertEquals("\u000c\r\u000b", unescapeValue("\"\\f\\r\\v\""))
-        // an escape fcitx does not make stands for the character
         assertEquals("q", unescapeValue("\"\\q\""))
-        // not quoted, or not quoted as fcitx quotes: as it is
         assertEquals("a\\nb", unescapeValue("a\\nb"))
         assertEquals("\"", unescapeValue("\""))
         assertEquals("\"a\"b\"", unescapeValue("\"a\"b\""))
@@ -288,9 +278,7 @@ class CodeTableReaderTest {
         assertEquals(listOf("你好", "ni'hao", "0"), splitValues(" 你好\tni'hao \u000B0\r"))
         assertEquals(listOf("a b", "c\\", "x\\ty\""), splitValues("\"a b\" \"c\\\\\"x\\ty\""))
         assertEquals(listOf("x\ty\"", "q"), splitValues("\"x\\ty\\\"\" \"\\q\""))
-        // what follows a closing quote starts the next value
         assertEquals(listOf("a", "b"), splitValues("\"a\"b"))
-        // a quote that never closes is the value's own
         assertEquals(listOf("\"a", "b"), splitValues("\"a b"))
         assertEquals(listOf("a\"b"), splitValues("a\"b"))
         assertEquals(listOf("\"a\\\""), splitValues("\"a\\\""))

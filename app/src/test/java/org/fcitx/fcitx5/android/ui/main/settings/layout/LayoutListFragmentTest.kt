@@ -37,7 +37,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 
-/** 外观 → 布局 (LayoutListFragment): its cards read on IO, its list let go of with its view. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class LayoutListFragmentTest {
@@ -59,7 +58,6 @@ class LayoutListFragmentTest {
         ThemeLayoutsToList.listedFile = { File(folder.root, "no_backup/listed") }
         ThemeLayoutsToList.restoredFile = { File(folder.root, "no_backup/restored") }
         ThemeLayoutsToList.tryingFile = { File(folder.root, "no_backup/trying") }
-        // a layout of the user's: a card made with its scene
         val k18 = BuiltInLayouts(appContext).text("k18")!!
         CustomLayouts.save("mine", k18.replace("name=\"18 键\"", "name=\"我的\"").replaceFirst("id=\"k18\"", "id=\"mine\" based-on=\"k18\""), layouts)
     }
@@ -75,10 +73,8 @@ class LayoutListFragmentTest {
         CustomLayouts.forgetAll()
     }
 
-    // R26 F8135: the page left (外观 closed, the screen turned) while its cards are read on IO, held by the start's listing
-    // as after an upgrade: the cards made all the same, with no fragment to ask its context of, never the app's crash.
-    // Waited for the read's end, not a time out (R26 F8490: a read that never ran passed as well); begun and not ended
-    // as the page is left told by the read's own latches, not how it waits (R26 F8506)
+    // the page left while its cards are read on IO (held by the start's listing): cards made without a fragment, no crash.
+    // Waits on the read's own latches, not a timeout
     @Test
     fun theCardsReadAfterThePageIsGoneCrashNothing() {
         val held = ArrayDeque<Runnable>()
@@ -104,12 +100,11 @@ class LayoutListFragmentTest {
             SettingsHarness().use { st ->
                 st.open(SettingsRoute.Theme)
                 st.tab(2)
-                // the read begun as the page is left
                 assertTrue("the read begun", readBegun.await(WAIT_MS, TimeUnit.MILLISECONDS))
             }
-            // the page gone, the read not ended: held by the start's listing (awaitStart)
+            // the page gone, the read held by the start's listing (awaitStart)
             assertEquals("the read waiting for the start", 1L, readEnded.count)
-            // the start ends: the read goes on, the page gone, to its end
+            // the start ends: the read goes on to its end
             held.removeFirst().run()
             assertTrue("the read ended", readEnded.await(WAIT_MS, TimeUnit.MILLISECONDS))
             shadowOf(Looper.getMainLooper()).idle()
@@ -119,15 +114,13 @@ class LayoutListFragmentTest {
         }
     }
 
-    // R26 F8403: 外观 kept on the back stack, its tab's view gone and the fragment kept: the old list no observer of the
-    // adapter the fragment keeps (held, Activity and all, and told of each reload)
+    // 外观 on the back stack with its tab's view gone: the old list no longer observes the kept adapter (it would leak the Activity)
     @Test
     fun theListOfAViewGoneIsNoObserverOfTheAdapter() {
         SettingsHarness().use { st ->
             st.open(SettingsRoute.Theme)
             st.tab(2)
             val page = st.page.childFragmentManager.fragments.filterIsInstance<LayoutListFragment>().single()
-            // the page's own, as its list has it
             val adapter = page.requireView().all().filterIsInstance<RecyclerView>().single().adapter!!
             assertTrue(adapter.hasObservers())
             st.open(SettingsRoute.About)
@@ -136,14 +129,12 @@ class LayoutListFragmentTest {
         }
     }
 
-    // R26 F8117: grouped keys based on the full keyboard (let in) previewed as the keyboard draws them (SceneLayouts):
-    // the styles, marks and keys' data of the board it is based on, its own family's drawn only in its place; the
-    // card's preview had its own family's base for both
+    // grouped keys based on the full keyboard previewed as the keyboard draws them (SceneLayouts), on the base board's styles
     @Test
     @Uat("ST-192")
     fun aCardBasedOnAnotherFamilysBoardIsPreviewedAsTheKeyboardDrawsIt() {
         val k18 = BuiltInLayouts(appContext).text("k18")!!
-        // in the folder the page lists (CustomLayouts.dir), not the keyboards' of this class's other tests
+        // the page's folder, not the keyboards' of this class's other tests
         val listed = CustomLayouts.dir()
         CustomLayouts.save("cross", k18.replace("name=\"18 键\"", "name=\"跨\"").replaceFirst("id=\"k18\"", "id=\"cross\" based-on=\"qwerty\""), listed)
         try {

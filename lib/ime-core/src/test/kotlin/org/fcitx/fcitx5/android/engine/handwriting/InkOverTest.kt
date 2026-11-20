@@ -20,10 +20,7 @@ import org.junit.Test
 
 class InkOverTest {
 
-    /**
-     * Pinyin as far as these need: letters typed into the input, its candidates [words]' of it, a pick
-     * committing one and offering [FOLLOW] after it (联想). Every action recorded.
-     */
+    /** Pinyin as far as these need: typed letters, [words] as candidates, a pick offering [FOLLOW]; every action recorded. */
     private class FakePinyin(
         private val words: Map<String, List<String>>,
         // an input whose first candidate takes part of it: that word and the input left
@@ -112,9 +109,7 @@ class InkOverTest {
         assertEquals(listOf("天", "人", "山"), over.candidates(0, 5).map { it.text })
         val picked = over.apply(Action.Pick(1))
         assertEquals("人", picked.commit)
-        // pinyin goes on from it
         assertEquals(Action.Context("人"), pinyin.actions.last())
-        // a second ink: the same handwriting
         write(1, "山")
         assertEquals(1, made)
     }
@@ -127,7 +122,6 @@ class InkOverTest {
         assertEquals("n", s.preedit)
         assertEquals(listOf("你", "呢"), s.candidates)
         assertFalse(over.inking)
-        // a letter of the nine keys' too
         over.apply(Action.Reset)
         write(1, "人")
         assertEquals("人", over.apply(Action.Letter('n')).commit)
@@ -143,11 +137,9 @@ class InkOverTest {
         val key = over.apply(Action.Key(','))
         assertEquals("天", key.commit)
         assertFalse(key.handled)
-        // none of it pinyin's but the context told after
         assertEquals(listOf<Action>(Action.Context("天")), pinyin.actions.drop(before))
     }
 
-    // 061-handwriting-toolbar §15: what pinyin has typed goes in as space would put it, then the stroke is written
     @Test
     @Uat("HW-46")
     fun aFirstStrokeWhilePinyinHasSomethingTypedPutsItsFirstCandidateInThenWrites() {
@@ -181,7 +173,6 @@ class InkOverTest {
         )
     }
 
-    // named so (review F8259): what it held, that the handwriting's preedit is no input typed, `typing`'s now and private
     @Test
     fun twoCharactersWrittenShowAsOneSentence() {
         assertNull(over.handwritingMade)
@@ -189,9 +180,7 @@ class InkOverTest {
         assertEquals(2, write(1, "人").preedit.length)
     }
 
-    // review F8186 (HK-48's quick order): 天 written, a hardware n typed puts it in; the pad's reading of 天 comes
-    // after. It writes nothing: n stays typed, nothing put in, as HandwritingSession drops a piece ended. Each way
-    // a piece ends a row of its own InkOver (R26 F8446)
+    // the pad's late reading of a piece already put in writes nothing; one row per way a piece ends
     @Test
     fun aLateReadingOfAPiecePutInLeavesWhatIsTyped() = assertRows(
         "put in by a letter: pinyin's input stays" to {
@@ -202,17 +191,14 @@ class InkOverTest {
             assertEquals("n", late.preedit)
             assertEquals("n", pinyin.input)
             assertFalse(over.inking)
-            // its finished notice the same
             val finished = over.apply(Action.Ink(0))
             assertEquals("", finished.commit)
             assertEquals("n", finished.preedit)
-            // nor does it take pinyin's 联想 away
             type("i")
             over.apply(Action.Pick(0))
             assertEquals(FakePinyin.FOLLOW, write(0, "天").candidates)
         },
-        // pinyin told the text put in shows what follows it (faked: 的 for an empty input); the late reading shows that
-        // again, not the handwriting's nothing
+        // the late reading shows what pinyin showed after the text put in, not the handwriting's nothing
         "put in by the pad's enter: what pinyin shows after it stays" to {
             val p = FakePinyin(mapOf("" to listOf("的")))
             val o = InkOver(p) { HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex)) }
@@ -223,8 +209,6 @@ class InkOverTest {
             assertEquals(listOf("的"), late.candidates)
             assertFalse(o.inking)
         },
-        // a handwriting made in place of one (the settings changed) with the piece ended, pinyin never asked: the
-        // handwriting's own dropping shown
         "nothing pinyin showed yet: the handwriting's dropping" to {
             val o = InkOver(FakePinyin(emptyMap())) {
                 HandwritingSession(handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex), ended = 0)
@@ -284,7 +268,6 @@ class InkOverTest {
         assertEquals("你", picked.commit)
         assertTrue(picked.predicting)
         assertEquals("天", write(0, "天").preedit)
-        // told pinyin the text before again: its offer gone
         assertEquals(Action.Context("你"), pinyin.actions.last())
         assertEquals("天", over.apply(Action.Select(0)).commit)
     }
@@ -293,12 +276,10 @@ class InkOverTest {
     fun theInputEndedPutsWhatIsWrittenIn() {
         over.apply(Action.Context("好"))
         write(0, "天")
-        // what was written is put in as it shows, not dropped (DECISIONS A2)
         assertEquals("天", over.endInput().commit)
         assertFalse(over.inking)
         assertEquals(Action.Reset, pinyin.actions.last())
         assertEquals("", over.apply(Action.Backspace).preedit)
-        // pinyin's code goes as ever
         type("n")
         assertEquals("", over.endInput().commit)
         assertEquals("", pinyin.input)
@@ -313,7 +294,6 @@ class InkOverTest {
         assertEquals("", s.preedit)
         assertFalse(over.inking)
         assertEquals(Action.Reset, pinyin.actions.last())
-        // nothing of it comes back with the next stroke
         assertEquals("人", write(1, "人").preedit)
     }
 

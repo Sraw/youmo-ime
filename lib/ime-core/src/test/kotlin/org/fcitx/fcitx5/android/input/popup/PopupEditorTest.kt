@@ -27,7 +27,7 @@ class PopupEditorTest {
         assertEquals(-1, e.selected)
     }
 
-    // the key's own letters and digit as any item (060-row-unlock): moved, deleted, made the first
+    // the key's own letters and digit as any item: moved, deleted, made the first
     @Test
     fun aRowItemMovesDeletesAndIsMadeTheFirst() {
         val e = editor()
@@ -112,7 +112,7 @@ class PopupEditorTest {
         assertEquals(listOf("1", "a"), PopupEditor(listOf("1", "a", "1"), null).items)
     }
 
-    // 061-no-cn-punct §2.1: an English mark a Chinese table converts, the user's table's keys too
+    // an English mark a Chinese table converts, the user's table's keys too
     @Test
     fun whatCanBeKeptAsIs() {
         val keys = setOf(",", ".", "@")
@@ -155,7 +155,7 @@ class PopupEditorTest {
         assertEquals(mapOf("\$day" to ItemMark.Variables), e.marks)
     }
 
-    // 061-text-variables §2.5, S3: the field one item, blanks round it gone, a line break a space, 64 at most
+    // the field one item, blanks round it gone, a line break a space, 64 at most
     @Test
     fun anItemOfVariablesAdded() {
         val e = PopupEditor(listOf("a"), "a")
@@ -165,14 +165,13 @@ class PopupEditorTest {
         e.add("x".repeat(70), ItemMark.Variables)
         assertEquals("x".repeat(64), e.items.last())
         assertEquals(ItemMark.Variables, e.marks["x".repeat(64)])
-        // nothing but blanks: nothing added, and true, as false is only "some did not fit" (add's KDoc): nothing was
-        // turned away for want of room, so the box is not told the list is full (R26 F8410)
+        // nothing but blanks: nothing added, and true (false only means "some did not fit"), so the box is not told it is full
         val before = e.items.toList()
         assertTrue(e.add("  ", ItemMark.Variables))
         assertEquals(before, e.items)
     }
 
-    // 061-no-cn-punct Q3: the marks of them that can have it, the others added as ever
+    // the marks of them that can have it, the others added as ever
     @Test
     fun itemsAddedAsIs() {
         val e = PopupEditor(emptyList(), null)

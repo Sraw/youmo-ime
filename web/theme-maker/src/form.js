@@ -1,13 +1,10 @@
-// youmo-form: what the editing's forms do to theme.xml (060-render-p3 §5.1, M2), apart from the page so node
-// tests it. A form edit finds the <style> whose select= is exactly the text it writes and changes that
-// attribute; none: a new style at the end. A style left with nothing but its select= goes. Everything else of
-// the text (comments, the user's own styles, their spacing) is kept as it was: only the attribute changed moves.
+// youmo-form: the theme maker's form edits on theme.xml; everything the form does not touch is kept as written.
 (function (root) {
   'use strict';
 
-  // the comments of [xml] blanked (same length), so what is looked for is never found inside one
+  // blanked to the same length, so a search never matches inside a comment
   const uncommented = (xml) => xml.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
-  // one pass, so &amp;#65; stays the text &#65;; a character reference as the reader takes it (an out-of-range one left)
+  // one pass, so &amp;#65; stays the text &#65;
   const NAMED = { quot: '"', apos: "'", lt: '<', gt: '>', amp: '&' };
   const unescape = (v) => v.replace(/&(?:#(\d+)|#x([0-9a-fA-F]+)|(quot|apos|lt|gt|amp));/g, (all, dec, hex, name) => {
     if (name) return NAMED[name];
@@ -24,15 +21,12 @@
     return out;
   }
 
-  /** The elements named [name] of [xml], not in comments: `[{start, end, line, tag, attrs}]` (end: past the element). */
   function elements(xml, name) {
     const plain = uncommented(xml);
     // a '>' inside a quoted value does not end the tag
     const re = new RegExp('<' + name + '\\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*?(\\/>|>)', 'g');
     const out = [];
-    // each element's line counted on from the last one's, up to it and no further (R25 web-7: from the start each
-    // time was a theme's length per element, seconds for a theme of thousands of styles; a look for the next line
-    // break was the rest of the theme per element where there is none, a theme written on one line)
+    // lines counted on from the last element, not from the start each time (quadratic on a big theme)
     let line = 1;
     let counted = 0;
     for (const m of plain.matchAll(re)) {
@@ -48,10 +42,10 @@
     return out;
   }
 
-  // the last text styles() read and what it found: a tab's drawing asks a dozen values of the same text (R25 web-7)
+  // a tab's drawing asks a dozen values of the same text: cache the last parse
   let stylesOf = { xml: null, list: [] };
 
-  /** The theme's styles in order: `[{start, end, line, select, attrs: [[name, value]]}]` (attrs without select). A new array each call, its items shared: not to be changed. */
+  /** A new array each call, its items shared: do not mutate. */
   function styles(xml) {
     if (stylesOf.xml !== xml) {
       const list = elements(xml, 'style').map((e) => Object.freeze({ ...e, select: (e.attrs.find((a) => a[0] === 'select') || [])[1] ?? null, attrs: e.attrs.filter((a) => a[0] !== 'select') }));
@@ -60,7 +54,6 @@
     return stylesOf.list.slice();
   }
 
-  // [xml] with [start, end) replaced by [text]; a removal takes its line's indent and its line break with it
   function splice(xml, start, end, text) {
     if (text === '') {
       const before = xml.slice(0, start).replace(/[ \t]*$/, '');
@@ -71,7 +64,6 @@
     return xml.slice(0, start) + text + xml.slice(end);
   }
 
-  // an element's tag with attribute [name] [value] (null: gone): changed in place, a new one at its end
   function withAttr(tag, name, value) {
     const re = new RegExp('(\\s)' + name.replace(/[-]/g, '\\-') + '\\s*=\\s*("[^"]*"|\'[^\']*\')');
     if (re.test(tag)) {
@@ -82,11 +74,10 @@
     return tag.replace(/\s*(\/?>)$/, (all, close) => ' ' + name + '="' + escape(value) + '"' + close);
   }
 
-  // two select= the same text but for their spacing (the engine reads " key  .letter " as "key .letter")
+  // the engine reads " key  .letter " as "key .letter"
   const spaced = (s) => String(s).trim().replace(/\s+/g, ' ');
   const sameSelect = (a, b) => a != null && b != null && spaced(a) === spaced(b);
 
-  /** The style [select] gives [prop], null where no style of that select= (but for spacing) gives it (the last such style's). */
   function valueOf(xml, select, prop) {
     for (const s of styles(xml).reverse()) {
       if (!sameSelect(s.select, select)) continue;
@@ -96,11 +87,7 @@
     return null;
   }
 
-  /**
-   * The scene-only key rules (`@compact key`, `@landscape @compact key`, ...) that give an inset an inset written on
-   * [sel] does not reach: those whose scenes take in all of [sel]'s and more, for [sel] a plain `key` or `@scene… key`
-   * (any other select= is not outranked by them in the same simple way: none listed). Their select= text, once each.
-   */
+  /** The scene-only key rules (`@compact key`, …) that outrank an inset written on [sel]. */
   function sceneInsets(xml, sel) {
     const scenes = (s) => { const t = spaced(s).split(' '); return t.pop() === 'key' && t.every((x) => /^@\S+$/.test(x)) ? t : null; };
     const mine = sel == null ? null : scenes(sel);
@@ -115,15 +102,12 @@
     return out;
   }
 
-  // the order theme.xml's elements go in (ThemeReader): one put in goes after the last of its kind or before
   const ORDER = ['meta', 'colors', 'picture', 'font', 'style', 'icon', 'sounds'];
 
-  /** [xml] with [text] (an element) put in where [kind]'s go: after the last of it or of a kind before it, else first in <theme>. */
   function insert(xml, kind, text) {
     let at = -1;
     for (const k of ORDER.slice(0, ORDER.indexOf(kind) + 1)) for (const e of elements(xml, k)) at = Math.max(at, e.end);
     if (at < 0) {
-      // the <theme> tag as elements() finds it: a '>' in a quoted value does not end it (R25 web-8)
       const open = elements(xml, 'theme')[0];
       if (!open) throw new Error('no <theme>');
       at = open.start + open.tag.length;
@@ -131,11 +115,7 @@
     return xml.slice(0, at) + '\n  ' + text + xml.slice(at);
   }
 
-  /**
-   * [xml] with the style of exactly [select] giving [prop] [value] (null: not giving it). The last style of that
-   * select= that gives it is changed, else the last of that select=, else a new one at the end of the styles.
-   * A style left with only its select= is taken out.
-   */
+  /** A style left with only its select= is removed. */
   function setProp(xml, select, prop, value) {
     const all = styles(xml).filter((s) => sameSelect(s.select, select));
     const target = [...all].reverse().find((s) => s.attrs.some((a) => a[0] === prop)) || all[all.length - 1];
@@ -151,15 +131,12 @@
     return splice(xml, target.start, target.start + target.tag.length, tag);
   }
 
-  /** Several of [setProp]: `{prop: value}` on [select]. */
   function setProps(xml, select, values) {
     for (const [p, v] of Object.entries(values)) xml = setProp(xml, select, p, v);
     return xml;
   }
 
-  // ---- colours ----
 
-  /** The named colours (060-render-v2 §6), in the groups the 配色 page shows them. */
   const COLOR_GROUPS = [
     ['键盘', ['background', 'keyboard', 'spaceBar']],
     ['按键', ['key', 'altKey', 'accentKey', 'keyPressHighlight', 'keyShadow', 'keyBorder']],
@@ -169,17 +146,14 @@
     ['其它', ['divider', 'clipboardEntry']],
   ];
 
-  // the version the <colors> without variant= is: a theme's only one (a dark-only theme's are its dark colours,
-  // R25 web-4), else the light one
+  // a dark-only theme's bare <colors> are its dark colours
   const bareVariant = (xml) => { const vs = variants(xml); return vs.length === 1 ? vs[0] : 'light'; };
 
-  // the <colors> of [variant] (see bareVariant for the one without variant=)
   function colorsBlock(xml, variant) {
     const bare = bareVariant(xml);
     return elements(xml, 'colors').find((e) => ((e.attrs.find((a) => a[0] === 'variant') || [])[1] || bare) === variant) || null;
   }
 
-  /** [variant]'s colours as written: `{name: value}` (the text: `#…`, `@name`, `darker(@key, 8%)`…). */
   function colors(xml, variant = bareVariant(xml)) {
     const b = colorsBlock(xml, variant);
     const out = {};
@@ -191,10 +165,8 @@
     return out;
   }
 
-  /** [xml] with colour [name] of [variant] [value] (null: taken out); a <colors> made where there is none. */
   function setColor(xml, name, value, variant = bareVariant(xml)) {
     let b = colorsBlock(xml, variant);
-    // a <colors …/> with nothing in it: an open and a close, so a colour has where to go
     if (b && /\/>$/.test(b.tag)) {
       if (value == null) return xml;
       xml = splice(xml, b.start, b.end, b.tag.replace(/\s*\/>$/, '>') + '\n  </colors>');
@@ -216,20 +188,13 @@
     return inside.length ? xml.slice(0, at) + '\n' + indent + text + xml.slice(at) : xml.slice(0, at).replace(/[ \t]*$/, '') + indent + text + '\n  ' + xml.slice(at);
   }
 
-  /** The <theme>'s variants= (`["light"]` where it says none). */
   function variants(xml) {
     const t = elements(xml, 'theme')[0];
     const v = t && (t.attrs.find((a) => a[0] === 'variants') || [])[1];
     return v ? v.split(/\s+/).filter(Boolean) : ['light'];
   }
 
-  /**
-   * [xml] with a dark version or without: on, variants="light dark" and a <colors variant="dark"> as a copy of the
-   * light colours where it has none; a dark-only theme's colours, now the light version's too, copied whichever
-   * way its block is written (without variant=, or variant="dark", which leaves no light block: a light version
-   * of the defaults). Off, variants="light" and the dark colours gone. A dark-only theme is never turned off:
-   * that would make its dark colours a light version's (R25 web-4), so it is [xml] as it is.
-   */
+  /** A dark-only theme is never turned off (its dark colours would become a light version's). */
   function withDark(xml, on) {
     const t = elements(xml, 'theme')[0];
     if (!t) throw new Error('no <theme>');
@@ -247,13 +212,11 @@
     return xml;
   }
 
-  /** `#rrggbb` (or `#aarrggbb`) of a colour picker's `#rrggbb` and an opacity 0–100. */
   function hexOf(rgb, opacity = 100) {
     const a = Math.round(Math.max(0, Math.min(100, opacity)) * 255 / 100);
     return a === 255 ? rgb.toLowerCase() : '#' + a.toString(16).padStart(2, '0') + rgb.slice(1).toLowerCase();
   }
 
-  /** `{rgb: "#rrggbb", opacity}` of a literal colour, null for any other text (a name, an expression). */
   function parseHex(v) {
     const m = /^#([0-9a-f]{6}|[0-9a-f]{8})$/i.exec(String(v || '').trim());
     if (!m) return null;
@@ -261,9 +224,7 @@
     return h.length === 6 ? { rgb: '#' + h, opacity: 100 } : { rgb: '#' + h.slice(2), opacity: Math.round(parseInt(h.slice(0, 2), 16) * 100 / 255) };
   }
 
-  // ---- the picture ----
 
-  /** The theme's <picture>: `{src, brightness, blur, cuts: {portrait: {file, rect}, landscape: …}}`, null for none. */
   function picture(xml) {
     const p = elements(xml, 'picture')[0];
     if (!p) return null;
@@ -276,11 +237,7 @@
     return { src: a.src, brightness: a.brightness ? parseFloat(a.brightness) : 100, blur: a.blur ? parseFloat(a.blur) : 0, cuts };
   }
 
-  /**
-   * [xml] with [p] as its <picture> (null: none). One there is changed in place: its src=, brightness=, blur= and
-   * each cut's file= and rect=, so what else it says (an attribute of a later app's, a comment) is kept; none there, one
-   * written. `{xml, gone}`: the files the old picture named that nothing names any more.
-   */
+  /** An existing <picture> is changed in place, keeping what the form does not know; `gone`: files nothing names any more. */
   function setPicture(xml, p) {
     const old = elements(xml, 'picture')[0];
     const before = old ? xml.slice(old.start, old.end) : '';
@@ -289,9 +246,7 @@
       let tag = withAttr(old.tag, 'src', p.src);
       tag = withAttr(tag, 'brightness', p.brightness != null && p.brightness !== 100 ? p.brightness + '%' : null);
       tag = withAttr(tag, 'blur', p.blur ? p.blur + 'dp' : null);
-      // a picture put in place of the old one says whether it is animated; one only tuned or cut keeps what it had
       if ('animated' in p) tag = withAttr(tag, 'animated', p.animated ? 'true' : null);
-      // a <picture …/>: an open and a close, so a cut has where to go
       const closed = /\/>$/.test(old.tag);
       let body = closed ? '\n  </picture>' : xml.slice(old.start + old.tag.length, old.end);
       if (closed) tag = tag.replace(/\s*\/>$/, '>');
@@ -422,7 +377,6 @@
     return new RegExp('(["\'])(?:' + lit(file) + '|' + lit(escape(file)) + ')\\1|\\(\\s*(["\']?)' + lit(file) + '\\2\\s*[,)]').test(plain);
   }
 
-  /** [text] (a fill=) as fillText takes it; `{kind: other, text}` for what the form does not edit (an image). */
   function parseFill(text) {
     if (text == null) return null;
     const t = text.trim();
@@ -431,7 +385,6 @@
       const stops = splitTop(m[2]).map((s) => { const x = /^(.*\S)\s+(-?[\d.]+)%$/.exec(s.trim()); return x ? [x[1], +x[2]] : null; });
       if (stops.every(Boolean)) return { kind: 'linear', angle: +m[1], stops };
     }
-    // a bare picture: the engine's, unblurred and undimmed
     if (t === 'picture') return { kind: 'picture', blur: 0, brightness: 100, over: null };
     m = /^picture\(([\s\S]*)\)$/.exec(t);
     if (m) {
@@ -444,7 +397,6 @@
     return { kind: 'solid', color: t };
   }
 
-  // [s] split at its commas not inside brackets
   function splitTop(s) {
     const out = [];
     let depth = 0;
@@ -458,19 +410,16 @@
     return out;
   }
 
-  /** `dx dy blur colour` (dp) of a shadow, `none` where it has no colour. */
   function shadowText(s) {
     const o = LIMITS.offsetDp;
     return s && s.color ? clamp(s.dx, -o, o, 1) + 'dp ' + clamp(s.dy, -o, o, 1) + 'dp ' + clamp(s.blur, 0, o, 1) + 'dp ' + s.color : 'none';
   }
 
-  /** A shadow= text read: `{dx, dy, blur, color}`, null for none or what is not one. */
   function parseShadow(t) {
     const m = /^(-?[\d.]+)(?:dp)?\s+(-?[\d.]+)(?:dp)?\s+([\d.]+)(?:dp)?\s+(.+)$/.exec(String(t || '').trim());
     return m ? { dx: +m[1], dy: +m[2], blur: +m[3], color: m[4] } : null;
   }
 
-  /** A border=/stroke= text: `width colour`, `none` for no width. */
   function borderText(b) {
     return b && b.width > 0 && b.color ? clamp(b.width, 0, LIMITS.borderDp, 1) + 'dp ' + b.color : 'none';
   }
@@ -480,7 +429,6 @@
     return m ? { width: +m[1], color: m[2] } : null;
   }
 
-  /** An inset= (or padding=) text read: `[top, right, bottom, left]` dp, null for what is none (CSS's 1, 2 or 4 values). */
   function parseInset(t) {
     const v = String(t ?? '').trim().split(/\s+/).map((x) => (x === '0' ? 0 : /^-?[\d.]+dp$/.test(x) ? parseFloat(x) : NaN));
     if (!t || !v.every(Number.isFinite)) return null;
@@ -489,14 +437,12 @@
     return v.length === 4 ? v : null;
   }
 
-  /** `[top, right, bottom, left]` as the shortest inset= text that says it. */
   function insetText(v, max = LIMITS.lengthDp) {
     const [t, r, b, l] = v.map((x) => clamp(x, 0, max, 1) + 'dp');
     if (t === b && r === l) return t === r ? t : t + ' ' + r;
     return [t, r, b, l].join(' ');
   }
 
-  /** A radius= text read: its four corners dp (top left, top right, bottom right, bottom left); null for none or `50%`. */
   function parseRadius(t) {
     const v = String(t ?? '').trim().split(/\s+/).map((x) => (x === '0' ? 0 : /^[\d.]+dp$/.test(x) ? parseFloat(x) : NaN));
     if (!t || !v.every(Number.isFinite)) return null;
@@ -504,21 +450,17 @@
     return v.length === 4 ? v : null;
   }
 
-  /** Four corners as the shortest radius= text. */
   function radiusText(v) {
     const c = v.map((x) => clamp(x, 0, LIMITS.lengthDp, 1) + 'dp');
     return c.every((x) => x === c[0]) ? c[0] : c.join(' ');
   }
 
-  // ---- the theme's <meta> ----
 
-  /** The <meta>'s attributes (author, version, license, min-app, preview): `{name: value}`, {} for none. */
   function meta(xml) {
     const m = elements(xml, 'meta')[0];
     return m ? Object.fromEntries(m.attrs) : {};
   }
 
-  /** [xml] with <meta>'s [name] [value] (null or empty: taken out); a <meta/> made first where none, one left empty taken out. */
   function setMeta(xml, name, value) {
     if (value === '') value = null;
     let m = elements(xml, 'meta')[0];
@@ -532,24 +474,15 @@
     return splice(xml, m.start, m.start + m.tag.length, tag);
   }
 
-  // ---- selectors ----
 
-  /** A key's name in a selector: `\` before what would be read as the grammar's (a comma, a star, a colon…). */
   const keyName = (id) => id.replace(/[\\,*:.[\]@\s/]/g, (c) => '\\' + c);
 
-  /** The ranges the 按键 and 字和图标 pages edit: what of the keyboard a style selects. */
   const RANGES = [
     ['all', '全部键'], ['letter', '字母'], ['function', '功能'], ['space', '空格'], ['enter', '回车'], ['picked', '选中的这个键'], ['board', '这块键盘的全部'],
   ];
-  /** The scenes a range may be narrowed to (`@…`). */
   const SCENES = [['', '任何时候'], ['compact', '紧凑时'], ['landscape', '横屏时'], ['flat', '平铺时'], ['floating', '悬浮时'], ['split', '分体时'], ['one-handed', '单手时'], ['dark', '深色时'], ['field=password', '密码框里']];
-  /** The states (`:…`). */
   const STATES = [['', '普通'], ['pressed', '按下'], ['locked', '锁定'], ['shifted', 'Shift']];
 
-  /**
-   * The selector a page's choices write: [range] (RANGES) of [board] (and [key], the picked one's id), in [scene]
-   * (SCENES), in [state] (STATES), of [part] (a key's part, none: its face). Null where the range needs a key or a board it has not.
-   */
   function selector({ range, board, key, scene = '', state = '', part = '' }) {
     let w;
     if (range === 'all') w = 'key';

@@ -13,9 +13,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // node for lib/keyboard-scene's JS tests: Kotlin/JS would add this repository to the root
-        // project itself, which FAIL_ON_PROJECT_REPOS forbids; so it is here, and the root build
-        // tells Kotlin not to (its downloadBaseUrl)
+        // node for lib/keyboard-scene's JS tests here, as FAIL_ON_PROJECT_REPOS forbids Kotlin/JS adding it to the root
         exclusiveContent {
             forRepository {
                 ivy("https://nodejs.org/dist") {

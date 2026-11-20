@@ -16,7 +16,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The whole phrases the learning record counts (U-73): [LearnState.phrases]. */
+/** The whole phrases the learning record counts: [LearnState.phrases]. */
 class PhrasesTest {
 
     private val clock = FakeClock()
@@ -34,10 +34,10 @@ class PhrasesTest {
         assertEquals(1, count("abc"))
     }
 
-    // user 2026-11-02: a number put in as words is no phrase; words with numerals in them are
+    // a number put in as words is no phrase; words with numerals in them are
     @Test
     fun chineseNumeralsAloneAreNot() {
-        // 三三两两, 一五一十: words all the same, of numerals alone (the rule's cost, as the user chose it)
+        // 三三两两, 一五一十: words all the same, of numerals alone (the rule's accepted cost)
         for (t in listOf("一二三四五六七八九十一二", "幺三八零零", "两千五百万", "贰仟伍佰", "零一二", "壹萬億", "三三两两", "一五一十")) whole(t)
         assertTrue("${log.state.phrases}", log.state.phrases.isEmpty())
         for (t in listOf("三个人", "一起去", "贰仟伍佰元")) whole(t)
@@ -49,12 +49,11 @@ class PhrasesTest {
         for (t in listOf("你好", "一二三四五六七八九十一二三", "我在3楼", "好的，谢谢", "好的 谢谢", "好的😀呀")) whole(t)
         assertTrue(log.state.phrases.isEmpty())
         assertFalse(Phrases.learnable(""))
-        // the length alone: 13 letters too long, 12 not
         assertFalse(Phrases.learnable("你好呀亲爱的你好呀亲爱的呀"))
         assertTrue(Phrases.learnable("你好呀亲爱的你好呀亲爱的"))
     }
 
-    // U-91: where no pairs are learned, no phrase either
+    // where no pairs are learned, no phrase either
     @Test
     fun aFieldThatLearnsNoPairsCountsNone() {
         whole("你好呀亲爱的", Commit.NO_PAIRS)
@@ -74,7 +73,6 @@ class PhrasesTest {
         log.record(listOf(PredictionOrder.row("好呀亲爱的", "你", "")), continued = "你好呀亲爱的")
         assertEquals(1, count("你好呀亲爱的"))
         assertEquals(0, count("好呀亲爱的"))
-        // nor in a search field
         log.record(listOf(PredictionOrder.row("好呀亲爱的", "你", "")), flags = Commit.NO_PREDICT, continued = "你好呀亲爱的")
         assertEquals(1, count("你好呀亲爱的"))
     }
@@ -90,7 +88,6 @@ class PhrasesTest {
         assertEquals(1, count(first))
     }
 
-    // C52, review MUST 1: a word forgotten, of its text too, leaves the phrase; the phrase deleted leaves the words
     @Test
     fun deletedByItsTextAWordForgottenLeavesIt() {
         whole("你好呀亲爱的")
@@ -128,7 +125,6 @@ class PhrasesTest {
         assertTrue(PhraseRow("你好呀亲爱的", 2, log.state.day) in rows)
         val again = LearnState().apply { rows.forEach { apply(it) } }
         assertEquals(log.state.dump(), again.dump())
-        // and a clear (U-86) drops them
         assertTrue(LogRewrites.cleared(log.state, 0, all = false).none { it is PhraseRow })
     }
 
@@ -142,8 +138,7 @@ class PhrasesTest {
         assertTrue(state.phrases.isEmpty())
     }
 
-    // an older build reads a PhraseForget as a type it does not know: kept as it is, through its fold,
-    // and applied by this one when it reads the log again (after the phrase's row, as written)
+    // an older build keeps a PhraseForget it cannot read, and this one applies it later
     @Test
     fun anOlderBuildKeepsAPhraseForget() {
         val event = LearnRecords.encode(PhraseForget(1, "你好呀亲爱的"))

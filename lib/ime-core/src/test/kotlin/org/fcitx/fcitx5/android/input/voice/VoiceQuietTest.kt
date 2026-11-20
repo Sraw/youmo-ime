@@ -12,17 +12,14 @@ import kotlin.math.sqrt
 
 class VoiceQuietTest {
 
-    // a window of [power] (mean square): the level is all VoiceQuiet reads of it
+    // the level is all VoiceQuiet reads of it
     private fun window(power: Double, n: Int = 512) = FloatArray(n) { sqrt(power).toFloat() }
 
     private fun db(d: Double) = Math.pow(10.0, d / 10)
 
     private fun VoiceQuiet.feed(power: Double, times: Int, voiced: Boolean = false) = repeat(times) { window(window(power), speech = voiced) }
 
-    // contract: resources/voice/quiet-golden.tsv is written by quiet_golden.py from the rule it states on
-    // its own; a change to VoiceQuiet or to that script without the other fails here.
-    // resources/voice/quiet_golden.py: real clips in a room's noise, Gain2, silero and the recognizer's
-    // own segments as the app has them
+    // resources/voice/quiet-golden.tsv is written by quiet_golden.py; a change to either side without the other fails here
     @Test
     fun goldenCases() {
         val lines = javaClass.getResourceAsStream("/voice/quiet-golden.tsv")!!.bufferedReader().readLines()
@@ -43,13 +40,13 @@ class VoiceQuietTest {
         for (speech in listOf("loud-english", "ok", "no", "yes", "hi", "soft-english-over-room", "q44-in-room", "soft-chinese")) {
             assertTrue(speech, got.getValue(speech))
         }
-        // a known leak: a fan 30 dB down is loud and voiced, its 「I'm sorry.」 typed (specs/app.md, Quiet)
+        // a known leak: a fan 30 dB down is loud and voiced, its 「I'm sorry.」 typed
         assertTrue(got.getValue("fan"))
     }
 
     @Test
     fun noDetectorKeepsEverything() {
-        // silero failed to load (VoiceOpening): the rule lets all through rather than lose speech
+        // silero failed to load: the rule lets all through rather than lose speech
         val quiet = VoiceQuiet()
         repeat(90) { quiet.window(window(db(-66.0)), speech = null) }
         assertTrue(quiet.keeps("I'm sorry.", 0, 90L * 512))
@@ -86,8 +83,7 @@ class VoiceQuietTest {
         val quiet = VoiceQuiet()
         quiet.feed(db(-45.0), 30, voiced = true)
         assertTrue(quiet.keeps("Yeah.", 0, 30L * 512))
-        // loud with no voiced window: dropped; letting loud alone through was measured and not taken
-        // (quiet_eval.py h3), a fan or traffic is loud too
+        // loud with no voiced window: dropped; a fan or traffic is loud too
         val unvoiced = VoiceQuiet()
         unvoiced.feed(db(-45.0), 30)
         assertFalse(unvoiced.keeps("Yeah.", 0, 30L * 512))

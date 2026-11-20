@@ -1,6 +1,4 @@
-// The layout maker's page (061-custom-layout §12): the preview and its environment, 文件 (新建, 打开, 保存), undo and
-// redo, the editing (a key selected on the preview, dragged, its tabs: 键, 行, 整块, 信息), the source, the problems.
-// What a change does is youmo-layout-maker's and youmo-layout-edit's; the drawing is the engine's.
+// The layout maker's page; what a change does is youmo-layout-maker's and youmo-layout-edit's, the drawing the engine's.
 (function () {
   'use strict';
 
@@ -15,9 +13,8 @@
   const EXAMPLES = JSON.parse($('youmo-layout-examples').textContent);
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
   const FONTS = { key: '"Youmo Latin", "Youmo Han", sans-serif' };
-  // the theme file's format (youmo-format, the theme maker's): what a .theme opened is held to
   const TFORMAT = JSON.parse($('youmo-format').textContent);
-  // the preview's theme where it is a .theme opened (§12.2): not one of E.themes(), so a draft kept with it restores the default
+  // not one of E.themes(), so a draft kept with it restores the default
   const OPENED = 'opened';
 
   let FORMAT = null; // the engine's layoutFormat()
@@ -30,7 +27,6 @@
   const themes = new Map(); // a built-in theme read, by id
   const store = (() => { try { return M.idbStore(window.indexedDB, 'youmo-layout-maker'); } catch (e) { return null; } })();
 
-  // what a text a page before L8 wrote had changed in it on opening (M.oldGroupFaces): said after what was opened
   const OLD_GROUPS = (keys) => (keys ? '；' + keys + ' 个分组键显示的字改成了大写字母（旧版页面写的 {group:…} 超过两个字母，App 读不了）' : '');
 
   function toast(text) {
@@ -43,9 +39,7 @@
     toast.timer = setTimeout(() => t.classList.remove('on'), 3500);
   }
 
-  // ---- the document ----
 
-  // [external]: not a change of the tabs' own (the source typed in, a file, a draft)
   function set(xml, { fresh = false, external = false } = {}) {
     const d = M.doc(xml);
     if (fresh || !history) history = new M.History(d);
@@ -64,7 +58,6 @@
     clearTimeout(keeping);
     keeping = null;
     if (!store || !edited || !history) return;
-    // a text past the app's limit is not kept (§13): the draft before it stays
     if (new TextEncoder().encode(history.current.xml).length > FORMAT.limits.bytes) return;
     M.keepDraft(store, history.current, env).then((ok) => {
       if (!ok && !keepFailed) toast('草稿存不下了（浏览器的存储满了）：关掉页面前记得保存');
@@ -72,7 +65,6 @@
     });
   }
 
-  // [external]: undo, redo, the source, a file: the selection found again by its keys' ids, the tab's fields shown anew
   function changed(external = false) {
     const xml = history.current.xml;
     if ($('source').value !== xml) $('source').value = xml;
@@ -87,7 +79,6 @@
     fill(external);
   }
 
-  // ---- the preview ----
 
   function themeOf(id) {
     if (id === OPENED) return opened && opened.theme;
@@ -128,7 +119,7 @@
       const li = document.createElement('li');
       li.className = p.level;
       const text = (p.level === 'error' ? '错误' : '警告') + (p.line ? '（第 ' + p.line + ' 行）' : '') + '：' + p.message;
-      // a key's problem selects the key; any other's goes to its line: a button, reached by Tab and read as one
+      // any other problem goes to its line: a button, reached by Tab and read as one
       if (p.line) {
         li.append(h('button', { type: 'button', onclick: () => {
           const at = LE.atLine(history.current.xml, p.line);
@@ -155,9 +146,7 @@
     ta.scrollTop = Math.max(0, (line - 3) * (parseFloat(getComputedStyle(ta).lineHeight) || 17));
   }
 
-  // ---- the environment ----
 
-  // what the window is laid out as (never a toggle: the device and its turn say it), and the field or the pads by family
   function fillShape(family) {
     const s = LM.shape(E, env);
     $('env-shape').textContent = s.widthDp + ' dp 宽，按' + (s.landscape ? '横屏' : '竖屏') + '排';
@@ -192,10 +181,8 @@
     if (history) preview();
   }
 
-  // ---- editing (§12.3, §12.5): the selection, the preview's drag, the tabs ----
 
-  // the selected cells, where they are written ({row, index}) and their keys' ids (found again by them after an undo,
-  // a redo, the source typed in); a fragment's key (the app's bottom row) by its scene id
+  // cells by place and their keys' ids, to find them again after an undo, a redo or the source typed in
   let sel = [];
   let fragmentKey = null; // {id, include}
   let rowTarget = -1; // the row 行 chose: where 加键 puts a key with none selected
@@ -227,21 +214,18 @@
   const xmlNow = () => history.current.xml;
   const keyboardAttrs = (xml) => { const k = F.elements(xml, 'keyboard')[0]; return k ? Object.fromEntries(k.attrs) : {}; };
   const columnsOf = (xml) => parseFloat(keyboardAttrs(xml).columns) || 10;
-  // the text's rows and cells, read once a text (a drag repaints on every pointer move: five passes over up to 64 KB each)
+  // parsed once per text: a drag repaints on every pointer move
   let parsedOf = { xml: null, p: null };
   const parsed = () => {
     const xml = xmlNow();
     if (parsedOf.xml !== xml) parsedOf = { xml, p: LE.parse(xml) };
     return parsedOf.p;
   };
-  // a fragment's text by its id (the app's bottom row): its keys' ids are the board's too
   const source = (src) => { try { return E.layoutSource(src) || null; } catch (e) { return null; } };
   const hasOwn = (o, k) => !!k && Object.hasOwn(o, k);
 
-  /** A change of the layout: [xml] the new text, [at] the selection after it (undefined: kept, null: none). */
   function edit(xml, at) {
     if (at !== undefined) {
-      // its key's id read once the text is the new one (tidy)
       sel = at ? [{ row: at.row, index: at.index }] : [];
       fragmentKey = null;
     }
@@ -249,13 +233,11 @@
     else fill();
   }
 
-  // [at] with the id of the key written there (a gap has none)
   function withId(at) {
     const c = LE.cellAt(parsed(), at);
     return { row: at.row, index: at.index, id: c && c.a.id };
   }
 
-  // the selection after a change not the tabs' own: each key where its id now is (one gone, or a gap, let go)
   function relocate() {
     const xml = xmlNow();
     const seen = new Set();
@@ -266,7 +248,6 @@
     }
   }
 
-  // the ids the preview's scene of [text] draws: which of a key written twice (when=) is shown
   function drawnIds(text) {
     const r = E.readOwnLayout(text);
     const theme = themeOf(env.theme);
@@ -275,14 +256,12 @@
     return s.ok ? s.scene.json().keys.map((k) => k.id) : [];
   }
 
-  // where the preview's key [id] is written, asked once a preview (a drag asks at every move)
   function locateShown(id) {
     if (!shown) return LE.locate(xmlNow(), id, drawnIds);
     if (!shown.at.has(id)) shown.at.set(id, LE.locate(xmlNow(), id, drawnIds));
     return shown.at.get(id);
   }
 
-  // a scene key's cell, or its fragment's include
   function cellOfKey(key) {
     const at = locateShown(key.id);
     if (at) return { at: { row: at.row, index: at.index, id: key.id } };
@@ -310,7 +289,6 @@
     paintShown();
   }
 
-  // ---- the preview drawn, with the selection and the drag over it ----
 
   function paintShown() {
     const canvas = $('preview');
@@ -354,7 +332,6 @@
     return i >= 0 ? shown.keys[i] : null;
   };
 
-  // where a dragged key goes: before or after the key under [p], by its middle; a line at that edge
   function dropTarget(p) {
     const key = keyAtPoint(p);
     const at = key && locateShown(key.id);
@@ -363,7 +340,6 @@
     return { row: at.row, index: before ? at.index : at.index + 1, x: before ? key.bounds[0] : key.bounds[2], y0: key.bounds[1], y1: key.bounds[3] };
   }
 
-  // the width a drag of the right edge gives: the key's units as now per pixel, snapped (§12.3)
   function widthAt(p) {
     const k = press.key;
     const kw = k.bounds[2] - k.bounds[0];
@@ -384,8 +360,7 @@
     const one = sel.length === 1 && LE.cellAt(parsed(), sel[0]);
     const mine = one && key && key.id === one.a.id;
     const touch = e.pointerType === 'touch';
-    // the selected key's right edge: its width
-    // (a finger only after the 300 ms press, as a drag: else a swipe there would not scroll)
+    // a finger only after the 300 ms press, as a drag: else a swipe there would not scroll
     if (mine && Math.abs(p.x - key.bounds[2]) < 16 * p.scale) {
       press = { mode: touch ? 'pending' : 'width', key, x: p.x, y: p.y, id: e.pointerId, touch };
       if (touch) {
@@ -398,8 +373,7 @@
       return;
     }
     if (touch) {
-      // a finger selects on lifting (a swipe over the preview scrolls the page, no tab changed under it) and drags
-      // only after a 300 ms press (§12.5)
+      // a finger selects on lifting (a swipe over the preview scrolls the page) and drags only after a 300 ms press
       press = { mode: 'pending', x: p.x, y: p.y, key, touch, id: e.pointerId };
       press.timer = setTimeout(() => {
         if (!press || press.mode !== 'pending' || !key) return;
@@ -445,7 +419,6 @@
     paintShown();
   }
 
-  // the arrow keys on the preview: the next key in the scene's order (← →), the nearest in the row above or below (↑ ↓)
   function stepSelection(e) {
     const dirs = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -2, ArrowDown: 2 };
     if (!shown || !shown.keys.length || !(e.key in dirs)) return;
@@ -470,7 +443,6 @@
     select(next, false);
   }
 
-  // ---- the tabs ----
 
   function render(t) {
     if (t === 'key') return keyTab(parsed());
@@ -480,19 +452,15 @@
     return null;
   }
 
-  // the selection and the row 行 chose kept to what the text has
   function tidy() {
     const p = parsed();
     sel = sel.filter((at) => LE.cellAt(p, at)).map(withId);
     if (rowTarget >= p.rows.length) rowTarget = -1;
     if (fragmentKey && !p.includes[fragmentKey.include]) fragmentKey = null;
-    // what a screen reader is told is selected: the keys as they are now (one taken out, another found), said once
     const say = fragmentKey ? '选中 ' + fragmentKey.id + '（App 的底行）' : sel.length ? '选中 ' + sel.map((s) => s.id || '空位').join('、') : '没有选中';
     if ($('selected').textContent !== say) $('selected').textContent = say;
   }
 
-  // a tab drawn whole (another chosen, or the change added or took controls): the control that had focus has it
-  // again where it still is, found by its place (controlKey)
   function showTab(t) {
     tab = t;
     for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === t));
@@ -508,9 +476,7 @@
     if (again) again.focus({ preventScroll: true });
   }
 
-  // the tab after a change, as the theme maker's (its refreshTab): its nodes kept, their values and texts made the
-  // new ones, so the field being typed in, its caret, a touch keyboard open over it, stay (a tab drawn anew took them).
-  // The field typed in keeps its text, but not where the change is not its own ([external]: undo, redo, the source).
+  // nodes kept, values updated, so the field being typed in, its caret and a touch keyboard over it stay
   function fill(external = false) {
     if (!history) return;
     const el = $('tab-' + tab);
@@ -524,22 +490,17 @@
     const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
     if (!same) { rebuildSoon(); return; }
-    // a part put in whole took the focused control with it (a key moved by ←): focus its like in the new one
     if (key && !el.contains(document.activeElement)) {
       const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
       if (again) again.focus({ preventScroll: true });
     }
   }
 
-  // the field typed in since its last commit (input before its change): kept over a rebuild
   let dirty = null;
   const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
   const CONTROLS = 'input, select, textarea, button';
 
-  // [to] made to show what [from] shows, its nodes kept (the theme maker's sync): a control's value, a text; a part
-  // with no control put in whole (a canvas drawn). A part whose data-key differs (what its handlers were made for:
-  // the keys selected, the base whose function keys a button adds) is put in whole, never kept with old handlers.
-  // False where the controls differ: the tab is then drawn anew. [skip] keeps its value (the field being typed in).
+  // a part whose data-key differs is replaced whole, never kept with stale handlers
   function sync(to, from, skip) {
     if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
     if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
@@ -574,9 +535,7 @@
     return true;
   }
 
-  // a change that adds or takes away controls draws the tab anew, a task later: on touch the old field's change
-  // comes inside the next tap, before focus moves, so drawn at once the tab lost the field tapped. What was typed
-  // into the focused field and not yet committed is kept with its caret.
+  // redrawn a task later: on touch the old field's change fires inside the next tap, before focus moves
   let rebuilding = null;
   function rebuildSoon() {
     clearTimeout(rebuilding);
@@ -594,7 +553,6 @@
     }, 0);
   }
 
-  // a control's place in a tab, the same in the tab drawn anew: its row's label, its own, its place in the row
   function controlKey(c) {
     const row = c.closest('.row, li, p');
     const what = row && row.querySelector('.what');
@@ -602,7 +560,6 @@
     return c.tagName + '|' + (what ? what.textContent : '') + '|' + (c.getAttribute('aria-label') || '') + '|' + inRow + '|' + (what ? '' : c.textContent || c.type);
   }
 
-  // 改成自己的底行 (§12.3): asked, then the fragment's rows copied in
   async function ownBottom(include) {
     const d = $('own-panel');
     d.returnValue = '';
@@ -610,7 +567,7 @@
     const before = LE.parse(xmlNow()).includes[include];
     const answer = await new Promise((ok) => d.addEventListener('close', () => ok(d.returnValue), { once: true }));
     if (answer !== 'yes') return;
-    // the text changed while asked (an undo, the source): the include is another or gone
+    // the text changed while asking (an undo, the source): the include may be another or gone
     const inc = LE.parse(xmlNow()).includes[include];
     const text = inc && before && inc.a.src === before.a.src ? source(inc.a.src) : null;
     if (!text) return toast('底行已经不在了');
@@ -622,7 +579,6 @@
     if (at) { sel = [withId(at)]; fill(); paintShown(); }
   }
 
-  // where 加键 puts a key: left of the one selected, else at the end of the row 行 chose, else of the last row
   function insertAt(p) {
     if (sel.length === 1) return sel[0];
     const row = rowTarget >= 0 ? rowTarget : p.rows.length - 1;
@@ -659,7 +615,6 @@
     ];
   }
 
-  // the group bar (§12.3): a–z, a letter no key types red, one two keys type yellow
   function groupBar() {
     const n = LE.coverage(xmlNow());
     return h('div', { className: 'groups', 'aria-label': '分组字母' }, ...'abcdefghijklmnopqrstuvwxyz'.split('').map((ch) =>
@@ -667,16 +622,13 @@
   }
 
   function iconPreview(name) {
-    // its data-key the icon: a canvas is put in anew only where it shows another (its pixels are not compared)
     const c = h('canvas', { width: 48, height: 48, className: 'icon', 'data-key': name || '' });
-    // the muted ink: seen on the light and the dark page alike
     if (hasOwn(ICONS, name)) E.paintIcon(c.getContext('2d'), { icons: ICONS }, name, 8, 8, 32, '#ff808890', 0);
     return c;
   }
 
   const KINDS = [['', '默认'], ['letter', '字母键'], ['function', '功能键'], ['space', '空格'], ['enter', '回车']];
   const LABELS = [['none', '不显示字'], ['text', '文字'], ['case', '随 Shift 大小写'], ['punct', '按标点转换'], ['other', '绑定（照写）']];
-  // where a long press comes from, a <popup> not a list of its own (§19.2)
   const POPUP_FROM = { preset: '底稿里同 id 的键', nine: '九键的数字（from="nine"）', group: '键上的分组字母（from="group"）', none: '没有：长按不弹（from="none"）' };
 
   function keyTab(p) {
@@ -693,7 +645,6 @@
     } else {
       out.push(...oneKey(p, sel[0], LE.cellAt(p, sel[0]), xml));
     }
-    // the selection's part: its handlers made for these keys, put in whole when they are others
     const mine = h('div', { 'data-key': fragmentKey ? 'f:' + fragmentKey.id + ':' + fragmentKey.include : 'k:' + sel.map((s) => s.row + '.' + s.index).join(' ') }, ...out);
     return [mine, ...palette(p)];
   }
@@ -729,7 +680,7 @@
 
   function oneKey(p, at, c, xml) {
     const set1 = (values) => edit(LE.setAttrs(xmlNow(), at, values));
-    // the key as written now: a handler kept over a change reads it, not what the tab was drawn from
+    // a handler kept over a change reads the key as written now, not what the tab was drawn from
     const now = () => (LE.cellAt(parsed(), at) || { a: {} }).a;
     const go = (r) => edit(r.xml, r.at);
     const moves = line('位置',
@@ -751,7 +702,6 @@
     if (c.name !== 'key') return out;
     const shared = LE.sharedName(a, FORMAT.prefixes);
     const label = LE.labelParts(a.label);
-    // the label's text written with the kind chosen beside it; braces only as a binding (照写): refused, said why
     const writeLabel = (type, arg) => {
       const why = LE.labelProblem(type, arg);
       if (why) return toast(why);
@@ -774,7 +724,6 @@
       out.push(groupBar(), line('分组字母', field(a.letters, (v) => {
         const l = v.trim().toLowerCase();
         if (l && LE.lettersProblem(l.replace(/ /g, ''))) return toast(LE.lettersProblem(l.replace(/ /g, '')));
-        // its face and, a key of the app's name, its name as LE.setLetters says; held-letters as the checker tells it
         const held = (x) => E.checkLayout(x, FORMAT.version, null).warnings.filter((f) => f.key === 'held-letters').map((f) => f.line);
         edit(LE.setAttrs(LE.setLetters(xmlNow(), at, l || null, held), at, { lean: l ? now().lean : null }));
       }, { 'aria-label': '分组字母', autocapitalize: 'off' })));
@@ -790,13 +739,11 @@
       const kind = choice(LE.ACTION_TYPES, ap.type, (v) => {
         arg.disabled = !v;
         arg.setAttribute('list', 'action-args-' + (v || 'none'));
-        // a kind chosen waits for its parameter: written once there is one
         if (!v || arg.value) set1({ [name]: v ? LE.actionText(v, arg.value) : null });
         else arg.focus();
       }, { disabled: off, 'aria-label': what });
       out.push(line(what, kind, arg));
     }
-    // the long press: a list of its own edited here; one from elsewhere said where, and a list written replaces it
     const pop = LE.popupOf(xml, at);
     const list = pop && pop.from === 'list';
     if (pop && !list) {
@@ -827,7 +774,6 @@
           ...moves,
           button('删除', () => edit(LE.removePart(xmlNow(), i), null)));
       }
-      // the handle: drag the row to another place
       const handle = item.querySelector('.handle');
       handle.draggable = true;
       handle.addEventListener('dragstart', (e) => { draggedPart = i; e.dataTransfer.setData('text/plain', String(i)); });
@@ -847,7 +793,6 @@
     ];
   }
 
-  // 加一行: after the row selected (a key's or 行's), else above the app's bottom row, else last
   function addRow() {
     const xml = xmlNow();
     const p = LE.parse(xml);
@@ -877,7 +822,7 @@
       const pads = (x) => new Set((keyboardAttrs(x).pads || '').split(' ').filter(Boolean));
       const on = pads(xml);
       out.push(line('数字键盘', ...FORMAT.pads.map((pad) => h('label', { className: 'inline' }, h('input', { type: 'checkbox', checked: on.has(pad), onchange: (e) => {
-        // the pads as written now: a box kept over a change has not the set it was drawn with
+        // a box kept over a change does not have the set it was drawn with
         const now = pads(xmlNow());
         if (e.target.checked) now.add(pad); else now.delete(pad);
         setK('pads', FORMAT.pads.filter((x) => now.has(x)).join(' '));
@@ -899,7 +844,6 @@
     ];
   }
 
-  // ---- files ----
 
   function pick(input) {
     return new Promise((ok) => {
@@ -913,7 +857,7 @@
   async function openFile() {
     const f = await pick($('open-input'));
     if (!f) return false;
-    // a pack by its bytes, not its name: one saved as .zip or x.theme.zip is a theme still (review S3)
+    // by its bytes, not its name: one saved as .zip or x.theme.zip is still a theme
     const head = new Uint8Array(await f.slice(0, 2).arrayBuffer());
     if (/\.theme$/i.test(f.name) || (head[0] === 0x50 && head[1] === 0x4b)) return openTheme(f);
     try {
@@ -931,18 +875,15 @@
     }
   }
 
-  // the preview's fonts: the page's, and where the theme is a .theme opened, its own by their names
   function fontsNow() {
     return Object.assign({}, FONTS, env.theme === OPENED && opened ? opened.fonts : {});
   }
 
-  // a .theme (§12.2, §12.4): its theme the preview's, and its boards (layouts/ the app lists) offered to start from, made
-  // layouts of the user's as the app makes them on import
   let opening = 0;
   async function openTheme(f) {
     let d;
     let theme;
-    // two opened one after another: the later's, the earlier ending after it dropped (review N6)
+    // the later wins, the earlier's late finish dropped
     const mine = ++opening;
     try {
       d = (await M.open(E, L, TFORMAT, new Uint8Array(await f.arrayBuffer()))).doc;
@@ -977,10 +918,7 @@
     return true;
   }
 
-  // [d]'s theme the preview's: its keys' images (those the app would take, as the theme maker decodes them; its picture
-  // not drawn here, not decoded: review S1) and fonts loaded
-  // ([current]: false once another is opened, this one's loaded then let go and false returned; it stays loaded till
-  // another is, the preview able to go back to it)
+  // only the images the app would take are decoded; its picture is not drawn here
   async function useTheme(d, theme, current) {
     const images = {};
     const fonts = {};
@@ -1001,7 +939,6 @@
           families[name] = family;
         }
       } catch (e) {
-        // one the browser cannot decode: drawn without it, as the app refuses it on import
       }
     }
     if (!current()) {
@@ -1042,7 +979,6 @@
       const answer = await new Promise((ok) => $('export-panel').addEventListener('close', () => ok($('export-panel').returnValue), { once: true }));
       if (answer !== 'save') return;
     }
-    // min-app as the checker worked it out: part of the document from now on (undo takes it back out)
     set(r.xml);
     const name = LM.fileName(r.xml);
     const a = document.createElement('a');
@@ -1055,9 +991,7 @@
     toast('已保存 ' + name);
   }
 
-  // ---- 新建 ----
 
-  // what 新建 starts from: a built-in board's id, or an example (`{id, label, note, xml}`)
   let base = 'qwerty';
   function chooseBase(b) {
     base = b;
@@ -1084,7 +1018,6 @@
     $('new-panel').close();
   }
 
-  // ---- start ----
 
   function wire() {
     window.addEventListener('pagehide', () => { if (keeping) keepNow(); });
@@ -1118,13 +1051,12 @@
     canvas.addEventListener('pointermove', pointerMove);
     canvas.addEventListener('pointerup', pointerUp);
     canvas.addEventListener('pointercancel', () => { if (press) clearTimeout(press.timer); press = null; paintShown(); });
-    // a finger dragging a key or its edge: the page not scrolled under it (touch-action pan-y lets a swipe scroll)
+    // touch-action pan-y lets a swipe scroll, so a drag must stop it
     canvas.addEventListener('touchmove', (e) => { if (press && (press.mode === 'move' || press.mode === 'width')) e.preventDefault(); }, { passive: false });
     canvas.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') select(null, false);
       else stepSelection(e);
     });
-    // Delete takes the selected keys out where the preview has the focus (or nothing has), never under 源码
     document.addEventListener('keydown', (e) => {
       if ((e.key !== 'Delete' && e.key !== 'Backspace') || !history || !sel.length || tab === 'source' || document.querySelector('dialog[open]')) return;
       if (e.target !== canvas && e.target !== document.body) return;
@@ -1139,18 +1071,17 @@
     let focusValue = null;
     $('edit').addEventListener('focusin', (e) => { focusValue = e.target.value; });
     $('edit').addEventListener('focusout', (e) => { if (e.target === dirty && e.target.value === focusValue) dirty = null; });
-    // the source read again a moment after typing stops: the checker builds every scene, not on every key
+    // debounced: the checker builds every scene
     let typing = null;
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey) || !history || document.querySelector('dialog[open]')) return;
       const k = e.key.toLowerCase();
       if (e.target === $('source')) {
-        // the textarea's own undo inside it; 保存 there takes what is typed now, not what the pause last read
+        // 保存 there takes what is typed now, not what the pause last read
         if (k === 's') { e.preventDefault(); clearTimeout(typing); set($('source').value, { external: true }); save(); }
         return;
       }
-      // a field typed in has its own undo; 保存 there commits what is typed first (a select, a box, a slider: no undo
-      // of their own, the layout's is theirs)
+      // selects, boxes and sliders have no undo of their own
       if (k === 's' && e.target.closest('input, textarea, select')) {
         e.preventDefault();
         if (typedIn(e.target)) e.target.blur();
@@ -1183,8 +1114,7 @@
       btn.addEventListener('click', () => chooseBase(ex));
       $('layout-examples').append(btn);
     }
-    // the form's default button (Enter in the name or the id is a click of it): its submit, which would close the
-    // dialog unchecked, is makeNew's to do
+    // Enter in the name or id clicks it: its submit would close the dialog unchecked
     $('new-make').addEventListener('click', (e) => { e.preventDefault(); makeNew(); });
     $('help-button').addEventListener('click', () => $('help-panel').showModal());
     $('new-open').addEventListener('click', async () => { if (await openFile()) $('new-panel').close(); });
@@ -1202,7 +1132,6 @@
     try {
       await Promise.all(['400', '700'].flatMap((w) => [document.fonts.load(w + ' 20px "Youmo Latin"', 'a'), document.fonts.load(w + ' 20px "Youmo Han"', '中')]));
     } catch (e) {
-      // drawn in the fallback font: measured the same, a little off from the phone's
     }
     const kept = store ? await M.draft(store) : null;
     if (kept) {

@@ -17,11 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Under 繁體 a block takes every candidate shown alike (国 with 國), each at its index of all, the
- * engine's text with it: past the first page too, where an act takes the list back to its first
- * page and another character would be at the page's index (review R3).
- */
+/** Under 繁體 a block takes every candidate shown alike, at its index of all, past the first page too. */
 class EnginesAlikeBlockTest : EnginesFixture() {
 
     // ten before 国 and 國, a page and more
@@ -51,7 +47,6 @@ class EnginesAlikeBlockTest : EnginesFixture() {
             assertTrue("$list", at >= 7 && "國" in list)
             val done = e.learning(PINYIN, LearningOp.Block(at, "国"), traditional)
             assertTrue("$done", done is LearningResult.Done)
-            // under the strokes typed, as the lookup blocks
             assertEquals(setOf("国", "國"), e.underCode())
             e.learning(PINYIN, LearningOp.Undo((done as LearningResult.Done).undo))
             assertEquals(emptySet<String>(), e.underCode())
@@ -72,8 +67,6 @@ class EnginesAlikeBlockTest : EnginesFixture() {
         }
     }
 
-    // review R4 M1: the pressed one refused by the host (its list changed), the one shown alike
-    // acted on before it is taken back: Unavailable, and nothing blocked
     @Test
     fun aBlockWhoseOwnActIsRefusedLeavesNothingBlocked() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->

@@ -23,7 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/** [PredictionOrder]: 联想 ranked by the user's picks after the word before (U-70). */
+/** [PredictionOrder]: 联想 ranked by the user's picks after the word before. */
 class PredictionOrderTest {
 
     // after 你: 好 吗 呀 啊 你们, most probable first; 们 after nothing
@@ -99,8 +99,6 @@ class PredictionOrderTest {
         assertEquals(Tier.FIRST_HERE, first.ranks.getValue(first.candidates[0]).tier)
     }
 
-    // U-91: a 联想 picked in a search field (or a URL's) ranks nothing, and taken back takes nothing
-    // back of a pick elsewhere
     @Test
     fun aPickInASearchFieldRanksNothing() {
         for (flags in listOf(Commit.NO_PREDICT, Commit.NO_PAIRS)) repeat(2) { pick("啊", flags = flags) }
@@ -127,17 +125,15 @@ class PredictionOrderTest {
         pick("好")
         pick("啊")
         pick("好")
-        // 啊 twice, 呀 once: by uses, after the first
         assertEquals(listOf("好", "啊", "呀", "吗", "你们"), texts())
     }
 
-    // U-70: 联想 has no 前文 beyond the word it follows
+    // 联想 has no 前文 beyond the word it follows
     @Test
     fun theWordBeforeTheWordFollowedChangesNothing() {
         pick("啊")
         pick("啊")
         assertEquals(listOf("啊", "好", "吗", "呀", "你们"), texts(prev2 = id("我")))
-        // after another word, nothing of it
         assertTrue("啊" !in texts("我"))
     }
 
@@ -148,7 +144,6 @@ class PredictionOrderTest {
         val o = offer()
         assertEquals(listOf("好", "们", "吗", "呀", "啊", "你们"), o.candidates.map { it.text })
         assertEquals(Tier.USED, o.ranks.getValue(o.candidates[1]).tier)
-        // one blocked since is not, nor one turned off there (U-72)
         user.predictionsOff = { prev, next -> prev == "你" && next == "们" }
         assertEquals(listOf("好", "吗", "呀", "啊", "你们"), texts())
         user.predictionsOff = { _, _ -> false }
@@ -156,7 +151,6 @@ class PredictionOrderTest {
         assertEquals(listOf("好", "吗", "呀", "啊", "你们"), texts())
     }
 
-    // 原 PY-71: offered after the word as put in (你们, read 你 们): a word put back is turned off after it too, not after the decoder's piece
     @Test
     fun aWordPutBackAfterTheWholeWordIsTurnedOffAfterIt() {
         picked("们", "你们", "好")
@@ -171,13 +165,12 @@ class PredictionOrderTest {
 
     @Test
     fun aWordOfTheUsersGoesBeforeTheModelsNeverPicked() {
-        // 你们, put in twice where it was no word of the dictionary's: the user's (U-06), after the first, before the rest (U-02)
+        // 你们, put in twice where it was no word of the dictionary's: the user's, after the first, before the rest
         repeat(2) { learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.FULL, "nimen"), "", Words.of("你们", "ni men"), 'A', Row.NONE, "你们"))) }
         assertTrue(learner.habits.mineOrder("你们") >= 0)
         assertEquals(listOf("好", "你们", "吗", "呀", "啊"), texts())
     }
 
-    // U-71: what was put in after a word, any way, three times
     @Test
     fun aWordPutInAfterTheWordThreeTimesIsOfferedThoughTheModelLacksIt() {
         fun typed() = learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.FULL, "men"), "你", Words.of("们", "men"), 'A', Row.DICTIONARY, "们")))
@@ -185,7 +178,6 @@ class PredictionOrderTest {
         assertTrue("们" !in texts())
         typed()
         assertTrue("们" in texts())
-        // a table's or handwriting's word, of no reading, as well
         repeat(Predictor.PAIRS) {
             learner.habits.record(listOf(Row(Row.PICK or Row.WHOLE, Code(Kinds.HANDWRITING, "们"), "我", Words.of("们"), 'A', Row.DICTIONARY, "们")))
         }
@@ -205,7 +197,7 @@ class PredictionOrderTest {
         assertTrue(PredictionOrder.RANKED > Predictor.DEFAULT_LIMIT)
     }
 
-    // U-73: the rest of a whole phrase, before the words; a word of its text once, as the phrase
+    // the rest of a whole phrase, before the words; a word of its text once, as the phrase
     @Test
     fun aPhrasesRestGoesBeforeTheWords() {
         val found = listOf(Continuations.Found("你好呀", "好呀", 3), Continuations.Found("你吗啊", "吗啊", 3))
@@ -218,7 +210,7 @@ class PredictionOrderTest {
         assertEquals("你好", same.phrases.getValue(same.candidates[0]).whole)
     }
 
-    // U-70 still: a word picked twice running there goes in front of a phrase, once picked behind it
+    // a word picked twice running there goes in front of a phrase, once picked behind it
     @Test
     fun aWordPutFirstHereStaysBeforeAPhrase() {
         val found = listOf(Continuations.Found("你好呀", "好呀", 3))
@@ -228,7 +220,6 @@ class PredictionOrderTest {
         assertEquals(listOf("啊", "好呀", "好"), order.offer(learner.habits, NO_WORD, id("你"), continued = found).candidates.take(3).map { it.text })
     }
 
-    // after a word the model has not (the user's new word): the phrases alone, after it as put in (review of 051-predict)
     @Test
     fun afterNoWordOfTheModelsThePhrasesAlone() {
         val found = listOf(Continuations.Found("龘你好", "你好", 3))

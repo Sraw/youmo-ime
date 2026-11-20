@@ -51,8 +51,7 @@ class VoicePostRunTest {
 
     @Test
     fun theReferencesNumbersAreComparedAsWritten() {
-        // numbers are the polish tagger's call, not this scorer's: a reference written in Han
-        // numerals against a typed 2026 is wrong; the same form on both sides is not
+        // numbers are the tagger's call: Han numerals against 2026 is wrong, the same form on both sides is not
         val s = VoicePostRun.Score()
         VoicePostRun.score("二零二六年", "2026年", s)
         assertEquals(4, s.wordErrors) // 2026 for one numeral, three numerals missing, 年 matched
@@ -111,8 +110,6 @@ class VoicePostRunTest {
         assertEquals(listOf("0.00%", "0.00%"), out.lines()[1].split('\t').subList(3, 5))
     }
 
-    // a clip with no written reference in a set with them: read as none (the set's ref, written false), left out
-    // of the written scores and counted as unwritten
     @Test
     fun aClipWithoutAWrittenReferenceInASetWithThemIsLeftOutAndCounted() = assertRows(
         "the key missing" to { leftOutAndCounted("seg-u.jsonl", "") },
@@ -174,14 +171,12 @@ class VoicePostRunTest {
         assertEquals("今天个人很好。" to "tagged: guard=false untagged=0 unfound=0 long=0", texts(false))
     }
 
-    // what says whether a tagged run's scores can be trusted: windows found where the stream is, and
-    // the clips that could not be replayed as the app's counted, not scored wrong without a word
+    // a tagged run's trust: windows found where the stream is, and clips not replayable counted, not scored wrong
     @Test
     fun taggedWindowsAreFoundAlongTheClipAndTheOnesNotReplayedCounted() {
         val tagger = tmp.newFile("polish-tagger.json")
         tagger.writeText("""{"ops": ["keep", "del"], "after": ["", "，", "。"], "num": ["none"]}""")
-        // 80 characters none of which repeats, so a window is found in one place only: two stretches, and
-        // windows [0, 40) then [16, 80) (WINDOW 64), the one deleted (75) only in the second
+        // 80 characters none of which repeats, so a window is found in one place only
         val han = (0 until 80).map { Char(0x5000 + it) }.joinToString("")
         fun labels(f: (Int) -> Int) = (0 until 80).joinToString(", ", "[", "]") { "${f(it)}" }
         val file = tmp.newFile("seg-w.jsonl")
@@ -217,7 +212,7 @@ class VoicePostRunTest {
         assertTrue(e.message!!, e.message!!.contains("short.wav"))
     }
 
-    // R25r5 F8020: a file not there (a path mistyped) ended the run with a stack trace, not a failed run naming it
+    // a file not there (a path mistyped) is a failed run naming it, not a stack trace
     @Test
     fun aFileNotThereIsRefusedNamingIt() = assertRows(
         "a set's clips: read outside the parsing, an IOException not caught" to {

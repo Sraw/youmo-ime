@@ -58,7 +58,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
-/** UAT cases of uat/14 on the settings app's own pages: search, help, language, about, themes. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -67,8 +66,7 @@ class SettingsMenuUatTest {
     @Before
     fun phone() {
         phoneStorage()
-        // the index built where it is asked for: each case's results there after an idle; the cases of its own
-        // thread below set theirs
+        // the index built where it is asked for: each case's results there after an idle
         SettingsIndexModel.Hooks.dispatcher = Dispatchers.Unconfined
         SettingsIndexModel.Hooks.builds.set(0)
     }
@@ -122,12 +120,11 @@ class SettingsMenuUatTest {
         assertEquals("pref:" + AppPrefs.PINYIN_KEYBOARD, via)
         st.activity.onBackPressedDispatcher.onBackPressed()
         st.idle()
-        // a row of 网址和邮箱: that page, pointed at the row itself
         assertEquals("pref:" + AddressSettingsFragment.EMAIL_KEY to null, searchAndOpen(st.s(R.string.email_suffixes)) { true })
         assertTrue(route, "Addresses" in route)
     }
 
-    /** The titles of the search page's results, the list's rows (not the field, which holds the query). */
+    /** The list's rows, not the field, which holds the query. */
     private fun resultTitles(): List<String> {
         val list = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>().first()
         list.measure(0, 0)
@@ -139,8 +136,7 @@ class SettingsMenuUatTest {
     private fun type(query: String) =
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first().setText(query)
 
-    // the index lands after the page is up: what was typed before is searched then, the last of it, with no
-    // 没有结果 shown meanwhile
+    // the index lands after the page is up: what was typed before is searched then, with no 没有结果 meanwhile
     @Test
     fun whatIsTypedBeforeTheIndexLandsIsSearchedWhenItDoes() {
         val build = StandardTestDispatcher()
@@ -159,7 +155,6 @@ class SettingsMenuUatTest {
         assertEquals(1, SettingsIndexModel.Hooks.builds.get())
     }
 
-    // a build not yet run when the page goes is cancelled with it: it never runs
     @Test
     fun aBuildNotDoneIsCancelledWithThePage() {
         val build = StandardTestDispatcher()
@@ -174,7 +169,6 @@ class SettingsMenuUatTest {
         assertEquals(0, SettingsIndexModel.Hooks.builds.get())
     }
 
-    // a rotation takes the build under way, or the one done, not another
     @Test
     fun aRotationKeepsTheBuild() {
         val build = StandardTestDispatcher()
@@ -196,7 +190,6 @@ class SettingsMenuUatTest {
         assertTrue("模糊音" in resultTitles())
     }
 
-    // the language changed while the page is up: the build of the old one is dropped, the new one built and searched
     @Test
     @Config(sdk = [35])
     fun aNewLanguageBuildsTheIndexAnew() {
@@ -210,7 +203,6 @@ class SettingsMenuUatTest {
         assertTrue(chinese.isCancelled)
         build.scheduler.runCurrent()
         st.idle()
-        // the Chinese one, cancelled before it ran, never did
         assertEquals(1, SettingsIndexModel.Hooks.builds.get())
         type("fuzzy")
         st.idle()
@@ -218,12 +210,10 @@ class SettingsMenuUatTest {
         assertTrue(titles.toString(), titles.any { it.startsWith("Fuzzy") })
     }
 
-    // 6T: 84 ms the first time, over a frame: never on the main thread (061-settings-search.md §4.11)
     @Test
     fun theIndexIsNotBuiltOnTheMainThread() {
         SettingsIndexModel.Hooks.dispatcher = Dispatchers.Default
         st.open(SettingsRoute.Search)
-        // done, however long it takes: no clock
         runBlocking { SettingsIndexModel.Hooks.latest!!.await() }
         st.idle()
         assertEquals(1, SettingsIndexModel.Hooks.builds.get())
@@ -233,7 +223,6 @@ class SettingsMenuUatTest {
         assertTrue("模糊音" in resultTitles())
     }
 
-    /** Searches [query]: each result's title and the line under it, in order. */
     private fun results(query: String): List<Pair<String, String>> {
         if ("Search" !in route) st.open(SettingsRoute.Search)
         val field = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first()
@@ -249,7 +238,6 @@ class SettingsMenuUatTest {
         }
     }
 
-    /** ST-156, ST-159: 笔画筛选 finds four in this order, said as what each is. */
     private fun strokeFilterFindsFour(query: String, alias: String) {
         val found = results(query)
         assertEquals(
@@ -269,7 +257,6 @@ class SettingsMenuUatTest {
         val (key, via) = searchAndOpen(st.s(R.string.stroke_filter)) { st.s(R.string.search_is_choice) in it }
         assertTrue(route, "SharedInput" in route)
         assertEquals("pref:" + AppPrefs.KEY_DRAWING to null, key to via)
-        // the row pointed at, its list not opened
         assertTrue(ShadowDialog.getLatestDialog()?.isShowing != true)
     }
 
@@ -277,7 +264,6 @@ class SettingsMenuUatTest {
     @Uat("ST-157")
     fun searchingAKeyCommandOpensTheKeysPageWithAHint() {
         val hint = { name: String -> st.s(R.string.search_command_hint, name) }
-        // by another name of the five, as ST-157 has it
         searchAndOpen("横竖撇点折", title = st.s(R.string.search_stroke_commands)) { st.s(R.string.search_is_command) in it }
         assertTrue(route, "PopupOverrides" in route)
         assertTrue(texts().toString(), hint(st.s(R.string.search_strokes_one)) in texts())
@@ -292,7 +278,6 @@ class SettingsMenuUatTest {
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().single { it.text.toString() == st.s(R.string.search_got_it) }.performClick()
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
         assertFalse(texts().toString(), hint(st.s(R.string.shortcut_copy)) in texts())
-        // nor does it outlive the page it is about: back to the search, it is gone
         st.activity.onBackPressedDispatcher.onBackPressed()
         st.idle()
         searchAndOpen(st.s(R.string.shortcut_copy)) { st.s(R.string.search_is_command) in it }
@@ -331,7 +316,6 @@ class SettingsMenuUatTest {
     @Config(qualifiers = "en-w393dp-h851dp-port-440dpi")
     fun strokeFilterFindsTheSameFourInEnglish() = strokeFilterFindsFour("stroke filter", "stroke filter")
 
-    /** The control the page flashed after [query]'s result titled [title] under [under] was opened. */
     private fun flashedFor(query: String, title: String = query, under: (String) -> Boolean): View? {
         SearchHighlight.Hooks.flashed = null
         searchAndOpen(query, title, under)
@@ -344,7 +328,6 @@ class SettingsMenuUatTest {
         st.idle()
     }
 
-    // a keyboard's card of 按键字符和快捷键: that keyboard picked, its card flashed; a button of the bar flashed
     @Test
     @Uat("ST-165")
     fun searchingAKeyboardOrAButtonOfTheKeysPageGoesToIt() {
@@ -353,7 +336,6 @@ class SettingsMenuUatTest {
         val card = flashedFor(zy9) { keys in it }
         assertTrue(route, "PopupOverrides" in route)
         assertEquals("view:keys/board/zy9", card?.tag)
-        // its keys' card under the cards: named as the keyboard picked
         assertTrue(texts().toString(), texts().count { it == zy9 } >= 2)
         back()
         assertEquals("view:keys/flip", flashedFor(st.s(R.string.swipe_flip_all)) { keys in it }?.tag)
@@ -372,7 +354,6 @@ class SettingsMenuUatTest {
         assertTrue(route, "PopupOverrides" in route)
     }
 
-    // a row of a page drawn by hand that has preferences (开发者, 词库与短语): pointed at by its key
     @Test
     @Uat("ST-168")
     fun aRowOfAPageDrawnByHandIsPointedAt() {
@@ -383,7 +364,6 @@ class SettingsMenuUatTest {
         assertTrue(route, "PinyinDict" in route)
     }
 
-    // a built-in theme by its name: 外观 on its themes' tab, the theme's card flashed
     @Test
     @Uat("ST-169")
     fun aBuiltInThemeIsFoundByItsName() {
@@ -394,7 +374,6 @@ class SettingsMenuUatTest {
         assertTrue(card != null && KeyboardHarness.all(card.parent as View).filterIsInstance<TextView>().any { it.text.toString() == pixel })
     }
 
-    // the home page's language row: back to the home page already under the search, pointed at the row
     @Test
     fun theLanguageRowGoesBackToTheHomePage() {
         val depth = { navController.currentBackStack.value.size }
@@ -406,10 +385,8 @@ class SettingsMenuUatTest {
     }
 
     /**
-     * Searches [query] and opens the result titled so ([title]) whose path [under] takes; the setting the
-     * opened page is to point at and the row to point at while it is hidden. Read from the result's
-     * entry as SearchHighlight keeps them: the flash itself waits for an input method page's
-     * options, which come from the engine, not here.
+     * Searches [query] and opens the result titled [title] whose path [under] takes. Read from the result's entry as
+     * SearchHighlight keeps it: the flash itself waits for an input method page's options, which come from the engine.
      */
     private fun searchAndOpen(query: String, title: String = query, under: (String) -> Boolean): Pair<String?, String?> {
         if ("Search" !in route) st.open(SettingsRoute.Search)
@@ -444,8 +421,7 @@ class SettingsMenuUatTest {
         assertTrue(Const.helpUrl, Const.helpUrl.startsWith("https://github.com/"))
     }
 
-    // not at 29: Robolectric there dies in appcompat's recreate below Android 13 (a sync barrier token
-    // "not posted"); picking English on Android 10 itself (AVD youmo29) switches the app as it should
+    // not at 29: Robolectric there dies in appcompat's recreate below Android 13 (a sync barrier token "not posted")
     @Test
     @Uat("ST-25")
     @Config(sdk = [35])
@@ -499,7 +475,6 @@ class SettingsMenuUatTest {
         prefs.followSystemDayNightTheme.setValue(true)
         try {
             st.open(SettingsRoute.Theme)
-            // one of two versions: each slot its version, no dialog
             pick(TestThemes.PixelDark.name)
             assertEquals("pixel#light", prefs.lightModeTheme.getValue().name)
             assertEquals("pixel#dark", prefs.darkModeTheme.getValue().name)
@@ -508,7 +483,6 @@ class SettingsMenuUatTest {
             assertEquals("amoled-black", prefs.lightModeTheme.getValue().name)
             assertEquals("amoled-black", prefs.darkModeTheme.getValue().name)
             assertEquals("amoled-black", ThemeManager.activeTheme.name)
-            // the normal slot too, the one used once following is turned off
             assertEquals("amoled-black", prefs.normalModeTheme.getValue().name)
             assertTrue(keyboardIsDark())
         } finally {
@@ -528,7 +502,6 @@ class SettingsMenuUatTest {
         assertTrue(ThemeManager.saveTheme(mine))
         try {
             st.open(SettingsRoute.Theme)
-            // 新增主题: a menu (060-render-p3 M5), 导入主题文件 the import's file picker, 在网页上制作 the browser
             themeList().findViewHolderForAdapterPosition(0)!!.itemView.performClick()
             st.idle()
             val menu = dialog().listView
@@ -536,12 +509,11 @@ class SettingsMenuUatTest {
             menu.performItemClick(menu.adapter.getView(0, null, menu), 0, menu.adapter.getItemId(0))
             st.idle()
             assertEquals(Intent.ACTION_GET_CONTENT, shadowOf(st.activity).nextStartedActivity?.action)
-            // one's own theme: no edit button, its long press 信息 (060-render-p3 T8a), 导出 or 删除
             pick("mine")
             assertEquals("mine", ThemeManager.activeTheme.name)
             val at = (themeList().adapter as ThemeListAdapter).entries.indexOfFirst { it.name == "mine" } + 1
             val row = themeList().findViewHolderForAdapterPosition(at)!!.itemView
-            // no edit button: nothing in the row takes a tap but the row itself (which picks the theme)
+            // nothing in the row takes a tap but the row itself (which picks the theme)
             assertEquals(0, KeyboardHarness.all(row).count { it !== row && it.hasOnClickListeners() })
             row.performLongClick()
             st.idle()
@@ -553,7 +525,6 @@ class SettingsMenuUatTest {
             st.idle()
             assertTrue(ThemeManager.getAllThemes().none { it.name == "mine" })
             assertTrue((themeList().adapter as ThemeListAdapter).entries.none { it.name == "mine" })
-            // the theme in use gone: the default's back
             assertEquals(ThemeManager.prefs.normalModeTheme.defaultValue.name, ThemeManager.activeTheme.name)
         } finally {
             ThemeManager.deleteTheme("mine")
@@ -562,8 +533,8 @@ class SettingsMenuUatTest {
         }
     }
 
-    // SDK 33: the keyboard selected is read from Settings.Secure there, which Robolectric keeps; from 34
-    // it is InputMethodManager.getCurrentInputMethodInfo, which it has no shadow for
+    // SDK 33: the keyboard selected is read from Settings.Secure there, which Robolectric keeps; from 34 it is
+    // InputMethodManager.getCurrentInputMethodInfo, which it has no shadow for
     @Test
     @Uat("SET-02")
     @Config(sdk = [33])
@@ -576,7 +547,6 @@ class SettingsMenuUatTest {
         SetupActivity.skipped = false
         try {
             st.activity
-            // no wizard over it: the home page's ten rows
             val next = shadowOf(st.activity).nextStartedActivity
             assertTrue("started ${next?.component}", next?.component?.className != SetupActivity::class.java.name)
             assertEquals(MainFragment.HOME.map { st.s(it.title) } + st.s(R.string.app_language), st.titles())

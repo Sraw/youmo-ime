@@ -6,55 +6,36 @@ package org.fcitx.fcitx5.android.scene.xml
 
 import org.fcitx.fcitx5.android.scene.Parsed
 
-/**
- * An element as read: its [name] (never prefixed: such an element is refused), its [attributes] in the order written
- * (prefixed ones, `xmlns` among them, kept as written), its [children] and the [line] it starts on.
- */
+/** [name] never prefixed (such an element is refused); prefixed attributes, `xmlns` among them, kept as written. */
 class XmlElement(
     val name: String,
     val attributes: Map<String, String>,
     val children: List<XmlElement>,
     val text: String,
     val line: Int,
-    /** Where it is in the source, only where it was asked for ([Xml.parse]'s `offsets`). */
     val offsets: XmlOffsets? = null,
 ) {
     operator fun get(attribute: String): String? = attributes[attribute]
 
-    /** Its children named [name]. */
     fun all(name: String): List<XmlElement> = children.filter { it.name == name }
 
     override fun toString(): String = "<$name> at line $line"
 }
 
-/**
- * Where an element is in its source, by index: [from] its `<`, [close] its start tag's `/>` or `>`, [to] just past its
- * end; [values] each attribute's value between its quotes, as written (references not read). What a rewrite of the
- * text in place needs (a pack's qwerty.xml given 分词, PackSeparator.addSeparator), the rest of the file kept as it is.
- */
+/** What a rewrite of the text in place needs (PackSeparator.addSeparator); [values] as written, references not read. */
 class XmlOffsets(val from: Int, val close: Int, val to: Int, val values: Map<String, IntRange>)
 
 /**
- * The XML a layout or a theme is written in, and no more (060-render-v2 §6): elements, attributes,
- * comments, text, the XML declaration. No DTD, so no entities of a file's own and no XXE; the five
- * predefined entities and character references are read (`&quot;` is how a `"` is written in an
- * attribute). CDATA is refused too: nothing here needs it. Every problem carries its line.
- *
- * Limits: a theme comes from anywhere, so a file is [MAX_CHARS] at most and [MAX_DEPTH] deep.
+ * The XML a layout or a theme is written in, and no more. No DTD, so no entities of a file's own and no XXE; CDATA is
+ * refused too. A theme comes from anywhere, so a file is [MAX_CHARS] at most and [MAX_DEPTH] deep.
  */
 object Xml {
     const val MAX_CHARS = 1_000_000
     const val MAX_DEPTH = 32
 
-    /**
-     * Whether [c] is a character of XML 1.0 (§2.2): not a C0 control but tab, LF and CR, nor NUL, U+FFFE or U+FFFF. A
-     * value is only ever of these, whichever way it was written (a control or U+FFFF in a name the page and the app
-     * would show): one written as it is dropped (a file 0.6.0 wrote or read with one still reads, R26 F8187), a
-     * reference to one refused; the writers leave them out.
-     */
+    /** XML 1.0 §2.2: one written as it is dropped (a file 0.6.0 wrote with one still reads), a reference to one refused. */
     fun allows(c: Char): Boolean = !(c < ' ' && c != '\t' && c != '\n' && c != '\r' || c == '\uFFFE' || c == '\uFFFF')
 
-    /** The root element of [source], or why not; [offsets]: each element with its [XmlOffsets]. */
     fun parse(source: String, offsets: Boolean = false): Parsed<XmlElement> =
         if (source.length > MAX_CHARS) {
             Parsed.Failed(0, "the file is over $MAX_CHARS characters")
@@ -67,7 +48,6 @@ object Xml {
         }
 }
 
-/** Thrown inside the reader only, caught by [Xml.parse]: a parse stops at its first problem. */
 private class XmlException(val line: Int, message: String) : Exception(message)
 
 private class Reader(private val s: String, private val offsets: Boolean) {
@@ -104,7 +84,6 @@ private class Reader(private val s: String, private val offsets: Boolean) {
         skipMisc()
     }
 
-    // spaces, comments and processing instructions (the declaration among them) between elements
     private fun skipMisc() {
         while (true) {
             skipSpace()
@@ -145,7 +124,7 @@ private class Reader(private val s: String, private val offsets: Boolean) {
         val from = i
         advance(1)
         val qName = name()
-        // the files are in one namespace, the default one: a prefixed element (l:key) is another's, or one not declared
+        // the files are in one namespace, the default one
         if (':' in qName) fail("<$qName>: an element with a prefix (write the namespace as xmlns=)")
         val values = valuesAsked()
         val attributes = attributes(qName, values)
@@ -182,7 +161,6 @@ private class Reader(private val s: String, private val offsets: Boolean) {
                     // no element here holds text: a word between them is a mistake (a quote not closed, a > too many)
                     val first = t.indexOfFirst { !it.isXmlSpace() }
                     if (first >= 0) {
-                        // the line the word is on, not the one the whitespace before it started
                         throw XmlException(textLine + t.take(first).replace("\r\n", "\n").count { it == '\n' || it == '\r' }, "text in <$qName>: \"${t.trim().take(TEXT_SHOWN)}\"")
                     }
                     text.append(t)
@@ -221,14 +199,12 @@ private class Reader(private val s: String, private val offsets: Boolean) {
         }
     }
 
-    // text up to [end] (not taken), references read; '<' is never in a value. A literal tab, LF or CR (CRLF as
-    // one) is a space, as XML 1.0 §3.3.3 normalises an attribute value; one written as a reference stays
+    // a literal tab, LF or CR (CRLF as one) is a space, as XML 1.0 §3.3.3 normalises an attribute value; a reference stays
     private fun endsLine(at: Int): Boolean {
         val c = s.getOrNull(at)
         return c == '\n' || c == '\r' && s.getOrNull(at + 1) != '\n'
     }
 
-    // what ends a run of plain characters: [end], a reference, an attribute's line break
     private fun plainEnds(c: Char, end: Char, attribute: Boolean) = c == end || c == '&' || attribute && c in BREAKS
 
     private fun chars(end: Char, attribute: Boolean = false): String {
@@ -237,7 +213,7 @@ private class Reader(private val s: String, private val offsets: Boolean) {
             if (s[i] == '<') fail("'<' in a value")
             advance(1)
         }
-        // no reference or character to drop in it (most values): the text as it is, not copied a character at a time
+        // not copied a character at a time
         if (i >= s.length || s[i] == end) return s.substring(start, i)
         val b = StringBuilder().appendRange(s, start, i)
         while (i < s.length && s[i] != end) {
@@ -298,8 +274,7 @@ private class Reader(private val s: String, private val offsets: Boolean) {
 
 private fun Char.isXmlSpace(): Boolean = this == ' ' || this == '\n' || this == '\t' || this == '\r'
 
-// names are ASCII: what Unicode calls a letter the JVM's and JS's tables may not agree on, and no name here needs one.
-// `:` for an attribute's namespace prefix (xmlns:xsi, xsi:schemaLocation); an element's is refused
+// names are ASCII: what Unicode calls a letter the JVM's and JS's tables may not agree on
 private fun Char.isNameStart(): Boolean = this in 'a'..'z' || this in 'A'..'Z' || this == '_' || this == ':'
 
 private fun Char.isNameChar(): Boolean = isNameStart() || this in '0'..'9' || this == '-' || this == '.'

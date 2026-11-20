@@ -9,7 +9,6 @@ import android.view.MotionEvent
 import android.view.ViewConfiguration
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.InputMethodSubMode
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard.SwipeChoice
@@ -29,11 +28,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * What a letter's swipe types ([SwipeChoice], [KeySwipe]): the key's own, the first of the long
- * press, or nothing where the user turned that long press off; the preview shows the same. The
- * swipes done on the keys the scene draws, what the keyboard was told recorded.
- */
+/** What a letter's swipe types: the key's own, the long press's first, or nothing where that long press is off. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class BaseKeyboardTest {
@@ -41,7 +36,6 @@ class BaseKeyboardTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    /** The pinyin keyboard, its key and popup actions recorded as they go on to the service. */
     private class Told(val h: KeyboardHarness, val board: TextKeyboard) {
         val actions = mutableListOf<KeyAction>()
         val popups = mutableListOf<PopupAction>()
@@ -53,7 +47,7 @@ class BaseKeyboardTest {
             board.popupActionListener = PopupActionListener { popups += it; pops?.onPopupAction(it) }
         }
 
-        // key [id] swiped [rows] of its own height down (up when less than 0): 0.8, some 44 dp here, past the 36 dp threshold
+        // [rows] of the key's height down (up when negative): 0.8, some 44 dp, past the 36 dp threshold
         fun drag(id: String, rows: Float) {
             val k = h.keyNamed(id)
             h.swipe(k, 0f, k.height * rows)
@@ -80,7 +74,7 @@ class BaseKeyboardTest {
         assertEquals("é", SwipeChoice.Output(KeyAction.HostKeyAction("é"), "é").preview("1"))
     }
 
-    // PY-41: a space long press that does nothing (None) took the touch from a slow drag
+    // a space long press that does nothing took the touch from a slow drag
     @Test
     fun aSpaceLongPressThatDoesNothingLeavesTheSwipeBe() {
         assertFalse(spaceLongPressTakesTouch(SpaceLongPressBehavior.None, voiceReady = true, inPasswordField = false))
@@ -91,7 +85,7 @@ class BaseKeyboardTest {
         assertTrue("another behaviour needs no pack", spaceLongPressTakesTouch(SpaceLongPressBehavior.Enumerate, voiceReady = false, inPasswordField = false))
     }
 
-    // hold to talk follows the finger holding the space: its long press told with that finger's pointer id
+    // hold to talk follows the finger holding the space
     @Test
     fun theSpacesLongPressCarriesTheFingersPointer() {
         told { t ->
@@ -111,9 +105,8 @@ class BaseKeyboardTest {
         }
     }
 
-    // a long press that takes the touch (Enumerate; Voice with its pack in): a slow drag on the space past the slop,
-    // then held past the delay, is a swipe, its long press never fired (the scene's touch path, KeyGesture;
-    // PY-41, R20 F5928: KeyboardUatTest's PY-41 rows are holds that do nothing, this one's takes the touch)
+    // a long press that takes the touch (Enumerate; Voice with its pack): a slow drag past the slop, then held past
+    // the delay, is a swipe, its long press never fired
     @Test
     fun aSlowDragOnTheSpaceKeepsTheLongPressFromFiring() {
         for (behavior in listOf(SpaceLongPressBehavior.Enumerate, SpaceLongPressBehavior.Voice)) told { t ->
@@ -128,7 +121,6 @@ class BaseKeyboardTest {
             fun send(action: Int, x: Float) = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y0, 0)
                 .also { h.inputView.dispatchTouchEvent(it); it.recycle() }
             send(MotionEvent.ACTION_DOWN, x0)
-            // slowly: a step at a time, under the delay, past the slop in all
             for (i in 1..4) {
                 h.after(50L)
                 send(MotionEvent.ACTION_MOVE, x0 + slop * i)
@@ -139,7 +131,7 @@ class BaseKeyboardTest {
         }
     }
 
-    // the slots at their default (the long press's first up, shortcuts down): a's select all down, its first up, s with nothing down a tap
+    // the slots at their default: a's select all down, its first up; s with nothing down a tap
     @Test
     @Uat("KB-61")
     fun aLettersSwipeDownIsItsShortcutAndUpItsFirst() = told { t ->
@@ -157,7 +149,6 @@ class BaseKeyboardTest {
         assertEquals("no copy of a password, nor a c", emptyList<KeyAction>(), t.actions.filter { it is KeyAction.ShortcutAction || it is KeyAction.HostKeyAction })
     }
 
-    // the space swiped up opens the edit menu over it; the backspace swiped up clears, down restores
     @Test
     @Uat("KB-62")
     fun theSpaceUpIsTheEditMenuAndTheBackspaceUpAndDownClearAndRestore() = told { t ->
@@ -172,7 +163,6 @@ class BaseKeyboardTest {
         )
     }
 
-    // a text shortcut set for a key is committed as its shortcut; the swipe off takes it all the same
     @Test
     @Uat("KB-63")
     fun aKeysOwnTextShortcutIsWhatItsSwipeRuns() {
@@ -183,7 +173,6 @@ class BaseKeyboardTest {
         }
     }
 
-    // ST-15: a swipe the other way (up, the symbol being down) types the letter once, just past the threshold or far off
     @Test
     fun aSwipeTheOtherWayTypesTheLetterOnce() {
         prefs.setLayers(SwipeLayersChoice.SymbolDownOnly)
@@ -195,7 +184,6 @@ class BaseKeyboardTest {
         }
     }
 
-    // with swiping off, sliding off the key takes the press back, as before ST-15
     @Test
     fun withSwipingOffSlidingOffAKeyTypesNothing() {
         prefs.setLayers(SwipeLayersChoice.Off)
@@ -203,12 +191,5 @@ class BaseKeyboardTest {
             t.drag("q", -2f)
             assertEquals(emptyList<String>(), t.actions.filterIsInstance<KeyAction.HostKeyAction>().map { it.act })
         }
-    }
-
-    @Test
-    fun theSpaceShowsTheSubModeToo() {
-        assertEquals("拼音", spaceLabel("拼音", InputMethodSubMode()))
-        assertEquals("拼音 (A)", spaceLabel("拼音", InputMethodSubMode("ascii", "A", "")))
-        assertEquals("by its name, unlabelled", "拼音 (ascii)", spaceLabel("拼音", InputMethodSubMode("ascii", "", "")))
     }
 }

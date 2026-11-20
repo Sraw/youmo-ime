@@ -4,13 +4,9 @@
  */
 package org.fcitx.fcitx5.android.host
 
-/**
- * A toggle a module puts in the status area, fcitx's `Action` (`fcitx/action.h`): what the keyboard's
- * status panel shows ([icon], [shortText]), whether it is on ([active]) and what a tap does ([activate]). [name] is the one the
- * app matches on for its own label (`StatusAreaEntry.label`), as fcitx's text is in fcitx's language.
- */
+/** fcitx's `Action`; [name] is what the app matches for its own label, as fcitx's text is in fcitx's language. */
 abstract class StatusAction(val name: String) {
-    /** Given by [StatusArea.register], from 1, as `UserInterfaceManager::registerAction` numbers them. */
+    /** From 1, as `UserInterfaceManager::registerAction` numbers them. */
     var id: Int = 0
         internal set
 
@@ -19,27 +15,23 @@ abstract class StatusAction(val name: String) {
     abstract fun icon(ic: InputContext): String
     abstract fun shortText(ic: InputContext): String
 
-    /** Whether the toggle is on in [ic]: said apart, not read off [icon]'s name (R25 core-input-6). */
+    /** Said apart, not read off [icon]'s name. */
     abstract fun active(ic: InputContext): Boolean
     abstract fun activate(ic: InputContext)
 
-    /** `Action::update`: the status area of [ic] shows this action anew. */
+    /** `Action::update`. */
     fun updateOn(ic: InputContext) {
         area?.changed(ic)
     }
 }
 
-/** One action as the status panel shows it on a context, the app's `Action` DTO's fields. */
+/** The app's `Action` DTO's fields. */
 data class StatusEntry(val id: Int, val name: String, val icon: String, val shortText: String, val active: Boolean)
 
 /**
- * The status area: the actions each context's input method shows (`fcitx/statusarea.cpp`). The
- * modules [register] theirs once; the host sets a context's list each time it activates an input
- * method ([setInputMethodActions]: `Instance::activateInputMethod` clears the InputMethod group,
- * `instance.cpp:2491`, then `AndroidEngine::activate` adds chttrans, punctuation, fullwidth for a
- * Chinese input method, `androidengine.cpp:500-509`). A module acts on a context only while its
- * action is in that context's list ([contains], fcitx's `Action::isParent` "in white list").
- * [onChanged] is told whenever a context's list or an action on it changes, to send the panel again.
+ * fcitx's `StatusArea`: modules [register] once; on each activation [setInputMethodActions] clears the list and
+ * `AndroidEngine::activate` adds chttrans, punctuation, fullwidth for Chinese. A module acts only while its action is
+ * listed ([contains], fcitx's "in white list"). [onChanged]: send the panel again.
  */
 class StatusArea(private val onChanged: (InputContext) -> Unit = {}) {
     private val registered = LinkedHashMap<String, StatusAction>()
@@ -52,7 +44,7 @@ class StatusArea(private val onChanged: (InputContext) -> Unit = {}) {
         registered[action.name] = action
     }
 
-    /** Clears [ic]'s list and puts in the registered actions of [names], in that order; unknown names are left out. */
+    /** Unknown names are left out. */
     fun setInputMethodActions(ic: InputContext, names: List<String>) {
         val list = ic.propertyFor(actions)
         list.clear()
@@ -65,7 +57,7 @@ class StatusArea(private val onChanged: (InputContext) -> Unit = {}) {
     fun entries(ic: InputContext): List<StatusEntry> =
         ic.propertyFor(actions).map { StatusEntry(it.id, it.name, it.icon(ic), it.shortText(ic), it.active(ic)) }
 
-    /** A tap on the entry [id] (`native-lib.cpp:344-350`): any registered action, as fcitx looks it up by id. */
+    /** Any registered action, as fcitx looks it up by id. */
     fun activate(ic: InputContext, id: Int) {
         registered.values.firstOrNull { it.id == id }?.activate(ic)
     }
@@ -73,21 +65,13 @@ class StatusArea(private val onChanged: (InputContext) -> Unit = {}) {
     internal fun changed(ic: InputContext) = onChanged(ic)
 }
 
-/**
- * The tips the modules show (`INotifications::showTip`), by the tip id fcitx gives them. The app turns
- * each into its text, the "summary: body" `androidnotification.cpp:84` makes, from its own string
- * resources (`Tip`'s doc says which fcitx strings).
- */
+/** `INotifications::showTip` ids; the app renders "summary: body" from its own strings. */
 enum class Tip(val id: String) {
-    /** "Punctuation" / "Full width punctuation is enabled." (`punctuation.cpp:265-271`) */
     PunctuationEnabled("fcitx-punc-toggle"),
 
-    /** "Punctuation" / "Full width punctuation is disabled." */
     PunctuationDisabled("fcitx-punc-toggle"),
 
-    /** "Switch to Traditional Chinese" / "Traditional Chinese is enabled." (`chttrans.cpp:115-124`) */
     TraditionalEnabled("fcitx-chttrans-toggle"),
 
-    /** "Switch to Simplified Chinese" / "Simplified Chinese is enabled." */
     SimplifiedEnabled("fcitx-chttrans-toggle"),
 }

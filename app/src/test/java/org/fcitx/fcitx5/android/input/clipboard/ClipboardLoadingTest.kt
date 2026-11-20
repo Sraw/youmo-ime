@@ -26,11 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.ConcurrentLinkedQueue
 
-/**
- * The empty history's panel while Room's first query of it is out: the hint, not the bar's clear button over no rows.
- * The paging's first load state (refresh loading, append not at its end) was taken for a list; a full run's load held
- * the query past LowLandscapeScreenshotTest's shot of the panel (R27), which alone it came back before.
- */
+/** While Room's first query is out, the empty panel shows the hint, not the clear button over no rows (the first load state was taken for a list). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -41,7 +37,7 @@ class ClipboardLoadingTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // Room's queries, the paging's among them, run on the architecture components' disk executor: held here
+    // Room's queries run on the architecture components' disk executor: held here
     private val held = ConcurrentLinkedQueue<Runnable>()
 
     @SuppressLint("RestrictedApi")
@@ -64,7 +60,6 @@ class ClipboardLoadingTest {
     @Test
     fun theEmptyHistorysHintStaysWhileItsListLoads() {
         h.start()
-        // the start's open of the database in
         runBlocking { ClipboardManager.coroutineContext.job.children.forEach { it.join() } }
         ArchTaskExecutor.getInstance().setDelegate(holding)
         h.clipboard()

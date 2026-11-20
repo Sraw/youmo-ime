@@ -15,10 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * A value that can't be read (a key whose type changed between versions, a name no enum has) reads as
- * the default and is written back, instead of crashing the settings or the keyboard after an upgrade.
- */
+/** A value that can't be read reads as the default and is written back, instead of crashing after an upgrade. */
 @RunWith(RobolectricTestRunner::class)
 class ManagedPreferenceReadOrResetTest {
 
@@ -52,7 +49,6 @@ class ManagedPreferenceReadOrResetTest {
             ),
             { it.why },
         ) { row ->
-            // each row its own file state, not what the row before left
             sp.edit { clear(); row.stored(this) }
             assertEquals(row.default, row.read())
             assertEquals(row.default, row.written())

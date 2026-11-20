@@ -31,7 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** A layout's own groups (060-render-p3 T9b) through the real host to a scripted engine, as KotlinHostTest's keys. */
+/** A layout's own groups through the real host to a scripted engine. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KotlinHostOwnKeysTest {
@@ -60,8 +60,7 @@ class KotlinHostOwnKeysTest {
         NineKeyLetters.clearInUse()
     }
 
-    // T9b review L6: the groups a layout's own keyboard told as it was shown reach the engine's side with its
-    // first key, before the key does (EngineBridge.syncOwnKeys): the keyboard its codes are read by
+    // they reach the engine's side with the first key, before the key itself (EngineBridge.syncOwnKeys)
     @Test
     fun aKeyTellsTheGroupsTheKeyboardShownToldFirst() = runBlocking {
         val letters = NineKeyLetters.custom(OWN)
@@ -70,7 +69,7 @@ class KotlinHostOwnKeysTest {
         assertNull(NineKeyLetters.ofCode(letters.codes[0].code))
         fcitx.sendKey('a', 0u, 0, false, 0)
         assertEquals(letters, NineKeyLetters.ofCode(letters.codes[0].code))
-        // other groups told: a key of none of theirs still reads by the ones before (061-custom-layout L4), their first code by them
+        // a key of none of the new groups still reads by the old ones; their first code by them
         val other = NineKeyLetters.custom(OWN.reversed())
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey('b', 0u, 0, false, 0)
@@ -79,9 +78,8 @@ class KotlinHostOwnKeysTest {
         assertEquals(other, NineKeyLetters.ofCode(other.codes[0].code))
     }
 
-    // T9b's leftover (T10), as KeyboardPair turns (061-custom-layout L4): other groups told while a code is typed on
-    // the ones before commit the code at their first code as Return does (EngineBridge.turnAt, HostCore.commitCode),
-    // not lost with the session made anew; no reset, so the context stays as after any commit
+    // at the new groups' first code the code typed is committed as Return does (EngineBridge.turnAt), not lost; no
+    // reset, so the context stays
     @Test
     @Uat("PY-155")
     fun otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode() = runBlocking {
@@ -92,13 +90,12 @@ class KotlinHostOwnKeysTest {
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey(NineKeyLetters.custom(OWN.reversed()).codes[0], 0u, 0, false, 0)
         assertEquals(listOf("nih"), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
-        // the code committed, then the key itself on to the engine: not swallowed by the turn
+        // then the key itself reaches the engine: not swallowed by the turn
         assertEquals(listOf(EngineEvent.ENTER, EngineEvent.CHAR), engine.events.takeLast(2))
         assertFalse("not reset", EngineEvent.RESET in engine.events.takeLast(3))
     }
 
-    // 061-custom-layout L4: a key before the other groups' first code (a Backspace) is still the code typed's,
-    // nothing committed under it; their first code then commits what is left
+    // a key before the new groups' first code (Backspace) still belongs to the old code; the first code commits what is left
     @Test
     @Uat("PY-155")
     fun aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped() = runBlocking {
@@ -113,10 +110,8 @@ class KotlinHostOwnKeysTest {
         assertEquals(listOf("ni"), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
     }
 
-    // review H1: the field's composing text (English's word) is no code of the groups: other groups
-    // told while it is there leave it, nothing committed, nothing cleared; nor the first groups ever told.
-    // A key of none of theirs waits (OwnKeysTurn.Step.WAIT), never reaching HostCore.commitCode; their first code
-    // turns (COMMIT_AND_TURN), and it is commitCode's guard (a code on the panel, not the field's word) that keeps it
+    // English's word in the field is no code: the turn leaves it alone. The guard is HostCore.commitCode's (a code on
+    // the panel only), reached at the first code (COMMIT_AND_TURN); other keys wait (WAIT)
     @Test
     fun otherGroupsLeaveTheFieldsComposingTextAlone() = runBlocking {
         focused()
@@ -126,14 +121,13 @@ class KotlinHostOwnKeysTest {
         events.clear()
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH))
         fcitx.activateIme(InputMethodCatalog.ENGLISH)
-        // the screen's keys: English composes its word from them, a hardware key's types itself
+        // the screen's keys: English composes from them, a hardware key types itself
         fcitx.sendKey('a', KeyStates.VIRTUAL.toUInt(), 0, false, 0)
         assertEquals("a", fcitx.clientPreeditCached.toString())
         EngineState.ownKeys = OWN.reversed()
         fcitx.sendKey('b', KeyStates.VIRTUAL.toUInt(), 0, false, 0)
         assertEquals(emptyList<String>(), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
         assertEquals("ab", fcitx.clientPreeditCached.toString())
-        // their first code turns all the same (COMMIT_AND_TURN): commitCode reached, the word kept as it is
         fcitx.sendKey(NineKeyLetters.custom(OWN.reversed()).codes[0], KeyStates.VIRTUAL.toUInt(), 0, false, 0)
         assertEquals(emptyList<String>(), events.list().filterIsInstance<HostEvent.Commit>().map { it.text })
         assertEquals("ab", fcitx.clientPreeditCached.toString())

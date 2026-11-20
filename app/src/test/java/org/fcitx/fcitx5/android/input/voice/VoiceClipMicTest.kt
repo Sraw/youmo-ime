@@ -21,7 +21,6 @@ class VoiceClipMicTest {
 
     private val rate = 16000
 
-    /** a clock that only the sleeps move, and a record of them */
     private class Time {
         var ns = 0L
         val slept = mutableListOf<Long>()
@@ -38,8 +37,7 @@ class VoiceClipMicTest {
 
     private fun clip(n: Int, v: Float) = Part.Clip("c", FloatArray(n) { v })
 
-    // the clip microphone is one object for the JVM: a test failing midway would leave it on, its clips queued,
-    // and a later test class's feed() reading them instead of the microphone
+    // one object for the JVM: a test failing midway would leave it on and a later class's feed() reading its clips
     @After
     fun tearDown() = VoiceClipMic.clear()
 
@@ -49,7 +47,7 @@ class VoiceClipMicTest {
         val f = feed(listOf(clip(rate, 0.5f)), time)
         val buf = FloatArray(1600)   // 100 ms
         repeat(10) { f.read(buf) }
-        // each window waited for: a second's worth read in a second, not at once
+        // a second's worth read in a second, not at once
         assertEquals(1000L, time.slept.sum())
         assertTrue(time.slept.all { it == 100L })
     }
@@ -170,8 +168,7 @@ class VoiceClipMicTest {
         f.close()
     }
 
-    // the feed's own side of clearing, without the singleton: a generation changed mid clip stops it and says
-    // so once (busy true then false), which the test above, through clear(), does not see
+    // a generation changed mid clip stops it and says so once, which clear() through the singleton does not show
     @Test
     fun clearingStopsTheClipPlaying() {
         var gen = 0
@@ -244,15 +241,13 @@ class VoiceClipMicTest {
     fun aWavItCannotReadIsRefused() {
         val good = wav(shortArrayOf(0, 1))
         assertRows(
-            // the voice models take 16 kHz: another rate would be heard sped up or slowed down
+            // the models take 16 kHz: another rate would be heard sped up or slowed down
             "a WAV at 44.1 kHz" to { refused(wav(shortArrayOf(0, 1), rate = 44100)) },
-            // the models take one channel: two interleaved would be heard as one at twice the rate
+            // two interleaved channels would be heard as one at twice the rate
             "a stereo WAV" to { refused(wav(shortArrayOf(0, 1), channels = 2)) },
-            // a RIFF file of another kind is not sound
             "RIFF but not WAVE" to { refused(good.copyOf().also { "AVI ".toByteArray().copyInto(it, 8) }) },
             // its header says 16 bytes of fmt, 4 follow
             "fmt cut short" to { refused(good.copyOf(12 + 8 + 4)) },
-            // the samples' format not yet known when they come
             "data before fmt" to { refused(good.copyOf(12) + "data".toByteArray() + byteArrayOf(4, 0, 0, 0, 0, 0, 1, 0)) },
         )
     }

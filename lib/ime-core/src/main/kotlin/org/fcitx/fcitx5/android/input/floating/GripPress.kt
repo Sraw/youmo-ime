@@ -6,23 +6,17 @@ package org.fcitx.fcitx5.android.input.floating
 
 import kotlin.math.abs
 
-/**
- * The docked keyboard's handle (始终显示悬浮条): its grip, the short bar in the middle, held for the
- * system's long-press time lets the keyboard go floating under the finger. A press counts that went
- * down on the grip ([gripWidth] wide about the strip's middle: the bar itself is too thin to aim at)
- * and stayed there, one finger, within [slop]: a finger sliding along the strip, or a second one,
- * is not a hold. The caller times it and asks [fire] once the time is up.
- */
+/** The handle's grip held for the long-press time floats the keyboard: down within [gripWidth] of the middle (the bar is too thin to aim at), one finger, within [slop]. */
 class GripPress(private val slop: Float, private val gripWidth: Float) {
 
     private var downX = 0f
     private var downY = 0f
 
-    /** Down and still: the long press counts if its time comes now. */
+    /** The long press counts if its time comes now. */
     var armed = false
         private set
 
-    /** A finger down at [x], [y] on a strip [stripWidth] wide: true if on the grip, to time the press. */
+    /** True if on the grip, to time the press. */
     fun down(x: Float, y: Float, stripWidth: Float): Boolean {
         downX = x
         downY = y
@@ -30,21 +24,21 @@ class GripPress(private val slop: Float, private val gripWidth: Float) {
         return armed
     }
 
-    /** The finger at [x], [y]: past the slop, no longer a hold. */
+    /** Past the slop, no longer a hold. */
     fun move(x: Float, y: Float) {
         if (armed && FloatingButtonPlacement.isDrag(x - downX, y - downY, slop)) armed = false
     }
 
-    /** Lifted, cancelled, or a second finger: no hold. */
+    /** Or a second finger. */
     fun end() {
         armed = false
     }
 
-    /** The long-press time came: true, once, if the hold counts. */
+    /** True, once, if the hold counts. */
     fun fire(): Boolean = armed.also { armed = false }
 
     companion object {
-        /** The grip's touch width, in dp, about the strip's middle. */
+        /** dp. */
         const val GRIP_TOUCH_DP = 120
     }
 }

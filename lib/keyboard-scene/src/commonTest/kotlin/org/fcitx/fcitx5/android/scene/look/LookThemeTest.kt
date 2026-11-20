@@ -34,8 +34,7 @@ import kotlin.test.assertTrue
 
 class LookThemeTest {
 
-    // a built-in theme is its colours and LookDefaults: converted, the scene is the one of the 4.0 file
-    // written by hand for it (material-light.xml, material-dark.xml), in every scene the styles tell apart
+    // a built-in theme converted is the scene of the 4.0 file written by hand for it, in every scene the styles tell apart
     @Test
     fun aBuiltInThemeDrawsAsItsHandWrittenFile() {
         for (file in listOf("material-light.xml", "material-dark.xml")) {
@@ -58,7 +57,6 @@ class LookThemeTest {
         val stroke = q.ops(false).filterIsInstance<Op.Stroke>().single()
         assertEquals(2 * d, stroke.width, 1e-9)
         assertTrue(q.ops(false).none { it is Op.Shadow })
-        // inset 6dp top, 5dp left
         val shape = q.shape as org.fcitx.fcitx5.android.scene.Shape.Rect
         assertEquals(q.bounds.top + 6 * d, shape.box.top, 1e-6)
         assertEquals(q.bounds.left + 5 * d, shape.box.left, 1e-6)
@@ -66,7 +64,6 @@ class LookThemeTest {
         assertTrue(q.ops(true).any { it is Op.Ripple })
     }
 
-    // the keyboard height 紧凑: the room above and below a key 40% of the look's, upright and on its side, across the same
     @Test
     fun atCompactTheRowsAreCloser() {
         val look = LookDefaults.look(palette(themeFile("material-light.xml"))).let {
@@ -84,7 +81,6 @@ class LookThemeTest {
         assertEquals(4.0 to 5.0, inset(portrait.copy(compact = true)).let { round(it) })
         assertEquals(6.0 to 2.0, inset(landscape).let { round(it) })
         assertEquals(2.0 to 2.0, inset(landscape.copy(compact = true)).let { round(it) })
-        // the keyboard and its keys' cells as they were (the gap is inside a cell): the faces the room taller
         val (normal, compact) = scene(t, portrait) to scene(t, portrait.copy(compact = true))
         assertEquals(normal.width to normal.height, compact.width to compact.height, "the keyboard's size")
         assertEquals(normal.keys.map { it.bounds }, compact.keys.map { it.bounds }, "the keys' cells")
@@ -92,7 +88,6 @@ class LookThemeTest {
         assertEquals(face(normal) + 2 * (9 - 4) * d, face(compact), 1e-6)
     }
 
-    // a gap stays one: 1 dp at least, none only where there was none
     @Test
     fun theCompactGapIsFortyPercentToTheNearestDp() {
         assertEquals(listOf(0, 1, 1, 1, 2, 2, 2, 3, 4, 4, 10), listOf(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 24).map(Gap::compact))
@@ -101,8 +96,7 @@ class LookThemeTest {
 
     private fun round(p: Pair<Double, Double>) = kotlin.math.round(p.first * 1e6) / 1e6 to kotlin.math.round(p.second * 1e6) / 1e6
 
-    // keys as round as can be (24 dp) with a margin: the floating keyboard's radius their sum, over the
-    // reader's 24 dp, refused the whole theme and nothing was drawn; at most 24 dp, it reads
+    // the floating keyboard's radius over the reader's 24 dp refused the whole theme and nothing was drawn
     @Test
     fun aRadiusOf24WithAGapReads() {
         val look = LookDefaults.look(palette(themeFile("material-light.xml"))).let {
@@ -113,8 +107,6 @@ class LookThemeTest {
         assertEquals(List(4) { Keys.MAX_RADIUS_DP.toDouble() }, radius.radius.corners)
     }
 
-    // theme 3.0's candidate font and weight carried into the 4.0 theme (060-render-p3 T6a), so the web's
-    // conversion and an export keep them; a look of neither writes no candidate style at all
     @Test
     fun theCandidatesFontIsTheThemes() {
         val base = LookDefaults.look(palette(themeFile("material-light.xml")))
@@ -127,7 +119,6 @@ class LookThemeTest {
         val bar = BarLook.of(Cascades(t), emptySet())
         assertEquals(LookTheme.CANDIDATE_FONT to 700, bar.plain.font to bar.plain.weight)
         assertEquals(LookTheme.CANDIDATE_FONT to 700, bar.selected.font to bar.selected.weight)
-        // a weight alone: the system's font at it
         val bold = theme(LookTheme.xml(base.copy(text = base.text.copy(candidateWeight = 700)), "T", false))
         assertEquals("system" to 700, BarLook.of(Cascades(bold), emptySet()).plain.let { it.font to it.weight })
         assertEquals(emptyMap(), bold.fonts)
@@ -160,21 +151,16 @@ class LookThemeTest {
         val scene = scene(theme, portrait)
         assertTrue(scene.base.any { it is Op.Picture })
         val q = key(scene, "q")
-        // the letter's colour under its image where the image is not there, as theme 3.0 showed it
         val keyColor = Argb(look.palette.keyBackgroundColor)
         assertEquals(Op.NineSlice(q.shape, "key.png", listOf(1, 2, 3, 4), 2, keyColor), q.ops(false).filterIsInstance<Op.NineSlice>().single())
-        // its own pressed face, not tinted over
         val pressed = q.ops(true).filterIsInstance<Op.NineSlice>()
         assertTrue(pressed.any { it.file == "key-down.png" && it.fallback == keyColor }, pressed.toString())
         val text = q.ops(false).filterIsInstance<Op.Text>().first()
         assertEquals(LookTheme.KEY_FONT, text.font)
         assertEquals(700, text.weight)
         val shift = key(scene, "shift")
-        // the function keys' colour laid over their picture, as theme 3.0's face did
         assertEquals(Argb(look.palette.altKeyBackgroundColor), shift.ops(false).filterIsInstance<Op.Picture>().single().over)
         assertTrue(shift.ops(true).any { it is Op.Fill && it.color.value == 0xff112233.toInt() })
-        // w's label hidden, its corner's symbol too (a hidden label hides the symbol: rules B §5); its face
-        // fill=Color, its kind's colour over the kind's image (theme 3.0: own fill or the kind's colour)
         val w = key(scene, "w")
         assertTrue(w.ops(false).filterIsInstance<Op.Text>().none { it.text == "w" })
         assertTrue(w.ops(false).none { it is Op.NineSlice })
@@ -182,8 +168,7 @@ class LookThemeTest {
         assertTrue(key(scene, "space").ops(false).any { it is Op.NineSlice })
     }
 
-    // a 3.0 file's insets have no bound: one past any key image's side is that side (theme 4 takes four
-    // digits at most, so 10000 unclamped would leave the theme written unread and the keyboard not shown)
+    // theme 4 takes four digits at most, so 10000 unclamped would leave the theme written unread
     @Test
     fun anInsetPastAnyImagesSideIsThatSide() {
         val big = NineSlice("/data/themes/t/key.png", Insets(10000, 0, NineSlice.MAX_SIDE, 10000), 1)
@@ -193,12 +178,9 @@ class LookThemeTest {
         val max = NineSlice.MAX_SIDE
         assertEquals(listOf(max, 0, max, max), q.ops(false).filterIsInstance<Op.NineSlice>().single().insets)
         assertTrue(q.ops(true).filterIsInstance<Op.NineSlice>().all { it.insets == listOf(max, 0, max, max) })
-        // a negative one never reaches a look: ThemeLook refuses it, and so a 3.0 file of one (ThemeLookReaderTest)
         assertFailsWith<IllegalArgumentException> { Insets(-5, 0, 0, 0) }
     }
 
-    // a single key's own face over its kind's colour, as theme 3.0's (ThemeColors.face for every key):
-    // under its picture, while its image is not there, and as fill=Color over a kind's picture or image
     @Test
     fun aSingleKeysFaceHasItsKindsColour() {
         val slice = NineSlice("/data/themes/t/key.png", Insets(1, 1, 1, 1), 1)
@@ -229,11 +211,8 @@ class LookThemeTest {
         assertTrue(backspace.none { it is Op.Picture })
         assertTrue(backspace.any { it is Op.Fill && it.color == Argb(p.altKeyBackgroundColor) }, backspace.toString())
         assertTrue(key(scene, "enter").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.accentKeyBackgroundColor) })
-        // a flat space's pressed image over the space bar's colour, as its face is
         val flat = scene(theme, portrait.copy(flat = true))
         assertTrue(key(flat, "space").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.spaceBarColor) })
-        // flat, a letter or function key has no face, its own or pressed (3.0's face=null), and no tint over a
-        // pressed face of its own (3.0 drew none there); Return keeps its own
         fun shown(op: Op) = op is Op.Picture || op is Op.NineSlice || (op is Op.Fill && op.color.value ushr 24 != 0)
         for (id in listOf("q", "backspace")) assertTrue(key(flat, id).ops(false).none(::shown), id)
         for (id in listOf("w", "shift")) {
@@ -241,7 +220,6 @@ class LookThemeTest {
             assertTrue(key(flat, id).ops(true).none(::shown), id)
         }
         assertTrue(key(flat, "enter").ops(true).any { it is Op.NineSlice && it.fallback == Argb(p.accentKeyBackgroundColor) })
-        // a ripple theme's press still ripples there
         val rippled = theme(LookTheme.xml(look.copy(keys = look.keys.copy(press = PressEffect.Ripple)), "T", false))
         val flatRipple = scene(rippled, portrait.copy(flat = true))
         for (id in listOf("w", "shift")) {
@@ -250,7 +228,6 @@ class LookThemeTest {
         }
     }
 
-    // a single key's Darken over its kind's pressed image: its own face tinted, as 3.0's own won
     @Test
     fun aSingleKeysDarkenIsItsOwn() {
         val down = NineSlice("/data/themes/t/key-down.png", Insets(1, 1, 1, 1), 1)
@@ -269,8 +246,7 @@ class LookThemeTest {
         assertTrue(e.any { it is Op.Fill && it.color == Argb(look.palette.keyPressHighlightColor) }, "$e")
     }
 
-    // a board's key of a role as 3.0 drew it (KeyStyleResolver: own ?: the role's on every board ?: the kind's):
-    // its Darken with no fill of its own tints the role's fill, not its kind's
+    // a board's key of a role as 3.0 drew it (KeyStyleResolver): its Darken tints the role's fill, not its kind's
     @Test
     fun aBoardKeysDarkenTintsItsRolesFill() {
         val image = NineSlice("/data/themes/t/shift.png", Insets(1, 1, 1, 1), 1)
@@ -289,7 +265,6 @@ class LookThemeTest {
         assertEquals(KeyOverride(KeyFill.Image(image), KeyPressed.Darken, KeyLabel.Show), LookTheme.resolved(look.keys.overrides)["qwerty/shift"])
     }
 
-    // the same the other way: a board's key's own image, pressed, and label win over its role's on every board
     @Test
     fun aBoardKeysOwnWinsOverItsRoles() {
         val slice = { f: String -> NineSlice("/data/themes/t/$f", Insets(1, 1, 1, 1), 1) }
@@ -302,12 +277,9 @@ class LookThemeTest {
         assertTrue(hidden.ops(false).none { it is Op.Icon }, "${hidden.ops(false)}")
         assertTrue(shift.ops(false).any { it is Op.Icon }, "${shift.ops(false)}")
         assertTrue(shift.ops(false).any { it is Op.NineSlice && it.file == "own.png" }, "${shift.ops(false)}")
-        // pressed: the role's pressed image, as 3.0 (own pressed none: the role's)
         assertTrue(shift.ops(true).any { it is Op.NineSlice && it.file == "all-down.png" }, "${shift.ops(true)}")
     }
 
-    // a single key's face of its own and no pressed one: pressed as its kind, as 3.0 drew it (own ?: all ?: kind),
-    // its own fill an id's not outranking the kind's pressed face; flat and not, as a key of no face of its own
     @Test
     fun aSingleKeysOwnFaceIsPressedAsItsKind() {
         val slice = NineSlice("/data/themes/t/own.png", Insets(1, 1, 1, 1), 1)
@@ -338,15 +310,12 @@ class LookThemeTest {
             }
             if (!flat) assertTrue(faces(key(scene, "q"), false).any { it.startsWith("image own.png") })
         }
-        // its kind's Darken: its own face tinted
         val darken = base.copy(keys = base.keys.copy(letter = KindStyle(KeyFill.Color, KeyPressed.Darken), overrides = mapOf("qwerty/q" to own)))
         val q = key(scene(theme(LookTheme.xml(darken, "T", false)), portrait), "q")
         assertTrue(faces(q, true).any { it.startsWith("image own.png") }, "${q.ops(true)}")
         assertTrue(faces(q, true).contains("fill ${Argb(darken.palette.keyPressHighlightColor)}"), "${q.ops(true)}")
     }
 
-    // the most single keys a 3.0 theme brings (Keys), each a face and a pressed one of its own:
-    // the theme written still reads, its styles more than a theme file's
     @Test
     fun theMostSingleKeysOfTheirOwnRead() {
         val base = LookDefaults.look(palette(themeFile("material-light.xml")))
@@ -361,8 +330,6 @@ class LookThemeTest {
         val styles = Regex("<style ").findAll(xml).count()
         assertTrue(styles in (ThemeReader.MAX_STYLES + 1)..LookTheme.MAX_STYLES, "$styles")
         assertTrue(ThemeReader.theme(xml, maxStyles = LookTheme.MAX_STYLES) is Parsed.Ok)
-        // the most styles a key brings, a Darken of a face of its own (nine), and of every kind's pressed face, a
-        // key's label hidden and one shown over its role's: within it too
         val most = (0 until Keys.MAX_OVERRIDES - 2).associate { i ->
             "b$i/k" to KeyOverride(KeyFill.Image(NineSlice("/data/themes/t/k$i.png", Insets(1, 1, 1, 1), 1)), KeyPressed.Darken, KeyLabel.Hide)
         } + mapOf(
@@ -380,8 +347,7 @@ class LookThemeTest {
         assertTrue(ThemeReader.theme(mostXml, maxStyles = LookTheme.MAX_STYLES) is Parsed.Ok)
     }
 
-    // 3.0's single keys by their names (KeyNames): 大千's , . ; / - selected as the keys of those ids, a
-    // selector's comma not read as the list's (060-render-p2 S4 step 6)
+    // 大千's , . ; / - selected as the keys of those ids, a selector's comma not read as the list's
     @Test
     fun aSingleKeyOfAnyNameIsTheKeyOfThatId() {
         val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
@@ -397,9 +363,7 @@ class LookThemeTest {
             assertTrue(k.ops(false).any { it is Op.NineSlice }, id)
             assertTrue(k.ops(false).none { it is Op.Text }, id)
         }
-        // the others their kind's: the comma of the bottom row (its id "comma") too
         for (id in listOf("w", "comma", "period")) assertTrue(key(scene, id).ops(false).none { it is Op.NineSlice }, id)
-        // number/* the pad's star, not every key of the pad; a role and a plain key as written
         assertEquals(Selector(emptySet(), "key", board = "number", key = "*"), LookTheme.selector("number/*"))
         assertEquals(Selector(emptySet(), "key", starRole = "space"), LookTheme.selector("*/space"))
         assertEquals(Selector(emptySet(), "key", board = "zhuyin", key = "q"), LookTheme.selector("zhuyin/q"))
@@ -407,8 +371,6 @@ class LookThemeTest {
         assertTrue("number/\\*" in LookTheme.xml(base.copy(keys = base.keys.copy(overrides = mapOf("number/*" to KeyOverride(null, null, KeyLabel.Hide)))), "T", false))
     }
 
-    // 注音九键's 3.0 single keys by their place in its grid (zhuyin-nine/r1c1: a tone, r1c2 a group, r4c4 the
-    // slot, r2c5 ?; ⌫ by its role), selected as the keys of those ids (060-render-p2 S4d, step 6)
     @Test
     fun zhuyinNinesSingleKeysAreTheKeysOfTheirPlaces() {
         val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
@@ -423,14 +385,11 @@ class LookThemeTest {
         for (id in listOf("r2c1", "r1c3", "r3c5", "comma")) assertTrue(key(scene, id).ops(false).none { it is Op.NineSlice }, id)
     }
 
-    // 3.0's single keys of the number pad (060-render-p2 S4b): number/* , . : each selects the one key of
-    // that id and no other (number/* unescaped was every key of the pad, a comma the selector's list)
     @Test
     fun theNumberPadsSingleKeysAreThoseKeysAlone() {
         val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
         val base = LookDefaults.look(palette(themeFile("material-light.xml")))
         val layout = (LayoutReader.layout(testData("number.xml")) as Parsed.Ok).value
-        // : is the date and time pad's, the others the full pad's
         for ((id, pad) in listOf("*" to "full", "," to "full", "." to "full", ":" to "datetime")) {
             val look = base.copy(keys = base.keys.copy(overrides = mapOf("number/$id" to KeyOverride(KeyFill.Image(slice), null, KeyLabel.Hide))))
             val env = portrait.copy(input = portrait.input.copy(pad = pad))
@@ -442,9 +401,6 @@ class LookThemeTest {
         }
     }
 
-    // a 3.0 file's names of any characters and length (the web converts any file): what theme 4 takes in a file's name
-    // ([ThemeReader]'s FILE), a character it does not as `_`, cut to 128 keeping the extension, numbered where two meet;
-    // a theme's name cut to the 64 characters theme 4 takes, none a name too
     @Test
     fun anyNameOfAFileOrThemeReads() {
         val base = LookDefaults.look(palette(themeFile("material-light.xml")))
@@ -469,7 +425,6 @@ class LookThemeTest {
         val file = Regex("[^,()/\\\\:*?\"<>| \\t\\n\\r\\u000C\\u000B]{1,128}")
         assertTrue(names.values.all(file::matches), "$names")
         assertEquals(names.size, names.values.toSet().size)
-        // an emoji not cut in two: its half no character
         val names64 = listOf(
             "名".repeat(80) to "名".repeat(64), "" to "theme", "  " to "theme", "a" to "a",
             "a" + "😀".repeat(40) to "a" + "😀".repeat(31),
@@ -484,7 +439,6 @@ class LookThemeTest {
         assertTrue("a__1_~2.png" in q.ops(true).filterIsInstance<Op.NineSlice>().map { it.file })
     }
 
-    // two images of one name in two folders stay two: the second numbered, in the theme written and the app's lookup alike
     @Test
     fun filesOfOneNameInTwoFoldersKeptApart() {
         val base = LookDefaults.look(palette(themeFile("material-light.xml")))
@@ -530,7 +484,7 @@ class LookThemeTest {
         }
 
     companion object {
-        /** Every character half the size wide, its ink the em box: what is measured does not matter here, only that both sides measure alike. */
+        /** What is measured does not matter here, only that both sides measure alike. */
         val measurer = TextMeasurer { text, _, _, size ->
             val w = text.length * size / 2
             TextMetrics(w, Box(0.0, -size * 0.7, w, 0.0), -size, size * 0.3)
@@ -540,7 +494,6 @@ class LookThemeTest {
 
         fun themeFile(name: String): Theme = ThemeReader.theme(testData(name)).ok()
 
-        /** A 4.0 theme's colours as a 3.0 palette: the built-in themes' palettes. */
         fun palette(t: Theme): Palette {
             fun c(n: String) = t.colors.getValue(n).value
             return Palette(

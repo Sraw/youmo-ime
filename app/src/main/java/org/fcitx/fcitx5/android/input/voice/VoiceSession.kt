@@ -17,16 +17,13 @@ import org.fcitx.fcitx5.android.input.editing.toEditorTraits
 import java.util.EnumSet
 
 /**
- * One talk, whatever starts and stops it (the space key held, [VoiceHoldSession]; the bar's
- * microphone tapped, [VoiceTapOverlay]): the microphone open from [begin], what is heard composing
- * in the field as it is said, what was said [commit]ted once it [finish]es (its end as the field
- * has it, [VoiceEnd]), into the field it was said for and never a password. [asItGoes]: the settled
- * part typed as it is said ([VoiceTalk]), only the tail composing. Tells [ui] on the main thread,
- * until [Ui.ended]. Used from the main thread.
+ * One talk, however started (space held, [VoiceHoldSession]; bar microphone tapped, [VoiceTapOverlay]):
+ * what is heard composes in the field, and what was said is [commit]ted once it [finish]es, into the
+ * field it was said for and never a password. [asItGoes]: the settled part is typed as said, only the
+ * tail composes. Used from the main thread.
  *
- * What composes is taken from the field by others too: the app sending or clearing the text (it
- * took it: not typed again), the cursor moved or input restarted in the field (taken away: it
- * composes anew where the cursor is, on the next heard).
+ * Others may take what composes: the app sending or clearing it (not typed again), or the cursor
+ * moved or input restarted (taken away; composes anew where the cursor is).
  */
 class VoiceSession(
     private val service: FcitxInputMethodService,
@@ -36,57 +33,49 @@ class VoiceSession(
     private val commit: (String) -> Unit,
 ) {
     interface Ui {
-        /** the microphone really on (its first sample not zero): 正在听 and a short vibration, 准备中 before */
+        /** its first sample not zero: 正在听 and a short vibration, 准备中 before */
         fun ready()
 
-        /** 2 s of zeroes, none other yet: 麦克风没有声音 until [ready] */
+        /** 2 s of zeroes: 麦克风没有声音 until [ready] */
         fun silent()
 
-        /** what was said so far, as it will be typed */
         fun heard(text: String)
 
-        /** how loud, 0 to 1 */
         fun level(level: Float)
 
-        /** stopped: the last of it being recognized */
         fun recognizing()
 
-        /** Over: typed or dropped ([message] null), or not ([message] to show a moment). */
+        /** [message] null: typed or dropped; else shown a moment. */
         fun ended(@StringRes message: Int?)
     }
 
-    // the field it is said for: the same one after input restarts in it (another EditorInfo, the same app and view id)
+    // the same one after input restarts in it (another EditorInfo, the same app and view id)
     private val field = service.currentInputEditorInfo
     private val main = Handler(Looper.getMainLooper())
     private var listener: Listening? = null
 
-    /**
-     * What is heard shows in the field as it is said: not a password's, nor over a word the field
-     * composes already (English's, which fcitx still has); there only the session's own view shows it.
-     */
+    /** Not in a password, nor over a word the field composes already (English's); there only the session's view shows it. */
     val composes = service.voiceComposes
 
     // typing as it is said needs the field's composing text: not over fcitx's
     private val asItGoes = asItGoes && composes
     private val talk = VoiceTalk(this.asItGoes)
 
-    // the utterances the app took ([taken]): what was heard before the last of them is not this one's
+    // what was heard before the last of them is not this one's
     private var utterance = 0
 
-    // where the talk was at the last heard the field showed of this utterance ([VoiceLive.Mark]);
     // null: none since the app took the last
     private var shownUpTo: VoiceLive.Mark? = null
 
-    // something composing in the field now, ours: taken away if nothing is typed
+    // ours: taken away if nothing is typed
     private var composing = false
 
-    // the keyboard hidden ([hidden]): nothing composes, what is left goes straight into the field
+    // nothing composes, what is left goes straight into the field
     private var direct = false
 
     var over = false
         private set
 
-    /** stopped (the finger lifted, the microphone tapped): the rest is the recognizer's */
     var stopped = false
         private set
 
@@ -105,16 +94,15 @@ class VoiceSession(
         }
 
         override fun heard(heard: VoiceLive.Heard) {
-            // heard before the app took what was said (the recognizer not told yet): gone with it
+            // heard before the app took what was said: gone with it
             if (over || heard.utterance < utterance) return
             shownUpTo = heard.upTo
-            // the field composes the engine's text now (another finger typing): nothing typed as it is
-            // said meanwhile, nor its text made voice's; the keyboard hidden: nothing composes
+            // the engine composes now (another finger typing): nothing typed meanwhile, nor its text made voice's
             val inField = composes && !direct && sameField && service.voiceOwnsComposing
             val step = talk.heard(heard, typing = inField)
             ui.heard(heard.text)
             if (inField) {
-                // put in at once, in place of what composed: then the tail composes after it
+                // in place of what composed: then the tail composes after it
                 service.voiceHeard(step.type, step.composing)
                 composing = step.composing.isNotEmpty()
             }
@@ -131,7 +119,7 @@ class VoiceSession(
         )
     }
 
-    /** The microphone opens now, the models load meanwhile. */
+    /** The models load meanwhile. */
     fun begin() {
         service.watchVoice(::taken)
         service.voiceTalkBegan()
@@ -145,10 +133,8 @@ class VoiceSession(
         }
     }
 
-    // what composed was taken from the field by others: the app took it (sent it, cleared the
-    // field), all it showed with it, and what is said next is a new utterance, nothing of the last
-    // joined to it nor typed again; left there as text, counted as typed, the talk going on after
-    // it; else taken away, composed anew on the next heard
+    // the app took it (sent, cleared): what is said next is a new utterance, nothing joined or typed again;
+    // left as text, counted as typed. Else taken away, composed anew on the next heard
     private fun taken(how: EditingSession.Taken) {
         if (over) return
         composing = false
@@ -163,7 +149,7 @@ class VoiceSession(
         }
     }
 
-    /** Stopped at [at] (uptime, ms: the lift's, the tap's): the tail after it counts from there, then the rest is typed. */
+    /** [at]: uptime ms of the lift or tap; the tail counts from there. */
     fun finish(at: Long) {
         if (over || stopped) return
         stopped = true
@@ -186,11 +172,7 @@ class VoiceSession(
         }
     }
 
-    /**
-     * The keyboard hidden, the field kept and its connection good: stopped as by a tap, what composes
-     * taken away now, what is left typed straight into the field once recognized (not through fcitx,
-     * which the hidden keyboard focused out).
-     */
+    /** Typed straight into the field once recognized, not through fcitx, which the hidden keyboard focused out. */
     fun hidden(at: Long) {
         if (over) return
         direct = true
@@ -199,18 +181,15 @@ class VoiceSession(
         finish(at)
     }
 
-    /** A press after the stop (the user's rule): the tail ends now, what was said is still typed. Recognizing already, it changes nothing. */
+    /** A press after the stop: the tail ends now, what was said is still typed. */
     fun cut() {
         if (!over && stopped) listener?.cut()
     }
 
-    /** Dropped, whatever was heard and not typed yet: another field, the keyboard gone, the touch taken away. */
+    /** Another field, the keyboard gone, the touch taken away. */
     fun drop() = end(null)
 
-    /**
-     * What was heard so far typed now, the rest not waited for: the field is being left (another
-     * field, the keyboard's view thrown away), its connection about to go, so not through fcitx's thread.
-     */
+    /** The field is being left and its connection is about to go, so not through fcitx's thread. */
     fun typeNow() {
         if (over) return
         typed(talk.restNow())?.let {
@@ -220,10 +199,8 @@ class VoiceSession(
         end(null)
     }
 
-    // given up (15 s with nothing back) or failed: typed as it was said, what was heard last is
-    // typed too (what was said stays, the user's rule), and "nothing heard" said only if nothing
-    // went in: else that the end may be cut short. A hold's and a tap's alike, typing as it goes or
-    // not (fcitx composing English): what was heard is what was said either way
+    // given up (15 s with nothing back) or failed: what was heard is typed; "nothing heard" only if
+    // nothing went in, else that the end may be cut short
     private fun endTypingWhatWasHeard(@StringRes message: Int) {
         if (over) return
         val put = typed(talk.restNow())?.let(::put) == true
@@ -231,9 +208,8 @@ class VoiceSession(
         end(if (some && message == R.string.voice_hold_nothing) R.string.voice_tap_cut_short else message)
     }
 
-    // [text] into the field: as its own commit (through fcitx: the bar's suggestions after it), or
-    // the keyboard hidden, straight in while the field's connection is still there. False if it
-    // could not go in (hidden, the connection gone)
+    // through fcitx (the bar's suggestions after it), or with the keyboard hidden straight in. False if
+    // it could not go in
     private fun put(text: String): Boolean {
         composing = false
         if (!direct) {
@@ -246,21 +222,20 @@ class VoiceSession(
         return true
     }
 
-    // [said] (what is left of it) to type, its end as the field has it; null if nothing, or not into this field
+    // null if nothing, or not into this field
     private fun typed(said: String?): String? =
         VoiceCommit.typed(said?.let { ended(it) }.orEmpty(), sameField = sameField, passwordField = service.inPasswordField)
 
-    // [text]'s end as the field it goes into has it, by the user's choice (语音输入 → 句末句号)
+    // by the user's choice (语音输入 → 句末句号)
     private fun ended(text: String): String {
         val kind = field?.let { VoiceEnd.field(it.toEditorTraits(service.packageName), it.packageName) } ?: VoiceEnd.Field.OTHER
         return VoiceEnd.apply(text, kind, AppPrefs.getInstance().keyboard.voiceEndMark.getValue().mode)
     }
 
-    // 语音整理 not applied, the raw text typed: said once a cause, for as long as the keyboard's process
-    // lives (060-pending-decisions L112/L170, the owner's); the failure itself is logged where it happened
+    // said once per cause while the process lives; the failure itself is logged where it happened
     @StringRes
     private fun polishHint(): Int? {
-        // the keyboard hidden: the card with it, a hint there unseen, kept for one that is (060-pending-decisions L658)
+        // a hint on a hidden card would go unseen: kept for one that shows
         if (direct) return null
         val why = listener?.polishFailure ?: return null
         return if (polishHinted.add(why)) R.string.voice_polish_failed else null
@@ -271,9 +246,9 @@ class VoiceSession(
         over = true
         main.removeCallbacksAndMessages(null)
         service.watchVoice(null)
-        // its text, all in (or once it is), followed for 语音先问再记
+        // followed for 语音先问再记
         service.voiceTalkEnded()
-        // dropped, nothing heard, given up: what composed goes, in the field it composed in only
+        // what composed goes, in the field it composed in only
         if (composing && sameField) service.composeVoice("")
         composing = false
         listener?.close()
@@ -281,54 +256,40 @@ class VoiceSession(
         ui.ended(message)
     }
 
-    /** Why 语音整理 did not apply: its model not read in (no polish at all), or failing on this talk. */
+    /** LOAD: its model not read in; RUN: failing on this talk. */
     enum class PolishFailure { LOAD, RUN }
 
-    /** What [VoiceListener] is to a session: the microphone and the recognizer behind [VoiceListener.Events]. */
     interface Listening {
         fun load()
         fun start()
 
-        /**
-         * the microphone closed a tail after [stoppedAt] (uptime, ms), all of it recognized, then
-         * [done] with what was said ([VoiceLive.finished], before the clean-up; null: nothing came
-         * back), raw: the recognizer's text, the polish having failed
-         */
+        /** [done] gets [VoiceLive.finished] before the clean-up (null: nothing came back); raw: the polish failed */
         fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit)
 
-        /** why 语音整理 did not apply to this talk, if it did not: read once [finish] is done */
+        /** read once [finish] is done */
         val polishFailure: PolishFailure? get() = null
 
-        /**
-         * what was said up to [upTo] (the last heard shown; null, none of this utterance) taken by
-         * the app: what is said next is utterance [to] ([VoiceLive.restart])
-         */
+        /** what was said up to [upTo] (null: none of this utterance) was taken by the app */
         fun restart(to: Int, upTo: VoiceLive.Mark?)
 
-        /** the utterance [finish]'s text is of ([VoiceLive.utterance]) */
         val utterance: Int
 
-        /** the microphone closed now, what was heard still recognized */
+        /** what was heard is still recognized */
         fun cut()
         fun close()
     }
 
     companion object {
-        /**
-         * The JVM's UAT tests' recognizer: what is heard told straight to the events, the chain
-         * after the recognizer (VoiceHold, VoiceTap, VoiceTalk, VoiceEnd, VoiceCommit, the commit)
-         * the app's own. sherpa-onnx and the microphone are a device's.
-         */
+        /** The JVM UAT tests' recognizer: the chain after it is the app's own; sherpa-onnx and the microphone are a device's. */
         @VisibleForTesting
         internal var listening: ((VoiceListener.Events) -> Listening)? = null
 
-        // the causes [polishHint] said already; the main thread's
+        // main thread
         @VisibleForTesting
         internal val polishHinted: MutableSet<PolishFailure> = EnumSet.noneOf(PolishFailure::class.java)
 
         private const val FINISH_MS = 15_000L
 
-        /** how long a message shows before the session's view goes */
         const val MESSAGE_MS = 1200L
     }
 }

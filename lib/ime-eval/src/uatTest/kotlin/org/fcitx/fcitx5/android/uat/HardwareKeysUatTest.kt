@@ -11,12 +11,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/17-hardware-keyboard.md, what the engine makes of a hardware keyboard's keys (not the
- * screen's: keyEvent's isVirtual false): space and digits, the page keys, the page size, English
- * typing as the keys. Where the keys go in the service is HardwareKeyUatTest's; the
- * window beside the cursor is the device's (HK-01).
- */
+/** uat/17-hardware-keyboard.md, what the engine makes of a hardware keyboard's keys (isVirtual false). */
 class HardwareKeysUatTest {
 
     @Test

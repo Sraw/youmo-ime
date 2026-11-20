@@ -24,10 +24,7 @@ abstract class ManagedPreference<T : Any>(
     }
 
     companion object {
-        /**
-         * [T] stored by its name; a name it does not have (another build's value, a backup's) reads as null, so the
-         * default, and is left stored: [readOrReset] would write the default over it, lost to a build that has it.
-         */
+        /** An unknown name (another build's, a backup's) reads as the default but stays stored, not overwritten as [readOrReset] would. */
         inline fun <reified T : Enum<T>> enumCodec(): StringLikeCodec<T> = object : StringLikeCodec<T> {
             override fun decode(raw: String): T? = enumValues<T>().firstOrNull { it.name == raw }
         }
@@ -43,14 +40,11 @@ abstract class ManagedPreference<T : Any>(
 
     abstract fun putValueTo(editor: SharedPreferences.Editor)
 
-    /**
-     * [read], or the default (written back) when the stored value can't be read: a key whose type
-     * changed between versions throws ClassCastException, a codec's decode whatever it throws.
-     */
+    /** A key whose type changed between versions throws ClassCastException; a codec's decode anything. */
     protected inline fun readOrReset(read: () -> T): T = try {
         read()
     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-        // as the five catches this replaces: a stored value of another type or format, not an Error
+        // a stored value of another type or format, not an Error
         Timber.w(e, "preference %s unreadable, reset", key)
         setValue(defaultValue)
         defaultValue

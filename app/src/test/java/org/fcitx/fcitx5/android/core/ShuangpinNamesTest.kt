@@ -14,10 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * Every scheme offered and every one dropped has a name: the names are written out by their config
- * names, the lists kept in ime-core, and one left out would tell the user of a scheme by its key.
- */
+/** The names are written out by config name and the lists live in ime-core: one left out would show the user a key. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ShuangpinNamesTest {

@@ -6,22 +6,14 @@ package org.fcitx.fcitx5.android.engine.data
 
 import java.text.Normalizer
 
-/**
- * Words often read wrongly (般若 read ban ruo, not bō rě): `lexicon/misreadings.tsv`, a line
- * `word<TAB>reading with tones<TAB>misreading[,misreading]`, misreadings as `pin'yin`. The
- * dictionary has each under both (the misreadings lower), so either types it, and the readings
- * go into pinyin data ([META_PREFIX]): typed by another, a candidate shows its reading.
- */
+/** Words often misread (般若 bō rě, not ban ruo) from `lexicon/misreadings.tsv`: the dictionary has both readings, misreadings lower, so the candidate shows the right one. */
 class Misreadings(val word: String, val reading: String, val misread: List<String>) {
 
-    /** [reading] as typed: `bo're`. */
     val typed: String get() = toneless(reading)
 
     companion object {
-        /** A pinyin data meta key: the word after it; the value [meta]. */
         const val META_PREFIX = "misread."
 
-        /** The reading, a tab, then the misreadings, `,` between them: what [fromMeta] reads back. */
         fun meta(entry: Misreadings) = entry.reading + "\t" + entry.misread.joinToString(",")
 
         fun fromMeta(word: String, value: String): Misreadings? {
@@ -29,13 +21,9 @@ class Misreadings(val word: String, val reading: String, val misread: List<Strin
             return Misreadings(word, reading, misread.split(','))
         }
 
-        /** Under a misreading, a word is this much (log10) less likely than under its reading. */
         const val WEIGHT = -1f
 
-        /**
-         * @throws SourceException on a line that is not one, or whose readings have not a
-         * syllable a character
-         */
+        /** @throws SourceException on a malformed line, or readings without one syllable per character */
         fun parse(lines: Sequence<String>, source: String): List<Misreadings> = lines.mapIndexedNotNull { i, line ->
             if (line.isBlank() || line.startsWith('#')) return@mapIndexedNotNull null
             val f = line.split('\t').map { it.trim() }
@@ -43,14 +31,13 @@ class Misreadings(val word: String, val reading: String, val misread: List<Strin
             if (f.size < 3 || f.any { it.isEmpty() }) fail("expected \"word<TAB>reading<TAB>misreadings\"")
             val entry = Misreadings(f[0], f[1], f[2].split(','))
             val readings = listOf(entry.typed) + entry.misread
-            // by code point: a character past U+FFFF (CJK Extension B) is two chars and one syllable
+            // by code point: past U+FFFF is two chars but one syllable
             val characters = f[0].codePointCount(0, f[0].length)
             if (readings.any { it.split('\'').size != characters }) fail("not a syllable a character: $line")
             if (entry.typed in entry.misread) fail("a misreading is the reading: $line")
             entry
         }.toList()
 
-        /** `bō rě` as typed, `bo're`; ü as v. */
         fun toneless(reading: String): String =
             Normalizer.normalize(reading.trim(), Normalizer.Form.NFD)
                 // ü as NFD leaves it, written out: an editor saving this file as NFC cannot change it

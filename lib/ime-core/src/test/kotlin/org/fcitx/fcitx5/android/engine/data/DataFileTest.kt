@@ -183,7 +183,6 @@ class DataFileTest {
 
     @Test
     fun anOversizedMetaSectionIsRejected() {
-        // written past addMeta, which refuses it
         val meta = "k=${"v".repeat(70_000)}\n".toByteArray()
         val file = open(DataFile.Writer(DataFile.KIND_TABLE, KIND_VERSION).add(1, meta).toByteArray())
         try {
@@ -201,7 +200,6 @@ class DataFileTest {
 
     @Test
     fun aMetaSectionAsLargeAsTheReaderTakesIsWrittenAndRead() {
-        // "k=", the value and a newline: 64 KiB
         val value = "v".repeat(64 * 1024 - 3)
         val file = open(DataFile.Writer(DataFile.KIND_TABLE, KIND_VERSION).addMeta(1, mapOf("k" to value)).toByteArray())
         assertEquals(value, file.meta(1)["k"])
@@ -245,7 +243,7 @@ class DataFileTest {
         }
     }
 
-    // the second writer, for a file too large for the heap, makes the file Writer makes: byte for byte
+    // the second writer, for a file too large for the heap, makes Writer's file byte for byte
     @Test
     fun aStreamedFileIsTheOneWriterMakes() {
         val sections = sortedMapOf(1 to byteArrayOf(9), 2 to ByteArray(13) { it.toByte() }, 5 to ByteArray(0), 7 to ByteArray(70_000) { (it * 31).toByte() })
@@ -269,7 +267,7 @@ class DataFileTest {
         const val KIND_VERSION = 3
     }
 
-    // what MergedDictionary reads to tell 0.3.2's dictionary from a damaged one, without mapping 52 MB
+    // lets MergedDictionary tell an old-format dictionary from a damaged one without mapping it
     @Test
     fun theKindsVersionIsPeekedFromTheHeaderAloneOrNullForAnythingElse() {
         val ours = sample()

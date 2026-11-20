@@ -7,30 +7,7 @@ package org.fcitx.fcitx5.android.dicttool
 import kotlin.math.ln
 import kotlin.math.log10
 
-/**
- * The words a corpus uses that the dictionary lacks: runs of two to [maxLength] Han characters
- * that occur at least [minCount] times, are not [known], hold together (their count against
- * their likeliest split's, [Candidate.pmi]) and are used freely (many different characters on
- * either side, [Candidate.leftEntropy] and [Candidate.rightEntropy]), with the earliest page
- * date they were seen on. The classic unsupervised recipe; the thresholds are the caller's, as
- * what is wanted of them differs (dev/TRAINING-PLAN.md section 11.7).
- *
- * The corpus is read in [passes] passes, each over every page in turn ([add] takes a page's
- * text and date; [nextPass] ends a pass). Counting every run exactly would not fit: billions
- * of characters have hundreds of millions of different runs of three. So pass n (from 2)
- * sketches the runs of n characters in a count-min sketch of up to [sketchBits] bits' width, only
- * those whose two parts one shorter the sketch found frequent enough, which every frequent
- * run's are; the pass after counts exactly the runs the sketch admitted, which a sketch only
- * overestimates, so none frequent is missed. The last pass gathers the neighbours of the runs
- * that reached [minCount], are not [known] (the dictionary's words need no telling apart; their
- * entropies come out NaN) and hold together at all ([GATHER_PMI]; a run of two whatever its pmi,
- * see there). The pairs of run and neighbour would not all fit, so a run's are gathered from its
- * first occurrence and every n-th after, n its count over [GATHER_PER_RUN]: a frequent run's
- * entropy from a sample is near enough, while a rare run's every occurrence counts. Pages sampled
- * alike for all runs, a rare run's entropy came from a handful of observations and out near nothing
- * (耗子尾汁, 丸辣: 0), which no threshold could tell from a fragment's; every n-th line sampled for
- * each, a run on a few lines could be sampled not once, and its entropy go unmeasured.
- */
+/** Frequent, cohesive (pmi) runs of Han characters with varied neighbours (entropy) that the dictionary lacks, sketched in [passes] passes. */
 class NewWords(
     private val known: Set<String>,
     private val minCount: Int,
@@ -44,50 +21,41 @@ class NewWords(
     class Candidate(
         val text: String,
         val count: Int,
-        /** The earliest year a page with it was dated, 0 if none was. */
+        /** The earliest year a page with it was dated, 0 if none. */
         val year: Int,
-        /** log10 of its count over what its likeliest split's parts predict: how much more it occurs than by chance. */
+        /** log10 of its count over what its likeliest split's parts predict. */
         val pmi: Double,
-        /** Of the character before it (nats); the more different ones, the freer the word stands. NaN for a known word. */
+        /** Of the character before it (nats): the more varied, the freer the word. NaN for a known word. */
         val leftEntropy: Double,
         val rightEntropy: Double,
-        /** Whether the dictionary has it: counted all the same, to calibrate the rest against the model. */
+        /** Whether the dictionary has it: counted all the same, to calibrate against the model. */
         val known: Boolean,
     )
 
-    // the runs of each length counted exactly, keyed by their chars packed 16 bits each, with
-    // count and first year: single chars all, longer ones those the sketch admitted
+    // the runs of each length counted exactly, keyed by their chars packed 16 bits each
     private val runs = Array(maxLength + 1) { LongIndex(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val counts = Array(maxLength + 1) { IntColumn(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val years = Array(maxLength + 1) { IntColumn(if (it <= 1) 1 shl 12 else 1 shl 20) }
     private val sketches = arrayOfNulls<Sketch>(maxLength + 1)
 
-    /** The Han characters counted, after the first pass. */
     var chars = 0L
         private set
 
-    // the last pass: the runs whose neighbours are gathered, every how many-th of its occurrences
-    // each is looked at and how many it has had, and (run, side, neighbour) counts by their index
+    // the last pass: the runs whose neighbours are gathered, and (run, side, neighbour) counts by index
     private val kept = LongIndex(1 shl 16)
     private val strides = IntColumn(1 shl 16)
     private val seen = IntColumn(1 shl 16)
     private val neighbours = LongIndex(1 shl 20)
     private val neighbourCounts = IntColumn(1 shl 20)
 
-    /**
-     * The pass under way, from 1: the first counts the characters, pass n from 2 sketches the runs
-     * of n and counts those of n - 1 the sketch admitted, [maxLength] + 1 counts those of
-     * [maxLength], [passes] gathers neighbours.
-     */
+    /** The pass under way, from 1: characters; n in 2..[maxLength] sketches runs of n and counts those of n - 1; then neighbours. */
     var pass = 1
         private set
 
     val passes: Int get() = maxLength + 2
 
-    /** Whether every pass is done: [candidates] can be asked for. */
     val done: Boolean get() = pass > passes
 
-    /** Ends the pass under way. */
     fun nextPass() {
         require(!done) { "no pass after $passes" }
         if (pass == maxLength + 1) {
@@ -101,7 +69,7 @@ class NewWords(
             }
         }
         pass++
-        // as many cells as the corpus could have different runs, four times over, up to the width given
+        // as many cells as the corpus could have distinct runs, four times over, capped by the width given
         if (pass in 2..maxLength) sketches[pass] = Sketch(minOf(sketchBits, maxOf(MIN_SKETCH_BITS, Long.SIZE_BITS - java.lang.Long.numberOfLeadingZeros(chars * 4))))
     }
 
@@ -139,7 +107,6 @@ class NewWords(
         val sketch = sketches[length]!!
         val parts = sketches[length - 1]
         for (start in begin..end - length) {
-            // both parts one shorter must have been found frequent enough: a frequent run's were
             if (parts != null && (parts.count(key(text, start, length - 1)) < minCount ||
                     parts.count(key(text, start + 1, length - 1)) < minCount)
             ) continue
@@ -161,7 +128,6 @@ class NewWords(
         if (year > 0 && (years[length][at] == 0 || year < years[length][at])) years[length][at] = year
     }
 
-    /** The exact count of a run, or the sketch's for one the sketch did not admit. */
     private fun countOf(length: Int, key: Long): Int {
         val at = runs[length].indexOf(key)
         return if (at >= 0) counts[length][at] else sketches[length]?.count(key) ?: 0
@@ -187,19 +153,10 @@ class NewWords(
         return nth % strides[run] == 0
     }
 
-    /**
-     * The runs that reached [minCount], each to [sink], in no order; only after the last pass.
-     * Handed over one at a time: millions of them in a list at once was too much on top of the
-     * counts.
-     */
+    /** The runs that reached [minCount], each to [sink] in no order (one at a time: a list would not fit beside the counts). */
     fun candidates(sink: (Candidate) -> Unit) {
         require(done) { "the passes are not done" }
-        // H = ln(total) - sum(n ln n) / total, summed over the neighbours of each run and side, plus
-        // Miller-Madow's (distinct - 1) / 2 total, as from a few observations (a rare run, or any
-        // run sampled) the plain estimate runs low. A boundary (punctuation, a
-        // space, the page's end) counts as a neighbour never seen before each time: a word between
-        // 《》 or before a full stop stands as free as one among others, where a fragment never sits
-        // at one
+        // entropy with Miller-Madow's correction, as the plain estimate runs low; each boundary counts as a new neighbour
         val totals = IntArray(kept.size * 2)
         val distinct = IntArray(kept.size * 2)
         val sums = DoubleArray(kept.size * 2)
@@ -218,7 +175,7 @@ class NewWords(
         fun entropy(run: Int, side: Int): Double {
             val slot = run * 2 + side
             val n = totals[slot]
-            // none gathered, as only other text in the last pass leaves a kept run: not measured
+            // none gathered (only other text in the last pass): not measured
             return if (n == 0) Double.NaN else ln(n.toDouble()) - sums[slot] / n + (distinct[slot] - 1) / (2.0 * n)
         }
         for (i in 0 until kept.size) {
@@ -229,7 +186,6 @@ class NewWords(
             val year = years[length][runs[length].indexOf(key)]
             sink(Candidate(text, count, year, pmi(text, count), entropy(i, 0), entropy(i, 1), known = false))
         }
-        // the known words and the runs that do not hold together, with their counts for calibration
         for (length in 2..maxLength) {
             val index = runs[length]
             for (i in 0 until index.size) {
@@ -242,7 +198,6 @@ class NewWords(
         }
     }
 
-    /** log10 of [count] over what [text]'s likeliest split's parts predict by chance. */
     private fun pmi(text: String, count: Int): Double {
         val length = text.length
         var expected = 0.0
@@ -254,7 +209,7 @@ class NewWords(
         return log10(count / expected)
     }
 
-    /** A count-min sketch of two rows in one array: counts a run never under, seldom much over. */
+    /** A count-min sketch of two rows in one array: never under a run's count, seldom much over. */
     class Sketch(bits: Int) {
         private val cells = IntArray(1 shl bits)
         private val shift = Long.SIZE_BITS - bits
@@ -278,29 +233,21 @@ class NewWords(
     companion object {
         const val MAX_LENGTH = 4
 
-        /** 2^27 cells, half a gigabyte a length: a billion characters' runs collide little. */
+        /** 2^27 cells per length: a billion characters' runs collide little. */
         const val SKETCH_BITS = 27
         const val MIN_SKETCH_BITS = 12
 
-        /**
-         * Neighbours are gathered for runs this much above chance (log10) only: threshold enough
-         * for any caller. Not for runs of two: their characters' counts are mostly other words',
-         * so a word of two common ones comes out below chance (社牛, 问界, 麻了; of the
-         * dictionary's words of two seen 50 times or more, two in three under 1, one in three under 0)
-         */
+        /** Neighbours are gathered only for runs this much above chance (log10); not for runs of two, whose characters are mostly other words'. */
         const val GATHER_PMI = 0.5
 
-        /** At most about as many of each run's occurrences as its neighbours are gathered from. */
         const val GATHER_PER_RUN = 40
         private const val LEFT = 0
         private const val RIGHT = 1
         private const val NONE = '\u0000'
 
-        // the chars are counted from just below the first Han one: four then fit a LongIndex key,
-        // which is never negative, and none is 0, so a key's top char tells its length
+        // counted from just below the first Han char: four then fit a non-negative key, and none is 0
         private const val FIRST = '㏿'
 
-        /** [length] Han chars of [text] from [start], 16 bits each, the first highest. */
         fun key(text: CharSequence, start: Int, length: Int): Long {
             var key = 0L
             for (i in 0 until length) key = (key shl 16) or (text[start + i] - FIRST).toLong()
@@ -313,7 +260,6 @@ class NewWords(
             return String(out)
         }
 
-        /** How many chars [key] packs. */
         fun lengthOf(key: Long): Int {
             var length = 1
             while (length < MAX_LENGTH && (key ushr (16 * length)) != 0L) length++

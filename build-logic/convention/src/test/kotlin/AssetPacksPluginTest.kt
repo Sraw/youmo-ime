@@ -22,10 +22,7 @@ import java.util.TimeZone
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
-/**
- * The packs as the build makes them: what the app's PackShelf reads (lib/ime-core's tests take
- * packs made the same way, TestPacks) must be what this writes, signed so the app's keys take it.
- */
+/** The packs as the build makes them must be what the app's PackShelf reads, signed so the app's keys take them. */
 class AssetPacksPluginTest {
 
     @get:Rule

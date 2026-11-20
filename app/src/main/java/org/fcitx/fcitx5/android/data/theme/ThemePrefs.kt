@@ -6,7 +6,6 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import android.content.SharedPreferences
-import android.os.Build
 import androidx.annotation.StringRes
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.BuildConfig
@@ -48,20 +47,16 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         return pref
     }
 
-    // the keys and defaults the preferences declare: a copy here would drift when one changes
+    // as the preferences declare them: a copy here would drift
     private fun defaults(vararg prefs: ManagedPreference.PInt) = prefs.map { it.key to it.defaultValue }
 
-    // the size of the keyboard: here, with the preview over it, rather than with the keys'
-    // behavior; AppPrefs.Keyboard holds the values, for the input view reads them there
     init {
         val keyboard = AppPrefs.getInstance().keyboard
         section(R.string.section_size)
         levels(
             R.string.keyboard_height, "keyboard_height_level",
             defaults(keyboard.keyboardHeightPercent, keyboard.keyboardHeightPercentLandscape),
-            // ime-core's, which the keyboard reads 紧凑 by
             listOf(R.string.level_compact, R.string.level_low, R.string.level_standard, R.string.level_tall, R.string.level_taller)
-                // a level added or taken away in ime-core is a label to add or take away here, not one cut off
                 .also { require(it.size == KeyboardHeightLevels.ALL.size) { "a label for each keyboard height level" } }
                 .zip(KeyboardHeightLevels.ALL) { label, l -> Level(label, l.portrait, l.landscapeLevel) },
             follow = keyboard.keyboardHeightFollowTheme,
@@ -89,22 +84,14 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         )
     }
 
-    /** [migrateSizeFollow] done: copied with the managed preferences. */
     val sizeFollowMigrated: Boolean get() = sharedPreferences.getBoolean(SIZES_FOLLOW_MIGRATED, false)
 
     /**
-     * Once (060-render-p3 T5): each size an older version had at its default follows the theme, one
-     * set otherwise stays as it is, not following; [SIZES_FOLLOW_MIGRATED] marks it done. A backup of
-     * an older version brought back has no mark, its sizes their own: done again at the next start.
-     * The mark is a key of no preference, so the hidden settings' reset leaves it; it is copied for
-     * before the first unlock (ThemeManager.syncToDeviceEncryptedStorage). Done too where a 跟随主题 is
-     * stored: only this version writes one, so a copy of before the mark was copied is not moved again
-     * (a default level picked there would follow the theme). A number not an int (a damaged file) is
-     * taken as set: kept, not following.
+     * Once: each size at an older version's default follows the theme. Also marked where a 跟随主题 is stored (only this
+     * version writes one), so an older copy is not migrated again.
      */
     fun migrateSizeFollow() {
         if (sizeFollowMigrated) return
-        // each list with its 跟随主题 flag's key
         val lists = managedPreferencesUi.filterIsInstance<ManagedPreferenceUi.Levels>().mapNotNull { l -> l.follow?.let { l to it.first } }
         val stored = lists.any { (_, flag) -> sharedPreferences.contains(flag) }
         sharedPreferences.edit {
@@ -118,17 +105,9 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         }
     }
 
-    /** [migrateKeyboardStyle] done: copied with the managed preferences. */
     val keyboardStyleMigrated: Boolean get() = runCatching { sharedPreferences.getBoolean(KEYBOARD_STYLE_MIGRATED, false) }.getOrDefault(false)
 
-    /**
-     * Once: 0.6.0's 分体键盘, 单手模式 and 悬浮键盘 as each shape's style, as it showed there
-     * (KeyboardStyleMigration.from060); [KEYBOARD_STYLE_MIGRATED] marks it done. The old keys stay, for a backup of
-     * this version brought back into 0.6.0, which reads them (§6.2). A backup of 0.6.0 brought back has no mark:
-     * moved at the start after it (the restore restarts the process). A shape's style stored already is kept (a
-     * damaged file); an old value unreadable is its default. Done before the first unlock too, on the copy there
-     * (ThemeManager.syncToDeviceEncryptedStorage): 0.6.0's copy has the old keys only.
-     */
+    /** Once; the old keys stay for a backup restored into 0.6.0. Done on the pre-unlock copy too: 0.6.0's has the old keys only. */
     fun migrateKeyboardStyle() {
         if (keyboardStyleMigrated) return
         fun string(key: String) = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
@@ -140,7 +119,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         val side = OneHanded.entries.firstOrNull { it.name == string(ONE_HANDED_060) }
         val floating = runCatching { sharedPreferences.getBoolean(FLOATING_KEYBOARD_060, false) }.getOrDefault(false)
         val migrated = KeyboardStyleMigration.from060(split, oneHanded = side != null, floating)
-        // none of the three stored (a new install, 0.6.0's defaults): the defaults, none written
+        // none stored (new install, 0.6.0's defaults): nothing written
         val any = listOf(SPLIT_KEYBOARD_060, ONE_HANDED_060, FLOATING_KEYBOARD_060).any(sharedPreferences::contains)
         sharedPreferences.edit {
             fun put(style: StyleKey, under: StyleKey, stored: KeyboardStyleMigration.Stored) {
@@ -150,48 +129,37 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
             }
             put(keyboardStylePortrait, keyboardStyleUnderPortrait, migrated.portrait)
             put(keyboardStyleLandscape, keyboardStyleUnderLandscape, migrated.landscape)
-            // 0.6.0 kept it as it changed; one of before that may not have
+            // 0.6.0 kept it as it changed; older ones may not have
             side?.let { putString(oneHandedSide.key, it.name) }
             putBoolean(KEYBOARD_STYLE_MIGRATED, true)
         }
     }
 
-    /** A style's or an under's name ([KeyboardStyles]), "" where none is stored: copied as it is, or as not there. */
     class StyleKey(sharedPreferences: SharedPreferences, key: String) : ManagedPreference<String>(sharedPreferences, key, "") {
         override fun setValue(value: String) = sharedPreferences.edit { if (value.isEmpty()) remove(key) else putString(key, value) }
 
         override fun getValue(): String = runCatching { sharedPreferences.getString(key, null) }.getOrNull().orEmpty()
 
-        // a style not stored stays so in the copy before the first unlock: its default is by the width there
+        // unstored stays unstored in the pre-unlock copy: its default depends on the width there
         override fun putValueTo(editor: SharedPreferences.Editor) {
             val value = getValue()
             if (value.isEmpty()) editor.remove(key) else editor.putString(key, value)
         }
     }
 
-    // the code being typed over the app, outside the keyboard (FloatingCodeStrip), or in it above the
-    // candidates as up to 0.5.0; the keyboard is lower floating, the keys keeping their height. For
-    // everyone, upgrades too (the user, 2026-11-01). The view is made anew for it. 输入框里 (实验性,
-    // 0.6.1): the code in the app's field, what it means said before it is picked (061-code-in-field §4.1)
+    // floating, the keyboard is lower with keys keeping their height
     val codeRow = enumList(
         R.string.code_row_style, "code_row_style", CodeRowStyle.Floating,
         confirm = ManagedPreferenceUi.Confirm(CodeRowStyle.InField, R.string.code_row_in_field, R.string.code_row_in_field_note),
     )
 
-    // the on-screen bar's words, its 联想 and the expanded grid; the bar grows with it, the keys
-    // keep their height (CandidateBarHeight). The floating window has its own candidates_window_font_size
+    // the bar grows, the keys keep their height; the floating window has its own size
     val candidateTextSize = int(
         R.string.candidate_text_size, "candidate_text_size",
         CandidateBarHeight.DEFAULT_TEXT_SP, 14, 28, "sp"
     )
 
-    /**
-     * 竖屏键盘样式 and 横屏键盘样式 (061-wide-keyboard-style): each shape's KeyboardStyle and what is under it, by
-     * name; a style not stored is the shape's default by its width (KeyboardStyleState.default), so none is
-     * written but by the user, the keyboard's toggles and [migrateKeyboardStyle]. Read and written through
-     * KeyboardStyles alone, the two of a shape in one edit; the view is made anew or slid by the service and
-     * InputView, not by the theme (ThemeManager).
-     */
+    /** Unstored means the shape's default by its width, so only the user, the toggles and the migration write one. */
     val keyboardStylePortrait = StyleKey(sharedPreferences, "keyboard_style_portrait").apply { register() }
     val keyboardStyleLandscape = StyleKey(sharedPreferences, "keyboard_style_landscape").apply { register() }
     val keyboardStyleUnderPortrait = StyleKey(sharedPreferences, "keyboard_style_portrait_under").apply { register() }
@@ -212,16 +180,12 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         ).registerUi()
     }
 
-    // the other boards at a side while it splits; read by the input view as it changes, not made anew. Of use
-    // where a shape splits, or goes back to split from one-handed or floating
+    // read by the input view as it changes, not remade
     val splitDock = enumList(R.string.split_dock, "split_dock", SplitDock.Right) {
         KeyboardStyles.splitDockOffered(appContext)
     }
 
-    // the side 单手 was last at, which turning it on goes back to (from the status area, the toolbar, the
-    // settings page): a left-handed user would otherwise move it across every time; the arrows beside it
-    // write it, read by the input view as it changes. The app's state, not a setting: no UI, and not
-    // `hidden`, which an import of a backup resets (audit-061 app-rest-1)
+    // app state, not a setting: no UI, and not `hidden`, which a backup import resets
     val oneHandedSide = ManagedPreference.PStringLike(
         sharedPreferences,
         "one_handed_side",
@@ -229,23 +193,16 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         ManagedPreference.enumCodec<OneHanded>(),
     ).apply { register() }
 
-    // where its drag handle is: made anew for it too. Set also while it does not float, for the next time
     val floatingHandle = enumList(R.string.floating_handle, "floating_handle", FloatingHandleSide.Bottom)
 
-    // the handle on the docked keyboard too, where floatingHandle puts it, added to the keyboard (the
-    // keys keep their height unless the app's 120 dp binds, KeyboardHeightCap; the user 2026-10-22);
-    // its grip long pressed lets the keyboard go floating under the finger. Made anew for it
+    // keys keep their height unless the app's 120 dp binds (KeyboardHeightCap)
     val alwaysShowHandle = switch(R.string.always_show_floating_handle, "always_show_floating_handle", false)
 
     init {
         section(R.string.section_key_style)
     }
 
-    // 0.5.0's three, each over the theme's or following it (the user, 2026-11-04); new keys, as
-    // ThemeLookMigration reads 0.5.0's to tell whether to move them into the theme. Following is the
-    // default: what 0.5.0 had set is in the theme in use already, so an upgrade looks as it did.
-    // The spacing two since 0.6.0, across and up and down (the user, 2026-11-06), 0.5.2's one moved
-    // into both (migrateKeySpacing)
+    // following is the default: what 0.5.0 set is in the theme already, so an upgrade looks the same
     val keyBorderChoice = enumList(R.string.key_border, "key_border_choice", KeyBorderChoice.FollowTheme)
     val keyHSpacingChoice = enumList(R.string.key_h_spacing, KEY_H_SPACING, KeyHSpacingChoice.FollowTheme)
     val keyVSpacingChoice = enumList(R.string.key_v_spacing, KEY_V_SPACING, KeyVSpacingChoice.FollowTheme)
@@ -255,7 +212,6 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         note(R.string.key_style_follow_theme, "key_style_note")
     }
 
-    /** What the four set over a theme's keys ([ThemeManager.shownLook]). */
     fun keyStyleChoice() = KeyStyleChoice(
         keyBorderChoice.getValue().blocks,
         keyHSpacingChoice.getValue().spacing,
@@ -263,12 +219,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         keyRadiusChoice.getValue().radiusDp,
     )
 
-    /**
-     * 0.5.2's one 按键间距 (`key_spacing_choice`) as the two, each the same level (the levels are named alike);
-     * one of the two stored already is kept. A value not a level's name (a damaged backup) is following, as
-     * it read. The old key dropped all the same. A backup of 0.5.2 or 0.6.0-beta1 brought back is moved at
-     * the start after it (the restore restarts the process).
-     */
+    /** One already stored is kept; a non-level value (damaged backup) is following. The old key is dropped anyway. */
     fun migrateKeySpacing() {
         if (!sharedPreferences.contains(KEY_SPACING_052)) return
         // stored as another type: read as unset, never a crash at every start
@@ -281,7 +232,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         }
     }
 
-    // 0.5.2's one level as the vertical one: each named, so a renamed or added level does not compile rather than throw at a start
+    // each named, so a renamed or added level fails to compile rather than throw at a start
     private fun vertical(level: KeyHSpacingChoice): KeyVSpacingChoice = when (level) {
         KeyHSpacingChoice.FollowTheme -> KeyVSpacingChoice.FollowTheme
         KeyHSpacingChoice.Compact -> KeyVSpacingChoice.Compact
@@ -295,7 +246,6 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         Off(R.string.key_border_off, false),
     }
 
-    /** 横向间距: the room left and right of a key. */
     enum class KeyHSpacingChoice(override val stringRes: Int, val spacing: KeyStyleChoice.Spacing?) : ManagedPreferenceEnum {
         FollowTheme(R.string.follow_theme, null),
         Compact(R.string.level_compact, KeyStyleChoice.H_COMPACT),
@@ -303,13 +253,7 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         Loose(R.string.level_loose, KeyStyleChoice.H_LOOSE),
     }
 
-    /**
-     * 纵向间距: the room above and below a key; at the keyboard height 紧凑 less (Gap.vCompact). Stored by name,
-     * so a level added keeps the others' meaning; the four of [KeyHSpacingChoice] are named alike, which
-     * [migrateKeySpacing] reads 0.5.2's one by. [VeryCompact] (0.6.1) is up and down only: as tight as 横向's
-     * 紧凑, for the gaps alike both ways (the user, 2026-11-16); a version without it
-     * reads it as following and writes that back over it (readOrReset): reset there.
-     */
+    /** Stored by name, so an added level keeps the others' meaning; a version without [VeryCompact] reads it as following. */
     enum class KeyVSpacingChoice(override val stringRes: Int, val spacing: KeyStyleChoice.Spacing?) : ManagedPreferenceEnum {
         FollowTheme(R.string.follow_theme, null),
         VeryCompact(R.string.level_very_compact, KeyStyleChoice.V_VERY_COMPACT),
@@ -325,37 +269,12 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         Round(R.string.level_round, KeyStyleChoice.RADIUS_ROUND),
     }
 
-    /** The key style settings as they were before theme file 3.0, while they are in the file ([ThemeLookMigration]). */
     fun legacyLook() = ThemeLookMigration.legacy(sharedPreferences)
 
-    /** The old settings kept for the Monet themes' keys ([ThemeLookMigration.monet]). */
     fun monetLook() = ThemeLookMigration.monet(sharedPreferences)
 
-    /** [ThemeLookMigration.settle] on these settings. */
     fun settleLook(slots: List<ThemeLookMigration.Slot>, save: (Theme.Custom) -> Boolean) =
         ThemeLookMigration.settle(sharedPreferences, slots, save)
-
-    enum class NavbarBackground(override val stringRes: Int) : ManagedPreferenceEnum {
-        None(R.string.navbar_bkg_none),
-        ColorOnly(R.string.navbar_bkg_color_only),
-        Full(R.string.navbar_bkg_full);
-    }
-
-    val navbarBackground = hidden {
-        enumList(
-            R.string.navbar_background,
-            "navbar_background",
-            NavbarBackground.Full,
-            // 35+ forces edge to edge
-            enableUiOn = { Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM }
-        )
-    }.apply {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            sharedPreferences.edit {
-                remove(this@apply.key)
-            }
-        }
-    }
 
     /**
      * When [followSystemDayNightTheme] is disabled, this theme is used.
@@ -395,21 +314,12 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         })
 
     /**
-     * 060-render-p3 T3: a slot ([normalModeTheme], [lightModeTheme], [darkModeTheme]) naming a built-in theme
-     * by its 0.5 name (`PixelDark`, `MonetLight`) names it as it is now (`pixel#dark`, `monet#light`,
-     * [BuiltinThemeFiles.LEGACY]): what each showed it shows. One naming a theme of the user's
-     * ([customs]: the listed ones' names, and any a json not listed or a directory not read may hold,
-     * [ThemeFilesManager.mayHoldThemes]) is left, which it was before as well (the user's first); till it
-     * is moved, [ThemeManager.getTheme] reads an old name as the built-in theme. Run at every start and
-     * refresh, no mark:
-     * no old name is written any more (an import of one is refused), so a backup of an older version
-     * brought back, and the copy for before the first unlock (written by an older version, read with
-     * this one's), are moved as they are read. A name of no theme (one deleted) is left: the default.
-     * Whether a slot was moved.
+     * A slot naming a built-in by its 0.5 name names it as it is now; one naming a possible user theme is left. No mark:
+     * no old name is written any more, so old backups and the pre-unlock copy are moved as read.
      */
     fun migrateThemeRefs(customs: Set<String>): Boolean {
         val moved = themeSlots.mapNotNull { key ->
-            // a value not a string (a damaged file) is no name: left, read as the default
+            // a non-string value (damaged file) is no name: left, read as the default
             val name = slotValue(key) ?: return@mapNotNull null
             BuiltinThemeFiles.moved(name)?.takeIf { name !in customs }?.let { key to it }
         }
@@ -417,26 +327,19 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
         return moved.isNotEmpty()
     }
 
-    // the settings naming a theme, and one's name (a value not a string, a damaged file's, none)
     private val themeSlots get() = listOf(normalModeTheme.key, lightModeTheme.key, darkModeTheme.key)
 
     private fun slotValue(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
 
-    /** Whether a slot names the theme [name]. */
     fun namesTheme(name: String): Boolean = themeSlots.any { slotValue(it) == name }
 
-    /**
-     * Each slot naming the user's theme [from] names [to] (060-render-p3 T3: one hiding a built-in theme
-     * saved again under a new name, [ThemeFilesManager.moveClashing]); on disk before it returns, as the
-     * old theme's json is deleted next. Whether it was written.
-     */
+    /** On disk before it returns, as the old theme's json is deleted next. */
     fun renameThemeRefs(from: String, to: String): Boolean {
         val keys = themeSlots.filter { slotValue(it) == from }
         if (keys.isEmpty()) return true
         return sharedPreferences.edit().apply { keys.forEach { putString(it, to) } }.commit()
     }
 
-    /** The slots naming one of [refs] back to their defaults ([PackDrawGuard]): whether any was. */
     fun dropThemeRefs(refs: Set<String>): Boolean {
         val keys = themeSlots.filter { slotValue(it) in refs }
         if (keys.isNotEmpty()) sharedPreferences.edit { keys.forEach(::remove) }
@@ -450,18 +353,15 @@ class ThemePrefs(sharedPreferences: SharedPreferences) :
     )
 
     companion object {
-        /** [migrateSizeFollow] done. */
         const val SIZES_FOLLOW_MIGRATED = "keyboard_sizes_follow_migrated"
 
-        /** [migrateKeyboardStyle] done. */
         const val KEYBOARD_STYLE_MIGRATED = "keyboard_style_migrated"
 
-        /** 0.6.0's three, read by [migrateKeyboardStyle] alone; kept for 0.6.0 (§6.2). */
+        /** Kept for 0.6.0. */
         const val SPLIT_KEYBOARD_060 = "split_keyboard"
         const val ONE_HANDED_060 = "one_handed"
         const val FLOATING_KEYBOARD_060 = "floating_keyboard"
 
-        /** 0.5.2's one 按键间距, which [migrateKeySpacing] moves into the two. */
         const val KEY_SPACING_052 = "key_spacing_choice"
         const val KEY_H_SPACING = "key_h_spacing_choice"
         const val KEY_V_SPACING = "key_v_spacing_choice"

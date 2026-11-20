@@ -66,8 +66,7 @@ class ThemeListFragment : Fragment() {
                 val ctx = requireContext()
                 val cr = ctx.contentResolver
                 lifecycleScope.withLoadingDialog(ctx) {
-                    // the picker shows every file (.theme has no MIME type of its own): the name decides,
-                    // and one without a name is refused as well; another input method's skin is converted
+                    // .theme has no MIME type, so the picker shows every file: the name decides (none: refused); other IMEs' skins are converted
                     val name = cr.queryFileName(uri)
                     val skin = ThemeFileName.isSkinFile(name)
                     if (!skin && !ThemeFileName.isThemeFile(name)) {
@@ -75,11 +74,10 @@ class ThemeListFragment : Fragment() {
                         return@withLoadingDialog
                     }
                     try {
-                        // the list read here, where it is changed, not on the thread that imports
+                        // read here, where it is changed, not on the importing thread
                         val themes = ThemeManager.getAllThemes()
                         val opened = withContext(Dispatchers.IO) {
-                            // not over the start's listing of the packs (ThemeLayoutsToList.atStart): the pack it reads
-                            // replaced, the layouts it would list told before it listed them
+                            // not over the start's pack listing (ThemeLayoutsToList.atStart): it would see the pack replaced under it
                             ThemeLayoutsToList.awaitStart()
                             val inputStream = cr.openInputStreamOrThrow(uri)
                             if (skin) {
@@ -88,14 +86,13 @@ class ThemeListFragment : Fragment() {
                                 ThemeFilesManager.openTheme(inputStream, themes).getOrThrow()
                             }
                         }
-                        // a theme 4.0 pack: shown, taken only if the user does (060-render-p3 T8a)
+                        // a theme 4.0 pack: shown, taken only if the user does
                         if (opened is ThemeFilesManager.Opened.Pack) {
                             confirmPack(opened)
                             return@withLoadingDialog
                         }
                         val (newCreated, theme, migrated) = (opened as ThemeFilesManager.Opened.Json).imported
-                        // one imported again under its name: its files new under the old names, the
-                        // keyboard drawn anew if it is the one in use
+                        // reimported under its name: new files under old names, the keyboard redrawn if in use
                         ThemeManager.filesChanged(theme.name) { ThemeManager.refreshThemes() }
                         if (newCreated) {
                             themeListAdapter.prependTheme(theme)
@@ -149,7 +146,7 @@ class ThemeListFragment : Fragment() {
         }
     }
 
-    /** The built-in theme [file]'s card scrolled to and given to [found], once it is laid out. */
+    /** Given to [found] once laid out. */
     fun reveal(file: String, found: (View) -> Unit) {
         val list = view as? RecyclerView ?: return
         val at = themeListAdapter.entries.indexOfFirst { it is Theme.Builtin && it.file == file }.takeIf { it >= 0 } ?: return
@@ -172,15 +169,15 @@ class ThemeListFragment : Fragment() {
         themeListAdapter.setSelectedThemes(active, light, dark)
     }
 
-    // the app makes no themes: 新增主题 imports a file, or opens the web theme maker to make one
+    // the app makes no themes: 新增主题 imports a file, or opens the web theme maker
     private fun addTheme() {
-        // the themes not settled: an import would go nowhere the next start reads
+        // themes not settled: an import would go nowhere the next start reads
         if (ThemeManager.refuseIfNotSettled()) return
         ThemeAddMenu.show(requireContext()) { importLauncher.launch("*/*") }
     }
 
     private fun selectTheme(theme: Theme) {
-        // a built-in theme of two versions: each slot its version, as a pack's
+        // a two-version built-in: each slot its version, as a pack's
         val builtinPair = (theme as? Theme.Builtin)?.let { t ->
             val versions = ThemeManager.BuiltinThemes.filter { it.file == t.file }
             val light = versions.firstOrNull { !it.isDark }
@@ -193,8 +190,7 @@ class ThemeListFragment : Fragment() {
         }
         ThemeManager.prefs.lightModeTheme.setValue(light)
         ThemeManager.prefs.darkModeTheme.setValue(dark)
-        // the normal slot too: following turned off later shows this pick, not the one before (written as the
-        // slots are: the theme in use found anew by the system's mode)
+        // the normal slot too, so turning following off later shows this pick
         ThemeManager.prefs.normalModeTheme.setValue(theme)
         updateSelectedThemes()
     }
@@ -204,14 +200,13 @@ class ThemeListFragment : Fragment() {
         exportLauncher.launch(ThemeFileName.of(ThemePackDialogs.title(theme)))
     }
 
-    // a pack unpacked and checked: its metadata, what it warns of; taken on 导入, else let go
+    // taken on 导入, else let go
     private fun confirmPack(pack: ThemeFilesManager.Opened.Pack) {
         val ctx = requireContext()
         val title = ctx.getString(R.string.theme_pack_import_title, pack.staged.name)
-        // let go however the dialog closes but by 导入 (cancelled, dismissed); one left by a fragment destroyed
-        // with it open is cleared by a later open (ThemeFilesManager.openTheme)
+        // let go however the dialog closes but by 导入; one left by a destroyed fragment is cleared by a later open
         var taken = false
-        // its boards the user picks among their own put in 外观 → 布局 with it (061-custom-layout §11), ticked unless unticked
+        // its user-pickable boards put in 外观 → 布局 too, ticked unless unticked
         val withLayouts = pack.staged.layoutReport.listed.takeIf { it.isNotEmpty() }?.let {
             CheckBox(ctx).apply {
                 setText(R.string.theme_pack_layouts_with)
@@ -226,15 +221,14 @@ class ThemeListFragment : Fragment() {
                     try {
                         withContext(Dispatchers.IO) { pack.commit().getOrThrow() }
                         ThemeManager.packPlaced(pack.staged.name)
-                        // its versions one card, a pack it replaced gone: the list made again
+                        // its versions one card, a pack it replaced gone: the list rebuilt
                         themeListAdapter.resetThemes(ThemeManager.getAllThemes())
                         updateSelectedThemes()
                     } catch (e: Exception) {
                         ctx.importErrorDialog(e)
                         return@withLoadingDialog
                     }
-                    // the theme in, whatever becomes of its layouts: what fails listing them said as theirs, not as the
-                    // import's failure (R26 F8378: it was, the list not made again)
+                    // the theme is in whatever becomes of its layouts: their failure is said as theirs, not the import's
                     if (withLayouts != null) {
                         try {
                             listLayouts(pack.staged.name, listLayouts, pack.staged.layoutReport.listed.size)
@@ -252,9 +246,7 @@ class ThemeListFragment : Fragment() {
             .show()
     }
 
-    // the pack [name] just imported, its boards put in 外观 → 布局 ([listed], none chosen), told where fewer than the
-    // confirmation listed ([expected]: the list full, one failed); or, unticked, recorded not to be listed by a restore.
-    // The theme imported whatever becomes of them
+    // [listed]: put in 外观 → 布局 (none chosen), told where fewer than [expected]; unticked: recorded so a restore does not list them
     private suspend fun listLayouts(name: String, listed: Boolean, expected: Int) {
         val pack = ThemeManager.Packs.firstOrNull { it.file == name } ?: return
         if (!listed) {
@@ -266,7 +258,7 @@ class ThemeListFragment : Fragment() {
         val made = withContext(Dispatchers.IO) {
             runCatching { ThemeLayoutsToList.run(pack) }.onFailure { Timber.w(it, "theme pack %s: layouts not listed", name) }.getOrNull()
         }
-        // here, on the main thread, where the settings pages change them too
+        // on the main thread, where the settings pages change them too
         made?.forEach { ThemeLayoutsToList.copySettings(it.done.renames) }
         context?.let { ctx -> layoutsNotListedNotice(ctx, made, expected)?.let { ctx.toast(it, Toast.LENGTH_LONG) } }
     }
@@ -297,10 +289,8 @@ class ThemeListFragment : Fragment() {
 
     companion object {
         /**
-         * What a theme imported says, one toast and its length: [migrated] (an older format's, made anew), and where its
-         * name was another theme's (a built-in one's since 0.6.0) [renamedFrom], the name it is under now, [name]. One
-         * toast: the newest takes the place of one shown (showBriefly), so a second would hide the first (R26 F8137).
-         * Null, nothing to say.
+         * One toast (a newer one replaces a shown one): [migrated] (older format remade) and [renamedFrom] (clashed with
+         * a built-in since 0.6.0, now [name]). Null, nothing to say.
          */
         @VisibleForTesting
         internal fun importedNotice(ctx: Context, migrated: Boolean, renamedFrom: String?, name: String): Pair<String, Int>? {
@@ -312,11 +302,7 @@ class ThemeListFragment : Fragment() {
             return lines.joinToString("\n") to if (renamedFrom != null) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
         }
 
-        /**
-         * What an import with 「一起导入」 says of its boards: [made] (null: the listing failed) fewer than the [expected]
-         * the confirmation listed (the list full, one failed), that not all were put in 外观 → 布局 (ST-72, ST-84). Null,
-         * all listed (R26 F8518).
-         */
+        /** Says not all boards went into 外观 → 布局 when [made] (null: listing failed) is below [expected]; null if all did. */
         @VisibleForTesting
         internal fun layoutsNotListedNotice(ctx: Context, made: List<ThemeLayoutsToList.Listed>?, expected: Int): String? =
             ctx.getString(R.string.theme_pack_layouts_not_listed).takeIf { made == null || made.size < expected }

@@ -8,35 +8,23 @@ import android.os.SystemClock
 import timber.log.Timber
 
 /**
- * The service's own subtype changes on their way back. When fcitx switches input method itself
- * (a switch key, a shortcut), the service tells the system the new subtype, and the system calls
- * `onCurrentInputMethodSubtypeChanged` with it a little later: an echo, which must not switch
- * fcitx again. Any other call is the user's pick in the system's picker.
+ * When fcitx switches input method itself, the service tells the system, and the system calls
+ * `onCurrentInputMethodSubtypeChanged` back a little later: an echo, which must not switch fcitx again.
+ * Any other call is the user's pick.
  *
- * Several switches can be told before the first echo is back -- fcitx busy loading an engine
- * runs the switches queued behind it back to back -- and the echoes come in the order told.
- * Remembering only the last switch took the echo of the one before it for the user's pick, and
- * switched fcitx back to it.
- *
- * An echo is back within milliseconds, later only behind a stalled main thread; one that is not
- * back by [ECHO_WITHIN_MS] never comes, and is forgotten before it can take a later pick of the
- * user's for itself. The window is wide: a late echo taken for a pick switches fcitx back, while
- * a lost echo is rare, the system being told only of a change of its subtype.
- *
- * Main thread only.
+ * Several switches can be told before the first echo is back (fcitx busy loading an engine), and echoes
+ * come in order: remembering only the last took the echo of the one before for the user's pick. One not
+ * back by [ECHO_WITHIN_MS] never comes. Main thread only.
  */
 class SubtypeEchoes(private val now: () -> Long = SystemClock::uptimeMillis) {
 
     private class Told(val inputMethod: String, val at: Long)
 
-    /** Input methods told to the system whose echo is not back yet, oldest first. */
     private val pending = ArrayDeque<Told>()
 
     /**
-     * fcitx switched to [inputMethod]; [had] is the system's subtype, null if not one of ours.
-     * True if the switch is to be told to the system, whose echo is then awaited; false if the
-     * system has [inputMethod] already: it calls back only when its subtype changes, not for a
-     * sub-mode's change, nor for the switch the user's pick made.
+     * [had] null if not one of ours. False if the system has [inputMethod] already: it calls back only when
+     * its subtype changes, not for a sub-mode's change, nor for the switch the user's pick made.
      */
     fun shouldTell(inputMethod: String, had: String?): Boolean {
         val time = now()
@@ -52,11 +40,7 @@ class SubtypeEchoes(private val now: () -> Long = SystemClock::uptimeMillis) {
         return true
     }
 
-    /**
-     * The system called back with [inputMethod]: true for the echo of a switch [shouldTell] let
-     * through, which is forgotten with any told before it that never came back; false for the
-     * user's pick.
-     */
+    /** True for an echo, which is forgotten with any told before it that never came back. */
     fun isEcho(inputMethod: String): Boolean {
         val time = now()
         forgetOverdue(time)
@@ -68,9 +52,8 @@ class SubtypeEchoes(private val now: () -> Long = SystemClock::uptimeMillis) {
     }
 
     /**
-     * The system refused the switch to [inputMethod] that [shouldTell] just let through, as it does
-     * for a keyboard no longer enabled: no echo comes, and awaited, it would take a later pick of
-     * the user's for itself. The newest switch to it is forgotten; any told before stay awaited.
+     * As it does for a keyboard no longer enabled: no echo comes, and awaited it would take a later pick for
+     * itself. The newest switch to it is forgotten; any told before stay awaited.
      */
     fun refused(inputMethod: String) {
         val at = pending.indexOfLast { it.inputMethod == inputMethod }
@@ -91,7 +74,7 @@ class SubtypeEchoes(private val now: () -> Long = SystemClock::uptimeMillis) {
     private companion object {
         const val ECHO_WITHIN_MS = 10_000L
 
-        /** Bounds memory only: echoes come back in order and within the window, well short of it. */
+        /** Bounds memory only. */
         const val MAX_PENDING = 16
     }
 }

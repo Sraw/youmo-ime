@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** The excerpt a clipboard entry shows: a few lines, each cut short, masked when sensitive. */
 class ClipboardAdapterTest {
 
     private val b = ClipboardEntry.BULLET
@@ -22,14 +21,12 @@ class ClipboardAdapterTest {
         assertEquals("$b$b\n$b$b$b", excerpt("ab\ncde", mask = true))
     }
 
-    // as a URL with a note after it: the note still shows
     @Test
     fun aLineLongerThanTheExcerptIsCutAndTheNextLineFollows() {
         assertEquals("abc\ngh", excerpt("abcdef\ngh", chars = 3))
         assertEquals("$b$b$b\n$b$b", excerpt("abcdef\ngh", mask = true, chars = 3))
     }
 
-    // four lines of three and their breaks are 16 characters: nothing past them is looked at
     @Test
     fun aLineReachingPastWhatTheExcerptCouldShowEndsIt() {
         assertEquals("aaa", excerpt("a".repeat(20) + "\nb", chars = 3))

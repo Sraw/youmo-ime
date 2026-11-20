@@ -25,38 +25,13 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.xml.Xml
 import org.fcitx.fcitx5.android.scene.xml.XmlElement
 
-/**
- * Whether a layout of its own (a `.layout`, 061-custom-layout §3) may be imported or saved: one check for the app's import
- * and the layout maker's page, so the two never disagree on a file. What is wrong comes back as [Finding]s, a key and its
- * words each ([KEYS]), the app and the page saying them in their own words.
- *
- * Errors (§3.2): it reads, its `min-app` is not past the app's; its id, name, family and `based-on=` as §2.2 has them,
- * its name and `<meta>` with no [hidden] character; the limits of §2.6; an `<include>` only of the app's fragments, a
- * `layout:` only to Text, Number, Symbol; what its base has that must be typed on kept ([kept]); every key's name its
- * own (`<id>/<key>`, §3.2 第 7 条) or the app's; the keys its family needs (§3.3); and a scene made in every environment
- * of [scenes] (the screens a phone and a foldable show it on, compact, split, the fields, the input methods it is for,
- * the pads it is for) with no problem and no key without words or a picture. Warnings: no way to the number pad or the
- * symbols, a key narrower than half a letter's, `commit:`s (listed too, the import's confirmation shows them), a key
- * [theme] leaves blank, a key without a name, a key of the app's name writing what it does held or swiped (the app's
- * key's is taken: [KeyData], §19.4), `<gap look= class=>` (0.6.0's, no longer drawn), a number or symbols board whose
- * bottom row's first two are not the way back and the other board.
- *
- * Not [strict] (a theme pack's layout made into one of the list, on import, upgrade and restore, §3.2 两种检查强度): only
- * what 0.6.0 refused is an error (it reads, [kept]); the rest are warnings, but the gap's and the bottom row's, which the
- * user decided such packs are not told of.
- */
+/** Whether a `.layout` may be imported or saved: one check shared by the app and the layout maker; not [strict] (a pack's converted layout), only what the old app refused is an error. */
 object LayoutCheck {
-    /** Something wrong at [line] (0: the file as a whole): [key], one of [KEYS], with [args] to say it with. */
     data class Finding(val line: Int, val key: String, val args: List<String> = emptyList()) {
         override fun toString(): String = (if (line > 0) "line $line: " else "") + key + args.joinToString("") { " [$it]" }
     }
 
-    /**
-     * What [check] found: [errors] (not imported, not saved), [warnings]; and what the app reads of it once it is: its
-     * [family], the input methods it may be chosen for ([ims], §5.1), the pads it is for ([pads], a number board's), the
-     * `commit:` texts its keys type that its base's do not ([commits]: a key of its base's id typing the same text left
-     * out, the import's confirmation listing only what is new), the oldest app that reads it ([minApp], what the maker writes).
-     */
+    /** What [check] found; [commits] lists only `commit:` texts the base's same-id keys do not type (the import shows what is new). */
     data class Report(
         val errors: List<Finding>,
         val warnings: List<Finding>,
@@ -69,18 +44,13 @@ object LayoutCheck {
         val ok: Boolean get() = errors.isEmpty()
     }
 
-    /**
-     * The app's boards and fragments, by id, as text: BuiltInLayouts on the phone, BuiltIns on the page. Read once, on the
-     * first check that asks (all of them: a few milliseconds), and kept: one Sources may be shared by checks on several
-     * threads (an import's, a migration's), each first read made once ([lazy] is synchronized on the JVM).
-     */
+    /** The app's boards and fragments as text, read lazily once and shared across threads. */
     class Sources(val layouts: Map<String, String>, val fragments: Map<String, String>) {
         private val read: Map<String, Layout?> by lazy { layouts.mapValues { (_, t) -> (LayoutReader.layout(t) as? Parsed.Ok)?.value } }
         private val readFragments: Map<String, Fragment?> by lazy { fragments.mapValues { (_, t) -> (LayoutReader.fragment(t) as? Parsed.Ok)?.value } }
 
         internal val names: Set<String> by lazy { appNames(this) }
 
-        // each key of the app's boards taking a function name, its states' taps: what a true copy of it sends
         internal val taps: Map<KeyId, List<Set<String>>> by lazy { tapsByName(this) }
 
         internal fun layout(id: String): Layout? = read[id]
@@ -88,31 +58,21 @@ object LayoutCheck {
         fun fragment(id: String): Fragment? = readFragments[id]
     }
 
-    /** The families a layout of its own may be (0.6.1). */
     val FAMILIES = listOf("letters", "grouped", "nine", "number", "symbols")
 
-    /**
-     * The app's boards one may be made from: those a .theme's layouts are converted of (KeyData.LISTED), in its order, so
-     * the layout page offers what the app's import converts (L8a review N7; one list, R26 F8358).
-     */
+    /** The boards a .theme's layouts convert from: the layout page offers what the app's import converts. */
     val BASES = KeyData.LISTED.toList()
 
-    /** The base a family's needs are held to where `based-on=` is of another family (§2.2: 26 keys made grouped). */
     val FAMILY_BASE = mapOf("letters" to "qwerty", "grouped" to "k18", "nine" to "nine", "number" to "number", "symbols" to "symbols")
 
-    /** What the app's key names begin with (SlotDefaults, KeyCaps, KeyListsMigration go by them): no id nor own name may. */
+    /** Prefixes of the app's key names (SlotDefaults, KeyCaps, KeyListsMigration rely on them): no own id or name may use one. */
     val NAME_PREFIXES = listOf("full", "g14", "g18", "t9", "zy9", "zyfull", "num", "fn")
 
-    /** The boards a `layout:` may go to (§13). */
     val LAYOUT_TARGETS = listOf("Text", "Number", "Symbol")
 
-    /** The version a layout of none of [FEATURES] needs: layout-1 as 0.6.0 reads it. */
     const val BASE_VERSION = "0.6.0"
 
-    /**
-     * What came after 0.6.0, and the app that first reads it (§2.5): a layout using one is refused by an older app, so
-     * the maker writes the newest of those it uses as `min-app`. Kept with the reader by LayoutCheckTest.
-     */
+    /** Features newer than [BASE_VERSION] and the first app reading each: the maker writes the newest used as `min-app`. */
     val FEATURES = mapOf(
         "meta" to "0.6.1",
         "based-on" to "0.6.1",
@@ -121,7 +81,7 @@ object LayoutCheck {
         "row-when" to "0.6.1",
     )
 
-    /** Every key a [Finding] may have: the app's strings and the page's table say each (LayoutCheckTest holds them to it). */
+    /** Every [Finding] key: the app's strings and the page's table must word each (LayoutCheckTest enforces it). */
     val KEYS = listOf(
         // errors
         "read", "newer", "id-length", "id-built-in", "id-prefix", "name-length", "family", "based-on", "too-big",
@@ -139,16 +99,10 @@ object LayoutCheck {
     const val MAX_COMMITS = 100
     const val MAX_LABEL = 16
 
-    /**
-     * [text] checked as a layout of its own for an app of [appVersion], against the app's boards [sources]; [theme] the
-     * one in use, for the blank-key warning (none: not asked). [strict]: see the class. It builds every scene the layout
-     * is shown in (tens of milliseconds on a phone, more the first time): an import or a migration calls it off the main
-     * thread.
-     */
+    /** Builds every scene the layout is shown in (tens of ms on a phone): call it off the main thread. */
     fun check(text: String, sources: Sources, appVersion: String, theme: Theme? = null, strict: Boolean = true): Report {
         val errors = ArrayList<Finding>()
         val warnings = ArrayList<Finding>()
-        // a new rule's finding: an error where strict, else a warning
         val newRule: (Finding) -> Unit = { if (strict) errors += it else warnings += it }
         val source = text.removePrefix(BOM)
         val layout = read(text, errors) ?: return Report(errors, warnings, null, emptyList(), emptyList(), emptyList(), BASE_VERSION)
@@ -172,8 +126,7 @@ object LayoutCheck {
         val commits = newCommits(layout, base, base?.let { baseFragments(it, sources) }.orEmpty(), sources.names)
         warnings += told(layout, fragments, commits, theme)
         base?.let { b -> unnamed(layout, b, baseFragments(b, sources)).forEach { warnings += it } }
-        // a name looked up as KeyData looks it up for this layout: from its own based-on, as its styles are (R26 F8117);
-        // one writing none (a theme's board, checked loosely) from the board it is held to
+        // names are looked up by the layout's own based-on, as its styles are
         warnings += heldData(layout, fragments, sources, layout.basedOn ?: baseId(layout, sources))
         shown.padLacks.forEach { warnings += it }
         warnings += ScaledRows.find(layout, fragments, scenes(layout, ims, pads))
@@ -184,7 +137,6 @@ object LayoutCheck {
         return Report(errors, warnings, layout.family, ims, pads, commits, minApp)
     }
 
-    // the fragments [layout] includes, one the app has not an error
     private fun includes(layout: Layout, sources: Sources, errors: MutableList<Finding>): Map<String, Fragment> {
         val fragments = HashMap<String, Fragment>()
         for (inc in layout.parts.filterIsInstance<Include>()) {
@@ -194,26 +146,19 @@ object LayoutCheck {
         return fragments
     }
 
-    // a layout: action to a board the app has no switch to
     private fun targets(layout: Layout): List<Finding> =
         actions(layout).filter { it.second.startsWith("layout:") && it.second.removePrefix("layout:") !in LAYOUT_TARGETS }
             .map { Finding(it.first, "layout-target", listOf(it.second)) }
 
-    /**
-     * The app's board [layout] is held to, and drawn as where it cannot be: the one it is made from, or its family's where
-     * that is of another family (a `based-on` of another family's board is let in) or none. Only that: its keys' data,
-     * the theme's styles and its default shortcuts are its own `based-on`'s, whatever family that is (R26 F8117).
-     */
+    /** The app board [layout] is held to and drawn as where it cannot be; its keys' data and styles follow its own `based-on`. */
     fun baseId(layout: Layout, sources: Sources): String? =
         layout.basedOn?.let { b -> if (sources.layout(b)?.family == layout.family) b else FAMILY_BASE[layout.family] }
             ?: layout.id.takeIf { it in sources.layouts } ?: FAMILY_BASE[layout.family]
 
-    // what is only told: no way to the number or symbol board, keys too narrow, what it types as it is, keys a theme leaves blank
     private fun told(layout: Layout, fragments: Map<String, Fragment>, commits: List<String>, theme: Theme?): List<Finding> {
         val out = ArrayList<Finding>()
         // its includes' keys too (the grouped boards' 123 and 符 are grouped-bottom's)
         val ways = cells(layout, fragments).filterIsInstance<Key>().flatMap { k -> listOf(k.attrs) + k.variants.map { it.attrs } }.mapNotNull { it.actions["send"] }
-        // each of the number pad and the symbols one may not get to (a board needs no way to itself)
         val own = mapOf("number" to "Number", "symbols" to "Symbol")[layout.family]
         val none = listOf("Number", "Symbol").filter { it != own && "layout:$it" !in ways }
         if (none.isNotEmpty()) out += Finding(0, "no-way", none)
@@ -225,13 +170,7 @@ object LayoutCheck {
         return out
     }
 
-    /**
-     * Why [layout] (its [fragments] with it) does not keep what [base] (its [baseFragments]) must be typed on, null where it
-     * does: the slots by kind (the symbols' grid, the nine keys' side column), the function keys by role (删除, 回车, 切换),
-     * the digit keys (the nine keys' 2–9, the number pad's) (060-render-v2 §4, §16). A theme pack's board is held to the
-     * app's of its id by it (PackLayouts.judge), a layout of its own to its base's; [digitsById] false: the digit keys not
-     * held by their ids (a number board of one's own, whose pads' keys are held by what they type).
-     */
+    /** Why [layout] drops something of [base] that must stay typeable; [digitsById] false: digits held by what they type. */
     fun kept(
         layout: Layout,
         fragments: Map<String, Fragment>,
@@ -250,11 +189,9 @@ object LayoutCheck {
         return null
     }
 
-    /** The newest app version [layout]'s [features] need, [BASE_VERSION] where none. */
     fun minApp(layout: Layout): String =
         features(layout).mapNotNull { FEATURES[it] }.fold(BASE_VERSION) { v, f -> if (ThemeReader.newer(f, v)) f else v }
 
-    /** Which of [FEATURES] [layout] uses. */
     fun features(layout: Layout): Set<String> = buildSet {
         if (layout.meta != null) add("meta")
         if (layout.basedOn != null) add("based-on")
@@ -263,8 +200,7 @@ object LayoutCheck {
             row.cells.withIndex().any { (i, c) -> i != 0 && i != row.cells.lastIndex && rowsOf(c, row, layout) > 1 }
         }
         if (middle) add("rows-middle")
-        // a key id twice, one of them conditional only by its row's when= (0.6.0 took it for the same key twice)
-        // every cell with an id, as the reader holds them (LayoutReader.checkKeys): a gap's and a slot's too
+        // a key id twice where one copy is conditional only by its row's when= (the old app took it for the same key twice)
         val ids = layout.parts.filterIsInstance<Row>().flatMap { r -> r.cells.filter { c -> c.id != null } }.groupBy { it.id }
         if (ids.values.any { cells -> cells.size > 1 && cells.any { it.condition == null } }) add("row-when")
     }
@@ -281,7 +217,6 @@ object LayoutCheck {
     private val DIGIT = Regex("[0-9]")
     private const val BLANK_LIMIT = 5
 
-    // §2.2's rules of the id, name, family and base
     private fun identity(layout: Layout, sources: Sources): List<Finding> = buildList {
         if (layout.id.length > MAX_ID) add(Finding(0, "id-length", listOf(layout.id, MAX_ID.toString())))
         if (layout.id in sources.layouts || layout.id in sources.fragments) add(Finding(0, "id-built-in", listOf(layout.id)))
@@ -289,31 +224,24 @@ object LayoutCheck {
         if (layout.name.isBlank() || layout.name.length > MAX_NAME) add(Finding(0, "name-length", listOf(layout.name, MAX_NAME.toString())))
         if (layout.family !in FAMILIES) add(Finding(0, "family", listOf(layout.family)))
         if (layout.basedOn == null || layout.basedOn !in BASES) add(Finding(0, "based-on", listOf(layout.basedOn.orEmpty())))
-        // what the list, its dialogs and the file saver show: no direction mark turning it around, nothing unseen
+        // shown in the list and dialogs: no direction mark turning it around, nothing unseen
         val m = layout.meta
         val shown = listOf("name" to layout.name, "author" to m?.author, "version" to m?.version, "license" to m?.license, "description" to m?.description)
         shown.filter { (_, v) -> v != null && v.any(::hidden) }.forEach { (field, _) -> add(Finding(0, "hidden-chars", listOf(field))) }
     }
 
-    /**
-     * Whether [c] is one a layout's name and `<meta>` may not hold (L2 security review N2): a control (a line break among
-     * them), a format character (the direction marks and overrides, the zero-width ones), a line or paragraph separator.
-     * A name with one is refused strictly; one taken without the strict check is shown [plain].
-     */
+    /** Whether [c] may not appear in a layout's name or `<meta>`: controls, format characters, line or paragraph separators. */
     fun hidden(c: Char): Boolean = c.category in HIDDEN
 
-    /** [text] without what [hidden] says. */
     fun plain(text: String): String = text.filterNot(::hidden)
 
     private val HIDDEN = setOf(CharCategory.CONTROL, CharCategory.FORMAT, CharCategory.LINE_SEPARATOR, CharCategory.PARAGRAPH_SEPARATOR)
 
-    // §2.6's limits
     private fun limits(layout: Layout): List<Finding> = buildList {
         val keys = ownCells(layout).filterIsInstance<Key>()
         if (keys.size > MAX_KEYS) add(Finding(0, "too-many-keys", listOf(keys.size.toString(), MAX_KEYS.toString())))
         val commits = actions(layout).filter { it.second.startsWith("commit:") }
         commits.filter { it.second.length - "commit:".length > MAX_COMMIT }.forEach { add(Finding(it.first, "commit-long", listOf(MAX_COMMIT.toString()))) }
-        // an alt= by what it types (`code:U+…` one character, `commit:` its text), as the long press has it
         alts(layout).filter { (firstTyped(it.second)?.length ?: 0) > MAX_COMMIT }.forEach { add(Finding(it.first, "commit-long", listOf(MAX_COMMIT.toString()))) }
         if (commits.size > MAX_COMMITS) add(Finding(0, "too-many-commits", listOf(commits.size.toString(), MAX_COMMITS.toString())))
         for (k in keys) {
@@ -324,29 +252,21 @@ object LayoutCheck {
         }
     }
 
-    // every action it writes, with its line: its keys' tap's and swipes', their variants', long presses', menus'; its
-    // <defaults>' and its rows' (each written once, however many keys take it)
+    // <defaults>' and rows' actions counted once however many keys take them
     private fun actions(layout: Layout): List<Pair<Int, String>> = ownCells(layout).filterIsInstance<Key>().flatMap { k ->
         actions(k).map { k.line to it }
     } + defaultsActions(layout).map { it.second to it.first }
 
-    // a key's: its tap's and swipes', its variants', its long press's, its menu's. A long press's list item types its
-    // text where it has no send= of its own (SceneKeyDef, SceneBehavior's Listed): a commit: of it, held to what one is
+    // a list item without its own send= types its text (SceneBehavior's Listed): checked as a commit:
     private fun actions(k: Key): List<String> =
         (listOf(k.attrs) + k.variants.map { it.attrs }).flatMap { written(it) } + listed(k)
 
-    // its long press's and menu's
     private fun listed(k: Key): List<String> = k.popup?.items.orEmpty().flatMap { listOfNotNull("commit:" + it.first, it.second) } + k.menu.map { it.action }
 
-    // its <defaults>' and its rows' (line 0: the layout's), each written once
     private fun defaultsActions(layout: Layout): List<Pair<String, Int>> =
         written(layout.defaults).map { it to 0 } + layout.parts.filterIsInstance<Row>().flatMap { r -> written(r.defaults).map { it to r.line } }
 
-    // the commit: texts it types its [base] does not, in order: a key of a base key's id typing a text that key types is
-    // the base's (qwerty's / @ . .com), one typing another or a key of its own is new; its defaults' always are. A key or
-    // variant of the [app]'s names (its row's and <defaults>' laid on it, as KeyData has them) types its tap alone, the
-    // rest the app's key's (KeyData; the `held` warning). A key of its own with no swipe-up= types its literal alt= as
-    // its first (DefaultMarks.nodes' layoutFirst, L6 review M2): `commit:` of it
+    // a key of a base key's id typing that key's text is the base's; a literal alt= with no swipe-up= types as a first, so counts
     private fun newCommits(layout: Layout, base: Layout?, baseFragments: Map<String, Fragment>, app: Set<String>): List<String> {
         fun texts(actions: List<String>) = actions.filter { it.startsWith("commit:") }.map { it.removePrefix("commit:") }
         fun typed(k: Key, under: KeyAttrs): List<String> {
@@ -360,27 +280,22 @@ object LayoutCheck {
             texts(defaultsActions(layout).map { it.first })
     }
 
-    // the text a literal alt= types as a long press's first (KeyDefaults.itemOf): none where it is an action (`ime-picker`)
     private fun firstTyped(alt: String): String? = KeyDefaults.itemOf(alt).takeIf { it.commit !is Commit.Action }?.text?.ifEmpty { null }
 
-    // a key's literal alt= and its variants': what its long press may type as its first (KeyDefaults' layoutFirst)
     private fun alts(k: Key): List<String> = (listOf(k.attrs) + k.variants.map { it.attrs }).mapNotNull { (it.alt as? Text.Literal)?.text }
 
-    // every literal alt= it writes, with its line: its keys' and variants', its <defaults>' and rows' ([defaultsAlts])
     private fun alts(layout: Layout): List<Pair<Int, String>> =
         ownCells(layout).filterIsInstance<Key>().flatMap { k -> alts(k).map { k.line to it } } + defaultsAlts(layout).map { it.second to it.first }
 
-    // its <defaults>' literal alt= and its rows' (line 0: the layout's), as [defaultsActions]
     private fun defaultsAlts(layout: Layout): List<Pair<String, Int>> = (listOf(layout.defaults to 0) + layout.parts.filterIsInstance<Row>().map { it.defaults to it.line })
         .mapNotNull { (d, line) -> (d.alt as? Text.Literal)?.let { it.text to line } }
 
     private fun written(a: KeyAttrs): Collection<String> = a.actions.filterKeys { it in ACTION_ATTRS }.values
 
-    // the attributes that hold an action (the rest of KeyAttrs.actions are a key's ways: swipe-axis, repeat, preview)
+    // the rest of KeyAttrs.actions are a key's ways (swipe-axis, repeat, preview), not actions
     private val ACTION_ATTRS = setOf("send", "swipe-up", "swipe-down", "long-press", "double-tap")
 
-    // §3.2 第 7 条: a name not the app's has a / and none of the app's prefixes; a key's, its variants', and one a
-    // <defaults> gives every key under it (the layout's, a row's: L7 review S4, a pack's 0.6.0 row named so slipped by)
+    // covers names a <defaults> gives every key under it too (a pack's row named so slipped by once)
     private fun names(layout: Layout, sources: Sources): List<Finding> {
         val rows = layout.parts.filterIsInstance<Row>()
         val keys = rows.flatMap { it.cells }.filterIsInstance<Key>()
@@ -395,20 +310,11 @@ object LayoutCheck {
         }
     }
 
-    /**
-     * The pad a number board lacks what its fields type of, where [finding] says so (`lacks` `pad=<pad>: …`); null for
-     * any other finding. A restore refuses such a board, a theme pack's made one is made for the pads it does not lack
-     * (061-custom-layout §7; L5 review N1, L7 review S3): one rule for both.
-     */
+    /** The pad a `lacks` finding names: a restore refuses such a board, and a pack's is made only for the pads it does not lack. */
     fun padLacking(finding: Finding): String? =
         finding.takeIf { it.key == "lacks" }?.args?.firstOrNull()?.takeIf { it.startsWith(PAD_LACKING) }
             ?.removePrefix(PAD_LACKING)?.substringBefore(':')
 
-    /**
-     * What §3.2 第 7 条 says of a key's [name] (as read: a bare one `fn/`'s), null where it may be: one not the app's
-     * (`name-no-slash`) without a `/`, (`name-prefix`) under one of the app's prefixes. What a theme pack's layout made
-     * one of the user's renames (PackLayouts.convert).
-     */
     internal fun nameProblem(name: String, sources: Sources): String? {
         if (name in sources.names) return null
         val id = KeyId(name)
@@ -419,8 +325,7 @@ object LayoutCheck {
         }
     }
 
-    // [text] read as the app reads a file: no more than its bytes, then its byte-order mark gone (PackLayouts.read); null
-    // where it is not, what stopped it in [errors]
+    // as the app reads a file: byte limit, then the BOM dropped (PackLayouts.read)
     private fun read(text: String, errors: MutableList<Finding>): Layout? {
         val bytes = text.encodeToByteArray().size
         if (bytes > PackLayouts.MAX_BYTES) {
@@ -432,18 +337,10 @@ object LayoutCheck {
         return (parsed as? Parsed.Ok)?.value
     }
 
-    /**
-     * What stops [layout], a file of the user's layouts read to be drawn, from being drawn (061-custom-layout §14, L3's
-     * security): the file is not trusted (one restored was held to the loose check alone, one of an older build to its
-     * rules), so the errors of [check] that need no scene are asked again: its `min-app` for an app of [appVersion], its
-     * id, family and base, the limits, the includes, the `layout:` targets, what its base has that must be typed on
-     * ([kept]), the keys' names, its family's keys, no [hidden] character typed, no command on a letter or the space its
-     * base has not there. Milliseconds: asked on the main thread as a keyboard is made. Empty where it may be drawn.
-     */
+    /** What stops a stored user layout from being drawn: the file is not trusted, so the scene-free errors are asked again. */
     fun loaded(layout: Layout, sources: Sources, appVersion: String): List<Finding> {
         val errors = ArrayList<Finding>()
         layout.meta?.minApp?.let { if (ThemeReader.newer(it, appVersion)) errors += Finding(0, "newer", listOf(it)) }
-        // its name and <meta> shown plain wherever shown (Entry.name): nothing of them is drawn on a key nor typed
         errors += identity(layout, sources).filter { it.key != "hidden-chars" && it.key != "name-length" }
         errors += limits(layout)
         val fragments = includes(layout, sources, errors)
@@ -457,8 +354,7 @@ object LayoutCheck {
         return errors
     }
 
-    // a character typed (a send= of one, a commit:'s text, a code:) that is not seen: a direction mark turning around
-    // what is typed into another app, a control (L2 security review S4). Line breaks and tabs too: Return types those
+    // a direction mark reverses text in another app; line breaks and tabs too, since Return types those
     private fun typedHidden(layout: Layout): List<Finding> {
         fun hides(a: String): Boolean {
             val text = when {
@@ -469,8 +365,7 @@ object LayoutCheck {
             }
             return text.any(::hidden) || supplementary(text).any(::hiddenCode)
         }
-        // a literal alt= is typed as a long press's first where no swipe-up= is (L6 review M2): what it types (KeyDefaults.itemOf:
-        // a `code:U+202E` decoded, verifier R-M1) held to what a commit: is
+        // KeyDefaults.itemOf decodes a `code:U+202E`, so judge what it types as a commit:
         fun typed(alt: String) = firstTyped(alt)?.let { "commit:$it" }
         val keys = ownCells(layout).filterIsInstance<Key>().flatMap { k ->
             (actions(k) + alts(k).mapNotNull(::typed)).filter(::hides).distinct().map { Finding(k.line, "hidden-chars", listOf(plain(k.id))) }
@@ -479,7 +374,6 @@ object LayoutCheck {
             .map { Finding(it.second, "hidden-chars", listOf("defaults")) }
     }
 
-    // [text]'s code points past the BMP
     private fun supplementary(text: String): List<Int> = buildList {
         var i = 0
         while (i < text.length) {
@@ -495,30 +389,13 @@ object LayoutCheck {
 
     private fun String.codePointCount(): Int = length - supplementary(this).size
 
-    // [cp] one [hidden] says, or a format character past the BMP (Kotlin's common Char has no category for those)
+    // Kotlin's common Char has no category past the BMP
     private fun hiddenCode(cp: Int): Boolean =
         if (cp < SUPPLEMENTARY) hidden(cp.toChar()) else HIDDEN_ASTRAL.any { cp in it }
 
-    // Unicode's Cf past the BMP: Kaithi's and Egyptian's format controls, the shorthand ones, musical symbols', the tags
     private val HIDDEN_ASTRAL = listOf(0x110BD..0x110BD, 0x110CD..0x110CD, 0x13430..0x1343F, 0x1BCA0..0x1BCA3, 0x1D173..0x1D17A, 0xE0001..0xE0001, 0xE0020..0xE007F)
 
-    /**
-     * What a letter's or the space's key does that its base's key of its id does not (L2 security review S4, the second
-     * way: a layout imported must not make a letter's swipe 清空 what is being written, nor a key that types make its tap
-     * act as another's). An allow-list over the key's every state, its root and each variant laid over it as Expand lays
-     * them (the L3 fix's second re-check: a deny-list of shapes let the next shape through):
-     * - a command (a `shortcut:`, a word of the app's, a symbol typing nothing: [isCommand]) written on a key any state
-     *   of which types or shows a letter ([typing]; a group's letters, a base letter's id too) is one only where the
-     *   base's key of its id has it. A key no state of which does may do any (符, 123): a function key, seen as one, its
-     *   swipes' and list's texts too (its tap visibly types none);
-     * - a name of the app's function keys (`shortcut="backspace"`: that key's tap, swipes, 清空 among them, and what is
-     *   set on it; a name not the app's is [names]'), on any key, is one only where the base's key of its id has it (on a
-     *   key that types, only where that key types too: the base's 删除 made a letter takes not its name), or
-     *   where the key is a true copy of a key of the app's taking that name: every state's tap a send that key's tap is
-     *   (the base's 分词 or 空格 added again, a 删除 labelled ⌫ or 删, the full keyboard's ⇧ kept on a board grouped),
-     *   never on a base letter's id (the space's among them), nor on a key showing a letter whose tap is a command (a
-     *   回车 or 删除 labelled e looks like e).
-     */
+    /** An allow-list (a deny-list let the next shape through): a typing key may not gain commands or app function names its base's key of the same id lacks. */
     private fun commands(layout: Layout, base: Layout, baseFragments: Map<String, Fragment>, sources: Sources): List<Finding> {
         val appNames = sources.names
         val baseKeys = keysOf(base, baseFragments)
@@ -537,10 +414,9 @@ object LayoutCheck {
         return keysOf(layout, emptyMap()).flatMap { (k, a) ->
             val held = k.id in letters || typing(k, a)
             val taken = states(k, a).mapNotNull { it.shortcut }.distinct().filter { it in appNames && KeyId.of(it).isFunction }
-            // a true copy's taps are its app key's (one showing a letter types: [copies] takes none whose tap is a command)
             val copied = taken.filter { copies(k, a, KeyId.of(it)) }
             val taps = if (copied.isEmpty()) emptySet() else states(k, a).mapNotNull { it.actions["send"] }.toSet()
-            // a base function key's id made a letter keeps none of its commands, as none of its name (the base's 回车 shown as e)
+            // a base function key's id made a letter keeps none of its commands (the base's 回车 shown as e)
             val kept = if (k.id in letters) theirs[k.id].orEmpty() else emptySet()
             val commands = if (!held) emptyList() else actions(k).filter(::isCommand).filter { it !in kept && it !in taps }.distinct()
             val names = taken.filter { !(KeyId.of(it) in theirNames[k.id].orEmpty() && (k.id in letters || !held)) && it !in copied }
@@ -548,7 +424,6 @@ object LayoutCheck {
         } + defaultsActions(layout).filter { isCommand(it.first) }.map { Finding(it.second, "command", listOf("defaults", it.first)) }
     }
 
-    // [layout]'s keys (its own rows' where [fragments] is empty), each with what its row's and the layout's defaults make of it
     private fun keysOf(layout: Layout, fragments: Map<String, Fragment>): List<Pair<Key, KeyAttrs>> = layout.parts.flatMap { part ->
         val rows = when (part) {
             is Row -> listOf(part to layout.defaults)
@@ -557,7 +432,6 @@ object LayoutCheck {
         rows.flatMap { (row, defaults) -> row.cells.filterIsInstance<Key>().map { it to it.attrs.over(row.defaults.over(defaults)) } }
     }
 
-    // the keys of [sources]' boards (with what they include) by each function name they take, each its states' taps
     private fun tapsByName(sources: Sources): Map<KeyId, List<Set<String>>> = sources.layouts.keys.mapNotNull(sources::layout).flatMap { b ->
         keysOf(b, baseFragments(b, sources)).flatMap { (k, a) ->
             val states = states(k, a)
@@ -566,15 +440,11 @@ object LayoutCheck {
         }
     }.groupBy({ it.first }, { it.second })
 
-    // [k]'s states: [a], its root as its row and layout make it, and each variant laid over it (Expand's row)
     private fun states(k: Key, a: KeyAttrs): List<KeyAttrs> = listOf(a) + k.variants.map { it.attrs.over(a) }
 
-    // whether a state of [k] types: a group's letters, a tap that types ([types]), or a letter shown ([showsLetter])
     private fun typing(k: Key, a: KeyAttrs): Boolean = k.letters != null || states(k, a).any { types(it.actions["send"]) || showsLetter(it.label) }
 
-    // a label a letter's or a digit's: a letter binding ({case:e}, {group:qw}, {root:e}, {nine-letters:2}), or a text
-    // the eye takes for letters ([Sight.readsAsLetters]), written or a {punct:} with none of its own (Expand draws it as is).
-    // 符, 123, 拼, 中, Emoji are no letters
+    // a letter binding, or text the eye takes for letters ([Sight.readsAsLetters])
     private fun showsLetter(label: Text?): Boolean = when (label) {
         is Text.Literal -> Sight.readsAsLetters(label.text)
         is Text.Binding -> label.name in Text.WITH_LETTER || label.name in Text.WITH_NUMBER || label.name == Text.GROUP ||
@@ -582,31 +452,25 @@ object LayoutCheck {
         null -> false
     }
 
-    // whether [send] types anything: text of any length, a space, a digit, a tone, a zhuyin's symbol ([typed]'s)
     private fun types(send: String?): Boolean =
         typed(send)?.isNotEmpty() == true || send?.startsWith("code:") == true || send?.startsWith("action:zhuyin") == true
 
-    // a symbol is a command but one that types (the space's, a digit's, a keypad's): Return sends, BackSpace and Escape take away
     private fun isCommand(a: String): Boolean =
         a.startsWith("shortcut:") || a in COMMANDS || (a.startsWith("sym:") && !types(a))
 
-    // the bare words of the vocabulary that do something to the text or the keyboard, Shift aside: every one of
-    // LayoutReader's, so a word added there is a command here too (R26 F8256)
+    // every bare word of LayoutReader's vocabulary but Shift, so a word added there is a command here too
     private val COMMANDS = LayoutReader.WORDS.toSet()
 
-    // what an app that cannot read it or build it, or a board too big to look through, says is enough: the rest told once it can
+    // the rest is told once the app can read, build or look through it
     private val STOPS = setOf("newer", "include", "too-many-keys")
 
-    // its base (null: the app has none), what it must keep of it held to, into [errors]
     private fun held(layout: Layout, fragments: Map<String, Fragment>, sources: Sources, strict: Boolean, errors: MutableList<Finding>): Layout? {
         val baseId = baseId(layout, sources)
         val base = baseId?.let(sources::layout)
         when {
-            // a family a layout of one's own cannot be has no base to hold it to: said once, as "family"
             strict && layout.family !in FAMILIES -> Unit
             base == null -> errors += Finding(0, "base", listOf("the app has no ${baseId ?: layout.family} to hold it to"))
             else -> {
-                // a number board of one's own: its digits by what they type, each pad's (padLacks), not by the base's ids (§16 风险 4)
                 val digitsById = !(strict && layout.family == "number")
                 kept(layout, fragments, base, baseFragments(base, sources), digitsById)?.let { errors += Finding(0, "base", listOf(it)) }
             }
@@ -614,7 +478,6 @@ object LayoutCheck {
         return base
     }
 
-    // the names the app's boards give their keys
     private fun appNames(sources: Sources): Set<String> = buildSet {
         for (id in sources.layouts.keys) {
             val l = sources.layout(id) ?: continue
@@ -623,7 +486,6 @@ object LayoutCheck {
         }
     }
 
-    // §3.3: the keys a family needs (a number board's by pad: scenes)
     private fun family(layout: Layout, fragments: Map<String, Fragment>): List<Finding> {
         val cells = cells(layout, fragments)
         val keys = cells.filterIsInstance<Key>()
@@ -649,13 +511,10 @@ object LayoutCheck {
         }
     }
 
-    // a grouped board's groups, its keys' letters in order, an included fragment's where it is included (as the app's
-    // SceneGroups.of collects them: review L4 N7)
     private fun groups(layout: Layout, fragments: Map<String, Fragment>): List<String> =
         cells(layout, fragments).filterIsInstance<Key>().mapNotNull { k -> k.letters?.rows?.joinToString(" ") }
 
-    // §5.1: which input methods may use it (a grouped board: 双拼 only on 14 or 18 keys' groups, in any order, each
-    // once, as the app's NineKeyLetters.custom takes them: a group on two keys is a keyboard of its own groups)
+    // 双拼 on a grouped board only with 14 or 18 key groups, each once, as NineKeyLetters.custom takes them
     private fun ims(layout: Layout, sources: Sources): List<String> = when (layout.family) {
         "letters" -> listOf("pinyin", "shuangpin", "english", "table")
         "nine" -> listOf("pinyin", "shuangpin", "english")
@@ -670,42 +529,23 @@ object LayoutCheck {
 
     private class Shown(val errors: List<Finding>, val padLacks: List<Finding>, val bottomLeft: Finding?)
 
-    /**
-     * A screen the scenes are made on: [widthDp] wide, [tallDp] high, [turned] sideways (61-wide-as-landscape: 横 by
-     * ScreenShape).
-     */
     data class Screen(val widthDp: Int, val turned: Boolean, val tallDp: Int) {
-        /** A foldable's inner screen, a tablet: the display's short side [LARGE_SHORT_SIDE_DP] or more (KeyboardHeightLevels). */
         val large: Boolean get() = minOf(widthDp, tallDp) >= LARGE_SHORT_SIDE_DP
     }
 
-    /**
-     * The screens (§3.2 第 5 条): two phones upright, one sideways, a foldable's inner screen upright (横 by its width) and its
-     * outer one.
-     */
     val SCREENS = listOf(
         Screen(360, false, 780), Screen(412, false, 915), Screen(800, true, 360), Screen(600, false, 841), Screen(344, false, 882),
     )
 
-    /**
-     * The keys' height on [s], dp, as the app asks for it at 标准 or [compact] 紧凑: upright the level's share of the screen's
-     * height; 横 (ScreenShape) four rows of the level's row, a phone's or a [Screen.large] one's (061-landscape-height
-     * §5.1). The app's numbers are ime-core's (KeyboardSizes, KeyboardHeightLevels), which this module cannot read:
-     * ime-core's LayoutCheckHeightsTest holds these to them.
-     */
+    /** The numbers are ime-core's (KeyboardSizes, KeyboardHeightLevels), which this module cannot read: LayoutCheckHeightsTest keeps them in step. */
     fun keysDp(s: Screen, compact: Boolean): Int = when {
         !ScreenShape.landscape(s.turned, s.widthDp) -> s.tallDp * (if (compact) COMPACT_PERCENT else NORMAL_PERCENT) / PERCENT
         else -> ROWS * if (s.large) (if (compact) LARGE_COMPACT_ROW_DP else LARGE_ROW_DP) else if (compact) COMPACT_ROW_DP else ROW_DP
     }
 
-    /**
-     * The lowest the keys are let get turned (KeyboardHeightCap: four rows of 36 dp where the app keeps its 120 dp): a
-     * layout checked on [SCREENS] is checked there too, so its keys' marks and labels are seen at the height a small
-     * phone gives them.
-     */
+    /** The lowest the keys may get turned (KeyboardHeightCap): checked here too, so marks are seen at a small phone's height. */
     const val LOWEST_DP = 4 * 36
 
-    // KeyboardHeightLevels' 标准 and 紧凑: upright percent, turned rows of dp; its large screen's short side
     private const val NORMAL_PERCENT = 30
     private const val COMPACT_PERCENT = 20
     private const val PERCENT = 100
@@ -718,14 +558,9 @@ object LayoutCheck {
 
     private const val DENSITY = 2.625
 
-    /** One environment a layout is built in, and how a finding names it. */
     class Scene(val name: String, val env: Env)
 
-    /**
-     * The environments a layout of [family] is built in ([layout]'s split ones where it splits): every [SCREENS] × normal and
-     * compact (× split), the first screen with every field, 地球键 on and off, each of [ims] (双拼 by three schemes, one
-     * typing `;`) with and without composing; a number board's in each of [pads] instead of the input methods.
-     */
+    /** Every [SCREENS] × normal and compact (× split), every field, 地球键 on and off, each of [ims] with and without composing; a number board per pad. */
     fun scenes(layout: Layout, ims: List<String>, pads: List<String>): List<Scene> {
         val out = ArrayList<Scene>()
         val splits = if (layout.onSplit == OnSplit.Split) listOf(false, true) else listOf(false)
@@ -786,13 +621,10 @@ object LayoutCheck {
         )
     }
 
-    // what bindings read to: a name for the space, Return's words
     private val TEXTS = Texts(imeName = "拼音", returnLabel = "换行")
 
-    // a theme of nothing: the scenes are asked where things go, not how they look
     private val PLAIN = Theme("check", false, "1", emptyMap(), emptyList(), emptyMap(), emptyMap(), null)
 
-    // §3.2 第 5、6 条: a scene in each environment, no problem and no blank key; a number board's pads' keys
     private fun scenes(layout: Layout, fragments: Map<String, Fragment>, ims: List<String>, pads: List<String>): Shown {
         val errors = LinkedHashMap<Pair<Int, String>, Finding>()
         val padLacks = ArrayList<Finding>()
@@ -809,15 +641,12 @@ object LayoutCheck {
             }
             val pad = scene.env.input.pad
             if (pad != null && padsChecked.add(pad)) padLacks(pad, keys).forEach { (error, f) -> if (error) errors[f.line to f.toString()] = f else padLacks += f }
-            // null: none found yet; each scene's bottom row asked until one is found (another pad's rows may be what it
-            // lacks in), which then stays
             if (bottomLeft == null && (layout.family == "number" || layout.family == "symbols")) bottomLeft = bottomLeft(layout.family, rows.lastOrNull()?.items.orEmpty())
         }
         return Shown(errors.values.toList(), padLacks, bottomLeft)
     }
 
-    // §3.3 a number pad's keys: 0–9, ⌫, ⏎, the way back; a decimal one's `.`, a signed one's `-` (errors); a phone's `+ * #`,
-    // a date's `- / :` (told). A key is what it types: its send=, a keypad's digit by its keysym
+    // a decimal pad needs `.`, a signed one `-` (errors); a phone's `+ * #`, a date's `- / :` (warnings)
     private fun padLacks(pad: String, keys: List<ExpandedKey>): List<Pair<Boolean, Finding>> {
         val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet()
         val roles = keys.mapNotNull { it.attrs.role }.toSet()
@@ -837,8 +666,6 @@ object LayoutCheck {
         )
     }
 
-    // what a send= types: a character (not a word of the vocabulary, `lang`), a commit:'s text, a keypad key's (sym:KP_1,
-    // sym:KP_Decimal, keypad:1), a symbol's of one (sym:space, sym:5), a tone's mark
     private fun typed(send: String?): String? = when {
         send == null -> null
         send.startsWith("sym:KP_") -> KEYPAD[send.removePrefix("sym:KP_")]
@@ -847,13 +674,11 @@ object LayoutCheck {
         send.startsWith("keypad:") -> send.removePrefix("keypad:")
         send.startsWith("action:tone-") -> TONES[send.removePrefix("action:tone-")]
         send.startsWith("commit:") -> send.removePrefix("commit:")
-        // one past the BMP is no pad's key
         send.startsWith("code:") -> LayoutReader.codePoint(send)?.takeIf { it < SUPPLEMENTARY }?.toChar()?.toString()
         ':' in send && send.length > 1 -> null
         else -> send.takeIf { it.codePointCount() == 1 }
     }
 
-    // 注音's tones 1–5 (LayoutReader's action:tone-n)
     private val TONES = mapOf("1" to "ˉ", "2" to "ˊ", "3" to "ˇ", "4" to "ˋ", "5" to "˙")
 
     private const val SUPPLEMENTARY = 0x10000
@@ -862,14 +687,13 @@ object LayoutCheck {
         "Decimal" to ".", "Subtract" to "-", "Add" to "+", "Multiply" to "*", "Divide" to "/", "Separator" to ",", "Equal" to "=",
     )
 
-    // §3.3: the bottom row's first two a number board's 符 and back, a symbols board's back and 123 (as the letters' are)
     private fun bottomLeft(family: String, items: List<Item>): Finding? {
         val want = if (family == "number") setOf("symbols", "back") else setOf("back", "numbers")
         val first = items.take(2).map { (it as? ExpandedKey)?.attrs?.role }.toSet()
         return if (first == want) null else Finding(0, "bottom-left", listOf(want.joinToString(" ")))
     }
 
-    // a key narrower than half a letter's (a tenth of a 10-column board's width)
+    // half a letter's: a tenth of a 10-column board's width
     private fun narrow(layout: Layout): List<Finding> = layout.parts.filterIsInstance<Row>().flatMap { row ->
         row.cells.filterIsInstance<Key>().mapNotNull { k ->
             val w = k.attrs.over(row.defaults.over(layout.defaults)).width as? Width.Units ?: return@mapNotNull null
@@ -879,7 +703,7 @@ object LayoutCheck {
 
     private const val NARROW = 20
 
-    // a key with no name, but where its base's of its id has none either (the number pad's + - * /)
+    // allowed where its base's key of the same id has no name either (the number pad's + - * /)
     private fun unnamed(layout: Layout, base: Layout, baseFragments: Map<String, Fragment>): List<Finding> {
         fun named(k: Key, defaults: KeyAttrs) = k.attrs.over(defaults).shortcut != null || k.variants.any { it.attrs.shortcut != null }
         val baseNamed = HashMap<String, Boolean>()
@@ -896,7 +720,7 @@ object LayoutCheck {
         }
     }
 
-    // `<gap look= class=>`: read, no longer drawn (0.6.0 §1.1)
+    // read but no longer drawn
     private fun gapLooks(text: String): List<Finding> {
         val root = Xml.parse(text).orNull() ?: return emptyList()
         val out = ArrayList<Finding>()
@@ -908,11 +732,9 @@ object LayoutCheck {
         return out
     }
 
-    // the base's fragments, the app's
     internal fun baseFragments(base: Layout, sources: Sources): Map<String, Fragment> =
         base.parts.filterIsInstance<Include>().mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }.toMap()
 
-    // every cell of [layout], its includes' rows in place
     private fun cells(layout: Layout, fragments: Map<String, Fragment>): List<Cell> = layout.parts.flatMap { part ->
         when (part) {
             is Row -> part.cells
@@ -920,32 +742,24 @@ object LayoutCheck {
         }
     }
 
-    // the cells the file writes itself
     private fun ownCells(layout: Layout): List<Cell> = layout.parts.filterIsInstance<Row>().flatMap { it.cells }
 }
 
-// what the eye takes a label's text for ([LayoutCheck]'s letters shown)
 private object Sight {
-    // one letter or digit, or 1 to 4 letters (a `;` among them: a 14/18 键 key's), as [seen] reads them: e, ｅ, е, é,
-    // " e", qw, abc; not 123, .com, Emoji, nor a key's own name ([KEY_WORDS]: DEL)
+    // one letter or digit, or 1 to 4 letters, as [seen] reads them: e, ｅ, е, é, qw; not 123, .com, Emoji, nor DEL
     fun readsAsLetters(text: String): Boolean {
         val signs = seen(text)
         if (signs.size == 1) return signs[0] == 'L' || signs[0] == 'D'
         return signs.size in 2..4 && signs.all { it == 'L' || it == ';' } && 'L' in signs && text.trim().uppercase() !in KEY_WORDS
     }
 
-    // a function key's name written as its label, not a letter key's letters
     private val KEY_WORDS = setOf("DEL", "ESC", "TAB", "FN", "ALT", "CTRL", "OK", "GO", "DONE", "NEXT", "SEND", "BACK", "EN")
 
-    // [text]'s characters as the eye takes them ([sign]'s), what draws nothing left out: spaces, what Unicode says
-    // draws nothing (Default_Ignorable_Code_Point: a zero-width space, a tag, a 한글 filler), the braille blank and the
-    // null notehead, marks over a letter (e + ´, e + 𝅥: beyond the BMP by [ASTRAL_MARKS])
     private fun seen(text: String): List<Char> = codePoints(text).filterNot { cp ->
         cp in BLANKS || IGNORABLE.holds(cp) || ASTRAL_MARKS.holds(cp) && !ASTRAL_LETTERS.holds(cp) ||
             (cp < 0x10000 && cp.toChar().let { it.isWhitespace() || it.category in UNSEEN })
     }.map(::sign)
 
-    // [text]'s code points, a surrogate pair one
     private fun codePoints(text: String): List<Int> {
         val out = mutableListOf<Int>()
         var i = 0
@@ -958,11 +772,7 @@ private object Sight {
         return out
     }
 
-    // L a letter, D a digit, ; itself, ? anything else. Fullwidth forms are their ASCII's (common code has no NFKC); a
-    // letter or number of 汉字, 注音, kana or 한글 is no letter; beyond the BMP only the mathematical letters and digits
-    // (𝐞), the segmented digits, the boxed and circled capitals (🄰), the musical dynamics' letters and the regional
-    // indicators (🇪) are. The tone marks ˉ ˊ ˇ ˋ are letters
-    // (Lm) on purpose: a tone key types anyway
+    // fullwidth forms count as ASCII (common code has no NFKC); the tone marks ˉ ˊ ˇ ˋ are letters on purpose
     private fun sign(cp: Int): Char {
         if (cp >= 0x10000) {
             return when {
@@ -981,22 +791,18 @@ private object Sight {
         }
     }
 
-    // Unicode's Default_Ignorable_Code_Point (DerivedCoreProperties)
     private val IGNORABLE = intArrayOf(
         0x00AD, 0x00AD, 0x034F, 0x034F, 0x061C, 0x061C, 0x115F, 0x1160, 0x17B4, 0x17B5, 0x180B, 0x180F, 0x200B, 0x200F,
         0x202A, 0x202E, 0x2060, 0x206F, 0x3164, 0x3164, 0xFE00, 0xFE0F, 0xFEFF, 0xFEFF, 0xFFA0, 0xFFA0, 0xFFF0, 0xFFF8,
         0x1BCA0, 0x1BCA3, 0x1D173, 0x1D17A, 0xE0000, 0xE0FFF,
     )
 
-    // whether [cp] is in one of the ranges these pairs bound (first, last), as IntRanges would but smaller in the engine
+    // pairs of (first, last): smaller in the engine than IntRanges
     private fun IntArray.holds(cp: Int): Boolean = (indices step 2).any { cp >= this[it] && cp <= this[it + 1] }
 
-    // the braille blank and the musical null notehead, drawn as nothing
     private val BLANKS = setOf(0x2800, 0x1D159)
 
-    // the stretches beyond the BMP holding every Mn, Mc and Me of Unicode 17, those under 256 apart merged (made by
-    // a script over Python's unicodedata): what else lies between, those scripts' letters and the musical symbols,
-    // is no letter of [sign]'s, and left out with a letter beside it the label is held the stricter
+    // generated from Python's unicodedata (Unicode 17), stretches under 256 apart merged: only makes the check stricter
     private val ASTRAL_MARKS = intArrayOf(
         0x101FD, 0x1037A, 0x10A01, 0x10AE6, 0x10D24, 0x10D6D, 0x10EAB, 0x1172B, 0x1182C, 0x11D97, 0x11EF3, 0x11F5A,
         0x13440, 0x13455, 0x1611E, 0x1612F, 0x16AF0, 0x16B36, 0x16F4F, 0x16FF1, 0x1BC9D, 0x1BC9E, 0x1CF00, 0x1CF46,
@@ -1004,9 +810,6 @@ private object Sight {
         0xE0100, 0xE01EF,
     )
 
-    // the musical dynamics drawn as letters (𝆏 p to 𝆔 z: within [ASTRAL_MARKS]' stretch, seen all the same), the
-    // parenthesized, tortoise-shelled, squared, circled, negative squared and crossed capitals (🄐 🄪 🄰 🅐 🅰 🆊) and
-    // the regional indicators
     private val ASTRAL_LETTERS = intArrayOf(
         0x1D18F, 0x1D194, 0x1F110, 0x1F12E, 0x1F130, 0x1F149, 0x1F150, 0x1F169, 0x1F170, 0x1F18A, 0x1F1E6, 0x1F1FF,
     )
@@ -1014,32 +817,20 @@ private object Sight {
     private val UNSEEN = setOf(CharCategory.FORMAT, CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK)
     private val NUMBERS = setOf(CharCategory.DECIMAL_DIGIT_NUMBER, CharCategory.LETTER_NUMBER, CharCategory.OTHER_NUMBER)
 
-    // 한글 jamo, CJK radicals and symbols (〇), kana, 注音, compatibility jamo, 汉字 (A and the unified), 한글
-    // syllables, compatibility ideographs, halfwidth kana and jamo
     private val NO_LETTERS = intArrayOf(
         0x1100, 0x11FF, 0x2E80, 0x2FDF, 0x3000, 0x31FF, 0x3400, 0x4DBF, 0x4E00, 0x9FFF, 0xA960, 0xA97F, 0xAC00, 0xD7FF,
         0xF900, 0xFAFF, 0xFF65, 0xFFDC,
     )
 }
 
-/**
- * A key of the app's name (or of no name, its base's key of its id having none either) that writes a long press, a
- * corner, a swipe, a double tap or a menu other than the app's key's: not taken, the app's is ([KeyData.Mode.Own],
- * §19.2), so the file is told (§19.4, L6): 「第 30 行：g18/h 是 18 键的键，这里写的长按、角标、滑动不起作用」. A key of
- * the app's name whose letters= are not that key's too: it is the app's key, its long press the app's
- * ([DefaultMarks.ownNodes]; L6 review S2). Its args: the name (the id of a key of none) and the app's board it is that
- * board's key of ([DefaultMarks.appBoard]); one a key or variant a line (KeyData.Ignored's key, L6 review N1). A
- * `popups=` not taken, its base's being, is `held-popups` (N2).
- */
-// outside LayoutCheck, as its size allows (detekt's LargeClass)
+/** A key of an app name writing a long press, corner, swipe or letters other than the app key's: ignored, so the file is told. */
+// outside LayoutCheck for detekt's LargeClass
 private fun heldData(layout: Layout, fragments: Map<String, Fragment>, sources: LayoutCheck.Sources, base: String?): List<LayoutCheck.Finding> {
-    // a group key's corner judged by its own family's board's shape, whatever its based-on (R26 F8437)
     val shape = LayoutCheck.baseId(layout, sources) ?: base ?: layout.id
     val ignored = KeyData.of(layout.id, layout, fragments, KeyData.Mode.Own, base, shape = shape).ignored.filter { it.file == layout.id }
     val told = ignored.filter { it.line > 0 }.map { Triple(it.line, "held", it.key) }.toMutableSet()
     val app = appKeys(sources, base)
-    // letters of its own on a key of the app's name: told apart, a name of its own being the way (verifier R-N1); a key
-    // writing none (a qwerty board's of a group's name) has the app's
+    // letters of its own on an app-named key are told apart (giving it its own name is the way)
     for (row in layout.parts.filterIsInstance<Row>()) for (k in row.cells.filterIsInstance<Key>()) {
         val name = k.attrs.over(row.defaults.over(layout.defaults)).shortcut
         val letters = name?.let(app)?.letters
@@ -1049,12 +840,7 @@ private fun heldData(layout: Layout, fragments: Map<String, Fragment>, sources: 
     return held + listOfNotNull(base?.takeIf { ignored.any { it.what == "popups" } }?.let { LayoutCheck.Finding(0, "held-popups", listOf(it)) })
 }
 
-/**
- * A key's id or name, or one its row's or the layout's `<defaults>` give, holding a [LayoutCheck.hidden] character (R26
- * F8347): the import's findings print an id and the key page shows a name, as they do a layout's name, so the same
- * rule; told by line, shown [LayoutCheck.plain]. Not asked of a layout read to be drawn (LayoutCheck.loaded): nothing
- * of them is drawn on a key or typed.
- */
+/** The import's findings print ids and the key page shows names, so the layout name's rule applies; not asked by `loaded`. */
 private fun hiddenNames(layout: Layout): List<LayoutCheck.Finding> {
     val rows = layout.parts.filterIsInstance<Row>()
     val keys = rows.flatMap { it.cells }.filterIsInstance<Key>()
@@ -1064,10 +850,7 @@ private fun hiddenNames(layout: Layout): List<LayoutCheck.Finding> {
         .map { (line, name) -> LayoutCheck.Finding(line, "hidden-chars", listOf(LayoutCheck.plain(name))) }
 }
 
-/**
- * The app's key of a name, as KeyData finds it for a board of [base] (DefaultMarks.appBoard): its node on that board, each
- * board read once; null for a name of none of the app's. LayoutCheck's held and PackLayouts' renaming share it.
- */
+/** The app's key of a name as KeyData finds it for a board of [base]; shared by LayoutCheck's held and PackLayouts' renaming. */
 internal fun appKeys(sources: LayoutCheck.Sources, base: String?): (String) -> NodeFacts? {
     val boards = HashMap<String, Map<String, NodeFacts>>()
     return { name ->

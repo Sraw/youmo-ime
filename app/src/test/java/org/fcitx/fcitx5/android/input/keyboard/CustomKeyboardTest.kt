@@ -55,11 +55,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import kotlin.math.roundToInt
 
-/**
- * A layout of the user's as an input method's keyboard (061-custom-layout L3, §4.4, §5): drawn in place of the app's,
- * its base drawn where its file is refused or gone (the choice left), listed by ⋯ and the settings, put back on its base
- * as it is deleted; a key of two rows bubbles over its first row.
- */
+/** A user's layout as an input method's keyboard: drawn in place of the app's, its base where its file is refused or gone, put back on its base when deleted. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class CustomKeyboardTest {
@@ -95,7 +91,6 @@ class CustomKeyboardTest {
         listOf(prefs.pinyinKeyboardLayout, prefs.shuangpinKeyboardLayout, prefs.englishKeyboardLayout, prefs.tableKeyboardLayout).forEach { it.setValue("") }
     }
 
-    // the app's board [base] made layout [id] of the user's, [edit] done to its text, saved as its file
     private fun own(id: String, base: String = "qwerty", edit: (String) -> String = { it }): CustomChoice? {
         val text = edit(BuiltInLayouts(context).text(base)!!.replaceFirst("id=\"$base\"", "id=\"$id\" based-on=\"$base\""))
         File(dir, "$id.xml").writeText(text)
@@ -103,7 +98,6 @@ class CustomKeyboardTest {
         return CustomKeyboards.choice(id)
     }
 
-    // q and w the other way round: AZERTY's way of a letters layout of one's own
     private fun swapped(t: String) = t.replace("<key id=\"q\" label=\"{case:q}\" send=\"q\"", "<key id=\"q\" label=\"{case:w}\" send=\"w\"")
         .replace("<key id=\"w\" label=\"{case:w}\" send=\"w\"", "<key id=\"w\" label=\"{case:q}\" send=\"q\"")
 
@@ -119,7 +113,7 @@ class CustomKeyboardTest {
         val custom = TextKeyboard(context, TestThemes.PixelDark, custom = "${mine.id}@${mine.stamp}").wired()
         assertEquals(labelOf(app, "w"), labelOf(custom, "q"))
         assertEquals(labelOf(app, "q"), labelOf(custom, "w"))
-        // the keyboard's name says which: another stamp (the file replaced) another keyboard
+        // another stamp (the file replaced) is another keyboard
         val name = KeyboardNames.of(TextKeyboard.Name, mine)
         assertEquals(TextKeyboard.Name, KeyboardNames.base(name))
         assertEquals("${mine.id}@${mine.stamp}", KeyboardNames.custom(name))
@@ -128,7 +122,7 @@ class CustomKeyboardTest {
 
     @Test
     fun oneRefusedAsItIsReadDrawsItsBaseTheChoiceKept() {
-        // a letter key that runs a command its base's does not: let in by an older build, refused as it is read now
+        // a command its base's key lacks: let in by an older build, refused as read now
         val mine = own("my-qwerty") { swapped(it).replace("send=\"w\" shortcut=\"full/q\"", "send=\"lang\" shortcut=\"full/q\"") }!!
         assertFalse(mine.drawn)
         val app = TextKeyboard(context, TestThemes.PixelDark).wired()
@@ -148,11 +142,10 @@ class CustomKeyboardTest {
         val (offered, current) = KeyboardPicker(context) { InputMethodCatalog.PINYIN }.offered()!!
         assertEquals(KeyboardPicker.Offered(ImKeyboard.CUSTOM, mine), offered.last())
         assertEquals(KeyboardPicker.Offered(ImKeyboard.CUSTOM, mine), current)
-        // shown as the 18 keys' drawn with it
         val shown = ImKeyboards.shown(InputMethodCatalog.PINYIN, prefs.imKeyboards(), EngineState.shuangpinScheme)
         assertEquals(ImKeyboards.Layout.PINYIN18, shown.layout)
         assertEquals(mine, shown.custom)
-        // English cannot type on grouped keys: not offered there
+        // English cannot type on grouped keys
         assertTrue(KeyboardPicker(context) { InputMethodCatalog.ENGLISH }.offered()!!.first.none { it.layout != null })
         fun pinyinList(): ListPreference {
             val ctx = PlaceholderStrings(context)
@@ -162,7 +155,6 @@ class CustomKeyboardTest {
         val list = pinyinList()
         assertEquals("Custom:my-k18", list.entryValues.last())
         assertEquals("Custom:my-k18", list.value)
-        // its file gone: the choice kept, the 18 keys drawn and the list saying so
         File(dir, "my-k18.xml").delete()
         CustomKeyboards.forget()
         val gone = prefs.imKeyboards()
@@ -174,7 +166,7 @@ class CustomKeyboardTest {
         assertTrue(after.entries.last().toString(), after.entries.size == after.entryValues.size)
     }
 
-    // a pref no layout may have (a backup's restored, edited by hand): its base drawn, nothing thrown (the fcitx thread asks too)
+    // a pref no layout may have (a backup's, edited by hand): its base drawn, nothing thrown (the fcitx thread asks too)
     @Test
     fun anIdNoLayoutMayHaveInAPrefDrawsTheBase() {
         val wubi = InputMethodCatalog.TABLES.keys.first { InputMethodCatalog.hasTableKeys(it) }
@@ -195,10 +187,8 @@ class CustomKeyboardTest {
         }
     }
 
-    // grouped keys based on the full keyboard (let in): where the engine refuses it here, or it is refused as read, grouped
-    // keys are drawn in its place, its own family's base, never the full keyboard with dead group keys (L3 review S2).
-    // Its theme styles, marks and keys' data are of the board it is based on, as the web's maker draws it (R26 F8117:
-    // they were k18's here, qwerty's there); but the defaults of the keys' shape its own family's, the 18 keys' (R26 F8437)
+    // refused here, grouped keys based on the full keyboard draw their own family's base, never the full keyboard with
+    // dead group keys; theme styles and key data are the based-on board's, the key shape's defaults its family's
     @Test
     @Uat("ST-192")
     fun oneBasedOnABoardOfAnotherFamilyFallsBackToItsOwnFamilys() {
@@ -208,20 +198,18 @@ class CustomKeyboardTest {
         assertEquals(ImKeyboard.KEYS18, ImKeyboards.baseOf(mine))
         val drawn = SceneLayouts.custom(context, mine.id, mine.stamp)!!
         assertEquals("styles and marks of, styles of, drawn in its place", listOf("qwerty", "qwerty", "k18"), listOf(drawn.base, drawn.stylesOf, drawn.fallback))
-        // 18 keys typed (its family's KEYS18), the 18 keys' corners and L's `:`: the 11th group's corner 18 keys' `(`, not 14's
-        // `~`, on the keyboard and in the settings' editor alike
+        // 18 keys typed; the 11th group's corner is the 18 keys' `(`, not 14's `~`, on the keyboard and in the editor alike
         assertEquals(KeyboardVariant.Form.Grouped18, KeyboardVariants.of(drawn.layout, "", ShuangpinScheme.ZIRANMA, shape = drawn.fallback).form)
         val h = KeyId.of("g18/h")
         assertEquals("(", SceneBoard.resolver(drawn, InputMethodCatalog.PINYIN).defaultOf(h)?.first?.text)
         assertEquals("(", KeyCaps.resolver(context, mine.id)!!.defaultOf(h)?.first?.text)
         assertEquals("grouped", SceneLayouts.builtIn(context, drawn.fallback)!!.layout.family)
-        // the file replaced (by one of another family) since a keyboard was made: not drawn by a stamp it no longer has
+        // replaced by one of another family since made: not drawn by a stamp it no longer has
         File(dir, "my-k18.xml").writeText(BuiltInLayouts(context).text("qwerty")!!.replaceFirst("id=\"qwerty\"", "id=\"my-k18\""))
         assertNull(SceneLayouts.custom(context, mine.id, mine.stamp + "x"))
     }
 
-    // a settings cap of a key of the user's layout (按键字符和快捷键) is the keyboard's key: a theme's styles of the board it is
-    // based on are its too (061-custom-layout §10), as SceneBoard has them; R26 F8127: the cap took only its own id's
+    // a settings cap of the user's layout takes its base's theme styles, as SceneBoard does, not only its own id's
     @Test
     fun aCapOfTheUsersLayoutTakesTheStylesOfItsBaseAsTheKeyboardDoes() {
         phoneStorage()
@@ -236,7 +224,6 @@ class CustomKeyboardTest {
         assertEquals("the app's qwerty, the user's on it", listOf(true, true), listOf(red("qwerty"), red(mine.id)))
     }
 
-    // a nine keys' layout of the user's reads the nine keys' settings: their section shown on its page (§5.4, L3 review S4)
     @Test
     fun aNineKeysLayoutOfTheUsersShowsTheNineKeysSettings() {
         fun nineShown(im: String) = InputMethodSettings.of(im)!!.filterIsInstance<InputMethodSettings.Section>()
@@ -248,29 +235,27 @@ class CustomKeyboardTest {
         prefs.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.CUSTOM, mine.id)
         assertTrue(nineShown(InputMethodCatalog.PINYIN))
         assertTrue(nineShown(InputMethodCatalog.ENGLISH))
-        // a letters one: not
         val letters = own("my-qwerty")!!
         prefs.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, letters.id)
         assertFalse(nineShown(InputMethodCatalog.PINYIN))
     }
 
-    // what an input start asks (the toolbar's 键盘 for a table) is the layouts as last listed: no file read for it (L3 review S3)
+    // an input start asks the layouts as last listed: no file read for it
     @Test
     fun anInputStartAsksTheLayoutsAsLastListed() {
         val wubi = InputMethodCatalog.TABLES.keys.first { InputMethodCatalog.hasTableKeys(it) }
         val picker = KeyboardPicker(context) { wubi }
         assertTrue(own("my-qwerty")!!.tableExtras)
-        // listed off the main thread: none till then (an earlier test's listing drained first, so none lands late)
+        // listed off the main thread; an earlier test's listing drained first, so none lands late
         CustomKeyboards.awaitListed()
         CustomKeyboards.relist()
         CustomKeyboards.awaitListed()
         assertTrue(picker.offers())
         File(dir, "my-qwerty.xml").delete()
         assertTrue("as last listed", picker.offers())
-        // the main thread's own listing (⋯ opened) is its own: not what an input start asks (re-check S-2)
+        // the main thread's own listing (⋯ opened) is not what an input start asks
         assertTrue(CustomKeyboards.all().isEmpty())
         assertTrue("the main thread's listing not kept", picker.offers())
-        // a change listed anew, off the main thread
         CustomKeyboards.changed(dir)
         CustomKeyboards.awaitListed()
         assertFalse(picker.offers())
@@ -294,8 +279,7 @@ class CustomKeyboardTest {
         assertTrue(ImKeyboards.usedBy(chosen, mine.id).isEmpty())
     }
 
-    // L1's review: the bubble over a key of two rows is over its first row (KeyNode.head), as BaseKeyboard's two
-    // GestureType.Down uses of previewBounds pass it on, the corner's (AltPreview) and the plain one's (Preview)
+    // the bubble over a key of two rows is over its first row (KeyNode.head), for both previews
     @Test
     fun aKeyOfTwoRowsBubblesOverItsFirstRow() {
         for (mark in listOf("", " mark=\"false\"")) {
@@ -323,7 +307,6 @@ class CustomKeyboardTest {
     }
 
     private companion object {
-        // a settings cap's side, px
         const val CAP = 120
     }
 }

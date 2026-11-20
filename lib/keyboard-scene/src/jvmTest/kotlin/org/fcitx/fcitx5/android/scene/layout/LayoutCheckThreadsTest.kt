@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 
 // one Sources shared by checks on several threads at once (an import's and a migration's): every check's report the one a
 // check alone makes. How often a first read is made is not seen here (its lazies are pure, any mode passes); a cache of
-// its that is not safe across threads would be (R26 F8306)
+// its that is not safe across threads would be
 class LayoutCheckThreadsTest {
     private val boards = listOf("k18", "nine", "number", "qwerty", "symbols")
 

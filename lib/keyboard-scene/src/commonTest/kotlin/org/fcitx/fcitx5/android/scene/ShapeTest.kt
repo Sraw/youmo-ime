@@ -18,7 +18,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// 060-render-v2 §3.1: a key's shape and touch area are shapes, Rect now, Path for what comes (arc)
+// a key's shape and touch area are shapes, Rect now, Path for what comes (arc)
 class ShapeTest {
 
     @Test

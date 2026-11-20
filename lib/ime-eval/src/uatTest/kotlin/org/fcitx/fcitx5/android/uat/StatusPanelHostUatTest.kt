@@ -8,11 +8,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.junit.Test
 
-/**
- * uat/05's status panel toggles, their effect on typing: the Kotlin host with the app's data, the
- * toggle tapped as the panel taps it ([HostReplay.toggle]). The panel itself, its labels and the tap
- * reaching the host, is BarUatTest's.
- */
+/** uat/05's status panel toggles, their effect on typing, tapped as the panel taps them ([HostReplay.toggle]). */
 class StatusPanelHostUatTest {
 
     @Test

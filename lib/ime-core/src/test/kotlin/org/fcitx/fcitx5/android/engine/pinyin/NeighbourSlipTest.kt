@@ -21,7 +21,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A key read as the key next to it by where it was tapped (061-neighbour-correction). */
+/** A key read as the key next to it by where it was tapped. */
 class NeighbourSlipTest {
 
     private val cost = SlipCost()
@@ -38,7 +38,6 @@ class NeighbourSlipTest {
     }
 
     // how far each reading of [g] from [at] to [to], slip or not, goes against where the taps fell, as `sa:0.9`
-    // (one walk for the tests that weigh the letters; review F8299)
     private fun SyllableGraph.againstOf(at: Int, to: Int): Map<String, Float> {
         val out = HashMap<String, Float>()
         for (e in edges(at)) {
@@ -59,7 +58,6 @@ class NeighbourSlipTest {
         // in the middle the key next to it costs more than the floor lets through; at its edge, little
         assertTrue(cost.of(g, h, legal = false).let { it < -3f && it > -4f })
         assertTrue(cost.of(g.copy(dx = 0.45f), h, legal = false) > -0.5f)
-        // legal: 2 more, then the floor
         assertTrue(cost.of(g, h, legal = true).isNaN())
         assertEquals(cost.of(g.copy(dx = 0.45f), h, legal = false) - 2f, cost.of(g.copy(dx = 0.45f), h, legal = true), 1e-4f)
         // a key above or below, a key height away, is read only near that edge
@@ -69,7 +67,6 @@ class NeighbourSlipTest {
 
     @Test
     fun aSlipIsNeverLikelierThanTheKeyHit() {
-        // past the key's edge, or by a wide key: never above 0
         val g = tap(QWERTY, 'g', dx = 0.9f)
         assertEquals(0f, cost.of(g, g.near('h')!!, legal = false), 0f)
         val wide = Touch(0.4f, 0f, 36f, 50f, listOf(Near('x', 1.5f, 0f, nw = 2f)))
@@ -83,15 +80,12 @@ class NeighbourSlipTest {
         assertEquals("aw".toSet(), QWERTY.around('q').map { it.char }.toSet())
         // the nine keys: no 1 nor 0 among them; 9 has 6 above and 8 beside
         assertEquals("68".toSet(), NINE.around('9').map { it.char }.toSet())
-        // a gap between keys is no gap between neighbours
         val apart = KeyBoxes(mapOf('a' to KeyBoxes.Box(0f, 0f, 30f, 50f), 'b' to KeyBoxes.Box(36f, 0f, 66f, 50f)))
         assertEquals(listOf('b'), apart.around('a').map { it.char })
         val n = QWERTY.around('g').first { it.char == 'h' }
         assertEquals(1f, n.nx, 1e-4f)
         assertEquals(0f, n.ny, 1e-4f)
-        // review F8167: x two rows high (rows="2") at the end of the second and third rows is in both, beside e and
-        // g, c above it; the rows it spans still above and below each other. By centres it was a row of its own,
-        // and e had neither x beside it nor g below
+        // x two rows high is in both rows; the rows stay above and below each other
         val box = { col: Int, row: Int, rows: Int -> KeyBoxes.Box(col * 40f, row * 50f, (col + 1) * 40f, (row + rows) * 50f) }
         val tall = KeyBoxes(
             mapOf(
@@ -110,14 +104,12 @@ class NeighbourSlipTest {
     @Uat("PY-137")
     fun fullPinyinReadsAKeyAsTheOneItWasTappedTowards() {
         val segmenter = PinyinSegmenter(neighbours = true)
-        // s tapped at its left edge, toward a: nihso is nihao
         val towardA = segmenter.segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's', dx = -0.45f)))
         assertTrue(towardA.slipsOf(2, 5).containsKey("hao"))
-        // tapped toward d it is no hao, though as typed hso spells nothing: the 0.6.0 rule would read it
+        // tapped toward d it is no hao, though as typed hso spells nothing
         val towardD = segmenter.segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's', dx = 0.45f)))
         assertFalse(towardD.slipsOf(2, 5).containsKey("hao"))
-        // in the middle, though it spells nothing, not: 全拼 reads none past -1.75, the loosest floor that turns no
-        // sentence typed on target wrong (the user's 11-16 rule); over the -4 the others read, at its cost
+        // 全拼 reads no slip past -1.75, the loosest floor that turns no on-target sentence wrong
         assertFalse(segmenter.segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's'))).slipsOf(2, 5).containsKey("hao"))
         val middle = PinyinSegmenter(neighbours = true, slipCost = SlipCost()).segment("nihso", null, touchesAt(5, 3, tap(QWERTY, 's'))).slipsOf(2, 5)
         assertTrue(middle.getValue("hao").let { it < -3f && it >= -4f })
@@ -129,8 +121,7 @@ class NeighbourSlipTest {
         // 全拼 reads none: a legal slip costs 2 more, past its floor -1.75 wherever the tap fell
         val full = PinyinSegmenter(neighbours = true)
         assertFalse(full.segment("tade", null, touchesAt(4, 0, tap(QWERTY, 't', dx = 0.49f))).anySlip())
-        // over -4 (as 双拼's 18 and 14 keys read): tade, in the middle of t, no ya; near y, ya, costing 2 more than a
-        // slip that spells nothing (ta at the end may still become tai: no slip there, as before)
+        // a slip that also spells costs 2 more than one that spells nothing
         val segmenter = PinyinSegmenter(neighbours = true, slipCost = SlipCost())
         assertFalse(segmenter.segment("tade", null, touchesAt(4, 0, tap(QWERTY, 't'))).anySlip())
         val near = segmenter.segment("tade", null, touchesAt(4, 0, tap(QWERTY, 't', dx = 0.35f))).slipsOf(0, 2)
@@ -145,7 +136,7 @@ class NeighbourSlipTest {
         // 你看完了: kw is 简拼, no ke where k and w were tapped in the middle
         val touches = "nikwl".map { tap(QWERTY, it) }.toTypedArray<Touch?>()
         assertTrue(segmenter.segment("nikwl", null, touches).slipsOf(2, 4).isEmpty())
-        // with no place, the 0.6.0 rule but for consonants alone: nihso is nihao, kw is no ke
+        // with no place, every slip but for consonants alone: nihso is nihao, kw is no ke
         assertTrue(segmenter.segment("nihso").slipsOf(2, 5).containsKey("hao"))
         assertTrue(segmenter.segment("nikwl").slipsOf(2, 4).isEmpty())
     }
@@ -176,30 +167,25 @@ class NeighbourSlipTest {
         assertTrue(g.hasOtherReadings)
         assertFalse(g.readsWhole(0, 5))
         assertFalse(g.withoutOtherReadings().anySlip())
-        // nor tells of other readings, so asked again is itself, not copied once more (review F8203)
+        // nor tells of other readings, so asked again is itself, not copied once more
         assertFalse(g.withoutOtherReadings().hasOtherReadings)
         assertSame(g.withoutOtherReadings(), g.withoutOtherReadings().withoutOtherReadings())
         val typed = PinyinSegmenter(neighbours = true).segment("nihao")
         assertTrue(typed.readsWhole(0, 5))
     }
 
-    // these and the keyboards' below have one shape (a tap toward a key reads a slip, in the middle none) but stay a test
-    // each: each is the JVM check of its own UAT case (@Uat), and their keyboards' setups differ (review F8394)
+    // one shape, but a test each: each is its own UAT case's JVM check
     @Test
     @Uat("SP-38")
     fun shuangpinReadsTwoKeysWithOneSlippedWhereTapped() {
         val xiaohe = ShuangpinSegmenter(XIAOHE, neighbours = true)
-        // ta: t near y is ya, in the middle nothing
         assertTrue(xiaohe.segment("ta", null, touchesAt(2, 0, tap(QWERTY, 't', dx = 0.35f))).slipsOf(0, 2).containsKey("ya"))
         assertFalse(xiaohe.segment("ta", null, touchesAt(2, 0, tap(QWERTY, 't'))).anySlip())
-        // with no place, none: two keys make nearly any syllable
         assertFalse(xiaohe.segment("ta").anySlip())
-        // off, none
         assertFalse(ShuangpinSegmenter(XIAOHE).segment("ta", null, touchesAt(2, 0, tap(QWERTY, 't', dx = 0.35f))).anySlip())
     }
 
-    // 小鹤, 自然码 and 微软 alike (q is iu, s is ong in each): tq (tiu, no syllable) with q tapped toward a is ta;
-    // ts (tong) with s tapped toward a is ta as well; in the middle neither
+    // q is iu, s is ong in each scheme
     @Test
     @Uat("SP-38", "SP-39", "SP-40")
     fun eachShuangpinSchemeReadsTheKeyTappedTowards() {
@@ -222,11 +208,9 @@ class NeighbourSlipTest {
         val near = nine.segment("99", null, touchesAt(2, 1, tap(NINE, '9', dy = -0.4f))).slipsOf(0, 2)
         assertTrue(near.keys.toString(), "wo" in near.keys)
         assertTrue(nine.segment("99", null, touchesAt(2, 1, tap(NINE, '9'))).slipsOf(0, 2).isEmpty())
-        // no place: none
         assertFalse(nine.segment("99").anySlip())
     }
 
-    // the nine keys' digits read no slip under -3 (N3, measured on the 6T), the other keyboards' floor -4
     @Test
     fun theNineKeysReadNoSlipCostingUnderMinusThree() {
         fun at(dy: Float) = tap(NINE, '9', dy = dy)
@@ -257,9 +241,7 @@ class NeighbourSlipTest {
         assertFalse(keys.segment(typed, taps, touchesAt(3, 0, tap(G14, g14Code('b')))).anySlip())
     }
 
-    // 拼音's 18 keys, a row of seven keys over one of six: BN tapped at its right edge, toward M, reads men, in the
-    // middle not; FG, wider than RT above it (which it has in its own size), tapped at its left edge toward SD
-    // reads sa as well as fa
+    // FG is wider than RT above it
     @Test
     @Uat("PY-142")
     fun theEighteenKeysReadAKeyAsTheOneNextToIt() {
@@ -273,10 +255,7 @@ class NeighbourSlipTest {
         assertTrue(keys.segment(g18("f a"), null, touchesAt(2, 0, fg)).slipsOf(0, 2).containsKey("sa"))
     }
 
-    // 061-neighbour-18key: pinyin's 18 keys' taps go with where across the key they fell (Keyboard.pinyin18Tap), so a
-    // slip has the letters of the key slipped to weighed as the 14 keys' do: FG tapped at its left edge, toward SD, is
-    // put onto SD's right edge, so sa goes nearly a whole against s and da none; with no place (as before) neither, and FG's
-    // own fa and ga as tapped (f none, g most of a whole)
+    // FG tapped toward SD is put onto SD's right edge: sa goes nearly a whole against s, da none
     @Test
     @Uat("PY-152")
     fun theEighteenKeysWeighTheLettersOfTheKeySlippedToByWhereTheTapFell() {
@@ -293,10 +272,7 @@ class NeighbourSlipTest {
         assertTrue(none.toString(), listOf("sa", "da", "fa", "ga").all { none.getValue(it) == 0f })
     }
 
-    // a key of one letter has its place too where the keys lean (GroupedKeyboard.tapped), so a slip from it onto a key
-    // of two weighs that key's letters: A tapped at its right edge, toward SD (aa spells nothing), puts the tap onto
-    // SD's left edge, s's half: da a whole against d, sa none; and the place of a key of one letter weighs nothing of its own,
-    // L; (微软 双拼's ing) l alone however far right
+    // a one-letter key's place puts a slip onto the near half of the key beside; its own place weighs nothing
     @Test
     @Uat("PY-152")
     fun aKeyOfOneLetterHasItsPlaceForASlipFromItAlone() {
@@ -310,8 +286,7 @@ class NeighbourSlipTest {
         assertEquals(0f, l.getValue("la"), 1e-4f)
     }
 
-    // 双拼's 18 and 14 keys (061-neighbour-groups), each scheme's: [BN][F] (ben) with BN tapped at its right edge,
-    // toward M, reads men too; in the middle, with no place or with the option off, nothing. 微软 has no 14 keys
+    // 微软 has no 14 keys
     @Test
     @Uat("SP-48", "SP-49")
     fun shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt() {
@@ -330,8 +305,7 @@ class NeighbourSlipTest {
         }
     }
 
-    // 双拼's nine keys: 99 with its second 9 tapped at its top, toward 6, reads 96 (wo) as well; like pinyin's nine
-    // keys, no slip costing under -3 (the -4 of the other keyboards would read one tapped a little lower)
+    // no slip costing under -3, as on pinyin's nine keys
     @Test
     @Uat("SP-50")
     fun shuangpinsNineKeysReadADigitAsTheOneItWasTappedTowards() {
@@ -346,9 +320,7 @@ class NeighbourSlipTest {
         assertTrue("wo" in floorFour.segment(typed, null, at(-0.4f)).slipsOf(0, 2))
     }
 
-    // 注音大千 (061-neighbour-groups): a symbol key's neighbours the symbol keys around it, its tone keys none.
-    // ㄈㄧ (spelling nothing) with ㄈ tapped at its right edge, toward ㄌ, reads ㄌㄧ (li) too; in the middle nothing.
-    // ㄇㄚ, which spells ma, with ㄇ toward ㄋ never: past 大千's floor -1.75 (the user's 11-16 rule), na costs 2 more
+    // tone keys are no neighbours; ㄇㄚ spells ma, so na (2 more) is past 大千's floor
     @Test
     @Uat("PY-150")
     fun dachenReadsASymbolAsTheOneNextToIt() {
@@ -367,8 +339,7 @@ class NeighbourSlipTest {
         assertTrue(d.near(ZhuyinKeys.symbolCode('ㄅ')) != null)
     }
 
-    // 注音九键 (read since the user's 11-16, over -2): [ㄖㄥㄩ][ㄅㄉㄚ], spelling nothing as typed, with ㄖㄥㄩ
-    // tapped at its very left edge, toward ㄈㄌㄝ, reads fa and la; a little in (-0.45), past the floor, nothing
+    // a little in (-0.45) is past the floor
     @Test
     @Uat("PY-151")
     fun zhuyinsNineKeysReadAGroupAsTheOneNextToIt() {
@@ -390,9 +361,7 @@ class NeighbourSlipTest {
         assertNull(Touch(0f, 0f, 1f, 1f).near('x'))
     }
 
-    // review L4: a layout of the 18 keys' groups with WE stacked, W over E. A tap at RT's top left read as a slip
-    // from WE is on WE's top right: along its letters that is down, near its top, so W, as a tap on WE there is
-    // sent (GroupedKeyboard.tapped); across, its right edge, it would be E
+    // along WE's stacked letters the tap is near the top, so W
     @Test
     fun aSlipOntoAKeyWhoseLettersAreStackedIsPlacedDownIt() {
         val we = NineKeyLetters.G18.key('w')
@@ -401,7 +370,6 @@ class NeighbourSlipTest {
         assertEquals(0.1f, stacked, 0.01f)
         assertEquals(0f, NineKeyLetters.G18.against(we, 0, stacked), 0f)
         assertTrue(NineKeyLetters.G18.against(we, 1, stacked) > 0f)
-        // the same keys with WE across: the right half, E
         val across = T9Segmenter.placeOn(touch, Near(we, -1f, 0f), 0.1f)
         assertEquals(1f, across, 0.06f)
         assertTrue(NineKeyLetters.G18.against(we, 0, across) > 0f)
@@ -410,8 +378,7 @@ class NeighbourSlipTest {
         assertEquals(NineKeyLetters.place(1f, 0.1f), both, 0.06f)
     }
 
-    // a split keyboard's G on both halves: the left half's G tapped has F beside it and H across the
-    // gap, too far to be read; the right's, H beside it
+    // the gap between halves is too far to be read
     @Test
     fun aKeyOnBothHalvesHasTheNeighboursOfTheCopyTapped() {
         val box = { x: Float -> KeyBoxes.Box(x, 0f, x + 40f, 56f) }
@@ -436,8 +403,7 @@ class NeighbourSlipTest {
         assertNull(Touch.parse("0,0,40,56|x"))
     }
 
-    // a slip's readings are an edge of their own, every match of it NEIGHBOUR, never among a reading as typed's:
-    // what reads the input as typed (withoutOtherReadings, readsWhole, the decoder's whole filters) drops them by the edge
+    // what reads the input as typed drops slips by their edge
     @Test
     fun slipReadingsAreEdgesOfTheirOwn() {
         val graphs = listOf(

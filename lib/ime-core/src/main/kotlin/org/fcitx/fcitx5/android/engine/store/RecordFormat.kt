@@ -12,23 +12,16 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.zip.CRC32
 
-/**
- * A log of records, each appended as it happens: a header of [magic] and [version], then records
- * of a length, a type and its fields, and a CRC32 of type and fields. A record cut short (the app
- * killed while writing) or garbled fails its length or CRC; reading stops there, and what came
- * before stands (a log's reader may read past a garbled one: [read]).
- */
+/** An append-only log: a [magic]/[version] header, then records of length, type, fields and a CRC32; reading stops at a record cut short or garbled. */
 class RecordFormat(magic: String, val version: Int) {
     private val magic = magic.toByteArray(Charsets.US_ASCII).also { require(it.size == MAGIC_SIZE) { "magic of four letters" } }
 
     fun header(): ByteArray = ByteBuffer.allocate(HEADER_SIZE).put(magic).putInt(version).array()
 
-    /** Whether [bytes] start with this format's header. */
     fun hasHeader(bytes: ByteArray) = bytes.size >= HEADER_SIZE && ByteBuffer.wrap(bytes).let { b ->
         magic.all { it == b.get() } && b.getInt() == version
     }
 
-    /** A record of [type] with the [fields] written. */
     fun record(type: Byte, fields: DataOutputStream.() -> Unit): ByteArray {
         val body = ByteArrayOutputStream()
         DataOutputStream(body).apply {
@@ -41,16 +34,9 @@ class RecordFormat(magic: String, val version: Int) {
     }
 
     /**
-     * Hands each record of [bytes], which start with the header, to [replay] with its type and
-     * its fields to read. A record whose fields run short or do not read, or make no sense to
-     * [replay] (a count below zero), is skipped, and [skipped] hears why: its CRC held, so that
-     * is a writer's bug rather than damage.
-     *
-     * Given [garbled], a record whose CRC alone fails, of a length a record may have, with a whole
-     * record after it (some run of such records then one whole), is read past rather than read to:
-     * [garbled] hears where each starts and ends. One damaged byte mid-log must not lose all after
-     * it (user's decision B2, 0.6.1 audit engine-07). Without it (a backup, written whole and never
-     * merged in part) reading stops there.
+     * Hands each record to [replay]. A record whose CRC holds but whose fields do not read (a writer's bug) is
+     * skipped and told to [skipped]. Given [garbled], a run of CRC-failing records followed by a whole one is read
+     * past, so one damaged byte does not lose the rest; without it (a backup) reading stops there.
      *
      * @return the length of the records read whole: past it the log was cut short
      */
@@ -72,10 +58,9 @@ class RecordFormat(magic: String, val version: Int) {
             try {
                 replay(input.readByte(), input)
             } catch (e: IOException) {
-                // skipped: the bytes are in memory, so this is a record read wrong, not the disk
+                // the bytes are in memory, so this is a record read wrong, not the disk
                 skipped(e)
             } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-                // one record the replay cannot take must not keep the rest of the log from opening
                 skipped(e)
             }
             at += 4 + length + 4
@@ -88,10 +73,7 @@ class RecordFormat(magic: String, val version: Int) {
         return at
     }
 
-    /**
-     * Where the whole record after the garbled ones from [at] starts, each told to [garbled]; null
-     * if they are not followed by one: cut short or garbage, where reading stops.
-     */
+    /** Where the whole record after the garbled ones from [at] starts; null if none follows. */
     private fun pastGarbled(bytes: ByteArray, at: Int, garbled: (Int, Int) -> Unit): Int? {
         val ends = ArrayList<Int>()
         var next = at
@@ -110,12 +92,7 @@ class RecordFormat(magic: String, val version: Int) {
         return next
     }
 
-    /**
-     * Hands [visit] where each record of [bytes] (which start with the header) is, from its length
-     * to its CRC, as [read] would read them: for a log rewritten in part, the rest copied as it is.
-     *
-     * @return the length of the records read whole
-     */
+    /** Hands [visit] each record's span, as [read] would read them, for a log rewritten in part; returns the length read whole. */
     fun spans(bytes: ByteArray, visit: (start: Int, end: Int) -> Unit): Int {
         require(hasHeader(bytes)) { "not a log of ${String(magic, Charsets.US_ASCII)} $version" }
         var at = HEADER_SIZE
@@ -128,7 +105,6 @@ class RecordFormat(magic: String, val version: Int) {
         return at
     }
 
-    /** The length of the fields of the record at [at], or -1 if it is cut short or garbled. */
     private fun wholeRecord(bytes: ByteArray, at: Int): Int {
         if (bytes.size - at < 4) return -1
         val buffer = ByteBuffer.wrap(bytes)
@@ -142,7 +118,7 @@ class RecordFormat(magic: String, val version: Int) {
         private const val MAGIC_SIZE = 4
         const val HEADER_SIZE = 8
 
-        /** A record is a few words; past this a length is garbage, so none longer is written. */
+        /** A record is a few words; past this a length is garbage. */
         const val MAX_RECORD = 1 shl 16
     }
 }

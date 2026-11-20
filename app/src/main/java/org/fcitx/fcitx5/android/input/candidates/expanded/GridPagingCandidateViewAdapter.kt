@@ -36,12 +36,10 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
         private const val TEXT_SIZE = 20f
     }
 
-    // 候选字号 scales the words, so the rows and the spans a word takes scale with it (design §6);
-    // the input view, and with it this adapter, is made anew when the size changes
+    // the input view, and with it this adapter, is made anew when 候选字号 changes
     private val textSp = ThemeManager.prefs.candidateTextSize.getValue()
     private val textScale = textSp / CandidateBarHeight.DEFAULT_TEXT_SP.toFloat()
 
-    // cache measureWidth
     private val measuredWidths = object : LruCache<String, Float>(200) {
         private val cachedPaint = Paint().apply { textSize = TEXT_SIZE }
         private val cachedRect = Rect()
@@ -56,9 +54,7 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
     fun measureWidth(position: Int): Float {
         // the span lookup reads ahead of what is shown: getItem would have Paging load for it
         val candidate = peek(position) ?: return 0f
-        // the number or dot before it a theme asks for (T6a), as wide as drawn
-        // by its advance, not its ink: the space after the number is part of its width (in the plain face: a
-        // theme's own label font may come out a little wider or narrower)
+        // by its advance, not its ink: the space after the number is part of its width
         val label = SceneBar.label(bar?.labelStyle, position + offset).let { if (it.isEmpty()) 0f else labelPaint.measureText(it) / TEXT_SIZE * textScale }
         if (candidate.readings.isEmpty()) return label + measuredWidths[candidate.textWithComment()] * textScale
         val hint = EngineState.candidateReading.value == ReadingStyle.OFF
@@ -67,20 +63,15 @@ abstract class GridPagingCandidateViewAdapter(theme: Theme) : PagingCandidateVie
         return label + (annotatedWidths[key] ?: annotatedWidth(candidate, hint).also { annotatedWidths.put(key, it) })
     }
 
-    // the widths of words with readings, measured once each as the grid lays out again and again
+    // measured once each as the grid lays out again and again
     private val annotatedWidths = LruCache<String, Float>(200)
 
     private val readingPaint = TextPaint()
 
-    // the theme's `bar height=` (T6b): the rows a bar's height each, as the bar and the flexbox window's; with no
-    // bar yet, the window's own [context]'s scenes where there is one (a row made), the app's where none (measuring)
+    // with no bar yet, the window's own [context]'s scenes where there is one, the app's where none (measuring)
     private fun barPercent(context: Context? = null): Double = bar?.heightPercent ?: context?.let(SceneBar::heightPercent) ?: SceneBar.heightPercent()
 
-    /**
-     * [candidate]'s width with its readings ([ReadingSpan]): measured as CandidateItemUi draws them, at the
-     * candidates' own size, since a reading's floor does not scale with the words; a hint's ([hint], 候选词注音
-     * off) small above the characters, else the readings as the setting has them; the comment after them.
-     */
+    /** At the candidates' own size, since a reading's floor does not scale with the words. */
     @VisibleForTesting
     internal fun annotatedWidth(candidate: CandidateWord, hint: Boolean): Float {
         val metrics = Resources.getSystem().displayMetrics

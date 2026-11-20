@@ -29,17 +29,9 @@ fun DependencyManager.inputMethodService() =
     mustWrapped<UniqueComponentWrapper<FcitxInputMethodService>, FcitxInputMethodService>()
 
 /**
- * The coroutine scope of the InputView the component belongs to, on the main thread: cancelled
- * when that view is detached (replaced after a theme or layout setting change), so work
- * launched here does not outlive the components it touches. Work that must survive the view
- * belongs on the service's own `lifecycleScope`.
- *
- * Components that only need somewhere to launch view-scoped work should take this rather
- * than the whole [FcitxInputMethodService]: it is the difference between depending on a
- * concrete `InputMethodService` and depending on a `CoroutineScope`.
- *
- * Found by the wrapped type, exactly [CoroutineScope]: the scope has to be registered as that
- * type, not a subtype, and a second scope registered so would be refused as a duplicate.
+ * Cancelled when the input view is detached (replaced after a theme or layout setting change); work that must
+ * survive the view belongs on the service's `lifecycleScope`. Registered as exactly [CoroutineScope]: a subtype
+ * is not found, and a second one would be refused as a duplicate.
  */
 fun DependencyManager.imeScope() =
     mustWrapped<UniqueComponentWrapper<CoroutineScope>, CoroutineScope>()

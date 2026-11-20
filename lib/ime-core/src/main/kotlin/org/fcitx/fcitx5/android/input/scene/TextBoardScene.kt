@@ -24,29 +24,23 @@ import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
 import java.util.Calendar
 
-/**
- * What the 26 keys (TextKeyboard) show as the input is, as values: what qwerty.xml's `when=` asks of
- * ([input]). The keyboard decides each as it always has (its show*Key): this says it in the scene's
- * words, so the keys drawn are the keys it has shown.
- */
+/** What the 26 keys show, as qwerty.xml's `when=` asks; the keyboard decides each as it always has. */
 data class TextBoardState(
-    /** The 双拼 scheme types `ing` on `;` (semicolonKey): the key shown, unsplit. */
+    /** `ing` on `;` (semicolonKey). */
     val semicolonScheme: Boolean = false,
-    /** A table input method's keyboard: its 拼 key in Shift's place, 确定 in Return's while a code is typed. */
+    /** Its 拼 key in Shift's place, 确定 in Return's while a code is typed. */
     val table: Boolean = false,
-    /** The table's code key the letters have no room for (TableKeyboard.extraKey): `;` or `*`. */
+    /** TableKeyboard.extraKey: `;` or `*`. */
     val tableExtra: Char? = null,
     val lookingUp: Boolean = false,
-    /** Something typed: Return commits it (ReturnKeyAppearance.composing). */
+    /** Return commits it (ReturnKeyAppearance.composing). */
     val composing: Boolean = false,
-    /** An address field's keys in place of the comma and the full stop. */
     val address: AddressKeys = AddressKeys.NONE,
     val langKey: Boolean = true,
-    /** Holding the space talks: a microphone on it. */
     val holdVoice: Boolean = false,
-    /** A table's roots or their names over the letters (TableKeyboard.labelled): `{root:x}` on them. */
+    /** TableKeyboard.labelled: `{root:x}` on them. */
     val roots: Boolean = false,
-    /** Pinyin or 双拼 typed (ShiftSeparator.on): 分词 in Shift's place. */
+    /** ShiftSeparator.on: 分词 in Shift's place. */
     val separating: Boolean = false,
 ) {
     fun input(): Input = Input(
@@ -71,39 +65,25 @@ data class TextBoardState(
         voice = holdVoice,
         holdVoice = holdVoice,
         langKey = langKey,
-        // qwerty.xml asks it of a table (确定 in Return's place) and of pinyin's and 双拼's (分词 in Shift's): elsewhere
-        // (English's word) the first key typed and the word committed would each give a new environment, so a
-        // scene made again the same as before
+        // asked only of a table and pinyin/双拼: elsewhere (English's word) each key typed would make a new scene the same as before
         composing = composing && table || separating,
         lookingUp = lookingUp,
     )
 }
 
-/**
- * The letters' texts the 26 keys' bindings read ([org.fcitx.fcitx5.android.scene.engine.Texts]): `{root:x}` what a
- * table shows over it ([TableKeyboard.label]; the letter itself where the table has none). The corners are the
- * resolver's, by key name (KeyResolver.readings).
- */
+/** `{root:x}`: what a table shows over a letter ([TableKeyboard.label]); corners are the resolver's. */
 object SceneLetters {
     private val LETTERS = 'a'..'z'
 
-    /**
-     * `root:x`'s, for Texts.other: none where [table] shows no roots; "" for a letter with none, which the
-     * engine's `{root:x}` falls back on `{case:x}` for (the letter as 拼音键字母大小写 and Shift show it).
-     */
+    /** "" for a letter with none, for which the engine's `{root:x}` falls back on `{case:x}`. */
     fun roots(table: TableKeyboard?): Map<String, String> =
         if (table?.labelled != true) emptyMap() else LETTERS.associate { c -> "root:$c" to table.label(c).orEmpty() }
 }
 
-/** The marks' settings ([MarkSettings]) from the app's: each key's two swipe slots, 上滑 and 下滑, where each draws. */
+/** Each key's two swipe slots, 上滑 and 下滑, where each draws. */
 object SceneMarks {
 
-    /**
-     * [names]' marks (a layout's keys', [names]) as [slots] has them, 上滑 and 下滑 on as [ways] are,
-     * drawn at [upAt] and [downAt]; a character key's shortcuts drawn where [charShortcuts] (a table's
-     * roots take their room). A long press's first is [firsts]' by the key's name (null or none there: nothing
-     * drawn; the keyboards' marks are their resolver's, KeyResolver.marks, which knows every key's).
-     */
+    /** A table's roots take [charShortcuts]' room; a long press's first by the key's name (none: nothing drawn). */
     @Suppress("LongParameterList")
     fun settings(
         slots: SwipeSlots,
@@ -117,8 +97,7 @@ object SceneMarks {
     ): MarkSettings {
         val marks = HashMap<String, MarkContent>()
         val user = HashSet<String>()
-        // one time for every mark of the board, read at the first that has variables (none: never), so two keys'
-        // `$minute` never show two minutes (R26 F8457)
+        // one time for every mark of the board, read at the first with variables, so two keys' `$minute` never differ
         val at by lazy(now)
         // the names as a layout reads them, one a key (`full/q`, `fn/space`): a slot stored by the same
         for (name in names) {
@@ -142,27 +121,24 @@ object SceneMarks {
         )
     }
 
-    /** The shortcut names of [layout]'s keys, its variants' too, and of the [fragments] it includes (a shared bottom row's). */
+    /** Its variants' too, and the included [fragments]'. */
     fun names(layout: Layout, fragments: Collection<Fragment> = emptyList()): Set<String> =
         (layout.parts.filterIsInstance<Row>() + fragments.flatMap { it.rows })
             .flatMap { it.cells }.filterIsInstance<Key>()
             .flatMap { k -> listOf(k.attrs.shortcut) + k.variants.map { it.attrs.shortcut } }
             .filterNotNull().toSet()
 
-    /** A long press's first as its corner draws it: as a swipe's text is (KeyMarkText, two characters as seen and 「…」), one rule for both; typed and said whole. */
+    /** As a swipe's text is (KeyMarkText): two characters as seen and 「…」; typed and said whole. */
     fun symbol(first: String): MarkContent = MarkContent.Symbol(KeyMarkText.of(first))
 
-    /**
-     * [s] as its mark draws it, a text of variables filled in at [now] (none where that is nothing). [now] asked of a
-     * text of variables alone: a keyboard's marks are made at each state, some 30-70 slots, few of them such (R26 F8250).
-     */
+    /** [now] asked of a text of variables alone: marks are made at each state, some 30-70 slots. */
     fun content(s: KeyShortcut, now: () -> Calendar): MarkContent? = when (s) {
         is KeyShortcut.Command -> MarkContent.Icon(icon(s.command))
-        // at most two characters as seen, the rest an ellipsis (要做 1): the bubble shows it whole
+        // at most two characters as seen, the rest an ellipsis: the bubble shows it whole
         is KeyShortcut.Text -> (if (s.variables) s.typed(now()) else s.text).takeIf { it.isNotEmpty() }?.let { MarkContent.Text(KeyMarkText.of(it), KeyMarkText.shorter(it)) }
         KeyShortcut.None -> null
     }
 
-    /** A command's icon as the scene names it (SlotDefaults.icon's names); the app draws each name's drawable. */
+    /** SlotDefaults.icon's names; the app draws each name's drawable. */
     fun icon(command: KeyCommand): String = SlotDefaults.icon(command.key)
 }

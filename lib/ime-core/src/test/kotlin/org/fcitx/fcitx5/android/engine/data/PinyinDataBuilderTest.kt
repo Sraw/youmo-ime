@@ -19,8 +19,7 @@ class PinyinDataBuilderTest {
         .unigram("c", -3f, 0f)
         .entry("a", intArrayOf(Syllables.id("ni")))
 
-    // the duplicate added apart from its first, others after the same word between them: sorted on
-    // that word alone, the two would stay apart
+    // sorted on the word alone, the duplicate would stay apart from its first
     private fun bigrams(twice: Boolean) = builder()
         .bigram("a", "b", -0.5f, 0f)
         .bigram("a", "c", -0.6f, 0f)

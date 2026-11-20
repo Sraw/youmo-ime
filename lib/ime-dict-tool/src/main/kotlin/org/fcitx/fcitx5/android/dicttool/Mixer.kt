@@ -7,12 +7,7 @@ package org.fcitx.fcitx5.android.dicttool
 import kotlin.math.log10
 import kotlin.math.pow
 
-/**
- * One backoff model of two: [weight] × [base] + (1 − [weight]) × [chat], as SRILM's static
- * mix does it. The n-grams are [base]'s and the chat's counted at least [minBigram] and
- * [minTrigram] times, each given the mixture's probability; the backoff weights are then
- * worked out again, so each context's probabilities sum to one.
- */
+/** One backoff model of two, [weight] × [base] + (1 − [weight]) × [chat] as SRILM's static mix; backoff weights redone after. */
 class Mixer(
     private val base: ArpaModel,
     private val counts: NgramCounts,
@@ -104,11 +99,7 @@ class Mixer(
         // what rounding the base's six digits can take a full context's sum from one
         private const val SLACK = 1e-4
 
-        /**
-         * The weight that makes the words a context has no n-gram for share what is left of it.
-         * Where it has one for every word, nothing is left for them to share: its own must then
-         * take it all, or the weight would blow up what little the others have.
-         */
+        /** The backoff weight; where a context has an n-gram for every word nothing is left, so its own must take it all. */
         inline fun backoff(explicit: Double, lower: Double, context: () -> String): Double {
             if (explicit == 0.0) return 1.0
             if (1 - lower <= FULL) {

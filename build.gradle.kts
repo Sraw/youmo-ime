@@ -3,9 +3,7 @@ import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin
 import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootPlugin
 
 plugins {
-    // the root's `clean` (deletes its build directory): base's, not one of its own, since Kotlin/JS
-    // (lib/keyboard-scene) applies base's lifecycle to the root for its node and npm setup, and a
-    // `clean` registered here then clashed with it
+    // the root's `clean` is base's: Kotlin/JS applies base's lifecycle to the root, and one registered here clashed
     base
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -20,18 +18,14 @@ plugins {
     id("youmo.detekt")
 }
 
-// node is fetched from the repository settings.gradle.kts declares (FAIL_ON_PROJECT_REPOS), not one
-// Kotlin/JS would add to the project (the root's setup and each JS module's)
+// node is fetched from the repository settings.gradle.kts declares, not one Kotlin/JS would add
 allprojects {
     for (type in listOf(NodeJsRootPlugin::class.java, NodeJsPlugin::class.java)) {
         plugins.withType(type) { the<NodeJsEnvSpec>().downloadBaseUrl.set(null as String?) }
     }
 }
 
-// The one list of what a change must pass, for CI (unit_test.yml, a job each, side by side) and the local full run
-// (dev/review/kit/scripts/verify.sh, all three at once). Not in either: the APK (pull_request.yml builds the
-// release one; locally verify.sh adds :app:assembleDebug for the emulator) and :lib:ime-eval:uatTest (the app's data).
-// youmoEngine is here because the theme maker's node tests read its output, which no `check` makes.
+// What a change must pass, for CI and the local full run.
 tasks.register("verifyCore") {
     group = "verification"
     description = "Plain JVM modules, the drawing engine (JVM, JS, the theme maker's build), the build plugins, detekt"

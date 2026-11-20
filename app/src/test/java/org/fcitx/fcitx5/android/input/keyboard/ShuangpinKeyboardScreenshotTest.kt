@@ -24,17 +24,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 双拼's 18 keys and nine keys in the whole keyboard, as its 「键盘」 setting shows them, against the
- * golden images under src/test/screenshots. Record them again with `-Proborazzi.test.record=true`
- * when the look changes on purpose.
- */
+/** 双拼's 18 keys and nine keys against the goldens; record again with `-Proborazzi.test.record=true` when the look changes on purpose. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class ShuangpinKeyboardScreenshotTest {
 
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
     private val setting = AppPrefs.getInstance().keyboard.shuangpinKeyboard
 
     @After
@@ -47,7 +43,6 @@ class ShuangpinKeyboardScreenshotTest {
             h.start()
             val labels = h.texts()
             for (l in listOf("Q", "WE", "IO", "SD", "L", "XC", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
-            // the code row a touch tall, for the syllables on it
             assertEquals(h.inputView.resources.displayMetrics.density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat(), 1f)
             h.captureBoard("ShuangpinKeyboardScreenshotTest/keys18_light")
         }
@@ -58,7 +53,6 @@ class ShuangpinKeyboardScreenshotTest {
         setting.setValue(ShuangpinKeyboard.NineKeys)
         KeyboardHarness(TestThemes.PixelLight, shuangpin).use { h ->
             h.start()
-            // as a user sees it by default: Chinese punctuation on, 1 and the column ，。？！
             h.chinesePunctuation(shuangpin)
             h.relayout()
             val labels = h.texts()

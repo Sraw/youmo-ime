@@ -6,7 +6,6 @@
 package org.fcitx.fcitx5.android.input
 
 import android.annotation.SuppressLint
-import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
@@ -58,7 +57,7 @@ import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
-import org.fcitx.fcitx5.android.input.candidates.expanded.window.BaseExpandedCandidateWindow
+import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.TypedComponent
@@ -72,13 +71,11 @@ import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.floating.FloatingPlacer
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.DisplayMetrics
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase.RealSize
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
@@ -102,7 +99,6 @@ import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.manager.wrapToUniqueComponent
 import org.mechdancer.dependency.plusAssign
 import splitties.dimensions.dp
-import splitties.views.backgroundColor
 import splitties.views.dsl.constraintlayout.above
 import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
@@ -122,14 +118,10 @@ import splitties.views.existingOrNewId
 import splitties.views.imageResource
 import timber.log.Timber
 
-// a button in the room beside a board at a side, square
 private const val SIDE_BUTTON_DP = SplitKeyboard.ONE_HANDED_MIN_FREE_DP
 
-// the side buttons' icon: a vector's own
 private const val SIDE_ICON_DP = 24
 
-// one-handed's way back to the whole width in the side buttons' colour: a theme's `one-handed-exit` where it has one,
-// [again] once its file is read
 private fun showFullWidthIcon(b: ImageView, theme: Theme, tint: Int, again: () -> Unit) =
     BarIconDrawables.show(b, PackIcons.of(theme), BarIcons.ONE_HANDED_EXIT, tint, b.dp(SIDE_ICON_DP), again)
 
@@ -140,25 +132,18 @@ class InputView(
     theme: Theme
 ) : BaseInputView(service, fcitx, theme) {
 
-    // the code row floating over the app (编码行), read once: the view is made anew as it changes
     private val codeFloats = KawaiiBarComponent.codeRowFloats()
 
-    // under the whole keyboard: the theme's picture (laid as CENTER_CROP lays it, PictureHost) or its colour
     private val customBackground = view(::PictureBaseView)
 
-    // the room the navigation bar takes under the keys, drawn behind it (导航栏背景 全部): the theme's `navbar`
-    // colour where it sets one (060-render-p3 T7a), else none, the keyboard's under it as ever
     private val navbarStrip = view(::View) { visibility = GONE }
 
-    // the bar's base, under the bar and the row above it for the code being typed: one taller bar.
-    // None (the keyboard's base seen through), its colour, or the picture's part there
     private val barBackground = view(::View) {
         background = SceneBar.background(SceneBar.of(context, theme))
     }
 
     private val placeholderOnClickListener = OnClickListener { }
 
-    // dressed as the theme has them ([dressSideButtons]) as they are shown
     private fun sideButton(icon: Int, description: Int, onClick: () -> Unit) = imageView {
         imageResource = icon
         scaleType = ImageView.ScaleType.CENTER
@@ -167,17 +152,12 @@ class InputView(
         setOnClickListener { onClick() }
     }
 
-    // whether the board is at a side one-handed (not split): what the buttons beside it change
     private var oneHandedPlaced = false
 
-    // where the board is as the theme's scenes (SceneWindow.placement: `@one-handed`, `@split`), docked; null
-    // till placed first, when the service's navigation bar, which a view before may have placed, is told too
     private var placedScenes: Set<String>? = null
 
-    // the window's scenes then (windowScenes): the keyboard's height changes `@compact` with the board where it was
     private var placedWindowScenes: Set<String>? = null
 
-    // the empty side of a board put at the other (SplitKeyboard.Dock): a button moves it across
     private fun moveButton(to: SplitKeyboard.Dock, icon: Int, description: Int) = sideButton(icon, description) {
         if (oneHandedPlaced) ThemeManager.prefs.oneHandedSide.setValue(OneHanded.entries.first { it.dock == to })
         else ThemeManager.prefs.splitDock.setValue(SplitDock.entries.first { it.dock == to })
@@ -186,9 +166,6 @@ class InputView(
     private val moveLeft = moveButton(SplitKeyboard.Dock.LEFT, R.drawable.ic_baseline_arrow_back_24, R.string.split_dock_move_left)
     private val moveRight = moveButton(SplitKeyboard.Dock.RIGHT, R.drawable.ic_baseline_arrow_forward_24, R.string.split_dock_move_right)
 
-    // one-handed, the other button there: both hands again, at either side; 普通 opens out from the side, split is
-    // made anew (the service), the letters halved as the view is made; its icon a theme's `one-handed-exit` too
-    // (dressSideButtons)
     private fun fullWidthButton() = sideButton(ToolbarButtonLooks.drawable(BarIcons.ONE_HANDED_EXIT.fallback), R.string.one_handed_exit) {
         KeyboardStyles.oneHandedOff(floatingController.screenBuilt)
     }
@@ -213,7 +190,6 @@ class InputView(
         setOnClickListener(placeholderOnClickListener)
     }
 
-    // the room the docked keys are worked out in: the window's, as laid out, each layout and insets checked again
     private val dockedRoom = DockedRoom(this, bottomPaddingSpace, { !floating }) { updateKeyboardSize() }
 
     private val scope = DynamicScope()
@@ -226,8 +202,6 @@ class InputView(
     private val preeditEmptyState = PreeditEmptyStateComponent()
     private val preedit = PreeditComponent(codeFloats)
 
-    // the code row's height in dp, for the input method shown (KawaiiBarComponent.preeditHeight):
-    // set anew on its change, never while typing in one
     private var codeRowDp = KawaiiBarComponent.preeditHeight(fcitx.runImmediately { inputMethodEntryCached }.uniqueName)
     private val commonKeyActionListener = CommonKeyActionListener()
     private val windowManager = InputWindowManager()
@@ -235,9 +209,8 @@ class InputView(
     internal val kawaiiBar = KawaiiBarComponent()
 
     /**
-     * Voice's [card] over the keys, a child of [keyboardView] so that it goes and scales with it
-     * (floating, dragged, one-handed): [underBar], from under the bar to the keys' bottom (tap to
-     * talk: the bar and its microphone left above it); else over the whole keyboard (the space held).
+     * A child of [keyboardView] so that it goes and scales with it. [underBar]: below the bar (tap to talk
+     * keeps the bar's microphone); else over the whole keyboard (the space held).
      */
     fun overKeys(card: View, underBar: Boolean) {
         val board = keyboardView as ConstraintLayout
@@ -255,14 +228,11 @@ class InputView(
     }
 
     /**
-     * The keyboards made anew in this view, the rest kept (a keyboard setting changed, 060-render-perf-2 #1):
-     * shown as a new view shows them, the keyboard window, its letters, the bar's toolbar as it starts; then
-     * the field started anew where [info] is one ([FcitxInputMethodService] as it would start a new view),
-     * and the input method and status told again, which pick the letters and the code row's height.
+     * The rest of the view is kept. The field is then started anew where [info] is one, and the input
+     * method and status told again, which pick the letters and the code row's height.
      */
     fun remakeKeyboards(info: EditorInfo?, capFlags: CapabilityFlags) {
         hold?.inputEnded(Hold.InputEnd.LEFT)
-        // as the view thrown away would have them on its detach (handleEvents off)
         dismissPopups()
         keyboardWindow.remakeKeyboards()
         windowManager.attachWindow(KeyboardWindow)
@@ -271,38 +241,30 @@ class InputView(
         if (handleEvents) onStartHandleFcitxEvent()
     }
 
-    /** The bar's microphone, where the user sees it now; null where not. */
     fun voiceButton(): View? = kawaiiBar.shownButton(ToolbarButton.Voice)
 
-    /** The floating keyboard's handle (or the docked one's, 始终显示悬浮条), where the user sees it now; null where not. */
     fun handleShown(): View? = floatingHandle?.takeIf { it.isShown }
 
-    // over the candidates' bar: this view is as high as the window, its top the screen's (setInputView)
     override val undoAnchor: View get() = kawaiiBar.view
 
-    // with candidates on the bar, above the whole keyboard (preedit row included): over the app, not a key
     override val undoAbove: View get() = keyboardView
 
-    // and above the floating code strip, never over it
     override fun undoStrip(out: Rect): Boolean = codeStripRegion(out)
     override val undoAnchorShowsCandidates: Boolean
         get() = kawaiiBar.view.displayedChild == KawaiiBarStateMachine.State.Candidate.ordinal
 
-    // docked, below the keyboard is the screen's edge; floating, dragged to the top, there is room below (F3205)
+    // docked, below the keyboard is the screen's edge; floating at the top, there is room below
     override val undoBelowOk: Boolean get() = floating
 
     override val floatingKeyboard: Boolean get() = floating
 
-    // the same bottom FloatingPlacer keeps the keyboard above: this view's bottom less the inset
-    // dispatched to it, in window pixels. The decor may already fit the bar (API < 35, floating),
-    // so the raw root insets subtracted from the decor's height can count the bar twice or not at all
+    // this view's bottom less its dispatched inset, as FloatingPlacer keeps. The decor may already fit the
+    // bar (API < 35, floating), so raw root insets could count it twice or not at all
     override val undoBottomLimit: Int
         get() = floatingPlacer?.let { placer ->
             IntArray(2).also { getLocationInWindow(it) }[1] + height - placer.bottomInset
         } ?: super.undoBottomLimit
 
-    // floating, the keyboard where it is now (dragged, translated) and the screen it may float in:
-    // this view, which fills it, less the status bar above and the navigation bar below
     override fun undoFloating(keyboard: Rect, screen: Rect): Boolean {
         val placer = floatingPlacer ?: return false
         placer.region(keyboard)
@@ -318,10 +280,8 @@ class InputView(
     private val emoticonPicker = emoticonPicker()
 
     /**
-     * Work that belongs to this view: a child of the service's scope, cancelled when this view is
-     * detached -- replaced by a new one after a theme or layout setting change -- rather than
-     * left running, holding on to this view's components, until the service is destroyed.
-     * Declared as exactly [CoroutineScope]: that is the type `imeScope()` finds it by.
+     * Cancelled when this view is detached (replaced after a theme or layout change), not left holding
+     * its components till the service dies. Typed exactly [CoroutineScope]: `imeScope()` finds it by that.
      */
     private val viewScope: CoroutineScope = CoroutineScope(
         service.lifecycleScope.coroutineContext.let { it + SupervisorJob(it[Job]) }
@@ -349,7 +309,6 @@ class InputView(
 
     private val keyboardPrefs = AppPrefs.getInstance().keyboard
 
-    private val focusChangeResetKeyboard by keyboardPrefs.focusChangeResetKeyboard
 
     private val keyboardHeightPercent = keyboardPrefs.keyboardHeightPercent
     private val keyboardHeightPercentLandscape = keyboardPrefs.keyboardHeightPercentLandscape
@@ -362,9 +321,6 @@ class InputView(
     private val keyboardSidePaddingFollowTheme = keyboardPrefs.keyboardSidePaddingFollowTheme
     private val keyboardBottomPaddingFollowTheme = keyboardPrefs.keyboardBottomPaddingFollowTheme
 
-    private val advancedPrefs = AppPrefs.getInstance().advanced
-    private val keyboardHeightPercentBase = advancedPrefs.keyboardHeightPercentBase
-
     private val keyboardSizePrefs = listOf(
         keyboardHeightPercent,
         keyboardHeightPercentLandscape,
@@ -376,7 +332,6 @@ class InputView(
         keyboardHeightFollowTheme,
         keyboardSidePaddingFollowTheme,
         keyboardBottomPaddingFollowTheme,
-        keyboardHeightPercentBase,
     )
 
     private val keyboardSidePaddingPx: Int get() = KeyboardArea.sidePadding(context)
@@ -398,15 +353,12 @@ class InputView(
     }
 
     @Keep
-    // 普通 and 单手 of the shape it was made for slid between, and 单手's side; another style the service makes the
-    // view anew for (ViewRebuild.STYLE), so this one, about to go, is left as it is
     private val onStyleChangeListener = ManagedPreference.OnChangeListener<Any> { _, _ ->
         if (KeyboardStyles.of(floatingController.screenBuilt).let { it.floating == floating && it.splits == floatingController.splitsBuilt }) updateKeyboardSize(slide = true)
     }
 
     val keyboardView: View
 
-    // the floating keyboard, or the docked one's handle (始终显示悬浮条): read once, the view made anew as they change
     private val floatingController: FloatingController = FloatingController(this, theme) { (it as? InputView)?.floatingController }
     private val floating = floatingController.floating
 
@@ -414,16 +366,10 @@ class InputView(
     private val floatingHandle = floatingController.handle
     private val handleAtBottom = floatingController.handleAtBottom
 
-    // the bars over the board and the docked handle go with it, moved across by their setting too
     private val boardFollowers by lazy {
         listOfNotNull(barBackground, preedit.ui.root.takeIf { !codeFloats }, kawaiiBar.view, floatingHandle?.takeIf { !floating })
     }
 
-    /**
-     * Floating over the app (编码行), the code row's strip: in this view, not in [keyboardView],
-     * which floating clips to its outline; placed outside the board's top-left as drawn, each frame
-     * ([placeCodeStrip]). Null embedded.
-     */
     private val codeStrip: FloatingCodeStrip?
     private val boardMover by lazy { BoardMover(keyboardView, listOf(windowManager.view) + boardFollowers) }
 
@@ -433,30 +379,23 @@ class InputView(
 
         // make sure KeyboardWindow's view has been created before it receives any broadcast
         SceneTrace.section("keyboard window") { windowManager.addEssentialWindow(keyboardWindow, createView = true) }
-        // the punctuation keys as the last run's host started with them, till this one says (its status, or the
-        // replay below): none kept, they are held back (PunctuationComponent.known)
         punctuation.update(PunctuationStartKeys.known)
-        // the service's read on its thread done after this view was made: taken then, unless the host said first
         viewScope.launch { PunctuationStartKeys.keys.collect { if (!punctuation.known) punctuation.update(it) } }
         windowManager.addEssentialWindow(symbolPicker)
         windowManager.addEssentialWindow(emojiPicker)
         windowManager.addEssentialWindow(emoticonPicker)
-        // emoji.data read and parsed off the main thread before the panel first opens; the lazy
-        // holds the panel back if it opens before this is done
+        // emoji.data parsed off the main thread; the lazy holds the panel back if it opens first
         viewScope.launch(Dispatchers.IO) { PickerData.Emoji }
-        // show KeyboardWindow by default
         windowManager.attachWindow(KeyboardWindow)
 
         broadcaster.onImeUpdate(fcitx.runImmediately { inputMethodEntryCached })
 
-        // the theme's picture or its colour, under it all; the picture lies where each key showing it finds it
         val look = ThemeManager.shownLook(theme)
         customBackground.background = ThemePictureDrawable.board(look)
         val pictureHost = look.picture?.let {
             PictureHost(look, customBackground, KeyboardArea.landscape(context))
         }
-        // an animated one played where it fits the limits (A4): read and decoded off the main thread, the
-        // still picture till then; stopped as the keyboard hides or the view goes
+        // decoded off the main thread, the still picture till then; stopped as the keyboard hides
         val animated = look.picture?.takeIf { look.base == BoardBase.Picture }
         if (animated != null && pictureHost != null) {
             AnimatedBoardDrawable.later(animated, ThemeColors.board(look.palette, look.keys), customBackground, viewScope) {
@@ -483,22 +422,17 @@ class InputView(
             add(barBackground, lParams(0, 0) {
                 topOfParent()
                 bottomToBottomOf(kawaiiBar.view)
-                // start and end set in updateKeyboardSize, as the bar's
             })
             floatingHandle?.let {
                 add(it, lParams(0, dp(FloatingHandle.HEIGHT_DP)) {
-                    // at the bottom under the keys, over the bottom padding (none floating) and the nav bar's room
                     if (handleAtBottom) above(bottomPaddingSpace) else topOfParent()
-                    // docked, with the board at a side, left and right as the bar's (updateKeyboardSize)
                     leftToLeft = LayoutParams.PARENT_ID
                     rightToRight = LayoutParams.PARENT_ID
                 })
             }
-            // the row at the top of the keyboard embedded; floating, the bar is, under a handle at the top
             val top = if (codeFloats) null else preedit.ui.root.also {
                 add(it, lParams(0, dp(codeRowDp)) {
                     if (floatingHandle != null && !handleAtBottom) below(floatingHandle) else topOfParent()
-                    // start and end set in updateKeyboardSize, as the bar's
                 })
             }
             add(kawaiiBar.view, lParams(0, dp(KawaiiBarComponent.heightDp(context))) {
@@ -507,10 +441,9 @@ class InputView(
                     floatingHandle != null && !handleAtBottom -> below(floatingHandle)
                     else -> topOfParent()
                 }
-                // start and end set in updateKeyboardSize
             })
-            // left and right, not start and end: a board docked right is on the right in any locale.
-            // Down to a handle at the bottom, not over it: they would take its touches
+            // left and right, not start and end: a board docked right is on the right in any locale. Not over a
+            // bottom handle: they would take its touches
             val bottomHandle = floatingHandle?.takeIf { handleAtBottom }
             add(leftPaddingSpace, lParams {
                 below(kawaiiBar.view)
@@ -525,9 +458,6 @@ class InputView(
             add(windowManager.view, lParams {
                 below(kawaiiBar.view)
                 above(bottomHandle ?: bottomPaddingSpace)
-                /**
-                 * set start and end constrain in [updateKeyboardSize]
-                 */
             })
             add(bottomPaddingSpace, lParams {
                 leftToRight = leftPaddingSpace.existingOrNewId
@@ -537,7 +467,6 @@ class InputView(
         }
 
         SceneTrace.section("updateKeyboardSize") { updateKeyboardSize() }
-        // the board at a side or across, as it changes, while the letters split: once laid out
         scope += DockFollower()
         keyboardWindow.onLayoutShown = { updateKeyboardSize() }
 
@@ -545,11 +474,9 @@ class InputView(
             centerHorizontally()
             bottomOfParent()
         })
-        // resized (061-floating-resize), its keys laid out as tall in place, the input view kept (what is typed stays)
         floatingController.setUp(keyboardView, ::updateKeyboardSize)
         if (codeFloats) preedit.onShown = ::showCodeStrip
         codeStrip = if (!codeFloats) null else FloatingCodeStrip(context, theme, preedit.ui.root).also {
-            // under the key previews, as the embedded row is
             add(it, lParams(wrapContent, dp(KawaiiBarComponent.stripHeight(fcitx.runImmediately { inputMethodEntryCached }.uniqueName))) {
                 topOfParent()
                 leftToLeft = LayoutParams.PARENT_ID
@@ -560,7 +487,6 @@ class InputView(
             centerHorizontally()
         })
         floatingController.keepAbove(popup.root)
-        // the edit menu up where the notices go, out from under the finger; over the bar where that is off the view
         popup.menuRoom = { width, height ->
             val bar = kawaiiBar.view
             val at = IntArray(2).also { bar.getLocationInWindow(it) }
@@ -570,32 +496,26 @@ class InputView(
         popup.onMenuGone = ::noticeUncovered
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
-        advancedPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)
         ThemeManager.prefs.splitDock.registerOnChangeListener(onSplitDockChangeListener)
         KeyboardStyles.styleKey(floatingController.screenBuilt.landscape).registerOnChangeListener(onStyleChangeListener)
         ThemeManager.prefs.oneHandedSide.registerOnChangeListener(onStyleChangeListener)
     }
 
-    // told each window attached, by the broadcaster: added once the views it places are laid out
     private inner class DockFollower : TypedComponent<DockFollower>(), InputBroadcastReceiver {
         override fun onWindowAttached(window: InputWindow) = updateKeyboardSize()
     }
 
-    // what updateKeyboardSize placed the views for last: each change of window or layout asks again
     private var placed: List<Int?>? = null
     private var placedSide: SplitKeyboard.Dock? = null
 
     private fun updateKeyboardSize(slide: Boolean = false) {
-        // floating: no padding, no side, keys as much shorter as the keyboard is narrower
         val sidePadding = if (floating) 0 else keyboardSidePaddingPx
         val placement = if (floating) null else placement()
         val boardHeight = if (floating) {
-            // floating's keys from 0.6.0's, a share of the screen (061-landscape-height §5.4), as its width cuts them and the
-            // user resized it (061-floating-resize)
             KeyboardArea.floatingSize(KeyboardArea.screen(context)).keysHeightPx
         } else {
-            // the app keeps 120 dp over the docked keyboard, the keys' rows 36 dp each, the rows winning (the user,
-            // 2026-11-14; KeyboardHeightCap). A docked handle (始终显示悬浮条) is added to the keyboard and counted
+            // the app keeps 120 dp over the docked keyboard, the rows 36 dp each, the rows winning (KeyboardHeightCap).
+            // A docked handle is counted in the keyboard
             val handle = if (floatingHandle != null) dp(FloatingHandle.HEIGHT_DP) else 0
             KeyboardArea.keysHeight(context, codeRowDp, handle, dockedRoom.take(), keyboardWindow.rowUnits())
         }
@@ -617,11 +537,9 @@ class InputView(
         BoardFollowers.place(boardFollowers, windowManager.view, placement?.side, sidePadding)
     }
 
-    /** The windows across between the side paddings, or [placement]'s width at its side, the rest left empty. */
     private fun placeBoard(placement: SplitKeyboard.Placement?, sidePadding: Int) {
         val side = placement?.side
         showSideButtons(side)
-        // the space at the board's side: the side padding, if any; at the other, all the rest
         val near = if (side == SplitKeyboard.Dock.LEFT) leftPaddingSpace else rightPaddingSpace
         val far = if (side == SplitKeyboard.Dock.LEFT) rightPaddingSpace else leftPaddingSpace
         listOf(leftPaddingSpace, rightPaddingSpace).forEach {
@@ -658,7 +576,6 @@ class InputView(
         }
     }
 
-    // the board placed anew as the theme's scenes: what the theme has of them, the navigation bar, the docked handle
     private fun placeScenes(scenes: Set<String>) {
         val window = SceneWindow.scenes(context, theme, floating, scenes)
         if (scenes == placedScenes && window == placedWindowScenes) return
@@ -669,17 +586,14 @@ class InputView(
         if (!floating) floatingHandle?.dress(floatingController.handleLook(window))
     }
 
-    // the scenes the window round the keys is in now (SceneWindow.scenes)
     private fun windowScenes() = SceneWindow.scenes(context, theme, floating, placedScenes.orEmpty())
 
-    // in the room beside a board at [side]: the arrow across, and one-handed the way back to the whole width
     private fun showSideButtons(side: SplitKeyboard.Dock?) {
         if (side != null) dressSideButtons()
         moveLeft.isVisible = side == SplitKeyboard.Dock.RIGHT
         moveRight.isVisible = side == SplitKeyboard.Dock.LEFT
         fullWidthLeft.isVisible = oneHandedPlaced && side == SplitKeyboard.Dock.RIGHT
         fullWidthRight.isVisible = oneHandedPlaced && side == SplitKeyboard.Dock.LEFT
-        // one-handed, the two one above the other about the middle; the arrow alone in it
         val apart = if (oneHandedPlaced) dp(SIDE_BUTTON_DP / 2 + 4).toFloat() else 0f
         moveLeft.translationY = -apart
         moveRight.translationY = -apart
@@ -687,31 +601,27 @@ class InputView(
         fullWidthRight.translationY = apart
     }
 
-    // the scenes the side buttons are dressed in last: dressed again only as they change (one-handed, split)
     private var sideButtonsDressed: Set<String>? = null
 
-    // the theme's `side-button` (060-render-p3 T7a) in the scenes now, one-handed or a board at the side of the letters split
     private fun dressSideButtons() {
         val scenes = windowScenes()
         if (scenes == sideButtonsDressed) return
         sideButtonsDressed = scenes
         val look = SceneWindow.sideButton(theme, scenes)
         for (b in listOf(moveLeft, moveRight)) b.colorFilter = PorterDuffColorFilter(look.iconColor.value, PorterDuff.Mode.SRC_IN)
-        // read late: dressed again (in the scenes then)
         for (b in listOf(fullWidthLeft, fullWidthRight)) showFullWidthIcon(b, theme, look.iconColor.value) { sideButtonsDressed = null; dressSideButtons() }
         for (b in listOf(moveLeft, moveRight, fullWidthLeft, fullWidthRight)) {
             b.background = SceneWindow.sideButtonBackground(context, look, dp(SIDE_BUTTON_DP))
         }
     }
 
-    /** Where the board shown goes, while the letters split or one-handed, or null for the whole width. */
     private fun placement(): SplitKeyboard.Placement? {
         val letters = keyboardWindow.lettersShown
         val kind = when (windowManager.currentWindow) {
             keyboardWindow -> if (letters) SplitKeyboard.Window.LETTERS else SplitKeyboard.Window.OTHER_LAYOUT
             is PickerWindow -> SplitKeyboard.Window.PICKER
             is ClipboardWindow -> SplitKeyboard.Window.CLIPBOARD
-            is BaseExpandedCandidateWindow<*> -> SplitKeyboard.Window.EXPANDED_CANDIDATES
+            is GridExpandedCandidateWindow -> SplitKeyboard.Window.EXPANDED_CANDIDATES
             else -> SplitKeyboard.Window.OTHER
         }
         val docks = SplitKeyboard.docks(kind, lettersLast = letters)
@@ -721,7 +631,6 @@ class InputView(
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
         val navBar = getNavBarBottomInset(insets)
-        // floating, it is kept above the bar rather than drawn over it, and below the status bar
         if (floating) floatingController.insets(
             floatingBottomInset(insets),
             WindowInsetsCompat.toWindowInsetsCompat(insets)
@@ -736,23 +645,14 @@ class InputView(
         return insets
     }
 
-    // the theme's colour of the bar, as the screen is turned and the board placed now
     private fun paintNavbar() {
         val navbar = if (floating) null else SceneWindow.navbar(theme, windowScenes())
         navbarStrip.isVisible = navbar != null
         navbar?.let(navbarStrip::setBackgroundColor)
     }
 
-    /**
-     * Floating ([FloatingKeyboard]), where the keyboard is in the window, all of it that takes
-     * touches (the service gives the rest to the app under it); false docked.
-     */
     fun floatingRegion(out: Rect): Boolean = floatingController.region(out)
 
-    /**
-     * Where the floating code strip is in the window while it shows, set into [out]: it takes
-     * touches over the app (the service adds it to the keyboard's region); false while it does not.
-     */
     fun codeStripRegion(out: Rect): Boolean {
         val strip = codeStrip ?: return false
         if (strip.visibility != VISIBLE || !strip.isLaidOut) return false
@@ -766,9 +666,8 @@ class InputView(
     private val keyboardAt = IntArray(2)
     private val viewAt = IntArray(2)
 
-    // each frame, the strip outside the board's top-left as it is drawn now: docked, at a side
-    // (one-handed, sliding across), floating and dragged; hidden while a floating keyboard is
-    // dragged or scaled (docking, undocking), where following it would shake
+    // each frame, outside the board's top-left as drawn; hidden while a floating keyboard is dragged or
+    // scaled, where following it would shake
     private val codeStripPlacer = ViewTreeObserver.OnPreDrawListener {
         placeCodeStrip()
         true
@@ -799,40 +698,30 @@ class InputView(
             // the touchable region is worked out again on the next traversal (onComputeInsets)
             strip.requestLayout()
         }
-        // a notice shown keeps off it as it grows and goes with the board (nothing done if none, or in place)
         undoStripMoved()
     }
 
-    /**
-     * called when [InputView] is about to show, or restart
-     */
-    fun startInput(info: EditorInfo, capFlags: CapabilityFlags, restarting: Boolean = false) {
+    fun startInput(info: EditorInfo, capFlags: CapabilityFlags) {
         hold?.inputEnded(Hold.InputEnd.STARTED)
         broadcaster.onStartInput(info, capFlags)
         returnKeyDrawable.updateDrawableOnEditorInfo(info)
-        if (focusChangeResetKeyboard || !restarting) {
-            windowManager.attachWindow(KeyboardWindow)
-        }
+        windowManager.attachWindow(KeyboardWindow)
     }
 
-    /** called when [InputView] is hidden ([finishingInput] false), or its field left */
     fun finishInput(finishingInput: Boolean) {
         hold?.inputEnded(if (finishingInput) Hold.InputEnd.LEFT else Hold.InputEnd.HIDDEN)
         floatingController.inputEnded()
         broadcaster.onFinishInput()
     }
 
-    // the engine's whole state, the candidates too: a view made anew while a code is typed showed
-    // the code row over an empty bar till the next key (A2)
+    // the candidates too: a remade view mid-typing showed the code row over an empty bar till the next key
     override fun onStartHandleFcitxEvent() {
-        // read together, in one hop: one the host changes meanwhile has its event come after, to the collector
         fcitx.runImmediately {
             val entry = inputMethodEntryCached
             listOf(
                 inputPanelCached,
                 HostEvent.InputMethodChanged(entry),
-                // the keys' marks as the host last said; null (none said yet, or a host stopped): kept as they are,
-                // not taken for punctuation off (a status replayed empty drew , where the engine typed 、)
+                // null (none said yet): kept as they are, not taken for punctuation off (that drew , where 、 was typed)
                 HostEvent.StatusArea(statusAreaCached, entry, punctuationCached, fullWidthCached),
                 candidatesCached,
             )
@@ -857,13 +746,10 @@ class InputView(
                 broadcaster.onImeUpdate(it.entry)
             }
             is HostEvent.PunctuationAsTyped -> punctuation.updateAsTyped(it.marks)
-            // a host started anew: its keys type themselves as it tells them, none yet; the marks it types before a
-            // status, worked out on its thread before it sent Ready (a cached read)
             is HostEvent.Ready -> {
                 punctuation.updateAsTyped(emptySet())
                 fcitx.runImmediately { punctuationCached to fullWidthCached }.let { (keys, full) -> punctuation.update(keys, full) }
             }
-            // the status of a view made anew (InputView recreation) comes too, from onStartHandleFcitxEvent
             is HostEvent.StatusArea -> {
                 punctuation.update(it.punctuation, it.fullWidth)
                 broadcaster.onStatusAreaUpdate(it.entries)
@@ -872,8 +758,6 @@ class InputView(
         }
     }
 
-    // floating, there only while there is something on it: from the first key till the code goes up or is
-    // cleared; with the code in the field (编码行 输入框里), while aux or the syllables are there
     private fun showCodeStrip() {
         val strip = codeStrip?.takeIf { (it.visibility == GONE) == (preedit.ui.visible || preedit.ui.syllables.isVisible) } ?: return
         strip.isVisible = strip.visibility == GONE
@@ -882,10 +766,8 @@ class InputView(
         if (!strip.isVisible) undoStripMoved()
     }
 
-    /** The code moved into the app's field or out of it (FcitxInputMethodService.codeInFieldNow): the strip drawn anew. */
     fun codePlaceChanged() = preedit.codePlaceChanged()
 
-    // the code row tall or thin for input method [im]; the keys keep their height (the cap aside)
     private fun updateCodeRow(im: String) {
         codeStrip?.let { strip ->
             val h = dp(KawaiiBarComponent.stripHeight(im))
@@ -904,7 +786,6 @@ class InputView(
 
     fun cursorMoved() = keyboardWindow.cursorMoved()
 
-    /** The sum just written, [worked] out, for the bar to offer while the cursor stays [at] its end. */
     fun offerCalculation(worked: Calculation.Worked, at: Int) = kawaiiBar.offerCalculation(worked, at)
 
     @RequiresApi(Build.VERSION_CODES.R)
@@ -912,7 +793,6 @@ class InputView(
         return kawaiiBar.handleInlineSuggestions(response)
     }
 
-    // a new touch on the keyboard: a drag handed over from the docked one that never saw its end is over
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) FloatingHandoff.newTouch(parent)
         return super.onInterceptTouchEvent(ev)
@@ -927,16 +807,13 @@ class InputView(
     }
 
     override fun onDetachedFromWindow() = SceneTrace.section("InputView detached") {
-        // the window's tree outlives this view, made anew in the same window
         viewTreeObserver.removeOnPreDrawListener(codeStripPlacer)
         floatingController.detached()
-        advancedPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         keyboardPrefs.unregisterOnChangeListener(onKeyboardSizeChangeListener)
         ThemeManager.prefs.splitDock.unregisterOnChangeListener(onSplitDockChangeListener)
         KeyboardStyles.styleKey(floatingController.screenBuilt.landscape).unregisterOnChangeListener(onStyleChangeListener)
         ThemeManager.prefs.oneHandedSide.unregisterOnChangeListener(onStyleChangeListener)
-        // replaced (a rotation, a theme) its windows are never detached: what they had going,
-        // the microphone above all, stops here
+        // a replaced view's windows are never detached: what they had going, the microphone above all, stops here
         broadcaster.onFinishInput()
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()

@@ -7,13 +7,7 @@ package org.fcitx.fcitx5.android.engine.table
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 
-/**
- * A [CodeTable] read the way its header says: which keys are codes (键码), how long a code gets
- * (码长), how phrases are coded (组词规则), which entries only say how a character builds
- * phrases (the 构词 marker), and which codes are not to build phrases from (规避字符).
- *
- * Entries are found by index and decoded only when shown: a key's range may hold thousands.
- */
+/** A [CodeTable] read as its header says (键码, 码长, 组词规则, the 构词 marker, 规避字符); entries decoded only when shown. */
 class TableDictionary(private val table: CodeTable) {
 
     val keys: Set<Char> = table.header["键码"]?.takeIf { it.isNotEmpty() }?.toSet()
@@ -24,20 +18,13 @@ class TableDictionary(private val table: CodeTable) {
     private val sortedKeys = keys.sorted()
     private val construct = table.header["构词"]?.singleOrNull()
 
-    /**
-     * What marks the table's pinyin entries (拼音, 五笔拼音's `@`): with it, as in libime, what is
-     * typed is looked up as pinyin too, any letter a key. Null for a table that names a marker
-     * but has no such entries (fcitx's wbx): it types as one without.
-     */
+    /** The table's pinyin-entry marker (五笔拼音's `@`); null where it names one but has no such entries (fcitx's wbx). */
     val pinyinMarker: Char? = table.header["拼音"]?.singleOrNull()?.takeUnless { table.prefixRange(it.toString()).isEmpty() }
     private val ignored = table.header["规避字符"].orEmpty().toSet()
 
-    /** Each character's longest code, and its 构词 code if the table gives one. */
     private class Reverse(val codes: Map<String, String>, val construct: Map<String, String>)
 
-    // Built on first use: a pass over the whole table, keeping characters alone (a phrase's code
-    // comes from the rules), as libime does. With rules, that is a session's first key once the
-    // user has words: CodedWords codes them, in the background (TableRegistry), so it may be two threads'.
+    // built on first use, as libime does; with rules that is a session's first key, maybe on two threads (CodedWords in the background)
     private val reverse by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val codes = HashMap<String, String>()
         val constructCodes = HashMap<String, String>()
@@ -62,22 +49,16 @@ class TableDictionary(private val table: CodeTable) {
 
     fun codeLength(index: Int): Int = table.codeLength(index)
 
-    /** [index]'s code's key at [at]: the entries in their codes' order, a glide walks them as a trie (TableGlide). */
+    /** [index]'s code key at [at]; a glide walks entries as a trie (TableGlide). */
     fun codeKey(index: Int, at: Int): Char = table.codeKey(index, at)
 
-    /** How many entries the table has. */
     val size: Int get() = table.size
 
-    /**
-     * The entries [pattern] leads to, in table order: those whose code starts with it, or with
-     * [wildcard] in it (standing for any one key), those whose code it spells whole, as libime
-     * matches. A wildcard scan stops at [MAX_MATCHES].
-     */
+    /** The entries [pattern] leads to, in table order: codes starting with it, or with a [wildcard] those it spells whole, as libime; a wildcard scan stops at [MAX_MATCHES]. */
     fun match(pattern: String, wildcard: Char?): IntArray {
         val cut = if (wildcard == null) -1 else pattern.indexOf(wildcard)
         if (cut < 0) {
-            // all of them: cut in code order, a short code past the cut would never be ranked
-            // (二笔's i leads to 19k entries, its two-key codes among the last)
+            // all of them: cut in code order, a short code past the cut would never be ranked (二笔's i: 19k entries)
             val range = table.prefixRange(pattern)
             return IntArray((range.last - range.first + 1).coerceAtLeast(0)) { range.first + it }
         }
@@ -92,28 +73,18 @@ class TableDictionary(private val table: CodeTable) {
         return out.toIntArray()
     }
 
-    /** The first entry, in table order, whose code starts with [prefix] (no wildcard, no pinyin entry): -1 where none does. */
     fun firstOf(prefix: String): Int = table.prefixRange(prefix).let { if (it.isEmpty()) -1 else it.first }
 
-    /**
-     * Whether some code starts with [pattern], [wildcard] standing for any key, or some pinyin
-     * entry's: whether typing on can lead anywhere (a wildcard code, unlike [match], by its start
-     * too, as in libime).
-     */
+    /** Whether typing on can lead anywhere: some code, or pinyin entry, starts with [pattern] (a wildcard too, unlike [match]). */
     fun hasMatch(pattern: String, wildcard: Char?): Boolean {
         val cut = if (wildcard == null) -1 else pattern.indexOf(wildcard)
-        // a pinyin entry's code is spelt as it is, the wildcard a letter too
         if (pinyinMarker != null && !table.prefixRange("$pinyinMarker$pattern").isEmpty()) return true
         if (cut < 0) return !table.prefixRange(pattern).isEmpty()
         if (pattern.length > maxLength) return false
         return wildcardRanges(pattern, cut).any { range -> range.any { spells(it, pattern, wildcard!!, whole = false) } }
     }
 
-    /**
-     * The ranges of codes a [pattern] with a wildcard at [cut] can be among, in code order: those
-     * starting as it does before the wildcard. One leading the pattern is each key in turn, with
-     * what follows it up to the next: never the whole table (五笔拼音's z starts most pinyin).
-     */
+    /** The code ranges a wildcard [pattern] can be among; a leading wildcard is each key in turn, never the whole table. */
     private fun wildcardRanges(pattern: String, cut: Int): List<IntRange> {
         if (cut > 0) return listOf(table.prefixRange(pattern.substring(0, cut)))
         val next = pattern.indexOf(pattern[0], 1).let { if (it < 0) pattern.length else it }
@@ -132,10 +103,7 @@ class TableDictionary(private val table: CodeTable) {
         return true
     }
 
-    /**
-     * The pinyin entries (see [pinyinMarker]) spelt [pinyin] whole, or also those it starts if
-     * [prefix], in table order; none if the table has none.
-     */
+    /** The pinyin entries spelt [pinyin] whole, or also those it starts if [prefix], in table order. */
     fun matchPinyin(pinyin: String, prefix: Boolean): IntArray {
         val marker = pinyinMarker ?: return IntArray(0)
         val range = table.prefixRange("$marker$pinyin")
@@ -144,21 +112,16 @@ class TableDictionary(private val table: CodeTable) {
         return range.filter { table.codeLength(it) == pinyin.length + 1 }.toIntArray()
     }
 
-    /** Whether [index] is a pinyin entry. */
     fun isPinyin(index: Int): Boolean = pinyinMarker != null && table.codeKey(index, 0) == pinyinMarker
 
     fun contains(code: String, text: String): Boolean = indexOf(code, text) >= 0
 
-    /** The entry of [text] under [code] exactly, or -1 if the table has none. */
     fun indexOf(code: String, text: String): Int = table.exactRange(code).firstOrNull { table.text(it) == text } ?: -1
 
-    /** [text]'s full code: a character's own, a phrase's put together by the rules; null if neither. */
     fun codeOf(text: String): String? = reverse.codes[text] ?: encode(text)
 
-    /** The code a character builds phrases with: its 构词 code where the table gives those. */
     private fun charCode(char: String): String? = if (construct != null) reverse.construct[char] else reverse.codes[char]
 
-    /** The code [text] would have as a new phrase, by the rules alone. */
     fun encode(text: String): String? = rules.encode(text, ::charCode)
 
     companion object {

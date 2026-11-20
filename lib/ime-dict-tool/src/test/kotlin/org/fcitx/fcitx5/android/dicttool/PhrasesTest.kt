@@ -39,8 +39,7 @@ class PhrasesTest {
 
     @Test
     fun wordsOfTheDictionaryRunningThroughItTogetherMakeAFragment() {
-        // 洛阳 and 贵阳 run into 阳市 from the character before, 洛阳 and 洛川 out of 去洛 into the
-        // character after: neither alone half of its count, both together more
+        // runs into 阳市 and out of 去洛: neither alone half of its count, both together more
         val p = phrases("洛阳市" to 6, "贵阳市" to 6, "去洛阳" to 6, "去洛川" to 6)
         assertTrue(p.isPhrase("阳市", 20))
         assertTrue(p.isPhrase("去洛", 20))

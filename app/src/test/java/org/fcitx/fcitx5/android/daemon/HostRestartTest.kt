@@ -18,11 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
-/**
- * The host restarted for a pack imported (review L3): one still starting (it may have read the old
- * files) waited for, then restarted, not skipped; and the restart waited for till the new host is
- * up, the old pack deleted only then.
- */
+/** A host still starting may have read the old files: waited for and restarted, the old pack deleted only once the new one is up. */
 class HostRestartTest {
 
     private fun waitFor(what: String, cond: () -> Boolean) {
@@ -54,7 +50,6 @@ class HostRestartTest {
         assertEquals(0, restarts.get())
         state.value = State.READY
         waitFor("restarted") { restarts.get() == 1 }
-        // the new one starting: not returned
         assertFalse(done.await(200, TimeUnit.MILLISECONDS))
         state.value = State.READY
         assertTrue(done.await(5, TimeUnit.SECONDS))
@@ -73,13 +68,12 @@ class HostRestartTest {
             },
         )
         assertEquals(1, restarts)
-        // no client: nothing restarted, nothing waited for; nothing reads the old files
+        // no client: nothing restarted or waited for
         val stopped = MutableStateFlow(State.STOPPED)
         assertTrue(HostDaemon.restartOnceStarted(stopped, 10_000) { false })
     }
 
-    // a host that never gets past starting: not waited for past the wait, not restarted (a stop
-    // would skip it), and false: what it reads is not known, the old pack not to be deleted (review L-2)
+    // false: what it reads is not known, so the old pack is not deleted
     @Test(timeout = 20_000)
     fun aHostStuckStartingIsWaitedForNoLongerThanTheWaitAndSaidNotUp() {
         val state = MutableStateFlow(State.STARTING)
@@ -93,7 +87,6 @@ class HostRestartTest {
         )
         assertEquals(0, restarts)
         assertTrue(System.nanoTime() - started < TimeUnit.SECONDS.toNanos(5))
-        // restarted, the new one stuck starting: false too
         val ready = MutableStateFlow(State.READY)
         assertFalse(
             HostDaemon.restartOnceStarted(ready, 100) {
@@ -106,8 +99,7 @@ class HostRestartTest {
     }
 
 
-    // audit-061 app-rest-2: a backup's import stops the host before replacing its files; one still starting
-    // (KotlinHost.stop skips it) is waited for and then stopped, not left reading and writing them
+    // KotlinHost.stop skips a starting host, which would go on using the files an import replaces
     @Test(timeout = 20_000)
     fun aHostStillStartingIsStoppedOnceReadyForAnImport() {
         val state = MutableStateFlow(State.STARTING)
@@ -126,7 +118,7 @@ class HostRestartTest {
         assertTrue(stopped.get())
     }
 
-    // one stuck starting: not stopped, false (the import then fails instead of overwriting files in use)
+    // the import then fails instead of overwriting files in use
     @Test(timeout = 20_000)
     fun aHostStuckStartingIsNotStoppedAndSaidSo() {
         var stops = 0
@@ -134,23 +126,18 @@ class HostRestartTest {
         assertEquals(0, stops)
     }
 
-    // R25r3 F7926 (R25r2 F7862): past starting as the wait ended, started anew before the stop has the lock (a pack's
-    // import or a language change restarting it): not stopped then (the stop would skip it, the import going on
-    // over a running host), waited for again and stopped once it is up. Runs stopFcitx's own body
-    // ([HostDaemon.stopOnceStartedUnderLock], R25r5 F8010), the restart made on its first look under the lock:
-    // without that look ([HostDaemon.stopUnlessStarting]) it stops at once, on a host starting.
+    // started anew between the wait and the stop's lock: waited for again and stopped once up. Runs stopFcitx's own body;
+    // without the look under the lock ([HostDaemon.stopUnlessStarting]) it would stop a host that is starting
     @Test(timeout = 20_000)
     fun aHostStartedAnewBetweenTheWaitAndTheLockIsWaitedForAgainThenStopped() {
         val state = RestartedOnFirstLook(MutableStateFlow(State.READY))
-        // as stopped: whether it had been started anew by then, and its state. Stopped once, after the restart and
-        // on the new host up; not how often the state was read (a look more, as a fast path, changes nothing: F8033)
+        // stopped once, after the restart, on the new host up; not how often the state was read
         val stoppedIn = ArrayList<Pair<Boolean, State>>()
         assertTrue(HostDaemon.stopOnceStartedUnderLock(state, 10_000) { stoppedIn += state.restarted.get() to state.inner.value })
         assertEquals(listOf(true to State.READY), stoppedIn)
     }
 
-    // a host whose state, read for the first time (the look under the stop's lock; the wait collects the flow and
-    // does not read it), has been started anew: starting, ready again 100 ms later
+    // the first read (the look under the stop's lock; the wait collects instead) finds it restarted: starting, ready 100 ms later
     @OptIn(ExperimentalForInheritanceCoroutinesApi::class)
     private class RestartedOnFirstLook(val inner: MutableStateFlow<State>) : StateFlow<State> by inner {
         val restarted = AtomicBoolean()
@@ -167,7 +154,6 @@ class HostRestartTest {
             }
     }
 
-    // one past starting already: stopped at once, nothing waited for
     @Test(timeout = 20_000)
     fun aHostReadyIsStoppedAtOnceForAnImport() {
         var stops = 0
@@ -175,9 +161,7 @@ class HostRestartTest {
         assertEquals(1, stops)
     }
 
-    // R25r2 F7862: the host restarted (a pack imported, the language changed) between the wait and the stop's
-    // lock is starting again: the stop, looking again under the lock, does not take it for stopped (it was, and
-    // the import went on over a running host) but waits for the new one
+    // the stop, looking again under the lock, does not take a restarted host for stopped but waits for it
     @Test(timeout = 20_000)
     fun aHostStartedAnewBetweenTheWaitAndTheStopIsWaitedForAgain() {
         val state = MutableStateFlow(State.READY)
@@ -187,7 +171,6 @@ class HostRestartTest {
         thread {
             stopped.set(
                 HostDaemon.stopOnceStarted(state, 10_000) {
-                    // the first look finds it restarted meanwhile: not stopped
                     if (asked.incrementAndGet() == 1) {
                         state.value = State.STARTING
                         false
@@ -199,14 +182,13 @@ class HostRestartTest {
             done.countDown()
         }
         waitFor("asked once") { asked.get() == 1 }
-        // the new one starting: neither stopped nor given up
         assertFalse(done.await(200, TimeUnit.MILLISECONDS))
         assertEquals(1, asked.get())
         state.value = State.READY
         assertTrue(done.await(5, TimeUnit.SECONDS))
         assertEquals(2, asked.get())
         assertTrue(stopped.get())
-        // and one that never comes up after that: false within the wait, as one stuck from the start
+        // and one that never comes up: false within the wait
         val stuck = MutableStateFlow(State.READY)
         assertFalse(
             HostDaemon.stopOnceStarted(stuck, 100) {

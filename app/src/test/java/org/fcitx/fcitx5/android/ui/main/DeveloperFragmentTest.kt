@@ -10,10 +10,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/**
- * A heap dump holds typed text and the clipboard: one left in the cache by an export that never
- * finished is deleted, and the one the file picker is waiting on is not.
- */
+/** A heap dump holds typed text: one an unfinished export left is deleted, the one the picker waits on is not. */
 class DeveloperFragmentTest {
 
     @get:Rule
@@ -26,7 +23,6 @@ class DeveloperFragmentTest {
     @Test
     fun everyDumpButTheOneAnExportIsWaitingOnIsStale() {
         val dir = cache("a.hprof", "b.hprof", "log.txt")
-        // the listed files against the waiting one named as onCreate names it from the saved state
         val stale = staleDumps(dir.listFiles()!!.asList(), dir.resolve("b.hprof"))
         assertEquals(setOf("a.hprof"), stale.map { it.name }.toSet())
     }

@@ -8,6 +8,22 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
+## 0.6.3（未发布）
+
+### 小改动
+
+- 0.4 及更早的版本不能再直接升级到这一版：先覆盖安装 0.6.2，弹出键盘打几个字、停一下，再装这一版。直接升级的话，码表里存的词等会丢掉，也没有提示。
+- 0.6.0 测试版里改过的长按和滑动不再带过来：回到从 0.5 带过来的设置，没有的用预设；测试版里清空过的列表也不再是关着的。0.6.0 正式版及以后改的照旧都在。
+- 网页上 0.6.0 之前的主题制作页（原来顶栏的 **旧版**）去掉了。它做的 3.0 主题 App 照样能导入，也能在现在的制作页用 **打开文件…** 打开接着改。
+
+### Smaller changes
+
+- 0.4 and earlier no longer upgrade straight to this release: install 0.6.2 over it first, type a few characters on its keyboard and pause, then install this one. Upgraded directly, the phrases saved in the tables, among others, are lost without a word.
+- Long press and swipe lists edited in the 0.6.0 betas are no longer carried over: they go back to what 0.5 left, or else the presets, and a list emptied in a beta is no longer turned off. Edits from 0.6.0 on stay.
+- The theme maker of before 0.6.0 (**旧版** in the top bar) is gone. The 3.0 themes it made still import into the app, and the current maker's **打开文件…** opens them to go on editing.
+
+---
+
 ## 0.6.2（2026-11-18）
 
 ### 修复

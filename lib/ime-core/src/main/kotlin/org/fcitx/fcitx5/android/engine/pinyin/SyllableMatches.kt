@@ -4,13 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/**
- * The syllables a piece of typed input may stand for, each with [flags] saying how far the
- * typing strays from the syllable's spelling. Sorted by syllable id. Instances are built once
- * per [PinyinSegmenter] and shared by every graph it makes.
- *
- * The flags only describe; what each costs is the decoder's decision, tuned on the evaluation set.
- */
+/** The syllables a piece of input may be, sorted by id, with [flags] saying how the typing strays (the decoder prices them). Built once per segmenter and shared. */
 class SyllableMatches internal constructor(private val syllables: IntArray, private val flags: IntArray) {
 
     val size: Int get() = syllables.size
@@ -19,18 +13,16 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
 
     fun flags(i: Int): Int = flags[i]
 
-    /** Whether [other] holds the same syllables with the same flags. */
     internal fun sameAs(other: SyllableMatches): Boolean =
         this === other || syllables.contentEquals(other.syllables) && flags.contentEquals(other.flags)
 
-    /** These with [flag] on each. */
     internal fun with(flag: Int) = SyllableMatches(syllables, IntArray(size) { flags[it] or flag })
 
-    // byFlags's, made at the first ask: a reading walks an edge's matches at each node it tries
+    // byFlags's, made on first ask: a reading walks an edge's matches at each node it tries
     @Volatile
     private var byFlags: IntArray? = null
 
-    /** The indexes, exact ones first: by [flags], ties in syllable order. */
+    /** Exact ones first: by [flags], ties in syllable order. */
     internal fun byFlags(): IntArray = byFlags ?: (0 until size).sortedBy { flags[it] }.toIntArray().also { byFlags = it }
 
     /** @return the index of [syllable], or -1 */
@@ -47,13 +39,13 @@ class SyllableMatches internal constructor(private val syllables: IntArray, priv
         /** A common slip: `gn` for `ng`, `on` for `ong`, `v` for the ü of ju, qu, xu, yu. */
         const val TYPO = 2
 
-        /** The typing is only the start of the syllable (简拼 `zh`, or `zho` still being typed). */
+        /** Only the start of the syllable (简拼 `zh`, or `zho` still being typed). */
         const val COMPLETION = 4
 
-        /** A letter slipped onto the key next to it: `nihap` for nihao. */
+        /** A letter slipped onto a neighbouring key: `nihap` for nihao. */
         const val NEIGHBOUR = 8
 
-        /** 双拼's key read as an initial alone where it and the next make a syllable: 简拼 in the middle (ShuangpinSegmenter). */
+        /** 双拼's key read as an initial alone where it pairs with the next (mid-input 简拼). */
         const val ABBREV = 16
 
         internal val EMPTY = SyllableMatches(IntArray(0), IntArray(0))

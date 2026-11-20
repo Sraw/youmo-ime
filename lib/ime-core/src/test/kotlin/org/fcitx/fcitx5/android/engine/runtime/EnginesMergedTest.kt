@@ -21,7 +21,6 @@ import kotlin.random.Random
 /** The merged dictionaries' file (DictionaryFile) typed through the engines: picked, and the time a key takes. */
 class EnginesMergedTest : EnginesFixture() {
 
-    // review S6: a merged word picked is spelt from the file's trie (Reading.Spelt) and committed
     @Test
     fun aMergedWordPickedIsCommittedWhole() {
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("妮好 ni'hao 0.5") })
@@ -32,14 +31,13 @@ class EnginesMergedTest : EnginesFixture() {
         }
     }
 
-    // review F3412 / U-93: habits off, a table offers the merged file's words as pinyin does (the
-    // dictionaries turned on are a setting, not a habit), under longer codes too
+    // the dictionaries turned on are a setting, not a habit
     @Test
     fun habitsOffATableOffersTheMergedWordsAsPinyinDoes() {
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("好你 hao'ni 0.5", "你你 ni'ni 0.5") })
         Engines(::load, MemoryFiles(), { throw it }, additions = { additions }, warmUps = { it.run() }).use { engines ->
             engines.settings = wubiShown
-            // the user's own (review F3440): one added by hand, one imported, and a merged word blocked
+            // the user's own: one added by hand, one imported, and a merged word blocked
             assertTrue(engines.addWord("你好", "ni hao"))
             assertEquals(1, engines.importWords(sequenceOf("好好 hao'hao 3"), "a.txt").imported)
             val at = engines.type(WUBI, "wqwq").candidates.indexOf("你你")
@@ -61,21 +59,15 @@ class EnginesMergedTest : EnginesFixture() {
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
             assertTrue("好你" in engines.type(WUBI, "vbwq").candidates)
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
-            // none of the user's own words, the block held
             for ((code, word) in listOf("wqvb" to "你好", "vbvb" to "好好", "wqwq" to "你你")) {
                 assertFalse(word, word in engines.type(WUBI, code).candidates)
                 engines.onEvent(WUBI, EngineEvent.RESET, 0)
             }
-            // pinyin's fresh model keeps them too
             assertTrue("好你" in engines.type(InputMethodCatalog.PINYIN, "haoni").candidates)
         }
     }
 
-    // review S6: the walkers' merged trie adds arcs, never a pass over the file: a key takes as long
-    // with a file whose words are a hundred times as many, the added ones under syllables the keys
-    // never reach. Timed as the thread's CPU, the two files' batches taken in turns and their medians
-    // compared: a busy machine (verify beside other builds, load 60) and the JIT's warming moved a
-    // wall-clock bound against no file at all (0.03 ms a key warm, 6 ms with the file under load)
+    // timed as thread CPU, batches alternated and medians compared: wall-clock bounds flaked
     @Test
     fun aKeyTakesAsLongWithAHundredTimesTheWordsElsewhereInTheFile() {
         val random = Random(7)
@@ -89,7 +81,7 @@ class EnginesMergedTest : EnginesFixture() {
         // initials none of KEYS' letters starts, nor a key next to one reads (fuzzy, slips): checked below, the candidates the same
         val elsewhere = lines(ELSEWHERE, all.filter { it[0] in "bpfdtkqxcw" })
         fun additions(lines: List<String>) = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { lines.asSequence() })
-        // asked before either is made, and each made inside its use: closed whatever fails (review F8298)
+        // asked before either is made, and each made inside its use: closed whatever fails
         val cpu = ManagementFactory.getThreadMXBean()
         assumeTrue("the thread's CPU time", cpu.isCurrentThreadCpuTimeSupported)
         fun engines(lines: List<String>) = Engines(::load, MemoryFiles(), { throw it }, additions = { additions(lines) }, warmUps = { it.run() })

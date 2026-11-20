@@ -8,7 +8,6 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The symbol panel's cells' long presses: the digits', the punctuation's and the currency's, the letters' none. */
 class PickerLongPressTest {
 
     @Test
@@ -26,7 +25,6 @@ class PickerLongPressTest {
 
     @Test
     fun aVariantHasNoneOfItsOwn() {
-        // € is offered in $'s list; held itself, nothing further
         assertNull(PickerLongPress["€"])
     }
 }

@@ -40,29 +40,20 @@ import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import splitties.dimensions.dp
 
 /**
- * The code row's syllables (拼音选择栏) for the 14 keys and 双拼's 18: what the leftmost keys not yet taken may
- * be, as 九键's column offers them ([EngineState.syllables]), in a row at the code row's right end,
- * never over [MAX_SHARE] of its width. A tap takes one ([Keyboard.syllableKey], with the list's id:
- * shown before a key typed since replaced it, the engine drops it). Gone while nothing is typed or
- * nothing is left to take, for any input method but pinyin and 双拼, and where the keyboard shown
- * offers them itself ([owned]): 九键's and 九键双拼's column.
+ * The 14 keys' and 双拼's 18: what the leftmost keys not yet taken may be. A tap sends the list's id: shown
+ * before a key typed since replaced it, the engine drops it. Gone where the keyboard offers them itself ([owned]).
  */
 @SuppressLint("ViewConstructor")
 class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScrollView(context) {
 
-    // the syllables in the code's colour (the theme's `preedit`, 060-render-p3 T6b)
     private val textColor = SceneBar.of(context, theme).preedit.color.value
 
-    /** Where a tap's key goes: the keyboard's listener (PreeditComponent). */
     var onPick: ((KeyAction) -> Unit)? = null
 
-    /**
-     * Told as the row comes or goes: the floating strip is there for it alone while the code is in
-     * the app's field (编码行 输入框里, PreeditComponent.onShown).
-     */
+    /** The floating strip is there for it alone while the code is in the app's field. */
     var onShownChanged: (() -> Unit)? = null
 
-    /** What a tap gives before its key: as 九键's column, the listener giving none of its own. */
+    /** As 九键's column, the listener giving none of its own. */
     internal var feedback: (View) -> Unit = {
         InputFeedbacks.hapticFeedback(it)
         InputFeedbacks.soundEffect(SoundKey.LETTER)
@@ -70,10 +61,8 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
 
     private val items = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
 
-    /** What the row shows, read by its items when tapped. */
     private var state = EngineState.SyllableState()
 
-    /** Whether the keyboard shown offers the syllables itself (BaseKeyboard.ownsSyllables), as KeyboardWindow tells. */
     var owned: Boolean = false
         set(value) {
             if (field == value) return
@@ -90,9 +79,8 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // unbounded (no parent of the row's yet): nothing to keep for the preedit
+        // no parent of the row's yet: nothing to keep for the preedit
         if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) return super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        // the row's width is what the parent offers: the preedit keeps the rest
         val cap = (MeasureSpec.getSize(widthMeasureSpec) * MAX_SHARE).toInt()
         super.onMeasure(MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST), heightMeasureSpec)
     }
@@ -112,7 +100,6 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
         super.onDetachedFromWindow()
     }
 
-    /** The row for [state]: its syllables while pinyin or 双拼 types with some to take, else gone; its items kept. */
     internal fun show(state: EngineState.SyllableState) {
         // the grouped session answers as its input method (the router's), the full keyboard's never has syllables
         val grouped = state.im == InputMethodCatalog.PINYIN || state.im == InputMethodCatalog.SHUANGPIN
@@ -120,8 +107,7 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
         this.state = state
         // every input method's state comes here: hidden and staying so, nothing to cancel or redraw
         if (labels.isEmpty() && !isVisible) return
-        // a press on the list replaced is cancelled, and a click released but not run yet (View
-        // posts it on ACTION_UP): its pick would take what now sits there, as 九键's column has it
+        // a click released but not run yet (View posts it on ACTION_UP) would take what now sits there
         MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).also {
             items.dispatchTouchEvent(it)
             it.recycle()
@@ -144,16 +130,15 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
         scrollTo(0, 0)
     }
 
-    // a plain TextView: the keyboard's views are not under an AppCompat theme, its tinting would add nothing
+    // the keyboard's views are not under an AppCompat theme, its tinting would add nothing
     @SuppressLint("AppCompatCustomView")
     private fun item(i: Int) = object : TextView(context) {
-        // a button to TalkBack, as it acts as one
         override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
             super.onInitializeAccessibilityNodeInfo(info)
             info.className = Button::class.java.name
         }
     }.apply {
-        // in dp, as 九键's column: the row's height is fixed
+        // the row's height is fixed
         setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16f)
         gravity = Gravity.CENTER
         includeFontPadding = false
@@ -170,10 +155,8 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
     }
 
     companion object {
-        /** The most of the code row's width the syllables take. */
         const val MAX_SHARE = 0.6f
 
-        /** What taking syllable [i] of [state] sends: its key, with the list's id. */
         internal fun pick(state: EngineState.SyllableState, i: Int): KeyAction =
             KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
     }

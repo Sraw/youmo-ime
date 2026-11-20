@@ -13,7 +13,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// the number keyboard's and the symbol panel's layout of the user's (061-custom-layout §7, §8, L5)
+// the number keyboard's and the symbol panel's user layout
 class PanelLayoutsTest {
 
     private val numbers = CustomChoice("my-num", "大数字", "number", "number", pads = listOf("full", "decimal"))

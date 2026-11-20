@@ -27,10 +27,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 不用我的输入习惯 (uat/15 PR-17), the part a screen shows: ⋯'s entry, the emoji panel's recently
- * used, the switch on top of 用户词库; the typing and the words are WordsUatTest's.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -50,7 +46,6 @@ class HabitsUatTest {
     private fun KeyboardHarness.s(id: Int) = service.getString(id)
 
     private fun KeyboardHarness.statusArea() {
-        // the toolbar stays expanded from the last time
         runCatching { described(s(R.string.expand_toolbar)) }.getOrNull()?.let {
             tap(it)
             after(500)
@@ -69,7 +64,6 @@ class HabitsUatTest {
         return KeyboardHarness.find<PickerLayout>(inputView)!!
     }
 
-    // the panel opened: whether its recently used section has nothing to show
     private fun KeyboardHarness.recentEmpty(): Boolean {
         emoji()
         return (KeyboardHarness.find<PickerGridView>(inputView)!!.adapter as PickerGridAdapter).recentEmpty
@@ -89,7 +83,6 @@ class HabitsUatTest {
             h.statusArea()
             h.tap(h.statusEntry(h.s(R.string.learning_habits_off)))
             assertEquals(false, habits.getValue())
-            // the emoji panel without its recently used; ⋯ says how to come back
             h.start()
             assertEquals(true, h.recentEmpty())
             h.start()

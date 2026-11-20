@@ -17,14 +17,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The modules as the app plugs them into [HostCore] ([ChineseModules]): the status area per input
- * method and its event, tips in the app's words, the keyboard's quick input and Unicode buttons, a
- * temp mode's panel and taps through the core, the module files saved as their state changes, and
- * what the events carry for the app. Lines, at the tag `native-last`: `ae` is
- * `app/src/main/cpp/androidengine/androidengine.cpp`, `nl` `app/src/main/cpp/native-lib.cpp`, `af`
- * `app/src/main/cpp/androidfrontend/androidfrontend.cpp`.
- */
+/** The modules as plugged into [HostCore]: status area, tips, quick input and Unicode buttons, temp mode panels, files saved, events. */
 class ChineseModulesHostTest {
 
     private class Host : EngineHost {
@@ -67,7 +60,7 @@ class ChineseModulesHostTest {
         ),
         strings,
     )
-    private val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+    private val profile = testProfile()
     private val core = HostCore(host, clock, profile, strings = strings, firstRun = true, persist = { persisted += it }, modules = modules::build)
     private val log = mutableListOf<HostEvent>().also { l -> core.events += HostEvents { l += it } }
 
@@ -91,8 +84,7 @@ class ChineseModulesHostTest {
         assertTrue(log.filterIsInstance<HostEvent.StatusArea>().last().entries.isEmpty())
     }
 
-    // the keys' marks worked out on this thread and sent with the status: off and on, English, a new table,
-    // each in the event that changes it; before any context, for the input method it would take (060-render-p2 S7a)
+    // the keys' marks worked out here and sent with the status, each in the event that changes it; before any context too
     @Test
     fun `the punctuation keys' marks go out with the status, switched in its event`() {
         val marks = mapOf("." to "。", "," to "，")
@@ -111,8 +103,7 @@ class ChineseModulesHostTest {
         assertEquals(emptyMap<String, String>(), log.filterIsInstance<HostEvent.StatusArea>().last().punctuation)
     }
 
-    // what a new host starts with (its first context on the group's first input method), whatever this one's
-    // context is on now: English, full width on, punctuation off (S7a round 4)
+    // a new host's start (its first context on the group's first input method), whatever this one's is on now
     @Test
     fun `the start keys are a new host's, not the current context's`() {
         // before any context: the input method a new host's first one takes
@@ -129,7 +120,7 @@ class ChineseModulesHostTest {
         assertEquals(emptyMap<String, String>(), core.startPunctuationKeys())
     }
 
-    // full width with the status, in the same event, on a Chinese input method only (S7a)
+    // full width with the status, in the same event, on a Chinese input method only
     @Test
     fun `full width goes out with the status`() {
         open()
@@ -326,10 +317,8 @@ class ChineseModulesHostTest {
         assertEquals("拼音", im.name)
         assertEquals("拼", im.label)
         assertEquals("zh_CN", im.languageCode)
-        assertTrue(im.isConfigurable)
-        // one the catalog lacks still runs on this host's engine, with no settings of its own (no gear)
-        assertEquals("androidengine", InputMethodEntries.of("x").addon)
-        assertFalse(InputMethodEntries.of("x").isConfigurable)
+        // one the catalog lacks: a bare entry of its name
+        assertEquals("x", InputMethodEntries.of("x").name)
         val status = log.filterIsInstance<HostEvent.StatusArea>().last()
         assertEquals(core.statusArea().map { it.id }, status.entries.map { it.id })
         assertEquals(core.currentInputMethod(), status.entry.uniqueName)

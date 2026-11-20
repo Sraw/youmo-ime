@@ -35,7 +35,6 @@ class TableRootsTest {
         for (k in keys) assertEquals("$k", roots.names.getValue(k), roots.all.getValue(k).first())
         val all = roots.all.values.flatten()
         assertEquals(all.toSet().size, all.size)
-        // its code stays letters
         assertEquals("ggll", roots.spell("ggll"))
     }
 
@@ -49,9 +48,7 @@ class TableRootsTest {
         // the long press shows them only while the keys show all of them
         assertNull(keyboard(KeyLabels.NAMES).rootsOf('g'))
         assertEquals(listOf("王", "龶", "戋", "五", "一"), keyboard(KeyLabels.ROOTS).rootsOf('g'))
-        // Z has none: the letter
         assertNull(keyboard(KeyLabels.ROOTS).label('z'))
-        // no roots, nothing to show whatever is set
         assertNull(keyboard(KeyLabels.ROOTS, roots = null).label('g'))
         assertTrue(keyboard(KeyLabels.NAMES).labelled)
         assertTrue(!keyboard(KeyLabels.NAMES, roots = null).labelled)
@@ -65,7 +62,6 @@ class TableRootsTest {
         assertEquals(keyboard(KeyLabels.NAMES), compact)
         assertEquals("王", compact.label('g'))
         assertNull(compact.rootsOf('g'))
-        // out of 紧凑 as set; names and letters alike at both
         assertEquals(keyboard(KeyLabels.ROOTS), keyboard(KeyLabels.ROOTS).atHeight(compact = false))
         for (labels in listOf(KeyLabels.NONE, KeyLabels.NAMES)) {
             assertEquals(keyboard(labels), keyboard(labels).atHeight(compact = true))
@@ -82,9 +78,7 @@ class TableRootsTest {
         // 仓颉 with its roots on the keys: the corners show letters, * is its own key
         val cangjie = TableKeyboard("engine-cangjie", setOf('*'), false, KeyLabels.NAMES, TableRoots.CANGJIE)
         assertEquals('*', cangjie.extraKey(slots, setOf(',', '.')))
-        // its swipes shown again: none
         assertNull(cangjie.extraKey(slots, setOf(',', '.', '*')))
-        // 五笔's codes are letters
         assertNull(TableKeyboard("engine-wubi", emptySet(), false, KeyLabels.NONE, TableRoots.WUBI86).extraKey(slots, emptySet()))
     }
 
@@ -95,7 +89,6 @@ class TableRootsTest {
         val set = TableSettings(keyLabels = KeyLabels.ROOTS)
         assertEquals(KeyLabels.ROOTS, set.applyTo(TableOptions.WUBI).keyLabels)
         assertEquals(KeyLabels.NONE, set.applyTo(TableOptions.ZIRANMA).keyLabels)
-        // 仓颉's preset shows them, its preedit in roots
         assertEquals("日月", TableOptions.CANGJIE.shown("ab"))
         assertEquals("ab", TableOptions.CANGJIE.copy(keyLabels = KeyLabels.NONE).shown("ab"))
         assertEquals("ab", TableOptions.WUBI.copy(keyLabels = KeyLabels.ROOTS).shown("ab"))

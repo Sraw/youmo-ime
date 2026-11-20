@@ -3,13 +3,7 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 
-/*
- * sherpa-onnx (k2-fsa, Apache-2.0), the speech recognizer of voice input, built from source
- * (src/main/cpp: upstream v1.13.8 and our commits on it, see README.md) rather than taken as
- * upstream's AAR: the recognizer is ours to change. Its CMake downloads onnxruntime's Android
- * libraries and its few small dependencies, SHA-256 checked. The app depends on it (one APK
- * since 0.6.0; its models are the voice pack's).
- */
+// sherpa-onnx (k2-fsa, Apache-2.0), voice input's recognizer, built from source (src/main/cpp).
 plugins {
     id("youmo.lib-convention")
 }

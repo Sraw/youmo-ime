@@ -11,8 +11,6 @@ import androidx.core.view.WindowInsetsCompat
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.junit.Assert.assertEquals
@@ -25,11 +23,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import kotlin.math.roundToInt
 
-/**
- * 061-landscape-height §5.2 in the input view: the keys worked out in the room the window gives, less what the view
- * keeps under them for the navigation bar, once laid out (not the room predicted), and again as the bar's insets come.
- * A phone on its side at 很高 (4 × 59 dp asked), the input method's bar 48 dp as under gestures.
- */
+/** The keys worked out in the window's room less what the view keeps for the navigation bar, once laid out and again as the bar's insets come. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w851dp-h393dp-land-440dpi")
 class ImeRoomViewTest {
@@ -41,7 +35,7 @@ class ImeRoomViewTest {
 
     private class Shown(val app: Int, val keys: Int)
 
-    // the bar under the window as the system tells it, the view laid out again (twice: the keys worked out after it)
+    // laid out twice: the keys worked out after it
     private fun KeyboardHarness.shownUnder(nav: Int): Shown {
         val insets = WindowInsetsCompat.Builder().setInsets(WindowInsetsCompat.Type.navigationBars(), Insets.of(0, 0, 0, nav)).build()
         ViewCompat.dispatchApplyWindowInsets(inputView, insets)
@@ -50,8 +44,7 @@ class ImeRoomViewTest {
         return Shown(box(keyboard).top - box(inputView).top, box(board).height())
     }
 
-    private fun under(background: NavbarBackground, keyboards: ImKeyboards.Chosen? = null): Shown {
-        prefs.set(ThemeManager.prefs.navbarBackground, background)
+    private fun under(keyboards: ImKeyboards.Chosen? = null): Shown {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         return KeyboardHarness(keyboards = keyboards).use { h ->
@@ -64,30 +57,15 @@ class ImeRoomViewTest {
 
     @Test
     @Uat("LS-47", "LS-48")
-    fun theAppKeeps120dpUnderEachBackground() {
-        listOf(NavbarBackground.Full, NavbarBackground.ColorOnly, NavbarBackground.None).forEach {
-            val shown = under(it)
-            assertTrue("$it: app ${shown.app} px", shown.app >= dp(KeyboardHeightCap.MIN_APP_DP) - 2)
-            assertTrue("$it: keys ${shown.keys} px", shown.keys >= dp(4 * KeyboardHeightCap.MIN_ROW_DP) - 2)
-        }
-    }
-
-    @Test
-    fun withoutTheBarKeptTheKeysHaveItsRoom() {
-        // a window not fitted above the bar (edge to edge): 全部 keeps the bar's 48 dp under the keys, 无 gives it them,
-        // the floor binding both ways (the room laid out, not the 70% of a screen of 0.6.0)
-        val full = under(NavbarBackground.Full)
-        val none = under(NavbarBackground.None)
-        assertEquals(dp(KeyboardHeightCap.MIN_APP_DP).toFloat(), full.app.toFloat(), 2f)
-        assertEquals(dp(KeyboardHeightCap.MIN_APP_DP).toFloat(), none.app.toFloat(), 2f)
-        assertEquals(dp(48).toFloat(), (none.keys - full.keys).toFloat(), 2f)
+    fun theAppKeeps120dpUnderTheBar() {
+        val shown = under()
+        assertTrue("app ${shown.app} px", shown.app >= dp(KeyboardHeightCap.MIN_APP_DP) - 2)
+        assertTrue("keys ${shown.keys} px", shown.keys >= dp(4 * KeyboardHeightCap.MIN_ROW_DP) - 2)
     }
 
     @Test
     fun theFirstFrameLeavesTheAppNoLessThanTheLast() {
-        // the first frame is worked out in the room predicted (ImeRoom), before the view is laid out or the bar's insets
-        // come: it errs to the app's side, so the field never shows hidden and then comes out (no short-then-tall)
-        prefs.set(ThemeManager.prefs.navbarBackground, NavbarBackground.Full)
+        // the first frame is worked out in the room predicted (ImeRoom): it errs to the app's side, so no short-then-tall
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         KeyboardHarness().use { h ->
             h.start()
@@ -107,9 +85,7 @@ class ImeRoomViewTest {
     @Test
     @Uat("LS-47")
     fun theBarsInsetsComingWorkTheKeysOutAgain() {
-        // laid out before the system tells of the bar (0), then told (48 dp): the keys give the bar its room, the app
-        // keeps its 120 dp; a dp or less is no new room (DockedRoomTest)
-        prefs.set(ThemeManager.prefs.navbarBackground, NavbarBackground.Full)
+        // laid out before the bar is told (0), then told (48 dp): the keys give the bar its room, the app keeps 120 dp
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         KeyboardHarness().use { h ->
             h.start()
@@ -127,9 +103,9 @@ class ImeRoomViewTest {
     @Uat("LS-50")
     @Config(qualifiers = "w780dp-h380dp-land-440dpi")
     fun aSmallPhonesZhuyinKeepsItsFiveRows() {
-        // 332 dp of room: the letters' four rows give the app its 120 dp, 注音's five keep 36 dp each and take from it
-        val pinyin = under(NavbarBackground.Full)
-        val zhuyin = under(NavbarBackground.Full, ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL))
+        // 332 dp of room: the letters' four rows leave the app 120 dp, 注音's five keep 36 dp each and take from it
+        val pinyin = under()
+        val zhuyin = under(ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL))
         assertEquals(dp(KeyboardHeightCap.MIN_APP_DP).toFloat(), pinyin.app.toFloat(), 2f)
         assertTrue("${pinyin.keys} px", pinyin.keys > dp(4 * KeyboardHeightCap.MIN_ROW_DP))
         assertEquals(dp(5 * KeyboardHeightCap.MIN_ROW_DP).toFloat(), zhuyin.keys.toFloat(), 2f)

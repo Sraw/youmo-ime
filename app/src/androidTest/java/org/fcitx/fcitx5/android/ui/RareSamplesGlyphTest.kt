@@ -10,12 +10,7 @@ import org.fcitx.fcitx5.android.ui.rare.RareSamples
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The group cards' picked characters (dev/design/061-settings-cards.md §3.1), on a phone: each one its
- * group's by the APK's table, and drawn by the phone's fonts (on youmo and youmo29 both, API 36 and 29).
- * One not drawn would be left out of its card, a plain character in its place; one of another group
- * would show a group what it does not hold.
- */
+/** On a phone: each group card's sample is in its group by the APK's table and drawn by the phone's fonts (API 36 and 29). */
 class RareSamplesGlyphTest {
 
     @Test

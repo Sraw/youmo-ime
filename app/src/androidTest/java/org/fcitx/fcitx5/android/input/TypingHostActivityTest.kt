@@ -12,12 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * The editor SoftKeyboardTest types into keeps a Return key event a newline in its multi-line
- * field. TextView offers that key to the editor-action listener as IME_NULL first, on key down and
- * on key up; the listener took it, so the field got no newline and [TypingHostActivity.actions]
- * read [0, 0].
- */
+/** TextView offers Return to the editor-action listener as IME_NULL on down and up; taken there, the field got no newline. */
 class TypingHostActivityTest {
 
     @Test
@@ -37,7 +32,7 @@ class TypingHostActivityTest {
         assertEquals(emptyList<Int>(), actions)
     }
 
-    /** IME_ACTION_UNSPECIFIED is 0, as IME_NULL is: sent as an editor action, it is still recorded as one. */
+    /** IME_ACTION_UNSPECIFIED is 0, as IME_NULL is. */
     @Test
     fun anUnspecifiedEditorActionIsAnAction() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

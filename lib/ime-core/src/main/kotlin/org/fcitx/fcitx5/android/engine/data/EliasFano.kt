@@ -8,20 +8,9 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /**
- * A read-only non-decreasing array of non-negative ints in Elias-Fano form: where each bigram's run of
- * trigrams starts in the language model. [BitPacked] stored those in 25 bits each, 43 MB of the pinyin
- * model; here they take some 3 bits, and its file 38 MB less. A lookup costs more than [BitPacked]'s,
- * so the unigrams' run starts, looked up for every bigram and only 1 MB, stay [BitPacked]: in
- * Elias-Fano they cost the decoder 70% at the 95th percentile of a key.
- *
- * Each value is split into its [lowWidth] low bits, packed as [BitPacked] packs them, and the rest,
- * written in unary into the upper bit array: value i sets bit `(value ushr lowWidth) + i`. Value i's
- * high part is then the position of the i-th set bit, less i. Finding that bit from the start would
- * be slow, so the position of every [SAMPLE]th set bit is kept: a lookup starts there and counts the
- * set bits of a word or two.
- *
- * Layout: `u32 lowWidth, u32 size, u32 upperWords, u32 sampleCount`, then the low bits and the upper bits
- * as little-endian 64-bit words, then the samples as u32s.
+ * Non-decreasing ints in Elias-Fano form (~3 bits each, not [BitPacked]'s 25) for trigram run starts; slower, so
+ * unigram run starts stay [BitPacked]. Layout: `u32 lowWidth, u32 size, u32 upperWords, u32 sampleCount`, low bits,
+ * upper bits in unary as 64-bit words, then every [SAMPLE]th set bit's position as u32.
  */
 class EliasFano(buffer: ByteBuffer) {
 
@@ -43,7 +32,7 @@ class EliasFano(buffer: ByteBuffer) {
         val sampleCount = b.getInt(12)
         require(lowWidth in 0..BitPacked.MAX_WIDTH) { "bad low width $lowWidth" }
         require(size >= 0) { "bad size $size" }
-        // bit positions are ints: more upper words than that and a lookup would wrap onto another word
+        // bit positions are ints: more upper words and a lookup would wrap
         require(upperWords in 0..MAX_UPPER_WORDS && sampleCount == samplesFor(size)) { "bad upper bits or samples" }
         // in longs: a damaged count would overflow an int past the check
         val upperAt = HEADER_BYTES + lowWords(lowWidth, size) * 8L
@@ -59,14 +48,13 @@ class EliasFano(buffer: ByteBuffer) {
         return value(index, select(index))
     }
 
-    /** Values [index] and [index] + 1 together: a run's start and end. */
     fun run(index: Int): Run {
         if (index < 0 || index >= size - 1) throw IndexOutOfBoundsException("$index and the next of $size")
         val bit = select(index)
         return Run(value(index, bit), value(index + 1, nextSet(bit + 1)))
     }
 
-    /** A run's [start] and [end], held in one long: the decoder looks one up for each word it scores, and none is an object. */
+    // packed in one long: looked up for every word scored
     @JvmInline
     value class Run private constructor(private val bits: Long) {
 
@@ -76,12 +64,7 @@ class EliasFano(buffer: ByteBuffer) {
         val end: Int get() = bits.toInt()
     }
 
-    /**
-     * Checks that this is a table of run starts: [first] first, never decreasing, [end] last; and that
-     * every lookup will find its bit, the samples pointing where they should. Lookups index other
-     * arrays with these values unchecked, so a table that got this far must not point outside them.
-     * Reads the table through once, a few MB, at load.
-     */
+    /** Checks run starts as [BitPacked.checkRuns] does, and every sample: lookups index other arrays unchecked. */
     fun checkRuns(what: String, first: Int, end: Int) {
         ensureFormat(size >= 1) { "$what: empty" }
         val words = (samples - upper) / 8
@@ -106,7 +89,6 @@ class EliasFano(buffer: ByteBuffer) {
 
     private fun word(w: Int): Long = buffer.getLong(upper + w * 8)
 
-    /** The position in the upper bits of the set bit of value [index]. */
     private fun select(index: Int): Int {
         val start = buffer.getInt(samples + index / SAMPLE * 4)
         var left = index % SAMPLE
@@ -121,7 +103,6 @@ class EliasFano(buffer: ByteBuffer) {
         return w * 64 + selectInWord(bits, left)
     }
 
-    /** The position of the set bit of [bits] with [rank] set bits below it: six halvings of the word, not up to 63 bits cleared one by one. */
     private fun selectInWord(bits: Long, rank: Int): Int {
         var x = bits
         var r = rank
@@ -139,7 +120,6 @@ class EliasFano(buffer: ByteBuffer) {
         return at
     }
 
-    /** The first set bit at or after [from]. */
     private fun nextSet(from: Int): Int {
         var w = from ushr 6
         var bits = word(w) and (-1L shl (from and 63))
@@ -159,18 +139,16 @@ class EliasFano(buffer: ByteBuffer) {
     }
 
     companion object {
-        /** one sample per this many values: a lookup counts the set bits of a word or two past it */
         const val SAMPLE = 64
         private const val HEADER_BYTES = 16
 
-        // the reader's bound, which encode keeps to: a table it builds is one a reader takes
+        // the reader's bound, which encode keeps to
         private const val MAX_UPPER_WORDS = Int.MAX_VALUE / 64
 
         private fun lowWords(width: Int, size: Int): Long = (size.toLong() * width + 63) / 64
 
         private fun samplesFor(size: Int): Int = ((size.toLong() + SAMPLE - 1) / SAMPLE).toInt()
 
-        /** [values], which must not decrease, in this form. */
         fun encode(values: IntArray): ByteArray {
             val size = values.size
             val max = values.maxOrNull() ?: 0
@@ -180,15 +158,9 @@ class EliasFano(buffer: ByteBuffer) {
         }
     }
 
-    /**
-     * [size] values, which must not decrease and end at most at [max], written to [out] as they
-     * come, the layout [EliasFano] reads: the low bits streamed, the upper bits and samples (some 2
-     * bits a value) held till [finish]. For a table too large to build in the heap first (a
-     * dictionary the user merged, DictionaryCompiler).
-     */
+    /** Streams values as they come; upper bits and samples (some 2 bits a value) held till [finish]. */
     class Writer(private val out: java.io.OutputStream, private val size: Int, max: Int) {
         private val bytes = LittleEndian(out)
-        // the low width that makes the whole smallest: about log2 of the mean gap
         private val lowWidth = if (size == 0) 0 else (63 - java.lang.Long.numberOfLeadingZeros(maxOf(1L, (max.toLong() + 1) / size)))
         private val upper: LongArray
         private val maxValue = max
@@ -217,7 +189,6 @@ class EliasFano(buffer: ByteBuffer) {
             previous = value
             val v = value.toLong()
             if (lowWidth > 0) {
-                // packed as BitPacked packs them, without its header
                 val bits = v and ((1L shl lowWidth) - 1)
                 lowWord = lowWord or (bits shl lowUsed)
                 lowUsed += lowWidth

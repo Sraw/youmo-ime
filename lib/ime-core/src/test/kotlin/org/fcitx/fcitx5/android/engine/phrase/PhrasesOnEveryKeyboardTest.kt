@@ -36,18 +36,10 @@ import org.junit.runners.Parameterized
 import java.util.Calendar
 import java.util.GregorianCalendar
 
-/**
- * A1: a custom phrase typed by its key on every input method and keyboard that has them, one
- * phrase each: offered, picked as it is and never learned, and deleted from the phrases by a long
- * press. On keys of letter groups the key is typed as its letters' keys.
- */
+/** A custom phrase typed on every input method and keyboard: offered, picked as is, never learned, deleted by a long press. */
 @RunWith(Parameterized::class)
 class PhrasesOnEveryKeyboardTest(private val name: String, private val keyboard: KeyboardCase) {
 
-    /**
-     * An input method on a keyboard: its session over the phrases learning into the log, the keys
-     * typing a key's letters, and the letters of an ordinary word it learns when picked.
-     */
     class KeyboardCase(val make: (PhraseBook, LearnLog) -> Session, val type: (Session, String) -> Unit, val word: String = "ni")
 
     @Test
@@ -64,7 +56,6 @@ class PhrasesOnEveryKeyboardTest(private val name: String, private val keyboard:
         assertTrue("$name: $shown", at >= 0)
         assertTrue(name, Offer.DELETE_PHRASE in session.offers(at))
         assertEquals(name, PHRASE, session.apply(Action.Pick(at)).commit)
-        // text, no word: nothing of it written to the learning record
         assertEquals(name, emptyList<LearnRecord>(), written)
         // typed again, deleted from the keyboard: gone from the file and the list
         keyboard.type(session, KEY)
@@ -94,7 +85,6 @@ class PhrasesOnEveryKeyboardTest(private val name: String, private val keyboard:
             EnglishSession(EnglishDecoderTest.data(), user = EnglishUser { log }, phrases = EnglishPhrases(book, day))
         }
 
-        // each letter as the key of [letters] that types it
         private fun keyed(letters: NineKeyLetters) = { s: Session, key: String -> key.forEach { s.apply(Action.Key(letters.key(it))) } }
 
         private val letters = { s: Session, key: String -> key.forEach { s.apply(Action.Key(it)) } }

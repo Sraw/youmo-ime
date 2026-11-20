@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
-/**
- * Punctuation as Unicode's general categories have it: `，` `“` `-` `%`, not `+` (a symbol). Its
- * own, not any one reader's: AutoPairs reads it for what may follow the cursor where a bracket
- * opens in pairs, VoiceRerank for which hypotheses are alike but for it; a rule of one of them
- * goes in that one.
- */
+/** Unicode's punctuation categories (`，` `“` `-` `%`, not `+`). Shared by AutoPairs and VoiceRerank; a rule of one goes in that one. */
 object UnicodePunctuation {
 
     private val CATEGORIES = setOf(

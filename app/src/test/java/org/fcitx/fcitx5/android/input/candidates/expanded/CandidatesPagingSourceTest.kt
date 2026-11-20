@@ -8,7 +8,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Where the expanded candidates' pages end, the last candidate on a page of its own included. */
 class CandidatesPagingSourceTest {
 
     @Test

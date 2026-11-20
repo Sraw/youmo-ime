@@ -67,11 +67,6 @@ import java.io.ByteArrayOutputStream
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 
-/**
- * UAT cases of the settings app's pages over a fake engine (uat/01, 03, 13): the input methods,
- * the nine keys' letters and long presses, the user dictionary's lists. What the engine does with
- * what a page saves (the words typed after) is the engine's.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -81,7 +76,6 @@ class SettingsPagesUatTest {
     fun phone() = phoneStorage()
 
     private val api = FakeHostApi()
-    // made anew by a test whose rows each want a settings app of their own
     private var st = SettingsHarness(api)
     private val activity get() = st.activity
 
@@ -90,7 +84,7 @@ class SettingsPagesUatTest {
 
     private fun idle() = st.idle()
 
-    // a page's work done off the main thread (a search, a list read): waited for, as a user would
+    // a page's work done off the main thread: waited for, as a user would
     private fun until(what: String, test: () -> Boolean) =
         waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
 
@@ -114,13 +108,13 @@ class SettingsPagesUatTest {
 
     private fun clickable(v: View): View = generateSequence(v) { it.parent as? View }.first { it.hasOnClickListeners() || it.isLongClickable }
 
-    // a dialog opened by a tap may show a looper turn later under load: wait for it rather than read null
+    // a dialog opened by a tap may show a looper turn later under load
     private fun dialog(): AlertDialog {
         until("a dialog showing") { ShadowDialog.getLatestDialog()?.isShowing == true }
         return ShadowDialog.getLatestDialog() as AlertDialog
     }
 
-    private fun entry(name: String) = InputMethodEntry(name, name, "", "", name, "zh_CN", "androidengine", false)
+    private fun entry(name: String) = InputMethodEntry(name, name, "", name, "zh_CN")
 
     @Test
     @Uat("SET-03")
@@ -133,7 +127,6 @@ class SettingsPagesUatTest {
         assertEquals(listOf("Pinyin", "English"), rows)
     }
 
-    // 0.4's 九键拼音 is pinyin's keyboard now (I1): none to add, 五笔 first
     @Test
     @Uat("SET-12")
     fun addingAnInputMethodOffersNoNineKeysAndWubiFirst() {
@@ -156,7 +149,6 @@ class SettingsPagesUatTest {
         assertTrue(api.calls.toString(), api.calls.last { it.startsWith("setEnabledIme") }.endsWith("${InputMethodCatalog.WUBI})"))
     }
 
-    // a key of the nine keys' page: its card, read out as its letters and digit
     private fun card(digit: Char): View = KeyboardHarness.all(activity.window.decorView)
         .first { it.isShown && it.contentDescription?.toString()?.endsWith(digit.toString()) == true && it.hasOnClickListeners() }
 
@@ -165,7 +157,6 @@ class SettingsPagesUatTest {
         idle()
         val d = dialog()
         if (typed != null) KeyboardHarness.all(d.window!!.decorView).filterIsInstance<EditText>().single().setText(typed)
-        // every per-key dialog names its reset 恢复此键默认, as uat T9-29 tells the tester to find it
         if (button == AlertDialog.BUTTON_NEUTRAL) assertEquals(activity.getString(R.string.reset_this_key), d.getButton(button).text.toString())
         d.getButton(button).performClick()
         idle()
@@ -179,17 +170,14 @@ class SettingsPagesUatTest {
             open(SettingsRoute.T9Letters)
             editKey('7', "prs")
             editKey('3', "")
-            // the keyboard made after: 7's long press without q, 3's symbols a row of up to five
             KeyboardHarness(im = KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).use { h ->
                 h.api.availableIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
                 h.api.enabledIme = h.api.availableIme
                 h.start()
                 val seven = h.longPressed('7')
                 assertTrue(seven.toString(), seven.containsAll(listOf("7", "p", "r", "s")) && "q" !in seven && "Q" !in seven)
-                // emptied, 3 is as on a phone (the field's hint says so); its two symbols one row, not a column
                 var rows = emptySet<Int>()
                 val three = h.longPressed('3') {
-                    // each cell's top, whichever draws the popup
                     rows = listOf("+", "-").map { t -> popupChoices().last { it.text == t }.cell.top }.toSet()
                 }
                 assertTrue(three.toString(), three.containsAll(listOf("+", "-", "D", "3", "d")))
@@ -205,7 +193,6 @@ class SettingsPagesUatTest {
     fun nineKeysLongPressesEdited() {
         val lists = AppPrefs.getInstance().internal.keyLists
         try {
-            // 九键's long press edited where every key's is (060-keys-unify S5: 按键字符和快捷键's 九键 tab, ST-107)
             open(SettingsRoute.PopupOverrides)
             clickable(view(s(R.string.shortcut_page_nine))).performClick()
             idle()
@@ -218,7 +205,6 @@ class SettingsPagesUatTest {
                 getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             }
             idle()
-            // every per-key dialog names its reset 恢复此键默认, as uat T9-29 tells the tester to find it
             nine('1').performClick()
             idle()
             dialog().apply {
@@ -235,7 +221,7 @@ class SettingsPagesUatTest {
                 assertTrue(five.toString(), "#" in five)
                 val one = h.longPressed('1')
                 assertTrue(one.toString(), "，" in one && "。" in one)
-                // nine keys English's 1: once changed, one list for every input method (060-keys-unify M3, KB-75)
+                // nine keys English's 1: once changed, one list for every input method
                 h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
                 val english = h.longPressed('1')
                 assertTrue(english.toString(), "，" in english && "。" in english)
@@ -284,13 +270,11 @@ class SettingsPagesUatTest {
         }
     }
 
-    /** The long press's popup of the nine keys' [digit] key, let go out of it (nothing typed). */
     private fun KeyboardHarness.longPressed(digit: Char, shown: KeyboardHarness.() -> Unit = {}): List<String> {
         val key = nineKey(digit.toString())
         val before = texts(inputView).size
         val f = finger(key, at(key))
         advance(700)
-        // the popup's texts, whichever draws it
         val popup = popupChoices().map { it.text }
         shown()
         f.move(at(key))
@@ -345,7 +329,6 @@ class SettingsPagesUatTest {
         assertTrue(api.calls.toString(), "learning(Undo(token=9))" in api.calls)
     }
 
-    // the toolbar's 删除所选 on the words selected: its confirmation
     private fun deleteSelected(): AlertDialog {
         val menu = shadowOf(activity).optionsMenu
         val delete = (0 until menu.size()).map { menu.getItem(it) }.first { it.title.toString() == s(R.string.delete_selected) }
@@ -354,8 +337,7 @@ class SettingsPagesUatTest {
         return dialog()
     }
 
-    // R25r8 F8053: a removal the record could not take back says so, as the chip's undo does, not the words just
-    // left out with nothing said; one no longer to be taken back says that (R25r9 F8076)
+    // a removal the record could not take back says so, as the chip's undo does
     @Test
     @Uat("WD-46")
     fun anUndoOfARemovalNotTakenBackSaysWhy() {
@@ -412,7 +394,6 @@ class SettingsPagesUatTest {
         open(SettingsRoute.UserWordList(UserWord.Kind.LEARNED.name))
         until("listed") { "汪小明" in shown() }
         val detail = shown()[shown().indexOf("汪小明") + 1]
-        // typed twice, the day only
         assertTrue(detail, "2" in detail && ":" !in detail.substringAfter("wang xiao ming"))
         val menu = shadowOf(activity).optionsMenu
         val recent = (0 until menu.size()).map { menu.getItem(it) }.first { it.title.toString() == s(R.string.learning_sort_recent) }
@@ -433,7 +414,6 @@ class SettingsPagesUatTest {
     @Test
     @Uat("PY-94")
     fun aPinOnTheFourteenKeysSaysSoAndShowsItsLetters() {
-        // as the engine lists a pin made on AS GH UI (WordsUatTest.aPinOnTheFourteenKeysIsListedUnderItsKeys)
         val keys = NineKeyLetters.G14.typings("shi").single()
         listedPage(LearningOp.Listed.PINS, listOf(ListedItem(Code(Kinds.keys(NineKeyLetters.G14.tag()), keys), "", "时")))
         assertEquals(s(R.string.learning_pinned_detail, "as gh ui", s(R.string.learning_kind_keys14)), said("时"))
@@ -442,7 +422,6 @@ class SettingsPagesUatTest {
     @Test
     @Uat("SP-19")
     fun aPinOnTheEighteenKeysSaysSoWithItsSchemeAndLetters() {
-        // as the engine lists them (WordsUatTest.pinsOnTheEighteenKeysAndTheFullListedUnderTheirKinds)
         val keys18 = "${NineKeyLetters.G18.key('u')}${NineKeyLetters.G18.key('i')}"
         listedPage(
             LearningOp.Listed.PINS,
@@ -473,7 +452,6 @@ class SettingsPagesUatTest {
                 else -> LearningResult.Done()
             }
         }
-        // in the lexicon page, right under the blocked words
         open(SettingsRoute.UserWords)
         val titles = st.titles()
         val blocked = titles.indexOf(s(UserWordsFragment.title(UserWord.Kind.BLOCKED)))
@@ -520,7 +498,6 @@ class SettingsPagesUatTest {
         idle()
     }
 
-    // a row tapped, one of what its dialog offers picked
     private fun act(word: String, action: Int) {
         clickable(view(word)).performClick()
         idle()
@@ -557,7 +534,6 @@ class SettingsPagesUatTest {
         open(SettingsRoute.UserWordList(UserWord.Kind.ADDED.name))
         until("listed") { "澜境花园" in shown() }
         act("澜境花园", R.string.edit)
-        // filled in with the word's own
         val fields = KeyboardHarness.all(dialog().window!!.decorView).filterIsInstance<EditText>().map { it.text.toString() }.toList()
         assertEquals(listOf("澜境花园", "lan jing hua yuan"), fields)
         wordDialog("澜境公园", "lan jing gong yuan")
@@ -576,7 +552,7 @@ class SettingsPagesUatTest {
         idle()
     }
 
-    // the page left, as going back to type: it saves then, and the engine reads it again
+    // the page left: it saves then, and the engine reads it again
     private fun phrasesSaved(): List<String> {
         open(SettingsRoute.About)
         until("saved") { "reloadEngine()" in api.calls }
@@ -584,7 +560,6 @@ class SettingsPagesUatTest {
         return CustomPhraseManager.load().map { "${it.key},${it.order}=${it.value}" }
     }
 
-    // a tap on the row's text, not its pen
     private fun tapPhrase(text: String) {
         open(SettingsRoute.PinyinCustomPhrase)
         until("listed") { shown().any { text in it } }
@@ -600,10 +575,8 @@ class SettingsPagesUatTest {
             open(SettingsRoute.PinyinCustomPhrase)
             KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
             idle()
-            // the key field's filter makes capitals lowercase as they are typed, so every keyboard reaches
-            // it; a capital being composed keeps its input method's composing span on the letter made
-            // lowercase, else one that composes and then appends would type the letters twice (F4955; F4973:
-            // the capital, not a letter already lowercase, is what reaches that branch)
+            // the key field's filter makes capitals lowercase as typed; a capital being composed keeps its composing span on the
+            // letter made lowercase, else one that composes and then appends would type the letters twice
             val key = KeyboardHarness.all(dialog().window!!.decorView).filterIsInstance<EditText>().first()
             key.setText("DZ")
             val typed = SpannableString("Xx").also { BaseInputConnection.setComposingSpans(it) }
@@ -627,10 +600,8 @@ class SettingsPagesUatTest {
         }
     }
 
-    // F4974: the page could be edited while its file was still being read, and what was added then was
-    // taken for the file's and never saved; F5001: import and export, off till the read ends; F5003: an
-    // import delivered before the read (the activity made anew under the picker) waits for it; F5008: so
-    // does an export, which wrote an empty file
+    // the page could be edited while its file was still being read, what was added then never saved; import and export
+    // wait for the read (an export before it wrote an empty file)
     @Test
     @Uat("WD-37")
     fun nothingIsAddedToTheCustomPhrasesBeforeTheirFileIsRead() {
@@ -648,11 +619,9 @@ class SettingsPagesUatTest {
                 (0 until menu.size()).map(menu::getItem).single { it.title.toString() == s(id) }.isEnabled
             }
             assertEquals(listOf(false, false), usable())
-            // the file's phrase again, which is not added twice, and a new one
             val file = Uri.parse("content://phrases.test/import.txt")
             shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("bj,1=北京\nsh,1=上海\n".toByteArray()))
             (page as PinyinCustomPhraseFragment).importPhrases(file)
-            // an export delivered before the read too (F5008): the file's phrase, not an empty file
             val exportTo = Uri.parse("content://phrases.test/export.txt")
             val exported = ByteArrayOutputStream()
             shadowOf(activity.contentResolver).registerOutputStream(exportTo, exported)
@@ -660,7 +629,6 @@ class SettingsPagesUatTest {
             idle()
             read.countDown()
             until("listed") { shown().any { "上海" in it } }
-            // the file's phrase not counted again; said on the import's undo bar (WD-37)
             until("said") { s(R.string.import_phrases_done, 1) in shown() }
             until("addable") { fab.visibility == View.VISIBLE }
             until("importable") { usable() == listOf(true, true) }
@@ -673,14 +641,13 @@ class SettingsPagesUatTest {
         }
     }
 
-    // audit-061 import-edit-3 (PinyinCustomPhraseFragment.MAX_PHRASES): a file of hundreds of thousands of phrases was
-    // imported whole, the list read and written whole at each change after; an import fills it to the limit and says
-    // how many were left out (adding by hand is not limited, WD-37a)
+    // a file of hundreds of thousands of phrases was read and written whole at each change: an import fills to the
+    // limit and says how many were left out
     @Test
     @Uat("WD-37a")
     fun anImportFillsTheCustomPhrasesToTheirLimitAndSaysTheRest() {
         val max = PinyinCustomPhraseFragment.MAX_PHRASES
-        // a key of letters alone (one with a digit is not a phrase's line, and the page would read none)
+        // one with a digit is not a phrase's line, and the page would read none
         CustomPhraseManager.save((1 until max).map { PinyinCustomPhrase("k", 1, "词$it") })
         try {
             open(SettingsRoute.PinyinCustomPhrase)
@@ -690,7 +657,7 @@ class SettingsPagesUatTest {
             (page as PinyinCustomPhraseFragment).importPhrases(file)
             val said = s(R.string.import_over_limit, s(R.string.import_phrases_done, 1), 2, max)
             until("said") { said in shown() }
-            // the limit is the import's alone: one more added through + past it is kept (WD-37a, R25r3 F7932)
+            // the limit is the import's alone: one more added through + past it is kept
             KeyboardHarness.all(activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
             idle()
             phraseDialog("zz", "1", "乙乙")
@@ -710,7 +677,6 @@ class SettingsPagesUatTest {
             st.activity
             st.open(SettingsRoute.Theme)
             st.tab(1)
-            // the preview's keys: where they start under the bar, and how tall they are
             fun keys(): Pair<Int, Int> {
                 st.tab(1)
                 val k = KeyboardHarness.find<TextKeyboard>(st.activity.window.decorView)!!

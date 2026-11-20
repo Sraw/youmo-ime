@@ -13,13 +13,9 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.openUrl
 
-/**
- * 外观 → 布局's **+** (061-custom-layout §4.3): import a `.layout` file, or make one on the web layout maker in a browser
- * (the theme maker's `layout/` page; the app has no network permission), as 新增主题's menu (ThemeAddMenu).
- */
+/** Makes one on the web layout maker in a browser (the app has no network permission). */
 object LayoutAddMenu {
 
-    /** The layout maker's page: the theme maker's `layout/`. */
     val makerUrl: String get() = Const.themeMakerUrl + "layout/"
 
     fun show(ctx: Context, import: () -> Unit): AlertDialog {

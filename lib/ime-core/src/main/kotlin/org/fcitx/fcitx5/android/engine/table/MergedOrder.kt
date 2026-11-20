@@ -4,13 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
-/**
- * A table session's candidates in order, as positions: those it found, in their [sorted] order
- * (by their [keys]), with the merged dictionaries' words of longer codes ([tail], each given a
- * position by [add]) put in where sorting them all would put them ([before]: a word of the tail
- * before the candidate of a key), read only as far as asked. A letter of 五笔 leads to some 80,000
- * of rime-frost's words: sorted with the rest at every key, they were 22 MB of garbage a key.
- */
+/** A table's candidates in [sorted] order with the merged dictionaries' longer-code words ([tail]) merged in lazily: sorting ~80,000 of them at every 五笔 key made 22 MB of garbage a key. */
 internal class MergedOrder<T>(
     private val sorted: IntArray,
     private val keys: LongArray,
@@ -23,22 +17,18 @@ internal class MergedOrder<T>(
     private var sortedAt = 0
     private var pendingTail: T? = null
 
-    /** The [k]th position, null past the last. */
     operator fun get(k: Int): Int? {
         while (filled <= k && step()) Unit
         return if (k < filled) positions[k] else null
     }
 
-    /** The first [count] positions (all, if fewer). */
     fun prefix(count: Int): IntArray {
         if (count > 0) get(count - 1)
         return positions.copyOf(minOf(count, filled))
     }
 
-    /** Those from the [k]th on, read as asked for. */
     fun from(k: Int): Sequence<Int> = generateSequence(k) { it + 1 }.map(::get).takeWhile { it != null }.map { it!! }
 
-    /** Where the first position [predicate] takes is; the count of all if none. */
     fun indexOfFirst(predicate: (Int) -> Boolean): Int {
         var k = 0
         while (true) {
@@ -48,7 +38,7 @@ internal class MergedOrder<T>(
         }
     }
 
-    /** The first of [sorted] [match] takes, or [outside] if it sorts before that: a position either way, null for neither. */
+    /** The first of [sorted] [match] takes, or [outside] if it sorts before that; null for neither. */
     fun first(match: (Int) -> Boolean, outside: T?): Int? {
         val k = sorted.indices.firstOrNull { match(sorted[it]) }
         return when {

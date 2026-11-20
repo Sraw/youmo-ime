@@ -21,7 +21,7 @@ class KeyboardNamesTest {
         assertNull(KeyboardNames.custom("Number.PHONE"))
     }
 
-    // L5 review S2: the pads one number board is for keep each other; a file replaced drops the older stamp's
+    // the pads one number board is for keep each other; a file replaced drops the older stamp's
     @Test
     fun onlyAnotherStampOfTheSameLayoutIsDropped() {
         assertFalse(KeyboardNames.stale("Number|my-num@5-9", "my-num@5-9"))

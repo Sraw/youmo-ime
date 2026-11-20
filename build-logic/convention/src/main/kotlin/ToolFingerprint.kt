@@ -12,16 +12,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 
-/**
- * A tool's code as far as a run of it reaches: the classes [main] names in its constant pool, and
- * those they name, hashed less their debug information. The engine's data is made by a tool that
- * shares :lib:ime-core with the app; keyed on the whole classpath, every edit to the keyboard's
- * logic made the data again, the mixed model sorted whole in memory (minutes, and 3.6 GB). Keyed on
- * this, only an edit to what the tool can run does. A class reached by reflection alone is missed:
- * the commands the build runs (pinyin, table, strokes) load none so, but the DuckDB driver of the
- * web-text commands (text, clean, words, mix ...), which DriverManager finds through ServiceLoader,
- * does not count.
- */
+/** A hash of the classes [main] reaches, less debug info, so only a runnable edit remakes the engine data; reflection is missed. */
 object ToolFingerprint {
 
     /** [warn] is told when a class cannot be read and the key falls back to the whole classpath. */
@@ -99,8 +90,7 @@ object ToolFingerprint {
         val position get() = pos
     }
 
-    // the classes a class file names: its Class constants, and the types in its descriptors; null for
-    // a constant pool tag this does not know
+    // the classes a class file names (Class constants, descriptor types); null for an unknown constant pool tag
     internal fun read(code: ByteArray): ClassFile? {
         val cursor = Cursor(code)
         val input = DataInputStream(cursor)
@@ -143,9 +133,7 @@ object ToolFingerprint {
         return ClassFile(out, withoutDebugInfo(cursor, input, utf8, integers, debug))
     }
 
-    // [cursor]'s code less what only a stack trace or a debugger reads, so code moved to other lines
-    // does not make the data again: [debug], the attributes after the constant pool [input] has read,
-    // and the [integers] a coroutine's lines are; whole if those do not read as a class file's
+    // [cursor]'s code less what only a stack trace or debugger reads, so moved code does not remake the data
     private fun withoutDebugInfo(
         cursor: Cursor,
         input: DataInputStream,
@@ -201,9 +189,7 @@ object ToolFingerprint {
         } catch (e: EOFException) {
             return code
         }
-        // a line's constant that anything else names is kept, as that is, and every one where an
-        // attribute this does not read might name it; code loads no int of a line's size from the
-        // pool (javac and kotlinc push it inline)
+        // a line's constant anything else names is kept, as is every one an unread attribute might name
         if (allRead) for (index in lines - others) integers[index]?.let { debug += it + 1 until it + 5 }
         debug.sortBy { it.first }
         val kept = ByteArrayOutputStream(code.size)
@@ -216,9 +202,7 @@ object ToolFingerprint {
         return kept.toByteArray()
     }
 
-    // the Integer constants attribute [name] names, its value [input] read to the end: a coroutine's
-    // lines in [lines], Kotlin keeping them in @DebugMetadata where no attribute above leaves them
-    // out, any other in [others]; false for an attribute this does not know to name none
+    // the Integer constants attribute [name] names: a coroutine's lines (@DebugMetadata) in [lines], others in [others]
     private fun constants(name: String?, input: DataInputStream, utf8: Map<Int, String>, lines: MutableSet<Int>, others: MutableSet<Int>): Boolean {
         when (name) {
             "RuntimeVisibleAnnotations" -> repeat(input.readUnsignedShort()) { annotation(input, utf8, lines, others) }
@@ -294,7 +278,6 @@ object ToolFingerprint {
 
     private const val DEBUG_METADATA = "Lkotlin/coroutines/jvm/internal/DebugMetadata;"
 
-    // l, the line of each suspension point, and nl, the line after it, which version 2 of the
-    // annotation adds for a debugger (getNextLineNumber)
+    // l, each suspension point's line, and nl, the line after it (version 2, for a debugger)
     private val DEBUG_LINES = setOf("l", "nl")
 }

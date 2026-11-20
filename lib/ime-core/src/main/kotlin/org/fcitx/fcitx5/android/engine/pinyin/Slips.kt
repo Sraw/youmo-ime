@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/**
- * An edge's matches read with one key slipped from the key next to it (061-neighbour-correction):
- * what each costs ([SlipCost], log10) and which key it took for which, [at] places into the edge
- * the key [meant] in place of the one typed. Learning files a word so read under the keys meant
- * (§8.2, N1).
- */
+/** An edge's matches read with one key slipped: each one's cost ([SlipCost], log10) and which key [at] it reads as [meant]. Learning files such words under the keys meant. */
 class Slips(private val cost: FloatArray, private val keys: IntArray) {
     init {
         require(cost.size == keys.size)
@@ -17,22 +12,20 @@ class Slips(private val cost: FloatArray, private val keys: IntArray) {
 
     val size: Int get() = cost.size
 
-    /** What the [i]th match costs. */
     fun cost(i: Int): Float = cost[i]
 
-    /** How many places into its edge the [i]th match's slipped key is. */
+    /** Places into the edge of the slipped key. */
     fun at(i: Int): Int = keys[i] ushr CHAR_BITS
 
-    /** The key the [i]th match reads in place of the one typed. */
     fun meant(i: Int): Char = (keys[i] and CHAR_MASK).toChar()
 
     override fun equals(other: Any?) = other is Slips && cost.contentEquals(other.cost) && keys.contentEquals(other.keys)
 
     override fun hashCode() = cost.contentHashCode() * 31 + keys.contentHashCode()
 
-    /** Built a match at a time, in the order of the edge's matches. */
+    /** In edge-match order. */
     class Builder {
-        // none until the first slip: most runs a segmenter builds for have none (the work of keys tapped on target)
+        // empty until the first slip: most runs have none
         private var cost = FloatArray(0)
         private var keys = IntArray(0)
         var size = 0

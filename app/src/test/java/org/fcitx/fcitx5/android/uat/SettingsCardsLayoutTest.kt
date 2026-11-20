@@ -38,10 +38,9 @@ import org.robolectric.shadows.ShadowDialog
 import splitties.dimensions.dp
 
 /**
- * The three card pages laid out (dev/design/061-settings-cards.md §8.1): on the phones and font sizes of §2.3's
- * table, in Chinese and English, upright and on the side, what each must show without a scroll is in the
- * window, no name or count cut, the badge clear of the picture and the name. Robolectric has no status or
- * navigation bar: h568 is a 360×640 phone's window with both taken off.
+ * The three card pages laid out on the phones and font sizes of the design's table: what each must show without a
+ * scroll is in the window, no name or count cut. Robolectric has no status or navigation bar: h568 is a 360×640
+ * phone's window with both taken off.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // text measured as drawn
@@ -76,7 +75,6 @@ class SettingsCardsLayoutTest : RarePageUat() {
     @Config(qualifiers = "en-w393dp-h851dp-port-440dpi", fontScale = 1.3f)
     fun phoneLargeFontEnglish() = allFit(stacked = true)
 
-    // 生僻字屏蔽's cards scroll here (§3.1), the first in view
     @Test
     @Config(qualifiers = "zh-rCN-w360dp-h568dp-port-xhdpi", fontScale = 1.3f)
     fun smallPhonesWindowLargeFont() = allFit(rareInView = 1)
@@ -94,7 +92,7 @@ class SettingsCardsLayoutTest : RarePageUat() {
     @Config(qualifiers = "en-w851dp-h393dp-land-440dpi")
     fun onItsSideEnglish() = allFit()
 
-    // [stacked]: the editor's three buttons (restore, cancel, OK) one above another, as English's are on a phone upright
+    // [stacked]: the editor's three buttons one above another, as English's are on a phone upright
     private fun allFit(rareInView: Int = 4, stacked: Boolean = false) {
         rarePage(rareInView)
         keysPage()
@@ -106,7 +104,7 @@ class SettingsCardsLayoutTest : RarePageUat() {
 
     private val land get() = activity.resources.configuration.screenWidthDp > activity.resources.configuration.screenHeightDp
 
-    // the whole of [v] on the screen as it is, nothing scrolled: no parent clips any of it
+    // no parent clips any of it
     private fun assertInView(what: String, v: View) {
         val seen = Rect()
         assertTrue("$what shown", v.isShown && v.getGlobalVisibleRect(seen))
@@ -116,7 +114,6 @@ class SettingsCardsLayoutTest : RarePageUat() {
 
     private fun rect(v: View) = IntArray(2).also(v::getLocationInWindow).let { (x, y) -> Rect(x, y, x + v.width, y + v.height) }
 
-    // no line cut short, at most [lines] of them, all inside the view
     private fun assertWhole(v: TextView, lines: Int) {
         val text = v.text.toString()
         val layout = v.layout ?: error("$text not laid out")
@@ -126,7 +123,7 @@ class SettingsCardsLayoutTest : RarePageUat() {
         assertTrue("$text too wide", (0 until layout.lineCount).all { layout.getLineWidth(it) <= v.width - v.paddingLeft - v.paddingRight + 0.5f })
     }
 
-    // a strip of a card (§2.7): 48 dp at least, its count whole and clear of the box's picture, the box no target
+    // 48 dp at least, its count whole and clear of the box's picture, the box no target
     private fun assertStrip(what: String, strip: CheckStrip) {
         assertTrue("$what's strip ${strip.height} px", strip.height >= strip.dp(CheckStrip.MIN_HEIGHT_DP))
         assertWhole(strip.count, 2)
@@ -137,8 +134,6 @@ class SettingsCardsLayoutTest : RarePageUat() {
         assertFalse(strip.box.isFocusable)
     }
 
-    // 生僻字屏蔽: four cards, the first [inView] of them, body and strip, in view; names one line, the about two;
-    // samples only where the window is 600 dp high
     private fun rarePage(inView: Int) {
         openPage()
         val samples = CardColumns.samples(activity.resources.configuration.screenHeightDp.toFloat())
@@ -163,8 +158,6 @@ class SettingsCardsLayoutTest : RarePageUat() {
 
     private val forms = listOf("full", "t9", "g14", "g18", "zy9", "zyfull", "num", "fn")
 
-    // 按键字符和快捷键: eight cards all in view, a row as high as each other, names whole in two lines, the badge
-    // (here on 全键盘, 九键 and 14 键) clear of the picture and the name
     private fun keysPage() {
         prefs.set(
             AppPrefs.getInstance().internal.keySwipes,
@@ -187,13 +180,11 @@ class SettingsCardsLayoutTest : RarePageUat() {
             val glyph = KeyboardHarness.all(cell).filterIsInstance<KeyboardGlyphView>().single()
             assertFalse("$form: the badge over the picture", Rect.intersects(rect(badge), rect(glyph)))
             assertFalse("$form: the badge over the name", Rect.intersects(rect(badge), rect(name)))
-            // above the card, in the room the row keeps over it: all of it, not clipped by the row
             assertInView("$form's badge", badge)
         }
         assertEquals(3, badges)
     }
 
-    // 多选: each card's strip
     private fun multiSelect() {
         var v: View = KeyboardHarness.all(decor).filterIsInstance<TextView>().first { it.text.toString() == s(R.string.swipe_multi_select) }
         while (!v.hasOnClickListeners()) v = v.parent as View
@@ -206,9 +197,8 @@ class SettingsCardsLayoutTest : RarePageUat() {
         idle()
     }
 
-    // the editor of 全键盘's a, its key's own default changed (the restore button besides cancel and OK): the
-    // three title rows and OK in view; the open card's inner scroll where the titles stay put, all folded where
-    // the whole scrolls (§5.1) — so too with the buttons stacked, laid out in a second pass
+    // the open card's inner scroll where the titles stay put, all folded where the whole scrolls; so too with the
+    // buttons stacked, laid out in a second pass
     private fun editor(stackedHere: Boolean) {
         prefs.set(AppPrefs.getInstance().internal.keySwipes, SwipeSlots.Default.with("full/a", true, SwipeSlot.Empty).serialize())
         st.open(SettingsRoute.PopupOverrides)

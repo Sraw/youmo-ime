@@ -36,19 +36,16 @@ import java.io.File
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 
 /**
- * The code row and the candidates while pinyin is half typed and the keyboard is made anew or put
- * away (uat/18, A2): a setting that makes it anew ends what was typed as leaving the field does
- * (pinyin's code dropped, English's word in the field committed); a view made anew otherwise (the
- * system's, floating and docked) shows the engine's whole state; nothing left that the next key does
- * not replace. On a real [KotlinHost] (its own thread, its own caches) over a scripted engine.
+ * The code row and candidates while pinyin is half typed and the keyboard is made anew or put away: a setting that
+ * remakes it ends what was typed as leaving the field does; a view made anew otherwise shows the engine's whole
+ * state. On a real [KotlinHost] over a scripted engine.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class StuckBarUatTest {
 
-    // what a case and the host change in the store put back, whatever fails: startedHost's firstRun, the keyboard, the
-    // style (D7: this class's flake at SDK 29 never reproduced; these were what it left behind for the next test)
+    // startedHost's firstRun, the keyboard and the style put back whatever fails: what this class's flake at SDK 29 left behind
     @get:Rule
     val prefs = PrefsRule()
 
@@ -85,14 +82,12 @@ class StuckBarUatTest {
 
     private fun state() = "preedit [${fcitx.inputPanelCached.preedit}] field [${h.field.text}] shown ${h.texts().take(12)}"
 
-    // n i on the full keyboard: the code row says ni, the bar offers 你好
     private fun ni() {
         "ni".forEach { h.tap(h.key(it.toString())) }
         until("ni typed", ::state) { fcitx.inputPanelCached.preedit.toString() == "ni" && shown("你好") != null }
         assertTrue(state(), shown("ni") != null)
     }
 
-    // what was typed dropped, not committed: the field empty, the code row and the bar too, the engine reset
     private fun nothingLeft() {
         until("ni dropped", ::state) { fcitx.inputPanelCached.preedit.isEmpty() && shown("你好") == null }
         assertEquals(state(), "", h.field.text.toString())
@@ -100,7 +95,6 @@ class StuckBarUatTest {
         assertTrue("the engine reset: ${engine.events}", EngineEvent.RESET in engine.events)
     }
 
-    // h a o typed after: the bar follows the new keys, nothing of ni before them
     private fun haoFollows() {
         "hao".forEach { h.tap(h.key(it.toString())) }
         until("hao typed", ::state) { fcitx.inputPanelCached.preedit.toString() == "hao" && shown("你好") != null }
@@ -114,7 +108,6 @@ class StuckBarUatTest {
         start()
         ni()
         engine.events.clear()
-        // the setting that swaps pinyin's keyboard: the input view made anew
         prefs.set(keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
         h.idle()
         nothingLeft()
@@ -161,7 +154,6 @@ class StuckBarUatTest {
         }
         until("English", ::state) { fcitx.inputMethodEntryCached.uniqueName == InputMethodCatalog.ENGLISH }
         "he".forEach { h.tap(h.key(it.toString())) }
-        // English's word is the field's composing text, not a code above the bar
         until("he composing", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) >= 0 && h.field.text.toString() == "he" }
         engine.events.clear()
         ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
@@ -169,7 +161,6 @@ class StuckBarUatTest {
         until("he committed", ::state) { BaseInputConnection.getComposingSpanStart(h.field.text) < 0 }
         assertEquals(state(), "he", h.field.text.toString())
         assertTrue("the engine reset: ${engine.events}", EngineEvent.RESET in engine.events)
-        // the next letter a new word after it, not he's
         h.tap(h.key("x"))
         until("x composing", ::state) { h.field.text.toString() == "hex" }
         assertEquals(state(), 2, BaseInputConnection.getComposingSpanStart(h.field.text))
@@ -182,7 +173,6 @@ class StuckBarUatTest {
         ni()
         engine.events.clear()
         for (floating in listOf(true, false)) {
-            // the handle dragged off the bottom, then back: the keyboard made anew, nothing typed ended
             if (floating) prefs.setStyle(KeyboardStyle.FLOATING) else prefs.setStyleDefault()
             h.idle()
             h.relayout()
@@ -198,7 +188,6 @@ class StuckBarUatTest {
     fun pinyinLeftForAnotherAppAndBackLeavesNothing() {
         start()
         ni()
-        // Home, the recents' other app, a notification's: the keyboard put away and the field left
         h.service.onFinishInputView(true)
         h.service.onFinishInput()
         h.idle()

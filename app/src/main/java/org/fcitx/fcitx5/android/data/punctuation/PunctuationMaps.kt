@@ -11,12 +11,8 @@ import java.io.IOException
 import java.io.InputStream
 
 /**
- * The punctuation maps' files for the Kotlin host: the user's `punctuation/punc.mb.<lang>` under
- * fcitx's data ([dataDir]; none: the built-in tables only) replaces the built-in table ([openBuiltIn])
- * whole when it is there, as the punctuation addon has it. Parsing is [PunctuationTable]'s. A user's table
- * that cannot be read is [onUnreadable]'s to tell. Since 0.6.1 no page edits it and nothing writes one (R26
- * F8109/F8279: the save path went with the page): one edited before is deleted once ([dropEdited]), one a backup
- * brings dropped by the restore, so the built-in table is everyone's.
+ * The user's `punctuation/punc.mb.<lang>` replaces the built-in table whole, as the punctuation addon has it. No page
+ * edits it now: one edited earlier is deleted once ([dropEdited]) and a restore drops a backup's.
  */
 class PunctuationMaps(
     private val dataDir: File?,
@@ -25,10 +21,10 @@ class PunctuationMaps(
 ) {
     private fun file(lang: String) = dataDir?.let { File(it, "$DIR/$TABLE$lang") }
 
-    /** The table in use: the user's, else the built-in one, else none. */
+    /** The user's, else the built-in one, else none. */
     fun load(lang: String): List<PunctuationMapEntry> {
         val user = file(lang)?.takeIf { it.isFile } ?: return builtIn(lang)
-        // a user's file that cannot be read leaves the keyboard the built-in marks, not none
+        // an unreadable user file leaves the built-in marks, not none
         return try {
             entries(user.readBytes())
         } catch (e: IOException) {
@@ -38,7 +34,7 @@ class PunctuationMaps(
         }
     }
 
-    /** The built-in table, what 恢复默认 shows. */
+    /** What 恢复默认 shows. */
     fun builtIn(lang: String): List<PunctuationMapEntry> =
         openBuiltIn(lang)?.use { entries(it.readBytes()) }.orEmpty()
 
@@ -46,13 +42,9 @@ class PunctuationMaps(
         PunctuationTable.parse(bytes).map { PunctuationMapEntry(it.key, it.mapping, it.altMapping) }
 
     companion object {
-        /** The user's tables' directory under fcitx's data. */
         const val DIR = "punctuation"
 
-        /**
-         * The user's tables under [dataDir] deleted, every language's (0.6.1: no page edits them, the built-in
-         * table everywhere): whether none is left. No directory, none; one that cannot be listed, not known.
-         */
+        /** Whether none is left; unknown when the directory cannot be listed. */
         fun dropEdited(dataDir: File): Boolean {
             val dir = File(dataDir, DIR)
             if (!dir.exists()) return true
@@ -60,7 +52,7 @@ class PunctuationMaps(
             return tables.map { it.delete() }.all { it }
         }
 
-        // a table's name, its language after it (a save's `.new` too)
+        // its language after it (a save's `.new` too)
         private const val TABLE = "punc.mb."
     }
 }

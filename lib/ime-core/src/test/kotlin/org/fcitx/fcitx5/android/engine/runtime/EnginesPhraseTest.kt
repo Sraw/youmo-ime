@@ -19,11 +19,7 @@ import org.junit.Test
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 
-/**
- * A whole phrase (U-73) deleted from its long press, as [Engines] wires it: its count alone goes
- * (再完整上屏 3 次又出来), never a word of the same text, added by hand, imported or a table's
- * saved, and an undo brings the count back (review of 051-predict, MUST 1).
- */
+/** A whole phrase deleted by long press: its count alone goes, never a word of the same text; undo brings it back. */
 class EnginesPhraseTest {
     private val pinyin = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
@@ -100,8 +96,7 @@ class EnginesPhraseTest {
         if (inWubi()) add("table")
     }
 
-    // the phrase's text a word of the user's, [byHand] added else imported (adding one imported takes it off
-    // the imports), and a table's saved (an older build's); then put in whole three times: offered
+    // [byHand] added else imported, plus a table's saved phrase; then put in whole three times
     private fun prepared(engines: Engines, byHand: Boolean): Set<String> {
         if (byHand) {
             assertTrue(engines.addWord(PHRASE, "zhang xiao ming tong xue"))
@@ -109,7 +104,6 @@ class EnginesPhraseTest {
             assertEquals(1, engines.importWords(sequenceOf("$PHRASE zhang'xiao'ming'tong'xue 5"), "a.txt").imported)
         }
         repeat(3) { engines.typedWhole() }
-        // an imported word typed is the user's (U-102): learned now
         return engines.words().also { assertEquals(setOf(if (byHand) "ADDED" else "LEARNED", "table"), it) }
     }
 
@@ -128,13 +122,11 @@ class EnginesPhraseTest {
             val done = engines.learning(pinyinIm, LearningOp.Delete(0, REST)) as LearningResult.Done
             assertNotEquals(LearningResult.NO_UNDO, done.undo)
             assertEquals(words, engines.words())
-            // taken back at once, as the chip does: offered again
             assertEquals(LearningResult.Done(), engines.learning(pinyinIm, LearningOp.Undo(done.undo)))
             assertEquals(REST, engines.afterZhangXiaoming().first())
-            // deleted for good: no longer offered, the words stay
             val again = engines.learning(pinyinIm, LearningOp.Delete(0, REST))
             assertTrue("$byHand $again", again is LearningResult.Done)
-            // as a phrase: imported, its pieces were put in apart at first, 同学 after 张小明 a pair learned (U-71)
+            // as a phrase: imported, its pieces were put in apart at first, 同学 after 张小明 a pair learned
             val after = engines.afterZhangXiaoming()
             assertFalse("$byHand $after", after.indexOf(REST).let { it >= 0 && engines.phraseAt(pinyinIm, it) })
             assertEquals(words, engines.words())
@@ -170,7 +162,6 @@ class EnginesPhraseTest {
         assertTrue(records(dir).none { it is LearnRecord.Forget })
     }
 
-    // 删除: three more whole commits to come back (U-73)
     @Test
     fun deletedItComesBackAfterThreeMore() {
         Engines(::load, MemoryFiles()).use { engines ->

@@ -40,7 +40,6 @@ class PinyinSessionCursorTest {
     fun aKeyMissedIsTypedWhereTheTapPutTheCursor() {
         val session = session()
         val typed = session.type("nhao")
-        // after the n
         val tapped = session.apply(Cursor(1))
         assertTrue(tapped.handled)
         assertEquals(typed.preedit, tapped.preedit)
@@ -48,7 +47,6 @@ class PinyinSessionCursorTest {
         val fixed = session.apply(Key('i'))
         assertEquals("ni hao", fixed.preedit)
         assertEquals("你好", fixed.candidates.first())
-        // after the i: before the space between the syllables
         assertEquals(2, fixed.cursor)
     }
 
@@ -56,7 +54,6 @@ class PinyinSessionCursorTest {
     fun backspaceDeletesBeforeTheCursor() {
         val session = session()
         session.type("nixhao")
-        // after the x
         session.apply(Step(-3))
         val fixed = session.apply(Backspace)
         assertEquals("ni hao", fixed.preedit)
@@ -92,9 +89,7 @@ class PinyinSessionCursorTest {
     fun aSeparatorTypedIsAKeyTheCursorPasses() {
         val session = session()
         assertEquals("xi'an", session.type("xi'an").preedit)
-        // before the a
         assertEquals(3, session.apply(Step(-2)).cursor)
-        // before the separator
         assertEquals(2, session.apply(Step(-1)).cursor)
         assertEquals("xian", session.apply(Step(1)).let { session.apply(Backspace) }.preedit)
     }
@@ -117,7 +112,6 @@ class PinyinSessionCursorTest {
         val session = session()
         val s = session.type("nihao")
         session.apply(Select(s.candidates.indexOf("你")))
-        // a tap on 你: the cursor at the end of the pieces, after 你
         val tapped = session.apply(Cursor(0))
         assertEquals(1, tapped.cursor)
         // what is before it is 你's last key: 你 goes, and its keys are read again but that
@@ -146,7 +140,6 @@ class PinyinSessionCursorTest {
     fun 双拼MovesAKeyAtATimeThroughWhatIsSpeltOut() {
         val session = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.XIAOHE), spell = true)
         assertEquals("ni hao", session.type("nihc").preedit)
-        // between the syllables' keys
         assertEquals(2, session.apply(Step(-2)).cursor)
         assertEquals(0, session.apply(Step(-2)).cursor)
     }
@@ -167,7 +160,6 @@ class PinyinSessionCursorTest {
         val shown = session.type("xi'").preedit
         assertEquals(1, session.apply(Cursor(1)).cursor)
         assertEquals(session().type("xai'").preedit, session.apply(Key('a')).preedit)
-        // the a went between x and i, not after the separator
         assertEquals("xi", shown)
     }
 
@@ -209,14 +201,12 @@ class PinyinSessionCursorTest {
     fun theNineKeysKeepACursorToo() {
         val session = nineKeys()
         session.type("6426")
-        // after the 6
         session.apply(Step.START)
         assertEquals(1, session.apply(Step(1)).cursor)
         val fixed = session.apply(Key('4'))
         assertEquals("ni hao", fixed.preedit)
         assertEquals("你好", fixed.candidates.first())
         assertEquals(2, fixed.cursor)
-        // a stray 6 after ni deleted
         session.apply(Step(1))
         session.apply(Key('6'))
         assertEquals("ni hao", session.apply(Backspace).preedit)
@@ -245,7 +235,6 @@ class PinyinSessionCursorTest {
         val taken = after.apply(Action.Syllable(0))
         assertEquals("ni'hao", taken.preedit)
         assertEquals(5, taken.cursor)
-        // before them, in a syllable taken before: where it was
         val before = nineKeys()
         before.type("64426")
         val ni = before.apply(Action.Syllable(0))
@@ -262,10 +251,7 @@ class PinyinSessionCursorTest {
         moved.apply(Action.Letter('a'))
         moved.type("6")
         moved.apply(Step(-1))
-        // a slice of refining meanwhile is no key
         moved.apply(Action.Refine)
-        // after the A: again would have made it B, in its place; the keyboard's b is no letter typed as
-        // itself either, but a press of the 2, any of its letters
         val s = moved.apply(Action.Letter('b', again = true))
         val typed = nineKeys()
         typed.apply(Action.Letter('a'))
@@ -283,7 +269,6 @@ class PinyinSessionCursorTest {
         session.type("426")
         session.apply(Step.START)
         val typed = session.apply(Action.Letter('n'))
-        // N426, the n read with the 4 as ni
         assertEquals("ni 26", typed.preedit)
         assertEquals(1, typed.cursor)
     }
@@ -293,7 +278,6 @@ class PinyinSessionCursorTest {
         val session = session()
         assertFalse(session.apply(Cursor(0)).handled)
         assertFalse(session.apply(Step(-1)).handled)
-        // nor over the words offered after a commit
         session.type("wo")
         assertTrue(session.apply(Select(0)).predicting)
         assertFalse(session.apply(Step(-1)).handled)
@@ -309,7 +293,6 @@ class PinyinSessionCursorTest {
         assertEquals("ni hao", fixed.preedit)
         assertEquals(-1, keyboard.onEvent(EngineEvent.OTHER, END).cursor)
         assertEquals(5, keyboard.onEvent(EngineEvent.OTHER, LEFT).cursor)
-        // another key no character: swallowed, the input as it was
         val tab = keyboard.onEvent(EngineEvent.OTHER, TAB)
         assertTrue(tab.handled)
         assertEquals(5, tab.cursor)

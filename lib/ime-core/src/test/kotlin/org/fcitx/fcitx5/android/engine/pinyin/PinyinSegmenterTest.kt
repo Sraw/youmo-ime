@@ -73,7 +73,6 @@ class PinyinSegmenterTest {
         val ni = g.edge("ni", Kind.SYLLABLE)
         assertEquals(5, g.to(ni))
         assertEquals(9, g.to(g.edge("hao", Kind.SYLLABLE)))
-        // a separator is never a node
         assertTrue(g.edges(3).isEmpty() && g.edges(4).isEmpty())
     }
 
@@ -88,9 +87,7 @@ class PinyinSegmenterTest {
         assertEquals(setOf("n:SYLLABLE", "ni:SYLLABLE"), plain.segment("nihao").leaving(0))
         val zhongg = plain.segment("zhongg")
         assertEquals(setOf("g:INITIAL"), zhongg.leaving(5))
-        // zhon is the slip for zhong
         assertEquals(setOf("zhon:SYLLABLE", "zhong:SYLLABLE"), zhongg.leaving(0))
-        // zh alone, or z and h alone: zhrm is 中华人民
         assertEquals(setOf("zh:INITIAL", "z:INITIAL"), plain.segment("zhg").leaving(0))
         assertEquals(setOf("h:INITIAL"), plain.segment("zhg").leaving(1))
         // but z not where zh starts a syllable, though zh stands alone there
@@ -102,11 +99,9 @@ class PinyinSegmenterTest {
     @Test
     fun aVowelStandsForTheSyllablesItStarts() {
         val ag = plain.segment("ag")
-        // ag is also on the way to agn, the slip for ang
         assertEquals(setOf("a:SYLLABLE", "a:INITIAL", "ag:PARTIAL"), ag.leaving(0))
         assertEquals(COMPLETION, ag.flags(ag.edge("a", Kind.INITIAL), "ai"))
         assertEquals(null, ag.flags(ag.edge("a", Kind.INITIAL), "e"))
-        // only where no longer syllable starts: an is an, not 爱你
         assertEquals(setOf("a:SYLLABLE", "an:SYLLABLE"), plain.segment("anb").leaving(0))
     }
 
@@ -116,7 +111,6 @@ class PinyinSegmenterTest {
         assertEquals(setOf("zho:PARTIAL", "zh:INITIAL"), g.leaving(0))
         assertEquals("zhong… zhou…", g.matches(g.edge("zho", Kind.PARTIAL)).toString())
         assertEquals(setOf("zho:PARTIAL", "zh:INITIAL"), plain.segment("zho'ng").leaving(0))
-        // not part-way through the input: zho there is zh + o
         assertFalse("zho:PARTIAL" in plain.segment("zhoa").leaving(0))
     }
 
@@ -131,16 +125,13 @@ class PinyinSegmenterTest {
         // zhon spells zhong only as a slip; finishing it is the better reading
         val zhon = plain.segment("zhon")
         assertEquals("zhong…", zhon.matches(zhon.edge("zhon", Kind.PARTIAL)).toString())
-        // nothing to go on to
         assertFalse("zhang:EXTENDED" in plain.segment("zhang").leaving(0))
         assertFalse("zhan:EXTENDED" in plain.segment("zhanb").leaving(0))
-        // a separator after a whole syllable closes it
         assertFalse("zhan:EXTENDED" in plain.segment("zhan'g").leaving(0))
         // a finished slip or fuzzy spelling is no start of one: jv goes on to jvan, not to ju
         val jv = plain.segment("jv")
         assertEquals("juan!… jue!… jun!…", jv.matches(jv.edge("jv", Kind.PARTIAL)).toString())
         val zan = PinyinSegmenter(setOf(Fuzzy.Z_ZH)).segment("zan")
-        // zhan~ is what zan already is; zhang~ is what zang would be
         assertEquals("zang… zhang~…", zan.matches(zan.edge("zan", Kind.EXTENDED)).toString())
     }
 
@@ -156,7 +147,6 @@ class PinyinSegmenterTest {
             assertEquals(COMPLETION, z.flags(z.indexOf(Syllables.id("zhong"))))
             assertEquals(COMPLETION, z.flags(z.indexOf(Syllables.id("zong"))))
         }
-        // but zh does not stand for z without it
         val plainZh = plain.segment("zhg").let { it.matches(it.edge("zh", Kind.INITIAL)) }
         assertEquals(-1, plainZh.indexOf(Syllables.id("zong")))
         val zh = fuzzy.segment("zhg").let { it.matches(it.edge("zh", Kind.INITIAL)) }
@@ -169,13 +159,11 @@ class PinyinSegmenterTest {
         assertEquals("guan guang~", matchesOf(PinyinSegmenter(setOf(Fuzzy.UAN_UANG)), "guan").toString())
         val uOu = PinyinSegmenter(setOf(Fuzzy.U_OU))
         assertEquals("dou~ du", matchesOf(uOu, "du").toString())
-        // the u of ju is ü, which ou is no slip for
         assertEquals("ju", matchesOf(uOu, "ju").toString())
         assertEquals(null, matchesOf(uOu, "jou"))
         val vU = PinyinSegmenter(setOf(Fuzzy.V_U))
         assertEquals("lu~ lv", matchesOf(vU, "lv").toString())
         assertEquals("nu nv~", matchesOf(vU, "nu").toString())
-        // only l and n have both
         assertEquals(null, matchesOf(vU, "bv"))
         assertEquals("ju!", matchesOf(vU, "jv").toString())
     }
@@ -184,7 +172,6 @@ class PinyinSegmenterTest {
     fun fuzzyPairsDoNotChain() {
         val fuzzy = PinyinSegmenter(setOf(Fuzzy.L_N, Fuzzy.L_R))
         assertEquals("lan nan~ ran~", matchesOf(fuzzy, "lan").toString())
-        // n reaches l, and l reaches r, but n does not reach r
         assertEquals("lan~ nan", matchesOf(fuzzy, "nan").toString())
         assertEquals("lan~ ran", matchesOf(fuzzy, "ran").toString())
         // m, n, ng and r are not initial + final, so no rule reaches them
@@ -202,16 +189,13 @@ class PinyinSegmenterTest {
         val strict = PinyinSegmenter(typos = false)
         assertEquals(null, matchesOf(strict, "zhagn"))
         assertEquals("lve", matchesOf(strict, "lue").toString())
-        // lue is standard, so fuzzy rules reach it like lve
         assertEquals("lve~ nve", matchesOf(PinyinSegmenter(setOf(Fuzzy.L_N)), "nue").toString())
-        // a fuzzy spelling slipped as well carries both flags
         assertEquals(FUZZY or TYPO, PinyinSegmenter(setOf(Fuzzy.Z_ZH)).segment("zagn").let { it.flags(it.edge("zagn", Kind.SYLLABLE), "zhang") })
     }
 
     @Test
     fun aLetterSlippedOntoTheNextKeyIsReadAsMeant() {
         val slips = PinyinSegmenter(neighbours = true)
-        // p is next to o
         assertEquals("hao?", matchesOf(slips, "hap").toString())
         for (typed in listOf("nihap", "nihapma")) {
             val g = slips.segment(typed)
@@ -221,8 +205,6 @@ class PinyinSegmenterTest {
         assertEquals("ai? ei? qi? si? wo? wu?", matchesOf(slips, "wi").toString())
         // what spells a syllable as typed is that syllable, not a slip for another
         assertEquals("ni", matchesOf(slips, "ni").toString())
-        // a vowel slipped away, the keys left consonants alone, is read only where tapped near it:
-        // with no place, keys that read as 简拼 are read as typed (061-neighbour-correction §4.5)
         assertFalse(slips.segment("zenmeyqng").let { g -> (0 until g.edgeCount).any { g.text(it) == "yqng" } })
         // (over -4, as 双拼's 18 and 14 keys read: 全拼's own floor, -1.75, wants the tap nearer the corner)
         val q = TouchBoxes.tap(TouchBoxes.QWERTY, 'q', dx = 0.3f, dy = 0.4f)
@@ -248,14 +230,12 @@ class PinyinSegmenterTest {
         assertEquals(setOf("f:INITIAL", "fi:PARTIAL"), slips.segment("fi").leaving(0))
         assertEquals(setOf("zh:INITIAL", "zho:PARTIAL"), slips.segment("nizho").leaving(2))
         assertEquals(setOf("zh:INITIAL", "zho:PARTIAL"), slips.segment("nizho'").leaving(2))
-        // but once more follows, it is: zho is no zhong before ba
         val zhi = slips.segment("nizhoba")
         assertEquals(NEIGHBOUR, zhi.flags(zhi.edge("zho", Kind.SYLLABLE), "zhi"))
     }
 
     @Test
     fun whatAFuzzyPairOrTheOtherLueSpellsIsNoSlip() {
-        // sei is shei with s=sh, else a slip for wei
         assertTrue("wei?" in matchesOf(PinyinSegmenter(neighbours = true), "sei").toString().split(' '))
         assertEquals("shei~", matchesOf(PinyinSegmenter(setOf(Fuzzy.S_SH), neighbours = true), "sei").toString())
         // lüe is spelled lue as often as lve, and slips from either: y is next to u, b to v

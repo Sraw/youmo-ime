@@ -8,24 +8,13 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
 
 /**
- * The tones of a dictionary word no curated source (`lexicon/tones.tsv`, the misreadings) reads, by rule
- * rather than a word at a time.
- *
- * 1. A word no source lists takes the tones of the longest word it ends with that one does
- *    (个人爱好 as 爱好 ài hào).
- * 2. A word no source lists ending in 为 has it wéi (沦为, 视为), but 因为.
- *
- * Then, for every word ([full]), curated or not: no neutral tone. A syllable a source reads neutral
- * takes its character's usual tone (东西 dōng xī, 桌子 zhuō zǐ): the user's choice (2026-11-02), every
- * reading in its characters' own tones. A character whose usual tone is the neutral one (的, 吗, 们)
- * has no other to take, and keeps it.
+ * Tones by rule for words no curated source reads: the tones of the longest listed word it ends with (个人爱好 as
+ * 爱好), 为 as wéi at the end but in 因为; then ([full]) a neutral syllable takes its character's usual tone
+ * (桌子 zhuō zǐ) unless that is neutral too (的, 吗).
  */
 object ToneRules {
 
-    /**
-     * [word] (its code points [cps]) read as [reading]: [own] the tones a source gave it, null if none did;
-     * [usual] its characters' usual tones; [listed] another word's listed tones for a reading, if any.
-     */
+    /** [own]: the tones a source gave, or null; [usual]: its characters' usual tones; [listed]: another word's listed tones. */
     fun tones(
         word: String,
         cps: IntArray,
@@ -37,14 +26,13 @@ object ToneRules {
         val out = (own ?: usual).copyOf()
         val n = cps.size
         if (n < 2 || own != null) return out
-        // the longest listed word this one ends with
         val from = (1..n - 2).firstOrNull { listed(String(cps, it, n - it), reading.subList(it, n)) != null }
         if (from != null) listed(String(cps, from, n - from), reading.subList(from, n))!!.copyInto(out, from)
         if (cps.last() == '为'.code && reading.last() == WEI && word != "因为") out[n - 1] = 2
         return out
     }
 
-    /** [tones] with each neutral one its character's [usual] tone, where that is known and not neutral too. */
+    /** Each neutral tone replaced by [usual] where that is known and not neutral. */
     fun full(tones: ByteArray, usual: ByteArray): ByteArray = ByteArray(tones.size) { i ->
         if (tones[i] == NEUTRAL && usual[i] in 1 until NEUTRAL) usual[i] else tones[i]
     }

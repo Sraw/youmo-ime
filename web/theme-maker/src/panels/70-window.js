@@ -1,4 +1,4 @@
-// 面板和窗口 (060-render-p3 §5.1 panel 7): the window round the keys (T7a: the floating keyboard's frame and handle,
+// 面板和窗口: the window round the keys (T7a: the floating keyboard's frame and handle,
 // the buttons beside a one-handed board, the split's gap, the navigation bar) and the app's panels (T7b: the
 // clipboard, the symbols' and emoji's picker, the editing panel, the voice mask, the ink of handwriting over the letter keys). What each
 // reads is the engine's (ThemeReader's WINDOW_READS, PANEL_READS); the preview shows a sample (环境 → 面板样例).

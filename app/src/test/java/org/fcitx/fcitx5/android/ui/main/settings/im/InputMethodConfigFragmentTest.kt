@@ -21,20 +21,17 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** An input method's page (InputMethodConfigFragment) as a back stack saved before has it. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class InputMethodConfigFragmentTest {
 
-    // R26 F8404: 0.6.0's 手写 page, its route restored, popped before its move to 通用输入 runs (the page left in the
-    // same frame): the move not done, no NavController asked of a fragment gone, no crash
+    // a retired page's route restored, popped before its move to 通用输入 runs: the move not done, no crash
     @Test
     fun theRetiredPageLeftBeforeItsMoveCrashesNothing() {
         SettingsHarness().use { st ->
             val nav = st.activity.supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
             nav.navController.navigate(SettingsRoute.InputMethodConfig("手写", InputMethodCatalog.HANDWRITING_RETIRED))
             val looper = shadowOf(Looper.getMainLooper())
-            // till the page's view is made: its move posted, not yet run
             var page: InputMethodConfigFragment? = null
             repeat(MAX_TASKS) {
                 if (page?.view == null) {
@@ -48,7 +45,7 @@ class InputMethodConfigFragmentTest {
             nav.childFragmentManager.executePendingTransactions()
             assertFalse(made.isAdded)
             st.idle()
-            // back where the page was opened from, not moved on to 通用输入 (R26 F8481: no crash alone was held)
+            // back where the page was opened from, not moved on to 通用输入
             val at = nav.navController.currentDestination!!
             assertFalse(at.hasRoute<SettingsRoute.SharedInput>())
             assertTrue(at.hasRoute<SettingsRoute.Index>())

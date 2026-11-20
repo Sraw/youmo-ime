@@ -69,36 +69,21 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     companion object : EssentialWindow.Key {
         /**
-         * The keyboard shown in place of [keyboard] while quick input lasts: its keys are typed letters,
-         * which the zhuyin keyboards send none of (a symbol's own code, which quick input takes as no
-         * key); null where [keyboard] types them itself.
+         * Quick input types letters, which the zhuyin keyboards send none of (a symbol's own code); null
+         * where [keyboard] types them itself.
          */
         fun quickInputStandIn(keyboard: String): String? = when (keyboard) {
             ZhuyinKeyboard.NameNine, ZhuyinKeyboard.NameFull -> TextKeyboard.Name
             else -> null
         }
 
-        /**
-         * Whether quick input's stand-in for [was], the input method's letters then being [lettersThen],
-         * gives way to another input method's [letters] at once: as [was] would, shown
-         * ([LettersLayout.inputMethodChanged]). The letters themselves (a zhuyin keyboard) are the new
-         * ones' place.
-         */
         fun givesWay(was: String, lettersThen: String, letters: String): Boolean =
             was == lettersThen && letters != lettersThen
 
-        /**
-         * The keyboard to show as quick input ends, the full one having stood in for [was] since the
-         * input method's letters were [lettersThen]: [was] again, unless it was the letters and they
-         * changed meanwhile ([lettersNow]); onImeUpdate shows those at once ([givesWay]), so this is a
-         * backstop.
-         */
+        /** [was] again, unless it was the letters and they changed meanwhile; [givesWay] already shows those, so this is a backstop. */
         fun afterQuickInput(was: String, lettersThen: String, lettersNow: String): String =
             if (was == lettersThen) lettersNow else was
 
-        /**
-         * [keyboard]'s rows ([KeyboardHeightCap.rowUnits]) as it is shown in [look], as [rowUnits] counts them.
-         */
         fun rowUnits(keyboard: BaseKeyboard, look: ThemeLook): Double {
             val (layout, env) = keyboard.shownAs(look, keyboard.width.coerceAtLeast(1), keyboard.height.coerceAtLeast(1))
                 ?: return KeyboardHeightCap.DEFAULT_ROWS
@@ -124,13 +109,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private lateinit var keyboardView: FrameLayout
 
-    // each made when first shown: every new input view made 九键 too, which most never use
-    // the window's context and theme asked as each is made: its dependencies, there once it is attached
     private val makers: Map<String, (String?) -> BaseKeyboard> = keyboardMakers({ context }, { theme })
 
-    // [tell] the engine of the keys' ink, in order with the keys; the call sends the Ink key carrying it itself (HostApi.offerInk)
     private fun ink(tell: suspend HostApi.() -> Unit) {
-        // the keyboard hidden while it was read: the input it was for is over
+        // hidden while it was read: the input it was for is over
         if (!service.isInputViewShown) return
         service.postFcitxJob { tell() }
     }
@@ -138,24 +120,19 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val keyboards = hashMapOf<String, BaseKeyboard>()
     private var currentKeyboardName = ""
 
-    /** Whether the keyboard shown last draws the input method's strokes at all (BaseKeyboard.strokesDrawn), for 展开候选's page over it. */
     fun filtersStrokes(): Boolean = keyboards[currentKeyboardName]?.strokesDrawn == true
     private var lastSymbolType: String by AppPrefs.getInstance().internal.lastSymbolLayout
 
-    // the space's badge asks what the hold to talk asks (CommonKeyActionListener), a shown password too
     private val service by manager.inputMethodService()
 
     private val autoCapsPref = AppPrefs.getInstance().keyboard.englishAutoCaps
 
-    // English is typed: Shift may come on by itself at a sentence start
     private var english = false
 
-    // a word is being composed: no sentence starts within it, and the editor is not asked
     private var composing = false
 
-    // a temporary mode (快速输入, Unicode) is on: its panel is the only one with a line above a
-    // preedit (HostCore.showPanel, a TempPanel's auxUp; the input method's name there comes with
-    // nothing typed), and what is typed in it is not the input method's
+    // its panel is the only one with a line above a preedit (a TempPanel's auxUp), and what is typed in it is
+    // not the input method's
     private var tempMode = false
 
     override fun onPreeditEmptyStateUpdate(empty: Boolean) {
@@ -163,8 +140,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         keyboards[currentKeyboardName]?.imTyping = composing && !tempMode
     }
 
-    // the keyboard the full one stands in for while quick input lasts ([quickInputStandIn]), shown again
-    // after, and the input method's letters then
     private var standingInFor: String? = null
     private var lettersWhenStoodIn = ""
 
@@ -185,8 +160,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
-    // a layout of the user's (KeyboardNames.custom): its keyboard made anew where its file is (a new stamp), the ones of an
-    // older stamp dropped; another name of the same stamp (a number board's other pads) kept
+    // a user's layout is remade where its file has a new stamp, the older stamp's dropped; another name of
+    // the same stamp (a number board's other pads) kept
     private val currentKeyboard: BaseKeyboard?
         get() {
             val name = currentKeyboardName
@@ -198,11 +173,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
 
     /**
-     * The rows the shown keyboard's layout has now, each counted by its height ([KeyboardHeightCap.rowUnits]): 注音's
-     * five, a custom layout's own. What the keys' least height is of where the app's room is short
-     * (061-landscape-height §5.2); four where no layout read. Expanded in the keyboard's size as last laid out, 1 × 1
-     * before it was (the keys are worked out before they are laid out): the built-in layouts' rows and their heights
-     * do not depend on the size; a layout whose rows did would be counted at 1 × 1 first.
+     * 注音's five, a custom layout's own; four where none read. The keys' least height where room is short.
+     * Expanded at the last laid-out size, 1 × 1 before: the built-in layouts' rows do not depend on it.
      */
     fun rowUnits(): Double {
         val keyboard = currentKeyboard ?: return KeyboardHeightCap.DEFAULT_ROWS
@@ -211,23 +183,19 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val spaceKeys = SpaceKeyInputMethod()
 
-    // the last run's keys read after this keyboard was made (the service's read on its thread, slower): taken now
     private fun known(): Boolean {
         if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
         return punctuation.known
     }
 
-    // the tap felt once while the punctuation keys are held back
     private var heldBackFelt = false
 
-    // a punctuation key while what it types is not known (a first install, the host not up): held back, a tap felt
-    // once, as no face could show what it would type (060-render-p2 S7a)
+    // unknown before the host is up (a first install): held back, a tap felt once, as no face could show it
     private fun heldBack(action: KeyAction): Boolean {
         if (known()) return false
         val mark = when (action) {
             is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code?.let(::isAsciiMark) == true
             is KeyAction.SymAction -> isAsciiMark(action.sym.sym)
-            // 九键's 1 and its column: typed as the punctuation maps it, held back as the ，。 keys are
             is KeyAction.CommitAction -> action.punctuation
             else -> false
         }
@@ -249,7 +217,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val popupActionListener: PopupActionListener by lazy {
         val shown = popup.listener
-        // nor its bubble
         PopupActionListener { a ->
             if (a !is PopupAction.PreviewAction || known() || a.content.singleOrNull()?.code?.let(::isAsciiMark) != true) shown.onPopupAction(a)
         }
@@ -282,7 +249,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.inMultiLineField = multiLine
             it.imTyping = composing && !tempMode
             it.tempMode = tempMode
-            // written on the letters (the toolbar's 手写): the current input method's own handwriting's
+            // the toolbar's 手写: the current input method's own handwriting's
             it.inkSink = { reading, piece -> ink { if (reading != null) offerInk(reading, piece) else inkFinished(piece) } }
             stripOwned = it.ownsSyllables
             preedit.ui.syllables.owned = stripHidden()
@@ -290,37 +257,28 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
                 keyboardView.apply { add(it, lParams(matchParent, matchParent)) }
                 it.onAttach()
                 it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
-                // the punctuation as it is now: a keyboard kept while another was shown missed what changed
-                // meanwhile, and would show , where it types ， (the user's 「显示和输出一致」, 060-render-p2 S4d)
+                // a keyboard kept while another was shown missed changes, and would show , where it types ，
                 it.onPunctuationUpdate(punctuation.mapping)
             }
         }
     }
 
-    // whether the keyboard shown offers the syllables itself (九键's column), as it attached
     private var stripOwned = false
 
-    // the code row's strip hidden: 九键's column offers the syllables, or the input method's keyboard
-    // shows none (its code row thin); on each attach and input method change
     private fun stripHidden() = syllablesOwned(stripOwned, KawaiiBarComponent.showsStrip(spaceKeys.current?.uniqueName))
 
-    /** Whether the letters are the layout shown, which take the whole width, split. */
     val lettersShown get() = KeyboardNames.base(currentKeyboardName) == TextKeyboard.Name
 
-    /** Told each layout shown: InputView, which puts the others at a side while the letters split. */
     var onLayoutShown: (() -> Unit)? = null
 
-    // a zhuyin keyboard first shown: Taiwan's users write 繁体, 简繁 is in ⋯ (design 051 Q11 A), said once
     private fun tellZhuyinOnce(target: String) {
         if (target != ZhuyinKeyboard.NameNine && target != ZhuyinKeyboard.NameFull) return
         val told = AppPrefs.getInstance().internal.zhuyinTraditionalTold
-        // already traditional (简繁 on for pinyin): nothing to tell, and it is told the first time it is not.
-        // Not known yet (the host not up): nor now, it may be; told when shown once it is known
         if (told.getValue()) return
         val traditional = EngineState.traditionalIms ?: return
         if (InputMethodCatalog.PINYIN in traditional) return
-        // posted: picked from ⋯, the panel closing as the layout shows would take a notice said now with it.
-        // Told only once said (on the keyboard, else as a toast): a post that never runs, the view gone first, tells it next time
+        // posted: the ⋯ panel closing as the layout shows would take a notice said now with it. Marked told
+        // only once said: a post that never runs tells it next time
         keyboardView.post {
             if (told.getValue()) return@post
             told.setValue(true)
@@ -333,7 +291,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         attachLayout(target)
         onLayoutShown?.invoke()
         tellZhuyinOnce(target)
-        // the letters back from the symbols, Shift off as they attach: at a sentence start, on again
         updateAutoCaps()
         if (windowManager.isAttached(this)) {
             notifyBarLayoutChanged()
@@ -344,12 +301,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private fun newLettersLayout() = LettersLayout(makers.keys, TextKeyboard.Name, PickerWindow.Key.Symbol.name)
 
-    /**
-     * Every keyboard made anew, as a new input view would make them (a keyboard setting changed:
-     * 拼音键盘, 九键's letters, the swipe marks): the cache dropped, the letters shown, what showed
-     * forgotten. The input view tells the input method and the field after, as it starts one
-     * (InputView.remakeKeyboards), and the letters for them are shown then.
-     */
     fun remakeKeyboards() {
         if (!::keyboardView.isInitialized) return
         detachCurrentLayout()
@@ -363,11 +314,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         if (windowManager.isAttached(this)) notifyBarLayoutChanged()
     }
 
-    // the pad of the number, phone or date field focused, shown for the number keyboard
     private val fieldPad = FieldPad()
 
     fun switchLayout(to: String, remember: Boolean = true) {
-        // read now, as before: the memory is what it was when the key was pressed
         val lastSymbol = lastSymbolType
         ContextCompat.getMainExecutor(context).execute {
             val outcome = lettersLayout.switchTo(to, lastSymbol, fieldPad.known(currentKeyboardName), remember)
@@ -381,11 +330,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         }
     }
 
-    // the field's, for the letters to show what an address is made of and no layout to glide there: told each layout as it attaches
     private var address = AddressKeys.NONE
     private var multiLine = false
 
-    // the field asks for no suggestions (CapabilityFlag.NoSpellCheck), where English spells no word on the nine keys
     private var noSuggestions = false
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
@@ -393,9 +340,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         keyboards.values.forEach { it.restartInk() }
         noSuggestions = capFlags.has(CapabilityFlag.NoSpellCheck)
         keyboards.filterKeys { KeyboardNames.base(it) == T9Keyboard.EnglishName }.values.forEach { (it as? T9Keyboard)?.noSuggestions = noSuggestions }
-        // the layout may stay as it is, so the one shown is told now
         currentKeyboard?.inPasswordField = service.inPasswordField
-        // shown again maybe a day later: its corners of variables of the minute now (061-text-variables §2.3)
         currentKeyboard?.catchUpMinute()
         val traits = info.toEditorTraits()
         address = AddressKeys.of(traits)
@@ -404,15 +349,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         typingChanged()
         currentKeyboard?.address = address
         currentKeyboard?.inMultiLineField = multiLine
-        // a number's, phone's or date's field its pad, any other the letters: leaving the one for
-        // another, the input method's letters come back, the nine keys, the 14 keys as they were
         fieldPad.field = NumberPad.of(traits.number)
-        // the user's number board as its file is now (one stat): a file replaced or a choice changed is shown anew, the
-        // 123 key's too (061-custom-layout §7)
         fieldPad.numbers = keyboardPrefs.drawnPanelLayout(PanelLayouts.Panel.NUMBER)
-        // English in a password field is the full keyboard whatever it chose, and its own again in the
-        // next field: the same input method fires no update, so its letters are picked again here and,
-        // shown anew, shown now (switchLayout below would find the letters already there)
+        // English in a password is the full keyboard, its own again in the next field: the same input method
+        // fires no update, so its letters are picked here (switchLayout would find the letters already there)
         spaceKeys.current?.let {
             lettersLayout.inputMethodChanged(lettersOf(it.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField), currentKeyboardName)
                 ?.takeIf { fieldPad.field == null }?.let(::showLayout)
@@ -424,16 +364,13 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     override fun onSelectionUpdate(start: Int, end: Int) = updateAutoCaps()
 
-    // the cursor moved by other than the service's own commit: the nine keys' 1 starts anew
     fun cursorMoved() {
         (currentKeyboard as? T9Keyboard)?.cursorMoved()
     }
 
-    // what the field's caps flags make of the text before the cursor: a capital where a sentence starts
     private fun updateAutoCaps() {
         val keyboard = currentKeyboard as? AutoCapsKeys ?: return
         if (composing || keyboard.capsLocked) return
-        // null after the input is bound and before it first starts
         val inputType = service.currentInputEditorInfo?.inputType
         val wants = english && autoCapsPref.getValue() && inputType != null &&
             (service.currentInputConnection?.getCursorCapsMode(inputType) ?: 0) != 0
@@ -442,13 +379,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val keyboardPrefs = AppPrefs.getInstance().keyboard
 
-    // what is typed, as a theme's scenes (060-render-p3 T5): the input method, the field
     private var typingIm: String? = null
     private var typingField: String? = null
 
     private fun typingChanged() {
         val scenes = SceneTyping.scenes(typingIm, typingField)
-        // the keyboards shown told (BaseKeyboard), this one as it is attached again too
         SceneEnvs.typing = scenes
     }
 
@@ -458,10 +393,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         typingChanged()
         preedit.ui.syllables.owned = stripHidden()
         val letters = lettersOf(ime.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField)
-        // left for another input method while quick input had the place of the pad or a zhuyin keyboard:
-        // as that keyboard would, shown. Where it was the letters the new ones are shown now, and quick
-        // input's end, told after this, brings it no more back; the pad over another's letters stays,
-        // to come back at the end (review Q1, givesWay)
+        // another input method while quick input stood in for the pad or a zhuyin keyboard: as that keyboard
+        // would. The pad over another's letters stays, to come back at the end ([givesWay])
         val stoodIn = standingInFor
         val lent = stoodIn != null && givesWay(stoodIn, lettersWhenStoodIn, letters)
         if (lent) standingInFor = null
@@ -471,7 +404,6 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             else -> stoodIn
         }
         val shown = lettersLayout.inputMethodChanged(letters, current)
-        // a layout shown anew is told the input method as it is attached
         if (shown != null) showLayout(shown) else currentKeyboard?.let(spaceKeys::show)
         english = ime.uniqueName == InputMethodNames.KEYBOARD
         updateAutoCaps()
@@ -511,29 +443,17 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 }
 
-/**
- * Whether the code row's syllables are hidden: the keyboard offers them itself ([owns], 九键's
- * column), or its layout [showsStrip] none ([CodeRowHeight.showsStrip]): asked of the layout, not the
- * row's height, which floating is none in the keyboard.
- */
 internal fun syllablesOwned(owns: Boolean, showsStrip: Boolean): Boolean = owns || !showsStrip
 
-/**
- * Each keyboard by its name, made when asked: the input view's, and a settings page's that tells how the keys
- * draw (SwipeFates).
- */
 internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme): Map<String, (String?) -> BaseKeyboard> {
     fun nineKeys(english: Boolean, custom: String?): T9Keyboard {
         val keyboard = AppPrefs.getInstance().keyboard
         return T9Keyboard(contextOf(), themeOf(), NineKeyLetters.parse(keyboard.t9Letters.getValue()), english = english, semicolon = false, custom = custom)
     }
-    // each given the layout of the user's it draws (KeyboardNames.custom), null for the app's; the keyboards no layout of
-    // the user's is offered for (注音's: 061-custom-layout §5.1) take none
     return mapOf(
         TextKeyboard.Name to { c: String? -> TextKeyboard(contextOf(), themeOf(), c) },
         T9Keyboard.Name to { c: String? -> nineKeys(english = false, c) },
         T9Keyboard.EnglishName to { c: String? -> nineKeys(english = true, c) },
-        // pinyin's: a theme's layout of its own groups typed as such (060-render-p3 T9b); 双拼's take the built-in groups alone
         GroupedKeyboard.Name14 to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), ownGroups = true, custom = c) },
         GroupedKeyboard.Name18 to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, custom = c) },
         GroupedKeyboard.Name18Plain to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, semicolon = false, custom = c) },
@@ -541,21 +461,14 @@ internal fun keyboardMakers(contextOf: () -> Context, themeOf: () -> Theme): Map
             GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false, ownGroups = true, custom = c)
         },
         GroupedKeyboard.NameShuangpin14 to { c: String? -> GroupedKeyboard(contextOf(), themeOf(), NineKeyLetters.G14, Keyboard::shuangpin14Key, custom = c) },
-        // its letters are 全拼's alone
         T9Keyboard.ShuangpinName to { c: String? -> T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = true, custom = c) },
         T9Keyboard.ShuangpinPlainName to { c: String? -> T9Keyboard(contextOf(), themeOf(), shuangpin = true, semicolon = false, custom = c) },
         ZhuyinKeyboard.NameNine to { _: String? -> ZhuyinKeyboard(contextOf(), themeOf(), nine = true) },
         ZhuyinKeyboard.NameFull to { _: String? -> ZhuyinKeyboard(contextOf(), themeOf(), nine = false) },
-        // the number keyboard's pads (a number's, phone's or date's field's own: FieldPad), each the user's number board
-        // where it is for that pad (FieldPad.numbers, 061-custom-layout §7)
         *NumberPad.entries.map { pad -> pad.layout to { c: String? -> NumberKeyboard(contextOf(), themeOf(), pad, c) } }.toTypedArray(),
     )
 }
 
-/**
- * The letters' layout of input method [ime]: its keyboard as [chosen] has it ([ImKeyboards.layoutOf]),
- * 双拼's under [scheme]; the full keyboard for any other, and for English in a [password] field.
- */
 internal fun lettersOf(
     ime: String,
     chosen: ImKeyboards.Chosen = ImKeyboards.Chosen(),
@@ -563,7 +476,6 @@ internal fun lettersOf(
     password: Boolean = false,
 ): String = ImKeyboards.shown(ime, chosen, scheme, password).let { KeyboardNames.of(nameOf(it.layout, scheme), it.custom) }
 
-/** The keyboard [layout] is shown on, by its name; 双拼's 18 and nine keys show `;` only where [scheme] types it. */
 internal fun nameOf(layout: ImKeyboards.Layout, scheme: ShuangpinScheme = ShuangpinScheme.XIAOHE): String = when (layout) {
     ImKeyboards.Layout.TEXT -> TextKeyboard.Name
     ImKeyboards.Layout.PINYIN14 -> GroupedKeyboard.Name14
@@ -578,28 +490,22 @@ internal fun nameOf(layout: ImKeyboards.Layout, scheme: ShuangpinScheme = Shuang
 }
 
 /**
- * The input method on the layouts' space keys. A layout announces a change of it only from the name
- * it showed itself (BaseKeyboard.showInputMethodName), and the user may last have seen another
- * layout's: one being shown is first told that one, before it has a parent, as
- * View.announceForAccessibility says nothing then. The change is announced once, on the layout
- * shown, and never the input method being left, nor a window's first.
+ * A layout announces a change only from the name it showed itself, and the user may have seen another
+ * layout's: one being shown is told that one first, before it has a parent, as announceForAccessibility
+ * says nothing then. Announced once, on the layout shown; never the one being left, nor a window's first.
  */
 internal class SpaceKeyInputMethod {
 
-    // as onImeUpdate last told it: asking fcitx would block the main thread on the fcitx one
     var current: InputMethodEntry? = null
 
-    // what the user last saw on a space key (NumberKeyboard has none)
     private var seen: InputMethodEntry? = null
 
-    /** Shows [keyboard], which [adding] puts in the window, the [current] input method. */
     fun attach(keyboard: BaseKeyboard, adding: () -> Unit) {
         seen?.let(keyboard::onInputMethodUpdate)
         adding()
         show(keyboard)
     }
 
-    /** Shows [keyboard], in the window, the [current] input method. */
     fun show(keyboard: BaseKeyboard) {
         val ime = current ?: return
         keyboard.onInputMethodUpdate(ime)
@@ -608,5 +514,4 @@ internal class SpaceKeyInputMethod {
     }
 }
 
-/** An ASCII mark (not a letter, digit or space): what a punctuation key sends. */
 internal fun isAsciiMark(c: Int): Boolean = c in '!'.code..'~'.code && !Character.isLetterOrDigit(c)

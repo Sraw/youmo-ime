@@ -72,7 +72,7 @@
 - **前提**：同 QU-10；九键用 B0-九键，手写用 B0-手写，注音九键用 B0-注音九键，大千用 B0-注音全键盘，注音两种先在 **按键 → 按键字符和快捷键** 里给一个键设上「快速输入」快捷键。
 - **操作**：九键上长按「符」；手写开着时长按「符」进快速输入，点几个字母，退出后写「人」；注音九键、大千上从快捷键（或勾上的工具栏「快速输入」按钮）进快速输入。
 - **预期**：进快速输入；手写开着时快速输入里字母不变淡、点了就打，退出后接着写；注音九键、大千时换成全键盘，退出后回到原来的键盘；快速输入时换了输入法，和平时换输入法一样，退出后是新输入法的键盘。
-- **JVM**：`LayoutSwitchKeyTest.theNineKeysSymbolsKeyHoldsQuickInputItsNumbersKeyOnlyTaps`、`KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain`；注音两种键盘 `QuickPhraseKeyboardUatTest.theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard`。
+- **JVM**：`NineSceneGesturesTest.eachKeyIsWiredAsCommitted`、`KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain`；注音两种键盘 `QuickPhraseKeyboardUatTest.theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard`。
 
 ### QU-13 [P1] 密码框里不记顺序
 - **前提**：同 QU-10，测试页的「密码」框。

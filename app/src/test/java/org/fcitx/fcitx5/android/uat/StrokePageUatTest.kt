@@ -52,10 +52,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 笔画筛选 drawn on 展开候选's page (uat/06 PY-145–149, uat/16 LS-52, uat/20 AX-20;
- * dev/design/061-stroke-on-candidate-page.md): while pinyin is typed the whole list draws strokes, sent as the keys'
- * are, the page staying; no drag scrolls it then, a tap still picks and a long press still opens the menu. Where the
- * keys draw none, the list is as before. The touch's rules are PageStrokeTouchTest's.
+ * 笔画筛选 drawn on 展开候选's page: while pinyin is typed the whole list draws strokes, the page staying; no drag
+ * scrolls it then, a tap still picks and a long press still opens the menu. The touch's rules are PageStrokeTouchTest's.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -77,10 +75,8 @@ class StrokePageUatTest {
 
     private val keyboard = AppPrefs.getInstance().keyboard
 
-    // the native model's, put back after a row that swapped it
     private val reader = HandwritingRecognition.shared.reader
 
-    // 展开候选 opened over 80 candidates of [pinyin] typed (none: 联想's), 在键上划 [drawing]
     private fun page(drawing: KeyDrawing = KeyDrawing.StrokeFilter, pinyin: String = "hao", aux: String = ""): StrokePageRecyclerView {
         prefs.set(keyboard.keyDrawing, drawing)
         open = KeyboardHarness(TestThemes.PixelLight).start()
@@ -109,7 +105,6 @@ class StrokePageUatTest {
         return generateSequence(text as View) { it.parent as? View }.first { it.hasOnClickListeners() }
     }
 
-    // the candidate at [position] of the list
     private fun word(rv: StrokePageRecyclerView, position: Int): String =
         KeyboardHarness.all(rv.findViewHolderForAdapterPosition(position)!!.itemView).filterIsInstance<TextView>().first().text.toString()
 
@@ -119,17 +114,14 @@ class StrokePageUatTest {
 
     private fun picked() = h.api.calls.filter { it.startsWith("select(") }
 
-    // the first candidate wholly in sight
     private fun first(rv: StrokePageRecyclerView): Int =
         (0 until rv.childCount).map(rv::getChildAt).filter { it.top >= 0 }.minOf(rv::getChildAdapterPosition)
 
-    // a finger down in [word]'s cell's middle, moved in [steps] of 16ms to [dx], [dy] dp from it, lifted there
     private fun draw(word: String, dx: Float, dy: Float, steps: Int = 8) {
         val v = cell(word)
         h.touch(v, *(0..steps).map { i -> h.at(v, dx * i / steps, dy * i / steps, if (i == 0) 0 else 16) }.toTypedArray())
     }
 
-    // a finger dragged up the list from its lower part by 200dp: the list scrolled where its own drag is
     private fun dragUp(rv: StrokePageRecyclerView) {
         val b = h.box(rv)
         h.drag(b, b.exactCenterX(), b.exactCenterY() - 200 * h.service.resources.displayMetrics.density, steps = 16)
@@ -147,7 +139,6 @@ class StrokePageUatTest {
         assertTrue(strokesSent().single().contains(stroke('s')))
         assertEquals(listOf<String>(), picked())
         assertNotNull("the page stays", list())
-        // 横 and 撇, the whole list (a cell and the blank by them alike)
         h.api.calls.clear()
         draw("字7", 40f, 0f)
         draw("字9", -25f, 35f)
@@ -159,8 +150,7 @@ class StrokePageUatTest {
         assertEquals(listOf<String>(), strokesSent() + picked())
     }
 
-    // the keys and the page by one rule (PageStrokeTouch.Draws): over each of pinyin's keyboards the page draws where
-    // its keys do; 注音's keys draw none, nor the page over them
+    // the keys and the page by one rule (PageStrokeTouch.Draws): the page draws where its keys do
     @Test
     @Uat("PY-145")
     fun thePageDrawsOverEachKeyboardAsItsKeysDo() {
@@ -176,7 +166,7 @@ class StrokePageUatTest {
             ),
             { it.why },
         ) { row ->
-            // closed whether the row passes or not: the next row starts on its own keyboard (review R26 F8133)
+            // closed whether the row passes or not: the next row starts on its own keyboard
             try {
                 prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, row.board)
                 prefs.set(keyboard.keyDrawing, KeyDrawing.StrokeFilter)
@@ -199,13 +189,12 @@ class StrokePageUatTest {
     @Uat("PY-146")
     fun aTapPicksADriftOrAStrokeLiftedShortPicksNothing() {
         page()
-        // still: picked
         h.api.calls.clear()
         draw("字20", 0f, 0f, steps = 2)
         assertTrue(h.api.calls.toString(), picked().single().startsWith("select(20"))
         assertEquals(listOf<String>(), strokesSent())
         class Row(val why: String, val dx: Float, val dy: Float, val picks: Boolean)
-        // the cell's touch slop, dp: 8 on a device, 16 under Robolectric, where no drift is past it and short of 12
+        // 8 dp on a device, 16 under Robolectric, where no drift is past it and short of 12
         val slop = ViewConfiguration.get(h.service).scaledTouchSlop / h.service.resources.displayMetrics.density
         assertRows(
             listOfNotNull(
@@ -234,7 +223,6 @@ class StrokePageUatTest {
         val v = cell("字20")
         val f = h.finger(v, h.at(v))
         h.after(keyboard.longPressDelay.getValue().toLong() + 50)
-        // moved after it: the menu's touch still, no stroke
         f.move(h.at(v, 0f, 40f))
         f.up(h.at(v, 0f, 40f))
         assertNotNull("the menu", h.inputView.candidateActionMenu)
@@ -252,8 +240,7 @@ class StrokePageUatTest {
                 Row("nothing typed: 联想's", pinyin = ""),
                 Row("快速输入", aux = "快速输入"),
                 Row("手写 writing on the keys", set = {
-                    // the reader in place before the switch turns on: a keyboard still hearing it warms the reader up,
-                    // and the app's cannot load in a JVM test, turning the switch off again on its worker
+                    // in place before the switch turns on: the app's reader cannot load in a JVM test, turning the switch off again
                     HandwritingRecognition.shared.reader = object : HandwritingRecognition.Reader {
                         override val loadable = true
                         override fun load() = Unit
@@ -264,7 +251,7 @@ class StrokePageUatTest {
             ),
             { it.why },
         ) { row ->
-            // put back whether the row passes or not: no handwriting or fake reader carried into the next (review R26 F8133)
+            // put back whether the row passes or not: no fake reader carried into the next
             try {
                 row.set()
                 val rv = page(row.drawing, row.pinyin, row.aux)
@@ -280,14 +267,12 @@ class StrokePageUatTest {
         }
     }
 
-    // a mouse's drag (a tablet's, a trackpad's pointer) and a trackpad's two-finger swipe down the page: the list's, no
-    // 竖 drawn (a finger's would be one)
+    // a mouse's drag and a trackpad's two-finger swipe down the page: the list's, no 竖 drawn
     @Test
     @Uat("PY-148")
     fun aMouseDragOrATrackpadSwipeDrawsNone() {
-        // a classification is given an event from 34 (MotionEvent.obtain's); at 29 there is none to give
-        // a finger's the same way: the 竖. Each given the touchscreen's source: what tells them apart here is the tool
-        // and the classification alone (one of a mouse's source never reaches the list under Robolectric)
+        // a classification is given an event from 34; at 29 there is none to give. What tells them apart here is the tool
+        // and the classification alone (a mouse's source never reaches the list under Robolectric)
         for (way in listOfNotNull("finger", "mouse", "trackpad".takeIf { Build.VERSION.SDK_INT >= 34 })) {
             val rv = page()
             h.api.calls.clear()
@@ -326,13 +311,11 @@ class StrokePageUatTest {
         }
     }
 
-    // PY-147's hint: whether the notice up says it
     private fun said() = h.notice()?.let { n ->
         val line = h.service.getString(R.string.stroke_page_hint)
         KeyboardHarness.all(n.contentView).filterIsInstance<TextView>().any { it.visibility == View.VISIBLE && it.text.toString() == line }
     } == true
 
-    // the page's pinyin typed, its ⌄ to open it
     private fun typedOn(): View {
         typed("hao")
         candidates(*Array(80) { "字$it" })
@@ -350,12 +333,11 @@ class StrokePageUatTest {
         h.tap(typedOn())
     }
 
-    // the notice the first three times the page opens drawing strokes: above the keyboard, off the list, gone in 2 s
+    // the first three times the page opens drawing strokes: above the keyboard, off the list, gone in 2 s
     @Test
     @Uat("PY-147")
     fun theFirstThreePagesDrawingSayHowTheyTurn() {
         val shown = AppPrefs.getInstance().internal.strokePageHintShown
-        // where the keys draw none: nothing said, none counted
         page(drawing = KeyDrawing.Glide)
         assertFalse(said())
         assertEquals(0, shown.getValue())
@@ -366,7 +348,6 @@ class StrokePageUatTest {
             assertNotNull("open $n: the page", list())
             assertTrue("open $n", said())
             assertEquals(n, shown.getValue())
-            // above the bar: the page's first row not under it
             val chip = h.noticeBox()
             assertTrue("open $n: $chip over ${h.box(h.bar)}", chip.bottom <= h.box(h.bar).top + 2)
             // its own 2 s, not a said line's 1 s
@@ -375,18 +356,15 @@ class StrokePageUatTest {
             h.after(shownAt + 2500 - SystemClock.uptimeMillis())
             assertFalse("gone after 2 s", said())
         }
-        // the fourth time: none, and never again
         closeAndOpen()
         assertFalse(said())
         assertEquals(3, shown.getValue())
     }
 
-    // the hint as any line said: a stroke drawn puts it away; one not said is not counted, said at a later opening
     @Test
     @Uat("PY-147")
     fun theHintGoesAsAStrokeIsDrawnAndIsCountedOnlyOnceSaid() {
         val shown = AppPrefs.getInstance().internal.strokePageHintShown
-        // a stroke drawn on the page: put away at once, not its 2 s (the engine's preedit edited)
         page()
         val shownAt = SystemClock.uptimeMillis()
         assertTrue(said())
@@ -396,7 +374,6 @@ class StrokePageUatTest {
         h.after(shownAt + 1500 - SystemClock.uptimeMillis())
         assertFalse("put away by the stroke", said())
         closePage()
-        // the keyboard not on the screen: not said, not counted
         val expand = typedOn()
         h.inputView.visibility = View.INVISIBLE
         h.tap(expand)
@@ -405,8 +382,7 @@ class StrokePageUatTest {
         assertFalse(said())
         assertEquals(1, shown.getValue())
         closePage()
-        // a notice with 撤销 up (a long press's 删除): not said over it, which would lapse its act, nor counted; its
-        // 撤销 still takes back (R27 F8528)
+        // a notice with 撤销 up: not said over it, which would lapse its act, nor counted
         val acts = mutableListOf<String>()
         val expandAgain = typedOn()
         h.inputView.say("删掉了", UndoChip.Undo({ acts += "undone" }, { acts += "lapsed" }))
@@ -420,7 +396,6 @@ class StrokePageUatTest {
         h.idle()
         assertEquals(listOf("undone"), acts)
         closePage()
-        // the next opening: said and counted
         h.tap(typedOn())
         assertTrue(said())
         assertEquals(2, shown.getValue())
@@ -431,24 +406,20 @@ class StrokePageUatTest {
     fun aStrokeLeavingNoCandidateKeepsThePageAndItsBackspaceTakesItBack() {
         page()
         draw("字20", 40f, 0f)
-        // the engine: nothing of 横 among them, the pinyin there still
         typed("hao")
         candidates()
         assertNotNull("the page stays, empty", list())
         assertEquals(0, list()!!.adapter!!.itemCount)
-        // the column's ⌫: the engine told it
         h.api.calls.clear()
         val side = KeyboardHarness.find<ExpandedCandidateLayout.Keyboard>(h.inputView)!!
         val backspace = h.keys(side).single { it.description == h.service.getString(R.string.a11y_key_backspace) }
         h.press(backspace)
         h.release()
         assertTrue(h.api.calls.toString(), h.api.calls.any { "sym=65288," in it && "up=false" in it })
-        // the stroke taken back: the candidates again on the page
         candidates(*Array(80) { "字$it" })
         h.relayout()
         assertNotNull(list())
         assertTrue(cell("字20").isShown)
-        // the pinyin gone: the page closed as ever
         typed("")
         candidates()
         assertNull(list())
@@ -461,7 +432,6 @@ class StrokePageUatTest {
         val rv = page()
         h.api.calls.clear()
         val first = first(rv)
-        // the page's second row: the bar holds more of them turned
         val at = rv.getChildAdapterPosition(rv.getChildAt(rv.childCount / 2))
         draw(word(rv, at), 0f, 40f)
         assertTrue(h.api.calls.toString(), strokesSent().single().contains(stroke('s')))
@@ -471,7 +441,7 @@ class StrokePageUatTest {
         assertEquals(h.api.calls.toString(), 1, picked().size)
     }
 
-    // TalkBack's touch exploration: its two-finger drag comes as one finger's, the list's scroll; no stroke drawn
+    // TalkBack's touch exploration: its two-finger drag comes as one finger's, the list's scroll
     @Test
     @Uat("AX-20")
     fun aScreenReadersTouchExplorationDrawsNone() {
@@ -485,7 +455,6 @@ class StrokePageUatTest {
         shadowOf(h.service.getSystemService(AccessibilityManager::class.java)).setTouchExplorationEnabled(false)
     }
 
-    // a second finger down: nothing of it, the first's stroke going on; the first lifted first ends it there
     @Test
     fun aSecondFingerIsSwallowed() {
         page()
@@ -499,16 +468,14 @@ class StrokePageUatTest {
         }
     }
 
-    // a finger down while ↓ still turns the page: the list's touch (it stops there), no stroke and no pick
     @Test
     fun aTouchWhileThePageTurnsIsTheLists() {
         val rv = page()
-        // RecyclerView's own scroller (移除动画 is not its): settling from here
+        // RecyclerView's own scroller (移除动画 is not its)
         rv.smoothScrollBy(0, 2000)
         assertEquals(RecyclerView.SCROLL_STATE_SETTLING, rv.scrollState)
         h.api.calls.clear()
-        // 40dp down, straight to the list with no looper run between (the harness's idling runs the whole scroll and
-        // the long press time with it)
+        // straight to the list with no looper run between (the harness's idling runs the whole scroll and the long press time)
         val x = rv.width / 2f
         val y = rv.height / 3f
         val t = SystemClock.uptimeMillis()

@@ -33,7 +33,6 @@ class RefineSlicesTest {
         slices.slice()
         assertFalse(slices.refines)
         assertEquals(listOf(2), placed)
-        // nothing left: no more asked
         slices.slice()
         assertEquals(3, asked)
     }
@@ -49,7 +48,6 @@ class RefineSlicesTest {
         assertFalse(slices.refines)
         assertEquals(SentenceRefiner.SLICES, asked)
         assertTrue(placed.isEmpty())
-        // started again: its slices anew
         slices.start(order, order.size)
         slices.slice()
         assertEquals(SentenceRefiner.SLICES + 1, asked)

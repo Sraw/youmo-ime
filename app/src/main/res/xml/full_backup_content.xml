@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The 0.3.x native host's data in device-protected storage (device_root: usr/, descriptor.json, README.md),
-     removed at the first start after an upgrade (FcitxApplication.deleteNativeData);
+     left on an install upgraded from 0.3.x and read by nothing;
      the resource packs (device_file packs/), far over the backup's 25 MB. Read on Android 11 and earlier
      only, where allowBackup="false" turns backup and phone-to-phone transfer off anyway: from such a phone
      the packs never move, the new phone imports them again -->

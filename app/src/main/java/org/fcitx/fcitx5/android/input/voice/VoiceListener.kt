@@ -37,79 +37,59 @@ import kotlin.math.log10
 import kotlin.math.sqrt
 
 /**
- * The microphone and the streaming recognizer, for one talk: reads the microphone while open and
- * hands what it reads to the recognizer on a thread of its own, which decodes it a chunk at a time,
- * closes a segment where its endpoint rules say ([VoiceEngine.choose] picking its text) and polishes
- * the text as it streams ([VoiceLive]). Tells [events] of it all on the main thread, until [close]d.
- * Used from the main thread.
+ * One talk: reads the microphone and hands it to the streaming recognizer on its own thread; segments
+ * close by its endpoint rules ([VoiceEngine.choose]) and the text is polished as it streams
+ * ([VoiceLive]). Tells [events] on the main thread until [close]d. Used from the main thread.
  */
 class VoiceListener(
     private val events: Events,
-    /** the user's words to listen for and blocked (VoiceHotwords.ofUser), asked for as the models load */
     private val hotwords: suspend () -> VoiceHotwords.Words,
-    /** the pinyin engine's models (VoiceEngine.language): to rank what is heard, and for the blocked words */
     private val language: VoiceChoice.Language,
 ) : VoiceSession.Listening {
 
-    /**
-     * Why the talk ended: the models not loading, the microphone failing, or recognizing failing with
-     * the models in (natively, or memory running out for a graph of hotwords), which was told as the
-     * models' (voice-5) and an uncaught failure as the microphone's (app-input-21).
-     */
     enum class Failure { NoModel, NoMicrophone, Recognition }
 
     interface Events {
         fun loaded()
         fun failed(why: Failure)
-        /** the microphone really on: its first sample not zero (VoiceOnset); 正在听 from here */
         fun ready()
 
-        /** 2 s of nothing but zeroes, and still none other: the microphone gives no sound */
         fun silent()
 
-        /** what was said so far, as it shows ([VoiceLive]): the segments closed, polished, and the one being said */
         fun heard(heard: VoiceLive.Heard)
 
-        /** how loud, 0 to 1, a few times a second */
         fun level(level: Float)
     }
 
-    // a native error is the session's to show, not the keyboard's to crash on; the microphone's
-    // ([record]) and the models' failures are told where they happen, so what reaches here is neither for certain
+    // a native error is the session's to show, not the keyboard's to crash on; microphone and model
+    // failures are told where they happen
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e ->
         Timber.w(e, "voice")
         tell { failed(Failure.Recognition) }
     })
 
-    // the recognizer's thread: the stream, the hotwords and VoiceLive are its alone. One for every
-    // listener (VoiceEngine.decoder): the last talk's tail still decoding does not overlap the next
-    // one's stream made on the same recognizer
+    // the stream, the hotwords and VoiceLive are this thread's alone. Shared by every listener: the last
+    // talk's tail still decoding does not overlap the next one's stream
     private val decoder = VoiceEngine.decoder
 
     private val main = Handler(Looper.getMainLooper())
 
-    // what the microphone read, in order, for the recognizer; closed when the microphone is. Read
-    // before the models are in too: a hold may start talking at once, nothing of it is lost
+    // read before the models are in too: a hold may start talking at once, nothing of it is lost
     private val audio = Channel<FloatArray>(Channel.UNLIMITED)
 
-    // the models once in, the user's words with them; cancelled if they never come
     private val ready = CompletableDeferred<Pair<VoiceEngine.Models, VoiceHotwords.Words>>()
 
-    // what was said (VoiceLive.finished, before the clean-up), once the microphone is closed and all
-    // of it decoded; true: the raw text, the polish having failed
+    // before the clean-up, once all of it is decoded; true: the raw text, the polish having failed
     private val said = CompletableDeferred<Pair<String, Boolean>?>()
 
-    // the restart asked for from the main thread ([restart]), the recognizer's VoiceLive brought to it
     private class Restart(val to: Int, val upTo: VoiceLive.Mark?)
 
     @Volatile
     private var restarting: Restart? = null
 
-    // the utterance the recognizer's VoiceLive is at
     @Volatile
     private var liveUtterance = 0
 
-    // the utterance [said] is of: set on the decoder before it completes
     @Volatile
     override var utterance = 0
         private set
@@ -122,14 +102,12 @@ class VoiceListener(
         restarting = Restart(to, upTo ?: last?.takeIf { it.to > liveUtterance }?.upTo)
     }
 
-    // on the recognizer's thread
     @Synchronized
     private fun restartIn(live: VoiceLive) {
         restarting?.let { live.restart(it.to, it.upTo) }
         liveUtterance = live.utterance
     }
 
-    // set on the decoder before [said] completes, read on the main thread once it has
     @Volatile
     override var polishFailure: VoiceSession.PolishFailure? = null
         private set
@@ -137,24 +115,17 @@ class VoiceListener(
     private var acquired = false
     private var decoding: Job? = null
     private var capture: Job? = null
-    // the microphone open, from the capture thread: [close] stops it so a read blocked in the HAL
-    // returns (VoiceCaptureEnd), not left recording after the talk ended
+    // [close] stops it so a read blocked in the HAL returns (VoiceCaptureEnd), not left recording
     @Volatile
     private var recording: AudioRecord? = null
-    // read off the main thread too, as the models load and on the recognizer's
     @Volatile
     private var closed = false
-    // the lift's uptime in ms, from the main thread: the capture thread stops VoiceCaptureEnd's tail after it
     @Volatile
     private var liftAt: Long? = null
 
-    // what the microphone heard, window by window, for the recognizer to ask whether a segment was
-    // the room (a lifted noise floor recognized as 「I'm sorry.」): fed on the capture thread
     private val quiet = VoiceQuiet()
-    // start()'s uptime: the debug log's time to the first sample not zero
     @Volatile
     private var startedAt = 0L
-    // debug: the first sample not zero, the first text shown and the microphone closed (uptime ms), for `voice timing:`
     @Volatile
     private var readyAt = 0L
     @Volatile
@@ -166,7 +137,6 @@ class VoiceListener(
         main.post { if (!closed) events.event() }
     }
 
-    // a failure logged and [fallback] in its place: one part lost, not the talk
     private inline fun <T> orFallback(tag: String, fallback: T, block: () -> T): T = try {
         block()
     } catch (e: CancellationException) {
@@ -177,25 +147,21 @@ class VoiceListener(
     }
 
     override fun load() {
-        // the opening's VAD made beside the models: none, or failing, it is made or done without then
-        // (an Error too, not only an Exception: on this scope it would end the process)
+        // an Error too, not only an Exception: on this scope it would end the process
         scope.launch(Dispatchers.IO) { VoiceEngine.prepareVad { Timber.w(it, "voice vad") } }
         scope.launch {
-            // asked for while the models load, not after: the engine may be busy a while
-            // an Error of it caught in here: thrown out of the async it would cancel this launch and reach the
-            // scope's handler (told as recognizing's failure) whichever message came first
+            // asked while the models load: the engine may be busy a while. An Error is caught in here: thrown out
+            // of the async it would cancel this launch and be told as recognizing's failure
             val user = async { caught { userHotwords() } }
             val loaded = try {
                 VoiceEngine.acquire()
             } catch (e: CancellationException) {
                 throw e
             } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                // an Error too (its library not loading, memory running out); the voice pack gone
-                // (PackUnavailableException), or a file of it (sherpa-onnx's config check, an exception)
+                // an Error too (its library not loading, memory running out), or the pack gone
                 Timber.w(e, "voice model")
                 user.cancel()
                 ready.cancel()
-                // the spare made beside them: not held for good, no idle timer being set without users
                 VoiceEngine.letGoVadIfIdle()
                 tell { failed(Failure.NoModel) }
                 return@launch
@@ -203,14 +169,12 @@ class VoiceListener(
             val words = try {
                 user.await()
             } catch (e: CancellationException) {
-                // closed while they loaded: the models let go, the cancellation not taken for a failure
                 ready.cancel()
                 main.post { VoiceEngine.release() }
                 throw e
             }.getOrElse { e ->
-                // an Error past the acquire (userHotwords falls back on exceptions only): the models
-                // let go, not held for good, and the decoder not left waiting for them; told as the
-                // models' failure, not recognizing's (the scope's handler)
+                // an Error past the acquire (userHotwords falls back on exceptions only): let go, the decoder not left
+                // waiting; told as the models' failure
                 Timber.w(e, "voice hotwords")
                 ready.cancel()
                 main.post { VoiceEngine.release() }
@@ -219,7 +183,6 @@ class VoiceListener(
             }
             main.post {
                 if (closed) {
-                    // closed while they loaded: not used, let go
                     ready.cancel()
                     VoiceEngine.release()
                 } else {
@@ -232,7 +195,6 @@ class VoiceListener(
         decoding = scope.launch(decoder) { decode() }
     }
 
-    // the engine failing: the text as heard, and each taken as having a blocked word
     private val safeLanguage = object : VoiceChoice.Language {
         override suspend fun boundaries(texts: List<String>): Map<String, IntArray> =
             orFallback("voice word boundaries", emptyMap()) { language.boundaries(texts) }
@@ -244,7 +206,6 @@ class VoiceListener(
             orFallback("voice homophones", null) { language.homophonesAllowed(spans) }
     }
 
-    // [block]'s result, or what it threw but a cancellation (which goes on, as cancellations must)
     private suspend fun <T> caught(block: suspend () -> T): Result<T> = try {
         Result.success(block())
     } catch (e: CancellationException) {
@@ -253,21 +214,16 @@ class VoiceListener(
         Result.failure(e)
     }
 
-    // voice input without them, not none: their read cancelled from elsewhere too (VoiceEngine's
-    // shared read, the host's scope ending), which is not this listener closing
+    // a read cancelled from elsewhere (VoiceEngine's shared read, the host's scope) is not this listener closing
     private suspend fun userHotwords() = cancelledElsewhereAs(VoiceHotwords.Words.NONE) {
         orFallback("voice hotwords", VoiceHotwords.Words.NONE) { hotwords() }
     }
 
-    /**
-     * Opens the microphone, once; the caller has checked the permission. The models may still be
-     * loading: what is heard meanwhile is recognized once they are in.
-     */
     override fun start() {
         if (closed || capture != null) return
         startedAt = SystemClock.uptimeMillis()
-        // closed on completion, not in a finally: a launch cancelled before it ran never runs its
-        // finally, and the decoder would wait on the microphone for good, the models with it
+        // closed on completion, not in a finally: a launch cancelled before it ran never runs its finally, and
+        // the decoder would wait on the microphone for good
         capture = scope.launch { record() }.also { it.invokeOnCompletion {
             capturedAt = SystemClock.uptimeMillis()
             audio.close()
@@ -275,10 +231,8 @@ class VoiceListener(
     }
 
     /**
-     * Closes the microphone a tail after [stoppedAt] (the lift's or the tap's uptime, ms) and,
-     * once what was heard is all recognized, [done] with what was said (null: nothing came back):
-     * the finger lifted from holding to talk, or the talk tapped to a stop. The tail keeps the last
-     * word's sound still on its way in, said as it stopped. Not if closed meanwhile.
+     * Closes the microphone a tail after [stoppedAt] (uptime ms), keeping the last word's sound still on
+     * its way in; [done] once all is recognized (null: nothing came back). Not if closed meanwhile.
      */
     override fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit) {
         liftAt = stoppedAt
@@ -288,73 +242,56 @@ class VoiceListener(
         }
     }
 
-    /** Closes the microphone now, the tail too; what was heard up to now is still recognized and typed. */
     override fun cut() {
         capture?.cancel()
-        // never started: nothing more to hear
         if (capture == null) audio.close()
     }
 
-    /** Closes the microphone, for good: nothing more is told. The models are let go once the recognizer stops. */
     override fun close() {
         if (closed) return
         closed = true
         cut()
         // from here, not only on the capture thread: its own stop comes after a read that may not return.
-        // Before the models are in too (the first talk, or the first after they were let go): the
-        // microphone is open from the press, and was left recording when closed then (voice-7, R25r2 F7829)
+        // Also before the models are in: the microphone is open from the press
         recording?.let {
             try {
                 it.stop()
             } catch (e: IllegalStateException) {
-                // released or stopped on the capture thread meanwhile
                 Timber.w(e, "voice record stop on close")
             }
         }
-        // still loading: once in, they are let go there
         if (!acquired) return
         acquired = false
         val last = decoding
         scope.launch {
             last?.join()
             main.post { VoiceEngine.release() }
-            // nothing of this listener's is left to run: a coroutine still waiting (finish's on [said]) ends here
             scope.cancel()
         }
     }
 
-    /**
-     * The recognizer's loop, on the [decoder]: what the microphone read, in order, decoded as it
-     * comes; once it is closed, the tail padded, the last decoded, and what was said [said].
-     */
     private suspend fun decode() {
         val (models, words) = try {
             ready.await()
         } catch (e: CancellationException) {
-            // the models never came in (told as such) or it closed first: nothing to type, said so
             said.cancel(e)
             return
         }
-        // all of it in the try: a throw before the stream (the polish's stream, the homophones) left
-        // [said] neither completed nor cancelled, and [finish] waiting on it for good (voice-5)
+        // all of it in the try: a throw before the stream left [said] unfinished and [finish] waiting for good
         var stream: OnlineStream? = null
         try {
             val recognizer = models.recognizer
             val live = VoiceLive(models.polisher?.stream())
-            // its model not read in (logged as VoiceEngine read it): the raw text throughout
             if (models.polisher == null) polishFailure = VoiceSession.PolishFailure.LOAD
-            // the user's words put in for what reads as them, after the polish, as it shows and as it is
-            // typed alike (060-voice-userdict.md): what shows is what is typed, no word changing at the end
+            // the user's words put in after the polish, for what shows and what is typed alike: no word changes at the end
             val homophones = words.homophones.hold()
             val homophoneLexicon = VoiceHomophones.Lexicon { safeLanguage.homophonesAllowed(it) }
-            // the polish failing: the raw text as it is after this step (read once the step has run), told as such
             suspend fun polished(step: () -> VoiceLive.Heard) {
                 restartIn(live)
                 val heard = orFallback<VoiceLive.Heard?>("voice polish", null) { step() }
                     ?: VoiceLive.Heard(live.raw, 0, fallback = true, utterance = live.utterance, upTo = live.mark()).also { polishFailure = VoiceSession.PolishFailure.RUN }
                 show(homophones.replace(heard, homophoneLexicon))
             }
-            // memory running out for the graph of hotwords too: recognizing's failure, the models being in
             val made = VoiceEngine.stream(recognizer, words)
             stream = made
             val segment = VoiceSegments(
@@ -376,14 +313,12 @@ class VoiceListener(
             val drained = SystemClock.uptimeMillis()
             segment.finish(FloatArray(VoiceEngine.TAIL_PADDING))
             val tailDecoded = SystemClock.uptimeMillis()
-            // numbers only, nothing said: the UAT's measure of the lift against the speech's end (uat/12 VO-23/24)
+            // numbers only: UAT measures the lift against the speech's end
             if (BuildConfig.DEBUG) Timber.d("voice segments: speechStart=%s segments=%d", segment.speechStart, segment.kept)
             restartIn(live)
             utterance = live.utterance
-            // the polish failing: the raw text, told as such (what was typed as it was said is polished)
             val polished = orFallback<String?>("voice polish", null) { live.finished() }
-            // a live step's failure only showed raw text for a moment: the whole of it polished now
-            // is what is typed, so 语音整理 did apply
+            // a live step's failure only showed raw text for a moment: the whole is polished now, so 语音整理 applied
             if (polished == null) {
                 polishFailure = VoiceSession.PolishFailure.RUN
             } else if (polishFailure == VoiceSession.PolishFailure.RUN) {
@@ -396,7 +331,6 @@ class VoiceListener(
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-            // the recognizer or the polish failing natively, with the models in: not the models' loading
             Timber.w(e, "voice decode")
             tell { failed(Failure.Recognition) }
         } finally {
@@ -405,10 +339,8 @@ class VoiceListener(
         }
     }
 
-    // where the time after the stop goes, numbers only (debug builds; uptime ms)
     private fun logTiming(drained: Long, tailDecoded: Long, polishedAt: Long, acceptMax: Long) {
         val end = SystemClock.uptimeMillis()
-        // -1: not known (no lift or tap time, the capture not closed)
         val stop = liftAt
         val captured = capturedAt.takeIf { it > 0 }
         Timber.d(
@@ -419,7 +351,6 @@ class VoiceListener(
         )
     }
 
-    /** [stream] of [recognizer] as VoiceSegments drives it; VoiceEngineTest's too, so it drives the real loop */
     internal class Recognition(private val recognizer: OnlineRecognizer, private val stream: OnlineStream) : VoiceRecognition<OnlineRecognizerResult> {
         override fun accept(samples: FloatArray) = stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
         override fun inputFinished() = stream.inputFinished()
@@ -437,9 +368,8 @@ class VoiceListener(
         tell { heard(shown) }
     }
 
-    // the microphone failing as it starts or is read (startRecording refused, a read throwing) is the
-    // microphone's failure, said so, not recognizing's (the scope's handler; R25r2 F7872); as a read's
-    // error is, not once lifted: what was said is in, typed as at the tail's end
+    // a start or read failing is the microphone's failure, not recognizing's; once lifted, what was said is
+    // in and typed
     private suspend fun record() {
         try {
             captureAudio()
@@ -459,9 +389,8 @@ class VoiceListener(
         }
         recording = record
         val opening = Opening(record.bufferSizeInFrames)
-        // whether a window is speech (VoiceQuiet), on the gained samples: silero did not fire at the
-        // -50 to -60 dBFS of soft speech before the gain (specs/app.md). Taken once the microphone is
-        // on: the record's 2 s buffer holds the first words meanwhile; none (its model failing): all kept
+        // VAD on the gained samples: silero missed soft speech at -50 to -60 dBFS before the gain. The 2 s buffer
+        // holds the first words meanwhile; no model: all kept
         VoiceOpening.run(
             start = { record.startRecording() },
             load = { VoiceEngine.takeVad() },
@@ -470,12 +399,11 @@ class VoiceListener(
                 try {
                     record.stop()
                 } catch (e: IllegalStateException) {
-                    // what was read is in already: a stop failing is no microphone failure to end the talk on
                     Timber.w(e, "voice record stop")
                 } finally {
                     recording = null
                     record.release()
-                    // numbers only, nothing said: the UAT's check of the tail's timing and the level (uat/12 VO-23/24)
+                    // numbers only: UAT checks the tail's timing and the level
                     if (BuildConfig.DEBUG) opening.log()
                 }
             },
@@ -484,7 +412,6 @@ class VoiceListener(
         )
     }
 
-    /** One microphone opening's: the gain, where it stops, and the debug log's numbers. */
     private class Opening(bufferFrames: Int) {
         val gain = VoiceGain(VoiceEngine.SAMPLE_RATE)
         val end = VoiceCaptureEnd(VoiceEngine.SAMPLE_RATE, bufferFrames)
@@ -493,7 +420,6 @@ class VoiceListener(
         private var vadNs = 0L
         private var vadMostNs = 0L
 
-        /** a window's VAD time, for the log: a phone's to be measured */
         fun vadTook(ns: Long) {
             vadWindows++
             vadNs += ns
@@ -512,18 +438,15 @@ class VoiceListener(
         )
     }
 
-    /** The microphone, in the first of [ENCODINGS] it records in; null if in none. */
     private fun open(): AudioRecord? {
         for ((encoding, bytes) in ENCODINGS) {
             val min = AudioRecord.getMinBufferSize(VoiceEngine.SAMPLE_RATE, CHANNEL, encoding)
-            // two seconds' room, should the reading fall behind; a HAL refusing that much still
-            // records with its least rather than not at all
+            // two seconds' room, should the reading fall behind; a HAL refusing that still records with its least
             for (size in listOf(maxOf(min, VoiceEngine.SAMPLE_RATE * bytes * BUFFER_S), min).distinct()) {
                 if (size <= 0) continue
                 val record = try {
                     record(encoding, size)
                 } catch (e: SecurityException) {
-                    // the permission taken back since the caller checked it: in no encoding either
                     Timber.w(e, "microphone")
                     return null
                 }
@@ -533,7 +456,6 @@ class VoiceListener(
         return null
     }
 
-    /** The record in [encoding] with [size] bytes of buffer; null if it does not record so. */
     @SuppressLint("MissingPermission")
     private fun record(encoding: Int, size: Int): AudioRecord? {
         val record = try {
@@ -551,28 +473,24 @@ class VoiceListener(
         val buffer = FloatArray(VoiceEngine.WINDOW)
         val shorts = if (record.audioFormat == AudioFormat.ENCODING_PCM_16BIT) ShortArray(VoiceEngine.WINDOW) else null
         val timestamp = AudioTimestamp()
-        // the device UAT's clips in place of what the microphone hears (VoiceClipMic); none in a release
+        // the device UAT's clips in place of the microphone (VoiceClipMic); none in a release
         val clips = if (BuildConfig.DEBUG) VoiceClipMic.feed() else null
         var windows = 0
-        // the detector while it works: one failing on a window is done without from there, as an opening with none
-        // (all kept), logged; not thrown on to be told as the microphone's failure (record's catch; R25r3 F7942)
+        // a detector failing on a window is dropped from there (all kept), logged; not told as the microphone's failure
         var detector = vad
         try {
             while (currentCoroutineContext().isActive) {
                 val n = clips?.read(buffer) ?: read(record, buffer, shorts)
                 if (n < 0) {
-                    // lifted already, in the tail: what was said is in, typed as at the tail's end; the
-                    // microphone failing is told only while it was still being spoken into
+                    // lifted already, in the tail: what was said is typed; a failure is told only while still spoken into
                     if (liftAt == null) tell { failed(Failure.NoMicrophone) }
                     return
                 }
                 val over = opening.end.window(n, SystemClock.uptimeMillis(), liftAt) {
-                    // the clips' frames are not the record's: counted from what is read
                     if (clips == null) stamp(record, timestamp, it) else null
                 }
                 if (n == 0) {
                     if (over) return
-                    // nothing read (a read that does not block): not a core spun until the lift
                     delay(EMPTY_READ_WAIT_MS)
                     continue
                 }
@@ -580,14 +498,12 @@ class VoiceListener(
                 if (opening.onset.silent()) tell { silent() }
                 if (onset) {
                     tell { ready() }
-                    // the UAT's (VO-26): from start() to the first sample not zero
                     if (BuildConfig.DEBUG) {
                         readyAt = SystemClock.uptimeMillis()
                         Timber.d("voice ready: fromStartMs=%d", readyAt - startedAt)
                     }
                 }
                 val samples = buffer.copyOf(n)
-                // before all of it: the recognizer and the level hear the same
                 opening.gain.apply(samples)
                 val speech = detector?.let {
                     @Suppress("TooGenericExceptionCaught")
@@ -608,12 +524,10 @@ class VoiceListener(
                 if (over) return
             }
         } finally {
-            // ended mid-clip (a lift in the speech): nothing left playing for uat.py to wait on
             clips?.close()
         }
     }
 
-    /** Whether [vad] is in speech after [samples]; its segments are not used. Its time counted for the debug log. */
     private fun speech(vad: Vad, samples: FloatArray, opening: Opening): Boolean {
         val at = System.nanoTime()
         vad.acceptWaveform(samples)
@@ -624,9 +538,8 @@ class VoiceListener(
     }
 
     /**
-     * The lift seen: where it fell in the record, from the record's timestamp (both on
-     * CLOCK_MONOTONIC, as uptime is), so the tail counts from the finger, not from the capture
-     * path's latency later; without one, from what is read.
+     * From the record's timestamp (CLOCK_MONOTONIC, as uptime), so the tail counts from the finger, not
+     * from the capture path's latency; without one, from what is read.
      */
     private fun stamp(record: AudioRecord, timestamp: AudioTimestamp, at: Long): VoiceCaptureEnd.Stamp? {
         if (record.getTimestamp(timestamp, AudioTimestamp.TIMEBASE_MONOTONIC) != AudioRecord.SUCCESS) return null
@@ -634,7 +547,6 @@ class VoiceListener(
         return frame?.let { VoiceCaptureEnd.Stamp(it, timestamp.framePosition) }
     }
 
-    /** A window into [buffer], as [AudioRecord.read]: a 16-bit record's through [shorts], to -1 to 1. */
     private fun read(record: AudioRecord, buffer: FloatArray, shorts: ShortArray?): Int {
         if (shorts == null) return record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
         val n = record.read(shorts, 0, shorts.size, AudioRecord.READ_BLOCKING)
@@ -651,8 +563,7 @@ class VoiceListener(
 
     companion object {
         private const val CHANNEL = AudioFormat.CHANNEL_IN_MONO
-        // float as the VAD and the recognizer take it, where the capture path has it; else 16-bit,
-        // which every device records in. Each with its bytes a sample
+        // float as the VAD and recognizer take it, where the capture path has it; else 16-bit, which every device records in
         private val ENCODINGS = listOf(
             AudioFormat.ENCODING_PCM_FLOAT to Float.SIZE_BYTES,
             AudioFormat.ENCODING_PCM_16BIT to Short.SIZE_BYTES,
@@ -667,10 +578,6 @@ class VoiceListener(
     }
 }
 
-/**
- * [block]'s result, or [fallback] where it threw a cancellation while the caller is still active: a
- * read it awaited cancelled from elsewhere, not the caller cancelled (that one goes on, as cancellations must).
- */
 internal suspend fun <T> cancelledElsewhereAs(fallback: T, block: suspend () -> T): T = try {
     block()
 } catch (e: CancellationException) {

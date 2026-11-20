@@ -17,10 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.FileNotFoundException
 
-/**
- * Ink written on the keys of an input method whose own session cannot be made (a code table that does not read):
- * that input method's failure, latched as its own, no key sent; handwriting's recognizer not latched, so it still loads.
- */
+/** Ink on the keys of an input method whose session cannot be made: that input method latches, not handwriting's recognizer. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class EngineBridgeInkOnKeysTest {
@@ -42,7 +39,7 @@ class EngineBridgeInkOnKeysTest {
         }
     }
 
-    // 061-handwriting-toolbar §3.4: handwriting's session given up, the toolbar's 手写 off, not drawing ink that reads nothing
+    // handwriting's session given up turns the toolbar's 手写 off rather than drawing ink that reads nothing
     @Test
     fun handwritingsSessionGivenUpTurnsTheSwitchOff() {
         val open = AppPrefs.getInstance().internal.handwritingOpen

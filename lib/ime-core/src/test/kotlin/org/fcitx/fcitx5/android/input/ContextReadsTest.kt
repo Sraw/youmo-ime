@@ -8,11 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * A context read the service queued is made only if it is still the last one asked for, and never
- * in a field other than the one it was asked in: a password's, read once the input left it, would
- * pass the password's text to the engine.
- */
+/** A queued context read is made only while still the last asked, and never in another field: a password's would reach the engine. */
 class ContextReadsTest {
 
     private val reads = ContextReads()

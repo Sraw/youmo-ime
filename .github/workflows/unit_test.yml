@@ -114,8 +114,8 @@ jobs:
         if: success() || failure()
         run: python3 -m unittest discover -s lib/ime-eval/tools
 
-      # the theme maker page against what the app makes (web/theme-maker/test/testdata): the drawing
-      # rules case by case, the theme file both ways, its export byte for byte; the engine's library:
+      # the theme maker page against what the app makes (web/theme-maker/test/testdata): the 3.0 theme
+      # file both ways, 2.1's migration, the zips; the engine's library:
       # the scene snapshots built through its facade, its painting against the app's (specs/testing.md)
       - name: Setup Node
         if: success() || failure()
@@ -174,9 +174,27 @@ jobs:
             **/build/reports/detekt/
           retention-days: 14
 
+  # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
+  # its own (robolectric.properties, app/build.gradle.kts); 0.5.1 shipped two crashes only it shows.
   app:
-    name: App JVM tests
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # verifyApp (root build.gradle.kts): the tests, lint, and the instrumented tests' sources
+          # compiled (otherwise only the weekly emulator job compiles them)
+          - sdk: 35
+            name: App JVM tests
+            run: --continue -PskipExhaustive verifyApp :app:koverLogDebug
+            task: testDebugUnitTest
+            artifact: app
+          - sdk: 29
+            name: App JVM tests at SDK 29
+            run: -PskipExhaustive verifyApp29
+            task: testDebugUnitTestAt29
+            artifact: "29"
     # above Test.timeout (40 min): a cancelled job skips the failure steps (heap dump, annotations)
     timeout-minutes: 45
     steps:
@@ -187,28 +205,26 @@ jobs:
           submodules: false
 
       # CMake: the app tests read the engine's data, whose archives are unpacked with it.
-      # A Robolectric cache key a job: each fetches its own SDKs' jars (35 here, 29 in app_29)
+      # A Robolectric cache key an SDK: each fetches its own SDK's jars
       - name: Set up the build
         uses: ./.github/actions/setup-build
         with:
           cmake: "true"
           downloads: restore
-          robolectric: robolectric-35
+          robolectric: robolectric-${{ matrix.sdk }}
 
       # debug only (one APK since 0.6.0, voice input in it). The screenshot tests compare against app/src/test/screenshots
-      # (roborazzi.test.verify in gradle.properties); goldens are recorded on JDK 21 locally.
-      # One ABI, the runner's. verifyApp (root build.gradle.kts): the tests, lint, and the instrumented
-      # tests' sources compiled (otherwise only the weekly emulator job compiles them)
-      - name: Run app unit tests, lint and the instrumented tests' compile
+      # (roborazzi.test.verify in gradle.properties); goldens are recorded on JDK 21 locally. One ABI, the runner's.
+      - name: Run app unit tests (SDK ${{ matrix.sdk }})
         env:
           BUILD_ABI: x86_64
-        run: ./gradlew --build-cache --continue -PskipExhaustive verifyApp :app:koverLogDebug
+        run: ./gradlew --build-cache ${{ matrix.run }}
 
       - name: Upload heap dumps
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: test-oom-app
+          name: test-oom-${{ matrix.artifact }}
           path: app/build/test-oom/
           if-no-files-found: ignore
           compression-level: 6
@@ -216,7 +232,7 @@ jobs:
 
       # what a changed look drew: <name>_actual.png and _compare.png beside the golden
       - name: Upload screenshot differences
-        if: failure()
+        if: failure() && matrix.sdk == 35
         uses: actions/upload-artifact@v7
         with:
           name: roborazzi-differences
@@ -231,60 +247,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: unit-test-report-app
+          name: unit-test-report-${{ matrix.artifact }}
           path: |
-            app/build/reports/tests/testDebugUnitTest/
-            app/build/test-results/testDebugUnitTest/
+            app/build/reports/tests/${{ matrix.task }}/
+            app/build/test-results/${{ matrix.task }}/
             app/build/reports/lint-results-debug.*
-          retention-days: 14
-
-  # Android 10 (minSdk 29) must keep working: every app Robolectric test again at SDK 29, a task of
-  # its own (robolectric.properties, app/build.gradle.kts); 0.5.1 shipped two crashes only it shows.
-  app_29:
-    name: App JVM tests at SDK 29
-    runs-on: ubuntu-24.04
-    # above Test.timeout (40 min): a cancelled job skips the failure steps (heap dump, annotations)
-    timeout-minutes: 45
-    steps:
-      - name: Fetch source code
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          submodules: false
-
-      - name: Set up the build
-        uses: ./.github/actions/setup-build
-        with:
-          cmake: "true"
-          downloads: restore
-          robolectric: robolectric-29
-
-      # debug, as above; one ABI
-      - name: Run app unit tests at SDK 29
-        env:
-          BUILD_ABI: x86_64
-        run: ./gradlew --build-cache -PskipExhaustive verifyApp29
-
-      - name: Upload heap dumps
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-oom-29
-          path: app/build/test-oom/
-          if-no-files-found: ignore
-          compression-level: 6
-          retention-days: 3
-
-      - name: Annotate test failures
-        if: failure()
-        run: python3 .github/scripts/annotate_test_failures.py
-
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: unit-test-report-29
-          path: |
-            app/build/reports/tests/testDebugUnitTestAt29/
-            app/build/test-results/testDebugUnitTestAt29/
           retention-days: 14

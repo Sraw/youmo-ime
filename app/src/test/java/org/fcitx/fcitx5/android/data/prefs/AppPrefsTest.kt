@@ -8,22 +8,18 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.InputFeedbacks
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
-import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
-import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -38,10 +34,6 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.File
 
-/**
- * A setting moved out of the settings page kept what an older version or a backup set, with
- * nothing left to change it back; one a level still sets must keep it.
- */
 @RunWith(RobolectricTestRunner::class)
 class AppPrefsTest {
 
@@ -52,125 +44,31 @@ class AppPrefsTest {
         sp.edit { clear() }
     }
 
-    @Test
-    fun settingsWithoutAUiGoBackToTheirDefaultsOnceAndAgainAfterAnImport() {
-        sp.edit {
-            putBoolean("ignore_system_cursor", true)
-            putString("lang_switch_key_behavior", LangSwitchBehavior.ToggleActivate.name)
-            putInt("candidates_window_radius", 12)
-        }
-        val prefs = AppPrefs(sp)
-        prefs.resetHiddenSettings()
-        assertFalse(prefs.advanced.ignoreSystemCursor.getValue())
-        assertEquals(LangSwitchBehavior.Enumerate, prefs.keyboard.langSwitchKeyBehavior.getValue())
-        assertEquals(0, prefs.candidates.windowRadius.getValue())
-        sp.edit { putBoolean("ignore_system_cursor", true) }
-        prefs.resetHiddenSettings()
-        assertTrue("once", prefs.advanced.ignoreSystemCursor.getValue())
-        prefs.resetHiddenSettings(again = true)
-        assertFalse(prefs.advanced.ignoreSystemCursor.getValue())
-    }
-
-    // a restore that could not delete the backup's punctuation table: the mark the backup brings would keep the
-    // start's from trying again
+    // a restore that could not delete the backup's punctuation table: the backup's mark would stop the start retrying
     @Test
     fun anImportClearsThePunctuationMark() {
         sp.edit { putBoolean("punctuation_reset_061", true) }
         val prefs = AppPrefs(sp)
-        prefs.resetHiddenSettings()
-        assertTrue("not without an import", prefs.internal.punctuationReset061.getValue())
-        prefs.resetHiddenSettings(again = true)
+        prefs.afterImport()
         assertFalse(prefs.internal.punctuationReset061.getValue())
     }
 
-    // the real application: ThemePrefs, which has the keyboard's size levels, is read through ThemeManager
-    @Test
-    @Config(application = FcitxApplication::class)
-    fun whatTheSettingsPageStillSetsIsKept() {
-        val prefs = AppPrefs(sp)
-        val categories = listOf(prefs.keyboard, prefs.candidates, prefs.clipboard, prefs.symbols, prefs.advanced)
-        // AppPrefs' keys alone: ThemeManager.prefs is registered with the application's AppPrefs, not this one.
-        // ThemePrefsTest checks that its reset keeps what its levels set
-        val own = categories.flatMapTo(HashSet()) { it.managedPreferences.keys }
-        // what every level sets, one off its default: the keyboard's size on the theme page, the long press, the vibration, the sound
-        val levels = (categories + ThemeManager.prefs)
-            .flatMap { it.managedPreferencesUi }
-            .filterIsInstance<ManagedPreferenceUi.Levels>()
-            .flatMap { it.keys }
-            .filter { it.first in own }
-            .associate { (key, default) -> key to default + 1 }
-        assertTrue(levels.keys.containsAll(listOf("keyboard_height_percent", "keyboard_long_press_delay")))
-        // and 跟随主题 of the keyboard's size, which a level list sets too
-        val follows = (categories + ThemeManager.prefs)
-            .flatMap { it.managedPreferencesUi }
-            .filterIsInstance<ManagedPreferenceUi.Levels>()
-            .mapNotNull { it.follow?.first }
-            .filter { it in own }
-        assertEquals(3, follows.size)
-        sp.edit {
-            levels.forEach { (key, value) -> putInt(key, value) }
-            follows.forEach { putBoolean(it, false) }
-            putBoolean("popup_on_key_press", false)
-        }
-        prefs.resetHiddenSettings()
-        assertEquals(levels, levels.mapValues { sp.getInt(it.key, -1) })
-        assertTrue(follows.none { sp.getBoolean(it, true) })
-        assertFalse("shown", prefs.keyboard.popupOnKeyPress.getValue())
-    }
-
-    // a category of the test's own, registered late as ThemePrefs is: a setting without a UI, one a level still sets, one shown
-    private class Late(sp: SharedPreferences) : ManagedPreferenceCategory(R.string.virtual_keyboard, sp) {
-        val unseen = hidden { switch(R.string.ignore_sys_cursor, "late_unseen", false) }
-        val setByALevel = hidden(setByLevels = true) { switch(R.string.hide_key_config, "late_set_by_a_level", false) }
-        val shown = switch(R.string.inline_suggestions, "late_shown", false)
-    }
-
-    // ThemeManager registers ThemePrefs after the reset at the start: what it hides goes back then, what a level sets
-    // is kept (ThemePrefs' own: ThemePrefsTest). R25r2 F7895: on settings declared here, not on navbar_background,
-    // ThemePrefs' last hidden setting (hidden at SDK 29 alone, and B9 deletes the settings without a UI); the
-    // mechanism stays for whatever is hidden next. R25r3 F7937: the test of the same on navbar_background is gone
-    @Test
-    @Config(application = FcitxApplication::class)
-    fun aCategoryOfTheTestsOwnRegisteredAfterTheResetIsResetAsItRegisters() {
-        fun stored() = sp.edit {
-            putBoolean("late_unseen", true)
-            putBoolean("late_set_by_a_level", true)
-            putBoolean("late_shown", true)
-        }
-        stored()
-        val prefs = AppPrefs(sp)
-        prefs.resetHiddenSettings()
-        val late = prefs.registerProvider(::Late)
-        assertFalse("without a UI: back to its default", late.unseen.getValue())
-        assertTrue("a level sets it: kept", late.setByALevel.getValue())
-        assertTrue("shown: the user's", late.shown.getValue())
-        // a later start, the reset done before it: nothing registered then is reset
-        stored()
-        val later = AppPrefs(sp)
-        later.resetHiddenSettings()
-        assertTrue(later.registerProvider(::Late).unseen.getValue())
-    }
-
-    // audit-061 app-rest-1: the side 单手模式 was last at is the app's state, not a hidden setting: neither the
-    // first start's reset nor the one after a backup's import puts it back to the right
+    // the side 单手模式 was last at is app state: kept across a backup import
     @Test
     @Config(application = FcitxApplication::class)
     @Uat("PR-53")
-    fun theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings() {
+    fun theOneHandedSideRememberedIsKeptAfterAnImport() {
         sp.edit { putString("one_handed_side", "Left") }
         val prefs = AppPrefs(sp)
-        prefs.resetHiddenSettings()
         val theme = prefs.registerProvider(::ThemePrefs)
-        assertEquals(OneHanded.Left, theme.oneHandedSide.getValue())
-        prefs.resetHiddenSettings(again = true)
+        prefs.afterImport()
         assertEquals(OneHanded.Left, theme.oneHandedSide.getValue())
         // Off is no side: read as the default
         sp.edit { putString("one_handed_side", "Off") }
         assertEquals(OneHanded.Right, theme.oneHandedSide.getValue())
     }
 
-    // 0.5's two switches 滑行输入 (glide_typing, 0.4's key too) and 笔画筛选 (stroke_filter) as the one list
-    // 在键上划: a 0.5 user's, or a backup's read at the next start, carries over; both old keys dropped
+    // 0.5's switches 滑行输入 (glide_typing) and 笔画筛选 (stroke_filter) become the one list 在键上划; old keys dropped
     @Test
     @Uat("ST-43")
     fun theTwoSwitchesMoveOverToKeyDrawing() {
@@ -185,7 +83,7 @@ class AppPrefsTest {
             row("glide on", { putBoolean("glide_typing", true); putBoolean("stroke_filter", false) }, KeyDrawing.Glide),
             row("strokes on", { putBoolean("glide_typing", false); putBoolean("stroke_filter", true) }, KeyDrawing.StrokeFilter),
             row("both off", { putBoolean("glide_typing", false); putBoolean("stroke_filter", false) }, KeyDrawing.Off),
-            // the page never stored both: a backup, edited by hand; glide, the older and wider
+            // never stored both by the page (a hand-edited backup): glide, the older and wider
             row("both on: glide", { putBoolean("glide_typing", true); putBoolean("stroke_filter", true) }, KeyDrawing.Glide),
             row("0.4's glide alone", { putBoolean("glide_typing", true) }, KeyDrawing.Glide),
             row("never stored: off", {}, KeyDrawing.Off),
@@ -194,8 +92,7 @@ class AppPrefsTest {
         )
     }
 
-    // 0.6.0's 在键上划 = 键盘手写 is 关 now, the toolbar's 手写 pinned for it (not turned on) and the user told once;
-    // a toolbar never arranged has it pinned already (ToolbarConfig.DEFAULT); any other choice is left as it is
+    // 0.6.0's 在键上划 = 键盘手写 becomes 关, the toolbar's 手写 pinned (not on) and the user told once; others left
     @Test
     @Uat("PR-56")
     fun zeroSixsKeyHandwritingIsOffWithTheToolbarsHandwritingPinned() {
@@ -217,9 +114,8 @@ class AppPrefsTest {
         )
     }
 
-    // a bar arranged in 0.6.0 (no 手写 in it) gets 手写 shown after 表情 at every start, a 0.6.0 backup restored too; the
-    // first test build's, written with it unticked where parse put it, the first start only; one the user took off since
-    // left so; never arranged, nothing written (the default has it)
+    // a 0.6.0-arranged bar gets 手写 after 表情 at every start (a restored backup too); the first test build's only once; one
+    // the user removed since stays; never arranged, nothing written
     @Test
     @Uat("TB-66")
     fun aBarArrangedBeforeHandwritingGetsIt() {
@@ -246,23 +142,21 @@ class AppPrefsTest {
         assertTrue("looked at once", prefs.internal.toolbarHandwritingLooked.getValue())
     }
 
-    // a 0.5 backup imported: the start after it resets the hidden settings (the import's marker) and then
-    // drops the retired ones, in FcitxApplication.onCreate's order; the two switches still move over
+    // a 0.5 backup imported: the next start reads the marker, then drops retired keys in FcitxApplication.onCreate's order
     @Test
     fun anImportedBackupsSwitchesMoveOverAtTheStartAfter() {
         sp.edit { clear(); putBoolean("glide_typing", false); putBoolean("stroke_filter", true) }
         val marker = File.createTempFile("imported", null)
         val prefs = AppPrefs(sp)
-        FcitxApplication.resetHiddenSettings(prefs, directBoot = false) { marker }
+        FcitxApplication.afterImport(prefs, directBoot = false) { marker }
         prefs.dropRetired()
         assertFalse("the marker gone", marker.exists())
         assertEquals(KeyDrawing.StrokeFilter, prefs.keyboard.keyDrawing.getValue())
         assertFalse(sp.contains("glide_typing") || sp.contains("stroke_filter"))
     }
 
-    // contract: the keyboard choices are stored by the constant's name under keys that never change:
-    // one renamed would put every user's back to the full keyboard; a value this version does not know
-    // (a later keyboard's) reads as the default
+    // keyboard choices are stored by constant name under fixed keys: a rename would reset everyone; an unknown value
+    // (a later keyboard's) reads as default
     @Test
     fun theKeyboardChoicesAreStoredByNamesThatNeverChange() {
         class Row(
@@ -279,7 +173,7 @@ class AppPrefsTest {
         )
         assertRows(
             listOf(
-                // 0.4's Full and Keys14 as they were; Keys18 and NineKeys since I1; Custom (a layout of the user's) since 0.6.1
+                // 0.4's Full and Keys14; Keys18 and NineKeys later; Custom since 0.6.1
                 Row(
                     "全拼's keyboard", listOf("Full", "Keys18", "Keys14", "NineKeys", "ZhuyinNine", "ZhuyinFull", "Custom"), PinyinKeyboard.entries, "pinyin_keyboard", AppPrefs.PINYIN_KEYBOARD,
                     { it.keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Keys14) }, "Keys14", "Keys16",
@@ -290,13 +184,12 @@ class AppPrefsTest {
                     { it.keyboard.shuangpinKeyboard.setValue(ShuangpinKeyboard.NineKeys) }, "NineKeys", "Keys16",
                     { it.keyboard.shuangpinKeyboard.getValue() }, ShuangpinKeyboard.Full,
                 ),
-                // 在键上划 since 0.6; 0.6.0's Handwriting moved over at the start (migrateKeyHandwriting)
+                // 在键上划 since 0.6; 0.6.0's Handwriting moved over at start (migrateKeyHandwriting)
                 Row(
                     "在键上划", listOf("Glide", "StrokeFilter", "Off"), KeyDrawing.entries, "key_drawing", AppPrefs.KEY_DRAWING,
                     { it.keyboard.keyDrawing.setValue(KeyDrawing.StrokeFilter) }, "StrokeFilter", "Strokes",
                     { it.keyboard.keyDrawing.getValue() }, KeyDrawing.Off,
                 ),
-                // 笔画筛选灵敏度 since 0.6.1
                 Row(
                     "笔画筛选灵敏度", listOf("High", "Medium", "Low"), StrokeLift.entries, "stroke_lift", AppPrefs.STROKE_LIFT,
                     { it.keyboard.strokeLift.setValue(StrokeLift.High) }, "High", "Extreme",
@@ -321,8 +214,7 @@ class AppPrefsTest {
         }
     }
 
-    // each pair of ways a SwipeLayers can be made is a choice of the setting's own: SwipeLayersChoice.of
-    // falls back to the default only for one no choice lists, which would then be lost unsaid
+    // every SwipeLayers pair must be a listed choice: SwipeLayersChoice.of would otherwise fall back silently
     @Test
     fun everySwipeLayersThatCanBeMadeIsAChoice() {
         for (up in SwipeLayers.Layer.entries) for (down in SwipeLayers.Layer.entries) {
@@ -331,16 +223,15 @@ class AppPrefsTest {
         }
     }
 
-    // 0.5's 划动输入标点符号及数字 becomes 滑动, and that 0.6's slots: the symbol the way it was, shortcuts the other
-    // way, off all off
+    // 0.5's 划动输入标点符号及数字 becomes 0.6's slots: the symbol the way it was, shortcuts the other way, off all off
     @Test
     fun theOldSwipeSettingBecomesTheTwoWays() {
-        // each row from an emptied store of its own: nothing one leaves is read by the next
+        // each row from its own emptied store
         fun row(why: String, stored: SharedPreferences.Editor.() -> Unit, orientation: SwipeOrientation, up: Boolean, down: Boolean) =
             why to {
                 sp.edit { clear(); stored() }
                 val prefs = AppPrefs(sp).apply { dropRetired() }
-                // written out, not worked out by SwipeMigration: 0.5's meaning of each direction checked here on its own
+                // written out, not derived via SwipeMigration: 0.5's meaning of each direction checked independently
                 assertEquals(orientation, SwipeSlots.parse(prefs.internal.keySwipes.getValue()).orientation)
                 assertEquals(up to down, prefs.keyboard.swipeUp.getValue() to prefs.keyboard.swipeDown.getValue())
                 assertFalse("the old setting dropped", sp.contains("swipe_symbol_behavior"))
@@ -357,14 +248,12 @@ class AppPrefsTest {
                 up = false,
                 down = false,
             ),
-            // the bug: the old key read as a String whatever it held, so a bad backup storing it as an
-            // Int threw a ClassCastException in dropRetired at every start; now the default, no crash
+            // the old key read as a String whatever it held, so an Int from a bad backup threw in dropRetired at every start
             row("stored as another type (a bad backup): the default, no crash at every start", { putInt("swipe_symbol_behavior", 1) }, SwipeOrientation.FirstDown, up = true, down = true),
         )
     }
 
-    // 0.5's 滑动, shortcuts and two places become 0.6's slots, ways and places, a swipe doing what it did, each
-    // mark where it was (060-swipe-slots); the old keys dropped
+    // 0.5's 滑动, shortcuts and two places become 0.6's slots, ways and places, each mark where it was; old keys dropped
     @Test
     fun theOldSwipeSettingsBecomeTheSlots() {
         sp.edit {
@@ -386,27 +275,10 @@ class AppPrefsTest {
         assertEquals("the symbol's place down, where it goes", KeyMarkPosition.BottomRight, prefs.keyboard.swipeDownPosition.getValue())
         assertEquals(KeyMarkPosition.TopLeft, prefs.keyboard.swipeUpPosition.getValue())
         for (old in listOf("swipe_layers", "key_shortcuts", "punctuation_position", "shortcut_mark_position")) assertFalse(old, sp.contains(old))
-        // read again: nothing more to do, nothing changed
+        // read again: nothing more to do
         val stored = sp.all
         AppPrefs(sp).dropRetired()
         assertEquals(stored, sp.all)
-    }
-
-    // a 0.6 beta's shortcuts (beta1 and on: the symbol up, shortcuts down) holding 滑选: the same slots, 滑选 kept
-    @Test
-    fun aBetasSwipeSelectStaysInItsSlot() {
-        sp.edit {
-            clear()
-            putInt("pid", 1)
-            putString("swipe_layers", SwipeLayersChoice.SymbolUpShortcutDown.name)
-            putString("key_shortcuts", "full/q\tswipe_select\nfn/space.up\tswipe_select")
-        }
-        val slots = SwipeSlots.parse(AppPrefs(sp).apply { dropRetired() }.internal.keySwipes.getValue())
-        val select = SwipeSlot.Command(KeyCommand.SwipeSelect)
-        assertEquals(SwipeOrientation.FirstUp, slots.orientation)
-        assertEquals(select, slots.resolve("full/q", up = false))
-        assertEquals(SwipeSlot.First, slots.resolve("full/q", up = true))
-        assertEquals(select, slots.resolve("fn/space", up = true))
     }
 
     // a newer version's slots (its backup restored here, a downgrade): read as the presets, never written over
@@ -419,8 +291,7 @@ class AppPrefsTest {
         assertEquals(SwipeSlots.Default, SwipeSlots.parse(prefs.internal.keySwipes.getValue()))
     }
 
-    // a new install: the defaults (the first up, its shortcut down), none of 0.5's; an upgrade that never set
-    // 滑动 had 0.5's default (shortcuts up, the symbol down), and keeps it
+    // a new install gets the defaults; an upgrade that never set 滑动 keeps 0.5's default (shortcuts up, symbol down)
     @Test
     fun aNewInstallHasTheNewDefaultsAnUpgradeItsOld() {
         sp.edit { clear() }
@@ -432,7 +303,7 @@ class AppPrefsTest {
         assertEquals(SwipeOrientation.FirstDown, SwipeSlots.parse(upgraded.internal.keySwipes.getValue()).orientation)
         assertEquals("the shortcut up, where its marks were", KeyMarkPosition.TopLeft, upgraded.keyboard.swipeUpPosition.getValue())
         assertEquals(KeyMarkPosition.TopRight, upgraded.keyboard.swipeDownPosition.getValue())
-        // 0.6's set already (a 0.5 backup's keys merged in by hand): kept, the old ones dropped
+        // 0.6's set already (0.5 keys merged by hand): kept, old ones dropped
         sp.edit { clear(); putString("key_swipes", SwipeSlots.Default.with("full/a", true, SwipeSlot.Empty).serialize()); putString("swipe_layers", "Off") }
         val kept = AppPrefs(sp).apply { dropRetired() }
         assertEquals(SwipeSlot.Empty, SwipeSlots.parse(kept.internal.keySwipes.getValue()).resolve("full/a", true))
@@ -440,7 +311,7 @@ class AppPrefsTest {
         assertFalse(sp.contains("swipe_layers"))
     }
 
-    // an import or a backup with the two in one place: the symbol stored where it reads, at the start after
+    // both in one place (an import): the symbol moved where it reads, at the next start
     @Test
     @Uat("KB-66")
     fun theSymbolStoredInTheShortcutsPlaceStoredWhereItReads() {
@@ -456,7 +327,7 @@ class AppPrefsTest {
             assertEquals(stored.name, now, prefs.keyboard.swipeUpPosition.getValue())
             assertEquals(stored.name, stored, prefs.keyboard.swipeDownPosition.getValue())
         }
-        // 0.6's own two stored in one place: the up one moved off the down one's, as the page reads it
+        // 0.6's own two in one place: the up one moved off the down one's
         sp.edit { clear(); putString("key_swipes", ""); putString("swipe_up_position", "TopLeft"); putString("swipe_down_position", "TopLeft") }
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.swipeUpPosition.getValue()) }
         // apart already: as stored
@@ -464,8 +335,7 @@ class AppPrefsTest {
         AppPrefs(sp).apply { dropRetired() }.let { assertEquals(KeyMarkPosition.BottomLeft, it.keyboard.swipeUpPosition.getValue()) }
     }
 
-    // the old drawing's settings (the redraw's switch of 0.6's betas, vivo's touch routing, 扩大按键触摸区) and the
-    // voice's 整理 switch (voice_polish), stored as either type: dropped, read by nothing, no crash
+    // the old drawing settings and voice_polish, of either type: dropped, no crash
     @Test
     fun theRetiredSettingsStoredAreDropped() {
         for (key in listOf("canvas_keyboard", "vivo_keypress_workaround", "expand_keypress_area", "voice_polish")) {
@@ -477,14 +347,13 @@ class AppPrefsTest {
         }
     }
 
-    // 按键音音量 a slider (owner, 2026-11-11): 0..100, 0 shown 系统默认, off with the sound, no levels; a 0.5's level kept
+    // 按键音音量 is a 0..100 slider (0 shown 系统默认, off with the sound); a 0.5 level is kept
     @Test
     @Uat("ST-111")
     fun theKeySoundVolumeIsASliderThatKeepsAnOlderLevel() {
         val context = RuntimeEnvironment.getApplication()
         sp.edit { putInt("button_sound_volume", 50); putString("button_sound_volume_level", "3") }
         val prefs = AppPrefs(sp)
-        prefs.resetHiddenSettings(again = true)
         assertEquals("the old level kept", 50, prefs.keyboard.soundOnKeyPressVolume.getValue())
         val uis = prefs.keyboard.managedPreferencesUi
         assertTrue(uis.filterIsInstance<ManagedPreferenceUi.Levels>().none { level -> level.keys.any { it.first == "button_sound_volume" } })

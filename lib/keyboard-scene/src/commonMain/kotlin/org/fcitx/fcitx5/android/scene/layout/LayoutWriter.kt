@@ -9,7 +9,7 @@ import org.fcitx.fcitx5.android.scene.xml.Xml
 import kotlin.math.floor
 
 /**
- * A [Layout] as layout-1's text (061-custom-layout §12, what the layout maker saves and the app exports), canonical: one
+ * A [Layout] as layout-1's text (what the layout maker saves and the app exports), canonical: one
  * layout is always the same text, and [LayoutReader] reads it back as the same layout.
  *
  * - `<meta>`, `<defaults>`, then the rows and includes in order; two spaces an indent, an element a line.
@@ -200,7 +200,7 @@ object LayoutWriter {
                 '\t' -> append("&#9;")
                 '\n' -> append("&#10;")
                 '\r' -> append("&#13;")
-                // what XML has no character for (a control pasted into a name): left out, as the reader drops it (R26 F8187)
+                // what XML has no character for (a control pasted into a name): left out, as the reader drops it
                 else -> if (Xml.allows(c)) append(c)
             }
         }

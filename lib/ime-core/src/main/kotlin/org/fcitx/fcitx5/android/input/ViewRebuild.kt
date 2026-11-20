@@ -5,48 +5,26 @@
 package org.fcitx.fcitx5.android.input
 
 /**
- * Why the keyboard's views are made anew, and what becomes of half-typed input then (A2).
- *
- * A setting that makes them anew or swaps the keyboard (pinyin's 14 keys for the full one, 九键's
- * letters, a theme) ends what was typed first, as leaving the field does: what shows only above the
- * candidates (pinyin's code) dropped, what is already in the field as composing text (English's
- * half-typed word, handwriting's characters) committed there (user, 2026-10-27 and 2026-10-31).
- * Kept, it outlived the keyboard it was typed on: the 14 keys' codes went on in the full keyboard's
- * session, committed as typed at its first letter, and the new view showed the code row with no
- * candidates under it. Whatever the cause, a view made anew then shows the engine's whole state
- * (code row, candidates, input method), never only what its own events bring.
+ * Why the keyboard's views are made anew, and what becomes of half-typed input. A setting that swaps the keyboard
+ * ends what was typed first, as leaving the field does (kept, the 14 keys' codes went on in the full keyboard's
+ * session). A view made anew always shows the engine's whole state, never only its own events'.
  */
 enum class ViewRebuild(
-    /** Whether what was typed ends (as leaving the field: the code dropped, the field's text committed) before the views are made. */
+    /** As leaving the field: the code dropped, the field's text committed. */
     val endsComposition: Boolean,
 ) {
-    /** A setting changed, from the settings or from the keyboard itself, that the views are made anew for. */
+    /** From the settings or the keyboard itself. */
     SETTING(endsComposition = true),
 
-    /**
-     * The shape's 键盘样式 changed so the views are made anew (floating or split into or out of, from the
-     * keyboard's toggles, the handle dragged, or the settings page): the same keyboard laid out another
-     * way, not a setting changed (user, 2026-10-31 for the handle; 2026-11-14 for every style change,
-     * 061-wide-keyboard-style §3.5). What is typed stays, and the new views show it.
-     */
+    /** 键盘样式 changed (floating, split, the handle dragged): the same keyboard laid out another way; what is typed stays. */
     STYLE(endsComposition = false),
 
-    /**
-     * 候选词注音 changed (the handwriting pad's 注, or its row in the settings): the bar's height alone, the
-     * same keyboard. What is typed stays, the engine annotates it the new way (HostCore.configure's
-     * recall), and the new views show it.
-     */
+    /** 候选词注音 changed: only the bar's height; what is typed stays, annotated anew (HostCore.configure's recall). */
     READING(endsComposition = false),
 
-    /**
-     * The system asked for them (onCreateInputView, the window's views made again) with nothing
-     * changed by the user: what is typed stays, and the new views show it.
-     */
+    /** The system asked (onCreateInputView) with nothing changed by the user: what is typed stays. */
     SYSTEM(endsComposition = false),
 
-    /**
-     * The app's language picked anew, seen as a field starts (onStartInputView): the field before it
-     * left already took what was typed with it.
-     */
+    /** Seen as a field starts: the field before already took what was typed. */
     LANGUAGE(endsComposition = false),
 }

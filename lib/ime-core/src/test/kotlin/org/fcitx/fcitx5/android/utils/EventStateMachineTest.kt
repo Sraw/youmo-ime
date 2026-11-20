@@ -15,7 +15,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The state machine framework itself, independent of any concrete machine in the app. */
+/** The state machine framework itself. */
 class EventStateMachineTest {
 
     enum class S { A, B, C }
@@ -24,7 +24,7 @@ class EventStateMachineTest {
 
     private typealias Event = EventStateMachine.TransitionEvent<S, Key>
 
-    /** An event whose transition is written out directly, for testing the machine's plumbing. */
+    /** Its transition written out directly. */
     private class RawEvent(
         private val fn: (initial: S, current: S, useBoolean: (Key) -> Boolean?) -> S
     ) : Event {
@@ -38,8 +38,6 @@ class EventStateMachineTest {
     ) = EventStateMachine<S, Event, Key>(initial, booleans)
 
 
-    // region basic transitions
-
     @Test
     fun pushAppliesTheTransitionAndNotifies() {
         val seen = mutableListOf<S>()
@@ -51,7 +49,7 @@ class EventStateMachineTest {
         assertEquals(listOf(B), seen)
     }
 
-    /** A transition back onto the current state is a no-op: no listener call. */
+    /** A transition onto the current state is a no-op: no listener call. */
     @Test
     fun pushThatDoesNotChangeStateDoesNotNotify() {
         val seen = mutableListOf<S>()
@@ -90,10 +88,6 @@ class EventStateMachineTest {
         m.push(RawEvent { initial, _, _ -> initial })
         assertEquals(A, m.currentState)
     }
-
-    // endregion
-
-    // region boolean states
 
     @Test
     fun booleanStatesAreReadableAndWritable() {
@@ -153,36 +147,6 @@ class EventStateMachineTest {
         assertEquals(true, m.getBooleanState(Flag))
     }
 
-    // endregion
-
-    // region unsafeJump
-
-    @Test
-    fun unsafeJumpSetsTheStateAndNotifies() {
-        val seen = mutableListOf<S>()
-        val m = machine().apply { onNewStateListener = { seen += it } }
-
-        m.unsafeJump(C)
-
-        assertEquals(C, m.currentState)
-        assertEquals(listOf(C), seen)
-    }
-
-    /** Unlike `push`, `unsafeJump` does not compare against the current state. */
-    @Test
-    fun unsafeJumpToTheSameStateStillNotifies() {
-        val seen = mutableListOf<S>()
-        val m = machine(initial = A).apply { onNewStateListener = { seen += it } }
-
-        m.unsafeJump(A)
-
-        assertEquals(listOf(A), seen)
-    }
-
-    // endregion
-
-    // region the transition DSL
-
     private fun dsl(block: TransitionBuildBlock<S, Key>): Event = BuildTransitionEvent(block)
 
     @Test
@@ -229,10 +193,7 @@ class EventStateMachineTest {
         assertEquals(A, notMatching.currentState)
     }
 
-    /**
-     * When several rules match, the first declared one wins. Concrete machines rely on this
-     * for priority -- see `KawaiiBarStateMachine.WindowDetached`.
-     */
+    /** The first matching rule wins; machines rely on it for priority (`KawaiiBarStateMachine.WindowDetached`). */
     @Test
     fun dslTakesTheFirstMatchingRuleWhenSeveralApply() {
         val event = dsl {
@@ -303,5 +264,4 @@ class EventStateMachineTest {
         }
     }
 
-    // endregion
 }

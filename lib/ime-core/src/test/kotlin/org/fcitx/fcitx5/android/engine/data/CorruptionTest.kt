@@ -10,17 +10,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/**
- * Damages a small file one byte at a time and requires that it either fails to load with a
- * [DataFormatException] or loads and then survives every lookup, failing none. Anything else would
- * crash the input method on a key press rather than when the file is opened. Checksums are skipped,
- * as a caller may skip them having checked the file before; they would catch most of this, but not
- * a damaged section id, whose checksum goes with its entry: the reader asking for each section by
- * id catches that (DataFileTest).
- */
+/** Damages a file byte by byte: each must fail to load with [DataFormatException] or survive every lookup. */
 class CorruptionTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     private val pinyin = PinyinDataBuilder()
         .layers(listOf("base", "places", "new"))
@@ -60,7 +51,6 @@ class CorruptionTest {
         for (node in 0 until d.nodeCount) {
             for (c in d.firstChild(node) until d.firstChild(node) + d.childCount(node)) {
                 d.child(node, d.syllable(c))
-                // spelt out by id wherever a trie is walked
                 Syllables.spelling(d.syllable(c))
             }
             d.child(node, 0)
@@ -125,8 +115,6 @@ class CorruptionTest {
                 loaded++
             }
         }
-        // padding and quantised values change nothing that can be checked, so some must load:
-        // a sign that the flips reached the walk rather than all failing on the header
         assertTrue("no damaged file loaded", loaded > 0)
     }
 

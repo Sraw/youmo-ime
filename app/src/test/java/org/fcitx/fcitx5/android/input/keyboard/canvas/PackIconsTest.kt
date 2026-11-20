@@ -30,7 +30,6 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
-/** A theme's `<icon>` drawn in place of the app's (060-theme-sounds-icons §2): its colours, its fit, a broken file. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, sdk = [SCREENSHOT_SDK])
@@ -59,7 +58,6 @@ class PackIconsTest {
 
     private fun icon(svg: String, file: String = "i.svg"): PackIcons = PackIcons(mapOf(name to File(dir, file).apply { writeText(svg) }.path))
 
-    // the icon [name] drawn in [tint] in a 24 px box at 0, 0 of a 24 × 24 bitmap
     private fun drawn(icons: PackIcons, tint: Argb = Argb(Color.WHITE), painter: ScenePainter = painter(icons)): Bitmap {
         val b = Bitmap.createBitmap(SIDE, SIDE, Bitmap.Config.ARGB_8888)
         painter.draw(Canvas(b), listOf(Op.Icon(name, Box(0.0, 0.0, SIDE.toDouble(), SIDE.toDouble()), tint)))
@@ -68,7 +66,7 @@ class PackIconsTest {
 
     private fun painter(icons: PackIcons) = ScenePainter(View(context), look, BoardImages.NONE, SceneFonts(look), icons)
 
-    // read off the main thread (a frame of the largest takes far past 16 ms): the app's icon till it is in, then drawn again
+    // read off the main thread (the largest takes far past 16 ms): the app's icon till it is in
     @Test
     fun anIconIsReadOnTheDecodeThreadTheAppsDrawnTillThen() {
         val queued = ArrayList<Runnable>()
@@ -86,17 +84,14 @@ class PackIconsTest {
         assertTrue(app.sameAs(drawn(icons, painter = painter)))
         assertTrue(painter.missed)
         assertEquals(1, queued.size)
-        // asked again while it is read: not read twice
         drawn(icons, painter = painter)
         assertEquals(1, queued.size)
         val before = asked
         queued.single().run()
-        // the waiting painter's view told to draw again, and that painter draws the icon now
         assertTrue(asked > before)
         assertEquals(Color.BLUE, drawn(icons, painter = painter).getPixel(4, 12))
     }
 
-    // a pack's files written over while one is read: its waiting view drawn again, the stale read not kept
     @Test
     fun aForgetWhileAnIconIsReadRedrawsItsViewAndDropsTheRead() {
         val queued = ArrayList<Runnable>()
@@ -117,13 +112,12 @@ class PackIconsTest {
         assertTrue(asked > before)
         queued.single().run()
         assertTrue(icons.outline(icons.file(name)!!) == null)
-        // read afresh, not the one read before the forget
         assertEquals(2, queued.size)
     }
 
     @Test
     fun aPathsOwnColourIsKeptAndTheTintsAlphaApplied() {
-        // the left half in its own blue (CSS's #rgba: alpha last), the right in the tint
+        // CSS's #rgba: alpha last
         val icons = icon("""<svg viewBox="0 0 24 24"><path d="M0 0h12v24h-12z" fill="#00ff"/><path d="M12 0h12v24h-12z"/></svg>""")
         val b = drawn(icons, Argb.of(HALF, 255, 0, 0))
         val left = b.getPixel(4, 12)
@@ -149,7 +143,6 @@ class PackIconsTest {
         fun same(b: Bitmap) = assertTrue(app.sameAs(b))
         same(drawn(icon("""<svg><script/></svg>""", "bad.svg")))
         same(drawn(PackIcons(mapOf(name to File(dir, "gone.svg").path))))
-        // over 64 KB: not read at all
         same(drawn(icon("""<svg><path d="M0 0h1v1z"/></svg>""" + " ".repeat(64 * 1024), "big.svg")))
         assertNull(PackIcons.read(File(dir, "gone.svg").path))
     }

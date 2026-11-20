@@ -41,7 +41,6 @@ object KawaiiBarStateMachine {
             from(Candidate) transitTo Title
         }),
         WindowDetached({
-            // candidate state has higher priority so here it goes first
             from(Title) transitTo Candidate on (CandidateEmpty to false)
             from(Title) transitTo Idle
         }),

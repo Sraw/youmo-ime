@@ -19,6 +19,8 @@ import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import kotlin.math.abs
+import kotlin.test.assertTrue
 import kotlin.test.fail
 
 /** The engine's font of fixed sizes ([FixedMeasurer]), which the snapshots are of. */
@@ -30,7 +32,8 @@ object Fixtures {
 
     val qwertySource: String by lazy { testData("qwerty.xml") }
     val qwerty: Layout by lazy { LayoutReader.layout(qwertySource).ok() }
-    val materialLight: Theme by lazy { ThemeReader.theme(testData("material-light.xml")).ok() }
+    val materialLightSource: String by lazy { testData("material-light.xml") }
+    val materialLight: Theme by lazy { ThemeReader.theme(materialLightSource).ok() }
 
     /** The letters' long press firsts as built in (KeyDefaults'), by letter: what each letter's corner shows till the user changes one. */
     val qwertyAlts: Map<String, String> = "q1w2e3r4t5y6u7i8o9p0a@s*d+f-g=h/j#k(l)z'x:c\"v?b!n~m\\".chunked(2).associate { it.take(1) to it.drop(1) }
@@ -73,4 +76,26 @@ object Fixtures {
         SceneBuilder(theme, env, FakeMeasurer).build(layout).ok()
 
     fun <T> Parsed<T>.ok(): T = getOr { fail("problems: $it") }
+
+    /** material-light.xml with [style] (styles, colours, a `<sounds>`) added at its end. */
+    fun withStyle(vararg style: String): String = materialLightSource.replace("</theme>", style.joinToString("\n", postfix = "\n</theme>"))
+
+    fun theme(vararg style: String): Theme = ThemeReader.theme(withStyle(*style)).ok()
+
+    /** The warnings of theme text [s], which must read. */
+    fun warnings(s: String): List<String> {
+        val t = ThemeReader.theme(s)
+        assertTrue(t is Parsed.Ok, "${t.problems()}")
+        return t.warnings().map { it.message }
+    }
+
+    fun problems(s: String): List<String> = ThemeReader.theme(s).problems().map { it.message }
+
+    fun ops(s: Scene, id: String, pressed: Boolean = false): List<Op> = s.keys.first { it.id == id }.ops(pressed)
+
+    fun texts(s: Scene, id: String): List<Op.Text> = ops(s, id).filterIsInstance<Op.Text>()
+
+    fun icons(s: Scene, id: String): List<Op.Icon> = ops(s, id).filterIsInstance<Op.Icon>()
+
+    fun near(e: Double, a: Double, what: String = "") = assertTrue(abs(e - a) < 0.01, "$what: expected $e, was $a")
 }

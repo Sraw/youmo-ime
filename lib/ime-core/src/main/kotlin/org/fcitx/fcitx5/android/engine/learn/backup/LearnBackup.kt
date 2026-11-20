@@ -18,48 +18,35 @@ import java.io.UTFDataFormatException
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 
-/** Where a backup came from and when (U-100's confirmation names both): its first record. */
+/** A backup's first record: where and when it came from. */
 data class BackupHead(
-    /** Epoch milliseconds it was made at. */
     val time: Long,
-    /** The typing day the learning had reached ([LearnState.day]): what another install's days are shifted by. */
+    /** The typing day reached: what another install's days are shifted by. */
     val day: Int,
-    /** The install that made it ([Backups.installId]); 0 for not known (a bare `learn.log`, an older build's files). */
+    /** 0 if unknown (a bare `learn.log`, an older build's files). */
     val installId: Long,
     val kind: Int,
-    /** The app's version that made it, for the user to tell backups apart. */
     val version: String = "",
 ) {
     companion object {
-        /** Made every few typing days (U-106). */
         const val AUTO = 0
 
-        /** Saved by the user where they can see it, or into the settings' zip. */
+        /** Saved by the user, or into the settings zip. */
         const val SAVED = 1
 
-        /** The phone's learning as it was before a restore, for 退回恢复前 (C38). */
         const val BEFORE_RESTORE = 2
     }
 }
 
-/** A word of the lists the user keeps by hand: [code] its syllables apart by `'`, as `words.added` has it. */
+/** [code]: syllables joined by `'`, as `words.added` has it. */
 data class ListedWord(val text: String, val code: String) {
-    /** As the user dictionary's import reads it: `你好 ni'hao`, `!你好 ni'hao` blocked. */
     fun line(blocked: Boolean) = "${if (blocked) "!" else ""}$text $code"
 }
 
-/**
- * What the app's address bar learned (input/address's AddressBook, its two strings as the app keeps
- * them): carried by the backups as they are, the engine reading nothing of them.
- */
+/** The address bar's learned data, carried opaquely. */
 data class AddressData(val counts: String, val addresses: String)
 
-/**
- * A backup read: its [head] (null for a bare log), the learning [state], the words added and
- * blocked; [origin], the install its days are of (BackupMerge.ORIGIN): the head's, else one told
- * by the file's bytes ([LearnBackup.origin]), so two older builds' files are not one install's;
- * [addresses], null in one made before they went with it (v0.4.0's, a bare log).
- */
+/** [origin]: the install its days belong to (the head's, else derived from the bytes); [addresses] null in older backups. */
 class Backup(
     val head: BackupHead?,
     val state: LearnState,
@@ -70,46 +57,30 @@ class Backup(
 )
 
 /**
- * A learning backup (PLAN §2.9, impl/streams/D-design.md §1): `learn.log`'s records under a
- * header of their own ([FORMAT], `FXLB` 1), so a file the user picks is told apart from a log, a
- * zip or a word list. A [HEAD] record, then the learning as a snapshot ([LearnLog.writeSnapshot]:
- * 不再联想, pins and whatever rows a later build keeps included), then the words added by hand
- * ([ADDED]) and blocked ([BLOCKED]), which live in their own lists, not the log, and what the
- * address bar learned ([ADDRESS_COUNTS], [ADDRESSES], since 0.5.0: v0.4.0 skips them). Never the clipboard.
- * Last, always and once, an [END] holding the file's length in bytes, itself included: a file cut
- * at a record's boundary, or one missing a record or given one more, does not read (原 WD-10d). A
- * file without it, a draft build's included, is refused.
- *
- * Evolves as the log does: version 1 for good, new record types or fields appended; one this
- * build does not know is skipped, or kept with the snapshot's rows.
+ * A learning backup: `learn.log` records under their own header ([FORMAT], `FXLB` 1): [HEAD], the
+ * learning snapshot, the [ADDED] and [BLOCKED] word lists, the address bar's data, and last exactly one
+ * [END] holding the file's length, so a truncated or spliced file does not read. Evolves like the log.
  */
 object LearnBackup {
     val FORMAT = RecordFormat("FXLB", 1)
 
-    // stream D's record types, 70–79 (impl/streams/D-backup.md)
+    // record types 70–79
     const val HEAD: Byte = 70
     const val ADDED: Byte = 71
     const val BLOCKED: Byte = 72
 
-    /** [AddressData.counts], one string. */
     const val ADDRESS_COUNTS: Byte = 75
 
-    /** [AddressData.addresses], one string. */
     const val ADDRESSES: Byte = 76
 
     /** The last record: the file's length in bytes (an Int), this record included. */
     const val END: Byte = 74
-    // the END record's whole size, framed: internal for the tests that cut a file at it
+    // internal for tests that cut a file at it
     internal const val END_SIZE = 4 + 1 + 4 + 4
 
-    /** The file name a backup is saved under, by the user or in the settings' zip. */
     const val EXTENSION = ".fxlb"
 
-    /**
-     * [state], the lists and [addresses] (none: not written) as a backup's bytes, headed by [head]: the
-     * rows [backedUp] takes, all of them in 退回恢复前's copy ([BackupHead.BEFORE_RESTORE]), the phone's
-     * own file, never listed nor handed around, which a revert lays over the phone's learning whole.
-     */
+    /** [state], lists and [addresses] as a backup headed by [head]; the pre-restore copy ([BackupHead.BEFORE_RESTORE]) takes every row, others only [backedUp] ones. */
     fun bytes(
         head: BackupHead,
         state: LearnState,
@@ -128,38 +99,29 @@ object LearnBackup {
                 writeUTF(head.version)
             },
         )
-        // a kept row of this file's range (a later build's, one per write) is dropped, ORIGIN aside:
-        // END must be the only 74, and last, or the file would not read
+        // a later build's row of this file's range is dropped (ORIGIN aside): END must be the only 74, and last
         LearnLog.writeSnapshot(state, state.cut, { record: ByteArray ->
             if (record[4] !in HEAD..LAST || record[4] == BackupMerge.ORIGIN) out.write(record)
         }, keeps = if (head.kind == BackupHead.BEFORE_RESTORE) { _ -> true } else ::backedUp)
         for (w in added) out.write(word(ADDED, w))
         for (w in blocked) out.write(word(BLOCKED, w))
         if (addresses != null) {
-            // the book's caps (AddressBook.MAX_ADDRESSES and its counts') keep them under writeUTF's 64 KB;
-            // past it they are left out, not every backup lost
+            // the address book's caps keep them under writeUTF's 64 KB; past it they are left out, not the whole backup
             try {
                 val counts = FORMAT.record(ADDRESS_COUNTS) { writeUTF(addresses.counts) }
                 val list = FORMAT.record(ADDRESSES) { writeUTF(addresses.addresses) }
                 out.write(counts)
                 out.write(list)
             } catch (_: UTFDataFormatException) {
-                // too long for a record: the rest of the backup as it is
             }
         }
         out.write(FORMAT.record(END) { writeInt(out.size() + END_SIZE) })
         return out.toByteArray()
     }
 
-    /**
-     * Whether a backup takes the snapshot's row [r]: a whole phrase (U-73) used once is not (user
-     * 2026-11-02, C54). Most whole commits are never put in whole again, and the tables and handwriting
-     * kept no sentence before them (S8): a backup, a file the user hands around, holds those used
-     * again. The phone counts each still, or none would reach the 3 times that offer it.
-     */
+    /** A whole phrase used once is left out (most never recur, and the file is handed around); the phone still counts it. */
     fun backedUp(r: LearnRecord): Boolean = r !is LearnRecord.PhraseRow || r.count >= MIN_PHRASE_USES
 
-    /** A whole phrase's uses (U-73) a backup takes it from. */
     const val MIN_PHRASE_USES = 2
 
     private fun word(type: Byte, w: ListedWord) = FORMAT.record(type) {
@@ -167,15 +129,11 @@ object LearnBackup {
         writeUTF(w.code)
     }
 
-    /** Whether [bytes] start as a backup or a learning log does: what [read] takes. */
     fun isBackup(bytes: ByteArray) = FORMAT.hasHeader(bytes) || LearnRecords.FORMAT.hasHeader(bytes)
 
     /**
-     * The backup [bytes] hold, or a bare `learn.log` (a zip of an earlier build has one), which
-     * has no head and no lists.
-     *
-     * The last record read is noted before it is parsed, and the length starts at -1, as
-     * [RecordFormat.read] skips a record that fails to parse: an END that does not read is not one.
+     * The backup [bytes] hold, or a bare `learn.log` (no head, no lists). The last record read is noted before
+     * parsing and the length starts at -1, as [RecordFormat.read] skips unparsable records: an unreadable END is none.
      *
      * @throws IOException if they are neither, or a backup is not whole or does not end in [END]
      */
@@ -189,8 +147,7 @@ object LearnBackup {
         var addresses: String? = null
         val state = LearnState()
         val reader = LearnRecords.Reader()
-        // a log stops at a record cut short (the app killed while writing), but a backup is written
-        // whole: one that ends before its last byte was cut (a copy broken off), never merged in part (原 WD-10d)
+        // a backup is written whole: one ending early was cut, never merged in part
         var lastType: Byte = 0
         var ended = -1
         val whole = FORMAT.read(bytes) { type, input ->
@@ -202,8 +159,7 @@ object LearnBackup {
                 ADDRESS_COUNTS -> counts = input.readUTF()
                 ADDRESSES -> addresses = input.readUTF()
                 END -> ended = input.readInt()
-                // this file's own range: a later build's type, not one of the log's; but ORIGIN, the log's
-                // own row of the range, kept as the log keeps a type it does not know (review-int-records M1)
+                // this file's range: a later build's type, except ORIGIN, kept as the log keeps unknown types
                 in HEAD..LAST -> if (type == BackupMerge.ORIGIN) reader.decode(type, input)?.let { LearnLog.applyOrKeep(state, it) }
                 else -> reader.decode(type, input)?.let { LearnLog.applyOrKeep(state, it) }
             }
@@ -218,7 +174,7 @@ object LearnBackup {
 
     private fun head(input: DataInputStream) = BackupHead(input.readLong(), input.readInt(), input.readLong(), input.readUnsignedByte(), input.readUTF())
 
-    /** The head of the backup in [input], read no further than its first record; null for a file of no head. */
+    /** Reads only the first record; null without a head. */
     fun head(input: InputStream): BackupHead? {
         val start = ByteArray(RecordFormat.HEADER_SIZE + 4)
         DataInputStream(input).use { data ->
@@ -234,13 +190,13 @@ object LearnBackup {
         }
     }
 
-    /** [state] written to [out] as a whole log: its header, then the state as a snapshot, [kinds] named as [replay] read them. */
+    /** [state] written as a whole log, [kinds] named as [replay] read them. */
     fun writeLog(out: OutputStream, state: LearnState, kinds: Map<Int, String> = emptyMap()) {
         out.write(LearnRecords.FORMAT.header())
         LearnLog.writeSnapshot(state, state.cut, out::write, kinds)
     }
 
-    /** What the log [bytes] (header and records) say, as [LearnLog.replay], and the kinds its snapshot named: for [writeLog] to keep. */
+    /** As [LearnLog.replay], plus the kinds its snapshot named, for [writeLog] to keep. */
     fun replay(bytes: ByteArray): Pair<LearnState, Map<Int, String>> {
         val state = LearnState()
         val reader = LearnRecords.Reader()
@@ -248,7 +204,7 @@ object LearnBackup {
         return state to reader.kinds
     }
 
-    /** An install id for a file of no head, told by [bytes]: the same file the same, never 0 (no known install) nor negative. */
+    /** An install id derived from [bytes] for a headless file: stable, never 0 nor negative. */
     fun origin(vararg bytes: ByteArray): Long {
         val digest = MessageDigest.getInstance("SHA-256")
         bytes.forEach(digest::update)

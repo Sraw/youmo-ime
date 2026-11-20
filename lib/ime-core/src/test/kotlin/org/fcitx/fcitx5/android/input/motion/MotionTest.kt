@@ -10,7 +10,7 @@ import org.junit.Test
 
 class MotionTest {
 
-    /** F3460: nothing animates longer than 150 ms (user decision 2026-10-23). */
+    /** Nothing animates longer than 150 ms. */
     @Test
     fun nothingPassesTheCapAndGoingTakesThreeQuartersOfComing() {
         val on = Motion.Settings.DEFAULT

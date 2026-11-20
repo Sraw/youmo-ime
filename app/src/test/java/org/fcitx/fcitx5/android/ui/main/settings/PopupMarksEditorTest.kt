@@ -33,11 +33,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowDialog
 import java.io.File
 
-/**
- * The long press editor's marks (061-text-variables §2.5: 使用变量; 061-no-cn-punct §2.3: 不转中文标点) and a swipe's
- * text of variables, as the page has them.
- */
-// a phone's height: the editor's titles stay put and it opens on its long press card (061-settings-cards §5.1)
+// a phone's height: the editor's titles stay put and it opens on its long press card
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
@@ -55,13 +51,13 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
     private fun AlertDialog.toggle(text: Int) = views().filterIsInstance<MaterialButton>().first { it.text.toString() == st.s(text) }
     private fun AlertDialog.shown() = views().filterIsInstance<TextView>().filter { it.visibility == View.VISIBLE && it.isShown }.map { it.text.toString() }.toList()
 
-    // an item with a mark: its cap said with the mark's words after it
+    // its cap said with the mark's words after it
     private fun AlertDialog.tapMarked(item: String) {
         views().first { it.contentDescription?.toString()?.substringBefore(", ") == item && it.hasOnClickListeners() }.performClick()
         st.idle()
     }
 
-    // the unit tests have no assets, the built-in table with them: the marks it converts as the user's table, [more] too
+    // unit tests have no assets: the built-in table's converted marks as the user's table, plus [more]
     private fun table(more: String = ""): File = File(HostConfigDir.inUse(ConfigHome.DATA).dir, "punctuation/punc.mb.zh_CN").apply {
         parentFile!!.mkdirs()
         writeText(". 。\n, ，\n< 《\n> 》\n~ ～\n_ ——\n$more")
@@ -93,7 +89,6 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         assertEquals(item, q.items.last())
         assertEquals(mapOf(item to ItemMark.Variables), q.marks)
         assertTrue(AppPrefs.getInstance().internal.keyLists.getValue().startsWith(KeyLists.HEADER_3))
-        // the cap says it, the selected one's value over the buttons
         dialogOf("q").apply {
             assertTrue(views().any { it.contentDescription?.toString() == "$item, ${st.s(R.string.text_mark_variables)}" })
             tapMarked(item)
@@ -125,7 +120,7 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         }
     }
 
-    // ST-127: on the button row only for an English mark a table converts; beside the field for those of what is added
+    // on the button row only for an English mark a table converts; beside the field for what is added
     @Test
     @Uat("ST-127")
     fun noChinesePunctuationIsForTheMarksATableConverts() = table().let { t ->
@@ -143,7 +138,7 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         dialogOf("q").apply {
             check(R.string.text_as_is)
             assertTrue(shown().toString(), st.s(R.string.text_as_is_hint) in shown())
-            // the two beside the field one or the other
+            // the two beside the field are exclusive
             check(R.string.text_variables_use)
             assertFalse(box(R.string.text_as_is).isChecked)
             check(R.string.text_as_is)
@@ -170,7 +165,7 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         assertEquals(mapOf(b to ItemMark.AsIs), stored("full/q")!!.marks)
     }
 
-    // 061-no-cn-punct Q1: a key the user's own table adds can have it too
+    // a key the user's own table adds can have it too
     @Test
     @Uat("ST-127")
     fun aKeyOfTheUsersOwnTableCanBeKeptAsIs() {
@@ -188,7 +183,7 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         }
     }
 
-    // only 不转中文标点 turned on, on a key's own list: stored all the same (061-text-variables §3)
+    // only 不转中文标点 on, on a key's own list: still stored
     @Test
     @Uat("ST-127")
     fun aDefaultListMarkedAloneIsStored() = table().let { t ->
@@ -224,10 +219,9 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         open()
         dialogOf("q").apply {
             val boxes = views().filterIsInstance<CheckBox>().filter { it.text.toString() == st.s(R.string.text_variables_use) }.toList()
-            // the long press's, then each way's
             assertEquals(3, boxes.size)
             val texts = views().filterIsInstance<EditText>().toList()
-            // 上滑's card opened (the long press's open first): its help shown under its field
+            // its help shown under its field
             openCard(R.string.swipe_up)
             texts[1].setText("\${fullhour}:\$minute")
             boxes[1].performClick()
@@ -239,7 +233,7 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         assertEquals(SwipeSlot.Text("\${fullhour}:\$minute", variables = true), slots.resolve("full/q", true))
     }
 
-    // a text tapped: where it is not its own target (a keyboard's card's name), what it is on
+    // a text that is not its own target (a card's name) taps what it is on
     private fun click(title: Int) {
         var v: View = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
         while (!v.hasOnClickListeners()) v = v.parent as View
@@ -247,7 +241,6 @@ class PopupMarksEditorTest : PopupOverridesFragmentTest.EditorDialog() {
         st.idle()
     }
 
-    // a card of the editor opened by its title row
     private fun AlertDialog.openCard(title: Int) {
         var v: View = views().filterIsInstance<TextView>().first { it.text.toString() == st.s(title) }
         while (!v.hasOnClickListeners()) v = v.parent as View

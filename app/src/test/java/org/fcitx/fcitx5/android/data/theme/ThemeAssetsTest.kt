@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 class ThemeAssetsTest {
 
-    // files of the sizes given, decoded at the sample asked; each decode counted
+    // files of the given sizes, decoded at the sample asked; each decode counted
     private class FakeDecoder(val sizes: Map<String, IntArray>) : ThemeAssets.Decoder {
         val decoded = mutableListOf<Pair<String, Int>>()
         var fonts = 0
@@ -70,7 +70,6 @@ class ThemeAssetsTest {
     }
 
     companion object {
-        // the real ones, taken once before any test sets its own
         private lateinit var realDecoder: ThemeAssets.Decoder
         private lateinit var realRunner: (Runnable) -> Unit
         private lateinit var realPoster: (Runnable) -> Unit
@@ -87,7 +86,7 @@ class ThemeAssetsTest {
     @Before
     fun setUp() {
         ThemeAssets.clear()
-        // the decoding thread a queue run by hand; the main thread at once
+        // the decoding thread is a queue run by hand; the main thread runs at once
         ThemeAssets.runner = { queued += it }
         ThemeAssets.poster = { it.run() }
     }
@@ -121,11 +120,10 @@ class ThemeAssetsTest {
         assertEquals(listOf("a.png" to 1, "b.png" to 1), decoder.decoded)
         assertNotNull(images.bitmap("a.png"))
         assertEquals(30, images.size("b.png")!![0])
-        // the same board again: what was decoded, nothing decoded again
+        // the same board again: nothing decoded again
         assertSame(images, ThemeAssets.boardImages(look, "qwerty", listOf(slice("b.png"), slice("a.png"))))
         runQueued()
         assertEquals(2, decoder.decoded.size)
-        // told at once once in
         images.whenReady { told++ }
         assertEquals(2, told)
     }
@@ -142,7 +140,7 @@ class ThemeAssetsTest {
 
     @Test
     fun theKeyboardDrawnLongestAgoGoesOverTheLimit() {
-        // 1024 × 1024 × 4 = 4 MB each, a board of three 12 MB: two boards in the 24 MB, the third drops the first
+        // 4 MB each, a board of three 12 MB: two boards fit in 24 MB, the third drops the first
         val side = 1024
         val files = (1..9).map { "$it.png" to intArrayOf(side, side) }.toTypedArray()
         use(*files)
@@ -153,7 +151,6 @@ class ThemeAssetsTest {
         assertEquals(24L * 1024 * 1024, ThemeAssets.boardBytes())
         board("number", 7)
         assertTrue(ThemeAssets.boardBytes() <= ThemeAssets.BOARDS_LIMIT)
-        // the first made again: decoded anew
         val again = ThemeAssets.boardImages(look, "qwerty", (1..3).map { slice("$it.png") })
         assertFalse(again === first)
     }
@@ -163,10 +160,9 @@ class ThemeAssetsTest {
         use("a.png" to intArrayOf(30, 30), "p.png" to intArrayOf(30, 30), "q.png" to intArrayOf(30, 30))
         fun board(l: ThemeLook) = ThemeAssets.boardImages(l, "qwerty", listOf(slice("a.png"))).also { runQueued() }
         val first = board(pictured())
-        // the same files, a brightness and a colour changed: kept
+        // the same files, brightness and a colour changed: kept
         val recoloured = pictured().let { it.copy(picture = it.picture!!.copy(brightness = 40), palette = TestThemes.PixelDark.look.palette) }
         assertSame(first, board(recoloured))
-        // another picture: let go
         val other = pictured().let { it.copy(picture = it.picture!!.copy(portrait = Crop("q.png", null, 0))) }
         board(other)
         assertEquals(2, decoder.decoded.size)
@@ -184,12 +180,10 @@ class ThemeAssetsTest {
         assertEquals(1024, p.width)
         assertSame(p, ThemeAssets.picture(l, false, 0, 1000, 2f))
         assertEquals(listOf("p.png" to 4), decoder.decoded)
-        // its blurs from it, each once, small
         val blurred = ThemeAssets.picture(l, false, 8, 1000, 2f)!!
         assertEquals(256, blurred.width)
         assertSame(blurred, ThemeAssets.picture(l, false, 8, 1000, 2f))
         assertEquals(1, decoder.decoded.size)
-        // turned: the landscape cut, the portrait's let go
         assertEquals(800, ThemeAssets.picture(l, true, 0, 2000, 2f)!!.width)
         ThemeAssets.picture(l, false, 0, 1000, 2f)
         assertEquals(listOf("p.png" to 4, "l.png" to 1, "p.png" to 4), decoder.decoded)
@@ -197,12 +191,11 @@ class ThemeAssetsTest {
 
     @Test
     fun aTallPictureIsDecodedNoBiggerThanTheLimit() {
-        // 1080 × 4096 drawn 1080 wide: as wide as it is drawn, but 17 MB and over the highest whole
+        // 1080 × 4096 drawn 1080 wide: as wide as drawn, but 17 MB, over the limit
         assertEquals(2, ThemeAssets.pictureSample(1080, 4096, 1080))
         assertEquals(1, ThemeAssets.pictureSample(1080, 2400, 1080))
-        // a square 4096 drawn 4096 wide (a tablet turned): the pixels' limit
+        // a square 4096 drawn 4096 wide: the pixels' limit
         assertEquals(2, ThemeAssets.pictureSample(4096, 4096, 4096))
-        // wider than drawn: halved while as wide
         assertEquals(4, ThemeAssets.pictureSample(4096, 4096, 1000))
     }
 
@@ -217,7 +210,7 @@ class ThemeAssetsTest {
         ThemeAssets.boardImages(pictured, "qwerty", listOf(slice("a.png")))
         runQueued()
         assertTrue(ThemeAssets.boardBytes() > 0)
-        // a theme of no files, picked: nothing of the other's kept, though it has nothing to decode
+        // a theme of no files picked: nothing of the other's kept
         ThemeAssets.prefetch(look, false, 1000, 2f)
         assertEquals(0L, ThemeAssets.boardBytes())
         assertEquals(0, ThemeAssets.pictureCount())
@@ -270,16 +263,13 @@ class ThemeAssetsTest {
         assertEquals(2, got.size)
         assertSame(got[0], got[1])
         assertEquals(300, got[0]!!.width)
-        // again: at once, nothing decoded
         ThemeAssets.thumbnail(pictured(), 300, 1000, 2f) { got += it }
         assertSame(got[0], got[2])
         assertEquals(1, decoder.decoded.size)
         assertTrue(ThemeAssets.thumbnailBytes() > 0)
-        // blurred as under the keyboard: smaller still, its own
         ThemeAssets.thumbnail(pictured(blur = 8), 300, 1000, 2f) { got += it }
         runQueued()
         assertEquals(75, got[3]!!.width)
-        // none for a theme of no picture, at once
         ThemeAssets.thumbnail(look, 300, 1000, 2f) { got += it }
         assertNull(got[4])
         ThemeAssets.clear()
@@ -303,9 +293,7 @@ class ThemeAssetsTest {
         assertEquals(1, decoder.fonts)
     }
 
-    // a broken theme's keys drawn in the built-in theme's fonts (060-render-p2 U8, SceneFonts), its
-    // candidates and picture its own: the built-in's system font asked between lets go of none of the
-    // drawn theme's files, its picture decoding comes in, its font read once
+    // a broken theme's keys drawn in the built-in's fonts: asking its system font releases none of the drawn theme's files
     @Test
     fun theBuiltInsSystemFontLetsGoOfNoneOfTheDrawnThemesFiles() {
         use("p.png" to intArrayOf(1000, 800))
@@ -314,7 +302,6 @@ class ThemeAssetsTest {
         assertNotNull(ThemeAssets.typeface(own, "f.ttf", 400))
         var told = 0
         assertNull(ThemeAssets.pictureOrLater(own, false, 0, 1000, 2f) { told++ })
-        // a frame of the keys while the picture decodes: their letters, their bold symbols
         builtIn.typeface(LookTheme.KEY_FONT, 400)
         builtIn.typeface(LookTheme.KEY_FONT, 700)
         builtIn.typeface("system", 700)
@@ -327,7 +314,7 @@ class ThemeAssetsTest {
         assertEquals(1, decoder.fonts)
     }
 
-    // [decoder]'s decodes held at the gate till it opens; [entered] when the first is held
+    // [decoder]'s decodes held till the gate opens; [entered] when the first is held
     private class Gate(val decoder: ThemeAssets.Decoder) : ThemeAssets.Decoder by decoder {
         val entered = CountDownLatch(1)
         val open = CountDownLatch(1)
@@ -341,10 +328,8 @@ class ThemeAssetsTest {
         }
     }
 
-    // [f] on a thread of its own, its result in [out]
     private fun thread(out: Array<Bitmap?>, f: () -> Bitmap?) = Thread { out[0] = f() }.apply { start() }
 
-    // till [t] waits on a lock (another thread decoding what it asked for)
     private fun waitsOnALock(t: Thread) {
         val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (t.state != Thread.State.WAITING && t.state != Thread.State.BLOCKED) {
@@ -358,7 +343,7 @@ class ThemeAssetsTest {
         use("p.png" to intArrayOf(1000, 800), "q.png" to intArrayOf(1000, 800), "a.png" to intArrayOf(30, 30))
         val a = pictured(blur = 8).copy(base = BoardBase.Picture)
         val b = a.copy(picture = a.picture!!.copy(portrait = Crop("q.png", null, 0)))
-        // A picked, its prefetch queued behind; B picked and drawn before it runs
+        // A picked, its prefetch queued; B picked and drawn before it runs
         ThemeAssets.prefetch(a, false, 1000, 2f)
         ThemeAssets.retain(b)
         assertNotNull(ThemeAssets.picture(b, false, 0, 1000, 2f))
@@ -385,7 +370,7 @@ class ThemeAssetsTest {
         check(gate.entered.await(10, TimeUnit.SECONDS))
         val t2 = thread(second) { ThemeAssets.picture(l, false, 0, 1000, 2f) }
         waitsOnALock(t2)
-        // the files written anew as they wait
+        // the files rewritten as they wait
         ThemeAssets.clear()
         gate.open.countDown()
         t1.join(10_000)
@@ -394,7 +379,6 @@ class ThemeAssetsTest {
         assertSame(first[0], second[0])
         assertEquals(1, gate.decodes.get())
         assertEquals("not put back after the clear", 0, ThemeAssets.pictureCount())
-        // asked again: decoded anew
         assertNotNull(ThemeAssets.picture(l, false, 0, 1000, 2f))
         assertEquals(2, gate.decodes.get())
     }
@@ -414,11 +398,9 @@ class ThemeAssetsTest {
         assertNull(ThemeAssets.pictureOrLater(l, false, 8, 1000, 2f) { told++ })
         gate.open.countDown()
         t.join(10_000)
-        // the blur made on the decode thread, from the sharp one decoded
         runQueued()
         assertEquals("each told once it is in", 2, told)
         assertSame(ahead[0], ThemeAssets.pictureOrLater(l, false, 0, 1000, 2f) { told++ }!!.bitmap)
-        // the blur itself made next on the decode thread, from the sharp one in
         assertNull(ThemeAssets.pictureOrLater(l, false, 8, 1000, 2f) { told++ })
         runQueued()
         assertEquals(3, told)
@@ -432,24 +414,20 @@ class ThemeAssetsTest {
         use("p.png" to intArrayOf(1000, 800))
         val l = pictured()
         val wide = ThemeAssets.picture(l, false, 8, 1000, 2f)!!
-        // nearly as wide: the same
         assertSame(wide, ThemeAssets.picture(l, false, 8, 980, 2f))
-        // a floating keyboard's, half as wide: its own, blurred twice the picture's pixels
+        // a floating keyboard's, half as wide: its own, blurred at twice the picture's pixels
         val narrow = ThemeAssets.picture(l, false, 8, 500, 2f)!!
         assertTrue(wide !== narrow)
         assertEquals(2 * ThemeAssets.blurRadius(8, 1000, 1000, 2f), ThemeAssets.blurRadius(8, 500, 1000, 2f))
-        // both from the one sharp picture
         assertEquals(listOf("p.png" to 1), decoder.decoded)
     }
 
-    // two views drawing one blur at two widths at once (the theme page's preview and the keyboard, split
-    // screen) once let each other's go: each asked anew, blurred again, neither ever getting one
+    // two views drawing one blur at two widths at once once evicted each other's, neither ever getting one
     @Test
     fun twoWidthsDrawnInTurnAreEachBlurredOnceAndKept() {
         use("p.png" to intArrayOf(1000, 800))
         val l = pictured(blur = 8)
         fun ask(width: Int) = ThemeAssets.pictureOrLater(l, false, 8, width, 2f) {}?.bitmap
-        // in turn till both are in: the sharp one, then each width's blur, on the decode thread
         repeat(3) {
             ask(1000)
             ask(500)
@@ -458,7 +436,6 @@ class ThemeAssetsTest {
         val wide = ask(1000)!!
         val narrow = ask(500)!!
         assertTrue(wide !== narrow)
-        // asked in turn again, as each view draws a frame: the same ones, nothing more to make
         repeat(4) {
             assertSame(wide, ask(1000))
             assertSame(narrow, ask(500))
@@ -467,8 +444,7 @@ class ThemeAssetsTest {
         assertEquals(listOf("p.png" to 1), decoder.decoded)
     }
 
-    // a blur kept for every width ever drawn (a floating keyboard resized again and again) would keep
-    // a bitmap each: past the last few widths the oldest is let go, the sharp one it is made from kept
+    // a blur per width ever drawn would keep a bitmap each: past the last few the oldest is evicted, the sharp source kept
     @Test
     fun aBlurOfAWidthNotDrawnLatelyIsLetGo() {
         use("p.png" to intArrayOf(1000, 800))
@@ -480,13 +456,11 @@ class ThemeAssetsTest {
         ThemeAssets.picture(l, false, 8, 300, 2f)
         ThemeAssets.picture(l, false, 8, 400, 2f)
         ThemeAssets.picture(l, false, 8, 600, 2f)
-        // three widths asked for since 1000 was: let go, made anew
         assertTrue(wide !== ThemeAssets.picture(l, false, 8, 1000, 2f))
         assertEquals("the sharp one decoded once", listOf("p.png" to 1), decoder.decoded)
     }
 
-    // a blur still being made, a view waiting on it, is never the one let go past the last few widths:
-    // two views drawing at two widths at once would else let each other's go and blur again and again
+    // a blur still being made with a view waiting is never the one evicted
     @Test
     fun aBlurAViewWaitsOnIsNotLetGoForWidthsDrawnSince() {
         use("p.png" to intArrayOf(1000, 800))
@@ -500,12 +474,11 @@ class ThemeAssetsTest {
         ThemeAssets.picture(l, false, 8, 600, 2f)
         runQueued()
         assertEquals(1, told)
-        // still kept: in at once, nothing queued to make it again
         assertNotNull(ThemeAssets.pictureOrLater(l, false, 8, 900, 2f) {}?.bitmap)
         assertTrue("nothing queued", queued.isEmpty())
     }
 
-    // each frame a view waiting on a picture draws once queued another fill, each found it done
+    // a waiting view's each frame once queued another fill
     @Test
     fun framesDrawnBeforeAPictureIsInQueueOneFill() {
         use("p.png" to intArrayOf(1000, 800))
@@ -517,8 +490,7 @@ class ThemeAssetsTest {
         assertEquals("every frame's view told", 5, told)
     }
 
-    // pins the outcome, not how: a theme drawn again after its queued fill was skipped (another theme
-    // drawn before it ran) gets a fill and its view told, never left blank waiting on the skipped one
+    // a theme redrawn after its queued fill was skipped gets a fill and its view told, never left blank
     @Test
     fun aFillSkippedForAnotherThemeIsQueuedAgainOnceTheThemeIsBack() {
         use("p.png" to intArrayOf(1000, 800), "q.png" to intArrayOf(1000, 800))
@@ -555,13 +527,12 @@ class ThemeAssetsTest {
         val base = View(RuntimeEnvironment.getApplication()).apply { layout(0, 0, 1000, 800) }
         val host = PictureHost(pictured(), base, false)
         val paint = PicturePaint()
-        // decoded on the decode thread, then drawn
         host.paint(base, 0, 100, paint)
         runQueued()
         assertNotNull(host.paint(base, 0, 100, paint))
         host.paint(base, 0, 100, paint)
         assertEquals("placed once", 1, decoder.decoded.size)
-        // imported again under its name, the theme itself the same: its new file decoded
+        // reimported under its name, the theme itself the same: its new file decoded
         ThemeAssets.clear()
         host.paint(base, 0, 100, paint)
         runQueued()
@@ -576,27 +547,25 @@ class ThemeAssetsTest {
         ThemeAssets.thumbnail(pictured(), 300, 1000, 2f) { got += it }
         runQueued()
         assertEquals(listOf<Bitmap?>(null), got)
-        // its file there now (written as it was asked, say): not none kept
+        // its file there now: not none kept
         use("p.png" to intArrayOf(600, 600))
         ThemeAssets.thumbnail(pictured(), 300, 1000, 2f) { got += it }
         runQueued()
         assertEquals(300, got[1]!!.width)
     }
 
-    // the bug: a theme picture no prefetch made (a floating keyboard's width) was decoded and blurred
-    // in draw on the main thread, a frame held up by a picture of 4096
+    // the bug: a picture no prefetch made was decoded and blurred in draw on the main thread
     @Test
     fun aPictureNotDecodedAheadIsDecodedOnTheDecodeThreadNotTheDrawingOne() {
         use("p.png" to intArrayOf(1000, 800))
         val l = pictured(blur = 8)
         var told = 0
-        // a width no prefetch made (a floating keyboard's): the sharp one queued, nothing decoded on the drawing thread
+        // nothing decoded on the drawing thread
         assertNull(ThemeAssets.pictureOrLater(l, false, 8, 600, 2f) { told++ })
         assertEquals(0, decoder.decoded.size)
         runQueued()
         assertEquals(1, decoder.decoded.size)
         assertEquals(1, told)
-        // its blur next: queued too, not made here
         assertNull(ThemeAssets.pictureOrLater(l, false, 8, 600, 2f) { told++ })
         runQueued()
         assertEquals(2, told)

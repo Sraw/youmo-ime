@@ -9,16 +9,7 @@ import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 import org.gradle.kotlin.dsl.register
 
-/**
- * Handwriting: the recognizers' runtime (:lib:handwriting, onnxruntime and a JNI to
- * it) and the release `handwriting-models-*` of this fork (its manifest.txt says what each file
- * is and how it was made). Of its files the single character's are taken: two ORT-format models
- * (its image, its path), the characters they tell apart, and their frequencies. Left out: a line's
- * and an overlay's models, as the app writes a character at a time, and the character bigram, as
- * the characters are read as a sentence with the pinyin model. Downloaded once, SHA-256 checked,
- * extracted as `handwriting/` for the text pack (AssetPacksPlugin), not the APK: the models are
- * mapped where the pack's import put them.
- */
+/** Handwriting: :lib:handwriting and the `handwriting-models-*` release's files, SHA-256 checked, for the text pack. */
 class HandwritingDataPlugin : Plugin<Project> {
 
     companion object {

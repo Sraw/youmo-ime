@@ -31,18 +31,11 @@ import org.fcitx.fcitx5.android.utils.addPreference
 import org.fcitx.fcitx5.android.utils.formatDateTime
 import org.fcitx.fcitx5.android.utils.toast
 
-/**
- * The learning's backups (U-100, U-103, U-106, D31): made every few typing days in the keyboard's
- * own folder, listed to restore or delete; one restored from a file the user picks (a backup, or
- * the user dictionary's export); a copy saved where they can see it; the last restore taken back.
- * A restore merges with what the phone has: the engine does it ([BackupOp]). The switch for the
- * automatic ones sits on the lexicon page's top, with 用我的输入习惯 (U-106, U-93).
- */
+/** The engine merges a restore with what the phone has ([BackupOp]); the automatic backups' switch is on the lexicon page. */
 class LearningBackupsFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
 
-    // the page shown again after each act
     private val restore by lazy { LearningRestore(this, { viewModel.fcitx }) { refresh() } }
 
     private lateinit var restoreLauncher: ActivityResultLauncher<Array<String>>
@@ -100,7 +93,7 @@ class LearningBackupsFragment : PaddingPreferenceFragment() {
 
     private fun refresh() {
         lifecycleScope.launch {
-            // not readable yet (the phone locked since boot): the list as it was
+            // not readable yet (locked since boot): the list as it was
             val result = restore.backups(BackupOp.Kept) ?: return@launch
             revert.isEnabled = result.canRevert
             kept.removeAll()
@@ -128,7 +121,7 @@ class LearningBackupsFragment : PaddingPreferenceFragment() {
                             restore.run(BackupOp.RestoreKept(info.name)) { context.toast(R.string.learning_restored) }
                         }
                     } else {
-                        // asked, as a restore is: one copied in may be the only copy there is
+                        // asked, as a restore is: one copied in may be the only copy
                         val message = getString(R.string.learning_backup_delete_confirm, title, restore.source(info.head, info.own))
                         restore.confirm(R.string.learning_backup_delete, message) { restore.run(BackupOp.Delete(info.name)) }
                     }
@@ -143,7 +136,7 @@ class LearningBackupsFragment : PaddingPreferenceFragment() {
     companion object : SearchablePage {
         private const val RESTORE_KEY = "learning_restore"
         private const val SAVE_COPY_KEY = "learning_save_copy"
-        // there while nothing has been restored too, greyed: the row is pointed at all the same
+        // greyed while nothing has been restored, so search can still point at it
         private const val REVERT_KEY = "learning_revert"
 
         override fun searchEntries(context: Context) = listOf(
@@ -152,11 +145,7 @@ class LearningBackupsFragment : PaddingPreferenceFragment() {
             Triple(R.string.learning_revert, REVERT_KEY, R.string.learning_revert_summary),
         ).map { (title, key, summary) -> PageEntry(context.getString(title), SearchHighlight.PREF + key, summary = context.getString(summary)) }
 
-        /**
-         * Asks before a copy of the learning is saved (U-106): anyone holding the phone can take the
-         * file, and what is typed often with it. [save] given its name, [prefix] and the day, on OK.
-         * The words' export too, the same file (review-uat-fixes S12). [confirm] shows the question.
-         */
+        /** Asked first: anyone with the phone could take the file and what is typed often. */
         fun askSaveCopy(
             ctx: Context,
             title: Int,

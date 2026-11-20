@@ -22,15 +22,11 @@ import org.fcitx.fcitx5.android.input.InputView
 import splitties.dimensions.dp
 
 /**
- * Hold to talk on the space key ([VoiceHoldSession]): over the keyboard while the finger is down,
- * the bars moving with the voice, what is heard so far, and where to slide to drop it; typed into
- * the field ([commit]) once the finger lifts. All of it in the upper part, the lower left empty:
- * the finger is on the space, at the bottom, and covers what is under it. The keyboard's view
- * stays under the overlay, so the key keeps the touch: [BaseInputView.hold] follows the finger.
+ * All of it in the upper part, the lower left empty: the finger is on the space and covers what is
+ * under it. The keyboard's view stays under the overlay, so the key keeps the touch.
  */
 class VoiceHoldOverlay(
     private val inputView: InputView,
-    // the finger the long press was for
     private val pointer: Int,
     commit: (String) -> Unit,
 ) : BaseInputView.Hold, VoiceHoldSession.Ui {
@@ -54,17 +50,15 @@ class VoiceHoldOverlay(
     private val heard = VoiceCard.heard(ctx, theme)
     private val wave = VoiceCard.wave(ctx, look.micColor.value)
 
-    // the bars on a pill of their own, as a bubble the voice is in
     private val pillColor = look.micFill.value
     private val pill = VoiceCard.pill(ctx, wave, pillColor)
-    // what the status line says (listeningText): ready before silent
     // the microphone's first sample not zero come: what 正在听 waits for
     private var ready = false
     // 2 s of zeroes before the first sound
     private var silent = false
-    // in the zone where lifting drops it: 松开手指，取消输入 stays as the microphone comes on
+    // 松开手指，取消输入 stays as the microphone comes on
     private var cancelling = false
-    // the 正在听 cue felt this hold (the card is made anew for each)
+    // the card is made anew for each hold
     private var cued = false
 
     private val status = VoiceCard.status(ctx, theme)
@@ -80,8 +74,7 @@ class VoiceHoldOverlay(
         addView(pill, VoiceCard.pillParams(ctx))
         addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(8) })
         addView(hint, LinearLayout.LayoutParams(-1, -2).apply { topMargin = ctx.dp(2) })
-        // under the finger: nothing there, it would not be seen. The keyboard's view runs under
-        // the navigation bar too: from where the finger went down to the bottom, and its tip above
+        // the keyboard's view runs under the navigation bar too: from where the finger went down to the bottom
         val under = (keyboard.height - downInKeyboard() + ctx.dp(FINGER)).toInt().coerceIn(0, keyboard.height / 2)
         addView(View(ctx), LinearLayout.LayoutParams(-1, under))
         // a touch on it is the held finger's, not the keys' under it
@@ -94,17 +87,15 @@ class VoiceHoldOverlay(
         })
     }
 
-    // where the finger went down, in the keyboard's own coordinates, where the card is: the keyboard
-    // may be moved and scaled in the input view (floating)
+    // the keyboard may be moved and scaled in the input view (floating)
     private fun downInKeyboard(): Float {
         val at = floatArrayOf(0f, downY - keyboard.top)
         Matrix().also { keyboard.matrix.invert(it) }.mapPoints(at)
         return at[1]
     }
 
-    /** The long press has fired: the microphone opens now, the models load meanwhile. */
     fun begin() {
-        // the keyboard's own child: it moves and scales with it (floating, one-handed)
+        // it moves and scales with it (floating, one-handed)
         inputView.overKeys(card, underBar = false)
         glass.under(card, keyboard as ViewGroup)
         card.alpha = 0f
@@ -118,8 +109,7 @@ class VoiceHoldOverlay(
 
     override fun touched(ev: MotionEvent) {
         if (session.over) return
-        // lifted, the rest is the recognizer's: a tap or a stray cancel drops nothing said. A new
-        // press ends the tail still being recorded, anywhere on the keyboard's view
+        // lifted, the rest is the recognizer's: a tap or a stray cancel drops nothing said
         if (session.released) {
             val action = ev.actionMasked
             if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) session.pressedAgain()
@@ -136,14 +126,9 @@ class VoiceHoldOverlay(
         }
     }
 
-    /**
-     * Another field, the keyboard hidden: what was heard typed into the field it was said in, the
-     * microphone closed, as a tap's talk does. The same field's input restarted (a WebView, the app's
-     * restartInput) while the finger is down: the hold goes on, what is said kept.
-     */
+    /** The same field's input restarted (a WebView, restartInput) while the finger is down: the hold goes on. */
     override fun inputEnded(how: BaseInputView.Hold.InputEnd) {
         if (how == BaseInputView.Hold.InputEnd.STARTED && session.sameField) return
-        // lifted already: hidden, the rest still comes, as a tap's does
         if (how == BaseInputView.Hold.InputEnd.HIDDEN && session.released) {
             session.hidden(SystemClock.uptimeMillis())
         } else {
@@ -155,7 +140,7 @@ class VoiceHoldOverlay(
         ready = true
         if (cancelling) return
         cued = true
-        // the cue to start talking: felt as well as seen; not under 松开手指，取消输入, which it would contradict
+        // not under 松开手指，取消输入, which it would contradict
         VoiceStyle.vibrate(card, cue = true)
         status.setText(R.string.voice_hold_listening)
     }
@@ -201,23 +186,18 @@ class VoiceHoldOverlay(
         }
     }
 
-    override fun recognizing() {
-        status.setText(R.string.voice_hold_recognizing)
-        hint.visibility = View.INVISIBLE
-        wave.active = false
-    }
+    override fun recognizing() = VoiceCard.recognizing(status, hint, wave)
 
     override fun ended(message: Int?) {
         if (inputView.hold === this) inputView.hold = null
         if (gone) return
         gone = true
-        // no longer the held finger's: clickable, it took the next press on the space under it and
-        // the long press never fired (VO-16)
+        // clickable, it took the next press on the space under it and the long press never fired
         VoiceCard.ended(card, status, hint, main, message)
     }
 
     companion object {
-        // slid up a quarter of the keyboard's height: no slip of the finger, and still in reach
+        // no slip of the finger, and still in reach
         private const val CANCEL_SHARE = 0.25f
 
         // how far above the point it touches a finger still covers, in dp

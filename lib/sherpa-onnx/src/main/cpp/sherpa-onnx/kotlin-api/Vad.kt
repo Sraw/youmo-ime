@@ -1,8 +1,6 @@
 // Copyright (c)  2023  Xiaomi Corporation
 package com.k2fsa.sherpa.onnx
 
-import android.content.res.AssetManager
-
 data class SileroVadModelConfig(
     var model: String = "",
     var threshold: Float = 0.5F,
@@ -23,17 +21,12 @@ data class VadModelConfig(
 class SpeechSegment(val start: Int, val samples: FloatArray)
 
 class Vad(
-    assetManager: AssetManager? = null,
     var config: VadModelConfig,
 ) {
     private var ptr: Long
 
     init {
-        if (assetManager != null) {
-            ptr = newFromAsset(assetManager, config)
-        } else {
-            ptr = newFromFile(config)
-        }
+        ptr = newFromFile(config)
         require(ptr != 0L) {
             "Invalid VadConfig: failed to create native Vad"
         }
@@ -69,11 +62,6 @@ class Vad(
     fun flush() = flush(ptr)
 
     private external fun delete(ptr: Long)
-
-    private external fun newFromAsset(
-        assetManager: AssetManager,
-        config: VadModelConfig,
-    ): Long
 
     private external fun newFromFile(
         config: VadModelConfig,

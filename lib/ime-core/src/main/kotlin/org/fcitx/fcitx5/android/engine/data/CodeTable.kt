@@ -6,14 +6,7 @@ package org.fcitx.fcitx5.android.engine.data
 
 import java.nio.ByteBuffer
 
-/**
- * A compiled code table (五笔, 仓颉, ...): entries sorted by code, entries sharing a code kept in
- * the order the source listed them, which is the order users expect to see them in. Looking up
- * a partial code is a binary search for the range of codes it prefixes.
- *
- * [header] and [rules] are the table's own settings (键码, 码长, 组词规则 ...), kept verbatim for
- * the engine to interpret.
- */
+/** A compiled code table (五笔, 仓颉, ...): entries sorted by code, ties in source order as users expect. */
 class CodeTable private constructor(file: DataFile) {
 
     val header: Map<String, String>
@@ -33,18 +26,15 @@ class CodeTable private constructor(file: DataFile) {
     fun code(index: Int): String = codes[index]
     fun text(index: Int): String = texts[index]
 
-    /** [index]'s text's UTF-16 length, without making a string of it. */
+    /** Without making a string. */
     fun textLength(index: Int): Int = texts.length(index)
 
-    /** [index]'s text's UTF-16 unit [at], without making a string of it. */
     fun textChar(index: Int, at: Int): Char = texts.char(index, at)
 
-    /** The length of [index]'s code, and its key [at]: without making a string of it. */
     fun codeLength(index: Int): Int = codes.length(index)
 
     fun codeKey(index: Int, at: Int): Char = codes.char(index, at)
 
-    /** The entries whose code starts with [prefix], as an index range (empty if none). */
     fun prefixRange(prefix: String): IntRange {
         val from = lowerBound(prefix)
         var lo = from
@@ -56,7 +46,6 @@ class CodeTable private constructor(file: DataFile) {
         return from until lo
     }
 
-    /** Entries whose code is exactly [code]. */
     fun exactRange(code: String): IntRange {
         val range = prefixRange(code)
         var end = range.first
@@ -86,10 +75,8 @@ class CodeTable private constructor(file: DataFile) {
             entries += code to text
         }
 
-        /** The entries so far, code and text, in the order given. */
         val entryList: List<Pair<String, String>> get() = entries
 
-        /** The entries [arrange] returns for those so far, in its order. */
         fun arrange(arrange: (List<Pair<String, String>>) -> List<Pair<String, String>>) = apply {
             val next = arrange(entries.toList())
             entries.clear()
@@ -97,7 +84,6 @@ class CodeTable private constructor(file: DataFile) {
         }
 
         fun build(): DataFile.Writer {
-            // stable: entries sharing a code keep their source order
             val sorted = entries.sortedBy { it.first }
             return DataFile.Writer(DataFile.KIND_TABLE, VERSION)
                 .addMeta(META, header.mapKeys { HEADER + it.key } + rules.mapKeys { RULE + it.key })
@@ -107,7 +93,7 @@ class CodeTable private constructor(file: DataFile) {
     }
 
     companion object {
-        /** Layout of the sections below; bump on any change to it. */
+        /** Bump on any layout change. */
         const val VERSION = 1
 
         private const val META = 1
@@ -118,10 +104,7 @@ class CodeTable private constructor(file: DataFile) {
         private const val HEADER = "header."
         private const val RULE = "rule."
 
-        /**
-         * [verify]: check every section's checksum first (see [DataFile.open]).
-         * @throws DataFormatException if [buffer] is not a code table this build can read
-         */
+        /** @throws DataFormatException if [buffer] is not a code table this build can read */
         fun load(buffer: ByteBuffer, verify: Boolean = true): CodeTable =
             CodeTable(DataFile.open(buffer, DataFile.KIND_TABLE, VERSION, verify))
     }

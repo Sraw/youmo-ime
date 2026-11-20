@@ -10,20 +10,14 @@ import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import java.util.UUID
 
 /**
- * The key style settings before theme file 3.0 (global: borders, corners, gaps…) into the themes,
- * in two steps, one rule: a theme of an older format gets the old settings as its keys.
- *
- * 1. As the themes are read ([ThemeFilesManager.listThemes] with [legacy]): each of an older format
- *    is saved as 3.0 with them. One of 3.0 is never changed, so an old backup restored (the old
- *    settings come back with it) leaves the themes made since as they are.
- * 2. [settle], once the keys are drawn from the themes: a built-in theme in use is copied with them
- *    and the copy put in its place, then the settings are removed. A Monet theme in use is not copied
- *    (a copy's colours would stop following the wallpaper): the settings are kept for the Monet
- *    themes' keys ([monet]).
+ * Moves the pre-3.0 global key style settings into the themes: a theme of an older format gets them as its keys.
+ * Listing saves each older theme as 3.0 with them ([legacy]); a 3.0 theme is never changed, so an old backup's
+ * settings leave newer themes be. Then [settle] copies a built-in theme in use and removes the settings; a Monet theme
+ * is not copied (it would stop following the wallpaper), so the settings are kept for it ([monet]).
  */
 object ThemeLookMigration {
 
-    /** Every key of the old settings, the hidden radii and the levels' too. */
+    /** The hidden radii and the levels' too. */
     val KEYS = listOf(
         "key_border", "key_border_stroke", "key_ripple_effect", "key_radius", "key_radius_level",
         "key_horizontal_margin", "key_horizontal_margin_landscape", "key_vertical_margin",
@@ -31,16 +25,13 @@ object ThemeLookMigration {
     )
 
     /**
-     * The old settings as [prefs] has them; null if none of them is there (a new install, or settled).
-     * Those the old settings page did not show (the border's stroke, the ripple, the two radii of the
-     * text editing and clipboard pages) are the defaults whatever [prefs] has: no user could change
-     * them, so a backup's values say nothing of what the user wanted. Removed with the rest.
+     * Null if none is there (a new install, or settled). Those the old page did not show (border stroke, ripple, two
+     * radii) are defaults whatever [prefs] has: no user could have set them.
      */
     fun legacy(prefs: SharedPreferences): LegacyLook? {
         if (KEYS.none(prefs::contains)) return null
         val d = LegacyLook()
-        // no longer managed preferences: a value of the wrong type (a bad backup, a hand edit) is the
-        // default, not a crash at every start
+        // no longer managed preferences: a wrong type (bad backup, hand edit) is the default, not a crash at every start
         fun bool(key: String, default: Boolean) = runCatching { prefs.getBoolean(key, default) }.getOrDefault(default)
         fun int(key: String, default: Int) = runCatching { prefs.getInt(key, default) }.getOrDefault(default)
         return LegacyLook(
@@ -53,17 +44,14 @@ object ThemeLookMigration {
         )
     }
 
-    /** Where the old settings are kept for the Monet themes' keys, once settled: their values joined. */
+    /** The old settings kept for the Monet themes' keys once settled, values joined. */
     const val MONET_KEY = "monet_key_style"
 
-    /** The old settings the Monet themes are drawn with, [settle]d into [prefs]; null for none (the defaults). */
+    /** Null for none (the defaults). */
     fun monet(prefs: SharedPreferences): LegacyLook? =
         runCatching { prefs.getString(MONET_KEY, null) }.getOrNull()?.let(::decode)
 
-    /**
-     * What the Monet themes' keys are drawn with, read as the themes are ([ThemeManager]): their look is
-     * made from the wallpaper's colours, not read from a file. Set before a Monet theme's look is first asked.
-     */
+    /** Monet looks are made from the wallpaper, not read from a file. Set before a Monet theme's look is first asked. */
     @Volatile
     var monetLook: LegacyLook? = null
 
@@ -84,30 +72,26 @@ object ThemeLookMigration {
         )
     }
 
-    /** A theme in use: light, dark or the one chosen, read and set. */
+    /** Light, dark or the one chosen. */
     class Slot(val get: () -> Theme, val set: (Theme.Custom) -> Unit)
 
     /**
-     * Step 2: each built-in theme in [slots] is copied with the old settings as its keys, the copy
-     * [save]d and put in the slot (one copy a theme, however many slots have it); a Monet theme in one
-     * keeps them for its keys ([MONET_KEY]). Then the old settings are removed, but if a copy could
-     * not be saved: kept, to be tried at the next start. True if the user is to be told, once: the
-     * settings were not the defaults and are settled. Run twice, the second finds nothing to do.
+     * One copy per built-in theme however many slots have it; a Monet one keeps them ([MONET_KEY]). The settings are removed
+     * unless a copy could not be saved (retried next start). True if the user is to be told once. Idempotent.
      */
     fun settle(prefs: SharedPreferences, slots: List<Slot>, save: (Theme.Custom) -> Boolean): Boolean {
         val legacy = legacy(prefs) ?: return false
         var failed = false
         var monet = false
         if (!legacy.isDefault) {
-            // one try a theme, a failed one too (null): getOrPut would try a null again, a second copy saved
+            // a failed try is kept as null: getOrPut would retry it and save a second copy
             val copies = HashMap<String, Theme.Custom?>()
             for (slot in slots) {
                 val theme = slot.get()
                 when {
                     theme is Theme.Custom -> Unit
-                    // a 4.0 pack's keys are its file's: the key style settings before 3.0 are not of it
+                    // a 4.0 pack's keys are its file's
                     theme is Theme.Pack -> Unit
-                    // Monet's
                     theme is Theme.Builtin && theme.followsSystem -> monet = true
                     else -> {
                         if (theme.name !in copies) {

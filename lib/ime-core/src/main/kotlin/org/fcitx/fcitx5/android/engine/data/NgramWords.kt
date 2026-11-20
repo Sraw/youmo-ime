@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
-/**
- * A backoff model's words and its n-grams by them, as [PinyinDataBuilder] and [EnglishDataBuilder]
- * take them from an ARPA file, checked alike: each word a unigram once, every word of an n-gram a
- * unigram, every probability finite. The words are numbered in the order added ([words]), and
- * [tables] writes the model.
- */
+/** ARPA words and n-grams, checked: each word a unigram once, every n-gram word a unigram, probabilities finite. */
 internal class NgramWords {
     private val ids = HashMap<String, Int>()
     private val list = ArrayList<String>()
@@ -35,13 +30,10 @@ internal class NgramWords {
         tables.trigram(id(prev2), id(prev), id(word), prob)
     }
 
-    /** [word]'s id, or null if it was not added. */
     operator fun get(word: String): Int? = ids[word]
 
-    /** [word]'s id, which it must have. */
     fun id(word: String): Int = requireNotNull(ids[word]) { "\"$word\" is not a unigram" }
 
-    /** [word]'s id, numbered after every word so far if it had none: a dictionary's word the model lacks. */
     fun add(word: String): Int = ids.getOrPut(word) { list.size.also { list += word } }
 
     // a NaN would poison the quantiser: it equals nothing, so it breaks every bin it lands in

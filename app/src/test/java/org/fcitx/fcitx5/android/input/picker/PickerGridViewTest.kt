@@ -16,11 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * Measured before its first size, the list makes keys for what fills it: with rows 0 high none
- * filled it, and the layout manager made and bound a key for every emoji on the main thread.
- * Under the app, whose preferences the adapter and its keys read.
- */
+/** Measured before its first size with rows 0 high, the layout manager made and bound a key for every emoji on the main thread. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PickerGridViewTest {

@@ -9,12 +9,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 
-/**
- * Types the full-pinyin samples of an evaluation set in 双拼, so both are measured on the same
- * sentences. The reading typed is the [ExactReading]: only samples with one are kept, which
- * leaves out abbreviations, unfinished input and typos. On a grouped keyboard ([KEYS]) each key
- * is then its group's code, as [T9Set] types the 14 keys.
- */
+/** Types an evaluation set's samples in 双拼 by their [ExactReading] (samples with none left out); on [KEYS] each key its group's code. */
 object ShuangpinSet {
 
     val SCHEMES = mapOf(
@@ -26,19 +21,12 @@ object ShuangpinSet {
     /** The grouped keyboards a set is typed on, `shuangpin --keys`: the 18 keys', the 14 keys' or the nine keys'. */
     val KEYS = mapOf("18" to NineKeyLetters.G18, "14" to NineKeyLetters.G14, "nine" to NineKeyLetters.NINE_SP)
 
-    /**
-     * The schemes read on a grouped keyboard ([GroupedShuangpinSegmenter]): each of [SCHEMES]
-     * with `-18`, `-14` or `-nine`, a set typed `--keys` so; no `-14` under a scheme typing `;` (微软),
-     * as the app offers no 14 keys there ([ImKeyboards.has14]).
-     */
+    /** The schemes on a grouped keyboard: each of [SCHEMES] with `-18`, `-14` or `-nine`, no `-14` where the app has none. */
     val GROUPED: Map<String, Pair<ShuangpinScheme, NineKeyLetters>> =
         SCHEMES.flatMap { (name, scheme) -> KEYS.map { (k, letters) -> "$name-$k" to (scheme to letters) } }.toMap()
             .filterValues { (scheme, letters) -> letters != NineKeyLetters.G14 || ImKeyboards.has14(scheme) }
 
-    /**
-     * [samples] typed in [scheme], on [keys] if given, each key its group's code: there a sample
-     * with a Latin letter is left out, the grouped keyboards having none.
-     */
+    /** [samples] typed in [scheme], on [keys] if given; there a sample with a Latin letter is left out. */
     fun convert(samples: List<Sample>, scheme: ShuangpinScheme, keys: NineKeyLetters? = null): List<Sample> = samples.mapNotNull { sample ->
         val reading = ExactReading.of(sample) { typed(scheme, it) != null } ?: return@mapNotNull null
         val input = reading.joinToString("") { typed(scheme, it.syllable)!! }

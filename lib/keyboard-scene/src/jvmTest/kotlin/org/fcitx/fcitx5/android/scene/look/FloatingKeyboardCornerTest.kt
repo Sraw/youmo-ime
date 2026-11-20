@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 
 /**
  * A theme 3.0's floating keyboard as round as the window's frame round it (WindowLooks.cornerDp): flat
- * or not, upright and turned, square keys square (R20 F5939, F6573).
+ * or not, upright and turned, square keys square.
  */
 class FloatingKeyboardCornerTest {
 

@@ -19,7 +19,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** 竖屏键盘样式 and 横屏键盘样式 as the keyboard and the settings page read and write them ([KeyboardStyles]). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KeyboardStylesTest {
@@ -48,7 +47,7 @@ class KeyboardStylesTest {
         assertEquals(KeyboardStyle.ONE_HANDED, KeyboardStyles.of(ctx).style)
     }
 
-    // a foldable unfolded and a tablet are 横屏 held either way: the landscape one
+    // a foldable unfolded and a tablet are 横屏 held either way
     @Test
     @Config(qualifiers = "w673dp-h841dp-port")
     fun aWideScreenUprightReadsTheLandscapeOne() {
@@ -71,7 +70,6 @@ class KeyboardStylesTest {
     fun notSetTurnedFrom600Splits() {
         TestStyles.clear()
         assertEquals(KeyboardStyle.SPLIT, KeyboardStyles.of(ctx).style)
-        // the settings page shows it as it is, nothing stored
         assertEquals(KeyboardStyle.SPLIT, KeyboardStyles.shown(ctx, landscape = true))
         assertEquals(KeyboardStyle.NORMAL, KeyboardStyles.shown(ctx, landscape = false))
         assertEquals("", store.keyboardStyleLandscape.getValue())
@@ -86,10 +84,8 @@ class KeyboardStylesTest {
         KeyboardStyles.toggleFloating(s)
         assertEquals("FLOATING" to "SPLIT", store.keyboardStyleLandscape.getValue() to store.keyboardStyleUnderLandscape.getValue())
         assertEquals("" to "", store.keyboardStylePortrait.getValue() to store.keyboardStyleUnderPortrait.getValue())
-        // docked: what was under it, split
         KeyboardStyles.toggleFloating(s)
         assertEquals(KeyboardStyle.SPLIT, KeyboardStyles.of(s).style)
-        // one-handed over split, and both hands again split
         KeyboardStyles.toggleOneHanded(s)
         assertEquals("ONE_HANDED" to "SPLIT", store.keyboardStyleLandscape.getValue() to store.keyboardStyleUnderLandscape.getValue())
         KeyboardStyles.oneHandedOff(s)
@@ -114,17 +110,14 @@ class KeyboardStylesTest {
     fun theSettingsPageWritesBothKeys() {
         TestStyles.clear()
         KeyboardStyles.set(ctx, landscape = true, KeyboardStyle.ONE_HANDED)
-        // over the default turned here (851 dp wide, split)
         assertEquals("ONE_HANDED" to "SPLIT", store.keyboardStyleLandscape.getValue() to store.keyboardStyleUnderLandscape.getValue())
         KeyboardStyles.set(ctx, landscape = false, KeyboardStyle.SPLIT)
         assertEquals("SPLIT" to "SPLIT", store.keyboardStylePortrait.getValue() to store.keyboardStyleUnderPortrait.getValue())
-        // the default picked is stored as it is
         TestStyles.clear()
         KeyboardStyles.set(ctx, landscape = true, KeyboardStyles.shown(ctx, landscape = true))
         assertEquals("SPLIT", store.keyboardStyleLandscape.getValue())
     }
 
-    // 分体时其他面板 (§2.3): of use where a shape splits, or goes back to split
     @Test
     @Config(qualifiers = "w393dp-h851dp-port")
     fun theOtherPanelsWhereSplitIsOrIsUnder() {
@@ -134,7 +127,6 @@ class KeyboardStylesTest {
         KeyboardStyles.set(ctx, landscape = true, KeyboardStyle.FLOATING)
         assertTrue(KeyboardStyles.splitDockOffered(ctx))
         TestStyles.clear()
-        // not set: turned splits here
         assertTrue(KeyboardStyles.splitDockOffered(ctx))
     }
 }

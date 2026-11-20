@@ -31,7 +31,7 @@ data class Box(val left: Double, val top: Double, val right: Double, val bottom:
 data class Point(val x: Double, val y: Double)
 
 /**
- * What a key is shaped as (060-render-v2 §3.1): a value, not a rectangle written into everything, so a
+ * What a key is shaped as: a value, not a rectangle written into everything, so a
  * fan of keys later is a [Path] the backends already draw. A theme's `path(…)` face is a [Path]; the rest are [Rect]s.
  */
 sealed interface Shape {

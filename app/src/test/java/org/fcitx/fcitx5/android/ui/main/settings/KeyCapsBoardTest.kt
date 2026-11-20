@@ -34,10 +34,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * A shortcut page's cap is the keyboard's key (060-render-p2 S7a): on 大千 (five rows) and 手写 (five rows),
- * standard and 紧凑, each key's marks the cap keeps are the ones the keyboard's scene keeps on that key.
- */
+/** On 大千 and 手写 (five rows), standard and 紧凑, each cap keeps the marks the keyboard's scene keeps on that key. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -48,11 +45,11 @@ class KeyCapsBoardTest {
 
     private val ctx get() = ContextThemeWrapper(RuntimeEnvironment.getApplication(), R.style.Theme_FcitxAppTheme)
 
-    // what a key draws besides its face and label: its marks, by what they show and where on the key, px
+    // marks by what they show and where on the key, px
     private fun marks(k: KeyNode): List<String> = k.ops(false).mapNotNull {
         val at = { x: Double, y: Double -> "at %.1f,%.1f".format(x - k.bounds.left, y - k.bounds.top) }
         when (it) {
-            // the space's voice badge the input method's (a voice pack), not a mark the page sets
+            // the space's voice badge is the input method's, not a page mark
             is Op.Icon -> if (it.name == "voice") null else "icon ${it.name} " + at(it.box.left, it.box.top)
             is Op.Text -> if (it.text == k.label) null else "text ${it.text} " + at(it.x, it.baseline)
             else -> null
@@ -68,7 +65,7 @@ class KeyCapsBoardTest {
     }
 
     private fun check(what: String, layout: String, im: InputMethodEntry, keyboards: ImKeyboards.Chosen?) {
-        // the shortcuts' marks top right, the symbols bottom right: both kinds drawn
+        // both kinds drawn
         prefs.set(AppPrefs.getInstance().keyboard.swipeDownPosition, KeyMarkPosition.TopRight)
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.BottomRight)
         prefs.setLayers(SwipeLayersChoice.SymbolUpShortcutDown)
@@ -77,7 +74,7 @@ class KeyCapsBoardTest {
             KeyboardHarness(keyboards = keyboards, im = im).use { h ->
                 h.start()
                 val keys = h.keys().filterIsInstance<SceneShownKey>().map { it.node }.filter { it.shortcut != null && it.copy == 0 }
-                    // Return's icon the field's action (完成 here), the page's a plain field's
+                    // Return's icon follows the field's action
                     .filter { it.shortcut != "fn/return" }
                 assertTrue("$what: keys with shortcuts", keys.isNotEmpty())
                 var marked = 0

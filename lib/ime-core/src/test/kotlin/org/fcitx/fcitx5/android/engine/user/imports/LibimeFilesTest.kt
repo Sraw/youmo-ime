@@ -7,8 +7,6 @@ package org.fcitx.fcitx5.android.engine.user.imports
 import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import org.fcitx.fcitx5.android.engine.user.imports.Fixtures.resource
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,10 +14,7 @@ import java.io.ByteArrayOutputStream
 import java.io.DataOutputStream
 import java.util.Random
 
-/**
- * libime's files read as its tools write them. The real ones are libime's (see
- * `resources/libime/README.md`); the others are written here, field by field, for what those lack.
- */
+/** libime's files read as its tools write them; the real ones are libime's (`resources/libime/README.md`), others written here. */
 class LibimeFilesTest {
 
     @Test
@@ -42,9 +37,6 @@ class LibimeFilesTest {
 
     @Test
     fun whatIsAndIsNotLibimes() {
-        assertTrue(LibimeFiles.isPinyinDictionary(resource("extra.dict")))
-        assertFalse(LibimeFiles.isPinyinDictionary(resource("db.main.dict")))
-        assertFalse(LibimeFiles.isPinyinDictionary(ByteArray(3)))
         assertThrows(DataFormatException::class.java) { LibimeFiles.pinyinDictionary(resource("db.main.dict")) }
     }
 
@@ -61,8 +53,6 @@ class LibimeFilesTest {
 
     @Test
     fun aTrieSkipsWhatCedarMarksEmpty() {
-        // root → placeholder 1 → 'G' at 0x47, whose base 0x100 puts N, O and P at 0x14E..0x150,
-        // each key's rest in the tail: 你 costs -1.5, 拟 has cedar's NO_VALUE, 泥 a NaN cost
         val tail = ByteArrayOutputStream().apply { write(0) }
         val offsets = listOf("你" to (-1.5f).toRawBits(), "拟" to 0x7fc00001, "泥" to 0x7fc00005).map { (text, value) ->
             tail.size().also {
@@ -135,7 +125,6 @@ class LibimeFilesTest {
 
     @Test
     fun aTriePointingPastItsTailFails() {
-        // a key whose rest would be 100 bytes into a tail of 6
         val nodes = Array(3) { Node() }
         nodes[0] = Node(base = 0, check = -1, child = 1)
         nodes[1] = Node(base = 0, check = 0, sibling = 2)

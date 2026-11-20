@@ -15,27 +15,18 @@ import org.fcitx.fcitx5.android.scene.skin.SkinOutput
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import java.io.InputStream
 
-/**
- * A skin's own part of [ThemeFilesManager.openSkin]: the picked file read and converted, a refusal said as the user
- * reads it, a converted picture written as PNG within its bytes.
- */
 internal object SkinImport {
-    /** [src] (the file [fileName]) read and converted with [codec]; refused with why. */
     fun convert(src: InputStream, fileName: String, codec: ThemeFilesManager.SkinCodec): SkinConversion = try {
         SkinConverter.convert(src.use { SkinZip.readSkin(it, fileName) }, codec, ThemeFileName.base(fileName))
     } catch (e: SkinError) {
-        // a .zip of no skin read here: most likely a theme exported under the old name (0.5.1's, upstream's)
+        // a .zip that is no skin: most likely a theme exported under the old name
         if (e.reason == SkinError.Reason.UNKNOWN && ThemeFileName.isZip(fileName)) {
             errorRuntime(R.string.exception_theme_filename, fileName)
         }
         refused(e)
     }
 
-    /**
-     * [r], an `OutOfMemoryError` or `StackOverflowError` in it a refusal: a backstop, as the readers hold a skin to
-     * [SkinLimits], but one made to get past them must not take the input method (the same process) down with it,
-     * as an Error the caller's getOrThrow would throw on would.
-     */
+    /** OOM or stack overflow becomes a refusal: a skin crafted past [SkinLimits] must not take the input method down. */
     fun <T> backstop(r: Result<T>): Result<T> = r.recoverCatching { e ->
         when (e) {
             is OutOfMemoryError -> refused(SkinError(SkinError.Reason.UNPACKED_TOO_BIG, cause = e))
@@ -44,7 +35,7 @@ internal object SkinImport {
         }
     }
 
-    /** [out] as PNG; one past its bytes halved till it is not, where it may be (a picture, the preview). */
+    /** Halved till within its bytes, where it may be (a picture, the preview). */
     fun png(out: SkinOutput.Image, codec: ThemeFilesManager.SkinCodec): ByteArray {
         var p = out.pixels
         var bytes = codec.png(p)

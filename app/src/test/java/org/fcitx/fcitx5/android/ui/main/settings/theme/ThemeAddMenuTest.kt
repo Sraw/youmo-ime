@@ -17,7 +17,7 @@ import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowLooper
 
-/** 新增主题's menu (060-render-p3 M5): import a file, or open the web theme maker in a browser. */
+/** 新增主题's menu: import a file, or open the web theme maker in a browser. */
 @RunWith(RobolectricTestRunner::class)
 class ThemeAddMenuTest {
 

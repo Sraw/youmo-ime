@@ -40,11 +40,9 @@ class AutoScaleTextViewTest {
             MeasureSpec.makeMeasureSpec(200, MeasureSpec.EXACTLY)
         )
         view.layout(0, 0, 1000, 200)
-        // drawn at the top of the content, its ascent below the padding
         assertEquals((10 - view.paint.fontMetrics.top).roundToInt(), view.baseline)
     }
 
-    // a part made smaller is drawn smaller: the text takes less room than drawn all at one size
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun aSpannedTextKeepsItsSpans() {
@@ -57,23 +55,18 @@ class AutoScaleTextViewTest {
         }
         val styled = SpannableString("中/英").apply { setSpan(RelativeSizeSpan(0.5f), 1, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
         assertTrue(width(styled) < width("中/英"))
-        // set again with the same characters, the spans go too
         val view = AutoScaleTextView(app).apply { text = styled }
         view.text = "中/英"
         assertFalse(view.text is Spanned)
     }
 
-    // inkBounds is where the glyphs are drawn: the drawn pixels' box, within 2 px, at its size and
-    // squeezed sideways into a narrow view
+    // inkBounds is the drawn pixels' box, within 2 px
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theInkIsWhereTheGlyphsAreDrawn() {
         val rows = listOf(
-            // a descender: the ink below the baseline, not the line's box
             Triple("g a descender, at its size", "g", 200),
-            // wide and tall glyphs mixed with a descender: the box spans them all
             Triple("Wg@ glyphs of every height, at its size", "Wg@", 200),
-            // too wide for the view: squeezed sideways, the ink squeezed with it
             Triple("WWWWWW squeezed sideways into a narrow view", "WWWWWW", 120),
         )
         assertRows(rows, { it.first }) { (_, text, width) ->

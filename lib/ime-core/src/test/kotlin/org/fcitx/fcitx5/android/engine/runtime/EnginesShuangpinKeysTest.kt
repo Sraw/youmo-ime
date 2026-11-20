@@ -17,15 +17,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 双拼 on the 18 keys and the nine keys through [Engines] (design §1.4): a session each, the hardware keyboard full 双拼's. */
+/** 双拼 on the 18 keys and the nine keys through [Engines]: a session each, the hardware keyboard full 双拼's. */
 class EnginesShuangpinKeysTest : EnginesFixture() {
 
     private val root = MemoryFiles()
 
-    private fun engines() = Engines(::load, root, warmUps = inPlace).also {
-        it.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
-        it.context(InputMethodCatalog.SHUANGPIN, "")
-    }
+    private fun engines() = ready(InputMethodCatalog.SHUANGPIN, root)
 
     private fun Engines.texts() = candidates(InputMethodCatalog.SHUANGPIN, 0, 10).map { it.text }
 
@@ -48,7 +45,6 @@ class EnginesShuangpinKeysTest : EnginesFixture() {
         val shown = engines.type(InputMethodCatalog.SHUANGPIN, nihao)
         assertTrue(shown.candidates.toString(), "你好" in shown.candidates.take(3))
         assertEquals(shown.candidates, engines.texts().take(shown.candidates.size))
-        // a syllable bar, the nine keys' way
         assertTrue(shown.syllables.toString(), "ni" in shown.syllables)
         engines.close()
     }
@@ -69,7 +65,6 @@ class EnginesShuangpinKeysTest : EnginesFixture() {
         val at = engines.texts().indexOf("拟")
         val menu = engines.learning(InputMethodCatalog.SHUANGPIN, LearningOp.Menu(at, "拟")) as LearningResult.Menu
         assertEquals(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G18.tag()), menu.why!!.code!!.kind)
-        // full 双拼 learned nothing of it
         engines.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
         engines.context(InputMethodCatalog.SHUANGPIN, "")
         assertEquals(0, engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates.indexOf("你"))
@@ -92,7 +87,7 @@ class EnginesShuangpinKeysTest : EnginesFixture() {
         engines.close()
     }
 
-    // design §1.3, review N5: 微软's ; is a letter of full 双拼, the hardware keyboard's while the 18 keys type
+    // 微软's ; is a letter of full 双拼, the hardware keyboard's while the 18 keys type
     @Test
     fun aSemicolonTheSchemeTypesIsFullShuangpins() {
         val engines = engines()
@@ -109,7 +104,7 @@ class EnginesShuangpinKeysTest : EnginesFixture() {
         engines.close()
     }
 
-    // review S1: the screen's ; (a long press of L;, the symbol page) is a mark after what the 18 keys type: 你；, never ni；
+    // the screen's ; (a long press of L;, the symbol page) is a mark after what the 18 keys type: 你；, never ni；
     @Test
     fun theScreensSemicolonIsAMarkAfterTheEighteenKeysTypingInMicrosoft() {
         val engines = engines()
@@ -123,7 +118,7 @@ class EnginesShuangpinKeysTest : EnginesFixture() {
         engines.close()
     }
 
-    // review S9: where the scheme types no ; (自然码) a hardware one is the grouped session's mark too
+    // where the scheme types no ; (自然码) a hardware one is the grouped session's mark too
     @Test
     fun aHardwareSemicolonTheSchemeDoesNotTypeStaysWithTheEighteenKeys() {
         val engines = engines()

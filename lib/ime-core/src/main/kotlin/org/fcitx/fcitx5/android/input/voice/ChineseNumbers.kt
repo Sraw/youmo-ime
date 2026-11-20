@@ -5,25 +5,13 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * A number the polish tagger marked ([VoicePolishTags], its `num` head; 060-voice-tagger.md 数字头)
- * written as one types it, as the [Kind] the tagger gave it. Whether a run of characters is a
- * number at all is the tagger's say, not this: 一个, 十分有趣, 三四个人 are never marked. A run that
- * does not read as its kind is written as it was said.
- *
- * voice-eval's `numeval.py render_run`, but for these:
- * - a time's 半, 刻 and 整 and a bare hour stay characters (8点半, 8点一刻, 7点整, 8点), not 8:30, 7:00;
- *   an hour past 24 or minutes past 59 (八点七十), or 分 with no minutes (八点分), as said;
- * - a value's 万/亿 after a decimal kept (3.5亿), where render writes it as said;
- * - a value of two points (一点二点三) as said; a model's later part with a place by value (三点十二 3.12);
- * - a ratio with neither 比 nor 分之 as said; 百分之百 as said (百 alone reads as no number);
- * - digits with a place among them (一百二十三) read as a value, 123.
+ * A number the polish tagger marked, written as its [Kind]; whether it is a number is the tagger's say (一个, 十分有趣
+ * are never marked), and a run that does not read as its kind stays as said. voice-eval's `numeval.py render_run`
+ * but: a time's 半/刻/整 and a bare hour stay characters (8点半, 8点); 3.5亿 kept; 一百二十三 as digits reads 123.
  */
 object ChineseNumbers {
 
-    /**
-     * The tagger's `num` classes, by name as its json lists them. A class this build does not know
-     * (a newer tagger's) is [NONE], its runs as said: the tagger's other labels still apply.
-     */
+    /** By name as the tagger's json lists them; an unknown class (a newer tagger's) is [NONE], as said. */
     enum class Kind {
         NONE, VALUE, DIGITS, DATE, TIME, MONEY, PERCENT, MODEL, RATIO;
 
@@ -43,7 +31,6 @@ object ChineseNumbers {
     private const val HOURS = 24
     private const val HUNDRED = 100L
 
-    // the places a large value is a decimal of, smallest first
     private val PLACES = listOf("万" to 10_000L, "亿" to 100_000_000L, "万亿" to 1_000_000_000_000L)
     private const val PERCENT = "百分之"
     private const val FRACTION = "分之"
@@ -52,11 +39,10 @@ object ChineseNumbers {
     private val IN_CHARACTERS = setOf("", "半", "整")
     private val QUARTERS = setOf("一刻", "三刻")
 
-    /** [run] as [kind] writes it; as it was if it does not read so. */
+    /** As it was if it does not read so. */
     fun written(run: String, kind: Kind): String = when (kind) {
         Kind.NONE -> null
-        // a place among them: the tagger's class wrong, the number read as said (一百二十三 123)
-        // a 点 among them: a version or an address (一九二点一六八), as a model
+        // a place among them: the class wrong, read as a value (一百二十三 123); a 点: a version or address (一九二点一六八), as a model
         Kind.DIGITS -> if (run.any { it in SMALL || it in BIG }) value(run) else if ('点' in run) model(run) else run.map { c -> DIGITS[c]?.let { "$it" } ?: "$c" }.joinToString("")
         Kind.TIME -> time(run)
         Kind.PERCENT -> value(run.removePrefix(PERCENT))?.let { "$it%" }
@@ -77,10 +63,7 @@ object ChineseNumbers {
         return "$first.$fraction$big"
     }
 
-    /**
-     * 十点十五 10:15, 八点五分 8:05, 八点半, 八点一刻, 八点整 and 八点 in characters; null if no time.
-     * 二十四点 is an hour, 二十四点三十 not; 八点五 (one character, no 分) may be 八点五十 misheard: as said.
-     */
+    /** 十点十五 10:15, 八点五分 8:05; 八点五 (no 分) may be 八点五十 misheard: as said. */
     private fun time(s: String): String? {
         val point = s.indexOf('点')
         if (point < 0) return value(s)
@@ -103,7 +86,6 @@ object ChineseNumbers {
         return (listOf(first) + rest).joinToString(".")
     }
 
-    /** 四分之三 3/4, 三比二 3:2 */
     private fun ratio(s: String): String? {
         val (sep, out) = when {
             FRACTION in s -> FRACTION to "/"
@@ -119,11 +101,7 @@ object ChineseNumbers {
     private fun digitByDigit(s: String): String? =
         if (s.isNotEmpty() && s.all { it in DIGITS && it != '两' }) s.map { DIGITS.getValue(it) }.joinToString("") else null
 
-    /**
-     * 三十三万 as 33万, 四百亿 as 400亿 and 三万亿 as 3万亿, as written; with more after the place, the largest
-     * place's decimal of at most two places (十二万三千 12.3万, 一亿两千三百万 1.23亿), the user's choice
-     * (2026-11-09) over 123000; in full where two places are not enough (一百二十三万四千五百六十七 1234567).
-     */
+    /** 三十三万 as 33万; with more after the place, its decimal to two places (十二万三千 12.3万), in full where that is not enough. */
     private fun whole(raw: String): String? {
         val value = integerDigits(raw) ?: return null
         val places = raw.takeLastWhile { it in BIG }
@@ -141,10 +119,9 @@ object ChineseNumbers {
         return "${n / unit}" + (if (fraction.isEmpty()) "" else ".$fraction") + name
     }
 
-    /** The integer [raw] reads as, as digits; null if it does not read as one (万一, 十十, 二十亿万). */
+    /** Null if it does not read as one (万一, 十十, 二十亿万). */
     private fun integerDigits(raw: String): String? {
         if (raw.isEmpty()) return null
-        // digits only: 二零零二, 一一七
         if (raw.all { it in DIGITS }) return raw.map { DIGITS.getValue(it) }.joinToString("")
         // a place first is no number, but 十 (十五); 幺 only among digits
         if ('幺' in raw) return null
@@ -154,26 +131,24 @@ object ChineseNumbers {
         return if (raw.all { reading.read(it) }) reading.value()?.toString() else null
     }
 
-    /** An integer read a character at a time, as said: 三十三万六千零五, 一万二 (12000). */
+    /** As said: 三十三万六千零五, 一万二 (12000). */
     private class Reading {
         private var total = 0L
         private var section = 0L
         private var pendingDigit = -1L
         private var zero = false
-        // the place last read: a digit after it is the next place down, 三千五 3500, but after 零 a one
+        // a digit after the place last read is the next place down (三千五 3500), but after 零 a one
         private var place = 1L
         private var lastSmall = Long.MAX_VALUE
         private var lastBig = Long.MAX_VALUE
 
-        /** false if [c] makes it no number */
         fun read(c: Char): Boolean = when (c) {
             in DIGITS -> digit(DIGITS.getValue(c).toLong())
             in SMALL -> small(SMALL.getValue(c))
             else -> big(BIG.getValue(c))
         }
 
-        // two digits side by side among places: 二十三四 is no number
-        // 零零 too
+        // two digits side by side among places (二十三四), 零零 too: no number
         private fun digit(d: Long): Boolean {
             if (pendingDigit >= 0 || (d == 0L && zero)) return false
             if (d == 0L) zero = true else pendingDigit = d

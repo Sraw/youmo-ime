@@ -4,7 +4,6 @@
     <item name="button_backspace" type="id"/>
     <item name="button_lang" type="id"/>
     <item name="button_space" type="id"/>
-    <item name="button_punctuation" type="id"/>
     <item name="button_return" type="id"/>
     <item name="button_comma" type="id"/>
     <item name="button_period" type="id"/>

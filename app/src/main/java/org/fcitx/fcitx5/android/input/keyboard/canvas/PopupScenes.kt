@@ -35,74 +35,56 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-/**
- * The popups of the keys the canvas draws, drawn by the engine too (060-render-p2 S2): [theme] as the
- * engine's theme, its text measured and drawn as the keyboard's, each popup's scene made in the
- * environment the keyboard is in now ([view]'s: landscape, 紧凑, floating, dark, flat), so its
- * looks are the keyboard's. A popup asks [builder] for each scene (a focus moved is a new one).
- */
+/** Each popup's scene made in the environment the keyboard is in now, so its looks are the keyboard's. */
 class PopupScenes(
     private val view: View,
     theme: Theme,
-    /** The text measured through this: a test's, to make the engine fail. */
+    /** A test's, to make the engine fail. */
     @VisibleForTesting measuring: (TextMeasurer) -> TextMeasurer = { it },
 ) {
-    // the built-in where the engine makes nothing of the theme or refused its keys' scene, as the keys are (U8): popups shown still
+    // the built-in where the engine makes nothing of the theme or refused its keys' scene: popups shown still
     private val theme = SceneBoard.drawnTheme(theme)
     private val look = ThemeManager.shownLook(this.theme)
     private val fonts = SceneFonts.of(this.theme, look)
     private val measurer = measuring(AndroidTextMeasurer(fonts))
     private val sceneTheme = SceneThemes.of(this.theme, look)
 
-    // the drawn theme's own icons, the keys' (none where they fell back to the built-in)
+    // none where the keys fell back to the built-in
     private val icons = PackIcons.of(this.theme)
 
-    /**
-     * Whether any of the theme's styles sets a popup's motion (`appear`, `transition` on popup, preview or menu,
-     * 060-render-p3 A2): asked once, so a theme with none (every built-in one) asks the engine nothing more.
-     */
+    /** Asked once, so a theme with none (every built-in one) asks the engine nothing more. */
     val moves: Boolean by lazy {
         sceneTheme?.styles.orEmpty().any { s -> s.selectors.any { it.widget in POPUP_WIDGETS } && ("appear" in s.values || "transition" in s.values) }
     }
 
-    /** Whether the theme or, where it fell back, the built-in converted: its popups drawn as scenes. */
     val ready: Boolean get() = sceneTheme != null
 
-    /** The theme these popups draw in: a test's, that they follow the keys. */
+    /** A test's, that they follow the keys. */
     @VisibleForTesting
     internal val drawsIn: String get() = theme.name
 
-    /** The environment now: the size, and what `@im=`, `@field=`, `@landscape`… styles are scoped by. */
     fun env(): Env = SceneEnvs.of(view, look, theme.isDark, view.width, view.height, Input())
 
-    /** A builder in [env]; null where neither the theme nor the built-in converted (nothing drawn, logged). */
+    /** Null where neither the theme nor the built-in converted (nothing drawn, logged). */
     fun builder(env: Env = env()): SceneBuilder? = sceneTheme?.let {
         SceneBuilder(it, env, measurer, cascades = SceneThemes.cascades(it))
     }
 
-    /**
-     * What [made] made of [what]; a failure logged and null: the popup then not shown (a new one) or
-     * the scene it had kept (a focus moved), never the views instead (gone) and never a
-     * popup not drawn that a lift would still type.
-     */
+    /** A failure logged and null: never the views instead, and never a popup not drawn that a lift would still type. */
     fun <T> made(what: String, made: Parsed<T>?): T? = when (made) {
         is Parsed.Ok -> made.value
         is Parsed.Failed -> null.also { Timber.w("popup %s not made: %s", what, made.problems) }
         null -> null
     }
 
-    /** px a dp, as the scenes are made in. */
     val density: Double get() = view.resources.displayMetrics.density.toDouble()
 
-    /** A view drawing a popup's scene. */
     fun view(context: Context): PopupSceneView = PopupSceneView(context) { ScenePainter(it, look, BoardImages.NONE, fonts, icons) }
 }
 
 /**
- * A popup's [scene] drawn ([ScenePainter]): its size the scene's and [outset] round it, where its
- * shadow reaches (a view draws nothing outside itself; theme 3.0's elevation shadow was the
- * renderer's). Placed [outset] up and left of where the popup is. TalkBack reads its keys as it
- * read the views' (their text or description): one virtual node a key, the one in focus selected.
+ * [outset] round it where its shadow reaches: a view draws nothing outside itself. TalkBack reads one
+ * virtual node a key, the one in focus selected.
  */
 @SuppressLint("ViewConstructor")
 class PopupSceneView internal constructor(context: Context, painter: (View) -> ScenePainter) : View(context) {
@@ -115,10 +97,10 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
         ViewCompat.setAccessibilityDelegate(this, speech)
     }
 
-    /** How far past the scene's box what it draws reaches, each side, px. */
+    /** Px each side. */
     val outset = Rect()
 
-    /** Told the [outset] before and now as a scene changes it: where it is placed moves by as much. */
+    /** Where it is placed moves by as much. */
     var onOutsetChanged: ((was: Rect, now: Rect) -> Unit)? = null
 
     var scene: Scene? = null
@@ -128,7 +110,7 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
             field = value
             outset.setEmpty()
             if (value != null) {
-                // the faces' reach: a text or an icon stays in its cell, and CanvasFrame's guess of a text's ink is wide
+                // a text or an icon stays in its cell, and CanvasFrame's guess of a text's ink is wide
                 val ops = (value.base + value.keys.flatMap { it.ops(false) }).filter { it !is Op.Text && it !is Op.Icon }
                 val e = CanvasFrame.extent(Box(0.0, 0.0, value.width, value.height), ops, EDGE_PX)
                 outset.set(ceil(-e.left).toInt().coerceAtLeast(0), ceil(-e.top).toInt().coerceAtLeast(0), ceil(e.right - value.width).toInt().coerceAtLeast(0), ceil(e.bottom - value.height).toInt().coerceAtLeast(0))
@@ -141,7 +123,6 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
             speech.invalidateRoot()
         }
 
-    /** The scene's size in whole px (the engine's are). */
     val sceneWidth: Int get() = scene?.width?.let { floor(it).toInt() } ?: 0
     val sceneHeight: Int get() = scene?.height?.let { floor(it).toInt() } ?: 0
 
@@ -160,9 +141,7 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
 
     override fun dispatchHoverEvent(event: MotionEvent): Boolean = speech.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
 
-    // a node a key, as its view was (060-render-p2 S2, S3): its words, where it is, selected and enabled
-    // as drawn, its class the view's (a text's TextView, a menu's icon's ImageView), its words read a
-    // piece at a time; no click, as the views had none (picked as the finger lifts)
+    // as its view was; no click, as the views had none (picked as the finger lifts)
     private inner class Speech : ExploreByTouchHelper(this) {
         val reading = NodeReading({ resources.configuration.locales[0] }, ::sendEventForVirtualView)
 
@@ -192,8 +171,7 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
             node.isSelected = k != null && KeyState.Selected in k.states
             node.isEnabled = k != null && KeyState.Disabled !in k.states
             node.className = if (k != null && k.ops(false).any { it is Op.Icon }) IMAGE_CLASS else TEXT_CLASS
-            // a character, word or paragraph at a time, as the views' text or description (not a
-            // TextView's line or page: one line, no page, the cell's words)
+            // not a TextView's line or page: one line, no page
             reading.node(virtualViewId, k?.let(::words), node)
         }
 
@@ -201,17 +179,16 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
             reading.populate(virtualViewId, scene?.keys?.getOrNull(virtualViewId)?.let(::words), event)
         }
 
-        // picked as the finger lifts (PopupComponent), as the views' were: nothing done here
+        // picked as the finger lifts (PopupComponent): nothing done here
         override fun onPerformActionForVirtualView(virtualViewId: Int, action: Int, arguments: Bundle?): Boolean =
             reading.perform(virtualViewId, scene?.keys?.getOrNull(virtualViewId)?.let(::words), action, arguments) ?: false
     }
 
-    // a key's words for TalkBack: the scene's (a menu's item's name), else its label; none, not read
     private fun words(k: KeyNode): String? = (k.a11y ?: k.label)?.takeIf { it.isNotEmpty() }
 
     private fun spoken(k: KeyNode) = words(k) != null
 
-    /** The nodes TalkBack has for the keys read out, as its provider makes them: for tests. */
+    /** For tests. */
     @VisibleForTesting
     fun spokenKeys(): List<AccessibilityNodeInfoCompat> {
         val provider = speech.getAccessibilityNodeProvider(this) ?: return emptyList()
@@ -219,10 +196,9 @@ class PopupSceneView internal constructor(context: Context, painter: (View) -> S
     }
 
     private companion object {
-        // room past what it draws for the edges' anti-aliasing, as a key's node has (KeyboardCanvasView)
+        // for the edges' anti-aliasing, as a key's node has
         const val EDGE_PX = 2.0
 
-        // the views' classes it stands for: a key's or item's text, a menu item's icon
         const val TEXT_CLASS = "android.widget.TextView"
         const val IMAGE_CLASS = "android.widget.ImageView"
     }

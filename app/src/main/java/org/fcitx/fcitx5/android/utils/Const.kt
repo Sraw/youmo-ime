@@ -14,19 +14,16 @@ object Const {
     const val licenseUrl = "https://www.gnu.org/licenses/old-licenses/lgpl-2.1"
     // upstream's pages describe upstream's app
     const val privacyPolicyUrl = "$githubRepo/blob/HEAD/PRIVACY.md"
-    // the user's manual, in the repository so it changes with the app: a release's as it shipped
+    // in the repository, so a release links the manual as it shipped
     val helpUrl = manualUrl(githubRepo, BuildConfig.VERSION_NAME)
     const val releasesUrl = "$githubRepo/releases"
-    // the web theme maker, published by .github/workflows/pages.yml: the repository's GitHub Pages
+    // published by .github/workflows/pages.yml
     val themeMakerUrl = githubRepo.removePrefix("https://github.com/").split('/').let { (owner, repo) ->
         "https://${owner.lowercase()}.github.io/$repo/theme-maker/"
     }
 }
 
-/**
- * [repo]'s manual for the app named [versionName]: a release's (bare, as at its tag: 0.2.0) at that
- * tag, whose manual is of what it has; any other build's (0.1.0-5-gabc1234, 0.1.0-untagged) at HEAD.
- */
+/** A release (bare, e.g. 0.2.0) links its tag; any other build (0.1.0-5-gabc1234) links HEAD. */
 internal fun manualUrl(repo: String, versionName: String): String {
     val ref = if (versionName.matches(RELEASE_NAME)) "v$versionName" else "HEAD"
     return "$repo/blob/$ref/docs/README.md"

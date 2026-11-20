@@ -20,7 +20,7 @@ object LetterCaseRule {
 
     /**
      * Capitals or not under [case] ([forIme]'s), [shift] Shift's state. Following Shift: capitals with it on,
-     * or [keepUppercase] (the hidden 键盘字母保持大写), or on a keyboard whose letters show in capitals with no
+     * or [keepUppercase] (the app always passes false), or on a keyboard whose letters show in capitals with no
      * Shift to follow ([shiftless]: 九键's and 14/18 键's pinyin, as they always have).
      */
     fun upper(case: LetterCase, shift: Shift, shiftless: Boolean = false, keepUppercase: Boolean = false): Boolean = when (case) {

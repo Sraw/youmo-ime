@@ -19,7 +19,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A grouped keyboard's code never reaches the app's text (E review S4), whatever the engine did with it. */
+/** A grouped keyboard's code never reaches the app's text, whatever the engine did with it. */
 class KeyRouterCodesTest {
 
     private class Host(val fails: Boolean) : EngineHost {
@@ -36,13 +36,12 @@ class KeyRouterCodesTest {
         override fun settings(settings: EngineSettings) = Unit
     }
 
-    private fun core(host: Host) = HostCore(host, VirtualHostClock(), Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "D"), firstRun = true).also {
+    private fun core(host: Host) = HostCore(host, VirtualHostClock(), testProfile("D"), firstRun = true).also {
         it.activate(1)
         it.setCapabilities(Capability.PREEDIT or Capability.COMMIT_STRING_WITH_CURSOR)
         it.focus(true)
     }
 
-    private fun HostCore.log() = mutableListOf<HostEvent>().also { l -> events += HostEvents { l += it } }
 
     // a tap with its place (Keyboard.TAPS) is a code too
     private val codes = listOf(g14Code('a'), g14Code('b'), g14Code('z'), '\uF8C0', '\uF8D9', nineSpCode('2'), nineSpCode('9')).map { Key(KeySyms.fromUnicode(it.code)) } +
@@ -77,8 +76,7 @@ class KeyRouterCodesTest {
     private fun isGroupedOrTap(c: Int) =
         c in NineKeyLetters.G14_BLOCK || c in NineKeyLetters.G18_BLOCK || c in NineKeyLetters.NINE_SP_BLOCK || c in Keyboard.TAPS || c in Keyboard.TAPS_18
 
-    // (c) a code reaches the input method whose keyboard it is of alone: pinyin the 14 keys', 双拼
-    // the 18 keys' and the nine keys' 双拼's; the other's dropped, never read as one of its groups
+    // (c) a code reaches only the input method whose keyboard it is of; the other's dropped, never read as a group
     @Test
     fun aCodeOfAnotherInputMethodsKeyboardIsSwallowed() {
         val tap = Keyboard.tapKey(g14Code('b'), 0.75f)
@@ -127,7 +125,7 @@ class KeyRouterCodesTest {
         }
     }
 
-    // review S1: 双拼 is told a hardware ; from the screen's, the screen's a mark after what is typed
+    // 双拼 is told a hardware ; from the screen's, the screen's a mark after what is typed
     @Test
     fun aHardwareMarkReachesShuangpinAsAHardwareChar() {
         val host = Host(fails = false)

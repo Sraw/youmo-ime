@@ -12,13 +12,7 @@ import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.HistoryLines
 import org.fcitx.fcitx5.android.engine.user.UserModel
 
-/**
- * Words a user typed before the run, for what hangs on them: 双拼 reads a key alone, 简拼 in the
- * middle, only for words typed or chosen ([org.fcitx.fcitx5.android.engine.lattice.UserWords.typed]),
- * so a run with no history measures that reading off. A history is lines of `text` or
- * `text<TAB>reading` (syllables apart by spaces); a text alone is typed at each reading the
- * dictionary has of it.
- */
+/** Words a user typed before the run (`text` or `text<TAB>reading` lines): 双拼 and 简拼 read a key alone only for those. */
 object TypedHistory {
 
     /** The [n] likeliest words of [data]'s dictionary by the model's score of each alone and its reading's weight, as a history's lines. */
@@ -32,11 +26,7 @@ object TypedHistory {
         return scored.sortedWith(compareByDescending<Pair<Float, String>> { it.first }.thenBy { it.second }).take(n).map { it.second }
     }
 
-    /**
-     * Counts [lines]' words in [user] as the learning record counts a word committed whole, once
-     * each, today.
-     * @return how many were counted: a text the dictionary lacks is none
-     */
+    /** Counts [lines]' words in [user] once each, today; returns how many were counted. */
     fun count(user: UserModel, data: PinyinData, lines: List<String>): Int {
         val log = LearnLog(null).apply { open() }
         val counts = HabitCounts(user).also { it.attach(log.state) }

@@ -20,7 +20,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 @OptIn(ExperimentalCoroutinesApi::class)
 class NineKeyLettersFragmentTest {
 
-    /** Fcitx starting till [ready] completes: until then [runIfReady] drops its block, as the real one does. */
+    /** Until [ready] completes [runIfReady] drops its block, as the real one does. */
     private class Starting(scope: CoroutineScope, val fake: FakeHostConnection = FakeHostConnection(scope)) :
         HostConnection by fake {
 
@@ -41,7 +41,6 @@ class NineKeyLettersFragmentTest {
         val edited = NineKeyLetters.STANDARD.withEdit('9', "WXYZL")
         assertEquals("wxyzl", edited.letters('9'))
         assertEquals("jkl", edited.letters('5'))
-        // put back as it was: as on a phone again
         assertEquals(NineKeyLetters.STANDARD, edited.withEdit('9', "wxyz"))
     }
 

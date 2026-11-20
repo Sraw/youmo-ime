@@ -85,7 +85,7 @@ class KeyResolverTest {
             assertEquals(board, Item("."), c.first)
             assertEquals(board, "。", c.firstShown)
             assertEquals(board, "。", items(c.popup).first())
-            // its slots: no shortcut, a char's tap where empty (D3)
+            // its slots: no shortcut, a char's tap where empty
             assertTrue(board, c.swipe.char)
         }
     }
@@ -97,7 +97,7 @@ class KeyResolverTest {
         assertEquals(Item("1", Commit.Keypad('1')), one.first)
         val p = one.popup as KeyPopup.Items
         assertEquals(1, p.inRow)
-        // shown as Chinese punctuation types it (用户 2026-11-11: 中英文标点还是要自动转换), as it is in English
+        // shown as Chinese punctuation types it, as it is in English
         assertEquals("。", p.labels[5])
         assertEquals(Commit.AsKey, p.items[5].commit)
         assertEquals(".", (r.resolve(KeyId("t9/1"), KeyState()).popup as KeyPopup.Items).labels[5])
@@ -114,7 +114,7 @@ class KeyResolverTest {
     private fun nine(vararg items: String, first: First = First.Default, variant: KeyboardVariant = KeyboardVariant(Form.Nine)) =
         resolver("nine", variant, KeyLists.of(mapOf(two to UserList(false, items.toList(), first)))).resolve(two, KeyState())
 
-    // the stored list is the whole list (060-row-unlock §1): its digit deleted, the first is its first item as the full keyboard's
+    // the stored list is the whole list: its digit deleted, the first is its first item as the full keyboard's
     @Test
     fun nineTwosDigitDeletedItsFirstIsA() {
         val a = nine("A", "B", "C", "a", "b", "c", "@")
@@ -142,7 +142,7 @@ class KeyResolverTest {
         assertEquals(Item("A"), back.first)
     }
 
-    // the row: the leading items of the default's row or single ASCII letters and digits; -1 for none (§1.3)
+    // the row: the leading items of the default's row or single ASCII letters and digits; -1 for none
     @Test
     fun theRowIsTheLeadingRowItems() {
         val moved = nine("A", "B", "C", "2", "a", "b", "@", "c", first = First.Literal("2"))
@@ -164,7 +164,7 @@ class KeyResolverTest {
     private val l = KeyId("g18/l")
     private val lStored = UserList(false, listOf("L", ":", "-", "l", ";", ")", "]"), First.Literal("-"))
 
-    // the one exception (§2): 18 键's L shows `:` only where the scheme types `;`; `;` itself everywhere
+    // the one exception: 18 键's L shows `:` only where the scheme types `;`; `;` itself everywhere
     @Test
     fun eighteenLsColonOnlyOnASchemeTypingSemicolon() {
         val lists = KeyLists.of(mapOf(l to lStored))
@@ -194,7 +194,6 @@ class KeyResolverTest {
 
     @Test
     fun noFirst() = assertRows(
-        // the user turned its long press off: nothing drawn, no swipe of its first
         "off: no popup, no first, no mark" to {
             val q = resolver("qwerty", Form.Full, KeyLists.of(mapOf(KeyId("full/q") to UserList.Off))).resolve(KeyId("full/q"), KeyState())
             assertNull(q.popup)
@@ -202,14 +201,11 @@ class KeyResolverTest {
             assertFalse(q.swipe.hasFirst)
             assertEquals(MarkContent.Empty, q.upMark)
         },
-        // a list with its first set to none: items kept, none first
         "a first set to none" to {
             val lists = KeyLists.of(mapOf(KeyId("full/w") to UserList(false, listOf("2"), First.None)))
             assertNull(resolver("qwerty", Form.Full, lists).resolve(KeyId("full/w"), KeyState()).first)
         },
-        // a theme's `send=` of no action KeyOutput can make: the corner and the swipe's slot read the same none as
-        // the keyboard's swipe, so the corner never shows what the swipe does not type; the item stays in the popup
-        // (FB2 of R24, was aFirstNoBuildCanTypeIsNone)
+        // a `send=` KeyOutput cannot make: corner and swipe read the same none; the item stays in the popup
         "a first KeyOutput cannot make" to {
             val node = NodeFacts(text = "q", popup = Popup("list", null, listOf("x" to "layout:", "y" to null), emptyMap()))
             val q = KeyResolver(KeyboardVariant(Form.Full), KeyLists.Empty, SwipeSlots.Default, listOf("full/q" to node))
@@ -261,7 +257,6 @@ class KeyResolverTest {
         val lists = KeyLists.of(mapOf(KeyId("full/q") to UserList(false, listOf("!", "Q"), First.None), KeyId("t9/5") to UserList.Off))
         val q = resolver("qwerty", Form.Full, lists).edit(KeyId("full/q"))
         assertEquals(KeyEdit(listOf("!", "Q"), null, UserList(false, listOf("!", "Q"), First.None)), q)
-        // off: nothing
         assertEquals(KeyEdit(emptyList(), null, UserList.Off), resolver("nine", Form.Nine, lists).edit(KeyId("t9/5")))
     }
 
@@ -270,7 +265,6 @@ class KeyResolverTest {
         val r = resolver("qwerty", Form.Full)
         val q = r.resolve(KeyId("full/q"), KeyState(letterCorners = true))
         assertEquals(MarkContent.Symbol("q"), q.upMark)
-        // its long press as ever
         assertEquals(r.resolve(KeyId("full/q"), KeyState()).popup, q.popup)
     }
 
@@ -278,13 +272,13 @@ class KeyResolverTest {
     fun theMarksAreMadeOnceAStateAndAreTheWebsByDefault() {
         val r = resolver("qwerty", Form.Full)
         val m = r.marks(KeyState())
-        // made once a state, a performance promise (every key's draw asks; KeyResolver's doc), not only equal
+        // made once a state, a performance promise (every key's draw asks), not only equal
         assertSame(m, r.marks(KeyState()))
         assertEquals(DefaultMarks.shortcuts(layout("qwerty"), fragments), m.shortcuts)
         assertFalse(r.marks(KeyState(roots = { null })).charShortcuts)
     }
 
-    // what a screen reader says of a key's corner: its first as drawn, only where a way draws it (060-keys-unify §3.4)
+    // a screen reader says a corner's first as drawn, only where a way draws it
     @Test
     fun theReadingsAreTheFirstsTheWaysDraw() {
         val r = resolver("qwerty", Form.Full)
@@ -293,7 +287,6 @@ class KeyResolverTest {
         assertSame(read, r.readings(zh))
         assertEquals("1", read["full/q"])
         assertEquals("@", read["full/a"])
-        // as Chinese punctuation shows it
         assertEquals("～", r.readings(zh.copy(punctuation = zh.punctuation + ("~" to "～")))["full/n"])
         // ， has a first, but no way draws it: nothing said
         assertNull(read["fn/comma"])
@@ -307,7 +300,7 @@ class KeyResolverTest {
         assertEquals("1", resolver("k14", Form.Grouped14).readings(KeyState())["g14/qw"])
     }
 
-    // a way turned off, or its place 无, draws no corner: none said (060-s6-review L1), each way apart
+    // a way turned off, or its place 无, draws no corner: none said, each way apart
     @Test
     fun theReadingsLeaveOutAWayOffOrPlacedNowhere() {
         val down = resolver("qwerty", Form.Full, slots = SwipeSlots.Default.with("full/q", up = true, SwipeSlot.Empty).with("full/q", up = false, SwipeSlot.First))
@@ -320,8 +313,7 @@ class KeyResolverTest {
         assertEquals("2", r.readings(zh.copy(ways = KeySwipe.Ways(up = true, down = false)))["full/w"])
     }
 
-    // a character key of `mark="false"` (注音's): no first of the defaults' drawn or said, one the user set both
-    // (060-s6-review L4)
+    // a `mark="false"` character key (注音's): no default first drawn or said, a user-set one both
     @Test
     fun aMarkOffKeysFirstIsTheUsersAlone() {
         val group = KeyId("zy9/1")
@@ -335,7 +327,7 @@ class KeyResolverTest {
         val chosen = resolver("zhuyin-nine", Form.ZhuyinNine, lists = KeyLists.of(mapOf(group to UserList(false, zhuyin + "?", First.Literal("?")))))
         assertEquals("?", chosen.resolve(group, KeyState()).corner)
         assertEquals(MarkContent.Symbol("?"), chosen.resolve(group, KeyState()).upMark)
-        // ˉ's ˙ (its defaults' first, a named key not fn/'s: a character key's mark=) not drawn, as the scene never drew it
+        // ˉ's ˙ (its defaults' first, a character key's mark=) not drawn, as the scene never drew it
         val tone = KeyId("zy9/tone-1")
         assertEquals("˙", r.resolve(tone, KeyState()).first?.text)
         assertEquals(MarkContent.Empty, r.resolve(tone, KeyState()).upMark)
@@ -343,8 +335,7 @@ class KeyResolverTest {
 
     @Test
     fun aLongFirstIsMarkedAsASetTextIs() {
-        // a 0.5 backup's long presses: the corner as a swipe's text is drawn (two characters as seen and 「…」), the
-        // first typed and said whole
+        // a 0.5 backup's long presses: the corner drawn as a swipe's text is, the first typed and said whole
         val long = "5%葡萄糖注射液100ml"
         val phone = "13895801474"
         val lists = KeyLists.of(mapOf(KeyId("full/l") to UserList(false, listOf(long)), KeyId("full/q") to UserList(false, listOf(phone))))

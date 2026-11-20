@@ -13,17 +13,15 @@ import java.text.BreakIterator
 import java.util.Locale
 
 /**
- * A key's words read a character, a word or a paragraph at a time, as TalkBack reads a view's
- * description ([AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY]): the framework's own
- * segments (android.view.AccessibilityIterators, which an app cannot reach), the same boundaries
- * by the same rules, so a virtual node a key is read by them as its view was.
+ * The framework's own segments (android.view.AccessibilityIterators, which an app cannot reach): the same
+ * boundaries by the same rules, so a virtual node a key is read as its view was.
  */
 internal class TextSegments(private val text: String, locale: Locale) {
 
     private val characters = BreakIterator.getCharacterInstance(locale).also { it.setText(text) }
     private val words = BreakIterator.getWordInstance(locale).also { it.setText(text) }
 
-    /** The segment of [granularity] after [current] (start, end); null, none, or a granularity a view had not. */
+    /** Null: none, or a granularity a view had not. */
     fun following(granularity: Int, current: Int): IntArray? = when (granularity) {
         AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER -> characterFollowing(current)
         AccessibilityNodeInfo.MOVEMENT_GRANULARITY_WORD -> wordFollowing(current)
@@ -31,7 +29,6 @@ internal class TextSegments(private val text: String, locale: Locale) {
         else -> null
     }
 
-    /** The segment of [granularity] before [current]; null as [following]. */
     fun preceding(granularity: Int, current: Int): IntArray? = when (granularity) {
         AccessibilityNodeInfo.MOVEMENT_GRANULARITY_CHARACTER -> characterPreceding(current)
         AccessibilityNodeInfo.MOVEMENT_GRANULARITY_WORD -> wordPreceding(current)
@@ -114,25 +111,18 @@ internal class TextSegments(private val text: String, locale: Locale) {
     }
 }
 
-/**
- * A helper's virtual nodes' words read a piece at a time ([TextSegments]), as a view's description
- * or text is (View.onInitializeAccessibilityNodeInfoInternal, traverseAtGranularity,
- * setAccessibilitySelection): a cursor in each node's words, moved by a reader's next or previous
- * character, word or paragraph, or put by it, told as the view tells it. [send] sends a node's event
- * (ExploreByTouchHelper.sendEventForVirtualView), its fields filled in by [populate].
- */
+/** As a view's description is (traverseAtGranularity, setAccessibilitySelection): a cursor in each node's words. */
 internal class NodeReading(private val locale: () -> Locale, private val send: (Int, Int) -> Unit) {
 
-    // each node's cursor in its words (a view's mAccessibilityCursorPosition), none for not set
+    // a view's mAccessibilityCursorPosition
     private val cursors = HashMap<Int, Int>()
 
-    // the move just made, for its event ([populate]): action, granularity, from, to
+    // action, granularity, from, to
     private var moved: IntArray? = null
 
-    /** The nodes are others (a new scene): no cursor kept. */
+    /** A new scene: no cursor kept. */
     fun clear() = cursors.clear()
 
-    /** Node [id]'s cursor and the moves, where it has [words]. */
     fun node(id: Int, words: String?, node: AccessibilityNodeInfoCompat) {
         if (words.isNullOrEmpty()) return
         val at = cursors[id] ?: NO_CURSOR
@@ -143,7 +133,7 @@ internal class NodeReading(private val locale: () -> Locale, private val send: (
         node.movementGranularities = GRANULARITIES
     }
 
-    /** [action] on node [id], if it is a reader's moving in its [words]: whether it moved; null, another action. */
+    /** Null: another action. */
     fun perform(id: Int, words: String?, action: Int, arguments: Bundle?): Boolean? = when (action) {
         AccessibilityNodeInfoCompat.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, AccessibilityNodeInfoCompat.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY ->
             if (arguments == null || words.isNullOrEmpty()) {
@@ -162,7 +152,6 @@ internal class NodeReading(private val locale: () -> Locale, private val send: (
         else -> null
     }
 
-    /** Node [id]'s [event] filled in as a view's: the move's, the cursor's in its [words]. */
     fun populate(id: Int, words: String?, event: AccessibilityEvent) {
         when (event.eventType) {
             AccessibilityEventCompat.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY -> moved?.let {
@@ -180,8 +169,7 @@ internal class NodeReading(private val locale: () -> Locale, private val send: (
         }
     }
 
-    // the next or previous segment from the cursor, the cursor put at its end (forward) or start,
-    // told as the text traversed; false, no such segment
+    // the cursor put at its end (forward) or start; false, no such segment
     private fun traverse(id: Int, words: String, granularity: Int, forward: Boolean): Boolean {
         val segments = TextSegments(words, locale())
         val current = cursors[id]?.takeIf { it != NO_CURSOR } ?: if (forward) 0 else words.length
@@ -201,7 +189,7 @@ internal class NodeReading(private val locale: () -> Locale, private val send: (
     }
 
     private companion object {
-        // a node's cursor not set (View.ACCESSIBILITY_CURSOR_POSITION_UNDEFINED)
+        // View.ACCESSIBILITY_CURSOR_POSITION_UNDEFINED
         const val NO_CURSOR = -1
 
         // what a view's description is read by

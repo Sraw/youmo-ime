@@ -5,8 +5,8 @@
 package org.fcitx.fcitx5.android.engine.glide
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
@@ -21,28 +21,15 @@ import org.fcitx.fcitx5.android.engine.user.addCount
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
 class PinyinGlideTest {
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你好", -3f, 0f)
-                .unigram("你", -2f, 0f)
-                .unigram("女", -3f, 0f)
-                .unigram("我", -1.8f, 0f)
-                .unigram("为", -2.2f, 0f)
-                .entry("你好", syl("ni", "hao"))
-                .entry("你", syl("ni"))
-                .entry("女", syl("nv"))
-                .entry("我", syl("wo"))
-                .entry("为", syl("wei"))
-                .build().toByteArray()
-        )
+    private val data = pinyinDataOf(
+        Triple("你好", "ni hao", -3f),
+        Triple("你", "ni", -2f),
+        Triple("女", "nv", -3f),
+        Triple("我", "wo", -1.8f),
+        Triple("为", "wei", -2.2f),
     )
 
     private val glide = PinyinGlide(data)
@@ -54,7 +41,6 @@ class PinyinGlideTest {
         val best = glide.decode(path("nihao"), GlideLayout.QWERTY, 3).first()
         assertEquals("ni'hao", best.keys)
         assertEquals("你好", best.word)
-        // ü spelt v, as typed
         assertEquals("nv", glide.decode(path("nv"), GlideLayout.QWERTY, 3).first().keys)
     }
 
@@ -70,7 +56,6 @@ class PinyinGlideTest {
         val scheme = ShuangpinScheme.ZIRANMA
         val keys = scheme.encode(Syllables.id("ni"))!! + scheme.encode(Syllables.id("hao"))!!
         val shuangpin = glide.decode(path(keys), GlideLayout.QWERTY, 3, PinyinGlide.Spelling.shuangpin(scheme)).first()
-        // two keys a syllable, no boundary
         assertEquals(keys, shuangpin.keys)
         assertEquals("你好", shuangpin.word)
         val nine = GlideLayout.nineKeys()
@@ -93,7 +78,6 @@ class PinyinGlideTest {
         var version = 0
         var blocked = false
         val user = PinyinGlide(data, user = { PinyinGlide.User(version, { w -> if (w == nihao) -1f else -2f }) { w, _ -> blocked && w == nihao } })
-        // 你好's -1 the user's, over the model's -3
         val lifted = user.decode(path("nihao"), GlideLayout.QWERTY, 3).first { it.word == "你好" }.score
         assertTrue(lifted > glide.decode(path("nihao"), GlideLayout.QWERTY, 3).first { it.word == "你好" }.score)
         blocked = true
@@ -136,14 +120,12 @@ class PinyinGlideTest {
         val all = asked
         assertTrue(all > 0)
         asked = 0
-        // nothing counted: no node's words asked about again
         user.decode(path("nihao"), GlideLayout.QWERTY, 3)
         assertEquals(0, asked)
         learned = setOf(nihao)
         user.decode(path("nihao"), GlideLayout.QWERTY, 3)
         asked = 0
         user.decode(path("nihao"), GlideLayout.QWERTY, 3)
-        // ni'hao's node again, not every node the path reaches
         assertTrue(asked in 1 until all)
         // and what it offers moves with the learned word's count, the version as it was
         val before = user.decode(path("nihao"), GlideLayout.QWERTY, 3).first { it.word == "你好" }.score
@@ -154,7 +136,6 @@ class PinyinGlideTest {
     @Test
     fun aWordOnlyTheUserHasGlides() {
         val woai = data.vocabulary.size
-        // 我爱 at wo'ai: the dictionary has wo, not wo'ai
         val words = object : UserWords {
             override fun child(node: Int, syllable: Int) = when {
                 node == 0 && syllable == Syllables.id("wo") -> 1
@@ -170,13 +151,12 @@ class PinyinGlideTest {
         val user = PinyinGlide(data, user = { PinyinGlide.User(blocked, { w -> if (w == woai) -1f else -2f }, words, null) { w, _ -> blocked && w == woai } })
         assertTrue(glide.decode(path("woai"), GlideLayout.QWERTY, 10).none { it.word == "我爱" })
         assertTrue(user.decode(path("woai"), GlideLayout.QWERTY, 10).any { it.keys == "wo'ai" && it.word == "我爱" })
-        // the dictionary's wo is still the dictionary's
         assertEquals("我", user.decode(path("wo"), GlideLayout.QWERTY, 3).first().word)
         blocked = true
         assertTrue(user.decode(path("woai"), GlideLayout.QWERTY, 10).none { it.word == "我爱" })
     }
 
-    // imported words glide (U-101), below the dictionary's of the same reading, never blocked ones, once owned once
+    // imported words glide, below the dictionary's of the same reading, never blocked ones, once owned once
     @Test
     fun anImportedWordGlidesBelowTheDictionarys() {
         val model = UserModel(data.dictionary, data.vocabulary)
@@ -195,7 +175,6 @@ class PinyinGlideTest {
         assertEquals(1, user.decode(path("woai"), GlideLayout.QWERTY, 10).count { it.word == "我爱" })
     }
 
-    // review S6: a merged file's words glide, its best first, a blocked one skipped
     @Test
     fun aMergedDictionarysWordsGlideBestFirstTheBlockedSkipped() {
         val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
@@ -214,14 +193,13 @@ class PinyinGlideTest {
         model.unblock(UserModel.Entry("我爱", syl("wo", "ai")))
         version++
         assertEquals(listOf("我爱"), woai())
-        // learned, second in its file: scored with its counts, found past the first (review S5)
+        // learned, second in its file: scored with its counts, found past the first
         model.addCount(UserModel.Entry("卧碍", syl("wo", "ai")), 5f)
         version++
         assertEquals(listOf("卧碍"), woai())
     }
 
-    // review R12: an imported and a merged word on one path the dictionary lacks: the path read once,
-    // carrying both tries' nodes, so with the imported one blocked the merged one is there
+    // the path read once carries both tries' nodes, so with the imported word blocked the merged one is there
     @Test
     fun anImportedAndAMergedWordOnOnePathAreOneReading() {
         val file = java.io.File.createTempFile("merged", ".ymd").apply { deleteOnExit() }

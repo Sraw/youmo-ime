@@ -10,54 +10,18 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import java.util.TreeMap
 
 /**
- * Cuts pinyin typed on a phone's nine keys (九键) into a [SyllableGraph]: each of 2 to 9 stands
- * for its [letters] (on a phone `2` abc … `9` wxyz, ü as v on `8`), so `64426` is ni'hao, mi'gao
- * and the rest, all of them in the graph for the decoder to weigh. A letter the user put on more
- * than one key is read from each. The separator is `'`: the session takes
- * the keyboard's 1 for it.
+ * Cuts pinyin typed on nine keys into a [SyllableGraph]: each key stands for its [letters], so `64426` is
+ * ni'hao, mi'gao and more, all left for the decoder; `'` separates (the session maps the keyboard's 1).
+ * Per digit: every syllable typed there (with [Fuzzy] partners); at the end or before a separator, every
+ * syllable it may become; before another digit, initials (简拼) where no longer syllable is read (with
+ * [abbreviations]).
  *
- * From each digit the graph gets:
- * - every syllable the digits there type, of any length, with their [Fuzzy] partners;
- * - at the end of the input or before a separator, every syllable the digits may still become
- *   ([Kind.PARTIAL], or [Kind.EXTENDED] where they are a syllable too, as on the full keyboard:
- *   `64` on the way to nian, `2`, 啊, on the way to bu, so a lone 2 reads a first);
- * - where another digit follows, the initials the digits type (简拼, `94` zh): with
- *   [abbreviations] where no longer syllable is read there (sh in `745` 时间, not in `744`, shi),
- *   without only where nothing else is read but a syllable of one letter (`25` is 北京 too, not
- *   only 啊 then j …).
- *
- * A letter typed as itself ([Action.Letter][org.fcitx.fcitx5.android.engine.session.Action.Letter],
- * chosen from a key's long press) is in the input upper case, in place of its digit: read as the
- * digit, keeping only the syllables with that letter there (`7H` is on the way to shi or sha, not
- * si or pian; fuzzy partners of another spelling go too).
- *
- * A key pressed again soon after itself (连按, where it is on) is that key's next letter and
- * nothing else: the session puts it in as a letter typed as itself, in place of the digit (4 4
- * fast is `H`, 4 4 4 `I`). Read both ways, as keys too, a learned 广告 overrode the h the key's
- * preview showed (2026-10-19).
- *
- * A syllable the user chose for the first digits not yet chosen
- * ([Action.Syllable][org.fcitx.fcitx5.android.engine.session.Action.Syllable]) is in the input as
- * its letters and a separator: read as that syllable alone, or as an initial for a letter (`h`).
- *
- * On a grouped keyboard ([NineKeyLetters.isGrouped]) each key of two letters may come with where it
- * was tapped ([segment] with taps): each edge then says, for each syllable, how far the letters it
- * reads its keys as go against those places ([SyllableGraph.against]). The letters are those of
- * the spelling actually typed for it (a fuzzy partner's, üe's ue), kept beside the index as the
- * group's first or second letter of each key.
- *
- * With [neighbours], a syllable some of the keys spell with one key slipped from a key around it is
- * read too, as likely as where it was tapped says ([SlipCost]; 061-neighbour-correction §4.3, §4.4):
- * whole syllables only, legal (costing more) where the keys as typed spell one. In zhuyin a key
- * around is a group key around (注音九键) or a symbol's key around (大千), never a tone's
- * (061-neighbour-groups; 注音九键 since the user's 11-16, over -2: a slip that also spells as typed
- * never). On a keyboard that weighs a key's letters by where it was tapped, the key slipped to has its
- * letters weighed by where the tap lies on it, the slipped key's own not at all: the slipped key needs a
- * place for it, so on such a keyboard a key of one letter has its place too, weighing nothing of its own.
- *
- * The keys may spell syllables in zhuyin's symbols instead ([KeySpelling], 注音九键 and 大千 of
- * [ZhuyinKeys]): every syllable indexed by its symbols' keys, a symbol typed as itself its code, a
- * tone after a syllable a separator (the decoder weighs it: [SyllableGraph.tone]).
+ * A letter typed as itself (upper case in the input, from a long press or 连按) keeps only syllables with
+ * that letter there. A bar-chosen syllable is in the input as its letters and a separator. On grouped
+ * keyboards each two-letter key may carry a tap place, weighed per syllable ([SyllableGraph.against]). With
+ * [neighbours], whole syllables with one key slipped to a neighbour are read too ([SlipCost]); in zhuyin
+ * never onto a tone key. Keys may spell zhuyin instead ([KeySpelling]), a tone after a syllable acting as
+ * a separator.
  */
 class T9Segmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
@@ -65,14 +29,9 @@ class T9Segmenter(
     override val letters: NineKeyLetters = NineKeyLetters.STANDARD,
     override val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
     neighbours: Boolean = false,
-    // the nine keys' digits read the slips over -3 alone: on a phone (6T) those over -4 cost 2.7 ms a key at the
-    // 41st to 60th key, over the 1.5 the design allows, and found 1 point more (061-neighbour-correction §7.2, N3).
-    // The rest by the user's 11-16 rule, the loosest floor that turns no sentence typed on target (a tap in the key's
-    // middle, σ 0.15, both halves × seeds 1–3) wrong (061-neighbour-18key-impl-report §5): 注音九键 -2 (over -2.5
-    // one with no tones went wrong); 大千 -1.75, with tones or without (over -2 one with no tones, 脚步哦 → 较多, so
-    // no slip that also spells as typed is read); the 14 keys -6, as much found as at -8 and two more than at -4;
-    // the 18 keys -4 (a key of one letter's place now weighs the key slipped onto: S1, 0 at -4). A layout's own
-    // groups take the 18 keys' -4 too, never measured so (deferred D5, review F8246)
+    // slip floors per keyboard: nine-key digits -3 (lower cost too much time on a phone); the rest the loosest
+    // floor that turns no on-target sentence wrong (σ 0.15): 注音九键 -2, 大千 -1.75, 14 keys -6, 18 keys -4;
+    // custom groups take the 18 keys' -4, unmeasured
     private val slipCost: SlipCost = when {
         letters == ZhuyinKeys.NINE -> SlipCost(floor = -2f)
         letters == ZhuyinKeys.DACHEN -> SlipCost(floor = -1.75f)
@@ -82,8 +41,7 @@ class T9Segmenter(
     },
 ) : KeyedSegmenter {
 
-    // the tables below made once for the settings that shape them, shared by the sessions made anew
-    // after another setting changed (SettingsMemo, S15 N2)
+    // tables built once per shaping settings, shared across sessions (SettingsMemo)
     private val tables = TABLES[fuzzy.toSet() to letters]
     private val spelling = KeySpelling.of(letters)
     private val whole = tables.whole
@@ -96,17 +54,14 @@ class T9Segmenter(
     private val initialLetters = tables.initialLetters
     private val slips = neighbours
 
-    /**
-     * How many times two spellings of a syllable kept for the same keys and flags had different
-     * letters: none, or which one [SyllableGraph.against] judges would depend on the order read.
-     */
+    /** Ties of two spellings with the same keys and flags but different letters: should be 0, else [SyllableGraph.against] depends on read order. */
     internal val letterTies: Int get() = tables.letterTies
 
-    /** What a segmenter reads [letters] by under [fuzzy]: made at once, never changed after. */
+    /** What a segmenter reads [letters] by under [fuzzy]: built once, immutable. */
     private class Tables(fuzzy: Set<Fuzzy>, private val letters: NineKeyLetters) {
         private val keySpelling = KeySpelling.of(letters)
 
-        // digits typing a syllable whole, the start of one, and an initial
+        // keys typing a syllable whole, its start, and an initial
         val whole = HashMap<String, SyllableMatches>()
         val starts = HashMap<String, SyllableMatches>()
         val initials = HashMap<String, SyllableMatches>()
@@ -114,12 +69,10 @@ class T9Segmenter(
         // a chosen letter, as an initial: its syllables
         val byInitial = HashMap<String, SyllableMatches>()
 
-        // digits typing a syllable of an initial and a final, or a final alone, of two letters or more:
-        // 啊, 呃, 哦, 呣, 嗯 and 儿 alone would keep 简拼 off every 2, 3, 6 and 7
+        // keys typing a syllable of two+ letters: 啊, 呃, 哦, 呣, 嗯, 儿 alone would keep 简拼 off every 2, 3, 6, 7
         val regular = HashSet<String>()
 
-        // on a grouped keyboard, beside each of whole, starts and initials: which of its key's letters
-        // the spelling kept for each syllable has at each key, LETTER_BITS a key, the first key lowest
+        // on grouped keyboards, beside whole/starts/initials: each key's letter in the kept spelling, LETTER_BITS a key
         val wholeLetters = HashMap<String, IntArray>()
         val startLetters = HashMap<String, IntArray>()
         val initialLetters = HashMap<String, IntArray>()
@@ -136,7 +89,7 @@ class T9Segmenter(
             val wholeChoices = HashMap<String, TreeMap<Int, Int>>()
             val startChoices = HashMap<String, TreeMap<Int, Int>>()
             val initialChoices = HashMap<String, TreeMap<Int, Int>>()
-            // keepBest, and on a grouped keyboard the letters of the spelling it kept
+            // keepBest, plus on grouped keyboards the kept spelling's letters
             fun keep(ids: HashMap<String, TreeMap<Int, Int>>, choices: HashMap<String, TreeMap<Int, Int>>, keys: String, id: Int, flags: Int, typed: String) {
                 val into = ids.getOrPut(keys) { TreeMap() }
                 val old = into[id]
@@ -167,7 +120,7 @@ class T9Segmenter(
                     }
                 }
                 for ((s, flags) in spellings) {
-                    // üe is typed ue too (略 lue): on a phone u and v share 8, on the user's keys maybe not
+                    // üe is typed ue too (略 lue): u and v may be on different keys
                     val typed = if (keySpelling != KeySpelling.Pinyin) listOfNotNull(keySpelling.of(s)) else if ("ve" in s) listOf(s, s.replace("ve", "ue")) else listOf(s)
                     val seen = HashSet<String>()
                     for (t in typed) {
@@ -184,13 +137,13 @@ class T9Segmenter(
             startIds.forEach { (k, m) -> starts[k] = toMatches(m) }
             initialIds.forEach { (k, m) -> initials[k] = toMatches(m) }
             letterIds.forEach { (k, m) -> byInitial[k] = toMatches(m) }
-            // in the matches' order: by syllable
+            // in match order: by syllable
             wholeChoices.forEach { (k, m) -> wholeLetters[k] = m.values.toIntArray() }
             startChoices.forEach { (k, m) -> startLetters[k] = m.values.toIntArray() }
             initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
         }
 
-        // which of its key's letters each of [typed] is, [keys] the keys typing it: LETTER_BITS a key
+        // which letter of its key each of [typed] is: LETTER_BITS a key
         private fun choiceOf(keys: String, typed: String): Int {
             var choice = 0
             for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
@@ -198,8 +151,7 @@ class T9Segmenter(
         }
     }
 
-    // the letters of a syllable taken are the session's to put in, not typed
-    // zhuyin's symbols typed as themselves and tones are keys sent as codes ([ZhuyinKeys]), read as the groups are
+    // bar-taken letters are the session's to put in; zhuyin symbols and tones are keys sent as codes
     override fun reads(c: Char) = letters.isCode(c) && letters.letters(c).isNotEmpty() || spelling.readsOwn(c)
 
     override fun segment(input: String): SyllableGraph = segment(input, null)
@@ -219,11 +171,7 @@ class T9Segmenter(
         }
     }
 
-    /**
-     * Adds, for each run of keys from [at], the whole syllables it spells with one key read as a
-     * key around it where it was tapped, those it spells as typed left out, each at its cheapest
-     * slip. Not a letter typed as itself (one chosen off a long press).
-     */
+    /** Adds, per key run from [at], whole syllables spelt with one key slipped to a neighbour, those spelt as typed left out, each at its cheapest; not for letters typed as themselves. */
     private fun slipped(input: String, at: Int, edges: GraphEdges, taps: FloatArray?, passing: Array<List<Passing>?>) {
         var length = 0
         var any = false
@@ -234,11 +182,7 @@ class T9Segmenter(
         }
     }
 
-    /**
-     * Each key's [Passing]: the keys around its tap a slip may read it as, past [SlipCost.floor] as
-     * an illegal one (a legal one costs more); null where none, and in all where no key has one, so
-     * keys tapped on target do none of [slippedRun]'s work.
-     */
+    /** Each key's slip candidates above [SlipCost.floor]; null when none anywhere, so on-target typing skips [slippedRun] entirely. */
     private fun passing(input: String, touches: Array<Touch?>): Array<List<Passing>?>? {
         var out: Array<List<Passing>?>? = null
         for (i in input.indices) {
@@ -253,13 +197,12 @@ class T9Segmenter(
         return out
     }
 
-    // whether the key [typed] may be read as [d], a key around it: another with letters
+    // whether key [typed] may be read as neighbour [d]: another key with letters
     private fun readsAs(typed: Char, d: Char) = d != typed && letters.isCode(d) && letters.letters(d).isNotEmpty()
 
-    // a key around a tap a slip may read it as: the tap, the key, what it costs read so where the keys typed spell nothing
+    // a slip candidate: the tap, the key, its illegal cost
     private class Passing(val touch: Touch, val near: Near, val cost: Float)
 
-    // [slipped] for the run of [length] keys from [at]
     private fun slippedRun(input: String, at: Int, length: Int, edges: GraphEdges, taps: FloatArray?, passing: Array<List<Passing>?>) {
         val typed = input.substring(at, at + length)
         val keys = keysOf(typed)
@@ -275,7 +218,7 @@ class T9Segmenter(
         edges.add(at, length, Kind.SYLLABLE, m, taps?.let { slipAgainst(m, found.values.toList(), typed, at, it) }, builder.build())
     }
 
-    // [best] (made if none and one is read) with the syllables [typed] spells with its [j]th key read as [p]'s, those [full] has left out
+    // [best] plus the syllables [typed] spells with key [j] read as [p]'s, those [full] lacks
     private fun slipOnto(typed: String, keys: String, j: Int, p: Passing, full: SyllableMatches?, best: TreeMap<Int, Slip>?): TreeMap<Int, Slip>? {
         val d = p.near.char
         val cost = if (full != null) slipCost.legal(p.cost) else p.cost
@@ -291,18 +234,9 @@ class T9Segmenter(
         return out
     }
 
-    // a syllable's cheapest slip so far: its cost, which key of the run, the key meant, its match's flags, where and by what
     private class Slip(val cost: Float, val at: Int, val meant: Char, val flags: Int, val touch: Touch, val near: Near)
 
-    /**
-     * [against] for the slips of [m], [found] each match's: the key slipped to weighed by where the
-     * tap lies on it ([Touch] put onto [Near]: its edge nearest the key hit), in the dimensions the
-     * keyboard's own places have (the 14 and 18 keys' across alone, a layout's own across and down); a
-     * tap with no place (a group whose layout has lean="off", a click no touch made) weighs none. The
-     * key slipped to is weighed by the hit key's lean alone: [Near] carries none of its own, so in a
-     * layout mixing lean="on" and "off" a slip onto a key of "off" is weighed by where the tap fell on
-     * it (deferred D5, review F8246).
-     */
+    /** [against] for [m]'s slips: the key slipped to weighed by where the tap lies on it ([placeOn]), in the keyboard's own place dimensions; a tap without place weighs none. */
     private fun slipAgainst(m: SyllableMatches, found: List<Slip>, typed: String, at: Int, taps: FloatArray): FloatArray? {
         var any = false
         val out = FloatArray(m.size) { i ->
@@ -316,7 +250,7 @@ class T9Segmenter(
             for (k in typed.indices) {
                 val tap = taps.getOrElse(at + k) { Float.NaN }
                 val code = if (k == slip.at) slip.meant else typed[k]
-                // a tap with no place (NaN: a group not leaning) has its letters never weighed, as in against
+                // a tap without place (NaN) is never weighed, as in against
                 if (tap.isNaN() || !letters.isCode(code) || !letters.weighs(code)) continue
                 val place = if (k == slip.at) placeOn(slip.touch, slip.near, tap) else tap
                 sum += letters.against(code, (choice shr (LETTER_BITS * k)) and LETTER_MASK, place)
@@ -327,7 +261,7 @@ class T9Segmenter(
         return out.takeIf { any }
     }
 
-    /** The syllable, or initial, chosen at [at]: its letters up to the separator. */
+    /** The bar-chosen syllable or initial at [at]: its letters up to the separator. */
     private fun chosen(input: String, at: Int, edges: GraphEdges) {
         var end = at
         while (end < input.length && input[end] in 'a'..'z') end++
@@ -354,16 +288,16 @@ class T9Segmenter(
             if (keys !in starts) break
         }
         for ((n, m, against) in initialEdges) {
-            // at the end the start of a syllable is read already, as PARTIAL
+            // at the end a syllable's start is read already, as PARTIAL
             if (endsAt(input, at + n)) continue
             if (longest == 0 || abbreviations && longest <= n) edges.add(at, n, Kind.INITIAL, m, against)
         }
     }
 
-    // the syllables [typed], the presses from [at] as [keys], are, whole or started; whether a regular one is whole
+    // adds what [typed] (keys [keys] from [at]) is, whole or started; returns whether a regular one is whole
     private fun read(input: String, at: Int, typed: String, keys: String, edges: GraphEdges, taps: FloatArray?): Boolean {
         val full = whole[keys]?.let { fitting(it, typed) }
-        // no taps (the nine keys, any key typed with no place): no lookups for them, in the hottest loop of a key
+        // no taps: skip the lookups in the key's hottest loop
         full?.let { edges.add(at, typed.length, Kind.SYLLABLE, it, taps?.let { t -> against(it, whole[keys], wholeLetters[keys], typed, at, t) }) }
         if (endsAt(input, at + typed.length)) {
             starts[keys]?.let { fitting(it, typed) }?.let {
@@ -373,11 +307,7 @@ class T9Segmenter(
         return isRegular(keys, full)
     }
 
-    /**
-     * For each of [m] (of [all], fitted to [typed]), how far its letters go against where [typed]'s
-     * keys from input place [at] were tapped ([SyllableGraph.against]), [choices] its letters
-     * beside [all]; null where no key of two letters has a place, so the graph is as untapped.
-     */
+    /** Per match of [m], how far its letters go against [typed]'s tap places from [at]; null when no two-letter key has a place. */
     @Suppress("ReturnCount")
     private fun against(m: SyllableMatches, all: SyllableMatches?, choices: IntArray?, typed: String, at: Int, taps: FloatArray): FloatArray? {
         if (all == null || choices == null) return null
@@ -387,7 +317,7 @@ class T9Segmenter(
             var sum = 0f
             for (k in typed.indices) {
                 val tap = taps.getOrElse(at + k) { Float.NaN }
-                // a letter typed as itself, a key of one letter: nothing to weigh
+                // a letter typed as itself, or a one-letter key: nothing to weigh
                 if (tap.isNaN() || !letters.isCode(typed[k]) || !letters.weighs(typed[k])) continue
                 sum += letters.against(typed[k], (choice shr (LETTER_BITS * k)) and LETTER_MASK, tap)
             }
@@ -397,7 +327,6 @@ class T9Segmenter(
         return out.takeIf { any }
     }
 
-    // [s] with its [k]th character [c]
     private fun replaced(s: String, k: Int, c: Char) = buildString(s.length) {
         append(s, 0, k)
         append(c)
@@ -409,22 +338,21 @@ class T9Segmenter(
         typed.forEach { append(if (letters.isCode(it)) it else spelling.letterOf(it).let { c -> letters.keysOf(c).firstOrNull() ?: c }) }
     }
 
-    // [spelling] has [c] at [k]; üe is spelt lve here and typed lue as well (略, 虐)
+    // üe is spelt lve here and typed lue as well (略, 虐)
     private fun spells(spelling: String, k: Int, c: Char) =
         spelling.getOrNull(k) == c || c == 'u' && spelling.getOrNull(k) == 'v' && spelling.getOrNull(k + 1) == 'e'
 
-    // the end of the input, or of a syllable the user separated (or gave a tone)
+    // the input's end, or a syllable's end the user marked (separator or tone)
     private fun endsAt(input: String, at: Int) = at == input.length || spelling.separates(input[at])
 
-    // a regular syllable read for [keys] as [full], what a letter typed as itself left of them
     private fun isRegular(keys: String, full: SyllableMatches?): Boolean = when {
         keys !in regular || full == null -> false
         full === whole[keys] -> true
-        // as [regular] has digits: of an initial and a final, or a final alone, of two letters or more
+        // as [regular]: initial plus final, or a final alone, of two+ letters
         else -> (0 until full.size).any { Syllables.spelling(full.syllable(it)).let { s -> s.length > 1 && SpellingIndex.split(s) != null } }
     }
 
-    /** Those of [matches] spelt with each letter typed as itself in [typed] where it is; null if none. */
+    /** Those of [matches] with each letter typed as itself in place; null if none. */
     private fun fitting(matches: SyllableMatches, typed: String): SyllableMatches? {
         if (typed.none { spelling.isFixed(it) }) return matches
         val kept = (0 until matches.size).filter { i ->
@@ -435,11 +363,7 @@ class T9Segmenter(
         return SyllableMatches(IntArray(kept.size) { matches.syllable(kept[it]) }, IntArray(kept.size) { matches.flags(kept[it]) })
     }
 
-    /**
-     * [text], of the input, as it is shown or committed: a letter typed as itself lower case, a
-     * grouped key's code its first letter ([NineKeyLetters.asTyped]). In zhuyin a symbol or tone as
-     * itself, and a syllable taken off the bar (its pinyin in the input) in symbols: ㄇㄧ, not mi.
-     */
+    /** As shown or committed: fixed letters lower case, grouped codes as first letters; in zhuyin, symbols and tones as themselves and bar syllables in symbols (ㄇㄧ). */
     override fun asTyped(text: CharSequence): String {
         if (spelling == KeySpelling.Pinyin) return letters.asTyped(text.toString())
         val out = StringBuilder()
@@ -459,17 +383,16 @@ class T9Segmenter(
         return out.toString()
     }
 
-    /** Whether [c] is a key typed: one of the keys' codes (the nine keys' digits) or a letter typed as itself. */
     override fun isKey(c: Char): Boolean = letters.isCode(c) || spelling.isFixed(c)
 
     override fun initialsOf(code: Char): List<String> = spelling.initialsOf(letters, code)
 
-    // digits say nothing: of a syllable still being typed as many letters as were typed
+    // digits say nothing: as many letters as were typed
     override fun started(syllable: Int, keys: Int): String = spelling.of(syllable).take(keys)
 
     override fun spelt(syllable: Int): String = spelling.of(syllable)
 
-    // an initial first, where the spelling shows one so
+    // an initial first, where the spelling shows one
     override fun shownOffered(offered: String): String =
         spelling.offeredInitial(offered) ?: Syllables.id(offered).takeIf { it >= 0 }?.let(spelling::of) ?: offered
 
@@ -484,13 +407,7 @@ class T9Segmenter(
     companion object {
         private const val MAX_SYLLABLE = 6
 
-        /**
-         * Where [touch] lies on the key [near] around the one it hit, as [NineKeyLetters.place] has a
-         * tap ([own], the hit key's place, says in which dimensions): clamped onto it, so on its edge
-         * nearest the key hit (061-neighbour-correction §4.4). A place of one dimension is along the
-         * key's letters: across, or down a key whose letters a layout stacks ([Near.stacked]), as a tap
-         * on that key itself is sent (review L4).
-         */
+        /** Where [touch] lies on neighbour [near], clamped onto it (its edge nearest the hit key), in [own]'s dimensions; 1-D is along the letters (down for a [Near.stacked] key). */
         internal fun placeOn(touch: Touch, near: Near, own: Float): Float {
             val x = ((touch.dx - near.nx) / near.nw + HALF).coerceIn(0f, 1f)
             val y = ((touch.dy - near.ny) / near.nh + HALF).coerceIn(0f, 1f)
@@ -502,27 +419,24 @@ class T9Segmenter(
 
         private val TABLES = SettingsMemo<Pair<Set<Fuzzy>, NineKeyLetters>, Tables>(SpellingIndex.MEMO) { (fuzzy, letters) -> Tables(fuzzy, letters) }
 
-        /** How many tables are held: the settings' last few. */
         internal val held: Int get() = TABLES.size
 
-        /** The letters that are an initial alone. */
         private const val INITIAL_LETTERS = "bcdfghjklmnpqrstwxyz"
 
-        // a key's letter, its index in the group, in a choice of [choiceOf]: of up to NineKeyLetters.MAX (5): three bits, ten keys in an Int (a syllable has at most six)
+        // a letter's index in its group (up to 5): three bits, ten keys per Int (a syllable has at most six)
         private const val LETTER_BITS = 3
         private const val LETTER_MASK = 7
 
-        /** A letter typed as itself, as it stands in the input: see the class. */
+        /** A letter typed as itself, as it stands in the input. */
         val FIXED = 'A'..'Z'
 
-        /** [asTyped] on the nine keys' digits ([NineKeyLetters.STANDARD]'s codes), where the codes are digits whatever the layout. */
+        /** For nine-key digits whatever the layout. */
         fun asTyped(text: CharSequence): String = text.toString().lowercase()
 
-        /** [initialsOf] on [letters]: the key's letters that are an initial alone; a letter typed as itself offers itself alone. */
+        /** The key's letters that are initials alone; a fixed letter offers itself alone. */
         fun initialsOf(letters: NineKeyLetters, code: Char): List<String> =
             (if (code in FIXED) code.lowercase() else letters.letters(code)).filter { it in INITIAL_LETTERS }.map { it.toString() }
 
-        /** [isKey] on the nine keys, whatever their layout: a digit or a letter typed as itself. */
         fun isKey(c: Char): Boolean = c in '2'..'9' || c in FIXED
     }
 }

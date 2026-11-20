@@ -4,16 +4,12 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/**
- * Keyboards as [KeyBoxes], in dp as on a phone 400 dp wide (a QWERTY key 40 by 56, the design's σ a quarter of its width): what tests and
- * ime-eval tap on (061-neighbour-correction §5.1).
- */
+/** Keyboards as [KeyBoxes], in dp on a 400 dp phone (a QWERTY key 40 by 56): what tests and ime-eval tap on. */
 object TouchBoxes {
     const val KEY_W = 40f
     const val KEY_H = 56f
 
-    // [rows] of keys [height] high, each row its keys' characters (a space a place no key types), where it starts and
-    // each key's width (in key widths)
+    // [rows] of keys [height] high: each row's characters (a space types nothing), start and key widths
     private fun rows(vararg rows: Triple<String, Float, Float>, height: Float = KEY_H): KeyBoxes {
         val keys = LinkedHashMap<Char, KeyBoxes.Box>()
         rows.forEachIndexed { r, (chars, offset, width) ->
@@ -41,10 +37,7 @@ object TouchBoxes {
         Triple(g14("z c b m"), 1f, 2f),
     )
 
-    /**
-     * 拼音's 18 keys, each key its code: a row's keys as wide as each other, the rows not (seven, six and five keys,
-     * the bottom row's as wide as the top's, centred), as ime-eval's k18 has them: keys of uneven widths.
-     */
+    /** 拼音's 18 keys as ime-eval's k18: rows of seven, six and five keys, uneven widths. */
     val G18 = rows(
         Triple(g18("q w r y u i p"), 0f, 10f / 7),
         Triple(g18("a s f h j l"), 0f, 10f / 6),
@@ -76,7 +69,6 @@ object TouchBoxes {
 
     /** A tap [dx] and [dy] (in its width and height) from the centre of the key [c] of [boxes]. */
     fun tap(boxes: KeyBoxes, c: Char, dx: Float = 0f, dy: Float = 0f): Touch {
-        // the key's size and the keys around it, the place then set
         return (boxes.touch(c, 0f, 0f) ?: error("no key $c")).copy(dx = dx, dy = dy)
     }
 

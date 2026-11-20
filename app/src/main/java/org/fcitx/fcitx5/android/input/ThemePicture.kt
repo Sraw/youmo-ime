@@ -28,22 +28,16 @@ import org.fcitx.fcitx5.android.utils.DarkenColorFilter
 import java.lang.ref.WeakReference
 
 /**
- * The theme's picture under a keyboard: laid over [base] (the view under the whole keyboard) as
- * CENTER_CROP lays it, so a view anywhere over it — a key, the bar — shows the part under it, as
- * the theme maker draws it ([PictureWindow]). Found by the views over it through [host]'s tag.
- * [animated]: the base plays the picture (060-render-p3 A4, [AnimatedBoardDrawable], given by [play] once
- * decoded); a view showing it is see-through then, only darkened to its brightness ([seeThrough]), never blurred.
+ * Laid over [base] as CENTER_CROP lays it, so a view anywhere over it shows the part under it, as the
+ * theme maker draws it. [animated]: the base plays it, and a view showing it is see-through then, only
+ * darkened to its brightness, never blurred.
  */
 class PictureHost(private val look: ThemeLook, val base: View, private val landscape: Boolean) {
 
     var animated: AnimatedBoardDrawable? = null
         private set
 
-    /**
-     * [frames] played under the keyboard from now on: the views showing the picture under [base]'s parent
-     * drawn again see-through (the keys' canvas recorded again, on a layer of its own: the frames under it
-     * change, not the keys).
-     */
+    /** The keys' canvas is recorded again, on a layer of its own: the frames under it change, not the keys. */
     fun play(frames: AnimatedBoardDrawable) {
         animated = frames
         (base as? PictureBaseView)?.play(frames) ?: run { base.background = frames }
@@ -57,10 +51,7 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
 
     private val dark = Paint()
 
-    /**
-     * Over an [animated] base: the paint that makes a view showing the picture at [brightness] (in its
-     * coordinates, the base under it showing through), null where nothing is to be drawn over it.
-     */
+    /** Null where nothing is to be drawn over it. */
     fun seeThrough(brightness: Int): Paint? {
         val board = animated?.brightness ?: return null
         val darken = PictureWindow.seeThroughDarken(board, brightness)
@@ -69,9 +60,8 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
         return dark
     }
 
-    // a blur's picture as laid over the base at its size: asked of ThemeAssets once, not each key a frame;
-    // asked again once the files were let go as changed (a theme imported again under its name, its
-    // picture another: the theme itself equal, nothing made anew for it)
+    // asked of ThemeAssets once, not each key a frame; again once the files were let go as changed (a theme
+    // imported again under its name: the theme equal, nothing made anew for it)
     private class Placed(
         val bitmap: Bitmap?, val w: Int, val h: Int, val scale: Float, val dx: Float, val dy: Float, val generation: Int,
     )
@@ -81,12 +71,7 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
     private val viewAt = IntArray(2)
     private val matrix = Matrix()
 
-    /**
-     * [into]'s paint set to the picture blurred [blurDp] at [brightness] percent lying where [view] is
-     * over the base, for drawing in [view]'s coordinates less ([left], [top]) (a drawable's bounds'
-     * corner, the canvas moved there); null with no picture or none that reads, or while it is decoded
-     * on another thread ([view] drawn again once it is in: not a frame waited for it).
-     */
+    /** Null with no picture, or while it is decoded on another thread ([view] drawn again once in: no frame waited). */
     fun paint(view: View, blurDp: Int, brightness: Int, into: PicturePaint, left: Int = 0, top: Int = 0): Paint? {
         val w = base.width
         val h = base.height
@@ -105,22 +90,15 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
         return into.of(bitmap, matrix, brightness)
     }
 
-    // the blurs asked for and still being decoded ([decoding])
     private val decodingBlurs = HashSet<Int>()
 
-    /**
-     * Whether [paint] found nothing for [blurDp] only because the picture is still being decoded: what
-     * asked is drawn again once it is in. False where nothing will come (no picture, none that reads,
-     * the base not laid out): no point recording a view again each frame for it.
-     */
+    /** False where nothing will come: no point recording a view again each frame for it. */
     fun decoding(blurDp: Int): Boolean = blurDp in decodingBlurs
 
-    // null while it is decoded on another thread
     private fun place(view: View, blurDp: Int, w: Int, h: Int): Placed? {
         // before it is asked for: let go while asked, it is asked again
         val generation = ThemeAssets.generation
-        // not holding the view, nor this host (whose base is the input view's), till the decode is done:
-        // a keyboard let go meanwhile (its theme changed, the keys' canvas given up) is not kept
+        // not holding the view, nor this host, till the decode is done: a keyboard let go meanwhile is not kept
         val asking = WeakReference(view)
         val host = WeakReference(this)
         val got = ThemeAssets.pictureOrLater(look, landscape, blurDp, w, base.resources.displayMetrics.density) {
@@ -140,9 +118,8 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
     private val offset = FloatArray(2)
     private val baseOffset = FloatArray(2)
 
-    // where [view] is over the base, from where each is in their root view (its parents' places added
-    // up): no window asked twice a key a frame. False under a scaled or turned parent, or for views of
-    // two roots (asked of the window then)
+    // from where each is in their root view: no window asked twice a key a frame. False under a scaled or
+    // turned parent, or for views of two roots
     private fun offsetOf(view: View): Boolean {
         val root = inRoot(view, offset) ?: return false
         if (inRoot(base, baseOffset) !== root) return false
@@ -167,14 +144,11 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
         return at
     }
 
-    // not scaled or turned: its place is its parent's plus its own offset
     private fun View.plain() = scaleX == 1f && scaleY == 1f && rotation == 0f && rotationX == 0f && rotationY == 0f
 
     companion object {
-        /** Puts [host] where the views in [on] find it. */
         fun install(on: View, host: PictureHost?) = on.setTag(R.id.theme_picture_host, host)
 
-        /** The picture host [v] is over: the nearest of its parents that has one. */
         fun of(v: View): PictureHost? {
             var at: Any? = v
             while (at is View) {
@@ -186,7 +160,7 @@ class PictureHost(private val look: ThemeLook, val base: View, private val lands
     }
 }
 
-/** A drawable's paint of the picture: its shader made again only for another bitmap. */
+/** Its shader made again only for another bitmap. */
 class PicturePaint {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private var bitmap: Bitmap? = null
@@ -209,11 +183,6 @@ class PicturePaint {
     }
 }
 
-/**
- * The picture's part where its view is, blurred [blurDp] at [brightness] percent, [over] laid on it
- * (a colour, 0 none); [fallback] where there is no picture to show (one that does not read, or a view
- * over none). The keyboard's base, the bar's.
- */
 class ThemePictureDrawable(
     private val blurDp: Int,
     private val brightness: Int,
@@ -228,7 +197,6 @@ class ThemePictureDrawable(
         val view = callback as? View
         val host = view?.let { PictureHost.of(it) }
         if (host?.animated != null) {
-            // see-through to the picture playing under it
             host.seeThrough(brightness)?.let { canvas.drawRect(bounds, it) }
             if (over ushr 24 != 0) {
                 solid.color = over
@@ -257,10 +225,7 @@ class ThemePictureDrawable(
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 
     companion object {
-        /**
-         * Under [look]'s keyboard: its picture as cut for it, or the colour ([ThemeColors.board]); an
-         * animated one its still picture till its frames are decoded ([PictureHost.play]).
-         */
+        /** An animated one its still picture till its frames are decoded. */
         fun board(look: ThemeLook): Drawable {
             val color = ThemeColors.board(look.palette, look.keys)
             val p = look.picture

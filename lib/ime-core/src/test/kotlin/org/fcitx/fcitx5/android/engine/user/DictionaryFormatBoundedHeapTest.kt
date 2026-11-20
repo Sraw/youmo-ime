@@ -12,8 +12,7 @@ import java.io.InputStream
 
 /** Run alone in a 48 MB JVM (`boundedHeapTest`): a file of one line far past the heap is read without holding it. */
 class DictionaryFormatBoundedHeapTest {
-    // 100 MB of one JSON line, made as it is read: a line kept whole ran out of the heap (review of
-    // the dictionary import, fixed in 77ca9604)
+    // 100 MB of one JSON line, made as it is read: a line kept whole ran out of the heap
     private fun hugeLine(): InputStream = object : InputStream() {
         private val unit = "\"k\":\"v\",".toByteArray()
         private var left = 100L shl 20

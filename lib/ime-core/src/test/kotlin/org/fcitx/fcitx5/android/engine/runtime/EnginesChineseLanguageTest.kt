@@ -13,10 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/**
- * What handwriting and a table read by as pinyin does, the coarse words held back one list for them
- * all: made again once an added word drops the sessions, so a coarse word the user adds is theirs in each.
- */
+/** Handwriting and the tables share pinyin's coarse words, made again when an added word drops the sessions. */
 class EnginesChineseLanguageTest : EnginesFixture() {
 
     private val coarsePinyin = PinyinDataBuilder()
@@ -35,13 +32,10 @@ class EnginesChineseLanguageTest : EnginesFixture() {
     @Test
     fun aCoarseWordTheUserAddsIsPredictedInHandwritingAndATableMadeAfter() {
         val engines = Engines({ if (it == InputMethodCatalog.PINYIN_DATA) ByteBuffer.wrap(coarsePinyin) else load(it) }, null, warmUps = inPlace)
-        // the decoder's reading alone
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
-        // 小穴 never offered unasked
         assertEquals(listOf("小学"), engines.handwritten("好"))
         assertTrue(engines.addWord("小穴", "xiao xue"))
         assertEquals(listOf("小穴", "小学"), engines.handwritten("好"))
-        // a table's session, first made now, reads the same list
         engines.type(InputMethodCatalog.WUBI, "vbg")
         assertEquals(listOf("小穴", "小学"), engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.PICK, 0).candidates)
     }

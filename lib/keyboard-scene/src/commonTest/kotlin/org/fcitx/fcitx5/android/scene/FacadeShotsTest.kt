@@ -62,7 +62,7 @@ class FacadeShotsTest {
     // each environment as written reads back as itself: what the library builds in is the shot's
     @Test
     fun everyEnvironmentReadsBackAsItself() {
-        val envs = Shots.all.map { it.name to it.env } + Shots.popups.map { it.name to it.env }
+        val envs = Shots.drawn.map { it.name to it.env } + Shots.popups.map { it.name to it.env }
         val wrong = envs.filter { (_, env) -> EnvJson.read(FacadeShots.env(env)).ok() != env }.map { it.first }
         assertTrue(wrong.isEmpty(), "read back otherwise: $wrong")
     }

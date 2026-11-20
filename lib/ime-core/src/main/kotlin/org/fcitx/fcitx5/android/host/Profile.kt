@@ -5,33 +5,19 @@
 package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
-import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 
-/**
- * fcitx's `config/profile`, the input method groups (`InputMethodConfig`,
- * `fcitx/inputmethodconfig_p.h`): each group's name, layout, default input method and items, and
- * the group order, whose first is the current group. Read and written with fcitx's semantics, not
- * its bytes (design §2.1), so a file either writes is read the same by the other.
- *
- * [load] is `InputMethodManagerPrivate::loadConfig` (`fcitx/inputmethodmanager.cpp:82-140`); [text]
- * is `InputMethodManager::save` (`:427-454`).
- */
+/** fcitx's `config/profile` (`InputMethodConfig`), with fcitx's semantics, not its bytes: either writes a file the other reads the same. */
 class Profile private constructor(val groups: List<Group>, val order: List<String>) {
 
     data class Item(val name: String, val layout: String = "")
 
     data class Group(val name: String, val defaultLayout: String, val defaultInputMethod: String, val items: List<Item>)
 
-    /** The current group, the order's first. */
     val current: Group get() = groups.first { it.name == order.first() }
 
-    /** The current group as the host switches on it. */
     fun currentGroup(): ImGroup = current.let { ImGroup.of(it.name, it.items.map(Item::name), it.defaultInputMethod) }
 
-    /**
-     * This with the current group's input methods and default as [group] has them: what fcitx's
-     * `setGroup` keeps of a group (its items' layouts, by name; its default layout) and saves.
-     */
+    /** As fcitx's `setGroup` keeps a group: its items' layouts, by name; its default layout. */
     fun with(group: ImGroup): Profile {
         val old = current
         val layouts = old.items.associate { it.name to it.layout }
@@ -39,47 +25,9 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
         return Profile(groups.map { if (it.name == old.name) updated else it }, order)
     }
 
-    /** What [mergeNineKeys] made: the [profile], pinyin's keyboard, and whether anything [changed] or [both] were on (the user told). */
-    data class Merged(val profile: Profile, val pinyin: ImKeyboard, val changed: Boolean, val both: Boolean)
-
-    /**
-     * This with 0.4's 九键拼音 merged into pinyin in every group ([NineKeysMerge.group]), pinyin's
-     * keyboard [pinyin] as set: the current group's says which keyboard pinyin shows (one with
-     * neither, the first group with 九键拼音 and no pinyin), any group's with both on that the user is told. Read with
-     * [NineKeysMerge.OLD] among the input methods [load] keeps, or it is dropped before this.
-     */
-    fun mergeNineKeys(pinyin: ImKeyboard): Merged {
-        var keyboard: ImKeyboard? = null
-        // a group with 九键拼音 and no pinyin: says the keyboard where the current group has neither
-        var alone: ImKeyboard? = null
-        var both = false
-        var changed = false
-        val merged = groups.map { group ->
-            val out = NineKeysMerge.group(group.items.map(Item::name), group.defaultInputMethod, pinyin) ?: return@map group
-            changed = true
-            both = both || out.both
-            if (group.name == order.first()) keyboard = out.pinyin
-            if (alone == null && group.items.none { it.name == InputMethodCatalog.PINYIN }) alone = out.pinyin
-            val layouts = group.items.associate { it.name to it.layout }
-            // pinyin keeps its own layout, else 九键拼音's
-            val layoutOf = { name: String -> layouts[name] ?: layouts[NineKeysMerge.OLD].orEmpty() }
-            // the default by ImGroup's rule again: pinyin first now, it is the second
-            val default = ImGroup.of(group.name, out.items, out.defaultIm).defaultInputMethod
-            group.copy(defaultInputMethod = default, items = out.items.map { Item(it, layoutOf(it)) })
-        }
-        // the current group's pinyin (26 or 14 keys) as it was; with none, the one of a group that had only 九键拼音
-        val shown = keyboard ?: if (current.items.any { it.name == InputMethodCatalog.PINYIN }) pinyin else alone ?: pinyin
-        return Merged(Profile(merged, order), shown, changed, both)
-    }
-
-    /** What [retireHandwriting] made: the [profile]; whether anything [changed]; whether pinyin [moved] first where handwriting was. */
     data class Retired(val profile: Profile, val changed: Boolean, val moved: Boolean)
 
-    /**
-     * This with 0.6.0's handwriting input method gone from every group ([HandwritingRetire.group]), pinyin
-     * first where it was first. Read with [HandwritingRetire.OLD] among the input methods [load] keeps, or
-     * it is dropped before this (a group of it alone gone with it).
-     */
+    /** 0.6.0's handwriting gone from every group, pinyin first where it was first; [load] must keep [HandwritingRetire.OLD] for this to see it. */
     fun retireHandwriting(): Retired {
         var changed = false
         var moved = false
@@ -93,13 +41,7 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
         return Retired(Profile(retired, order), changed, moved)
     }
 
-    /**
-     * The file as fcitx writes it (`writeAsIni`, `fcitx-config/iniparser.cpp:102-148`), through
-     * [IniFile]: a value equal to its option's default (the empty string for all of these) is
-     * implicit, written as a comment (`# Layout=`), so it reads as unset; the descriptions fcitx
-     * writes above each are left out, as fcitx skips every comment it reads. Groups in their order,
-     * then the order.
-     */
+    /** `writeAsIni`: a value equal to its default ("" for all) is implicit, written as a comment (`# Layout=`); descriptions left out. */
     fun text(): String {
         val tree = ConfigTree()
         fun ConfigTree.put(key: String, value: String) = get(key).also {
@@ -131,16 +73,10 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
         private const val DEFAULT_IM = "DefaultIM"
         private const val GROUP_ORDER = "GroupOrder"
 
-        /** `native-lib`'s layout for every group it makes (`native-lib.cpp:199`) and fcitx's default group's. */
+        /** `native-lib`'s layout for every group it makes, and fcitx's default group's. */
         const val DEFAULT_LAYOUT_US = "us"
 
-        /**
-         * `loadConfig`: [text] (null: no file) read; a group with no name or no default layout is
-         * skipped, an item not [available] dropped, a group left empty removed, each group's default
-         * set by [ImGroup]'s rule; the order is the file's (groups it does not name after it, unknown
-         * names dropped), or the groups' when it has none. No valid group: fcitx's default one,
-         * [defaultName] (its translated "Default") holding `keyboard-us` (`buildDefaultGroup`, `:142-162`).
-         */
+        /** `loadConfig`: invalid groups and unavailable items dropped, empty groups removed; no valid group: [defaultName] holding `keyboard-us`. */
         @Suppress("LoopWithTooManyJumpStatements")
         fun load(text: String?, available: Set<String>, defaultName: String): Profile {
             val values = text?.let(::read).orEmpty()
@@ -155,8 +91,7 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
                     val ours = InputMethodCatalog.fromUpstream(im)
                     Item(ours, values["$path/$ITEMS/$i/$LAYOUT"].orEmpty()) to (ours != im)
                 }
-                // a second group of the name is the first's: `groups_.emplace` keeps the first, the
-                // second's items appended to its list, its layout and default set over the first's
+                // a second group of the name is the first's: `groups_.emplace` keeps the first, the second's items appended, its layout and default over
                 val existing = groups[name]
                 val merged = ArrayList(existing?.items.orEmpty())
                 // upstream's name beside the engine's own (a list half moved over), either first: listed once
@@ -176,14 +111,14 @@ class Profile private constructor(val groups: List<Group>, val order: List<Strin
             return Profile(groups.values.toList(), named + groups.keys.filter { it !in named })
         }
 
-        /** fcitx's default group (`buildDefaultGroup`, `inputmethodmanager.cpp:147-162`): [name], `keyboard-us` alone. */
+        /** `buildDefaultGroup`. */
         fun default(name: String) = Profile(listOf(Group(name, DEFAULT_LAYOUT_US, "", listOf(Item(ImGroup.KEYBOARD_US)))), listOf(name))
 
-        // a vector option's items, `0`, `1`, … till the first missing (`marshallfunction.h:70-88`)
+        // a vector option's items, `0`, `1`, … till the first missing
         private fun indexes(values: Map<String, String>, path: String): List<Int> =
             generateSequence(0) { it + 1 }.takeWhile { i -> values.keys.any { it.startsWith("$path/$i/") || it == "$path/$i" } }.toList()
 
-        // `readFromIni` (`fcitx-config/iniparser.cpp:58-101`), [IniFile]'s: values by path
+        // `readFromIni`: values by path
         internal fun read(text: String): Map<String, String> = IniFile.read(text).leaves()
     }
 }

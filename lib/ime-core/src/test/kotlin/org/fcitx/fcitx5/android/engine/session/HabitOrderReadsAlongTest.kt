@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
@@ -27,13 +28,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/**
- * [HabitOrder.readsAlong] reads each word at its place once an order and walks the code read whole only where it must:
- * held to what it did before, every word of a candidate walked on the graph without slips (061-sp-abbrev §3.6: 简拼 in
- * the middle is no slip, kept), on random keys of 全拼, 小鹤 and 自然码 (简拼 in the middle on, on the grouped keyboards
- * too), the nine keys, tapped anywhere on their keys, the decoder's candidates, each cut short and each with a word kept
- * as typed in its place.
- */
+/** [HabitOrder.readsAlong] reads each word at its place and walks only where it must, on random keys of every keyboard. */
 class HabitOrderReadsAlongTest {
 
     private val data = pinyinDataOf(
@@ -65,8 +60,7 @@ class HabitOrderReadsAlongTest {
         return true
     }
 
-    // readsAlong without its walk past text kept as typed: a word read over no slip taken to read along
-    // [whole] wherever it starts. Where this says yes and [walked] no, only that walk tells them apart
+    // readsAlong without its walk past text kept as typed
     private fun trustingPastKept(graph: SyllableGraph, whole: SyllableGraph, c: Candidate): Boolean {
         var from = whole.start
         for (i in c.words.indices) {
@@ -151,7 +145,7 @@ class HabitOrderReadsAlongTest {
             // 双拼: any letters, nearly every pair a syllable and every key an initial
             val keys = (1..random.nextInt(3, 10)).map { 'a' + random.nextInt(26) }.joinToString("")
             for (s in shuangpin) check("双拼", s, keys, touches(keys, TouchBoxes.QWERTY, random), counts)
-            // 双拼's grouped keyboards and zhuyin's (061-neighbour-groups): their slips read otherwise as the others'
+            // 双拼's grouped keyboards and zhuyin's: their slips read otherwise as the others'
             for ((letters, board) in grouped) {
                 val codes = keys.map(letters::key).joinToString("")
                 check("双拼分组", groupedShuangpin.getValue(letters), codes, touches(codes, board, random), counts)
@@ -168,17 +162,12 @@ class HabitOrderReadsAlongTest {
         for (kind in listOf("全拼", "九键", "双拼", "双拼分组", "注音")) assertTrue("${counts.slipped[kind]} $kind graphs with a slip", (counts.slipped[kind] ?: 0) > 150)
         assertTrue("${counts.read} of ${counts.candidates} read", counts.read > 5000 && counts.read < counts.candidates)
         assertTrue("${counts.pastKept} read past text kept as typed", counts.pastKept > 200)
-        // and ones that read only if the word after text kept as typed is not walked again. Fewer since 双拼's keys read
-        // alone count as read otherwise no longer, only slips do (061-sp-abbrev §3.6): the bound of 500 counted 双拼's random
-        // keys, nearly every one a graph with keys alone; the slipped graphs of every kind are what is left (R27 F8559)
         assertTrue("${counts.onlyWalked} told apart by the walk past text kept as typed", counts.onlyWalked > 40)
     }
 
-    // a word over keys nothing reads slipped is not read: on a long input most are, and reading every one of
-    // every candidate took most of what the nine keys' slips cost a key (061-nine-perf-impl-report)
+    // on a long input most words are over keys nothing reads slipped, and reading them all cost most of a key
     @Test
     fun onlyTheWordsOverKeysReadSlippedAreRead() {
-        // 我们在家里 and 99, its second 9 tapped at its top, toward 6: wo (T9-68)
         val keys = "womenzaijiali".map { NineKeyLetters.STANDARD.key(it) }.joinToString("") + "99"
         val touches = Array<Touch?>(keys.length) { TouchBoxes.tap(TouchBoxes.NINE, keys[it]) }
         touches[keys.length - 1] = TouchBoxes.tap(TouchBoxes.NINE, '9', dy = -0.42f)
@@ -202,9 +191,6 @@ class HabitOrderReadsAlongTest {
         assertTrue("${readings.read} read, ${over.size} over the slip", readings.read <= over.size)
     }
 
-    // the skip takes each word for one the graph reads at its place, as every candidate an order ranks is (the decoder's,
-    // or one walked on the graph there): a word it does not read, over keys nothing reads slipped, is taken to read
-    // along unread. Before, it was read and the candidate turned away. No such candidate comes from the session
     @Test
     fun aWordOverKeysNothingReadsOtherwiseIsTakenToReadThereUnread() {
         // 你 (64) and 99, its second 9 tapped toward 6: a slip at the end only
@@ -215,7 +201,6 @@ class HabitOrderReadsAlongTest {
         assertTrue("a slip read", graph.hasSlips && graph.readsSlipWithin(2, 4) && !graph.readsSlipWithin(0, 2))
         val whole = graph.withoutSlips()
         val ta = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == "他" }
-        // 他 (82) over 64
         val c = Candidate("他", 2, 0f, intArrayOf(ta), intArrayOf(2))
         assertEquals("walked, it does not read", false, walked(whole, c))
         val readings = HabitOrder.Readings()
@@ -223,12 +208,10 @@ class HabitOrderReadsAlongTest {
         assertEquals(0, readings.read)
     }
 
-    // on the grouped keyboards nearly every place has a key read alone (061-sp-abbrev §3.1): those are no slips, so
-    // with no tap's place no candidate is read at all, as before the keys alone were read there
+    // keys read alone are no slips, so with no tap's place nothing is read
     @Test
     fun keysReadAloneOnlyReadNoCandidate() {
         val letters = NineKeyLetters.NINE_SP
-        // 小鹤 xm: 下面 by x and m alone, then 我们在家里 in whole syllables
         val keys = ("xm" + "womfzdjxli").map(letters::key).joinToString("")
         val graph = GroupedShuangpinSegmenter(ShuangpinScheme.XIAOHE, letters, neighbours = true).segment(keys, null, null)
         assertTrue("keys read alone", graph.hasAbbreviations && !graph.hasSlips)

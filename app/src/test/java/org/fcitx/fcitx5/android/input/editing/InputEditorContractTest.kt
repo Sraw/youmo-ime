@@ -17,16 +17,9 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * Holds [FakeEditor] to the behaviour of the editor it stands in for.
- *
- * Every `EditingSession` test trusts the fake to behave like a real editor; if it drifts, those
- * tests keep passing while asserting things no editor does. Here each scenario runs twice --
- * once on the fake, once on AOSP's real `BaseInputConnection` over an `Editable` (what a plain
- * `EditText` hands an input method), reached through the production [InputConnectionEditor] --
- * and the resulting text, selection, composing region and return values must be identical.
- *
- * To model a new editor behaviour, add a scenario here first; the real side says what the fake
- * has to do.
+ * Holds [FakeEditor] to AOSP's `BaseInputConnection` over an `Editable` (through [InputConnectionEditor]): each
+ * scenario runs on both and text, selection, composing region and return values must match. A new editor
+ * behaviour gets a scenario here first.
  */
 @RunWith(RobolectricTestRunner::class)
 open class InputEditorContractTest {
@@ -41,19 +34,16 @@ open class InputEditorContractTest {
     private interface Subject {
         val editor: InputEditor
 
-        /** Where a random sequence records what the editor returned along the way. */
         var returned: MutableList<String>
         fun outcome(returned: List<String>): Outcome
 
-        /** The app's own edit of [from, to) to [text], not the keyboard's ([FakeEditor.appReplace]). */
         fun appReplace(from: Int, to: Int, text: String)
 
-        /** The app's: the composing span dropped, the text kept ([FakeEditor.appDropSpan]). */
         fun appDropSpan()
     }
 
     private class Fake(text: String, selStart: Int, selEnd: Int) : Subject {
-        private val fake = FakeEditor(text, selStart, reselectsZeroAfterInsert = Build.VERSION.SDK_INT > 29) // run at 29 and 35 only; 30-34 unverified
+        private val fake = FakeEditor(text, selStart, reselectsZeroAfterInsert = Build.VERSION.SDK_INT > 29) // 30-34 unverified
             .apply { reportSelection(selStart, selEnd) }
         override val editor: InputEditor = fake
         override var returned = mutableListOf<String>()
@@ -104,7 +94,7 @@ open class InputEditorContractTest {
         val ops: Subject.(returned: MutableList<String>) -> Unit,
     )
 
-    private val wave = String(Character.toChars(0x1F44B)) // one code point, two UTF-16 units
+    private val wave = String(Character.toChars(0x1F44B))
     private val high = wave[0]
     private val low = wave[1]
 
@@ -122,7 +112,7 @@ open class InputEditorContractTest {
         )
     }
 
-    // what each commit returned compared too: a long paste's pieces go on by it (EditingSession.commitText)
+    // return values compared too: a long paste's pieces go on by them
     @Test
     fun commitText() = run(
         listOf(
@@ -237,14 +227,13 @@ open class InputEditorContractTest {
             Scenario("an emoji after", "${wave}a", 0) { editor.deleteSurroundingText(0, 1, true) },
             Scenario("mixed", "x${wave}b$wave", 6) { editor.deleteSurroundingText(3, 0, true) },
             Scenario("more than there is", "a$wave", 3) { editor.deleteSurroundingText(9, 9, true) },
-            // the editor widens the deletion by its own composing region
             Scenario("around a composition", "a${wave}bc${wave}d", 4) {
                 editor.setComposingRegion(3, 4)
                 editor.deleteSurroundingText(1, 1, true)
             },
             Scenario("a composition before the cursor, an emoji before it", "a${wave}bcde", 7) {
                 editor.setComposingRegion(3, 5)
-                // the editor deletes from the composition's start, 4 units before the cursor
+                // from the composition's start, 4 units before the cursor
                 editor.deleteSurroundingText(1, 0, true)
             },
             Scenario("the cursor inside a composition, emoji on both sides", "${wave}bcd$wave", 3) {
@@ -257,7 +246,6 @@ open class InputEditorContractTest {
         )
     )
 
-    /** Malformed text: what the real editor does with a surrogate that has lost its partner. */
     @Test
     fun deleteSurroundingTextInCodePointsWithLoneSurrogates() = run(
         listOf(
@@ -297,7 +285,6 @@ open class InputEditorContractTest {
         )
     )
 
-    // the app's edits around the keyboard's composing text (061-code-in-field §8): where its span goes
     @Test
     fun appEdits() = run(
         listOf(
@@ -314,10 +301,6 @@ open class InputEditorContractTest {
         ),
     )
 
-    /**
-     * Random sequences of every operation, text with surrogate pairs and the odd lone surrogate,
-     * positions in and out of range. Seeded, so a failure names a reproducible sequence.
-     */
     @Test
     fun randomSequences() {
         val random = kotlin.random.Random(20260923)
@@ -358,7 +341,6 @@ open class InputEditorContractTest {
         run(scenarios)
     }
 
-    /** The same contract at API 29, the app's minSdk. */
     @Config(sdk = [29])
     class AtMinSdk : InputEditorContractTest()
 }

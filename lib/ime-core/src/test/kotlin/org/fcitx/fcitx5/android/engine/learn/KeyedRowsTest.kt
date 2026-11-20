@@ -19,12 +19,10 @@ class KeyedRowsTest {
         )
         assertEquals(3, rows.size)
         val (first, second, whole) = rows
-        // no word before a pick (U-28, U-29), no reading (D28)
         assertEquals(Code(Kinds.HANDWRITING, "人入八"), first.code)
         assertEquals("", first.prev)
         assertEquals(Row.PICK, first.flags)
         assertEquals(Words.of("人"), first.words)
-        // another than the first shown: corrected
         assertEquals(Row.PICK or Row.CORRECTED, second.flags)
         assertEquals('B', second.how)
         assertEquals("夫", second.shown)
@@ -33,11 +31,10 @@ class KeyedRowsTest {
         assertEquals("高", whole.prev)
         assertEquals(listOf("人", "天"), whole.words.list.map { it.text })
         assertEquals('B', whole.how)
-        // nothing put in, nothing learned
         assertEquals(emptyList<Row>(), KeyedRows.of(Kinds.table("engine-wubi"), emptyList(), emptyList(), ""))
     }
 
-    // review C N4: a table no input method's (ime-eval's) has no kind to file it under
+    // a table no input method's (ime-eval's) has no kind to file it under
     @Test
     fun noKindNoRows() {
         assertEquals(emptyList<Row>(), KeyedRows.of("", listOf(KeyedRows.Pick("a", "工", 'A', "工")), listOf(Word("工", "")), ""))

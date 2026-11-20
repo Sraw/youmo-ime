@@ -10,7 +10,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 
-/** A language picked in the phone's settings is told apart from the phone's own, and named. */
 class AppLanguageTest {
 
     private fun tagOf(tag: String) = AppLanguage.tagOf(Locale.forLanguageTag(tag))

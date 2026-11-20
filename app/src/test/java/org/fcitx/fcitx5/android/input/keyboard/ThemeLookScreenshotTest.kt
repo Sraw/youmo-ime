@@ -29,14 +29,8 @@ import java.io.File
 import org.fcitx.fcitx5.android.uat.TestStyles
 
 /**
- * Theme file 3.0 drawn (§4.2 of dev/design/051-d3-theme-maker.md): five sample themes, light and
- * dark, on every keyboard and in every mode. A few are goldens (src/test/screenshots/
- * ThemeLookScreenshotTest), a regression for the keys' faces, the picture and the bar; the whole
- * set, for the eye, with `-PthemeShots=<dir>`.
- *
- * The images are made in ThemeLookSamples: a picture of bands and rings (where a key's part of it is shows), a
- * nine-slice key with a thick frame (a stretched corner shows), a letter of each hue. A font file
- * is none: the font sample's keys and candidates are drawn in monospace, as a font read would be.
+ * The five sample themes on every keyboard and mode: a few are goldens, the whole set for the eye with
+ * `-PthemeShots=<dir>`. The pictures show where a key's part is and a stretched corner shows.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -58,7 +52,6 @@ class ThemeLookScreenshotTest {
     @Before
     fun setUp() {
         ThemeAssets.clear()
-        // decoded at once on this thread: each shot has its images in
         ThemeAssets.runner = { it.run() }
         ThemeAssets.poster = { it.run() }
         ThemeAssets.decoder = object : ThemeAssets.Decoder by realDecoder {
@@ -89,10 +82,8 @@ class ThemeLookScreenshotTest {
         Board("symbols"),
     )
 
-    // [golden] under src/test/screenshots, compared; the set's every shot into [shots] when asked
     private fun shoot(theme: Theme.Custom, board: Board, mode: String, golden: Boolean) {
         if (!golden && shots == null) return
-        // the 注音 keyboards' 简繁 hint not said
         prefs.set(org.fcitx.fcitx5.android.data.prefs.AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         KeyboardHarness(theme, keyboards = board.keyboards).use { h ->
             h.start(board.inputType)
@@ -101,15 +92,13 @@ class ThemeLookScreenshotTest {
                 h.idle()
             }
             val name = "${theme.name}_${board.name}_$mode"
-            // a picture not made ahead (a floating keyboard's blur) is asked for at the first draw and comes in
-            // from the decode thread, the view told after: drawn once, then shot as the next frame shows it
+            // a picture not made ahead (a floating keyboard's blur) comes in from the decode thread after the first draw
             h.inputView.draw(android.graphics.Canvas(android.graphics.Bitmap.createBitmap(maxOf(1, h.inputView.width), maxOf(1, h.inputView.height), android.graphics.Bitmap.Config.ARGB_8888)))
             h.idle()
             if (golden) h.capture("ThemeLookScreenshotTest/$name", h.inputView)
             shots?.let { save(h, h.inputView, File(it, "$name.png")) }
             // ⌫ held: its own pressed colour, not its face darkened
             if (golden && theme.name.startsWith("each_key") && board.name == "full") {
-                // a finger down on it, whichever draws it (the field is empty: lifted, nothing deleted)
                 h.press(h.keyNamed("backspace"))
                 h.capture("ThemeLookScreenshotTest/${name}_backspace_down", h.inputView)
                 h.release()
@@ -136,7 +125,6 @@ class ThemeLookScreenshotTest {
     @Uat("ST-52")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
     fun everyThemeOnEveryKeyboard() = everyTheme("port") { s, _, b ->
-        // each sample on the 26 keys light and dark; the one of each key's image on every keyboard light
         b.name == "full" || s.name == "each_key"
     }
 

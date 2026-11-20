@@ -12,12 +12,7 @@ import org.fcitx.fcitx5.android.scene.theme.Radius
 import org.fcitx.fcitx5.android.scene.theme.ShapePath
 import kotlin.math.min
 
-/**
- * Where a key's layers go in its cell: [face] (null: none drawn), the [shadow] under it, its border's
- * width and [line] (the border's middle, half its width inside the face), the [pressed] layer,
- * [content], what its text and marks are placed in (the cell less its inset, whatever the face's
- * shape, less its [depth] band), and [depth], its cap's band under the face (null: none).
- */
+/** [content] is what text and marks are placed in: the cell less its inset, whatever the face's shape, less its [depth]. */
 class FaceGeometry(
     val face: Shape?,
     val shadow: Shape?,
@@ -29,19 +24,9 @@ class FaceGeometry(
 )
 
 /**
- * Rules B §2 (ime-core's KeyFaceGeometry, copied here as the theme's values): the face is the cell
- * less its `inset` (theme 3.0's gap), rounded by `radius` but no more than half its shorter side;
- * the shadow is the face drawn down by its offset, kept within the cell (never on the row below).
- * A `bar` (the flat space) is the cell less 10 dp a side and as much top and bottom as leaves it 26 dp,
- * 16 dp at most; a `circle` (the flat Return) is as wide as the cell's shorter side, 35 dp at most,
- * in its middle. A key whose layout says `face="none"` draws no face (its pressed layer still shows);
- * `face="default"` on flat keys is a rectangle whatever the theme's shape (theme 3.0: only the space
- * and Return, `face="special"`, were a bar or a circle).
- *
- * 060-render-p3 T4b: a `path(…)` is drawn in the cell less its inset (its 0–1 that box's), its curves
- * straight edges no more than [ShapePath.TOLERANCE] px off; its shadow the face moved, each point kept
- * in the cell. A `depth` takes that much off the face's bottom (the face, its content, its pressed
- * layer up as much) and draws the face moved down by it, under it, as the cap's side.
+ * Rules B §2 (ime-core's KeyFaceGeometry): the face is the cell less its inset, rounded no more than half its shorter
+ * side; the shadow is the face moved, kept within the cell (never on the row below). A `depth` takes that much off the
+ * face's bottom and draws the face moved down by it, under it, as the cap's side.
  */
 object Faces {
     const val SPACE_MIN_HEIGHT_DP = 26.0
@@ -56,15 +41,13 @@ object Faces {
         val plain = face == Face.Default && flat
         val shape = if (plain) "rect" else look.shape
         val path = look.path?.takeIf { !plain }
-        // the cap's depth, px: no more than half the face; a rectangle's or a path's (the flat space's bar and
-        // Return's circle are no caps), and a face of none has none
+        // the flat space's bar and Return's circle are no caps
         val capped = face != Face.None && (path != null || shape !in listOf("bar", "circle"))
         val depth = if (capped) min(look.depth * density, maxOf(0.0, inner.height / 2)) else 0.0
         val top = inner.inset(0.0, 0.0, 0.0, depth)
-        // a path only in a box of some size: one turned inside out (an inset past the cell) would draw it mirrored, out of the cell
+        // one turned inside out (an inset past the cell) would draw it mirrored, out of the cell
         val faceShape: Shape = path?.takeIf { top.hasSize }?.flatten(top) ?: rect(shape, cell, top, look, density)
         val drawn = faceShape.takeIf { face != Face.None && it.bounds.hasSize }
-        // the cap: the face's outline moved down by the depth (a path's, or the rectangle the face is up from)
         val cap = drawn?.takeIf { depth > 0 }?.moved(0.0, depth)
         val shadow = drawn?.let { shadow(if (cap == null) it else outline(it, cap), look, cell, density) }
         val border = if (drawn == null) 0.0 else look.border.width * density
@@ -72,7 +55,6 @@ object Faces {
         return FaceGeometry(drawn, shadow, border, faceShape, top, line, cap)
     }
 
-    // a face of [shape]: the flat space's bar, Return's circle, else the rectangle [top] rounded
     private fun rect(shape: String, cell: Box, top: Box, look: KeyLook, density: Double): Shape.Rect = when (shape) {
         "bar" -> {
             val h = SPACE_H_INSET_DP * density
@@ -89,7 +71,6 @@ object Faces {
         else -> Shape.Rect(top, radii(look.radius, top, density))
     }
 
-    // what casts the shadow, moved by its offset and kept in the cell (never on the row below); none where it is none
     private fun shadow(whole: Shape, look: KeyLook, cell: Box, density: Double): Shape? {
         val s = look.shadow.takeIf { it.dx != 0.0 || it.dy != 0.0 || it.blur != 0.0 } ?: return null
         if (s.color == null) return null
@@ -99,12 +80,7 @@ object Faces {
         }
     }
 
-    /**
-     * The middle of a border [width] px wide along [face]: half its width in, so all of it is inside. A
-     * rectangle's box less half the width a side, its corners as much smaller; a path's ([path], drawn in
-     * [box]) drawn again in [box] less half the width a side (the same outline a little smaller: its edges
-     * half the width in where they run along the box, about as much elsewhere).
-     */
+    /** Half its width in, so all of it is inside; a path's drawn again in [box] less half the width a side. */
     fun line(face: Shape, width: Double, path: ShapePath?, box: Box): Shape {
         val w = width / 2
         return when {
@@ -114,14 +90,12 @@ object Faces {
         }
     }
 
-    // a face and its cap, what casts the shadow: a rectangle the two boxes'; a path its cap's (one outline, not
-    // two overlapping, which even-odd would leave a hole in), the face over the rest of it
+    // a path its cap's (one outline, not two overlapping, which even-odd would leave a hole in), the face over the rest
     private fun outline(face: Shape, cap: Shape): Shape = when (face) {
         is Shape.Rect -> Shape.Rect(face.box.union(cap.bounds), face.radii)
         is Shape.Path -> cap
     }
 
-    // [p] with each point kept in [box]: a path's shadow never on the row below
     private fun within(p: Shape.Path, box: Box) = Shape.Path(
         p.ops.map {
             when (it) {
@@ -132,7 +106,6 @@ object Faces {
         },
     )
 
-    /** [r] in px for [box]: each corner no more than half its shorter side, none where it has no size. */
     fun radii(r: Radius, box: Box, density: Double): List<Double> {
         val max = maxOf(0.0, min(box.width, box.height) / 2)
         return if (r.half) List(CORNERS) { max } else r.corners.map { (it * density).coerceIn(0.0, max) }

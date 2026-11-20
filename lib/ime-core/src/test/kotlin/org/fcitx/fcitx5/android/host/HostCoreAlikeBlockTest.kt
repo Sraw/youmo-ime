@@ -20,11 +20,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The host's side of a long press's acts (KotlinHost.learning hands the engines
- * [HostCore.actOnCandidate]): under 繁體, a block of 国 on the stroke lookup's second page takes
- * 國 too, each found by its index of all and checked by its text; nothing else (review R3).
- */
+/** Under 繁體, a block of 国 on the stroke lookup's second page takes 國 too, each found by index and checked by text. */
 class HostCoreAlikeBlockTest : EnginesFixture() {
 
     private val fillers = "甲乙丙丁戊己庚辛壬癸".map { it.toString() }
@@ -46,7 +42,7 @@ class HostCoreAlikeBlockTest : EnginesFixture() {
         val modules = ChineseModules(
             ModuleInputs(PunctuationProfile.parse(""), chttransEnabled = setOf(InputMethodCatalog.PINYIN), converter = { converter }),
         )
-        val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+        val profile = testProfile()
         val core = HostCore(EnginesHost(engines), clock, profile, firstRun = true, modules = modules::build)
         core.events += HostEvents { log += it }
         core.activate(1)

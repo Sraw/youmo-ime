@@ -29,7 +29,7 @@ class CandidateBarHeightTest {
 
     @Test
     fun theThemesHeightScalesTheBarNotItsReadings() {
-        // 060-render-p3 T6b: `bar height=` of the bar 候选字号 gives, rounded; the readings' line added as it is
+        // `bar height=` of the bar 候选字号 gives, rounded; the readings' line added as it is
         assertEquals(40, CandidateBarHeight.dp(20, ReadingStyle.OFF, 100.0))
         assertEquals(48, CandidateBarHeight.dp(20, ReadingStyle.OFF, 120.0))
         assertEquals(32, CandidateBarHeight.dp(20, ReadingStyle.OFF, 80.0))

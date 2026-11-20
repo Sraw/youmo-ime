@@ -6,15 +6,11 @@ package org.fcitx.fcitx5.android.engine.data
 
 import org.fcitx.fcitx5.android.core.FcitxUtils
 
-/**
- * Spaces, tabs and a stray carriage return. Deliberately not [Char.isWhitespace]: that includes
- * the ideographic space U+3000, which code tables list as a character to type.
- */
+/** Space, tab, stray CR. Not [Char.isWhitespace]: that includes U+3000, which code tables list as a character. */
 fun Char.isSeparator() = this == ' ' || this == '\t' || this == '\r'
 
 fun String.trimSeparators() = trim { it.isSeparator() }
 
-/** [isSeparator]-separated fields; a run of separators counts as one. */
 fun String.fields(): List<String> {
     val out = ArrayList<String>(4)
     var start = -1
@@ -30,23 +26,12 @@ fun String.fields(): List<String> {
     return out
 }
 
-/**
- * [value] as fcitx writes one with spaces, quotes or line breaks in it: quoted, `\` escaping a
- * quote, a backslash or one of `n f r t v`, any other character escaped standing for itself.
- * Unchanged if it is not quoted, or a quote ends it early: then the quotes are its own, where
- * fcitx's [FcitxUtils.unescapeForValue], which quick phrases are read with, calls it no value.
- */
+/** Unquotes [value] as fcitx does; unchanged if unquoted or a quote ends it early (where [FcitxUtils.unescapeForValue] gives null). */
 fun unescapeValue(value: String): String = FcitxUtils.unescapeForValue(value) ?: value
 
-/** [value] as fcitx's `escapeForValue` writes it, which [unescapeValue] reads back. */
 fun escapeValue(value: String): String = FcitxUtils.escapeForValue(value)
 
-/**
- * [line] cut into values as fcitx's `consumeMaybeEscapedValue` cuts it at `FCITX_WHITESPACE`,
- * which libime's text dictionaries are read by: a value starting with a quote runs, unescaped, to
- * the quote closing it (what follows it starts the next value), and one whose quote never closes
- * is taken as it is, to the next whitespace, quote and all.
- */
+/** Splits [line] as fcitx's `consumeMaybeEscapedValue`: a quoted value runs unescaped to its close; one never closed is taken to the next whitespace. */
 fun splitValues(line: String): List<String> {
     val out = ArrayList<String>(4)
     val value = StringBuilder()

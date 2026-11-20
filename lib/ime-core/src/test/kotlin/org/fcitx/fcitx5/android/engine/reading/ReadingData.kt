@@ -11,11 +11,7 @@ import org.fcitx.fcitx5.android.engine.data.ToneSources
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.nio.ByteBuffer
 
-/**
- * Pinyin data with a few characters' readings as Unihan's five fields list them (pinyin-data's text,
- * in the order the app's build reads them) and words reading them: 行's four, 和's many, 子 zi beside zǐ,
- * 了 le and liǎo, 能 néng and nài.
- */
+/** Pinyin data with a few characters' readings as Unihan lists them: 行, 和, 子, 了, 能. */
 object ReadingData {
 
     private val SOURCES = listOf(
@@ -121,9 +117,7 @@ object ReadingData {
             Triple("银", "yin", -3f), Triple("江", "jiang", -3f), Triple("还是", "hai shi", -3f),
             // the model's, not a dictionary's: two words run together, commoner than 和平 but no example
             Triple("荣和", "rong he", -2f),
-            // 了 and 能, a polyphone each (A5): 了 le alone, liǎo in 了解
             Triple("好了", "hao le", -2.6f), Triple("了解", "liao jie", -3f), Triple("了", "le", -1.5f), Triple("能", "neng", -2f),
-            // the model's alone, yet what puts 长's zhǎng before cháng
             Triple("长大", "zhang da", -2f),
         ).forEach { (w, r, p) -> b.unigram(w, p, 0f).entry(w, syl(*r.split(' ').toTypedArray())) }
         // a word the model has after 行 and 银行: something offered once either is put in; and a polyphone after 江

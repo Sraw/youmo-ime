@@ -6,22 +6,15 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
-/**
- * 0.6.0's 手写 (`engine-handwriting`), an input method of its own, gone in 0.6.1: handwriting is the
- * toolbar's 手写, written over the letters of whichever input method is on (061-handwriting-toolbar §6).
- * Where it was first of a group, pinyin takes its place (moved there, or added where it was not on), so
- * the keyboard a user opens to is a Chinese one still; elsewhere it is dropped. Run at every read of the
- * profile ([Profile.retireHandwriting]), as [NineKeysMerge]: a 0.6.0 backup restored is read the same way.
- */
+/** 0.6.0's 手写 input method, gone: first in a group, pinyin takes its place; elsewhere dropped. Run at every profile read, so old backups too. */
 object HandwritingRetire {
 
-    /** 0.6.0's handwriting input method, as a user's profile may still name it. */
     const val OLD = InputMethodCatalog.HANDWRITING_RETIRED
 
-    /** A group after it: its [items] and [defaultIm]; [moved], pinyin put first where handwriting was. */
+    /** [moved]: pinyin put first where handwriting was. */
     data class Outcome(val items: List<String>, val defaultIm: String, val moved: Boolean)
 
-    /** The group of [items] and [defaultIm] without [OLD]; null where it has none. */
+    /** Null where it has none. */
     fun group(items: List<String>, defaultIm: String): Outcome? {
         if (OLD !in items) return null
         val moved = items.first() == OLD
@@ -36,14 +29,10 @@ object HandwritingRetire {
         return Outcome(out, default, moved)
     }
 
-    /** chttrans' `EnabledIM` without [OLD] ([enabled]); [lost], handwriting was turned traditional and nothing took that over. */
+    /** [lost]: handwriting was traditional and nothing took that over. */
     data class Traditional(val enabled: Set<String>, val lost: Boolean)
 
-    /**
-     * chttrans' list [enabled] without [OLD] (no input method of that name any more); null where it has none.
-     * Where pinyin took handwriting's first place ([moved]) it takes its 繁体 too, the user writing on the same
-     * first keyboard as before (the user's Q12); elsewhere what is written follows the input method written over.
-     */
+    /** Null where it has none; where pinyin took handwriting's place ([moved]) it takes its 繁体 too. */
     fun traditional(enabled: Set<String>, moved: Boolean): Traditional? {
         if (OLD !in enabled) return null
         val rest = enabled - OLD

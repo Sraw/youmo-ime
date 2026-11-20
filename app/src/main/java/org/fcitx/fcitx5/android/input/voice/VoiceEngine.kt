@@ -38,10 +38,9 @@ import java.io.File
 import java.io.IOException
 
 /**
- * The streaming recognizer (X-ASR's 1920 ms streaming transducer, its encoder fine-tuned for
- * accented Mandarin; 060-voice-tagger.md §4.4) and the polish tagger ([VoicePolisher]): read in
- * once, which takes a second or two and some 400 MB, and kept while voice input is in use; let go a
- * while after the talk ends, so that coming back to it soon is instant and the memory is not held all day.
+ * The streaming recognizer and the polish tagger ([VoicePolisher]): read once (a second or two, some
+ * 400 MB) and kept while voice is in use; let go a while after the talk ends, so coming back soon is
+ * instant without holding the memory all day.
  */
 object VoiceEngine {
 
@@ -51,36 +50,26 @@ object VoiceEngine {
     const val WINDOW = 512
 
     /**
-     * Zeros after the last of the speech so the last chunk is decoded: a chunk (1.92 s) and half a
-     * second more. Measured 2026-11-11 (voice-eval seg_app.py ENDPOINTS=1, six sets, 1448 clips): CER
-     * and the last character lost as with 2.92 s (6.96% vs 6.97%, 8.84% vs 8.91%), while a second
-     * chunk, ~600 ms of decoding on a Snapdragon 845, is run after ~19% of stops instead of ~45%;
-     * 2.05 s lost the last character more often (10.36%). The owner's choice.
-     * Changing this requires raising voice.minVersion (app/packs.properties): it holds only for the
-     * pack's encoder chunk, and an older pack would still be Ready (voice-1, decided 2026-11-13).
+     * Zeros after the speech so the last chunk (1.92 s) is decoded, plus half a second; shorter lost the
+     * last character more often. Changing it requires raising voice.minVersion (app/packs.properties): it
+     * holds only for the pack's encoder chunk, and an older pack would still be Ready.
      */
     const val TAIL_PADDING = SAMPLE_RATE * 242 / 100
 
     private const val DIR = "voice"
     private const val KEEP_MS = 2 * 60 * 1000L
-    // the encoder's chunk (1.92 s of audio) on a OnePlus 6T (Snapdragon 845, four big cores), voice-eval bench/stream_bench
-    // 2026-11-14: 350 ms on 1 thread, 226 on 2, 181 on 3, 189 on 4 (an encoder in 0.96 s chunks, measured and not taken:
-    // 198, 133, 110, 117); 4 is no faster, and 3 leaves a big core to the UI (one fewer than the cores on a smaller phone)
+    // on a Snapdragon 845, 4 threads are no faster than 3, and 3 leave a big core to the UI
     private val THREADS = minOf(3, Runtime.getRuntime().availableProcessors() - 1).coerceAtLeast(1)
-    // hypotheses kept: the n-best VoiceRerank ranks again, as measured (seg_app.py)
+    // the n-best VoiceRerank ranks again
     private const val BEAM = 16
 
-    /**
-     * The recognizer and the tagger, if it loaded (none: the text as recognized, cleaned), read
-     * from the voice pack in [dir].
-     */
+    /** [polisher] null: the text as recognized, cleaned. */
     class Models(val recognizer: OnlineRecognizer, val polisher: VoicePolisher?, val dir: File?)
 
     /**
-     * The recognizer's calls, every listener's, one at a time: a talk's tail still decoding and the
-     * next talk's stream made on the same recognizer (which keeps its last graph of hotwords) never run
-     * at once. Only that: a listener's decode suspends (awaiting audio, the engine's answers), and
-     * another's may run in between, interleaved on this one thread.
+     * Every listener's recognizer calls, one at a time: a talk's tail still decoding and the next talk's
+     * stream on the same recognizer (which keeps its last hotword graph) never run at once. Decodes
+     * suspend, so listeners still interleave on this one thread.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     val decoder: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
@@ -109,13 +98,10 @@ object VoiceEngine {
         spareVad.clear()
     }
 
-    /**
-     * The models, read in if they are not, from the voice pack (AppData: PackUnavailableException
-     * without it); on a worker thread. [release] when done with them.
-     */
+    /** On a worker thread; PackUnavailableException without the voice pack. [release] when done. */
     fun acquire(): Models = synchronized(lock) {
         main.removeCallbacks(letGo)
-        // a voice pack imported since they were read: the new one's, once no talk holds the old
+        // a voice pack imported since: the new one's, once no talk holds the old
         val dir = PackStore.dir(PackKind.VOICE)
         if (modelsOutdated(users, models?.dir, models != null, dir)) unload()
         // counted before the load: offerVad, reading it without the lock, keeps the VAD for this talk
@@ -128,13 +114,13 @@ object VoiceEngine {
         }
     }
 
-    // the pack's files by their paths: sherpa-onnx maps the .ort ones (lib/sherpa-onnx README)
+    // sherpa-onnx maps the .ort files by their paths (lib/sherpa-onnx README)
     private fun load(dir: File?): Models {
-        val recognizer = OnlineRecognizer(null, config())
+        val recognizer = OnlineRecognizer(config())
         val polisher = try {
             polisher()
         } catch (@Suppress("TooGenericExceptionCaught") t: Throwable) {
-            // an Error from the tagger (out of memory, a library not linked): the recognizer just made not left to its finalizer
+            // an Error from the tagger (out of memory, a library not linked): the recognizer not left to its finalizer
             recognizer.release()
             throw t
         }
@@ -156,47 +142,35 @@ object VoiceEngine {
     }
 
     /**
-     * A stream to recognize a hold in, listening for the user's [words] (VoiceHotwords.ofUser)
-     * besides the pack's, its search never completing a word they blocked, even within a longer
-     * one. With hotwords of theirs, the recognizer builds its graph of hotwords, the pack's 78
-     * thousand too, only when they differ from the last stream's (it keeps that graph): a tenth of a
-     * second or more.
+     * Its search never completes a word the user blocked, even inside a longer one. With user hotwords the
+     * recognizer rebuilds its graph (the pack's 78 thousand too) only when they differ from the last
+     * stream's: a tenth of a second or more.
      */
     fun stream(recognizer: OnlineRecognizer, words: VoiceHotwords.Words): OnlineStream = when {
-        // the blocked words and 生僻字屏蔽's characters (design 061-rare-char-block §5.3)
+        // the blocked words and 生僻字屏蔽's characters
         words.searchBlocked.isNotEmpty() -> recognizer.createStream(words.hotwords, words.searchBlocked)
         words.hotwords.isNotEmpty() -> recognizer.createStream(words.hotwords)
         else -> recognizer.createStream()
     }
 
-    /**
-     * A segment's text, the recognizer's [result] at its endpoint: of its hypotheses, the one
-     * [VoiceChoice] chooses with [language], one with no character 生僻字屏蔽 holds first; the blocked
-     * words were blocked in the search already.
-     */
+    /** Of its hypotheses, the one [VoiceChoice] chooses, one with no 生僻字屏蔽 character first; blocked words were cut in the search. */
     suspend fun choose(result: OnlineRecognizerResult, words: VoiceHotwords.Words, language: VoiceChoice.Language): String {
         val heard = VoiceChoice.Heard(result.nbest.toList(), result.nbestScores, result.text)
         return VoiceChoice.choose(heard, words.blockedWords, language, held = words::holds) { heard }
     }
 
-    /**
-     * the words the user added and made (VoiceHotwords.ofUser), read again for each listener; with
-     * [habits] off (U-93's 用我的输入习惯) none of theirs, the blocked still blocked
-     */
+    /** Read again for each listener; with [habits] off (用我的输入习惯) none of the user's, the blocked still blocked. */
     suspend fun userHotwords(fcitx: HostConnection, habits: Boolean = true): VoiceHotwords.Words {
-        // not cancelled with the wait: a read that comes late is still remembered for the next listener
-        // one read at a time: a hold while one is still waiting on a busy engine waits on it too
-        // read with habits on: shared and remembered, it serves later listeners whose switch may differ;
-        // each listener's own switch is applied below
+        // not cancelled with the wait: a late read is remembered for the next listener. One read at a time,
+        // with habits on: shared, it serves listeners whose switch differs; each applies its own below
         val read = remembered.shared<Deferred<VoiceHotwords.Words>>({ it.isActive }) { ticket ->
             reading.async {
-                // the homophones made of the same words, at once: their words are the hotwords'
-                // their failing costs the homophones only, never the hotwords
+                // the homophones' failure costs the homophones only, never the hotwords
                 val chars = recognizerChars()
                 val words = fcitx.runOnReady {
                     userWords().let { all ->
-                        // 生僻字屏蔽: a word of the user's with a character held back neither listened for nor put
-                        // in for what was heard; the recognizer's characters held never completed (design §5.3)
+                        // 生僻字屏蔽: a user word with a held-back character is neither listened for nor put in; held characters are
+                        // never completed
                         val held = rareHeld(all.map { it.text } + chars)
                         val w = VoiceHotwords.unheld(all, held)
                         val homophones = try {
@@ -217,9 +191,7 @@ object VoiceEngine {
         return inTimeOrLast(read, remembered, USER_WORDS_MS).withHabits(habits).also { Timber.d("voice hotwords: %d listened for, %d blocked", it.hotwords.split('/').count { w -> w.isNotEmpty() }, it.blockedWords.size) }
     }
 
-    // the recognizer's Chinese characters, each a token of its own (tokens.txt: a token and its id a
-    // line), read once from the voice pack: what 生僻字屏蔽 may have to keep the search from; none without the pack
-    // (again for a pack put in since: a file of another time)
+    // each a token of its own (tokens.txt), read once from the voice pack; again for a pack put in since
     @Volatile private var tokenChars: Pair<Long, List<String>>? = null
 
     private fun recognizerChars(): List<String> = try {
@@ -241,10 +213,7 @@ object VoiceEngine {
     // a failed read is the awaiting listener's to log (its Deferred), not this scope's
     private val reading = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /**
-     * The pinyin engine's [VoiceChoice.Language], each answer in time or none: no boundaries
-     * (VoiceBlocking takes a text as having the word), no scores (the recognizer's order).
-     */
+    /** Each answer in time or none: no boundaries (VoiceBlocking takes a text as having the word), no scores. */
     fun language(fcitx: HostConnection) = object : VoiceChoice.Language {
         override suspend fun boundaries(texts: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
@@ -259,15 +228,13 @@ object VoiceEngine {
     // the engine busy or starting: the text as heard, not a wait
     private const val LANGUAGE_MS = 1000L
 
-    // a VAD made ahead (the talk's start, beside the models) or kept from the last opening: the
-    // press waits on no model read (dev/design/voice-start-latency.md). Lock-free: under [lock] the
-    // capture thread would wait out a whole model load (VoiceSpare); let go with the models
+    // made ahead or kept from the last opening, so the press waits on no model read. Lock-free: under [lock]
+    // the capture thread would wait out a whole model load (VoiceSpare)
     private val spareVad = VoiceSpare<Vad> { it.release() }
 
-    /** One for this microphone opening: the spare if there is one, else made now. */
     fun takeVad(): Vad = spareVad.take() ?: vad()
 
-    /** [vad], done with, kept for the next opening (its state cleared) or let go if one is kept. */
+    /** Kept for the next opening (its state cleared), or let go if one is kept. */
     fun offerVad(vad: Vad) {
         @Suppress("TooGenericExceptionCaught")
         try {
@@ -278,31 +245,25 @@ object VoiceEngine {
             vad.release()
             return
         }
-        // no talk holding the models and none loaded (they failed): let go now, no letGo would clear it.
-        // Read without the lock: a talk loading its models (seconds) is counted in users already
+        // none loaded (they failed): let go now, no letGo would. Read without the lock: a loading talk is counted in users
         val clears = spareVad.clears
         spareVad.offer(vad, wanted = users > 0 || models != null, clearsBefore = clears)
-        // letGo may have run between the read and the keep: not left without an owner until the next talk
-        // (a talk starting meanwhile at worst makes its VAD anew)
+        // letGo may have run between the read and the keep: not left ownerless until the next talk
         if (users == 0 && models == null) spareVad.clear()
     }
 
-    /** The spare let go if no talk holds the models: one made for a talk whose models failed to load. */
+    /** One made for a talk whose models failed to load. */
     fun letGoVadIfIdle() = synchronized(lock) {
         if (users == 0) spareVad.clear()
     }
 
-    /** A spare VAD made, if there is none; off the main thread. A failure, an Error too, is [failed]'s. */
+    /** Off the main thread. A failure, an Error too, is [failed]'s. */
     fun prepareVad(failed: (Throwable) -> Unit) {
         spareVad.tryBuild({ vad() }, failed)
     }
 
-    /**
-     * silero VAD for one microphone opening (VoiceQuiet): the threshold that kept the soft speech
-     * measured (0.2; 0.5 lost half of it at -58 dBFS), segments as sherpa-onnx's defaults.
-     */
+    /** Threshold 0.2: 0.5 lost half the soft speech at -58 dBFS. Segments as sherpa-onnx's defaults. */
     private fun vad() = Vad(
-        null,
         VadModelConfig(
             sileroVadModelConfig = SileroVadModelConfig(model = path("silero_vad.onnx"), threshold = VAD_THRESHOLD, windowSize = WINDOW),
             sampleRate = SAMPLE_RATE,
@@ -313,7 +274,6 @@ object VoiceEngine {
     private const val VAD_THRESHOLD = 0.2f
     private const val RULE2_SILENCE_S = 1.2f
 
-    // a voice pack file's path; without the pack, PackUnavailableException
     private fun path(name: String) = AppData.file("$DIR/$name").path
 
     private fun config() = OnlineRecognizerConfig(
@@ -329,9 +289,7 @@ object VoiceEngine {
             modelingUnit = "bpe",
             bpeVocab = path("bpe.vocab"),
         ),
-        // a segment ends where its rules say, its hypotheses carried over (lib/sherpa-onnx README):
-        // sherpa-onnx's defaults, rule2 (silence after text) as measured, 1.2 s (the C++ and
-        // Python default, voice-eval's); the Kotlin API's default is 1.4 s
+        // rule2 (silence after text) at 1.2 s, the C++ and Python default; the Kotlin API's default is 1.4 s
         enableEndpoint = true,
         endpointConfig = EndpointConfig(rule2 = EndpointRule(true, RULE2_SILENCE_S, 0.0f)),
         // hotwords and the n-best need the beam search
@@ -342,18 +300,12 @@ object VoiceEngine {
     )
 }
 
-/**
- * The models read are another pack's than the one installed now ([dir]: a voice pack imported since) and no talk holds
- * them: let go, to be read anew from [dir].
- */
 internal fun modelsOutdated(users: Int, loadedDir: File?, loaded: Boolean, dir: File?): Boolean =
     users == 0 && loaded && loadedDir != dir
 
 /**
- * [read]'s words in [ms], or [remembered]'s last read where it took longer, failed or was
- * cancelled from elsewhere (its scope ending); the caller cancelled stays cancelled ([cancelledElsewhereAs]).
- * A failed read falls back as a late one does: before, it reached the listener's fallback of no
- * words, so a word the user blocked was typed (voice-6).
+ * [remembered]'s last read where [read] took longer, failed or was cancelled from elsewhere; a cancelled
+ * caller stays cancelled ([cancelledElsewhereAs]). A failed read once fell back to no words, typing a blocked word.
  */
 @VisibleForTesting
 internal suspend fun inTimeOrLast(read: Deferred<VoiceHotwords.Words>, remembered: VoiceHotwords.Remembered, ms: Long): VoiceHotwords.Words {
@@ -369,7 +321,7 @@ internal suspend fun inTimeOrLast(read: Deferred<VoiceHotwords.Words>, remembere
             }
         }
     }
-    // a timeout was silent: the user's words were dropped and nothing said so
+    // say so: the user's words are dropped
     if (inTime == null) Timber.w("voice hotwords: no answer in %d ms or the read cancelled, the last read used", ms)
     return remembered.inTime(inTime)
 }

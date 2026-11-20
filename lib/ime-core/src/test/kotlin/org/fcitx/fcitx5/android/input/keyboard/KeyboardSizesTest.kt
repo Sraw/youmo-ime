@@ -23,7 +23,7 @@ class KeyboardSizesTest {
     fun aThemeWithoutASizeIsTheDefaultLevels() {
         // 851 px high upright, 393 on its side
         assertEquals(851 * 30 / 100, following.heightPx(851, landscape = false, density = 1f, large = false))
-        // turned, 标准's four rows of 48 dp, whatever the screen's height (061-landscape-height §5.1)
+        // turned, 标准's four rows of 48 dp, whatever the screen's height
         assertEquals(4 * 48, following.heightPx(393, landscape = true, density = 1f, large = false))
         assertEquals(0.0, following.sidePaddingDp(false), 0.0)
         assertEquals(0.0, following.bottomPaddingDp(true), 0.0)
@@ -34,7 +34,7 @@ class KeyboardSizesTest {
     fun theThemeSetsAHeight() {
         val sizes = following.copy(theme = themed)
         assertEquals((851 * 0.38).toInt(), sizes.heightPx(851, landscape = false, density = 1f, large = false))
-        // the theme's landscape 52 is a level, between 标准 (49, 48 dp) and 高 (55, 54 dp): 51 dp a row (the user's Q8)
+        // the theme's landscape 52 is a level between 标准 (49, 48 dp) and 高 (55, 54 dp): 51 dp a row
         assertEquals(4 * 51, sizes.heightPx(393, landscape = true, density = 1f, large = false))
         assertEquals(8.0, sizes.sidePaddingDp(false), 0.0)
         assertEquals(48.0, sizes.sidePaddingDp(true), 0.0)
@@ -69,7 +69,7 @@ class KeyboardSizesTest {
     @Test
     @Uat("PR-61")
     fun floatingKeepsThePercentOf060() {
-        // 061-landscape-height §5.4: floating's base is 0.6.0's, the level's percent of the short side
+        // floating's base is 0.6.0's, the level's percent of the short side
         assertEquals(393 * 49 / 100, following.percentHeightPx(393, 851, landscape = true))
         assertEquals(673 * 49 / 100, following.percentHeightPx(841, 673, landscape = true))
         assertEquals(851 * 30 / 100, following.percentHeightPx(851, 393, landscape = false))

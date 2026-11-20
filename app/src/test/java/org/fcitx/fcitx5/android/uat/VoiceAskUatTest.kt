@@ -27,12 +27,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 语音先问再记, the app's side (061-voice-learn-from-edits.md): a talk's text, all in, told to the engine with what
- * is before the cursor then; what goes in after reported; the engine's ask shown as a notice with 记住, its 撤销
- * after; the switch and the counts. What the engine follows and decides: VoiceEditsTest, EnginesVoiceEditsTest
- * (`lib/ime-core`); here [FakeHostApi.voiceAsk] says what it asks.
- */
+/** 语音先问再记, the app's side; what the engine follows and decides is ime-core's, here [FakeHostApi.voiceAsk] says what it asks. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -45,7 +40,6 @@ class VoiceAskUatTest : VoiceTapUat() {
 
     private val xujing = VoiceEdits.Ask("徐婧", "xu jing", "徐静", replaces = null, hint = false)
 
-    // a talk of [said], tapped on and off
     private fun talk(said: String) {
         tapMic()
         voice.said += said
@@ -53,7 +47,6 @@ class VoiceAskUatTest : VoiceTapUat() {
         h.idle()
     }
 
-    // the engine's commit of [text] (徐婧 typed into the gap)
     private fun typed(text: String) {
         h.field.text.let { it.delete(it.length - text.length, it.length) }
         h.emit(HostEvent.Commit(text, -1))
@@ -100,7 +93,7 @@ class VoiceAskUatTest : VoiceTapUat() {
             "记住: added by hand, said so with 撤销" to {
                 button(string(R.string.voice_ask_remember_action))
                 assertTrue(h.api.calls.toString(), "addUserWord(徐婧, xu jing)" in h.api.calls)
-                // the word added drops the engine's sessions: what the bar showed of the old one cleared (review 16)
+                // the word added drops the engine's sessions: what the bar showed of the old one cleared
                 assertTrue(h.api.calls.toString(), h.api.calls.lastIndexOf("reset()") > h.api.calls.indexOf("addUserWord(徐婧, xu jing)"))
                 assertEquals(listOf(string(R.string.voice_ask_remembered, "徐婧"), string(R.string.learning_undo)), h.noticeTexts())
                 assertEquals(1 to 1, counts())
@@ -193,7 +186,6 @@ class VoiceAskUatTest : VoiceTapUat() {
     fun aTalkThatPutsNothingInLeavesTheLastFollowed() {
         start()
         talk("我找徐静")
-        // tapped on and off, nothing said
         tapMic()
         tapMic()
         h.idle()

@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** The empty clipboard's page: its icon and words 16 dp apart, as before the icon could shrink (R26 F8363: 32 dp). */
+/** The empty clipboard's icon and words 16 dp apart, as before the icon could shrink. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class ClipboardInstructionUiTest {

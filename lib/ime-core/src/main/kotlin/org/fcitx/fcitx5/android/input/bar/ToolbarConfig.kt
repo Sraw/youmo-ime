@@ -4,69 +4,51 @@
  */
 package org.fcitx.fcitx5.android.input.bar
 
-/**
- * The buttons the bar above the keyboard may have besides its menu key. The menu key and [More]
- * are always there (the ⋯ panel is the way to the settings and to fcitx's own toggles), so not
- * the user's to set. [key] is what the preference stores: never renamed.
- */
+/** The bar's optional buttons; the menu key and [More] are always there. [key] is stored: never rename it. */
 enum class ToolbarButton(val key: String) {
     Undo("undo"),
     Redo("redo"),
     CursorMove("cursor_move"),
     Clipboard("clipboard"),
 
-    /** The ⋯ panel (StatusAreaWindow): fixed, the toolbar's last, never in [ToolbarConfig.items] */
+    /** Fixed, the toolbar's last, never in [ToolbarConfig.items]. */
     More("more"),
     Emoji("emoji"),
 
-    /** Never in a password field: nothing said out loud goes into one */
+    /** Never in a password field: nothing said out loud goes into one. */
     Voice("voice"),
     Hide("hide"),
 
-    // the ⋯ panel's own, the same actions there and here
-    /** chttrans's 简繁, where the input method has it */
     TradSimp("trad_simp"),
     Floating("floating"),
 
-    /** Not where the keyboard floats, as in the panel; split, it goes one-handed over the split (061-wide-keyboard-style §3.3) */
+    /** Not where the keyboard floats; split, it goes one-handed over the split. */
     OneHanded("one_handed"),
     Habits("habits"),
     ClearRecent("clear_recent"),
     Theme("theme"),
     InputMethodSettings("input_method_settings"),
 
-    /** 键盘: the input method's keyboards to pick from (KeyboardPicker), where it has a choice */
     Keyboard("keyboard"),
 
-    /** 快速输入, as a long press on 符 opens it */
     QuickPhrase("quick_input"),
 
-    /**
-     * 手写: written over the letters of the input method in use, on or off (061-handwriting-toolbar); not in
-     * English nor a password field
-     */
+    /** Not in English nor a password field. */
     Handwriting("handwriting");
 
     companion object {
         fun ofKey(key: String) = entries.firstOrNull { it.key == key }
 
-        /** The ones the user sets: all but the fixed [More] */
         val settable get() = entries.filter { it != More }
     }
 }
 
-/**
- * Which buttons the bar has and where, as the user set them in one list: the ones before
- * [DIVIDER] on the toolbar the menu key opens, the ones after it on the bar's right whenever
- * it is idle; each shown or not. Every settable [ToolbarButton] is in it once, so a button added
- * in a later version comes in hidden, before the divider ([parse]), the bar as the user left it.
- */
+/** One list: before [DIVIDER] the toolbar, after it the bar's right. A button new in a later version comes in hidden before the divider. */
 data class ToolbarConfig(val items: List<Item>) {
 
     sealed interface Item {
         data class Button(val button: ToolbarButton, val shown: Boolean) : Item
 
-        /** Where the toolbar's buttons end and the always-there ones begin */
         data object Divider : Item
     }
 
@@ -77,12 +59,7 @@ data class ToolbarConfig(val items: List<Item>) {
         }
     }
 
-    /**
-     * What the bar has in [situation]: the toolbar's, then the fixed ⋯ at its end; every one shown after the divider
-     * at the right, however narrow the bar (the user's call, 2026-11-15: never one left out, [Layout.slots]). 手写 where
-     * it is not written (English, a password field) keeps its place, [Layout.unavailable]: nothing moves as 中/英
-     * switch (the user's call, 2026-11-15). No divider: all on the toolbar.
-     */
+    /** Every one after the divider shows however narrow the bar; an unavailable 手写 keeps its place so nothing moves on 中/英. */
     fun layout(situation: Situation): Layout {
         val divider = items.indexOf(Item.Divider).takeIf { it >= 0 } ?: items.size
         fun shown(range: List<Item>) = range.filterIsInstance<Item.Button>()
@@ -95,17 +72,12 @@ data class ToolbarConfig(val items: List<Item>) {
         )
     }
 
-    /** What the keyboard is in, for the buttons that are of use only in some. */
     data class Situation(
-        /** not in a password field (0.5.x: and a voice build) */
         val voice: Boolean,
-        /** the input method has chttrans's 简繁 */
         val tradSimp: Boolean,
-        /** not floating */
         val oneHanded: Boolean,
-        /** the input method has keyboards to choose from */
         val keyboards: Boolean,
-        /** handwriting may be written: not a password field, not English (HandwritingMode.offered); else greyed in its place */
+        /** Not a password field nor English (HandwritingMode.offered); else greyed in its place. */
         val handwriting: Boolean = true,
     ) {
         fun offers(button: ToolbarButton) = when (button) {
@@ -118,21 +90,15 @@ data class ToolbarConfig(val items: List<Item>) {
         }
     }
 
-    /**
-     * This with 手写 shown first of the buttons at the right (after the divider), whatever the user had of it:
-     * once, as 0.6.0's handwriting input method or 键盘手写 becomes it (KotlinHost, AppPrefs), so it is there to tap.
-     */
+    /** 手写 shown first at the right, once, as 0.6.0's handwriting input method becomes it (KotlinHost, AppPrefs). */
     fun withHandwritingPinned(): ToolbarConfig {
         val rest = items.filterNot { it is Item.Button && it.button == ToolbarButton.Handwriting }
-        // none but where made so (parse puts one in): the bar's right begins after the rest, 手写 alone there
+        // none but where made so (parse puts one in): 手写 alone at the right
         val divider = rest.indexOf(Item.Divider).takeIf { it >= 0 } ?: return ToolbarConfig(rest + Item.Divider + Item.Button(ToolbarButton.Handwriting, true))
         return ToolbarConfig(rest.subList(0, divider + 1) + Item.Button(ToolbarButton.Handwriting, true) + rest.subList(divider + 1, rest.size))
     }
 
-    /**
-     * This with 手写 shown at the bar's right after 表情 (where [DEFAULT] has it; first there without 表情): for a bar
-     * arranged before 手写 was there to choose ([handwritingNeverOffered]).
-     */
+    /** For a bar arranged before 手写 was offered ([handwritingNeverOffered]): after 表情, as [DEFAULT] has it. */
     fun withHandwritingOffered(): ToolbarConfig {
         val rest = items.filterNot { it is Item.Button && it.button == ToolbarButton.Handwriting }.toMutableList()
         if (Item.Divider !in rest) rest += Item.Divider
@@ -142,29 +108,18 @@ data class ToolbarConfig(val items: List<Item>) {
         return ToolbarConfig(rest)
     }
 
-    /**
-     * [toolbar] in the middle when it is opened, [pinned] at the right, after the middle; [unavailable] in their place
-     * all the same, drawn greyed, a tap saying why.
-     */
+    /** [unavailable] drawn greyed in their place, a tap saying why. */
     data class Layout(
         val toolbar: List<ToolbarButton>,
         val pinned: List<ToolbarButton>,
         val unavailable: Set<ToolbarButton> = emptySet(),
     ) {
-        /**
-         * Nothing of the toolbar's to show here, none ticked or none of use ([layout]; a greyed 手写 holds its slot, so
-         * counts): the menu key is ⋯ itself, a tap opening its panel, the toolbar never opened, 默认展开工具栏 of no
-         * effect (the user's call, 2026-11-15).
-         */
+        /** Nothing of the toolbar's to show: the menu key is ⋯ itself. */
         val moreOnly: Boolean get() = toolbar.all { it == ToolbarButton.More }
 
         /**
-         * The bar of [rowPx] split into slots of one width (the user's call, 2026-11-15): as many as fit at about
-         * [preferredPx] (a bar button's own), the menu key in the first, [pinned] in the last, the toolbar open or shut
-         * alike, so nothing moves nor changes width as it opens. Never fewer than the menu key, [pinned] and
-         * [MIDDLE_SLOTS] between: a narrow bar (the floating keyboard's) has its slots narrower, every one at the right
-         * kept. Open, the toolbar's in the slots between, ⋯ last; those with no slot left are in ⋯'s panel, none
-         * scrolled. Not laid out yet ([rowPx] 0): [preferredPx] wide, all on the toolbar.
+         * Equal slots of about [preferredPx]: menu key first, [pinned] last, at least [MIDDLE_SLOTS] between, open or
+         * shut alike so nothing moves. Toolbar buttons with no slot go to ⋯'s panel. [rowPx] 0 (not laid out): all on the toolbar.
          */
         fun slots(rowPx: Int, preferredPx: Int): Slots {
             if (rowPx <= 0 || preferredPx <= 0) return Slots(0, preferredPx, toolbar, emptyList())
@@ -177,29 +132,17 @@ data class ToolbarConfig(val items: List<Item>) {
         }
     }
 
-    /**
-     * The bar split into [count] slots [cellPx] wide (what is left over, less than a slot, after the toolbar's);
-     * [toolbar] the open toolbar's, ⋯ last; [overflow] the toolbar's with no slot, in ⋯'s panel in this order.
-     */
+    /** [overflow]: the toolbar's with no slot, in ⋯'s panel in this order. */
     data class Slots(val count: Int, val cellPx: Int, val toolbar: List<ToolbarButton>, val overflow: List<ToolbarButton>)
 
     companion object {
         const val DIVIDER = "|"
 
-        /**
-         * The least slots between the menu key and the right's: shut, a clipboard suggestion's or a sum's room; open,
-         * one of the toolbar's and ⋯.
-         */
+        /** Shut, room for a clipboard suggestion or a sum; open, one toolbar button and ⋯. */
         const val MIDDLE_SLOTS = 2
         private const val HIDDEN = "-"
 
-        /**
-         * The bar as it always was: what v0.4 had, and the panel's others hidden on the toolbar. 快速输入
-         * among them, first: one to add, not on the bar till the user ticks it (the user's call,
-         * 2026-11-02; 符's long press and the gestures' command open it as ever). A bar the user
-         * arranged gets it hidden too, as any button added later ([parse]). 手写 at the right among the
-         * always-there ones (the user's call, 061-handwriting-toolbar Q2).
-         */
+        /** 快速输入 comes hidden, first on the toolbar, as any button added later; 手写 at the right. */
         val DEFAULT = ToolbarConfig(
             listOf(ToolbarButton.Undo, ToolbarButton.Redo, ToolbarButton.CursorMove, ToolbarButton.Clipboard)
                 .map { Item.Button(it, true) } +
@@ -211,11 +154,7 @@ data class ToolbarConfig(val items: List<Item>) {
                 listOf(ToolbarButton.Emoji, ToolbarButton.Handwriting, ToolbarButton.Voice, ToolbarButton.Hide).map { Item.Button(it, true) }
         )
 
-        /**
-         * [raw] as [serialize] wrote it; empty (never set) is [DEFAULT]. A key not known (from a
-         * later version) or twice is dropped, and so is ⋯ (fixed); a button missing is put in hidden
-         * before the divider.
-         */
+        /** Empty is [DEFAULT]; an unknown or repeated key, and ⋯, dropped; a missing button put in hidden before the divider. */
         fun parse(raw: String): ToolbarConfig {
             if (raw.isEmpty()) return DEFAULT
             val items = mutableListOf<Item>()
@@ -233,11 +172,8 @@ data class ToolbarConfig(val items: List<Item>) {
         }
 
         /**
-         * Whether [raw], a bar the user arranged, is one from before 手写 was on the list to choose: 0.6.0's, no 手写 in
-         * it (parse adds it hidden, as any button added later, but this one the user's call has on the bar, 2026-11-15);
-         * or, [firstLook] (the first start of a version with this), 0.6.1's first test build's, where the settings page
-         * wrote it unticked before the divider, as parse put it in. One the user took off since it was there to choose
-         * (unticked at the right, or moved) stays so. Empty: never arranged, [DEFAULT] has it.
+         * Whether a user-arranged [raw] predates 手写 on the list: 0.6.0's (none in it), or with [firstLook] the first
+         * test build's (unticked before the divider). One the user moved or unticked since stays so.
          */
         fun handwritingNeverOffered(raw: String, firstLook: Boolean): Boolean {
             if (raw.isEmpty()) return false

@@ -111,7 +111,7 @@ class LayoutImportTest {
         assertEquals("label-long", bad.errors.single().key)
     }
 
-    // the number keyboard's and the symbol panel's (L5): taken with no warning, the number one for 123's pad and a phone's
+    // the number keyboard's and the symbol panel's: taken with no warning
     @Test
     @Uat("ST-170", "ST-172")
     fun theUatsPanelLayoutsAreTakenWithNoWarning() {
@@ -124,8 +124,7 @@ class LayoutImportTest {
         assertEquals(emptyList<LayoutCheck.Finding>(), symbols.report.warnings)
     }
 
-    // the settings UAT's layout of names (uat/fixtures/layouts/uat-names.layout, 061-custom-layout §9, L6): taken, its
-    // WE's 下滑 told (the 18 keys' is used) and not among what it types; its own key's 哈 and long press are
+    // the UAT's uat-names.layout: taken, its WE's 下滑 told (the 18 keys' is used) and not among what it types
     @Test
     @Uat("ST-188")
     fun theUatsLayoutOfNamesIsTakenItsHeldKeyTold() {
@@ -134,7 +133,7 @@ class LayoutImportTest {
         assertEquals(listOf("哈", "哈哈", "嘿"), ok.commits)
     }
 
-    // L8: a split row with 8 keys to halve, taken with that one warning, its count and the scene told
+    // a split row with 8 keys to halve, taken with that one warning
     @Test
     @Uat("ST-180")
     fun theUatsSplitRowThatCannotBeHalvedIsTakenWithAWarning() {

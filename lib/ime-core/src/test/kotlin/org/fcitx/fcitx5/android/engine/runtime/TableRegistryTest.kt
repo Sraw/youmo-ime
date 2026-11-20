@@ -26,10 +26,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.util.concurrent.Executor
 
-/**
- * The user's words as [TableRegistry] codes them for a table, below what a session makes of them,
- * and what a table forgets of what is forgotten elsewhere ([TableRegistry.forgetInTables]).
- */
+/** The user's words as [TableRegistry] codes them for a table, and what a table forgets ([TableRegistry.forgetInTables]). */
 class TableRegistryTest : EnginesFixture() {
 
     // wired as Engines wires it: the merged dictionaries coded from their file, into an index of the table's
@@ -57,13 +54,9 @@ class TableRegistryTest : EnginesFixture() {
         assertTrue(lexicon.addWord("好你", "hao ni"))
         assertTrue(lexicon.addWord("你好", "li hao"))
         assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
-        // once is the registry's own doing, nothing the user sees: a session shows a text once however often
-        // it is offered (EnginesTest's ...OfferedOnce). Twice would be the word coded again and ranked twice on each key
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
     }
 
-    // review R2 L5: what a table leaves out as blocked everywhere is a word of Chinese; an emoji
-    // blocked in pinyin's reading (👍🏻 for hao) is no table's word blocked
     @Test
     fun anEmojiBlockedInPinyinIsNoWordATableLeavesOut() {
         val now = Executor { it.run() }
@@ -75,11 +68,10 @@ class TableRegistryTest : EnginesFixture() {
         assertTrue(lexicon.isBlocked("👍🏻"))
         assertFalse(shared.blocked("👍🏻"))
         assertTrue(shared.blocked("你好"))
-        // a Latin word blocked in pinyin is hidden in a table too, as before (review R3)
         assertTrue(shared.blocked("ao"))
     }
 
-    // D8 / TBL-12: 一二's vava is 七上八下's alone, which commits itself; 你好's wqvb the table has nothing under
+    // 一二's vava is 七上八下's alone, which commits itself; 你好's wqvb the table has nothing under
     @Test
     fun aWordWhoseCodeATableCommitsAloneIsToldWithThatWord() {
         val now = Executor { it.run() }
@@ -89,13 +81,12 @@ class TableRegistryTest : EnginesFixture() {
         val wubi = WUBI
         val words = listOf("一二", "你好", "一")
         assertEquals(mapOf("一二" to "七上八下"), registry.sameCode(wubi, TableOptions.WUBI, words))
-        // nothing commits itself: every word is offered
         assertEquals(emptyMap<String, String>(), registry.sameCode(wubi, TableOptions.WUBI.copy(autoSelect = false), words))
     }
 
     @Test
     fun theListedWordsAreCodedInTheBackgroundAndTillThenATableHasAddedOnesOnly() {
-        // F2443: the pending state, on a queued executor rather than in place
+        // the pending state, on a queued executor rather than in place
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("你好 ni'hao 0") })
         val now = Executor { it.run() }
         val queued = ArrayList<Runnable>()
@@ -126,12 +117,11 @@ class TableRegistryTest : EnginesFixture() {
         val shared = registry.shared(registry.table(WUBI), WUBI)
         registry.prepare(WUBI)
         while (queued.isNotEmpty()) queued.removeAt(0).run()
-        // the first key finds them coded
         assertEquals(listOf("wqvb" to "你好"), shared.words("wqvb"))
         assertTrue(queued.isEmpty())
     }
 
-    /** A start whose 五笔 has 你好 saved at wqvb, pinyin's own word too, as 0.4 converted an older build's. */
+    /** A start whose 五笔 has 你好 saved at wqvb, pinyin's own word too, as an older build converted it. */
     private fun savedNihao(): UserFiles = MemoryFiles().apply { olderPhrases(this, "wqvb" to "你好", own = mapOf("你好" to "ni hao")) }
 
     private fun Engines.wubi(keys: String): List<String> {
@@ -165,7 +155,6 @@ class TableRegistryTest : EnginesFixture() {
         Engines(::load, dir).use { assertFalse("你好" in it.wubi("wqvb")) }
     }
 
-    // a phrase a table saved is pinyin's word too: learned there, so offered to forget
     @Test
     fun aPhraseATableSavedForgottenInPinyinIsForgottenByTheTableToo() {
         val dir = savedNihao()
@@ -183,8 +172,7 @@ class TableRegistryTest : EnginesFixture() {
     @Test
     fun aWordAddedPickedInATableAndRemovedIsNotBackThereAtTheNextStart() {
         val dir = MemoryFiles()
-        // the listed words coded at once: added before pinyin's model was made, the word is one of
-        // them, and in the background a slow machine typed before they were coded
+        // the listed words coded at once, as a slow machine typed before they were
         Engines(::load, dir, warmUps = { it.run() }).use { engines ->
             assertTrue(engines.addWord("你好", "ni hao"))
             // the user's word, coded by the table's rule: its pick is the table's, read back as a phrase saved
@@ -212,9 +200,7 @@ class TableRegistryTest : EnginesFixture() {
         val registry = TableRegistry(blobs = { opened += it; load(it) }, onError = {}, coding = now, assets = assets, lexicon = lexicon, state = { log.state }, dropSaved = log::dropTableWords)
         registry.forgetInTables(setOf("好"))
         assertEquals(emptyList<String>(), opened.filter { it.startsWith(InputMethodCatalog.TABLE_DIR) })
-        // a phrase a table saved neither: its table is not loaded on the fcitx thread to tell, the row
-        // out of the record all the same; the count rising is what has the long press answer with no
-        // undo (the learning facade reads it), the safe answer when the table cannot say what it had
+        // the table is not loaded to tell, so the long press answers with no undo
         val before = registry.forgets
         registry.forgetInTables(setOf("你好"))
         assertEquals(emptyList<String>(), opened.filter { it.startsWith(InputMethodCatalog.TABLE_DIR) })
@@ -225,8 +211,7 @@ class TableRegistryTest : EnginesFixture() {
 
     @Test
     fun aFieldStartingInATableStartsCodingTheWordsListedSinceBeforeItsFirstKey() {
-        // Engines.context → TableRegistry.prepare, end to end: dictionaries changed by a reload are
-        // coded as the next field starts in 五笔, not at its first key
+        // dictionaries changed by a reload are coded as the next field starts, not at the first key
         var lines = sequenceOf<String>()
         var name = "a"
         val queued = ArrayList<Runnable>()
@@ -249,7 +234,7 @@ class TableRegistryTest : EnginesFixture() {
 
     @Test
     fun theMergedFilesWordsComeFromAnIndexOnDiskBuiltInTheBackgroundAndKept() {
-        // design D4: coded once into the table's index, not listed as objects (0.3.1 ran out of heap so)
+        // coded once into the table's index, not listed as objects (which ran out of heap)
         val file = mergedFile("merged.ymd", "s", "好你 hao'ni 0.5", "门你 men'ni 0.2")
         val queued = ArrayList<Runnable>()
         val assets = EngineAssets(::load, {}, null)
@@ -263,7 +248,6 @@ class TableRegistryTest : EnginesFixture() {
         assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
         assertTrue(shared.leadsAnywhere("vbw"))
         assertTrue(root.file("merged.$WUBI.ymc").exists())
-        // added by hand once the index has it: offered once
         assertTrue(lexicon.addWord("好你", "hao ni"))
         assertEquals(listOf("vbwq" to "好你"), shared.words("vbwq"))
         // the next start opens the index kept, built for the same table and file
@@ -276,8 +260,6 @@ class TableRegistryTest : EnginesFixture() {
         assertEquals(modified, File(folder.root, "merged.$WUBI.ymc").lastModified())
     }
 
-    // review F3295: the file merged again (another word, another stamp) at the same index path: built again,
-    // not the old index's places read into the new file
     @Test
     fun anIndexOfAnotherMergedFileIsBuiltAgain() {
         val queued = ArrayList<Runnable>()
@@ -290,13 +272,12 @@ class TableRegistryTest : EnginesFixture() {
             return shared.words(code)
         }
         assertEquals(listOf("vbwq" to "好你"), typed(mergedFile("a.ymd", "a", "好你 hao'ni 0.5"), "vbwq"))
-        // the same path compiled again: its stamp alone tells the index is another's (review F3432)
+        // the same path compiled again: its stamp alone tells the index is another's
         val newer = mergedFile("a.ymd", "b", "你好 ni'hao 0.2")
         assertEquals(emptyList<Pair<String, String>>(), typed(newer, "vbwq"))
         assertEquals(listOf("wqvb" to "你好"), typed(newer, "wqvb"))
     }
 
-    // review F3303: a word added by hand that the merged file has too, while no index is kept: offered still
     @Test
     fun aWordAddedByHandThatTheFileHasIsOfferedWithoutAnIndex() {
         val assets = EngineAssets(::load, {}, null)

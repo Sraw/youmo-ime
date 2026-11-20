@@ -40,7 +40,6 @@ class UserScorerTest {
         val scorer = UserScorer(data.model, m, weight = 0.5f)
         val expected = log10(Math.pow(10.0, plain.score(NO_WORD, NO_WORD, ni).toDouble()) + 0.5 / (1 + UserModel.UNSEEN)).toFloat()
         assertEquals(expected, scorer.score(NO_WORD, NO_WORD, ni), 1e-6f)
-        // through a context made once, as the decoder asks
         assertEquals(expected, scorer.scoreAfter(scorer.context(NO_WORD, NO_WORD), ni), 1e-6f)
         // a word of the user's own scores as the model's unknown word plus its share
         val nihao = m.learn(null, listOf(entry("拟好", "ni", "hao")))[0]
@@ -58,9 +57,7 @@ class UserScorerTest {
         assertEquals(-4f, scorer.score(NO_WORD, NO_WORD, nihao), 1e-6f)
         // after 你: the unknown word's score there, moved by the same amount
         assertEquals(plain.score(NO_WORD, ni, nihao) + 3f, scorer.score(NO_WORD, ni, nihao), 1e-6f)
-        // a model word listed by a pack scores as the model says
         assertEquals(-2f, m.list(entry("你", "ni"), -1f, 1, modelWords).let { scorer.score(NO_WORD, NO_WORD, it) }, 1e-6f)
-        // and never above 0
         assertEquals(0f, UserScorer(data.model, m).score(NO_WORD, NO_WORD, m.list(entry("拟吗", "ni", "ma"), 0f, 1, modelWords)), 0f)
     }
 
@@ -80,18 +77,15 @@ class UserScorerTest {
         val scorer = UserScorer(d.model, m, weight = 0f)
         val ni = m.id(entry("你", "ni"))
         val hao = m.id(entry("好", "hao"))
-        // from a dictionary of the user's: not their choice yet
         val nin = m.list(entry("你", "nin"))
         // the unknown word's scores differ from 你's: what is asserted below tells them apart
         assertNotEquals(lm.score(NO_WORD, NO_WORD, ni), lm.score(NO_WORD, NO_WORD, nin))
         assertNotEquals(lm.score(NO_WORD, ni, hao), lm.score(NO_WORD, nin, hao))
         assertEquals(lm.score(NO_WORD, NO_WORD, nin), scorer.score(NO_WORD, NO_WORD, nin))
         assertEquals(lm.score(NO_WORD, nin, hao), scorer.score(NO_WORD, nin, hao))
-        // the user's: the model's 你, scored and as context
         m.own(entry("你", "nin"))
         assertEquals(lm.score(NO_WORD, NO_WORD, ni), scorer.score(NO_WORD, NO_WORD, nin))
         assertEquals(lm.score(NO_WORD, ni, hao), scorer.score(NO_WORD, nin, hao))
-        // the user's without being listed maps too
         val nian = m.own(entry("你", "nian"))
         assertEquals(lm.score(NO_WORD, ni, hao), scorer.score(NO_WORD, nian, hao))
         // added by hand then taken off, never typed, it no longer does
@@ -164,7 +158,6 @@ class UserScorerTest {
         // a word the model lacks is still the unknown word, its pack score in place of it
         val nihao = m.list(entry("你好", "ni", "hao"))
         assertEquals(lm.score(NO_WORD, NO_WORD, nihao), scorer.score(NO_WORD, NO_WORD, nihao))
-        // even added by hand: no word of the model's has its text
         val nima = m.listByHand(entry("你吗", "ni", "ma"))
         assertEquals(lm.score(NO_WORD, NO_WORD, nima), scorer.score(NO_WORD, NO_WORD, nima))
         assertEquals(lm.score(NO_WORD, nima, hao), scorer.score(NO_WORD, nima, hao))

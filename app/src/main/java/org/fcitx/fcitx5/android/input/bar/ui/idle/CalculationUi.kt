@@ -23,7 +23,6 @@ import splitties.views.dsl.core.verticalMargin
 import splitties.views.dsl.core.wrapContent
 import splitties.views.horizontalPadding
 
-/** The result of the sum just written ([org.fcitx.fcitx5.android.input.bar.Calculation]): `= 42`, a tap puts it in. */
 class CalculationUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val text = textView {

@@ -55,7 +55,7 @@ class SettingsSearchTest {
         assertEquals(listOf(1, 2, 3), found("虚拟"))
     }
 
-    // 061-settings-search.md §4.5's example: 笔画筛选 itself, a title that starts with it, then what is also called so, the shorter first
+    // 笔画筛选 itself, a title that starts with it, then what is also called so, the shorter first
     private val strokes = SettingsSearch(
         listOf(
             Entry("在键上划", "", listOf("通用输入"), 1, "pref:key_drawing"),

@@ -28,46 +28,29 @@ import java.util.PriorityQueue
 import kotlin.math.log10
 
 /**
- * Compiles the dictionaries the user merged into the base one into one [DictionaryFile], once
- * (at import, at a change of which are on, at a new base dictionary). It runs in the keyboard's
- * process beside typing, so its heap is bounded whatever the size: the lines are streamed and
- * sorted on disk in runs ([RUN_WORDS] words in the heap at a time), merged, and written a
- * section at a time; the largest thing held is the text index as it is sorted, 4 bytes a slot and a place (8 to 12 bytes a word: a slot per word to two). Rime-frost's 1.9
- * million words compile in 48 MB (DictionaryFileBoundedHeapTest proves 2 million in that).
+ * Compiles the dictionaries the user merged into one [DictionaryFile], once per change. It runs in the keyboard's
+ * process, so its heap is bounded whatever the size: lines are sorted on disk in runs ([RUN_WORDS] in the heap),
+ * merged, and written a section at a time (rime-frost's 1.9 million words in 48 MB, DictionaryFileBoundedHeapTest).
  *
- * The words come out in their trie's breadth-first order, so a node's words are a run of places:
- * by depth, then by syllables, a node's words by score, best first. Those the base dictionary has (`inBase`) are kept apart,
- * past [DictionaryFile.trieWords], out of the trie: the decoder finds them in the base already,
- * and a second arc would double them (and bring back one the user blocked there).
+ * Words come out in the trie's breadth-first order, a node's words by score. Those the base dictionary has
+ * (`inBase`) are kept past [DictionaryFile.trieWords], out of the trie: a second arc would double them and bring
+ * back one the user blocked.
  */
 object DictionaryCompiler {
 
-    /** More than this many words is no dictionary for a phone: the import says so. */
     const val MAX_WORDS = 4_000_000
 
-    /**
-     * More lines than this (the same word twice counted twice) is no source of at most [MAX_WORDS]
-     * words: read no further. Twice the words, so a file listed with itself still compiles.
-     */
+    /** More lines than this is no source of [MAX_WORDS]; twice, so a file listed with itself still compiles. */
     const val MAX_LINES = MAX_WORDS * 2
 
-    /** More syllables than this is no word: the line does not read. */
     const val MAX_SYLLABLES = 32
 
-    /**
-     * More words than this of one reading are left out (counted unread): a reading's words are held
-     * together to rank them, and no dictionary has a reading near so many (rime-frost's most is
-     * under a thousand); a file of millions at one reading would otherwise take them all in the heap.
-     */
+    /** More words than this of one reading are left out: a reading's words are held together to rank them (rime-frost's most is under a thousand). */
     const val MAX_PER_READING = 16_384
 
-    // the sources' names and words read, name/count/name/count…
     private const val SOURCES = "sources"
 
-    /**
-     * How many words each source of [file] read, by the name it was compiled under; none for a
-     * file of no names, or one that cannot be read. Its header only, unchecked: for the settings' list.
-     */
+    /** How many words each source of [file] read, by name, from its unchecked header; none if unreadable. */
     fun sourceWords(file: File): Map<String, Int> = try {
         RandomAccessFile(file, "r").use { f ->
             val buffer = f.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.length())
@@ -81,26 +64,16 @@ object DictionaryCompiler {
         emptyMap()
     }
 
-    /** The steps of a compile, in order: the lines read and sorted in runs, the runs merged, the file written. */
     enum class Stage { READ, MERGE, WRITE }
 
-    /**
-     * Told how far a compile is: [done] of [of] in [stage] (lines read, of none known; words merged;
-     * sections written). It may throw to stop the compile (the user cancelled): the file there stays.
-     */
+    /** Told how far a compile is; it may throw to cancel, leaving the existing file. */
     fun interface Progress {
         fun at(stage: Stage, done: Int, of: Int)
     }
 
-    /** What a compile made: the words written, how many the base has, the lines that did not read as one. */
     class Result(val words: Int, val inBase: Int, val unread: Int)
 
-    /**
-     * Whether [name] is what a compile here or a table's index build (CodedIndex) leaves while it
-     * writes: `<dest>.tmp` of a `.ymd` or `.ymc`, or the `.<dest>.build` folder of its runs. Half
-     * made: left out of a backup, deleted by a sweep. The app asks here, not its own copy of these
-     * names, so a rename here cannot quietly break its filter (review F3373).
-     */
+    /** Whether [name] is a half-made compile or CodedIndex build (`<dest>.tmp`, `.<dest>.build`): left out of backups, swept. The app asks here so a rename cannot break its filter. */
     fun isWorkFile(name: String): Boolean =
         name.endsWith(".ymd$TEMP") || name.endsWith(".ymc$TEMP") || (name.startsWith(".") && name.endsWith(WORK))
 
@@ -108,25 +81,13 @@ object DictionaryCompiler {
     private const val WORK = ".build"
 
     /**
-     * The words of [sources] (each a dictionary, in libime's text format: `text pin'yin [weight]`,
-     * as [WordText.dictionaryEntry] reads a line) into [dest], replaced whole or not at all.
-     * A source's weights are read as their kind, decided over the whole source: all in (0, 1]
-     * probabilities (rime-frost), all > 1 counts (Sogou), all < 0 log10 probabilities; a 0 is
-     * none, as 0.3.1 wrote one missing; signs mixed are none. Each source's best word scores 0,
-     * the rest below it as their weight says: so what a source ranks above what is kept, and no
-     * source outranks another by its scale. A word in two sources, or twice, keeps its best.
+     * The words of [sources] (libime's text format, as [WordText.dictionaryEntry] reads) into [dest], replaced whole.
+     * A source's weights are read as one kind over the whole source: all in (0, 1] probabilities, all > 1 counts,
+     * all < 0 log10; 0 is none, mixed signs are none. Each source's best word scores 0, so no source outranks another
+     * by scale; a word in two sources keeps its best. [names] are kept with their word counts for the settings.
      *
-     * [stamp] and [base] are kept in the file: what it was compiled from, and the base dictionary
-     * [inBase] answered for. [progress] hears the lines read. [names] are the sources', kept
-     * with how many words each read ([sourceWords]), for the settings' list.
-     *
-     * Heap: a run (about 6 MB), the streams of the trie's depths (16 KB each, some 2 MB) and the
-     * scores' book (512 KB); as the file is written, its text index, 4 bytes a slot and a place
-     * (about 16 MB at 2 million words, 32 MB at [MAX_WORDS]), let go before the other sections:
-     * within 48 MB for rime-frost's 1.9 million (DictionaryFileBoundedHeapTest), not at the cap (review NIT 2).
-     * Files: up to some 140 open at once (three streams a depth's words, one its nodes, up to
-     * [MAX_SYLLABLES] deep, the base's and a merge's runs); far below Android's 32K, opened per depth
-     * lazily if a ROM's limit is ever found low (review F3628).
+     * Heap: a run (~6 MB), the depth streams (~2 MB), the score book (512 KB), and the text index while written
+     * (~16 MB at 2 million words). Up to ~140 files open at once, far below Android's 32K.
      *
      * @throws IOException if [dest] cannot be written, more than [MAX_WORDS] words come, or the heap runs out
      */
@@ -142,8 +103,7 @@ object DictionaryCompiler {
     ): Result = try {
         compileInto(sources, dest, stamp, base, inBase, progress, names)
     } catch (e: OutOfMemoryError) {
-        // a compile is bounded, but a heap a phone has nearly filled already is not: told as a
-        // failed compile, which the caller records for this stamp, never a crash it retries at
+        // a phone's heap may be nearly full already: a failed compile, recorded for this stamp, not a crash retried at
         // every start (0.3.1's loop)
         throw IOException("out of memory compiling $dest", e)
     }
@@ -185,9 +145,7 @@ object DictionaryCompiler {
             val words = runs.size
             var merged = 0
             progress.at(Stage.MERGE, 0, words)
-            // counted as the runs give them, each copy of a word too: [words] counts them so
-            // a word no weight ranks is put with the least any source ranks (MUST-2): below every word
-            // weighted, as the trie orders them, and alike whatever the source
+            // a word no weight ranks gets the least any source ranks: below every weighted word, whatever the source
             val floor = kinds.minOfOrNull { it.worst() }?.takeIf { it.isFinite() } ?: 0f
             val score = { w: Word -> kinds[w.source].score(w.weight).let { if (it.isNaN()) floor else it } }
             runs.merge(score, { if (++merged and PROGRESS_EVERY == 0) progress.at(Stage.MERGE, merged, words) }) { w, s -> out.add(w, s) }
@@ -209,12 +167,10 @@ object DictionaryCompiler {
         }
     }
 
-    /** Whether [data]'s dictionary has a word read so: the `inBase` of [compile], for the dictionary typing reads. */
     fun inBase(data: PinyinData): (String, IntArray) -> Boolean = { text, syllables ->
         val dictionary = data.dictionary
         val node = dictionary.find(syllables)
-        // compared in place, not each word made a String: a node of one syllable has hundreds,
-        // asked for every word of a 1.9-million-word compile
+        // compared in place, not as Strings: asked for every word of a 1.9-million-word compile
         val vocabulary = data.vocabulary
         node >= 0 && (0 until dictionary.wordCount(node)).any { i ->
             val id = dictionary.word(node, i)
@@ -222,14 +178,13 @@ object DictionaryCompiler {
         }
     }
 
-    // the slot of a text's hash in the text index: String.hashCode, as the JLS fixes it, spread
+    // String.hashCode, as the JLS fixes it, spread
     internal fun slot(hash: Int, hashSize: Int): Int {
         var h = hash * -0x61c88647
         h = h xor (h ushr 16)
         return h and (hashSize - 1)
     }
 
-    // what a source's weights are, from all of them
     private class Kind {
         var some = 0
         var logs = 0
@@ -244,34 +199,28 @@ object DictionaryCompiler {
             if (w < least) least = w
         }
 
-        // the score of the source's least weighted word: +inf for a source no weight ranks
         fun worst(): Float = if (some == 0) Float.POSITIVE_INFINITY else score(least).let { if (it.isNaN()) Float.POSITIVE_INFINITY else it }
 
-        // log10 of the weight against the source's best: 0 for its best, NaN for none (the floor, in compile)
         fun score(w: Float): Float = when {
             w == 0f || some == 0 -> Float.NaN
             logs == some -> w - best
             logs == 0 -> log10(w / best)
-            // signs mixed: no kind it could be
             else -> Float.NaN
         }
     }
 
-    // words read, sorted on disk a run at a time
     private class Runs(private val dir: File) {
         private val files = ArrayList<File>()
         private var n = 0
         private val sylFrom = IntArray(RUN_WORDS + 1)
         private val textFrom = IntArray(RUN_WORDS + 1)
-        // a run's syllables and characters: full, it is spilled, never grown (review NIT 3: long
-        // words doubled them past the heap the compile is bounded by)
+        // full, a run is spilled, never grown: long words doubled them past the bounded heap
         private val syls = ShortArray(RUN_WORDS * 4)
         private val chars = CharArray(RUN_WORDS * 4)
         private val weights = FloatArray(RUN_WORDS)
         private val sources = IntArray(RUN_WORDS)
         private var total = 0
 
-        /** The words read so far, the same word twice counted twice: what the merge goes through. */
         val size get() = total
 
         fun addLine(line: String, source: Int, kind: Kind): Boolean {
@@ -332,8 +281,7 @@ object DictionaryCompiler {
 
         fun finish() = spill()
 
-        // the runs merged: each word once, in order, scored the best of every time it came. One
-        // score kept, not each time's: a line repeated millions of times is no more heap (MUST-1)
+        // each word once, scored its best; one score kept, so a line repeated millions of times costs no heap
         fun merge(score: (Word) -> Float, taken: () -> Unit, each: (Word, Float) -> Unit) {
             val heads = PriorityQueue<Reader>(maxOf(files.size, 1)) { a, b -> a.word.compareTo(b.word) }
             files.forEach { f -> Reader(f).also { if (it.next()) heads += it else it.close() } }
@@ -394,7 +342,6 @@ object DictionaryCompiler {
         fun close() = input.close()
     }
 
-    // a section written as it comes, little-endian, to a file of its own
     private class Stream(val file: File, buffer: Int = BUFFER) {
         private val out = DataOutputStream(BufferedOutputStream(FileOutputStream(file), buffer))
         var count = 0L
@@ -420,8 +367,7 @@ object DictionaryCompiler {
         fun close() = out.close()
     }
 
-    // the words of one part (a depth of the trie's, or the base's), place by place: each one's
-    // text length, characters and score; the base's syllables too, a trie word's being its node's
+    // a part's words place by place: text length, characters, score; the base's syllables too (a trie word's are its node's)
     private class Part(dir: File, name: String, withSyllables: Boolean, buffer: Int) {
         val lengths = Stream(File(dir, "$name.lengths"), buffer)
         val chars = Stream(File(dir, "$name.chars"), buffer)
@@ -443,8 +389,7 @@ object DictionaryCompiler {
         fun close() = listOfNotNull(lengths, chars, scores, sylLengths, syls).forEach { it.close() }
     }
 
-    // the distinct scores, up to what a u16 code tells apart: raw bits in a set of open addressing
-    // (512 KB). Past that, none kept: the codes go linear (DictionaryFile's SCORES_LINEAR)
+    // the distinct scores, up to what a u16 code tells apart (512 KB); past that the codes go linear (SCORES_LINEAR)
     private class ScoreSet {
         private val slots = IntArray(SCORE_SLOTS).also { it.fill(EMPTY) }
         var size = 0
@@ -473,7 +418,6 @@ object DictionaryCompiler {
             size++
         }
 
-        // the codebook, ascending: a score's code its index
         fun book(): FloatArray {
             val out = FloatArray(size)
             var n = 0
@@ -488,20 +432,17 @@ object DictionaryCompiler {
         }
     }
 
-    // the merged words into the file's parts and trie, a reading at a time
     private class Output(private val dir: File, private val inBase: (String, IntArray) -> Boolean) {
-        // the trie's words a part per depth, so they come out breadth first, as its nodes; and the base's
+        // a part per depth, so words come out breadth first as the nodes do; and the base's
         val depthWords = ArrayList<Part>()
         val base = Part(dir, "base", withSyllables = true, buffer = BUFFER)
         val scoreSet = ScoreSet()
         var trieWords = 0
             private set
-        // a reading's words, least ranked at the head
         private val group = PriorityQueue<Pair<Word, Float>>(INITIAL_GROUP, compareBy<Pair<Word, Float>>({ it.second }).thenByDescending { it.first.text })
         var dropped = 0
             private set
 
-        // the open path of the trie, by depth: each node's syllable, words and children so far
         private val pathSyl = IntArray(MAX_SYLLABLES + 1)
         private val pathWords = IntArray(MAX_SYLLABLES + 1)
         private val pathChildren = IntArray(MAX_SYLLABLES + 1)
@@ -513,7 +454,7 @@ object DictionaryCompiler {
             if (group.isNotEmpty() && !group.peek().first.sameReading(w)) flushGroup()
             // -0f as 0f: one code for both
             group += w to (score + 0f)
-            // past the cap, the least ranked goes (NIT 1): kept by score, not by the order they came
+            // past the cap the least ranked goes, not the latest
             if (group.size > MAX_PER_READING) {
                 group.poll()
                 dropped++
@@ -534,7 +475,7 @@ object DictionaryCompiler {
             group.clear()
             capped()
             if (mine.isEmpty()) return
-            // best first; then by text, so a compile is the same each time
+            // best first; then by text, so a compile is deterministic
             mine.sortWith(compareBy<Pair<Word, Float>>({ -it.second }).thenBy { it.first.text })
             enter(reading, mine.size)
             while (depthWords.size <= reading.size) {
@@ -549,12 +490,10 @@ object DictionaryCompiler {
             capped()
         }
 
-        // the trie's and the base's together: the cap is of the file's words, its index sized by them
         private fun capped() {
             if (trieWords + base.size > MAX_WORDS) throw IOException("more than $MAX_WORDS words")
         }
 
-        // the trie's node of [reading] given its words: the path closed where it parts from the last
         private fun enter(reading: IntArray, count: Int) {
             var common = 0
             while (common < minOf(reading.size, lastReading.size) && reading[common] == lastReading[common]) common++
@@ -570,8 +509,6 @@ object DictionaryCompiler {
             lastReading = reading
         }
 
-        // the nodes deeper than [depth] done: each to its depth's file, in the order of their
-        // readings, which is the order of their words in the depth's part
         private fun close(depth: Int) {
             for (d in pathLength downTo depth + 1) writeNode(d)
             pathLength = depth
@@ -595,7 +532,7 @@ object DictionaryCompiler {
             return Made(depthWords + base, trieWords, base.size, depths.map { it.file to (it.count / NODE_INTS).toInt() }, scoreSet)
         }
 
-        // a compile failed or cancelled: its files' descriptors let go now, not at a GC (review NIT 4)
+        // failed or cancelled: descriptors let go now, not at a GC
         fun abandon() {
             depthWords.forEach { runCatching { it.close() } }
             runCatching { base.close() }
@@ -603,8 +540,6 @@ object DictionaryCompiler {
         }
     }
 
-    // what the file is made of, on disk, written into it a section at a time: [parts] in place
-    // order (the trie's depths, breadth first, then the base's, the last)
     private class Made(
         private val parts: List<Part>,
         val trieWords: Int,
@@ -620,7 +555,7 @@ object DictionaryCompiler {
         fun write(f: RandomAccessFile, stamp: String, baseOf: String, sources: List<Pair<String, Int>>, written: (Int, Int) -> Unit) {
             val hashSize = Integer.highestOneBit(maxOf(size, 1) * 2 - 1)
             val book = if (scoreSet.overflow) floatArrayOf(scoreSet.least) else scoreSet.book()
-            // checked before a byte is written: a list of sources the reader would refuse fails the compile, not every open
+            // checked before a byte is written: a source list the reader would refuse fails the compile, not every open
             val header = try {
                 DataFile.metaBytes(meta(stamp, baseOf, hashSize, sources, book.size))
             } catch (e: IllegalArgumentException) {
@@ -643,7 +578,6 @@ object DictionaryCompiler {
             written(steps, steps)
         }
 
-        // the text index's bucket ends, from TEXT_PLACES to TEXT_BUCKETS, then let go
         private var buckets: IntArray? = null
 
         private fun writeSection(id: Int, out: OutputStream, hashSize: Int, book: FloatArray) {
@@ -670,7 +604,6 @@ object DictionaryCompiler {
             }
         }
 
-        // where each of [count] runs starts, their lengths in [lengths], and where the last ends ([end])
         private fun writeStarts(out: OutputStream, end: Int, count: Int, lengths: List<Stream>) {
             val w = BitPacked.Writer(out, BitPacked.widthFor(end), count + 1)
             var at = 0
@@ -679,7 +612,7 @@ object DictionaryCompiler {
             w.finish()
         }
 
-        // a score's u16 code: its place in the book, or its step from the floor (the book's one) up to 0
+        // a score's u16 code: its book index, or its step from the floor up to 0
         private fun code(score: Float, book: FloatArray): Int = if (!scoreSet.overflow) {
             java.util.Arrays.binarySearch(book, score).also { check(it >= 0) { "score $score not in the book" } }
         } else {
@@ -693,13 +626,11 @@ object DictionaryCompiler {
             "scores" to if (scoreSet.overflow) DictionaryFile.SCORES_LINEAR else DictionaryFile.SCORES_BOOK, "scoreCodes" to codes,
             "syllableCount" to Syllables.count, "syllableChecksum" to Syllables.checksum(),
             "stamp" to stamp.replace('\n', ' ').replace('\r', ' '), "base" to baseOf.replace('\n', ' ').replace('\r', ' '),
-            // a name holds no '/', a file's; one with a line break is kept with spaces, and found by none
+            // a name holds no '/'; a line break becomes a space
             SOURCES to sources.joinToString("/") { "${it.first.replace('\n', ' ').replace('\r', ' ')}/${it.second}" },
         ).mapValues { it.value.toString() }
 
-        // the places by the slot of their text's hash, each slot's in place order; returns where
-        // each slot's run ends. The one thing held whole: 4 bytes a slot and a place (about 16 MB
-        // at 2 million words), let go once the buckets are written
+        // the places by text-hash slot; the one thing held whole (~16 MB at 2 million words), let go after
         private fun writeTextPlaces(hashSize: Int, out: OutputStream): IntArray {
             val next = IntArray(hashSize)
             forEachHash { _, h -> next[slot(h, hashSize)]++ }
@@ -711,7 +642,6 @@ object DictionaryCompiler {
             return next
         }
 
-        // each place with its text's String.hashCode, from the parts' lengths and characters
         private fun forEachHash(each: (Int, Int) -> Unit) {
             var p = 0
             for (part in parts) {
@@ -725,7 +655,6 @@ object DictionaryCompiler {
             }
         }
 
-        // the depths' nodes, root first, a depth after another: breadth first, each node's children a run
         private fun writeTrie(id: Int, out: OutputStream) {
             val (width, count) = when (id) {
                 DictionaryFile.FIRST_CHILD -> BitPacked.widthFor(nodes) to nodes + 1
@@ -776,8 +705,7 @@ object DictionaryCompiler {
         }
     }
 
-    // buffered and with shorts, for the score files written a value at a time: engine.data's
-    // LittleEndian writes straight through and has neither
+    // buffered and with shorts: engine.data's LittleEndian writes straight through and has neither
     private class BufferedLittleEndian(out: OutputStream) {
         private val out = DataOutputStream(BufferedOutputStream(out, BUFFER))
         fun int(v: Int) = out.writeInt(Integer.reverseBytes(v))
@@ -785,7 +713,7 @@ object DictionaryCompiler {
         fun flush() = out.flush()
     }
 
-    // a bottom-up merge sort of 0 until n: no boxing, one array of scratch
+    // a bottom-up merge sort of 0 until n: no boxing, one scratch array
     private fun sortIndices(n: Int, compare: (Int, Int) -> Int): IntArray {
         var a = IntArray(n) { it }
         var t = IntArray(n)
@@ -811,14 +739,12 @@ object DictionaryCompiler {
         return a
     }
 
-    // words sorted in the heap at a time: about 4 MB of them
     private const val RUN_WORDS = 1 shl 17
     private const val INITIAL_GROUP = 16
     private const val NODE_INTS = 3
     private const val BUFFER = 1 shl 16
-    // the streams kept one a depth (up to 33 of words', 33 of nodes'): smaller, so all of them stay a MB or two
+    // one stream per depth (up to 33 each of words and nodes): small, so all of them stay a MB or two
     private const val SMALL_BUFFER = 1 shl 14
-    // a u16 code tells this many scores apart; the set that finds them has twice the slots
     private const val MAX_CODES = 1 shl 16
     private const val SCORE_SLOT_BITS = 17
     private const val SCORE_SLOTS = 1 shl SCORE_SLOT_BITS

@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// 竖屏 and 横屏 each their place and width (061-floating-resize §2.6)
+// 竖屏 and 横屏 each their place and width
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class FloatingStoreTest {
@@ -51,7 +51,6 @@ class FloatingStoreTest {
         assertEquals(-1f, FloatingStore.widthDp(true), 0f)
     }
 
-    // while a finger resizes it its width is read as it is now, kept only as the finger lifts
     @Test
     fun aResizeUnderWayIsReadNotKept() {
         FloatingStore.keepWidth(landscape = false, 280)

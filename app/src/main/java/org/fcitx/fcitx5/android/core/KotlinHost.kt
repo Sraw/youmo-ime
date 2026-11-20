@@ -20,7 +20,6 @@ import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationStartKeys
 import org.fcitx.fcitx5.android.data.quickphrase.QuickPhraseManager
@@ -52,7 +51,6 @@ import org.fcitx.fcitx5.android.host.Key
 import org.fcitx.fcitx5.android.host.KeySyms
 import org.fcitx.fcitx5.android.host.ModuleConfigs
 import org.fcitx.fcitx5.android.host.ModuleInputs
-import org.fcitx.fcitx5.android.host.NineKeysMerge
 import org.fcitx.fcitx5.android.host.OpenCCData
 import org.fcitx.fcitx5.android.host.Persist
 import org.fcitx.fcitx5.android.host.Profile
@@ -79,35 +77,27 @@ import kotlin.coroutines.EmptyCoroutineContext
 import org.fcitx.fcitx5.android.host.KeyStates as HostKeyStates
 
 /**
- * The Kotlin host behind [HostApi] (fcitx-replacement §4): [HostCore] on one thread
- * ([HostDispatcher], still `fcitx-main`), the engines through its own [EngineBridge], the modules as the
- * app's fcitx loads them ([ChineseModules]), fcitx's files at the same paths with the same INI
- * semantics, written as they change ([ConfigWriter]). Callers see the same [HostApi] as on the
- * native host, and the host's own [HostEvent]s as the event flow, which keeps every event (no buffer
- * of 15 that drops the oldest). The app's only host (HostDaemon).
+ * The Kotlin host behind [HostApi]: [HostCore] on one thread ([HostDispatcher]), the engines through its
+ * [EngineBridge], fcitx's files at the same paths and INI semantics ([ConfigWriter]). Its event flow keeps every
+ * event (no 15-event buffer dropping the oldest).
  */
 @Suppress("TooManyFunctions", "LargeClass")
 class KotlinHost(
     private val context: Context,
-    /** The engine side: null for this host's [bridge]; a test's scripted engine on the JVM, where the data is not. */
+    /** Null for this host's [bridge]; a test's scripted engine on the JVM. */
     engine: EngineSide? = null,
 ) : HostInstance {
 
-    /** fcitx's `ShowInputMethodInformation`, read at [start]: the instrumented tests turn it off (TestHost). */
+    /** The instrumented tests turn it off (TestHost). */
     @VisibleForTesting
     @Volatile
     var showInputMethodInformation = true
 
-    /** The app's engines, this host's own: what the settings and the keyboard ask of them goes here, a scripted engine or not. */
     internal val bridge = EngineBridge()
 
     private val engine: EngineSide = engine ?: EngineSide.App(bridge)
 
-    /**
-     * What the host needs of the engine besides its port: where fcitx's data files are ([data]: the
-     * punctuation maps, quick input) and its config ([config]), each called once a start, on the host
-     * thread, and the engine's start and end.
-     */
+    /** Each called once a start, on the host thread. */
     interface EngineSide {
         val host: EngineHost
         fun data(): HostConfig
@@ -117,10 +107,8 @@ class KotlinHost(
 
         class App(private val bridge: EngineBridge) : EngineSide {
             override val host: EngineHost get() = bridge.host
-            // an older build's data moved in at the first start that can, as the config (A4)
             override fun data(): HostConfig = bridge.data()
 
-            // an older build's config moved in at the first start that can (A4)
             override fun config(): HostConfig = HostConfigDir.settle()
 
             override fun start() {
@@ -139,14 +127,14 @@ class KotlinHost(
 
     override val lifecycle: HostLifecycle get() = lifecycleRegistry
 
-    // every event kept, however slow a collector (design §4): tryEmit never fails
+    // every event kept, however slow a collector: tryEmit never fails
     private val eventsOut = MutableSharedFlow<HostEvent>(extraBufferCapacity = Int.MAX_VALUE)
 
     override val eventFlow = eventsOut.asSharedFlow()
 
     override val isReady get() = lifecycle.currentState == HostLifecycle.State.READY
 
-    // the six written on the host thread, read on the main one (runImmediately)
+    // the six below: written on the host thread, read on main
     private val noInputMethod = InputMethodEntry(context.getString(R.string._not_available_))
 
     @Volatile
@@ -165,7 +153,7 @@ class KotlinHost(
     override var fullWidthCached: Boolean = false
         private set
 
-    // what the keys type at a start, kept for the next one (the keyboard's before this host is up): on this thread
+    // kept for the next start, the keyboard's before this host is up
     private fun HostCore.keepStartKeys() = PunctuationStartKeys.write(context, startPunctuationKeys())
 
     @Volatile
@@ -186,42 +174,40 @@ class KotlinHost(
 
     private val dispatcher = HostDispatcher()
 
-    // the host thread's own, made by startup
     private var core: HostCore? = null
     private var modules: ChineseModules? = null
     private val options = EngineOptions()
     private var writer: ConfigWriter? = null
 
-    // the writer's thread, the same at every start: it ends when idle, so a stopped host keeps none
+    // ends when idle, so a stopped host keeps no thread
     private val configThread = ThreadPoolExecutor(1, 1, IDLE_SECONDS, TimeUnit.SECONDS, LinkedBlockingQueue()) {
         Thread(it, "host-config")
     }.apply { allowCoreThreadTimeOut(true) }
     private lateinit var punctuationMaps: PunctuationMaps
-    // fcitx's data this run (EngineSide.data): with none, the built-in tables only
+    // with none, the built-in tables only
     private var dataHome: File? = null
 
-    // the config's directory this run (EngineSide.config): none, every setting at its default
+    // with none, every setting at its default
     private var configHome: File? = null
 
-    // whether this run began before the user unlocked (startup's): a reload then settles nothing either
+    // a reload then settles nothing either
     private var directBoot = false
 
-    // the config left where an older build kept it (ConfigHome.Problem.NOT_MOVED): its directory not listed is unread, not empty
+    // a directory not listed is unread, not empty
     private var configNotMoved = false
 
-    // the user told this run that the config could not be read
     private var configUnreadableTold = false
 
-    // the module files' text as last read or written, what the next write keeps of them
+    // what the next write keeps of them
     private val confTexts = HashMap<String, String?>()
 
-    // the clipboard's latest text, which Unicode lists the characters of when it opens
+    // Unicode lists its characters when it opens
     @Volatile
     private var clipboardText = ""
 
     @Keep
     private val onClipboardUpdate = ClipboardManager.OnClipboardUpdateListener {
-        // not a password's: fcitx's clipboard kept those out of what it offered
+        // fcitx's clipboard kept passwords out of what it offered
         clipboardText = if (it.sensitive) "" else it.text
     }
 
@@ -231,9 +217,6 @@ class KotlinHost(
 
     private suspend inline fun <T> onHost(crossinline block: HostCore.() -> T): T = withContext(dispatcher) { block(host) }
 
-    // ---- the engine's own calls, as Fcitx makes them
-
-    /** Every change is written as it happens; this writes what is still pending, as `save()` did. */
     override suspend fun save() = withContext(dispatcher) { writer?.flush() ?: Unit }
 
     override suspend fun reloadConfig() = onHost { readModuleFiles() }
@@ -244,7 +227,7 @@ class KotlinHost(
     override suspend fun sameCodes(texts: List<String>, ims: List<String>) = withContext(dispatcher) { bridge.engines.sameCodes(texts, ims) }
     override suspend fun pinyinOf(text: String) = withContext(dispatcher) { bridge.engines.pinyinOf(text) }
     override suspend fun pinyinsOf(texts: List<String>) = withContext(dispatcher) { bridge.engines.pinyinsOf(texts) }
-    // 繁體: the candidate as shown, converted; the engine checks it against its own so (as learning's menu)
+    // 繁體: the candidate as shown, converted; the engine checks it against its own
     override suspend fun candidateCard(index: Int, text: String, paged: Boolean) =
         onHost { inputMethodEntryCached.uniqueName.takeIf(EngineBridge::isEngines)?.let { bridge.engines.card(it, index, text, paged, ::shownText) } }
 
@@ -297,13 +280,12 @@ class KotlinHost(
 
     override suspend fun inkFinished(piece: Int) = onHost { inkKey(Action.Ink(piece)) }
 
-    // the Ink key carries what the keys' ink told: it cannot come apart from it
+    // the Ink key carries what the keys' ink told, so they cannot come apart
     private fun HostCore.inkKey(piece: Action.Ink) =
         bridge.sendInk(piece, inputMethodEntryCached.uniqueName) { sendVirtual(Keyboard.INK, piece) }
 
     override suspend fun learning(op: LearningOp) = onHost {
-        // 繁體: the menu names the candidate as shown, converted; the engine has it simplified. Each
-        // act names its candidate by its index of all and the engine's text (HostCore.actOnCandidate)
+        // 繁體: the menu names the candidate as shown, the engine has it simplified; acts go by index and engine text
         bridge.learning(op, inputMethodEntryCached.uniqueName, ::shownText) { event, index, text -> actOnCandidate(index, event, text) }
             .also { (_, again) -> if (again) sendVirtual(Keyboard.AGAIN) }.first
     }
@@ -314,17 +296,14 @@ class KotlinHost(
         read != null
     }
 
-    // a private-use key the engine reads, carrying [payload], what it reads there (KeyEvent.payload)
     private fun HostCore.sendVirtual(char: Int, payload: Action? = null) {
         sendKey(Key(UNICODE + char, HostKeyStates.VIRTUAL), virtual = true, payload = payload)
     }
 
-    // ---- keys and the panel
-
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int, touch: Touch?) =
         onHost { key(KeySyms.fromString(key), states.toInt(), up, timestamp, touch) }
 
-    // a UTF-16 unit, as native-lib read it: a lone surrogate is no key
+    // a lone surrogate is no key
     override suspend fun sendKey(c: Char, states: UInt, code: Int, up: Boolean, timestamp: Int) =
         onHost { key(KeySyms.fromString(c.toString()), states.toInt(), up, timestamp) }
 
@@ -334,20 +313,16 @@ class KotlinHost(
     override suspend fun sendKey(sym: KeySym, states: KeyStates, code: Int, up: Boolean, timestamp: Int, touch: Touch?) =
         onHost { key(sym.sym, states.toInt(), up, timestamp, touch) }
 
-    // the frontend's keyEvent: virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it; a
-    // tap's [touch] goes with it as the key's payload, the engine's Keyboard reads it there
+    // virtual is the state's bit, as fcitx's KeyEvent::isVirtual reads it; [touch] rides as the payload
     private fun HostCore.key(sym: Int, states: Int, up: Boolean, timestamp: Int, touch: Touch? = null) {
-        // a layout's own keyboard's groups as it last told them, before its key reaches a temporary mode or the engine.
-        // Other groups than the ones typed on (060-render-p3 T10, 061-custom-layout L4): their first code commits the
-        // code as Return commits it, not lost with the session made anew, the field's composing text left alone; a key
-        // before it (Backspace, space, a syllable) is still the groups' before, as KeyboardPair turns between keyboards
+        // a key on other own groups than the ones typed on commits the code first, as Return does, rather than losing it
+        // with the remade session; a key before it (Backspace, space, a syllable) still belongs to the old groups
         val own = EngineState.ownKeys
         val unicode = KeySyms.toUnicode(sym)
         val turn = bridge.turnAt(own, unicode)
         if (turn == OwnKeysTurn.Step.COMMIT_AND_TURN) commitCode()
         if (turn != OwnKeysTurn.Step.WAIT) bridge.syncOwnKeys(own)
-        // the tap's place is all this payload carries to the engine (Keyboard.char reads only .touch): its char is no key's
-        // for a code past the BMP (a group's tap code, Keyboard.TAPS_18, PLACES) or a sym of none (0)
+        // the payload carries only the tap's place (Keyboard.char reads only .touch): its char is no key's for a code past the BMP
         val payload = touch?.takeUnless { up }?.let { Action.Key(unicode.toChar(), touch = it) }
         sendKey(Key(sym, states), release = up, virtual = states and HostKeyStates.VIRTUAL != 0, timestamp = timestamp, payload = payload)
     }
@@ -360,8 +335,6 @@ class KotlinHost(
     override suspend fun retype(typing: HostCore.Retyping, keyboard: Any?) = onHost { retype(typing, keyboard) }
     override suspend fun moveCursor(position: Int) = onHost { moveCursor(position) }
 
-    // ---- input methods
-
     override suspend fun availableIme() = withContext(dispatcher) { InputMethodCatalog.LISTED.map { InputMethodEntries.of(it.name) }.toTypedArray() }
 
     override suspend fun enabledIme() = onHost { contexts.group.inputMethods.map(InputMethodEntries::of).toTypedArray() }
@@ -371,8 +344,6 @@ class KotlinHost(
     override suspend fun activateIme(ime: String) = onHost { setCurrentInputMethod(ime) }
     override suspend fun enumerateIme(forward: Boolean) = onHost { enumerate(forward) }
     override suspend fun currentIme() = onHost { InputMethodEntries.of(currentInputMethod()) }
-
-    // ---- settings pages (design §5)
 
     override suspend fun imOptions(im: String) = withContext(dispatcher) { options.page(im)?.leaves() }
 
@@ -386,8 +357,6 @@ class KotlinHost(
     override suspend fun punctuationMap(lang: String) = withContext(dispatcher) {
         if (lang != ZH_CN) emptyList() else punctuationMaps.load(ZH_CN)
     }
-
-    // ---- quick input, focus, status area, candidates
 
     override suspend fun triggerQuickPhrase() = onHost { triggerQuickPhrase(); Unit }
     override suspend fun quickPhraseAt(index: Int) = onHost { quickPhraseAt(index) }
@@ -410,8 +379,6 @@ class KotlinHost(
     override suspend fun setCandidatePagingMode(mode: Int) = onHost { setCandidatePagingMode(mode) }
     override suspend fun offsetCandidatePage(delta: Int) = onHost { offsetCandidatePage(delta) }
 
-    // ---- start and stop
-
     override fun start() {
         if (lifecycle.currentState != HostLifecycle.State.STOPPED) {
             Timber.w("Skip starting fcitx: not at stopped state!")
@@ -425,14 +392,12 @@ class KotlinHost(
             try {
                 startup()
             } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                // the executor would keep it and the host stay STARTING, the keyboard dead with no
-                // word said: the process ends instead, as the native host's startup failure did
+                // the executor would keep it and the host stay STARTING, a dead keyboard with no word said: end the process instead
                 Timber.e(e, "Kotlin host failed to start")
-                // the text pack read through first, so one damaged is marked so (the next start's
-                // load reads it as such, the gate up) rather than this ending every start (review M-2)
+                // read the text pack through first, so a damaged one is marked rather than failing every start
                 runCatching { PackStore.verifyAfterFailure(PackKind.TEXT, e) }
                 val thread = Thread.currentThread()
-                // never null: a live thread without its own handler answers with its group
+                // never null: a thread without its own handler answers with its group
                 thread.uncaughtExceptionHandler.uncaughtException(thread, e)
             }
         }
@@ -448,23 +413,20 @@ class KotlinHost(
         ClipboardManager.removeOnUpdateListener(onClipboardUpdate)
         try {
             dispatcher.stop {
-                // what is pending goes to disk (not before unlock: the writer is not writable then)
+                // not before unlock: the writer is not writable then
                 writer?.flush()
                 core = null
                 modules = null
-                // the engine gone with the host, as with fcitx's exit
                 engine.close()
             }.let { if (it.isNotEmpty()) Timber.w("${it.size} job(s) didn't get a chance to run!") }
         } finally {
             forgetCaches()
-            // stopped even when the last step threw, so a later start (another restart, a new client's
-            // connect) can run; the throw goes on, so this restart's own start is skipped
+            // stopped even when the last step threw, so a later start can run; the throw goes on
             lifecycleRegistry.postEvent(HostLifecycle.Event.ON_STOPPED)
         }
     }
 
-    // the stopped host's state: a view made anew before the next host speaks (a restart, the app's
-    // language changed) would show its code row and candidates, a dead engine's
+    // a view remade before the next host speaks would show a dead engine's code row and candidates
     private fun forgetCaches() {
         inputMethodEntryCached = noInputMethod
         statusAreaCached = emptyList()
@@ -476,22 +438,17 @@ class KotlinHost(
         pagedCached = HostEvent.Paged.EMPTY
     }
 
-    /**
-     * A host left STARTING by a failed [startup] (which [stop] skips): its thread and clipboard
-     * listener taken away, as the process's end does in production, so a test's later ones do not
-     * see them (process-wide counts, F4296).
-     */
+    /** A failed [startup] leaves STARTING, which [stop] skips: tear down its thread and clipboard listener so later tests do not see them. */
     @VisibleForTesting
     internal fun tearDownFailedStart() {
         ClipboardManager.removeOnUpdateListener(onClipboardUpdate)
         dispatcher.stop {}
     }
 
-    /** `KotlinHost.start` of design §4: the config and data directories settled, the engine, the files, the core, then ready. */
     private fun startup() {
         val started = System.nanoTime()
         var lap = started
-        // debug builds: each step's time (logcat HostStartup), for the cold-start comparison of gate 5
+        // debug builds: each step's time in logcat (HostStartup)
         val step = { name: String ->
             if (BuildConfig.DEBUG) {
                 val now = System.nanoTime()
@@ -517,8 +474,7 @@ class KotlinHost(
                 null
             }
         }
-        // before the first unlock nothing is written (design §2.2): the process restarts at unlock; nor
-        // where the config is not settled (ConfigHome.Problem), the user told
+        // nothing written before the first unlock (the process restarts then) nor where the config is not settled
         val sink = config.dir?.let { dir -> ConfigWriter.files(dir) { path, e -> Timber.w(e, "cannot write %s", path) } }
         writer = ConfigWriter(!directBoot && config.writable && sink != null, configThread, sink ?: { _, _ -> false })
         if (!directBoot && !config.writable) EngineNotices.failedUntilSeen(R.string.config_not_settled)
@@ -526,8 +482,8 @@ class KotlinHost(
         step("punctuation maps, writer")
         val strings = AppHostStrings(context)
         val available = InputMethodCatalog.LISTED.map { it.name }.toSet()
-        val loaded = Profile.load(readConfig(PROFILE).getOrNull(), available + NineKeysMerge.OLD + HandwritingRetire.OLD, strings.defaultGroup)
-        val retired = retireHandwriting(mergeNineKeys(loaded, directBoot), directBoot)
+        val loaded = Profile.load(readConfig(PROFILE).getOrNull(), available + HandwritingRetire.OLD, strings.defaultGroup)
+        val retired = retireHandwriting(loaded, directBoot)
         this.directBoot = directBoot
         loadOptions(readConfig(EngineOptions.PATH).getOrNull(), directBoot)
         for (path in CONF_FILES) confTexts[path] = readConfig(path).getOrNull()
@@ -560,13 +516,13 @@ class KotlinHost(
         made.events += HostEvents(::forward)
         made.configure(options)
         core = made
-        // the modules are built by HostCore's constructor: 简繁's list is there only now
+        // HostCore's constructor builds the modules: 简繁's list exists only now
         publishTraditional()
         step("HostCore")
         if (wasFirstRun) firstRun = false
         Timber.i("Kotlin host ready in %d ms", (System.nanoTime() - started) / NANOS_PER_MILLI)
         lifecycleRegistry.postEvent(HostLifecycle.Event.ON_READY)
-        // the keys' marks before any context is focused, on this thread: the keyboard draws them from Ready on
+        // before any context is focused: the keyboard draws the marks from Ready on
         punctuationCached = made.punctuationKeys()
         made.keepStartKeys()
         emit(HostEvent.Ready)
@@ -575,8 +531,7 @@ class KotlinHost(
         }
     }
 
-    // the module files read again (fcitx's reloadConfig): the punctuation table, the modules' files, quick phrases, the engine options
-    // one event: the punctuation's new table and config and the status sent anew at the end, the status sent once
+    // fcitx's reloadConfig, as one event: the status sent once at the end
     private fun HostCore.readModuleFiles() = batch { readModuleFilesNow() }
 
     private fun HostCore.readModuleFilesNow() {
@@ -589,7 +544,6 @@ class KotlinHost(
             punctuationCached = punctuationKeys()
             keepStartKeys()
         }
-        // traditional per input method as the file now says, the toggle's icon told anew
         modules?.chttrans?.reload(ModuleConfigs.chttrans(confTexts[ModuleConfigs.CHTTRANS]))
         publishTraditional()
         contexts.active?.let(::updateStatusArea)
@@ -601,22 +555,16 @@ class KotlinHost(
         configure(options)
     }
 
-    /**
-     * The config file [path]'s text: null if it is not there (every option in it at its default, as
-     * fcitx writes only what is set). One there that cannot be read is a failure, never its defaults
-     * (A4: a start that read none put 通用输入 back to its defaults, written so at the next change):
-     * held, so nothing replaces it this run, and the user told.
-     */
+    /** Null if absent (fcitx writes only what is set). One there but unreadable is a failure, never its defaults: held for this run and the user told. */
     private fun readConfig(path: String): Result<String?> {
         val home = configHome ?: return Result.success(null)
         val file = File(home, path)
         return try {
             if (!file.exists()) {
                 if (!statFailed(file, home)) return Result.success(null).also { writer?.release(path) }
-                // a first write renamed in place between the two looks (a reload racing a change) is there now
+                // a first write renamed in place between the two looks (a reload racing a change)
                 if (!file.exists()) throw IOException("$path is listed but cannot be read")
             }
-            // read after all (a reload): saved again
             Result.success(file.readText().also { writer?.release(path) })
         } catch (e: IOException) {
             Timber.e(e, "cannot read %s: kept as it is, not written this run", path)
@@ -626,9 +574,7 @@ class KotlinHost(
         }
     }
 
-    // whether [file], which exists() says is not there, may be after all: a failed stat (the external
-    // storage's FUSE) reads as no file, which would load the defaults and write them over it at the next
-    // change. So: its directory lists it, or a directory on the way to [home] is there but cannot be listed
+    // the external storage's FUSE can fail a stat as "no file", which would write defaults over it: trust a listing instead
     private fun statFailed(file: File, home: File): Boolean {
         var f = file
         while (true) {
@@ -640,11 +586,10 @@ class KotlinHost(
         }
     }
 
-    // what the user added (custom phrases, quick input, an edited punctuation table) not read or not
-    // settled: said once a process, as the theme list and the engine's phrases say it
+    // once a process, as the theme list and the engine's phrases say it
     private fun dataUnreadable() = EngineNotices.failedOnce(R.string.user_data_unreadable)
 
-    // said on the keyboard, once a run, till the user has seen it there
+    // once a run, till seen on the keyboard
     private fun configUnreadable() {
         if (configUnreadableTold) return
         configUnreadableTold = true
@@ -658,17 +603,14 @@ class KotlinHost(
     private fun punctuationProfile(): PunctuationProfile =
         PunctuationProfile.fromEntries(punctuationMaps.load(ZH_CN).map { PunctuationEntry(it.key, it.mapping, it.altMapping) })
 
-    // fcitx loads them as the addon loads, in C++ at no cost; here 0.4 s on a debug build, so on a
-    // thread of their own, at the start in parallel with the engine and at a reload with the keys
-    // typed meanwhile; a lookup before they are read waits for them
+    // 0.4 s on a debug build, so off the host thread; a lookup before they are read waits for them
     private fun quickPhrasesLater(): () -> QuickPhraseBook {
         val table = FutureTask { quickPhrases() }
         Thread(table, "host-quickphrase").start()
         return table::get
     }
 
-    // the user's own (fcitx's data, which backups keep) and the built-in ones; the user's not read: the
-    // built-in ones still, the user told (the settings page reads them anew before it writes)
+    // the user's unreadable: the built-in ones still, the user told
     private fun quickPhrases(): QuickPhraseBook {
         val builtIn = AssetPkgDataDir(context.assets, BUILT_IN)
         val user = dataHome?.let(::FilePkgDataDir)
@@ -676,8 +618,7 @@ class KotlinHost(
             try {
                 return QuickPhraseBook.load(user, builtIn)
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                // any slip reading the user's (not only IOException): the built-in ones, never a key's
-                // lookup failing in the FutureTask
+                // any slip, not only IOException: never a key's lookup failing in the FutureTask
                 Timber.e(e, "quick phrases: the built-in ones only")
                 dataUnreadable()
             }
@@ -690,9 +631,8 @@ class KotlinHost(
         }
     }
 
-    // quick input's ties to the app: the nine keys' letters, the habits (借手机), the use kept, ＋添加
     private val quickPhraseHooks = object : QuickPhraseHooks {
-        // read at every key quick input sees: parsed again only when the setting's text changed
+        // read at every key: parsed again only when the setting's text changed
         private var nineKeysRead: Pair<String, NineKeyLetters>? = null
 
         override val nineKeys: NineKeyLetters
@@ -705,12 +645,12 @@ class KotlinHost(
         override val withMine: Boolean get() = AppPrefs.getInstance().internal.useHabits.getValue()
 
         override fun used(entry: QuickPhraseEntry, at: Long) {
-            // on the writer's thread, never the host's: a key is not held on a file
+            // on the writer's thread: a key is never held on a file
             configThread.execute {
                 try {
                     QuickPhraseManager.markUsed(entry, at)
                 } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                    // a file this cannot write or parse costs the use kept, never the input method's process
+                    // a bad file costs the use counts, never the process
                     Timber.w(e, "quick phrase use")
                 }
             }
@@ -721,7 +661,7 @@ class KotlinHost(
         }
     }
 
-    // OpenCC s2tw, mapped where it lies in the APK, at the first traditional text
+    // OpenCC s2tw, mapped in place in the APK, at the first traditional text
     private fun converter(): ChineseConverter? = try {
         ChineseConverter.s2tw(OpenCCData.read(bridge.asset(OPENCC)))
     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
@@ -729,7 +669,7 @@ class KotlinHost(
         null
     }
 
-    // 4.5 MB, read on the host thread at Unicode's first trigger (fcitx's own moment); its index is built off it
+    // 4.5 MB, read on the host thread at Unicode's first trigger, as fcitx does
     private fun charSelectData(): ByteArray? = try {
         val t0 = System.nanoTime()
         context.assets.open("$BUILT_IN/unicode/charselectdata").use { it.readBytes() }.also {
@@ -741,38 +681,9 @@ class KotlinHost(
     }
 
     /**
-     * [loaded] with 0.4's 九键拼音 read as pinyin on the nine keys (NineKeysMerge), at every start: an
-     * upgrade's profile and a 0.4 backup restored alike, nothing done where none names it. The profile
-     * written once it is unlocked ([directBoot] writes nothing); pinyin's keyboard set and the user who
-     * had both told once where the keyboards are switched now (I1 Q2), once by a flag of their own
-     * ([AppPrefs.Internal.nineKeysMerged]): a profile that could not be written back is merged again at
-     * the next start, which must not put back a keyboard the user changed since, nor tell it again.
-     * The flag is the keyboard's (set with it, in the same prefs), not the profile's: whether the
-     * profile is on disk changes nothing it reads, as the merge is made at each read of 九键拼音. The
-     * notice waits in [AppPrefs.Internal.nineKeysUnseen] till it is seen ([tellUnseen]).
-     */
-    private fun mergeNineKeys(loaded: Profile, directBoot: Boolean): Profile {
-        val prefs = AppPrefs.getInstance()
-        val keyboard = prefs.keyboard.pinyinKeyboard
-        val merged = loaded.mergeNineKeys(keyboard.getValue().keyboard)
-        if (!merged.changed || directBoot) return merged.profile
-        if (!prefs.internal.nineKeysMerged.getValue()) {
-            keyboard.setValue(PinyinKeyboard.of(merged.pinyin))
-            prefs.internal.nineKeysMerged.setValue(true)
-            if (merged.both) prefs.internal.nineKeysUnseen.setValue(true)
-        }
-        persist(Persist.ProfileChanged(merged.profile))
-        return merged.profile
-    }
-
-    /**
-     * [loaded] without 0.6.0's handwriting input method (HandwritingRetire), at every start: an upgrade's profile
-     * and a 0.6.0 backup restored alike, nothing done where none names it; the profile written once it is
-     * unlocked ([directBoot] writes nothing). The user told whenever it retires one (§6.1: a 0.6.0 backup
-     * restored, handwriting added back there and upgraded again; [AppPrefs.Internal.handwritingRetiredUnseen],
-     * [tellUnseen]); once ([AppPrefs.Internal.handwritingRetired], which must not undo what the user did since,
-     * the button taken off the toolbar): the toolbar's 手写 pinned, turned on where handwriting was the first input
-     * method (pinyin there now).
+     * Drops the retired handwriting input method from the profile at every start (an upgrade or an old backup); written
+     * only once unlocked. The user is told each time ([tellUnseen]); the toolbar's 手写 is pinned only the first time
+     * ([AppPrefs.Internal.handwritingRetired]), so later changes by the user are not undone.
      */
     private fun retireHandwriting(loaded: Profile, directBoot: Boolean): Profile.Retired {
         val retired = loaded.retireHandwriting()
@@ -788,11 +699,7 @@ class KotlinHost(
         return retired
     }
 
-    /**
-     * chttrans' list without 0.6.0's handwriting (HandwritingRetire.traditional), written back: its 繁体 pinyin's
-     * where pinyin took its first place ([retired] moved), else gone, and the user told so as handwriting is
-     * retired ([retired] changed: the first time). [directBoot] writes nothing.
-     */
+    /** chttrans' list without the retired handwriting: its place goes to pinyin if pinyin took its first place. */
     private fun retireTraditionalHandwriting(retired: Profile.Retired, directBoot: Boolean) {
         if (directBoot) return
         val old = confTexts[ModuleConfigs.CHTTRANS]
@@ -805,25 +712,19 @@ class KotlinHost(
     }
 
     /**
-     * The options read, 双拼's scheme as 0.5 has them (SchemeMigration): an install from before 0.5
-     * (not this one's first run, not [AppPrefs.Internal.schemeSettled]: a 0.4 backup's prefs restored
-     * have neither) with none stored pinned to 自然码, a dropped one 小鹤 and the user told once;
-     * written back. Settled where what the file says is read so again: a scheme kept or dropped (read
-     * again, the same), or the pin once it is on disk; a pin not written (the config held as it could not
-     * be read, not writable, a failed write) is made again at the next start. [directBoot] reads the
-     * defaults and settles nothing. A dropped scheme's notice waits in [AppPrefs.Internal.schemeRetiredUnseen]
-     * till it is seen ([tellUnseen]).
+     * Pins installs from before 双拼's scheme migration with none stored to 自然码 and moves a dropped scheme to 小鹤,
+     * telling once. Settled only once what the file says reads so again, so a pin not written is retried at the next
+     * start. [directBoot] reads the defaults and settles nothing.
      */
     private fun loadOptions(read: String?, directBoot: Boolean) {
         val internal = AppPrefs.getInstance().internal
-        // direct boot's prefs are a copy, its config none of the user's: the defaults, 小鹤
+        // direct boot's prefs are a copy and its config none of the user's
         options.load(read.orEmpty(), upgrade = !directBoot && !firstRun && !internal.schemeSettled.getValue())
         if (directBoot) return
         val settle: () -> Unit = { internal.schemeSettled.setValue(true) }
         val migrated = options.schemeMigrated
         val retired = migrated?.retired
         when {
-            // the scheme kept: read again, the same
             migrated == null -> settle()
             // read again it is dropped again: settled whether or not 小鹤 is written
             retired != null -> {
@@ -832,7 +733,7 @@ class KotlinHost(
                 val written = options.text()
                 writer?.write(EngineOptions.PATH, null) { written }
             }
-            // the pin: the next start reads 自然码 only once it is on disk, so settled then and not before
+            // the pin reads back only once on disk: settled then, not before
             else -> {
                 val written = options.text()
                 writer?.write(EngineOptions.PATH, settle) { written }
@@ -840,11 +741,7 @@ class KotlinHost(
         }
     }
 
-    /**
-     * The I1 notices not yet seen ([mergeNineKeys], [loadOptions]) told until they are: at each start, so
-     * one a process ended before any keyboard showed is told at the next; each kept till said on the
-     * keyboard. Told again as a reload reads the config, the same notice (one per id) waiting.
-     */
+    /** At each start, so a notice whose process ended before any keyboard showed is told at the next. */
     private fun tellUnseen() {
         val internal = AppPrefs.getInstance().internal
         val handwriting = internal.handwritingRetiredUnseen.getValue().split(',').filterTo(HashSet()) { it.isNotEmpty() }
@@ -858,10 +755,6 @@ class KotlinHost(
         if (internal.keyHandwritingUnseen.getValue()) {
             EngineNotices.toldUntilSeen(R.string.key_handwriting_retired) { internal.keyHandwritingUnseen.setValue(false) }
         }
-        if (internal.nineKeysUnseen.getValue()) {
-            EngineNotices.toldUntilSeen(R.string.nine_keys_merged) { internal.nineKeysUnseen.setValue(false) }
-        }
-        // the theme packs' boards put in the list and chosen, not yet seen: told as the start that chose them told them
         ThemeLayoutsToList.tellUnseen()
         val retired = internal.schemeRetiredUnseen.getValue()
         if (retired.isNotEmpty()) {
@@ -878,7 +771,7 @@ class KotlinHost(
     }
 
     private fun persist(change: Persist) {
-        // a toggle of 简繁 saves the list: the keyboard reads it from here (EngineState.traditionalIms)
+        // the keyboard reads 简繁's list from here (EngineState.traditionalIms)
         if (change is Persist.ConfChanged && change.conf == ModuleConfigs.CHTTRANS) publishTraditional()
         val writer = writer ?: return
         when (change) {
@@ -894,11 +787,8 @@ class KotlinHost(
         }
     }
 
-    // ---- events: the host's, as they are, into the app's flow
-
     private fun forward(event: HostEvent) {
         if (event is HostEvent.Tip) {
-            // on the keyboard if it is up (Fcitx.showToast)
             EngineNotices.tip(event.text)
             return
         }
@@ -906,12 +796,11 @@ class KotlinHost(
     }
 
     private fun emit(event: HostEvent) {
-        // the type only: the contents are what the user types, password fields included; debug builds
-        // alone, as it is every key's
+        // the type only: the contents are what the user types, password fields included
         if (BuildConfig.DEBUG) Timber.d("Handling %s", event.javaClass.simpleName)
         when (event) {
             is HostEvent.InputMethodChanged -> {
-                // the input method's name only, never what is typed
+                // never what is typed
                 Timber.d("input method now %s", event.im)
                 inputMethodEntryCached = event.entry
             }
@@ -919,7 +808,6 @@ class KotlinHost(
                 statusAreaCached = event.entries
                 event.punctuation?.let { punctuationCached = it }
                 fullWidthCached = event.fullWidth
-                // the toggle or the input method changed: the start's keys as they now would be
                 core?.keepStartKeys()
                 // a sub mode changed, which no InputMethodChanged tells: told first, as Fcitx's handler does
                 if (event.entry != inputMethodEntryCached) {
@@ -929,7 +817,7 @@ class KotlinHost(
             }
             is HostEvent.ClientPreedit -> clientPreeditCached = event.text
             is HostEvent.InputPanel -> inputPanelCached = event
-            // one or the other, as the paging mode has it: the one not sent last is no longer the engine's
+            // one or the other by paging mode: the one not sent last is no longer the engine's
             is HostEvent.Candidates -> {
                 candidatesCached = event
                 pagedCached = HostEvent.Paged.EMPTY
@@ -946,13 +834,11 @@ class KotlinHost(
     internal companion object {
         private const val PROFILE = "profile"
 
-        // what the notice of handwriting moved onto the toolbar says besides that (Internal.handwritingRetiredUnseen,
-        // its markers comma-separated)
+        // Internal.handwritingRetiredUnseen holds comma-separated markers
         private const val RETIRED_TOOLBAR = "toolbar"
         private const val RETIRED_MOVED = "moved"
         private const val RETIRED_TRADITIONAL = "traditional"
 
-        // the modules' files, read at the start and again at reloadConfig
         private val CONF_FILES = listOf(ModuleConfigs.PUNCTUATION, ModuleConfigs.CHTTRANS)
         const val ZH_CN = "zh_CN"
         private const val BUILT_IN = "pkgdata"
@@ -962,8 +848,7 @@ class KotlinHost(
     }
 }
 
-// a text at a time, yielding between: a key typed meanwhile goes in before the next, and a caller that
-// gave up (the clipboard's split after its second) stops the rest instead of holding the thread through them
+// yields between texts, so a key typed meanwhile goes first and a caller that gave up stops the rest
 internal suspend fun aTextAtATime(texts: List<String>, of: (List<String>) -> Map<String, IntArray>): Map<String, IntArray> =
     buildMap {
         for (text in texts) {

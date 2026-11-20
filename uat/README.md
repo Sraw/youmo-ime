@@ -33,7 +33,7 @@
 | [20-accessibility.md](20-accessibility.md) | 读屏：开着 TalkBack 探索触摸每个键盘、表情/颜文字/符号面板的格子、长按候选的菜单（读的话、节点框、焦点） |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
-大词库用例（WD-14d、14h、TBL-12c 发版时用发布包脚本跑，平时不跑；发版时手动跑的 WD-14r、14v、TBL-12d 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
+大词库用例（WD-14d、14h、TBL-12c 发版时用发布包脚本跑，平时不跑；发版时手动跑的 WD-14v 也要；14i、14s 等搬到 JVM 的用 fixtures 里的 big-words.txt 或小词表，不要它）要雾凇拼音（[rime-frost](https://github.com/gaboolic/rime-frost/releases)）发布的
 `frost_dict_for_fcitx5.txt`，约 89 MB，不放进 fixtures：下载后用环境变量 `UAT_FROST=<路径>` 指给脚本。用例里的数
 （1914461 个词、176 行读不懂）出自 SHA-256 为 `86473190c505691c7f1ef7b87345a16b555c75fea30527f472a151b6eb1ad41f`
 的那一份（1914637 行），脚本先核对哈希，对不上记为 Blocked；换新版时连同用例里的数一起改。
@@ -183,7 +183,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 | 类 | 在哪 | 写法 | 例子 |
 |---|---|---|---|
-| 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟） | `needs="jvm:<测试类>.<方法>"`，`.md` 加 **JVM** 行 | 整句、学习排序、标点、快速输入、九键连按 |
+| 引擎 | ime-core 单测（小数据、毫秒级）或 `:lib:ime-eval:uatTest`（真数据：EngineReplay 只有引擎，HostReplay 加 Kotlin 宿主的标点、简繁、快速输入、面板、虚拟时钟） | `.md` 写 **JVM** 行，测试方法标 `@Uat`；脚本里不用登记 | 整句、学习排序、标点、快速输入、九键连按 |
 | 界面 | `:app:testDebugUnitTest` 的 Robolectric + Roborazzi（`uat/*UatTest`、`KeyboardHarness`、`*KeyboardScreenshotTest`） | 同上 | 键盘样子、状态面板、设置页、词库页、横屏/分体 |
 | 只能在设备上 | 模拟器 | 不写 `needs=` | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
 | 冒烟 | 模拟器，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
@@ -216,14 +216,14 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | `needs=` | 在哪跑 | 例子 |
 |---|---|---|
 | `voice:…` | 导入了语音包的 debug 包（默认就是；`--no-voice` 时、发布包上在别处跑：发布包没有片段麦克风） | 12 语音 |
-| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-30、PR-35、PR-36、PR-37、PR-38、PR-41、PR-43、TBL-12d、TBL-33、TBL-43、WD-14r、WD-14v、QU-20、ST-82、ST-85、ST-110 |
+| `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-35、PR-36、PR-37、PR-38、TBL-43、WD-14v、QU-20、ST-82、ST-85 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
 | `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、VO-40、PY-121a、LC-33、ST-131、ST-141、ST-189、ST-190、PY-156 |
-| `jvm:<测试>` | JVM 上的测试（`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`，`:lib:keyboard-scene:jvmTest`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
+| `jvm:<测试>` | JVM 上的测试（.md 有 **JVM** 行、脚本里没有这条的，`uat.py` 自动按 jvm 算，测试名从 `@Uat` 读；`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`，`:lib:keyboard-scene:jvmTest`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 1107 条（P0 149、P1 830、P2 128）：模拟器上跑 179 条（其中 129 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 928 条（JVM 817、发版时 25、真机或手工 66、语音 20）。
+现在共 1098 条（P0 147、P1 823、P2 128）：模拟器上跑 179 条（其中 129 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 919 条（JVM 815、发版时 18、真机或手工 66、语音 20）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
@@ -276,7 +276,7 @@ debug 包（要先有 arm64-v8a debug 包），只当宿主应用、把它自己
 有些用例的 **预期** 在 JVM 上就能完整断言：`app/src/test` 里的 `KeyboardHarness` 在 Robolectric 里造出整个键盘
 （真的输入法服务和 `InputView`，引擎换成 `FakeHostApi`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
 样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`（keyboard-scene 的测试用它自己的 `org.fcitx.fcitx5.android.scene.Uat`），用例 .md 里多一行
-**JVM** 写测试名；整条搬走的，脚本里是 `needs="jvm:…"`，设备上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
+**JVM** 写测试名；整条搬走的，脚本里不再登记（`uat.py` 把它算作 `jvm:`，测试名从 `@Uat` 读），设备上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
 .md 里写明。
 
 ```sh

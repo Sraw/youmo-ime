@@ -13,7 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 双拼 down to 小鹤, 微软 and 自然码, 小鹤 the default (the user's 2026-11-01): a config as stored, read as 0.5 has them.
+ * 双拼 down to 小鹤, 微软 and 自然码, 小鹤 the default.
  *
  * contract: the configs as 0.4.0 stores them (its schemes' names), which mutation cannot see.
  */
@@ -29,8 +29,7 @@ class SchemeMigrationTest {
             assertNull(text, options.schemeMigrated)
             assertEquals(text, EngineSettings.XIAOHE, options.toSettings().shuangpin)
         }
-        // what resets it is the option's default: a page's value it cannot read (setPage), an upgrade's
-        // pinned 自然码 too; written, the default is left out (fcitx's way)
+        // the option's default resets it; written, the default is left out (fcitx's way)
         val pinned = read("", upgrade = true)
         val page = pinned.page(InputMethodCatalog.SHUANGPIN)!!.apply { this[EngineSettings.SHUANGPIN_PROFILE].value = "" }
         assertTrue(pinned.setPage(InputMethodCatalog.SHUANGPIN, page))
@@ -76,7 +75,6 @@ class SchemeMigrationTest {
                 val options = read("ShuangpinProfile=$quoted\nPageSize=5\n", upgrade)
                 assertEquals(name, SchemeMigration.Outcome(EngineSettings.XIAOHE, retired = name), options.schemeMigrated)
                 assertEquals(name, EngineSettings.XIAOHE, options.toSettings().shuangpin)
-                // the rest as it was
                 assertEquals(name, 5, options.toSettings().pageSize)
                 // written so (the default: left out), read again: nothing more to do
                 val again = read(options.text())
@@ -89,11 +87,9 @@ class SchemeMigrationTest {
     @Test
     fun anUpgradeWithAnEmptyOrUnknownSchemeIsPinnedToZiranmaAsWithNone() {
         assertRows(listOf("" to "empty", "Foo" to "no scheme, current or retired"), { "${it.first}: ${it.second}" }) { (stored, _) ->
-            // 0.4 read either as its default, 自然码
             val options = read("ShuangpinProfile=$stored\n", upgrade = true)
             assertEquals(SchemeMigration.Outcome(EngineSettings.ZIRANMA), options.schemeMigrated)
             assertEquals(EngineSettings.ZIRANMA, options.toSettings().shuangpin)
-            // settled (no upgrade): a bad value, the option's default
             val settled = read("ShuangpinProfile=$stored\n")
             assertNull(settled.schemeMigrated)
             assertEquals(EngineSettings.XIAOHE, settled.toSettings().shuangpin)

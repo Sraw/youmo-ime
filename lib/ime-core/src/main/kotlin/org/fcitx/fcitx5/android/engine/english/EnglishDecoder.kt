@@ -10,15 +10,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.KeyNeighbours
 import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
-/**
- * What typing a word's keys otherwise costs, in the model's log10: a key beside the one meant
- * ([near]) or any other ([far]), a key of the word not typed ([missed]), one typed it has not
- * ([extra]), two side by side the other way round ([swapped]); one of a doubled letter missed or
- * one doubled that is not, helo for hello, helllo ([repeated]). Past [limit] the keys are not the
- * word's. A word longer than the keys is offered as typed so far, at [complete] more, from keys
- * that cost no more than [completeLimit] to be its start (nothing short of [completeFrom] keys, for
- * which only the start they spell is any word's).
- */
+/** Typing error costs in model log10: near/far key, missed, extra, swapped, doubled letter ([repeated]); past [limit] no match. Completions cost [complete] more. */
 data class TypingCosts(
     val near: Float = 1.0f,
     val far: Float = 3.0f,
@@ -33,59 +25,35 @@ data class TypingCosts(
 )
 
 /**
- * The words of [data] for the keys typed: those they spell, those they start, and those a few
- * slips from them on the keyboard ([TypingCosts]), each scored by the model after the words before
- * it, less what typing it so cost.
- *
- * The words are searched as a trie of their keys, which [EnglishData]'s key order is: each prefix a
- * run of it, its children found by binary search. A row of edit costs (Damerau's, with the swap) is
- * carried down; a prefix past the limit ends the search there. A prefix the keys spell whole (at
- * no more than the completion limit, and more cheaply than its parent's) offers the words it
- * starts, and is searched no further: those words cost no less below it.
+ * The words the keys spell, start, or spell within a few slips, scored by the model less the typing cost. Walks
+ * [EnglishData]'s key order as a trie with a Damerau cost row, pruning past the limit; a prefix the keys spell
+ * whole offers its words and is not searched deeper.
  */
 class EnglishDecoder(
     private val data: EnglishData,
     private val costs: TypingCosts = TypingCosts(),
-    // what a key typed costs for the letter meant: by default a key beside it [TypingCosts.near], any other far
     private val keyCost: ((meant: Char, typed: Char) -> Float)? = null,
-    // what a key tapped at a place costs read as the one meant: by default [nearTap]'s
     private val tapCost: ((touch: Touch, typed: Char, meant: Char) -> Float)? = null,
-    // what a word read through a tap's slip costs more where the keys as typed spell a word as long as them (as
-    // SlipCost.legal; the nine keys'), none past the limit; 0 for nothing more
+    // extra cost of a slip reading when the keys as typed spell a word as long (as SlipCost.legal)
     private val legalSlip: Float = 0f,
-    // a word's score after a context: the model's, or with what the user typed added
     private val score: (context: Long, word: Int) -> Float = data.model::scoreAfter,
 ) {
 
-    /**
-     * A word offered: its id, its model score after the context, what typing it so cost, and
-     * whether it is longer than the keys typed (a completion).
-     */
     class Suggestion(val word: Int, val lm: Float, val cost: Float, val completes: Boolean) {
         val score: Float get() = lm - cost
     }
 
-    /**
-     * The context of the next word after [words] (the nearest last): ids of the last two, each as the
-     * dict tool counted it ([wordId]), a word the data lacks as none.
-     */
     fun context(words: List<String>): Long {
         val from = maxOf(0, words.size - 2)
         val ids = (from until words.size).map { wordId(words[it], first = it > 0 && words[it - 1] == EnglishText.START) }
         val prev = ids.lastOrNull() ?: NgramModel.NO_WORD
-        // a word the data lacks starts afresh, as such a word broke the pages' runs
+        // after a word the data lacks, start afresh, as such words broke the pages' runs
         val prev2 = if (ids.size == 2 && prev != NgramModel.NO_WORD) ids[0] else NgramModel.NO_WORD
         return data.model.context(prev2, prev)
     }
 
-    // [word] as EnglishVocabulary.Words.id counted it: a sentence's [first] as the commoner (the lower id)
-    // of it and its lower-case form, The as the; a spelling the data lacks as its letters' commonest,
-    // dont as don't, but one with an apostrophe as their commonest with one (WE'LL as we'll, not well)
-    // and one without of [LIKE_CONTRACTIONS] as their commonest without (WED as wed). Looked up as
-    // written, a sentence's first word was mostly none, and nothing followed it. A slip the pages had
-    // is none (teh, which the dict tool counted as the): the data does not say which they were. The
-    // rules for an apostrophe and for [LIKE_CONTRACTIONS] reach the shipped model only at the next
-    // `english-data` release: it counted WE'LL and WED as their letters' commonest (well, we'd), not as read here
+    // as EnglishVocabulary counted it: a sentence's first word as the commoner of it and its lower case; an unknown
+    // spelling as its letters' commonest. The shipped model follows the apostrophe rules only from the next `english-data`
     private fun wordId(word: String, first: Boolean): Int {
         val exact = data.id(word)
         if (first) {
@@ -99,8 +67,6 @@ class EnglishDecoder(
         return if (held != NgramModel.NO_WORD) held else commonestOf(key, apostrophe = null)
     }
 
-    // the lowest id of the words typed with [key] (their run in key order) with an [apostrophe] or
-    // without, either for null; none for no such word. The keys are read in place, as the search reads them
     private fun commonestOf(key: String, apostrophe: Boolean?): Int {
         var at = 0
         var hi = data.keyed
@@ -116,7 +82,6 @@ class EnglishDecoder(
         return if (best == Int.MAX_VALUE) NgramModel.NO_WORD else best
     }
 
-    // the key at [rank] in key order against [key], as String.compareTo compares them
     private fun compareKey(rank: Int, key: String): Int {
         val length = data.keyLength(rank)
         for (i in 0 until minOf(length, key.length)) {
@@ -126,13 +91,7 @@ class EnglishDecoder(
         return length.compareTo(key.length)
     }
 
-    /**
-     * The [limit] best words for [keys] (letters, lower case: [EnglishData.key]) after [context], best
-     * first; [exactFirst], those as long as the keys before any longer (the nine keys', whose words
-     * all cost nothing). [touches]: where each key was tapped and the keys around it, a key each
-     * (null for none): a key read as one around it costs by how far toward it the tap fell
-     * ([tapCost], or [nearTap] by default), not [TypingCosts.near] alike.
-     */
+    /** The [limit] best words for [keys] after [context]; [exactFirst] (nine keys) puts words as long as the keys first; [touches] cost neighbours by tap distance. */
     fun suggest(keys: String, context: Long, limit: Int, exactFirst: Boolean = false, touches: Array<Touch?>? = null): List<Suggestion> {
         if (limit <= 0 || keys.isEmpty() || keys.length > MAX_KEYS) return emptyList()
         val tapped = touches?.takeIf { it.size == keys.length }
@@ -142,8 +101,6 @@ class EnglishDecoder(
         return (if (tapped != null && legalSlip < 0f) legal(found) else found).sortedWith(order).take(limit)
     }
 
-    // [found] with a slip read ([legalSlip]'s decoder, whose every other key costs nothing or never) costing
-    // [legalSlip] more where a word spelt as typed is among them
     private fun legal(found: Collection<Suggestion>): Collection<Suggestion> {
         if (found.none { !it.completes && it.cost == 0f }) return found
         return found.mapNotNull { s ->
@@ -151,7 +108,6 @@ class EnglishDecoder(
         }
     }
 
-    /** The [limit] likeliest words after [context], best first: what may come next. */
     fun predict(context: Long, limit: Int): List<Suggestion> {
         if (limit <= 0) return emptyList()
         val best = ArrayList<Suggestion>()
@@ -166,12 +122,7 @@ class EnglishDecoder(
         return best
     }
 
-    /**
-     * What reading the key [typed], tapped at [touch], as [meant] costs: nothing for the key itself;
-     * for a key around it, the log of how much likelier the tap is aimed at the key hit ([SlipCost],
-     * as pinyin reads a slip, 061-neighbour-english), but never more than a key anywhere
-     * ([TypingCosts.far]: a word misspelt, which is no matter of where a tap fell); far for any other.
-     */
+    /** Cost of reading [typed] tapped at [touch] as [meant]: 0 for itself, a neighbour by [SlipCost] capped at [TypingCosts.far], far for any other. */
     private fun nearTap(touch: Touch, typed: Char, meant: Char): Float {
         if (meant == typed) return 0f
         val near = touch.near(meant) ?: return costs.far
@@ -197,7 +148,6 @@ class EnglishDecoder(
         private fun visit(depth: Int, from: Int, to: Int) {
             val row = rows[depth]
             var pos = from
-            // the words whose keys end here come first in the run
             while (pos < to && data.keyLength(pos) == depth) {
                 if (row[n] <= costs.limit) add(data.keyedWord(pos), row[n], completes = false)
                 pos++
@@ -215,12 +165,10 @@ class EnglishDecoder(
             }
         }
 
-        // whether the keys spell the prefix well enough for its words to be offered: more cheaply than
-        // its parent, and best here, not where they spell a shorter one fairly (se for see)
+        // offered here only if spelt more cheaply than by its parent, not where a shorter prefix is spelt fairly (se for see)
         private fun completesHere(row: FloatArray, parent: FloatArray): Boolean =
             row[n] <= completeLimit && parent[n] > row[n] && row[n] <= row.min()
 
-        // the row for the prefix with [c] after it; false where every cost is past the limit
         private fun step(depth: Int, c: Char): Boolean {
             path[depth] = c
             val prev = rows[depth]
@@ -241,7 +189,6 @@ class EnglishDecoder(
             return least <= costs.limit
         }
 
-        // the keys typed up to [j] end in the prefix's last two, [c] and the one before it, the other way round
         private fun swapped(depth: Int, j: Int, c: Char): Boolean =
             depth >= 1 && j >= 2 && c == keys[j - 2] && path[depth - 1] == keys[j - 1]
 
@@ -261,9 +208,8 @@ class EnglishDecoder(
         }
 
         private fun complete(from: Int, to: Int, cost: Float) {
-            // a long run (a key or two typed): its commoner words alone, as ids are by frequency
+            // a long run: only its common words, as ids go by frequency
             val frequentOnly = to - from > MAX_SCAN
-            // all cost the same here: only the run's [limit] likeliest can be offered, of thousands for a key or two
             val best = ArrayList<Suggestion>(limit + 1)
             for (pos in from until to) {
                 val word = data.keyedWord(pos)
@@ -273,8 +219,6 @@ class EnglishDecoder(
             for (s in best) found[s.word] = s
         }
 
-        // [word] completed at [cost] into [best], the run's [limit] likeliest in the order offered, unless
-        // it is found as cheaply already or ranks past them
         private fun keepIfAmongBest(best: MutableList<Suggestion>, word: Int, cost: Float) {
             val old = found[word]
             if (old != null && old.cost <= cost) return
@@ -285,7 +229,6 @@ class EnglishDecoder(
             if (best.size > limit) best.removeAt(best.size - 1)
         }
 
-        // [word] scored [lm] before [s] as they are offered: likelier, or as likely and the lower id
         private fun outranks(lm: Float, word: Int, s: Suggestion) = lm > s.lm || lm == s.lm && word < s.word
 
         private fun add(word: Int, cost: Float, completes: Boolean) {
@@ -296,30 +239,19 @@ class EnglishDecoder(
     }
 
     companion object {
-        // a cost past any limit: what cannot be
         private const val NEVER = 1000f
 
-        /**
-         * Typing on the nine keys: a word's letters each on the key typed, or the letter typed itself
-         * (a hardware key's among the screen's); no key missed, extra or swapped, as each press is
-         * meant. A word longer than the keys is offered from the first key.
-         */
+        /** The nine keys: any letter on the key typed, or the letter itself; nothing missed, extra or swapped. */
         val NINE_KEY_COSTS = TypingCosts(
             near = NEVER, far = NEVER, missed = NEVER, extra = NEVER, swapped = NEVER, repeated = NEVER,
             limit = 0f, complete = 0f, completeLimit = 0f, completeFrom = 1,
         )
 
-        /** [NINE_KEY_COSTS]' key cost: a digit typed (2 to 9) is any of its [letters], a letter only itself. */
         fun nineKeyCost(letters: (Char) -> String): (Char, Char) -> Float = { meant, typed ->
             val fits = if (typed in '2'..'9') meant in letters(typed) else meant == typed
             if (fits) 0f else NEVER
         }
 
-        /**
-         * [nineKeyCost] for a key tapped at a place: a letter of a digit key around it besides, at
-         * what [slip] has the tap aimed at that key cost (none below its floor), as pinyin's nine
-         * keys read a slip (061-neighbour-english).
-         */
         fun nineKeyTap(letters: (Char) -> String, slip: SlipCost): (Touch, Char, Char) -> Float {
             val fits = nineKeyCost(letters)
             return { touch, typed, meant ->
@@ -327,8 +259,7 @@ class EnglishDecoder(
                 if (own == 0f || typed !in '2'..'9') {
                     own
                 } else {
-                    // the cheapest key around with the letter: a user's keys may have it on two (review F8289); a plain
-                    // loop, nothing allocated, as it runs at every touch, key and letter searched (R26 F8495)
+                    // a plain loop: runs per touch, key and letter (custom keys may have a letter twice)
                     var least = Float.NaN
                     for (i in touch.near.indices) {
                         val near = touch.near[i]
@@ -341,23 +272,15 @@ class EnglishDecoder(
             }
         }
 
-        // a full keyboard's tap read as pinyin's full keyboard reads it
         private val SLIP = SlipCost()
 
-        /** Keys past this are no word the data has: nothing is searched for them. */
         const val MAX_KEYS = EnglishText.MAX_WORD
 
-        // a run of completions longer than this is scored for its commoner words alone
         internal const val MAX_SCAN = 4000
 
-        // the words below this id: the commonest, as EnglishVocabulary numbers them
         internal const val FREQUENT = 30_000
 
-        /**
-         * Real words with a contraction's letters (wed beside we'd), by key: a spelling of them without
-         * an apostrophe is counted as their commonest without one, as EnglishVocabulary counts the pages,
-         * and read so before the cursor. Not cant or wont, typed for can't and won't far more often than meant.
-         */
+        /** Real words spelt like a contraction without its apostrophe (wed, we'd); not cant or wont, meant as can't and won't. */
         val LIKE_CONTRACTIONS: Set<String> = setOf("hell", "id", "ill", "its", "lets", "shed", "shell", "wed", "well", "were")
     }
 }

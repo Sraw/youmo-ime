@@ -12,15 +12,7 @@ import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 
-/**
- * 候选词注音 against a hand-checked list (data/readings/chat.tsv, `word<TAB>reading`, the reading's syllables
- * marked as [org.fcitx.fcitx5.android.engine.reading.ToneMark.pinyin] writes them, spaces between): how many
- * words the candidates would show read right, every character's syllable and tone, each read by its
- * text as a table's or a prediction's candidate is (the likeliest reading the dictionary has); [typed], as
- * pinyin's candidate is when the word was typed by the list's syllables (their tones still the data's).
- * A syllable the list reads neutral is right in any tone ([agrees]): the readings shown keep each
- * character's own tone (the user, 2026-11-02), and which tone that is the data says, not the list.
- */
+/** 候选词注音 against a hand-checked list (data/readings/chat.tsv); a neutral syllable is right in any tone. */
 internal class ReadingsRun(private val data: PinyinData, private val typed: Boolean = false) {
 
     private val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
@@ -55,7 +47,7 @@ internal class ReadingsRun(private val data: PinyinData, private val typed: Bool
             }
         }
 
-        /** A share of the words read right a release must reach (design 051-zhuyin §4). */
+        /** A share of the words read right a release must reach. */
         const val GATE = 98.0
 
         fun parse(lines: Sequence<String>): List<Pair<String, String>> = lines

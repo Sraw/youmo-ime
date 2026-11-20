@@ -45,10 +45,6 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.time.Duration
 
-/**
- * 常用词's page (dev/design/060-common-words.md, WD-39, WD-42): what [SettingsPagesUatTest] has for
- * the other pages, for this one.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -66,7 +62,7 @@ class CommonWordsPageUatTest {
 
     private fun idle() = st.idle()
 
-    // a page's work done off the main thread (a search, a list read): waited for, as a user would
+    // a page's work done off the main thread: waited for, as a user would
     private fun until(what: String, test: () -> Boolean) =
         waitUntil(what, { "; shown ${shown()}" }, step = { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }, done = test)
 
@@ -90,7 +86,7 @@ class CommonWordsPageUatTest {
 
     private fun clickable(v: View): View = generateSequence(v) { it.parent as? View }.first { it.hasOnClickListeners() || it.isLongClickable }
 
-    // a dialog opened by a tap may show a looper turn later under load: wait for it rather than read null
+    // a dialog opened by a tap may show a looper turn later under load
     private fun dialog(): AlertDialog {
         until("a dialog showing") { ShadowDialog.getLatestDialog()?.isShowing == true }
         return ShadowDialog.getLatestDialog() as AlertDialog
@@ -103,9 +99,6 @@ class CommonWordsPageUatTest {
         return CommonWordsManager.load().words.map { it.toString() }
     }
 
-    // 常用词 (060-common-words): added with the pinyin left blank, filled as the dictionary reads it for
-    // the user to check, the replacements one a line; listed with the keys that type it; a file imported
-    // after saying what it adds and skips; exported tab-separated under its header
     @Test
     @Uat("WD-39", "WD-42")
     fun aCommonWordAddedImportedAndExported() {
@@ -168,7 +161,6 @@ class CommonWordsPageUatTest {
         until("read") { shown().any { it.startsWith("木字旁") } }
     }
 
-    // the edit dialog of the row shown as [row]: its fields text, pinyin, replacements
     private fun editRow(row: String): Pair<AlertDialog, List<EditText>> {
         clickable(view(row)).performClick()
         val d = dialog()
@@ -177,8 +169,6 @@ class CommonWordsPageUatTest {
 
     private fun rowsOfWords() = shown().filter { " → " in it }.map { it.substringBefore('\n') }
 
-    // 常用词's rows: edited in their dialog, which refuses a second row of one word and a replacement
-    // with a space; one swiped off and back from the snackbar's undo; all deleted at once
     @Test
     @Uat("WD-39")
     fun aCommonWordEditedSwipedOffAndBackAndAllDeleted() {
@@ -186,7 +176,6 @@ class CommonWordsPageUatTest {
         try {
             commonWordsPage()
             assertEquals(listOf("米字旁 → 米、糸", "木字旁 → 木", "你好 → 您好"), rowsOfWords())
-            // a word of two's initials typed on full pinyin's 26 keys alone, as its row says
             assertTrue(shown().toString(), "你好 → 您好\nnihao · ${s(R.string.common_word_keys_full_pinyin_only, "nh")}" in shown())
             val (d, fields) = editRow("米字旁 → 米、糸\nmizipang · mzp")
             val (text, _, replacements) = fields
@@ -203,7 +192,6 @@ class CommonWordsPageUatTest {
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             idle()
             until("edited") { rowsOfWords() == listOf("米字旁 → 米、糸、丝", "木字旁 → 木", "你好 → 您好") }
-            // swiped left off, and back
             val list = KeyboardHarness.all(activity.window.decorView).filterIsInstance<RecyclerView>().single { it.adapter is DynamicListAdapter<*> }
             @Suppress("UNCHECKED_CAST")
             val words = list.adapter as DynamicListAdapter<CommonWords.Word>
@@ -212,8 +200,7 @@ class CommonWordsPageUatTest {
             callback.onSwiped(list.findViewHolderForAdapterPosition(1)!!, ItemTouchHelper.LEFT)
             idle()
             until("swiped off") { rowsOfWords() == listOf("米字旁 → 米、糸、丝", "你好 → 您好") }
-            // undone: what the snackbar's undo does (BaseDynamicListUi.onItemRemoved), the row put back
-            // where it was; Robolectric shows no Snackbar on this page to tap
+            // what the snackbar's undo does (BaseDynamicListUi.onItemRemoved); Robolectric shows no Snackbar on this page to tap
             words.addItem(1, swiped)
             idle()
             until("back") { rowsOfWords() == listOf("米字旁 → 米、糸、丝", "木字旁 → 木", "你好 → 您好") }
@@ -231,8 +218,8 @@ class CommonWordsPageUatTest {
         }
     }
 
-    // the keyboard deletes a replacement while the page is open, and while it is away: the page's
-    // save keeps the deletion, the page shows it once back, and its next edit does not put it back
+    // the keyboard deletes a replacement while the page is open, and while it is away: the page's next edit does not
+    // put it back
     @Test
     @Uat("WD-39", "WD-43")
     fun whatTheKeyboardDeletedStaysDeletedThroughThePagesEdits() {
@@ -245,11 +232,9 @@ class CommonWordsPageUatTest {
             d.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
             idle()
             until("edited") { "木字旁 → 木、目" in rowsOfWords() }
-            // the keyboard took 糸 off, the page open
             CommonWordsManager.saveOver(base, base.without("米字旁", "糸"))
             st.leaveAndReturn()
             until("shown as saved") { rowsOfWords() == listOf("米字旁 → 米", "木字旁 → 木、目") }
-            // and 米 with the page away
             val saved = CommonWordsManager.load()
             activityStopped {
                 CommonWordsManager.saveOver(saved, saved.without("米字旁", "米"))
@@ -265,8 +250,7 @@ class CommonWordsPageUatTest {
         }
     }
 
-    // an import merged before its 确定 once put back a replacement the keyboard deleted while the
-    // dialog was up: it is merged again at 确定, over the list as read anew
+    // an import merged before its 确定 once put back a replacement the keyboard deleted while the dialog was up
     @Test
     @Uat("WD-42")
     fun anImportConfirmedAfterTheKeyboardDeletedKeepsTheDeletion() {
@@ -278,7 +262,6 @@ class CommonWordsPageUatTest {
             shadowOf(activity.contentResolver).registerInputStream(file, ByteArrayInputStream("竹字头[zhu'zi'tou] 竹\n".toByteArray()))
             (page as CommonWordsFragment).importWords(file)
             val asked = dialog()
-            // the keyboard took 糸 off with the dialog up; the page reads the file again on its return
             activityStopped { CommonWordsManager.saveOver(base, base.without("米字旁", "糸")) }
             until("read again") { "米字旁 → 米" in rowsOfWords() }
             asked.getButton(AlertDialog.BUTTON_POSITIVE).performClick()
@@ -292,8 +275,7 @@ class CommonWordsPageUatTest {
         }
     }
 
-    // an edit dialog open as the page comes back and reads the file anew: what it saves goes to the
-    // row of its word as listed now, not to where the word was
+    // an edit dialog open as the page reads the file anew saves to the row of its word as listed now
     @Test
     @Uat("WD-39")
     fun anEditOpenAsTheFileIsReadAgainGoesToItsWordsRow() {
@@ -302,7 +284,6 @@ class CommonWordsPageUatTest {
         try {
             commonWordsPage()
             val (d, fields) = editRow("米字旁 → 米、糸\nmizipang · mzp")
-            // the keyboard took 糸 off: the word the dialog opened with is listed no more
             activityStopped { CommonWordsManager.saveOver(base, base.without("米字旁", "糸")) }
             until("read again") { rowsOfWords() == listOf("米字旁 → 米", "木字旁 → 木") }
             fields[2].setText("米\n丝")
@@ -315,8 +296,7 @@ class CommonWordsPageUatTest {
         }
     }
 
-    // an export carries the file's lines the page could not read (one with no pinyin), as the file keeps them:
-    // moved to a new phone with it, nothing is lost
+    // an export carries the lines the page could not read, as the file keeps them
     @Test
     @Uat("WD-42")
     fun anExportKeepsTheLinesNotRead() {
@@ -336,7 +316,6 @@ class CommonWordsPageUatTest {
         }
     }
 
-    // what happens while the page is away, another app over it
     private fun activityStopped(meanwhile: () -> Unit) = st.leaveAndReturn(meanwhile)
 
 }

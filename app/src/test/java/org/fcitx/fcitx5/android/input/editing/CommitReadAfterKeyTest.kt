@@ -20,11 +20,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * The read before a commit (CommitCheck.before) on a hardware keyboard: fcitx hands back the up of
- * every key it took, the space that chose a word too, and the service replays it to the app. A key's
- * up changes no text, so the next commit at the cursor the last one left is not read and the commit
- * that space chose is still judged; a key's down handed back (a digit the app inserts itself) is a
- * change to the field, and the next commit reads.
+ * fcitx hands back the up of every key it took and the service replays it; an up changes no text, so the next
+ * commit is not read again. A down handed back (a digit the app inserts itself) changes the field: the next reads.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi-keysexposed-qwerty")
@@ -44,7 +41,7 @@ class CommitReadAfterKeyTest {
 
     private val KeyboardHarness.commits: CommitCheck get() = service.commitCheck
 
-    /** A hardware space, down and up, sent to fcitx; the timestamps they carry there, down's first. */
+    /** Down and up sent to fcitx; the timestamps they carry, down's first. */
     private fun KeyboardHarness.space(): List<Int> {
         service.onKeyDown(KeyEvent.KEYCODE_SPACE, event(KeyEvent.ACTION_DOWN))
         service.onKeyUp(KeyEvent.KEYCODE_SPACE, event(KeyEvent.ACTION_UP))
@@ -53,18 +50,16 @@ class CommitReadAfterKeyTest {
         return api.keyTimestamps.toList()
     }
 
-    /** fcitx hands back the space's half sent with [timestamp], as it does a key it did not take. */
     private fun KeyboardHarness.handedBack(up: Boolean, timestamp: Int) =
         emit(HostEvent.Key(FcitxKeyMapping.FcitxKey_space, 0, ' '.code, up, timestamp))
 
-    /** The reads of the text before the cursor 吗's commit makes, before any wait for the field runs out. */
+    /** The reads 吗's commit makes, before any wait for the field runs out. */
     private fun KeyboardHarness.readsCommitting(): Int {
         beforeReads.clear()
         emit(HostEvent.Commit("吗", -1))
         return beforeReads.count { it == CommitCheck.READ }
     }
 
-    /** 你好 committed and reported where it left the cursor, then a hardware space. */
     private fun landedThenSpace(): Pair<KeyboardHarness, List<Int>> {
         val h = KeyboardHarness().also { harness = it }
         h.start()
@@ -85,11 +80,9 @@ class CommitReadAfterKeyTest {
     @Test
     fun aKeysDownHandedBackIsTypedByTheAppAndTheNextCommitReadsThoughTheFieldHasNotReportedIt() {
         val (h, sent) = landedThenSpace()
-        // the space's report held back: only the key handed back says the field changed
         h.selectionLags = true
         h.handedBack(up = false, sent[0])
-        // the commit after the key's down is read before it and right after it, as the text before the cursor was not
-        // known (R26 F8168)
+        // read before the commit and right after it: the text before the cursor was not known
         assertEquals(2, h.readsCommitting())
         assertEquals("你好 吗", h.field.text.toString())
     }
@@ -98,7 +91,6 @@ class CommitReadAfterKeyTest {
     fun theUpOfTheSpaceThatChoseAWordHandedBackBeforeTheFieldReportsLeavesTheCommitJudged() {
         val h = KeyboardHarness().also { harness = it }
         h.start()
-        // a field that takes the write and does nothing with it (CommitKeptUatTest)
         h.writesDropped = true
         val sent = h.space()
         // the down chose 你好; its up comes back with the commit, before any report could

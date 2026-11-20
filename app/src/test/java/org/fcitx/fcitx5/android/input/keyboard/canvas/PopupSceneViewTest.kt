@@ -21,9 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** A popup's scene as a view: sized to it and the room round it its shadow takes. */
 @RunWith(RobolectricTestRunner::class)
-// the scenes read the theme's look (ThemeManager, so AppPrefs)
 @Config(application = FcitxApplication::class)
 class PopupSceneViewTest {
 
@@ -35,7 +33,6 @@ class PopupSceneViewTest {
         emptyList(), emptyList(),
     )
 
-    // a scene of the same size with a shadow reaching further is a view of another size: laid out again
     @Test
     fun aShadowsReachOfItsOwnLaysItOutAgain() {
         val view = PopupScenes(View(context), TestThemes.PixelDark).view(context)
@@ -50,7 +47,6 @@ class PopupSceneViewTest {
         view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         assertEquals(40 + view.outset.left + view.outset.right, view.measuredWidth)
         view.layout(0, 0, view.measuredWidth, view.measuredHeight)
-        // the same again (a focus moved): drawn, not laid out
         view.scene = scene(8.0)
         assertFalse(view.isLayoutRequested)
     }

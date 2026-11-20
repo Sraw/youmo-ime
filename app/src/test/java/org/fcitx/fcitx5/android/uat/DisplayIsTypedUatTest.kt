@@ -42,10 +42,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * What a key shows is what it types (060-keys-unify §3.3, 用户 2026-11-11: 标点转换不仅作用于打出的字符，选择时的也要
- * 一起变): on every keyboard and panel, Chinese punctuation on and off, each long press's items, the swipe's
- * bubble and the corner as the item or the swipe types them; changed as the punctuation is toggled with the
- * keyboard up. PickerLongPress (the symbol grid's own) is no named key's and as is for both.
+ * What a key shows is what it types, Chinese punctuation on and off: each long press's items, the swipe's bubble and
+ * the corner, changed as the punctuation is toggled with the keyboard up. PickerLongPress is no named key's.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -71,13 +69,13 @@ class DisplayIsTypedUatTest {
             api.enabledIme = api.availableIme
         }.start(inputType).also { h ->
             made = h
-            // as fcitx's punctuation addon tells it, cached too: an input view made anew replays it
+            // cached too: an input view made anew replays it
             h.chinesePunctuation(im, punctuation)
             h.relayout()
         }
     }
 
-    // what [a] types with [punctuation]: a key the engine maps, a text as it is, a keypad's digit; null for an action
+    // null for an action
     private fun typed(a: KeyAction, punctuation: Map<String, String>): String? = when (a) {
         is KeyAction.HostKeyAction -> punctuation[a.act] ?: a.act
         is KeyAction.CommitAction -> a.text
@@ -110,17 +108,14 @@ class DisplayIsTypedUatTest {
         },
         Board("emoji search", KeyboardHarness.PINYIN) {
             emoji()
-            // from the emoticons' page (shown last) to the emoji's, which has the search
             tap(runCatching { keyNamed("search") }.getOrElse { tap(keyNamed("emoji")); keyNamed("search") })
             check(KeyboardHarness.find<EmojiSearchUi>(inputView) != null)
         },
     )
 
-    // the keyboards shown now and their named keys
     private fun KeyboardHarness.shownBoards(): List<BaseKeyboard> =
         KeyboardHarness.all(inputView).filterIsInstance<BaseKeyboard>().filter { it.isShown }.toList()
 
-    // every named key of every board shown: its long press's labels, its swipe's bubble and its corner as they type
     private fun KeyboardHarness.checkShownAsTyped(where: String, punctuation: Map<String, String>): Int {
         val boards = shownBoards()
         assertTrue("$where: no keyboard shown", boards.isNotEmpty())
@@ -129,7 +124,6 @@ class DisplayIsTypedUatTest {
         }
     }
 
-    // [k]'s, as [checkShownAsTyped]: how many of its texts were compared
     private fun checkKey(where: String, board: BaseKeyboard, k: SceneShownKey, punctuation: Map<String, String>): Int {
         val name = k.node.shortcut ?: return 0
         val ref = board.sceneKey(k.node)?.ref?.id ?: return 0
@@ -141,7 +135,7 @@ class DisplayIsTypedUatTest {
         val swipe = board.resolvedKeys.swipe(name) { null } as? BaseKeyboard.SwipeChoice.Output ?: return checked
         val swiped = typed(swipe.action, punctuation) ?: return checked
         assertEquals("$at: the swipe's bubble", swiped, swipe.shown)
-        // its corner, where its up is its first (a full keyboard's letter may show its letter instead)
+        // where its up is its first (a full keyboard's letter may show its letter instead)
         val id = KeyId.of(name)
         val letter = id.form == "full" && id.key.singleOrNull()?.isLetter() == true
         if (!letter && SwipeSlots.parse(AppPrefs.getInstance().internal.keySwipes.getValue()).resolve(name, true) == SwipeSlot.First) {
@@ -160,14 +154,11 @@ class DisplayIsTypedUatTest {
                 board.open(h)
                 h.idle()
                 val checked = h.checkShownAsTyped("${board.name} $mode", punctuation)
-                // the number pad's, the symbol panel's and the expanded candidates' keys type no character of a list
-                // (no ，. there)
                 if (board.name !in setOf("number", "symbols", "expanded")) assertTrue("${board.name} $mode: nothing checked", checked > 0)
             }
         }
     }
 
-    // what pops up is what the keyboard resolved: on each board, its first named key with a long press, held for real
     @Test
     @Uat("KB-83")
     fun aHeldKeysPopupIsTheResolvers() {
@@ -190,12 +181,10 @@ class DisplayIsTypedUatTest {
         assertTrue("$compared", compared >= boards.size - 4)
     }
 
-    // toggled with the keyboard up: the corner, the bubble and the long press as it now types
     @Test
     @Uat("KB-83")
     fun toggledWithTheKeyboardUp() {
         prefs.setWays(up = true, down = true)
-        // ，'s and 。's corners their firsts' (. and ,)
         val slots = SwipeSlots.Default.with("fn/comma", up = true, SwipeSlot.First).with("fn/period", up = true, SwipeSlot.First)
         prefs.set(AppPrefs.getInstance().internal.keySwipes, slots.serialize())
         // the nine keys' 1 has no punctuation first: its long press's . alone
@@ -212,7 +201,6 @@ class DisplayIsTypedUatTest {
             val corner = key().node.shortcut != "t9/1"
             if (corner) assertTrue("${board.name}: ${key().drawnTexts}", mapped in key().drawnTexts)
             assertTrue(board.name, mapped in h.longPress(key()))
-            // 九键's 1 and its column as they type, through the punctuation: ，。？！ on
             if (board.name == "nine") h.nineAsTyped("，。？！", "，")
             h.api.punctuationCached = emptyMap()
             h.emit(HostEvent.StatusArea(emptyList(), board.im, emptyMap()))
@@ -221,12 +209,10 @@ class DisplayIsTypedUatTest {
             if (corner) assertTrue("${board.name}: ${key().drawnTexts}", first in key().drawnTexts && mapped !in key().drawnTexts)
             val held = h.longPress(key())
             assertTrue("${board.name}: $held", first in held && mapped !in held)
-            // and , . ? ! off
             if (board.name == "nine") h.nineAsTyped(",.?!", ",")
         }
     }
 
-    // 九键's 1 its [face], its column's first [first], each typing what it shows
     private fun KeyboardHarness.nineAsTyped(face: String, first: String) {
         assertEquals(face, nineKey("1").label)
         val column = nineColumn()
@@ -242,13 +228,13 @@ class DisplayIsTypedUatTest {
     private fun KeyboardHarness.nineColumn(): List<TextView> = KeyboardHarness.all(keyboard).filterIsInstance<ScrollView>().first { shown(it) }
         .let { it.getChildAt(0) as ViewGroup }.children.filterIsInstance<TextView>().filter { it.isVisible }.toList()
 
-    // 九键's 1 and its column before the marks are known (a first install, the host not up): held back as the ，。 keys
-    // are, nothing typed that its face might not show; known, each types its mark
+    // 九键's 1 before the marks are known (the host not up): held back as the ，。 keys are, nothing typed that its face
+    // might not show
     @Test
     @Uat("KB-83")
     fun ninesOneAndColumnAreHeldBackTillTheMarksAreKnown() {
         val h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, zh, InputType.TYPE_CLASS_TEXT)
-        // not known: the harness's host tells its marks as the view is made, so the component is set back by hand
+        // the harness's host tells its marks as the view is made, so the component is set back by hand
         val punctuation = h.inputView.punctuation
         PunctuationStartKeys.forget(h.service)
         punctuation.forget()

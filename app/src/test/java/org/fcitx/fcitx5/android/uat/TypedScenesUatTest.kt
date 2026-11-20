@@ -21,10 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * What is typed reaches a theme as its scenes (060-render-p3 T5): the input method by its kind and a
- * table by its name, the field (a password first), in the input method; a settings page's keys none.
- */
+/** What is typed reaches a theme as its scenes: the input method's kind, a table's name, the field; a settings page's keys none. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class TypedScenesUatTest {
@@ -34,11 +31,11 @@ class TypedScenesUatTest {
     @After
     fun close() {
         h?.close()
-        // a process's, the next test's keyboard tells its own
+        // a process's: the next test's keyboard tells its own
         SceneEnvs.typing = null
     }
 
-    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
+    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", name.take(1), "zh_CN")
 
     private fun typed(view: View) =
         SceneEnvs.of(view, TestThemes.PixelLight.look, false, 1000, 700, Input(ime = "pinyin")).typed
@@ -48,13 +45,11 @@ class TypedScenesUatTest {
         val h = KeyboardHarness(im = entry(InputMethodCatalog.WUBI, "Wubi")).also { h = it }
             .start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         assertEquals(setOf("im=table", "im=wubi", "field=password"), SceneEnvs.typing)
-        // a keyboard's environment in the input method: the input method's word, not its board's Input
         assertEquals(setOf("im=table", "im=wubi", "field=password"), typed(h.inputView))
         h.restart(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         assertEquals(setOf("im=table", "im=wubi", "field=url"), SceneEnvs.typing)
         h.restart(InputType.TYPE_CLASS_TEXT)
         assertEquals(setOf("im=table", "im=wubi"), SceneEnvs.typing)
-        // outside the input method (a settings page's preview): the board's Input
         assertNull(typed(View(h.service.applicationContext)))
     }
 }

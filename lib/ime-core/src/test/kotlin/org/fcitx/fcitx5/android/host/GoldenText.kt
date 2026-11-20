@@ -4,11 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
-/**
- * A golden file's field as written by lib/ime-core/tools: `\\` and `\t` (host-golden), `\s`
- * (host-golden's queries), `\n` (fcitx-ini's pages). Each generator escapes `\` first, so one set
- * reads them all.
- */
+/** A golden field from lib/ime-core/tools: `\\` `\t` `\s` `\n`; each generator escapes `\` first, so one set reads them all. */
 internal fun unescapeGolden(s: String) = buildString {
     var i = 0
     while (i < s.length) {

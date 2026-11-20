@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes as ThemeSizes
 
-/** 061-landscape-height §5.2, at 1x unless said: the app keeps 120 dp, the rows 36 dp each, the rows winning. */
+/** At 1x unless said: the app keeps 120 dp, the rows 36 dp each, the rows winning. */
 class KeyboardHeightCapTest {
 
     @Test
@@ -49,7 +49,6 @@ class KeyboardHeightCapTest {
         "a small phone under gestures: 272 of room leaves the keys 112, the rows keep 4 × 36" to {
             assertEquals(144, KeyboardHeightCap.keysHeight(192, 272, 40, 0))
         },
-        // R26 F8123: was a request of 0 giving 0, which tested nothing once the rows won
         "a screen too short even for the bars: the rows still keep 4 × 36, no less" to {
             assertEquals(144, KeyboardHeightCap.keysHeight(192, 50, 58, 12))
         },
@@ -84,7 +83,7 @@ class KeyboardHeightCapTest {
 
     @Test
     fun aThemesLandscapeHeightIsARowOfTheTable() {
-        // 060-render-p3 T5 and the user's Q8 (2026-11-14): the theme's height followed is asked for as a level is
+        // the theme's height followed is asked for as a level is
         val sizes = KeyboardSizes(
             KeyboardSizes.Setting(true, 30, 49), KeyboardSizes.Setting(true, 0, 0), KeyboardSizes.Setting(true, 0, 0), false,
             ThemeSizes(height = Twin(40.0, 60.0)),

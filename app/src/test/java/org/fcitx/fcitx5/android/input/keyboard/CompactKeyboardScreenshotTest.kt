@@ -28,12 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 键盘高度 紧凑 (uat/14 ST-51) on every keyboard, upright and turned, at a w393dp 440dpi phone's screen: the goldens
- * under src/test/screenshots/CompactKeyboardScreenshotTest, looked at one by one for text cut off
- * and corners crowded (the engine squeezes its own text, so no
- * measure here would see it cut: the eye does).
- */
+/** 键盘高度 紧凑 on every keyboard at a w393dp 440dpi phone: the goldens are looked at by eye for text cut off (the engine squeezes its own text). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class)
@@ -47,7 +42,7 @@ class CompactKeyboardScreenshotTest {
         EngineState.tableKeyboardState.value = null
     }
 
-    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
+    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", name.take(1), "zh_CN")
 
     private val shuangpin = entry(InputMethodCatalog.SHUANGPIN, "双拼")
 
@@ -72,18 +67,17 @@ class CompactKeyboardScreenshotTest {
         Board("number", inputType = InputType.TYPE_CLASS_NUMBER),
     ) + zhuyin
 
-    // the two 注音 keyboards, their text the largest of any keyboard's: also on a small phone
+    // the 注音 keyboards' text is the largest of any keyboard's
     private val zhuyin get() = listOf(
         Board("zhuyin_nine", keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE)),
         Board("zhuyin_full", keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)),
     )
 
-    // [board]: the golden named as captureBoard names it (canvas_, the 注音 ones since 060-render-p2 S4c), else as
-    // capture does; every keyboard is drawn by the canvas now, the two names kept so the goldens stay as recorded
+    // [board]: named as captureBoard names it (canvas_), else as capture does; both kept so the goldens stay as recorded
     private fun shoot(orientation: String, boards: List<Board> = this.boards, board: Boolean = false) {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        // the 注音 keyboards' 简繁 hint: not said, and its "told" put back for the tests after (KeyboardPickerUatTest)
+        // the 简繁 hint not said; its "told" put back for later tests
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         for (b in boards) {
             KeyboardHarness(TestThemes.PixelLight, b.im, keyboards = b.keyboards).use { h ->
@@ -110,8 +104,6 @@ class CompactKeyboardScreenshotTest {
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun everyKeyboardTurned() = shoot("land")
 
-    // the full keyboard with the layouts 紧凑 meets: floating, one-handed, dark; split turned; [shift]:
-    // its capitals too, taller beside their symbols
     private fun shootFull(name: String, theme: Theme = TestThemes.PixelLight, shift: Boolean = false) {
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)

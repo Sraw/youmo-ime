@@ -15,12 +15,8 @@ import org.fcitx.fcitx5.android.core.HostDispatcher
 import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
 
 /**
- * Whether the input method is idle, for the device UAT (uat.py's Device.idle, through `content
- * query --uri content://<package>.uat.idle`): no job waiting for the fcitx thread, no refine due,
- * no background work ([BackgroundWork]), nothing due on the main thread. The UAT read the
- * candidates the moment some showed, and a refine or a late table coding changed them after (the
- * first candidate of T9-02 read too early under load). Debug builds only, and only to the shell
- * (the manifest asks for DUMP): it tells whoever reads it whether you are typing.
+ * Whether the input method is idle, for uat.py's Device.idle: no fcitx job, refine, [BackgroundWork] or main-thread
+ * work due, so candidates are read only once settled. Shell only (DUMP): it tells the reader whether you are typing.
  */
 class UatIdleProvider : ContentProvider() {
 

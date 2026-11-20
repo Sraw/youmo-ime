@@ -7,78 +7,36 @@ package org.fcitx.fcitx5.android.core
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import org.fcitx.fcitx5.android.BuildConfig
+import org.fcitx.fcitx5.android.host.Capability
 import org.fcitx.fcitx5.android.input.FieldPolicy
 import splitties.bitflags.hasFlag
 
-/**
- * translated from
- * [fcitx-utils/capabilityflags.h](https://github.com/fcitx/fcitx5/blob/5.1.1/src/lib/fcitx-utils/capabilityflags.h)
- */
-@Suppress("unused")
-enum class CapabilityFlag(val flag: ULong) {
-    NoFlag(0UL),
+/** fcitx's capability bits ([capabilityflags.h](https://github.com/fcitx/fcitx5/blob/5.1.1/src/lib/fcitx-utils/capabilityflags.h)); values from the host's [Capability]. */
+enum class CapabilityFlag(bits: Long) {
+    NoFlag(0L),
+    Preedit(Capability.PREEDIT),
+    Password(Capability.PASSWORD),
+    ClientUnfocusCommit(Capability.CLIENT_UNFOCUS_COMMIT),
+    Email(Capability.EMAIL),
+    Uppercase(1L shl 9),
+    Url(Capability.URL),
+    Dialable(1L shl 13),
+    Number(1L shl 14),
+    SpellCheck(1L shl 16),
+    NoSpellCheck(Capability.NO_SPELL_CHECK),
+    UppercaseWords(1L shl 19),
+    UppercaseSentences(1L shl 20),
+    Alpha(1L shl 21),
+    Date(1L shl 33),
+    Time(1L shl 34),
+    Multiline(1L shl 35),
+    Sensitive(Capability.SENSITIVE),
 
-    /**
-     * Deprecated, because this flag is not compatible with fcitx 4.
-     */
-    ClientSideUI(1UL shl 0),
-    Preedit(1UL shl 1),
-    ClientSideControlState(1UL shl 2),
-    Password(1UL shl 3),
-    FormattedPreedit(1UL shl 4),
-    ClientUnfocusCommit(1UL shl 5),
-    SurroundingText(1UL shl 6),
-    Email(1UL shl 7),
-    Digit(1UL shl 8),
-    Uppercase(1UL shl 9),
-    Lowercase(1UL shl 10),
-    NoAutoUpperCase(1UL shl 11),
-    Url(1UL shl 12),
-    Dialable(1UL shl 13),
-    Number(1UL shl 14),
-    NoOnScreenKeyboard(1UL shl 15),
-    SpellCheck(1UL shl 16),
-    NoSpellCheck(1UL shl 17),
-    WordCompletion(1UL shl 18),
-    UppercaseWords(1UL shl 19),
-    UppercaseSentences(1UL shl 20),
-    Alpha(1UL shl 21),
-    Name(1UL shl 22),
-    GetIMInfoOnFocus(1UL shl 23),
-    RelativeRect(1UL shl 24),
-    // 25 ~ 31 are reserved for fcitx 4 compatibility.
+    CommitStringWithCursor(Capability.COMMIT_STRING_WITH_CURSOR),
 
-    // New addition in fcitx 5.
-    Terminal(1UL shl 32),
-    Date(1UL shl 33),
-    Time(1UL shl 34),
-    Multiline(1UL shl 35),
-    Sensitive(1UL shl 36),
-    KeyEventOrderFix(1UL shl 37),
+    PasswordOrSensitive(Capability.PASSWORD_OR_SENSITIVE);
 
-    /**
-     * Whether client will set KeyState::Repeat on the key event.
-     */
-    ReportKeyRepeat(1UL shl 38),
-
-    /**
-     * Whether client display input panel by itself.
-     */
-    ClientSideInputPanel(1UL shl 39),
-
-    /**
-     * Whether client request input method to be disabled.
-     * Usually this means only allow to type with raw keyboard.
-     */
-    Disable(1UL shl 40),
-
-    /**
-     * Whether client support commit string with cursor location.
-     */
-    CommitStringWithCursor(1UL shl 41),
-
-    PasswordOrSensitive(Password.flag or Sensitive.flag);
-
+    val flag: ULong = bits.toULong()
 }
 
 operator fun ULong.plus(other: CapabilityFlag) = or(other.flag)
@@ -96,21 +54,14 @@ value class CapabilityFlags constructor(val flags: ULong) {
             CapabilityFlag.CommitStringWithCursor
         )
 
-        /**
-         * What the service tells fcitx of [info]: [fromEditorInfo], and a field of this app's own
-         * package ([ownPackage]) is Sensitive, so it learns nothing, as a 无痕 field: the engine,
-         * the context memory and the recently used emoji and symbols alike.
-         */
+        /** A field of this app's own package is Sensitive: it learns nothing, as a 无痕 field. */
         fun forField(info: EditorInfo, ownPackage: String): CapabilityFlags = fromEditorInfo(info).let {
             val own = FieldPolicy.ownApp(info.packageName, ownPackage) &&
                 !(BuildConfig.DEBUG && info.privateImeOptions == TEST_HOST_FIELD)
             if (own) CapabilityFlags(it.flags + CapabilityFlag.Sensitive) else it
         }
 
-        /**
-         * The debug build's TypingHostActivity marks its field so: the instrumented tests type there
-         * as in another app's field (learning, predictions), though it lives in this package.
-         */
+        /** Marks the debug TypingHostActivity's field, typed into as another app's though in this package. */
         const val TEST_HOST_FIELD = "io.github.sraw.youmo.testHostField"
 
         fun fromEditorInfo(info: EditorInfo): CapabilityFlags {
@@ -177,7 +128,7 @@ value class CapabilityFlags constructor(val flags: ULong) {
                     InputType.TYPE_CLASS_NUMBER -> {
                         flags += CapabilityFlag.NoSpellCheck
                         flags += CapabilityFlag.Number
-                        // a PIN: as a password, nothing of it read, kept or learned
+                        // a PIN: as a password
                         if ((it and InputType.TYPE_MASK_VARIATION) == InputType.TYPE_NUMBER_VARIATION_PASSWORD) {
                             flags += CapabilityFlag.Password
                         }
@@ -202,11 +153,7 @@ value class CapabilityFlags constructor(val flags: ULong) {
             return CapabilityFlags(flags)
         }
 
-        /**
-         * Whether [info] is a password's, its characters hidden or shown: fcitx is told a shown
-         * one is only [CapabilityFlag.Sensitive], so what the keyboard keeps out of a password
-         * (pairs, voice) asks here.
-         */
+        /** A shown password reaches fcitx only as [CapabilityFlag.Sensitive], so what the keyboard keeps out of passwords asks here. */
         fun isPassword(info: EditorInfo): Boolean =
             fromEditorInfo(info).has(CapabilityFlag.Password) ||
                 (info.inputType and (InputType.TYPE_MASK_CLASS or InputType.TYPE_MASK_VARIATION)) ==
@@ -219,10 +166,7 @@ value class CapabilityFlags constructor(val flags: ULong) {
 
     fun has(flag: CapabilityFlag) = flags.hasFlag(flag.flag)
 
-    /**
-     * Whether any of [flag]'s bits is set: [has] needs them all, which a field rarely has of a
-     * combined flag such as [CapabilityFlag.PasswordOrSensitive].
-     */
+    /** [has] needs all bits, which a field rarely has of a combined flag such as [CapabilityFlag.PasswordOrSensitive]. */
     fun hasAny(flag: CapabilityFlag) = (flags and flag.flag) != 0UL
 
     fun toLong() = flags.toLong()

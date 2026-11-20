@@ -35,11 +35,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * uat/10-tables.md's keyboard half (the engine's is TablesUatTest in :lib:ime-eval): what a table's
- * letters keyboard shows as the engine tells it (EngineState.tableKeyboard): its roots, its 拼 key,
- * 确定, the code keys its face has nowhere else.
- */
+/** What a table's letters keyboard shows as the engine tells it (EngineState.tableKeyboard): its roots, 拼, 确定. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -47,16 +43,13 @@ class TablesKeysUatTest {
 
     private var h: KeyboardHarness? = null
 
-    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
+    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", name.take(1), "zh_CN")
 
-    // the keyboard of [im], as the engine tells it after its first answer
     private fun harness(im: String, name: String, state: TableKeyboard?): KeyboardHarness =
         KeyboardHarness(im = entry(im, name)).also { h = it }.start().apply { told(state) }
 
-    // the letter key whose corner shows [letter] (a table's roots on its face)
     private fun letterKey(h: KeyboardHarness, letter: String) = h.keys().first { it.alt == letter }
 
-    // the command icons drawn on [letter]'s key: its shortcut's mark
     private fun KeyboardHarness.shortcutIcons(letter: String) = letterKey(this, letter).drawnIcons
 
     @get:Rule
@@ -97,12 +90,10 @@ class TablesKeysUatTest {
         val labels = h.texts()
         for (root in listOf("日", "月", "金", "難", "重")) assertTrue("$root in $labels", root in labels)
         assertFalse("no capital: $labels", labels.any { it.length == 1 && it[0] in 'A'..'Z' })
-        // its letters in the corners
         assertTrue(labels.toString(), "a" in labels && "z" in labels)
         assertNotNull(h.keyWithId(R.id.button_star))
         assertNull(h.keyWithId(R.id.button_caps))
         h.capture("TablesKeysUatTest/cangjie_roots", h.inputView)
-        // off: the letters, no * key (S's swipe types it)
         h.told(cangjie.copy(labels = KeyLabels.NONE))
         assertTrue(h.texts().toString(), "a" in h.texts() && "日" !in h.texts())
         assertNull(h.keyWithId(R.id.button_star))
@@ -122,10 +113,8 @@ class TablesKeysUatTest {
         assertNotNull(h.keyWithId(R.id.button_lookup_on))
         h.typed("hao", auxUp = "拼")
         h.capture("TablesKeysUatTest/wubi_lookup_on", h.inputView)
-        // pressed again, off: the same key sent, shown light
         h.tap(h.keyWithId(R.id.button_lookup_on)!!)
         assertEquals(2, h.sentSyms().count { "${UNICODE + Keyboard.LOOKUP}" in it })
-        // not a table: Shift, no 拼
         h.switchTo(entry(InputMethodCatalog.PINYIN, "拼音"))
         assertNotNull(h.keyWithId(R.id.button_caps))
         assertTrue(h.keyWithId(R.id.button_lookup) == null && h.keyWithId(R.id.button_lookup_on) == null)
@@ -140,7 +129,7 @@ class TablesKeysUatTest {
         h.typed("ggg")
         assertNotNull(h.keyWithId(R.id.button_confirm))
         assertNull(h.keyWithId(R.id.button_return))
-        // 确定 in the app's words, key_confirm (OK in English), not the layout's Chinese
+        // in the app's words, key_confirm, not the layout's Chinese
         assertEquals(h.service.getString(R.string.key_confirm), h.keyWithId(R.id.button_confirm)!!.label)
         h.capture("TablesKeysUatTest/wubi_confirm", h.inputView)
         h.tap(h.keyWithId(R.id.button_confirm)!!)
@@ -161,14 +150,12 @@ class TablesKeysUatTest {
         h.capture("TablesKeysUatTest/wubi_names", h.inputView)
         h.told(wubi(KeyLabels.ROOTS))
         assertTrue(h.texts().toString(), "王龶戋\n五一" in h.texts())
-        // the roots fill the key: no shortcut drawn over them, its swipe down selecting all the same
         assertEquals(0, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_roots", h.inputView)
         h.field.setText("你好")
         val a = letterKey(h, "a")
         h.swipe(a, 0f, a.height.toFloat())
         assertEquals(0 to 2, h.field.selectionStart to h.field.selectionEnd)
-        // held: its roots, large, nothing typed
         val before = h.api.calls.size
         val shown = h.longPress(h.key("王龶戋\n五一"))
         assertTrue(shown.toString(), "王 龶 戋 五 一" in shown)
@@ -190,16 +177,13 @@ class TablesKeysUatTest {
         val names = h.texts()
         val namesMarks = h.shortcutIcons("a")
         h.told(wubi(KeyLabels.ROOTS))
-        // 紧凑: the names, as with 键名 set, its marks too
         assertEquals(names, h.texts())
         assertTrue(names.toString(), "王" in names && "王龶戋\n五一" !in names)
         assertEquals(namesMarks, h.shortcutIcons("a"))
         h.capture("TablesKeysUatTest/wubi_roots_compact", h.inputView)
-        // held: its symbols, not the roots large
         val shown = h.longPress(h.key("王"))
         assertFalse(shown.toString(), "王 龶 戋 五 一" in shown)
         h.idle()
-        // out of 紧凑, all the roots again: the setting was kept
         level(38, 60)
         h.idle()
         h.relayout()
@@ -213,19 +197,16 @@ class TablesKeysUatTest {
         val erbi = TableKeyboard(InputMethodCatalog.ERBI, setOf(';', '\'', ',', '.', '/', '*'), false, KeyLabels.NONE, null)
         val h = harness(InputMethodCatalog.ERBI, "二笔", erbi)
         val semicolon = h.keyWithId(R.id.button_semicolon)!!
-        // its * a swipe types (S), no key of its own
         assertNull(h.keyWithId(R.id.button_star))
         h.capture("TablesKeysUatTest/erbi_semicolon", h.inputView)
         h.tap(semicolon)
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && ";" in it })
-        // 五笔's codes are letters
         h.switchTo(entry(InputMethodCatalog.WUBI, "五笔"))
         h.told(wubi())
         assertNull(h.keyWithId(R.id.button_semicolon))
     }
 
-    // the halves split on a phone held sideways: the key after L in the right half, the room
-    // between them giving way, the keyboard no wider (review b5)
+    // the key after L in the right half, the room between the halves giving way, the keyboard no wider
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun theSplitHalvesHaveTheKeyAfterLToo() {
@@ -238,11 +219,9 @@ class TablesKeysUatTest {
             val l = h.key("l")
             assertTrue("${left(semicolon)} after ${left(l)}", left(semicolon) >= left(l) + l.width - 1)
             assertTrue(left(semicolon) + semicolon.width <= h.service.resources.displayMetrics.widthPixels + 1)
-            // the right half's other rows end where this one does
             val p = h.key("p")
             assertEquals((left(p) + p.width).toFloat(), (left(semicolon) + semicolon.width).toFloat(), 2f)
             h.capture("TablesKeysUatTest/erbi_split", h.inputView)
-            // 仓颉's * there as well
             h.switchTo(entry(InputMethodCatalog.CANGJIE, "仓颉"))
             h.told(cangjie)
             assertNotNull(h.keyWithId(R.id.button_star))
@@ -252,7 +231,7 @@ class TablesKeysUatTest {
         }
     }
 
-    // 五笔's 键名, then 仓颉 told before the switch shows: 仓颉's roots, not 五笔's names (review b5)
+    // 五笔's 键名, then 仓颉 told before the switch shows: 仓颉's roots, not 五笔's names
     @Test
     @Uat("TBL-49")
     fun anotherTablesRootsRelabelTheKeys() {

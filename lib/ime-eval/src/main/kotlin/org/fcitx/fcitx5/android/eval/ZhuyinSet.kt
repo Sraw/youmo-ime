@@ -11,12 +11,7 @@ import org.fcitx.fcitx5.android.engine.reading.ToneMark
 import org.fcitx.fcitx5.android.engine.reading.Zhuyin
 import java.io.File
 
-/**
- * Types the full-pinyin samples of an evaluation set in zhuyin, as [T9Set] does on the nine keys:
- * the [ExactReading]'s symbols on 注音九键's groups or 大千's keys, as the session's input has them
- * ([ZhuyinKeys]), no separators; with [Tones], each syllable's tone after it, as one who types
- * tones does. Samples with a Latin letter are left out.
- */
+/** Types an evaluation set's samples in zhuyin by their [ExactReading], with [Tones] after each syllable if given. */
 object ZhuyinSet {
 
     /** `zhuyin --keys`: the keyboard a set is typed on, by its name (nine or full). */
@@ -38,12 +33,7 @@ object ZhuyinSet {
         sample.copy(input = input.toString())
     }
 
-    /**
-     * Each character's tones read as a syllable, and each word's, from a local copy of the lists the
-     * reading table is made of (mozillazg's pinyin-data `pinyin.txt` lines `U+4F60: nǐ  # 你`, its
-     * phrase-pinyin-data `pinyin.txt` lines `你好: nǐ hǎo`). For typing a set's tones only: the
-     * decoder reads them with the app's own table, compiled into its pinyin data.
-     */
+    /** Each character's and word's tones from local copies of pinyin-data's lists, for typing a set's tones only. */
     class Tones(chars: File, phrases: File?) {
         // a character's syllable's tones, the most common first: code point, syllable → tones
         private val byChar = HashMap<Long, IntArray>()

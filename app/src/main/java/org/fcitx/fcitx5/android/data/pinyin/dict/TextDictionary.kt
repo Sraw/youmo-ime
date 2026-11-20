@@ -8,11 +8,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.utils.errorArg
 import java.io.File
 
-/**
- * A dictionary in libime's text format, a word a line (`text pin'yin cost`): one to import, or
- * one imported, kept gzip-compressed ([SourceNames]) and turned off by naming it `.txt.gz.disable`;
- * one an older build kept as `.txt[.disable]` till the compile thread converts it.
- */
+/** libime's text format (`text pin'yin cost`); kept gzipped, off as `.txt.gz.disable`; old `.txt[.disable]` converted later. */
 class TextDictionary(file: File) : PinyinDictionary() {
     override var file: File = file
         private set
@@ -33,10 +29,10 @@ class TextDictionary(file: File) : PinyinDictionary() {
         }
     }
 
-    /** Whether it is now on: false if the file could not be renamed. */
+    /** False if the file could not be renamed. */
     fun enable() = rename(true)
 
-    /** Whether it is now off: false if the file could not be renamed. */
+    /** False if the file could not be renamed. */
     fun disable() = rename(false)
 
     private fun rename(enabled: Boolean): Boolean {
@@ -59,7 +55,6 @@ class TextDictionary(file: File) : PinyinDictionary() {
     companion object {
         const val DISABLE = "disable"
 
-        /** The file a dictionary called [name] is kept in, on or off ([SourceNames.fileName]). */
         fun fileName(name: String, enabled: Boolean = true) = SourceNames.fileName(name, enabled)
     }
 }

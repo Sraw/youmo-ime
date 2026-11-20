@@ -33,11 +33,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowPopupMenu
 
-/**
- * ⋯'s 键盘 (I1 Q1, uat/05 TB-47): the keyboards the input method on offers, the one in use ticked;
- * one picked is its page's setting, the keyboard made anew on it; none for an input method with no
- * choice. The entry's place among ⋯'s own is the toolbar's (ToolbarUatTest).
- */
+/** ⋯'s 键盘: the input method's keyboards, the one in use ticked; one picked is its page's setting. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
@@ -49,7 +45,7 @@ class KeyboardPickerUatTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // the process's scheme as the test found it: a later test reads it
+    // a later test reads it
     private val schemeWas = EngineState.shuangpinScheme
 
     @After
@@ -61,7 +57,7 @@ class KeyboardPickerUatTest {
 
     private fun s(id: Int) = h.service.getString(id)
 
-    private fun entry(name: String) = InputMethodEntry(name, name, "", "", name, "zh_CN", "androidengine", false)
+    private fun entry(name: String) = InputMethodEntry(name, name, "", name, "zh_CN")
 
     private fun start(): KeyboardHarness = KeyboardHarness().also {
         harness = it
@@ -75,7 +71,6 @@ class KeyboardPickerUatTest {
         h.emit(HostEvent.InputMethodChanged(im))
     }
 
-    // ⋯ opened from the toolbar
     private fun statusArea() {
         if (KeyboardHarness.all(h.inputView).none { h.shown(it) && it.contentDescription == s(R.string.hide_toolbar) }) {
             h.tap(h.described(s(R.string.expand_toolbar)))
@@ -89,7 +84,6 @@ class KeyboardPickerUatTest {
         .firstOrNull { h.shown(it) && it is TextView && it.text.toString() == text }
         ?.let { t -> generateSequence(t) { it.parent as? View }.first { it.hasOnClickListeners() } }
 
-    // ⋯ → 键盘: the list's items, the ticked one, and a pick of [pick]
     private fun picked(pick: Int? = null): Pair<List<String>, String> {
         statusArea()
         h.tap(button(s(R.string.status_keyboard)) ?: error("no 键盘 in ${h.texts(h.inputView)}"))
@@ -113,19 +107,16 @@ class KeyboardPickerUatTest {
         prefs.set(keyboard.shuangpinKeyboard, ShuangpinKeyboard.Full)
         prefs.set(keyboard.englishKeyboard, EnglishKeyboard.Full)
         start()
-        // pinyin: the six (two of them zhuyin's), 全键盘 ticked; the nine keys picked, the keyboard is them
         val pinyinKeyboards = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_18, R.string.pinyin_keyboard_14, R.string.keyboard_nine, R.string.keyboard_zhuyin_nine, R.string.keyboard_zhuyin_full).map(::s)
         assertEquals(pinyinKeyboards to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_nine))
         assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
         assertTrue(h.texts().toString(), "重输" in h.texts())
         assertEquals(pinyinKeyboards to s(R.string.keyboard_nine), picked())
         h.start()
-        // 注音九键 picked while pinyin is already traditional: nothing to tell, nor marked told
         EngineState.traditionalIms = setOf(InputMethodCatalog.PINYIN)
         picked(R.string.keyboard_zhuyin_nine)
         assertEquals(PinyinKeyboard.ZhuyinNine, keyboard.pinyinKeyboard.getValue())
         assertFalse(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
-        // picked before the host has said which are traditional: nothing told yet, nor marked told
         EngineState.traditionalIms = null
         h.start()
         picked(R.string.keyboard_nine)
@@ -135,7 +126,6 @@ class KeyboardPickerUatTest {
         assertFalse(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
         EngineState.traditionalIms = emptySet()
         h.start()
-        // 大千 picked on 简体: said once that 繁体 is in ⋯
         assertEquals(pinyinKeyboards to s(R.string.keyboard_zhuyin_nine), picked(R.string.keyboard_zhuyin_full))
         assertEquals(PinyinKeyboard.ZhuyinFull, keyboard.pinyinKeyboard.getValue())
         assertTrue(AppPrefs.getInstance().internal.zhuyinTraditionalTold.getValue())
@@ -146,7 +136,6 @@ class KeyboardPickerUatTest {
             listOfNotNull(ShadowToast.getTextOfLatestToast())
         assertTrue("$notice", s(R.string.zhuyin_traditional_hint) in notice)
         h.start()
-        // English: its own two, the nine keys picked moves no other's
         switchTo(KeyboardHarness.ENGLISH)
         val two = listOf(R.string.pinyin_keyboard_full, R.string.keyboard_nine).map(::s)
         assertEquals(two to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_nine))
@@ -160,7 +149,6 @@ class KeyboardPickerUatTest {
         assertEquals(three to s(R.string.pinyin_keyboard_full), picked(R.string.keyboard_18))
         assertEquals(ShuangpinKeyboard.Keys18, keyboard.shuangpinKeyboard.getValue())
         h.start()
-        // 五笔: no choice, no entry
         switchTo(entry(InputMethodCatalog.WUBI))
         statusArea()
         assertFalse(h.texts(h.inputView).toString(), s(R.string.status_keyboard) in h.texts(h.inputView))
@@ -173,7 +161,6 @@ class KeyboardPickerUatTest {
         prefs.set(keyboard.pinyinKeyboard, PinyinKeyboard.Full)
         prefs.set(AppPrefs.getInstance().internal.toolbarButtons, "undo,|,keyboard,hide")
         start()
-        // at the bar's right: the same list as ⋯'s, the one in use ticked; a pick is the keyboard
         h.tap(h.described(s(R.string.status_keyboard)))
         val menu = ShadowPopupMenu.getLatestPopupMenu().menu
         val items = (0 until menu.size()).map { menu.getItem(it) }
@@ -183,7 +170,6 @@ class KeyboardPickerUatTest {
         shadowOf(ShadowPopupMenu.getLatestPopupMenu()).onMenuItemClickListener.onMenuItemClick(items.first { it.title.toString() == s(R.string.keyboard_nine) })
         h.idle()
         assertEquals(PinyinKeyboard.NineKeys, keyboard.pinyinKeyboard.getValue())
-        // 五笔 has no choice: no button
         h.start()
         switchTo(entry(InputMethodCatalog.WUBI))
         h.idle()

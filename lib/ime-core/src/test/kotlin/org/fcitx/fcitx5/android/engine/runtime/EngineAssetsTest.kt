@@ -53,8 +53,6 @@ class EngineAssetsTest : EnginesFixture() {
         assertTrue(fresh.all { it == null })
     }
 
-    // kept across a setting while the one user model's counts are as they were when it was made:
-    // a node filled since would be filled alike now (S15 N2)
     @Test
     fun theLookAheadIsKeptTillTheCountsItReadMoveOrTwoModelsShareIt() {
         val data = assets.pinyinData
@@ -67,7 +65,6 @@ class EngineAssetsTest : EnginesFixture() {
         assets.dropDecoderExtensionsIfLearned()
         val again = assets.decoderExtensions(user)
         assertNotSame(held, again)
-        // a pair, the counts made again, each moves them too
         user.setPair(0, 1, 1f)
         assets.dropDecoderExtensionsIfLearned()
         val third = assets.decoderExtensions(user)
@@ -85,7 +82,6 @@ class EngineAssetsTest : EnginesFixture() {
         assets.dropDecoderExtensionsIfLearned()
         val forgotten = assets.decoderExtensions(user)
         assertNotSame(read, forgotten)
-        // nothing learned since it was made: kept
         assets.dropDecoderExtensionsIfLearned()
         assertSame(forgotten, assets.decoderExtensions(user))
         // asked for by another model's sessions too: whose counts it read is not known
@@ -95,14 +91,9 @@ class EngineAssetsTest : EnginesFixture() {
         assertEquals(7, assets.extensionsMade)
     }
 
-    /**
-     * The look-ahead's picks are the model's alone, whatever the user typed in full (D32: a short
-     * edge scores no counts, look-ahead arcs included), in the sessions made after a change to the
-     * user's words too.
-     */
+    /** The look-ahead's picks are the model's alone, whatever the user typed. */
     @Test
     fun theLookAheadIsTheModelsThoughTheWordAheadWasTypedInFull() {
-        // 拟 may go on to 拟好, under 拟 alone till learned
         val data = PinyinDataBuilder()
             .unigram("<unk>", -7f, 0f)
             .unigram("你", -2.2f, 0f)
@@ -116,7 +107,6 @@ class EngineAssetsTest : EnginesFixture() {
             .build()
             .toByteArray()
         val engines = Engines({ if (it == InputMethodCatalog.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null)
-        // the decoder's reading alone
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "n").candidates.take(2))
         repeat(PICKS) {
@@ -127,7 +117,6 @@ class EngineAssetsTest : EnginesFixture() {
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "n").candidates.take(2))
         assertTrue(engines.addWord("号", "hao"))
-        // made again: 拟 as the model scores 拟好, not as learned
         assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "n").candidates.take(2))
     }
 
@@ -151,11 +140,6 @@ class EngineAssetsTest : EnginesFixture() {
             .toByteArray()
     }
 
-    /**
-     * A setting keeps the decoders' look-ahead while nothing was learned since it was made, and
-     * drops it once something was: a node filled before the learning picks then as a fresh one
-     * would (the user's counts in its scores), as it did when every setting dropped it (S15 N2).
-     */
     @Test
     fun aSettingKeepsTheLookAheadTillSomethingWasLearned() {
         Engines({ if (it == InputMethodCatalog.PINYIN_DATA) ByteBuffer.wrap(niDing) else load(it) }, null).use { engines ->
@@ -163,7 +147,6 @@ class EngineAssetsTest : EnginesFixture() {
             engines.type(InputMethodCatalog.PINYIN, "n")
             assertEquals(1, engines.extensionsMade)
             assertTrue(engines.lookAheadPicks().contains("拟定"))
-            // nothing learned: kept, its picks as they were
             engines.settings = engines.settings.copy(pageSize = 5)
             engines.type(InputMethodCatalog.PINYIN, "n")
             assertEquals(1, engines.extensionsMade)
@@ -173,7 +156,6 @@ class EngineAssetsTest : EnginesFixture() {
                 engines.type(InputMethodCatalog.PINYIN, "nihao")
                 engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, engines.candidates(InputMethodCatalog.PINYIN, 0, 20).indexOfFirst { it.text == "拟好" })
             }
-            // learned, then a setting: made anew, 拟 now going on to 拟好
             engines.settings = engines.settings.copy(pageSize = 6)
             engines.type(InputMethodCatalog.PINYIN, "n")
             assertEquals(2, engines.extensionsMade)
@@ -182,8 +164,6 @@ class EngineAssetsTest : EnginesFixture() {
         }
     }
 
-    // what keeping it rests on: no setting changes how a node's look-ahead is scored, so the array kept
-    // across one picks as an array made under the new setting does
     @Test
     fun noSettingChangesWhatTheLookAheadPicks() {
         val base = EngineSettings(modelLevel = ModelLevel.LOW)
@@ -215,13 +195,8 @@ class EngineAssetsTest : EnginesFixture() {
         }
     }
 
-    /**
-     * A word whose first character reads in it as it never does alone is read as the word, whole or inside a text not read
-     * whole, for the settings and an import; piecewise for what a table asks as it is typed in, which the walk for it would hold up.
-     */
     @Test
     fun aWordIsReadAsItsFirstCharacterNeverIsAlone() {
-        // 了 alone le, liao in 了解
         val data = PinyinDataBuilder()
             .unigram("<unk>", -7f, 0f)
             .unigram("了", -2f, 0f)
@@ -236,11 +211,8 @@ class EngineAssetsTest : EnginesFixture() {
         val liao = EngineAssets(pinyin, { throw it }, null)
         assertEquals("liao jie", liao.pinyinOf("了解", strayFirst = true))
         assertEquals("le liao jie", liao.pinyinOf("了了解", strayFirst = true))
-        // a phrase a table saves, what a long press offers: walked with no stray first, the pieces'
-        // reading, not the word's (a word of the model's so read is read again, with a stray first).
-        // This pins the walk's cost, not a reading wanted: a walk as cheap that reads it liao jie should change it
+        // pins the walk's cost, not a wanted reading: a walk as cheap reading liao jie may change it
         assertEquals("le jie", liao.pinyinOf("了解"))
-        // what the settings guess
         assertEquals("liao jie", Engines(pinyin, null).pinyinOf("了解"))
     }
 
@@ -251,7 +223,6 @@ class EngineAssetsTest : EnginesFixture() {
         // 了解了 read whole though its 解了 was not found; 了解x not, its x no word; "" no text to read
         val offsets = mapOf("了解了" to intArrayOf(0, 1, 2, 3), "了解x" to intArrayOf(0, 1, 2, 3), "" to null)
         assertEquals(setOf("解x", "了解x"), assets.strayPieces(offsets, found))
-        // each read whole: no walk again
         assertEquals(emptySet<String>(), assets.strayPieces(offsets - "了解x", found))
     }
 
@@ -291,7 +262,6 @@ class EngineAssetsTest : EnginesFixture() {
         var interrupted = false
         val refined = engines.refined(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "nihao")) {
             val typed = engines.type(InputMethodCatalog.SHUANGPIN, "ni")
-            // through the refiner the pinyin's refine is half way through
             assertTrue("shuangpin refines", typed.refines)
             engines.refined(InputMethodCatalog.SHUANGPIN, typed)
             interrupted = true
@@ -300,8 +270,7 @@ class EngineAssetsTest : EnginesFixture() {
         assertEquals(expected, refined)
     }
 
-    // engine-13: an optional file that does not make sense (IllegalArgumentException, as a sentence model's has it)
-    // falls back as one not in the pack does, the stroke lookup's too: told once, none, never thrown
+    // told once, never thrown
     @Test
     fun anOptionalFileThatDoesNotReadFallsBackOneWay() {
         val errors = ArrayList<IOException>()

@@ -40,7 +40,6 @@ class EnginesStrokeBlockTest : EnginesFixture() {
             assertEquals(BlockScope.UNDER_CODE, menu.scope)
             val done = e.learning(PINYIN, LearningOp.Block(at, "好")) as LearningResult.Done
             assertFalse("好" in e.candidates(PINYIN, 0, 9).map { it.text })
-            // taken back on the spot, then blocked again
             e.learning(PINYIN, LearningOp.Undo(done.undo))
             assertTrue("好" in e.found("zp"))
             e.onEvent(PINYIN, EngineEvent.BLOCK, e.found("zp").indexOf("好"))
@@ -50,7 +49,6 @@ class EnginesStrokeBlockTest : EnginesFixture() {
             e.onEvent(PINYIN, EngineEvent.RESET, 0)
             assertTrue("好" in e.type(PINYIN, "hao").candidates)
         }
-        // kept in the learning record, listed with the tables' blocks
         Engines(::load, dir, warmUps = inPlace).use { e ->
             assertFalse("好" in e.found("zp"))
             val listed = e.listed()

@@ -6,13 +6,12 @@ package org.fcitx.fcitx5.android.engine.pinyin
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.nio.ByteBuffer
 
 class LatinWordsTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     private fun letters(word: String) = syl(*word.uppercase().map { it.toString() }.toTypedArray())
 
@@ -42,7 +41,6 @@ class LatinWordsTest {
         assertEquals(emptyList<Int>(), at("a", 0))
         assertEquals(emptyList<Int>(), at("agu", 0))
         assertEquals(emptyList<Int>(), at("qq", 0))
-        // a word ends where the letters do
         assertEquals(listOf(3), at("app'le", 0))
         assertEquals(emptyList<Int>(), at("Apple", 0))
     }
@@ -55,10 +53,8 @@ class LatinWordsTest {
         // one letter is no word; each word the input spells from there, shortest first
         assertEquals(listOf(2, 3), at("abcd", 0))
         assertEquals(listOf(3), at("qxyz", 1))
-        // a word ends where the letters do
         assertEquals(listOf(2), at("ab'c", 0))
         assertEquals(emptyList<Int>(), at("Abc", 0))
-        // a new set replaces the words before it
         user.set(setOf("xy"))
         assertEquals(setOf("xy"), user.words)
         assertEquals(emptyList<Int>(), at("abc", 0))

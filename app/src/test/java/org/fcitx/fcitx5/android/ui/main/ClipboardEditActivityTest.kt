@@ -8,11 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * An edited clip too big for the clipboard service failed past what [launchOutlivingPage] catches:
- * the RuntimeException reached the crash handler, which exits the process the keyboard runs in too,
- * instead of being shown.
- */
+/** A clip too big for the clipboard service once reached the crash handler, killing the keyboard's process too. */
 class ClipboardEditActivityTest {
 
     @Test

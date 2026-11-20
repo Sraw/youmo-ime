@@ -11,13 +11,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import java.util.Random
 import java.util.zip.CRC32
 
-/**
- * Taps simulated with a place (061-neighbour-correction §5): a hand taps the meant key's centre
- * plus N(0, σ) on each axis and a shift, on a keyboard laid out in dp as a phone 400 dp wide has
- * it (a QWERTY key [KEY_W] by [KEY_H]; σ and the shift in its width, the same spread in millimetres
- * on every keyboard). Clean: every key lands in its own box, the input as typed; slip: one key (by
- * the sample's hash) lands in a key next to it, the input then having that key.
- */
+/** Taps simulated with a place: the meant key's centre plus N(0, σ) and a shift; slip moves one key into a neighbour. */
 object TouchSim {
     const val KEY_W = 40f
     const val KEY_H = 56f
@@ -27,8 +21,7 @@ object TouchSim {
         val boxes = KeyBoxes(keys)
     }
 
-    // [rows] of keys [height] high, each its characters (a space a key that types none: a place, no key), where it
-    // starts and each key's width (in key widths)
+    // [rows] of keys [height] high: each its characters (a space a place, no key), its start and key widths
     private fun rows(vararg rows: Triple<String, Float, Float>, height: Float = KEY_H): Board {
         val keys = LinkedHashMap<Char, KeyBoxes.Box>()
         rows.forEachIndexed { r, (chars, offset, width) ->
@@ -44,15 +37,7 @@ object TouchSim {
 
     private fun g14(groups: String) = grouped(NineKeyLetters.G14, groups)
 
-    /**
-     * `qwerty`, `qwerty-ms` (微软双拼's `;` ending the middle row), `nine` (nine.xml's digits with
-     * letters), `k14` (each key its code), `k18` (each key its code, as GroupedKeyboard lays the 18
-     * keys out: a row's keys alike, a seventh, a sixth and 0.14 of the width, one letter or two each), `nine-sp`
-     * (双拼's nine keys, nine's digits each its [NineKeyLetters.NINE_SP] code), `zy9` (注音九键's 11 groups, three a
-     * row 0.24 of the width after the tones' column, zhuyin-nine.xml) and `zy` (大千's 37 symbols, zhuyin.xml: the
-     * number row's 11 alike, its tones no key here, then 10, 10 and 10 of 0.085). Zhuyin's keyboards have five rows
-     * where the others have four, in the same height: their rows 0.8 as high.
-     */
+    /** The keyboard [name] in dp: `qwerty`, `qwerty-ms`, `nine`, `k14`, `k18`, `nine-sp`, `zy9`, `zy` (zhuyin's five rows each 0.8 as high). */
     fun board(name: String): Board = when (name) {
         "qwerty" -> rows(Triple("qwertyuiop", 0f, 1f), Triple("asdfghjkl", 0.5f, 1f), Triple("zxcvbnm", 1.5f, 1f))
         "qwerty-ms" -> rows(Triple("qwertyuiop", 0f, 1f), Triple("asdfghjkl;", 0f, 1f), Triple("zxcvbnm", 1.5f, 1f))
@@ -116,12 +101,7 @@ object TouchSim {
         }
     }
 
-    /**
-     * [samples] with each tap's place across its key ([Sample.taps]) where the app sends one on [letters]'
-     * keyboard (GroupedKeyboard.tapped as built in: the 14 and the 18 keys' every key, one of one letter for
-     * a slip from it): `clamp(dx + 0.5, 0, 1)` to the nearest of the places the app sends ([Taps.placed]);
-     * NaN elsewhere, and none at all on another keyboard.
-     */
+    /** [samples] with each tap's place across its key where the app sends one on [letters]' keyboard; NaN elsewhere. */
     fun placed(samples: List<Sample>, letters: NineKeyLetters): List<Sample> {
         if (letters != NineKeyLetters.G14 && letters != NineKeyLetters.G18) return samples
         return samples.map { s ->
@@ -135,11 +115,7 @@ object TouchSim {
         }
     }
 
-    /**
-     * A tap of [hand] aimed at the key [c] of [board], landing in one of the keys [onto] (itself, or
-     * keys next to it, the first that has the tap): the key hit and the tap. Null where none of
-     * [onto] is on the board or none lands so in [MAX_TRIES].
-     */
+    /** A tap of [hand] aimed at [c], landing in one of [onto]: the key hit and the tap; null if none lands so in [MAX_TRIES]. */
     fun tap(board: Board, c: Char, onto: List<Char>, hand: Hand, random: Random, middle: Float = board.keys.values.maxOf { it.right } / 2): Pair<Char, Touch>? {
         val box = board.keys.getValue(c)
         val boxes = onto.mapNotNull { d -> board.keys[d]?.let { d to it } }

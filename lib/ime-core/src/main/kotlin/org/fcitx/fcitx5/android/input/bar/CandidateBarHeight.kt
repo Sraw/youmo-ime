@@ -7,58 +7,40 @@ package org.fcitx.fcitx5.android.input.bar
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 
 /**
- * The candidate bar's height from 候选字号: at the default [DEFAULT_TEXT_SP] it is the bar's old
- * fixed [DEFAULT_DP]; each sp more or less moves it by two dp, so the words keep the same margin
- * above and below. The keys keep their height: the keyboard grows with the bar (the user, 2026-10-22).
- *
- * 候选词注音 in pinyin puts a line above the words, its text half theirs ([READING_SCALE]): the bar grows
- * by that line, [READING_LINE] of the text size. Zhuyin stands upright to the right of each character,
- * so it widens the candidates and adds no height.
+ * The bar's height from 候选字号: [DEFAULT_DP] at [DEFAULT_TEXT_SP], two dp per sp; the keys keep their height. 候选词注音
+ * in pinyin adds a line of [READING_LINE]; zhuyin stands to the right and adds width, not height.
  */
 object CandidateBarHeight {
     const val DEFAULT_TEXT_SP = 20
     const val DEFAULT_DP = 40
     private const val FULL = 100.0
 
-    /** The readings' text size, of the candidates'. */
+    /** Of the candidates'. */
     const val READING_SCALE = 0.5f
 
-    /** A line of pinyin above the words, of their text size: half their size, and its line's spacing. */
+    /** Of their text size: half their size, and its line's spacing. */
     const val READING_LINE = 0.6f
 
-    /** Where a Han character's top stands above its baseline, of the text size (Noto CJK's ideographs: 0.88 em). */
+    /** Of the text size (Noto CJK's ideographs: 0.88 em). */
     const val HAN_TOP = 0.88f
 
-    /** The smallest a hint's reading is drawn, in sp: smaller, pinyin's tone marks are hard to tell apart. */
+    /** Smaller, pinyin's tone marks are hard to tell apart. */
     const val HINT_FLOOR_SP = 7f
 
-    /**
-     * The text size of a hint's reading above a candidate (候选词注音 off: a misreading's, a part's, a stroke
-     * lookup's): as large as fits the [room] between the view's top and the characters' tops, its line [line]
-     * of its size, at most a reading's [READING_SCALE] of [textSize] and at least [floor]. The bar keeps its
-     * height (the user, 2026-11-02); at the floor the reading may reach a little into the characters' tops.
-     */
+    /** A hint's reading (候选词注音 off) as large as fits above the characters, [READING_SCALE] at most, [floor] at least; the bar keeps its height. */
     fun hintSize(textSize: Float, room: Float, line: Float, floor: Float): Float {
         val most = textSize * READING_SCALE
         return (room / line).coerceIn(minOf(floor, most), most)
     }
 
-    /**
-     * The text size of a handwritten character's readings above it (xíng/háng…): a reading's [READING_SCALE]
-     * of [textSize] where they fit over the character ([charWidth]; [width] theirs at that size), else as
-     * small as fits but no smaller than [floor] (the candidate is widened then). [floor] 0: never smaller.
-     */
+    /** A handwritten character's readings: [READING_SCALE] where they fit, else smaller down to [floor] (the candidate widened); 0: never smaller. */
     fun readingsSize(textSize: Float, charWidth: Float, width: Float, floor: Float): Float {
         val most = textSize * READING_SCALE
         if (width <= charWidth || floor <= 0f) return most
         return (most * charWidth / width).coerceIn(minOf(floor, most), most)
     }
 
-    /**
-     * The bar's height in dp at [textSp], [reading] its readings, [percent] the theme's (060-render-p3 T6b:
-     * `bar height=`, 80–140, of the height 候选字号 gives it, rounded to a dp); a line of readings is the
-     * text's, added after.
-     */
+    /** [percent]: the theme's `bar height=`, 80–140; a readings line is added after. */
     fun dp(textSp: Int, reading: ReadingStyle = ReadingStyle.OFF, percent: Double = FULL): Int {
         val bar = Math.round((DEFAULT_DP + 2 * (textSp - DEFAULT_TEXT_SP)) * percent / FULL).toInt()
         return if (reading == ReadingStyle.PINYIN) bar + Math.round(textSp * READING_LINE) else bar

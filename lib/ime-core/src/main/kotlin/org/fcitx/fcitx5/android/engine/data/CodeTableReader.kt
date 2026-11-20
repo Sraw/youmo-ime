@@ -7,30 +7,9 @@ package org.fcitx.fcitx5.android.engine.data
 import java.io.BufferedReader
 
 /**
- * Reads a fcitx code table text file (the `.txt` libime's `libime_tabledict` compiles, or writes
- * back from a `.dict`):
- *
- * ```
- * ;comment
- * 键码=abcdefghijklmnopqrstuvwxy
- * 码长=4
- * 拼音=@
- * [组词规则]
- * e2=p11+p12+p21+p22
- * [数据]
- * a 工
- * @a 阿
- * [词组]
- * 工作
- * ```
- *
- * libime writes the same in English (`KeyCode=`, `[Rule]`, `[Data]`, `[Phrase]`); the header is
- * kept under the Chinese names, which the engine reads. Header and rules are kept verbatim.
- * Entries keep their code as written, including a marker prefix such as 拼音's `@`: the marker is
- * never a 键码, so those entries cannot turn up in a lookup of ordinary codes, and the engine
- * finds them by asking for the marker. A text quoted as fcitx quotes one is read unquoted.
- * Comments (`;` or `#`) are recognised only before `[数据]`, since some tables use `;` as a key.
- * The phrases of `[词组]` have no code: they are left in [phrases], for the 组词规则 to code.
+ * Reads a fcitx code table text file (what `libime_tabledict` compiles): header lines (`键码=`, `码长=`, `拼音=@`),
+ * then `[组词规则]`, `[数据]` (`a 工`, `@a 阿`) and `[词组]` (codeless phrases, to [phrases]); libime's English names
+ * too. A marker prefix (`@`) stays in the code, never a 键码. Comments only before `[数据]`: some tables key `;`.
  */
 class CodeTableReader {
 
@@ -39,14 +18,9 @@ class CodeTableReader {
     var entries = 0
         private set
 
-    /** The phrases listed without a code, under `[词组]`. */
     val phrases = ArrayList<String>()
 
-    /**
-     * Unmarked entries whose code uses a character that is not a 键码. Marked entries are not
-     * checked: a 拼音 entry is spelt in pinyin, which may need a letter the table's own keys lack
-     * (五笔 has no z key).
-     */
+    /** Unmarked entries using a non-键码 character. Marked ones are not checked: pinyin may need a key the table lacks (五笔 has no z). */
     val strayCodes = ArrayList<String>()
 
     private enum class Part { HEADER, RULES, DATA, PHRASES }
@@ -99,10 +73,8 @@ class CodeTableReader {
     }
 
     companion object {
-        /** Header keys whose value is a prefix marking a special kind of entry. */
         private val MARKER_KEYS = listOf("拼音", "构词", "提示")
 
-        // as libime reads them, in either language
         private val SECTIONS = mapOf(
             "[组词规则]" to Part.RULES, "[Rule]" to Part.RULES,
             "[数据]" to Part.DATA, "[Data]" to Part.DATA,

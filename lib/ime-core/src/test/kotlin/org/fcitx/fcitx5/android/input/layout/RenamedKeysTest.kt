@@ -16,7 +16,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-// a theme pack's keys renamed as its layout is made the user's (061-custom-layout §2.3, M3): the settings copied, the old kept
+// a theme pack's keys renamed as its layout is made the user's: the settings copied, the old kept
 class RenamedKeysTest {
     private val renames = mapOf("fn/mine" to "t1234abcd-k18/r1c1", "g18/nope" to "t1234abcd-k18/r1c3")
 
@@ -36,8 +36,7 @@ class RenamedKeysTest {
     @Test
     @Uat("ST-193")
     fun aLongPressTurnedOffIsCopiedOff() {
-        // R26 F8143: copied through `with` and no default, an off list was taken for no setting and dropped,
-        // and the renamed key's long press came back
+        // copied through `with` and no default, an off list was taken for no setting and dropped
         val text = KeyLists.of(mapOf(KeyId("fn/mine") to UserList.Off)).serialize()
         val out = KeyLists.parse(RenamedKeys.keyLists(text, renames))!!
         assertEquals(UserList.Off, out[KeyId("t1234abcd-k18/r1c1")])

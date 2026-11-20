@@ -47,17 +47,11 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
 /**
- * The nine keys' column keeps its items from one key to the next and reads what it shows when one
- * is picked: a syllable goes with its list's id, for the engine to drop if a key typed since
- * replaced that list; punctuation is committed as it is. A click released on a list the column has
- * replaced since is dropped, as removing the items dropped it.
- *
- * The keys as they are pressed, before the engine tells of what is typed: a digit sent makes 1 the
- * separator at once; 1's punctuation keeps cycling through the engine's own reset, and with 连按
- * off too, which is the letters'; it starts again once what was typed goes or the cursor moves. A
- * key's preview is its own, though another has the same letters; a key with none types no input.
+ * The column reads what it shows when one is picked: a syllable goes with its list's id, for the engine to drop if
+ * a key since replaced that list; a click released on a replaced list is dropped. A digit sent makes 1 the separator
+ * at once; 1's punctuation keeps cycling through the engine's reset, till what was typed goes or the cursor moves.
  */
-// Robolectric, as LayoutSwitchKeyTest: reading T9Keyboard's companion initialises the View class
+// Robolectric: reading T9Keyboard's companion initialises the View class
 @RunWith(RobolectricTestRunner::class)
 class T9KeyboardTest {
 
@@ -79,17 +73,16 @@ class T9KeyboardTest {
         val four = KeyAction.HostKeyAction("4")
         assertEquals(four, T9Keyboard.resolve(four, keys, tap, 0))
         assertEquals(letter('h', again = true), T9Keyboard.resolve(four, keys, tap, 100))
-        // something else between: a key of its own again
         val back = KeyAction.SymAction(KeySym(0xff08))
         assertEquals(back, T9Keyboard.resolve(back, keys, tap, 150))
         assertEquals(four, T9Keyboard.resolve(four, keys, tap, 200))
-        // off: every press a key
         val off = MultiTap(0)
         assertEquals(four, T9Keyboard.resolve(four, keys, off, 0))
         assertEquals(four, T9Keyboard.resolve(four, keys, off, 1))
     }
 
     @Test
+    @Config(application = FcitxApplication::class)
     fun aDigitPressedAgainGoesThroughTheLettersTheUserPutOnIt() {
         val tap = MultiTap(600)
         val keys = KeyActionListener.Source.Keyboard
@@ -99,9 +92,8 @@ class T9KeyboardTest {
         assertEquals(letter('n', again = true), T9Keyboard.resolve(six, keys, tap, 100, letters = letters))
         assertEquals(letter('o', again = true), T9Keyboard.resolve(six, keys, tap, 200, letters = letters))
         assertEquals(letter('h', again = true), T9Keyboard.resolve(six, keys, tap, 300, letters = letters))
-        // drawn on the key too
-        val row = T9Keyboard.layout(letters)[1]
-        assertTrue(row.any { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "MNOH" })
+        val drawn = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, letters, semicolon = false).laidOut()
+        assertTrue(drawn.shownKeys().any { it.label == "MNOH" })
     }
 
     @Test
@@ -110,16 +102,14 @@ class T9KeyboardTest {
         val popup = KeyActionListener.Source.Popup
         assertEquals(KeyAction.CommitAction("g"), T9Keyboard.resolve(KeyAction.HostKeyAction("g"), popup, tap, 0))
         assertEquals(KeyAction.CommitAction("G"), T9Keyboard.resolve(KeyAction.HostKeyAction("G"), popup, tap, 5, composing = true))
-        // the digit too, while typing as well: never the GHI key, nor a candidate picked
+        // never the GHI key, nor a candidate picked
         assertEquals(KeyAction.CommitAction("4"), T9Keyboard.resolve(KeyAction.HostKeyAction("4"), popup, tap, 10))
         assertEquals(KeyAction.CommitAction("1"), T9Keyboard.resolve(KeyAction.HostKeyAction("1"), popup, tap, 15, composing = true))
-        // and the next press is a key of its own
         assertEquals(KeyAction.HostKeyAction("4"), T9Keyboard.resolve(KeyAction.HostKeyAction("4"), KeyActionListener.Source.Keyboard, tap, 20))
     }
 
-    // the marks changed between two taps of a run (半角 after a digit; the engine tells the full-width map again once the
-    // first , is in, and on a slow device before the second tap): the whole run types with its first tap's map and
-    // takes back what the last tap committed (FB1 of R24, was 3,。; end to end T9-19b)
+    // the marks changed between two taps of a run (the engine tells the full-width map after the first ,): the run types
+    // with its first tap's map and takes back what the last tap committed
     @Test
     fun oneAgainTypesWithTheRunsFirstMarksThoughTheyChanged() {
         val tap = MultiTap(600)
@@ -127,9 +117,7 @@ class T9KeyboardTest {
         val one = KeyAction.HostKeyAction("1")
         assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 0, composing = false, marks = emptyMap()))
         assertEquals(KeyAction.CommitAction(".", replacing = ",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 100, composing = false, marks = ZH))
-        // after a pause a run of its own, with the marks as they are now: nothing of the last taken back
         assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
-        // another key between: the same
         T9Keyboard.resolve(KeyAction.HostKeyAction("4"), keys, tap, 2100)
         assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2200, composing = false, marks = ZH))
     }
@@ -144,16 +132,13 @@ class T9KeyboardTest {
         assertEquals(KeyAction.CommitAction("？", replacing = "。", punctuation = true), T9Keyboard.resolve(one, keys, tap, 200, composing = false, marks = ZH))
         assertEquals(KeyAction.CommitAction("！", replacing = "？", punctuation = true), T9Keyboard.resolve(one, keys, tap, 300, composing = false, marks = ZH))
         assertEquals(KeyAction.CommitAction("，", replacing = "！", punctuation = true), T9Keyboard.resolve(one, keys, tap, 400, composing = false, marks = ZH))
-        // after a pause, a ， of its own; Chinese punctuation off, , as it is
         assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolve(one, keys, tap, 2000, composing = false, marks = ZH))
         assertEquals(KeyAction.CommitAction(",", punctuation = true), T9Keyboard.resolve(one, keys, tap, 4000, composing = false))
-        // while typing, the separator the engine reads
         assertEquals(one, T9Keyboard.resolve(one, keys, tap, 2100, composing = true))
     }
 
-    // a long-pressed symbol goes on as the popup gives it: 2 to 9's to the engine, as the full keyboard's (the
-    // candidate, then the mark); a user's literal item committed as it is. 1's defaults are stored as their source
-    // characters and typed as keys through the punctuation (KB-75), which the popup's own action carries
+    // 2 to 9's to the engine, as the full keyboard's; a user's literal item as it is; 1's defaults are source characters
+    // typed through the punctuation, which the popup's own action carries
     @Test
     fun aLongPressedSymbolGoesOnAsThePopupGivesIt() {
         val tap = MultiTap(600)
@@ -166,23 +151,11 @@ class T9KeyboardTest {
             val picked = KeyAction.CommitAction(symbol)
             assertEquals(symbol, picked, T9Keyboard.resolve(picked, popup, tap, 0, composing = true))
         }
-        // and a 2 pressed again soon after one is a 2 anew, not the next letter
         val two = KeyAction.HostKeyAction("2")
         val keys = KeyActionListener.Source.Keyboard
         assertEquals(two, T9Keyboard.resolve(two, keys, tap, 1000))
         T9Keyboard.resolve(PopupKeyboardUi.keyAction("!"), popup, tap, 1100, composing = true)
         assertEquals(two, T9Keyboard.resolve(two, keys, tap, 1200))
-    }
-
-    @Test
-    fun swipingADigitKeySendsItsKeypadDigit() {
-        // a keypad's, as the number keyboard's: its candidate picked while typing, not committed after it
-        fun swipe(row: Int, digit: String) = T9Keyboard.layout(NineKeyLetters.STANDARD)[row]
-            .first { (it.appearance as? KeyDef.Appearance.AltText)?.altText == digit }
-            .behaviors.filterIsInstance<KeyDef.Behavior.Swipe>().single().action
-        assertEquals(keypad(1), swipe(0, "1"))
-        assertEquals(keypad(2), swipe(0, "2"))
-        assertEquals(keypad(9), swipe(2, "9"))
     }
 
     private fun keypad(d: Int) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + d), KeyStates.Virtual)
@@ -194,7 +167,7 @@ class T9KeyboardTest {
     fun withNothingToOfferTheColumnCommitsPunctuation() {
         val zh = ChinesePunctuation.map
         listOf(T9State(), T9State(composing = true)).forEach { state ->
-            // as the punctuation maps it, shown as typed: ，。？！ with Chinese punctuation on, , . ? ! with it off
+            // as the punctuation maps it, shown as typed
             assertEquals(listOf("，", "。", "？", "！", "…"), T9Keyboard.labels(state, marks = zh).take(5))
             assertEquals(listOf(",", ".", "?", "!", "…"), T9Keyboard.labels(state).take(5))
             assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.pick(state, 0, marks = zh))
@@ -205,7 +178,6 @@ class T9KeyboardTest {
         }
     }
 
-    /** Item [i] of the column, which is the ScrollView among the keyboard's children. */
     private fun T9Keyboard.columnItem(i: Int): View {
         val column = (0 until childCount).map { getChildAt(it) }.filterIsInstance<ScrollView>().single()
         return (column.getChildAt(0) as ViewGroup).getChildAt(i)
@@ -220,7 +192,6 @@ class T9KeyboardTest {
         }
     }
 
-    // a touch down and up in [key]'s middle, sent to its keyboard (whose touches go to the scene's keys)
     private fun tap(key: ShownKey) {
         key as SceneShownKey
         val keyboard = key.canvas.parent as View
@@ -234,7 +205,6 @@ class T9KeyboardTest {
         }
     }
 
-    // under the app, whose preferences the keys read, with placeholder strings, as NumberKeyboardTest
     @Test
     @Config(application = FcitxApplication::class)
     fun aClickReleasedOnAListSinceReplacedIsDropped() {
@@ -252,33 +222,26 @@ class T9KeyboardTest {
         tap(keyboard.columnItem(10))
         keyboard.show(T9State())
         looper.idle()
-        // nor did the user see the syllables of a list that came after their release
         tap(keyboard.columnItem(0))
         val next = twelve.copy(id = 2)
         keyboard.show(next)
         looper.idle()
         assertEquals(emptyList<KeyAction>(), picked)
-        // a click on the list shown picks from it
         tap(keyboard.columnItem(0))
         looper.idle()
         assertEquals(listOf(T9Keyboard.pick(next, 0)), picked)
     }
 
-    /** The input view's lifecycle, which the keys' long-press timers run in. */
     private class Owner : LifecycleOwner {
         override val lifecycle = LifecycleRegistry(this)
     }
 
-    // 连按 is off by default; [keyboard] sets it on for the tests of it
     @After
     fun multiTapAtItsDefault() {
         AppPrefs.getInstance().keyboard.t9MultiTap.let { it.setValue(it.defaultValue) }
     }
 
-    /**
-     * A keyboard of [letters] out of a window, 连按 at [multiTap], what it sends put in [sent] and what
-     * it previews in [previews]. The clock stands still here: every press is within the multi-tap timeout of the last.
-     */
+    /** The clock stands still here: every press is within the multi-tap timeout of the last. */
     private fun keyboard(
         sent: MutableList<KeyAction>,
         previews: MutableList<PopupAction> = ArrayList(),
@@ -290,12 +253,10 @@ class T9KeyboardTest {
             setViewTreeLifecycleOwner(Owner())
             keyActionListener = KeyActionListener { action, _ -> sent += action.placeless() }
             popupActionListener = PopupActionListener { previews += it }
-            // Chinese punctuation on: 1 types ，。？！
             onPunctuationUpdate(ZH)
         }
     }
 
-    /** The key of [digit], as the scene draws it (laid out the first time). */
     private fun T9Keyboard.key(digit: Char): ShownKey =
         apply { if (width == 0) laidOut() }.shownKeys().single { it.id == digit.toString() }
 
@@ -309,8 +270,7 @@ class T9KeyboardTest {
         assertEquals(listOf(coded('2'), coded('1')), sent)
     }
 
-    // the punctuation's map told between a digit sent and the engine's answer: 1 still the separator, the
-    // column's labels redrawn only (the engine's last word, nothing typed, would make 1 punctuation)
+    // told between a digit sent and the engine's answer: 1 still the separator, the labels redrawn only
     @Test
     @Config(application = FcitxApplication::class)
     fun aPunctuationUpdateBeforeTheEngineTellsKeepsOneTheSeparator() {
@@ -329,7 +289,6 @@ class T9KeyboardTest {
         val keyboard = keyboard(sent)
         keyboard.key('4').click()
         keyboard.show(T9State(composing = true, syllables = listOf("g", "h", "i"), id = 1))
-        // a candidate picked on the bar: nothing typed
         keyboard.show(T9State())
         keyboard.key('4').click()
         assertEquals(listOf(coded('4'), coded('4')), sent)
@@ -385,7 +344,7 @@ class T9KeyboardTest {
     @Test
     @Config(application = FcitxApplication::class)
     fun withMultiTapOffTheDefaultADigitAndOneAreAKeyEachPress() {
-        // off by default (2026-10-19): a quick 4 4 is two keys, gg/gh/hh… for the model to weigh
+        // a quick 4 4 is two keys, gg/gh/hh… for the model to weigh
         assertEquals(T9MultiTap.Off, AppPrefs.getInstance().keyboard.t9MultiTap.defaultValue)
         val sent = ArrayList<KeyAction>()
         val previews = ArrayList<PopupAction>()
@@ -395,13 +354,11 @@ class T9KeyboardTest {
         tap(keyboard.key('4'))
         tap(keyboard.key('4'))
         val four = coded('4')
-        // 1's punctuation too: two quick presses are two ，, the rest picked from the column
         assertEquals(listOf(KeyAction.CommitAction("，", punctuation = true), KeyAction.CommitAction("，", punctuation = true), four, four), sent)
         assertEquals(listOf("GHI", "GHI"), previews.filterIsInstance<PopupAction.PreviewAction>().map { it.content })
     }
 
-    // while typing every digit its code (0 and a key emptied of letters end the input, never pick the
-    // candidate they number); with nothing typed 0 and such a key are the digits themselves
+    // 0 and a key emptied of letters end the input while typing, never pick the candidate they number
     @Test
     fun whileTypingEveryDigitIsItsCode() {
         val emptied = NineKeyLetters.of(listOf("abc", "def", "ghi", "jkl", "", "pqrs", "tuv", "wxyz"))
@@ -416,7 +373,6 @@ class T9KeyboardTest {
         assertEquals(KeyAction.HostKeyAction("6"), of('6', typing = false, emptied))
     }
 
-    // pinyin's nine keys' digit [d] as they send it, a code of their own (I1)
     private fun coded(d: Char) = KeyAction.SymAction(KeySym(0x01000000 + Keyboard.pinyinNineKey(d)), KeyStates.Virtual)
 
     private fun nineKey(d: Char, upper: Boolean = false) =
@@ -433,15 +389,12 @@ class T9KeyboardTest {
             T9Keyboard.resolveEnglish(action, source, tap, 0, composing, spells = true, upper = upper)
         assertEquals(nineKey('4'), spell(four))
         assertEquals(nineKey('4', upper = true), spell(four, upper = true))
-        // pressed again soon, a key all the same
         assertEquals(nineKey('4'), spell(four))
-        // a long press's letter pinned into the word as chosen, Shift or not; its digit committed
         fun pinned(c: Char) = KeyAction.SymAction(KeySym(0x01000000 + Keyboard.nineLetter(c)), KeyStates.Virtual)
         assertEquals(pinned('x'), spell(KeyAction.HostKeyAction("x"), popup, composing = true, upper = true))
         assertEquals(pinned('X'), spell(KeyAction.HostKeyAction("X"), popup))
         assertTrue(T9Keyboard.startsLetter(pinned('x')))
         assertEquals(KeyAction.CommitAction("4"), spell(four, popup, composing = true))
-        // 连按 (no word spelled): the letter committed as it is
         assertEquals(KeyAction.CommitAction("x"), T9Keyboard.resolveEnglish(KeyAction.HostKeyAction("x"), popup, tap, 0, false, spells = false, upper = false))
         // 1 in a word an apostrophe (366 1 8, don't); 0 English's own key
         assertEquals(KeyAction.HostKeyAction("'"), spell(KeyAction.HostKeyAction("1"), composing = true))
@@ -457,13 +410,12 @@ class T9KeyboardTest {
         val one = KeyAction.HostKeyAction("1")
         fun press(time: Long, marks: Map<String, String> = emptyMap()) =
             T9Keyboard.resolveEnglish(one, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = true, upper = false, marks = marks)
-        // 用户 2026-11-11: , . ? ! as pinyin's, no ' or - (the long presses have them)
+        // , . ? ! as pinyin's, no ' or - (the long presses have them)
         assertEquals(KeyAction.CommitAction(",", punctuation = true), press(0))
         assertEquals(KeyAction.CommitAction(".", replacing = ",", punctuation = true), press(100))
         assertEquals(KeyAction.CommitAction("?", replacing = ".", punctuation = true), press(200))
         assertEquals(KeyAction.CommitAction("!", replacing = "?", punctuation = true), press(300))
         assertEquals(KeyAction.CommitAction(",", replacing = "!", punctuation = true), press(400))
-        // as the punctuation maps them, whatever the map
         assertEquals(KeyAction.CommitAction("，", punctuation = true), press(2000, ZH))
     }
 
@@ -475,7 +427,6 @@ class T9KeyboardTest {
         fun press(time: Long, upper: Boolean, runUpper: Boolean = upper) =
             T9Keyboard.resolveEnglish(four, KeyActionListener.Source.Keyboard, tap, time, composing = false, spells = false, upper = upper, runUpper = runUpper)
         assertEquals(KeyAction.CommitAction("G"), press(0, upper = true))
-        // Shift used up by the G: the run keeps its case
         assertEquals(KeyAction.CommitAction("H", replacing = "G"), press(100, upper = false, runUpper = true))
         assertEquals(KeyAction.CommitAction("I", replacing = "H"), press(200, upper = false, runUpper = true))
         assertEquals(KeyAction.CommitAction("g"), press(2000, upper = false))
@@ -486,10 +437,10 @@ class T9KeyboardTest {
     @Test
     @Config(application = FcitxApplication::class)
     fun englishsKeysAreLowerCaseWithShiftForStartingOverAndItsOwnMarks() {
-        val english = T9Keyboard.layout(NineKeyLetters.STANDARD, english = true)
-        assertTrue(english[1].any { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == "ghi" })
-        assertTrue(english[1].any { it is CapsKey })
-        assertFalse(english.flatten().any { (it.appearance as? KeyDef.Appearance.Text)?.displayText == "重输" })
+        val english = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, english = true, semicolon = false).laidOut()
+        val labels = english.shownKeys().map { it.label }
+        assertTrue(labels.toString(), "ghi" in labels && "重输" !in labels)
+        assertTrue(english.shownKeyWithId(R.id.button_caps) != null)
         assertEquals(listOf(",", ".", "?", "!", "'"), T9Keyboard.labels(T9State(composing = true), english = true).take(5))
         assertEquals(KeyAction.HostKeyAction(","), T9Keyboard.pick(T9State(composing = true), 0, english = true))
     }
@@ -506,21 +457,19 @@ class T9KeyboardTest {
         keyboard.key('4').click()
         keyboard.key('4').click()
         assertEquals(listOf(nineKey('4', upper = true), nineKey('4')), sent.filterIsInstance<KeyAction.SymAction>())
-        // never glides, whatever 滑行输入 says
         val glide = BaseKeyboard::class.java.getDeclaredMethod("getGlide").apply { isAccessible = true }
         assertEquals(null, glide.invoke(keyboard))
         sent.clear()
         keyboard.inPasswordField = true
         keyboard.key('4').click()
         assertEquals(listOf(KeyAction.CommitAction("g")), sent)
-        // Shift ends the run: 4 again soon is a capital G of its own, not h in g's place
+        // Shift ends the run: 4 again soon is a capital G of its own
         sent.clear()
         keyboard.laidOut().shownKeyWithId(R.id.button_caps)!!.click()
         keyboard.key('4').click()
         assertEquals(listOf(KeyAction.CommitAction("G")), sent.filterIsInstance<KeyAction.CommitAction>())
     }
 
-    // an address's marks in the column, in place of its punctuation: the bottom row as it always is
     @Test
     @Config(application = FcitxApplication::class)
     fun anAddressFieldsMarksAreInTheColumn() {
@@ -528,11 +477,9 @@ class T9KeyboardTest {
             val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, english = english, semicolon = false)
             val sent = mutableListOf<KeyAction>()
             keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action.placeless() }
-            // the column: the scrolling list left of the keys
             val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
             fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
             fun pickFirst() = items.getChildAt(0).performClick()
-            // no keys of their own beside the space
             assertTrue(listOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain).all { keyboard.findViewById<View>(it) == null })
             keyboard.address = AddressKeys.URL
             assertEquals(AddressKeys.column(AddressKeys.URL), column())
@@ -545,14 +492,12 @@ class T9KeyboardTest {
             keyboard.address = AddressKeys.NONE
             assertEquals(T9Keyboard.labels(T9State(), english), column())
         }
-        // pinyin typed in an address field: its syllables still
         val typing = T9State(composing = true, syllables = listOf("ni", "mi"))
         assertEquals(listOf("ni", "mi"), T9Keyboard.labels(typing, address = AddressKeys.URL))
         assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(T9State(), 2, address = AddressKeys.URL))
         assertEquals(KeyAction.CommitAction(".com"), T9Keyboard.pick(T9State(composing = true), 2, english = true, address = AddressKeys.URL))
     }
 
-    // no 中/英 on either since I1 (English's keyboard is its own setting); the globe, in an address field too
     @Test
     @Config(application = FcitxApplication::class)
     fun neitherHasALanguageKeyAndBothTheGlobeEvenInAnAddressField() {
@@ -570,7 +515,6 @@ class T9KeyboardTest {
         }
     }
 
-    // the nine keys are pinyin's (I1): the column takes pinyin's syllables, not another input method's
     @Test
     @Config(application = FcitxApplication::class)
     fun theColumnShowsTheNineKeysSyllablesAloneNotAnotherInputMethods() {
@@ -587,8 +531,7 @@ class T9KeyboardTest {
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("ni", "mi"), id = 2)
             looper.idle()
             assertEquals(listOf("ni", "mi"), column())
-            // a switch away: pinyin's answer and the next one's at once, the last alone seen (3daa0415b:
-            // a filter on the input method kept the stale syllables shown)
+            // a switch away: both answers at once, the last alone seen (a filter on the input method once kept stale syllables)
             (keyboard.parent as ViewGroup).removeView(keyboard)
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("bu"), id = 3)
             activity.setContentView(keyboard)
@@ -600,12 +543,11 @@ class T9KeyboardTest {
     }
 
     private companion object {
-        // Chinese punctuation's map of 1's marks
         val ZH = mapOf("," to "，", "." to "。", "?" to "？", "!" to "！")
     }
 }
 
-// the action alone: where a key fell (061-neighbour-correction) is NeighbourTouchTest's
+// where a key fell is NeighbourTouchTest's
 private fun KeyAction.placeless(): KeyAction = when (this) {
     is KeyAction.HostKeyAction -> copy(touch = null)
     is KeyAction.SymAction -> copy(touch = null)

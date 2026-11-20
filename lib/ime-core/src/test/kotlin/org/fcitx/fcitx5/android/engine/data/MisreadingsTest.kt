@@ -50,7 +50,6 @@ class MisreadingsTest {
 
     @Test
     fun aCharacterPastTheBasicPlaneIsOneSyllable() {
-        // 𠮷 is U+20BB7, two chars
         val entry = Misreadings.parse(sequenceOf("𠮷野\tjí yě\tzhan'ye"), "list").single()
         assertEquals("ji'ye", entry.typed)
     }

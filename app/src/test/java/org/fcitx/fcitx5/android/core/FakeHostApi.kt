@@ -33,23 +33,15 @@ import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * In-memory stand-in for the engine, so that code written against [HostApi] runs on the JVM
- * without JNI. Configuration is stored and read back, [addons] and [candidates] are plain
- * fields to set up a scenario, and everything else that changes engine state is appended to
- * [calls] so a test can assert what was asked of the engine.
- *
- * It does not simulate input: no composition, no candidate generation. Push events through
- * [events] to drive listeners instead.
+ * In-memory [HostApi] for the JVM: config stored and read back, [addons] and [candidates] set up by tests, every
+ * other engine request appended to [calls]. Simulates no input: push [events] to drive listeners.
  */
 class FakeHostApi : HostApi {
 
-    /**
-     * Engine requests in call order, e.g. `"select(2)"`, `"activateIme(pinyin)"`. Copy-on-write: a test
-     * polls it while a page's coroutine appends on another thread; so every list here the host's calls change.
-     */
+    /** E.g. `"select(2)"`. Copy-on-write, as every list here the calls change: a test polls while a coroutine appends. */
     val calls: MutableList<String> = CopyOnWriteArrayList()
 
-    /** The timestamp each hardware key sent carried, in order: what fcitx hands back with a key it did not take. */
+    /** What fcitx hands back with a key it did not take. */
     val keyTimestamps: MutableList<Int> = CopyOnWriteArrayList()
 
     val events = MutableSharedFlow<HostEvent>(extraBufferCapacity = 64)
@@ -58,7 +50,7 @@ class FakeHostApi : HostApi {
     override var isReady = true
     override var inputMethodEntryCached = InputMethodEntry("fake")
     override var statusAreaCached: List<StatusEntry> = emptyList()
-    // a host up with punctuation off: the keys known (none held back)
+    // punctuation off: the keys known, none held back
     override var punctuationCached: Map<String, String>? = emptyMap()
     override var fullWidthCached = false
     override var clientPreeditCached = FormattedText.Empty
@@ -71,9 +63,6 @@ class FakeHostApi : HostApi {
     var enabledIme: Array<InputMethodEntry> = emptyArray()
 
     private val imOptions = mutableMapOf<String, Map<String, String>>()
-
-    /** What [setImOptions] stored, by input method: a test reads the values set, not only that a set happened. */
-    val imOptionsSet: Map<String, Map<String, String>> get() = imOptions
     private val punctuationMaps = mutableMapOf<String, List<PunctuationMapEntry>>()
 
     override suspend fun save() {
@@ -88,7 +77,6 @@ class FakeHostApi : HostApi {
         calls += "reloadEngine()"
     }
 
-    /** The user's words, as the engine would list them: kept as given, the pinyin not read. */
     val userWords: MutableList<UserWord> = CopyOnWriteArrayList()
 
     override suspend fun userWords(): List<UserWord> = userWords.toList()
@@ -98,26 +86,24 @@ class FakeHostApi : HostApi {
     override suspend fun userWordCounts(): Map<UserWord.Kind, Int> =
         UserWord.Kind.entries.associateWith { kind -> userWords.count { it.kind == kind } }
 
-    // no table to code them by
     override suspend fun sameCodes(texts: List<String>, ims: List<String>): Map<String, List<Pair<String, String>>> = emptyMap()
 
-    /** What [pinyinOf] reads a word as: no dictionary to read it by, so none unless set here. */
+    /** No dictionary here: none unless set. */
     val readings = mutableMapOf<String, String>()
 
     override suspend fun pinyinOf(text: String): String? = readings[text]
 
     override suspend fun pinyinsOf(texts: List<String>): Map<String, String?> = texts.associateWith { readings[it] }
 
-    /** What [candidateCard] answers, by the candidate's text: no data to make one of, so none unless set here. */
+    /** By the candidate's text; none unless set. */
     val candidateCards = mutableMapOf<String, CandidateCard>()
 
     override suspend fun candidateCard(index: Int, text: String, paged: Boolean): CandidateCard? = candidateCards[text]
 
-    /** What [charCardOf] answers, by the character, and what it was asked. */
     val charCards = mutableMapOf<String, CharCard>()
     val charCardsAsked: MutableList<Pair<String, CardReading?>> = CopyOnWriteArrayList()
 
-    /** Held till completed, if set: [charCardOf]'s answer late. */
+    /** If set, [charCardOf] answers only once it completes. */
     var charCardGate: CompletableDeferred<Unit>? = null
 
     override suspend fun charCardOf(char: String, reading: CardReading?): CharCard? {
@@ -126,7 +112,6 @@ class FakeHostApi : HostApi {
         return charCards[char]
     }
 
-    // no model: each char a word of its own
     override suspend fun wordBoundaries(texts: List<String>) = texts.associateWith { IntArray(it.length + 1) { i -> i } }
 
     // all alike: the recognizer's order kept
@@ -134,11 +119,8 @@ class FakeHostApi : HostApi {
     override suspend fun voiceHomophones(words: List<UserWord>) = VoiceHomophones.NONE
     override suspend fun voiceHomophonesAllowed(spans: List<VoiceHomophones.Span>) = BooleanArray(spans.size)
 
-    /** What [rareHeld] answers: the texts with a character of these. */
-    var rareChars: Set<String> = emptySet()
-    override suspend fun rareHeld(texts: Collection<String>) = texts.filterTo(HashSet()) { t -> rareChars.any { it in t } }
+    override suspend fun rareHeld(texts: Collection<String>) = emptySet<String>()
 
-    /** What [rareGrid] answers. */
     var rareGridAnswer: RareGrid? = null
     override suspend fun rareGrid() = rareGridAnswer
 
@@ -148,15 +130,15 @@ class FakeHostApi : HostApi {
         return true
     }
 
-    // voice's text not followed: no engine to follow it (EngineBackedHostApi has); the calls recorded
+    // no engine to follow voice's text (EngineBackedHostApi has one)
     override suspend fun voiceSaid(text: String, before: String?, hinted: Boolean) {
         calls += "voiceSaid($text, $before, $hinted)"
     }
 
-    /** What the next report of a put-in asks ([voicePutIn]), confirmed as it is ([voiceConfirm]): none unless set here. */
+    /** Confirmed as it is ([voiceConfirm]); none unless set. */
     var voiceAsk: VoiceEdits.Ask? = null
 
-    /** Set, a report of a put-in ([voicePutIn]) answers once it is completed: what the field does meanwhile. */
+    /** If set, [voicePutIn] answers only once it completes. */
     var voicePutInHeld: CompletableDeferred<Unit>? = null
 
     override suspend fun voicePutIn(text: String): VoiceEdits.Reply {
@@ -206,18 +188,16 @@ class FakeHostApi : HostApi {
     }
 
     override suspend fun importUserWords(lines: Sequence<String>, fileName: String): Engines.Imported {
-        // once: a file's lines may be read only once
+        // a file's lines may be read only once
         val count = lines.count()
         calls += "importUserWords($count, $fileName)"
         return Engines.Imported(0, 0, count)
     }
 
-    /** What [importBatches] answers, as set by a test: nothing is imported here. */
     val importBatches: MutableList<ImportLayer.Batch> = CopyOnWriteArrayList()
 
     override suspend fun importBatches(): List<ImportLayer.Batch> = importBatches.toList()
 
-    // the batch's words left, taken out of [importBatches]; null for none such
     override suspend fun dropImport(batch: Int): Int? {
         calls += "dropImport($batch)"
         val dropped = importBatches.firstOrNull { it.id == batch } ?: return null
@@ -230,7 +210,7 @@ class FakeHostApi : HostApi {
         return false
     }
 
-    /** What [tableKeys] answers, by table input method: none for any other, as the engine. */
+    /** By table input method; none for any other, as the engine. */
     val tableKeys = HashMap<String, Set<Char>>()
 
     override suspend fun tableKeys(im: String): Set<Char> = tableKeys[im].orEmpty()
@@ -249,16 +229,14 @@ class FakeHostApi : HostApi {
             (if (started) ", started" else "") + (after?.let { ", after $it" } ?: "") + (if (selected) ", selected" else "") + (if (said) ", said)" else ")")
     }
 
-    // written on the letters, with its first reading
     override suspend fun offerInk(reading: InkReading, piece: Int): Boolean {
         calls += "offerInk($piece, ${reading.texts.firstOrNull()})"
         return true
     }
 
-    /** What [learning] answers: a test puts its own; Done by default. */
     var learned: (LearningOp) -> LearningResult = { LearningResult.Done() }
 
-    /** Run in [learning] before [learned] answers: where a test waits on something else, as the host's thread would. */
+    /** Where a test waits on something else, as the host's thread would. */
     var whileLearning: suspend (LearningOp) -> Unit = {}
 
     override suspend fun learning(op: LearningOp): LearningResult {
@@ -267,7 +245,6 @@ class FakeHostApi : HostApi {
         return learned(op)
     }
 
-    /** The glides offered, as given: their paths and the letters' places. */
     val glides: MutableList<Glide> = CopyOnWriteArrayList()
 
     override suspend fun offerGlide(glide: Glide): Boolean {
@@ -281,7 +258,7 @@ class FakeHostApi : HostApi {
         return true
     }
 
-    /** How long each key takes the host, ms, by the key's turn: a busy engine (FastTypingTest). */
+    /** ms by the key's turn: a busy engine (FastTypingTest). */
     var keyDelay: (Int) -> Long = { 0L }
     private var keysTaken = 0
 
@@ -290,7 +267,6 @@ class FakeHostApi : HostApi {
         if (ms > 0) kotlinx.coroutines.delay(ms)
     }
 
-    /** Each key sent with a tap's place, and the place ([TypingApi.sendKey]'s touch). */
     val touches: MutableList<Pair<String, Touch>> = CopyOnWriteArrayList()
 
     override suspend fun sendKey(key: String, states: UInt, code: Int, up: Boolean, timestamp: Int, touch: Touch?) {
@@ -357,7 +333,7 @@ class FakeHostApi : HostApi {
         val wasEnabled = enabledIme.any { it.uniqueName == current }
         // in the order given, as fcitx keeps it
         enabledIme = array.mapNotNull { name -> availableIme.find { it.uniqueName == name } }.toTypedArray()
-        // the current one taken out: fcitx turns to the first left, as for a context that has no other
+        // the current one removed: fcitx turns to the first left
         if (wasEnabled && enabledIme.none { it.uniqueName == current }) enabledIme.firstOrNull()?.let { inputMethodEntryCached = it }
     }
 
@@ -392,7 +368,7 @@ class FakeHostApi : HostApi {
         return punctuationMaps[lang].orEmpty()
     }
 
-    /** [lang]'s table as fcitx would read it: a test's, as no app path saves one since 0.6.1 (HostApi has no setter). */
+    /** For tests only: no app path saves a table and HostApi has no setter. */
     suspend fun setPunctuationMap(lang: String, entries: List<PunctuationMapEntry>) {
         calls += "setPunctuationMap($lang)"
         punctuationMaps[lang] = entries.toList()
@@ -402,7 +378,6 @@ class FakeHostApi : HostApi {
         calls += "triggerQuickPhrase()"
     }
 
-    /** What [quickPhraseAt] gives, by the candidate's index. */
     val quickPhrases = mutableMapOf<Int, QuickPhraseBook.Found>()
 
     override suspend fun quickPhraseAt(index: Int): QuickPhraseBook.Found? = quickPhrases[index]
@@ -455,22 +430,18 @@ class FakeHostApi : HostApi {
     }
 }
 
-/**
- * A [HostConnection] onto a [FakeHostApi]: what components receive from `manager.fcitx()`.
- * [lifecycleScope] is the scope [runIfReady] launches into; pass the test's scope so that a
- * virtual clock and `advanceUntilIdle` govern it.
- */
+/** Pass the test's scope as [lifecycleScope] so a virtual clock and `advanceUntilIdle` govern [runIfReady]. */
 class FakeHostConnection(
     override val lifecycleScope: CoroutineScope,
     val api: FakeHostApi = FakeHostApi(),
-    /** What the blocks run on: [api], or one delegating to it (EngineBackedHostApi). */
+    /** [api], or one delegating to it (EngineBackedHostApi). */
     private val host: HostApi = api,
 ) : HostConnection {
 
     override fun <T> runImmediately(block: suspend HostApi.() -> T): T =
         runBlocking { block(host) }
 
-    // unlike the real one this does not wait for [FakeHostApi.isReady]: it runs at once
+    // unlike the real one this does not wait for [FakeHostApi.isReady]
     override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T = block(host)
 
     override fun runIfReady(block: suspend HostApi.() -> Unit) {

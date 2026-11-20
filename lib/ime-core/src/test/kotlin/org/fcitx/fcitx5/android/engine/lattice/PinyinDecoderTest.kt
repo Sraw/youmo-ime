@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.engine.lattice
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
@@ -33,8 +35,6 @@ import java.nio.ByteBuffer
 import kotlin.random.Random
 
 class PinyinDecoderTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     // few enough values that every one quantises exactly
     private val data = PinyinData.load(
@@ -92,7 +92,6 @@ class PinyinDecoderTest {
     fun theLanguageModelPicksTheSentence() {
         val nihaoma = decode("nihaoma").sentences
         assertEquals("你好吗", nihaoma.first().text)
-        // 你好, then 吗 after it: -3 - 0.5
         assertEquals(-3.5f, nihaoma.first().score, 1e-4f)
         assertEquals(listOf(id("你好"), id("吗")), nihaoma.first().words.toList())
         assertEquals("再见", decode("zaijian").sentences.first().text)
@@ -111,7 +110,6 @@ class PinyinDecoderTest {
     @Test
     fun theCommittedTextIsContext() {
         assertEquals("在", decode("zai").sentences.first().text)
-        // 我 then 再 is a bigram; 我 then 在 backs off
         assertEquals("再", decode("zai", prev = id("我")).sentences.first().text)
         assertEquals("再", decode("zai", prev = id("我")).words.first().text)
     }
@@ -119,11 +117,9 @@ class PinyinDecoderTest {
     @Test
     fun firstWordsAreEveryWordTheInputStartsWith() {
         val words = decode("nihaoma").words
-        // none reads all of it: best first
         assertEquals(listOf("你", "你好", "拟"), texts(words))
         assertEquals(listOf(2, 5, 2), words.map { it.end })
         assertEquals(words.sortedByDescending { it.score }, words)
-        // 你好 reads all of nihao: first
         assertEquals(listOf("你好", "你", "拟"), texts(decode("nihao").words))
     }
 
@@ -133,7 +129,6 @@ class PinyinDecoderTest {
         // 你好 through two initials, best as 你 then 好 (-2 - 0.75) rather than the word (-3)
         assertEquals(-2.75f + 2 * p.initial, decode("nh").sentences.first { it.text == "你好" }.score, 1e-4f)
         assertEquals(-2.75f + p.partial, decode("nih").sentences.first { it.text == "你好" }.score, 1e-4f)
-        // zhan finished, read as the start of zhang
         assertEquals(-3f + p.extended, decode("zhan").sentences.first { it.text == "张" }.score, 1e-4f)
         assertEquals(-2f + p.fuzzy, decode("li", PinyinSegmenter(setOf(Fuzzy.L_N))).sentences.first().score, 1e-4f)
         val zagn = decode("zagn", PinyinSegmenter(setOf(Fuzzy.Z_ZH))).sentences.first()
@@ -144,17 +139,10 @@ class PinyinDecoderTest {
     // ng read whole is 嗯 (ńg), which hardly anyone types so: it pays for it, n'g for 那个 its initials
     @Test
     fun aNasalAloneReadWholeCostsItsPenalty() {
-        val nasal = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("嗯", -2f, 0f)
-                    .unigram("那个", -1f, 0f)
-                    .entry("嗯", syl("ng"))
-                    .entry("嗯", syl("n"))
-                    .entry("那个", syl("na", "ge"))
-                    .build().toByteArray(),
-            ),
+        val nasal = pinyinDataOf(
+            Triple("嗯", "ng", -2f),
+            Triple("嗯", "n", -2f),
+            Triple("那个", "na ge", -1f),
         )
         val p = Penalties()
         val s = PinyinDecoder(nasal.dictionary, nasal.vocabulary, WordScorer.of(nasal.model), p).decode(plain.segment("ng")).sentences
@@ -171,10 +159,8 @@ class PinyinDecoderTest {
         assertEquals("中", s.first().text)
         assertTrue(texts(s).indexOf("张") > 0)
         assertEquals(-1.5f + p.initial + p.lookAhead, s.first().score, 1e-4f)
-        // what was typed is what it reads
         assertEquals(listOf(id("中")), s.first().words.toList())
         assertEquals(s.first().score, decode("zh").words.first { it.text == "中" }.score, 1e-4f)
-        // nor once the syllable is finished
         assertEquals(-3.5f, decode("zhong").sentences.first().score, 1e-4f)
         // where the longer word is no likelier, the word's own score stands: 你好 after 你 is rarer than 你
         assertEquals(-2f + p.initial, decode("n").sentences.first { it.text == "你" }.score, 1e-4f)
@@ -192,8 +178,6 @@ class PinyinDecoderTest {
         // the second reads what the first worked out, and scores zh as one of its own would
         assertEquals(-1.5f + p.initial + p.lookAhead, sharing(1).decode(plain.segment("zh")).sentences.first().score, 1e-4f)
         assertEquals(listOf(1, 1), asked.toList())
-        // and goes by it, not working it out again: zhong's entry made to say no longer word is likelier,
-        // 中 is scored as itself
         shared[data.dictionary.find(syl("zhong"))] = intArrayOf(NO_WORD)
         assertEquals(-3.5f + p.initial, sharing(1).decode(plain.segment("zh")).sentences.first { it.text == "中" }.score, 1e-4f)
     }
@@ -213,14 +197,12 @@ class PinyinDecoderTest {
         assertEquals(-2f + Penalties().raw, s.score, 1e-4f)
         assertEquals(listOf("iu"), texts(decode("iu").sentences))
         assertTrue(decode("iu").words.isEmpty())
-        // a syllable the dictionary has no word for
         assertEquals("你o", decode("nio").sentences.first().text)
     }
 
     @Test
     fun twoCommittedWordsAreTrigramContext() {
         assertEquals(-0.25f, decoder().decode(plain.segment("jian"), id("我"), id("再")).sentences.first().score, 1e-4f)
-        // one word of context: the bigram
         assertEquals(-0.5f, decode("jian", prev = id("再")).sentences.first().score, 1e-4f)
     }
 
@@ -233,8 +215,7 @@ class PinyinDecoderTest {
 
     @Test
     fun aBetterReadingOfTheSameWordReplacesAWorseOne() {
-        // zhon reads zhong as a slip (first) and as unfinished (better, and as the 中华 it may become);
-        // 中 is listed once, at the best
+        // zhon reads zhong as a slip and as unfinished; 中 listed once, at the best
         val s = decode("zhon").sentences
         assertEquals(listOf("中"), texts(s))
         assertEquals(-1.5f + Penalties().partial + Penalties().lookAhead, s.first().score, 1e-4f)
@@ -335,9 +316,6 @@ class PinyinDecoderTest {
         assertTrue("went on $on times", on > 400)
     }
 
-    // 简拼 in the middle reads every 双拼 key alone too: the words collected from where nothing changed
-    // are kept from key to key, and what the decoder reads is what it reads afresh, the user's words,
-    // those only imported and a key read alone each way among them
     @Test
     fun buildingOnTheLastDecodeChangesNothingIn双拼() {
         // 自然码: ni hc(hao) ma zl(zai) jm(jian) wo vh(zhang) vs(zhong) hw(hua) rf(ren) mn(min), and keys alone
@@ -350,17 +328,14 @@ class PinyinDecoderTest {
     fun buildingOnTheLastDecodeChangesNothingInZhuyinWithTones() {
         val allows = { cp: Int, syllable: Int, tone: Int -> (cp + syllable + tone) % 3 != 0 }
         val segmenter = T9Segmenter(abbreviations = false, letters = ZhuyinKeys.DACHEN, toneAllows = allows)
-        // ni hao ma zai jian wo, symbol by symbol, and the five tones
         val pieces = "ㄋㄧㄏㄠㄇㄚㄗㄞㄐㄢㄨㄛ".map { ZhuyinKeys.symbolCode(it).toString() } + (1..5).map { ZhuyinKeys.toneCode(it).toString() }
         buildsOnTheLast(segmenter, pieces, Random(13), steps = 1500, toneAllows = allows)
     }
 
-    // letters: a syllable is read more than one way (re n, ren), so a word only imported (热 of re) ends
-    // before the key that takes the dictionary's one word from the start (人民 of renm, none of renma)
+    // a word only imported ends before the key that starts the dictionary's one word
     @Test
     fun buildingOnTheLastDecodeChangesNothingInLetters() {
-        // few pieces, so that ren, m, a come one after another from the start
-        // it goes on a good part of the steps, not a count one build and seed made (review F8350: 411, a quarter of 1645)
+        // few pieces, so that ren, m, a come one after another from the start; it goes on a good part of the steps
         val steps = 6000
         buildsOnTheLast(PinyinSegmenter(), listOf("ren", "m", "a", "re", "n", "i"), Random(19), steps = steps, atLeast = steps / 10)
     }
@@ -370,17 +345,11 @@ class PinyinDecoderTest {
     fun buildingOnTheLastDecodeChangesNothingOnTheNineKeys() {
         // 64 ni, 426 hao, 62 ma, 924 zai, 5426 jian, 96 wo, 94664 zhong, 482 hua, 736 ren, 6466 min and a key, 73 re, and keys alone
         val pieces = listOf("64", "426", "62", "924", "5426", "96", "94664", "482", "736", "6466", "73", "6", "4", "9", "5", "2", "7", "'")
-        // a tenth of the steps, as letters' (review F8350: 168, a quarter of 672)
         val steps = 3000
         buildsOnTheLast(T9Segmenter(abbreviations = true), pieces, Random(17), steps = steps, atLeast = steps / 10)
     }
 
-    /**
-     * Types [pieces] at random with [segmenter] and checks, at each step, that a decoder building on
-     * the last decode reads what one made afresh does: the sentences, the words and the arcs between
-     * every two positions, as whole syllables or not. Every so often the user's words change (owned,
-     * blocked, unblocked) and the decoder is [PinyinDecoder.reset], as the session does.
-     */
+    /** Types [pieces] at random and checks that a decoder building on the last decode reads what a fresh one does. */
     private fun buildsOnTheLast(
         segmenter: Segmenter,
         pieces: List<String>,
@@ -390,7 +359,6 @@ class PinyinDecoderTest {
         atLeast: Int = steps / 4,
         readsAlone: Boolean = false,
     ) {
-        // the dictionaries the user merged among the tries walked
         val user = mergedModel().also(::typeWords)
         user.attachImports(ImportedWords().import("妮好" to "ni hao", "中人" to "zhong ren", "热" to "re", "仁" to "ren"))
         val changes = listOf(
@@ -436,9 +404,7 @@ class PinyinDecoderTest {
             went.count(kept, graph, typed, if (readsAlone) decoder() else null)
         }
         assertTrue("went on over words read by a key alone ${went.alone} times", went.alone >= if (readsAlone) steps / 20 else 0)
-        // going on from the last decode's steps (collectOn) was among what was compared, where it may be:
-        // not while tones are typed, a word's asked of the whole path to it. And going on where input is
-        // kept as typed, which a start-only word kept from the last decode once hid
+        // going on (collectOn) is compared only where it may be: not while tones are typed
         if (toneAllows == null) assertTrue("went on ${went.times} times, ${went.typed} with input kept as typed", went.times >= atLeast && went.typed > 0) else assertEquals(0, went.times)
     }
 
@@ -456,7 +422,6 @@ class PinyinDecoderTest {
         assertTrue("${d.collectedAnew}", d.collectedAnew <= 6)
         val steps = d.work.steps
         val scored = d.work.scored
-        // and as many as before where it starts again
         d.reset()
         d.decode(segmenter.segment(input + "vs"))
         assertEquals(input.length + 2, d.collectedAnew)
@@ -475,8 +440,7 @@ class PinyinDecoderTest {
             return calls
         }
         val d = PinyinDecoder(data.dictionary, data.vocabulary, counting)
-        // the same key costs about the same however much input comes before it, once the beams are
-        // full: one that grew with the input would cost four times as much after 32 as after 8
+        // a key's cost must not grow with the input once the beams are full
         val building = listOf(8, 16, 32).map { n ->
             val input = "nihao".repeat(n)
             count(d, input)
@@ -513,7 +477,6 @@ class PinyinDecoderTest {
         val d = PinyinDecoder(data.dictionary, data.vocabulary, scorer)
         assertEquals("在我", d.decode(plain.segment("zaiwo")).sentences.first().text)
         favour = id("再")
-        // the search up to wo is kept, with the old scores
         assertEquals("在我吗", d.decode(plain.segment("zaiwoma")).sentences.first().text)
         d.reset()
         val again = d.decode(plain.segment("zaiwoma"))
@@ -535,33 +498,17 @@ class PinyinDecoderTest {
         assertEquals(describe(decoder().decode(input)), describe(d.decode(input)))
     }
 
-    /**
-     * The words reading all the input come before the rest, however common: a rarer
-     * character of jiao (觉) is not crowded out by the common ones of ji and jia, past the words
-     * returned.
-     */
     @Test
     fun theWordsReadingAllTheInputComeBeforeThoseReadingAPart() {
-        val jiao = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("几", -1f, 0f)
-                    .unigram("家", -1.25f, 0f)
-                    .unigram("见", -2f, 0f)
-                    .unigram("叫", -2.5f, 0f)
-                    .unigram("觉", -3f, 0f)
-                    .entry("几", syl("ji"))
-                    .entry("家", syl("jia"))
-                    .entry("见", syl("jian"))
-                    .entry("叫", syl("jiao"))
-                    .entry("觉", syl("jiao"))
-                    .build().toByteArray(),
-            ),
+        val jiao = pinyinDataOf(
+            Triple("几", "ji", -1f),
+            Triple("家", "jia", -1.25f),
+            Triple("见", "jian", -2f),
+            Triple("叫", "jiao", -2.5f),
+            Triple("觉", "jiao", -3f),
         )
         val decoder = PinyinDecoder(jiao.dictionary, jiao.vocabulary, WordScorer.of(jiao.model), Penalties())
         assertEquals(listOf("叫", "觉", "几", "家"), texts(decoder.decode(plain.segment("jiao")).words))
-        // the first two only: those of all of it
         assertEquals(listOf("叫", "觉"), texts(decoder.decode(plain.segment("jiao"), words = 2).words))
         // not on the nine keys: by score alone, the syllable column there to narrow them
         val nineKeys = PinyinDecoder(jiao.dictionary, jiao.vocabulary, WordScorer.of(jiao.model), Penalties(), wholeFirst = false)
@@ -585,7 +532,6 @@ class PinyinDecoderTest {
         val coarse = CoarseWords.of({ data.wordIndex.find(it) }, listOf("在", "仔仔"))
         fun decoder(c: CoarseWords) = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user, coarse = c)
         fun score(d: PinyinDecoder, input: String, words: List<Int>) = d.decode(plain.segment(input)).sentences.first { it.words.toList() == words }.score
-        // one the vocabulary lacks is known by its text
         assertEquals(score(decoder(CoarseWords.NONE), "zaizai", listOf(own)) + CoarseWords.PENALTY, score(decoder(coarse), "zaizai", listOf(own)), 1e-4f)
         val lowered = score(decoder(coarse), "zai", listOf(id("在")))
         assertEquals(score(decoder(CoarseWords.NONE), "zai", listOf(id("在"))) + CoarseWords.PENALTY, lowered, 1e-4f)
@@ -593,11 +539,6 @@ class PinyinDecoderTest {
         assertTrue(score(decoder(coarse), "zai", listOf(id("在"))) > lowered - CoarseWords.PENALTY - 1e-4f)
     }
 
-    /**
-     * What is typed in full never moves what is typed short (D32): a word counted, read from a whole
-     * syllable as the start of a longer one (方向 from fangxian), is scored without its counts where
-     * an uncounted scorer is given; typed exactly it has them.
-     */
     @Test
     fun aCountedWordReadOverAnExtendedSyllableIsScoredWithoutItsCounts() {
         val fang = fang()
@@ -614,22 +555,14 @@ class PinyinDecoderTest {
         assertTrue(score("fangxian", "方向", guard = false) > before + 1e-3f)
     }
 
-    // 方向 and 防线 over fang, and 的 to go on with (F2938)
-    private fun fang() = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("方向", -3f, 0f)
-                .unigram("防线", -3f, 0f)
-                .unigram("的", -2f, 0f)
-                .entry("方向", syl("fang", "xiang"))
-                .entry("防线", syl("fang", "xian"))
-                .entry("的", syl("de"))
-                .build().toByteArray(),
-        ),
+    // 方向 and 防线 over fang, and 的 to go on with
+    private fun fang() = pinyinDataOf(
+        Triple("方向", "fang xiang", -3f),
+        Triple("防线", "fang xian", -3f),
+        Triple("的", "de", -2f),
     )
 
-    // review-1b S5: so is one of the first words that ends before the input does (level 2's, firstWords), over initials
+    // so is one of the first words that ends before the input does (firstWords), over initials
     @Test
     fun aCountedFirstWordReadOverInitialsIsScoredWithoutItsCounts() {
         val fang = fang()
@@ -656,7 +589,6 @@ class PinyinDecoderTest {
         calls = 0
         assertEquals(words(decoder().decode(graph).words), words(d.words(graph, words = PinyinDecoder.DEFAULT_WORDS)))
         assertEquals(0, calls)
-        // in another context, decoded again
         val wo = id("我")
         assertEquals(words(decoder().decode(graph, prev = wo).words), words(d.words(graph, prev = wo, words = PinyinDecoder.DEFAULT_WORDS)))
         assertTrue(calls > 0)
@@ -665,17 +597,12 @@ class PinyinDecoderTest {
     /** Text kept as typed is the segmenter's to show: a letter typed as itself on the nine keys lower case. */
     @Test
     fun textKeptAsTypedShowsAsAskedOrAsTyped() {
-        // no word starts with t, u or v here
         val graph = T9Segmenter().segment("8U")
         val nineKeys = PinyinDecoder(data.dictionary, data.vocabulary, WordScorer.of(data.model), asTyped = { T9Segmenter.asTyped(it) })
         assertEquals("8u", nineKeys.decode(graph).sentences.first().text)
         assertEquals("8U", decoder().decode(graph).sentences.first().text)
     }
 
-    /**
-     * A word only imported (U-101, C19) is offered as a word the input starts with, never inside a
-     * sentence nor after another word: 妮好 imported, nihaonihao reads no 妮好 anywhere but its start.
-     */
     @Test
     fun anImportedWordIsOfferedOnlyFromTheStart() {
         val user = UserModel(data.dictionary, data.vocabulary)
@@ -686,21 +613,18 @@ class PinyinDecoderTest {
         val alone = d.decode(plain.segment("nihao"))
         assertTrue(alone.words.any { it.words.toList() == listOf(id) })
         assertTrue(alone.sentences.none { id in it.words })
-        // three syllables deep too, from the start
         val twice = d.decode(plain.segment("nihaonihao"), sentences = 64, words = 256)
         assertTrue(twice.words.any { it.words.toList() == listOf(id) && it.end == 5 })
         assertTrue(twice.words.any { it.words.toList() == listOf(three) })
         assertTrue(twice.sentences.none { id in it.words || three in it.words })
-        // after a word: never, not at the input's second word either
         d.reset()
         assertTrue(d.decode(plain.segment("hainihao"), sentences = 64, words = 256).let { r -> r.words.none { id in it.words } && r.sentences.none { id in it.words } })
-        // the user's own, it is a word like any other
         user.own(UserModel.Entry("妮好", syl("ni", "hao")))
         d.reset()
         assertTrue(d.decode(plain.segment("nihaonihao"), sentences = 64).sentences.any { id in it.words })
     }
 
-    // C19 with imports there, not only with none (review-G S7): the sentences are the same, word for word
+    // with imports there, not only with none: the sentences are the same, word for word
     @Test
     fun importedWordsChangeNoSentence() {
         val inputs = listOf("nihao", "nihaonihao", "nihaoma", "nhnh")
@@ -713,7 +637,7 @@ class PinyinDecoderTest {
         assertEquals(sentences(plainUser), sentences(imported))
     }
 
-    // review-G S2: an import alone over the input's first syllable leaves the typed letters to go on from
+    // an import alone over the input's first syllable leaves the typed letters to go on from
     @Test
     fun aSyllableOnlyAnImportHasStillReadsAsTyped() {
         val user = UserModel(data.dictionary, data.vocabulary)
@@ -735,20 +659,18 @@ class PinyinDecoderTest {
         return UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)))
     }
 
-    // review MUST-2/S6: a merged file's words come in its order, one without a weight after all weighted
+    // a merged file's words come in its order, one without a weight after all weighted
     @Test
     fun mergedWordsComeAsTheirFileRanksThemTheUnweightedLast() {
         val user = mergedModel()
         val words = PinyinDecoder(data.dictionary, data.vocabulary, UserScorer(data.model, user), user = user)
             .decode(plain.segment("ni")).words.map { it.text }
-        // the base's 你 once, from the base
         assertEquals(1, words.count { it == "你" })
         val order = listOf("妮", "泥", "尼").map(words::indexOf)
         assertTrue(order.toString(), order.all { it >= 0 } && order == order.sorted())
         assertTrue(words.indexOf("泥") < words.indexOf("倪"))
     }
 
-    // review S5/S6: mid-sentence a node's merged words are cut at the limit, but not the user's chosen one
     @Test
     fun mergedWordsAreCutMidSentenceButNotOneTheUserChose() {
         val user = mergedModel()

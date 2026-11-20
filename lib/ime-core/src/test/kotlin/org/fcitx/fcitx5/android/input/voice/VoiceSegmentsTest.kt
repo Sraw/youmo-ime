@@ -13,10 +13,10 @@ import kotlin.math.sqrt
 
 class VoiceSegmentsTest {
 
-    /** a step of the recognizer's: decoded once for each window accepted */
+    /** Decoded once for each window accepted. */
     private class Step(val text: String, val endpoint: Boolean = false)
 
-    /** the recognizer as a script: each window accepted makes the next step ready */
+    /** Each window accepted makes the next step ready. */
     private class Script(steps: List<Step>) : VoiceRecognition<String> {
         private val steps = ArrayDeque(steps)
         private var ready = 0
@@ -76,8 +76,7 @@ class VoiceSegmentsTest {
 
     @Test
     fun eachSegmentIsJudgedOnItsOwnWindows() {
-        // said loudly, a silence the endpoint needs, then the room alone: the room's segment is not
-        // lifted by the speech before it (its window reaches back 0.5 s before the endpoint, into the silence)
+        // said loudly, an endpoint, then the room alone: the room's segment is not lifted by the speech before it
         val said = listOf(Step("你")) + List(6) { Step("你好") } + List(15) { Step("你好") } + Step("你好", endpoint = true)
         val s = segments(*said.toTypedArray(), Step("I'm"), Step("I'm sorry."), Step("I'm sorry.", endpoint = true))
         s.hear(-30.0, voiced = true, times = 7)
@@ -87,8 +86,7 @@ class VoiceSegmentsTest {
         assertEquals(1, s.kept)
     }
 
-    // review F5918: the loud windows fed before an endpoint but decoded after it are the next segment's:
-    // its short word is typed (judged from the endpoint's fed count alone it would see only the quiet after)
+    // loud windows fed before an endpoint but decoded after are the next segment's: its short word is typed
     @Test
     fun windowsFedBeforeAnEndpointCountForTheNextSegment() {
         val s = segments(Step("你"), *Array(4) { Step("你好") }, Step("你好", endpoint = true), Step("O"), Step("OK"), Step("OK", endpoint = true))
@@ -135,7 +133,7 @@ class VoiceSegmentsTest {
         assertEquals(listOf("你好"), closes)
     }
 
-    // review F5991: a blank result after something was shown is taken back
+    // a blank result after something was shown is taken back
     @Test
     fun aShownSegmentTheRecognizerTookBackToNothingIsTakenBack() {
         val s = segments(Step("你"), Step("", endpoint = true))

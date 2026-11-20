@@ -44,7 +44,6 @@ fun <T : ListPreference> T.restore() {
 
 fun <T : ListPreference> T.hasDefault() = def() is String
 
-/** Its default value; null for none. */
 fun <T : ListPreference> T.defaultValue() = def() as? String
 
 fun <T : SwitchPreferenceCompat> T.restore() {

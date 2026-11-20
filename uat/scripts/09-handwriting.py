@@ -46,12 +46,6 @@ def lit(d):
     return b.checked if b else None
 
 
-case("HW-01", needs="jvm:HandwritingUatTest.theKeyboardWithHandwritingOn")(lambda d: None)
-
-
-case("HW-02", needs="jvm:HandwritingUatTest.whileWritingTheReadingIsOfferedAndThePauseWipesThePad、HostCasesUatTest.aCharacterWrittenIsShownAsTypedWithItsReadings")(lambda d: None)
-
-
 @case("HW-03", base="B0-手写", mutates="learn")
 def hw03(d):
     write(d, "大")
@@ -62,60 +56,8 @@ def hw03(d):
     return f"「{t}」"
 
 
-case("HW-04", needs="jvm:HandwritingEngineUatTest.aCharacterWrittenAfterCorrectsTheOneBefore")(lambda d: None)
-
-
-case("HW-05", needs="jvm:HandwritingEngineUatTest.aCandidatePickedPutsInTheSentenceEndingWithIt")(lambda d: None)
-
-
-case("HW-06", needs="jvm:HandwritingUatTest.backspaceTakesTheLastStrokeBack")(lambda d: None)
-
-
-case("HW-07", needs="jvm:HandwritingEngineUatTest.backspaceTakesTheUnwrittenCharacterThenTheText")(lambda d: None)
-
-
-case("HW-08", needs="jvm:HandwritingEngineUatTest.punctuationPutsTheSentenceInFirst")(lambda d: None)
-
-
-case("HW-09", needs="jvm:HostCasesUatTest.aCharacterNotCommittedIsPutInWhenTheKeyboardGoes")(lambda d: None)
-
-
-case("HW-10", needs="jvm:HandwritingEngineUatTest.aSpaceThenPredictions")(lambda d: None)
-
-
-case("HW-19", needs="jvm:KeyboardHalvesUatTest.handwritingsMenuHasNoPinItsBlockUndoneAndForgettingReordersAtOnce、HandwritingUatTest.handwritingsMenuHasNoPinAndItsNoticeIsOverTheCandidates")(lambda d: None)
-
-
-case("HW-11", needs="jvm:HandwritingEngineUatTest.returnPutsInWithoutPredictions")(lambda d: None)
-
-
-case("HW-12", needs="jvm:HandwritingUatTest.aShortAndALongPause")(lambda d: None)
-
-
-case("HW-14", needs="jvm:HandwritingEngineUatTest.aCharacterPickedRanksUpTwiceFirst")(lambda d: None)
-
-
-case("HW-16", needs="jvm:HandwritingUatTest.aPasswordIsTypedOnAndHandwritingComesBackAfter")(lambda d: None)
-
-
 case("HW-25", needs="jvm:HostCasesUatTest.aTapInTheFieldPutsTheWrittenInAsItIs、"
               "HostCasesUatTest.aTapElsewhereInTheFieldPutsTheWrittenInAtTheNewCursor")(lambda d: None)
-
-
-case("HW-23", needs="jvm:HandwritingEngineUatTest.aCharacterDeletedRightAwayIsNotUsed")(lambda d: None)
-
-
-case("HW-26", needs="jvm:HandwritingEngineUatTest.aCharacterNotYetInIsShownTraditionalAtTheToggle")(lambda d: None)
-
-
-case("HW-27", needs="jvm:EnginesHandwritingReadingsTest.turnedOnWhatIsWrittenStaysAndIsReadAgain、CandidateReadingsUatTest.handwritingPortrait、CandidateReadingsUatTest.handwritingLandscape、ReadingSpanTest、HandwritingEngineUatTest.theCandidatesLeaveOutACharactersOwnNeutralTone")(lambda d: None)
-
-
-
-case("HW-29", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu、HandwritingUatTest.theCardInLandscapeIsTwoColumns、HandwritingEngineUatTest.aCardsWordsAreADictionarys、HandwritingEngineUatTest.aCardsStrokeOrderIsTheMainlands、HandwritingEngineUatTest.aCardsTurningStrokesEachTheirShape、HandwritingEngineUatTest.theStandardsExamplesEachTheirTurningStroke")(lambda d: None)
-
-
-case("HW-30", needs="jvm:HandwritingUatTest.copyPutsTheCharacterAloneOnTheClipboardAndCommitIsATap")(lambda d: None)
 
 
 @case("HW-31", base="B0-手写", mutates=True)
@@ -139,7 +81,6 @@ def hw31(d):
     return f"「天」「人」的菜单都有屏蔽；屏蔽后候选 {after[:4]}（设置里恢复由 JVM 管）"
 
 
-# ---- written over the keys (HW-32..37)
 
 
 @case("HW-32", base="B0-手写", mutates="learn")
@@ -153,15 +94,10 @@ def hw32(d):
     return f"「{t}」（短划由 JVM 管）"
 
 
-case("HW-34", needs="jvm:KeyHandwritingUatTest.whileWritingATapIsAStrokeBackspaceTakesOneBackAndSpaceCommits")(lambda d: None)
-
-case("HW-36", needs="jvm:KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo")(lambda d: None)
-
 case("HW-37", needs="jvm:KeyHandwritingUatTest.urlAndEmailFieldsAreWrittenOn、KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores、"
               "KeyHandwritingUatTest.englishKeysGoStraightOnTheRecognizerNotMade")(lambda d: None)
 
 
-# ---- the toolbar's 手写 (HW-41..52)
 
 
 @case("HW-41", base="B0", mutates="learn")
@@ -198,8 +134,6 @@ def hw42(d):
     return f"候选 {c[:3]}"
 
 
-case("HW-43", needs="jvm:KeyHandwritingUatTest.shiftIsWrittenOn")(lambda d: None)
-
 case("HW-44", needs="jvm:KeyHandwritingUatTest.theOtherKeyboardsAreWrittenOnToo、KeyHandwritingUatTest.anotherInputMethodAndBackTheToggleIsKept、"
               "HandwritingModeTest.offeredInEveryChineseInputMethodNotEnglishNorAPassword")(lambda d: None)
 
@@ -228,8 +162,6 @@ def hw45(d):
 case("HW-46", needs="jvm:InkOverTest.aFirstStrokeWhilePinyinHasSomethingTypedPutsItsFirstCandidateInThenWrites、"
               "EnginesInkOverTest.aStrokeWhilePinyinIsTypedPutsItsFirstCandidateInThenIsWritten")(lambda d: None)
 
-case("HW-47", needs="jvm:KeyHandwritingUatTest.anotherInputMethodAndBackTheToggleIsKept")(lambda d: None)
-
 
 @case("HW-48", base="B0-手写", mutates="learn")
 def hw48(d):
@@ -243,8 +175,6 @@ def hw48(d):
     return f"候选 {c[:3]}"
 
 
-case("HW-40", needs="jvm:HandwritingUatTest.aHeldCharactersCardThenItsButtonsAndTheMenu、EnginesHandwritingReadingsTest.theCardOfAWrittenCharacterOrOneLookedUp")(lambda d: None)
-
 case("HW-49", needs="jvm:KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores、"
               "KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain")(lambda d: None)
 
@@ -255,7 +185,6 @@ case("HW-51", needs="jvm:EnginesHandwritingReadingsTest.aWrittenCharacterShowsIt
               "EnginesHandwritingReadingsTest.aCharacterPinyinLooksUpAfterWritingShowsOneReading、"
               "EnginesInkOverTest.pinyinsOwnCandidatesOfferPinningAfterWritingHandwritingsDoNot")(lambda d: None)
 
-case("HW-52", needs="jvm:KeyHandwritingUatTest.aStrokeStartsInTheSplitGap")(lambda d: None)
 
 case("HW-53", needs="jvm:KeyHandwritingUatTest.aFingerRestingThroughSeveralStrokesIsNoInk、KeyHandwritingUatTest.aThumbHoldingSpaceLetsTheLettersBeWrittenOn、"
               "KeyHandwritingUatTest.theThumbLiftedMidStrokeLeavesTheStrokeAlone、KeyHandwritingUatTest.aFingerDownAndUpWhileWritingIsNotHeard、"

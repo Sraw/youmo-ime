@@ -31,7 +31,7 @@ class UserWordsClearTextTest {
 
     @Test
     fun clearingAllListsPinsAndBlocksAsCleared() {
-        // the text the tick shows (review F3425: the mapping checked here, not in a test of its own)
+        // the text the tick shows
         assertEquals(R.string.learning_clear_all_message, clearMessage(all = true))
         assertEquals(R.string.learning_clear_learned_message, clearMessage(all = false))
         check("values", "Kept:", "pins", "blocks")

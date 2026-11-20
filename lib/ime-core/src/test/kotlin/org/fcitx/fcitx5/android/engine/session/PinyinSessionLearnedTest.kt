@@ -14,11 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * What the user committed, typed short (impl/design-1b.md D32, U-06, U-65): 简拼's first is the
- * model's alone, what was typed in full never moves it; a word of the user's own comes next to it,
- * before the dictionary's words not used there.
- */
+/** What the user committed, typed short: 简拼's first is the model's alone, the user's own word next. */
 class PinyinSessionLearnedTest {
 
     private val data = sessionTestData()

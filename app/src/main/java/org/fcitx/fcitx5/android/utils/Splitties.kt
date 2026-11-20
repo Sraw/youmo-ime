@@ -35,10 +35,7 @@ inline fun Ui.styledFloat(@AttrRes attrRes: Int) = ctx.styledFloat(attrRes)
 inline val ConstraintLayout.LayoutParams.unset
     get() = ConstraintLayout.LayoutParams.UNSET
 
-/**
- * Replaces splitties' `styledColor`, which rejects anything but a plain color. Material 3 themes
- * point attributes such as `colorControlNormal` at color state lists; this takes their default.
- */
+/** Splitties' `styledColor` rejects color state lists, which Material 3 points attributes such as `colorControlNormal` at. */
 @ColorInt
 fun Context.styledColor(@AttrRes attrRes: Int): Int =
     MaterialColors.getColor(this, attrRes, "styledColor")

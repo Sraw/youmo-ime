@@ -4,16 +4,10 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
-/**
- * A table's roots (字根) on its letter keys: each key's [name] (仓颉's one root, 五笔's 键名) and
- * [all] of them. [inPreedit]: the code is shown as its roots too (日月 for ab), where a key has one
- * root and a code is spelt by them (仓颉); 五笔's keys hold many, its code stays letters.
- *
- * What a key shows is [TableOptions.keyLabels]'s, the keyboard asks the engine (TableKeyboard).
- */
+/** A table's roots (字根) per letter key: its [names] and [all] of them. [inPreedit]: the code shows as roots too (仓颉's one root a key); 五笔's keys hold many, so its code stays letters. */
 class TableRoots(val names: Map<Char, String>, val all: Map<Char, List<String>>, val inPreedit: Boolean) {
 
-    /** [code] as [inPreedit] shows it: each letter its root, one character for one (the cursor counts the same), the rest as typed. */
+    /** [code] in roots, one character per letter (so the cursor counts the same), the rest as typed. */
     fun spell(code: String): String {
         if (!inPreedit) return code
         val out = StringBuilder(code.length)
@@ -22,17 +16,11 @@ class TableRoots(val names: Map<Char, String>, val all: Map<Char, List<String>>,
     }
 
     companion object {
-        /** 仓颉's 24 roots and 難 (X) and 重 (Z), one a key: its name. */
         val CANGJIE: TableRoots = roots(
             "a日 b月 c金 d木 e水 f火 g土 h竹 i戈 j十 k大 l中 m一 n弓 o人 p心 q手 r口 s尸 t廿 u山 v女 w田 x難 y卜 z重",
         ).let { names -> TableRoots(names, names.mapValues { listOf(it.value) }, inPreedit = true) }
 
-        /**
-         * 王码五笔 86's: each key's 键名 and its roots, as zh.wikipedia's 五笔字型输入法 (§86版五笔字根)
-         * gives the 口诀 and izywang.com/126.html explains them root by root. Only roots a character
-         * of their own writes: 具字上部, 皮字上部, 羊底, 革底, 衣底, 业头, 高头, 母无点 and the like have none, and
-         * a 口诀's 礻 and 衤 stand for them without their dots, as it says. Z has none: 五笔's 学习键.
-         */
+        /** 王码五笔 86's 键名 and roots per key (zh.wikipedia 86版五笔字根, izywang.com/126.html); only roots that are characters, 礻 and 衤 without their dots as the 口诀 says. Z has none: the 学习键. */
         val WUBI86: TableRoots = TableRoots(
             roots("g王 f土 d大 s木 a工 h目 j日 k口 l田 m山 t禾 r白 e月 w人 q金 y言 u立 i水 o火 p之 n已 b子 v女 c又 x纟"),
             mapOf(
@@ -65,12 +53,10 @@ class TableRoots(val names: Map<Char, String>, val all: Map<Char, List<String>>,
             inPreedit = false,
         )
 
-        // "a日 b月": a key's letter and its name
         private fun roots(pairs: String): Map<Char, String> = pairs.split(' ').associate { it[0] to it.substring(1) }
     }
 }
 
-/** What a table's letter keys show of its [TableRoots]: the letters alone, each key's name, all its roots. */
 enum class KeyLabels(val key: String) {
     NONE("None"),
     NAMES("Names"),
@@ -78,7 +64,6 @@ enum class KeyLabels(val key: String) {
     ;
 
     companion object {
-        /** By its [key], as the config has it; null for none of them. */
         fun of(key: String): KeyLabels? = entries.firstOrNull { it.key == key }
     }
 }

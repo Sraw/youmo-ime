@@ -34,7 +34,6 @@ class EnginesInkOverTest : EnginesFixture() {
         assertEquals(HandwritingSession.NO_PIECE, engines.inkEnded)
         assertEquals("好", engines.onEvent(PINYIN, EngineEvent.CHAR, ' '.code).commit)
         assertEquals(0, engines.inkEnded)
-        // pinyin types on after it
         assertEquals("ni", engines.type(PINYIN, "ni").preedit)
     }
 
@@ -52,7 +51,6 @@ class EnginesInkOverTest : EnginesFixture() {
         val escaped = engines.onEvent(PINYIN, EngineEvent.ESCAPE, 0)
         assertEquals("", escaped.commit)
         assertEquals("", escaped.preedit)
-        // nothing left to put in when the input then ends
         assertEquals("", engines.onEvent(PINYIN, EngineEvent.RESET, 0).commit)
     }
 
@@ -82,12 +80,10 @@ class EnginesInkOverTest : EnginesFixture() {
         val engines = Engines(::load, null, warmUps = inPlace)
         engines.write(PINYIN, 0, "好")
         assertEquals("好拟", engines.write(PINYIN, 1, "拟").preedit)
-        // a letter puts it in and is typed: pinyin's own now
         val s = engines.type(PINYIN, "n")
         assertEquals("n", s.preedit)
     }
 
-    // 061-handwriting-toolbar §15: what pinyin has typed (from before handwriting was on) goes in as space puts it, then the stroke is written
     @Test
     @Uat("HW-46")
     fun aStrokeWhilePinyinIsTypedPutsItsFirstCandidateInThenIsWritten() {
@@ -101,7 +97,7 @@ class EnginesInkOverTest : EnginesFixture() {
         assertEquals("人", engines.onEvent(PINYIN, EngineEvent.CHAR, ' '.code).commit)
     }
 
-    // 061-handwriting-toolbar §3.5: what offers 固定首位 is what shows, not whether handwriting was ever written
+    // what offers 固定首位 is what shows, not whether handwriting was ever written
     @Test
     @Uat("HW-51")
     fun pinyinsOwnCandidatesOfferPinningAfterWritingHandwritingsDoNot() {
@@ -114,7 +110,6 @@ class EnginesInkOverTest : EnginesFixture() {
         assertTrue(Offer.PIN in engines.offers(PINYIN, 1))
     }
 
-    // typed on the nine keys and the 14 keys, deleted, then written
     @Test
     fun aKeyTypedAndDeletedOnTheNineAndThe14KeysThenWritten() {
         fun takenBack(im: String, key: Int) {
@@ -127,7 +122,7 @@ class EnginesInkOverTest : EnginesFixture() {
         takenBack(PINYIN, NineKeyLetters.G14.key('n').code)
     }
 
-    // U-03: a sentence written over the keys and deleted as soon as it was put in is taken back, as on the pad
+    // a sentence written over the keys and deleted as soon as it was put in is taken back, as on the pad
     @Test
     fun aSentenceDeletedAtOnceIsNotLearned() {
         fun learned(deleted: Boolean): Boolean = Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -147,7 +142,6 @@ class EnginesInkOverTest : EnginesFixture() {
         assertFalse(learned(deleted = true))
     }
 
-    // pinyin typed after the sentence: backspaces then delete pinyin's text, not the sentence, which stays learned
     @Test
     fun aSentenceFollowedByPinyinStaysLearnedThroughItsBackspaces() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->

@@ -41,8 +41,7 @@ HOST_DATA = f"{DATA}/files/host-data"
 DE = f"/data/user_de/0/{PKG}"   # device-protected: the old builds' synced native data and direct-boot prefs
 PREFS = f"{DATA}/shared_prefs/{PKG}_preferences.xml"
 
-# what every fixture set (uat/fixtures/upgrade/*/README.md); each value as the app may show it
-# simplified or, 繁体 being on, traditional
+# each value as the app may show it, simplified or (繁体 on) traditional
 PHRASE = ("北京市海淀区", "北京市海淀區")   # OpenCC s2tw keeps the place name 海淀
 LEARNED = ("鲸喵屿", "鯨喵嶼")
 # fixtures whose learning this build no longer reads, nor restores their backups (exception_user_data_too_old)
@@ -92,8 +91,7 @@ def restore_files(d, version):
     # the external dir as Android makes it for an app (uid, group ext_data_rw), else the app cannot write it
     de = (f"mkdir -p {DE} && cd {DE} && tar -xf /data/local/tmp/de.tar && chown -R {u}:{u} {DE} && "
           f"restorecon -R {DE} && ") if "de" in names(version) else ""
-    # the chain's own marker: d.root returns stdout only, and a failed step must block here, not
-    # fail gate 2's check as if the new build were at fault
+    # the chain's own marker: d.root returns stdout only, and a failed step must block here
     out = d.root(f"mkdir -p {EXTERNAL} && cd {EXTERNAL} && tar -xf /data/local/tmp/external.tar && "
                  f"chown -R {u}:1078 /data/media/0/Android/data/{PKG} && chmod -R ug+rwX {EXTERNAL} && "
                  f"cd {DATA} && tar -xf /data/local/tmp/data.tar && chown -R {u}:{u} {DATA} && "
@@ -153,8 +151,7 @@ def file_checks(d, version=None, old=False):
     trad = ini_values(cat(d, f"{config}/conf/chttrans.conf"))
     item("繁体 (chttrans.conf EnabledIM)", "engine-pinyin" in [v for k, v in trad.items() if k.startswith("EnabledIM/")],
          trad)
-    # 0.6.1 has no 中文标点 page: an upgrade deletes an edited table and a restore does not bring one back (ST-145),
-    # and the new build's backup has none for an old build to restore
+    # the new build has no 中文标点 page: an upgrade deletes an edited table and a restore does not bring one back
     punc = cat(d, f"{data}/punctuation/punc.mb.zh_CN")
     item("中文标点 改过的表不在 (punc.mb.zh_CN 没有 , 、)", ", 、" not in punc.splitlines(),
          [l for l in punc.splitlines() if l.startswith(",")])
@@ -164,19 +161,11 @@ def file_checks(d, version=None, old=False):
         # the old copies deleted once the move is read back: one left there is a cleaner's or another app's to read
         left = d.root(f"ls -d {EXTERNAL}/config {EXTERNAL}/data {EXTERNAL}/theme 2>/dev/null").split()
         item("外部存储的旧副本已删 (Android/data config、data、theme)", not left, left)
-    if version and "de" in names(version):
-        # only a fixture with a de.tar put the old data there: else the item would pass unexercised;
-        # the old native host's synced data (FcitxApplication.deleteNativeData) gone after the first start
-        left = d.root(f"ls {DE}/descriptor.json {DE}/usr 2>/dev/null").split()
-        item("旧原生数据已删 (user_de descriptor.json, usr)", not left, left)
-    elif version:
-        # ok None: listed as not checked in the report, so a fixture without de.tar can't read as all-pass
-        res.append({"item": "旧原生数据已删 (user_de descriptor.json, usr)", "ok": None, "got": f"未检查：{version} 无 de.tar"})
     return res
 
 
 def typed_checks(d, version=None):
-    """version: gate 2's fixture; v0.3.0's learning is not read by this build (only 0.4.x converts it)"""
+    """version: gate 2's fixture; v0.3.0's learning is not read by this build"""
     res = []
 
     def item(name, ok, got):
@@ -315,8 +304,7 @@ def import_(d, zip_path, old=False):
     name = pushed(d, zip_path)
     first_start(d, packs=not old)
     warn, restarted = s15.restore(d, name)
-    # restore() only reports a missing restart; a gate that restored without one must fail (F4089)
-    # uat.check, not check: this file's own check (the gate step) shadows the import (F4160)
+    # uat.check, not check: this file's own check shadows the import
     uat.check(restarted, "恢复后应用没有重启")
     return f"restored {name}, restarted {restarted}"
 

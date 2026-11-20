@@ -20,11 +20,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The engine's half of uat/ cases whose keyboard half is the app's (Robolectric, the keys and
- * menus on a fake engine): what the 14 keys' swipes, long presses and taps give with the app's
- * data, and the long-press menu's rows and acts for a candidate.
- */
+/** The engine's half of uat/ cases whose keyboard half is the app's Robolectric tests: the 14 keys' gestures and the long-press menu. */
 class KeyboardHalvesUatTest {
 
     private fun EngineReplay.menuRows(text: String): List<LearningMenu.Row> {
@@ -35,8 +31,6 @@ class KeyboardHalvesUatTest {
 
     private fun EngineReplay.act(row: LearningMenu.Row, text: String): LearningResult =
         learn(LearningMenu.op(row, candidates.indexOf(text), text, false)!!)
-
-    // ------------------------------------------------------------------ 06 14 keys
 
     // a swipe sends the corner: a digit as a keypad's (GroupedKeyboard), a mark as its key
     @Test
@@ -121,8 +115,6 @@ class KeyboardHalvesUatTest {
         assertTrue("${panel.syllables}", panel.syllables.size >= 6 && panel.syllables.first() == "zhuang")
     }
 
-    // ------------------------------------------------------------------ 07 双拼's grouped keys
-
     private fun codes(keys: String, letters: NineKeyLetters) = keys.map(letters::key).joinToString("")
 
     // the keyboard half is GroupedKeyboardUatTest's: what the engine makes of the keys in an address field
@@ -160,8 +152,6 @@ class KeyboardHalvesUatTest {
         assertTrue("$first in $preedit", first in preedit.replace("'", "").replace(" ", ""))
     }
 
-    // ------------------------------------------------------------------ 06 the candidate menu
-
     @Test
     @Uat("PY-33")
     fun theMenuListsOnlyWhatApplies() = with(EngineReplay(engines = UatEngines.fresh())) {
@@ -176,8 +166,6 @@ class KeyboardHalvesUatTest {
         val again = menuRows(word)
         assertTrue("$again", LearningMenu.Row.FORGET in again)
     }
-
-    // ------------------------------------------------------------------ 09 handwriting
 
     @Test
     @Uat("HW-19")

@@ -28,10 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * uat/02-keyboard.md's address suggestions (AddressStrip over AddressSuggestions): what the bar
- * offers in an email's and a URL's field, what a tap leaves there, and what is learned leaving it.
- */
+/** What the address bar offers in an email's and a URL's field, what a tap leaves there, and what is learned leaving it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -66,7 +63,7 @@ class AddressUatTest {
     // another field focused: what the one before was left with is learned
     private fun next(inputType: Int = InputType.TYPE_CLASS_TEXT, imeOptions: Int = 0) = h.start(inputType, imeOptions, fieldId = ++fieldId)
 
-    // the strip's chips: in a row in a scroll view, which the bar's other buttons are not
+    // in a row in a scroll view, which the bar's other buttons are not
     private fun chipViews() = KeyboardHarness.all(h.bar).filterIsInstance<TextView>()
         .filter { h.shown(it) && it.parent?.parent is HorizontalScrollView }
 
@@ -74,7 +71,6 @@ class AddressUatTest {
 
     private fun tap(shown: String) = h.tap(chipViews().first { it.text.toString() == shown })
 
-    // the field as if typed: its text, the cursor at the end
     private fun typed(text: String) {
         h.field.setText(text)
         h.field.setSelection(text.length)
@@ -90,7 +86,6 @@ class AddressUatTest {
         assertEquals(listOf("@qq.com", "@163.com", "@gmail.com", "@outlook.com", "@126.com", "@foxmail.com", "@icloud.com"), chips())
         tap("@gmail.com")
         assertEquals("|@gmail.com", field())
-        // a plain field none
         next()
         assertEquals(emptyList<String>(), chips())
     }
@@ -102,7 +97,6 @@ class AddressUatTest {
         typed("zhang")
         tap("@163.com")
         assertEquals("zhang@163.com|", field())
-        // the address whole: nothing more
         assertEquals(emptyList<String>(), chips())
     }
 
@@ -128,7 +122,6 @@ class AddressUatTest {
         tap(".cn")
         assertEquals("https://www.example.cn|", field())
         assertEquals(emptyList<String>(), chips())
-        // a Chinese word is no host: no suffix
         typed("天气")
         assertEquals(emptyList<String>(), chips())
     }
@@ -150,28 +143,24 @@ class AddressUatTest {
     fun addressesTypedAreRememberedAndTheirSuffixesComeFirst() {
         next(email)
         typed("zhang.san@outlook.com")
-        // left: the next field's start
         next(email)
         assertEquals(listOf("zhang.san@outlook.com", "@outlook.com", "@qq.com"), chips().take(3))
         typed("zh")
         assertEquals("zhang.san@outlook.com", chips().first())
         tap("zhang.san@outlook.com")
         assertEquals("zhang.san@outlook.com|", field())
-        // turned off: none offered, none remembered, those remembered kept, the suffixes still counted
+        // off: none offered or remembered, those remembered kept, the suffixes still counted
         prefs.set(keyboard.rememberAddresses, false)
         next(email)
         assertEquals("@outlook.com", chips().first())
         typed("li@126.com")
         next(email)
-        // the suffixes alone: a remembered address does not start with @
         assertTrue(chips().toString(), chips().all { it.startsWith("@") })
         assertEquals(listOf("zhang.san@outlook.com"), AddressStore.book().addresses.map { it.address })
         assertEquals(1, AddressStore.book().count("@126.com"))
-        // on again: what was remembered offered again
         prefs.set(keyboard.rememberAddresses, true)
         next(email)
         assertEquals("zhang.san@outlook.com", chips().first())
-        // a URL's host's suffix only
         next(url)
         typed("https://www.example.org/a?b=c")
         next(url)
@@ -184,7 +173,6 @@ class AddressUatTest {
     @Uat("KB-50")
     fun incognitoFieldsAndNoHabitsLearnNothing() {
         next(email, imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)
-        // offered, as anywhere
         assertEquals("@qq.com", chips().first())
         typed("secret@gmail.com")
         next(email)
@@ -217,7 +205,6 @@ class AddressUatTest {
         assertEquals(emptyList<String>(), chips())
     }
 
-    // the keyboard put away and brought back in the same field
     private fun hideAndShow() {
         h.service.onFinishInputView(true)
         h.idle()
@@ -230,12 +217,10 @@ class AddressUatTest {
     @Uat("KB-52")
     fun halfAnAddressIsNotLearnedTillTheFieldIsLeft() {
         val half = "zhang@qq.c"
-        // the keyboard hidden, the bar made anew by a setting, the screen turned, the app's restart: the same field
         val ways = listOf<Pair<String, () -> Unit>>(
             "hidden" to ::hideAndShow,
             "rebuilt" to {
-                // a setting that makes the keyboard anew (recreateInputViewPrefs) and changes nothing here: a
-                // space more is still the standard letters (NineKeyLetters.parse); PrefsRule puts it back
+                // a setting that remakes the keyboard and changes nothing here: a trailing space is still the standard letters
                 prefs.set(keyboard.t9Letters, keyboard.t9Letters.getValue() + " ")
                 h.idle()
                 h.relayout()
@@ -243,7 +228,7 @@ class AddressUatTest {
             "turned" to { h.inLandscape(relayout = true) {} },
             "restarted" to { h.restart() },
         )
-        // each way from an empty book: a row failing leaves none to the next
+        // each from an empty book: a row failing leaves none to the next
         assertRows(ways, { it.first }) { (_, way) ->
             internal.rememberedAddresses.setValue("")
             internal.addressCounts.setValue("")
@@ -254,7 +239,6 @@ class AddressUatTest {
             typed("zhang@qq.com")
             way()
             assertEquals("", internal.rememberedAddresses.getValue())
-            // left for another field: the address as finished, once
             next()
             assertEquals(listOf("zhang@qq.com"), AddressStore.book().addresses.map { it.address })
             assertEquals(1, AddressStore.book().count("@qq.com"))
@@ -264,13 +248,12 @@ class AddressUatTest {
     @Test
     @Uat("KB-53")
     fun anAddressTheAppFilledInIsNotLearnedWhateverIsSelected() {
-        // the app's own: the field starts with it, all of it selected, as a login form's may
+        // a login form's prefilled field, all of it selected
         h.start(email, fieldId = ++fieldId) {
             it.setText("me@qq.com")
             it.selectAll()
         }
         assertEquals(emptyList<String>(), chips())
-        // the cursor moved, nothing typed: still as it started
         h.field.setSelection(2)
         h.idle()
         h.field.setSelection(h.field.text.length)
@@ -282,7 +265,7 @@ class AddressUatTest {
 
     @Test
     fun aSelectionTheAppGaveNoPositionOfIsStillASelection() {
-        // a WebView's -1, -1: the text selected read, nothing offered that a tap would put over it
+        // a WebView's -1, -1: nothing offered that a tap would put over the selected text
         h.start(email, fieldId = ++fieldId) { it.setText("zhang") }
         h.field.selectAll()
         h.service.onUpdateSelection(0, 0, -1, -1, -1, -1)
@@ -299,12 +282,10 @@ class AddressUatTest {
         tap(".com")
         assertEquals("baidu.com|", field())
         assertEquals(emptyList<String>(), chips())
-        // a suffix already there, another half typed: only the longer one it starts
         typed("sina.com.c")
         assertEquals(listOf(".com.cn"), chips())
         tap(".com.cn")
         assertEquals("sina.com.cn|", field())
-        // a half typed that no suffix after .cn starts: nothing, no whole suffix either
         typed("sina.cn.c")
         assertEquals(emptyList<String>(), chips())
     }
@@ -326,14 +307,13 @@ class AddressUatTest {
     @Test
     @Uat("KB-59")
     fun aUrlFieldsStartingHostIsNotCountedAddedOnesAre() {
-        // a page's own URL, only added to: its .org is the app's, not the user's, so .com stays first
+        // a page's own URL: its .org is the app's, not the user's, so .com stays first
         h.start(url, fieldId = ++fieldId) { it.setText("https://www.python.org/doc?a=1") }
         typed("https://www.python.org/doc?a=1&b=2")
         next(url)
         assertEquals(0, AddressStore.book().count(".org"))
         typed("github")
         assertEquals(".com", chips().first())
-        // a host the user typed counts
         typed("x.org")
         next(url)
         assertEquals(1, AddressStore.book().count(".org"))
@@ -364,7 +344,7 @@ class AddressUatTest {
     @Test
     @Uat("KB-56")
     fun fieldsThatShareANameAreToldApartByTheirText() {
-        // a Compose screen's or a web page's fields: one view, one name. 邮箱 typed, then 备用邮箱 the app filled in
+        // a Compose screen's or a web page's fields: one view, one name
         val shared = ++fieldId
         h.start(email, fieldId = shared)
         typed("me@qq.com")
@@ -373,7 +353,6 @@ class AddressUatTest {
         h.idle()
         next()
         assertEquals(listOf("me@qq.com"), AddressStore.book().addresses.map { it.address })
-        // a web mail's 收件人 typed, then its 抄送 left empty, then 主题: the address typed learned
         val mail = ++fieldId
         h.start(email, fieldId = mail)
         typed("a@163.com")
@@ -388,13 +367,12 @@ class AddressUatTest {
     fun theLastFieldIsLearnedAsTheKeyboardGoesNotWhatTheSettingsForgot() {
         next(email)
         typed("zhang@qq.com")
-        // 全部清空 in the settings, then back in the same field: what it held then not learned again
+        // 全部清空, then back in the same field: what it held then not learned again
         hideAndShow()
         AddressStore.forget { it.forgetAddresses() }
         h.restart()
         next()
         assertEquals("", internal.rememberedAddresses.getValue())
-        // another keyboard picked: the service goes, the field it was in learned
         next(email)
         typed("li@163.com")
         h.destroy()

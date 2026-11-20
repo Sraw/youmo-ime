@@ -5,15 +5,11 @@
 package org.fcitx.fcitx5.android.engine.runtime
 
 /**
- * What a field's start wants read ahead of its first key, as [FieldContext] hands it to the
- * platform's executor (Engines' `warmUps`): [steps] by name, run in their order on the one thread
- * the executor gives them, so each reads what the one before it read (the lazies' lock modes are
- * as they were: review B 1.7). Whatever a step throws ends the rest when [quiet]: what was not
- * read is read again as the session is made, on the fcitx thread, where it is reported; let out
- * of a bare thread it would end the app. Memory run out is no Exception, and is not caught.
+ * A field start's read-ahead ([FieldContext]): [steps] run in order on one executor thread, each reading what the
+ * previous read. With [quiet], a throwing step ends the rest silently: the session rereads on the fcitx thread,
+ * where it is reported, since uncaught on a bare thread it would end the app. OOM is not an Exception, not caught.
  */
 internal class WarmUp(val steps: List<Step>, private val quiet: Boolean) : Runnable {
-    /** One of [steps]: what it reads, by [name], and the read. */
     class Step(val name: String, val read: () -> Unit)
 
     val names: List<String> get() = steps.map { it.name }

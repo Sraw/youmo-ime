@@ -12,20 +12,15 @@ import org.fcitx.fcitx5.android.input.voice.VoicePolishStream
 import org.fcitx.fcitx5.android.input.voice.VoiceSession
 
 /**
- * The JVM UAT tests' recognizer ([VoiceSession.listening]): what [said] holds is heard as the talk
- * stops, each a segment closed, [heard] one before, [hearing] the segment being said; [opened]
- * times the microphone opened. [held]: the tail after the stop still being recorded, until
- * [release] or a [cut]. As VoiceListener's, without the tagger (语音整理 is a device's: the model is)
- * unless [polish] gives a stream, a test's own small tagger behind it.
+ * What [said] holds is heard as the talk stops, [held] the tail still being recorded until [release] or a [cut].
+ * As VoiceListener's, without the tagger unless [polish] gives a stream.
  */
 class FakeRecognizer : VoiceSession.Listening {
     lateinit var events: VoiceListener.Events
     val said = mutableListOf<String>()
 
-    /** 语音整理's stream, one a talk; null: none */
     var polish: (() -> VoicePolishStream)? = null
 
-    // one a talk, as a listener is
     private var live = VoiceLive()
     var opened = 0
     var held = false
@@ -34,17 +29,14 @@ class FakeRecognizer : VoiceSession.Listening {
     var closes = 0
     var stoppedAt: Long? = null
 
-    // as VoiceListener's: once closed, nothing more told
     private var closed = false
 
     /** a recognizer that never comes back, even cut: the session's 15 s give-up ends it */
     var stuck = false
     private var waiting: ((String?, Boolean) -> Unit)? = null
 
-    /** the polish failing at the end: what was said comes back as the raw text, as VoiceListener's then */
     var finishRaw = false
 
-    /** 语音整理's model not read in: the raw text throughout, as VoiceListener's then */
     var polishNotLoaded = false
 
     override val polishFailure
@@ -54,12 +46,12 @@ class FakeRecognizer : VoiceSession.Listening {
             else -> null
         }
 
-    // a test's own: the causes said already are the process's
+    // the causes said already are the process's
     init {
         VoiceSession.polishHinted.clear()
     }
 
-    /** the microphone's first sample not zero comes as it opens; false: only when [on] says so */
+    /** false: the first sample not zero only when [on] says so */
     var warm = true
 
     private var restarting: Pair<Int, VoiceLive.Mark?>? = null
@@ -68,7 +60,6 @@ class FakeRecognizer : VoiceSession.Listening {
     /** the recognizer not told yet of the app taking the text: what it hears is of the last utterance */
     var lagging = false
 
-    // as VoiceListener's: brought to the utterance asked for on the next step
     override fun restart(to: Int, upTo: VoiceLive.Mark?) {
         val last = restarting
         restarting = to to (upTo ?: last?.takeIf { it.first > live.utterance }?.second)
@@ -83,23 +74,17 @@ class FakeRecognizer : VoiceSession.Listening {
         restarting = null
         utterance = 0
         closed = false
-        // from the capture thread, as VoiceListener's
         if (warm) Handler(Looper.getMainLooper()).post { on() }
     }
 
-    /** the microphone really on */
     fun on() = events.ready()
 
-    /** 2 s of zeroes */
     fun silent() = events.silent()
 
-    /** the listener failing ([VoiceListener.Failure]): the models, the microphone, or recognizing */
     fun fail(why: VoiceListener.Failure) = events.failed(why)
 
-    /** a segment closed at an endpoint, the talk going on */
     fun heard(raw: String) = events.heard(live().closed(raw))
 
-    /** the segment being said, so far */
     fun hearing(raw: String) = events.heard(live().heard(raw))
 
     override fun finish(stoppedAt: Long, done: (said: String?, raw: Boolean) -> Unit) {
@@ -109,7 +94,6 @@ class FakeRecognizer : VoiceSession.Listening {
         if (!held) release()
     }
 
-    /** the tail recorded: what was said heard, then the session's done */
     fun release() {
         said.forEach(::heard)
         said.clear()
@@ -119,7 +103,7 @@ class FakeRecognizer : VoiceSession.Listening {
         if (!closed) done?.invoke(if (finishRaw) live.raw else live.finished(), finishRaw)
     }
 
-    // as VoiceListener's: the capture ends, and what was heard comes back from another thread
+    // what was heard comes back from another thread
     override fun cut() {
         cuts++
         if (waiting != null && !stuck) Handler(Looper.getMainLooper()).post { release() }

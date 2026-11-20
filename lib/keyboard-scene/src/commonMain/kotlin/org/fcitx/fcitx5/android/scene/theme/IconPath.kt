@@ -15,7 +15,7 @@ import kotlin.math.sqrt
 import kotlin.math.tan
 
 /**
- * A theme icon's `d=` (060-theme-sounds-icons §2.1) read once for both drawers: every SVG path command
+ * A theme icon's `d=` read once for both drawers: every SVG path command
  * made absolute M, L, Q, C and Z, so the app's `android.graphics.Path` and the web's `Path2D` are given the
  * same segments and neither parses SVG. H and V are lines, S and T take the reflected control point SVG's
  * way, an arc is up to four cubics (SVG 1.1 appendix F.6). Numbers are read by [ShapePath]'s reader.

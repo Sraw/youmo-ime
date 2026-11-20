@@ -9,10 +9,7 @@ import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.configure
 
-/**
- * An app that packs the native libraries of its library modules (handwriting, sherpa-onnx) and has
- * none of its own to build: an APK per ABI, each with its own version code.
- */
+/** An app packing its library modules' native libraries: an APK per ABI, each with its own version code. */
 @Suppress("unused")
 class NativeAppConventionPlugin : Plugin<Project> {
 

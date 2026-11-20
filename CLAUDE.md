@@ -72,4 +72,6 @@ need an APK build and an emulator; CI runs them weekly / on PRs labelled `emulat
   reads and `eventFlow` only.
 - detekt findings are frozen in `config/detekt/baseline-*.xml`. New code must not add to them;
   don't regenerate the baseline just to silence a new finding.
-- Comments explain *why* (a bug that bit, an Android quirk); match the surrounding density.
+- Comments are short and say *why* only (a bug that bit, an Android quirk, a hidden coupling): one sentence,
+  two at most. No history, dates, review or design-page numbers, nor what the code or the name already says;
+  git and `dev/` keep the stories.

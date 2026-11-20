@@ -132,8 +132,7 @@ class KeyFaceGeometryTest {
         assertEquals(listOf(NineSliceLayout.Piece(Area(0f, 0f, 64f, 32f), Area(5f, 5f, 105f, 55f))), pieces)
     }
 
-    // ST-101's imported Baidu skin: 1 px lines a quarter of the panel's colour across its keys' faces, where pieces
-    // met mid-pixel and each anti-aliased edge covered half the pixel (half over half: 75%)
+    // pieces meeting mid-pixel, each anti-aliased edge covering half, left 1 px lines across an imported skin's keys
     @Test
     fun piecesMeetOnWholePixelsLeavingNoSeam() {
         val slice = NineSlice("f", Insets(24, 24, 24, 24), 3)
@@ -148,11 +147,9 @@ class KeyFaceGeometryTest {
         for (y in 7 until 406) for (x in 7 until 290) assertEquals("($x,$y)", 1.0, cover[y][x], 1e-6)
     }
 
-    // a side with no inset has no piece there: rounding its edge moved the face's own edge in by half a pixel,
-    // a line of what is under the key along it
+    // a side with no inset has no piece: rounding its edge moved the face's edge in by half a pixel
     @Test
     fun aSideWithNoInsetKeepsTheTargetsEdge() {
-        // R23 F7525: whole-pixel rounding first moved a side with no inset in by half a pixel, losing the face's edge
         val pieces = NineSliceLayout.of(40, 40, NineSlice("f", Insets(0, 8, 12, 0), 2), Area(3.5f, 7.25f, 96.5f, 60.75f), 2.6f)
         assertEquals(
             listOf(
@@ -191,9 +188,7 @@ class KeyFaceGeometryTest {
         val out = BoxBlur.blur(row, 5, 1, 1)
         val red = out.map { it ushr 16 and 0xff }
         assertEquals(listOf(38, 57, 66, 57, 38), red)
-        // alpha stays opaque
         assertTrue(out.all { it ushr 24 == 0xff })
-        // an even field stays even
         val flat = IntArray(12) { 0x80406020.toInt() }
         assertArrayEquals(flat, BoxBlur.blur(flat, 4, 3, 2))
     }
@@ -216,19 +211,19 @@ class KeyFaceGeometryTest {
         assertEquals(6f, cornerRadius(6f, 40f, 30f))
         assertEquals(15f, cornerRadius(20f, 40f, 30f))
         assertEquals(0f, cornerRadius(-2f, 40f, 30f))
-        // split screen (ST-57): the border's inset wider than the key, a negative height threw an empty range
+        // split screen: the border's inset wider than the key, a negative height threw an empty range
         assertEquals(0f, cornerRadius(6f, 40f, -12.5f))
         assertEquals(0f, cornerRadius(6f, -1f, -1f))
     }
 
     @Test
     fun aKeySqueezedUnderItsGapHasAFaceOfNoSize() {
-        // split screen (ST-57): a 4×4 px cell inside a 3 dp gap at 2 px a dp; KeyFaceDrawable draws no face then
+        // split screen: a 4×4 px cell inside a 3 dp gap at 2 px a dp; KeyFaceDrawable draws no face then
         val face = KeyFaceGeometry.of(4f, 4f, KeyKind.Letter, keys, landscape = false, density = 2f)
         assertTrue(face.face?.hasSize != true)
     }
 
-    // A4: a see-through key over the animated picture, darkened from the board's brightness to its own
+    // a see-through key over the animated picture, darkened from the board's brightness to its own
     @Test
     fun aSeeThroughKeyIsDarkenedFromTheBoards() {
         assertEquals(0, PictureWindow.seeThroughDarken(80, 80))

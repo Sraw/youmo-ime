@@ -10,37 +10,21 @@ import java.nio.BufferUnderflowException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * Other input methods' word lists, as the user dictionary imports them (U-101): a line of text
- * ([frequency] of one), and Sogou's cell dictionaries (.scel, [Scel]) read to such lines.
- */
+/** Other input methods' word lists as the user dictionary imports them: text lines, and Sogou .scel read to such lines. */
 object ImportFiles {
     // as WordLists.line reads numbers: 3D and NaN are words
     private val NUMBER = Regex("-?\\d+(\\.\\d+)?")
     private val SPACES = Regex("\\s+")
 
-    /**
-     * The count a list gives the word of [line] (`词 pin'yin 12`, `pin'yin 词 12`, libime's
-     * `词\tpin'yin\t0`), its last number; null for none. Only orders the imported words among
-     * themselves (D24), so a cost or a log probability read as a count does no harm beyond that.
-     * Never the first field: a word of digits (`520 wu'er'ling`) is no count of itself.
-     */
+    /** A list line's count, its last number (never the first field: `520 wu'er'ling` is a word); only orders imports among themselves, so a misread cost does no harm. */
     fun frequency(line: String): Double? =
         line.trim().split(SPACES).drop(1).lastOrNull { NUMBER.matches(it) }?.toDoubleOrNull()
 
-    /** A word of a cell dictionary: [text] read [pinyin] (syllables apart by `'`), with the count it gives, if any. */
     data class Word(val text: String, val pinyin: String, val frequency: Int?) {
-        /** As a line of a word list: `词 pin'yin 12`. */
         fun line() = if (frequency == null) "$text $pinyin" else "$text $pinyin $frequency"
     }
 
-    /**
-     * Sogou's cell dictionary (.scel), as fcitx's scel2org5 reads it: its own table of syllables
-     * (Sogou's default if empty), then groups of words of one reading, each word with a few bytes
-     * of its own whose first two are its count; then, in newer files, phrases of 17 bytes of
-     * information each. The deleted words' table is not read. A word of a syllable it does not
-     * have, or of no reading, is left out.
-     */
+    /** Sogou's .scel, as fcitx's scel2org5 reads it: a syllable table (Sogou's default if empty), then word groups per reading with counts. The deleted words' table is not read; unknown syllables are left out. */
     object Scel {
         private val HEADERS = listOf(
             byteArrayOf(0x40, 0x15, 0, 0, 0x44, 0x43, 0x53, 0x01, 0x01, 0, 0, 0),
@@ -52,20 +36,17 @@ object ImportFiles {
         private const val PINYIN_OFFSET = 0x1540
         private const val PHRASE_INFO = 17
 
-        /** Words a file gives at most: Sogou's biggest have some hundred thousand; past this it is no cell dictionary. */
+        /** Sogou's biggest have some hundred thousand; past this it is no cell dictionary. */
         const val MAX_WORDS = 1_000_000
 
-        // syllables a file's table has at most: pinyin's are some 420
         private const val MAX_SYLLABLES = 4096
 
-        /** Whether [head] begins as a cell dictionary does. */
         fun isScel(head: ByteArray) = HEADERS.any { h -> head.size >= h.size && h.indices.all { head[it] == h[it] } }
 
         /**
-         * The words of [bytes], a whole .scel file, in its order, to [each].
+         * The words of a whole .scel file, in its order, to [each].
          *
-         * @throws IOException if it is no cell dictionary, ends where a word should be, or has
-         *   more than [MAX_WORDS] words or [MAX_SYLLABLES] syllables
+         * @throws IOException if it is no cell dictionary, cut short, or over [MAX_WORDS] words or [MAX_SYLLABLES] syllables
          */
         @Throws(IOException::class)
         fun read(bytes: ByteArray, each: (Word) -> Unit) {
@@ -78,8 +59,7 @@ object ImportFiles {
         }
 
         /**
-         * [bytes] as scel2org5 wrote it for the pinyin dictionary import (`scel2org5 -o`): a line
-         * `词\tpin'yin\t0` per word (`scel2org5.cpp:447`), in the file's order, into [out].
+         * [bytes] as `scel2org5 -o` writes it: `词\tpin'yin\t0` per word (`scel2org5.cpp:447`), into [out].
          *
          * @throws IOException as [read], or as [out] throws
          */
@@ -87,14 +67,10 @@ object ImportFiles {
         fun writeTextDictionary(bytes: ByteArray, out: Appendable) =
             read(bytes) { out.append(it.text).append('\t').append(it.pinyin).append("\t0\n") }
 
-        /** [writeTextDictionary] into a String. */
-        @Throws(IOException::class)
-        fun textDictionary(bytes: ByteArray): String = StringBuilder().also { writeTextDictionary(bytes, it) }.toString()
-
-        // every read is relative or checked: a file cut short, or not as it should be, underflows
+        // every read is relative or checked: a file cut short underflows
         private fun read(buffer: ByteBuffer, sink: (Word) -> Unit) {
             buffer.seek(PHRASE_OFFSET)
-            // counts unsigned: one of 2^31 or more is a file cut short, not one of no words
+            // unsigned: 2^31 or more is a file cut short, not one of no words
             val phrases = buffer.u32()
             val phraseOffset = buffer.int
             buffer.seek(ENTRY_OFFSET)
@@ -128,26 +104,23 @@ object ImportFiles {
                     val text = buffer.string()
                     if (reading != null && text.isNotEmpty()) each(Word(text, reading, null))
                 } else {
-                    // a code of some other kind, and its word: not pinyin's
                     buffer.skip(buffer.u16())
                     buffer.skip(buffer.u16())
                 }
             }
         }
 
-        // the file's table of syllables by index: Sogou's own if it has none
         private fun syllables(buffer: ByteBuffer): List<String> {
             val count = buffer.u32()
             if (count > MAX_SYLLABLES) throw IOException("$count syllables: no cell dictionary")
             val out = ArrayList<String>()
             repeat(count.toInt()) {
-                buffer.u16() // its index, in order
+                buffer.u16()
                 out += buffer.string().let { if (it == "lue" || it == "nue") it.replace("ue", "ve") else it }
             }
             return out.ifEmpty { DEFAULT_SYLLABLES }
         }
 
-        // a reading of [indices] in [syllables], `'` apart; null for one it has not, or none
         private fun pinyin(indices: IntArray, syllables: List<String>): String? {
             if (indices.isEmpty() || indices.any { it !in syllables.indices }) return null
             return indices.joinToString("'") { syllables[it] }
@@ -159,21 +132,18 @@ object ImportFiles {
 
         private fun ByteBuffer.skip(n: Int) = seek(position() + n)
 
-        // Buffer's: ByteBuffer.position(int) returning ByteBuffer is Java 9's, not on every Android. Past the end, as a read past it
+        // via Buffer: ByteBuffer.position(int) returning ByteBuffer is Java 9's, not on every Android
         private fun ByteBuffer.seek(at: Int) {
             if (at !in 0..limit()) throw BufferUnderflowException()
             (this as Buffer).position(at)
         }
 
-        // a length in bytes, then as many 16-bit indices
         private fun ByteBuffer.indices(): IntArray {
             val size = u16()
-            // half a unit: no file of Sogou's, read as one cut short
             if (size % 2 != 0) throw BufferUnderflowException()
             return IntArray(size / 2) { u16() }
         }
 
-        // a length in bytes, then UTF-16LE, ended early by a 0
         private fun ByteBuffer.string(): String {
             val units = indices()
             val end = units.indexOf(0).let { if (it < 0) units.size else it }

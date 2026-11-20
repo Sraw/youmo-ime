@@ -83,10 +83,7 @@ class AboutFragment : PaddingPreferenceFragment() {
     }
 }
 
-/**
- * The page in [repo] of the commit [hash] names (anything after a '-' is not the commit's), or
- * null when it names none: a build made without git has "N/A" for its hash.
- */
+/** Null when [hash] names no commit: a build made without git has "N/A". */
 internal fun commitUrl(repo: String, hash: String): String? {
     val commit = hash.substringBefore('-')
     val isHash = commit.isNotEmpty() && commit.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }

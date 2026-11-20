@@ -9,10 +9,10 @@ import org.fcitx.fcitx5.android.input.Contrast
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 撤销 reads on the chip in every built-in theme: 4.5:1, normal-size text's (§4). */
+/** 撤销 reads on the chip in every built-in theme: 4.5:1, normal-size text's. */
 class UndoChipColourTest {
 
-    // every built-in theme's version, as its file has it (a file added is checked too), and Transparent's two
+    // a file added is checked too
     private val presets = TestThemes.builtins.map { it.second } + TestThemes.TransparentLight + TestThemes.TransparentDark
 
     @Test

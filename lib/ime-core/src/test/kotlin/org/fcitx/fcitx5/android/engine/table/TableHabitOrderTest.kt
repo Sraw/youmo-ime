@@ -11,7 +11,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** [TableHabitOrder]'s edges, directly (review R11 F2997); the orders it makes are TableHabitsTest's. */
+/** [TableHabitOrder]'s edges, directly; the orders it makes are TableHabitsTest's. */
 class TableHabitOrderTest {
 
     private val texts = listOf("叫", "员", "叫员", "员叫")

@@ -6,48 +6,31 @@ package org.fcitx.fcitx5.android.engine.rerank
 
 import kotlin.math.ln
 
-/** Which of a decoder's readings to put first. */
 fun interface SentencePicker {
-    /**
-     * The index in [readings] to put first: 0 to keep the decoder's order. [scores] are the
-     * decoder's, log10 as it keeps them; [context] is the text before.
-     */
+    /** Index in [readings] to put first, 0 to keep the order; [scores] are the decoder's log10, [context] the text before. */
     fun pick(context: String, readings: List<String>, scores: List<Float>): Int
 }
 
-/** A [SentencePicker] whose work may be spread over calls, as the user pauses. */
+/** A [SentencePicker] whose work may be spread over calls while the user pauses. */
 fun interface SentenceRefiner {
-    /**
-     * As [SentencePicker.pick], or null if that takes more than [budget] (in [Reranker]'s units):
-     * the work done is kept, and a call with the same arguments goes on from it. [NONE] if it has
-     * nothing to say, the order shown left as it is.
-     */
+    /** As [SentencePicker.pick], or null if it needs more than [budget]; the work is kept and resumed on a call with the same arguments. [NONE]: no opinion. */
     fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int?
 
-    /** Calls at most for one input; past them the order shown stands. */
+    /** Calls at most per input; past them the order shown stands. */
     val slices: Int get() = SLICES
 
     companion object {
         const val NONE = -1
 
-        /**
-         * On the evaluation set a pause takes 25 slices of the large model at the median, 60 at
-         * the 90th percentile and 137 at most: a reorder half a second after the key would move
-         * what the user is already reaching for.
-         */
+        // a reorder much after the key would move what the user is already reaching for
         const val SLICES = 64
     }
 }
 
 /**
- * Reorders the decoder's best whole-input readings by adding what a [SentenceModel] thinks of
- * each, after what the user wrote before, to the decoder's own score. The decoder's n-gram sees
- * two words at a time; the model sees the whole sentence.
- *
- * Added, not replacing: where the dictionary has the evidence (a word read whole, a frequent
- * phrase) the decoder's margin holds, and the model decides where it is thin (简拼, sentences
- * put together from pieces). Replacing the decoder's order with the model's lost 2.2 points of
- * top1 on the evaluation set; adding it gained 3 to 5.
+ * Reorders the decoder's best readings by adding a [SentenceModel]'s score (with the text before) to the
+ * decoder's; added, not replacing, so the decoder's margin holds where the dictionary has evidence and the
+ * model decides where it is thin (简拼, pieced-together sentences).
  */
 class Reranker(
     model: SentenceModel,
@@ -78,17 +61,12 @@ class Reranker(
     }
 
     companion object {
-        /** The model's log-probability counted at this weight against the decoder's, both in nats. */
+        /** The model's log-probability weight against the decoder's, both in nats. */
         const val WEIGHT = 0.4f
-        /** How many of the decoder's best readings are compared: the first two hold most of the gain. */
+        /** How many of the decoder's best readings are compared. */
         const val LIMIT = 2
-        /**
-         * A position or a denominator is 0.5 to 1 ms on a phone. With what is left over carried to
-         * the next keystroke, 4 of them lose 1 sample of 548 against no bound, and take the
-         * 95th percentile of a keystroke on an emulator from 8.1 to 5.7 ms.
-         */
         const val BUDGET = 4
-        /** How many readings a refiner weighs, with time to: past the first two, it still finds some. */
+        /** How many readings a refiner weighs, given time. */
         const val REFINE_LIMIT = 5
         private val LN_10 = ln(10f)
     }

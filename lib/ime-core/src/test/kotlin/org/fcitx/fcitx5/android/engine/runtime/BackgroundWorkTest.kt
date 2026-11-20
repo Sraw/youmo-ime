@@ -13,8 +13,7 @@ import java.util.concurrent.RejectedExecutionException
 
 class BackgroundWorkTest {
 
-    // a count of its own: the process's is shared with the Engines tests' warm-up and compaction
-    // threads, which may still be finishing as these run
+    // a count of its own: the process's is shared with other tests' threads
     private val work = BackgroundCount()
 
     @Test
@@ -30,17 +29,16 @@ class BackgroundWorkTest {
         assertEquals(0, work.busy)
     }
 
-    // each row: an executor that throws from execute; the throwable still reaches the caller, and
-    // the work is counted down once, or [busy] stays wrong for good and the idle signal never comes
+    // counted down once even when execute throws, or the idle signal never comes
     @Test
     fun workAnExecutorThrowsOnIsCountedDownOnceAndRethrown() {
         data class Row(val why: String, val executor: Executor, val work: Runnable, val thrown: Class<out Throwable>)
         assertRows(
             listOf(
                 Row("refused", throwing(RejectedExecutionException()), Runnable {}, RejectedExecutionException::class.java),
-                // F3933: a thread that cannot be started throws an Error, not a RuntimeException
+                // a thread that cannot be started throws an Error, not a RuntimeException
                 Row("never started", throwing(OutOfMemoryError("pthread_create")), Runnable {}, OutOfMemoryError::class.java),
-                // F3938: run inline, the work's own finally has counted it down already; not twice
+                // run inline, the work's own finally has counted it down already; not twice
                 Row("thrown inline", Executor { it.run() }, Runnable { error("x") }, IllegalStateException::class.java),
             ),
             { it.why },

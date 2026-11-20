@@ -25,12 +25,11 @@ class ImportedDictionariesTest {
 
     private val dir by lazy { folder.newFolder("dictionaries") }
 
-    // what libime kept of a dictionary imported from text (see ime-core's resources/libime)
     private val extra = javaClass.getResourceAsStream("/libime/extra.dict")!!.use { it.readBytes() }
 
     private fun names() = dir.list()!!.sorted()
 
-    // the dictionaries put aside, not the dot files noting which were unread
+    // not the dot files noting which were unread
     private fun aside() = File(dir, ImportedDictionaries.LIBIME).list()?.filter { !it.startsWith(".") }?.sorted().orEmpty()
 
     @Test
@@ -70,9 +69,7 @@ class ImportedDictionariesTest {
         assertEquals(listOf(".libime", "b.txt.gz", "mine.txt"), names())
     }
 
-    // two dictionaries shown, the user's and the base: one an older build merged into the new words
-    // (listed in INTO_NEW, or half written as its .tmp) is merged into the base, the list gone, as
-    // it is again after a restore brings it back
+    // one an older build merged into the new words goes into the base, the list gone, again after a restore brings it back
     @Test
     fun dictionariesOnceMergedIntoTheNewWordsAreMergedIntoTheBase() {
         File(dir, "mine.txt").writeText("搭子 da'zi 0\n")
@@ -94,7 +91,6 @@ class ImportedDictionariesTest {
         assertEquals(listOf(".libime", "off.txt.gz.disable", "on.txt.gz"), names())
         assertEquals("骁骎 xiao'qin 0.0\n琮璟 cong'jing 0.0\n", gunzip(File(dir, "on.txt.gz")))
         assertEquals(listOf("off.dict.disable", "on.dict"), aside())
-        // and again, nothing left to do
         ImportedDictionaries.migrate(dir)
         assertEquals(listOf(".libime", "off.txt.gz.disable", "on.txt.gz"), names())
         assertEquals(listOf("off.dict.disable", "on.dict"), aside())
@@ -133,7 +129,6 @@ class ImportedDictionariesTest {
     fun eachDictionaryPutAsideUnreadIsNotedWithWhy() {
         File(dir, "good.dict").writeBytes(extra)
         File(dir, "corrupt.dict.disable").writeBytes(extra.copyOf(30))
-        // libime's format, version 1: magic, version, a trie with no node
         File(dir, "empty.dict").writeBytes(byteArrayOf(0, 0x0f, 0xc6.toByte(), 0x13, 0, 0, 0, 1) + ByteArray(20))
         File(dir, "taken.dict").writeBytes(extra)
         File(dir, "taken.txt").writeText("你 ni 0.0\n")
@@ -157,7 +152,6 @@ class ImportedDictionariesTest {
         ImportedDictionaries.migrate(dir)
         val told = ImportedDictionaries.unread(dir)
         assertEquals(listOf(Unread("a.dict", Unread.Reason.DAMAGED)), told)
-        // put aside while the user read of a.dict
         File(dir, "b.dict").writeBytes(extra.copyOf(30))
         ImportedDictionaries.migrate(dir)
         ImportedDictionaries.forgetUnread(dir, told)
@@ -180,7 +174,7 @@ class ImportedDictionariesTest {
         File(dir, "off.txt.disable").writeText("你 ni 0.0\n")
         File(dir, "new.dict").writeBytes(extra.copyOf(30))
         ImportedDictionaries.migrate(dir)
-        // one with a text dictionary of its name is no news, one noted as it is put aside is noted once
+        // one noted as put aside is noted once
         assertEquals(
             listOf(
                 Unread("old.dict", Unread.Reason.DAMAGED),
@@ -189,7 +183,6 @@ class ImportedDictionariesTest {
             ),
             ImportedDictionaries.unread(dir),
         )
-        // told of, they are not noted again
         ImportedDictionaries.forgetUnread(dir, ImportedDictionaries.unread(dir))
         ImportedDictionaries.migrate(dir)
         assertEquals(emptyList<Unread>(), ImportedDictionaries.unread(dir))
@@ -202,14 +195,12 @@ class ImportedDictionariesTest {
         // turned into text by an older migration, its text deleted since
         File(libime, "gone.dict").writeBytes(extra)
         File(libime, "old.dict").writeBytes(extra.copyOf(30))
-        // libime's format, version 1: magic, version, a trie with no node
         File(libime, "empty.dict").writeBytes(byteArrayOf(0, 0x0f, 0xc6.toByte(), 0x13, 0, 0, 0, 1) + ByteArray(20))
         ImportedDictionaries.migrate(dir)
         assertEquals(
             listOf(Unread("empty.dict", Unread.Reason.NO_WORDS), Unread("old.dict", Unread.Reason.DAMAGED)),
             ImportedDictionaries.unread(dir),
         )
-        // nor does the one deleted come back
         assertEquals(listOf(".libime"), names())
         assertEquals(listOf("empty.dict", "gone.dict", "old.dict"), aside())
     }
@@ -221,7 +212,6 @@ class ImportedDictionariesTest {
         File(libime, "lost.dict").writeBytes(extra.copyOf(30))
         ImportedDictionaries.migrate(dir) { data ->
             if (data.size == extra.size) throw OutOfMemoryError("Java heap space")
-            // as if the file could not be read
             throw IOException("I/O error")
         }
         assertEquals(
@@ -232,13 +222,10 @@ class ImportedDictionariesTest {
 
     @Test
     fun oneOfTheNameOfOneAnOlderMigrationPutAsideIsNotedApartFromIt() {
-        // as an older migration left it: put aside, nothing noted
         val libime = File(dir, ImportedDictionaries.LIBIME).apply { mkdir() }
-        // libime's format, version 1: magic, version, a trie with no node
         File(libime, "a.dict").writeBytes(byteArrayOf(0, 0x0f, 0xc6.toByte(), 0x13, 0, 0, 0, 1) + ByteArray(20))
         File(dir, "a.dict").writeBytes(extra.copyOf(30))
         ImportedDictionaries.migrate(dir)
-        // the older first, each once
         assertEquals(
             listOf(Unread("a.dict", Unread.Reason.NO_WORDS), Unread("a.dict", Unread.Reason.DAMAGED)),
             ImportedDictionaries.unread(dir),
@@ -248,12 +235,11 @@ class ImportedDictionariesTest {
 
     @Test
     fun oneAnOlderMigrationPutAsideIsNotedThoughOneOfItsNameIsTurnedIntoTextAfter() {
-        // as an older migration left it: put aside, nothing noted
         val libime = File(dir, ImportedDictionaries.LIBIME).apply { mkdir() }
         File(libime, "x.dict").writeBytes(extra.copyOf(30))
         File(dir, "x.dict").writeBytes(extra)
         ImportedDictionaries.migrate(dir)
-        // looked at before the new one is turned into x.txt: another dictionary, never told of
+        // looked at before the new one becomes x.txt: another dictionary, never told of
         assertEquals(listOf(Unread("x.dict", Unread.Reason.DAMAGED)), ImportedDictionaries.unread(dir))
         assertEquals(listOf(".libime", "x.txt.gz"), names())
         assertEquals("骁骎 xiao'qin 0.0\n琮璟 cong'jing 0.0\n", gunzip(File(dir, "x.txt.gz")))
@@ -267,7 +253,6 @@ class ImportedDictionariesTest {
         val told = ImportedDictionaries.unread(dir)
         assertEquals(listOf(Unread("a.dict", Unread.Reason.DAMAGED)), told)
         ImportedDictionaries.forgetUnread(dir, told)
-        // told of, it is not noted again
         ImportedDictionaries.migrate(dir)
         assertEquals(emptyList<Unread>(), ImportedDictionaries.unread(dir))
     }
@@ -298,7 +283,7 @@ class ImportedDictionariesTest {
         assertEquals(listOf("a.txt.gz"), names())
     }
 
-    // a dictionary is any of four files by its name: an older build's text, on or off, or one kept, on or off
+    // a dictionary is any of four files by name: an older build's text, on or off, or one kept, on or off
     @Test
     fun aNameIsTakenByAnyOfItsFourFiles() {
         assertRows(listOf("a.txt", "a.txt.disable", "a.txt.gz", "a.txt.gz.disable"), { it }) { file ->
@@ -306,25 +291,24 @@ class ImportedDictionariesTest {
             File(dir, file).writeText("你 ni 0.0\n")
             assertTrue(file, ImportedDictionaries.hasDictionary(dir, "a"))
             assertFalse(file, ImportedDictionaries.hasDictionary(dir, "b"))
-            // and an import of its name made meanwhile is not renamed over it, refused as a name taken (F3603)
+            // a same-named import made meanwhile is not renamed over, refused as taken
             val temp = File(dir, "a.txt.gz.tmp").apply { writeText("new") }
             assertThrows(file, ImportedDictionaries.NameTaken::class.java) { ImportedDictionaries.commit(temp, File(dir, "a.txt.gz")) }
             assertEquals(file, listOf(file, "a.txt.gz.tmp").sorted(), names())
         }
     }
 
-    // a tmp another write of its path deleted is never renamed into place as an empty file (F3594)
+    // a tmp another write of its path deleted is never renamed into place as an empty file
     @Test
     fun aTmpGoneIsNotCommitted() {
         assertThrows(IOException::class.java) { ImportedDictionaries.commit(File(dir, "a.txt.gz.tmp"), File(dir, "a.txt.gz")) }
         assertEquals(emptyList<String>(), names())
     }
 
-    // each of a dictionary's kept files deleted, though one before it could not be: whether all went (F3598).
-    // Its text refused, its gzip stays too: the two never parted, the text not converted again (F3686)
+    // every kept file deleted even if one before could not be; with the text refused its gzip stays too
     @Test
     fun aDeleteGoesOnPastAFileThatStays() {
-        // a directory of a file's name, not empty: its delete fails
+        // a non-empty directory of a file's name: its delete fails
         File(dir, "a.txt.gz").apply { mkdir() }.resolve("inside").writeText("x")
         File(dir, "a.txt.gz.disable").writeText("kept")
         assertFalse(ImportedDictionaries.delete(dir, "a"))
@@ -335,8 +319,7 @@ class ImportedDictionariesTest {
         assertEquals(listOf("a.txt.gz", "b.txt", "b.txt.gz"), names())
     }
 
-    // the page lists one row a name: the text if there is one (it wins, converted next), else the
-    // kept one; kept both on and off with no text, the newer stays, the on one at one time (RN3)
+    // one row per name: the text if any, else the kept one; with both on and off kept, the newer
     @Test
     fun oneOfANameIsListedOnceAndTheNewerOfTwoKeptStays() {
         File(dir, "a.txt").writeText("text")
@@ -345,39 +328,35 @@ class ImportedDictionariesTest {
         File(dir, "b.txt.gz.disable").apply { writeText("new"); setLastModified(2_000_000) }
         File(dir, "c.txt.gz").apply { writeText("on"); setLastModified(1_000_000) }
         File(dir, "c.txt.gz.disable").apply { writeText("off"); setLastModified(1_000_000) }
-        // texts both on and off by the same rule, before either is converted: not the off one always (F3596)
+        // texts both on and off by the same rule, before either is converted
         File(dir, "d.txt").apply { writeText("new"); setLastModified(2_000_000) }
         File(dir, "d.txt.disable").apply { writeText("old"); setLastModified(1_000_000) }
         File(dir, "e.txt").apply { writeText("on"); setLastModified(1_000_000) }
         File(dir, "e.txt.disable").apply { writeText("off"); setLastModified(1_000_000) }
         assertEquals(listOf("a.txt", "b.txt.gz.disable", "c.txt.gz", "d.txt", "e.txt"), ImportedDictionaries.list(dir).map { it.name })
-        // the text's conversion settles a's
         assertEquals(listOf("a.txt", "a.txt.gz.disable", "b.txt.gz.disable", "c.txt.gz", "d.txt", "e.txt"), names())
     }
 
-    // turned and deleted by name: whichever of its files is there now, not the one listed (RS1)
     @Test
     fun aDictionaryIsTurnedAndDeletedByItsName() {
         File(dir, "a.txt.gz").writeText("kept")
         assertTrue(ImportedDictionaries.turn(dir, "a", false))
         assertEquals(listOf("a.txt.gz.disable"), names())
         assertTrue(ImportedDictionaries.turn(dir, "a", false))
-        // an older build's text beside it (its delete refused after its conversion): both turned,
-        // never parted, or the text is converted again and an upgrade told (F3686)
+        // an older build's text beside it: both turned, never parted, else converted again
         File(dir, "a.txt").writeText("text")
         assertTrue(ImportedDictionaries.turn(dir, "a", false))
         assertEquals(listOf("a.txt.disable", "a.txt.gz.disable"), names())
         assertTrue(ImportedDictionaries.turn(dir, "a", true))
         assertEquals(listOf("a.txt", "a.txt.gz"), names())
-        // a backup's gzip of the other state beside them (settle leaves the pair while the text is there):
-        // that one is it, skipped, not a refused rename failing the turn (F3700)
+        // a backup's gzip of the other state beside them is skipped, not a refused rename failing the turn
         File(dir, "a.txt.gz.disable").writeText("backup")
         assertTrue(ImportedDictionaries.turn(dir, "a", false))
         assertEquals(listOf("a.txt.disable", "a.txt.gz", "a.txt.gz.disable"), names())
         File(dir, "a.txt.gz.disable").delete()
         assertTrue(ImportedDictionaries.turn(dir, "a", true))
         assertEquals(listOf("a.txt", "a.txt.gz"), names())
-        // the gzip's rename refused (one of its name there, a directory): the text turned back
+        // the gzip's rename refused: the text turned back
         File(dir, "a.txt.gz.disable").mkdir()
         assertFalse(ImportedDictionaries.turn(dir, "a", false))
         File(dir, "a.txt.gz.disable").delete()
@@ -387,26 +366,23 @@ class ImportedDictionariesTest {
         assertEquals(emptyList<String>(), names())
     }
 
-    // a conversion's gzip put in the text's place, on or off as the text is at the commit; dropped
-    // if the text went or changed since it was read
+    // on or off as the text is at commit; dropped if the text went or changed since read
     @Test
     fun aConversionIsCommittedAsTheTextIsThen() {
         val text = File(dir, "a.txt").apply { writeText("你 ni 0.0\n") }
         val length = text.length()
         val modified = text.lastModified()
         File(dir, "a.txt.gz").writeText("kept before")
-        // turned off as it was read: its length and time kept by the rename
         assertTrue(text.renameTo(File(dir, "a.txt.disable")))
         val temp = File(dir, "a.txt.gz.tmp").apply { writeText("gzip") }
         assertNull(ImportedDictionaries.commitConversion(dir, "a", temp, length, modified)!!.left)
         assertEquals(listOf("a.txt.gz.disable"), names())
         assertEquals("gzip", File(dir, "a.txt.gz.disable").readText())
-        // changed since (a backup restored over it): not committed, the text left to convert again
+        // changed since (a backup restored over it): not committed, converted again
         File(dir, "b.txt").apply { writeText("new words"); setLastModified(modified) }
         val other = File(dir, "b.txt.gz.tmp").apply { writeText("gzip") }
         assertNull(ImportedDictionaries.commitConversion(dir, "b", other, length, modified))
         assertEquals(listOf("a.txt.gz.disable", "b.txt"), names())
-        // deleted since: nothing
         assertNull(ImportedDictionaries.commitConversion(dir, "c", File(dir, "c.txt.gz.tmp").apply { writeText("gzip") }, 1, 1))
         assertEquals(listOf("a.txt.gz.disable", "b.txt"), names())
     }

@@ -9,26 +9,16 @@ import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 
-/**
- * Which of the layouts made of the theme packs' boards (061-custom-layout §11, L7) take the place of the board each stood
- * for, where it is chosen: what 0.6.0 drew, the pack's `k18.xml` over the app's 18 keys while the pack was in use, drawn
- * as a layout of the user's chosen since. Only at an upgrade from 0.6.0 and at a restore of a backup made before 0.6.1:
- * the user picks these in 外观 → 布局 otherwise. The app reads the choices and the layouts; this decides.
- */
+/** Which layouts made of theme packs' boards take the place of the boards they stood for: only at an upgrade from 0.6.0 or a restore of an older backup. */
 object ThemeLayoutSwitch {
-    /** The number keyboard's and the symbol panel's boards: one choice each for every input method (§7, §8). */
+    /** One choice each for every input method. */
     const val NUMBER = "number"
     const val SYMBOLS = "symbols"
 
-    /** A layout made of pack [pack]'s (its file's) board [board] (`k18`), [choice] as the keyboard reads it. */
+    /** [choice] as the keyboard reads it. */
     data class Made(val pack: String, val board: String, val choice: CustomChoice)
 
-    /**
-     * What is to change: each [ImKeyboards.SLOTS] slot's layout of the user's ([slots], by slot: chosen as
-     * [ImKeyboard.CUSTOM]) and each panel's ([panels], [NUMBER] and [SYMBOLS]); [uses] each layout switched in with the
-     * slots and panels now on it, in [made]'s order; [aside] those of the pack in the other slot (dark where the light
-     * is shown) that one of the shown pack's took the place of (Q15: listed, not chosen).
-     */
+    /** [aside]: those of the other slot's pack that one of the shown pack's took the place of (listed, not chosen). */
     class Plan(
         val slots: Map<String, String>,
         val panels: Map<String, String>,
@@ -36,10 +26,7 @@ object ThemeLayoutSwitch {
         val aside: List<Made>,
     )
 
-    /**
-     * The board of the app's [im] shows on its choice in [chosen] under [scheme] (the one a pack's file of that id stood
-     * for: `qwerty`, `k14`, `k18`, `nine`); null for one a pack's board of those never was (注音's, a layout of the user's).
-     */
+    /** Null for a board no pack's file ever stood for (注音's, the user's own). */
     fun boardOf(im: String, chosen: ImKeyboards.Chosen, scheme: ShuangpinScheme): String? {
         val choice = chosen.of(im)
         if (choice == ImKeyboard.CUSTOM) return null
@@ -52,14 +39,7 @@ object ThemeLayoutSwitch {
         }
     }
 
-    /**
-     * What [made] (the packs' boards made layouts of the user's) changes of [chosen] under [scheme] and of [panels] (each
-     * panel's id, "" the app's): the packs in use are [shown] (the pack of the theme shown now, its file) and [other] (the
-     * one in the other slot of 跟随系统深色模式, null none). Each board the shown pack's where it has it, else the other's
-     * (both slots count, §11); each input method on that board switched where it may be typed on the layout
-     * ([ImKeyboards.usable]: 双拼 not on 17 keys of other groups, S8; one not drawn, none), each panel on the app's where
-     * the layout is of its family and drawn. A pack in neither slot changes nothing: its layouts are only listed.
-     */
+    /** The shown pack's board where it has one, else the other slot's; switched only where [ImKeyboards.usable]. A pack in neither slot changes nothing. */
     fun plan(
         chosen: ImKeyboards.Chosen,
         scheme: ShuangpinScheme,

@@ -18,7 +18,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** The floating keyboard let go in the docking zone: docked only when the finger lifted there. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class FloatingPlacerTest {
@@ -26,7 +25,7 @@ class FloatingPlacerTest {
     private val prefs = AppPrefs.getInstance().internal
     private val zone = mutableListOf<Boolean>()
 
-    // where a test put the keyboard: not the next test's (AppPrefs outlives it), put back as it was before
+    // AppPrefs outlives the test: put back as it was
     @get:Rule
     val prefsBack = PrefsRule().apply {
         set(prefs.floatingKeyboardX, prefs.floatingKeyboardX.getValue())
@@ -57,7 +56,7 @@ class FloatingPlacerTest {
         p.drag(0f, -300f)
         assertFalse("not in the zone", p.drop(lifted = true))
         val kept = FloatingStore.spot(false).y
-        // down into the zone, then the system takes the touch (or a second finger comes)
+        // into the zone, then the system takes the touch (or a second finger comes)
         p.drag(0f, 3000f)
         assertEquals(listOf(true), zone)
         assertFalse(p.drop(lifted = false))
@@ -78,8 +77,6 @@ class FloatingPlacerTest {
         assertEquals(kept, FloatingStore.spot(false).let { it.x to it.y })
     }
 
-    // 始终显示悬浮条: let go of by the docked keyboard, its grip goes under the finger and stays
-    // there as the finger lifts; lifted before it was laid out, kept at once
     @Test
     fun grabbedItsGripIsUnderTheFingerAndKeptAsTheFingerLifts() {
         val p = grabbedPlacer()
@@ -93,7 +90,6 @@ class FloatingPlacerTest {
         assertEquals(212f / 1568f, FloatingStore.spot(false).y, 0.001f)
     }
 
-    // N1: grabbed by accident and dragged straight back into the zone, the place it last floated at stays
     @Test
     fun grabbedThenDockedTheFloatingPlaceKeptStays() {
         prefs.floatingKeyboardX.setValue(0f)
@@ -105,7 +101,7 @@ class FloatingPlacerTest {
         assertEquals(0f to 0f, FloatingStore.spot(false).let { it.x to it.y })
     }
 
-    // F3470: lifted before it was laid out, no slack is left for the next drag to take up first
+    // lifted before it was laid out: no slack left for the next drag to take up first
     @Test
     fun grabbedAndKeptTheNextDragMovesItAtOnce() {
         val p = grabbedPlacer()

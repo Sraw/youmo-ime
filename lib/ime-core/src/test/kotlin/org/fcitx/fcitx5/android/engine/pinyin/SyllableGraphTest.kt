@@ -12,11 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/**
- * What [SyllableGraph] says of the slips apart from 简拼 in the middle (061-sp-abbrev §3.6): [SyllableGraph.withoutSlips]
- * drops only the slips, [SyllableGraph.readsSlipWithin] counts them as a walk over the edges does, and
- * [SyllableGraph.readsWhole] reads neither. On random keys of 双拼 on all four keyboards, tapped anywhere on their keys.
- */
+/** [SyllableGraph]'s slip queries on random 双拼 keys, all four keyboards, tapped anywhere. */
 class SyllableGraphTest {
 
     // an edge as where it goes and what it reads, to compare two graphs' edges

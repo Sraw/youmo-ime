@@ -20,13 +20,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * `EditingSession` driven over a real editor: after each operation, the session's prediction
- * must be exactly where the editor put the cursor, and its composing range exactly the
- * editor's. This is what cursor prediction is for -- a mismatch makes the service treat the
- * editor's next report as the user moving the cursor.
- *
- * Complements `InputEditorContractTest`, which checks the fake; this checks the session's
- * arithmetic against the real thing.
+ * After each operation the session's prediction must be where the real editor put the cursor, and its composing
+ * range the editor's: a mismatch makes the service take the next report for the user moving the cursor.
  */
 @RunWith(RobolectricTestRunner::class)
 open class EditingSessionOverRealEditorTest {
@@ -48,7 +43,6 @@ open class EditingSessionOverRealEditorTest {
             }
         }
 
-        /** When set, the text the editor must end up with. */
         var expectedText: String? = null
 
         fun mismatch(name: String): String? {
@@ -116,7 +110,6 @@ open class EditingSessionOverRealEditorTest {
 
     private fun preedit(text: String, cursor: Int) = FormattedText(arrayOf(text), intArrayOf(0), cursor)
 
-    /** fcitx's preedit shown in the editor, with its cursor at the end, in the middle, or unset. */
     @Test
     fun composing() = check(
         "a first preedit at the cursor" to {
@@ -168,19 +161,13 @@ open class EditingSessionOverRealEditorTest {
             Setup("xy", 2).apply {
                 session.updateComposingText(preedit("ni", 2))
                 Selection.setSelection(editable, 0) // the user taps at 0
-                session.onCursorUpdate(0, 0, 2, 4, ignoreSystemCursor = false)
+                session.onCursorUpdate(0, 0, 2, 4)
                 expectedText = "xyni"
             }
         },
     )
 
-    /**
-     * Random sessions: the operations the service drives, plus the user moving the cursor, in
-     * any order over text with surrogate pairs. After each step the prediction must be where the
-     * editor is, and the text must be what a session over [FakeEditor] (held to the platform by
-     * `InputEditorContractTest`) produced -- right cursor, right text. Every step's report is fed
-     * back as the service would. Seeded, so a failure names a reproducible sequence.
-     */
+    /** Random operations and cursor moves over text with surrogate pairs, checked against a session over [FakeEditor]; seeded. */
     @Test
     fun randomSessions() {
         val random = kotlin.random.Random(20260923)
@@ -197,7 +184,7 @@ open class EditingSessionOverRealEditorTest {
                 val t = text(3)
                 val k = random.nextInt(0, 4)
                 val at = random.nextInt(0, 12)
-                // the second argument sends the Backspace key event when the session declines
+                // the second argument sends Backspace when the session declines
                 val op: Pair<String, EditingSession.(sendKey: () -> Unit) -> Unit> = when (random.nextInt(10)) {
                     0 -> "commitText($t)" to { commitText(t) }
                     1 -> "commitText($t, cursor $k)" to { commitText(t, k.coerceAtMost(t.length)) }
@@ -207,13 +194,12 @@ open class EditingSessionOverRealEditorTest {
                     5 -> "backspace" to { sendKey -> if (!backspace(EditorTraits(acceptsDeleteSurrounding = true))) sendKey() }
                     6 -> "select back $k" to { applySelectionOffset(-k) }
                     7 -> "cancelSelection" to { cancelSelection() }
-                    8 -> "user taps at $at" to {} // applied to the editors below
+                    8 -> "user taps at $at" to {}
                     else -> "deleteSelection" to { deleteSelection() }
                 }
                 log += op.first
                 val name = "#$n '$initial': ${log.joinToString()}"
-                // With direct deletion on, the key event only goes at the very start, where it
-                // does nothing, or before an unpaired surrogate, which DEL removes as one unit.
+                // with direct deletion on, the key goes only at the very start (does nothing) or before an unpaired surrogate (DEL removes it as one)
                 setup.session.(op.second) {
                     val c = Selection.getSelectionStart(setup.editable)
                     if (c > 0) {
@@ -233,14 +219,12 @@ open class EditingSessionOverRealEditorTest {
                 if (fake.text != setup.editable.toString()) {
                     failures += "$name: text '${setup.editable}', expected '${fake.text}'"
                 }
-                // the editor's report for this step, as the service would pass it on
                 setup.session.onCursorUpdate(
                     Selection.getSelectionStart(setup.editable), Selection.getSelectionEnd(setup.editable),
                     BaseInputConnection.getComposingSpanStart(setup.editable),
                     BaseInputConnection.getComposingSpanEnd(setup.editable),
-                    ignoreSystemCursor = false,
                 )
-                twin.onCursorUpdate(fake.selectionStart, fake.selectionEnd, fake.composingStart, fake.composingEnd, ignoreSystemCursor = false)
+                twin.onCursorUpdate(fake.selectionStart, fake.selectionEnd, fake.composingStart, fake.composingEnd)
                 if (failures.isNotEmpty()) break
             }
         }
@@ -254,7 +238,7 @@ open class EditingSessionOverRealEditorTest {
         val connection = object : BaseInputConnection(View(RuntimeEnvironment.getApplication()), true) {
             override fun getEditable() = editable
 
-            // counted at every SDK: below 33 the framework has no such method, a call would be a NoSuchMethodError
+            // below 33 the framework has no such method: a call would be a NoSuchMethodError
             override fun takeSnapshot(): android.view.inputmethod.TextSnapshot? = super.takeSnapshot().also { snapshots++ }
         }
         connection.setComposingRegion(2, 4)
@@ -267,14 +251,12 @@ open class EditingSessionOverRealEditorTest {
             assertEquals(-1 to -1, none?.let { it.start to it.end })
             assertEquals(2, snapshots)
         } else {
-            // cannot tell: the code's write goes on as it would (LC-30's one letter at most)
             assertNull(spanned)
             assertNull(none)
             assertEquals(0, snapshots)
         }
     }
 
-    /** The same at the app's minSdk. */
     @Config(sdk = [29])
     class AtMinSdk : EditingSessionOverRealEditorTest()
 }

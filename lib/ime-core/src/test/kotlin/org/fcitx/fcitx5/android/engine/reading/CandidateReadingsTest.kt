@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -17,8 +18,6 @@ import org.junit.Test
 import java.nio.ByteBuffer
 
 class CandidateReadingsTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     private val data = PinyinData.load(
         ByteBuffer.wrap(
@@ -38,7 +37,6 @@ class CandidateReadingsTest {
                 .charTone('说'.code, Syllables.id("shuo"), 1)
                 .charTone('话'.code, Syllables.id("hua"), 4)
                 .charTone('我'.code, Syllables.id("wo"), 3)
-                // 们 as Unihan has it: no tone but the neutral one, kept in 我们
                 .charTone('们'.code, Syllables.id("men"), ToneMark.NEUTRAL)
                 .wordTones("我们", syl("wo", "men"), byteArrayOf(3, 5))
                 .charTone('银'.code, Syllables.id("yin"), 2)
@@ -71,14 +69,12 @@ class CandidateReadingsTest {
     fun theSessionsReadingWins() {
         val typed = listOf(WordReading("行", -1, syl("hang")), WordReading("走", -1, syl("zou")))
         assertEquals(listOf("háng", "zǒu"), readings.of("行走", ReadingStyle.PINYIN, typed))
-        // not of the text: read by it instead
         assertEquals(listOf("xíng", "zǒu"), readings.of("行走", ReadingStyle.PINYIN, typed.take(1)))
     }
 
     @Test
     fun byTextTheLongestWordFirstThenEachCharacterItsLikeliestWay() {
         assertEquals(listOf("yín", "háng", "xíng", "zǒu"), readings.of("银行行走", ReadingStyle.PINYIN))
-        // the same in 注音
         assertEquals(listOf("ㄧㄣˊ", "ㄏㄤˊ"), readings.of("银行", ReadingStyle.ZHUYIN))
     }
 
@@ -91,8 +87,6 @@ class CandidateReadingsTest {
         assertEquals(listOf("nǐ", ""), readings.of("你䄝", ReadingStyle.PINYIN))
     }
 
-    // a character whose tone is not known, its syllable known (the typed one, or the dictionary's): in pinyin
-    // that syllable toneless, a neighbour of known tone toned as ever (the user, 2026-11-14)
     @Test
     @Uat("PY-121")
     fun aCharacterOfNoKnownToneIsItsSyllableTonelessInPinyin() = assertRows(
@@ -116,8 +110,6 @@ class CandidateReadingsTest {
         },
     )
 
-    // read by its text (a table's, handwriting's), a character of several dictionary syllables takes one of
-    // known tone first: 䏝 zhuān, not the toneless chun the dictionary lists before it
     @Test
     @Uat("PY-121")
     fun aCharacterReadByItsTextTakesASyllableOfKnownToneFirst() {
@@ -137,19 +129,14 @@ class CandidateReadingsTest {
     @Test
     @Uat("PY-111", "PY-121")
     fun aHintIsOneReadingACharacterWithItsTones() {
-        // a misreading's, toned already
         assertEquals(listOf("jué", "sè"), readings.ofHint("角色", "jué sè"))
         // a stroke lookup's or a part's: the syllable as hinted, with its tone in the character
         assertEquals(listOf("háng"), readings.ofHint("行", "hang"))
         assertEquals(listOf("xíng"), readings.ofHint("行", "xing"))
-        // no tone known, or no syllable: as hinted
         assertEquals(listOf("he"), readings.ofHint("𠀀", "he"))
         assertEquals(listOf("hm"), readings.ofHint("你", "hm"))
-        // in zhuyin: the hint's tones, or the character's
         assertEquals(listOf("ㄅㄛ", "ㄖㄜˇ"), readings.ofHint("般若", "bō rě", ReadingStyle.ZHUYIN))
         assertEquals(listOf("ㄒㄧㄥˊ"), readings.ofHint("行", "xing", ReadingStyle.ZHUYIN))
-        // R25 F7970: no tone known, in zhuyin: not written (toneless it would read as the first tone), as a
-        // candidate's own reading is not; the characters beside it keep theirs
         assertEquals(listOf(""), readings.ofHint("𠀀", "he", ReadingStyle.ZHUYIN))
         assertEquals(listOf("ㄒㄧㄥˊ", ""), readings.ofHint("行𠀀", "xing he", ReadingStyle.ZHUYIN))
         assertEquals(listOf("xíng", "he"), readings.ofHint("行𠀀", "xing he"))
@@ -158,8 +145,7 @@ class CandidateReadingsTest {
     // the readings of 了, 能, 行 and their words as Unihan and the dictionaries have them
     private val polyphones = ReadingData.data.let { d -> CandidateReadings(d, d.tones) { Predictor.charReadingsOf(d.dictionary, d.vocabulary) } }
 
-    // a polyphone's several readings hinted (a part's or a stroke lookup's "le/liao"): one, toned, the one it has
-    // after what was put before it, else its commonest (A5, the user, 2026-11-06)
+    // one reading, toned: the one after what came before, else the commonest
     @Test
     @Uat("PY-111", "PY-118", "PY-121")
     fun aHintOfACharactersSeveralReadingsIsTheOneItHasThere() = assertRows(
@@ -185,7 +171,6 @@ class CandidateReadingsTest {
         },
     )
 
-    // a word read by its text (a table's, a prediction's): each polyphone as the word has it
     @Test
     @Uat("PY-118")
     fun aPolyphoneInAWordIsReadAsTheWordHasIt() = assertRows(

@@ -10,7 +10,7 @@ import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What the user's sentences keep put in the decoder's (U-08, impl/design-1c.md §1). */
+/** What the user's sentences keep put in the decoder's. */
 class EnforcedTest {
 
     // word ids by text; wozhidao is wo(0..2) zhi dao(2..8), le(8..10)
@@ -34,7 +34,6 @@ class EnforcedTest {
         val s = listOf(sentence("我" to 2, "知道" to 8, score = -3f), sentence("喔" to 2, "知道" to 8))
         val out = Enforced.apply(s, listOf(item("指导", 2, 8, "我", Enforced.Kind.FIRST)), "", text)
         assertEquals(listOf("我指导", "喔知道"), out.map { it.text })
-        // the score is the decoder's
         assertEquals(-3f, out[0].score)
         assertEquals(listOf(id("我"), id("指导")), out[0].words.toList())
     }
@@ -47,7 +46,7 @@ class EnforcedTest {
             assertEquals("指导", Enforced.apply(s, listOf(item("指导", 0, 6, "我", Enforced.Kind.FIRST)), "我", text).single().text)
             assertEquals("知道", Enforced.apply(s, listOf(item("指导", 0, 6, "我", Enforced.Kind.FIRST)), "", text).single().text)
         },
-        // F2814: input starting with a separator ('zhidao) starts the graph at 1, the sentence's first word there
+        // input starting with a separator ('zhidao) starts the graph at 1, the sentence's first word there
         "a first at a start past a separator follows the word before" to {
             val s = listOf(sentence("知道" to 7))
             assertEquals("指导", Enforced.apply(s, listOf(item("指导", 1, 7, "我", Enforced.Kind.FIRST)), "我", text, start = 1).single().text)
@@ -69,8 +68,7 @@ class EnforcedTest {
         },
     )
 
-    // review-1c N3: a first fits only after an item that stands: 老师 and 喔 overlap, so neither, and the first after 老师
-    // takes no place from the word added by hand
+    // 老师 and 喔 overlap, so neither fits; the word added by hand keeps its place
     @Test
     fun aFirstFitsOnlyAfterAnItemThatStands() {
         val s = listOf(sentence("我" to 2, "知道" to 8, "了" to 10))
@@ -102,7 +100,7 @@ class EnforcedTest {
         assertEquals(setOf(c, a), Enforced.settle(listOf(a, c)).toSet())
     }
 
-    // review-design-1c S5: a first whose word before is not there overlaps a pin, and the pin stands
+    // a first whose word before is not there overlaps a pin, and the pin stands
     @Test
     fun aFirstThatDoesNotApplyLeavesAPinItOverlaps() {
         val s = listOf(sentence("我" to 2, "知道" to 8, "了" to 10))

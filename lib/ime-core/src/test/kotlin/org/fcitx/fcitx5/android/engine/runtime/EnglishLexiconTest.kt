@@ -11,7 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The English page's words, as the learning record has them (U-31). */
+/** The English page's words, as the learning record has them. */
 class EnglishLexiconTest {
 
     private val log = LearnLog(null)

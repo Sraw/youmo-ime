@@ -19,12 +19,7 @@ import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.io.File
 
-/**
- * A user learning as the app's does (impl/design-1b.md §5): a learning record ([log], in memory
- * or in [file]), its [habits] the sessions record into and rank by, and the user [model] the
- * decoder reads, its own words and counts kept from the record as `Engines` keeps them. Its
- * [clock] is the eval's: a typing day passes when [nextDay] is called, never by itself.
- */
+/** A user learning as the app's does: a learning record, its [habits], and a user [model]; a typing day passes only on [nextDay]. */
 class EvalUser(data: PinyinData, file: File? = null) {
     val clock = StepClock()
     val model = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
@@ -39,8 +34,7 @@ class EvalUser(data: PinyinData, file: File? = null) {
     /** Imports [words] as a batch of their own (U-101), as `Engines` does a list: those the model or the user has left out. How many went in. */
     fun import(words: List<ImportedWords.Incoming>): Int {
         val state = log.state
-        // as ImportLayer.import and UserLexicon.kept leave words out: imported already, a word already
-        // (nothing is blocked here: no step blocks a word)
+        // as ImportLayer.import and UserLexicon.kept leave words out
         fun known(text: String, reading: String): Boolean {
             if (text in state.mine || state.imports.has(text, reading) || model.knowsText(text)) return true
             // a reading not of syllables cannot be typed: left out as a known one is
@@ -71,7 +65,6 @@ class EvalUser(data: PinyinData, file: File? = null) {
     /** How a session of [kind] learns into [habits]. */
     fun learnTo(kind: String = Kinds.FULL) = LearnTo(habits, kind)
 
-    /** A typing day passes: the next commit is on the next. */
     fun nextDay() = clock.nextDay()
 }
 

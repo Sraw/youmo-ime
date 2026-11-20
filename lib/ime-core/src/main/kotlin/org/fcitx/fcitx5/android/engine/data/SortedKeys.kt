@@ -4,11 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
-/**
- * The end of the run from [from] (before [to]) whose keys have [c] where [keyChar] reads them: the
- * run is sorted, and every key in it is long enough to have that place. The English decoders' and a
- * table glide's walk of their sorted keys as a trie.
- */
+/** End of the run in [from, to) whose keys have [c] at [keyChar]; keys sorted and long enough. */
 internal inline fun runEnd(from: Int, to: Int, c: Char, keyChar: (Int) -> Char): Int {
     var lo = from
     var hi = to

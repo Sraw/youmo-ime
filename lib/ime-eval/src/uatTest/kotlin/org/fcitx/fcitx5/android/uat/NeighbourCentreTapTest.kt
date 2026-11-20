@@ -17,12 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
-/**
- * Each key tapped in its very middle, on the app's data: the first candidate is what it is with the
- * slips not read (061-neighbour-correction §3, PY-138 / SP-41). A key's touch is its centre: the
- * board's `touch(c, x, y)` takes the tap's place on the board, so the place is set after it (a tap
- * at the board's origin is keys away, every key around it as likely as the one hit).
- */
+/** Each key tapped in its very middle: the first candidate as with the slips not read; the place set after `touch`. */
 class NeighbourCentreTapTest {
 
     private val data = UatEngines.pinyinData

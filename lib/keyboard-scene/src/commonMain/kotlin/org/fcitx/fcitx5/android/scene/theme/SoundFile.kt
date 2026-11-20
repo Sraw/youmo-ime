@@ -8,16 +8,9 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problem
 
 /**
- * A theme's key sound (060-theme-sounds-icons §1.2): Ogg Vorbis, WAV of 8- or 16-bit PCM, or MP3 (MPEG
- * Layer III), each at most [MAX_BYTES], [MAX_MS] long, of [MIN_CHANNELS]–[MAX_CHANNELS] channels at
- * [MIN_RATE]–[MAX_RATE] Hz, its extension its content's. One check for the app's import, its loading
- * (a pack restored from a backup was never imported) and the theme maker.
- *
- * The file comes from anywhere: every length and offset is held to the bytes left before it is read, a
- * value past [Int] is over the limit, a rate is in range before it divides. The length is the headers'
- * (an Ogg's last granule, a WAV's data, an MP3's frames counted); what the platform decodes is bounded
- * besides by the file's size and its own heap limit on one sample, which a file lying about its length
- * meets: it fails to load and the system's click plays.
+ * A theme's key sound: one check for the app's import, its loading (a restored pack was never imported) and the theme
+ * maker. The file comes from anywhere: every length and offset is held to the bytes left before it is read, and a
+ * rate is in range before it divides. A file lying about its length fails to load and the system's click plays.
  */
 object SoundFile {
     const val MAX_BYTES = 100 * 1024
@@ -27,21 +20,17 @@ object SoundFile {
     const val MIN_RATE = 8000
     const val MAX_RATE = 48000
 
-    /** `<sound>`s in a theme at most: a class a file, and room for classes of later versions. */
+    /** Room for classes of later versions. */
     const val MAX_SOUNDS = 16
 
-    /** The extensions taken, each its format's. */
     val EXTENSIONS = mapOf("ogg" to Format.OGG, "wav" to Format.WAV, "mp3" to Format.MP3)
 
     enum class Format { OGG, WAV, MP3 }
 
-    /** What a sound is: its [format], [channels], [rate] in Hz, [ms] its length rounded up. */
     data class Info(val format: Format, val channels: Int, val rate: Int, val ms: Int)
 
-    /** What is wrong with [bytes] as the sound file [name]; none: it is one. */
     fun check(name: String, bytes: ByteArray): List<Problem> = read(name, bytes).problems()
 
-    /** [bytes], the file [name], read: what it is, or the first thing wrong with it. */
     @Suppress("TooGenericExceptionCaught")
     fun read(name: String, bytes: ByteArray): Parsed<Info> = try {
         Parsed.Ok(info(name, bytes))
@@ -66,7 +55,7 @@ object SoundFile {
             Format.WAV -> wav(b)
             Format.MP3 -> mp3(b)
         }
-        // a WAV's empty data: nothing to play (its loading would fail and the system's click play, unsaid why)
+        // its loading would fail and the system's click play, unsaid why
         if (samples == 0L) bad("no audio")
         val ms = (samples * MS_PER_S + rate - 1) / rate
         if (ms > MAX_MS) bad("over $MAX_MS ms long ($ms ms)")
@@ -80,7 +69,6 @@ object SoundFile {
         else -> null
     }
 
-    // channels and rate in range, checked before anything divides by the rate
     private fun ranged(channels: Int, rate: Long) {
         if (channels !in MIN_CHANNELS..MAX_CHANNELS) bad("$channels channels: $MIN_CHANNELS or $MAX_CHANNELS taken")
         if (rate !in MIN_RATE..MAX_RATE) bad("$rate Hz: $MIN_RATE–$MAX_RATE Hz taken")
@@ -88,7 +76,6 @@ object SoundFile {
 
     private data class Audio(val channels: Int, val rate: Int, val samples: Long)
 
-    // ---- Ogg Vorbis: every page walked, its CRC checked; one logical stream, Vorbis's
 
     private fun ogg(b: ByteArray): Audio {
         var at = 0
@@ -128,12 +115,10 @@ object SoundFile {
             pages++
             at += length
         }
-        // the headers' pages say granule 0: a stream of them alone holds no audio
         if (granule <= 0) bad("no audio in the Ogg stream")
         return Audio(channels, rate, granule)
     }
 
-    // the first packet, on the first page alone: Vorbis's identification header
     private fun vorbisId(b: ByteArray, first: Int, body: Int): Audio {
         if (body >= OPUS_HEAD.length && b.startsWith(first, OPUS_HEAD)) bad("Ogg Opus is not taken: Ogg Vorbis, WAV or MP3")
         if (body < VORBIS_ID_LENGTH || b.u8(first) != 1 || !b.startsWith(first + 1, "vorbis")) bad("not Ogg Vorbis")
@@ -160,7 +145,6 @@ object SoundFile {
         r
     }
 
-    // ---- WAV: RIFF chunks walked, `fmt ` (PCM, 8 or 16 bits) before `data`
 
     private fun wav(b: ByteArray): Audio {
         var at = WAV_FIRST_CHUNK
@@ -196,12 +180,10 @@ object SoundFile {
                     return f.copy(samples = size / blockAlign)
                 }
             }
-            // a chunk of odd length is padded with a byte
             at = body + size.toInt() + (size and 1L).toInt()
         }
     }
 
-    // ---- MP3: MPEG-1, 2 or 2.5 Layer III frames from the start (after an ID3v2), every one counted
 
     private class Frame(val version: Int, val rate: Int, val channels: Int, val length: Int, val samples: Int)
 
@@ -220,7 +202,7 @@ object SoundFile {
             if (end > b.size) bad("truncated ID3v2")
             at = end.toInt()
         }
-        // no search for a sync word: the first frame right there, the platform's extractor would find frames further on
+        // no search for a sync word: the platform's extractor would find frames further on
         val first = frame(b, at) ?: bad("no MPEG frame at byte $at")
         var frames = 0L
         while (true) {
@@ -231,11 +213,10 @@ object SoundFile {
             at += f.length
         }
         tail(b, at)
-        // every frame counted, an Xing/Info/VBRI header's own frame too: what such a header says it holds is not trusted
+        // what an Xing/Info/VBRI header says it holds is not trusted
         return Audio(first.channels, first.rate, frames * first.samples)
     }
 
-    // the frame whose header is at [at]; null where none starts there; refused where one does but is not taken
     private fun frame(b: ByteArray, at: Int): Frame? {
         if (b.size - at < MP3_HEADER || b.u8(at) != SYNC_BYTE || b.u8(at + 1) and SYNC_LOW != SYNC_LOW) return null
         val h1 = b.u8(at + 1)
@@ -258,7 +239,6 @@ object SoundFile {
         return Frame(version, rate, channels, length, if (mpeg1) MPEG1_SAMPLES else MPEG2_SAMPLES)
     }
 
-    // what follows the frames: nothing, an APEv2 tag, an ID3v1 tag, or the APE then the ID3v1
     private fun tail(b: ByteArray, at: Int) {
         var end = b.size
         if (end - at >= ID3V1 && b.startsWith(end - ID3V1, "TAG")) end -= ID3V1
@@ -271,7 +251,6 @@ object SoundFile {
         if (end != at) bad("unknown data after its frames at byte $at")
     }
 
-    // ---- bytes
 
     private fun ByteArray.u8(at: Int): Int = this[at].toInt() and BYTE_MASK
 

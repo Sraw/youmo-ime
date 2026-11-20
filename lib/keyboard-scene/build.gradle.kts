@@ -3,16 +3,13 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 
-// The keyboard's drawing engine (dev/design/060-render-v2.md §6): a layout and a theme in, a scene of
-// keys, shapes and drawing ops out. Kotlin Multiplatform so the app (JVM) and the theme maker's web page
-// (JS) run the same code and draw the same; no dependency but the Kotlin standard library on either.
+// The keyboard's drawing engine: Kotlin Multiplatform so the app (JVM) and the theme maker's page (JS) draw the same.
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.animalsniffer)
     alias(libs.plugins.kover)
 }
 
-// BuiltInFilesTask, below: the built-in layouts and themes as jsMain's source
 val builtInFiles = tasks.register<BuiltInFilesTask>("builtInFiles") {
     layouts.from(fileTree("src/commonMain/layouts") { include("*.xml") })
     themes.from(fileTree("src/commonMain/themes") { include("*.xml") })
@@ -28,17 +25,13 @@ kotlin {
         }
     }
     js {
-        // node, not a browser: the tests need no headless Chromium, and read the snapshot files
-        // the scanning tests (ContentTest's px-by-px sweeps) build a few thousand scenes: past mocha's 2 s
+        // ContentTest's px-by-px sweeps build a few thousand scenes: past mocha's 2 s
         nodejs { testTask { useMocha { timeout = "120s" } } }
-        // the theme maker's library (060-render-p3 W1): jsMain's @JsExport facade, one UMD file a page
-        // loads with a script element and node with require; not the browser target, whose webpack and
-        // karma the page does not need (a plain script, no bundler: the page's CSP hashes it)
+        // one UMD file a page loads with a script element; not the browser target, whose webpack and karma the page does not need
         outputModuleName.set("youmo-engine")
         binaries.library()
         compilerOptions {
             moduleKind.set(org.jetbrains.kotlin.gradle.dsl.JsModuleKind.MODULE_UMD)
-            // ES classes: 5% smaller than prototypes, every browser the page runs in has them
             useEsClasses.set(true)
         }
     }
@@ -52,16 +45,9 @@ kotlin {
     }
 }
 
-/**
- * The built-in layouts (src/commonMain/layouts) and themes (src/commonMain/themes, theme 4's files of
- * 060-render-p3 T3, none yet or any number) as a Kotlin source of jsMain: the theme maker's library
- * has the app's files in it, read when asked for (BuiltIns), not a copy of them kept by hand.
- */
+/** The built-in layouts and themes as a Kotlin source of jsMain, so the page's library is not a copy kept by hand. */
 abstract class BuiltInFilesTask : DefaultTask() {
-    // a layout as the library keeps it (060-render-p3 M4, the page's engine under its size budget): its comments
-    // (notes for the app's developers, a quarter of it) and each line's indent and trailing blanks gone, its lines
-    // kept, so a problem's line is the file's. Themes are kept as written: the maker shows them as its source.
-    // BuiltInsTest and the page's engine.test.mjs pack a file the same way
+    // comments and indents gone, lines kept so a problem's line is the file's; BuiltInsTest and engine.test.mjs pack alike
     private fun packed(xml: String) = xml.replace(Regex("<!--[\\s\\S]*?-->")) { c -> "\n".repeat(c.value.count { it == '\n' }) }
         .replace(Regex("(?m)^[ \\t]+|[ \\t]+$"), "")
 
@@ -116,15 +102,9 @@ abstract class BuiltInFilesTask : DefaultTask() {
     }
 }
 
-// The theme maker's library as the page takes it (060-render-p3 W1): build/youmo-engine/youmo-engine.js,
-// which web/theme-maker/tools/assemble.mjs puts in the page as its youmo-engine block (the page's test
-// holds the two alike, and the block to its size budget). The production library, its lines' indents gone
-// (a sixth of it; Kotlin writes no string over two lines, so none is cut) and its line comments, the source
-// map's among them (the page has no map). There is no minifier here: one is npm's, and the page's block is checked against this
-// file in CI.
+// No minifier here (one is npm's): indents and line comments go; Kotlin writes no string over two lines, so none is cut.
 val engineLink = tasks.named<org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile>("compileProductionLibraryKotlinJs") {
-    // the global a page reads it by (UMD's): `youmo-engine`, not the project's path. The library's link
-    // only: the klibs and the tests keep theirs (one name for both is a compiler error)
+    // one name for the link and the klibs is a compiler error
     compilerOptions.freeCompilerArgs.add("-Xir-module-name=youmo-engine")
 }
 
@@ -133,18 +113,14 @@ val youmoEngine = tasks.register<Copy>("youmoEngine") {
     into(layout.buildDirectory.dir("youmo-engine"))
     // Gradle does not see a filter's lambda: change this with the filter, or the engine built before stays
     inputs.property("filter", "2")
-    // and nothing a script element in a page ends or escapes at (the layouts' comments are in it, `<!--`): `<\!--`
-    // and `<\/` are those texts again in a string or a regex, the only places Kotlin writes them
+    // `<\!--` and `<\/` are those texts again in a string or a regex, the only places Kotlin writes them
     filter { line: String ->
-        // the compiler's own line comments (`// Inline function 'kotlin.collections.map' call`, a tenth of it) gone too:
-        // a whole line of comment, never a string's (none goes over two lines)
         val text = line.trimStart()
         if (text.startsWith("//")) "" else text.replace("<!--", "<\\!--").replace("</", "<\\/")
     }
 }
 
-// The JS test runner's npm packages are pinned by kotlin-js-store/package-lock.json: a lock that does not
-// match fails the build (the default), and so does a run that would write one where none is committed
+// a lock that does not match fails the build, and so does a run that would write one where none is committed
 rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.npm.NpmExtension> {
     reportNewPackageLock.set(true)
 }
@@ -154,35 +130,28 @@ dependencies {
     signature(variantOf(libs.gummyBears.api29) { artifactType("signature") })
 }
 
-// The tests read src/commonTest/data (the example layouts and themes; the snapshots, which they also
-// write), src/commonMain/layouts (the layouts the app draws) and src/commonMain/themes (its built-in themes) on both targets: told where by a system property (JVM) or the environment (node), so no
-// absolute path of this machine is compiled into anything
+// told where by a system property (JVM) or the environment (node), so no absolute path is compiled into anything
 val themeDoc = rootProject.layout.projectDirectory.file("docs/theme-format.md")
 val testData: String = layout.projectDirectory.dir("src/commonTest/data").asFile.absolutePath
 tasks.withType<org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest>().configureEach {
     environment("SCENE_TEST_DATA", testData)
 }
 
-// the data is read by path, not off the classpath, so Gradle is told: a changed layout or snapshot
-// reruns the tests (both targets) rather than finding them up to date; recording always runs
+// read by path, not off the classpath, so a changed layout or snapshot reruns the tests
 val recording = providers.gradleProperty("snapshots.record").getOrElse("false") == "true"
 tasks.withType<AbstractTestTask>().configureEach {
     inputs.dir(layout.projectDirectory.dir("src/commonTest/data"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("sceneTestData")
-    // the app's layouts (qwerty.xml), which the tests read from src/commonMain/layouts beside the data
     inputs.dir(layout.projectDirectory.dir("src/commonMain/layouts"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("sceneLayouts")
-    // and the built-in themes (pixel.xml), from src/commonMain/themes
     inputs.dir(layout.projectDirectory.dir("src/commonMain/themes"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("sceneThemes")
-    // and the layout page's examples (ExampleLayoutsTest, BasedOnStylesTest), from web/theme-maker/examples/layouts
     inputs.dir(rootProject.file("web/theme-maker/examples/layouts"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("layoutExamples")
-    // and ime-core's keys-golden.tsv, whose first column BuiltInKeyDataTest holds the boards' key names to
     inputs.file(rootProject.file("lib/ime-core/src/test/resources/keys-golden.tsv"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
         .withPropertyName("keysGolden")
@@ -190,11 +159,9 @@ tasks.withType<AbstractTestTask>().configureEach {
 }
 
 tasks.withType<Test>().configureEach {
-    // -Psnapshots.record=true writes the scene snapshots anew instead of comparing (JVM only: the JS
-    // run then compares with what the JVM wrote, so the two agree or fail)
+    // JVM only: the JS run then compares with what the JVM wrote, so the two agree or fail
     systemProperty("snapshots.record", providers.gradleProperty("snapshots.record").getOrElse("false"))
     systemProperty("scene.testData", testData)
-    // docs/theme-format.md, whose property table a JVM test holds to Values (ThemeFormatDocTest)
     systemProperty("scene.themeDoc", themeDoc.asFile.absolutePath)
     inputs.file(themeDoc).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("themeDoc")
     testLogging {
@@ -202,7 +169,6 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Coverage floors on the JVM target, as ime-core's: the engine is the logic every key is drawn by
 kover {
     reports {
         verify {

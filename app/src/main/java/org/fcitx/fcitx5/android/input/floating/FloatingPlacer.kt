@@ -9,14 +9,7 @@ import android.view.View
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard.Spot
 import splitties.dimensions.dp
 
-/**
- * Where the floating keyboard [view] is in the input view [parent], which fills the screen: laid
- * out at its bottom, moved to its [Spot] by translation, so a drag lays nothing out again. The
- * spot is kept ([FloatingStore], the shape's it was made on: [landscape]) when a drag or a resize ends; [bottomInset], the navigation bar, it stays above,
- * and [topInset], the status bar or a cutout, below, and the docking zone's mark ([DOCK_MARK_DP])
- * above the bottom, as Gboard's. Dragged to the bottom it is in the docking zone ([FloatingDrag]):
- * [onZone] is told as it goes in and out, and [drop] says to dock.
- */
+/** Laid out at the bottom and moved by translation, so a drag lays nothing out again. */
 class FloatingPlacer(private val parent: View, private val view: View, private val landscape: Boolean) {
 
     private var spot = FloatingStore.spot(landscape)
@@ -35,26 +28,22 @@ class FloatingPlacer(private val parent: View, private val view: View, private v
 
     private var moved = false
 
-    /** While a drag moves it, till it is let go. */
     val dragging get() = moved
 
     private val dock = FloatingDrag(view.context.dp(DOCK_SLOP_DP).toFloat())
 
-    // the strip above the bottom the keyboard never goes into: the docking zone's mark shows there
+    // the docking zone's mark shows there
     private val markHeight = view.context.dp(DOCK_MARK_DP)
 
-    /** Told true as a drag goes into the docking zone, false as it leaves it or ends. */
     var onZone: (Boolean) -> Unit = {}
 
-    /** Told as it is placed ([place]): laid out, dragged, its insets changed. */
     var onPlaced: () -> Unit = {}
 
     private val location = IntArray(2)
 
-    /** The height it moves in, px, from [topInset] down. */
+    /** Px, from [topInset] down. */
     val room get() = (parent.height - bottomInset - topInset - markHeight).toFloat()
 
-    /** At its spot, once laid out (and each time it is again). */
     fun place() {
         val (left, top) = FloatingKeyboard.place(spot, view.width.toFloat(), view.height.toFloat(), parent.width.toFloat(), room)
         view.translationX = left - view.left
@@ -62,39 +51,31 @@ class FloatingPlacer(private val parent: View, private val view: View, private v
         onPlaced()
     }
 
-    /** Moved by [dx], [dy], within the screen. */
     fun drag(dx: Float, dy: Float) {
         val left = view.left + view.translationX + dx
         val was = dock.inZone
         val top = dock.move(view.top + view.translationY - topInset, dy, (room - view.height).coerceAtLeast(0f))
         spot = FloatingKeyboard.spot(left, top, view.width.toFloat(), view.height.toFloat(), parent.width.toFloat(), room)
         moved = true
-        // a new translation draws again, and the service's touchable region is asked anew with it
+        // the service's touchable region is asked anew with it
         place()
         if (dock.inZone != was) onZone(dock.inZone)
     }
 
-    /**
-     * Let go of by the docked keyboard ([FloatingHandoff]): its grip, [gripX], [gripY] in it, under
-     * the finger at [fingerX], [fingerY] in the parent, within the screen. Laid out first: its size
-     * is not known before. Kept as any drag is, as it ends ([drop]): not if it docks, the place
-     * kept the last it floated at; [keep] the finger lifted before it was laid out, kept now.
-     */
+    /** Laid out first: its size is not known before. [keep]: the finger lifted before it was laid out. */
     fun grabbed(fingerX: Float, fingerY: Float, gripX: Float, gripY: Float, keep: Boolean) {
         spot = FloatingKeyboard.underFinger(fingerX, fingerY - topInset, gripX, gripY, view.width.toFloat(), view.height.toFloat(), parent.width.toFloat(), room)
         place()
-        // the finger below where it can go (the docked grip is lower): taken up first as it comes up,
-        // the grip then under it (MN-11 on redroid: kept 150 px above the finger all the way up).
-        // Kept, no finger is down: the next drag starts afresh (F3470: else it stuck for the slack)
+        // the finger below where it can go (the docked grip is lower): taken up first, the grip then under it.
+        // Kept, no finger is down: the next drag starts afresh, else it stuck for the slack
         dock.start(slack = if (keep) 0f else fingerY - (view.top + view.translationY + gripY))
         moved = !keep
         if (keep) FloatingStore.keepSpot(landscape, spot)
     }
 
     /**
-     * The drag ended: kept there, if it moved; true if [lifted] in the docking zone, to dock it. A
-     * cancelled drag or a second finger never docks: the zone is just above the gesture bar, whose
-     * swipe the system takes. Docked, the place kept is the last it floated at, not the zone's.
+     * True if [lifted] in the docking zone. A cancelled drag or a second finger never docks: the zone is just
+     * above the gesture bar, whose swipe the system takes. Docked, the place kept is the last it floated at.
      */
     fun drop(lifted: Boolean): Boolean {
         val inZone = dock.inZone
@@ -103,32 +84,28 @@ class FloatingPlacer(private val parent: View, private val view: View, private v
         if (inZone) onZone(false)
         if (moved && !docks) FloatingStore.keepSpot(landscape, spot)
         moved = false
-        // a frame drawn: the floating code strip, hidden while dragged, shows again on one (InputView)
+        // the floating code strip, hidden while dragged, shows again on one (InputView)
         view.invalidate()
         return docks
     }
 
-    /**
-     * Resized ([FloatingController]): its left and top to be [left], [top] (in the room: from [topInset]) at its new size,
-     * [w] by [h], once laid out at it ([place]); kept by [keep] as the resize ends.
-     */
+    /** In the room: from [topInset]. */
     fun resized(left: Float, top: Float, w: Float, h: Float) {
         spot = FloatingKeyboard.spot(left, top, w, h, parent.width.toFloat(), room)
     }
 
-    /** Its place kept where it is now (a resize ended). */
     fun keep() = FloatingStore.keepSpot(landscape, spot)
 
     companion object {
-        /** At the bottom when a drag began, how far on down it goes into the docking zone, in dp. */
+        /** At the bottom when a drag began, how far on down it goes into the docking zone. */
         const val DOCK_SLOP_DP = 8
 
-        /** The zone's mark across the bottom of the screen, in dp: its height and its line's width. */
+        /** Its height and its line's width. */
         const val DOCK_MARK_DP = 32
         const val DOCK_MARK_STROKE_DP = 1.5f
     }
 
-    /** Where it is in the window, its translation too: all of it that takes touches. */
+    /** Its translation too: all of it that takes touches. */
     fun region(out: Rect) {
         view.getLocationInWindow(location)
         out.set(location[0], location[1], location[0] + view.width, location[1] + view.height)

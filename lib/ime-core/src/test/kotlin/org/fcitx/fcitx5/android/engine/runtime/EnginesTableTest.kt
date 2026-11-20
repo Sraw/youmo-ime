@@ -41,8 +41,7 @@ class EnginesTableTest {
     // 你好 follows 好: offered after it
     private val pinyin = pinyinData(nin = false)
 
-    // 你 read nin too, likelier, for 你好 to be put together at a reading of its own (of equal
-    // weight, 你 picked from ninhao would read ni, the arc found first)
+    // 你 also read nin, likelier, so 你好 gets a reading of its own
     private fun pinyinData(nin: Boolean): ByteArray = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
         .unigram("你", -2f, 0f)
@@ -76,7 +75,6 @@ class EnginesTableTest {
         },
     )
 
-    // a prediction blocked in 五笔 is blocked in the lexicon, for pinyin too
     @Test
     fun aTablesPredictionIsBlockedInTheLexicon() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -99,7 +97,6 @@ class EnginesTableTest {
         Engines(::load, dir).use { engines ->
             assertTrue("你好" in engines.type("engine-wubi", "wqv").candidates)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
-            // picked: learned, to be forgotten
             val picked = engines.type("engine-wubi", "vbg ").candidates.indexOf("你好")
             assertEquals("你好", engines.onEvent("engine-wubi", EngineEvent.PICK, picked).commit)
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
@@ -109,18 +106,16 @@ class EnginesTableTest {
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
             assertFalse("你好" in engines.type("engine-wubi", "wqv").candidates)
         }
-        // review-1a-app S3: and from the learning record
         assertEquals(listOf("你好"), forgotten(dir))
     }
 
-    // U-72 in a table (review-E-engine S10): 你好 after 好 turned off there, as pinyin's, and taken back
+    // 你好 after 好 turned off there in a table, as pinyin's, and taken back
     @Test
     fun aTablesPredictionIsTurnedOffAfterItsWord() {
         Engines(::load, MemoryFiles()).use { engines ->
             val i = engines.type("engine-wubi", "vbg ").candidates.indexOf("你好")
             val menu = engines.learning("engine-wubi", LearningOp.Menu(i, "你好")) as LearningResult.Menu
             assertTrue(MenuItem.NO_PREDICT in menu.items)
-            // what may follow is blocked as pinyin's: everywhere
             assertEquals(BlockScope.EVERYWHERE, menu.scope)
             val done = engines.learning("engine-wubi", LearningOp.NoPredict(i, "你好")) as LearningResult.Done
             // one by-text kind for every IM (no code): what pinyin and handwriting block after 好 too
@@ -129,7 +124,6 @@ class EnginesTableTest {
             assertFalse("你好" in engines.onEvent("engine-wubi", EngineEvent.CHAR, Keyboard.AGAIN).candidates)
             assertEquals(LearningResult.Done(), engines.learning("engine-wubi", LearningOp.Undo(done.undo)))
             assertTrue("你好" in engines.onEvent("engine-wubi", EngineEvent.CHAR, Keyboard.AGAIN).candidates)
-            // turned off again, it stays off for the next time
             val again = engines.candidates("engine-wubi", 0, 10).map { it.text }.indexOf("你好")
             engines.learning("engine-wubi", LearningOp.NoPredict(again, "你好"))
             engines.onEvent("engine-wubi", EngineEvent.RESET, 0)
@@ -137,7 +131,7 @@ class EnginesTableTest {
         }
     }
 
-    // U-28 屏蔽 in a table: under the code typed alone, kept by 清空学到的, gone with 全部清空 as the phrases an older build saved
+    // 屏蔽 in a table: under the code typed alone, kept by 清空学到的, gone with 全部清空 as the phrases an older build saved
     @Test
     fun aTablesBlockAndPhrasesGoOnlyWithEverything() {
         val dir = MemoryFiles()
@@ -162,7 +156,7 @@ class EnginesTableTest {
         }
     }
 
-    // verify-int-E: 全部清空 that failed on disk forgets none of the phrases an older build saved
+    // 全部清空 that failed on disk forgets none of the phrases an older build saved
     @Test
     fun aFailedClearOfEverythingKeepsATablesPhrases() {
         val disk = folder.newFolder()
@@ -174,7 +168,6 @@ class EnginesTableTest {
             // the record cannot be written anew where its folder takes no new file
             assertTrue(disk.setWritable(false))
             try {
-                // root writes there all the same (a container's build)
                 assumeFalse("a user who may write any file", disk.canWrite())
                 assertEquals(LearningResult.Failed, engines.learning(null, LearningOp.ClearLearned(all = true)))
             } finally {
@@ -199,7 +192,6 @@ class EnginesTableTest {
         }
     }
 
-    // U-28: a character looked up by pinyin in 五笔 is learned as full pinyin learns it, the table's codes untouched
     @Test
     fun whatIsLookedUpByPinyinIsLearnedAsFullPinyin() {
         val dir = MemoryFiles()
@@ -213,7 +205,6 @@ class EnginesTableTest {
         assertTrue(codes.toString(), codes.none { it.kind == Kinds.table("engine-wubi") })
     }
 
-    // a character looked up by pinyin in 五笔 is blocked as full pinyin blocks it, and comes back unblocked
     @Test
     fun whatIsLookedUpByPinyinIsBlockedAsFullPinyinBlocksIt() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -235,7 +226,7 @@ class EnginesTableTest {
         }
     }
 
-    // review H3: the menu says what a block of it does: pinyin's word, blocked everywhere, as the list of blocked words shows it
+    // the menu says what a block of it does: pinyin's word, blocked everywhere, as the list of blocked words shows it
     @Test
     fun whatIsLookedUpByPinyinSaysItIsBlockedEverywhere() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -257,7 +248,6 @@ class EnginesTableTest {
         }
     }
 
-    // and what the table's code typed has, under that code alone
     @Test
     fun whatIsTypedByTheCodeSaysItIsBlockedUnderIt() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -269,7 +259,7 @@ class EnginesTableTest {
         }
     }
 
-    // U-93 (review-int M3): 不用我的输入习惯 holds in a table's lookup by pinyin too: nothing learned, nor 删除 offered of what was
+    // 不用我的输入习惯 holds in a table's lookup by pinyin too: nothing learned, nor 删除 offered of what was
     @Test
     fun aLookUpByPinyinWithHabitsOffLearnsNothingAndForgetsNothing() {
         val dir = MemoryFiles()
@@ -304,7 +294,6 @@ class EnginesTableTest {
                 engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, Keyboard.INK, payload = Action.Ink(engines.inkEnded + 1, InkReading(listOf("好"), doubleArrayOf(0.0))))
                 return engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 0).candidates
             }
-            // picked: learned, to be forgotten
             assertEquals("你好", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, afterHao().indexOf("你好")).commit)
             val i = afterHao().indexOf("你好")
             assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, i))
@@ -315,13 +304,11 @@ class EnginesTableTest {
         assertEquals(listOf("你好"), forgotten(dir))
     }
 
-    // a text forgotten is forgotten as the learning record has it, however read (U-84): the 你好 the
-    // user put together at nin hao too. Apart from the test above, as a word of the user's the tables code too
+    // however read: the 你好 put together at nin hao too
     @Test
     fun handwritingForgetsAPredictionAsItsTextEverywhere() {
         val ninPinyin = pinyinData(nin = true)
         Engines({ load(it, ninPinyin) }, MemoryFiles()).use { engines ->
-            // twice: the user's word (U-06)
             repeat(2) {
                 engines.type(InputMethodCatalog.PINYIN, "ninhao")
                 engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, engines.candidates(InputMethodCatalog.PINYIN, 0, 20).indexOfFirst { it.text == "你" })
@@ -343,7 +330,6 @@ class EnginesTableTest {
         }
     }
 
-    // U-91, D19: a search field shows no 联想, in a table as in pinyin
     @Test
     fun aSearchFieldShowsNoPredictionInATable() {
         Engines(::load, MemoryFiles()).use { engines ->

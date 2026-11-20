@@ -36,16 +36,9 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * Draws a scene's ops ([Op]) on a canvas, in [view]'s coordinates: it computes nothing of where
- * anything goes (the engine did), only how Android draws each. The theme's files are [look]'s,
- * named as the theme written names them ([LookTheme.fileNames]); its key images [images]', the
- * picture [PictureHost]'s under [view]; the theme's own icons [packIcons]' (those of the theme actually drawn),
- * drawn in place of the app's of the same name.
- *
- * [missed] is set when something was not drawn as it will be: an image or the picture still being
- * decoded, which draws the view again once in; what was recorded then is to be recorded again. Not
- * for what will never come (no picture host, a file that does not decode): that would record every
- * frame again for nothing.
+ * Draws a scene's ops on a canvas: it computes nothing of where anything goes, only how Android draws
+ * each. [missed] is set when an image or the picture is still being decoded (the view drawn again once
+ * in, to be recorded again); not for what will never come, which would record every frame for nothing.
  */
 class ScenePainter(
     private val view: View,
@@ -55,12 +48,11 @@ class ScenePainter(
     private val packIcons: PackIcons = PackIcons.EMPTY,
 ) {
 
-    // a theme icon read: this painter's view drawn again; one reference a painter, not one an icon a frame (not
-    // holding the view: the icon cache outlives it)
+    // one reference a painter, not one an icon a frame; not holding the view: the icon cache outlives it
     private val redraw: () -> Unit = WeakReference(view).let { drawn -> { drawn.get()?.invalidate() } }
     var missed = false
 
-    // asked to be told when the images are in (BoardImages.whenReady): once
+    // once
     private var waiting = false
 
     private val files: Map<String, String> = LookTheme.fileNames(look).entries.associate { (path, name) -> name to path }
@@ -72,10 +64,8 @@ class ScenePainter(
     private val rect = RectF()
     private val src = Rect()
 
-    // an icon's drawable by what it is drawn as, not where: one a size, drawn moved to its place
-    // [pixelWidth], [pixelHeight]: the size it is drawn at on the device, the canvas's scale applied (a settings page's
-    // smaller preview, a key's own): a vector keeps the raster of its first draw, which another scale would stretch.
-    // [source]: a theme's icon's file (two themes' icons of one name are two), null the app's own
+    // one a size, drawn moved to its place: a vector keeps the raster of its first draw, which another scale would
+    // stretch. [source]: two themes' icons of one name are two
     private data class IconKey(
         val name: String,
         val source: String?,
@@ -129,8 +119,7 @@ class ScenePainter(
         canvas.drawPath(pathOf(shape), paint)
     }
 
-    // [shape] less [less] (a key cap's band less its face): Path.op's difference, each of the two filled as a
-    // face is (winding), so what is left is what shows of the one past the other however either crosses itself
+    // each filled by winding, so what is left is what shows however either crosses itself
     private fun fillLess(canvas: Canvas, shape: Shape, less: Shape, color: Int) {
         plain(color)
         path.rewind()
@@ -141,9 +130,8 @@ class ScenePainter(
         canvas.drawPath(path, paint)
     }
 
-    // inside the face, its ring less its hole blurred (BlurMaskFilter draws on a hardware canvas since API 28): the
-    // face clipped first, so the ring's path may be built in the one path after; the hole taken out by Path.op, filled
-    // by the face's rule (winding), so a path crossing itself has as much inside its clip as inside its hole
+    // BlurMaskFilter draws on a hardware canvas since API 28. The face clipped first, the hole taken out by Path.op
+    // filled by winding, so a path crossing itself has as much inside its clip as inside its hole
     private fun innerShadow(canvas: Canvas, op: Op.InnerShadow) {
         canvas.save()
         canvas.clipPath(pathOf(op.shape))
@@ -160,8 +148,7 @@ class ScenePainter(
         canvas.restore()
     }
 
-    // a blur of [radius] px (none for none), one filter a radius: a popup's scene is drawn straight to its view, a
-    // shadow's every frame made anew would be one more object each time
+    // one filter a radius: a popup's scene is drawn straight to its view, a new one every frame
     private fun blur(radius: Double): BlurMaskFilter? = if (radius > 0) {
         blurs.getOrPut(radius.toFloat()) { BlurMaskFilter(radius.toFloat(), BlurMaskFilter.Blur.NORMAL) }
     } else {
@@ -208,7 +195,7 @@ class ScenePainter(
         val half = abs(b.width / 2 * dx) + abs(b.height / 2 * dy)
         val cx = (b.left + b.right) / 2
         val cy = (b.top + b.bottom) / 2
-        // opaque: a paint's alpha scales its shader's colours, and plain(0)'s none drew nothing (ScenePainterGradientTest)
+        // a paint's alpha scales its shader's colours, and plain(0)'s none drew nothing (ScenePainterGradientTest)
         plain(OPAQUE)
         paint.shader = LinearGradient(
             (cx - dx * half).toFloat(), (cy - dy * half).toFloat(), (cx + dx * half).toFloat(), (cy + dy * half).toFloat(),
@@ -223,17 +210,15 @@ class ScenePainter(
         val bitmap = images.bitmap(file)
         val size = images.size(file)
         if (bitmap == null || size == null) {
-            // the colour theme 3.0 showed there till the image is in, or where none reads
+            // till the image is in, or where none reads
             op.fallback?.let { fill(canvas, op.shape, it.value) }
-            // drawn again once it is in
             if (!images.ready) {
                 missed = true
-                // once, and not holding the view: one the keyboard let go (its keys drawn by their views
-                // again, the theme changed) is not kept till the images are in
+                // not holding the view: one the keyboard let go is not kept till the images are in
                 if (!waiting) {
                     waiting = true
                     val drawn = WeakReference(view)
-                    // this painter not held either (it holds the view): ready once, ready for good, never asked again
+                    // this painter not held either (it holds the view): ready once, ready for good
                     images.whenReady { drawn.get()?.invalidate() }
                 }
             }
@@ -259,11 +244,9 @@ class ScenePainter(
         canvas.restore()
     }
 
-    // the theme's picture where the shape is over the keyboard's base, as the old keys' faces showed it
     private fun picture(canvas: Canvas, op: Op.Picture) {
         pictureItself(canvas, op)
-        // the colour over it, there with the picture or without (theme 3.0's key face laid its colour on
-        // the picture, and the colour alone where there was none to show)
+        // with the picture or without (theme 3.0's key face laid its colour on it)
         op.over?.let { fill(canvas, op.shape, it.value) }
     }
 
@@ -273,24 +256,22 @@ class ScenePainter(
         val brightness = op.brightness?.roundToInt() ?: p.brightness
         val host = PictureHost.of(view) ?: return
         if (host.animated != null) {
-            // see-through to the picture playing under the keys, darkened alone: no frame blurred (A4)
+            // darkened alone: no frame blurred
             host.seeThrough(brightness)?.let { canvas.drawPath(pathOf(op.shape), it) }
             return
         }
         val paint = host.paint(view, blur, brightness, picture)
         if (paint == null) {
-            // drawn as nothing till it is in (the host draws the view again then); none that reads, nothing
+            // none that reads, nothing
             if (host.decoding(blur)) missed = true
             return
         }
         canvas.drawPath(pathOf(op.shape), paint)
     }
 
-    // a theme's text-shadow under the glyphs (the outline's, where there is one), then the outline, then the
-    // fill over it: the stroke's paint twice its width, half of it under the fill, so its width shows outside.
-    // The shadow is the glyphs again, moved, in its colour, blurred as a key's shadow is (BlurMaskFilter's
-    // radius, setShadowLayer's too): drawn so, not by setShadowLayer, it is there under a transparent fill as
-    // CSS has it (setShadowLayer's of an opaque colour takes the fill's alpha) and sharp where it has no blur (setShadowLayer's draws none)
+    // shadow, outline, then fill: the stroke twice its width, half under the fill. The shadow is the glyphs again,
+    // moved and blurred (BlurMaskFilter), not setShadowLayer: so it is there under a transparent fill as CSS has
+    // it (setShadowLayer's takes the fill's alpha) and sharp with no blur (setShadowLayer's draws none)
     private fun text(canvas: Canvas, op: Op.Text) {
         val x = op.x.toFloat()
         val y = op.baseline.toFloat()
@@ -302,7 +283,7 @@ class ScenePainter(
             textPaint(op, shadow.color.value, op.stroke)
             paint.maskFilter = blur(shadow.blur)
             canvas.drawText(op.text, x + shadow.dx.toFloat(), y + shadow.dy.toFloat(), paint)
-            // what comes next starts from a paint of none (fill keeps a shadow's mask: Op.Shadow's)
+            // fill keeps a shadow's mask (Op.Shadow's)
             paint.maskFilter = null
         }
         op.stroke?.let { stroke ->
@@ -333,9 +314,8 @@ class ScenePainter(
     private val scaleValues = FloatArray(9)
 
     private fun icon(canvas: Canvas, op: Op.Icon) {
-        // one drawable a name, tint and size, its bounds at 0, 0 and the canvas moved to the place: a
-        // vector's tint and bounds are the drawable's own, which a display list recorded with it reads
-        // when drawn, not when recorded, so two sizes must be two drawables; places need not be
+        // a vector's tint and bounds are the drawable's own, which a display list reads when drawn, not when
+        // recorded: two sizes must be two drawables; places need not be
         val b = op.box
         val left = b.left.roundToInt()
         val top = b.top.roundToInt()
@@ -351,11 +331,10 @@ class ScenePainter(
         @Suppress("DEPRECATION") // the matrix the canvas draws with so far: its scale is what the raster is made at
         canvas.getMatrix(scale)
         scale.getValues(scaleValues)
-        // a scale not finite (a matrix gone NaN) taken as 1: roundToInt throws on NaN, and this is the draw
+        // a matrix gone NaN taken as 1: roundToInt throws on NaN, and this is the draw
         val pw = (w * scaleOf(scaleValues[Matrix.MSCALE_X])).roundToInt()
         val ph = (h * scaleOf(scaleValues[Matrix.MSCALE_Y])).roundToInt()
-        // a theme's icon: read on the decode thread, the app's of that name drawn till it is in (and drawn again
-        // then), or for good where its file is gone or broken since its import
+        // read on the decode thread, the app's of that name drawn till it is in, or for good where its file is broken
         val file = packIcons.file(op.name)
         val outline = file?.let { f ->
             packIcons.outline(f, redraw).also { if (it == null && packIcons.pending(f)) missed = true }
@@ -376,7 +355,6 @@ class ScenePainter(
     }
 
     internal companion object {
-        /** A canvas's scale as an icon's raster size reads it: its size, 1 when not finite. */
         fun scaleOf(v: Float): Float = abs(v).takeIf { it.isFinite() } ?: 1f
 
         const val RADII = 8
@@ -384,18 +362,16 @@ class ScenePainter(
         private const val KEPT_BLURS = 16
         private const val OPAQUE = 0xFF000000.toInt()
 
-        // the icons drawn, every painter's (main thread), the last KEPT_ICONS used: a keyboard made again (a
-        // theme switched) inflates none again; let go when what inflating one reads changes (night mode,
-        // density, font scale), not for the rest of the configuration (turning the screen keeps them)
+        // every painter's (main thread): let go when what inflating reads changes (night mode, density, font
+        // scale), not for the rest of the configuration
         private val icons = lruMap<IconKey, Drawable>(KEPT_ICONS)
 
-        /** The icons kept let go ([SceneThemes.forgetAll]). */
         fun forgetIcons() {
             icons.clear()
             PackIcons.forget()
         }
 
-        // kept for a name with no icon (none in SceneIcons, or none inflated): not looked for again each frame
+        // not looked for again each frame
         private val NO_ICON: Drawable = ColorDrawable()
         private var iconsUiMode = 0
         private var iconsDensity = 0

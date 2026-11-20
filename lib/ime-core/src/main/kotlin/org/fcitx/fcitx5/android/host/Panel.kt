@@ -6,61 +6,49 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.core.FormattedText
 
-/**
- * A candidate on a [CandidateList], fcitx's `CandidateWord`: its [text], the [comment] beside it, what
- * picking it does. Named apart from the app's `core.CandidateWord`, the [CandidateEntry] the host sends.
- */
+/** fcitx's `CandidateWord`; named apart from the app's `core.CandidateWord`. */
 interface PanelCandidate {
     val text: String
     val comment: String get() = ""
 
-    /** 候选词注音's, one per code point of [text] ([org.fcitx.fcitx5.android.engine.session.Snapshot.readings]); empty for none. */
+    /** One per code point of [text]; empty for none. */
     val readings: List<String> get() = emptyList()
 
-    /** Shown as it is put in, never through the output filters (traditional): the user's own quick phrases. */
+    /** Never through the output filters (traditional): the user's own quick phrases. */
     val asIs: Boolean get() = false
 
-    /** Picked (a tap, a key): the list it is on may be replaced by what this does. */
+    /** The list it is on may be replaced by what this does. */
     fun select(ic: InputContext)
 }
 
-/** One item of a candidate's long-press menu, fcitx's `CandidateAction`: [id] is what [CandidateList.triggerAction] is given back. */
+/** fcitx's `CandidateAction`: [id] is what [CandidateList.triggerAction] gets back. */
 data class CandidateAction(val id: Int, val text: String)
 
-/**
- * The candidates on a [Panel], fcitx's `CandidateList` with the parts the frontend reads
- * (`androidfrontend.cpp:94-293`): a page of [size] with [label]s and a [cursorIndex]; a bulk list
- * ([bulk]) is also read as a whole ([candidateFromAll], [totalSize], -1 not yet counted); a
- * pageable one ([pageable]) turns its pages; an actionable one has a long-press menu.
- *
- * An index out of range is null here, where fcitx throws `std::invalid_argument`.
- */
+/** fcitx's `CandidateList` as the frontend reads it; an index out of range is null, where fcitx throws. */
 interface CandidateList {
-    /** How many the page shown has. */
     val size: Int
 
     fun label(index: Int): String
 
-    /** The [index]th of the page shown. */
     fun candidate(index: Int): PanelCandidate?
 
-    /** The highlighted one of the page, what space would pick; -1 none. */
+    /** What space would pick; -1 none. */
     val cursorIndex: Int
 
     val bulk: Boolean get() = false
 
-    /** All of them, -1 while not counted ([bulk] lists). */
+    /** -1 while not counted ([bulk] lists). */
     val totalSize: Int get() = size
 
-    /** The [index]th of all ([bulk] lists); else the page's. */
+    /** [bulk] lists; else the page's. */
     fun candidateFromAll(index: Int): PanelCandidate? = candidate(index)
 
-    /** 联想's words with nothing typed ([org.fcitx.fcitx5.android.engine.runtime.Snapshot.predicting]): the bar's × drops them. */
+    /** 联想's words with nothing typed: the bar's × drops them. */
     val predicting: Boolean get() = false
 
     val pageable: Boolean get() = false
 
-    /** `CandidateList::layoutHint`, what the paged window's orientation follows when automatic (Unicode's: vertical). */
+    /** What the paged window's orientation follows when automatic (Unicode's: vertical). */
     val layoutHint: LayoutHint get() = LayoutHint.NotSet
 
     val hasPrev: Boolean get() = false
@@ -68,17 +56,12 @@ interface CandidateList {
     fun prev() {}
     fun next() {}
 
-    /** The long-press menu of [word], one of this list's. */
     fun actions(word: PanelCandidate): List<CandidateAction> = emptyList()
 
     fun triggerAction(word: PanelCandidate, id: Int) {}
 }
 
-/**
- * A [TempCandidateList] as the panel's list (fcitx's `CommonCandidateList`, `fcitx/candidatelist.cpp:465-700`:
- * bulk, pageable, labelled): a pick is the candidate's own select. The temp modes' lists and
- * punctuation's marks (`androidengine.cpp:534-541`) are shown through it, one pager for both.
- */
+/** As fcitx's `CommonCandidateList`: a pick is the candidate's own select; the temp modes and punctuation share it. */
 internal open class TempModeCandidates(private val list: TempCandidateList) : CandidateList {
     private inner class Word(val candidate: TempCandidate) : PanelCandidate {
         override val text get() = candidate.text
@@ -104,11 +87,7 @@ internal open class TempModeCandidates(private val list: TempCandidateList) : Ca
     override val layoutHint get() = list.layoutHint
 }
 
-/**
- * One context's input panel, fcitx's `InputPanel` (`fcitx/inputpanel.cpp`): the preedit above the
- * candidates, the client preedit shown in the app, the aux lines, the candidates, and the overlay
- * message (the input method's name) shown while the rest is empty.
- */
+/** fcitx's `InputPanel`; the overlay (the input method's name) shows while the rest is empty. */
 class Panel {
     var preedit: FormattedText = FormattedText.Empty
     var clientPreedit: FormattedText = FormattedText.Empty
@@ -117,16 +96,12 @@ class Panel {
     var candidateList: CandidateList? = null
     var overlayMessage: String = ""
 
-    /** A quick input's panel ([TempPanel.quickPhrase]). */
     var quickPhrase: Boolean = false
 
-    /**
-     * [preedit] is an input method's session code (`KeyRouter.show`), not a temp mode's text nor a
-     * punctuation key's marks: the app may write it into the field (编码行 输入框里, 061-code-in-field).
-     */
+    /** [preedit] is a session code, not a temp mode's text: the app may write it into the field (编码行 输入框里). */
     var code: Boolean = false
 
-    /** `InputPanel::reset` (`inputpanel.cpp:121-132`): everything, the overlay too. */
+    /** Everything, the overlay too. */
     fun reset() {
         preedit = FormattedText.Empty
         clientPreedit = FormattedText.Empty
@@ -138,11 +113,7 @@ class Panel {
         code = false
     }
 
-    /**
-     * `InputPanel::empty` (`inputpanel.cpp:134-139`): the overlay does not count. Text counts here by
-     * its characters, fcitx's by its segments (one empty segment is not empty there, as Unicode's
-     * preedit before anything is typed); no panel reaches the difference, as aux is set with it.
-     */
+    /** The overlay does not count; text counts by characters, not fcitx's segments (no panel reaches the difference). */
     val empty: Boolean
         get() = preedit.isEmpty() && clientPreedit.isEmpty() && (candidateList?.size ?: 0) == 0 &&
             auxUp.isEmpty() && auxDown.isEmpty()

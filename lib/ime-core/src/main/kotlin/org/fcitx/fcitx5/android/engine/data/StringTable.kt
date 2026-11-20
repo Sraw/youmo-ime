@@ -6,11 +6,7 @@ package org.fcitx.fcitx5.android.engine.data
 
 import java.nio.ByteBuffer
 
-/**
- * Strings stored as one run of UTF-16 code units ([chars]) cut up by [offsets]: string i is
- * units offsets[i] until offsets[i + 1]. Read in place, so comparing against a key allocates
- * nothing.
- */
+/** Strings as one run of UTF-16 units cut by [offsets]; read in place, so comparing allocates nothing. */
 internal class StringTable(private val offsets: BitPacked, private val chars: ByteBuffer) {
 
     init {
@@ -25,7 +21,6 @@ internal class StringTable(private val offsets: BitPacked, private val chars: By
     fun char(i: Int, at: Int) = chars.getChar((offsets[i] + at) * 2)
 
     operator fun get(i: Int): String {
-        // each offset read unpacks bits: read the start once
         val start = offsets[i]
         return String(CharArray(offsets[i + 1] - start) { chars.getChar((start + it) * 2) })
     }

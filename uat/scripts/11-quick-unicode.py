@@ -26,72 +26,14 @@ def qu01(d):
     return f"栏上 {lab[:3]}"
 
 
-case("QU-02", needs="jvm:HostCasesUatTest.aMoodWordGivesKaomoji")(lambda d: None)
-
-
-case("QU-03", needs="jvm:HostCasesUatTest.anEmojiByItsName")(lambda d: None)
-
-
-case("QU-04", needs="jvm:HostCasesUatTest.aLatexNameGivesItsSymbol")(lambda d: None)
-
-
-case("QU-05", needs="jvm:HostCasesUatTest.backspacingQuickInputEmptyLeavesIt")(lambda d: None)
-
-
-case("QU-06", needs="jvm:HostCasesUatTest.unicodeByName")(lambda d: None)
-
-
-case("QU-07", needs="jvm:HostCasesUatTest.unicodeByHexCode")(lambda d: None)
-
-
-case("QU-08", needs="jvm:PinyinUatTest.quickInputOffersNoEnglishWords")(lambda d: None)
-
-
-case("QU-09", needs="jvm:Keys14UatTest.unicodeOnTheFourteenKeysTakesTheCodeFromCornersAndHalves")(lambda d: None)
-
-
-case("QU-10", needs="jvm:QuickPhraseMineTest.nothingTypedListsMineThenAddWithNothingLit、QuickPhraseBookTest.mineInOrderOfUseThenFileOrder")(lambda d: None)
-
-
-case("QU-11", needs="jvm:QuickPhraseMineTest.theNineKeysFindAKeyByItsLettersShowingDigits、QuickPhraseMineTest.the14KeysFindByTheWholeKeyAndBackspaceKeepsStep")(lambda d: None)
-
-
-case("QU-12", needs="jvm:LayoutSwitchKeyTest.theNineKeysSymbolsKeyHoldsQuickInputItsNumbersKeyOnlyTaps、KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain、"
+case("QU-12", needs="jvm:NineSceneGesturesTest.eachKeyIsWiredAsCommitted、KeyHandwritingUatTest.outOfQuickInputTheLettersAreWrittenOnAgain、"
               "QuickPhraseKeyboardUatTest.theZhuyinKeyboardsLendTheirPlaceToTheFullKeyboard")(lambda d: None)
-
-
-case("QU-13", needs="jvm:QuickPhraseMineTest.inAPasswordFieldMineCommitsButItsUseIsNotKept")(lambda d: None)
-
-
-case("QU-14", needs="jvm:QuickPhraseMineTest.habitsOffShowNoneOfMine")(lambda d: None)
-
-
-case("QU-15", needs="jvm:QuickPhraseManagerTest、QuickPhraseSettingsUatTest.anEntryAddedChangedFoundAndDeleted、QuickPhraseSettingsUatTest.aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain、QuickPhraseSettingsUatTest.theImportToastCountsEveryLineSkipped、QuickPhraseSettingsUatTest.aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage、QuickPhraseSettingsUatTest.aSwitchTurnedTwiceWhileTheFilesAreBusyNeverShowsTheFirstTurn")(lambda d: None)
-
-
-case("QU-16", needs="jvm:UserDataManagerTest.quickInputsEntriesOrderAndSwitchesRoundTripThroughABackup")(lambda d: None)
-
-
-case("QU-17", needs="jvm:QuickPhraseKeyboardUatTest.aCandidatesCardCommitsCopiesEditsDeletesAndUndoes、QuickPhraseMineTest.refreshedAfterAReloadTheListIsTheNewBooks、QuickPhraseTest.aListMadeAgainKeepsItsPage、QuickPhraseTest.aListMadeAgainShorterKeepsTheLastPageAndLitIndexItStillHas、QuickPhraseManagerTest.aDeletionUndoneIsPutBackWhereItWasWithItsTimeOfUse")(lambda d: None)
-
-
-case("QU-18", needs="jvm:QuickPhraseKeyboardUatTest.theClipboardSavesAnEntryAsQuickInputButNotAPasswordNorOneTooLong")(lambda d: None)
-
-
-case("QU-19", needs="jvm:QuickPhraseSettingsUatTest.theEditorAndWhatWasTypedOutliveTheActivityMadeAnew、QuickPhraseSettingsUatTest.aContentTooLongIsToldAtOkAndNeverCut、QuickPhraseSettingsUatTest.theKeyboardAskingAgainOverAChangedEditorAsksFirst")(lambda d: None)
 
 
 case("QU-20", needs="release:要一份 v0.5.0 正式版做的「备份全部」")(lambda d: None)
 
 
-case("QU-21", needs="jvm:QuickPhraseSettingsUatTest.theKeyboardAskingAgainOverAChangedEditorAsksFirst、QuickPhraseSettingsUatTest.theKeyboardAskingBeforeARestoredEditorIsShownAsksOverItOnceItIs")(lambda d: None)
-
-
 case("QU-24", needs="manual:要切到别的输入法后在后台杀掉应用进程再让系统恢复编辑框")(lambda d: None)
-case("QU-22", needs="jvm:QuickPhraseTest.spaceWithNothingTypedCommitsTheEntryLitElseASpace")(lambda d: None)
-
-
-case("QU-23", needs="jvm:HostCoreEnginesTest.quick input's own entry goes out as it is under traditional, a built-in one converted, neither learnt nor predicted from")(lambda d: None)
 
 
 # fcitx's data is in the app's own files: root copies the file in, the app's owner and label given
@@ -136,9 +78,3 @@ def qu25(d):
     got = d.field_text()
     check(got == "www.sina.com.cn", f"框里是 {got!r}")
     return f"候选 {lab[:4]}，点新浪上屏 {got}"
-
-
-case("QU-26", needs="jvm:QuickPhraseManagerTest.foldersAreMadeRenamedAndDeletedWithNoEntryLostAndAMoveKeepsItsTime、QuickPhraseSettingsUatTest.aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage、QuickPhraseFilesTest.version2RoundTripsNotesFoldersEmptyFoldersAndKeylessOnes、QuickPhraseManagerTest.aDeletionUndoneAfterItsFolderWentPutsItBackIntoTheFolderMadeAgain、QuickPhraseSettingsUatTest.aFolderNameTakenIsToldAndADeletionUndoneAndAKeyboardsEditKeepTheFolder、QuickPhraseFilesTest.version2ReadsCrLfLinesABomAndBarsOrFolderMarksInsideContent")(lambda d: None)
-
-
-case("QU-27", needs="jvm:QuickPhraseFilesTest.aFileOfBeforeHasItsKeysSplitFromTheFirstCharacterNotAsciiOnAndNoneLost、QuickPhraseManagerTest.filesOfBeforeAreReadConvertedAndWrittenAnewAtTheNextChange、QuickPhraseManagerTest.anImportOfBeforeOrAComputersIsConvertedIntoItsFoldersKeylessOnesCounted、QuickPhraseSettingsUatTest.aFileOfBeforeIsConvertedAndItsKeylessOnesAreListedToBeGivenAKey、UserDataManagerTest.quickInputOfABackupOfBeforeIsReadConvertedAndOneOfNowKeepsItsFolders、QuickPhraseFilesTest.aFileOfNowABuildBeforeWroteAgainReadsAsItWasMeantNotWithBarsPiledUp、QuickPhraseFilesTest.aKeyThatWasABarAloneIsKeptAsItsNoteAndOneWithNeitherIsNoEntry、QuickPhraseFilesTest.version2KeepsTheContentLimitAndEachEntryOnce、QuickPhraseFilesTest.anImportTakesANoteOfOtherSpacesAsItIsKept")(lambda d: None)

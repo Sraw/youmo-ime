@@ -11,9 +11,7 @@ import org.w3c.dom.Element
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-// contract: lexicon/stroke-order.tsv's header and the strings.xml files against StrokeShape's order.
-// TalkBack reads a card's strokes by these names, a shape's its index's (CharCardView): one for each, in
-// StrokeShape's order, in each language. Read from the resource files, as UserWordsClearTextTest does
+// TalkBack reads a card's strokes by these names by StrokeShape's index: one each, in its order, in each language
 class StrokeNamesTest {
 
     private fun names(values: String): List<String> {
@@ -26,7 +24,6 @@ class StrokeNamesTest {
 
     @Test
     fun aNameForEachShapeInItsOrder() {
-        // zh-CN's as stroke-order.tsv's head names each code (横折钩 HZG), the five kinds' 折 after them
         val head = File("../lexicon/stroke-order.tsv").readLines().takeWhile { it.startsWith("#") }
         val named = head.flatMap { Regex("""([A-Z]+) (\p{IsHan}+) """).findAll(it).map { m -> m.groupValues[1] to m.groupValues[2] }.toList() }.toMap()
         assertEquals(StrokeShape.entries.map { named[it.code] ?: "折" }, names("values-zh-rCN"))

@@ -21,7 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/** A file's format told before it is imported, one format each; anything unsure refused (D6). */
+/** A file's format told before it is imported, one format each; anything unsure refused. */
 class DictionaryFormatTest {
 
     private val words = listOf("你好" to "ni hao", "幽默" to "you mo", "输入法" to "shu ru fa", "词库" to "ci ku", "拼音" to "pin yin")
@@ -90,8 +90,7 @@ class DictionaryFormatTest {
         }
     }
 
-    // a 1 among costs is no log10 probability: written as none, not kept to make the compiler's signs
-    // mixed and the whole source unranked (R12 F3292)
+    // a 1 among costs is written as none, else the signs mix and the source goes unranked
     @Test
     fun aOneAmongCostsIsWrittenAsNone() {
         val bytes = text(words.map { (t, p) -> "$t ${p.replace(' ', '\'')} -${t.length}.5" } + "啊 a 1")
@@ -100,7 +99,7 @@ class DictionaryFormatTest {
         assertEquals("你好 ni'hao -2.5", lines(bytes).first())
     }
 
-    // Rime's share of a polyphone's readings (`10%`) reads as a number of no kind (R12 F3300)
+    // Rime's share of a polyphone's readings (`10%`) reads as a number of no kind
     @Test
     fun rimesPercentagesReadAsNoWeight() {
         val head = listOf("---", "name: luna_pinyin", "...")
@@ -138,24 +137,19 @@ class DictionaryFormatTest {
         return { text, syllables -> (text to syllables.single()) in known }
     }
 
-    // Big5's pairs all decode as GBK: read so, every character is another, its pinyin no reading of it (review S1)
+    // Big5's pairs all decode as GBK: read so, every character is another, its pinyin no reading of it
     @Test
     fun big5ReadAsGbkIsRefusedByItsReadings() {
         val traditional = listOf("你好" to "ni hao", "幽默" to "you mo", "輸入法" to "shu ru fa", "詞庫" to "ci ku", "拼音" to "pin yin")
         val knows = knowing(traditional)
         val big5 = traditional.joinToString("\n") { (t, p) -> "$t ${p.replace(' ', '\'')}" }.toByteArray(charset("Big5"))
         assertEquals(Reason.MISMATCH, (DictionaryFormat.analyse({ big5.inputStream() }, knows = knows) as Refused).reason)
-        // the same words in UTF-8 have their readings
         val utf8 = traditional.joinToString("\n") { (t, p) -> "$t ${p.replace(' ', '\'')}" }.toByteArray()
         assertTrue(DictionaryFormat.analyse({ utf8.inputStream() }, knows = knows) is Detected)
-        // and a UTF-8 file is what it decodes as even where the base lacks its characters: only
-        // a GB18030 read can be another encoding (R12 F3301)
         assertTrue(DictionaryFormat.analyse({ utf8.inputStream() }, knows = { _, _ -> false }) is Detected)
     }
 
-    // a line of block marks as long as a line may be: read in a small stack (64 KB), where a mark
-    // taken off a call at a time overflowed it (review of the dictionary import, fixed in c178d7ea;
-    // the huge line itself: DictionaryFormatBoundedHeapTest)
+    // read in a small stack (64 KB), where recursion per mark overflowed
     @Test
     fun manyBlockMarksAreReadInASmallStack() {
         val marks = text(words.map { (t, p) -> "$t ${p.replace(' ', '\'')}" } + ("!".repeat(4000) + "你好 ni'hao"))
@@ -166,14 +160,12 @@ class DictionaryFormatTest {
         assertTrue("$result", result is Detected)
     }
 
-    // anything not sure of refused, with the reason
     @Test
     fun filesNotOfOneLayoutAreRefusedWithTheReason() {
         val rows = listOf(
             Triple("initials only", text(listOf("你好 nh", "幽默 ym", "输入法 srf", "词库 ck")), Reason.INITIALS),
             Triple("Baidu's parentheses", text(words.map { (t, p) -> "$t(${p.replace(' ', '|')}) 2" }), Reason.UNREADABLE),
             Triple("a NUL", text(listOf("你好 ni'hao")) + byteArrayOf(0, 0, 0) + text(listOf("幽默 you'mo")), Reason.BINARY),
-            // bytes neither UTF-8 nor GB18030 decodes
             Triple("garbage", Random(7).nextBytes(4096) + byteArrayOf(0x80.toByte(), 0xFF.toByte()), Reason.ENCODING),
             Triple("comments only", text(listOf("# nothing", "")), Reason.NO_WORDS),
             Triple(
@@ -210,24 +202,20 @@ class DictionaryFormatTest {
         assertTrue(stop.exceptionOrNull() is java.util.concurrent.CancellationException)
     }
 
-    // a file UTF-8 fails on late, read again as GB18030 from its start: the bar never goes back (R12 F3319)
+    // a file UTF-8 fails on late, read again as GB18030 from its start: the bar never goes back
     @Test
     fun progressNeverGoesBackWhenUtf8FailsLate() {
         val bytes = text(List(200_000) { "你好 ni'hao" }) + "你好 ni'hao\n".toByteArray(charset("GB18030"))
         val told = ArrayList<Float>()
         val read = DictionaryFormat.analyse({ bytes.inputStream() }, size = bytes.size.toLong(), progress = { told += it })
-        // the late fallback taken, else this tests nothing (review F3431)
         assertEquals(WordLists.GB18030, (read as Detected).charset)
         assertTrue("$told", told.size > 2 && told.zipWithNext().all { (a, b) -> a <= b })
     }
 
-    // review F3398: the GB18030 pass heard all through, even over what the UTF-8 one read: a cancel
-    // (a throw from progress) stops it there, not only once it catches up
     @Test
     fun aCancelStopsTheGb18030PassWhileItCatchesUp() {
         val bytes = text((1..200_000).map { "ni hao $it" }) + "你好 ni'hao\n".toByteArray(charset("GB18030"))
-        // each stream opened, the passes told apart by which one is read when progress is heard, not
-        // by how many opens come before (a sniff of the byte order mark or not; review F3439)
+        // passes told apart by which stream is read, not by how many opens came before
         val opened = ArrayList<java.io.ByteArrayInputStream>()
         var first: java.io.ByteArrayInputStream? = null
         var second: java.io.ByteArrayInputStream? = null
@@ -252,11 +240,9 @@ class DictionaryFormatTest {
         val d = detected(text(words.map { it.first }))
         assertEquals(5, d.textOnly)
         assertEquals(Reason.NO_PINYIN, d.refusedForBase)
-        // a few among words with pinyin: the base reads the rest
         val some = detected(text((1..100).map { "你好 ni'hao" } + "幽默"))
         assertNull(some.refusedForBase)
         assertTrue(some.textOnly == 1)
-        // a user's list: a word with pinyin, one without, one blocked
         val list = detected(text(listOf("幽默测试 you'mo'ce'shi", "蓝鲸花园", "!马上就好")))
         assertEquals(1, list.words)
         assertEquals(2, list.textOnly)
@@ -279,10 +265,8 @@ class DictionaryFormatTest {
         assertEquals(2, d.guessed)
         assertEquals(1, d.textOnly)
         assertEquals(1, d.unguessed)
-        // the one skipped is said, not held against the base
         assertNull(d.refusedForBase)
         assertEquals(listOf("你好 ni'hao 0.0", "幽默 you'mo 0.0"), out)
-        // none read: nothing for the base
         assertEquals(Reason.NO_PINYIN, guessed(text(listOf("蓝鲸", "花园"))).refusedForBase)
     }
 
@@ -292,12 +276,10 @@ class DictionaryFormatTest {
         val d = guessed(text((1..100).map { "测试 ce'shi" } + "你好" + "你好" + "!幽默"), out)
         assertEquals(102, d.words)
         assertEquals(2, d.guessed)
-        // the blocked one: the user dictionary's alone, never guessed
         assertEquals(1, d.textOnly)
         assertEquals(0, d.unguessed)
         assertEquals(2, out.count { it == "你好 ni'hao 0.0" })
         assertTrue(out.none { it.startsWith("幽默") })
-        // a list's numbers kept on a word alone
         val counted = ArrayList<String>()
         guessed(text(listOf("你好 12", "幽默 3")), counted)
         assertEquals(listOf("你好 ni'hao 12.0", "幽默 you'mo 3.0"), counted)
@@ -315,10 +297,8 @@ class DictionaryFormatTest {
     fun aGuessChangesNoOtherRefusal() {
         // blocked lines past 2%: the user dictionary's alone, guess or not
         assertEquals(Reason.NO_PINYIN, guessed(text(List(10) { "测试 ce'shi" } + List(5) { "!幽默" })).refusedForBase)
-        // lines of no word past 2%
         val unreadable = text(List(50) { "你好" } + List(10) { "你好 世界 再见" })
         assertEquals(Reason.UNREADABLE, (DictionaryFormat.analyse({ unreadable.inputStream() }, guess = guess) as Refused).reason)
-        // more words than the compiler takes, the guessed counted too
         val many = "你好\n".toByteArray()
         val n = DictionaryCompiler.MAX_WORDS + 1
         val tooMany = DictionaryFormat.analyse(
@@ -333,7 +313,6 @@ class DictionaryFormatTest {
         val d = DictionaryFormat.analyse({ text(listOf("测试 ce'shi", "你好", "幽默")).inputStream() }, guess = { error("the engine is gone") }) as Detected
         assertEquals(1, d.words)
         assertEquals(2, d.unguessed)
-        // skipped, not held to the 2%: the word with pinyin goes in
         assertNull(d.refusedForBase)
         // thrown, the batch skipped, never a mismatch: a GBK list's words not judged by a guess that failed
         val gbk = text(listOf("你好", "幽默")).let { String(it).toByteArray(WordLists.GB18030) }
@@ -355,7 +334,7 @@ class DictionaryFormatTest {
         assertEquals(texts.map { "$it a 0.0" }, out)
     }
 
-    // Q3: a list of words alone in Big5 reads as GBK, every character another: the guess reads few of them
+    // a list of words alone in Big5 reads as GBK, every character another: the guess reads few of them
     @Test
     fun aBig5ListOfWordsAloneIsRefusedByItsReadings() {
         val traditional = listOf("輸入法" to "shu ru fa", "詞庫" to "ci ku", "電腦" to "dian nao", "資訊" to "zi xun", "網際網路" to "wang ji wang lu")
@@ -364,23 +343,18 @@ class DictionaryFormatTest {
         val big5 = traditional.joinToString("\n") { it.first }.toByteArray(charset("Big5"))
         // some of its pairs no Han as GBK reads them (lines of no word), the rest characters the guess does not read
         val refused = DictionaryFormat.analyse({ big5.inputStream() }, guess = reads) as Refused
-        // either refusal, by design: as GBK one line is a private-use character (no word) and four are Han the guess
-        // does not read, so which check stops it first (a sample too unreadable, or the readings not holding) is the
-        // two charsets' accident, not the rule this pins; both tell the user the file is not what it says
+        // which check refuses it first is the charsets' accident, not the rule pinned here
         assertTrue("${refused.reason}", refused.reason in setOf(Reason.UNREADABLE, Reason.MISMATCH))
         // Han all through as GBK reads it, but not words the dictionary reads: a mismatch
         val gbk = traditional.joinToString("\n") { it.first }.toByteArray(WordLists.GB18030)
         val readsNone: (List<String>) -> Map<String, String?> = { texts -> texts.associateWith { null } }
         assertEquals(Reason.MISMATCH, (DictionaryFormat.analyse({ gbk.inputStream() }, guess = readsNone) as Refused).reason)
-        // the dictionary reading them, it is what it says
         assertEquals(5, (DictionaryFormat.analyse({ gbk.inputStream() }, guess = reads) as Detected).guessed)
-        // the same in UTF-8 reads
         val utf8 = traditional.joinToString("\n") { it.first }.toByteArray()
         assertEquals(5, (DictionaryFormat.analyse({ utf8.inputStream() }, guess = reads) as Detected).guessed)
     }
 
-    // a GBK export with pinyin and a line the dictionary cannot read (a rare name): not refused for it; the words
-    // alone the file's most are held to the guess (the Big5 test above) (R20 F5924)
+    // a line the dictionary cannot read refuses nothing; words without pinyin are held to the guess
     @Test
     @Uat("WD-38")
     fun aFewWordsAloneInAGbkFileWithPinyinRefuseNothing() {

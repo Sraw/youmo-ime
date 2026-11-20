@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.scene.layout
 
 /**
  * What a grouped keyboard's letters must be (ime-core's NineKeyLetters.problem, moved here so the layout check
- * asks it on the phone and in the layout maker alike: 061-custom-layout §3.1).
+ * asks it on the phone and in the layout maker alike).
  */
 object Groups {
     /** The most letters a key types. */

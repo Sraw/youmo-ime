@@ -5,14 +5,11 @@
 package org.fcitx.fcitx5.android.engine.stroke
 
 /**
- * A stroke's shape as 《GB13000.1字符集汉字折笔规范》 and 《现代汉语通用字笔顺规范》 name them, for a
- * character's card: [code] is the stroke's abbreviation in Unicode's names of the CJK Strokes block
- * (`CJK STROKE HZG` 横折钩), how `lexicon/stroke-order.tsv` writes it; [kind] the standard's number of it,
- * 1 横 2 竖 3 撇 4 点 5 折 (提 is 横, 竖钩 竖, 捺 点), which stroke typing and the checks go by; [shown]
- * the character the card draws it with. Unicode 16's ㇤ (HXG) and ㇥ (SZP) are not in the phone's
- * fonts yet (Noto Sans CJK 2.004): ⺄ and ㄣ, their closest shapes there, stand in.
+ * A stroke's shape per GB13000.1 折笔规范: [code] is its abbreviation in Unicode's CJK Strokes names (as
+ * `lexicon/stroke-order.tsv` writes it), [kind] the standard's 1 横 2 竖 3 撇 4 点 5 折, [shown] what the card
+ * draws. ㇤ (HXG) and ㇥ (SZP) are not in the phone's fonts yet, so ⺄ and ㄣ stand in.
  *
- * The order of the entries is charinfo.data's (each stroke its index): add new ones at the end.
+ * The order is charinfo.data's (each stroke its index): add new ones at the end.
  */
 enum class StrokeShape(val code: String, val kind: Int, val shown: Char) {
     H("H", 1, '一'), // 横
@@ -48,10 +45,7 @@ enum class StrokeShape(val code: String, val kind: Int, val shown: Char) {
     XG("XG", 5, '㇂'), // 斜钩 戈
     BXG("BXG", 5, '㇃'), // 卧钩 心
 
-    /**
-     * A stroke of one of the five kinds only, rime-stroke's order of a character the mainland's
-     * table lacks (a traditional one): shown as the kind, 一丨丿丶乛.
-     */
+    /** A stroke of one of the five kinds only (rime-stroke's order of a character the mainland table lacks). */
     ZHE("", 5, '乛'),
     ;
 
@@ -59,19 +53,15 @@ enum class StrokeShape(val code: String, val kind: Int, val shown: Char) {
         private val byCode = entries.filter { it.code.isNotEmpty() }.associateBy { it.code }
         private val kinds = arrayOf(H, S, P, D, ZHE)
 
-        /** The shape written [code] (`HZG`), null for none: a kind alone is no shape. */
+        /** The shape written [code] (`HZG`); null for none: a kind alone is no shape. */
         fun of(code: String): StrokeShape? = byCode[code]
 
-        /** The shapes written [codes], a space between (`P P S H H SG`); a code that is none fails. */
         fun parse(codes: String): List<StrokeShape> = codes.split(' ').filter { it.isNotEmpty() }.map { requireNotNull(of(it)) { "not a stroke's shape: $it" } }
 
-        /** A stroke known by its kind only, a [Strokes.KEYS] letter (rime-stroke's `z`: [ZHE]). */
         fun ofKey(key: Char): StrokeShape = kinds[Strokes.KEYS.indexOf(key).also { require(it >= 0) { "not a stroke: $key" } }]
 
-        /** [shapes] as [Strokes.KEYS] letters, a kind a stroke: rime-stroke's way of writing them. */
         fun keys(shapes: List<StrokeShape>): String = shapes.joinToString("") { Strokes.KEYS[it.kind - 1].toString() }
 
-        /** [shapes] as the card draws them: 行 丿丿丨一一亅. */
         fun shown(shapes: List<StrokeShape>): String = shapes.joinToString("") { it.shown.toString() }
     }
 }

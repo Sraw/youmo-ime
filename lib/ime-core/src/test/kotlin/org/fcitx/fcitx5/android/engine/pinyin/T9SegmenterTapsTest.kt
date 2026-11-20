@@ -9,10 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
-/**
- * Where the 14 keys were tapped, weighed in the graph (design k14-tap-position §2.2): how far the
- * letters each syllable reads its keys as go against the taps, the spelling typed for it judged.
- */
+/** Where the 14 keys were tapped, weighed in the graph against each syllable's letters. */
 class T9SegmenterTapsTest {
 
     private val g14 = NineKeyLetters.G14
@@ -33,7 +30,6 @@ class T9SegmenterTapsTest {
 
     @Test
     fun aLetterOnTheOtherSideOfItsKeyCostsByHowFarTheTapWentPastTheCentre() {
-        // BN UI: b and u left, n and i right
         val graph = segmenter.segment(keys("ni"), floatArrayOf(1f, 0.5f))
         assertEquals(0f, against(graph, "ni"), 0f)
         assertEquals(0f, against(graph, "nu"), 0f)
@@ -43,7 +39,6 @@ class T9SegmenterTapsTest {
         assertEquals(0f, against(both, "ni"), 0f)
         assertEquals(1f, against(both, "bu"), 1e-6f)
         assertEquals(0.5f, against(both, "bi"), 1e-6f)
-        // the start of a syllable at the end too
         val started = segmenter.segment(keys("hao").take(1), floatArrayOf(0.25f))
         assertEquals(0.5f, against(started, "hao", Kind.PARTIAL), 1e-6f)
         assertEquals(0f, against(started, "gao", Kind.PARTIAL), 0f)
@@ -59,7 +54,6 @@ class T9SegmenterTapsTest {
             assertEquals(plain, graph.toString())
             for (e in 0 until graph.edgeCount) for (i in 0 until graph.matches(e).size) assertEquals(0f, graph.against(e, i), 0f)
         }
-        // the nine keys have no place, whatever is passed
         val nine = T9Segmenter(abbreviations = false)
         val graph = nine.segment("64", floatArrayOf(1f, 1f))
         for (e in 0 until graph.edgeCount) for (i in 0 until graph.matches(e).size) assertEquals(0f, graph.against(e, i), 0f)
@@ -67,7 +61,6 @@ class T9SegmenterTapsTest {
 
     @Test
     fun theLettersJudgedAreThoseTyped() {
-        // üe typed ue: UI's u, the left
         val lue = segmenter.segment(keys("lue"), floatArrayOf(0.5f, 0.25f, 0.5f))
         assertEquals(0f, against(lue, "lve"), 0f)
         assertEquals(0.5f, against(segmenter.segment(keys("lue"), floatArrayOf(0.5f, 0.75f, 0.5f)), "lve"), 1e-6f)

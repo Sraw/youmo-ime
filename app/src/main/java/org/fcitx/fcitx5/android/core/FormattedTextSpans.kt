@@ -13,13 +13,7 @@ import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import androidx.core.text.buildSpannedString
 
-/**
- * Renders a [FormattedText] as a [android.text.Spanned].
- *
- * The data half of [FormattedText] lives in `:lib:ime-core`, which cannot reach the Android
- * framework; this is the rendering half. It stays an extension in the same package, so call
- * sites are identical to when it was a member.
- */
+/** The rendering half of [FormattedText], whose data half is in `:lib:ime-core` and cannot reach Android. */
 fun FormattedText.toSpannedString(highlightColor: Int) = buildSpannedString {
     for (i in strings.indices) {
         val str = strings[i]

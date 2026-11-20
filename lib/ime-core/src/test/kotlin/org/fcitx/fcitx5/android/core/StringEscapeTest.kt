@@ -10,7 +10,7 @@ import org.junit.Test
 
 class StringEscapeTest {
 
-    // https://github.com/fcitx/fcitx5/blob/5.1.21/test/teststringutils.cpp#L142
+    // fcitx5 test/teststringutils.cpp
     private val data = listOf(
         "\"" to """"\""""",
         "\"\"\n" to """"\"\"\n"""",

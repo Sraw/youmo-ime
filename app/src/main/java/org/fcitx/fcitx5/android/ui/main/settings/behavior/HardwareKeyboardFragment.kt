@@ -19,11 +19,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
 import org.fcitx.fcitx5.android.ui.main.settings.search.ReadyLater
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchHighlight
 
-/**
- * The physical keyboard's page: its candidate window and shortcuts (the app's preferences), and
- * how many candidates the window shows, one of fcitx's options (InputMethodSettings.HARDWARE_KEYBOARD),
- * read from pinyin's config, which has those every input method shares, and added once fcitx answers.
- */
+/** Fcitx's candidate count option, read from pinyin's config (which holds shared options), is added once fcitx answers. */
 class HardwareKeyboardFragment : ManagedPreferenceFragment(AppPrefs.getInstance().candidates), ReadyLater {
 
     private val viewModel: MainViewModel by activityViewModels()
@@ -35,25 +31,22 @@ class HardwareKeyboardFragment : ManagedPreferenceFragment(AppPrefs.getInstance(
         lifecycleScope.launch {
             val cfg = fcitx.runOnReady { imOptions(InputMethodCatalog.PINYIN) }?.toMutableMap() ?: return@launch
             val items = InputMethodSettings.HARDWARE_KEYBOARD
-            // on the connection's scope: a change made just before leaving the page is still saved
+            // on the connection's scope: a change just before leaving is still saved
             InputMethodSettings.addTo(screen, items, cfg, save = {
-                // taken now, on the main thread: the page goes on changing cfg
+                // taken now on the main thread: the page keeps changing cfg
                 val shown = cfg.toMap()
                 fcitx.launchOnReady { save(it, shown) }
             }, open = {})
-            // a search result for it opened the page before it was there
+            // a search result opened the page before it was there
             view?.post { SearchHighlight.ready(this@HardwareKeyboardFragment) }
         }
     }
 
     companion object {
-        /** The page's managed preferences, as SettingsIndex reads them too. */
+        /** As SettingsIndex reads them too. */
         fun build(screen: PreferenceScreen) = AppPrefs.getInstance().candidates.createUi(screen)
 
-        /**
-         * What the page shows alone, through pinyin: the shared options read with it may have been
-         * changed on 通用输入 since, and writing them back would undo that.
-         */
+        /** Only what the page shows: the shared options may have changed on 通用输入 since, and writing them back would undo that. */
         suspend fun save(fcitx: HostApi, cfg: Map<String, String>) =
             fcitx.setImOptions(InputMethodCatalog.PINYIN, InputMethodSettings.only(InputMethodSettings.HARDWARE_KEYBOARD, cfg))
     }

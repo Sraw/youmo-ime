@@ -17,7 +17,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** [GroupedShuangpinSegmenter]: 双拼 on the 18 keys and the nine keys (design §1.4). */
+/** [GroupedShuangpinSegmenter]: 双拼 on the 18 keys and the nine keys. */
 class GroupedShuangpinSegmenterTest {
 
     private fun codes(keys: String, letters: NineKeyLetters) = keys.map(letters::key).joinToString("")
@@ -48,8 +48,6 @@ class GroupedShuangpinSegmenterTest {
 
     @Test
     fun noSlipIsReadNotEvenUTypedWithTheKeyOfU() {
-        // the 18, 14 and nine keys read slipped keys by where a tap fell (061-neighbour-groups), but no ü typo
-        // (060-correction-fuzzy-report): 小鹤's jv is no ju there, as it is on 26 keys
         for ((name, scheme) in EngineSettings.SCHEMES) {
             for (letters in listOf(G18, G14, NINE_SP)) {
                 val segmenter = GroupedShuangpinSegmenter(scheme, letters)
@@ -73,10 +71,8 @@ class GroupedShuangpinSegmenterTest {
 
     @Test
     fun aGroupLeavesItsSyllablesToTheDecoder() {
-        // 小鹤 bn bn: bin, biao, nin, niao (b, n initials; n iao, b in)
         val read = GroupedShuangpinSegmenter(XIAOHE, G18).read(codes("bb", G18))
         assertTrue(read.toString(), read.getValue(Kind.SYLLABLE).containsAll(listOf("bin", "biao", "nin", "niao")))
-        // one key at the end is the start of every syllable it leads
         val lead = GroupedShuangpinSegmenter(ZIRANMA, G18).read(codes("n", G18))
         assertTrue(lead.toString(), lead.getValue(Kind.PARTIAL).containsAll(listOf("ni", "bi", "nao")))
     }
@@ -93,7 +89,6 @@ class GroupedShuangpinSegmenterTest {
 
     @Test
     fun aKeysInitialsAreTheSchemes() {
-        // 自然码: v is zh, u sh, i ch; v alone no initial
         assertEquals(listOf("zh"), GroupedShuangpinSegmenter(ZIRANMA, G18).initialsOf(G18.key('v')))
         assertEquals(listOf("t", "sh", "zh"), GroupedShuangpinSegmenter(ZIRANMA, NINE_SP).initialsOf(NINE_SP.key('t')))
         assertEquals(listOf("b", "n"), GroupedShuangpinSegmenter(ZIRANMA, G18).initialsOf(G18.key('b')))
@@ -112,8 +107,6 @@ class GroupedShuangpinSegmenterTest {
         assertEquals("b", segmenter.asTyped(codes("b", G18)))
     }
 
-    // 061-sp-abbrev §3.1: where a key and the next make a syllable, the key is also read alone, an INITIAL of the
-    // syllables it leads, each ABBREV; two keys too; and the graph without them is the one with none
     @Test
     fun aKeyThatMakesASyllableWithTheNextIsReadAloneToo() {
         for (letters in listOf(G18, G14, NINE_SP)) {

@@ -60,8 +60,7 @@ def lc02(d):
     s = d.screen()
     if not keyboard_up(d):
         raise Blocked("横屏后键盘收起了")
-    # the keyboard is rebuilt for landscape and comes back on the letters; the selection is the
-    # field's, so the edit panel's 复制 copies it
+    # rebuilt for landscape on the letters; the selection is the field's, so the edit panel's 复制 copies it
     cp = s.find(desc="复制", where="ime") or s.find(text="复制", where="ime")
     if not cp and keyboard_up(d):
         d.expand_toolbar()
@@ -108,18 +107,6 @@ def lc03(d):
     return f"没有残留；「{t}」"
 
 
-case("LC-04", needs="jvm:HostCasesUatTest.anotherFieldTappedWhilePinyinIsTypedLeavesNothing")(lambda d: None)
-
-
-case("LC-05", needs="jvm:LifecycleUatTest.aNumberFieldThenTextIsLettersAgain")(lambda d: None)
-
-
-case("LC-06", needs="jvm:LifecycleUatTest.anotherFieldFromTheSymbolsIsLetters")(lambda d: None)
-
-
-case("LC-07", needs="jvm:LifecycleUatTest.hiddenAndShownAgainIsStillTheInputMethod")(lambda d: None)
-
-
 @case("LC-08", mutates="learn")
 def lc08(d):
     d.type("ni")
@@ -138,9 +125,6 @@ def lc08(d):
     check(up, "解锁点框后键盘没出来")
     check(t == "你好", f"接着打出「{t}」（候选 {c[:2]}）")
     return f"键盘正常；「{t}」"
-
-
-case("LC-09", needs="jvm:LifecycleUatTest.systemDarkModeFlippedWhileShown")(lambda d: None)
 
 
 @case("LC-10", base="B0-设置", mutates=True)
@@ -217,27 +201,6 @@ def lc13(d):
     return f"「{t}」"
 
 
-# A2: a setting or a theme changed with the keyboard up and pinyin half typed; the views made anew by the system
-case("LC-14", needs="jvm:StuckBarUatTest.aKeyboardSettingChangedMidPinyinDropsIt")(lambda d: None)
-
-
-case("LC-15", needs="jvm:StuckBarUatTest.aThemeChangedMidPinyinDropsIt")(lambda d: None)
-
-
-case("LC-16", needs="jvm:StuckBarUatTest.aViewMadeAnewMidPinyinShowsTheEnginesState")(lambda d: None)
-
-
-case("LC-17", needs="jvm:StuckBarUatTest.aThemeChangedMidEnglishWordCommitsIt")(lambda d: None)
-
-
-case("LC-18", needs="jvm:StuckBarUatTest.floatingAndDockedMidPinyinKeepIt")(lambda d: None)
-
-
-
-case("LC-20", needs="jvm:DeveloperUatTest.aRestartGivenUpOnAHostStillStartingSaysItMayNotHaveRestarted、DeveloperUatTest.restartedTheInstanceSaysDone、AppLanguageUatTest.aLanguageChangedWhileTheHostStaysStartingSaysItMayNotHaveRestarted")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 编码行在输入框里（B-IF）
 
 
 def in_field(d, page="text"):
@@ -246,8 +209,7 @@ def in_field(d, page="text"):
     d.tap_text("大小与样式", scroll=False, after=1.0)
     choose(d, "编码行", "输入框里")
 
-    # the note's 确定 shows a moment after the option is tapped: choose, looking once, missed it on a loaded
-    # machine, and the case went on with the code on the strip (LC-24 passed so, nothing of it tested)
+    # the note's 确定 shows a moment after the option is tapped: waited for, as one look missed it on a loaded machine
     def chosen(s):
         ok = s.find(text="确定")
         if ok:
@@ -313,8 +275,7 @@ def lc21(d):
 @case("LC-22", mutates=True)
 def lc22(d):
     testbed_in_field(d, "ime", "preselected")
-    # the tap put the cursor where it landed: two letters selected again with shift and the left arrow; `input
-    # keycombination` is Android 12's (API 31), so before it (youmo29) a long press selects a word instead
+    # `input keycombination` is API 31's, so on youmo29 a long press selects a word instead
     sdk = int(d.sh("getprop ro.build.version.sdk").strip() or 0)
     if sdk >= 31:
         for _ in range(2):
@@ -381,8 +342,7 @@ def lc24(d):
     d.type("nihao")
     d.cands()
     d.rotate(1)
-    # the keyboard laid out anew after the turn: looked for a few seconds, not once (gone for a moment, the field
-    # tapped would be under it, not in the dump: 页面上没有第 1 个框; its view started 7 s after the turn on a loaded machine)
+    # the keyboard laid out anew after the turn: looked for a few seconds, not once
     try:
         d.wait(lambda s: s.find(rid="keyboard_view", where="ime"), 12, step=0.3, what="the keyboard back")
     except Blocked:
@@ -390,19 +350,14 @@ def lc24(d):
     d.type("hao")
     d.cands()
     d.space()
-    # a commit is judged 800 ms after it (CommitCheck.WAIT_MS); the screen turned back sooner restarts input in
-    # the field, which ends the wait unjudged (specs/pitfalls.md): a person does not turn it back that fast
+    # a commit is judged 800 ms after it; turning back sooner restarts input and ends the wait unjudged
     try:
         d.wait(lambda s: s.find(contains="没写进去", where="ime"), 1.5, step=0.3, what="没写进去")
     except Blocked:
         pass
-    # read back in portrait: in landscape the keyboard leaves the page a strip about 40 px tall, the field under the
-    # keyboard unless the page happened to scroll it into that strip, and a field not shown is not in the dump
-    # (None, half the runs). The focused field, else the page's first, polled: a rebuilt page's field may not be focused
+    # read back in portrait: in landscape the field is often under the keyboard and so not in the dump
     d.rotate(0)
-    # the web view may have lost its focus as the screen turned (its height nothing for a moment, the keyboard
-    # over most of the page): it takes the writes and drops them. The keyboard then says so above the candidates,
-    # and after a tap on the field a tap on that line writes the text (about 3 runs in 5 on the API 36 emulator)
+    # the web view may lose focus as the screen turns and drop the writes; the keyboard then says so, and a tap on that line writes the text
     kept = None
     try:
         kept = d.wait(lambda s: s.find(contains="没写进去", where="ime"), 2.5, step=0.3, what="没写进去")
@@ -641,5 +596,3 @@ def lc34(d):
     check(not row, f"键盘上方还有「{row}」")
     check(end == "你", f"最后框里「{end}」")
     return f"「{before}」发出，再打「{t.get('text')}」→「{end}」"
-
-case("LC-35", needs="jvm:HostCasesUatTest.aCharacterNotCommittedIsPutInWhenTheKeyboardGoes、KeyHandwritingUatTest.theKeyboardHiddenAndShownAgainStillWrites")(lambda d: None)

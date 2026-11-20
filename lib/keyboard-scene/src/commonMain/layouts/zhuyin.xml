@@ -2,7 +2,7 @@
 <!--
   注音大千（ZhuyinKeyboard nine=false，ZhuyinFull，rules C §5），板 zhuyin，键名是大千键盘的 QWERTY 位置（与 ZhuyinKeys.DACHEN_QWERTY 核对过）。
   宽度为行宽的百分之几：第 1 行 11 键平分，第 2、3 行各 10，第 4 行十键各 8.5 + ⌫ 15；第 5 行是分组底行。
-  符号 20 号，紧凑档再乘 0.9（compact-text-scale，KeyTextScale.dachen，乘在引擎的紧凑缩放之上）。点按发注音私有码，由 App 的表给
+  符号 20 号，紧凑档再乘 0.9（compact-text-scale，乘在引擎的紧凑缩放之上）。点按发注音私有码，由 App 的表给
   （060-render-p2 U4 B，ZhuyinKeyboard.sceneTable）：action:zhuyin 发键面上那个符号的码，action:tone-1…5 发声调 ˉ ˊ ˇ ˋ ˙ 的码
   （大千的声调在数字行：3 ˇ、4 ˋ、6 ˊ、7 ˙）。没有长按；预览就是符号本身，上滑时预览换成这个键的快捷键（快捷键 zyfull/<QWERTY 位置>）。
 -->

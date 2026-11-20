@@ -17,16 +17,11 @@ import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import splitties.dimensions.dp
 
-/**
- * The code row floating over the app (编码行 浮在键盘上方): [content] ([CodeRowUi] wrapped) on a
- * patch of the bar's colour, nine tenths opaque, its two corners away from the keyboard rounded.
- * Outside the keyboard's view, which floating clips to its outline (FloatingCorners); InputView
- * places it ([CodeStripPlacement]) and shows it while there is a code.
- */
+/** Outside the keyboard's view, which floating clips to its outline (FloatingCorners). */
 @SuppressLint("ViewConstructor")
 class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout(ctx) {
 
-    /** As wide as the board at most, in pixels; 0 for no cap. */
+    /** 0 for no cap. */
     var maxWidth = 0
         set(value) {
             if (field == value) return
@@ -34,7 +29,6 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout
             requestLayout()
         }
 
-    /** Hanging under the board, its rounded corners at the bottom. */
     var below = false
         set(value) {
             if (field == value) return
@@ -44,9 +38,8 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout
 
     private val radius = dp(CORNER_DP).toFloat()
 
-    // the colour the bar looks (the theme's `bar`, SceneBar): the keyboard's under a bar of none, the bar's
-    // own else; a theme's picture is not carried out to the strip. A see-through bar (the Transparent themes,
-    // 15% black) is the keyboard's colour seen through it: made 90% opaque as it is, black text sat on black
+    // a theme's picture is not carried out to the strip. A see-through bar is the keyboard's colour seen through it:
+    // made 90% opaque as it is, black text sat on black
     private val shape = GradientDrawable().apply {
         val look = ThemeManager.shownLook(theme)
         val picture = look.picture != null && look.base == BoardBase.Picture
@@ -76,7 +69,6 @@ class FloatingCodeStrip(ctx: Context, theme: Theme, content: View) : FrameLayout
     companion object {
         const val CORNER_DP = 8
 
-        // nine tenths opaque: the app under it seen faintly, the code still clear (the user, 2026-11-01)
         const val ALPHA = 230
     }
 }

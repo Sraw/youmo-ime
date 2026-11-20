@@ -128,13 +128,12 @@ class EnginesGlideTest : EnginesFixture() {
     @Test
     fun aCoarseWordTheUserAddedIsAnotherReadingsOffer() {
         val engines = Engines(::loadCoarse, null, warmUps = inPlace)
-        // two characters, two syllables: as the settings take a word
         assertTrue(engines.addWord("小穴", "ni'ao"))
         val s = engines.glided(PINYIN, "nihao")
         assertEquals(listOf("你好", "小穴"), s.candidates.take(2))
     }
 
-    // U-93 off: a glide reads the words as installed, as typing does (review-E-engine M2)
+    // habits off: a glide reads the words as installed, as typing does
     @Test
     fun withHabitsOffAGlideOffersNoWordOfTheUsers() {
         val engines = Engines(::loadCoarse, null, warmUps = inPlace)
@@ -197,11 +196,7 @@ class EnginesGlideTest : EnginesFixture() {
         .build()
         .toByteArray()
 
-    /**
-     * A table's glide blocks as its session does, through Engines' wiring: a block in pinyin hides
-     * none of the table's own (U-28 C12), a character blocked under one pinyin reading (好 hao) nor
-     * a word.
-     */
+    /** A table's glide blocks as its session does: a block in pinyin hides none of the table's own. */
     @Test
     fun aTableGlideKeepsTheTablesOwnBlockedInPinyin() {
         val engines = Engines({ if (it == "${InputMethodCatalog.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubiWord) else load(it) }, null, warmUps = inPlace)
@@ -215,7 +210,6 @@ class EnginesGlideTest : EnginesFixture() {
         assertEquals("你好", engines.glided(WUBI, "vbgf").candidates.first())
     }
 
-    // review L4: another reading's word of a table's glide blocked under its code, as the table blocks its own
     @Test
     fun aTableGlidesOtherReadingIsBlockedUnderItsCode() {
         val engines = Engines({ if (it == "${InputMethodCatalog.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubiWord) else load(it) }, MemoryFiles(), warmUps = inPlace)
@@ -247,10 +241,6 @@ class EnginesGlideTest : EnginesFixture() {
         .build()
         .toByteArray()
 
-    /**
-     * A word picked from a table is the table's to learn, through Engines' wiring: never counted for
-     * the user model's order (D28), which the glide reads.
-     */
     @Test
     fun aWordTheUserPickedInATableLeavesTheUserModelsOrder() {
         val engines = Engines({ if (it == "${InputMethodCatalog.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubiShared) else load(it) }, null, warmUps = inPlace)
@@ -264,16 +254,12 @@ class EnginesGlideTest : EnginesFixture() {
             assertEquals("拟", engines.onEvent(WUBI, EngineEvent.PICK, at).commit)
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
         }
-        // the table's own order by its picks under the code (U-28), the glide reading it; pinyin's as it was
+        // the table's own order by its picks under the code, the glide reading it; pinyin's as it was
         assertEquals("拟", engines.glided(WUBI, "wqiy").candidates.first())
         engines.onEvent(WUBI, EngineEvent.RESET, 0)
         assertEquals(pinyin, engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
     }
 
-    /**
-     * A table word blocked under its code, through Engines' wiring, leaves the glide too: the decoder
-     * kept from a glide before reads it anew (the blocks are part of its version).
-     */
     @Test
     fun aTableWordBlockedUnderItsCodeLeavesAGlideMadeBefore() {
         val engines = Engines({ if (it == "${InputMethodCatalog.TABLE_DIR}/wbx.data") ByteBuffer.wrap(wubiShared) else load(it) }, MemoryFiles(), warmUps = inPlace)

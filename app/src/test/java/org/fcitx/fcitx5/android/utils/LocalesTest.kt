@@ -21,7 +21,6 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.util.Locale
 
-/** The locales fcitx and the tables' `Name[...]` keys are looked up by. */
 @RunWith(RobolectricTestRunner::class)
 class LocalesTest {
 
@@ -58,8 +57,7 @@ class LocalesTest {
         assertEquals(listOf("zh_CN", "zh", "en_US", "en"), of("zh-CN", "en-US", "zh-CN"))
     }
 
-    // below Android 13 the change reads the app's own pick through the app: without its own
-    // application this passed only when an earlier test had made one
+    // below 13 the pick is read through the app: without its own application this passed only after another test
     @Test
     @Config(application = FcitxApplication::class)
     fun theLanguageIsTheBareLanguageOfTheFirstLocale() {
@@ -78,10 +76,10 @@ class LocalesTest {
     }
 
     @Test
-    // Android 10: the configuration's one locale, and the language picked, as each start reads them
+    // Android 10: one configuration locale plus the pick, as each start reads them
     @Config(sdk = [29], application = FcitxApplication::class)
     fun aLanguagePickedInTheAppComesFirstBeforeAndroid13() {
-        // the keyboard starts before any activity: appcompat does not know it yet, the app's preferences do
+        // the keyboard starts before any activity: only the app's preferences know it
         val picked = AppPrefs.getInstance().internal.appLanguage
         picked.setValue("zh-TW")
         try {
@@ -110,7 +108,7 @@ class LocalesTest {
         assertEquals(of(phone.toLanguageTag()).joinToString(":"), Locales.fcitxLocale)
     }
 
-    // Android 13 on (pinned: every test also runs at 29): the configuration has a pick only once the system sends it
+    // from 13 the configuration has a pick only once the system sends it
     @Test
     @Config(sdk = [35])
     fun aLanguageJustPickedComesFirstThoughTheConfigurationGetsItLater() {
@@ -124,7 +122,7 @@ class LocalesTest {
     @Config(sdk = [35])
     fun thePhonesLanguagePickedAgainIsReadFromTheSystemNotFromTheConfigurationNotYetSent() {
         val app = RuntimeEnvironment.getApplication()
-        // the configuration of the language picked before
+        // the configuration of the previous pick
         val stale = app.createConfigurationContext(Configuration().apply { setLocales(LocaleList.forLanguageTags("zh-TW")) })
         Locales.onLocalesPicked(stale)
         val system = app.getSystemService(LocaleManager::class.java).systemLocales
@@ -132,7 +130,7 @@ class LocalesTest {
         assertNotEquals("zh_TW", Locales.languageWithCountry)
     }
 
-    // picked(): below Android 13 appcompat's pick, else the app's copy; from 13 on the system's alone
+    // below 13 appcompat's pick, else the app's copy; from 13 the system's alone
     @Test
     @Config(sdk = [29], application = FcitxApplication::class)
     fun nothingPickedBeforeAndroid13IsThePhonesLanguages() {

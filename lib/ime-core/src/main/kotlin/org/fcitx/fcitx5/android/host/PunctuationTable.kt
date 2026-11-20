@@ -8,22 +8,12 @@ import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 
-/**
- * A punctuation map file, `punc.mb.<lang>`, as the punctuation addon reads and writes it
- * (`ca/punctuation/punctuation.cpp:75-173`): a line per key, the key (one character) then one or
- * two results, split at whitespace. The user's file, when there is one, replaces the built-in table
- * whole (`:410-430`); the editor saves the whole table.
- */
+/** `punc.mb.<lang>`: a key (one character) then one or two results per line; the user's file replaces the built-in whole. */
 object PunctuationTable {
 
     data class Entry(val key: String, val mapping: String, val altMapping: String = "")
 
-    /**
-     * [bytes] as `PunctuationProfile::load` reads them (`:107-128`): lines trimmed, cut at
-     * `FCITX_WHITESPACE` with empty pieces skipped; a line kept with two or three pieces of which at
-     * least one is valid UTF-8 (fcitx's `any_of`) and a key of one valid character. `#` is a key
-     * like any other. Duplicates are kept, in order (the first is the one typed).
-     */
+    /** As `PunctuationProfile::load`: trimmed, split at FCITX_WHITESPACE; kept with 2–3 pieces, one valid UTF-8, a one-character key. `#` is a key; duplicates kept in order. */
     fun parse(bytes: ByteArray): List<Entry> {
         val out = ArrayList<Entry>()
         var start = 0
@@ -55,15 +45,12 @@ object PunctuationTable {
         return Entry(key, text(1), if (tokens.size > 2) text(2) else "")
     }
 
-    /**
-     * [entries] as the editor's table is taken (`PunctuationProfile::set`, `:130-152`): an entry with
-     * no key or no first result, or a key not one character, left out.
-     */
+    /** As `PunctuationProfile::set`: no key, no first result, or a multi-character key left out. */
     fun accepted(entries: List<Entry>): List<Entry> = entries.filter {
         it.key.isNotEmpty() && it.mapping.isNotEmpty() && it.key.codePointCount(0, it.key.length) == 1
     }
 
-    /** [entries] as `PunctuationProfile::save` writes them (`:154-173`): `key result[ alt]`, a line each. */
+    /** As `PunctuationProfile::save`: `key result[ alt]`. */
     fun write(entries: List<Entry>): ByteArray = buildString {
         for (e in entries) {
             append(e.key).append(' ').append(e.mapping)

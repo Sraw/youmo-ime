@@ -12,10 +12,7 @@ abstract class PinyinDictionary {
         LibIME("dict"), Sougou("scel"), Text("txt");
 
         companion object {
-            /**
-             * Case-sensitive, as the files kept are named in lowercase, as the engine reads them: a
-             * name from outside goes through [org.fcitx.fcitx5.android.utils.withLowercaseExtension] first.
-             */
+            /** Case-sensitive: a name from outside goes through [org.fcitx.fcitx5.android.utils.withLowercaseExtension] first. */
             fun fromFileName(name: String): Type? =
                 when {
                     name.endsWith(".dict") -> LibIME
@@ -49,7 +46,6 @@ abstract class PinyinDictionary {
     override fun toString(): String = "${javaClass.simpleName}[$name -> ${file.path}]"
 
     companion object {
-        /** A dictionary's name, from its file's: what the extension (and `.disable`) leave. */
         fun nameOf(fileName: String): String =
             fileName.removeSuffix(".${TextDictionary.DISABLE}").substringBeforeLast('.')
 

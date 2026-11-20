@@ -20,10 +20,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-/**
- * The home page (a list of the pages) or one page: `am start -n …testbed/.MainActivity --es page <name>`.
- * Each page is a column of fields over a folding log of their events (EventLog).
- */
+/** The list of pages, or one page (`am start -n …testbed/.MainActivity --es page <name>`). */
 class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,8 +43,7 @@ class MainActivity : Activity() {
         show(pageOf(intent))
     }
 
-    // singleTask: `am start --es page` reaches the running instance (onNewIntent); a page opened
-    // here replaces the content in place, and back from a page is the list
+    // singleTask: `am start --es page` reaches the running instance, which replaces its content in place
     private fun open(name: String?) {
         intent = Intent(intent).putExtra(EXTRA_PAGE, name)
         show(name)

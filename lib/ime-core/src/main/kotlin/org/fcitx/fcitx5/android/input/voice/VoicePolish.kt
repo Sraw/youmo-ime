@@ -5,14 +5,9 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * The polish tagger's labels (060-voice-tagger.md; voice-eval's `tags.py`, which this follows
- * character for character): each character of the recognised text gets an op, kept, deleted or
- * written as one of [ops]' replacements, and an after, nothing or one of [afters]' marks written
- * after it, and a number class, none or one of [nums] ([ChineseNumbers.Kind]): adjacent characters of a
- * class not none are a number, written as the class most of them have ([ChineseNumbers.written]).
- * [ops], [afters] and [nums] are the model's own lists (its `polish-tagger.json`), in its order.
- *
- * Characters are code points, as the model's vocabulary and Python's strings have them.
+ * The polish tagger's labels, following voice-eval's `tags.py` character for character: per code point an op
+ * (keep, delete, or one of [ops]), an after mark ([afters]) and a number class ([nums]), in the model's
+ * `polish-tagger.json` order. Adjacent characters of one class form a number ([ChineseNumbers.written]).
  */
 class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums: List<String>) {
 
@@ -25,12 +20,8 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
     }
 
     /**
-     * What the op and after labels of each character of [text] (normed, [norm]) write; a kept
-     * character with [spaced] (the space [norm] took out between two English words, [spaces]) after
-     * an English letter or digit written with it. [num]: each character's number class (none if
-     * not given); a character [op] deletes is in no number, so one that went (a pause's 「，」 inside
-     * it) leaves the number whole. [ascii]: each character's [asciiMarks], a mark English wrote, kept
-     * so after an English letter (「Yes, I」; not 「iPhone，」, said in Chinese).
+     * What the labels of normed [text] write. A deleted character is in no number, so a pause's 「，」 inside one
+     * leaves it whole. [spaced] and [ascii] restore the space and ASCII mark English had (「Yes, I」).
      */
     fun apply(
         text: IntArray,
@@ -77,27 +68,16 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             }
         }
         flush()
-        // a pause's mark before another mark goes (。 written after a 、 the input had); 「……」 is one mark inside
+        // a pause's mark before another mark goes; 「……」 is one mark inside
         return PAUSE_BEFORE_MARK.replace(out, "").replace("…", "……")
     }
 
     /**
-     * The model's labels of [text] (normed) with what it does wrong in English undone, in place:
-     * an English letter is kept (its ops are Chinese words and a del, which took the second r of
-     * 「sorry」 as a stutter: 「I'm sory」 typed on a OnePlus 6T, 2026-11-06), and nothing is written
-     * after a full stop, question or exclamation mark (「I'm sorry.。」, 「。。」 read as an ellipsis). Applied by [VoicePolishStream] to what the model says; not in
-     * [apply], which is voice-eval's tags.py to the letter.
-     *
-     * Two more that hold whatever the model (060-pending-decisions L574, the owner's, 2026-11-10; N-kd3b broke
-     * both, and which edge sentences a retrain gets right varies run to run): a Chinese number's character
-     * ([NUMBER_CHARS]) is never deleted (「一点一点」 lost an 一), nor an ASCII digit (a hotword's or English
-     * output's, 「iPhone10」: the tagger's vocabulary has 1–8 alone, so it reads 0 and 9 as <unk>), and [num] (if
-     * given) marks nothing inside an idiom of [IDIOMS] (「十全十美」 written 10全十美). A number character's
-     * replacement still applies: the rule is no deletion, and an op writing another word for it (二 as 两, a
-     * misheard 十 as 是, 2个 as 两个) is the polish's.
-     *
-     * [op], [after] and [num] are changed in place. [lead] is the text just before [text] (a stream window's
-     * start cuts an idiom): an idiom found across it unmarks its characters in [text] only.
+     * Undoes, in place, what the model gets wrong: an English letter is always kept (its del took sorry's
+     * second r as a stutter) and nothing is written after 。？！. Also, whatever the model: a Chinese number's
+     * character ([NUMBER_CHARS]) or an ASCII digit is never deleted (the vocabulary reads 0 and 9 as <unk>), and
+     * nothing inside an [IDIOMS] entry is a number. Applied by [VoicePolishStream], not in [apply] (which is
+     * tags.py to the letter). [lead]: the text before [text], so an idiom cut by a window's start is found.
      */
     fun guarded(text: IntArray, op: IntArray, after: IntArray, num: IntArray? = null, lead: IntArray = IntArray(0)) {
         for (i in text.indices) {
@@ -118,25 +98,20 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
 
         private const val ASCII = 0x80
 
-        // norm's full width marks, and what English writes for each
         private val WIDE_MARKS = VoiceMarks.WIDE.codePoints().toArray()
         private const val ASCII_MARKS = VoiceMarks.ASCII
         private val STOPS = VoiceMarks.STOPS.codePoints().toArray()
 
-        // marks end a number though the tagger put them in one (numeval.py render); each of VoiceLive.ENDS
-        // among them (VoicePolishTest checks), so what is typed as it is said is never cut inside a number
+        // marks that end a number; each of VoiceLive.ENDS among them (VoicePolishTest), so typing never cuts inside one
         internal val NUMBER_BREAKS = VoiceMarks.NUMBER_BREAKS
 
-        /** the characters a Chinese number is said with, 点 among them (三点五): never deleted ([guarded]) */
+        /** Never deleted ([guarded]); 点 among them (三点五). */
         val NUMBER_CHARS = "一二两三四五六七八九十百千万亿零〇幺点".codePoints().toArray().toSet()
 
         /**
-         * Idioms and fixed words said with number characters that are no number (「十全十美」, not 10全十美):
-         * nothing in them is marked a number ([guarded]). A list here, not the pinyin dictionary: that is
-         * the native engine's, which the voice path has no reach to, and these are a closed set; four
-         * characters and more, so a real number beside one (「三个一心一意的人」) is not taken for it.
-         * voice-eval has no copy of it: `ime-eval voice-post --source tagged` scores the tagger's labels
-         * through this code, with `--guard off` to measure what the guards are worth. Each once (VoicePolishTest checks).
+         * Idioms said with number characters that are no number (「十全十美」): here, not the pinyin dictionary,
+         * which the voice path cannot reach. Four characters and more, so 「三个一心一意的人」 still has its number.
+         * Each once (VoicePolishTest checks).
          */
         val IDIOMS: List<String> = """
             十全十美 一心一意 七上八下 三心二意 一五一十 四面八方 五颜六色 乱七八糟 一模一样 万无一失 一干二净
@@ -151,10 +126,9 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
 
         private val IDIOM_CODES = IDIOMS.map { it.codePoints().toArray() }
 
-        /** the longest idiom's length: how far back of a stream window idioms are looked for */
+        /** How far back of a stream window idioms are looked for. */
         internal val IDIOM_LONGEST = IDIOM_CODES.maxOf { it.size }
 
-        // each place an idiom is in [text], as the indices it covers
         private fun idioms(text: IntArray): List<IntRange> {
             val found = ArrayList<IntRange>()
             for (idiom in IDIOM_CODES) for (i in 0..text.size - idiom.size) {
@@ -165,8 +139,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
 
         private val PAUSE_BEFORE_MARK = Regex("[${VoiceMarks.PAUSE_BEFORE}]+(?=[。？！…，])")
 
-        // a mark English wrote after an English letter (a number still pending in [run] is what it follows, not
-        // [out]'s last) as English writes it (「Yes, I know?」): norm made it full width
+        // a mark English wrote after an English letter, as English writes it: norm made it full width
         private fun kept(c: Int, run: CharSequence, out: CharSequence, english: Boolean): String {
             val afterLetter = (run.lastOrNull() ?: out.lastOrNull())?.let { it.code < ASCII && it.isLetter() } == true
             return if (english && afterLetter && c in WIDE_MARKS) ASCII_MARKS[WIDE_MARKS.indexOf(c)].toString()
@@ -179,11 +152,8 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
         private fun endsAWord(out: StringBuilder) = out.isNotEmpty() && (isAsciiWord(out.last().code) || out.last() in ASCII_MARKS)
 
         /**
-         * For each character of [norm]`(raw)`, whether [raw] had a space before it between two
-         * English words (letters or digits), or after an English word's mark (「Yes, I」): the tagger
-         * reads none, the text written keeps them. A space is what [norm] takes out (Kotlin's
-         * isWhitespace, NBSP among them, and U+0085).
-         * [norm] neither drops nor changes a letter or digit, so the k-th of them is the raw text's k-th.
+         * For each normed character, whether the raw text had a space before it between English words or after an
+         * English word's mark: the tagger reads none. [norm] keeps every letter and digit, so the k-th matches.
          */
         fun spaces(raw: String, normed: IntArray): BooleanArray {
             val wanted = ArrayList<Boolean>()
@@ -197,7 +167,6 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
                         gap = false
                     }
                     isSpace(c) -> gap = true
-                    // the word goes on through its mark: 「Yes, I」
                     lastWord && !gap && c < ASCII && c.toChar() in ASCII_MARKS -> Unit
                     else -> {
                         lastWord = false
@@ -209,11 +178,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
             return BooleanArray(normed.size) { i -> isAsciiWord(normed[i]) && wanted.getOrElse(k++) { false } }
         }
 
-        /**
-         * For each character of [norm]`(raw)`, whether it is a mark [raw] had in ASCII (「,」, not 「，」):
-         * [norm] makes both full width, [apply] writes this one back after an English letter. [norm]
-         * neither drops nor adds one of ，？！：； or their ASCII, so the k-th of them is the raw text's k-th.
-         */
+        /** For each normed character, whether it was an ASCII mark: [norm] widens both, [apply] writes this one back. */
         fun asciiMarks(raw: String, normed: IntArray): BooleanArray {
             val wasAscii = ArrayList<Boolean>()
             raw.codePoints().forEach { c ->
@@ -225,7 +190,7 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
 
         private fun isSpace(c: Int) = c == 0x85 || (Character.isBmpCodePoint(c) && c.toChar().isWhitespace())
 
-        /** [text] as the tagger reads it: no spaces, title marks or ·, 「……」 and ... as one 「…」, ASCII marks full width. */
+        /** As the tagger reads it: no spaces, title marks or ·, 「……」 and ... as one 「…」, ASCII marks full width. */
         fun norm(text: String): IntArray {
             val s = StringBuilder()
             for (c in text) if (!c.isWhitespace() && c !in DROPPED) s.append(c)
@@ -236,14 +201,13 @@ class VoicePolishTags(val ops: List<String>, val afters: List<String>, val nums:
     }
 }
 
-/** The model's inputs and outputs (voice-eval's `export_onnx.py`): ids `[CLS] text [SEP]`, logits a label each. */
+/** The model's I/O (voice-eval's `export_onnx.py`): ids `[CLS] text [SEP]`, logits a label each. */
 class VoicePolishVocab(vocab: List<String>, private val cls: Long, private val sep: Long, private val unk: Long) {
 
     private val ids = HashMap<Int, Long>(vocab.size * 2).apply {
         vocab.forEachIndexed { i, ch -> if (ch.codePointCount(0, ch.length) == 1) putIfAbsent(ch.codePointAt(0), i.toLong()) }
     }
 
-    /** The model's `ids` input for [text] (code points), a row. */
     fun encode(text: IntArray): LongArray =
         LongArray(text.size + 2) { i ->
             when (i) {
@@ -254,7 +218,7 @@ class VoicePolishVocab(vocab: List<String>, private val cls: Long, private val s
         }
 
     companion object {
-        /** Each of [n] rows' best label of [logits] (rows of [width], one after another): the model's `op` or `after`. */
+        /** Each of [n] rows' best label of [logits]. */
         fun best(logits: FloatArray, n: Int, width: Int): IntArray {
             require(logits.size == n * width) { "${logits.size} logits, not $n rows of $width" }
             return IntArray(n) { row ->
@@ -267,36 +231,25 @@ class VoicePolishVocab(vocab: List<String>, private val cls: Long, private val s
 }
 
 /**
- * The tagger run as streaming recognition hands text over (060-voice-tagger.md §4.1–4.2): each
- * time the press's text so far is tagged on its last [window] characters, and a character's labels
- * are kept for good ("frozen") once [freezeAfter] characters follow it, or once it leaves the
- * window; at the end, what is left is tagged with the rest and frozen. Frozen characters are always
- * a prefix of the text.
- *
- * The recogniser may write a character again differently (its best hypothesis changing): from where
- * the new text first differs the labels are dropped, frozen ones too, and tagged again.
+ * The tagger over streaming text: tagged on the last [window] characters, a character's labels frozen once
+ * [freezeAfter] follow it or it leaves the window. Where the recogniser rewrites text, labels from the first
+ * difference on are dropped, frozen ones too.
  */
 class VoicePolishStream(
     private val tags: VoicePolishTags,
     private val tagger: Tagger,
     private val freezeAfter: Int = FREEZE_AFTER,
     private val window: Int = WINDOW,
-    /** the labels [VoicePolishTags.guarded]; false only for voice-eval's goldens, which have none, and `ime-eval voice-post --guard off` */
+    /** False only for voice-eval's goldens and `ime-eval voice-post --guard off`. */
     private val guard: Boolean = true,
 ) {
-    /** The op, after and number labels of [text] (code points), a character each; the model run. */
     fun interface Tagger {
         fun labels(text: IntArray): Labels
     }
 
-    /** A label each of the characters tagged; [num] none (0) if not given. */
     class Labels(val op: IntArray, val after: IntArray, val num: IntArray = IntArray(op.size))
 
-    /**
-     * What to show: the frozen characters polished, then the rest of the text as recognised (normed).
-     * Not always where [finish] ends up word for word: a pause's mark at the frozen end before a mark
-     * in the rest goes only once both are polished, and the rest's 「…」 is 「……」 then.
-     */
+    /** The frozen part polished, then the rest as recognised (a pause's mark before a mark in the rest goes only at [finish]). */
     data class Shown(val polished: String, val rest: String)
 
     init {
@@ -307,25 +260,20 @@ class VoicePolishStream(
     private var spaced = BooleanArray(0)
     private var ascii = BooleanArray(0)
 
-    // the length of the prefix last tagged, and each of its characters' labels as last tagged
     private var done = 0
     private var seenOp = IntArray(0)
     private var seenAfter = IntArray(0)
     private var seenNum = IntArray(0)
 
-    // the frozen prefix's length; its labels are seen's
     private var frozen = 0
 
-    /** The press's text so far, [raw] as recognised; what to show. */
     fun update(raw: String): Shown {
         take(raw)
-        // a step at most window - freezeAfter long: the characters it pushes out of the window were tagged at
-        // the step before, with freezeAfter characters after them
+        // a step at most window - freezeAfter long: what it pushes out was tagged with freezeAfter after it
         while (done < text.size) step(minOf(text.size, done + window - freezeAfter), last = false)
         return shown()
     }
 
-    /** The press's text when it ends, [raw] as recognised: polished whole. */
     fun finish(raw: String): String {
         take(raw)
         if (text.isEmpty()) return ""
@@ -334,11 +282,7 @@ class VoicePolishStream(
         return tags.apply(text, seenOp.copyOf(text.size), seenAfter.copyOf(text.size), spaced, seenNum.copyOf(text.size), ascii)
     }
 
-    /**
-     * The first [count] characters of the text last [update]d, no more than are frozen, polished:
-     * what they write whatever is said after them, but for a pause's mark at its very end, which
-     * a mark coming next takes away ([VoicePolishTags.apply]).
-     */
+    /** No more than are frozen; a pause's mark at its very end may still go ([VoicePolishTags.apply]). */
     fun frozenPrefix(count: Int): String {
         val n = minOf(count, frozen)
         return tags.apply(text.copyOf(n), seenOp.copyOf(n), seenAfter.copyOf(n), spaced.copyOf(n), seenNum.copyOf(n), ascii.copyOf(n))
@@ -356,7 +300,6 @@ class VoicePolishStream(
         val wasAscii = ascii
         spaced = VoicePolishTags.spaces(raw, next)
         ascii = VoicePolishTags.asciiMarks(raw, next)
-        // the polished prefix shown holds while its characters, their spaces and marks' widths do
         if (shownCut > frozen || (0 until shownCut).any { spaced[it] != wasSpaced[it] || ascii[it] != wasAscii[it] }) shownCut = -1
         if (seenOp.size < text.size) {
             seenOp = seenOp.copyOf(text.size)
@@ -367,7 +310,6 @@ class VoicePolishStream(
 
     private fun step(end: Int, last: Boolean) {
         val start = maxOf(0, end - window)
-        // left the window before freezeAfter characters followed: frozen as last tagged
         frozen = maxOf(frozen, start)
         val part = text.copyOfRange(start, end)
         val labels = tagger.labels(part)
@@ -375,9 +317,7 @@ class VoicePolishStream(
         val after = labels.after
         val num = labels.num
         check(op.size == end - start && after.size == end - start && num.size == end - start) { "a label each of ${end - start} characters" }
-        // an idiom the window's start cuts is looked for with what is before it
         if (guard) tags.guarded(part, op, after, num, text.copyOfRange(maxOf(0, start - (VoicePolishTags.IDIOM_LONGEST - 1)), start))
-        // a frozen character keeps its labels, though tagged again in the window
         op.copyInto(seenOp, frozen, frozen - start, op.size)
         after.copyInto(seenAfter, frozen, frozen - start, after.size)
         num.copyInto(seenNum, frozen, frozen - start, num.size)
@@ -385,7 +325,7 @@ class VoicePolishStream(
         done = end
     }
 
-    // the frozen prefix last polished for shown, and its length: polished again only when it changed
+    // polished again only when the frozen prefix changed
     private var shownCut = -1
     private var shownPolished = ""
 
@@ -407,10 +347,8 @@ class VoicePolishStream(
     }
 
     companion object {
-        /** K: 16 characters after a character before its labels are kept (§4.1: no worse than tagging whole) */
         const val FREEZE_AFTER = 16
 
-        /** the characters tagged at a time, which bounds a step's cost (§4.1: 64 tag as well as the whole prefix) */
         const val WINDOW = 64
     }
 }

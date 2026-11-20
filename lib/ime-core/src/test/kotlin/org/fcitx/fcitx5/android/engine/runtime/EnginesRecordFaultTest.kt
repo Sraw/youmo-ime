@@ -28,23 +28,18 @@ import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 
-/**
- * What the engines do when the disk refuses the learning record a write (review R11 F2743), and
- * that what is learned in memory alone is told, whatever the cause (061-userdict-loss).
- */
+/** What the engines do when the disk refuses the learning record a write. */
 class EnginesRecordFaultTest : EnginesFixture() {
 
     @get:Rule
     val folder = TemporaryFolder()
 
-    // review R11 F2743: an append the disk refuses is reported once; the act is done, and kept in memory for the run
     @Test
     fun anAppendRefusedIsReportedOnceAndTheActKeptInMemory() {
         val dir = folder.newFolder("engine")
         val errors = ArrayList<IOException>()
         val disk = RefusingDisk()
         Engines(::load, JvmFiles(dir), onError = { errors += it }, openAppend = disk::open).use { engines ->
-            // 拟 used once, written: a word learned there, to delete
             engines.type(InputMethodCatalog.PINYIN, "ni")
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 1)
             assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
@@ -52,7 +47,6 @@ class EnginesRecordFaultTest : EnginesFixture() {
             disk.refuseNextWrite()
             assertTrue(engines.learning(InputMethodCatalog.PINYIN, LearningOp.Delete(1, "拟")) is LearningResult.Done)
             assertEquals(1, errors.size)
-            // forgotten for the run all the same
             assertFalse(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, 1))
             disk.refuseNextWrite()
             assertTrue(engines.learning(InputMethodCatalog.PINYIN, LearningOp.Pin(1, "拟")) is LearningResult.Done)
@@ -62,11 +56,6 @@ class EnginesRecordFaultTest : EnginesFixture() {
         }
     }
 
-    /**
-     * 0.5.2's fresh install had no user directory: the record did not open (ENOENT) and what was learned
-     * lived in memory for days, gone with the process, nothing said. Learned in memory alone, for any
-     * cause, it is told, once, as the first word learned is not kept; nothing on a record that keeps it.
-     */
     @Test
     fun whatIsLearnedButNotKeptIsToldOnceWhateverTheCause() = assertRows(
         listOf<Pair<String, () -> UserFiles?>>(
@@ -110,8 +99,7 @@ class EnginesRecordFaultTest : EnginesFixture() {
         assertEquals("拟", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, at).commit)
     }
 
-    // R25 decode-1 rest: a write refused and the record not opened again: learning stops saving, which the
-    // overview says (the panels' "not saving" line); saving before
+    // the panels' "not saving" line
     @Uat("WD-46")
     @Test
     fun aRecordThatStoppedTakingWritesIsNotSaving() {
@@ -125,21 +113,18 @@ class EnginesRecordFaultTest : EnginesFixture() {
             pick(engines)
             assertEquals(2, errors.size)
             assertFalse(overview(engines).saving)
-            // and takes no rewrite till a new start, which the app tells from a full disk by (R25 F8037)
+            // and takes no rewrite till a new start, which the app tells from a full disk by
             assertEquals(LearningResult.Saving(saving = false, rewrites = false), engines.learning(InputMethodCatalog.PINYIN, LearningOp.Saving))
         }
     }
 
-    // R25 F8050: storage full, a forget's own write is refused: forgotten in memory alone, with nothing in the file
-    // to take out. Its undo takes it back in memory and says done, as any undo; it said 「已经撤销不了了」, the
-    // word still deleted
+    // its undo takes it back in memory and says done
     @Uat("WD-46")
     @Test
     fun aForgetTheDiskRefusedIsTakenBackInMemory() {
         val errors = ArrayList<IOException>()
         val disk = RefusingDisk()
         Engines(::load, JvmFiles(folder.newFolder()), onError = { errors += it }, openAppend = disk::open).use { engines ->
-            // 拟 used once, written: a word learned there, to delete
             pick(engines)
             assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
             disk.full = true
@@ -149,19 +134,13 @@ class EnginesRecordFaultTest : EnginesFixture() {
             val said = errors.size
             assertEquals(LearningResult.Done(), engines.learning(InputMethodCatalog.PINYIN, LearningOp.Undo(done.undo)))
             assertEquals("nothing rewritten, nothing more said of the disk", said, errors.size)
-            // learned again, as before the forget
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
             assertTrue(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, 1))
-            // taken back once
             assertEquals(LearningResult.Unavailable, engines.learning(InputMethodCatalog.PINYIN, LearningOp.Undo(done.undo)))
         }
     }
 
-    // R25 F8079: a delete whose pressed candidate is refused after the one shown alike was forgotten takes that back
-    // at once (LearningOps.acted). Storage full, the forget is in memory alone and is taken back there only where
-    // nothing else is unwritten (R25 F8066); with a word learned in memory since the disk filled, the one alike
-    // stays deleted, not done said all the same, rather than what was learned since dropped to bring it back
     @Uat("WD-46")
     @Test
     fun aDeleteRefusedAfterTheOneAlikeTakesItBackOnlyWhereNothingElseIsUnwritten() = assertRows(
@@ -202,23 +181,19 @@ class EnginesRecordFaultTest : EnginesFixture() {
         }
     }
 
-    // R25 F8038: a forget on disk is taken back by the record rewritten without it; a rewrite that fails is told as
-    // failed (the chip then says 「没撤销成」, its own text). It was told as an act no longer the last,
-    // 「已经撤销不了了」. Here the rewrite's file cannot be made, the record still open (as with no room for it)
+    // the chip says 「没撤销成」, not that the act is no longer the last
     @Uat("WD-46")
     @Test
     fun aForgetOnDiskWhoseRewriteFailsSaysItFailed() {
         val errors = ArrayList<IOException>()
         val dir = folder.newFolder()
         Engines(::load, JvmFiles(dir), onError = { errors += it }).use { engines ->
-            // 拟 used once, written: a word learned there, to delete
             pick(engines)
             assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
             val done = engines.learning(InputMethodCatalog.PINYIN, LearningOp.Delete(1, "拟")) as LearningResult.Done
             assertTrue(done.undo != LearningResult.NO_UNDO)
             assertFalse(Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, 1))
-            // where a rewrite is written before it is renamed over the record (RecordStore's ".compacting"): a
-            // directory there, not empty, is neither written as a file nor deleted
+            // a directory where the rewrite is written (".compacting") makes it fail
             File(File(dir, LearnLog.FILE + ".compacting"), "in the way").apply { parentFile.mkdirs() }.writeText("")
             val file = File(dir, LearnLog.FILE).readBytes()
             val said = errors.size
@@ -226,18 +201,13 @@ class EnginesRecordFaultTest : EnginesFixture() {
             assertEquals("said once", said + 1, errors.size)
             assertFalse("still forgotten", Offer.FORGET in engines.offers(InputMethodCatalog.PINYIN, 1))
             assertTrue(file.contentEquals(File(dir, LearnLog.FILE).readBytes()))
-            // the record itself as it was: saving, and taking a rewrite
             assertEquals(LearningResult.Saving(saving = true, rewrites = true), engines.learning(InputMethodCatalog.PINYIN, LearningOp.Saving))
-            // no longer the last act: that, not a failure, from then on
             assertEquals(LearningResult.Unavailable, engines.learning(InputMethodCatalog.PINYIN, LearningOp.Undo(done.undo)))
             assertEquals(said + 1, errors.size)
         }
     }
 
-    // R25 F8018: such a record's file still holds what was typed before the write refused, and is not rewritten:
-    // a clear says it failed. It said cleared (清掉最近) or unavailable (清空学到的), the file as it was either way.
-    // R25 F8021: and nothing else is cleared: a clear deletes the automatic backups that hold what it clears and
-    // the copy for 退回恢复前 before its rewrite, and did so before this one sure to fail, at every try
+    // the clear fails and clears nothing else, backups and 退回恢复前's copy included
     @Uat("WD-46")
     @Test
     fun aClearOfARecordThatStoppedTakingWritesSaysItFailed() = assertRows(
@@ -249,7 +219,6 @@ class EnginesRecordFaultTest : EnginesFixture() {
         // an install with an id, its backups written as they come due (on the first typing day), not on a thread
         Engines(::load, JvmFiles(dir), installFile = MemoryFiles().file("learn.install"), background = { it.run() }, openAppend = disk::open).use { engines ->
             pick(engines)
-            // the phone's own copy restored: a copy for 退回恢复前
             val copy = checkNotNull(backups(engines, BackupOp.Copy).bytes)
             assertTrue("$clear", backups(engines, BackupOp.Restore(copy)).ok)
             val kept = backups(engines, BackupOp.Kept)
@@ -270,9 +239,7 @@ class EnginesRecordFaultTest : EnginesFixture() {
 
     private fun backups(engines: Engines, op: BackupOp) = engines.learning(null, op) as BackupResult
 
-    // R25 F7819: storage full, as it happens: the record opens again after the write refused and the next
-    // writes are refused too. Not saving for as long as that lasts, and saving again, with no restart, once
-    // a word is written
+    // not saving while the disk stays full, saving again once a word is written, no restart
     @Uat("WD-46")
     @Test
     fun aRecordWhoseWritesKeepFailingIsNotSavingUntilOneIsWritten() {
@@ -284,8 +251,6 @@ class EnginesRecordFaultTest : EnginesFixture() {
             assertEquals(LearningResult.Saving(true), engines.learning(InputMethodCatalog.PINYIN, LearningOp.Saving))
             disk.full = true
             pick(engines)
-            // the panel's question alone says the same (R25 F7897)
-            // not saving, but a rewrite still goes through once there is room, no restart needed (R25 F8037)
             assertEquals(LearningResult.Saving(saving = false, rewrites = true), engines.learning(InputMethodCatalog.PINYIN, LearningOp.Saving))
             // the write alone refused: the file was cut back and opened again
             assertEquals(listOf("full"), errors.map { it.message }.distinct())
@@ -298,11 +263,6 @@ class EnginesRecordFaultTest : EnginesFixture() {
         }
     }
 
-    // R25 F7953: a clear rewrote the record whole after the write refused: saving again from then, not only
-    // from the next word learned (none is, with habits off or in a field that learns nothing). R25 F7964: a
-    // 清掉最近 rewrites it only where the file holds records of that time; one that finds none there (what
-    // was typed then was refused, in memory alone) clears that from memory and leaves the file, so it is
-    // not saving till a write next goes through
     @Uat("WD-46")
     @Test
     fun aRecordAWriteWasRefusedIsSavingAgainOnceAClearRewroteIt() = assertRows(
@@ -341,12 +301,7 @@ class EnginesRecordFaultTest : EnginesFixture() {
         engines.learning(InputMethodCatalog.PINYIN, LearningOp.Overview) as LearningResult.Overview
 }
 
-/**
- * The learning record's disk in a test: the next write after [refuseNextWrite] throws, as a full disk would,
- * and the store recovers as from one (opens the file again); with [refuseOpens], that open throws too.
- * While [full], every write throws and the file opens, as on a disk with no room left. The record's file
- * handed over as [file] has its rewrites refused then too, and does not read while [unreadable].
- */
+/** The record's disk in a test: [refuseNextWrite], [refuseOpens], [full] and [unreadable] fail it as a phone's disk would. */
 internal class RefusingDisk {
     private var refuseNext = false
     var refuseOpens = false
@@ -376,10 +331,7 @@ internal class RefusingDisk {
         }
     }
 
-    /**
-     * [real] on this disk: while [full], a file made anew is refused too, as its appends are, so a rewrite of it
-     * (written beside it, then renamed over it) throws, the file as it was.
-     */
+    /** While [full], a file made anew is refused too, so a rewrite of it throws. */
     fun file(real: LogFile): LogFile = OnDisk(real)
 
     private inner class OnDisk(val real: LogFile) : LogFile by real {
@@ -389,7 +341,6 @@ internal class RefusingDisk {
 
         override fun beside(suffix: String): LogFile = OnDisk(real.beside(suffix))
 
-        // the files themselves, which a rename asks for
         override fun renameTo(dest: LogFile) = real.renameTo(if (dest is OnDisk) dest.real else dest)
     }
 

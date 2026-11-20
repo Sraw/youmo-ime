@@ -7,19 +7,13 @@ package org.fcitx.fcitx5.android.input.handwriting
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * The handwriting pad's strokes and when they are read: each stroke ended asks for the character
- * being written (a piece) to be read ([Read]); the pen up for [finishMillis] ends the piece
- * ([finish]), its ink wiped while its reading stays on show; the next stroke starts a new piece.
- * Backspace takes the last stroke back ([undo]). Times in milliseconds, points in any one unit.
- *
- * Pieces are numbered, later ones higher, across pads: what a reading does to what is shown is
- * the engine's to decide, in order with the keys (HandwritingSession). The engine says which
- * pieces it ended (a reading picked, space, the cursor moved): the pad wipes the one being written
- * if it is among them ([ended]).
+ * Handwriting strokes: each stroke asks for the piece to be read; the pen up for [finishMillis] ends the piece (ink
+ * wiped, reading kept). Pieces are numbered across pads; the engine says which it ended, and the pad wipes the
+ * current one if among them ([ended]).
  */
 class InkPad {
 
-    /** Read [strokes], of [piece]; [id] numbers the reads asked for, later ones higher. */
+    /** [id]: later reads higher. */
     class Read(val strokes: List<FloatArray>, val piece: Int, val id: Int)
 
     private val done = ArrayList<FloatArray>()
@@ -27,39 +21,33 @@ class InkPad {
     private var lastUp = 0L
     private var reads = 0
 
-    /** How long the pen stays up before the piece counts as done: the user's to set, the hand's pace. */
+    /** The user's to set, the hand's pace. */
     var finishMillis = FINISH_MILLIS
         set(value) {
             require(value > 0) { "finish after $value ms" }
             field = value
         }
 
-    /** The piece being written. */
     var piece = pieces.getAndIncrement()
         private set
 
-    /** The strokes of the piece being written, the one under the pen last. */
+    /** The one under the pen last. */
     val strokes: List<FloatArray> get() = done + listOfNotNull(current?.toArray())
 
-    /** The finished ones of [strokes], for drawing: not copied, so not to be kept. */
+    /** Not copied, so not to be kept. */
     val finished: List<FloatArray> get() = done
 
-    /** Counts the changes to [finished]: what was drawn of them holds while this is the same. */
+    /** What was drawn of [finished] holds while this is the same. */
     var edits = 0
         private set
 
-    /** Whether a stroke is being drawn. */
     val drawing: Boolean get() = current != null
 
-    /**
-     * The stroke under the pen, for drawing each frame: [each] given its x, y pairs as the first n
-     * values of xy, not copied, so not to be kept; not called where none is drawn.
-     */
+    /** [each] gets x, y pairs as the first n values of xy, not copied; not called where none is drawn. */
     fun underPen(each: (xy: FloatArray, n: Int) -> Unit) {
         current?.let { each(it.xy, it.n) }
     }
 
-    /** The pen down at [x], [y]: a stroke starts. */
     fun down(x: Float, y: Float) {
         current = Points().apply { add(x, y) }
     }
@@ -68,7 +56,6 @@ class InkPad {
         current?.add(x, y)
     }
 
-    /** The pen up at [time]: the stroke ends, the piece to be read. */
     fun up(time: Long): Read? {
         val stroke = current ?: return null
         current = null
@@ -78,23 +65,19 @@ class InkPad {
         return read()
     }
 
-    /** The stroke drawn given up (the touch cancelled). */
+    /** The touch cancelled. */
     fun cancel() {
         current = null
     }
 
-    /**
-     * At [time], whether the piece written is now done: the pen up long enough since the last
-     * stroke, or since one was taken back ([undo]). Its ink is then wiped, its reading left on
-     * show, and the next stroke starts another.
-     */
+    /** The pen up long enough since the last stroke or [undo]: ink wiped, reading left, the next stroke another piece. */
     fun finish(time: Long): Boolean {
         if (done.isEmpty() || current != null || time - lastUp < finishMillis) return false
         next()
         return true
     }
 
-    /** The piece ended as it is (the pad hidden): wiped, the next stroke another's. */
+    /** The pad hidden: wiped, the next stroke another's. */
     fun next() {
         done.clear()
         edits++
@@ -102,18 +85,14 @@ class InkPad {
         piece = pieces.getAndIncrement()
     }
 
-    /** The engine ended the pieces up to [latest]: whether the one being written was among them, now wiped. */
+    /** Whether the one being written was among them, now wiped. */
     fun ended(latest: Int): Boolean {
         if (latest < piece) return false
         next()
         return true
     }
 
-    /**
-     * Backspace at [time]: the last stroke taken back and what is left read, nothing left read as
-     * nothing; null where the pad has no stroke to take back, backspace then the engine's. The
-     * pause that ends the piece counts from [time]: the stroke taken back is often written again.
-     */
+    /** Null with no stroke, backspace then the engine's; the finishing pause counts from [time] (the stroke is often rewritten). */
     fun undo(time: Long): Read? {
         if (current != null || done.isEmpty()) return null
         done.removeAt(done.size - 1)
@@ -140,7 +119,7 @@ class InkPad {
     }
 
     companion object {
-        /** How long the pen stays up before the character written counts as done, unless set: [finishMillis]. */
+        /** Unless set: [finishMillis]. */
         const val FINISH_MILLIS = 700L
 
         private const val INITIAL = 64

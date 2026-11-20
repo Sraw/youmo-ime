@@ -49,12 +49,11 @@ class VoiceTextTest {
         check("Huh, really?", "Huh, really?")
         check("哎呦喂。", "哎呦喂。")
         check("hummus", "hummus")
-        // F4272: one letter past LONGEST_SOUND is a word, not a hum
+        // one letter past LONGEST_SOUND is a word, not a hum
         check("m".repeat(65), "m".repeat(65))
     }
 
-    // F3810: one `(sound pause*)+` regex split "mmmm…m okay" 2^n ways before failing, which hangs
-    // rather than fails; a generous timeout, not a wall-clock bound that a loaded CI can miss
+    // one `(sound pause*)+` regex split "mmmm…m okay" 2^n ways (a hang); a generous timeout, not a wall-clock bound
     @Test(timeout = 2_000)
     fun aLongHumBeforeAWordIsCheckedFast() {
         // typed whole: "okay" is no sound

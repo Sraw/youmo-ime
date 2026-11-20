@@ -8,12 +8,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * An image as ARGB ints, not premultiplied, row by row: what the skin converter ([SkinConverter]) cuts from a
- * skin's atlases, measures (the opaque part of a key, the colour of a letter drawn as a picture) and draws (the
- * board under the bar and the keys, a nine-patch at its size). The platform decodes a skin's files into it
- * ([SkinImage]) and encodes it as PNG; nothing here reads or writes a file format.
- */
+/** An image as ARGB ints, not premultiplied, row by row; the platform decodes and encodes, nothing here reads a file format. */
 class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(width * height)) {
     init {
         require(width > 0 && height > 0 && argb.size == width * height) { "$width×$height: ${argb.size} pixels" }
@@ -21,21 +16,18 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
 
     operator fun get(x: Int, y: Int): Int = argb[y * width + x]
 
-    /** The part at [x], [y] of [w]×[h] within this one (cut to it), or null where nothing of it is. */
     fun crop(x: Int, y: Int, w: Int, h: Int): Pixels? {
         val l = max(0, x)
         val t = max(0, y)
         val r = min(width, x.toLong().plus(w).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt())
         val b = min(height, y.toLong().plus(h).coerceIn(0L, Int.MAX_VALUE.toLong()).toInt())
         if (r <= l || b <= t) return null
-        // l ≥ 0 and r ≤ width: all of it
         if (r - l == width && b - t == height) return this
         val out = Pixels(r - l, b - t)
         for (row in t until b) argb.copyInto(out.argb, (row - t) * out.width, row * width + l, row * width + r)
         return out
     }
 
-    /** The smallest box holding every pixel not wholly transparent (left, top, right, bottom), or null where none is. */
     fun opaqueBounds(): Box? {
         var l = width
         var t = height
@@ -54,13 +46,9 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         return if (r < 0) null else Box(l, t, r + 1, b + 1)
     }
 
-    /** Whether some pixel is not wholly opaque. */
     fun translucent(): Boolean = argb.any { it ushr ALPHA_SHIFT != OPAQUE }
 
-    /**
-     * The mean colour, each pixel counted by its alpha; its alpha the mean alpha where [keepAlpha] and that is
-     * below [NEARLY_OPAQUE], else opaque. Null where all is transparent. At most [SAMPLES]² pixels are read.
-     */
+    /** Each pixel counted by its alpha; at most [SAMPLES]² pixels are read. */
     fun average(keepAlpha: Boolean = true): Int? {
         var r = 0L
         var g = 0L
@@ -81,7 +69,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         return if (!keepAlpha || alpha >= NEARLY_OPAQUE) rgb else (rgb and RGB) or (alpha shl ALPHA_SHIFT)
     }
 
-    /** The colour of a glyph drawn as a picture (a letter, an icon): the mean of its fairly opaque pixels; null where none is. */
     fun glyphColor(): Int? {
         var r = 0L
         var g = 0L
@@ -99,7 +86,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         return argbOf(OPAQUE, (r.toDouble() / n).roundToInt(), (g.toDouble() / n).roundToInt(), (b.toDouble() / n).roundToInt())
     }
 
-    // every pixel, or an even grid of SAMPLES² of them in a large image
     private inline fun sample(each: (Int) -> Unit) {
         val sx = max(1, width / SAMPLES)
         val sy = max(1, height / SAMPLES)
@@ -114,21 +100,14 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         }
     }
 
-    /**
-     * This at [w]×[h], each new pixel the area it covers of this one averaged (alpha-weighted, so a transparent
-     * pixel's colour does not bleed): a shrink is smooth, a stretch of a flat band stays flat.
-     */
+    /** Alpha-weighted, so a transparent pixel's colour does not bleed. */
     fun resized(w: Int, h: Int): Pixels {
         if (w == width && h == height) return this
         val rows = resample(argb, width, height, w, horizontal = true)
         return Pixels(w, h, resample(rows, w, height, h, horizontal = false))
     }
 
-    /**
-     * This drawn as a nine-patch at [w]×[h]: the corners of [insets] kept as they are, the edges stretched along,
-     * the middle both ways. Insets past half the size are cut to half; insets that leave no middle of this one along
-     * an axis (a skin's inner rect outside its source) are none along it, so nothing is left undrawn.
-     */
+    /** Insets that leave no middle along an axis (a skin's inner rect outside its source) are none along it, so nothing is left undrawn. */
     fun nine(insets: Box?, w: Int, h: Int): Pixels {
         val given = insets ?: Box(0, 0, 0, 0)
         val across = given.left.toLong() + given.right < width
@@ -139,7 +118,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         val t = min(min(ins.top, h / 2), height)
         val b = min(min(ins.bottom, h / 2), height - t)
         val out = Pixels(w, h)
-        // each band as (source from, source to, drawn from, drawn to)
         val xs = listOf(intArrayOf(0, l, 0, l), intArrayOf(l, width - r, l, w - r), intArrayOf(width - r, width, w - r, w))
         val ys = listOf(intArrayOf(0, t, 0, t), intArrayOf(t, height - b, t, h - b), intArrayOf(height - b, height, h - b, h))
         for (y in ys.filter { it[1] > it[0] && it[3] > it[2] }) {
@@ -151,7 +129,7 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         return out
     }
 
-    /** [src]'s pixels written over this one's at [x], [y] (replaced, not blended). */
+    /** Replaced, not blended. */
     fun paste(src: Pixels, x: Int, y: Int) {
         val from = max(0, -x)
         val to = min(src.width, width - x)
@@ -161,7 +139,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         }
     }
 
-    /** [src] drawn over this one at [x], [y] (source over: its transparent parts show this one). */
     fun over(src: Pixels, x: Int, y: Int) {
         for (row in max(0, -y) until min(src.height, height - y)) {
             for (col in max(0, -x) until min(src.width, width - x)) {
@@ -171,7 +148,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         }
     }
 
-    /** A box of an image: [left], [top] in it, [right], [bottom] past it. */
     data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
         val width get() = right - left
         val height get() = bottom - top
@@ -191,10 +167,8 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
         fun argbOf(a: Int, r: Int, g: Int, b: Int): Int =
             (a.coerceIn(0, BYTE) shl ALPHA_SHIFT) or (r.coerceIn(0, BYTE) shl RED) or (g.coerceIn(0, BYTE) shl GREEN) or b.coerceIn(0, BYTE)
 
-        /** [w]×[h] of the one colour [argb]. */
         fun filled(w: Int, h: Int, argb: Int) = Pixels(w, h, IntArray(w * h) { argb })
 
-        // source over, not premultiplied
         private fun blend(s: Int, d: Int): Int {
             val sa = s ushr ALPHA_SHIFT
             if (sa == BYTE) return s
@@ -206,7 +180,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
             return argbOf(outA, ch(RED), ch(GREEN), ch(0))
         }
 
-        // one axis resampled by area: each new pixel the weighted mean of the old ones it covers, alpha-weighted
         private fun resample(src: IntArray, w: Int, h: Int, n: Int, horizontal: Boolean): IntArray {
             val old = if (horizontal) w else h
             val lines = if (horizontal) h else w
@@ -223,7 +196,6 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
             return out
         }
 
-        // the alpha-weighted mean of the pixels [a0]–[a1] of a line of [old], each by how much of it is covered
         private fun covered(a0: Double, a1: Double, old: Int, at: (Int) -> Int): Int {
             var wa = 0.0
             var wr = 0.0
@@ -247,25 +219,22 @@ class Pixels(val width: Int, val height: Int, val argb: IntArray = IntArray(widt
     }
 }
 
-/** A decoded image of a skin, its pixels read a part at a time (an atlas of several megapixels is not copied whole). */
+/** Read a part at a time: an atlas of several megapixels is not copied whole. */
 interface SkinImage {
     val width: Int
     val height: Int
 
-    /** The pixels at [x], [y] of [w]×[h], all within the image. */
     fun pixels(x: Int, y: Int, w: Int, h: Int): Pixels
 }
 
-/** What the platform does for the converter: decode an image, read text in a legacy encoding. */
 interface SkinPlatform {
-    /** [bytes] decoded, or null: not an image it decodes, or past [SkinLimits.MAX_IMAGE_PIXELS] (checked before decoding). */
+    /** Past [SkinLimits.MAX_IMAGE_PIXELS] is checked before decoding. */
     fun image(bytes: ByteArray): SkinImage?
 
-    /** Text neither UTF-8 nor UTF-16 with a byte-order mark: GB18030, as old Chinese skins are written. */
+    /** GB18030, as old Chinese skins are written. */
     fun legacyText(bytes: ByteArray): String
 }
 
-/** [Pixels] as a [SkinImage]: a platform's decoder for tests, and an image drawn here. */
 class PixelsImage(private val p: Pixels) : SkinImage {
     override val width get() = p.width
     override val height get() = p.height

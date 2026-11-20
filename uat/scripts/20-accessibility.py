@@ -152,12 +152,8 @@ def ax12(d):
     return explore(d, box=box, skip=lambda n: n.b in before, want=["屏蔽"], least=2)
 
 
-case("AX-13", needs="jvm:KeyHandwritingUatTest.notInAPasswordFieldNorEnglishNorQuickInputNorWhileTalkBackExplores")(lambda d: None)
-
-
 case("AX-17", needs="jvm:RareCharsPageUatTest.thePageHoldsBackAndLetsThrough、RareCharsTouchTest.aLongPressWithNoFingerIsNoDrag、"
               "RareCharsTouchTest.newLettersAreAtTheirTop")(lambda d: None)
-case("AX-14", needs="jvm:ShiftKeyNameTest.theShiftKeyIsNamedOnItsCapAndToAScreenReader")(lambda d: None)
 
 
 case("AX-15", needs="manual:TalkBack 读框里的拼音（设计页 M16）：手工听")(lambda d: None)
@@ -167,8 +163,6 @@ case("AX-18", needs="jvm:HandwritingUatTest.theCandidateBarsButtonIsLitWhileHand
               "ToolButtonNodeTest.aButtonNamedForItsStateIsNoCheckableNode")(lambda d: None)
 case("AX-19", needs="manual:TalkBack 读竖屏、横屏键盘样式两项，单手、悬浮按当时的方向读开关，斜箭头读「退出单手模式」，双击单手后焦点在单手按钮上：真机手工听")(lambda d: None)
 
-
-case("AX-20", needs="jvm:StrokePageUatTest.aScreenReadersTouchExplorationDrawsNone")(lambda d: None)
 
 case("AX-21", needs="jvm:GroupCardTest.a card read body then strip, the next card after this strip、"
                "ChoiceCardTest.the body is one node read as a radio button named by the keyboard、"

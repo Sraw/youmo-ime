@@ -12,20 +12,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Decoding `EditorInfo`'s bit fields. Each bit is read out of a field that packs several
- * others, so each case sets a neighbour too, to catch a mask that is too wide or too narrow.
- *
- * Plain JUnit, no Robolectric: `EditorInfo` is only a bag of public fields, and constructing
- * one does not reach any stubbed framework method.
- */
+/** Each bit is read out of a packed field, so each case sets a neighbour too: a mask too wide or narrow shows. */
 class EditorInfoTraitsTest {
 
     private fun info(block: EditorInfo.() -> Unit) = EditorInfo().apply(block).toEditorTraits()
 
     @Test
     fun aFieldOfThisAppIsSensitiveWhenThePackageIsGiven() {
-        // F2330/F2420: the arrow policy reads the same flags the service tells fcitx
         val own = EditorInfo().apply { inputType = InputType.TYPE_CLASS_TEXT; packageName = "io.github.sraw.youmo" }
         assertTrue(own.toEditorTraits("io.github.sraw.youmo").isSensitive)
         assertFalse(own.toEditorTraits("other.app").isSensitive)
@@ -39,15 +32,12 @@ class EditorInfoTraitsTest {
 
     @Test
     fun aMessageFieldSendsAndTakesLinesAsItSays() {
-        // what VoiceEnd reads to tell a chat from a one-line field
         val chat = info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; imeOptions = EditorInfo.IME_ACTION_SEND }
         assertTrue(chat.sends)
         assertTrue(chat.isMultiLine)
         assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE }.isMultiLine)
         assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE }.isShortMessage)
-        // its own labelled action, a send
         assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT; actionLabel = "发送"; actionId = EditorInfo.IME_ACTION_SEND }.sends)
-        // a number takes no lines, whatever its flags say
         assertFalse(info { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_TEXT_FLAG_MULTI_LINE }.isMultiLine)
     }
 
@@ -84,7 +74,7 @@ class EditorInfoTraitsTest {
 
     @Test
     fun aPasswordHiddenOrShownIsAPasswordNotAFieldThatOnlyAsksNotToBeLearnedFrom() {
-        // the code stays out of a password's field (编码行 输入框里, 061-code-in-field §6.1), a shown one too
+        // the code stays out of a password's field, a shown one too
         assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }.isPassword)
         assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD }.isPassword)
         assertTrue(info { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD }.isPassword)
@@ -95,7 +85,6 @@ class EditorInfoTraitsTest {
         assertFalse(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }.isPassword)
     }
 
-    /** A password, or a field that asks not to be learned from: what an arrow must not read. */
     @Test
     fun aPasswordOrAFieldNotToLearnFromIsSensitive() {
         assertTrue(info { inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }.isSensitive)
@@ -113,7 +102,6 @@ class EditorInfoTraitsTest {
         assertFalse(info { privateImeOptions = null }.acceptsDeleteSurrounding)
     }
 
-    /** `privateImeOptions` is a comma-separated list, so the option counts among others too. */
     @Test
     fun ourOptionAmongOthersStillOptsIn() {
         assertTrue(info { privateImeOptions = "nm,$DeleteSurroundingFlag" }.acceptsDeleteSurrounding)
@@ -126,7 +114,6 @@ class EditorInfoTraitsTest {
 
     @Test
     fun numberPhoneAndDateFieldsAreNumbers() {
-        // U-91: no word pairs learned in them
         assertTrue(info { inputType = InputType.TYPE_CLASS_NUMBER }.isNumber)
         assertTrue(info { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD }.isNumber)
         assertTrue(info { inputType = InputType.TYPE_CLASS_PHONE }.isNumber)
@@ -136,7 +123,6 @@ class EditorInfoTraitsTest {
 
     @Test
     fun aSearchActionMakesASearchField() {
-        // U-91: no 联想 in it
         assertTrue(info { imeOptions = EditorInfo.IME_ACTION_SEARCH or EditorInfo.IME_FLAG_NO_EXTRACT_UI }.isSearch)
         assertFalse(info { imeOptions = EditorInfo.IME_ACTION_GO }.isSearch)
         assertFalse(info { inputType = InputType.TYPE_CLASS_TEXT }.isSearch)
@@ -162,7 +148,6 @@ class EditorInfoTraitsTest {
         assertEquals(EditorInfo.IME_ACTION_SEND, t.imeAction)
     }
 
-    /** A custom action needs both a label to show and an id to perform. */
     @Test
     fun aCustomActionNeedsALabelAndAnId() {
         assertEquals(0x42, info { actionLabel = "Post"; actionId = 0x42 }.customActionId)
@@ -183,7 +168,6 @@ class EditorInfoTraitsTest {
         assertEquals(NumberKind.SIGNED, kind(n or InputType.TYPE_NUMBER_FLAG_SIGNED))
         assertEquals(NumberKind.DECIMAL, kind(n or InputType.TYPE_NUMBER_FLAG_DECIMAL))
         assertEquals(NumberKind.SIGNED_DECIMAL, kind(n or InputType.TYPE_NUMBER_FLAG_SIGNED or InputType.TYPE_NUMBER_FLAG_DECIMAL))
-        // a PIN's digits whatever its flags
         assertEquals(NumberKind.PIN, kind(n or InputType.TYPE_NUMBER_VARIATION_PASSWORD or InputType.TYPE_NUMBER_FLAG_DECIMAL))
         assertEquals(NumberKind.PHONE, kind(InputType.TYPE_CLASS_PHONE))
         assertEquals(NumberKind.DATE, kind(d or InputType.TYPE_DATETIME_VARIATION_DATE))

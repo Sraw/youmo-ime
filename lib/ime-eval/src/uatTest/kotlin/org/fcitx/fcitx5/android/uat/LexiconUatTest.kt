@@ -23,13 +23,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/13-words.md, the user lexicon's half: blocked, learned and imported words, export and
- * learning backups, custom phrases, clearing what was learned. The pages do these through
- * HostApi's calls (the words, the imports, `learning(op)`); here they are those calls, and a
- * page's list is what the engine lists. An import's file is read as the page reads it: a word
- * list's lines as they are, libime's `.dict` through LibimeFiles.
- */
+/** uat/13-words.md, the user lexicon's half, through the HostApi calls the pages make; an import's file read as the page reads it. */
 class LexiconUatTest {
 
     private fun EngineReplay.listed(kind: UserWord.Kind) = engines.userWords(kind).map { it.text }
@@ -163,14 +157,12 @@ class LexiconUatTest {
         assertTrue("骁骎" in typed("xiaoqin"))
     }
 
-    // into the user dictionary a .scel is read straight to word-list lines, as the page reads it
-    // (ImportFiles.Scel, PinyinDictionaryFragment's scelLines); into the base it is converted to a
-    // text dictionary first (WD-14z2, ScelDictionaryUatTest)
+    // into the user dictionary a .scel is read straight to word-list lines; into the base it is converted first
     @Test
     @Uat("WD-14z")
     fun aScelFileIntoTheUserDictionaryIsImportedWords() = with(EngineReplay()) {
         val lines = ArrayList<String>()
-        ImportFiles.Scel.read(UatEngines.fixture("extra.scel").readBytes()) { lines += it.line() }
+        ImportFiles.Scel.read(UatEngines.fixture("scel/extra.scel").readBytes()) { lines += it.line() }
         assertEquals(2, engines.importWords(lines.asSequence(), "extra.scel").imported)
         val batch = engines.importBatches().single()
         assertEquals("extra.scel", batch.file)
@@ -289,7 +281,7 @@ class LexiconUatTest {
         assertEquals("nihao $candidates", "您好呀", candidates[2])
     }
 
-    // 常用词 (060-common-words): 米字旁 → 米、糸 and 中华人民共和国 → 中国 as the settings page saves them
+    // 常用词: 米字旁 → 米、糸 and 中华人民共和国 → 中国 as the settings page saves them
     private fun EngineReplay.commonWords(text: String) {
         UatEngines.commonWords = text
         engines.reload()
@@ -344,8 +336,7 @@ class LexiconUatTest {
         assertEquals(listOf("米", "木", pinned), typed("mzp").take(3))
         val part = typed("mizipan")
         assertTrue("mizipan $part", "米" !in part.take(1) && "木" !in part.take(2))
-        // nothing of the common words' placed at all: the list is the one without them, 米 and 木
-        // where the decoder has them
+        // nothing of the common words' placed: the list is the one without them
         commonWords("")
         assertEquals(typed("mizipan"), part)
     }

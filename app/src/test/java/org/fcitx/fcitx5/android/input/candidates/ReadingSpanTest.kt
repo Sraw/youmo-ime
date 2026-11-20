@@ -18,7 +18,7 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.math.ceil
 import kotlin.math.max
 
-/** A handwritten character's several readings ([ReadingSpan]): pinyin made smaller to the floor before the candidate widens; zhuyin a column each. */
+/** Several readings: pinyin made smaller to the floor before the candidate widens; zhuyin a column each. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class)
@@ -33,11 +33,8 @@ class ReadingSpanTest {
     @Test
     fun severalPinyinReadingsShrinkToTheFloorThenWiden() {
         val char = paint.measureText("行")
-        // one reading: half the size, as ever, the floor or not
         assertEquals(ceil(max(char, measured("xíng", 30f))).toInt(), width("xíng", 21f))
-        // several, no floor: half the size, the candidate widened for them
         assertEquals(ceil(measured("xíng/háng…", 30f)).toInt(), width("xíng/háng…"))
-        // with a floor: smaller, but no smaller than it
         val shrunk = width("xíng/háng…", 21f)
         assertEquals(ceil(max(char, measured("xíng/háng…", 21f))).toInt(), shrunk)
         assertTrue("$shrunk < ${width("xíng/háng…")}", shrunk < width("xíng/háng…"))
@@ -50,11 +47,10 @@ class ReadingSpanTest {
         val more = width("ㄒㄧㄥˊ/ㄏㄤˊ…")
         assertTrue("$one < $two", one < two)
         assertTrue("$two < $more", two < more)
-        // the second column, and the gap before it: wider by more than a column's symbol
         assertTrue(two - one > measured("ㄅ", 30f))
     }
 
-    // the line's metrics, at SDK 29 too: the text's own fonts are read from API 33 (0.5.1 crashed on 10-12 there)
+    // at SDK 29 too: the text's own fonts are read from API 33 only
     @Test
     fun aPinyinReadingMakesRoomAboveTheLineAHintsDoesNot() {
         fun metrics(span: ReadingSpan) = Paint.FontMetricsInt().also { span.getSize(paint, "行", 0, 1, it) }

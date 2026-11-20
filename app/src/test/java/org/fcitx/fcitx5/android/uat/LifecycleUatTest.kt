@@ -22,7 +22,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** UAT cases of the keyboard across fields and system changes (uat/18). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
@@ -64,12 +63,10 @@ class LifecycleUatTest {
         h.emit(HostEvent.InputMethodChanged(h.api.inputMethodEntryCached))
         assertTrue(h.texts().toString(), "English" in h.texts())
         h.api.calls.clear()
-        // ⌄, the system hiding the window, the field tapped again
         h.tap(h.described(h.service.getString(R.string.hide_keyboard)))
         h.service.hideWindow()
         h.idle()
         h.start()
-        // no switch asked on the way: English still, its keyboard shown
         assertEquals(h.api.calls.toString(), emptyList<String>(), h.api.calls.filter { "Ime(" in it || it == "toggleIme()" })
         assertEquals(KeyboardHarness.ENGLISH.uniqueName, h.api.inputMethodEntryCached.uniqueName)
         assertTrue(h.texts().toString(), "English" in h.texts() && letters())
@@ -79,7 +76,7 @@ class LifecycleUatTest {
         val config = Configuration(h.service.resources.configuration)
         config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
             (if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
-        // what the application is told as the system's mode flips: its own handler, the glue this checks
+        // the application's own handler of the system's mode flipping: the glue this checks
         FcitxApplication.getInstance().onConfigurationChanged(config)
         h.idle()
         h.relayout()
@@ -94,7 +91,6 @@ class LifecycleUatTest {
                 system(night)
                 val want = (if (night) ThemeManager.prefs.darkModeTheme else ThemeManager.prefs.lightModeTheme).getValue()
                 assertEquals(want.name, ThemeManager.activeTheme.name)
-                // the keys in the theme: the canvas's scene painted in its look
                 val canvas = checkNotNull(KeyboardHarness.boardCanvas(h.inputView))
                 assertNotNull(canvas.scene)
                 assertEquals("the keys in the theme", ThemeManager.shownLook(want), canvas.paintedIn)

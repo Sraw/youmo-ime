@@ -18,15 +18,13 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.scene.theme.Transition
 
 /**
- * Whether a theme's keys may move this moment (060-render-p3 §4.1, A1): 键盘动效 on, 禁用动画 off,
- * the system's battery saver off and its animations not removed ([ValueAnimator.areAnimatorsEnabled]).
- * Asked at each press of a key that has motion, so a change takes at once; battery saver is kept from
- * its broadcast (PowerManager's is a call into the system: not on a keystroke).
+ * Asked at each press of a key that has motion, so a change takes at once. Battery saver is kept from its
+ * broadcast: PowerManager's is a call into the system, not for a keystroke.
  */
 object KeyMotionSwitch {
     @Volatile
     private var powerSave = false
-    // the application watched (one a process; a test's each its own)
+    // one a process; a test's each its own
     private var watching: Context? = null
 
     private val receiver = object : BroadcastReceiver() {
@@ -36,11 +34,9 @@ object KeyMotionSwitch {
         }
     }
 
-    // what plays on its own till told to stop (A4's animated picture), told of battery saver as it changes;
-    // the main thread's (the broadcast's and the views')
+    // what plays on its own till told to stop (the animated picture); main thread
     private val changes = ArrayList<() -> Unit>()
 
-    /** [f] called as battery saver turns on or off, till [unlisten]: what keys read at a press, a picture playing must be told. */
     fun listen(context: Context, f: () -> Unit) {
         val app = context.applicationContext
         if (watching !== app) watch(app)
@@ -51,10 +47,7 @@ object KeyMotionSwitch {
         changes.remove(f)
     }
 
-    /**
-     * Whether keys may move now. Its first call in a process (and [listen]'s) starts watching battery saver:
-     * the receiver registered on the application, never unregistered (one a process, as long as it lives).
-     */
+    /** Its first call in a process starts watching battery saver: registered on the application, never unregistered. */
     fun on(context: Context): Boolean {
         val app = context.applicationContext
         if (watching !== app) watch(app)
@@ -62,8 +55,8 @@ object KeyMotionSwitch {
         return prefs.keyboardMotion.getValue() && !prefs.disableAnimation.getValue() && !powerSave && ValueAnimator.areAnimatorsEnabled()
     }
 
-    // battery saver's broadcast is the system's (protected): only the system sends it, so exported is safe.
-    // Not RECEIVER_NOT_EXPORTED: below Android 13 ContextCompat then asks for DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION,
+    // battery saver's broadcast is protected: only the system sends it, so exported is safe. Not
+    // RECEIVER_NOT_EXPORTED: below Android 13 ContextCompat then asks for DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION,
     // which the manifest removes (it throws)
     private fun watch(app: Context) {
         watching = app
@@ -71,7 +64,6 @@ object KeyMotionSwitch {
         ContextCompat.registerReceiver(app, receiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED), ContextCompat.RECEIVER_EXPORTED)
     }
 
-    // CSS's curves (cubic-bezier), made once
     private val curves = mapOf(
         "linear" to LinearInterpolator(),
         "ease" to PathInterpolator(0.25f, 0.1f, 0.25f, 1f),

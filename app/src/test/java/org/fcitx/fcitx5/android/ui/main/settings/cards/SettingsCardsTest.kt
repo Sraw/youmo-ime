@@ -29,7 +29,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
 
-/** The settings cards' shared parts (dev/design/061-settings-cards.md §2.2, §2.3, §2.5, §2.8): the card, the check strip, the grid. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -46,7 +45,7 @@ class SettingsCardsTest {
     // the strip's children are its own: their frame is their place in it
     private fun View.rect() = Rect(left, top, right, bottom)
 
-    // the box as drawn: the checkbox's drawable less its empty sides
+    // the checkbox's drawable less its empty sides
     private fun CheckStrip.drawnBox(): Rect = box.rect().apply { inset(dp(CheckStrip.BOX_INSET_DP), 0) }
 
     private fun strip(text: String) = CheckStrip(ctx).apply { count.text = text }
@@ -71,7 +70,7 @@ class SettingsCardsTest {
         assertFalse(strip.box.isClickable)
         assertFalse(strip.box.isFocusable)
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO, strip.box.importantForAccessibility)
-        // the margins that take the drawable's empty sides back are sized for Material's 32 dp drawable
+        // the margins taking back the empty sides are sized for Material's 32 dp drawable
         assertEquals(dp(CheckStrip.BOX_DP), strip.box.buttonDrawable!!.intrinsicWidth)
     }
 
@@ -136,7 +135,7 @@ class SettingsCardsTest {
         assertEquals(1, asked)
     }
 
-    // §2.2: a keyboard card is 76 dp at its narrowest; its strip still fits "26/26" on one line beside the box
+    // a 76 dp card's strip still fits "26/26" on one line beside the box
     @Test
     fun `the strip on the narrowest card keeps its count whole beside the box`() {
         val strip = strip("26/26")
@@ -150,7 +149,7 @@ class SettingsCardsTest {
         assertEquals(dp(4), strip.paddingBottom)
     }
 
-    // §3.1: on a 360 dp phone the strip of a group fully held wraps, and the strip grows rather than cut it
+    // on a 360 dp phone a full group's strip wraps and grows rather than cut it
     @Test
     fun `a count too long for one line wraps and the strip grows`() {
         val text = "已屏蔽 14,802/14,802 已屏蔽 14,802/14,802"
@@ -198,7 +197,7 @@ class SettingsCardsTest {
         assertEquals(1 to 0, grid.placeOf(cards[3]))
     }
 
-    // §2.8: read as a list, "item 2 of 8", whatever the columns
+    // read as a list, "item 2 of 8", whatever the columns
     @Test
     fun `the grid reads as a list of its cards`() {
         val (grid, cards) = grid(8)

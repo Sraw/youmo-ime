@@ -36,16 +36,12 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
 
     private val essentialWindows = mutableMapOf<EssentialWindow.Key, Pair<InputWindow, View?>>()
 
-    /** The window shown: InputView puts the boards SplitKeyboard.Dock lists at a side while the letters split. */
+    /** InputView puts the boards SplitKeyboard.Dock lists at a side while the letters split. */
     var currentWindow: InputWindow? = null
         private set
     private var currentView: View? = null
 
-    /**
-     * One window for another (⋯'s panels, the clipboard, the candidates expanded): each as [Motion]
-     * says, a panel's [Motion.Medium] unless the window set its own (the candidates expanded, Long),
-     * coming in slowing to a stop and going speeding away. Animation off, at once.
-     */
+    /** A panel's [Motion.Medium] unless the window set its own. Animation off, at once. */
     private fun prepareAnimation(
         exitAnimation: Transition?,
         enterAnimation: Transition?,
@@ -117,11 +113,10 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
         if (window === currentWindow)
             Timber.d("Re-attaching $window")
         val newView = if (window is EssentialWindow) {
-            // keep the view for essential windows
             essentialWindows[window.key]?.second ?: window.onCreateView()
                 .also { essentialWindows[window.key] = window to it }
         } else {
-            // add the new window to scope, except essential windows (they are always in scope)
+            // except essential windows (they are always in scope)
             scope += window
             window.onCreateView()
         }
@@ -134,28 +129,21 @@ class InputWindowManager : UniqueViewComponent<InputWindowManager, FrameLayout>(
                 oldView,
                 newView
             )
-            // notify the window that it will be detached
             oldWindow.onDetached()
-            // remove the old window from layout
             view.removeView(oldView)
-            // broadcast the old window was removed from layout
             broadcaster.onWindowDetached(oldWindow)
             Timber.d("Detach $oldWindow")
-            // finally remove the old window from scope only if it's not an essential window,
             if (oldWindow !is EssentialWindow)
                 scope -= oldWindow
         }
         // call before attached for essential window
         if (window is EssentialWindow)
             window.beforeAttached()
-        // add the new window to layout
         view.apply { add(newView, lParams(matchParent, matchParent)) }
         currentView = newView
         Timber.d("Attach $window")
-        // notify the window it was attached
         window.onAttached()
         currentWindow = window
-        // broadcast the new window was added to layout
         broadcaster.onWindowAttached(window)
     }
 

@@ -35,10 +35,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The full keyboard's 分词 in Shift's place while pinyin or 双拼 is typed (KB-106, KB-107), as the scene draws it: the
- * scenes it takes, what a press of it sends, and a theme's own qwerty without it.
- */
+/** The full keyboard's 分词 in Shift's place while pinyin or 双拼 is typed: the scenes it takes, what a press sends, a theme's qwerty without it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
@@ -53,8 +50,7 @@ class ShiftSeparatorCanvasTest {
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 
-    // KB-106: pinyin typed, 分词 in Shift's place: one scene made as typing starts, none after (the kept two reused, as
-    // the nine keys' 1); another input method's typing none of pinyin's
+    // one scene made as typing starts, none after (the kept two reused); another input method's typing none
     @Test
     @Uat("KB-106")
     fun pinyinTypedSwapsShiftKeepingTheScenes() = harness().use { h ->
@@ -85,11 +81,10 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // the separator's keys sent since [from] (the 14 keys' `'`, Shift not held with it)
     private fun KeyboardHarness.separatorsSent(from: Int) =
         api.calls.drop(from).filter { it.startsWith("sendKey") && ("char=',") in it || it.startsWith("sendKey") && "key='," in it }
 
-    // KB-106: 分词 types `'`, neither using up Shift once nor turning it off: typing done, Shift once as it was
+    // 分词 types `'`, neither using up Shift once nor turning it off
     @Test
     @Uat("KB-107")
     fun theSeparatorKeepsShiftAsItWas() = harness().use { h ->
@@ -114,14 +109,13 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // a finger on [k] as it is now, its place kept as the scene changes under it (a ShownKey is read anew each step)
+    // a ShownKey is read anew each step: its place kept as the scene changes under it
     private fun KeyboardHarness.fingerKept(k: ShownKey): KeyboardHarness.Finger {
         val r = Rect(k.bounds)
         return Finger { intArrayOf(r.left, r.top) }.also { it.send(MotionEvent.ACTION_DOWN, at(k)) }
     }
 
-    // KB-107: a theme's or user's own qwerty with no 分词 key: its Shift stays Shift while pinyin is typed, drawn
-    // and read as Shift, a tap Shift once, a long press caps lock; no `'` sent
+    // a theme's own qwerty with no 分词 key: Shift stays Shift while pinyin is typed; no `'` sent
     @Test
     @Uat("KB-107")
     fun aThemesOwnShiftStaysShiftWhilePinyinIsTyped() {
@@ -161,14 +155,12 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // KB-107: a theme's or user's own qwerty that keeps its Shift while pinyin is typed, 分词 beside it: its Shift a tap
-    // Shift once, no `'` sent (R26 F8178: 分词 anywhere in the scene took every Shift tap)
+    // a qwerty with 分词 beside Shift: its Shift a tap Shift once, no `'` sent (分词 anywhere once took every Shift tap)
     @Test
     @Uat("KB-107")
     fun aShiftKeptBesideTheSeparatorStaysShift() {
         val app = RuntimeEnvironment.getApplication()
         val builtIn = BuiltInLayouts(app)
-        // both in the row: Shift 1 wide, 分词 0.5, as wide as the two were one at a time
         val own = builtIn.text("qwerty")!!
             .replace("width=\"1.5\" icon=\"{shift-icon}\"", "width=\"1\" icon=\"{shift-icon}\"")
             .replace("when=\"!table !composing\"", "when=\"!table\"")
@@ -199,7 +191,7 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // KB-107: a theme's own `'` key (its m sending it here) is no 分词: Shift once is used up on it, with Shift sent, as in 0.6.0
+    // a theme's own `'` key is no 分词: Shift once is used up on it, with Shift sent
     @Test
     @Uat("KB-107")
     fun aThemesPlainApostropheKeyUsesUpShiftOnce() {
@@ -232,8 +224,7 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // KB-107: Shift pressed as nothing was typed, lifted once 分词 is in its place (the first letter's answer in
-    // between): 分词's `'`, Shift left off
+    // Shift pressed with nothing typed, lifted once 分词 is in its place: 分词's `'`, Shift left off
     @Test
     @Uat("KB-107")
     fun shiftDownAsTypingBeginsUpIsTheSeparator() = harness().use { h ->
@@ -244,7 +235,6 @@ class ShiftSeparatorCanvasTest {
             val finger = h.fingerKept(shift)
             EngineState.syllablesState.value = EngineState.SyllableState(im, composing = true)
             h.idle()
-            // drawn, as a frame comes before the finger is lifted
             assertNotNull(h.canvas()!!.scene!!.keys.firstOrNull { it.id == "apostrophe" })
             val from = h.api.calls.size
             finger.up(upAt)
@@ -258,8 +248,7 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // KB-107: 分词 pressed while typing, lifted once typing has ended (committed meanwhile): its `'` as ever, Shift
-    // once kept, not used up on it
+    // 分词 pressed while typing, lifted once typing ended: its `'` as ever, Shift once kept
     @Test
     @Uat("KB-107")
     fun theSeparatorLiftedAfterTypingEndedKeepsShiftOnce() = harness().use { h ->
@@ -274,7 +263,6 @@ class ShiftSeparatorCanvasTest {
             val finger = h.fingerKept(separator)
             EngineState.syllablesState.value = EngineState.SyllableState(im)
             h.idle()
-            // drawn with Shift back, as a frame comes before the finger is lifted
             assertNotNull(h.canvas()!!.scene!!.keys.firstOrNull { it.id == "shift" })
             val from = h.api.calls.size
             finger.up(upAt)
@@ -288,8 +276,7 @@ class ShiftSeparatorCanvasTest {
         }
     }
 
-    // KB-106: a field with an action (Send): Return's label and 分词 change in frames of their own as typing begins
-    // and ends; the scenes made bounded, every round after the first made of kept ones alone
+    // a field with an action: Return's label and 分词 change in frames of their own; every round after the first of kept scenes alone
     @Test
     @Uat("KB-106")
     fun aFieldsActionAndTheSeparatorReuseTheKeptScenes() = KeyboardHarness(im = KeyboardHarness.PINYIN).start(imeOptions = EditorInfo.IME_ACTION_SEND).use { h ->
@@ -310,12 +297,10 @@ class ShiftSeparatorCanvasTest {
         )
         try {
             frame { board.onReturnDrawableUpdate(send) }
-            // a frame of its own first, so start-up's frames settle: without it, run with the class, the first round's
-            // first frame was a scene other than the one its state keeps after (where from, not found; the count the same)
+            // a frame of its own first, so start-up's frames settle: without it, run with the class, the first round made one scene more
             frame { EngineState.syllablesState.value = EngineState.SyllableState(im) }
             val made = board.scenesMade
             round()
-            // the two new states, Return's 确定 look without and with 分词
             assertEquals(made + 2, board.scenesMade)
             val again = board.scenesMade
             val second = round()

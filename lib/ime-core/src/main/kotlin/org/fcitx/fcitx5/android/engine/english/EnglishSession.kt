@@ -22,44 +22,13 @@ import org.fcitx.fcitx5.android.engine.session.Snapshot
 import java.util.BitSet
 
 /**
- * English typed a word at a time, as Gboard has it. The candidates are the word typed and the
- * words it may be ([EnglishDecoder]: those it spells, starts, or spells with a slip), scored after
- * the words before the cursor. A word typed that is none is corrected: the likeliest word it
- * spells otherwise (dont as don't, london as London) or with a slip (teh as the) is the first
- * candidate, what space commits; backspace right after takes the correction back, the word typed
- * shown again, and that word is never corrected again. Punctuation commits the word as space does,
- * correction and all.
+ * English typed a word at a time, as Gboard: the typed word and what it may be ([EnglishDecoder]), scored after
+ * the words before the cursor. A non-word is corrected (dont as don't, teh as the) and space commits it;
+ * backspace right after takes it back, and that word is never corrected again. A committed word gets a space and
+ * predictions; punctuation right after moves the space behind it, a second space makes a full stop.
  *
- * A word committed by space or picked is followed by a space and by the words that may come next
- * ([Snapshot.predicting]); punctuation typed right after puts that space behind it (`word .` as
- * `word. `), as a closing bracket does and a quote where one is open (`word.)` as `word.) `);
- * space typed again turns it into a full stop (`word  ` as `word. `). A lone i is
- * I. Enter commits the word as typed and is the app's all the same: a search runs at once. A tap
- * in the word puts the cursor there, where letters go in and backspace deletes.
- *
- * Keys it does not [read][reads] (digits, punctuation, space with nothing typed) are the app's.
- * The host hands it every key (see the host's `Keyboard`): space and digits pick nothing here.
- * Where nothing is to be suggested (a password, an editor asking for none, suggestions turned
- * off) the addon hands it none: the keys type themselves.
- *
- * What it knows of the text before the cursor ([Action.Context] and what it committed since) is
- * kept only while [learning]: without, every word is scored as a sentence's first might be.
- *
- * On the nine keys ([Action.NineKey]) each key is any of its letters ([nineKeys]): the words
- * whose letters fit, those as long as the keys first, then longer ones, are the candidates, the
- * first shown as the input and committed for it wherever the word typed would be (space,
- * punctuation, Enter), as a phone's T9 did. A letter typed among the keys (a hardware key's; the
- * screen's long press commits its own) is itself, an apostrophe where the word has one (don't). No slip is
- * corrected there, and the input is not edited inside: its keys are no text.
- *
- * While [learning], each word committed is counted in [EnglishUser], after the word before it:
- * scored up as typed again, offered after that word, and, the data lacking it, offered by its keys.
- * A correction taken back makes the word typed never corrected (U-31): by backspace right after,
- * by picking the word typed over its correction, or later by a tap right after the correction
- * ([Corrections]), the word typed then offered in its place. A long press on a word counted forgets it.
- *
- * The user's custom phrases come among the candidates ([phrases], A1), never first; one picked goes
- * in as it is, no space after it, never learned; a long press deletes it from the phrases.
+ * Keys it does not [read][reads] are the app's. The text before the cursor is kept only while [learning]. On the
+ * nine keys each key is any of its letters, exact length first, as old T9, with no slip correction or editing.
  */
 class EnglishSession(
     private val data: EnglishData?,
@@ -69,14 +38,11 @@ class EnglishSession(
     user: EnglishUser? = null,
     coarseWords: List<String> = CoarseWords.LIST,
     private val misspellings: Map<String, String> = Misspellings.MAP,
-    // the nine keys' letters (the user's 按键字母): which a key typed for English is
     private val nineKeys: NineKeyLetters = NineKeyLetters.STANDARD,
     private val phrases: EnglishPhrases = EnglishPhrases(),
-    /** The words the user blocked: never offered, predicted, glided or corrected to; none blocked here without. */
     private val blocks: EnglishBlocks? = null,
 ) : Session {
 
-    // what the user committed, kept by the host; else for this session alone
     private val user = user ?: EnglishUser()
 
     private val autocorrect = Autocorrect(maxCorrection, misspellings)
@@ -87,20 +53,16 @@ class EnglishSession(
 
     private val glider = data?.let { d -> GlideDecoder(d, score = { context, word -> scored(d, context, word) }) }
 
-    // never offered, completed or corrected to; typed, they are kept as typed. Looked up at the first
-    // key, not here: the session is made on the thread that types, and the lookups would build the
-    // data's word index there rather than leave it to the warm-up
+    // lazy: the session is made on the typing thread, and the lookups would build the word index there
     private val coarse by lazy { data?.let { d -> CoarseWords.of({ d.id(it) }, coarseWords) } ?: CoarseWords.NONE }
 
-    // the model's words that are misspellings, by id, looked up as late
     private val misspelt by lazy {
         val ids = BitSet()
         data?.let { d -> for (word in misspellings.keys) d.id(word).takeIf { it != NgramModel.NO_WORD }?.let { ids.set(it) } }
         ids
     }
 
-    // a coarse word the user typed is theirs to be offered; a misspelling once it is theirs, never
-    // corrected (see read)
+    // a coarse word the user typed is theirs to offer; a misspelling once theirs is never corrected
     private fun offered(word: Int): Boolean {
         if (blocks?.has(checkNotNull(data).word(word)) == true) return false
         val misspelling = misspelt[word]
@@ -110,62 +72,47 @@ class EnglishSession(
     }
 
     private val input = TypedKeys()
-    private var cursor = 0 // in input
+    private var cursor = 0
 
-    // a nine key in the input (a digit: English reads none otherwise): its words are spelled by keys
-    // a letter a long press pinned in (Action.NineKey) makes the word the nine keys' though no
-    // digit is left in it: spelled from the keys, never corrected as a word typed letter by letter
+    // a long-pressed letter keeps the word the nine keys' though no digit is left
     private var pinned = false
 
     private fun nineKeyed(): Boolean = input.isNotEmpty() && (pinned || input.any { it in '2'..'9' })
 
-    // the nine keys' first letters where no word fits ([typed]): a guess, not a word the user meant;
-    // letters all pinned are one; so are phrases alone
+    // the nine keys' first letters where no word fits: a guess, not a word
     private fun guessed(): Boolean = phrases.noWord(candidates) && input.any { it in '2'..'9' }
 
     override val picksByDigit: Boolean get() = nineKeyed()
     private var candidates: List<String> = emptyList()
     private val pager = Pager(pageSize)
 
-    // what space commits in place of the word typed, if anything
     private var correction: String? = null
 
-    // the word typed and what space committed for it, while backspace may take the correction back
     private var corrected: Corrected? = null
 
-    // shown again by backspace: committed as typed
     private var keepTyped = false
 
-    // the word a correction taken back learned as typed already (takeBack): not again as it is committed
+    // a taken-back correction already learned this word: not again on commit
     private var reverted: String? = null
 
-    // the corrections made in this field, and the one a tap came back to, its word typed offered
     private val corrections = Corrections()
     private var recalled: Corrections.Found? = null
 
-    // what the field's commits are not learned for (Action.Context.learnFlags): as the last context said
     private var learnFlags = 0
 
-    // what this session committed last, if the cursor stayed after it: a space it ends with is
-    // the session's own, which the space rules may take back
+    // what this session committed last while the cursor stayed after it: a trailing space is its own to take back
     private var last = ""
 
-    // the end of the text before the cursor, as far as the session knows it: if [known], from the
-    // app's (Action.Context) on, [cut] where the text goes on before it; else what it committed alone
+    // the end of the text before the cursor: from the app's Action.Context if [known], else only what was committed
     private var recent = ""
     private var known = false
     private var cut = false
 
-    // where the field's own text starts in [recent], -1 if not there: before it, what was written
-    // in a field that has cleared itself (Action.Context.cleared), a space put after it as a word's
-    // end for scoring. At the mark nothing is before the cursor: no glide's space, and a Backspace
-    // takes nothing
+    // where the field's own text starts in [recent], -1 if absent: before it, text from before the field cleared
+    // itself, for scoring only
     private var clearedAt = -1
 
-    // the end of the text before the cursor, known while learning or not: its last few chars not
-    // spaces (a few, for the app's Backspaces to take back one by one) and the spaces after it,
-    // empty if unknown. A glide's space before its word, and its
-    // case after a full stop, need it where [recent] is kept empty. It is never learned or scored
+    // the end of the text before the cursor, learning or not, for Backspaces, glide spacing and capitals; never learned
     private var edge = ""
 
     override var learning = true
@@ -179,14 +126,10 @@ class EnglishSession(
             }
         }
 
-    // a hyphen ends what the nine keys typed: no word has one, and the keys would spell none
     override fun reads(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z' || (c == '\'' || c == '-' && !nineKeyed()) && input.isNotEmpty()
 
     override val takesEveryCharacter: Boolean get() = true
 
-    // the word a glide committed, the space it put before it ([lead]) and the others it may have
-    // been, while the cursor stays after it; [edge], the end of the text before them, for a glide after the
-    // word is taken back
     private class Glided(val committed: String, val words: List<String>, val lead: String = "", val edge: String = "", val seqs: List<Long> = emptyList())
 
     private var glided: Glided? = null
@@ -195,16 +138,13 @@ class EnglishSession(
         val r = recalled
         recalled = null
         if (r != null && (action == Action.Pick(0) || action == Action.Select(0))) return recall(r)
-        // the word typed offered back goes with the offer: left on screen, a later pick would commit
-        // it after the correction rather than in its place
+        // the offered typed word goes with the offer: a later pick would commit after the correction instead of in its place
         if (r != null) unoffer()
         val g = glided?.takeIf { input.isEmpty() && it.committed == last }
-        // what goes on from the word glided: a pick, a backspace, a page; anything else leaves it
         if (!keepsGlided(action)) glided = null
         return when {
             g == null -> act(action)
-            // the glide's own space is there already: not a full stop; its others are no longer offered.
-            // Any space, a glided one too (glided is part of the action's equality)
+            // the glide's own space is there already: not a full stop (any space: glided is part of the action's equality)
             action is Action.Key && action.char == ' ' -> {
                 candidates = predictions()
                 pager.reset()
@@ -218,7 +158,7 @@ class EnglishSession(
         }
     }
 
-    // 联想's × too: it puts the list away, the word glided still the backspace's to take back whole
+    // 联想's × too: it hides the list, the glided word still whole for backspace
     private fun keepsGlided(action: Action) = when (action) {
         is Action.Pick, is Action.Select, is Action.Block, Action.Backspace, Action.NextPage, Action.PreviousPage, Action.DropPredictions -> true
         else -> false
@@ -232,10 +172,8 @@ class EnglishSession(
         is Action.Pick -> pick(action.index)
         Action.NextPage -> turn(pager.page + 1)
         Action.PreviousPage -> turn(pager.page - 1)
-        // an arrow, a tab, enter: the word left as it is, maybe half typed, so not learned
         Action.CommitRaw -> commitRaw()
         is Action.NineKey -> nineKey(action.digit, action.upper, action.touch)
-        // the nine keys' input is no text to move about in: a tap on it leaves it as it is
         is Action.Cursor -> cursor(action.at)
         // the keyboard commits the word on an arrow (Keyboard.whileComposing): none comes here
         is Action.Step -> snapshot(handled = false)
@@ -247,10 +185,7 @@ class EnglishSession(
         is Action.Forget -> forget(action.index)
         is Action.Unpin -> unpin(action.index)
         is Action.Block -> block(action.index)
-        // 联想's ×, sent only while predicting (nothing typed): the offer alone; [last] (its own space, which a mark
-        // takes the place of) and [corrected] stay
         Action.DropPredictions -> { unoffer(); snapshot() }
-        // nothing here refines, inks, pins or picks a syllable or letter: what is shown stays
         Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Syllable, is Action.Letter, Action.LookUp -> snapshot()
     }
 
@@ -264,13 +199,10 @@ class EnglishSession(
         return snapshot()
     }
 
-    // 从自定义词组中删除 is an unpin (LearningMenu), on a phrase: nothing else is pinned here
+    // 从自定义词组中删除 is an unpin (LearningMenu): only phrases are pinned here
 
     private fun unpin(index: Int): Snapshot = also { if (phrases.delete(candidates, index)) read() }.snapshot()
 
-    // what was learned read anew after an undo, the session and what is typed kept (review-int S1): the
-    // word typed's candidates, or what may follow the word committed; a glide's words and a correction
-    // offered back are as they were
     override fun reread(): Snapshot? {
         if (glided != null || recalled != null) return null
         if (input.isEmpty() && last.isEmpty()) return null
@@ -287,33 +219,27 @@ class EnglishSession(
     override fun candidates(from: Int, count: Int): List<Choice> =
         candidates.subList(minOf(from, candidates.size), minOf(from + count, candidates.size)).map { Choice(it) }
 
-    // forgetting here records no word, it only takes counts away: offered in a password field too
+    // forgetting records no word, only removes counts: offered in a password field too
     override fun offers(index: Int): Set<Offer> = if (phrases.at(candidates, index) != null) OfferRules.offers(learning, forgets = { false }, phrase = true)
         else OfferRules.offers(learning = true, forgets = { candidates.getOrNull(index)?.let(::learnedAs) != null }, blocks = { blockable(index) })
 
-    // the candidate [text] as the user committed it, if they did: as shown, or as at a sentence's start
     private fun learnedAs(text: String): String? =
         text.takeIf { user.count(it) > 0f } ?: text.replaceFirstChar(Char::lowercaseChar).takeIf { user.count(it) > 0f }
 
-    // the glide's word committed, a word typed before it ended as space ends it; a glide no
-    // word fits leaves that word as it is, so it is decoded after the word as space would end it
+    // if no word fits, the typed word stays and the glide decodes after it as if space ended it
     private fun glide(glide: Glide?): Snapshot {
         glide ?: return snapshot()
         if (glider == null) return snapshot()
-        // what key(' ') below commits: the two must stay in step. It is not called first, as a glide
-        // no word fits leaves the word typed
+        // must stay in step with key(' ') below
         val ending = if (input.isNotEmpty()) "${correction ?: typed()} " else ""
-        // right after a word or punctuation not the session's (the cursor put there): a space between them
         val lastChar = if (recent.length == clearedAt) null else recent.lastOrNull() ?: edge.lastOrNull()
         val space = if (ending.isEmpty() && lastChar?.let { it.isLetterOrDigit() || it in SPACED_AFTER } == true) " " else ""
-        // what is before the cursor once the word is ended, as wrote would keep it
         val ahead = if (learning) recent + ending + space else recent
         val context = EnglishText.context(ahead, start = known && !cut)
         val words = glideWords(glide, context)
         val word = words.firstOrNull() ?: return snapshot()
         val ended = if (ending.isNotEmpty()) key(' ').commit else ""
         val before = edge
-        // a correction space made is no longer the last thing before the cursor
         corrected = null
         wrote(space)
         val seqs = learn(word, word, EnCommit.TYPED)
@@ -326,7 +252,6 @@ class EnglishSession(
         return snapshot(commit = ended + space + made)
     }
 
-    // the words [glide] may be after [before], best first, in the keyboard's case: the data's and the user's own
     private fun glideWords(glide: Glide, before: List<String>): List<String> {
         val data = checkNotNull(data)
         val context = checkNotNull(decoder).context(before)
@@ -336,18 +261,15 @@ class EnglishSession(
             .map { data.word(it.word) to it.score }
         return (found + ownGlided(data, glide, scoredPrev))
             .sortedByDescending { it.second }
-            // a capital only where Shift gives one, as typing: the data's sentence-start "Hello" is
-            // "hello" (a field that asks for capitals has Shift on there); a name or iPhone keeps its own
+            // a capital only where Shift gives one: the data's sentence-start "Hello" is "hello"; a name keeps its own
             .map { (w, _) -> inSentence(w, first = true) }
-            // i and i'm as tapping commits them ([typed]), whichever case the data has them in
             .map(::capitalI)
             .map { w -> if (glide.capsLock) w.uppercase() else if (glide.shift) w.replaceFirstChar(Char::uppercaseChar) else w }
             .distinct()
             .take(SUGGESTED + 1)
     }
 
-    // the words the user committed that the data lacks, which the trie the glide searches has not:
-    // each held to the path as the decoder holds its words, scored by the user's counts alone
+    // the user's words the data lacks, which the glide's trie has not: scored by the user's counts alone
     private fun ownGlided(data: EnglishData, glide: Glide, prev: String?): List<Pair<String, Float>> {
         refreshUser(data)
         if (userOnly.isEmpty()) return emptyList()
@@ -361,8 +283,6 @@ class EnglishSession(
         }
     }
 
-    // the word [g] glided taken back: deleted (a backspace), the space it put before it too, or
-    // another it may have been in its place
     private fun unglide(g: Glided, other: String?): Snapshot {
         recent = recent.dropLast(g.committed.length)
         g.seqs.forEach(user::undo)
@@ -393,22 +313,18 @@ class EnglishSession(
                 if (recent.isNotEmpty() && !recent.last().isWhitespace()) recent += " "
                 clearedAt = recent.length
             } else if (action.offers) {
-                // a tap right after a correction: the word typed offered in its place
                 recalled = corrections.at(action.before)?.also { candidates = listOf(it.made.typed) }
             }
         }
         return snapshot()
     }
 
-    // the correction [found] before the cursor taken back, a tap after making it: the word typed in
-    // its place, never corrected from now on, as by backspace right after it
     private fun recall(found: Corrections.Found): Snapshot {
         val m = found.made
         corrections.remove(m)
         recent = recent.dropLast(found.length)
         edge = endOf(edge.dropLast(found.length))
-        // past the log's last UNDOABLE commits an undo finds nothing: the word corrected to stays
-        // counted, the word typed is still never corrected again (R11 F2998, accepted)
+        // past the log's last UNDOABLE commits an undo finds nothing: the corrected word stays counted (accepted)
         m.seqs.forEach(user::undo)
         learn(m.typed, m.typed, EnCommit.REVERTED)
         val made = if (found.spaced) "${m.typed} " else m.typed
@@ -421,22 +337,18 @@ class EnglishSession(
 
     private fun blocked(word: String) = blocks?.has(word) == true
 
-    // a word offered, as shown; not the letters typed, which are kept as typed whatever is blocked. On
-    // the nine keys what is typed is the decoder's first word, itself blockable: only the letters
-    // pinned as typed (no digit among them) are kept so; nor the word a glide just committed, in the text as typed
+    // an offered word, not the typed letters; on the nine keys only all-pinned letters are kept so; nor a just-glided word
     private fun blockable(index: Int): Boolean {
         val word = candidates.getOrNull(index) ?: return false
         val asTyped = if (nineKeyed()) input.none { it in '2'..'9' } && word == capitalI(input.toString()) else word == typed()
         return learning && blocks != null && EnglishText.isWord(word) && !(input.isNotEmpty() && asTyped) && !(input.isEmpty() && glided?.takeIf { it.committed == last }?.committed == "$word ")
     }
 
-    // as written, the data's or the user's, not as the input's case shows it: the word blocked, or null
     private fun blockAt(index: Int): String? =
         candidates.getOrNull(index)?.takeIf { blockable(index) }?.also { checkNotNull(blocks).blockShown(it) { w -> (data?.id(w) ?: -1) >= 0 || user.count(w) > 0f } }
 
     private fun block(index: Int): Snapshot = shownWithout(blockAt(index))
 
-    // a glide's other blocked: gone from what it offers, the rest still there to take the glided word's place
     private fun blockGlided(g: Glided, index: Int): Snapshot {
         val word = blockAt(index) ?: return snapshot()
         glided = Glided(g.committed, g.words - word, g.lead, g.edge, g.seqs)
@@ -445,7 +357,6 @@ class EnglishSession(
 
     private fun forget(index: Int): Snapshot = shownWithout(candidates.getOrNull(index)?.let(::learnedAs)?.also(user::forget))
 
-    // what is shown read anew once [gone] is: a long press's 删除 or 屏蔽
     private fun shownWithout(gone: String?): Snapshot {
         if (gone != null) if (input.isEmpty()) candidates = predictions() else read()
         return snapshot()
@@ -459,7 +370,6 @@ class EnglishSession(
             candidates = emptyList()
             pinned = false
         }
-        // a word begun on the full keyboard (a hardware key's letters) goes on as the nine keys'
         pinned = pinned || letter
         input.append(digit, upper, touch)
         cursor = input.length
@@ -487,10 +397,7 @@ class EnglishSession(
         }
         if (input.isNotEmpty()) {
             val typed = typed()
-            // space and punctuation end a word as meant; a digit or a symbol goes on with it as typed
             val word = if (c == ' ' || c in SWAPPED) correction ?: typed else typed
-            // space ends the word with a space of the session's own, and punctuation with itself
-            // and one; anything else is the app's
             if (c == ' ') return commit(word, space = true, typed = typed)
             if (c in SWAPPED) {
                 val lead = Corrections.lead(recent, clearedAt, known && !cut)
@@ -506,17 +413,13 @@ class EnglishSession(
         return afterOwnSpace(c)
     }
 
-    // the session's own space after a colon, taken back by / (https://). Not a full stop's by a
-    // lower-case letter (e.g.): where the field asks for no capitals, a sentence starts with one
+    // the session's space after a colon, taken back by / (https://); not a full stop's by a lower-case letter (e.g.)
     private fun joins(c: Char): Boolean = c == '/' && last.endsWith(": ")
 
-    // [c] with no word typed: after the session's own space, it may take its place
     private fun afterOwnSpace(c: Char): Snapshot {
-        // before the session's own space, if the cursor is still after it
         val before = if (last.length >= 2 && last.last() == ' ') last[last.length - 2] else null
         val word = before != null && endsWord(before)
         val mark = before != null && before in MARKS && !word
-        // after punctuation, or a bracket or quote closed, the space is there already
         if (c == ' ' && mark) {
             last = ""
             return snapshot()
@@ -532,16 +435,12 @@ class EnglishSession(
         return spaced(made, deleteBefore = 1)
     }
 
-    // whether [c], before the session's own space, ends a word: an apostrophe too where it follows
-    // a letter (dogs'), as quoteOpen reads one in a word; one put in after anything else is a quote
+    // an apostrophe after a letter ends a word too (dogs'), as quoteOpen reads it
     private fun endsWord(c: Char): Boolean =
         c.isLetterOrDigit() || c == '\'' && last.getOrNull(last.length - 3)?.isLetterOrDigit() == true
 
-    // whether a quote [q] is open in the text before the cursor, as far as the session knows it
-    // (quoteOpenIn): the field's start is known unless the text was cut short or unknown (after a Reset)
     private fun quoteOpen(q: Char): Boolean = quoteOpenIn(recent, q, startKnown = known && !cut)
 
-    // [made], ending with a space of the session's own, in place of the [deleteBefore] before it
     private fun spaced(made: String, deleteBefore: Int): Snapshot {
         last = made
         wrote(made)
@@ -561,21 +460,18 @@ class EnglishSession(
             return snapshot(handled = false)
         }
         last = ""
-        // at the start of the word: nothing before it is the session's to delete
         if (cursor == 0) return snapshot()
         input.deleteAt(--cursor)
         read()
         return snapshot()
     }
 
-    // the correction [undo] taken back: the word typed shown again, kept as typed
     private fun takeBack(undo: Corrected): Snapshot {
         val typed = undo.typed
         last = ""
         recent = recent.dropLast(undo.committed.length)
         edge = ""
         corrections.remove(undo.made)
-        // what was counted of the correction taken back; the word typed never corrected from now on (U-31)
         undo.made.seqs.forEach(user::undo)
         learn(typed, typed, EnCommit.REVERTED)
         reverted = typed
@@ -589,13 +485,10 @@ class EnglishSession(
     private fun pick(index: Int): Snapshot {
         val text = candidates.getOrNull(index) ?: return snapshot(handled = candidates.isNotEmpty())
         corrected = null
-        // the word typed picked over its correction: kept as typed, as by a correction taken back
         val kept = correction != null && text == typed()
-        // a phrase as it is: no word to learn, nor a space after it
         return if (phrases.at(candidates, index) != null) commit(text, space = false, typed = typed(), learned = false) else commit(text, space = true, typed = typed(), how = if (kept) EnCommit.REVERTED else EnCommit.PICKED)
     }
 
-    // [text] committed for [typed], how as [howOf] tells unless given; [learned] unless left as it is
     private fun commit(text: String, space: Boolean, typed: String = text, how: Int = howOf(text, typed, keepTyped), learned: Boolean = true): Snapshot {
         val committed = if (space) "$text " else text
         val lead = Corrections.lead(recent, clearedAt, known && !cut)
@@ -603,8 +496,7 @@ class EnglishSession(
         clear()
         last = committed
         wrote(committed)
-        // only what the session changed by itself is a correction to take back: a word picked, or
-        // a prediction picked with nothing typed, is the user's own (U-31; R11 F2650)
+        // only what the session changed by itself is a correction to take back
         if (space && how == EnCommit.AUTOCORRECTED && typed.isNotEmpty()) {
             corrections.made(typed, text, lead, seqs, learning)?.let { corrected = Corrected(typed, committed, it) }
         }
@@ -612,7 +504,6 @@ class EnglishSession(
         return snapshot(commit = committed)
     }
 
-    // [word] typed as [typed] learned, how [howOf] tells
     private fun learnTyped(word: String, typed: String) = if (word == reverted) emptyList() else learn(word, typed, howOf(word, typed, keepTyped))
 
     // nothing to pick past the page: the key (space, a digit) is the app's
@@ -645,12 +536,7 @@ class EnglishSession(
         corrected = null
     }
 
-    /**
-     * [text] committed for [typed], [how] as [EnCommit.how]: each word of it (two for alot as a
-     * lot) learned after the word before it, while learning; the commits made, for an undo. What
-     * is no word (a run of letters past [EnglishText.MAX_WORD]) is not counted, and breaks the run,
-     * as in the pages.
-     */
+    /** Learns each word of [text] (alot as a lot) after the one before; a non-word breaks the run, as in the pages. Returns the commits for undo. */
     private fun learn(text: String, typed: String, how: Int): List<Long> {
         if (!learning || guessed()) return emptyList()
         val before = before()
@@ -666,12 +552,7 @@ class EnglishSession(
         return seqs
     }
 
-    /**
-     * [word] as written inside a sentence, as the data has its words: a capital a sentence's start
-     * accounts for, where it is the sentence's [first], is not the word's (Hello as hello), unless
-     * the word is written so anyway, as the data has it (London, I) or the user typed it inside a
-     * sentence; a word in capitals as it is.
-     */
+    /** [word] mid-sentence: a capital only from being a sentence's [first] word is dropped, unless written so anyway (London) or typed so mid-sentence. */
     private fun inSentence(word: String, first: Boolean): String {
         if (!first || word.drop(1).any { it.isUpperCase() }) return word
         val lower = word.replaceFirstChar(Char::lowercaseChar)
@@ -681,8 +562,7 @@ class EnglishSession(
         return if (capital) word else lower
     }
 
-    // the user's words the data has, by id (sorted, so a key's search boxes no id it scores), and
-    // those it lacks, as of the user's [EnglishUser.changes]
+    // sorted, so a search boxes no id
     private var userIds = IntArray(0)
     private var userOnly: List<String> = emptyList()
     private var userSeen = -1
@@ -700,15 +580,12 @@ class EnglishSession(
         userOnly = only
     }
 
-    // the word before, as the user's pairs have it: the same for every word a key's search scores (see read)
     private var scoredPrev: String? = null
 
-    // the trigrams after the context last scored, looked up once for the thousands of words a key or
-    // two's search scores after it, as PinyinDecoder does; at first of a context no model makes
+    // the trigram run looked up once for the thousands of words a search scores
     private var trigramsOf = Long.MIN_VALUE
     private var trigrams = NgramModel.Trigrams.NONE
 
-    // [word]'s score after [context], with the user's chance of it added
     private fun scored(data: EnglishData, context: Long, word: Int): Float {
         if (context != trigramsOf) {
             trigramsOf = context
@@ -720,20 +597,16 @@ class EnglishSession(
         return user.score(base, scoredPrev, data.word(word))
     }
 
-    // [text] went in before the cursor
     private fun wrote(text: String) {
         edge = endOf(edge + text)
         if (!learning) return
         val all = recent + text
         cut = cut || all.length > EnglishText.CONTEXT_CHARS
         recent = all.takeLast(EnglishText.CONTEXT_CHARS)
-        // the mark goes with the text it is in, and once out of it is no longer in reach
         if (clearedAt >= 0) clearedAt = (clearedAt - (all.length - recent.length)).takeIf { it > 0 } ?: -1
     }
 
-    // the app typed [text] itself (a key where English suggests nothing): kept after what is known
-    // of the text before the cursor, as what the session wrote; with nothing known, a word's tail
-    // perhaps, it is no word to score, only the edge. A Backspace is [erased]
+    // the app typed [text] itself: with nothing known it may be a word's tail, so only the edge takes it
     override fun typed(text: String) {
         glided = null
         clear()
@@ -746,13 +619,9 @@ class EnglishSession(
         }
     }
 
-    // the app's Backspace, the session's input empty: the last code point off what is known, and
-    // off the edge, which may know more where the field's text is not. An editor may take more (an
-    // emoji sequence, a flag, a "\r\n") or less; where the code point taken or the char now
-    // last may belong to such a cluster, nothing is known rather than guessed (a glide right after
-    // may then add no space)
+    // the app's Backspace with empty input: one code point off; where that may be a cluster an editor deletes
+    // otherwise, nothing is known rather than guessed
     private fun erased() {
-        // the field empty, nothing taken
         if (known && recent.length <= clearedAt) return
         val end = if (known) recent else edge
         recent = withoutLast(recent)
@@ -760,10 +629,8 @@ class EnglishSession(
         if (endsInCluster(end) || endsInCluster(if (known) recent else edge)) forgetText()
     }
 
-    // what is typed read, the user's phrases under it put among its candidates (EnglishPhrases)
     private fun read() = readWords().also { candidates = phrases.place(input, nineKeys.takeIf { nineKeyed() }, candidates, ::typed) }
 
-    // the word typed, then what it may be, in its case; the correction first, if any
     private fun readWords() {
         pager.reset()
         correction = null
@@ -772,14 +639,13 @@ class EnglishSession(
         val typed = typed()
         val keys = EnglishData.key(input.toString())
         val before = before()
-        // no decoder, no correction: the context is not looked at
         val context = decoder?.context(before) ?: 0L
         scoredPrev = previous(before)
         val found = decoder?.let { d -> offeredOf(SUGGESTED + 1, ::offered) { d.suggest(keys, context, it, touches = input.keyTouches()) } }.orEmpty()
-        // a capital the sentence's start does not account for is the user's: a name, not a slip
+        // a capital the sentence start does not explain is the user's: a name, not a slip
         val upper = typed.count { it.isUpperCase() }
         val name = upper > 1 || upper == 1 && !(typed[0].isUpperCase() && before.lastOrNull().let { it == null || it == EnglishText.START })
-        // each part of a word with a hyphen is one, which the words have none of: as typed
+        // each part of a hyphenated word is a word, which the data has none of: as typed
         val theirs = user.neverCorrected(typed) || user.neverCorrected(typed.replaceFirstChar(Char::lowercaseChar))
         correction = if (keepTyped || theirs || '-' in typed) null else data?.let { autocorrect.of(it, typed, keys, found, context, name) }?.let(::inCase)?.takeUnless(::blocked)
         val data = data ?: return run { candidates = listOf(typed) }
@@ -789,8 +655,6 @@ class EnglishSession(
         candidates = (listOfNotNull(correction) + typed + words).distinct().take(SUGGESTED + 1)
     }
 
-    // the words the nine keys typed may be, those as long as the keys first, each in the case typed:
-    // the data's and the user's own, an apostrophe typed where the word has one
     private fun readNineKeys() {
         val data = data ?: return run { candidates = emptyList() }
         val nine = checkNotNull(nine)
@@ -804,12 +668,10 @@ class EnglishSession(
         refreshUser(data)
         val own = userOnly.mapNotNull { if (blocked(it)) null else nine.own(it, keys, user.score(Float.NEGATIVE_INFINITY, prev, it)) }
         val words = nine.ordered(found + own, input).map { nine.inCase(capitalI(it), input, input.upper) }
-        // every letter pinned: that word first, as typed, though the data has longer ones it starts
         val pinnedWord = listOfNotNull(capitalI(input.toString()).takeIf { input.none { it in '2'..'9' } })
         candidates = (pinnedWord + words).distinct().take(SUGGESTED + 1)
     }
 
-    // the words the user committed that the data lacks, which [keys] spell or start, scored by the user's counts alone
     private fun ownWords(data: EnglishData, keys: String, before: List<String>): List<Pair<String, Float>> {
         refreshUser(data)
         val prev = previous(before)
@@ -820,21 +682,18 @@ class EnglishSession(
         }
     }
 
-    // the words that may come next, a sentence's first capitalised but for one with a capital of its own (iPhone)
     private fun predictions(): List<String> {
         val decoder = decoder ?: return emptyList()
-        // a search field: no next words, as no 联想 in pinyin (U-91)
+        // a search field: no next words, as pinyin has no 联想 there
         if (learnFlags and Commit.NO_PREDICT != 0) return emptyList()
         val data = checkNotNull(data)
         val before = before()
-        // nothing known of the text: nothing to follow
         if (before.isEmpty()) return emptyList()
         val start = before.lastOrNull() == EnglishText.START
         val context = decoder.context(before)
         val prev = previous(before)
         val model = offeredOf(SUGGESTED + 1, ::offered) { decoder.predict(context, it) }
             .map { data.word(it.word) to user.score(it.lm, prev, data.word(it.word)) }
-        // what the user typed after the word before: theirs to type again
         val theirs = prev?.let(user::followers).orEmpty().filterNot(::blocked).map { word ->
             val id = data.id(word)
             word to user.score(if (id == NgramModel.NO_WORD) Float.NEGATIVE_INFINITY else data.model.scoreAfter(context, id), prev, word)
@@ -847,29 +706,21 @@ class EnglishSession(
             .take(SUGGESTED + 1)
     }
 
-    // the words before the cursor, as EnglishText reads them: what the session committed, if that
-    // is all it knows, starting no sentence that is known
     private fun before(): List<String> = EnglishText.context(recent, start = known && !cut)
 
-    // the word last in [before], if one is known, as it was learned: a sentence's first as written
-    // inside one (Hello as hello), which the user's pairs after it are counted under
+    // the user's pairs are counted under a sentence's first word in mid-sentence form (Hello as hello)
     private fun previous(before: List<String>): String? {
         val word = before.lastOrNull()?.takeIf { it != EnglishText.START } ?: return null
         return inSentence(word, first = before.size == 2 && before[0] == EnglishText.START)
     }
 
-    /**
-     * What was typed, as committed: i alone, and i before an apostrophe (i'm), as I. On the nine
-     * keys, the first word they may be, as shown; for none, each key's first letter (never its
-     * digit), for the user to mend.
-     */
+    /** The typed word as committed: i and i' as I; on the nine keys the first word shown, else each key's first letter. */
     private fun typed(): String {
         if (nineKeyed()) return candidates.firstOrNull() ?: nine?.firstLetters(input, input.upper) ?: input.toString()
         return capitalI(input.toString())
     }
 
-    // [word], as written, as the input has its case: Hello for he, HELLO for HE; I' at a
-    // sentence's start is I'm's, not I'M's
+    // I' at a sentence start is I'm's, not I'M's
     private fun inCase(word: String): String = when {
         input.count { it.isLetter() } > 1 && input.all { !it.isLetter() || it.isUpperCase() } -> word.uppercase()
         input[0].isUpperCase() -> word.replaceFirstChar { it.uppercaseChar() }
@@ -891,78 +742,60 @@ class EnglishSession(
             first = pager.from,
             deleteBefore = deleteBefore,
             cursor = if (cursor == input.length || nineKeyed()) -1 else cursor,
-            // a long press's act (屏蔽, 删除) goes by the host's candidate actions, which a list not actionable has none of
+            // long press acts (屏蔽, 删除) use the host's candidate actions, which a non-actionable list lacks
             actionable = candidates.isNotEmpty(),
         )
     }
 
-    // a correction space committed: the word [typed], what it put in ([committed], its space too), as [made]
     private class Corrected(val typed: String, val committed: String, val made: Corrections.Made)
 
     companion object {
         const val DEFAULT_PAGE_SIZE = 5
 
-        /** How many words are suggested besides the one typed. */
         const val SUGGESTED = 9
 
-        /** The most a slip may cost ([TypingCosts]) for space to correct it: a key far from the one meant. */
         const val MAX_CORRECTION = 3.0f
 
-        /** Fewer keys than this are corrected only as written otherwise (i as I): too many words are a slip from one. */
+        /** Fewer keys are only corrected as respelt (i as I): too many words are a slip away. */
         const val MIN_CORRECTED = 2
 
-        /** The most a slip may cost in a word typed with a capital of its own, a name likelier than not: a key beside. */
         const val NAME_CORRECTION = 1.0f
 
-        /** How much likelier (log10) a word must be than the word typed, one too, to be put in its place: a hundred times. */
         const val KNOWN_MARGIN = 2f
     }
 }
 
-// brackets a quote after opens one: ("hi")
-// after these, not the session's, a glide's word has a space before it
+// brackets a quote after opens one: ("hi"); after these a glided word gets a space before it
 private const val SPACED_AFTER = ".,!?;:"
 
-// words a glide's search keeps, before those never offered are left out
 private const val GLIDE_SEARCHED = 30
 
-/** Punctuation that takes the place of the space after a word, a space after it. */
 private const val SWAPPED = ".,!?;:"
 
-// brackets that close, and quotes that may: in the place of the session's space, a space after them
 private const val CLOSING = ")]}"
 private const val QUOTES = "\"'"
 
-// what the session's own space may follow besides a word: a space typed after it is that one
 private const val MARKS = SWAPPED + CLOSING + QUOTES
 
-// a word committed as typed, or for it: corrected, unless the correction was taken back ([keepTyped])
 private fun howOf(word: String, typed: String, keepTyped: Boolean) = when {
     keepTyped && word == typed -> EnCommit.REVERTED
     word != typed -> EnCommit.AUTOCORRECTED
     else -> EnCommit.TYPED
 }
 
-// what [c] typed after the session's own space makes in its place, [before] it, a [word]'s end or a
-// [mark]; null, nothing: the space stays and [c] is typed after it
+// what [c] after the session's own space puts in its place; null: the space stays and [c] goes after it
 private fun madeAfterOwnSpace(c: Char, before: Char?, word: Boolean, mark: Boolean, quoteOpen: () -> Boolean): String? = when {
     before == null -> null
-    // twice after a word: a full stop
     c == ' ' && word -> ". "
-    // in place of the space, and one after it: "word, " then "?" is "word? ", "?! " after "? "
     c in SWAPPED && (word || mark) -> "$c "
-    // a bracket closed, likewise ("(see above.) ", "hello:) "), and a quote where one is open
     c in CLOSING || c in QUOTES && quoteOpen() -> "$c "
     else -> null
 }
 
 private const val OPENING = "([{"
 
-// whether a quote [q] is open at the end of [text]: the last of them not in a word (don't, 90's)
-// opens one after a space, a bracket or the text's start ([startKnown]: the field's), and closes one
-// after a word or punctuation (dogs', "Stop."), so one whose opening one is out of [text] is no
-// opening one, nor one first of a text whose start is not known, which may close one. An opening
-// one is the app's to type
+// the last quote not inside a word (don't) opens after a space, bracket or the field start, closes after a word
+// or punctuation; with the start unknown the first one may be a close
 private fun quoteOpenIn(text: String, q: Char, startKnown: Boolean): Boolean {
     var open = false
     for (i in text.indices) {
@@ -973,12 +806,10 @@ private fun quoteOpenIn(text: String, q: Char, startKnown: Boolean): Boolean {
     return open
 }
 
-// whether the char at [i] of [text] has a letter or digit on both sides, as the quote in don't
 private fun inWord(text: String, i: Int): Boolean =
     text.getOrNull(i - 1)?.isLetterOrDigit() == true && text.getOrNull(i + 1)?.isLetterOrDigit() == true
 
-// the [limit] best that [find] finds, asked for how many, that are [offered]: more asked for where
-// some are not, so those left out leave no gap
+// asks for more where some are dropped, so none leave a gap
 private fun offeredOf(
     limit: Int,
     offered: (Int) -> Boolean,
@@ -993,32 +824,21 @@ private fun offeredOf(
     }
 }
 
-// i alone, and i before an apostrophe (i'm), as I; tapping and gliding alike
 private fun capitalI(s: String): String = if (s == "i" || s.startsWith("i'")) "I" + s.substring(1) else s
 
-// [text]'s end as [edge] keeps it: its last [EDGE_CHARS] chars up to its last not a space,
-// and the spaces after them, as many as fit after those
 private fun endOf(text: String): String {
     val end = text.trimEnd().length
     val kept = text.substring(maxOf(0, end - EDGE_CHARS), end)
     return kept + text.substring(end).take(EnglishText.CONTEXT_CHARS - kept.length)
 }
 
-// the chars [edge] keeps before the spaces at its end: where nothing is known of the text
-// before the cursor (forgotten at a Reset, an Enter or an arrow, a hardware key, the field
-// left, and no Context read since), the app's Backspaces after keys typed take back a
-// word's worth before nothing is known
+// with nothing known before the cursor (after a Reset, Enter, arrow), the app's Backspaces can still take back a word
 private const val EDGE_CHARS = 32
 
-// [text] less its last code point
 private fun withoutLast(text: String): String =
     if (text.isEmpty()) text else text.substring(0, text.offsetByCodePoints(text.length, -1))
 
-// whether [text]'s last code point may belong to a cluster an editor's Backspace takes
-// otherwise than by code point: a mark (an accent, a variation selector, a keycap), a
-// ZWJ, anything outside the BMP (an emoji, a skin tone, a regional indicator, a tag), or
-// a CR, taken or left, perhaps a "\r\n"'s half (a key event takes both, an opted-in editor
-// the "\n")
+// a combining mark, ZWJ, anything outside the BMP, or a CR: an editor's Backspace may not take it by code point
 private fun endsInCluster(text: String): Boolean {
     if (text.isEmpty()) return false
     val c = text.codePointBefore(text.length)

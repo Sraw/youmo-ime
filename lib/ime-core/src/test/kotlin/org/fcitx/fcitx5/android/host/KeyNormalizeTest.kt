@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.host.KeyStates.ALT
 import org.fcitx.fcitx5.android.host.KeyStates.CAPS_LOCK
 import org.fcitx.fcitx5.android.host.KeyStates.CTRL
@@ -17,7 +18,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** `Key::normalize`, one case per branch; lines are `fcitx5/lib/fcitx-utils/key.cpp`. */
+/** `Key::normalize`, one case per branch. */
 class KeyNormalizeTest {
 
     private fun norm(sym: Int, states: Int = 0) = Key(sym, states).normalize()
@@ -72,7 +73,6 @@ class KeyNormalizeTest {
 
     @Test
     fun `key predicates`() {
-        // key.cpp:446-458,489
         assertTrue(Key('a'.code).isLAZ)
         assertFalse(Key('a'.code, SHIFT).isLAZ)
         assertTrue(Key('Z'.code).isUAZ)
@@ -85,7 +85,7 @@ class KeyNormalizeTest {
 
     @Test
     fun `keysym to unicode`() {
-        // key.cpp:738-800, in the order of its checks
+        // keySymToUnicode, in the order of its checks
         assertEquals('a'.code, KeySyms.toUnicode('a'.code))
         assertEquals(0xe9, KeySyms.toUnicode(0xe9))
         assertEquals(' '.code, KeySyms.toUnicode(KeySyms.KP_SPACE))
@@ -94,8 +94,8 @@ class KeyNormalizeTest {
         assertEquals('5'.code, KeySyms.toUnicode(KeySyms.KP_0 + 5))
         assertEquals(0x7f, KeySyms.toUnicode(KeySyms.DELETE))
         assertEquals(0, KeySyms.toUnicode(0x0100d800))
-        assertEquals(0x4e2d, KeySyms.toUnicode(KeySyms.UNICODE_OFFSET + 0x4e2d))
-        assertEquals(0x1f600, KeySyms.toUnicode(KeySyms.UNICODE_OFFSET + 0x1f600))
+        assertEquals(0x4e2d, KeySyms.toUnicode(UNICODE + 0x4e2d))
+        assertEquals(0x1f600, KeySyms.toUnicode(UNICODE + 0x1f600))
         // keydata.h: first, last and a middle entry of keysym_to_unicode_tab
         assertEquals(0x0104, KeySyms.toUnicode(0x01a1))
         assertEquals(0x20ac, KeySyms.toUnicode(0x20ac))

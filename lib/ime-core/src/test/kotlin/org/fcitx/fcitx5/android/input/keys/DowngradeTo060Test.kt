@@ -13,14 +13,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * What 0.6.0 makes of what this version writes (061-text-variables §4.3, ST-126): its readers rewritten here by
- * v0.6.0's rules (KeyLists.kt:123 needsMigration, :136 parse's header, KeyListsCache's choice; SwipeSlot.kt:197
- * parseValue, a line it cannot read skipped), not its code, which this version no longer has.
- */
+/** What 0.6.0 makes of what this version writes: its readers rewritten here by its rules, not its code, which this version no longer has. */
 class DowngradeTo060Test {
 
-    // v0.6.0 KeyLists.kt:136: parse is null for any header but `@2`; :123 needsMigration only for none, no number or `@1`
+    // 0.6.0's KeyLists.parse is null for any header but `@2`; needsMigration only for none, no number or `@1`
     private object KeyLists060 {
         fun parses(text: String) = text.trimStart { it.isWhitespace() || it == '﻿' }.lineSequence().first().trimEnd() == "@2"
         fun needsMigration(text: String): Boolean {
@@ -32,7 +28,7 @@ class DowngradeTo060Test {
         fun usesDefaults(text: String) = !parses(text) && !needsMigration(text)
     }
 
-    // v0.6.0 SwipeSlot.kt:197 parseValue: a value it knows kept, any other line skipped, the slot its preset
+    // 0.6.0's SwipeSlot.parseValue: a value it knows kept, any other line skipped, the slot its preset
     private object SwipeSlots060 {
         fun kept(text: String): Map<String, String> = text.split('\n').drop(1).mapNotNull { line ->
             val name = line.substringBefore('\t')

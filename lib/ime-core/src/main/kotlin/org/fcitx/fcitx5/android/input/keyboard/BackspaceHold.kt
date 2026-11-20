@@ -7,32 +7,26 @@ package org.fcitx.fcitx5.android.input.keyboard
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * One hold of ⌫ (the keyboard's, or a hardware Backspace's auto-repeat): whether each of its repeats deletes.
- * A hold begun while something was typed (a preedit, a code, a stroke filter, the field's composing word)
- * stops once that is all deleted, for the rest of the hold: it never goes on into the field's text, which
- * takes letting go and pressing again (user 2026-11-15). One begun with nothing typed deletes on as ever.
- *
- * Told its press and asked each repeat in their turns on the host's thread, every key sent before them
- * handled: what the keyboard shows lags behind the engine, and a repeat 50 ms after the one that emptied
- * the preedit would else delete a character of the field's before the keyboard knew. The press's, not the
- * first repeat's: another finger's key may commit what is typed in the long press's wait between them.
+ * One hold of ⌫: a hold begun with something typed stops once that is all deleted, never going on into the field's
+ * text. Asked in turn on the host's thread after every key sent before: the keyboard's view lags the engine, and a
+ * repeat right after emptying the preedit would else delete a field character. The press decides, not the first repeat:
+ * another finger may commit during the long-press wait.
  */
 class BackspaceHold {
-    // whether something was typed as the hold began: told by its press's turn on the host's thread, or by the
-    // keyboard on the main thread where strokes written on the keys are there to take back; whichever tells first
+    // whatever tells first: the press's turn on the host thread, or the keyboard where strokes on the keys are to take back
     private val began = AtomicReference<Boolean?>(null)
 
-    /** Set once the hold has stopped: its later repeats need not be sent. */
+    /** Its later repeats need not be sent. */
     @Volatile
     var stopped = false
         private set
 
-    /** Its press's turn, [composing] as every key before it left things: what was typed as the hold began. */
+    /** [composing] as every key before it left things. */
     fun press(composing: Boolean) {
         began.compareAndSet(null, composing)
     }
 
-    /** A repeat's turn, [composing] as every key before it left things: whether it goes on as a backspace. */
+    /** Whether it goes on as a backspace. */
     fun repeat(composing: Boolean): Boolean {
         // a press never told (a repeat first in its turn): as things are now
         began.compareAndSet(null, composing)
@@ -43,7 +37,7 @@ class BackspaceHold {
         return true
     }
 
-    /** Strokes written on the keys that the hold takes back, which the host does not see: something was typed as it began. */
+    /** The host does not see strokes on the keys: something was typed as it began. */
     fun taken() {
         began.compareAndSet(null, true)
     }

@@ -5,20 +5,16 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.theme
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
-import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 // the one rule the app's import and the theme maker refuse a pack by: Shift, Backspace, Space, Return never blank
 class BlankKeysTest {
-    private val source = testData("material-light.xml")
-
-    private fun theme(vararg style: String): Theme = ThemeReader.theme(source.replace("</theme>", style.joinToString("\n", postfix = "\n</theme>"))).ok()
-
     private val qwerty = BlankKeys.Board(Fixtures.qwerty)
 
     // the same keys under another board's id: what a theme's @keyboard= tells apart
@@ -38,7 +34,7 @@ class BlankKeysTest {
     }
 
     // two boards of one <keyboard id> (emoji.xml's and emoticon.xml's are both `emoji`): each asked, each its own keys,
-    // each told by the id it is drawn as (R26 F8415)
+    // each told by the id it is drawn as
     @Test
     fun twoBoardsOfOneKeyboardIdAreEachAsked() {
         val twin = BlankKeys.Board(LayoutReader.layout(Fixtures.qwertySource.replace(Regex("<key id=\"backspace\"[^>]*/>"), "")).ok(), id = "twin")

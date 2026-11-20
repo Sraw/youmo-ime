@@ -27,7 +27,6 @@ class ToneRulesTest {
     @Test
     fun aWordTakesTheTonesOfTheLongestListedWordItEndsWith() {
         assertEquals("4244", tones("个人爱好", "ge ren ai hao", "4243"))
-        // its own listing wins
         assertEquals("4243", tones("个人爱好", "ge ren ai hao", "4243", own = "4243"))
         assertEquals("143", tones("核电子", "he dian zi", "143"))
     }
@@ -50,13 +49,10 @@ class ToneRulesTest {
 
     @Test
     fun aNeutralToneIsItsCharactersUsualOneUnlessThatIsNeutralToo() {
-        // 东西 dōng xi as phrase-pinyin-data lists it: 西 is xī
         assertEquals("11", ToneRules.full(bytes("15"), bytes("11")).joinToString(""))
-        // 我们: 们 has no tone but the neutral one
         assertEquals("35", ToneRules.full(bytes("35"), bytes("35")).joinToString(""))
         // a character with no usual tone known keeps what the source gave
         assertEquals("15", ToneRules.full(bytes("15"), bytes("10")).joinToString(""))
-        // toned syllables stand, usual or not
         assertEquals("44", ToneRules.full(bytes("44"), bytes("43")).joinToString(""))
     }
 }

@@ -31,9 +31,7 @@ class AllReadingsTest {
         assertEquals(listOf("háng/xíng…"), readings.allOf("行", ReadingStyle.PINYIN, "银"))
         assertEquals(listOf("háng", "xíng", "héng", "hàng"), ordered('行', "银"))
         assertEquals(listOf("héng", "xíng", "háng", "hàng"), ordered('行', "道"))
-        // the word at the end of what was written
         assertEquals("háng", ordered('行', "你银").first())
-        // no word: as usual
         assertEquals(listOf("xíng", "háng", "héng", "hàng"), ordered('行', "你"))
         assertEquals(listOf("xíng", "háng", "héng", "hàng"), ordered('行', "道路"))
     }

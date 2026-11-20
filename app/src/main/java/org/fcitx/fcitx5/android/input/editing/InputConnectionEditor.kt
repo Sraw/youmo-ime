@@ -10,12 +10,8 @@ import android.view.inputmethod.InputConnection
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 
 /**
- * Binds [InputEditor] to the real editor.
- *
  * The connection is fetched per call rather than held: `InputMethodService` hands out a new
- * one on every input session and the old one silently stops working. When there is none,
- * [isAvailable] is false and `EditingSession` skips the operations the service used to guard
- * with `currentInputConnection ?: return`; any call that still arrives is dropped here.
+ * one on every input session and the old one silently stops working.
  */
 class InputConnectionEditor(private val connection: () -> InputConnection?) : InputEditor {
 

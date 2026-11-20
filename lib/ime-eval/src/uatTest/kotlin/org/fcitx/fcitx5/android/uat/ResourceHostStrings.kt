@@ -12,12 +12,7 @@ import org.fcitx.fcitx5.android.host.UnicodeStrings
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-/**
- * The host's texts as the app's AppHostStrings reads them, from the app's string resources in one
- * locale ([qualifier], `zh-rCN` as the parity redroids run: uat.py sets persist.sys.locale), the
- * default `values/` where that locale has none. A parity recording shows the device's language in
- * the quick input and Unicode prompts; the replay has to show the same.
- */
+/** The host's texts from the app's string resources in one locale, as the device shows them in its language. */
 class ResourceHostStrings(res: File, qualifier: String) : HostStrings {
     private val strings: Map<String, String> = read(File(res, "values/strings.xml")) + read(File(res, "values-$qualifier/strings.xml"))
 
@@ -68,8 +63,7 @@ class ResourceHostStrings(res: File, qualifier: String) : HostStrings {
         /** The app's strings in the parity devices' locale; null when not run by Gradle (no `uat.res`). */
         fun device(): ResourceHostStrings? = System.getProperty("uat.res")?.let { ResourceHostStrings(File(it), "zh-rCN") }
 
-        // the host_ strings of a strings.xml, as aapt reads them: a quoted value's quotes taken off
-        // (spaces kept), \' and \" unescaped
+        // a strings.xml's host_ strings as aapt reads them: quotes taken off (spaces kept), \' and \" unescaped
         private fun read(file: File): Map<String, String> {
             if (!file.isFile) return emptyMap()
             val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)

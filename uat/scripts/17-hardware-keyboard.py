@@ -12,7 +12,6 @@ MANUAL_NO_CURSOR = ("manual:要一个不告诉输入法光标位置的应用（�
 BUTTON = "显示屏幕键盘"
 
 
-
 def typ(d, text, after=0.5):
     d.kb("type", text)
     time.sleep(after)
@@ -102,9 +101,6 @@ def hk01(d):
     check(b.b[0] >= right - 5, f"键盘图标不在右端：图标 {b.b}，候选到 {right}")
     check(f and abs(b.b[1] - f.b[3]) < 300, f"小窗不在光标附近：小窗 {b.b}，框 {f.b if f else None}")
     return f"屏幕键盘收起；小窗 `{p}` {c[:4]}，右端键盘图标"
-
-
-case("HK-02", needs="jvm:HardwareKeysUatTest.spaceCommitsTheFirstADigitPicksByNumber、HardwareKeyUatTest.keysGoToTheEngineAndTheTouchKeyboardGoes")(lambda d: None)
 
 
 @case("HK-03", base="B0-实体", mutates="learn")
@@ -234,8 +230,7 @@ def search_box(d, e):
     t = next((n.text for n in s.app() if n.cls.endswith("EditText") and n.focused), "")
     check(not soft(s), "在设置的搜索框里按 n i 空格，屏幕键盘没收起")
     check(t == "你", f"设置的搜索框里是「{t}」")
-    # no Esc first: a search box offers no 联想 to close (docs/pinyin.md), so the app takes the Esc
-    # and the box loses its focus
+    # no Esc first: a search box offers no 联想 to close, so the app takes the Esc and the box loses focus
     d.tap(e.c, 1.0)
     ok = False
     try:
@@ -247,46 +242,9 @@ def search_box(d, e):
     return f"按 n i 空格「{t}」，屏幕键盘收起；点框回来"
 
 
-case("HK-04", needs="jvm:HardwareKeyUatTest.enterAndEscapeGoToTheEngine")(lambda d: None)
-
-
-case("HK-05", needs="jvm:HardwareKeyUatTest.backspaceGoesToTheEngine")(lambda d: None)
-
-
-case("HK-06", needs="jvm:HardwareKeysUatTest.minusAndEqualTurnThePagesWhileTyping")(lambda d: None)
-
-
-case("HK-07", needs="jvm:HardwareKeysUatTest.minusAfterACommitIsTheMark")(lambda d: None)
-
-
-case("HK-08", needs="jvm:HardwareKeysUatTest.pageDownAndPageUpTurnThePages")(lambda d: None)
-
-
-case("HK-09", needs="jvm:HardwareKeyUatTest.aShiftTapSwitchesChineseAndEnglish")(lambda d: None)
-
-
-case("HK-10", needs="jvm:HardwareKeyUatTest.shiftWhileTypingSwitchesToEnglish")(lambda d: None)
-
-
-case("HK-11", needs="jvm:HardwareKeyUatTest.shiftHeldTypesCapitalsAndSwitchesNothing")(lambda d: None)
-
-
-case("HK-12", needs="jvm:HardwareKeyUatTest.ctrlSpaceSwitchesAndTypesNoSpace")(lambda d: None)
-
-
 @case("HK-30", base="B0-实体", needs="manual:要分屏（上面测试页、下面设置）再点回上面的窗口；模拟器上手动摆（最近任务里点应用图标→分屏）")
 def hk30(d):
     pass
-
-
-case("HK-13", needs="jvm:HardwareKeyUatTest.shiftBackFromEnglishIsWubiNotPinyin")(lambda d: None)
-
-
-
-case("HK-15", needs="jvm:HardwareKeyUatTest.shiftThenCtrlToo")(lambda d: None)
-
-
-case("HK-16", needs="jvm:HardwareKeyUatTest.ctrlCAndCtrlVAreForTheApp")(lambda d: None)
 
 
 @case("HK-17", base="B0-实体")
@@ -308,18 +266,6 @@ def hk17(d):
     return f"Meta+空格 后当前输入法 {cur.split('/')[0]}；幽默没报错"
 
 
-
-
-case("HK-20", needs="jvm:HardwareKeyUatTest.nineKeysTypedOnAndBack")(lambda d: None)
-
-
-case("HK-21", needs="jvm:HardwareKeysUatTest.returnPutsTheWrittenInThenGoesToTheApp")(lambda d: None)
-
-
-
-case("HK-23", needs="jvm:HardwareKeysUatTest.englishTypesTheKeysAsPressed")(lambda d: None)
-
-
 @case("HK-24", base="B0-实体", page="password")
 def hk24(d):
     typ(d, "abc123")
@@ -330,35 +276,9 @@ def hk24(d):
     return f"框里 {len(t)} 个字符（「{t}」），没有候选窗"
 
 
-case("HK-25", needs="jvm:HardwareKeyUatTest.noCandidatesWindowKeepsTheTouchKeyboard")(lambda d: None)
-
-
-case("HK-25a", needs="jvm:HardwareKeyUatTest.shortcutsOffSwitchNothing")(lambda d: None)
-
-
-case("HK-26", needs="jvm:HardwareKeyUatTest.theCandidatesWindowStandsUp")(lambda d: None)
-
-
-case("HK-27", needs="jvm:HardwareKeyUatTest.unpluggedTheTouchKeyboardComesBack")(lambda d: None)
-
-
-case("HK-28", needs="jvm:HardwareKeyUatTest.landscapeSplitBack")(lambda d: None)
-
-
 case("HK-33", base="B0-实体", needs="manual:要一个输入框在屏幕最顶上的应用（候选窗贴屏幕顶）；测试页的框不够高，手动跑")(lambda d: None)
 
 
-# ---------------------------------------------------------------- Shift+Delete (HK-31, HK-32)
-
-# emu-keyboard.sh's key/combo release at once; holding a key down for a while (the system's key
-# repeat) or releasing in a given order needs the raw events, on the same device it registered
-case("HK-31", needs="jvm:HardwareKeyUatTest.shiftDeleteForgetsTheHighlightedOnceHeld")(lambda d: None)
-
-
-case("HK-32", needs="jvm:HardwareKeyUatTest.aQuickShiftDeleteIsNoShiftTap")(lambda d: None)
-
-
-case("HK-34", needs="jvm:HardwareKeysUatTest.thePageSizeSetIsTheWindowsPage")(lambda d: None)
 
 
 def tip_seen(d, timeout=1.5, text="全角标点"):
@@ -377,11 +297,7 @@ def hk35(d):
     typ(d, "a")   # the touch keyboard away first
     key(d, "ESC")
     d.step("Ctrl+. 后马上打字")
-    # the tip's 1 s is shorter than the reads around the key take (~1.2 s on an emulator: the key
-    # tool's adb ~0.3 s a call, a dump ~0.15 s): for this step it is lengthened as accessibility asks
-    # (the time to read, 5 s), so only typing can have put it away. Timed from the shortcut to the
-    # last look, the screen reads on either side included: the tip can't be older than that (F3583)
-    # put back as it was after (a phone's own setting): "null" when it was never set
+    # the 1 s tip is shorter than the reads around the key, so it is lengthened as accessibility asks (5 s); restored after
     was = d.sh("settings get secure accessibility_non_interactive_ui_timeout_ms").strip()
     d.sh("settings put secure accessibility_non_interactive_ui_timeout_ms 5000")
     try:
@@ -406,8 +322,7 @@ def hk35(d):
     t0 = time.time()
     combo(d, "CTRL", "DOT", after=0)
     t2 = tip_seen(d)
-    # said for 1 s (rule 5), not the 2 s a failure stays: looked at 1.6 s from the shortcut, the key
-    # tool's ~0.3 s in it, so the tip is 1.3–1.6 s old and gone, slid out too, while a failure's is not
+    # said for 1 s, not a failure's 2 s: looked at 1.6 s from the shortcut, the tip is gone while a failure's is not
     time.sleep(max(0.0, t0 + 1.6 - time.time()))
     gone2 = tip_seen(d, 0.1) is None
     late2 = time.time() - t0
@@ -458,9 +373,7 @@ def hk36(d):
     return f"「{t1}」→「{f1}」；「{t2}」→「{f2}」"
 
 
-# Android's window manager policy takes every key pressed with Meta held before an input method sees it
-# ("Dropped event because policy consumed it" for Meta and the key, down and up; hk37-debug.md): fcitx's
-# Super+` and Super+; triggers are kept, asserted on the JVM, and reached only where a system delivers them
+# Android's window manager consumes every key pressed with Meta before an input method sees it: Super+` and Super+; asserted on the JVM
 @case("HK-37", base="B0-实体")
 def hk37(d):
     away(d)
@@ -474,9 +387,6 @@ def hk37(d):
     check(not p and f0 == "", f"Super+` 后小窗「{p}」框「{f0}」")
     check(f == "你", f"之后 ni 空格 上屏「{f}」")
     return f"Super+` 后没有快速输入，小窗「{p}」框「{f0}」；再打「{f}」"
-
-
-case("HK-38", needs="jvm:QuickPhraseTest.superGraveAndSuperSemicolonTriggerOnPressOnly")(lambda d: None)
 
 
 @case("HK-39", base="B0-实体")
@@ -500,7 +410,7 @@ def hk39(d):
     check(t, "按 Ctrl+Alt+Shift+U 光标旁没有「Unicode：」")
     check(any("°" in x for x in c), f"degree 的候选 {c[:5]}")
     check(labels and all(x.startswith("A-") for x in labels), f"标号不是 Alt 加数字 {labels}")
-    # 方向「自动」: the Unicode list asks for vertical, pinyin stays horizontal (F3975)
+    # 方向「自动」: the Unicode list asks for vertical, pinyin stays horizontal
     check(len(nodes) > 1 and all(a.b[1] < b.b[1] and abs(a.b[0] - b.b[0]) < 5 for a, b in zip(nodes, nodes[1:])),
           f"Unicode 候选不是竖排 {[n.b[:2] for n in nodes[:3]]}")
     check(f and c and f in c[0], f"Alt+1 上屏「{f}」，第一个候选 {c[:1]}")
@@ -596,9 +506,7 @@ def hk43(d):
 
 @case("HK-44", base="B0-实体", mutates=True)
 def hk44(d):
-    # the Escape half is KeyboardPairTest's (.md): on the device a hardware key puts the touch keyboard
-    # away whoever gets the Escape (no 联想 left to see) and Esc leaves a web field's text alone, so
-    # the Escape here is a smoke and only the digit picking is checked
+    # the Escape half is KeyboardPairTest's: here a smoke, and only the digit picking is checked
     to_14(d)
     show_touch(d, must=False)
     # BN UI GH AS OP is 不好 as well as 你好: each tapped on its letter's half, as a finger means it
@@ -648,6 +556,3 @@ def hk45(d):
 
 
 case("HK-46", needs="manual:编码行在输入框里时实体键盘的悬浮候选窗没有拼音那一行：接 emu-keyboard.sh 的实体键盘手工看")(lambda d: None)
-case("HK-47", needs="jvm:HardwareKeyUatTest.theFloatingWindowsCardsAreOneColumn")(lambda d: None)
-
-case("HK-48", needs="jvm:HardwareKeysUatTest.aHardwareKeyPutsTheWrittenInThenTypes")(lambda d: None)

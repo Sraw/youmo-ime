@@ -47,12 +47,11 @@ class LexiconViewTest {
     fun onlyThoseKnownNotUsedForLong() {
         assertEquals("旧", texts(recent = false, unused = true))
         assertEquals("旧", texts(recent = true, unused = true))
-        // from the day it is two months of typing
         assertTrue(LexiconView.unused(word("满", LexiconView.UNUSED_DAYS, 0)))
         assertFalse(LexiconView.unused(word("差", LexiconView.UNUSED_DAYS - 1, 0)))
     }
 
-    // verify-E F3: when a word was last used, as the lexicon page lists it: idle in typing days, never a day not known
+    // when a word was last used, as the lexicon page lists it: idle in typing days, never a day not known
     @Test
     fun aWordsLastUseIsCountedInTypingDays() {
         val log = LearnLog(dir.file(LearnLog.FILE), clock).also { it.open() }
@@ -63,15 +62,13 @@ class LexiconViewTest {
         }
         val words = listOf("指导", "没打过").map { UserWord(it, "", UserWord.Kind.ADDED) }
         val (used, never) = LexiconView.dated(log.state, words)
-        // 15 days away, 3 of them typed on
         assertEquals(3, used.idle)
         assertEquals(LearnClock.localDay(clock, (FakeClock.START / LearnClock.MINUTE).toInt()), used.lastUsed)
         assertEquals(UserWord.NEVER, never.idle)
         assertEquals(UserWord.NEVER, never.lastUsed)
     }
 
-    // 「最近学到」: by the typing day each became the user's, a merge having moved another install's
-    // onto the phone's, then by seq; never by seqs of two installs' counts alone
+    // by the typing day each became the user's, then by seq; never by two installs' seqs alone
     @Test
     fun theLatestLearnedFirstByTheirTypingDay() {
         val state = LearnState()

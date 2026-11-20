@@ -45,53 +45,41 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 
-/**
- * A uat/ case's 操作 replayed through the Kotlin host ([HostCore]) as the app runs it:
- * the same keys as [EngineReplay]'s (whose host has no modules), here with the rest of the host's
- * code (the punctuation module with the table the app ships, the panel, paging,
- * activate and deactivate), the refine timer a [VirtualHostClock] the user's pause runs out, and
- * the field a [FakeEditor] the host's events edit (commits, deletions around the cursor, text after
- * it) and that tells the engine what is around the cursor as the service does after each change.
- */
+/** A uat/ case's 操作 replayed through the Kotlin host ([HostCore]) with its modules, a [VirtualHostClock] and a [FakeEditor] field. */
 class HostReplay(
     val engines: Engines = UatEngines.fresh(),
     im: String = InputMethodCatalog.PINYIN,
     field: EngineReplay.Field = EngineReplay.Field.TEXT,
-    /** How long a field's text is remembered ([ContextMemory]'s fresh): short in a case, as the engine's own timers run on the clock too. */
+    /** [ContextMemory]'s fresh: short in a case, as the engine's own timers run on the clock too. */
     freshMillis: Long = ContextMemory.FRESH_MILLIS,
-    /** The input methods enabled, in their order: every listed one unless given (a parity file's header gives a device's). */
+    /** The input methods enabled, in order (a parity file's header gives a device's). */
     private val inputMethods: List<String> = InputMethodCatalog.LISTED.map { it.name },
-    /** The host's texts in the app's language: fcitx's English unless given (a parity replay gives the device's, [ResourceHostStrings]). */
+    /** fcitx's English unless given (a parity replay gives the device's, [ResourceHostStrings]). */
     strings: HostStrings = HostStrings.ENGLISH,
-    /** The first field's name, as the service names a field for its memory of it (ContextMemory.field). */
+    /** The first field's name, as ContextMemory.field names it. */
     private val firstField: String = "field1",
 ) {
     val clock = VirtualHostClock()
 
-    // declared before init, whose activation already sends events through the port that reads them
-    /** How long the engine takes over a refine slice and over any other event, on the [clock]: a device's pace. */
+    /** The engine's time per refine slice and per other event: a device's pace (declared before init, which already uses it). */
     var refineMillis = 0L
     var keyMillis = 0L
 
-    /** The refine slices the router sent the engine: what a timer that ran was for. */
     var refines = 0
         private set
 
-    // what the engine threw: the router catches it (KeyRouter.call) and goes on, so a case that expects
-    // nothing would pass over a crash; thrown after the key or at the next pause instead
+    // the router catches an engine throw (KeyRouter.call) and goes on: rethrown after the key or at the next pause
     private var crash: Throwable? = null
 
     var field: EngineReplay.Field = field
         private set
 
-    /** The uid of the app focused. */
     var uid = 0
         private set
 
     var editor = FakeEditor()
         private set
 
-    /** What the panel shows: the last preedit, and the last list sent. */
     var preedit: String = ""
         private set
 
@@ -101,40 +89,29 @@ class HostReplay(
     var hasNextPage = false
         private set
 
-    /**
-     * The code row as the keyboard draws it (PreeditUi): the aux text above, then the preedit, a `|`
-     * at its cursor unless the cursor is at the end.
-     */
+    /** The code row as PreeditUi draws it: the aux text, then the preedit with `|` at its cursor unless at the end. */
     var row: String = ""
         private set
 
-    /** How many panel and candidate updates the host has sent: whether what is shown changed. */
     var panelUpdates = 0
         private set
 
-    /**
-     * How often [ime] went to another input method: the language key's presses each show fcitx's
-     * overlay of the name on the bar (the device's panel shows it, on either host), which ends what
-     * another app left shown there. The host here is made without it (showInputMethodInformation).
-     */
+    /** How often [ime] switched input method: on a device each switch's name overlay ends what another app left on the bar. */
     var switches = 0
         private set
 
-    /**
-     * How many hardware keys with a character were pressed: each shows the floating candidates
-     * window over the bar (InputDeviceManager.evaluateOnKeyDown), until the next field's input view.
-     */
+    /** Hardware keys with a character pressed: each shows the floating candidates window (InputDeviceManager.evaluateOnKeyDown). */
     var floatingShown = 0
         private set
 
-    /** The page as the bar shows each candidate: its text, and its comment after a space if it has one. */
+    /** The page as the bar shows it: each text, its comment after a space if any. */
     var shown: List<String> = emptyList()
         private set
 
     val commits = ArrayList<String>()
 
     private val port = object : EngineHost {
-        // every call the host makes into the engines: a throw from the bar's paging is a crash as much as a key's
+        // every call into the engines: a throw from the bar's paging is a crash as much as a key's
         private fun <T> caught(call: () -> T): T =
             try {
                 call()
@@ -155,7 +132,6 @@ class HostReplay(
     private val modules = ChineseModules(
         ModuleInputs(
             punctuationProfile = PunctuationProfile.parse(PUNCTUATION),
-            // HalfWidthPuncAfterLetterOrNumber off, the default
             punctuationConfig = PunctuationConfig(halfWidthAfterLatinOrNumber = false),
             converter = { CONVERTER },
             quickPhraseTable = QUICK_PHRASES,
@@ -171,32 +147,21 @@ class HostReplay(
 
     val im: String get() = core.currentInputMethod()
 
-    /** The field's text, all of it. */
     val text: String get() = editor.text
 
-    /** The candidates among them all (the engine's list, as [EngineReplay.candidates]). */
     val candidates: List<String> get() = engines.candidates(im, 0, ALL).map { it.text }
 
-    // ------------------------------------------------------------------ the field
-
-    /** The field left by the last [focus], as it was left. */
     var left: String? = null
         private set
 
-    /**
-     * A new field focused with [before] and [after] the cursor. The old one loses focus as the
-     * service leaves it: fcitx commits nothing, the app's field keeping the client preedit as its
-     * composing text (ClientUnfocusCommit, instance.cpp:1131-1138; the app finishes the composing
-     * text, FcitxInputMethodService.finishComposing), and androidengine drops what was typed
-     * (androidengine.cpp:765-771).
-     */
+    /** A new field focused; the old one loses focus as the service leaves it (fcitx commits nothing, the app finishes composing). */
     fun focus(
         before: String,
         field: EngineReplay.Field = this.field,
         after: String = "",
-        // null: named by its app's uid, the one given (a field of another app by its own), else the next new one's
+        // null: the given app's uid names it, else the next new one's
         name: String? = null,
-        /** The uid of the app the field is in (one focused before: its input context again); a new app's unless given. */
+        /** The field's app (one focused before: its input context again); a new app's unless given. */
         app: Int? = null,
     ) {
         if (uid > 0) {
@@ -218,75 +183,65 @@ class HostReplay(
         page = emptyList()
         shown = emptyList()
         policy.focusAnother(name ?: "field$uid", password = field == EngineReplay.Field.PASSWORD, sensitive = field.sensitive)
-        // the new field is told below: a switch the activation made needs no telling of its own
         switched = false
         told(started = true)
         pause()
     }
 
-    /** Whether the editor itself answered the last context told ([Action.Context.said]), as the service tells it. */
+    /** Whether the editor itself answered the last context told ([Action.Context.said]). */
     var contextSaid: Boolean = false
         private set
 
-    /** What the engine was last told is before the cursor. */
     var contextTold: String = ""
         private set
 
-    /** The user is away [millis]: the host's clock and the engines' uptime both moved on. */
     fun away(millis: Long) = advance(millis)
 
-    // every wait moves both clocks: the engines' timing (a table's space taken after a commit) sees a
-    // pause or a tap's gap as the device's does, not the few milliseconds the replay took
+    // every wait moves both clocks: engine timing (a table's space after a commit) sees a device's gaps
     private fun advance(millis: Long) {
         clock.advance(millis)
         UatEngines.Clock.away(millis)
     }
 
-    /** The code shown in the field (the client preedit, with the preedit capability). */
+    /** The client preedit (with the preedit capability). */
     var clientPreedit: String = ""
         private set
 
-    /** The candidate list paged by the host (the floating window's and the hardware keyboard's mode) rather than by the bar. */
+    /** The candidate list paged by the host (floating window, hardware keyboard) rather than by the bar. */
     fun pagedList() {
         core.setCandidatePagingMode(1)
     }
 
-    // what the service decides of each field, and what it remembers across them (FieldPolicy.context)
     private val memory = ContextMemory(fresh = freshMillis)
     private val policy = FieldPolicy(memory)
 
-    // the service's commitText: the field and the memory of it, nothing told (the engine knows its own
-    // commits; the app tells it only on a cursor report it did not expect, tellContextLater)
+    // the service's commitText: field and memory, nothing told (the engine knows its own commits)
     private fun commit(text: String) {
         editor.commitText(text, 1)
         memory.committed(text, -1, clock.uptimeMillis())
     }
     private var recall = false
 
-    // a hardware key being sent: one handed back is the editor's own key event (the service replays it), not the screen's
+    // a hardware key being sent: one handed back is the editor's own key event, not the screen's
     private var pressing = false
 
-    // an input method change the policy has the session told the field for (FcitxInputMethodService's IMChangeEvent)
+    // a switch the session told the field for (FcitxInputMethodService's IMChangeEvent)
     private var switched = false
 
     init {
         core.events += HostEvents(::apply)
-        // the router's half of HostCore.configure, from the settings the engines were given: without it
-        // English suggests here whatever they say, the keys composing where the device types them as is (EN-19)
+        // the router's half of HostCore.configure: without it English suggests regardless of settings
         core.router.options = KeyRouter.Options(engines.settings.pageSize, engines.settings.englishSuggest)
-        // every listed input method in the group, as a user who enabled them all: any can be switched to
         core.setInputMethods(inputMethods)
         focus("", name = firstField)
         // on the field's context, as the language key switches (fcitx switches the active context's)
         core.setCurrentInputMethod(im)
         check(core.currentInputMethod() == im) { "$im not active" }
-        // the field focused again with [im] current, as the app's first field is when [im] was left on:
-        // its session made at the activation and told the field's start (English ranks a sentence's
-        // first word by it), not made later by the switch with no context
+        // the first field focused again so its session gets the field's start, not the switch's empty context
         if (im != inputMethods.first()) focus("", app = uid, name = firstField) else pause()
     }
 
-    /** The field tapped where the cursor is: the session reset, the engine told the field again, what it offers shown (RECALL). */
+    /** The field tapped at the cursor: session reset, the engine told the field again (RECALL). */
     fun tapField() {
         core.reset()
         told()
@@ -294,33 +249,23 @@ class HostReplay(
         pause()
     }
 
-    /**
-     * How many Enters a single-line field took as its editor action (EditorKeyPolicy's
-     * PerformEditorAction): the EditText's Done puts the keyboard away.
-     */
+    /** Enters a single-line field took as its editor action (EditorKeyPolicy's PerformEditorAction). */
     var editorActions = 0
         private set
 
-    /**
-     * The keyboard put away in the field (Back, an editor action): the service's onFinishInputView,
-     * the composing text finished, fcitx focused out and in.
-     */
+    /** The keyboard put away (Back, an editor action): onFinishInputView, composing finished, fcitx focused out and in. */
     fun keyboardHidden() {
         editor.finishComposingText()
         core.focusOutIn()
     }
 
-    /**
-     * The keyboard brought back in the field it was put away in: the field told anew
-     * (onStartInputView's contextDropped). [tapped] at the end of its text, as a tap on a short field
-     * puts the cursor there: a cursor report not predicted, as [tapField].
-     */
+    /** The keyboard brought back: the field told anew. [tapped]: at its text's end, an unpredicted cursor report, as [tapField]. */
     fun keyboardShown(tapped: Boolean) {
         told()
         if (tapped) tappedAtEnd()
     }
 
-    /** The field tapped at the end of its text: the cursor put there, if not there already, as [tapField]. */
+    /** The field tapped at the end of its text, as [tapField]. */
     fun tappedAtEnd() {
         val end = editor.text.length
         if (editor.selectionStart == end && editor.selectionEnd == end) return
@@ -328,23 +273,18 @@ class HostReplay(
         tapField()
     }
 
-    /** The keyboard put away and brought back with a tap on the field, the cursor already at its end. */
     fun keyboardHiddenAndShown() {
         keyboardHidden()
         keyboardShown(tapped = true)
         pause()
     }
 
-    /** Another input method by its name, as the language key picks it. */
     fun ime(name: String) {
         if (name != im) switches++
         core.setCurrentInputMethod(name)
         pause()
     }
 
-    // ------------------------------------------------------------------ keys
-
-    /** [keys] tapped [gapMillis] apart, as a device's driver taps them; then the user pauses. */
     fun typeAt(keys: String, gapMillis: Long) {
         keys.codePoints().forEach {
             key(it)
@@ -353,11 +293,7 @@ class HostReplay(
         pause()
     }
 
-    /**
-     * [keys] tapped one after another, as a device's driver taps them: each `input tap` a process of
-     * its own, a few hundred milliseconds, so the refine after each key runs out before the next
-     * (the engine's sentences after a key depend on how far the last ones were refined).
-     */
+    /** [keys] tapped one by one as a device's driver does: each refine runs out before the next key, as the sentences depend on. */
     fun type(keys: String) {
         keys.codePoints().toArray().forEachIndexed { i, key ->
             if (i > 0) advance(TAP_MILLIS)
@@ -368,7 +304,7 @@ class HostReplay(
 
     fun space() = tap(EngineReplay.SPACE)
 
-    /** A character written on the pad, read as [readings] (as EngineReplay.write: the recognizer's readings, then the ink key). */
+    /** A character written on the pad, read as [readings] (the recognizer's readings, then the ink key). */
     fun write(vararg readings: String) {
         val ink = UatEngines.ink(engines, im, readings.toList(), lastPiece)
         lastPiece = ink.piece
@@ -379,41 +315,28 @@ class HostReplay(
 
     private var lastPiece = -1
 
-    /**
-     * A glide across the centres of [keys] on [layout] ([shift] on or not), as the keyboard hands it
-     * over: the GLIDE key that commits its word, carrying the glide as the engine read it
-     * (KotlinHost.offerGlide; UatEngines.glide).
-     */
+    /** A glide across [keys]' centres on [layout], as the keyboard hands it over: the GLIDE key (KotlinHost.offerGlide). */
     fun glide(keys: String, layout: GlideLayout = GlideLayout.QWERTY, shift: Boolean = false) {
         key(EngineReplay.symOf(Keyboard.GLIDE), HostKeyStates.VIRTUAL, payload = UatEngines.glide(engines, im, keys, layout, shift))
         pause()
     }
 
-    /**
-     * The code row tapped at [offset] into its line as drawn ([row], the `|` a character of it): where
-     * the tap puts the cursor in the preedit as CodeRowUi finds it (CodeRow.tapAt), sent as the app's
-     * PreeditComponent does (HostCore.moveCursor).
-     */
+    /** The code row tapped at [offset] into [row] (the `|` counts): the cursor placed as CodeRow.tapAt finds it, sent via HostCore.moveCursor. */
     fun tapRow(offset: Int) {
         core.moveCursor(CodeRow.tapAt(offset, rowCursor, rowAux, preedit))
         recalled()
         pause()
     }
 
-    /** The code row tapped right after the first [text] in its line as drawn ([row]). */
     fun tapRowAfter(text: String) {
         val at = row.indexOf(text)
         assertTrue("「$text」 not in the row 「$row」", at >= 0)
         tapRow(at + text.length)
     }
 
-    /** The code row tapped past its end: the cursor to the end. */
     fun tapRowEnd() = tapRow(row.length)
 
-    /**
-     * [digits] tapped on pinyin's nine keys one after another, as [type] taps: each digit key's code as
-     * T9Keyboard sends it ([Keyboard.pinyinNineKey]), 1 too (typed after a key, the separator).
-     */
+    /** [digits] tapped on pinyin's nine keys as [type] taps, each as T9Keyboard sends it ([Keyboard.pinyinNineKey]); 1 is the separator. */
     fun pinyinNine(digits: String) {
         digits.forEachIndexed { i, d ->
             if (i > 0) advance(TAP_MILLIS)
@@ -422,24 +345,20 @@ class HostReplay(
         pause()
     }
 
-    /** The keys' codes as the screen sends them, each a character with no keysym of its own (the separator ' its own). */
+    /** Codes as the screen sends them, each a character with no keysym of its own. */
     fun keys(codes: String) {
         codes.forEach { key(EngineReplay.symOf(it.code)) }
         pause()
     }
 
-    // the row's aux length and its cursor as drawn (-1 at the end), as CodeRowUi keeps them for a tap
+    // the row's aux length and cursor as drawn (-1 at the end), as CodeRowUi keeps them for a tap
     private var rowAux = 0
     private var rowCursor = -1
 
     fun backspace(times: Int = 1) = repeat(times) { tap(EngineReplay.BACKSPACE) }
     fun enter() = tap(EngineReplay.RETURN)
 
-    /**
-     * A chat box's send (uat/fixtures/fields.html#chat): Enter, whose key event the page takes and
-     * empties the box on, with no new input started; to the service a cursor report it did not
-     * expect, so the field is told again (tellContextLater), as it is now: empty.
-     */
+    /** A chat box's send: Enter empties the box with no new input started, so the service tells the field again. */
     fun send() {
         sending = true
         try {
@@ -449,7 +368,7 @@ class HostReplay(
         }
     }
 
-    // set only while [send]'s Enter goes through: the app's Enter (app) is then the page's send, not a new line
+    // only while [send]'s Enter goes through: Enter is then the page's send, not a new line
     private var sending = false
 
     fun pageDown() {
@@ -457,7 +376,7 @@ class HostReplay(
         pause()
     }
 
-    /** The bar's [index]th candidate tapped, as shown (converted, with 繁 on): what the bar sends, its index and text. */
+    /** The bar's [index]th candidate tapped as shown (converted, with 繁 on). */
     fun pickShown(index: Int) {
         val text = page[index]
         assertTrue("「$text」 not taken at $index of $page", core.select(index, text))
@@ -473,32 +392,25 @@ class HostReplay(
         pause()
     }
 
-    /** The status area's entry [name] tapped (chttrans, punctuation, fullwidth); nothing if the input method has none. */
+    /** The status area's entry [name] tapped (chttrans, punctuation, fullwidth); nothing if the input method lacks it. */
     fun toggle(name: String) {
         core.statusArea().firstOrNull { it.name == name }?.let { core.activateAction(it.id) }
         pause()
     }
 
-    /** Quick input opened (the 符 key held). */
     fun quick() {
         commitAndReset()
         core.triggerQuickPhrase()
         pause()
     }
 
-    /** Unicode search opened (the 123 key held). */
     fun unicode() {
         commitAndReset()
         core.triggerUnicode()
         pause()
     }
 
-    /**
-     * What the keyboard's 符 and 123 keys do first (CommonKeyActionListener.afterPendingInput) and
-     * what a commit over the engine starts with: what is typed resolved as PendingInputPolicy says,
-     * then fcitx's reset, which leaves English knowing nothing of the text before the cursor
-     * (FcitxInputMethodService.commitAndReset). The resolution taken, for a case to hold it.
-     */
+    /** What the 符 and 123 keys do first: the pending input resolved per PendingInputPolicy, then fcitx's reset. */
     fun commitAndReset(): PendingInputPolicy.Resolution {
         val language = InputMethodCatalog.listed(im)?.language.orEmpty()
         val address = field == EngineReplay.Field.URL || field == EngineReplay.Field.EMAIL
@@ -521,11 +433,7 @@ class HostReplay(
         return resolution
     }
 
-    /**
-     * Text the keyboard puts in over the engine (a long press's letter or digit, .com, @: its
-     * CommitAction), as FcitxInputMethodService.commitOverEngine does: [commitAndReset], then the
-     * text. The resolution taken.
-     */
+    /** Text the keyboard commits over the engine (a long press's letter, .com, @), as FcitxInputMethodService.commitOverEngine. */
     fun commitOverEngine(text: String): PendingInputPolicy.Resolution {
         val resolution = commitAndReset()
         editor.commitText(text, 1)
@@ -533,7 +441,7 @@ class HostReplay(
         return resolution
     }
 
-    /** A hardware key pressed and let go, as `adb shell input keyevent` sends it; one no one takes the app's. */
+    /** A hardware key pressed and released, as `input keyevent` sends it; one no one takes goes to the app. */
     fun hardware(sym: Int) {
         if (sym == KeySyms.RETURN) floatingShown++
         pressing = true
@@ -547,16 +455,14 @@ class HostReplay(
         pause()
     }
 
-    /** A key the screen's keyboard sends; one no one takes comes back as a key event, typed by the app as it is. */
+    /** A screen key; one no one takes comes back as a key event the app types. */
     fun key(sym: Int, states: Int = 0, payload: Action? = null) {
         core.sendKey(Key(sym, states), virtual = true, payload = payload)
         recalled()
     }
 
-    // what the engine asked to show again after it was told the context: the service's RECALL key,
-    // sent after the event that told it (Fcitx.engineContext), not inside it
+    // the service's RECALL after it told the context, sent after that event (Fcitx.engineContext), not inside it
     private fun recalled() {
-        // the service's tellContext on an IMChangeEvent, a job after the switch's
         if (switched) {
             switched = false
             told(started = true)
@@ -565,7 +471,7 @@ class HostReplay(
             recall = false
             core.sendKey(Key(EngineReplay.UNICODE_KEYSYM + Keyboard.RECALL, HostKeyStates.VIRTUAL), virtual = true)
         }
-        // after every key, not only at a pause: a case ending on a bare key() must not pass over a crash (F4304)
+        // after every key, not only at a pause: a case ending on a bare key() must not pass over a crash
         rethrow()
     }
 
@@ -578,31 +484,24 @@ class HostReplay(
         pause()
     }
 
-    /** The user pauses: the refine timer and the overlays run out. */
     fun pause() {
         recalled()
         advance(PAUSE_MILLIS)
         rethrow()
     }
 
-    // a key nothing took, as the service types it
     private fun app(sym: Int, virtual: Boolean) {
         when (sym) {
             EngineReplay.BACKSPACE -> if (editor.selectionEnd > 0) {
                 val selected = editor.selectionStart != editor.selectionEnd
                 val units = if (selected) 0 else Character.charCount(editor.text.codePointBefore(editor.selectionStart))
-                // the screen's: what the memory of the field takes off, as handleBackspaceKey has it
+                // the screen's: off the field's memory too, as handleBackspaceKey does
                 if (virtual) memory.backspace(editor.selectionStart, editor.selectionEnd)
                 editor.deleteSurroundingText(1, 0, true)
-                // the screen's Backspace key event has its cursor report predicted a unit back
-                // (EditingSession.backspace): nothing told unless the editor took more (a surrogate
-                // pair), or a selection, which handleBackspaceKey tells. A hardware one is the
-                // editor's own, its report not predicted: the field told again (tellContextLater)
+                // the screen's Backspace has its cursor report predicted a unit back: told only if the editor took more
                 if (!virtual || selected || units != 1) told()
             }
-            // a key event the editor handles, its cursor report not predicted: the field told again
-            // (tellContextLater). A new line only in a field that has lines (the parity editor's text
-            // field; its password, URL and email fields are single-line, where Enter is the editor action)
+            // a key event the editor handles, its report not predicted; single-line fields take Enter as the editor action
             EngineReplay.RETURN -> if (sending) {
                 editor.setSelection(0, editor.text.length)
                 editor.commitText("", 1)
@@ -613,8 +512,7 @@ class HostReplay(
             } else {
                 editorActions++
             }
-            // an arrow no one took moves the field's cursor, as an EditText's does: a cursor report the
-            // service did not expect, so it tells the engine the field again (tellContextLater)
+            // an arrow no one took moves the cursor as an EditText's does; an unpredicted report: told again
             KeySyms.LEFT -> editor.selectionStart.let { if (it > 0) moved(it - 1) }
             EngineReplay.RIGHT -> editor.selectionEnd.let { if (it < editor.text.length) moved(it + 1) }
             else -> KeySyms.toUnicode(sym).takeIf { it >= EngineReplay.SPACE }?.let { commit(String(Character.toChars(it))) }
@@ -633,15 +531,13 @@ class HostReplay(
                 commits += event.text
             }
             is HostEvent.DeleteSurrounding -> {
-                // in code points, as the service deletes (EditingSession.deleteSurrounding, inCodePoints = true)
+                // in code points, as the service deletes
                 editor.deleteSurroundingText(event.before, event.after, true)
-                // handleDeleteSurrounding: each one off the memory too
                 repeat(event.before) { memory.deleted() }
             }
             is HostEvent.ClientPreedit -> {
                 clientPreedit = event.text.toString()
-                // an empty one takes what was composing out, as EditingSession.updateComposingText does
-                // (a commit before it has already replaced it)
+                // an empty one clears the composing text, as EditingSession.updateComposingText does
                 editor.setComposingText(clientPreedit)
             }
             is HostEvent.InputPanel -> {
@@ -670,8 +566,7 @@ class HostReplay(
         hasNextPage = hasNext
     }
 
-    // the service tells the engine what is around the cursor after the field changed, through the
-    // policy at the clock's time (an empty context for a password, the memory of a field gone back to)
+    // the service tells the engine the cursor's surroundings after a change, through the policy
     private fun told(started: Boolean = false) {
         val cursor = editor.selectionStart
         val text = editor.text
@@ -679,15 +574,12 @@ class HostReplay(
         val c = policy.told(clock.uptimeMillis(), { text.substring(0, cursor) }, { text.substring(cursor) }, started, selected) ?: return
         contextTold = c.before
         contextSaid = c.said
-        // every flag passed on, as the service's tell does (FcitxInputMethodService.tell)
         val offers = engines.context(
             im, c.before, learning = !policy.sensitive, cleared = c.cleared, learnFlags = c.learnFlags ?: 0,
             started = c.started, after = c.after, selected = c.selected, said = c.said,
         )
         if (offers) recall = true
     }
-
-    // ------------------------------------------------------------------ expectations
 
     fun expectText(text: String) = assertEquals("the field", text, this.text)
 
@@ -701,8 +593,7 @@ class HostReplay(
         const val PAUSE_MILLIS = 5_000L
         const val TAP_MILLIS = 200L
 
-        // fcitx's data as the app ships it (host-assets/pkgdata): quick phrases, charselectdata. Required: a
-        // missing dir would replay quick input and Unicode with no data rather than fail
+        // required, so a missing dir fails rather than replaying with no data
         private val FCITX5: File? get() = System.getProperty("uat.fcitx5")?.let(::File)
             ?.also { check(it.isDirectory) { "uat.fcitx5 $it is not a directory" } }
 
@@ -710,13 +601,13 @@ class HostReplay(
 
         val CHAR_SELECT: ByteArray? by lazy { FCITX5?.let { File(it, "unicode/charselectdata") }?.takeIf { it.isFile }?.readBytes() }
 
-        // OpenCC s2tw as the app maps it (compileOpenccData, among uat.assets)
+        // OpenCC s2tw as the app maps it (compileOpenccData)
         val CONVERTER: ChineseConverter? by lazy {
             System.getProperty("uat.assets")?.split(File.pathSeparator)?.map { File(it, "engine/opencc-s2tw.data") }?.firstOrNull { it.isFile }
                 ?.let { f -> RandomAccessFile(f, "r").use { ChineseConverter.s2tw(OpenCCData.read(it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()))) } }
         }
 
-        // the punctuation table the app ships (chinese-addons' punc.mb.zh_CN)
+        // the punctuation table the app ships (punc.mb.zh_CN)
         val PUNCTUATION: String by lazy {
             File(checkNotNull(System.getProperty("uat.punctuation")) { "no uat.punctuation given: run by Gradle" }).readText()
         }

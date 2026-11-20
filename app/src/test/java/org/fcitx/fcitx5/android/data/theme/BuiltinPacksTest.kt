@@ -16,7 +16,6 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.io.IOException
 
-/** The built-in themes that are packs (060-builtin-themes): unpacked from the assets, listed, never deleted. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class BuiltinPacksTest {
@@ -34,7 +33,7 @@ class BuiltinPacksTest {
         assertEquals(listOf("简蓝#light", "简蓝#dark"), packs.filter { it.file == "简蓝" }.map { it.name })
         // listed after the user's and the built-in themes
         assertEquals(packs, ThemeManager.getAllThemes().takeLast(packs.size))
-        // their pictures not decoded by the listing: each look made when drawn
+        // their pictures not decoded by the listing
         packs.forEach { assertTrue(it.name, File(it.dir, ThemePackFiles.THEME_XML).isFile) }
     }
 
@@ -50,7 +49,7 @@ class BuiltinPacksTest {
     fun aBuiltInPackKeepsTheVersionPickedAsTheBuiltInThemesDo() {
         val was = ThemeManager.prefs.normalModeTheme.getValue()
         try {
-            // the system light (Robolectric's): the dark version all the same, not switched as an imported pair is
+            // the dark version even with a light system, not switched as an imported pair is
             ThemeManager.setNormalModeTheme(ThemeManager.getTheme("素雅#dark")!!)
             assertEquals("素雅#dark", ThemeManager.activeTheme.name)
         } finally {
@@ -60,7 +59,7 @@ class BuiltinPacksTest {
 
     @Test
     fun unpackedWhereTheKeyboardReadsBeforeTheFirstUnlock() {
-        // device-protected storage: the credential-encrypted noBackupFilesDir is not there before the first unlock
+        // the credential-encrypted noBackupFilesDir is not there before the first unlock
         val de = appContext.createDeviceProtectedStorageContext().noBackupFilesDir
         assertEquals(de, BuiltinPacks.dir(appContext).parentFile)
     }
@@ -77,9 +76,9 @@ class BuiltinPacksTest {
         assertEquals(BuiltinPacks.FILES.size, BuiltinPacks.list(root, ThemeManager.BuiltinThemes).distinctBy { it.file }.size)
         // a user's pack of the same name shown instead
         assertTrue(BuiltinPacks.list(root, ThemeManager.BuiltinThemes, setOf("奶油")).none { it.file == "奶油" })
-        // its name still one of the built-in packs': an import of that name is refused as ever
+        // still a built-in name: an import of it is refused
         assertTrue("奶油" in BuiltinPacks.names(root))
-        // a new version, one asset failing: none listed (tried again ten minutes later or at the next start)
+        // one asset failing: none listed, retried later
         assertFalse(BuiltinPacks.unpack(root, "v2") { if (it == "cream") throw IOException("full") else BuiltinPacks.open(appContext, it) })
         assertEquals(emptyList<Theme.Pack>(), BuiltinPacks.list(root, ThemeManager.BuiltinThemes))
         root.deleteRecursively()
@@ -87,7 +86,7 @@ class BuiltinPacksTest {
 
     @Test
     fun aFolderGoneUnderTheStampIsUnpackedAgain() {
-        // the stamp alone was trusted: a pack's folder deleted (a cleaner app) stayed gone until the next version
+        // a deleted folder (a cleaner app) under a present stamp is unpacked again
         val root = File(appContext.cacheDir, "bp-gone").apply { deleteRecursively() }
         assertTrue(BuiltinPacks.unpack(root, "v1") { BuiltinPacks.open(appContext, it) })
         val names = BuiltinPacks.names(root)
@@ -100,8 +99,7 @@ class BuiltinPacksTest {
 
     @Test
     fun oneThatFailedIsTriedAgainOnlyTenMinutesLater() {
-        // each refresh of the themes (each opening of the theme page) deleted and unpacked all of them again;
-        // and a full disk cleared while the process lives on must still get them unpacked
+        // a failed unpack is not retried on every refresh, yet retried later in the same process
         val root = File(appContext.cacheDir, "bp-failed").apply { deleteRecursively() }
         var opened = 0
         var full = true
@@ -121,7 +119,7 @@ class BuiltinPacksTest {
 
     @Test
     fun aZipThatDoesNotReadIsNoCrash() {
-        // only some exceptions were caught: another one out of a zip the build got wrong crashed every start
+        // any exception from a bad build's zip, not just some, is caught
         val root = File(appContext.cacheDir, "bp-bad").apply { deleteRecursively() }
         assertFalse(BuiltinPacks.unpack(root, "v1") { throw IllegalArgumentException("bad entry name") })
         assertEquals(emptyList<String>(), BuiltinPacks.names(root))

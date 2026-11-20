@@ -5,16 +5,13 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * The order of a microphone opening: recording [start]ed first, the speech detector [load]ed only
- * then (its model read in after the microphone is on, not before: the press's first words are in
- * the record's buffer meanwhile, dev/design/voice-start-latency.md). A detector that fails to load
- * is none ([use] gets null, VoiceQuiet then keeps everything): Chinese and the microphone go on
- * without it. [stop] and [unload] whatever happens, the record let go even if the detector broke.
+ * Recording [start]s first, the speech detector [load]s after (the first words wait in the record's buffer). A detector
+ * that fails is none ([use] gets null, VoiceQuiet keeps everything). [stop] and [unload] always, the record let go even
+ * if the detector broke.
  */
 object VoiceOpening {
     @Suppress("TooGenericExceptionCaught")
-    // try/finally, not crossinline: [use] suspends at the caller (VoiceListener), and a return out of a
-    // lambda still runs the stop and the unload
+    // try/finally, not crossinline: [use] suspends at the caller, and a return out of a lambda still runs stop and unload
     inline fun <V : Any> run(
         start: () -> Unit,
         load: () -> V,
@@ -24,10 +21,9 @@ object VoiceOpening {
         noinline failed: (Throwable) -> Unit = {},
     ) {
         var detector: V? = null
-        // what broke first is what is thrown; a stop or unload failing after it is suppressed into it
+        // what broke first is thrown; a later stop or unload failure is suppressed into it
         var broke: Throwable? = null
-        // false in the finally on a return out of [use]: what is after it is not reached. An array, not a var:
-        // a var set in the try read true in the finally on that return when inlined into another module
+        // false in the finally on a return out of [use]. An array, not a var: a var set in the try read true there when inlined into another module
         val through = booleanArrayOf(false)
         var after: Throwable? = null
         try {
@@ -51,10 +47,7 @@ object VoiceOpening {
         after?.let { throw it }
     }
 
-    /**
-     * [stop] and [unload] [detector]; their failure, suppressed into [broke] if something broke before. On a
-     * return out of `use` ([returned]) told to [failed], not thrown over the return (and null returned).
-     */
+    /** On a return out of `use` ([returned]) a failure goes to [failed], not thrown over the return. */
     @PublishedApi
     @Suppress("TooGenericExceptionCaught")
     internal fun <V : Any> close(detector: V?, stop: () -> Unit, unload: (V) -> Unit, broke: Throwable?, returned: Boolean, failed: (Throwable) -> Unit): Throwable? {
@@ -76,6 +69,6 @@ object VoiceOpening {
         return after.takeIf { broke == null }
     }
 
-    /** [e] the first failure, or suppressed into the one before it (not into itself: the same one thrown again) */
+    /** Not into itself: the same one thrown again. */
     fun suppress(first: Throwable?, e: Throwable): Throwable = first?.apply { if (this !== e) addSuppressed(e) } ?: e
 }

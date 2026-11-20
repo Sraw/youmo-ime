@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowLooper
 
-/** 外观 → 布局's **+** (061-custom-layout §4.3): import a `.layout`, or open the layout maker in a browser. */
+/** 外观 → 布局's **+**: import a `.layout`, or open the layout maker in a browser. */
 @RunWith(RobolectricTestRunner::class)
 class LayoutAddMenuTest {
 

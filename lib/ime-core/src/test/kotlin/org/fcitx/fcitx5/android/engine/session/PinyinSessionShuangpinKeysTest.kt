@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.RecordingHabits
@@ -18,29 +17,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
 /** A [PinyinSession] of 双拼 on the 18 keys and the nine keys ([GroupedShuangpinSegmenter]): the bar, Enter, learning. */
 class PinyinSessionShuangpinKeysTest {
 
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("西", -2f, 0f)
-                .unigram("词", -3f, 0f)
-                .unigram("错", -3.5f, 0f)
-                .unigram("你", -2f, 0f)
-                .unigram("好", -2.5f, 0f)
-                .unigram("你好", -2.5f, 0f)
-                .entry("西", syl("xi"))
-                .entry("词", syl("ci"))
-                .entry("错", syl("cuo"))
-                .entry("你", syl("ni"))
-                .entry("好", syl("hao"))
-                .entry("你好", syl("ni", "hao"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("西", "xi", -2f),
+        Triple("词", "ci", -3f),
+        Triple("错", "cuo", -3.5f),
+        Triple("你", "ni", -2f),
+        Triple("好", "hao", -2.5f),
+        Triple("你好", "ni hao", -2.5f),
     )
 
     private fun session(letters: NineKeyLetters = NineKeyLetters.G18, kind: String = Kinds.shuangpin("Ziranma"), habits: RecordingHabits? = null) =
@@ -52,7 +39,7 @@ class PinyinSessionShuangpinKeysTest {
     // 自然码's keys as [letters]' codes
     private fun Session.type(keys: String, letters: NineKeyLetters = NineKeyLetters.G18): Snapshot = keys.map { apply(Key(letters.key(it))) }.last()
 
-    // review S2, the user's decision (b): an initial taken binds the next key as its final, read by group
+    // an initial taken binds the next key as its final, read by group
     @Test
     fun anInitialTakenKeepsTheSyllableOfThatInitial() {
         val session = session()
@@ -66,7 +53,6 @@ class PinyinSessionShuangpinKeysTest {
         assertEquals(listOf("ci", "cuo"), c.syllables.sorted())
         val ci = session.apply(Action.Syllable(c.syllables.indexOf("ci")))
         assertEquals("词", ci.candidates.first())
-        // back last first: ci, then c
         assertTrue(session.apply(Backspace).candidates.all { it == "词" || it == "错" })
         assertEquals("西", session.apply(Backspace).candidates.first())
     }
@@ -105,7 +91,6 @@ class PinyinSessionShuangpinKeysTest {
         assertTrue(cut.preedit, cut.preedit.contains('\''))
     }
 
-    // review S9: learned under spk:<scheme>:<the keys' tag>, the nine keys' apart from the 18 keys', each scheme apart
     @Test
     fun theNineKeysLearnUnderTheirOwnSpkKindPerScheme() {
         for (scheme in listOf("Ziranma", "Xiaohe")) {

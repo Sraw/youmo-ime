@@ -27,15 +27,10 @@ import org.fcitx.fcitx5.android.pack.Refusal
 import org.fcitx.fcitx5.android.utils.queryFileName
 import timber.log.Timber
 
-/** Imports a file: (resolver, uri, progress(copied, total), replaceNewer(file's, installed) asked before an older replaces a newer). */
 internal typealias PackImporter =
     suspend (ContentResolver, Uri, (Long, Long) -> Unit, suspend (PackManifest, PackManifest) -> Boolean) -> ImportResult
 
-/**
- * The files the user picked on the 资源包 page, imported one after another on the app's scope: a
- * rotation, or the page left, does not stop them. The page shows [running] and, once all are done,
- * [results] (taken by [seen]).
- */
+/** Imports run one after another on the app's scope, so a rotation or leaving the page does not stop them. */
 object PackImports {
 
     class Running(val file: String, val percent: Int)
@@ -48,7 +43,6 @@ object PackImports {
     private val done = MutableStateFlow<List<Outcome>?>(null)
     val results: StateFlow<List<Outcome>?> = done.asStateFlow()
 
-    /** A question waiting for the page: the file [file], a pack of [kind] v[version], would replace the newer v[installed]; [answer] takes the reply. */
     class ReplaceNewerQuestion(val file: String, val kind: PackKind, val version: Int, val installed: Int) {
         internal val answer = CompletableDeferred<Boolean>()
     }
@@ -56,18 +50,17 @@ object PackImports {
     private val replaceQuestionNow = MutableStateFlow<ReplaceNewerQuestion?>(null)
     val replaceQuestion: StateFlow<ReplaceNewerQuestion?> = replaceQuestionNow.asStateFlow()
 
-    /** The page's answer to [replaceQuestion]: replace the newer pack or keep it. One asked no more is let be. */
+    /** A question no longer asked is let be. */
     fun answer(question: ReplaceNewerQuestion, replace: Boolean) {
         question.answer.complete(replace)
         replaceQuestionNow.compareAndSet(question, null)
     }
 
-    /** What imports a file: [PackStore]'s; a test's that throws, to see the files after it imported all the same. */
     @VisibleForTesting
     internal var importer: PackImporter =
         { resolver, uri, progress, replaceNewer -> PackStore.import(resolver, uri, progress, replaceNewer) }
 
-    /** [uris] imported in turn; false (nothing started) if an import is under way. */
+    /** False (nothing started) if an import is under way. */
     fun start(context: Context, uris: List<Uri>): Boolean {
         if (runningNow.value != null || uris.isEmpty()) return false
         val resolver = context.applicationContext.contentResolver
@@ -84,7 +77,7 @@ object PackImports {
         return true
     }
 
-    /** [uris] imported in turn, each one's outcome added to [outcomes]: one that throws is its own, the rest imported all the same. */
+    /** One that throws is its own outcome; the rest import all the same. */
     @VisibleForTesting
     internal suspend fun importAll(resolver: ContentResolver, uris: List<Uri>, outcomes: MutableList<Outcome>) {
         for (uri in uris) outcomes += importOne(resolver, uri)
@@ -93,14 +86,14 @@ object PackImports {
     private suspend fun importOne(resolver: ContentResolver, uri: Uri): Outcome {
         var name = uri.lastPathSegment.orEmpty()
         val result = try {
-            // a provider's binder call, perhaps over the network: not on the main thread
+            // a provider's binder call, perhaps over the network
             name = withContext(Dispatchers.IO) { resolver.queryFileName(uri) } ?: name
             runningNow.value = Running(name, 0)
             val progress = { copied: Long, total: Long ->
                 val percent = if (total > 0) (copied * PERCENT / total).toInt() else 0
                 if (runningNow.value?.percent != percent) runningNow.value = Running(name, percent)
             }
-            // an older pack over a newer one: asked on the page (shown again when it is opened again), answered there
+            // an older pack over a newer one: asked on the page (again when reopened)
             importer(resolver, uri, progress) { manifest, installed ->
                 val question = ReplaceNewerQuestion(name, manifest.kind, manifest.version, installed.version)
                 replaceQuestionNow.value = question
@@ -113,28 +106,25 @@ object PackImports {
         } catch (e: CancellationException) {
             throw e
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            // for the log: no paths, no names of the user's (a provider's message may carry them)
-            // (its frames kept: an importer's own bug is found by them)
+            // no paths or names (a provider's message may carry them), frames kept to find an importer bug
             Timber.w(Throwable(e.javaClass.name).apply { stackTrace = e.stackTrace }, "pack import")
             ImportResult.Refused(Refusal.Unreadable(e.message ?: e.javaClass.simpleName))
         }
         return Outcome(name, result)
     }
 
-    /** Tests: [outcomes] as an import's, for the page to show. */
     @VisibleForTesting
     fun finished(outcomes: List<Outcome>) {
         done.value = outcomes
     }
 
-    /** Tests that ran [importAll] themselves: nothing left running or asked for the tests after them ([start] clears its own). */
+    /** Nothing left running or asked for the next tests ([start] clears its own). */
     @VisibleForTesting
     internal fun reset() {
         runningNow.value = null
         replaceQuestionNow.value = null
     }
 
-    /** The results shown: not shown again. */
     fun seen() {
         done.value = null
     }
@@ -146,7 +136,6 @@ object PackImports {
         },
     )
 
-    /** What [status] is, for the pack's row. */
     fun describe(context: Context, status: PackStatus): String = when (status) {
         PackStatus.Missing -> context.getString(R.string.pack_status_missing)
         is PackStatus.Ready -> context.getString(R.string.pack_status_ready, status.manifest.version)
@@ -155,11 +144,10 @@ object PackImports {
         is PackStatus.Damaged -> context.getString(R.string.pack_status_damaged, status.manifest.version)
     }
 
-    /** What became of [outcome], a line of the results. */
     fun describe(context: Context, outcome: Outcome): String {
         val file = outcome.file
         return when (val result = outcome.result) {
-            // an older one over a newer is allowed (a pack gone wrong taken back), and said
+            // an older one over a newer is allowed (taking back a bad pack), and said
             is ImportResult.Imported -> result.replaced?.takeIf { it.version > result.manifest.version }?.let {
                 context.getString(R.string.pack_imported_older, name(context, result.manifest.kind), result.manifest.version, it.version)
             } ?: context.getString(R.string.pack_imported, name(context, result.manifest.kind), result.manifest.version)

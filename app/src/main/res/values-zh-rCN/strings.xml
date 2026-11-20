@@ -5,11 +5,8 @@
     <string name="app_name_bench">幽默输入法 (测速)</string>
     <string name="input_methods">输入法</string>
     <string name="advanced">高级</string>
-    <string name="ignore_sys_cursor">忽略系统光标位置</string>
-    <string name="hide_key_config">隐藏快捷键配置</string>
     <string name="_not_available_">（不可用）</string>
     <string name="button_haptic_feedback">按键时振动</string>
-    <string name="button_up_haptic_feedback">按键松开时振动</string>
     <string name="button_vibration_milliseconds">按键振动时长</string>
     <string name="button_press">短按</string>
     <string name="button_long_press">长按</string>
@@ -34,9 +31,6 @@
     <string name="clipboard_listening">记录剪贴板历史</string>
     <string name="clipboard_limit">剪贴板历史记录上限</string>
     <string name="clipboard_enable">启用剪贴板</string>
-    <string name="expanded_candidate_style">展开候选词样式</string>
-    <string name="expanded_candidate_style_grid">表格</string>
-    <string name="expanded_candidate_style_flexbox">弹性盒</string>
     <string name="no_more_input_methods">没有输入法可供切换</string>
     <string name="add_more_input_methods">您想添加更多输入法吗？</string>
     <string name="about">关于</string>
@@ -51,7 +45,6 @@
     <string name="clipboard">剪贴板</string>
     <string name="keyboard_height">键盘高度</string>
     <string name="virtual_keyboard">按键</string>
-    <string name="clipboard_suggestion_timeout">剪贴板提示超时</string>
     <string name="version">版本</string>
     <string name="build_time">提交时间</string>
     <string name="engine_data">基础数据</string>
@@ -64,7 +57,6 @@
     <string name="open_source_licenses">开源软件许可</string>
     <string name="licenses_of_third_party_libraries">第三方库许可证</string>
     <string name="github_repo">GitHub 仓库</string>
-    <string name="expanded_candidate_grid_span_count">表格样式展开候选词列数</string>
     <string name="no_config_options">目前没有可用的配置选项</string>
     <string name="select">选择</string>
     <string name="text_editing">文本编辑</string>
@@ -84,11 +76,6 @@
     <string name="reset">重置</string>
     <string name="input_method_options">输入法设置</string>
     <string name="theme">主题</string>
-    <string name="navbar_background">导航栏背景</string>
-    <string name="navbar_bkg_none">无背景</string>
-    <string name="navbar_bkg_color_only">跟随键盘背景色</string>
-    <string name="navbar_bkg_full">键盘背景图片</string>
-    <string name="expand_toolbar_by_default">默认展开工具栏</string>
     <string name="popup_on_key_press">按键时弹出显示字符</string>
     <string name="disable_animation">禁用动画</string>
     <string name="keyboard_motion">键盘动效</string>
@@ -223,7 +210,6 @@
     <string name="skip">跳过</string>
     <string name="theme_migrated">主题已迁移到当前版本</string>
     <string name="theme_imported_renamed">“%1$s”和别的主题重名，已存为“%2$s”</string>
-    <string name="keep_keyboard_letters_uppercase">键盘字母保持大写</string>
     <string name="choose_input_method">选择输入法</string>
     <string name="edit_clipboard">编辑剪贴板</string>
     <string name="clipboard_edit_text_hint">剪贴板内容</string>
@@ -240,18 +226,12 @@
     <string name="default_">默认</string>
     <string name="saving">保存中</string>
     <string name="delete_all_pinned_items">要删除所有置顶条目吗？</string>
-    <string name="toolbar_num_row_on_password">输入密码时在工具栏上显示数字行</string>
     <string name="space_long_press_behavior">空格键长按行为</string>
     <string name="space_behavior_none">无</string>
     <string name="space_behavior_enumerate">轮换输入法</string>
     <string name="space_behavior_activate">在当前输入法和第一个输入法之间切换</string>
     <string name="space_behavior_picker">显示输入法选择对话框</string>
     <string name="show_lang_switch_key">显示语言切换键</string>
-    <string name="horizontal_candidate_style">横向候选词样式</string>
-    <string name="horizontal_candidate_never_fill">从不填充宽度</string>
-    <string name="horizontal_candidate_auto_fill">按需填充宽度</string>
-    <string name="horizontal_candidate_always_fill">总是填充宽度</string>
-    <string name="inline_suggestions">显示内嵌自动填充建议</string>
     <string name="delete_all_except_pinned">要删除所有未置顶条目吗？</string>
     <string name="num_items_deleted">已删除 %1$d 项</string>
     <string name="delete_theme">删除主题</string>
@@ -270,7 +250,6 @@
     <string name="clipboard_return_after_paste">粘贴后回到键盘</string>
     <string name="text_copied">已复制</string>
     <string name="text_cut">已剪切</string>
-    <string name="reset_keyboard_on_focus_change">焦点改变时切换回键盘</string>
     <string name="export_user_data">备份全部</string>
     <string name="import_user_data">从备份恢复</string>
     <string name="exception_user_data_host_starting">键盘还在启动，没等到它启动完：什么都没有恢复。请稍后再试</string>
@@ -286,8 +265,6 @@
     <string name="confirm_import_user_data">导入用户数据会覆盖设置、自定义短语、常用词、快速输入和剪贴板，标点用自带的（备份里没有的，手机上的也删掉：0.5.1 以前的备份没有快速输入，自己加的条目会没了，关掉的自带表会重新打开；0.6.0 以前的备份没有常用词，手机上的会没了；备份里没有生僻字屏蔽的（0.6.1 以前的，或做备份时没开过它），恢复后它是关的），学到的和词库与手机上现有的合并；重启应用后生效。继续吗？</string>
     <string name="clear_clp_db_confirm">剪贴板数据库将会被完全清空，包括已置顶的条目。继续吗？</string>
     <string name="clear_clp_db_not_all">部分剪贴板数据未能清除，可能仍然存在，或在下次启动时重新出现；再次清空，或重启后再清空，或许有效。</string>
-    <string name="lang_switch_key_behavior">语言切换键行为</string>
-    <string name="lang_switch_behavior_next_ime_app">切换至下一个输入法应用</string>
     <string name="_cannot_be_empty">%1$s不能为空</string>
     <string name="clipboard_mask_sensitive">隐藏敏感信息（如密码）</string>
     <string name="clipboard_clear_urls">去除链接中的跟踪参数</string>
@@ -298,7 +275,6 @@
     <string name="please_wait">请稍候…</string>
     <string name="candidates_window">实体键盘的候选窗</string>
     <string name="show_candidates_window">显示候选窗口</string>
-    <string name="candidates_window_radius">候选窗口圆角半径</string>
     <string name="follow_input_device">根据输入设备而定</string>
     <string name="candidates_orientation">候选词列表方向</string>
     <string name="automatic">自动</string>
@@ -306,14 +282,10 @@
     <string name="vertical">纵向</string>
     <string name="candidates_font_size">浮动候选窗字号</string>
     <string name="candidate_text_size">候选字号</string>
-    <string name="candidates_padding">候选词边距</string>
-    <string name="candidates_window_min_width">候选窗口最小宽度</string>
-    <string name="candidates_window_padding">候选窗口边距</string>
     <string name="restart_fcitx_instance">重启 Fcitx 实例</string>
     <string name="restart_fcitx_instance_confirm">Fcitx 实例将被销毁并重新初始化。继续吗？</string>
     <string name="restart_fcitx_still_starting">键盘还在启动，可能没有重启成。请稍后再试</string>
     <string name="user_data">备份与恢复</string>
-    <string name="haptic_on_repeat">重复按键时的振动反馈</string>
     <string name="redo">重做</string>
     <string name="status_area">状态区域</string>
     <string name="expand_candidates_list">展开候选词列表</string>
@@ -343,10 +315,6 @@
     <string name="emoji_skin_tone_type_4">🏽 中等肤色 (Type-4)</string>
     <string name="emoji_skin_tone_type_5">🏾 中等深肤色 (Type-5)</string>
     <string name="emoji_skin_tone_type_6">🏿 深肤色 (Type-6)</string>
-    <string name="hide_unsupported_emojis">隐藏不支持的表情</string>
-    <string name="keyboard_height_percent_base">键盘高度百分比</string>
-    <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
-    <string name="real_size">真实尺寸 (Display.getRealSize)</string>
     <string name="a11y_key_shift">大小写</string>
     <string name="a11y_state_shift_once">仅下一个字母大写</string>
     <string name="a11y_state_caps_lock">大写锁定</string>
@@ -377,7 +345,6 @@
     <string name="a11y_copy">复制</string>
     <string name="long_press_characters">按键字符和快捷键</string>
     <string name="section_keys">按键</string>
-    <string name="section_candidates">候选栏</string>
     <string name="section_sound_and_vibration">声音与振动</string>
     <string name="long_press_characters_summary">长按弹出的字符，上滑和下滑做什么：长按首选、快捷键（全选、复制、粘贴、撤销）、一段文字</string>
     <string name="toolbar_buttons">工具栏按钮</string>
@@ -687,7 +654,6 @@
     <string name="handwriting_retired_moved">。输入法列表里已换成拼音</string>
     <string name="handwriting_retired_traditional">。手写的字现在跟所在输入法的简繁走</string>
     <string name="key_handwriting_retired">键盘手写已并入工具栏的手写按钮，在键上划已改为关</string>
-    <string name="nine_keys_merged">九键拼音已并入拼音，在 ⋯ → 键盘里切换。</string>
     <string name="shuangpin_scheme_retired">你用的%1$s双拼已不再提供，已改成小鹤双拼，可在双拼设置里换。</string>
     <string name="status_keyboard">键盘</string>
     <string name="learning_kind_shuangpin_keys18">双拼 18 键</string>

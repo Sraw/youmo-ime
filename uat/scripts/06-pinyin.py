@@ -5,7 +5,6 @@ import time
 from uat import (PKG, Blocked, block_candidate, case, check, choose, first, grouped_keys, keys_at, open_url, script)
 
 
-# ---------------------------------------------------------------- 打字
 
 @case("PY-01", mutates="learn")
 def py01(d):
@@ -17,75 +16,6 @@ def py01(d):
     return f"框里是「{t}」"
 
 
-case("PY-02", needs="jvm:PinyinUatTest.aWholeSentence")(lambda d: None)
-
-
-case("PY-03", needs="jvm:PinyinUatTest.theFirstHalfPickedTheRestStillOffered")(lambda d: None)
-
-
-case("PY-04", needs="jvm:PinyinUatTest.anotherCandidateCommitsThatOne")(lambda d: None)
-
-
-case("PY-05", needs="jvm:PinyinUatTest.backspaceDeletesTheLastLetter")(lambda d: None)
-
-
-case("PY-06", needs="jvm:PinyinUatTest.anApostropheSeparatesSyllables")(lambda d: None)
-
-
-case("PY-07", needs="jvm:PinyinUatTest.initials")(lambda d: None)
-
-
-case("PY-10", needs="jvm:PinyinUatTest.theWordsBeforeChooseTheWord")(lambda d: None)
-
-
-case("PY-11", needs="jvm:PinyinUatTest.aChatsBoxSentStillGivesTheWordsBefore")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 纠错
-
-case("PY-14", needs="jvm:PinyinUatTest.pinyinTypedWrongStillGivesTheWord")(lambda d: None)
-
-
-case("PY-18", needs="jvm:PinyinUatTest.aWordOftenMisreadShowsItsReading")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 模糊音、中英混输、笔画
-
-case("PY-21", needs="jvm:PinyinUatTest.fuzzyOffByDefault")(lambda d: None)
-
-
-case("PY-22", needs="jvm:PinyinUatTest.chineseAndEnglishMixed")(lambda d: None)
-
-
-case("PY-24", needs="jvm:PinyinUatTest.uThenStrokes")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 联想
-
-case("PY-26", needs="jvm:PinyinUatTest.wordsThatMayFollowAfterACommit")(lambda d: None)
-
-
-case("PY-27", needs="jvm:PinyinUatTest.typingPutsTheWordsThatMayFollowAway")(lambda d: None)
-case("PY-134", needs="jvm:BarUatTest.theCrossWithThePredictionsDropsThem")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 长按候选
-
-case("PY-29", needs="jvm:CandidateMenuUatTest.blockingAWordSaysWhereAndAsksFirst")(lambda d: None)
-
-
-case("PY-68", needs="jvm:CandidateMenuUatTest.aBlockIsTakenBackOnTheSpot")(lambda d: None)
-
-
-case("PY-31", needs="jvm:PinyinUatTest.pinnedFirstThenUnpinned")(lambda d: None)
-
-
-case("PY-32", needs="jvm:PinyinUatTest.forgettingWhatWasLearned")(lambda d: None)
-
-case("PY-33", needs="jvm:KeyboardHalvesUatTest.theMenuListsOnlyWhatApplies、CandidateMenuUatTest.theMenuShowsTheRowsTheEngineGivesAndForgetOnceLearned")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 学词
 
 SENTENCE, SENTENCE_PY, PIECES = "汪小明", "wangxiaoming", ("汪", "小明")
 
@@ -111,100 +41,6 @@ def learn_sentence(d, times=2):
     return c0
 
 
-case("PY-34", needs="jvm:PinyinUatTest.aNamePickedPieceByPieceTwiceIsAWordAndInItsInitials")(lambda d: None)
-
-
-case("PY-37", needs="jvm:PinyinUatTest.vulgarWordsAreNotOnTheFirstPage")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 改拼音
-
-case("PY-39", needs="jvm:HostCasesUatTest.aLetterMissedIsTypedWhereTheRowIsTapped")(lambda d: None)
-
-
-case("PY-40", needs="jvm:HostCasesUatTest.backspaceInTheMiddleOfThePinyin")(lambda d: None)
-
-
-case("PY-41", needs="jvm:KeyboardUatTest.aSlowSpaceDragMovesThePinyinCursorAndTheRowFollowsIt")(lambda d: None)
-
-
-case("PY-42", needs="jvm:HostCasesUatTest.aCharacterTakenHasNoCursorBeforeItAndBackspaceGivesItBack")(lambda d: None)
-
-
-case("PY-43", needs="jvm:HostCasesUatTest.aStrokeMissedIsTypedWhereTheRowIsTapped")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 拆字、表情、自带短语
-
-case("PY-44", needs="jvm:PinyinUatTest.chaiziByTheParts")(lambda d: None)
-
-
-case("PY-45", needs="jvm:PinyinUatTest.notPartsArePinyinAsEver")(lambda d: None)
-
-
-case("PY-46", needs="jvm:PinyinUatTest.anEmojiCandidateIsNotLearnedFirst")(lambda d: None)
-
-
-case("PY-48", needs="jvm:PinyinUatTest.theDateTimeAndWeekdayBuiltIn")(lambda d: None)
-
-
-case("PY-49", needs="jvm:PinyinUatTest.aBuiltInPhraseDeletedIsOneTurnedOffInTheCustomPhrases")(lambda d: None)
-
-
-# ---------------------------------------------------------------- B0-设置 cases
-
-
-case("PY-12", needs="jvm:PinyinUatTest.theLowLevelStillTypesASentence")(lambda d: None)
-
-
-case("PY-19", needs="jvm:PinyinUatTest.eachSwitchTurnedOffTakesItsCandidates")(lambda d: None)
-
-
-case("PY-20", needs="jvm:PinyinUatTest.fuzzyZZh")(lambda d: None)
-
-
-case("PY-50", needs="jvm:PinyinUatTest.pinyinGlide、GlideUatTest.pinyinsGlideIsDrawnAsTheFingerGoes、GlideSessionTest.readingsAndLookupsAreTheSessionsShiftedPastTheOthers")(lambda d: None)
-
-
-case("PY-52", needs="jvm:PinyinUatTest.theBuiltInDatesTurnedOff")(lambda d: None)
-
-
-case("PY-64", needs="jvm:HostReplayUatTest.aSentenceTypedBeforeIsNotToldAfterTheAppsOwnCommits")(lambda d: None)
-
-
-# ---------------------------------------------------------------- R11 learning (context, runs, pins)
-
-case("PY-54", needs="jvm:PinyinUatTest.afterTheSameWordsPickedOnceIsSecondTwiceFirst")(lambda d: None)
-
-
-case("PY-69", needs="jvm:CandidateMenuUatTest.whyItIsThereAndTheReportCopied")(lambda d: None)
-
-
-case("PY-73", needs="jvm:PinyinUatTest.textAlreadyInTheFieldIsTheWordsBefore")(lambda d: None)
-
-
-case("PY-72", needs="jvm:PinyinUatTest.aWordNoLongerOfferedAfterAnother、SettingsPagesUatTest.aPredictionTurnedOffListedUnderBlockedAndTakenBack")(lambda d: None)
-
-
-case("PY-75", needs="jvm:HostCasesUatTest.wordsSentFromAChatBoxAreLearnedWithNothingBefore")(lambda d: None)
-
-
-case("PY-09", needs="jvm:PinyinUatTest.aWordTypedTwiceInFullGoesThirdUnderItsInitials、aWordTypedTwiceInFullGoesThirdUnderPartsOfItToo、aWordUsedUnderTheInitialsStaysFirstThere")(lambda d: None)
-
-
-case("PY-09b", needs="jvm:PinyinUatTest.aWordCorrectedToUnderTheInitialsIsNoLowerThanSecondInFullTillItExpires")(lambda d: None)
-
-
-case("PY-09c", needs="jvm:PinyinUatTest.aPinGoesFirstAndTheLiftedWordAPlaceDown")(lambda d: None)
-
-
-case("PY-09d", needs="jvm:PinyinUatTest.whyItIsHereTellsTheLiftAndTheFloor")(lambda d: None)
-
-
-case("PY-77b", needs="jvm:PinyinUatTest.aWordGlidedTwiceGoesThirdUnderItsInitials")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 导入的分组键盘 (061-custom-layout L4)
 
 
 def import_grouped(d, name, title):
@@ -230,7 +66,7 @@ def py153(d):
     k = d.keys(refresh=True)
     check("hjk" in k and "jk" not in k and "h" not in k, f"键盘上不是 17 键（有 HJK，没有 H、JK）：{sorted(k)}")
     d.shot("ime", "拼音用导入的 17 键：第 2 行 A SD FG HJK L")
-    # each letter where it sits on its key, as a user aims (按落点加权: 061-pending-decisions L4): n i h a o
+    # each letter where it sits on its key, as a user aims: n i h a o
     grouped_keys(d, "bn io hjk a io", at=[0.75, 0.25, 1 / 6, 0.5, 0.75])
     c = d.cands()
     check(c[:1] == ["你好"], f"BN IO HJK A IO（点在 n i h a o 那边）的候选 {c[:8]}")
@@ -251,35 +87,10 @@ def py153(d):
     return f"只问拼音、没提醒；17 键画出来；候选 {c[:3]}；点「你好」上屏；HJK 长按 {items}"
 
 
-case("PY-154", needs="jvm:NineKeyLettersCustomTest.theBuiltInGroupsInAnotherOrderAreThatKeyboardAndItsRecord、KeyboardCustomTest.theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod、ImKeyboardsTest.aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs、GroupedKeyboardOwnGroupsTest.theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys")(lambda d: None)
-
-
-case("PY-155", needs="jvm:OwnKeysTurnTest.otherGroupsWaitForTheirFirstCodeAndCommitThen、OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey、KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode、KotlinHostOwnKeysTest.aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped")(lambda d: None)
-
-
 case("PY-156", needs="manual:导入 uat-k17-tall-1.0.layout 用在拼音上，FG、BN 点在靠 HJK 的边上和正中各打一次 a 看候选；"
                      "NeighbourSlipTest.theKeysAroundAKeyAreThoseBesideItAndThoseAboveAndBelowOverlappingIt 只查几何")(lambda d: None)
 
 
-# ---------------------------------------------------------------- 14 键 (B0-14键)
-
-
-case("PY-84", needs="jvm:GroupedKeyboardUatTest.theFourteenKeysAsIFlytekLaysThemOut")(lambda d: None)
-
-
-case("PY-85", needs="jvm:Keys14UatTest.atTheKeysCentresTheFirstIsTheModelsAndYourIsOnThePage")(lambda d: None)
-
-
-case("PY-86", needs="jvm:GroupedKeyboardUatTest.theCodeRowsSyllablesBesideTheCodeTheirWidthsAndTheirCap、KeyboardHalvesUatTest.aSyllablePickedLeadsTheCodeAndBackspaceGivesItBack")(lambda d: None)
-
-
-case("PY-87", needs="jvm:GroupedKeyboardUatTest.theSeparatorWithNothingTypedIsPairedQuotes、Keys14UatTest.theSeparatorWithNothingTypedIsAQuoteAndWhileTypingSplitsXian")(lambda d: None)
-
-
-case("PY-88", needs="jvm:GroupedKeyboardUatTest.aSwipeUpTypesTheCornerAndWhileTypingPicksThatCandidate、KeyboardHalvesUatTest.aCornersDigitTypesItselfOrPicksThatCandidateWhileTyping")(lambda d: None)
-
-
-case("PY-89", needs="jvm:GroupedKeyboardUatTest.aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge、GroupedKeyboardUatTest.theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove、KeyboardHalvesUatTest.aLetterOfTheLongPressWhileTypingFollowsTheFirstCandidate")(lambda d: None)
 
 
 def edge_hold(d, xy, dx, note=None):
@@ -310,24 +121,6 @@ def py89b(d):
     return f"L←{left} L→边{edge} AS→{as_}"
 
 
-case("PY-90", needs="jvm:Keys14UatTest.theFourteenKeysLearnApartFromTheFullKeyboardAndYourWordsAreBoths")(lambda d: None)
-
-
-case("PY-91", needs="jvm:GroupedKeyboardUatTest.theGlobeGoesToTheEnglishKeyboardAndBack、GroupedKeyboardUatTest.aPasswordOnTheFourteenKeysIsEnglishsFullKeyboard、GroupedKeyboardTest.theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting")(lambda d: None)
-
-
-case("PY-92", needs="jvm:Keys14UatTest.keysWithNoReadingCommitAsTheirLetters")(lambda d: None)
-
-
-case("PY-93", needs="jvm:GroupedKeyboardUatTest.anAddressFieldsDotComAndAtGoInAsTheyAre、KeyboardHalvesUatTest.inAnAddressFieldTheKeysGoInAsLettersBeforeDotComAndAt、GroupedKeyboardTest.theSpaceIsAtLeast15PercentOfTheRowInEveryField")(lambda d: None)
-
-
-case("PY-94", needs="jvm:SettingsPagesUatTest.aPinOnTheFourteenKeysSaysSoAndShowsItsLetters、WordsUatTest.aPinOnTheFourteenKeysIsListedUnderItsKeys")(lambda d: None)
-
-
-case("PY-95", needs="jvm:Keys14UatTest.theBuiltInDatesUnderRqAndRiqi")(lambda d: None)
-
-
 @case("PY-96", base="B0-14键")
 def py96(d):
     s = d.screen()
@@ -343,41 +136,6 @@ def py96(d):
     check(ni and (ni.desc == "拼音 ni" or ni.row().desc == "拼音 ni"), f"ni 的说明「{ni and ni.desc}」")
     check(ni and "Button" in (ni.cls + ni.row().cls), f"ni 不是按钮：{ni and ni.cls}")
     return "QW、分词、ni 的说明都对"
-
-
-case("PY-97", needs="jvm:Keys14UatTest.syllablesTakenGoBackLastFirstAndATapInTheCodeOnlyMovesTheCursor")(lambda d: None)
-
-
-case("PY-98", needs="jvm:GroupedKeyboardUatTest.theFourteenKeysDoNotGlide")(lambda d: None)
-
-
-case("PY-100", needs="jvm:KeyboardHalvesUatTest.tappedOnTheLettersOfNihaoTheStripStartsWithNi")(lambda d: None)
-
-
-case("PY-101", needs="jvm:KeyboardHalvesUatTest.tappedOnTheLettersOfBuhaoTheStripStartsWithBu")(lambda d: None)
-
-
-case("PY-102", needs="jvm:Keys14UatTest.whereTheKeysWereTappedIsNotLearnedAndQuickInputGetsTheLetter")(lambda d: None)
-
-
-case("PY-103", needs="jvm:StrokeFilterUatTest.xiThenFourStrokesOfXi")(lambda d: None)
-
-
-case("PY-104", needs="jvm:StrokeFilterUatTest.haoThenADotThenBackspace")(lambda d: None)
-case("PY-135", needs="jvm:StrokeFilterUatTest.keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst")(lambda d: None)
-case("PY-136", needs="jvm:StrokeFilterTest.aMovedCandidatesOffersPinBlockReasonAndCardAreOfItsOwnPlace、StrokeFilterTest.theOrderIsMadeAgainAtEachStrokeAndBackspaceAndAPageTurnGoesOnFromIt")(lambda d: None)
-
-
-case("PY-105", needs="jvm:ImKeyboardsUatTest.pinyinsEighteenKeysShowTheGroupsAndSendTheirOwnCodes、GroupedKeyboardTest.talkBackReadsAGroupLetterByLetterWithItsCorner")(lambda d: None)
-
-
-case("PY-106", needs="jvm:PhraseUatTest.aWholeSentenceTypedThreeTimesGoesOnAfterItsStart、PhraseUatTest.aPhraseTurnedOffOrDeletedIsNoLongerOffered")(lambda d: None)
-
-
-case("PY-107", needs="jvm:PhraseUatTest.piecesCommittedApartAreNoPhrase")(lambda d: None)
-
-
-case("PY-108", needs="jvm:PhraseUatTest.noPhraseWhereNothingIsLearnedAndOneInATable")(lambda d: None)
 
 
 @case("PY-109", base="B0-注音全键盘", mutates="learn")
@@ -408,12 +166,6 @@ def py109(d):
     return f"码行 {code}、{toned}，框里「{got}」"
 
 
-case("PY-110", needs="jvm:PinyinUatTest.aReadingIsInItsCharactersOwnTones、ToneTableTest.aWordsNeutralToneIsItsCharactersOwn")(lambda d: None)
-
-
-case("PY-111", needs="jvm:CandidateHintsUatTest、EnginesReadingsTest.offShowsNoneButTheHintsAboveTheCandidates、CandidateReadingsTest.aHintIsOneReadingACharacterWithItsTones、CandidateBarHeightTest.aHintsReadingFillsTheRoomBetweenItsBounds、EnginesReadingsTest.aPolyphoneFoundByItsPartsOrStrokesIsReadOnceAbove、CandidateReadingsTest.aHintOfACharactersSeveralReadingsIsTheOneItHasThere、PolyphoneReadingUatTest.aPolyphoneIsReadOnceAboveAsItsWordHasIt、GridReadingWidthTest.aWordWithReadingsIsMeasuredAsItIsDrawnInEachStyle")(lambda d: None)
-
-
 @case("PY-118", base="B0-设置", mutates=True, visual=True)
 def py118(d):
     """the readings are drawn, not in the bar's accessibility: the machine checks the characters are
@@ -439,12 +191,6 @@ def py118(d):
     check("行" in c, f"选了银以后候选里没有「行」：{c[:8]}")
     d.shot("kb", "银 之后的 行 上方 háng")
     return "、".join(seen) + "、银+行 都在候选里，读音看图"
-
-
-case("PY-112", needs="jvm:ZhuyinShortcutsUatTest.dachensKeysTakeTheFullKeyboardsShortcutsByPlace、ZhuyinKeyboardTest.theSymbolKeysAreNamedForTheirShortcuts")(lambda d: None)
-
-
-case("PY-113", needs="jvm:EnginesReadingsTest.eachCandidateIsReadAsTyped、EnginesReadingsTest.aCharacterOfTwoReadingsIsReadAsTypedThroughFullPinyinsWrappers、StrokeFilterTest.readingsAndLookupsOfAKeptCandidateAreOfItsOwnPlace")(lambda d: None)
 
 
 @case("PY-114", mutates=True)   # a word blocked stays blocked: the next case needs a reset
@@ -481,7 +227,7 @@ def py115(d):
     after = d.cands()
     check(emoji not in after, f"屏蔽后 dianzan 还有「{emoji}」：{after[:8]}")
     d.clear()
-    # review H1: kept over a restart of the input method (the line read back from words.blocked)
+    # kept over a restart of the input method (the line read back from words.blocked)
     restart_ime(d)
     d.type("dianzan")
     restarted = d.cands(timeout=30)
@@ -560,8 +306,6 @@ def py116(d):
     return f"切到「{trad}」：长按「國家」菜单 {menu}；屏蔽后繁體 {after[:4]}，简体 {simp[:4]}"
 
 
-case("PY-117", needs="jvm:WordListsTest.aBlockedLatinWordReadsBackAsItsLetters、EnginesUserWordsTest.aLatinWordBlockedInPinyinStaysBlockedAfterARestartTillRestored")(lambda d: None)
-case("PY-119", needs="jvm:FastTypingTest.fourteenKeysTwoFingersOnOneKeyTypeEachItsHalf")(lambda d: None)
 case("PY-120", needs="jvm:EnginesStrokeLookupChainTest.withoutAKeyPassedOnWhatWasCommittedIsTheContext、"
      "EnginesStrokeLookupChainTest.enterPassedOnToTheAppDropsWhatWasCommittedBefore")(lambda d: None)
 
@@ -571,7 +315,7 @@ def py121(d):
     """the readings are drawn, not in the bar's accessibility: the machine finds the rare characters of
     chun in the expanded list, the shots show their toneless chun (none in zhuyin) and each row's
     characters on one line; and the floating window's emoji and word in English beside candidates read
-    (its JVM test lays out a Han character alone, R25r5 F8001)"""
+   """
     rare = ("䏝", "䏰", "䄝")
     d.goto("通用输入")
     choose(d, "候选词注音", "拼音")
@@ -580,7 +324,7 @@ def py121(d):
     for style in ("拼音", "注音符号"):
         if style == "注音符号":
             d.clear()
-            # the test page is in front: settings first, or goto finds no 通用输入 (R25 device pass)
+            # the test page is in front: settings first, or goto finds no 通用输入
             d.open_settings()
             d.goto("通用输入")
             choose(d, "候选词注音", "注音符号")
@@ -612,8 +356,7 @@ def py121(d):
             d.cands()
             d.shot("kb", "拼音：表情这种没注音的候选和有注音的字底边对齐")
             d.clear()
-            # the window by the cursor, on the emulator's USB keyboard (the next case's baseline unplugs it
-            # if this one stops before the down); a shot of the top half, where the test page's field is
+            # the window by the cursor, on the emulator's USB keyboard; a shot of the top half
             d.kb("up")
             try:
                 time.sleep(3)
@@ -663,22 +406,10 @@ def py122(d):
     return f"光标点到第 {at} 位，「{t1}」→「{t2}」"
 
 
-case("PY-123", needs="jvm:CodeInFieldUatTest.aSelectionMadeInTheCodeLeavesItAsTextAndTheEngineReset")(lambda d: None)
-case("PY-125", needs="jvm:EnginesWordCardTest、CharCardTest.theReadingACandidateHasItInFirst、WordCardUatTest.theExamplesReadAsTheDesignHasThem")(lambda d: None)
-case("PY-126", needs="jvm:CandidateMenuUatTest.aHeldCharacterOpensToItsFullCard、EnginesWordCardTest")(lambda d: None)
-case("PY-127", needs="jvm:EnginesWordCardTest、WordCardUatTest.theCardReadsAsTheBarOnTheChatWordsAndTheMisreadings")(lambda d: None)
-case("PY-128", needs="jvm:WordCardTest、EnginesWordCardTest、CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard")(lambda d: None)
-case("PY-129", needs="jvm:EnginesWordCardTest.aPredictionHasItsLineAsTheBarReadsIt、CandidateMenuUatTest.aPredictionHasItsReadingLineOverItsLines")(lambda d: None)
-case("PY-130", needs="jvm:EnginesWordCardTest、WordCardUatTest.theExamplesReadAsTheDesignHasThem")(lambda d: None)
-case("PY-131", needs="jvm:EnginesWordCardTest.traditionalOutputHasItsCardItsCharactersAsShown、EnginesHandwritingReadingsTest.traditionalOutputsWrittenCharacterHasItsCardAsShown")(lambda d: None)
-case("PY-132", needs="jvm:CandidateMenuUatTest.withTheCodeInTheFieldTheCardLeavesItAsItIs")(lambda d: None)
-case("PY-133", needs="jvm:CandidateMenuUatTest.aLongCandidateHasItsReadingAloneWrapped、EnginesWordCardTest、CardNavTest")(lambda d: None)
-
-
 @case("PY-124", base="B0", visual=True)
 def py124(d):
     """the reading line over the menu, the word card it opens, a character's card and the way back
-    (061-word-card.md); the views' children are hidden from accessibility, so each step is found by
+   ; the views' children are hidden from accessibility, so each step is found by
     its description, as TalkBack reads it"""
     d.open_page("text")
     d.type("yinhang")
@@ -710,14 +441,11 @@ def py124(d):
     return "读音行、词卡、字卡、返回、上屏"
 
 
-# ---------------------------------------------------------------- 按偏的键按落点读 (061-neighbour-correction)
 
 
 @case("PY-137")
 def py137(d):
-    # the same nihso twice, only where s is tapped differing: at a fifth of its width, toward a (hso spells nothing),
-    # read as nihao, the code row the spelling read; in the middle, no a read (全拼's floor), as typed. A place lost
-    # (read as no place) reads nihao both times, so the middle's tells it reached the engine (review R26 F8433)
+    # nihso twice, s tapped toward a (read as nihao) and in its middle (as typed): the middle's tells the place reached the engine
     keys_at(d, "nihso", [None, None, None, (0.2, 0.5), None])
     slip = d.cands()
     code = d.preedit()
@@ -732,28 +460,6 @@ def py137(d):
     # how the unread hso is split in the code row is the engine's to choose (no JVM test holds it): only no hao is checked
     check("hao" not in mid_code and first(mid) != "你好", f"正中点的 nihso：编码行「{mid_code}」，候选 {mid[:6]}")
     return f"靠边 {slip[:1]}「{code}」；正中 {mid[:3]}「{mid_code}」"
-
-
-case("PY-138", needs="jvm:NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle")(lambda d: None)
-
-
-case("PY-139", needs="jvm:PinyinSessionSlipTest.withNoPlaceAWordReadThroughASlipIsLearnedUnderTheKeyMeantToo、NeighbourSlipTest.withNoPlaceALegalSlipIsNotRead、PinyinUatTest.pinyinTypedWrongStillGivesTheWord")(lambda d: None)
-
-
-case("PY-140", needs="jvm:PinyinSessionSlipTest.aLegalSlipPickedIsLearnedUnderTheKeysMeantNotThoseTyped、PinyinSessionSlipTest.aLegalSlipPickedRaisesNothingUnderTheKeysTyped")(lambda d: None)
-
-
-case("PY-141", needs="jvm:NeighbourSlipTest.theFourteenKeysReadAKeyAsTheOneNextToItAndWeighItsLetters、PinyinSessionSlipTest.onTheFourteenKeysTheKeyMeantIsLearnedAsItsCode、GroupedKeyboardTapTest.aTapCarriesWhereItFellAndTheKeysAroundIt")(lambda d: None)
-
-
-case("PY-142", needs="jvm:NeighbourSlipTest.theEighteenKeysReadAKeyAsTheOneNextToIt、GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem、NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem")(lambda d: None)
-
-
-case("PY-150", needs="jvm:NeighbourSlipTest.dachenReadsASymbolAsTheOneNextToIt、PinyinSessionSlipTest.onDachenTheSymbolMeantIsLearnedAsItsCode、EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff、NeighbourTouchTest.dachensSymbolKeysGoWithTheSymbolKeysAround")(lambda d: None)
-case("PY-151", needs="jvm:EnginesZhuyinSlipTest.zhuyinsNineKeysReadASlipUnlessSlipsAreOff、NeighbourSlipTest.zhuyinsNineKeysReadAGroupAsTheOneNextToIt、NeighbourTouchTest.zhuyinsNineGroupKeysGoWithTheGroupKeysAround")(lambda d: None)
-
-
-case("PY-152", needs="jvm:GroupedKeyboard18Test.pinyinsTapGoesWithWhereItFellAndShuangpinsIsTheCodeAlone、EnginesImKeyboardsTest.pinyinsEighteenKeysTapsGoWithWhereTheyFell、KeyboardTapsTest.aPinyinEighteenKeysTapComesBackAsItsG18CodeAndPlace、NeighbourSlipTest.theEighteenKeysWeighTheLettersOfTheKeySlippedToByWhereTheTapFell")(lambda d: None)
 
 
 @case("PY-144", base="B0", visual=True)
@@ -779,9 +485,7 @@ def py144_steps(d, how):
     check(line is not None, f"{how}：没有读音行")
     d.tap(line.c, after=0.8)
 
-    # the window's left, right and the edge on the candidate bar, and its side of the bar: the lines under the
-    # card scroll with it where the card is taller than the room (a learned word's four lines under 行's card,
-    # seen; turned, off the window), so the window is found from the card's head
+    # the window found from the card's head, as lines under a tall card scroll with it
     def placed(s, what):
         head = next((n for n in s.nodes if n.desc.startswith(("银行，读音", "返回 银行"))), None)
         check(head is not None, f"{how}{what}：弹窗里没有卡")
@@ -817,9 +521,7 @@ def py144_steps(d, how):
 
 @case("PY-143")
 def py143(d):
-    # t tapped at 85% of its width, toward y (still on t): tama spells as typed, so 全拼 (floor -1.75) reads no yama;
-    # in the middle neither. nihso with s at 12% of its width, toward a (hso spells nothing): read as nihao, its cost
-    # about -0.7 on a key 36-40 dp wide, over the floor
+    # t tapped toward y still reads tama as typed (全拼's floor); nihso with s toward a reads nihao, over the floor
     ya = ("亚麻", "鸭毛", "压埋")
     keys_at(d, "tama", [(0.85, 0.5), None, None, None])
     edge = d.all_cands()
@@ -836,19 +538,3 @@ def py143(d):
     check(not any(w in mid for w in ya), f"四个键都点在正中的 tama，候选里有 ya ma 的词：{mid[:14]}")
     check(slip[:1] == ["你好"], f"s 靠 a 点的 nihso，首选不是「你好」：{slip[:6]}")
     return f"tama 靠边 {[w for w in edge if w in ya]}；正中 {mid[:6]}；nihso 靠边首选 {slip[:1]}"
-
-
-case("PY-145", needs="jvm:StrokePageUatTest.aStrokeDrawnOnThePageIsSentAndThePageStaysAndScrollsNot")(lambda d: None)
-
-
-case("PY-146", needs="jvm:StrokePageUatTest.aTapPicksADriftOrAStrokeLiftedShortPicksNothing、StrokePageUatTest.aLongPressStillOpensTheCandidatesMenu")(lambda d: None)
-
-
-case("PY-147", needs="jvm:StrokePageUatTest.theFirstThreePagesDrawingSayHowTheyTurn、StrokePageUatTest.theHintGoesAsAStrokeIsDrawnAndIsCountedOnlyOnceSaid")(lambda d: None)
-
-
-case("PY-148", needs="jvm:StrokePageUatTest.whereTheKeysDrawNoStrokeThePageScrollsAsBefore、StrokePageUatTest.aMouseDragOrATrackpadSwipeDrawsNone")(lambda d: None)
-
-
-case("PY-149", needs="jvm:StrokePageUatTest.aStrokeLeavingNoCandidateKeepsThePageAndItsBackspaceTakesItBack")(lambda d: None)
-case("PY-157", needs="jvm:StrokeFilterRefineTest.aRefineThatReordersPastTheFirstPageLeavesATapTheCandidateTapped、StrokeFilterTest.aRefineThatReordersOnlyPastThePageTheSessionShowsIsFilteredAgain、StrokeFilterTest.aCandidateTheSessionMovedUnderTheStrokesIsPickedAndPressedWhereItIsNow、StrokeFilterTest.aCandidateGoneFromTheSessionUnderTheStrokesPutsNothingUpAndIsLookedForAgain")(lambda d: None)

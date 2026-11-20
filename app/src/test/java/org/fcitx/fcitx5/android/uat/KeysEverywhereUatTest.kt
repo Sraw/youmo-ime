@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.popup.PopupFocus
+import org.fcitx.fcitx5.android.input.sent
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.keys.KeyId
@@ -37,10 +38,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * One key the same on every keyboard (060-keys-unify §6.2, UAT KB-73–79): ，'s long press, its edit and its
- * first; the nine keys' 1 and 5 by input method; 注音九键's ˉ and its slot r4c4, which is ，.
- */
+/** One key the same on every keyboard: ，'s long press, its edit and its first; the nine keys' 1 and 5; 注音九键's ˉ. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -65,16 +63,14 @@ class KeysEverywhereUatTest {
             api.enabledIme = api.availableIme
         }.start().also { h ->
             made = h
-            // fcitx's Chinese punctuation on, as its addon tells it (cached too: an input view made anew replays it)
+            // cached too: an input view made anew replays it
             if (punctuation != null) h.chinesePunctuation(im, punctuation)
             h.relayout()
         }
     }
 
-    // ，'s list as Chinese punctuation shows it, its first (。) under the finger as it opens
     private val zh = ChinesePunctuation.map
 
-    // held: the popup's items and the one focused as it opens (let go there: it is typed)
     private fun KeyboardHarness.held(key: ShownKey): Pair<List<String>, String?> {
         val f = finger(key, at(key))
         advance(700)
@@ -85,20 +81,17 @@ class KeysEverywhereUatTest {
         return shown.map { it.text } to shown.singleOrNull { it.focused }?.text
     }
 
-    // every keyboard with a ，: pinyin's full, 14 and 18 keys, 注音's two; [punctuation] on where given
     private fun everyComma(punctuation: Map<String, String>? = null): Sequence<Pair<String, KeyboardHarness>> = sequence {
         for (k in listOf(ImKeyboard.FULL, ImKeyboard.KEYS14, ImKeyboard.KEYS18, ImKeyboard.ZHUYIN_FULL, ImKeyboard.ZHUYIN_NINE)) {
             yield(k.name to harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = k), punctuation))
         }
     }
 
-    // the keys named [name] the board shows (注音九键 has two ，: the bottom row's and r4c4)
+    // 注音九键 has two ，: the bottom row's and r4c4
     private fun KeyboardHarness.named(name: String): List<SceneShownKey> =
         keys().filterIsInstance<SceneShownKey>().filter { k -> k.node.copy == 0 && k.node.shortcut?.let { KeyId.of(it).name } == name }
 
-    private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
-
-    // held, then slid from [from]'s cell to [label]'s: the popup's focus moves by PopupFocus.STEP, not by where its cells are
+    // the popup's focus moves by PopupFocus.STEP, not by where its cells are
     private fun KeyboardHarness.longPressTo(key: ShownKey, from: String, label: String) {
         val f = finger(key, at(key))
         advance(700)
@@ -117,11 +110,10 @@ class KeysEverywhereUatTest {
     @Test
     @Uat("KB-73")
     fun commaIsOneKey() {
-        // Chinese punctuation on, then off: the one list as each shows it
         for (punct in listOf(zh, emptyMap<String, String>())) for ((board, h) in everyComma(punct)) {
             val keys = h.named("fn/comma")
             assertEquals(board, if (board == ImKeyboard.ZHUYIN_NINE.name) 2 else 1, keys.size)
-            // the same items and the first focused; their places on the screen go by where the key is, so not their order
+            // their places on the screen go by where the key is, so not their order
             for (k in keys) assertEquals("$board ${k.node.id}", comma.map { punct[it] ?: it }.sorted() to (punct["."] ?: "."), h.held(k).let { (items, focused) -> items.sorted() to focused })
         }
     }
@@ -153,24 +145,20 @@ class KeysEverywhereUatTest {
         }
     }
 
-    // held and let go where it opened: its first typed, focused as it opens wherever it is in the list (a first
-    // above the row opened on, not the row's middle)
+    // focused as it opens wherever it is in the list, not the row's middle
     @Test
     @Uat("KB-75")
     fun heldAndLetGoTypesTheFirst() {
         fun first(id: String, symbols: List<String>, first: String) =
             prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId(id) to UserList(false, symbols, First.Literal(first)))).serialize())
-        // in the row
         first("t9/5", listOf("J", "K", "L", "5", "j", "k", "l", "#", "/"), "k")
         var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
         assertEquals("k", h.held(h.nineKey("5")).second)
-        // a symbol above a row
         first("t9/5", listOf("J", "K", "L", "5", "j", "k", "l", "#", "/"), "/")
         h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)
         h.api.calls.clear()
         assertEquals("/", h.held(h.nineKey("5")).second)
         assertTrue(h.sent().toString(), "key=/," in h.sent().last())
-        // a key of no row
         first("full/q", listOf("1", "Q", "‰"), "Q")
         h = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.FULL))
         h.api.calls.clear()
@@ -178,8 +166,7 @@ class KeysEverywhereUatTest {
         assertTrue(h.sent().toString(), "key=Q," in h.sent().last())
     }
 
-    // a letter first swiped to: the bubble shows it as it types, not in the face's case (seen on a device: q's first Q
-    // read q in the bubble, typed Q; 14 键's capitals over a first q the other way round)
+    // the bubble shows the letter as it types, not in the face's case
     @Test
     @Uat("KB-83")
     fun aLetterFirstSwipedShowsAsItTypes() {
@@ -191,7 +178,7 @@ class KeysEverywhereUatTest {
             val bubble = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
             finger.up(h.at(k, dy = -k.height * 1.5f))
             h.idle()
-            // a letter of a long press: sent as a key on the full keyboard, committed as it is on 14 键 (GroupedKeyboard.resolve)
+            // sent as a key on the full keyboard, committed as it is on 14 键 (GroupedKeyboard.resolve)
             return bubble to (h.sent().lastOrNull() ?: "committed ${h.field.text}")
         }
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("full/q") to UserList(false, listOf("1", "Q"), First.Literal("Q")))).serialize())
@@ -206,7 +193,6 @@ class KeysEverywhereUatTest {
         assertEquals("committed q", qwSent)
     }
 
-    // narrow (one-handed): the popup's rows more, a first in the symbols above still focused as it opens and typed
     @Test
     @Uat("KB-75")
     fun heldAndLetGoTypesTheFirstOnANarrowKeyboard() {
@@ -227,20 +213,17 @@ class KeysEverywhereUatTest {
     @Test
     @Uat("KB-76")
     fun nineKeysOneThroughThePunctuationEverywhereAndSharedOnceEdited() {
-        // Chinese punctuation on: shown as it types, 。, sent as the key . the engine maps (用户 2026-11-11)
         var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, punctuation = zh)
         val one = listOf("1", "^", ":", ";", "~", ".", "-", "@", "\\", "\"")
         assertEquals(one.map { zh[it] ?: it }.sorted(), h.longPress(h.nineKey("1")).sorted())
         h.api.calls.clear()
         h.longPressTo(h.nineKey("1"), "1", "。")
         assertTrue(h.sent().toString(), "key=.," in h.sent().last())
-        // English's the same list (no case of its own), as English types it
         h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
         assertEquals(one.sorted(), h.longPress(h.nineKey("1")).sorted())
         h.api.calls.clear()
         h.longPressTo(h.nineKey("1"), "1", ".")
         assertTrue(h.sent().toString(), "key=.," in h.sent().last())
-        // changed once on pinyin's: English's the same (M3), its 1 kept where the user kept it
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/1") to UserList(false, listOf("1", ".", "@")))).serialize())
         h = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS))
         assertEquals(listOf(".", "1", "@"), h.longPress(h.nineKey("1")).sorted())
@@ -249,19 +232,16 @@ class KeysEverywhereUatTest {
     @Test
     @Uat("KB-76")
     fun nineKeysOnesTapCyclesThePunctuationAsItMapsInBothLanguages() {
-        // 用户 2026-11-11: English's 1 as pinyin's (no ' or -: the long presses have them), each as the punctuation
-        // maps it, its face as it types
+        // English's 1 as pinyin's (no ' or -: the long presses have them)
         prefs.set(AppPrefs.getInstance().keyboard.t9MultiTap, T9MultiTap.Medium)
         fun KeyboardHarness.cycle(): List<String> = List(5) {
             tap(nineKey("1"))
-            // within 连按's time (中, 0.6 s): the next of the run
             advance(150)
             field.text.toString()
         }
         var h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, punctuation = zh)
         assertEquals("，。？！", h.nineKey("1").label)
         assertEquals(listOf("，", "。", "？", "！", "，"), h.cycle())
-        // Chinese punctuation off: as they are, as English's
         h = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS, punctuation = emptyMap())
         assertEquals(",.?!", h.nineKey("1").label)
         assertEquals(listOf(",", ".", "?", "!", ","), h.cycle())
@@ -276,7 +256,6 @@ class KeysEverywhereUatTest {
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("t9/5") to UserList(false, listOf("J", "K", "L", "5", "j", "k", "l", "#", "(", ")", "%")))).serialize())
         val pinyin = harness(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS).let { it.longPress(it.nineKey("5")) }
         assertTrue(pinyin.toString(), pinyin.containsAll(listOf("J", "K", "L", "5", "j", "k", "l", "%")))
-        // English's pinyin's: its capitals too
         val english = harness(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)).let { it.longPress(it.nineKey("5")) }
         assertEquals(pinyin.sorted(), english.sorted())
     }
@@ -287,7 +266,6 @@ class KeysEverywhereUatTest {
         prefs.setWays(up = true, down = true)
         prefs.set(internal.keySwipes, SwipeSlots.Default.with("fn/comma", up = true, SwipeSlot.First).serialize())
         val h = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_NINE))
-        // ˉ held: ˙, the neutral tone, sent as the tone key (its item's action:tone-5, the keyboard's)
         val tone = h.named("zy9/tone-1").single()
         val sentBefore = h.sent().size
         assertEquals(listOf("˙"), h.longPress(tone, "˙"))
@@ -296,14 +274,12 @@ class KeysEverywhereUatTest {
         h.swipe(tone, 0f, -tone.height * 1.3f)
         h.idle()
         assertEquals("swiped to its first, the same", toneSent.single(), h.sent().last())
-        // the slot is ，: the bottom row's list, its first up; its down empty, a tap (the slot's own)
         val (bottom, slot) = h.named("fn/comma").sortedBy { it.node.id != "r4c4" }.let { it[1] to it[0] }
         assertEquals(h.longPress(bottom).sorted(), h.longPress(slot).sorted())
         h.swipe(slot, 0f, -slot.height * 1.3f)
         h.idle()
         assertTrue(h.sent().toString(), "key=.," in h.sent().last())
-        // composing: the slot's tap is 分词, and so is its empty down (D3: a swipe to nothing is a tap on every
-        // keyboard); its up still its first, the . the engine types after committing what is typed
+        // composing: the slot's tap is 分词, and so is its empty down (a swipe to nothing is a tap on every keyboard)
         KeyboardHarness.find<ZhuyinKeyboard>(h.keyboard)!!.showTyping(true)
         h.tap(slot)
         h.idle()
@@ -318,7 +294,6 @@ class KeysEverywhereUatTest {
         assertTrue(h.sent().toString(), "key=.," in h.sent().last())
     }
 
-    // ˉ's list turned off: no popup, its up to nothing a tap (ˉ), as the resolver has it
     @Test
     @Uat("KB-78")
     fun zhuyinNinesToneOff() {
@@ -344,7 +319,6 @@ class KeysEverywhereUatTest {
         val h = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14))
         val qw = h.named("g14/qw").single()
         assertTrue(qw.drawnTexts.toString(), "!" in qw.drawnTexts)
-        // held and swiped up: the bubble shows the first the resolver has, not the layout's corner (M6)
         val finger = h.finger(qw, h.at(qw))
         for (i in 1..5) finger.move(h.at(qw, dy = -qw.height * 0.3f * i, ms = 16))
         val bubble = h.popupChoices().map { it.text }.filter { it.isNotEmpty() }
@@ -355,7 +329,6 @@ class KeysEverywhereUatTest {
         h.swipe(qw, 0f, -qw.height * 1.3f)
         h.idle()
         assertTrue(h.sent().toString(), "key=!," in h.sent().last())
-        // the full keyboard's q is another key (L3)
         prefs.set(internal.keyLists, KeyLists.of(mapOf(KeyId("full/q") to UserList(false, listOf("?"), First.Literal("?")))).serialize())
         val again = harness(KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14))
         assertTrue(again.named("g14/qw").single().drawnTexts.toString(), "1" in again.named("g14/qw").single().drawnTexts)

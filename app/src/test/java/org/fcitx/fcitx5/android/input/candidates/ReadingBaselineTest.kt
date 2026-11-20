@@ -25,11 +25,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * PY-121: with 候选词注音 on, a candidate of no reading (a character whose tone is not known, in zhuyin; an
- * emoji; a word in English) stands on the baseline of its neighbours read, in a cell as tall (the user,
- * 2026-11-14): the expanded grid's cells and the floating window's. The bar's: CandidateReadingsUatTest.
- */
+/** With 候选词注音 on, a candidate of no reading stands on its read neighbours' baseline, in a cell as tall. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class)
@@ -46,7 +42,7 @@ class ReadingBaselineTest {
     private val zhuyinRead = CandidateWord("", "你", "", readings = listOf("ㄋㄧˇ"))
     private val plain = listOf(CandidateWord("", "好", ""), CandidateWord("", "😀", ""), CandidateWord("", "ok", ""))
 
-    // a grid cell's glyphs' baseline from the cell's top: a row's cells are as tall (the adapter's row height)
+    // a row's cells are as tall (the adapter's row height)
     private fun gridBaseline(grid: GridPagingCandidateViewAdapter, word: CandidateWord): Int {
         val holder = grid.onCreateViewHolder(FrameLayout(ctx), 0)
         holder.update(1, word)
@@ -57,12 +53,11 @@ class ReadingBaselineTest {
         return text.top + text.baseline
     }
 
-    // R25r4 F7973: a row a style, each its own grid and style, so a pinyin row failing does not hide zhuyin's
+    // a row a style, so a pinyin row failing does not hide zhuyin's
     @Test
     @Uat("PY-121")
     fun aGridCellOfNoReadingStandsOnItsNeighboursBaseline() {
         fun onTheBaselineOf(style: ReadingStyle, withReading: CandidateWord) {
-            // the row's height is the style's, read as the cell is made
             EngineState.candidateReadingState.value = style
             try {
                 val grid = object : GridPagingCandidateViewAdapter(TestThemes.PixelLight) {}
@@ -78,8 +73,7 @@ class ReadingBaselineTest {
         )
     }
 
-    // the floating window's candidate: a TextView laid out by lines, a line of pinyin raised by its span
-    // (ReadingSpan.getSize), one of none by the padding the item gives it; the window's own text size and padding
+    // a line of pinyin raised by its span (ReadingSpan.getSize), one of none by the item's padding
     private fun floating(word: CandidateWord): View {
         val ui = LabeledCandidateItemUi(ctx, TestThemes.PixelLight, { textSize = 20f; setPadding(12, 6, 12, 6) })
         ui.update(word, active = false)
@@ -88,11 +82,8 @@ class ReadingBaselineTest {
         return ui.root
     }
 
-    // a Han character read and one not, alike in their fonts, at Android 10 as at 15: below API 33 the span cannot ask
-    // the character's own fonts and takes a Han character's line as laid out (ReadingSpan.hanLine; R25r4 F7990, the
-    // paint's own font there, shorter than the plain line's fallback, put the two lines on two baselines).
-    // Robolectric's fonts have no fallback of another height: at sdk 29 this passes with or without hanLine (R25r5
-    // F8003, tried), so it guards the path's arithmetic only; the device's look is PY-121's screenshot on youmo29
+    // below API 33 the span cannot ask the character's own fonts (ReadingSpan.hanLine). Robolectric's fonts have no
+    // fallback of another height, so this guards the arithmetic only; the device's look is PY-121's screenshot
     @Test
     @Uat("PY-121")
     @Config(sdk = [29, 35])
@@ -104,8 +95,7 @@ class ReadingBaselineTest {
             assertEquals("baseline", withReading.baseline, without.baseline)
             assertEquals("height", withReading.measuredHeight, without.measuredHeight)
         }
-        // R25r4 F7987: a candidate read and one not compared alone held whether the one not was given room or not;
-        // its height with the setting off says it was given none
+        // compared alone, a read and an unread candidate matched whether given room or not: the setting-off height says none
         fun zhuyin() {
             EngineState.candidateReadingState.value = ReadingStyle.OFF
             val off = floating(plain[0]).measuredHeight

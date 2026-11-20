@@ -37,8 +37,7 @@ class StrokeShapeTest {
 
     private fun shape(vararg legs: Pair<Double, Float>) = StrokeShape.classify(path(*legs))
 
-    // [legs] as [path] has them, each corner drawn round as a steady finger draws it: an arc of [radius] key
-    // widths, the legs on either side shortened by what the arc takes of them
+    // each corner an arc of [radius] key widths, as a steady finger draws it, the legs shortened by it
     private fun rounded(radius: Float, vararg legs: Pair<Double, Float>): FloatArray {
         val turns = (0 until legs.size - 1).map { i -> ((legs[i + 1].first - legs[i].first + 540.0) % 360.0) - 180.0 }
         val cuts = turns.map { radius * tan(Math.toRadians(abs(it)) / 2).toFloat() }
@@ -110,16 +109,13 @@ class StrokeShapeTest {
 
     @Test
     fun aCurveWithATickIsNoZheACornerIs() {
-        // a 撇 bowed a little (an eighth of its length), a tick up at its end: it turned as much where it
-        // strayed most as a corner does, and was 折 (issue #4); its arms are curves, not straight.
-        // 0.9 key widths, ticked right as it starts, bowed out, flicked up to the left as it ends
+        // a 撇 bowed an eighth, ticked at both ends: it turned at its widest as a corner does and was 折; its arms are curves
         val pie = floatArrayOf(
             2.0f, 1.0f, 2.03f, 1.0f, 2.06f, 1.0f, 2.09f, 1.0f, 2.08f, 1.06f, 2.07f, 1.13f, 2.06f, 1.19f, 2.04f, 1.24f,
             2.02f, 1.3f, 2.0f, 1.35f, 1.97f, 1.4f, 1.94f, 1.45f, 1.91f, 1.49f, 1.87f, 1.53f, 1.83f, 1.57f, 1.79f, 1.61f,
             1.74f, 1.65f, 1.69f, 1.68f, 1.63f, 1.71f, 1.57f, 1.74f, 1.54f, 1.71f, 1.51f, 1.67f, 1.48f, 1.64f,
         )
-        // a 横 0.9 key widths rising 10°, ticked down as it starts, bowed down a little more than an eighth of
-        // its length as a thumb sweeps, flicked up to the left as it ends
+        // a 横 rising 10°, ticked down at its start, bowed down, flicked up-left at its end
         val heng = ArrayList(path(-90.0 to 0.09f).toList())
         val (x0, y0) = heng[heng.size - 2] to heng.last()
         val r = Math.toRadians(10.0)

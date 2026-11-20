@@ -43,7 +43,6 @@ class PinyinDataTest {
 
     private fun PinyinData.id(word: String) = (0 until vocabulary.size).first { vocabulary.word(it) == word }
 
-    /** Where section [id]'s entry is in the section table of [bytes]. */
     private fun sectionEntry(bytes: ByteArray, id: Int): Int {
         val file = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         return (0 until file.getInt(16)).map { 24 + it * 24 }.first { file.getInt(it) == id }
@@ -102,7 +101,6 @@ class PinyinDataTest {
 
     @Test
     fun layersAreNamedAndAWordIsOfTheFirstItIsIn() {
-        // without layers named, everything is of the base
         val plain = load()
         assertEquals(listOf(WordLayers.BASE), plain.layers.names)
         assertEquals(0, plain.layers.layer(plain.id("妳好")))
@@ -121,7 +119,6 @@ class PinyinDataTest {
         assertThrows(IllegalArgumentException::class.java) { builder().entry("x", syl("ni"), layer = 1) }
         assertThrows(IllegalArgumentException::class.java) { builder().layers(listOf("base", "base")) }
         assertThrows(IllegalArgumentException::class.java) { builder().layers(listOf("a,b")) }
-        // fewer names than an entry added already needs
         assertThrows(IllegalArgumentException::class.java) {
             builder().layers(listOf("base", "new")).entry("x", syl("ni"), layer = 1).layers(listOf("base"))
         }
@@ -131,7 +128,6 @@ class PinyinDataTest {
     @Test
     fun aWordOfALayerPastTheNamesFailsToLoad() {
         val bytes = builder().layers(listOf("base", "places", "new")).entry("尼豪", syl("ni", "hao"), layer = 2).build().toByteArray()
-        // the same length, and two names: 尼豪's layer 2 is past them
         val needle = "places,new".toByteArray()
         val at = (0..bytes.size - needle.size).first { i -> needle.indices.all { bytes[i + it] == needle[it] } }
         "places;new".toByteArray().copyInto(bytes, at)
@@ -172,17 +168,14 @@ class PinyinDataTest {
     fun unseenNgramsBackOff() {
         val data = load()
         val m = data.model
-        // P(拟 | 你) = bo(你) + P(拟)
         assertEquals(-0.5f + -5f, m.score(data.id("你"), data.id("拟")), 1e-6f)
         // P(拟 | 你 好): bigram 你 好 exists, trigram does not = bo(你 好) + P(拟 | 好) = -0.1 + (-0.25 + -5)
         assertEquals(-0.1f + -0.25f + -5f, m.score(data.id("你"), data.id("好"), data.id("拟")), 1e-6f)
-        // P(吗 | 拟 好): no bigram 拟 好, so straight to P(吗 | 好)
         assertEquals(-1.1f, m.score(data.id("拟"), data.id("好"), data.id("吗")), 1e-6f)
     }
 
     @Test
     fun theWordsSeenAfterAContextAreWalkedOnceWithTheirScores() {
-        // 拟 after 你 好 but never after 好 alone
         val data = load(builder().bigram("好", "你", -1.3f, 0f).trigram("你", "好", "拟", -0.6f))
         val m = data.model
         fun after(prev2: Int, prev: Int): List<String> {
@@ -205,7 +198,6 @@ class PinyinDataTest {
         assertEquals(emptyList<String>(), after(NO_WORD, data.id("妳好")))
     }
 
-    // found once a context, as the decoder scores every word after one: the same scores
     @Test
     fun aContextsTrigramsLookedUpOnceServeEveryWordAfterIt() {
         val data = load(builder().bigram("好", "你", -1.3f, 0f).trigram("你", "好", "拟", -0.6f))
@@ -214,9 +206,7 @@ class PinyinDataTest {
         val trigrams = m.trigrams(nihao)
         assertEquals(-0.2f, m.scoreAfter(nihao, trigrams, data.id("吗")), 0f)
         assertEquals(-0.6f, m.scoreAfter(nihao, trigrams, data.id("拟")), 0f)
-        // none after both: bo(你 好) + P(你 | 好)
         assertEquals(-0.1f + -1.3f, m.scoreAfter(nihao, trigrams, data.id("你")), 1e-6f)
-        // no bigram 拟 好: no trigrams to look up
         val none = m.context(data.id("拟"), data.id("好"))
         assertEquals(-1.1f, m.scoreAfter(none, m.trigrams(none), data.id("吗")), 1e-6f)
     }
@@ -233,7 +223,6 @@ class PinyinDataTest {
     /** The words forEachAfter hands on are looked up in the vocabulary: one past the model loads, and is not handed on. */
     @Test
     fun anNgramWordPastTheModelIsNotHandedOn() {
-        // 3 bits each, all set: 7, past the model's 6 words
         for (section in listOf(PinyinData.Section.BI_WORD, PinyinData.Section.TRI_WORD)) {
             val bytes = builder().build().toByteArray()
             maxFirstValue(bytes, section)
@@ -247,8 +236,7 @@ class PinyinDataTest {
         }
     }
 
-    // the bigrams' answers are kept by (prev, word) (S15 N1): asked again, in any order, more pairs
-    // than the cache has slots, each still the file's, a bigram seen or one backed off
+    // more pairs than the cache has slots, asked in any order, each still the file's
     @Test
     fun bigramsAskedAgainScoreAsTheFileHasThem() {
         val b = builder()
@@ -273,7 +261,6 @@ class PinyinDataTest {
         val b = builder()
         val words = (0 until 8).map { "w$it" }
         words.forEach { b.unigram(it, -4f, 0f) }
-        // few distinct values, so each quantises exactly
         fun prob(vararg i: Int) = -0.1f * (1 + i.sum() % 7)
         val random = Random(7)
         val pairs = words.indices.flatMap { p -> words.indices.map { w -> p to w } }.shuffled(random)
@@ -295,11 +282,8 @@ class PinyinDataTest {
         assertEquals(-7f, m.score(data.id("妳好")), 0f)
         assertEquals(-2.5f, m.score(NO_WORD, data.id("好")), 0f)
         assertEquals(-0.8f, m.score(NO_WORD, data.id("你"), data.id("好")), 0f)
-        // unknown context: <unk> has backoff 0
         assertEquals(-2.5f, m.score(data.id("妳好"), data.id("好")), 0f)
-        // an unknown word two back: no bigram (<unk>, 你), so P(好 | 你)
         assertEquals(-0.8f, m.score(data.id("妳好"), data.id("你"), data.id("好")), 0f)
-        // no previous word at all: prev2 cannot matter
         assertEquals(-2.5f, m.score(data.id("你"), NO_WORD, data.id("好")), 0f)
     }
 
@@ -329,7 +313,6 @@ class PinyinDataTest {
         words.forEachIndexed { i, w ->
             val bo = m.backoff(data.id("你"), data.id(w))
             assertEquals(-0.001f * (i + 1), bo, 0.002f)
-            // P(拟 | 你 w) = bo(你 w) + bo(w) + P(拟)
             assertEquals(bo + -0.2f + -5f, m.score(data.id("你"), data.id(w), data.id("拟")), 1e-5f)
         }
     }

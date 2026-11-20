@@ -12,11 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * A commit that did not go in is kept ([CommitCheck], UAT LC-24): against a [FakeEditor] that takes
- * every write and drops it, as a WebView whose view lost the focus does, and against editors that are
- * only slow, silent or particular, where nothing may be kept.
- */
+/** A commit a field dropped is kept (a WebView that lost focus); slow, silent or particular editors keep nothing. */
 class CommitCheckTest {
 
     private class Rig(text: String = "", cursor: Int = text.length, on: Boolean = true) {
@@ -32,8 +28,8 @@ class CommitCheckTest {
 
         val kept get() = s.commits.kept
 
-        /** The editor's report of where it is now, as onUpdateSelection brings it. */
-        fun report() = s.onCursorUpdate(e.selectionStart, e.selectionEnd, e.composingStart, e.composingEnd, false)
+        /** As onUpdateSelection brings it. */
+        fun report() = s.onCursorUpdate(e.selectionStart, e.selectionEnd, e.composingStart, e.composingEnd)
 
         fun code(text: String) = s.writeCode(FormattedText(arrayOf(text), intArrayOf(0), -1))
 
@@ -136,7 +132,6 @@ class CommitCheckTest {
         val takenWhileWaiting = r.kept
         r.s.judgeCommit()
         val still = r.kept
-        // the field has the focus again
         r.e.dropsWrites = false
         r.s.commitText(r.s.commits.take())
         r.report()
@@ -154,8 +149,7 @@ class CommitCheckTest {
         val typedOn = kept().apply { s.commitText("吗"); report() }
         val typedOnSilently = kept().apply { s.commitText("吗"); s.judgeCommit() }
         val reported = kept().apply { e.reportSelection(1); report() }
-        // typed on into the field still dropping, and the field tapped before the wait is up: its report
-        // is not the commit's and the cursor is elsewhere, so nothing is read; what was kept before stays
+        // typed on, the field tapped before the wait is up: the report is not the commit's, nothing read; what was kept stays
         val tappedMeanwhile = Rig("AB").apply {
             e.dropsWrites = true; s.commitText("你"); s.judgeCommit()
             s.commitText("好"); e.reportSelection(1); report(); s.judgeCommit()
@@ -195,8 +189,7 @@ class CommitCheckTest {
             s.commitText("好")
             report()
         }
-        // the screen turned, the field's view lost the focus: the code's writes are dropped, it floats
-        // (FieldCode), and the commit from the strip is dropped too
+        // the screen turned, the view lost focus: the code's writes and the strip's commit are dropped
         val dead = Rig("AB").apply {
             e.dropsWrites = true
             code("h")
@@ -214,9 +207,7 @@ class CommitCheckTest {
 
     @Test
     fun `a commit made after the one a wait was timed for has its own wait`() {
-        // the service's timer was set for the first commit; that one reported at once, or its field was
-        // left, and the next is made just before the timer runs: an editor whose reads lag a frame would
-        // not show it yet, so it is not judged then
+        // the timer was set for the first commit; the next made just before it runs is not judged then (reads may lag a frame)
         fun next(between: Rig.() -> Unit) = Rig("AB").let { r ->
             var now = 0L
             r.s.commits.clock = { now }
@@ -250,9 +241,7 @@ class CommitCheckTest {
 
     @Test
     fun `anything else done to the field while a commit waits leaves it unjudged`() {
-        // an editor that reports late: the commit went in, then was deleted or the cursor moved back
-        // before the wait is up, and a read finds the text before the cursor as it was before the commit.
-        // Made where the text before the cursor is known (你 landed), so not read right after either
+        // a late reporter: the commit went in then was deleted or the cursor moved back before the wait; a read shows the old text
         fun after(change: EditingSession.() -> Unit) = Rig("说").apply {
             s.commitText("你")
             report()
@@ -370,8 +359,7 @@ class CommitCheckTest {
 
     @Test
     fun `the known text before the cursor is what a read there would give`() {
-        // [text] before the cursor; a commit that lands, then one the field drops: kept, and the reads made
-        // before the judging (the first commit read before it and right after)
+        // a commit that lands, then one the field drops: kept, and the reads made before the judging
         fun keptAfterLanded(text: String, limit: Int = Int.MAX_VALUE) = Rig(text).run {
             e.revealLimit = limit
             s.commitText("你")
@@ -410,9 +398,7 @@ class CommitCheckTest {
     @Test
     @Uat("LC-36")
     fun `a field that uses the text and puts its buffer back is not said to have dropped it`() {
-        // R26 F8168: a terminal's, a remote desktop's field takes the text, sends it on and empties itself
-        // in the same batch edit; the cursor ends where it was, so no report, and a read at the wait's
-        // end gives what was there before. The read right after the write saw it go in
+        // a terminal's field takes the text and empties itself in one batch edit, no report; the read right after saw it go in
         fun used(text: String) = Rig(text).apply {
             s.commitText("ls")
             e.appSetsText(text)
@@ -420,8 +406,7 @@ class CommitCheckTest {
         }
         val empty = used("")
         val prompt = used("> ")
-        // one that takes it away within the write itself reads the same right after: cannot be told
-        // from one that drops it, kept; but no more than KEPT_MAX units of it, a pair not cut
+        // one taken away within the write itself reads as dropped: kept, but no more than KEPT_MAX units, a pair not cut
         val first = "😀".repeat(100)
         val second = "x" + "😀".repeat(100)
         val within = Rig().apply {

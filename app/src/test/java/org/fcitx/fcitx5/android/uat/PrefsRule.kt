@@ -26,28 +26,21 @@ import org.fcitx.fcitx5.android.ui.main.settings.PopupOverridesFragment
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.rules.ExternalResource
 
-/**
- * What a test sets is set back to what it was, last set first: the prefs outlive the test
- * (Robolectric keeps the sandbox). Runs after the test's own `@After`, its keyboard closed first.
- */
+/** Set back last set first: the prefs outlive the test (Robolectric keeps the sandbox). Runs after the test's `@After`. */
 class PrefsRule : ExternalResource() {
 
     private val restore = mutableListOf<() -> Unit>()
 
-    // the app's settings store (AppPrefs and ThemeManager.prefs alike) as the test found it
     private val store get() = PreferenceManager.getDefaultSharedPreferences(appContext)
     private var found: Map<String, Any?> = emptyMap()
 
-    // 表情 opens the panel last shown, which app code writes and another test may have left at 颜文字 or the
-    // symbols: the emoji at each test's start (R20 F6608)
+    // 表情 opens the panel last shown, which another test may have left at 颜文字 or the symbols
     override fun before() {
         found = HashMap(store.all)
         set(AppPrefs.getInstance().internal.lastPickerType, PickerWindow.Key.Emoji.name)
-        // the symbol panel opens on the category picked last, which a test without this rule may have left
         set(AppPrefs.getInstance().internal.symbolPanelCategory, "")
-        // the floating keyboard's spot, which a drag's end writes: another test's drag moved the theme maker's
-        // floating shots (ThemeMakerLayoutTest)
-        // and its width, 竖屏 and 横屏 each their own (061-floating-resize)
+        // the floating keyboard's spot and width, which a drag's end writes: another test's drag moved the theme maker's
+        // floating shots
         AppPrefs.getInstance().internal.run {
             listOf(
                 floatingKeyboardX, floatingKeyboardY, floatingPortraitX, floatingPortraitY, floatingLandscapeX, floatingLandscapeY,
@@ -62,23 +55,15 @@ class PrefsRule : ExternalResource() {
         pref.setValue(value)
     }
 
-    /**
-     * A key's long press set as 按键字符和快捷键 sets it (`key_lists`, 060-keys-unify): by its name (`full/q`, `t9/2`,
-     * `fn/comma`; KeyId.of), its whole list [items] (a row's letters and digit too, 060-row-unlock), its [first] (the swipe's, the corner's) the default's
-     * unless given, or [off], its items' [marks] (061-text-variables §3); the other keys as they are. The store is put
-     * back after the test, key_lists with it.
-     */
+    /** A key's long press set as 按键字符和快捷键 sets it: by its name (`full/q`, KeyId.of), its [first] the default's unless given. */
     fun setList(name: String, items: List<String> = emptyList(), first: String? = null, off: Boolean = false, marks: Map<String, ItemMark> = emptyMap()) {
         val pref = AppPrefs.getInstance().internal.keyLists
         val list = if (off) UserList.Off else UserList(off = false, items = items, first = first?.let(First::Literal) ?: First.Default, marks = marks)
-        // as stored, none left out as a default: a list turned off is kept where no default is told here
+        // a list turned off is kept where no default is told here
         set(pref, KeyLists.of((KeyLists.parse(pref.getValue())?.lists.orEmpty()) + (KeyId.of(name) to list)).serialize())
     }
 
-    /**
-     * 0.5's shortcuts as 0.6's slots (060-swipe-slots) over the slots set now: a character key's on the way that
-     * is not its long press's first (down, by default), a function key's (`fn/space.up`) its own way; the other keys as they are.
-     */
+    /** 0.5's shortcuts as 0.6's slots: a character key's on the way that is not its long press's first. */
     fun setShortcuts(shortcuts: KeyShortcuts) {
         val now = AppPrefs.getInstance().internal.keySwipes.getValue().let { if (it.isEmpty()) SwipeSlots.Default else SwipeSlots.parse(it) }
         val up = now.orientation == SwipeOrientation.FirstDown
@@ -86,11 +71,7 @@ class PrefsRule : ExternalResource() {
         set(AppPrefs.getInstance().internal.keySwipes, made.serialize())
     }
 
-    /**
-     * 0.5's 滑动 [choice] as 0.6 migrates it (SwipeMigration): the slots' orientation, the ways on, and the two
-     * places swapped where the long press's first goes down, so each mark stays where the test had it. The slots
-     * start again from the preset's: a [setShortcuts] before it is lost, so call it after.
-     */
+    /** As SwipeMigration migrates it; the slots start again from the preset's: a [setShortcuts] before it is lost. */
     fun setLayers(choice: SwipeLayersChoice) {
         val k = AppPrefs.getInstance().keyboard
         val r = SwipeMigration.of(choice.layers, upgraded = true, KeyShortcuts.Empty, k.swipeUpPosition.getValue().at, k.swipeDownPosition.getValue().at)
@@ -100,28 +81,22 @@ class PrefsRule : ExternalResource() {
         set(k.swipeDownPosition, KeyMarkPosition.of(r.downAt))
     }
 
-    /** 上滑 and 下滑 on or off. */
     fun setWays(up: Boolean, down: Boolean) {
         set(AppPrefs.getInstance().keyboard.swipeUp, up)
         set(AppPrefs.getInstance().keyboard.swipeDown, down)
     }
 
-    /**
-     * 键盘样式 [style] on both shapes, or on the one [landscape] says (TestStyles); [side] where 单手 is at. Put back
-     * with the store after the test.
-     */
     fun setStyle(style: KeyboardStyle, landscape: Boolean? = null, side: OneHanded? = null) {
         side?.let { set(ThemeManager.prefs.oneHandedSide, it) }
         TestStyles.set(style, landscape)
     }
 
-    /** No style stored: each shape's default by its width (竖屏 普通; 横屏 split from 600 dp). */
+    /** Each shape's default by its width (竖屏 普通; 横屏 split from 600 dp). */
     fun setStyleDefault() = TestStyles.clear()
 
-    /** [key] stored as [value] as it is, of no setting this version declares (0.5's long presses): put back after the test. */
+    /** Of no setting this version declares (0.5's long presses). */
     fun setStored(key: String, value: String) = store.edit().putString(key, value).commit()
 
-    /** Something else a test changed that outlives it, put back with the prefs. */
     fun later(undo: () -> Unit) {
         restore += undo
     }
@@ -130,12 +105,11 @@ class PrefsRule : ExternalResource() {
         restore.asReversed().forEach { it() }
         restore.clear()
         putBackFound()
-        // the key page's one step back outlives the page: not into the next test
+        // the key page's one step back outlives the page
         PopupOverridesFragment.forgetUndo()
     }
 
-    // every key the test (or app code it ran) changed or added set back to what it was, in one commit: a setting
-    // a test forgot to put back does not leak into the next test
+    // in one commit: a setting a test forgot to put back does not leak into the next test
     private fun putBackFound() {
         val now = store.all
         val e = store.edit()

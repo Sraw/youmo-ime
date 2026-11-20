@@ -25,14 +25,14 @@ import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.search.ReadyLater
 import org.fcitx.fcitx5.android.utils.addPreference
 
-// its preferences come once fcitx answers: a search result's waits for them (set as a new screen)
+// its preferences come once fcitx answers: a search result waits for them
 abstract class HostPreferenceFragment : PaddingPreferenceFragment(), ReadyLater {
     abstract fun getPageTitle(): String
-    /** The page's options by path; null if the host has none for it. */
+    /** Null if the host has none for it. */
     abstract suspend fun obtainConfig(fcitx: HostApi): Map<String, String>?
     abstract suspend fun saveConfig(fcitx: HostApi, newConfig: Map<String, String>)
 
-    /** The page as shown and changed, on the main thread. */
+    /** Main thread. */
     private val options = LinkedHashMap<String, String>()
     private var configLoaded = false
 
@@ -46,10 +46,8 @@ abstract class HostPreferenceFragment : PaddingPreferenceFragment(), ReadyLater 
 
     private fun save() {
         if (!configLoaded) return
-        // a copy taken here, on the main thread: the page goes on changing its options while the
-        // fcitx thread reads them, with nothing between the two
+        // copied on the main thread: the page keeps changing its options while the fcitx thread reads them
         val cfg = options.toMap()
-        // launch "saveConfig" job under supervisorJob scope
         scope.launch {
             fcitx.runOnReady {
                 saveConfig(this, cfg)
@@ -57,7 +55,7 @@ abstract class HostPreferenceFragment : PaddingPreferenceFragment(), ReadyLater 
         }
     }
 
-    /** [block] on the fcitx thread, as [save] is: what the page does, saved before the page goes back too. */
+    /** As [save] is, so it is saved before the page goes back too. */
     protected fun launchOnFcitx(block: suspend HostApi.() -> Unit) {
         scope.launch { fcitx.runOnReady { block() } }
     }
@@ -80,27 +78,14 @@ abstract class HostPreferenceFragment : PaddingPreferenceFragment(), ReadyLater 
     }
 
     /**
-     * **TLDR:**
-     * Intentionally empty, since we need to create PreferenceScreen during onStart,
-     * or it will crash when MainActivity relaunches.
-     *
-     * **Long version:**
-     * When `MainActivity` relaunches, its `onCreate` get called, and somewhere in `super.onCreate`
-     * decided to `restoreChildFragmentState` of `NavHostFragment`, thus recreate the child fragment.
-     * If that fragment was derived from `HostPreferenceFragment`, it needs to call `obtainConfig`
-     * which would need the route params, and in turn needs `NavGraph`.
-     * But at this time it's still in `MainActivity`'s `super.onCreate`, the Activity did not have
-     * chance to set up `NavGraph` on `navController`, so accessing `lazyRoute` would crash.
-     *
-     * That is to say, if we declare `app:navGraph` on `<FragmentContainerView />` in `activity_main.xml`,
-     * the graph would have been initialized when `NavHostFragment` got inflated, and does not suffer
-     * from this problem? But maintain navigation destinations in XML is too tedious ...
+     * Intentionally empty: the screen is created in onStart. When MainActivity relaunches, `super.onCreate` restores the
+     * child fragment before the NavGraph is set, and `obtainConfig` needs the route, so building it here would crash.
      */
     final override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) = Unit
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // make sure to create preference only once since `onViewCreated` is also called on Fragment resume
+        // `onViewCreated` is also called on Fragment resume: create preferences only once
         if (preferenceScreen?.isEmpty() == false) return
         val context = requireContext()
         lifecycleScope.withLoadingDialog(context) {
@@ -121,7 +106,7 @@ abstract class HostPreferenceFragment : PaddingPreferenceFragment(), ReadyLater 
         }
     }
 
-    /** The page over [options], [save] called after each change. */
+    /** [save] called after each change. */
     protected abstract fun createScreen(options: MutableMap<String, String>, save: () -> Unit = ::save): PreferenceScreen
 
     override fun onStart() {

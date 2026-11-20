@@ -2,43 +2,5 @@
 前提/操作/预期."""
 from uat import case
 
-case("MN-01", needs="jvm:BarUatTest.noticeAboveKeysTapAndTimeout")(lambda d: None)
-
-
-case("MN-02", needs="jvm:MotionNoticeUatTest.habitsOffAndOnEachSaidTheNewInTheOldsPlace")(lambda d: None)
-
-
-case("MN-03", needs="jvm:MotionNoticeUatTest.floatingAtTheLeftTheNoticeGoesRight")(lambda d: None)
-
-
-case("MN-04", needs="jvm:MotionNoticeUatTest.clipboardDeleteUndoneOnTheNoticeInEitherTheme、UndoChipTest.aNoticeWithUndoIsAsTallAsOneThatOnlySays")(lambda d: None)
-
-
-case("MN-10", needs="jvm:MotionNoticeUatTest.theDockedHandleUnderOrOverTheKeysTheKeysAsTall")(lambda d: None)
-
-
-case("MN-11", needs="jvm:MotionNoticeUatTest.aLongPressOnTheHandleLetsItFloatUnderTheFinger")(lambda d: None)
-
-
-case("MN-12", needs="jvm:MotionNoticeUatTest.oneHandedTheHandleAsWideAsTheKeyboard")(lambda d: None)
-
 
 case("MN-13", base="B0-设置", needs="manual:要 TalkBack 读屏，在模拟器（google_apis 镜像带 TalkBack）或真机上手动做")(lambda d: None)
-
-
-case("MN-20", needs="jvm:BarUatTest.candidateTextSizeChangesBarNotKeys")(lambda d: None)
-
-
-case("MN-22", needs="jvm:SettingsPagesUatTest.thePreviewsBarFollowsTheCandidateSizeOnThePage")(lambda d: None)
-
-
-case("MN-23", needs="jvm:BarUatTest.candidateSpacingFollowsTextSize")(lambda d: None)
-
-
-case("MN-21", needs="jvm:MotionNoticeUatTest.landscapeLargestCandidatesStillLeaveTheApp120dp")(lambda d: None)
-
-case("MN-24", needs="jvm:KotlinHostHandwritingTest.theHandwritingNoticeNotSeenIsToldAtTheNextStart")(lambda d: None)
-
-case("MN-25", needs="jvm:KotlinHostHandwritingTest.bothHandwritingNoticesAreToldEachOnce")(lambda d: None)
-
-case("MN-26", needs="jvm:ToastTest.aToastGoesAfterItsTime")(lambda d: None)

@@ -12,18 +12,14 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
 import kotlin.math.abs
 
 /**
- * The SVG a theme 4.0 pack's `<icon>` may be (060-render-p3 T8a): filled paths and nothing else. An
- * icon from the web is read by the engine's XML reader (no DTD, no entities of its own: no XXE, no
- * billion laughs), and anything that reaches outside the file or runs (`<script>`, `<image>`, `<use>`,
- * `href`, `style`, `on…`) or that a later drawer would have to grow for (strokes, gradients, text,
- * filters, transforms) is refused, so whatever draws icons later draws only what this lets in.
+ * The SVG a theme's `<icon>` may be: filled paths and nothing else. Read by the engine's XML reader (no DTD: no XXE);
+ * anything that reaches outside the file, runs, or that a drawer would have to grow for is refused.
  */
 object SvgSubset {
 
-    /** Paths in one icon at most. */
     const val MAX_PATHS = 256
 
-    /** Numbers in all its paths at most: an icon's outline, not a traced photo. */
+    /** An icon's outline, not a traced photo. */
     const val MAX_NUMBERS = 20_000
 
     private val SHARED = setOf("fill", "fill-rule", "fill-opacity", "opacity", "id")
@@ -38,42 +34,26 @@ object SvgSubset {
     // longest first: JS's matches() takes the first alternative that matches a prefix and never tries the rest (#f008 was refused)
     private val COLOR = Regex("#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})")
 
-    /** What is wrong with [source] as an icon, each with its line; none: it is one. */
     fun check(source: String): List<Problem> = when (val read = read(source)) {
         is Parsed.Failed -> read.problems
         is Parsed.Ok -> emptyList()
     }
 
-    /**
-     * An icon's outline as a drawer takes it: its viewBox's sides and the paths it draws; [x], [y] the
-     * viewBox's origin (Material Symbols' `0 -960 960 960`).
-     */
+    /** [x], [y] the viewBox's origin (Material Symbols' `0 -960 960 960`). */
     data class Icon(val width: Double, val height: Double, val paths: List<Path>, val x: Double = 0.0, val y: Double = 0.0) {
-        /**
-         * Where it goes in [box] (the engine's icon box, a built-in icon's size whatever the SVG's): scaled alike
-         * both ways and centred, SVG's `xMidYMid meet`, so a wide icon is not stretched; both drawers use it.
-         */
+        /** SVG's `xMidYMid meet`, so a wide icon is not stretched; both drawers use it. */
         fun fit(box: Box): Fit {
             val scale = minOf(box.width / width, box.height / height)
             return Fit(scale, box.left + (box.width - width * scale) / 2 - x * scale, box.top + (box.height - height * scale) / 2 - y * scale)
         }
     }
 
-    /** A point (u, v) of the icon is drawn at ([dx] + [scale]·u, [dy] + [scale]·v). */
     data class Fit(val scale: Double, val dx: Double, val dy: Double)
 
-    /**
-     * A path it draws: [segments] its `d=` made absolute ([IconPath]), [evenOdd] its rule, [alpha] its opacity
-     * (its fill-opacity, its own or a group's, times its groups' opacity), [color] its own `#` fill, null where it
-     * takes the key's icon-color (no fill, or currentColor: Material icons write none).
-     */
+    /** [color] null where it takes the key's icon-color (no fill, or currentColor: Material icons write none). */
     data class Path(val segments: List<ShapePath.Segment>, val evenOdd: Boolean, val alpha: Double, val color: Argb? = null)
 
-    /**
-     * [source] as an [Icon] where it is one: the sides its viewBox's (else width and height, else 24), the paths
-     * that draw, each with the rule, opacity and colour its groups give it. Refused where nothing would be drawn
-     * (every path filled none, of no opacity, or moves only): a required key replaced by it would be blank.
-     */
+    /** Refused where nothing would be drawn: a required key replaced by it would be blank. */
     fun read(source: String): Parsed<Icon> {
         val root = when (val xml = Xml.parse(source)) {
             is Parsed.Failed -> return xml
@@ -94,7 +74,7 @@ object SvgSubset {
         return Parsed.Ok(Icon(w, h, paths, box?.get(0) ?: 0.0, box?.get(1) ?: 0.0))
     }
 
-    // the paths of [root] that draw: fill, fill-rule and fill-opacity inherited as SVG's are (the nearest one's), opacity multiplied
+    // fill, fill-rule and fill-opacity inherited as SVG's are (the nearest one's), opacity multiplied
     private fun drawn(root: XmlElement, count: Count): List<Path> {
         val paths = ArrayList<Path>()
         fun walk(el: XmlElement, fill: String?, rule: String?, fillOpacity: Double, alpha: Double) {
@@ -113,13 +93,10 @@ object SvgSubset {
         return paths
     }
 
-    /** Why an icon of no path that draws is refused. Zero-area paths (`M0 0L1 0Z`) still count: their area is not worked out. */
+    /** Zero-area paths (`M0 0L1 0Z`) still count: their area is not worked out. */
     const val NOTHING_DRAWN = "nothing to draw: every path is filled none, of no opacity, or moves only"
 
-    /**
-     * A `#` fill as CSS writes it, `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`: its alpha LAST, the other way
-     * round from the project's own `#aarrggbb` ([ColorExpr]), so it is read here and never by that.
-     */
+    /** Alpha LAST, the other way round from the project's own `#aarrggbb` ([ColorExpr]), so it is read here and never by that. */
     fun cssColor(hex: String): Argb {
         val h = hex.removePrefix("#")
         val full = if (h.length <= SHORT_RGBA) h.map { "$it$it" }.joinToString("") else h
@@ -168,7 +145,6 @@ object SvgSubset {
                         count.segments[el] = read.segments
                     }
                     is IconPath.Read.Bad -> p += Problem(el.line, "d=: ${read.message}")
-                    // said once, as [MAX_NUMBERS]'s problem
                     IconPath.Read.TooMany -> {
                         count.tooMany = true
                         count.numbers = MAX_NUMBERS + 1
@@ -181,7 +157,6 @@ object SvgSubset {
         }
     }
 
-    // what is wrong with [value] of [name], null if nothing
     private fun attribute(name: String, value: String): String? = when (name) {
         "fill" -> "a #hex colour, none or currentColor".unless(value in FILL_WORDS || COLOR.matches(value))
         "fill-rule" -> "nonzero or evenodd".unless(value in FILL_RULES)
@@ -194,17 +169,16 @@ object SvgSubset {
 
     private fun String.unless(ok: Boolean): String? = if (ok) null else this
 
-    /** A number's size at most, and a side's least (a viewBox's, width= and height=): an icon's, what a drawing in floats scales by finitely. */
+    /** What a drawing in floats scales by finitely. */
     const val MAX_NUMBER = 1e6
     const val MIN_SIDE = 1e-3
 
-    // a number drawn as a float: 1e999 is written as one but read as Infinity, 1e300 a float's Infinity,
-    // which no drawing scales by
+    // 1e999 reads as Infinity, 1e300 is a float's Infinity: no drawing scales by either
     private fun inRange(value: Double): Boolean = abs(value) <= MAX_NUMBER
 
     private fun finite(value: String): Boolean = NUMBER.matches(value) && inRange(value.toDouble())
 
-    // a side of 1e-300 would scale the icon by Infinity (width= and height= too, the sides where no viewBox is)
+    // a side of 1e-300 would scale the icon by Infinity
     private fun viewBox(value: String): Boolean {
         val v = value.trim().split(Regex("[\\s,]+"))
         if (v.size != VIEW_BOX || !v.all(::finite)) return false

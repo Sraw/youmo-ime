@@ -65,8 +65,7 @@ class ThemeFragment : Fragment(), SearchAnchors {
         }
     }
 
-    // the size as the user picks it, so they see what a level does before typing (the keys' look
-    // is ThemePrefs', for which ThemeManager calls onThemeChangeListener)
+    // so the user sees what a level does before typing (the keys' look is ThemePrefs', which calls onThemeChangeListener)
     @Keep
     private val onSizeChangeListener = ManagedPreferenceProvider.OnChangeListener { key ->
         if (key in SIZE_KEYS) lifecycleScope.launch { previewUi.recalculateSize() }
@@ -96,7 +95,7 @@ class ThemeFragment : Fragment(), SearchAnchors {
                     else -> LayoutListFragment()
                 }
             }
-            // a layout tapped on 布局 shows in the preview while that tab is open: the keyboard's again on another
+            // a layout tapped on 布局 shows in the preview while that tab is open
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     if (position != LAYOUTS_TAB) previewUi.showLayout(null)
@@ -104,7 +103,7 @@ class ThemeFragment : Fragment(), SearchAnchors {
             })
         }
 
-        // a search result here is a setting of the look, on the second tab, or a built-in theme, on the first
+        // a look setting on the second tab, or a built-in theme on the first
         if (SearchHighlight.isWaiting(this@ThemeFragment) && SearchHighlight.waitingFor(this@ThemeFragment) == null) viewPager.setCurrentItem(1, false)
 
         TabLayoutMediator(tabLayout, viewPager) { tab, position ->
@@ -120,8 +119,7 @@ class ThemeFragment : Fragment(), SearchAnchors {
         val box = HalfSizeBox(this).apply { add(preview, lParams(wrapContent, wrapContent)) }
         val gap = dp(16)
         if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            // side by side: the preview, half the keyboard's width, takes half the screen's; the
-            // settings get its whole height, which above the preview left them a line of it
+            // side by side: the half-size preview takes half the screen, the settings the whole height
             constraintLayout {
                 add(box, lParams(wrapContent, wrapContent) {
                     topOfParent(gap)
@@ -173,11 +171,10 @@ class ThemeFragment : Fragment(), SearchAnchors {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // the themes are listed as the first tab is made: a search result's theme is pointed at once it is
+        // the themes are listed as the first tab is made
         SearchHighlight.ready(this)
     }
 
-    // a built-in theme's card, on the first tab, its list scrolled to it
     override fun reveal(id: String, found: (View) -> Unit) {
         val file = id.removePrefix(THEME).takeIf { it != id } ?: return
         viewPager.setCurrentItem(0, false)
@@ -187,20 +184,16 @@ class ThemeFragment : Fragment(), SearchAnchors {
         }
     }
 
-    /**
-     * The keyboard preview at half its size, taking half its size: a view scaled still takes its
-     * whole size, which left the space a preview at full size would.
-     */
+    /** A scaled view still takes its whole size: this takes half. */
     private class HalfSizeBox(context: Context) : FrameLayout(context) {
         init {
-            // exactly the scaled preview's size: clipped to it, the preview's elevation shadow was cut off
+            // clipped to the scaled size, the preview's elevation shadow was cut off
             clipChildren = false
         }
 
         override fun onAttachedToWindow() {
             super.onAttachedToWindow()
-            // the shadow is drawn in this box's own display list, which its parent clips to the box's
-            // bounds: the gap around it is in the parent, so the parent must not clip either
+            // the shadow is in this box's display list, clipped by the parent to the box's bounds: the parent must not clip either
             (parent as? ViewGroup)?.clipChildren = false
         }
 
@@ -220,7 +213,7 @@ class ThemeFragment : Fragment(), SearchAnchors {
         }
     }
 
-    /** [layout] shown in the preview in the keyboard's letters' place (外观 → 布局's card tapped), nothing set; null, the keyboard's. */
+    /** In the keyboard letters' place, nothing saved; null, the keyboard's. */
     fun previewLayout(layout: SceneLayout?) {
         if (::previewUi.isInitialized) previewUi.showLayout(layout)
     }
@@ -236,9 +229,8 @@ class ThemeFragment : Fragment(), SearchAnchors {
         super.onDestroy()
     }
 
-    // the built-in themes, by their names in the list (Q5: the user's own are not searched, the list shows them)
+    // the built-in themes by name (the user's own are not searched; the list shows them)
     companion object : SearchablePage {
-        // 外观's third tab (061-custom-layout §4.3)
         private const val LAYOUTS_TAB = 2
 
         private const val THEME = "view:theme/"
@@ -246,14 +238,14 @@ class ThemeFragment : Fragment(), SearchAnchors {
         override fun searchEntries(context: Context) =
             BuiltinThemeFiles.FILES.map { (file, _) -> PageEntry(ThemeNames.shown(context, file), THEME + file) }
 
-        // the keys AppPrefs.Keyboard declares: one renamed there is renamed here
+        // declared by AppPrefs.Keyboard: renamed there, renamed here
         private val SIZE_KEYS by lazy {
             with(AppPrefs.getInstance().keyboard) {
                 listOf(
                     keyboardHeightPercent, keyboardHeightPercentLandscape,
                     keyboardSidePadding, keyboardSidePaddingLandscape,
                     keyboardBottomPadding, keyboardBottomPaddingLandscape,
-                    // 跟随主题: picking a level whose numbers are stored already changes only these
+                    // 跟随主题: picking a level whose numbers are already stored changes only these
                     keyboardHeightFollowTheme, keyboardSidePaddingFollowTheme, keyboardBottomPaddingFollowTheme,
                 ).mapTo(HashSet()) { it.key }
             }

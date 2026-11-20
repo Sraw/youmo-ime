@@ -65,10 +65,7 @@ object Fields {
     fun remove(f: Stateful) = live.removeAll { it.get() === f || it.get() == null }
 }
 
-/**
- * An EditText that reports its text changes (with the composing span), selection, focus,
- * editor actions, keys and each new InputConnection (a restartInput) to [log], under [name].
- */
+/** An EditText that logs its text changes, selection, focus, editor actions, keys and each new InputConnection under [name]. */
 @SuppressLint("AppCompatCustomView")
 class TbEdit(context: Context, val name: String, private val log: EventLog) : EditText(context), Stateful {
     /** "读不到内容": the IME's getExtractedText answered null */
@@ -77,10 +74,7 @@ class TbEdit(context: Context, val name: String, private val log: EventLog) : Ed
     /** "读不到内容": nothing before the cursor reaches the IME (getTextBeforeCursor, the surrounding text) */
     var nullBeforeCursor = false
 
-    /**
-     * What an editor action does in the app: true when handled. Run once per action: for the IME's
-     * action (no key event) or a key's down; the key's up is swallowed. [naive]: run for every call.
-     */
+    /** What an editor action does in the app, true when handled: run once per action, the key's up swallowed; [naive]: every call. */
     var onAction: ((Int) -> Boolean)? = null
     var naive = false
     private var ready = false
@@ -205,8 +199,7 @@ class TbEdit(context: Context, val name: String, private val log: EventLog) : Ed
         }
     }
 
-    // @TargetApi, not @RequiresApi: android.annotation.RequiresApi is hidden from the SDK's
-    // android.jar and this module has no androidx
+    // @TargetApi, not @RequiresApi: android.annotation.RequiresApi is hidden and this module has no androidx
     private inner class Wrapper(ic: InputConnection) : InputConnectionWrapper(ic, false) {
         // the field left mid batch edit: no batch to wait for any more
         override fun closeConnection() {
@@ -246,10 +239,7 @@ class TbEdit(context: Context, val name: String, private val log: EventLog) : Ed
     }
 }
 
-/**
- * A terminal-like view as Termux does it: a text editor to the framework, TYPE_NULL to the IME,
- * which then sends key events (or commits through BaseInputConnection, which turns them into keys).
- */
+/** A terminal-like view as Termux does it: TYPE_NULL to the IME, which then sends key events. */
 class TbTerminal(context: Context, val name: String, private val log: EventLog) : View(context), Stateful {
     private val buffer = StringBuilder()
 

@@ -5,16 +5,9 @@
 package org.fcitx.fcitx5.android.host
 
 /**
- * The full-width module, fcitx's `Fullwidth` (`ca/fullwidth/fullwidth.cpp`): while on, and only on a
- * context whose status area has its toggle ([action]), printable ASCII comes out full width.
- *
- * - [keyHook], at PostInputMethod (`:37-82`): a press with no modifier of a key from space to `~`
- *   commits its full-width form through [commit] (so the commit filters see it) and is accepted,
- *   not filtered: ReservedLast still runs. Space is U+3000 this way only.
- * - [commitFilter] (`:84-103`): every committed character above space (`wc > 32`) in the table; not
- *   space itself.
- *
- * No hotkey (`fullwidth.h:18-19` has no default, Q6) and nothing saved: off when the app starts.
+ * fcitx's `Fullwidth`, on a context whose status area has [action]: [keyHook] commits an unmodified space..`~` press
+ * full width through [commit] and accepts it without filtering (ReservedLast still runs; only here is space U+3000);
+ * [commitFilter] converts every committed character above space. No hotkey, nothing saved: off at start.
  */
 class FullWidth(private val statusArea: StatusArea, private val commit: (InputContext, String) -> Unit) {
 
@@ -28,7 +21,6 @@ class FullWidth(private val statusArea: StatusArea, private val commit: (InputCo
         override fun activate(ic: InputContext) = setEnabled(!enabled, ic)
     }.also(statusArea::register)
 
-    /** `setEnabled` (`fullwidth.h:60-65`). */
     fun setEnabled(enabled: Boolean, ic: InputContext) {
         if (enabled == this.enabled) return
         this.enabled = enabled
@@ -38,7 +30,7 @@ class FullWidth(private val statusArea: StatusArea, private val commit: (InputCo
     fun inWhiteList(ic: InputContext) = statusArea.contains(ic, action)
 
     val keyHook = PostKeyHook { ic, e ->
-        // the engine's acceptance is not asked: fcitx's filterKey does not look at it (:37-53)
+        // the engine's acceptance is not asked: fcitx's filterKey does not look at it
         if (!enabled || !inWhiteList(ic)) return@PostKeyHook
         if (e.key.states != 0 || e.release) return@PostKeyHook
         val sym = e.key.sym
@@ -54,12 +46,12 @@ class FullWidth(private val statusArea: StatusArea, private val commit: (InputCo
     }
 
     companion object {
-        /** `sCornerTrans` (`fullwidth.cpp:23-33`): U+0020–U+007E's full-width forms, all in the BMP. */
+        /** `sCornerTrans`: U+0020–U+007E's full-width forms, all in the BMP. */
         const val TABLE = "　！＂＃￥％＆＇（）＊＋，－．／０１２３４５６７８９：；＜＝＞？＠" +
             "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ［＼］＾＿｀" +
             "ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ｛｜｝～"
 
-        /** The commit filter's rule: characters above space within the table, by code point. */
+        /** Characters above space within the table. */
         fun convert(text: String): String = buildString(text.length) {
             var i = 0
             while (i < text.length) {

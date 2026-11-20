@@ -6,10 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 import java.io.File
 
-/**
- * Chinese punctuation's map as the app ships it (`punc.mb.zh_CN`), each key to its first (the one typed): what a test
- * hands the keyboard for Chinese punctuation on, so every mark is covered (`^` ……, `\` 、, `"` “), not a few written out.
- */
+/** Chinese punctuation's map as the app ships it (`punc.mb.zh_CN`), so tests cover every mark. */
 object ChinesePunctuation {
     private const val PATH = "pkgdata/punctuation/punc.mb.zh_CN"
     private val DIRS = listOf("src/main/host-assets", "../../app/src/main/host-assets", "app/src/main/host-assets")

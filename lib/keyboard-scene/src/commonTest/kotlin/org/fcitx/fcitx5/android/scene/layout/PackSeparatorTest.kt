@@ -244,7 +244,7 @@ class PackSeparatorTest {
         kept(including, "a Shift in a fragment", mapOf("grouped-bottom" to own))
     }
 
-    // a row's when= alternatives with its Shift's (every pair of them) bounded (R26 F8348): 17 of each, each shown
+    // a row's when= alternatives with its Shift's (every pair of them) bounded: 17 of each, each shown
     // whatever the rest (landscape or not), is kept for that; 16 of each is not
     @Test
     fun aShiftAndItsRowOfTooManyAlternativesAreKept() {

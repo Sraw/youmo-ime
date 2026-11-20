@@ -36,9 +36,7 @@ class HandwritingDecoderTest {
 
     @Test
     fun `a later character puts an earlier one right`() {
-        // 淡 the pad's first reading, and the likelier alone
         assertEquals("淡", decoder.decode(listOf(read("淡", "谈", step = 0.3))).text)
-        // with 话 after it, the word 谈话
         assertEquals("谈话", decoder.decode(listOf(read("淡", "谈", step = 0.3), read("话"))).text)
     }
 
@@ -49,7 +47,6 @@ class HandwritingDecoderTest {
         val hua = read("话", "天")
         assertEquals("淡", d.decode(listOf(tan)).text)
         assertEquals("谈话", d.decode(listOf(tan, hua)).text)
-        // the last read again
         assertEquals("淡天", d.decode(listOf(tan, read("天"))).text)
         val other = listOf(read("话"), tan, hua)
         assertEquals(handwritingDecoder().decode(other).sentences, d.decode(other).sentences)
@@ -72,7 +69,6 @@ class HandwritingDecoderTest {
         val user = UserModel(d.dictionary, d.vocabulary)
         user.own(UserModel.Entry("行", intArrayOf(Syllables.id("hang"))))
         assertEquals("[行(hang)]", polyphoneDecoder(user).decode(listOf(read("行"))).endings[0].words.toString())
-        // forgotten, the reading it was learned at no longer wins
         user.entriesOf("行").forEach(user::disown)
         assertEquals("[行(xing)]", polyphoneDecoder(user).decode(listOf(read("行"))).endings[0].words.toString())
     }
@@ -159,7 +155,6 @@ class HandwritingDecoderTest {
         val after = UserModel(later.dictionary, later.vocabulary, index = later.wordIndex)
         after.own(UserModel.Entry("行人", walk("xing ren")))
         assertEquals("[行人(xing ren)]", walkersDecoder(later, after).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
-        // forgotten, the dictionary's reading again
         after.entriesOf("行人").forEach(after::disown)
         assertEquals("[行人(hang ren)]", walkersDecoder(later, after).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
@@ -176,7 +171,6 @@ class HandwritingDecoderTest {
         val listedId = theirs.id(UserModel.Entry("行人", walk("hang ren")))
         val scorer = UserScorer(first.model, theirs)
         assertEquals(scorer.score(NO_WORD, NO_WORD, listedId), listed.score, 1e-6f)
-        // xing ren, found after the dictionary's hang ren
         val later = walkers("hang ren")
         val after = UserModel(later.dictionary, later.vocabulary, index = later.wordIndex)
         after.listByHand(UserModel.Entry("行人", walk("xing ren")))
@@ -192,14 +186,12 @@ class HandwritingDecoderTest {
         user.list(UserModel.Entry("行人", walk("hang ren")))
         val best = walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0]
         assertEquals("[行人(xing ren)]", best.words.toString())
-        // made the user's own, it is theirs
         user.own(UserModel.Entry("行人", walk("hang ren")))
         assertEquals("[行人(hang ren)]", walkersDecoder(d, user).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
     }
 
     @Test
     fun `a word of the user's no longer theirs but listed yields to the dictionary's reading`() {
-        // still in the trie, found first, but no longer theirs
         val d = walkers("xing ren")
         val user = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
         val own = UserModel.Entry("行人", walk("hang ren"))
@@ -214,7 +206,6 @@ class HandwritingDecoderTest {
         val d = walkers("xing ren")
         val hang = UserModel.Entry("行人", walk("hang ren"))
         val xing = UserModel.Entry("行人", walk("xing ren"))
-        // hang ren, the user's own, is found first
         val more = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
         more.own(hang)
         more.own(xing)
@@ -227,7 +218,6 @@ class HandwritingDecoderTest {
         fewer.addCount(hang, 2f)
         fewer.addCount(xing, 1f)
         assertEquals("[行人(hang ren)]", walkersDecoder(d, fewer).decode(listOf(read("行"), read("人"))).endings[0].words.toString())
-        // hang ren listed, not theirs, against xing ren theirs
         val listed = UserModel(d.dictionary, d.vocabulary, index = d.wordIndex)
         listed.list(hang)
         listed.own(xing)
@@ -248,7 +238,6 @@ class HandwritingDecoderTest {
         assertEquals(listOf("谈话", "淡天", "淡Ω"), d.sentences)
         // a character the model lacks is a word of its own, the unknown word
         assertEquals("Ω", decoder.decode(listOf(read("Ω"))).text)
-        // one past the BMP, two chars, offered whole
         assertEquals(setOf("淡𠀀", "淡天"), decoder.decode(listOf(read("淡"), read("𠀀", "天", step = 0.1))).sentences.toSet())
         assertTrue(decoder.decode(emptyList()).sentences.isEmpty())
         assertEquals("", decoder.decode(emptyList()).text)
@@ -292,11 +281,9 @@ class HandwritingDecoderTest {
         val ren = data.wordIndex.find("人")
         val blocking = handwritingDecoder(OneWord(blocked = ren))
         assertEquals(listOf("山"), blocking.decode(listOf(read("人", "山"))).sentences)
-        // something to put in all the same
         assertEquals(listOf("人"), blocking.decode(listOf(read("人"))).sentences)
     }
 
-    // 话 blocked, 谈话 would show it again as its last: a character blocked is in no word either
     @Test
     fun `a character blocked is in no word either`() {
         val hua = data.wordIndex.find("话")
@@ -305,8 +292,7 @@ class HandwritingDecoderTest {
         assertTrue(d.sentences.toString(), d.sentences.none { "话" in it })
     }
 
-    // review R3: every reading of the second position blocked, its best (话) still makes 谈话 there,
-    // as arcsFrom keeps it alone: not a position nothing reads
+    // as arcsFrom keeps the best alone, a position nothing reads never comes up
     @Test
     fun `every reading blocked the best still makes a word`() {
         val blocking = handwritingDecoder(OneWord(blocked = data.wordIndex.find("话"), alsoBlocked = data.wordIndex.find("天")))
@@ -314,7 +300,6 @@ class HandwritingDecoderTest {
         assertTrue(d.endings.toString(), d.endings.any { it.words?.map { w -> w.text } == listOf("谈话") })
     }
 
-    // every reading of the ink blocked: the ink's best put in all the same, as arcsFrom does, not the rest (review M2)
     @Test
     fun `where every reading is blocked only the ink's best goes into a word`() {
         val blocking = handwritingDecoder(OneWord(blocked = data.wordIndex.find("话"), alsoBlocked = data.wordIndex.find("天")))
@@ -322,12 +307,12 @@ class HandwritingDecoderTest {
         assertTrue(d.sentences.toString(), d.sentences.none { "话" in it })
     }
 
-    // 生僻字屏蔽 (dev/design/061-rare-char-block.md §5.1): held back by text, a reading with no word id too
+    // 生僻字屏蔽: held back by text, a reading with no word id too
     @Test
     fun `a character held back is never read, nor put in as all the ink reads`() {
         val held = setOf("𤝰", "人")
         // a decoder a row: decode() goes on from the beams of the positions it saw before, so one shared would
-        // read a row on from the row before it (review F8118)
+        // read a row on from the row before it
         fun holding() = handwritingDecoder(held = { t -> held.any { it in t } })
         val gao = read("高")
         val ren = read("人", "𤝰")
@@ -403,7 +388,7 @@ class HandwritingDecoderTest {
         }
     }
 
-    // review-G-design M2: a word only imported is no word of a handwritten sentence (C19); owned, it is
+    // a word only imported is no word of a handwritten sentence; owned, it is
     @Test
     fun `a word only imported is no word of a sentence written`() {
         val d = polyphoneData
@@ -413,7 +398,7 @@ class HandwritingDecoderTest {
         val decoder = HandwritingDecoder(d.dictionary, d.vocabulary, d.wordIndex, UserScorer(d.model, user), { readings }, user)
         fun words() = decoder.decode(listOf(read("人"), read("行"))).endings.flatMap { it.words.orEmpty() }.map { it.text }
         assertTrue("人行" !in words())
-        // typed once, still not the user's (U-101, review-int-runtime Q1): no word of a sentence yet
+        // typed once, still not the user's: no word of a sentence yet
         val renHang = UserModel.Entry("人行", intArrayOf(Syllables.id("ren"), Syllables.id("hang")))
         user.learn(null, listOf(renHang))
         assertTrue(user.startOnly(user.idsOfText("人行").first()))
@@ -424,7 +409,7 @@ class HandwritingDecoderTest {
         assertTrue("人行" in words())
     }
 
-    // review S6: a merged file's word (DictionaryFile) is written as one word, at its file's reading, once learned; blocked, it is not
+    // a merged file's word (DictionaryFile) is written as one word, at its file's reading, once learned; blocked, it is not
     @Test
     fun `a merged dictionary's word is found by its characters, and not once blocked`() {
         val d = walkers()

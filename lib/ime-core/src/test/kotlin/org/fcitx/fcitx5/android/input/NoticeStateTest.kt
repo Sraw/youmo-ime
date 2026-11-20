@@ -22,11 +22,11 @@ class NoticeStateTest {
         // rule 5: nothing to reach for
         "a line said, 1 s" to { assertEquals(1000L, NoticeState<String>().show(null, steady = false).ms) },
         "one with 撤销, 3 s" to { assertEquals(3000L, NoticeState<String>().show("删", steady = false).ms) },
-        // F3464: rule 4, said once as a key fails, read before it goes
+        // rule 4, said once as a key fails, read before it goes
         "a failure, 2 s" to { assertEquals(2000L, NoticeState<String>().show(null, steady = true).ms) },
         // a button to reach for wins
         "a failure with a button, 3 s" to { assertEquals(3000L, NoticeState<String>().show("删", steady = true).ms) },
-        // news of several lines (L7's boards chosen): the time its sayer asks, the kinds' own unchanged
+        // news of several lines: the time its sayer asks, the kinds' own unchanged
         "a time asked, that" to { assertEquals(4000L, NoticeState<String>().show(null, steady = false, ms = 4000L).ms) },
         "a time asked, typed away all the same" to {
             assertTrue(NoticeState<String>().apply { show(null, steady = false, ms = 4000L) }.typed())
@@ -81,7 +81,7 @@ class NoticeStateTest {
         assertNull(s.dismiss())
     }
 
-    // R27 F8528: another notice waits while an act's 撤销 still works, and only then
+    // another notice waits while an act's 撤销 still works, and only then
     @Test
     fun whetherItHoldsAnUndo() = assertRows(
         "shown with 撤销" to { assertTrue(NoticeState<String>().apply { show("删", steady = false) }.holdsUndo) },
@@ -94,7 +94,7 @@ class NoticeStateTest {
         "none shown yet" to { assertFalse(NoticeState<String>().holdsUndo) },
     )
 
-    // 051-fix-popup: the edit menu goes where the notices go, under their window
+    // the edit menu goes where the notices go, under their window
     @Test
     fun theEditMenuPutsAwayOrHides() = assertRows(
         "what was done goes, as typing would" to {
@@ -122,7 +122,7 @@ class NoticeStateTest {
             n.gone()
             assertFalse(n.uncover())
         },
-        // review M1: said while the menu is up where it goes, any notice: not over the menu, not lost
+        // said while the menu is up where it goes, any notice: not over the menu, not lost
         "one said under the menu is hidden, and back once as it goes" to {
             val n = NoticeState<String>()
             n.show(null, steady = false, hidden = true)

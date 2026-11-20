@@ -27,7 +27,7 @@ class TextDictionaryTest {
         assertEquals("my.words", dictionary("my.words.txt").name)
         assertEquals("a.txt.b", dictionary("a.txt.b.txt").name)
         assertEquals("off", dictionary("off.txt.disable").name)
-        // kept gzip'd: `.txt.gz` stripped whole (F3607)
+        // kept gzip'd: `.txt.gz` stripped whole
         assertEquals("words", dictionary("words.txt.gz").name)
         assertEquals("off", dictionary("off.txt.gz.disable").name)
         assertEquals("a.txt.b", dictionary("a.txt.b.txt.gz").name)
@@ -40,7 +40,7 @@ class TextDictionaryTest {
         assertEquals("my.words", PinyinDictionary.nameOf("my.words.txt.disable"))
     }
 
-    // an older build's text and one kept gzip'd alike, each staying of its kind (F3607). Each row: the file, its name off
+    // an older build's text and one kept gzip'd alike, each staying of its kind. Each row: the file, its name off
     @Test
     fun turningOffAndOnRenamesTheFile() {
         assertRows(listOf("words.txt" to "words.txt.disable", "words.txt.gz" to "words.txt.gz.disable"), { it.first }) { (on, off) ->

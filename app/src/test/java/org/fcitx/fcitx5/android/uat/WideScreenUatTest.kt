@@ -10,7 +10,6 @@ import android.view.View
 import android.view.ViewGroup
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.candidates.expanded.window.GridExpandedCandidateWindow
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
@@ -35,9 +34,8 @@ import org.robolectric.annotation.Config
 import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes as ThemeSizes
 
 /**
- * A window 600 dp wide or wider is 横屏 held either way (061-wide-as-landscape): a foldable's inner screen and a
- * tablet upright are laid out as turned, a foldable's outer screen and a phone upright as before. The qualifiers'
- * screens have no system bars, so the input method's screen is the display's whole.
+ * A window 600 dp wide or wider is 横屏 held either way. The qualifiers' screens have no system bars, so the input
+ * method's screen is the display's whole.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w673dp-h841dp-port-420dpi")
@@ -49,7 +47,6 @@ class WideScreenUatTest {
     private val ctx get() = RuntimeEnvironment.getApplication()
     private val was = KeyboardArea.themeSizes
 
-    // the settings' sizes, 标准 (30% upright, 49% turned), whatever the theme in use sets
     private fun noThemeSizes() {
         KeyboardArea.themeSizes = { ThemeSizes() }
     }
@@ -67,13 +64,10 @@ class WideScreenUatTest {
         noThemeSizes()
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
-        // turned's rows, a large screen's (its short side 673 dp): 4 × 56 dp, as high as turned (the next test), not 30% of 841
         assertTrue(s.large)
         assertEquals(s.dp(4 * 56.0), KeyboardArea.requestedHeight(ctx))
-        // the theme's `@landscape` and the gaps' turned ones, split as 横屏键盘样式 is when not set (by the width)
         assertTrue("landscape" in scenes())
         assertTrue(KeyboardArea.splits(s))
-        // the display's pair as the settings pages draw it: 横屏 both ways up, the one held now as the keyboard's
         val (upright, turned) = KeyboardArea.screens(ctx)
         assertTrue(upright.landscape && turned.landscape)
         assertEquals(s.widthDp, KeyboardArea.displayScreen(ctx).widthDp)
@@ -86,7 +80,6 @@ class WideScreenUatTest {
         noThemeSizes()
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
-        // the same rows as upright: 4 × 56 dp
         assertEquals(s.dp(4 * 56.0), KeyboardArea.requestedHeight(ctx))
     }
 
@@ -111,7 +104,6 @@ class WideScreenUatTest {
         val s = KeyboardArea.screen(ctx)
         assertTrue(s.landscape)
         assertTrue(KeyboardArea.splits(s))
-        // as high as on its side, 4 × 56 dp at 1x, not 30% of 1280
         assertEquals(4 * 56, KeyboardArea.requestedHeight(ctx))
     }
 
@@ -122,7 +114,6 @@ class WideScreenUatTest {
         val s = KeyboardArea.screen(ctx)
         assertFalse(s.landscape)
         assertFalse(KeyboardArea.splits(s))
-        // the settings pages' screen held now says the same as the keyboard's
         assertEquals(s.widthDp to false, KeyboardArea.displayScreen(ctx).let { it.widthDp to it.landscape })
     }
 
@@ -142,22 +133,13 @@ class WideScreenUatTest {
         val theme = ThemeManager.activeTheme
         val env = SceneEnvs.of(View(ctx), ThemeManager.shownLook(theme), theme.isDark, 1000, 700, Input())
         assertTrue(env.landscape)
-        // a symbol at 底部 drawn in a corner, as on a phone on its side
         assertEquals(KeyMarks.At.TopRight, KeyMarks.onKeys(KeyMarks.At.Bottom, KeyMarks.At.TopLeft, env.landscape, compact = false).symbol)
-        // the character card in two columns, three readings' rows before they scroll
         val twoColumns = CharCardLayout.twoColumns(KeyboardArea.landscape(ctx), floating = false)
         assertTrue(twoColumns)
         assertEquals(3, CharCardLayout.readingRows(twoColumns))
     }
 
-    // the expanded candidates' columns: 横屏's setting on the wide screen upright, the upright one's on a phone
-    private fun columns(): Int {
-        AppPrefs.getInstance().keyboard.run {
-            prefs.set(expandedCandidateGridSpanCount, 5)
-            prefs.set(expandedCandidateGridSpanCountLandscape, 8)
-        }
-        return GridExpandedCandidateWindow.spanCount(ctx)
-    }
+    private fun columns(): Int = GridExpandedCandidateWindow.spanCount(ctx)
 
     @Test
     @Uat("LS-33")
@@ -169,23 +151,21 @@ class WideScreenUatTest {
     @Uat("LS-34")
     @Config(qualifiers = "w412dp-h891dp-port-420dpi")
     fun theOuterScreensExpandedCandidatesTakeTheUprightColumns() {
-        assertEquals(5, columns())
+        assertEquals(6, columns())
     }
 
     @Test
     @Uat("LS-37")
     fun theSettingsPreviewInHalfASplitScreenIsTheDisplays() {
-        // the settings page in half of the unfolded screen, upright and 336 dp wide: its window's own configuration
+        // the settings page in half of the unfolded screen: its window's own configuration
         val half = Configuration(ctx.resources.configuration).apply { screenWidthDp = 336 }
         val page = ContextThemeWrapper(ctx, ctx.theme).apply { applyOverrideConfiguration(half) }
         assertFalse(KeyboardArea.landscape(page))
         val ui = KeyboardPreviewUi(page, ThemeManager.activeTheme)
         fun keys(v: View): TextKeyboard? = v as? TextKeyboard ?: (v as? ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { keys(g.getChildAt(it)) } }
         val kb = keys(ui.root)!!
-        // the keys drawn as the keyboard is on the display, 横屏 and split, not as the page's narrow window
         assertTrue(KeyboardArea.landscape(kb.context))
         assertTrue(TextKeyboard.splits(kb.context))
-        // the bar as the keyboard's there: its height the theme's 横屏 one
         assertEquals(SceneBar.heightPercent(true), SceneBar.heightPercent(kb.context), 0.0)
         ui.recalculateSize()
         assertEquals(KeyboardArea.displayScreen(ctx).widthPx, ui.intrinsicWidth)

@@ -24,7 +24,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
 
-/** uat/05-toolbar.md's TB-49 at the edges: the grid's auto-scroll, the pieces replaced mid-sweep, the cut note. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ClipboardSwipeTest {
@@ -60,7 +59,6 @@ class ClipboardSwipeTest {
         }
     }
 
-    // the middle of the cell at adapter [position], in the grid's own coordinates
     private fun ClipboardChunksUi.over(position: Int): Pair<Float, Float> =
         root.findViewHolderForAdapterPosition(position)!!.itemView.let { (it.left + it.right) / 2f to (it.top + it.bottom) / 2f }
 
@@ -71,14 +69,12 @@ class ClipboardSwipeTest {
 
     private val long = (0 until 300).joinToString(" ", transform = ::word)
 
-    // frames one at a time: the auto-scroll asks for the next as each runs, and the paused looper's clock
-    // never gets past them (an idle never returns)
+    // one frame at a time: the auto-scroll asks for the next as each runs, so an idle never returns
     private fun frames() = repeat(FRAMES) { shadowOf(Looper.getMainLooper()).runOneTask() }
 
     @Test
     fun heldAtTheBottomTheGridScrollsAndTheRangeFollows() = assertRows(
         "held in the bottom band" to { heldAt(HEIGHT - 4f) },
-        // over no cell: the edge row stands in for the finger
         "dragged out past the panel's bottom" to { heldAt(HEIGHT + 40f) },
     )
 
@@ -96,7 +92,6 @@ class ClipboardSwipeTest {
             val offset = ui.root.computeVerticalScrollOffset()
             val size = ui.picked.size
             assertTrue("scrolled", offset > 0)
-            // from w1 on, past the last piece shown when the finger came down
             assertEquals(word(1), ui.pickedTexts().first())
             assertTrue(ui.pickedTexts().toString(), size > lastShown)
             frames()
@@ -130,7 +125,6 @@ class ClipboardSwipeTest {
     @Test
     fun aSidewaysSweepAlongTheTopRowDoesNotScroll() {
         val ui = grid(long)
-        // scrolled down a way, a row's first piece at the top: the grid could scroll either way
         val rowStart = (1 until ui.root.childCount).first { ui.over(it).first < ui.over(it - 1).first && ui.over(it).second > HEIGHT / 2 }
         ui.root.scrollBy(0, ui.root.findViewHolderForAdapterPosition(rowStart)!!.itemView.top - ui.root.paddingTop)
         idle(0)
@@ -151,7 +145,6 @@ class ClipboardSwipeTest {
         ui.finger(MotionEvent.ACTION_DOWN, x, y)
         ui.over(2).let { (tx, ty) -> ui.moveTo(tx, ty) }
         assertEquals((0..2).map(::word), ui.pickedTexts())
-        // the model's split coming in: the next move changes nothing
         ui.show(ClipboardChunks.chunks(long))
         idle(0)
         ui.over(4).let { (tx, ty) -> ui.moveTo(tx, ty) }

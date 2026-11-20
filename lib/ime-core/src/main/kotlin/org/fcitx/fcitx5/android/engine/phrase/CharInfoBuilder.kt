@@ -12,52 +12,34 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 
 /**
- * Compiles [CharInfo] on the build host (ime-dict-tool's `charinfo`) and in tests, from:
- *
- * - Unihan's kRSUnicode (the Kangxi radical, `'` after a simplified one: 说 `149'.7`) and
- *   kTotalStrokes (the mainland's count first), [unihan];
- * - CJKRadicals.txt, each radical's character ([radicals]): `149'` 讠;
- * - 汉语拆字字典's ways to take a character apart ([chaizi]): 江 `水 工` `氵 工`;
- * - rime-stroke's stroke orders ([strokes]): the first's length for a character Unihan counts no
- *   strokes of; all of them to check the mainland's against;
- * - `lexicon/stroke-order.tsv`, the stroke orders as the mainland writes them ([orders]), first taken
- *   from cnchar (MIT) and kept by this project since: rime-stroke's first order of a character is
- *   Taiwan's as often as not (出 丨乛丨乛丨, not 乛丨丨乛丨; 必 丶乛丶丶丿, not 丶乛丶丿丶), and the user wants the
- *   mainland's standard (2026-11-02), each stroke by its shape (行's last 竖钩, not a 竖; 九's 横折弯钩, not
- *   any 折: the user, 2026-11-02). [build] fails on an order whose strokes are not as many as
- *   Unihan counts, or whose kinds are none of rime-stroke's orders of the character, unless its line says why
- *   (and on a line that says why of neither):
- *   that is how cnchar's slips were found (皙 without 白's 丿, 德's 十 a 一丿). A character with the
- *   mainland's order counts its strokes as that order does (Unihan counts 范 as Taiwan's, 9).
- *
- * The radical is written as the mainland does where the character's parts show it so (江 氵, 打 扌,
- * 草 艹: [VARIANTS]), else as CJKRadicals has it (和 口, 说 讠): Unicode's Kangxi radicals, not the
- * mainland's 201 (no table of those under a licence the app can take). Of a character's ways to take it
- * apart, the first with the radical so written (江 氵 工, not 水 工; 说 讠 兑, not 言 兑), else the first.
+ * Compiles [CharInfo] on the build host (ime-dict-tool's `charinfo`) and in tests, from Unihan
+ * (kRSUnicode, kTotalStrokes), CJKRadicals.txt, 汉语拆字字典, rime-stroke, and `lexicon/stroke-order.tsv`
+ * (mainland stroke orders: rime-stroke's first order is often Taiwan's, e.g. 出, 必). [build] fails on an
+ * order whose count differs from Unihan's or whose kinds match none of rime-stroke's, unless its line says
+ * why. Radicals are written as the mainland does where the parts show it (江 氵: [VARIANTS]), else as
+ * CJKRadicals has them; the first decomposition using that form is chosen.
  */
 class CharInfoBuilder {
 
-    // code point to its radical (kRSUnicode's number and marks: 149') and strokes
+    // code point to radical (kRSUnicode's number and marks: 149') and strokes
     private val radicalOf = HashMap<Int, String>()
     private val totalStrokes = HashMap<Int, Int>()
     private val strokeOrders = HashMap<Int, Int>()
 
-    // code point to rime-stroke's orders of it, all of them
     private val rimeOrders = HashMap<Int, MutableSet<String>>()
 
-    // code point to its stroke order as the mainland writes it, each stroke's shape; the line it is on, and the code points whose line says why it differs from Unihan's or rime-stroke's
+    // code point to mainland stroke order (shapes); plus its line, and code points whose line says why it differs
     private val orders = HashMap<Int, List<StrokeShape>>()
     private val orderLines = HashMap<Int, Int>()
     private val explained = HashSet<Int>()
     private var ordersSource = ""
 
-    // radical (85, 149') to its character's code point
     private val radicalChars = HashMap<String, Int>()
 
-    // code point to its ways apart, each its parts' code points, in the order listed
+    // code point to its decompositions (parts' code points), as listed
     private val ways = HashMap<Int, MutableList<IntArray>>()
 
-    /** Unihan's `U+6C5F<TAB>kRSUnicode<TAB>85.3` lines (Unihan_IRGSources.txt); other fields are skipped. */
+    /** Unihan_IRGSources.txt `U+6C5F<TAB>kRSUnicode<TAB>85.3` lines; other fields skipped. */
     fun unihan(lines: Sequence<String>, source: String) = apply {
         lines.forEachIndexed { n, line ->
             if (line.startsWith('#') || line.isBlank()) return@forEachIndexed
@@ -75,7 +57,7 @@ class CharInfoBuilder {
         }
     }
 
-    /** CJKRadicals.txt's `149'; 2EC8; 8BA0` lines: a radical, its radical sign, its character. */
+    /** CJKRadicals.txt `149'; 2EC8; 8BA0` lines: radical, radical sign, character. */
     fun radicals(lines: Sequence<String>, source: String) = apply {
         lines.forEachIndexed { n, line ->
             val body = line.substringBefore('#').trim()
@@ -87,7 +69,7 @@ class CharInfoBuilder {
         }
     }
 
-    /** 汉语拆字字典's `江<TAB>水 工<TAB>氵 工` lines; a way of a part not one character, or of the character itself, is skipped. */
+    /** 汉语拆字字典 `江<TAB>水 工<TAB>氵 工` lines; a part that is not one character, or the character itself, is skipped. */
     fun chaizi(lines: Sequence<String>) = apply {
         for (line in lines) {
             val f = line.split('\t')
@@ -105,10 +87,7 @@ class CharInfoBuilder {
         }
     }
 
-    /**
-     * One of rime-stroke's orders of [codePoint], in [Strokes.KEYS]' letters, its first first: the first
-     * counts the strokes of a character Unihan has no count of; all check the mainland's order ([orders]).
-     */
+    /** One rime-stroke order of [codePoint] in [Strokes.KEYS] letters, first one first: it counts strokes Unihan lacks; all check [orders]. */
     fun strokes(codePoint: Int, order: String) = apply {
         if (order.isEmpty()) return@apply
         strokeOrders.putIfAbsent(codePoint, order.length)
@@ -116,12 +95,10 @@ class CharInfoBuilder {
     }
 
     /**
-     * `lexicon/stroke-order.tsv`'s `行<TAB>P P S H H SG[<TAB>why]` lines (`#` a comment): a character's
-     * strokes in the order 《现代汉语通用字笔顺规范》 gives, each its shape by its [StrokeShape.code], and,
-     * for one [build] would otherwise fail on, why its count is not Unihan's or its order none of
-     * rime-stroke's (which knows the five kinds only: the shapes' [StrokeShape.kind]s are checked).
+     * `lexicon/stroke-order.tsv` `行<TAB>P P S H H SG[<TAB>why]` lines: strokes per 《现代汉语通用字笔顺规范》 by
+     * [StrokeShape.code], and why, where [build] would otherwise fail on it.
      *
-     * @throws SourceException on a line that is not one
+     * @throws SourceException on a malformed line
      */
     fun orders(lines: Sequence<String>, source: String) = apply {
         ordersSource = source
@@ -141,7 +118,7 @@ class CharInfoBuilder {
         }
     }
 
-    /** [codePoint]'s radical and parts, as [build] chooses them; null for a character Unihan gives no radical. */
+    /** Null for a character without a Unihan radical. */
     fun entry(codePoint: Int): CharInfo.Entry? {
         val radical = radicalOf[codePoint] ?: return null
         val number = radical.trimEnd('\'').toInt()
@@ -155,10 +132,7 @@ class CharInfoBuilder {
         return CharInfo.Entry(String(Character.toChars(shown)), strokes, way?.map { String(Character.toChars(it)) }, order)
     }
 
-    /**
-     * @throws SourceException naming the stroke orders Unihan counts or rime-stroke writes otherwise with
-     * no note why, and the notes with nothing to say why of (a note is no place for a line's history)
-     */
+    /** @throws SourceException naming unexplained stroke orders that differ from Unihan or rime-stroke, and notes with nothing to explain */
     fun build(): DataFile.Writer {
         val odd = orders.keys.sortedBy { orderLines.getValue(it) }.mapNotNull { cp ->
             val order = orders.getValue(cp)
@@ -216,10 +190,7 @@ class CharInfoBuilder {
         private const val TOTAL = "kTotalStrokes"
         private const val HEX = 16
 
-        /**
-         * Kangxi radicals by number, each as the mainland writes it on the side or top of a character
-         * (人 亻, 水 氵, 艸 艹, 辵 辶, 邑 and 阜 阝): shown where the character's parts have it.
-         */
+        /** Kangxi radicals by number with their mainland side or top forms (人 亻, 水 氵, 艸 艹, 辵 辶, 邑 and 阜 阝). */
         val VARIANTS: Map<Int, Set<Int>> = mapOf(
             9 to "亻", 18 to "刂", 61 to "忄", 64 to "扌", 66 to "攵", 85 to "氵", 86 to "灬", 87 to "爫",
             93 to "牜", 94 to "犭", 96 to "王", 113 to "礻", 122 to "罒罓", 125 to "耂", 130 to "月", 140 to "艹",

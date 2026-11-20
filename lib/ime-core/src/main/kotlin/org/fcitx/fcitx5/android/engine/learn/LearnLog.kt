@@ -33,14 +33,13 @@ import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * The learning record (PLAN §2.2, impl/design-1a.md): [file], `learn.log`, of [LearnRecords],
- * replayed into [state] at [open], each commit and act of the user appended as one write and
- * applied as written. Folded in the [background] from the file's own bytes: what is older than
- * the cut ([LearnClock.cut]) becomes a snapshot, what is newer stays as it was written, for U-88
- * to take back. Without a [file] (no user directory, a test) it learns in memory alone. [unkept]
- * is told once, at the first record applied that did not reach the disk (no file, one that did
- * not open, a write refused): what is learned from then on may be gone with the process, which the
- * user is to know (0.5.2's fresh installs learned in memory alone for days, unseen: 061-userdict-loss).
+ * The learning record: [file] (`learn.log`) of [LearnRecords], replayed into [state] at [open], each
+ * commit or user act appended as one write and applied as written. Folded in the [background] from the
+ * file's own bytes: what is older than the cut ([LearnClock.cut]) becomes a snapshot, newer stays as
+ * written so it can still be cleared. Without a [file] (no user directory, a test) it learns in memory
+ * alone. [unkept] is told once, at the first applied record that did not reach disk (no file, one that
+ * did not open, a refused write): what is learned from then may vanish with the process, which the user
+ * must be told.
  */
 class LearnLog(
     private val file: LogFile?,
@@ -48,7 +47,7 @@ class LearnLog(
     private val onError: (IOException) -> Unit = {},
     private val background: Executor? = null,
     private val compactAt: Long = RecordStore.DEFAULT_COMPACT_AT,
-    // a seam for tests: folded only as it grows, not on each calendar day and start
+    // a seam for tests: folded only as it grows, not each calendar day and start
     private val foldDaily: Boolean = true,
     private val unkept: () -> Unit = {},
     // a seam for tests: a disk that refuses a write ([RecordStore]'s)
@@ -60,44 +59,41 @@ class LearnLog(
 
     /**
      * Hears what each record applied from now on changed that the user model keeps apart
-     * ([LearnState.Changes]: words formed and gone, the counts): one function for every record, a
-     * commit, an undo, a forget, what an older build changed (impl/design-1b.md §3, NIT 1). What
-     * [open] read is not told: the model is made from the state then.
+     * ([LearnState.Changes]: words formed and gone, counts), for every kind of record alike. What [open]
+     * read is not told: the model is built from the state then.
      */
     var listener: ((LearnState.Changes) -> Unit)? = null
 
     /**
-     * Hears each record appended from now on, as written: what an act wrote, for it to be taken back
-     * (LearningControl). `kept` false: the file did not take it (a write refused, no file open), and it is in
-     * the state alone, where taking it back needs no rewrite (R25 F8050).
+     * Hears each record appended from now on, as written, so an act can be taken back (LearningControl).
+     * `kept` false: the file did not take it, and it is in the state alone, where taking it back needs no rewrite.
      */
     var appended: ((record: LearnRecord, kept: Boolean) -> Unit)? = null
 
     internal var store: RecordStore? = null
         private set
 
-    /** A commit the user may still take back (U-03, written from step 1c): it and what it changed, as it was. */
+    /** A commit the user may still take back: it and what it changed, as it was. */
     private class Undoable(val commit: LearnRecord, val befores: List<Before>)
 
     private val undoable = LinkedHashMap<Long, Undoable>()
 
     /**
-     * Which writing of the record this is: another once it was rewritten (a stretch of it forgotten,
-     * a backup restored: [rewritten]), and no other log's, so that what was read of it before may no
-     * longer be there: an act to take back (LearningControl) and what a session keeps of commits
-     * before (CommitJournal) are dropped, with a log replaced as much as with one rewritten (review-1c S4).
+     * Which writing of the record this is: changes on every rewrite (a span forgotten, a backup restored:
+     * [rewritten]) and differs from any other log's, so what was read of it before may be gone: an act to
+     * take back (LearningControl) and a session's kept commits (CommitJournal) are dropped.
      */
     @Volatile
     var rewrites = GENERATIONS.incrementAndGet()
         internal set
 
-    /** The record was rewritten: no commit before is taken back any more, nor is a session's kept (U-86, U-88). */
+    /** No commit before is taken back any more, nor a session's kept. */
     fun rewritten() {
         undoable.clear()
         rewrites = GENERATIONS.incrementAndGet()
     }
 
-    /** Replays the log, and appends from now on; once only. One that does not open learns in memory this time. */
+    /** Replays the log, then appends; once only. If it does not open, learns in memory this time. */
     fun open() {
         val file = file ?: return
         val oldestTail = openStore(file) ?: return
@@ -105,8 +101,7 @@ class LearnLog(
         state.takeChanges()
     }
 
-    // the store opened on [file]: the oldest minute of its tail, or null if it did not open
-    // (learning in memory this time)
+    // the store on [file]: its tail's oldest minute, or null if it did not open (in memory this time)
     private fun openStore(file: LogFile): Int? {
         val reader = LearnRecords.Reader()
         var inTail = true
@@ -135,15 +130,11 @@ class LearnLog(
         return oldestTail
     }
 
-    /**
-     * Appends and applies a commit of [rows] (and the nine keys' [takes]), stamped now: as written,
-     * a commit too long for a record losing its level-3 rows first, then itself. Null if nothing
-     * was kept.
-     */
+    /** Appends and applies a commit of [rows] (and nine-key [takes]), stamped now; a commit too long for a record drops its level-3 rows first, then itself. Null if not kept. */
     fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0, continued: String = ""): Commit? {
         if (rows.isEmpty()) return null
         val stamp = LearnClock.stamp(clock, state, commit = true)
-        // a count of takes is a byte: more in one commit than anyone takes, the first so many
+        // the take count is a byte: more than anyone takes in one commit; the first so many
         var commit = Commit(state.nextSeq, stamp.minute, stamp.day, stamp.localDay, flags, rows, takes.take(MAX_TAKES), continued)
         var bytes = encoded(commit)
         if (bytes == null) {
@@ -166,30 +157,27 @@ class LearnLog(
 
     private fun newDay(localDay: Int) = state.localDay != Int.MIN_VALUE && localDay > state.localDay
 
-    // a commit written: one of the last few to take back, and the first of a calendar day lets yesterday's records be folded
+    // one of the last few to take back; the first commit of a calendar day lets yesterday's records be folded
     private fun remember(seq: Long, commit: LearnRecord, befores: List<Before>, newDay: Boolean) {
         undoable[seq] = Undoable(commit, befores)
         while (undoable.size > UNDOABLE) undoable.remove(undoable.keys.first())
         if (newDay && foldDaily) store?.compactSoon()
     }
 
-    /** Takes the commit [seq] back (U-03), if it is one of the last few: whether it was. */
+    /** If one of the last few; whether it was. */
     fun undo(seq: Long): Boolean {
         val u = undoable[seq] ?: return false
         val stamp = LearnClock.stamp(clock, state, commit = false)
-        // taken off the list once written: an Undo too long for a record (it holds the commit and its befores) says so, not silently nothing
+        // taken off the list once written: an Undo too long for a record (it holds the commit and befores) says so, not silently nothing
         if (!write(Undo(seq, stamp.minute, stamp.day, state.localDay, u.commit, u.befores))) return false
         undoable.remove(seq)
         return true
     }
 
-    /**
-     * [undo], for a commit deleted as soon as written (U-03): only one in the tail (PLAN §2.5,
-     * written in the last hour or the same calendar day). One older is learned as it was.
-     */
+    /** [undo] for a commit deleted right after writing: only one in the tail (the last hour or the same calendar day). An older one stays learned. */
     fun undoRecent(seq: Long, commit: LearnRecord? = null): Boolean {
         val c = undoable[seq]?.commit
-        // the commit kept, not another of its seq: a record rolled back gives its seqs again (review-1c S4)
+        // the commit kept, not another with its seq: a rolled-back record reissues seqs
         if (commit != null && c != commit) return false
         val (minute, localDay) = when (c) {
             is Commit -> c.minute to c.localDay
@@ -201,19 +189,19 @@ class LearnLog(
         return undo(seq)
     }
 
-    /** Pins [text] first under [code] (U-83), or unpins it. */
+    /** Pins [text] first under [code], or unpins it. */
     fun pin(code: Code, text: String, reading: String, on: Boolean) {
         val stamp = LearnClock.stamp(clock, state, commit = false)
-        // another pinned there unpinned first, in its own record: an act's undo, the opposites, pins it again (U-82)
+        // another pin there is unpinned first in its own record, so an act's undo (the opposites) pins it again
         val was = state.pins[code]?.takeIf { on && (it.text != text || it.reading != reading) }
         if (was != null) write(Pin(stamp.minute, stamp.day, code, was.text, was.reading, false))
         write(Pin(stamp.minute, stamp.day, code, text, reading, on))
     }
 
     /**
-     * Takes in [rows] (of [LearnRecord.MineRow], [LearnRecord.WordUseRow], [LearnRecord.TableWordRow], [LearnRecord.EnWordRow]) where the log has none of them,
-     * stamped now: an export's words, a table's saved phrases, as [Absorbed] takes an older build's.
-     * Whether all of them reached the disk.
+     * Takes in [rows] (of [LearnRecord.MineRow], [LearnRecord.WordUseRow], [LearnRecord.TableWordRow],
+     * [LearnRecord.EnWordRow]) the log lacks, stamped now: an export's words, a table's saved phrases, as
+     * [Absorbed] takes an older build's. Whether all reached the disk.
      */
     fun absorb(rows: List<LearnRecord>): Boolean {
         if (rows.isEmpty()) return true
@@ -221,45 +209,44 @@ class LearnLog(
         return rows.chunked(LearnRecords.ABSORBED_ROWS).map { absorbed(stamp.minute, it) }.all { it }
     }
 
-    // long rows (an export's long phrases and readings) make so many pass a record's 64 KB: halved
-    // till they fit, not dropped whole (R11 F2688)
+    // long rows (an export's long phrases and readings) can push a record past 64 KB: halved till they fit,
+    // not dropped whole
     private fun absorbed(minute: Int, rows: List<LearnRecord>): Boolean {
         val record = Absorbed(minute, rows, emptyList())
-        // [encoded] tells nothing, so a row too long for any record is told once, by the write of it alone (F3145)
+        // [encoded] tells nothing, so a row too long for any record is reported once, by writing it alone
         if (rows.size == 1 || encoded(record) != null) return put(record) == Put.ON_DISK
         val half = rows.size / 2
         val first = absorbed(minute, rows.subList(0, half))
         return absorbed(minute, rows.subList(half, rows.size)) && first
     }
 
-    /** Takes [rows], phrases a table saved, out of the record, stamped now: forgotten in a table, or everywhere (U-84). */
+    /** Removes phrases a table saved, stamped now: forgotten in a table, or everywhere. */
     fun dropTableWords(rows: List<LearnRecord.TableWordRow>) {
         if (rows.isEmpty()) return
         val stamp = LearnClock.stamp(clock, state, commit = false)
         rows.chunked(LearnRecords.ABSORBED_ROWS).forEach { write(Absorbed(stamp.minute, emptyList(), it)) }
     }
 
-    /** Turns [text] off as a prediction after [prev] (U-72 不再联想), or on again. */
+    /** 不再联想: turns [text] off as a prediction after [prev], or on again. */
     fun noPredict(prev: String, text: String, on: Boolean) {
         val stamp = LearnClock.stamp(clock, state, commit = false)
         write(NoPredict(stamp.minute, prev, text, on))
     }
 
-    /** Forgets [text] everywhere (U-84). */
     fun forget(text: String) {
         val stamp = LearnClock.stamp(clock, state, commit = false)
         write(Forget(stamp.minute, stamp.day, text))
     }
 
-    /** Forgets the whole phrase [text]'s count (U-73), nothing else of that text ([PhraseForget]). */
+    /** Forgets only the whole phrase [text]'s count ([PhraseForget]). */
     fun forgetPhrase(text: String) {
         write(PhraseForget(LearnClock.stamp(clock, state, commit = false).minute, text))
     }
 
     /**
-     * Appends and applies an English [word] committed after [prev] ("" for none), [typed] as the
-     * keys spelt it, [how] it came ([EnCommit.how]), stamped now: a commit as [record]'s, of a
-     * typing day, and one of the last few [undo] takes back. Null if it was too long to keep.
+     * Appends and applies an English [word] committed after [prev] ("" for none), [typed] as keyed, [how] as
+     * in [EnCommit.how], stamped now: like [record]'s commits it makes a typing day and [undo] can take it
+     * back. Null if too long to keep.
      */
     fun recordEnglish(prev: String, word: String, typed: String, how: Int, flags: Int = 0): EnCommit? {
         val stamp = LearnClock.stamp(clock, state, commit = true)
@@ -275,20 +262,20 @@ class LearnLog(
         write(EnAdd(LearnClock.stamp(clock, state, commit = false).minute, word, on))
     }
 
-    /** Has the English [word] corrected again, its uses and pairs kept ([EnCorrect]). */
+    /** Lets the English [word] be corrected again, keeping its uses and pairs ([EnCorrect]). */
     fun correctEnglish(word: String) {
         write(EnCorrect(LearnClock.stamp(clock, state, commit = false).minute, word))
     }
 
-    /** Forgets the English [word]: its uses, its pairs, and that it was added or is never corrected ([EnForget]). */
+    /** Forgets the English [word]: uses, pairs, and whether it was added or never corrected ([EnForget]). */
     fun forgetEnglish(word: String) {
         write(EnForget(LearnClock.stamp(clock, state, commit = false).minute, word))
     }
 
     /**
-     * Writes an import's [records] (U-101, U-102: [LearnRecord.ImportBatch] and its words, an
-     * [LearnRecord.ImportUndo]), each applied as written, the listener told once at the end: a
-     * list of 100 000 words is as many records. One too long to keep is left out, reported.
+     * Writes an import's [records] ([LearnRecord.ImportBatch] and its words, or an [LearnRecord.ImportUndo]),
+     * each applied as written, the listener told once at the end: a 100 000-word list is as many records.
+     * One too long to keep is left out and reported.
      */
     fun imports(records: List<LearnRecord>) {
         require(records.all { it is LearnRecord.ImportBatch || it is LearnRecord.Imported || it is LearnRecord.ImportUndo }) { "not an import's" }
@@ -303,22 +290,19 @@ class LearnLog(
             kept += record
             bytes += b
         }
-        // one write for them all: a write per word took 100 000 words over a second on the fcitx thread (F3058, F3078)
+        // one write for all: a write per word took over a second for 100 000 words on the fcitx thread
         val written = bytes.isEmpty() || store?.appendAll(bytes) == true
         tellIfUnkept(written, kept.size)
         for (record in kept) {
-            // as a replay would: one failing is reported, the rest go on, and the listener is told (review-G NIT 2)
+            // as a replay would: a failing one is reported, the rest go on, and the listener is told
             applyOrKeep(state, record) { onError(IOException("a record not applied", it)) }
-            // an act's records as written: the last act before them is no longer one to take back (LearningControl)
+            // an act's records as written: the last act before them can no longer be taken back (LearningControl)
             appended?.invoke(record, written)
         }
         changed()
     }
 
-    /**
-     * Appends and applies the event [make] gives for the minute and typing day now: one no method
-     * here writes (a table's order reset, its per-code blocks). Whether it was kept.
-     */
+    /** Appends and applies the record [make] builds for the current minute and typing day, for events no method here writes (a table's order reset, per-code blocks). Whether kept. */
     fun event(make: (minute: Int, day: Int) -> LearnRecord): Boolean {
         val stamp = LearnClock.stamp(clock, state, commit = false)
         return write(make(stamp.minute, stamp.day))
@@ -328,7 +312,7 @@ class LearnLog(
 
     private enum class Put { TOO_LONG, IN_MEMORY, ON_DISK }
 
-    // [record] applied, unless too long to keep; on disk, or in the state alone
+    // [record] applied unless too long to keep; on disk or in the state alone
     private fun put(record: LearnRecord): Put {
         val bytes = encoded(record)
         if (bytes == null) {
@@ -346,14 +330,13 @@ class LearnLog(
     private var toldUnkept = false
 
     /**
-     * How many records the open store did not take and are in the state alone, since it was last what the file
-     * says. Counted, for an act taken back in memory to know its own are all of them ([dropUnwritten] drops
-     * every one: R25 F8066).
+     * Records the open store did not take, in the state alone, since it last matched the file: lets an act
+     * taken back in memory know its own are all of them ([dropUnwritten] drops every one).
      */
     internal var unwritten = 0
         private set
 
-    // [records] about to be applied, [written] or not: the first not written told
+    // [records] about to be applied, [written] or not: the first not written is reported
     private fun tellIfUnkept(written: Boolean, records: Int = 1) {
         if (!written && store != null) unwritten += records
         if (written || toldUnkept) return
@@ -362,50 +345,47 @@ class LearnLog(
     }
 
     /**
-     * Rewrites the log whole (U-88, U-86, an act taken back: impl/streams/E-design.md §3), as
-     * [RecordStore.rewrite] has [transform] do it; the state is then what the bytes written replay
-     * to, the listener told what that changed of the user's words, and no commit before it may be
-     * taken back. False if nothing was written: a file that did not open (learned in memory this
-     * run), or [transform] said so; with no file at all, the state's own snapshot is rewritten.
+     * Rewrites the whole log (clears, an act taken back) via [RecordStore.rewrite] with [transform]; the
+     * state becomes what the written bytes replay to, the listener is told what that changed of the user's
+     * words, and no earlier commit may be taken back. False if nothing was written: a file that did not open
+     * (in memory this run), or [transform] declined; with no file at all, the state's own snapshot is rewritten.
      *
-     * @throws IOException if the disk failed, or the file stopped taking writes after one that failed
-     * ([RecordStore.rewrite]: not "nothing written", or a clear is told done with its records still in the file,
-     * R25 F8018): the log and the state as they were
+     * @throws IOException if the disk failed, or the file stopped taking writes after a failed one (not
+     * "nothing written", else a clear would report done with its records still in the file): log and state as they were
      */
     @Throws(IOException::class)
     fun rewrite(transform: (ByteArray, OutputStream) -> Boolean): Boolean = rewrite(endUndo = true, transform)
 
     /**
-     * Throws as [rewrite] would of a file that stopped taking writes, before anything is read or written
-     * ([RecordStore.checkRewrites]): for a clear, which deletes the backups before its rewrite (R25 F8021).
-     * Nothing for a log in memory, or one that did not open.
+     * Throws as [rewrite] would for a file that stopped taking writes, before anything is read or written
+     * ([RecordStore.checkRewrites]): a clear deletes the backups before its rewrite. Nothing for an in-memory
+     * or unopened log.
      */
     @Throws(IOException::class)
     fun checkRewrites() {
         store?.checkRewrites()
     }
 
-    // [endUndo] false: a rewrite the user did not make (the conversion landing) leaves an import's 撤销 (F3209)
+    // [endUndo] false: a rewrite the user did not make (the conversion landing) keeps an import's 撤销
     private fun rewrite(endUndo: Boolean, transform: (ByteArray, OutputStream) -> Boolean): Boolean {
         val store = store
         // a record that did not open learns in memory, where a rewrite would not last: not done
         if (store == null && file != null) return false
         val bytes = if (store != null) store.rewrite(transform) else inMemory(transform)
         bytes ?: return false
-        // written: what was read of it before is no longer there, whatever reading it again throws (review-int-records N5)
+        // written: what was read of it before is gone, whatever rereading throws
         rewritten()
         read(bytes, endUndo)
         return true
     }
 
     /**
-     * The state made what the file says, where records the disk refused are in the state alone: a clear
-     * that found nothing of its span in the file would leave what was typed then offered till the process
-     * ends, though told cleared (R25 F7999). With it goes whatever else was not written, of any time, as
-     * with a rewrite, whose state is the file's too: none of it would outlast the process. So is an act taken
-     * back none of whose records the file took (R25 F8050), but only where its records are all that is not
-     * written ([unwritten]), so that nothing else goes with it (LearningControl.takeBack: R25 F8066). Whether
-     * there was any; then no commit before it may be taken back.
+     * Makes the state what the file says where the disk refused records: else a clear finding nothing of its
+     * span in the file would keep offering what was typed then, though reported cleared. Anything else
+     * unwritten goes too, as with a rewrite: none of it would outlast the process. Likewise an act taken back
+     * whose records the file never took, but only where they are all that is unwritten ([unwritten]), so
+     * nothing else goes with it (LearningControl.takeBack). Whether there was any; then no earlier commit may
+     * be taken back.
      *
      * @throws IOException if the file did not read: the state as it was
      */
@@ -418,37 +398,36 @@ class LearnLog(
         return true
     }
 
-    // the state made what the log [bytes] replay to, the listener told what that changed of the user's words
+    // the state made what [bytes] replay to, the listener told what that changed of the user's words
     private fun read(bytes: ByteArray, endUndo: Boolean) {
         val was = state
-        // what replaying it changed is no change of the user's: [Changes.between] says that (review-int-records S1)
+        // replaying is no change of the user's: [Changes.between] reports that
         state = replay(bytes).also { it.takeChanges() }
-        // the words imported where they were: a model over them, and a session typing, go on (review-G M1)
+        // imported words keep their places, so a model over them and a typing session go on
         state.keepImportsOf(was, endUndo)
         unwritten = 0
         listener?.invoke(LearnState.Changes.between(was, state))
     }
 
-    /** Whether what is written lasts: a file, opened. Without, what was typed has no times kept to clear a span of (U-88). */
+    /** Whether writes last: a file, opened. Without, typing keeps no times to clear a span by. */
     val onDisk: Boolean get() = store != null
 
     /**
-     * Whether what is learned now reaches the disk: [onDisk], and its writes not stopped by one that failed
-     * and could not be cut back. False, what is learned lives in memory till the process ends, which the
-     * word list and the status panel say for as long as it lasts (user's decision decode-4).
+     * Whether learning reaches disk now: [onDisk], with writes not stopped by a failure that could not be cut
+     * back. False: learning lives in memory till the process ends, shown in the word list and status panel.
      */
     val saving: Boolean get() = store?.writing == true
 
     /**
-     * False once the file stopped taking writes for this run ([RecordStore.takesRewrites]): [checkRewrites]
-     * and [rewrite] throw from then on, and only a new start opens it again. False too of a file that did not
-     * open (or is closed): [rewrite] writes nothing there, at every try, till a start opens it (R25 F8064: said
-     * true, a restore that failed there was told to try again). True otherwise, as while a full disk refuses
-     * the appends ([saving] false), and for a log in memory, which is rewritten there (R25 F8037).
+     * False once the file stopped taking writes this run ([RecordStore.takesRewrites]): [checkRewrites] and
+     * [rewrite] throw from then on till a new start reopens it. False too for a file that did not open (or is
+     * closed): [rewrite] writes nothing there till a start opens it, so a failed restore must not say "try
+     * again". True otherwise, including while a full disk refuses appends ([saving] false), and for an
+     * in-memory log, rewritten there.
      */
     val takesRewrites: Boolean get() = store?.takesRewrites ?: (file == null)
 
-    // learned in memory (no user directory yet): the log the state would fold to, rewritten as one on disk would be
+    // in memory (no user directory yet): the log the state would fold to, rewritten as a disk one would be
     private fun inMemory(transform: (ByteArray, OutputStream) -> Boolean): ByteArray? {
         val log = ByteArrayOutputStream()
         log.write(LearnRecords.FORMAT.header())
@@ -462,36 +441,35 @@ class LearnLog(
         if (!changes.isEmpty()) listener?.invoke(changes)
     }
 
-    // null for a record too long to keep, or one that cannot be written at all (a field past 64 KB
-    // as UTF-8): never the key's failure, and told by its caller, once (F3145)
+    // null for a record too long to keep or unwritable (a field past 64 KB as UTF-8): never the key's
+    // failure, reported by the caller once
     private fun encoded(record: LearnRecord): ByteArray? = try {
         LearnRecords.encode(record).takeIf(::fits)
     } catch (_: IOException) {
         null
     }
 
-    /** Folds the log now, as the background would: for tests. */
+    /** Folds now, as the background would: for tests. */
     internal fun fold() = store?.compact()
 
-    /** Closes the log. */
     override fun close() {
         store?.close()
         store = null
     }
 
     companion object {
-        /** The log, in the engine's user directory. */
+        /** In the engine's user directory. */
         const val FILE = "learn.log"
 
         private const val MAX_TAKES = 255
 
-        /** How many of the last commits may be taken back: PLAN §2.5's 16. */
+        /** How many of the last commits may be taken back. */
         const val UNDOABLE = 16
 
-        /** How long a commit may be taken back, or else the same calendar day: the tail (PLAN §2.5). */
+        /** How long a commit may be taken back (or else the same calendar day): the tail. */
         const val TAIL_MINUTES = 60
 
-        // what [rewrites] is taken from: one for every log and rewrite of this process
+        // [rewrites] source: one per log and rewrite in this process
         private val GENERATIONS = AtomicLong()
 
         private fun fits(record: ByteArray) = record.size <= 4 + RecordFormat.MAX_RECORD + 4
@@ -508,7 +486,7 @@ class LearnLog(
             state.snapshot(cut).forEach { if (keeps(it)) writer.write(it) }
         }
 
-        /** The state the log [bytes] (header and records) say: what a start would read. */
+        /** The state log [bytes] (header and records) replay to: what a start reads. */
         fun replay(bytes: ByteArray): LearnState {
             val state = LearnState()
             val reader = LearnRecords.Reader()
@@ -517,16 +495,16 @@ class LearnLog(
         }
 
         /**
-         * Folds [log] (header and records) at [cut]: the snapshot and the records before the last
-         * one older than the cut, replayed afresh, written as a snapshot; the records after it as
-         * they are. False, nothing written, if no record of the tail is older than the cut.
+         * Folds [log] (header and records) at [cut]: the snapshot and the records up to the last one older than
+         * the cut, replayed, become a snapshot; later records stay as written. False, nothing written, if no tail
+         * record is older than the cut.
          */
         fun fold(log: ByteArray, cut: Int, to: OutputStream): Boolean {
             val walk = Walk(log)
             val records = walk.records
-            // after the last record of the tail older than the cut; one of no minute goes with those
-            // before it, but an import's is as old as the record before it: a tail of imports alone,
-            // 100 000 words of a list, folds with no commit after it
+            // after the last tail record older than the cut; one with no minute goes with those before it, but an
+            // import's is as old as the record before it: a tail of imports alone (a 100 000-word list) folds with no
+            // commit after it
             var last = -1
             var before = Int.MIN_VALUE
             for ((i, r) in records.withIndex()) {
@@ -544,8 +522,7 @@ class LearnLog(
             return true
         }
 
-        // a log's whole records but those emptied, read: [fold]'s and [merged]'s one walk, as the two
-        // must agree on where the tail starts (R11 F2682)
+        // a log's records except emptied ones: one walk for [fold] and [merged], which must agree where the tail starts
         private class Walk(val log: ByteArray) {
             val spans = ArrayList<Long>().also { s ->
                 LearnRecords.FORMAT.spans(log) { start, end -> if (log[start + 4] != EMPTIED) s += (start.toLong() shl 32) or end.toLong() }
@@ -556,7 +533,7 @@ class LearnLog(
             /** The first record after the snapshot's [Cut]. */
             val tail = records.indexOfFirst { it === Cut } + 1
 
-            /** The records before [until] replayed afresh. */
+            /** The records before [until], replayed afresh. */
             fun state(until: Int) = LearnState().also { s -> for (i in 0 until until) records[i]?.let { applyOrKeep(s, it) } }
 
             /** The records from [from] on, as written. */
@@ -575,9 +552,9 @@ class LearnLog(
         }
 
         /**
-         * [record] applied to [state]: one that does not read is kept as it is ([LearnRecord.Unknown],
-         * by [LearnState.apply]); one this build fails on applying is reported and left out, as
-         * keeping it would apply what it half did again at each fold (review-1a-r2 NIT 1).
+         * Applies [record]: one that does not read is kept as it is ([LearnRecord.Unknown], via
+         * [LearnState.apply]); one this build fails to apply is reported and left out, as keeping it would
+         * reapply its half-done part at each fold.
          */
         internal fun applyOrKeep(state: LearnState, record: LearnRecord, onError: (Exception) -> Unit = {}) {
             try {
@@ -587,7 +564,7 @@ class LearnLog(
             }
         }
 
-        // RecordStore's mark of a log emptied, which no format's records have
+        // RecordStore's mark of an emptied log, which no format's records start with
         internal const val EMPTIED: Byte = 0
     }
 }

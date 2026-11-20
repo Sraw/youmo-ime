@@ -16,7 +16,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** [SpelledForm]: how a code spells a word of its keyboard, by its keys' count (U-20, D32 B). */
+/** [SpelledForm]: how a code spells a word of its keyboard, by its keys' count. */
 class SpelledFormTest {
     private class Row(val why: String, val kind: String, val keys: String, val reading: String, val form: SpelledForm?)
 
@@ -54,7 +54,6 @@ class SpelledFormTest {
     @Test
     fun spellsTellsTheStartsOfTheSyllablesInTurn() {
         class Look(val why: String, val kind: String, val keys: String, val reading: String, val spells: Boolean)
-        // the user's own letters: f on 2 (F3768)
         val custom = Kinds.nineKeys(NineKeyLetters.parse("abcf,de,ghi,jkl,mno,pqrs,tuv,wxyz").tag())
         val rows = listOf(
             Look("fengh", Kinds.FULL, "fengh", "feng hua", true),
@@ -73,7 +72,7 @@ class SpelledFormTest {
         assertRows(rows, { it.why }) { assertEquals(it.why, it.spells, SpelledForm.spells(it.kind, it.keys, it.reading)) }
     }
 
-    // D32 B on the 14 keys (design §2): a code a letter, found by its letters as a digit is
+    // on the 14 keys: a code a letter, found by its letters as a digit is
     @Test
     fun theFourteenKeysSpellByTheirGroupsLetters() {
         val qk = Kinds.keys(NineKeyLetters.G14.tag())

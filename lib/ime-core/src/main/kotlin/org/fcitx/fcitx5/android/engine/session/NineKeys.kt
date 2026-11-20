@@ -14,56 +14,45 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableMatches
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 
-/**
- * A [PinyinSession]'s syllables on the nine keys (九键): which the first digits not yet taken may
- * be ([offered]), and those taken, which stand in the input as their letters and a separator.
- * Taking one and giving it back edit the session's input; the session reads it again after.
- */
+/** A [PinyinSession]'s nine-key syllables: what the first untaken digits may be ([offered]), and those taken, standing in the input as letters plus separator; taking and returning edit the input, which the session rereads. */
 internal class NineKeys(
     private val data: PinyinData,
     private val letters: NineKeyLetters,
-    /** The keys pressed, kept in step with the input as this edits it. */
+    /** Kept in step with the input as this edits it. */
     private val pressed: PressedKeys = PressedKeys(),
-    /**
-     * Whether a character of the input is a key pressed: the segmenter's ([KeyedSegmenter.isKey]), its
-     * codes and the letters typed as themselves, which [offer] finds the first of and 连按 runs on.
-     */
+    /** Whether an input character is a pressed key ([KeyedSegmenter.isKey]): codes and fixed letters, which [offer] and 连按 work on. */
     private val isKey: (Char) -> Boolean = T9Segmenter.Companion::isKey,
-    /** The initials a key offers for 简拼 ([KeyedSegmenter.initialsOf]): the nine keys' its initial letters. */
+    /** Initials a key offers for 简拼 ([KeyedSegmenter.initialsOf]). */
     private val initialsOf: (Char) -> List<String> = { c -> T9Segmenter.initialsOf(letters, c) },
-    /** The key an initial is taken as ([KeyedSegmenter.keyOf]): zhuyin's symbol; null for its letters and a separator. */
+    /** The key an initial is taken as ([KeyedSegmenter.keyOf]): zhuyin's symbol; null for letters plus separator. */
     private val keyOf: (String) -> Char? = { null },
-    /** How an offered syllable or initial shows ([KeyedSegmenter.shownOffered]). */
+    /** [KeyedSegmenter.shownOffered]. */
     private val shown: (String) -> String = { it },
-    /** How often each syllable was taken for some digits (the bar's habit, U-23): its order after the best reading's. */
+    /** How often each syllable was taken for some digits (the bar's habit): orders them after the best reading's. */
     private val bar: (digits: String) -> Map<String, Int> = { emptyMap() },
 ) {
 
-    /**
-     * A syllable taken at [at] for the keys [was], [put] in their place (its [spelling], or the key an
-     * initial is taken as), a separator [added] after it; [then] the input after; [runs], what
-     * [pressed] had for the keys.
-     */
+    /** A syllable taken at [at] for keys [was], [put] in their place (its [spelling], or the key of an initial), a separator [added] after; [then] the input after; [runs] what [pressed] had. */
     private class Taken(val at: Int, val was: String, val spelling: String, val put: String, val added: Boolean, val then: String, val runs: List<PressedKeys.Run>) {
         val length get() = put.length
     }
 
-    private val taken = ArrayList<Taken>() // the last last
+    private val taken = ArrayList<Taken>() // latest last
 
-    /** Whether the keys' 1 splits syllables (分词), the nine keys': the 14 keys have a key of their own for it, a 1 swiped off one the keypad's. */
+    /** Whether 1 separates syllables (the nine keys'; the 14 keys have their own key, a swiped 1 is the keypad's). */
     val oneSeparates = letters.separator == PinyinSession.NINE_KEYS_SEPARATOR
 
-    /** What the first digits not taken may be, likeliest first, a letter for an initial last: see [Snapshot.syllables]. */
+    /** Likeliest first, initials last: see [Snapshot.syllables]. */
     var offered: List<String> = emptyList()
         private set
     private var offeredAt = -1 // where in the input those digits start
-    private var offeredPresses: List<Int> = emptyList() // the presses each of offered stands for
+    private var offeredPresses: List<Int> = emptyList() // the presses each offered one stands for
 
-    /** Which list [offered] is: see [Snapshot.syllablesId]. */
+    /** See [Snapshot.syllablesId]. */
     var id = 0
         private set
 
-    // where in the input the best reading has a syllable start: which
+    // input positions where the best reading's syllables start, with lengths
     private var best: Map<Int, Int> = emptyMap()
 
     fun clear() {
@@ -71,7 +60,7 @@ internal class NineKeys(
         show(emptyList(), -1)
     }
 
-    // a list unlike the last gets another id: a pick from the last is stale
+    // a different list gets a new id: a pick from the last is stale
     private fun show(syllables: List<String>, at: Int, presses: List<Int> = syllables.map { it.length }) {
         if (syllables == offered && at == offeredAt && presses == offeredPresses) return
         offered = syllables
@@ -80,40 +69,34 @@ internal class NineKeys(
         id = (id + 1) % Action.Syllable.IDS
     }
 
-    /** Before the best reading of the input read again is noted: see [note]. */
+    /** Before the reread input's best reading is noted ([note]). */
     fun forgetBest() {
         best = emptyMap()
     }
 
-    /** Syllables of the best reading: [syllables] from input position [from] on, the [k]th ending at [ends] [k]. */
+    /** The best reading's [syllables] from [from], the [k]th ending at [ends] [k]. */
     fun note(from: Int, ends: List<Int>, syllables: IntArray) {
         val noted = HashMap(best)
         for (k in syllables.indices) noted[if (k == 0) from else ends[k - 1]] = syllables[k]
         best = noted
     }
 
-    /**
-     * Offers what the first digits after [from] of [input] may be, as [graph] (of the input from
-     * [from]) reads them: the best reading's syllable first, then those taken most for their digits,
-     * then those no tap clearly goes against (a key of two letters tapped at its other letter's
-     * centre or further: a tap near the middle moves nothing), then the longer, then the more common; then the letters of the first digit that are initials, for 简拼. Nothing where all
-     * is taken.
-     */
+    /** Offers what the first digits after [from] may be per [graph]: the best reading's syllable, then most taken, then those no tap clearly contradicts, then longer, then commoner; then initials of the first digit for 简拼. Nothing when all is taken. */
     fun offer(input: CharSequence, from: Int, graph: SyllableGraph) {
         val key = (from until input.length).firstOrNull { isKey(input[it]) }
         if (key == null) {
             show(emptyList(), -1)
             return
         }
-        // an initial taken that binds this key as its final (grouped 双拼): its syllables, from the initial on
+        // an initial taken that binds this key as its final (grouped 双拼): its syllables from the initial on
         val at = boundFrom(input, from, key, graph) ?: key
         val first = best[at] ?: -1
         val found = syllablesAt(graph, from, at)
-        // a habit by the digits each syllable takes, as a take files it (impl/design-1b.md NIT 7)
+        // habits by the digits each syllable takes, as a take files them
         val bars = HashMap<Int, Map<String, Int>>()
         val taken = { s: Int -> bars.getOrPut(found.getValue(s)) { bar(pressed.keys(at, at + found.getValue(s))) }[Syllables.spelling(s)] ?: 0 }
         val taps = pressed.taps(at, input.length)
-        // the nine keys and 双拼's are never tapped with a place: nothing to weigh, nothing made for it
+        // the nine keys and 双拼 have no tap places: nothing to weigh
         val objections = if (taps == null) emptyMap() else found.keys.associateWith { objected(input, at, Syllables.spelling(it), found.getValue(it), taps) }
         val order = found.keys.sortedWith(
             compareByDescending<Int> { it == first }.thenByDescending(taken)
@@ -123,15 +106,14 @@ internal class NineKeys(
         val initials = if (at == key) initialsOf(input[at]) else emptyList()
         val presses = HashMap<String, Int>()
         for ((s, length) in found) presses[Syllables.spelling(s)] = length
-        // an initial taken as a key that alone reads a syllable shown the same (zhuyin's ㄓ, zhi's and
-        // zh's): the initial only, which is the syllable too unless a final follows
+        // an initial taken as a key that alone reads a same-looking syllable (zhuyin ㄓ for zhi and zh): the initial only
         val keyed = initials.filter { keyOf(it) != null }.mapTo(HashSet(), shown)
         val offered = (order.map { Syllables.spelling(it) }.filterNot { shown(it) in keyed } + initials).take(Action.Syllable.MAX)
         show(offered, at, offered.map { s -> presses[s] ?: 1 })
     }
 
-    // the start of the taken letters before [key] and its separator, if [graph] (of the input from [from]) reads
-    // them and [key] as one syllable: an initial taken on grouped 双拼 (GroupedShuangpinSegmenter); else null
+    // the start of taken letters before [key] and its separator if [graph] reads them with [key] as one syllable
+    // (an initial taken on grouped 双拼); else null
     private fun boundFrom(input: CharSequence, from: Int, key: Int, graph: SyllableGraph): Int? {
         if (key - 1 <= from || input[key - 1] != SyllableGraph.SEPARATOR) return null
         var start = key - 1
@@ -139,11 +121,8 @@ internal class NineKeys(
         return start.takeIf { s -> s < key - 1 && graph.edges(s - from).any { graph.kind(it) == Kind.SYLLABLE && graph.to(it) > key - from } }
     }
 
-    // whether a key [spelling] reads from [at] of [input] was tapped on its other letter's half at
-    // that letter's centre or further ([taps] from [at]): a yes or no, not how far, so the bar
-    // does not reorder for a tap a little off the middle. Only its [presses] keys: a syllable started
-    // there, its later letters on keys of the next one (NineKeyLetters.against has the sides). üe's v
-    // typed as u on a key without v is weighed as that u, as the segmenter does
+    // whether [spelling]'s keys from [at] were tapped at or past the other letter's centre: yes or no, so a slightly
+    // off-centre tap does not reorder the bar. Only its [presses] keys; üe's v typed as u is weighed as u
     private fun objected(input: CharSequence, at: Int, spelling: String, presses: Int, taps: FloatArray): Boolean = (0 until minOf(spelling.length, presses)).any { k ->
         val tap = taps.getOrElse(k) { Float.NaN }
         val group = if (at + k < input.length) letters.letters(input[at + k]) else ""
@@ -151,8 +130,7 @@ internal class NineKeys(
         !tap.isNaN() && at + k < input.length && letters.weighs(input[at + k]) && j >= 0 && letters.against(input[at + k], j, tap) >= OBJECTION
     }
 
-    // the syllables [graph] (of the input from [from]) reads at input position [at], each to its most
-    // presses, in the order read
+    // syllables [graph] reads at [at], each to its most presses, in read order
     private fun syllablesAt(graph: SyllableGraph, from: Int, at: Int): Map<Int, Int> {
         val found = LinkedHashMap<Int, Int>() // syllable to its length
         for (e in graph.edges(at - from)) {
@@ -169,11 +147,7 @@ internal class NineKeys(
         return found
     }
 
-    /**
-     * Puts the syllable at [index] of [offered] into [input] for its digits: where the [cursor] is
-     * after it, past the syllable if it was in or after its digits; -1 if there is none, or the pick
-     * was [of] another list (see [Action.Syllable]).
-     */
+    /** Puts the [index]th offered syllable in place of its digits; the new cursor, or -1 if none or the pick was [of] another list. */
     fun take(input: StringBuilder, index: Int, of: Int, cursor: Int): Int {
         if (of != Action.Syllable.ANY && of != id) return -1
         val spelling = offered.getOrNull(index) ?: return -1
@@ -181,11 +155,9 @@ internal class NineKeys(
         val was = input.substring(at, at + offeredPresses[index])
         val lengthBefore = input.length
         val runs = pressed.runs(at, at + was.length)
-        // an initial taken as a key: the key, which goes on into the next, no separator (no syllable is
-        // spelt as an initial is: m, n and r alone are never offered, syllablesAt)
+        // an initial taken as a key goes on into the next, no separator (no syllable is spelt as an initial)
         val key = keyOf(spelling)
         val put = key?.toString() ?: spelling
-        // the key it is already (ㄓ typed as itself, ㄓ taken): nothing to take
         if (put == was) return cursor
         input.replace(at, at + was.length, put)
         val end = at + put.length
@@ -197,14 +169,9 @@ internal class NineKeys(
     }
 
     /**
-     * Puts [c] into [input] as a letter typed as itself ([Action.Letter]), upper case, at [cursor],
-     * the key before it the last; where the cursor is after it, or -1 for what is no letter. But
-     * [again] (连按) after the same key, a digit or a letter typed as itself after [picked], what is
-     * picked already, in its place: the key's next letter, what its preview showed, and nothing
-     * else, so 4 4 fast is `H`. The letter shown wins where the keyboard counted a press the input
-     * lacks (a pick it did not see). Again with no such key (a candidate picked in between, or the
-     * cursor moved, [picked] then the cursor itself: what the keyboard did not see) it is its key,
-     * any of its letters, as a press after a pause.
+     * Puts [c] in as a letter typed as itself at [cursor]; the new cursor, or -1 for no letter. With [again] (连按)
+     * after the same key, or a letter after [picked], it replaces that in place with the key's next letter, so 4 4 fast
+     * is `H`. Again with no such key it is its key, as a press after a pause.
      */
     fun letter(input: StringBuilder, c: Char, again: Boolean, picked: Int, cursor: Int, glided: Boolean = false): Int {
         if (c !in 'a'..'z') return -1
@@ -220,16 +187,12 @@ internal class NineKeys(
             again -> if (letters.keysOf(c).length == 1) letters.key(c) else c.uppercaseChar()
             else -> c.uppercaseChar()
         }
-        // pressed again after another key: a press after a pause, the key or the letter, not one 连按 chose
         pressed.insert(cursor, key.toString(), glided, input = input, letters = letters)
         input.insert(cursor, key)
         return cursor + 1
     }
 
-    /**
-     * Gives the syllable taken last back to [input] as the keys it was, if nothing was typed since:
-     * where it starts; else -1, and backspace deletes as it would.
-     */
+    /** Gives the last taken syllable back as its keys if nothing was typed since: where it starts, else -1. */
     fun giveBack(input: StringBuilder): Int {
         val last = taken.lastOrNull()
         // the input itself, not its length: a letter typed as itself replaces the last key in place
@@ -241,13 +204,13 @@ internal class NineKeys(
         return last.at
     }
 
-    /** The syllables taken and kept, for their digits: learned with the commit, the bar's (PLAN §2.2 state 6) under [layout]. */
+    /** The syllables taken and kept, for their digits, under [layout]. */
     fun takes(layout: String): List<Take> = taken.map { Take(layout, it.runs.joinToString("") { r -> r.keys }, it.spelling) }
 
-    /** Whether a syllable is taken: a pick then is 'H' (spec §1), learned against the first shown before it was. */
+    /** Whether a syllable is taken: a pick then is 'H', weighed against the first shown before it was. */
     val anyTaken get() = taken.isNotEmpty()
 
-    // how common each syllable is: its commonest character's score; for the order offered only
+    // each syllable's commonest character's score; for the order offered only
     private val weights: FloatArray by lazy {
         val dictionary = data.dictionary
         FloatArray(Syllables.count) { s ->
@@ -261,8 +224,7 @@ internal class NineKeys(
     }
 
     private companion object {
-        // how far a tap goes against a letter for it to count (NineKeyLetters.against): a quarter of the
-        // key past the middle, the other letter's centre (SyllableGraph.against 0.5)
+        // how far past the middle a tap must go to count against a letter (the other letter's centre)
         private const val OBJECTION = 0.5f
     }
 }

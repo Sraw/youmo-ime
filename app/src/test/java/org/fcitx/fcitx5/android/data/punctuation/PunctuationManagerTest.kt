@@ -15,16 +15,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
-/**
- * The keyboard reads the punctuation table on every focus: [PunctuationManager] keeps what it read
- * over JNI until fcitx reads its tables again (no table is saved since 0.6.1: R26 F8279).
- */
+/** The keyboard reads the punctuation table on every focus: [PunctuationManager] caches it until fcitx rereads its tables. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PunctuationManagerTest {
 
-    /** Fcitx as it hands a table back, a read held till [held] is completed. */
+    /** A read held till [held] is completed. */
     private class Tables(private val fake: FakeHostApi = FakeHostApi()) : HostApi by fake {
-        /** Set, a read waits for it with the table it has read. */
         var held: CompletableDeferred<Unit>? = null
 
         override suspend fun punctuationMap(lang: String): List<PunctuationMapEntry> {
@@ -33,7 +29,7 @@ class PunctuationManagerTest {
             return entries
         }
 
-        /** [lang]'s table changed in fcitx, not through [PunctuationManager]: an edited file read again. */
+        /** Changed in fcitx, not through [PunctuationManager]. */
         suspend fun change(lang: String, entries: List<PunctuationMapEntry>) = fake.setPunctuationMap(lang, entries)
     }
 
@@ -74,7 +70,7 @@ class PunctuationManagerTest {
         runCurrent()
         fcitx.held = null
 
-        // fcitx reads its tables anew while the read, holding the table from before, is on its way back
+        // fcitx rereads its tables while the read, holding the old table, is on its way back
         fcitx.change("zh_CN", both)
         PunctuationManager.forget()
         gate.complete(Unit)
@@ -99,7 +95,7 @@ class PunctuationManagerTest {
         val fcitx = Tables()
         fcitx.change("zh_CN", comma)
         assertEquals(comma, PunctuationManager.load(fcitx, "zh_CN"))
-        // edited while fcitx was stopped: it reads the file as it starts
+        // edited while fcitx was stopped: read as it starts
         PunctuationManager.starting { fcitx.change("zh_CN", both) }
         assertEquals(both, PunctuationManager.load(fcitx, "zh_CN"))
     }

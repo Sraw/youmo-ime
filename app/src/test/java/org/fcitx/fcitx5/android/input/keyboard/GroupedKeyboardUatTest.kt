@@ -49,11 +49,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * uat/06's and 07's 14- and 18-key cases on the whole keyboard over a fake engine: what the keys
- * look like and send, their popups, the code row's height per input method. What the engine
- * makes of the keys sent is KeyboardHalvesUatTest's and Keys14UatTest's (uatTest, the app's data).
- */
+/** uat/06's and 07's 14- and 18-key cases over a fake engine; what the engine makes of the keys is KeyboardHalvesUatTest's. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -71,8 +67,8 @@ class GroupedKeyboardUatTest {
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
-    private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
+    private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
 
     private fun keys14(im: InputMethodEntry = KeyboardHarness.PINYIN, theme: Theme = TestThemes.PixelLight): KeyboardHarness {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
@@ -83,7 +79,6 @@ class GroupedKeyboardUatTest {
         }
     }
 
-    // a group's key by its face, whichever draws it (060-render-p2 S4a: the canvas's where it is on)
     private fun group(face: String): ShownKey = h.key(face)
 
     private fun sent() = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
@@ -96,7 +91,6 @@ class GroupedKeyboardUatTest {
         h.relayout()
     }
 
-    // what fcitx tells while typing: the code row's text, a few candidates, the strip's syllables
     private fun typing(im: String, vararg syllables: String, code: String = "bn ui") {
         val typed = FormattedText(arrayOf(code), intArrayOf(0), code.length)
         h.api.inputPanelCached = HostEvent.InputPanel(typed, FormattedText.Empty, FormattedText.Empty)
@@ -108,10 +102,9 @@ class GroupedKeyboardUatTest {
         h.relayout()
     }
 
-    // fcitx's Chinese punctuation, as its addon has it on
     private fun chinesePunctuation(im: InputMethodEntry, vararg marks: Pair<String, String>) {
         val active = listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", "", true))
-        // cached as the real host caches what it sent: an input view made anew replays these
+        // cached as the real host caches it: an input view made anew replays these
         h.api.statusAreaCached = active
         h.api.punctuationCached = marks.toMap()
         h.emit(HostEvent.StatusArea(active, im, marks.toMap()))
@@ -121,12 +114,10 @@ class GroupedKeyboardUatTest {
     @Uat("PY-84")
     fun theFourteenKeysAsIFlytekLaysThemOut() {
         keys14().start()
-        // the third row's corners shown as fcitx types them
         chinesePunctuation(KeyboardHarness.PINYIN, "~" to "～", "!" to "！", "?" to "？", "," to "，", "." to "。")
         val corners = listOf("QW", "ER", "TY", "UI", "OP", "AS", "DF", "GH", "JK", "L", "ZX", "CV", "BN", "M")
             .associateWith { group(it).alt }
         assertEquals("1 2 3 4 5 6 7 8 9 0 ～ ！ @ ？".split(" "), corners.values.toList())
-        // three rows, top to bottom, each across the keyboard
         val rows = listOf(listOf("QW", "OP"), listOf("AS", "L"), listOf("ZX", "M")).map { (a, b) -> h.box(group(a)) to h.box(group(b)) }
         assertTrue("$rows", rows.zipWithNext().all { (a, b) -> a.first.top < b.first.top })
         val width = h.box(h.keyboard).width()
@@ -153,7 +144,7 @@ class GroupedKeyboardUatTest {
         assertTrue(idle[1], "key=@," in idle[1])
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         h.swipe(group("ER"), 0f, -group("ER").height * 1.3f)
-        // the keypad's 2: the engine takes it as the second candidate (KeyboardHalvesUatTest)
+        // the keypad's 2: the engine takes it as the second candidate
         assertTrue(sent().toString(), keypad(2) in sent().last() && sent().size == 3)
     }
 
@@ -161,11 +152,10 @@ class GroupedKeyboardUatTest {
     @Uat("PY-89", "PY-89b")
     fun theLongPressIsTheGroupsLettersAroundTheCornerWithTheLettersSymbolsAbove() {
         keys14().start()
-        // q and w long-press to their digit and capital alone on the full keyboard: nothing above. At
-        // the screen's left the corner is first, the rest in order inward (060-edge-popup)
+        // at the screen's left the corner is first, the rest in order inward
         h.api.calls.clear()
         assertEquals(listOf("1", "Q", "W", "q", "w"), h.longPress(group("QW")))
-        // let go where it opened: the finger was on the corner, the keypad's 1 (060-keys-unify L7, D7)
+        // let go where it opened, on the corner: the keypad's 1
         assertTrue(sent().toString(), keypad(1) in sent().single())
         h.field.setText("")
         val asRow = h.longPress(group("AS"))
@@ -175,15 +165,13 @@ class GroupedKeyboardUatTest {
         h.field.setText("")
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         h.api.calls.clear()
-        // w, the cell beside the corner: the harness slides by distance, two cells over lands short of q (any letter of the row goes the same way)
+        // the harness slides by distance: two cells over lands short of q
         h.longPress(group("QW"), "w")
         // what was typed ended first (the engine puts its first candidate in on reset), then the letter
         assertTrue(h.api.calls.toString(), "reset()" in h.api.calls)
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("w"))
         assertTrue(sent().toString(), sent().isEmpty())
-        // L at the screen's right, under wider symbols (l L 0, 4 above, 060-edge-popup): its corner last,
-        // the rest inward as listed, as the full keyboard's; once in the middle, l right of it toward
-        // the edge the finger was at. A move left of a key's step picks L
+        // L at the screen's right, under wider symbols: its corner last, the rest inward; a move left of a key's step picks L
         h.field.setText("")
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         val l = group("L")
@@ -200,8 +188,7 @@ class GroupedKeyboardUatTest {
         assertTrue(h.field.text.toString(), h.field.text.toString().endsWith("L"))
     }
 
-    // QW at the screen's left with loose keys (gap.h 5dp): 1 Q W q w (060-edge-popup), the 1 first,
-    // every letter right of it: the finger slides only inward, Q a step, w four
+    // QW at the screen's left with loose keys: 1 Q W q w, the finger slides only inward
     @Test
     @Uat("PY-89")
     fun aLooseKeyAtTheLeftReachesItsFirstLetterAtTheEdge() {
@@ -212,7 +199,7 @@ class GroupedKeyboardUatTest {
         val density = h.inputView.resources.displayMetrics.density
         val y = qw.bounds.height() / 2f
         val x = (25 * density).toInt() - qw.bounds.left
-        // [steps] popup steps right, or to the screen's edge (null)
+        // [steps] right, or to the screen's edge (null)
         fun slide(steps: Int?): String {
             h.field.setText("")
             val f = h.finger(qw, KeyboardHarness.Touch(x.toFloat(), y))
@@ -227,14 +214,12 @@ class GroupedKeyboardUatTest {
         }
         h.api.calls.clear()
         slide(null)
-        // the corner: the keypad's 1 (060-keys-unify L7), with which the engine picks the first candidate
         assertTrue(sent().toString(), keypad(1) in sent().single())
         assertTrue(h.field.text.toString(), slide(1).endsWith("Q"))
         assertTrue(h.field.text.toString(), slide(4).endsWith("w"))
     }
 
-    // a grouped keyboard with no 中/英 key ([probe] its letters' group): the globe asks the host for the
-    // next input method, English's own full keyboard shown, and back
+    // a grouped keyboard with no 中/英 key: the globe asks the host for the next input method, and back
     private class Globe(val why: String, val make: () -> KeyboardHarness, val im: InputMethodEntry, val probe: String)
 
     @Test
@@ -259,8 +244,7 @@ class GroupedKeyboardUatTest {
     }
 
     private fun keys18Shuangpin(): KeyboardHarness {
-        // pinyin's own keyboard back to full: a row before may have left it fourteen keys, which the
-        // globe's switch back would show instead
+        // a row before may have left it fourteen keys, which the globe's switch back would show
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Full)
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.Keys18)
         return KeyboardHarness(TestThemes.PixelLight, shuangpin).also {
@@ -270,7 +254,7 @@ class GroupedKeyboardUatTest {
         }
     }
 
-    // a password field: androidengine puts English up for it (PR-03), the full keyboard
+    // a password field: androidengine puts English up for it, the full keyboard
     @Test
     @Uat("PY-91")
     fun aPasswordOnTheFourteenKeysIsEnglishsFullKeyboard() {
@@ -280,7 +264,6 @@ class GroupedKeyboardUatTest {
         assertTrue(password.toString(), "q" in password && "QW" !in password)
     }
 
-    // an address field: the group's code to the engine (letters out, KeyboardHalvesUatTest), .com and @ as they are
     @Test
     @Uat("PY-93")
     fun anAddressFieldsDotComAndAtGoInAsTheyAre() {
@@ -298,15 +281,14 @@ class GroupedKeyboardUatTest {
         assertFalse("中/英" in h.texts())
     }
 
-    // the engine half (' with nothing typed is ‘, xi'an is 西安): Keys14UatTest
     @Test
     @Uat("PY-87")
     fun theSeparatorWithNothingTypedIsPairedQuotes() {
         keys14().start()
         h.tap(h.key("分词"))
-        // ' as a key to fcitx, however it is spelled (its keysym is its code)
+        // however it is spelled (its keysym is its code)
         assertTrue(sent().toString(), sent().any { "key='," in it || "char='," in it || "sym=${'\''.code}," in it })
-        // fcitx's Chinese punctuation commits the key as ‘; the app pairs it, as the full keyboard's '
+        // fcitx's Chinese punctuation commits ' as ‘; the app pairs it
         h.emit(HostEvent.Commit("‘", -1))
         h.idle()
         assertEquals("‘’", h.field.text.toString())
@@ -325,7 +307,6 @@ class GroupedKeyboardUatTest {
         h.captureBoard("GroupedKeyboardUatTest/keys14_dragged")
         h.release()
         assertFalse(h.api.calls.toString(), "offerGlide" in h.api.calls)
-        // a swipe on BN alone: at most its one key
         assertTrue(sent().toString(), sent().size <= 1)
     }
 
@@ -336,7 +317,6 @@ class GroupedKeyboardUatTest {
         fun row() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height() / density()
         fun area() = h.box(h.board).bottom - h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top
         fun keys() = h.box(h.board).height()
-        // the full keyboard first
         harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN)
         h.start()
         h.relayout()
@@ -349,7 +329,6 @@ class GroupedKeyboardUatTest {
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), row(), 1f)
         val keysHigh = keys()
         assertEquals(14f, (area() - fullArea) / density(), 1f)
-        // typing: the row stays as it was
         typing(InputMethodCatalog.PINYIN, "ni", "bu")
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), row(), 1f)
         for (other in listOf(KeyboardHarness.ENGLISH, wubi)) {
@@ -362,7 +341,6 @@ class GroupedKeyboardUatTest {
         assertEquals(keysHigh, keys())
         h.close()
         harness = null
-        // 双拼's 18 keys the same, its row alone
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Full)
         prefs.set(AppPrefs.getInstance().keyboard.shuangpinKeyboard, ShuangpinKeyboard.Keys18)
         harness = KeyboardHarness(TestThemes.PixelLight, shuangpin)
@@ -375,7 +353,6 @@ class GroupedKeyboardUatTest {
         }
         h.close()
         harness = null
-        // pinyin's nine keys: the thin row (their column shows what is typed), switched to and from 双拼's 18 keys
         harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, shuangpin = ImKeyboard.KEYS18))
         h.start()
         h.relayout()
@@ -386,7 +363,6 @@ class GroupedKeyboardUatTest {
         assertEquals(CodeRowHeight.THIN_DP.toFloat(), row(), 1f)
     }
 
-    // 微软's ; beside L: as wide as the row's other keys, A and L too
     @Test
     @Uat("SP-03")
     fun microsoftsSemicolonKeyBesideL() {
@@ -404,7 +380,7 @@ class GroupedKeyboardUatTest {
         h.captureBoard("GroupedKeyboardUatTest/shuangpin_microsoft")
         h.api.calls.clear()
         h.tap(semicolon)
-        // the key's own ;: the engine reads it as a final or a mark (HostCasesUatTest.microsoftsSemicolonIsAFinal)
+        // the engine reads it as a final or a mark
         assertTrue(sent().toString(), sent().size == 1 && "key=;," in sent().single())
     }
 
@@ -414,8 +390,6 @@ class GroupedKeyboardUatTest {
 
     private fun syllableSent(i: Int, id: Int = 1) = "sym=${UNICODE + Keyboard.syllableKey(i, id).code},"
 
-    // the strip's half: buttons, the 60% cap, the long code scrolled; what a pick and ⌫ make of
-    // the code is KeyboardHalvesUatTest's (the app's data)
     @Test
     @Uat("PY-86")
     fun theCodeRowsSyllablesBesideTheCodeTheirWidthsAndTheirCap() {
@@ -427,7 +401,6 @@ class GroupedKeyboardUatTest {
         val row = h.box(h.inputView.findViewById<View>(R.id.code_row_text))
         assertTrue(h.shown(strip()))
         assertEquals(listOf("ni", "bu", "nu", "bi"), stripItems().map { it.text.toString() })
-        // at the row's right end, each button a touch wide and the row's height (32dp)
         assertTrue("${h.box(strip())} after $row", h.box(strip()).left >= row.right - 1)
         for (b in stripItems()) {
             assertTrue("${b.text} ${b.width / dp}dp", b.width / dp >= 40f)
@@ -438,14 +411,12 @@ class GroupedKeyboardUatTest {
         h.api.calls.clear()
         h.tap(stripItems().first())
         assertTrue(sent().toString(), sent().size == 1 && syllableSent(0) in sent().single())
-        // many syllables: held at 60% of the row, the rest scrolled to
         val many = arrayOf("zhuang", "zhuan", "zhua", "zhu", "zh", "z", "xu", "xi", "cu", "ci", "ce", "ca")
         typing(InputMethodCatalog.PINYIN, *many, code = "zx gh ui as bn gh")
         val text = h.box(h.inputView.findViewById<View>(R.id.code_row_text))
         val share = h.box(strip()).width().toFloat() / (h.box(strip()).right - text.left)
         assertTrue("$share", share in 0.55f..0.61f)
         assertTrue("more than shown", strip().getChildAt(0).width > strip().width)
-        // a long code: the text part scrolled to the cursor at its end
         typing(InputMethodCatalog.PINYIN, *many, code = "zhuang bu hao kuo ni hao a ni hao a ni hao a ni hao")
         h.idle()
         h.relayout()
@@ -470,8 +441,6 @@ class GroupedKeyboardUatTest {
     private fun noPrivateUse() =
         assertTrue(h.field.text.toString(), h.field.text.codePoints().noneMatch { Character.getType(it) == Character.PRIVATE_USE.toInt() })
 
-    // the keyboard's half: 18 keys and 九键双拼 in an address field; the space's 15% is
-    // GroupedKeyboard18Test's, the engine's letters KeyboardHalvesUatTest's
     @Test
     @Uat("SP-21")
     fun theEighteenAndNineKeysInAnAddressField() {
@@ -496,7 +465,6 @@ class GroupedKeyboardUatTest {
         h.idle()
         val typingColumn = column()
         assertTrue("$typingColumn", "ni" in typingColumn && ".com" !in typingColumn)
-        // the space's word in, nothing left typed
         h.field.setText("你")
         h.field.setSelection(1)
         EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = false, id = 2)
@@ -509,11 +477,8 @@ class GroupedKeyboardUatTest {
         noPrivateUse()
     }
 
-    // 九键's right side: the row (6's capitals, 6, its letters) wider than the symbols above, pushed
-    // in from the edge on a narrow screen, left the last letter more steps right than the finger had
-    // room for. The steps right are shorter where the room is: a slide to the screen's last pixel
-    // picks it. Not the evidence for that: this screen leaves 6 room for whole steps, so it passes
-    // with them too; PopupKeyboardUiTest's edge cases (keys wide enough to be pushed in) are
+    // 九键's right side, pushed in from a narrow screen's edge: steps right are shorter where the room is, so the
+    // screen's last pixel picks the last letter. This screen leaves room for whole steps, so it passes either way;
     @Test
     @Uat("SP-24")
     fun aNineKeyAtTheRightReachesItsLastLetterOnScreen() {
@@ -532,8 +497,6 @@ class GroupedKeyboardUatTest {
         assertEquals("${row.map { it.text }}", row.last().text, h.field.text.toString())
     }
 
-    // the keyboard's half: 九键双拼's popups, its code row and the 123 page's strip; what a syllable
-    // picked makes of the code is KeyboardHalvesUatTest's
     @Test
     @Uat("SP-24")
     fun nineKeyShuangpinsLongPressesCodeRowAndTheNumbersStrip() {
@@ -546,12 +509,11 @@ class GroupedKeyboardUatTest {
         h.relayout()
         val five = h.longPress(h.nineKey("5"))
         h.field.setText("")
-        // 5 is JKL alone: 微软's ; is 1's, none of ; : on 5's long press
+        // 微软's ; is 1's: none of ; : on 5's long press
         assertTrue("$five", listOf("j", "k", "l").all { l -> five.any { it.lowercase() == l } })
         assertTrue("$five", five.none { it == "；" || it == ";" || it == "：" || it == ":" })
         val two = h.longPress(h.nineKey("2"), "～")
         assertTrue("$two", "～" in two)
-        // the mark to the engine, which types its Chinese ～ (KeyboardHalvesUatTest)
         assertTrue(sent().toString(), "key=~," in sent().last())
         h.field.setText("")
         fun row() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height() / h.inputView.resources.displayMetrics.density
@@ -568,13 +530,11 @@ class GroupedKeyboardUatTest {
         assertTrue(sent().toString(), sent().size == 1 && syllableSent(0) in sent().single())
         EngineState.syllablesState.value = EngineState.SyllableState()
         h.close()
-        // pinyin's nine keys the same symbols
         harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS).also { it.start() }
         chinesePunctuation(KeyboardHarness.PINYIN, "~" to "～")
         h.relayout()
         assertTrue("～" in h.longPress(h.nineKey("2")))
         h.close()
-        // 拼音 on the full keyboard keeps its thin row
         harness = KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).also { it.start() }
         typing(InputMethodCatalog.PINYIN, code = "ni")
         assertEquals(18f, row(), 1f)

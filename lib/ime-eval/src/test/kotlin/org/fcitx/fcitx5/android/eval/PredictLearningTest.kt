@@ -23,8 +23,7 @@ class PredictLearningTest {
 
     private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
-    // the model has 好 after 你, and nothing after 我: 们 comes after it only once 我们 is typed;
-    // 他 is in the dictionary alone, no word of the model's
+    // the model has 好 after 你 and nothing after 我; 他 is no word of the model's
     private val bytes = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
         .unigram("我", -2f, 0f)
@@ -56,8 +55,7 @@ class PredictLearningTest {
         )
     }
 
-    // the word before's id falls back to the model's (data.wordIndex.find), as PinyinSession's does
-    // (F2696): these fixtures score the same either way, the fallback kept only by that likeness
+    // the word before's id falls back to the model's, as PinyinSession's does
     @Test
     fun whatIsTypedThreeTimesIsOfferedAfterItsFirstWord() {
         assertEquals(listOf(Halves.TUNE, Halves.HELD_OUT), samples.map { Halves.of(it) })

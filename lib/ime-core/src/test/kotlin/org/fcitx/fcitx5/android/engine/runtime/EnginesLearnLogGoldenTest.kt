@@ -18,15 +18,9 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * The learning record a scripted session writes, byte for byte as 2184786dc wrote it (F2 gate 3,
- * engine-restructure.md §2): a refactor of [Engines] that moves when the record opens, what it
- * writes first (the backups' ORIGIN) or a record's fields shows here. The script is one calendar
- * day on [VirtualHostClock], so no fold or backup runs in the background; the install id is fixed.
+ * The learning record a scripted session writes, byte for byte as golden. Record a meant change with `GOLDEN_RECORD=1`.
  *
- * A difference that is meant (a new record, a changed behaviour) is recorded
- * again with `GOLDEN_RECORD=1` in the environment: the file under src/test/resources is rewritten.
- *
- * contract: the record's bytes as 2184786dc wrote them, which mutation cannot see.
+ * contract: the record's bytes as the golden file has them, which mutation cannot see.
  */
 class EnginesLearnLogGoldenTest : EnginesFixture() {
 
@@ -64,18 +58,15 @@ class EnginesLearnLogGoldenTest : EnginesFixture() {
         fun step() = clock.advance(STEP)
         engines.settings = wubiShown
         engines.context(InputMethodCatalog.PINYIN, "", started = true)
-        // a pick of the first, and of another
         engines.type(InputMethodCatalog.PINYIN, "ni")
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code)
         step()
         engines.type(InputMethodCatalog.PINYIN, "ni")
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, engines.index("拟"))
         step()
-        // a sentence of two words
         engines.type(InputMethodCatalog.PINYIN, "haoni")
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code)
         step()
-        // pinned, then forgotten, the forget taken back
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         engines.context(InputMethodCatalog.PINYIN, "")
         engines.type(InputMethodCatalog.PINYIN, "ni")
@@ -86,12 +77,10 @@ class EnginesLearnLogGoldenTest : EnginesFixture() {
         if (forgot is LearningResult.Done) engines.learning(InputMethodCatalog.PINYIN, LearningOp.Undo(forgot.undo))
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         step()
-        // a table's commit
         engines.context(InputMethodCatalog.WUBI, "", started = true)
         engines.type(InputMethodCatalog.WUBI, "wqiy")
         engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.CHAR, ' '.code)
         step()
-        // English: a word committed, one added by hand
         engines.context(InputMethodCatalog.ENGLISH, "", started = true)
         engines.type(InputMethodCatalog.ENGLISH, "the")
         engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code)

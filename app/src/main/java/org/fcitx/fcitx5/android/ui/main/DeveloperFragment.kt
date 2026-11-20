@@ -44,7 +44,7 @@ class DeveloperFragment : PaddingPreferenceFragment() {
         super.onCreate(savedInstanceState)
         val cacheDir = requireContext().cacheDir
         hprofFile = savedInstanceState?.getString(HPROF_FILE)?.let { cacheDir.resolve(it) }
-        // a dump no export is waiting on: the whole heap, typed text and clipboard with it
+        // a whole heap with typed text and clipboard: deleted unless an export waits on it
         cacheDir.listFiles()?.let { staleDumps(it.asList(), hprofFile) }?.forEach { it.delete() }
         launcher = registerForActivityResult(CreateDocument("application/octet-stream")) { uri ->
             val file = hprofFile ?: return@registerForActivityResult
@@ -112,7 +112,7 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                         lifecycleScope.launch {
                             // waits for a host still starting: off the main thread
                             val restarted = withContext(Dispatchers.IO) { HostDaemon.restartFcitx() }
-                            // one that stayed starting was not restarted, or was and the new one is starting still: not said done (R25r2 F7883)
+                            // a host still starting may not have restarted: not said done
                             context.toast(if (restarted) R.string.done else R.string.restart_fcitx_still_starting)
                         }
                     }
@@ -133,7 +133,7 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                     .setNegativeButton(android.R.string.cancel, null)
                     .show()
             }
-            // 语音先问再记's counts, for the owner to see whether it asks too often (061-voice-learn-from-edits.md §6)
+            // 语音先问再记's counts, to see whether it asks too often
             addPreference(Preference(context).apply {
                 val internal = AppPrefs.getInstance().internal
                 title = getString(R.string.voice_ask_counts, internal.voiceAskShown.getValue(), internal.voiceAskTaken.getValue())
@@ -146,15 +146,14 @@ class DeveloperFragment : PaddingPreferenceFragment() {
                 val file = context.cacheDir.resolve(fileName)
                 hprofFile = file
                 System.gc()
-                // kept on the main thread: ART stops every thread for a dump, and no recreation can split dump and picker
+                // on the main thread: ART stops every thread anyway, and no recreation can split dump and picker
                 Debug.dumpHprofData(file.absolutePath)
                 launcher.launch(fileName)
             }
         }
     }
 
-    // found by the search a step lower than the rest (dev/design/061-settings-search.md §8 Q6); the counts are
-    // no setting, said only
+    // found a step lower than the rest; the counts are no setting
     companion object : SearchablePage {
         private const val HPROF_FILE = "hprof_file"
         private const val LOGS_KEY = "real_time_logs"
@@ -177,10 +176,9 @@ class DeveloperFragment : PaddingPreferenceFragment() {
 
 }
 
-/** The heap dumps among [files] but the one [keep] (the dump an export is waiting on), to delete. */
 internal fun staleDumps(files: List<File>, keep: File?): List<File> =
     files.filter { it.name.endsWith(".hprof") && it != keep }
 
-// a clearing that left clips to come back says so, long enough to read
+// one that left clips to come back says so, long enough to read
 private fun Context.toastCleared(cleared: Boolean) =
     if (cleared) toast(R.string.done) else toast(R.string.clear_clp_db_not_all, Toast.LENGTH_LONG)

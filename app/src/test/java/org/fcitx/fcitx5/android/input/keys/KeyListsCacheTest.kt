@@ -10,11 +10,11 @@ import org.junit.Test
 
 class KeyListsCacheTest {
 
-    // `@1` read upgraded by the user's 按键字母: those changed alone (key_lists still `@1`), the lists are made again
+    // the old ones changed alone (no key_lists still): the lists are made again
     @Test
-    fun aV1ListIsMadeAgainWhenTheNineLettersAloneChange() {
+    fun theOldOnesAreMadeAgainWhenTheNineLettersAloneChange() {
         var letters = "abc,def,ghi,jkl,mno,pqrs,tuv,wxyz"
-        val cache = KeyListsCache { KeyListsCache.Stored("@1\nt9/2\tset\t*\t#", { letters }) { KeyListsCache.Old(null, null, null) } }
+        val cache = KeyListsCache { KeyListsCache.Stored(null, { letters }) { KeyListsCache.Old(null, "2 #") } }
         assertEquals(listOf("A", "B", "C", "2", "a", "b", "c", "#"), cache.current[KeyId("t9/2")]?.items)
         val version = cache.version
         letters = "abd,def,ghi,jkl,mno,pqrs,tuv,wxyz"

@@ -7,10 +7,8 @@ package org.fcitx.fcitx5.android
 import android.os.Build
 
 /**
- * The SDK the screenshot goldens are recorded at. Every Robolectric test also runs at minSdk 29
- * (robolectric.properties), where the framework draws text and shapes a little differently: there a
- * capture still lays out and draws the view (a call or cast Android 10 lacks fails the test), but is
- * compared with nothing.
+ * The SDK the screenshot goldens are recorded at. At minSdk 29 the framework draws text and shapes a little
+ * differently: there a capture still lays out and draws, but is compared with nothing.
  */
 const val SCREENSHOT_SDK = 35
 

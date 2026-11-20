@@ -227,14 +227,13 @@ class PinyinUatTest {
             val shown = afterTa(keys, null)
             assertEquals("$keys $shown", 2, shown.indexOf("奉化"))
         }
-        // the emoji of the first after the lifted word, not before it (R15, user 2026-10-25): one
-        // Android 14 draws (凤凰's 🐦‍🔥 is Emoji 15.1, not offered there), as docs/pinyin.md's example
+        // the emoji of the first after the lifted word: one Android 14 draws
         repeat(2) { afterTa("shoujia", "售价") }
         val shown = afterTa("shouj", null)
         assertEquals("shouj $shown", listOf("手机", "收集", "售价", "📱"), shown.take(4))
     }
 
-    // a pin in front, the rest a place down: the lifted word fourth (U-83, R14)
+    // a pin in front, the rest a place down: the lifted word fourth
     @Test
     @Uat("PY-09c")
     fun aPinGoesFirstAndTheLiftedWordAPlaceDown() = with(EngineReplay()) {
@@ -588,9 +587,7 @@ class PinyinUatTest {
         }
     }
 
-    // readings in their characters' own tones, no 轻声 (the user, 2026-11-02): 桌子 zhuō zǐ, 东西 dōng xī;
-    // only a character with no tone but the neutral one keeps it (们). Typed, 子 and 西 still take ˙ as
-    // Taiwan types them, as well as their own tone: the zhuyin keyboards' decoder costs neither
+    // readings in their characters' own tones, no 轻声 (but for 们); typed, 子 and 西 still take ˙ as Taiwan types them
     @Test
     @Uat("PY-110")
     fun aReadingIsInItsCharactersOwnTones() {
@@ -616,8 +613,7 @@ class PinyinUatTest {
         }
     }
 
-    // 子 and 西 shown in their own tones (桌子 zhuō zǐ), typed with ˙ as Taiwan types them, in their
-    // own tone or with none: the same word first each way, on both zhuyin keyboards (the user, 2026-11-02)
+    // typed with ˙, in their own tone or with none: the same word first each way, on both zhuyin keyboards
     @Test
     @Uat("PY-109")
     fun aNeutralToneTypedOrNotPutsTheWordFirst() {
@@ -689,18 +685,10 @@ class PinyinUatTest {
     }
 }
 
-/**
- * A fresh install's engines with [s] set, as the settings pages set them. For pinyin's cases: [s]
- * replaces [UatEngines.BASELINE] whole, so a table gets EngineSettings' defaults, not a new
- * install's (a table's case sets its options as its page does, TablesUatTest.wubi).
- */
+/** A fresh install's engines with [s] in place of [UatEngines.BASELINE] whole, so a table gets EngineSettings' defaults. */
 internal fun settings(s: EngineSettings) = UatEngines.fresh().also { it.settings = s }
 
-/**
- * [block] on today's date, read before it as a case reads it: the engine's built-in dates read the
- * wall clock, so a run across midnight (the date read one day, the engine's the next) is skipped,
- * not failed.
- */
+/** [block] on today's date: the engine's built-in dates read the wall clock, so a run across midnight is skipped, not failed. */
 internal fun onOneDay(block: (LocalDate) -> Unit) {
     val day = LocalDate.now()
     try {

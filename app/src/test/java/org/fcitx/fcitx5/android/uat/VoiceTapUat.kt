@@ -20,12 +20,7 @@ import org.junit.After
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 
-/**
- * What tapping the bar's microphone to talk's UAT tests share (uat/12): the harness with the
- * [FakeRecognizer] behind the real VoiceSession, and how they find the microphone, the mask and
- * the field's text. [VoiceTapUatTest]: talking and stopping; [VoiceTapFieldUatTest]: the field
- * left, restarted or the keyboard hidden, and the ends with nothing back.
- */
+/** The harness with the [FakeRecognizer] behind the real VoiceSession, and how to find the microphone, mask and text. */
 open class VoiceTapUat {
 
     protected val voice = FakeRecognizer()
@@ -52,7 +47,6 @@ open class VoiceTapUat {
     protected fun described(description: CharSequence, within: View = h.inputView): View? =
         KeyboardHarness.all(within).firstOrNull { h.shown(it) && it.contentDescription == description }
 
-    // the bar's own microphone
     protected fun mic(): View = described(string(R.string.voice_input)) ?: error("no microphone on the bar")
 
     protected fun tapMic() {
@@ -60,7 +54,7 @@ open class VoiceTapUat {
         h.advance(100)
     }
 
-    // the mask: what its hint sits on (hidden once it is stopped), taken by a click
+    // what its hint sits on (hidden once it is stopped), taken by a click
     protected fun mask(): View? {
         val hint = KeyboardHarness.all(h.inputView)
             .firstOrNull { it is TextView && it.text.toString() == string(R.string.voice_tap_hint) } ?: return null
@@ -69,7 +63,6 @@ open class VoiceTapUat {
         return at?.takeIf { h.shown(it) }
     }
 
-    // the keyboard's own Enter, named as the field's action
     protected fun enter(): ShownKey = h.describedKey(ReturnKeyDrawableComponent.appearanceFromEditorInfo(h.info).label(h.service).toString())
 
     protected fun shown(): List<String> = KeyboardHarness.all(h.inputView)

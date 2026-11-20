@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import sys
 import tempfile
 import threading
 import time
@@ -146,8 +147,7 @@ class ScreenTest(unittest.TestCase):
             self.assertEqual([n.text for n in s.ime() if n.text], ["键"], t)
 
     def test_the_keys_found_alike_on_the_views_and_the_canvas(self):
-        # the old drawing: a view a key, its letter and corner its children's texts; the canvas
-        # (060-render-p2 S3): a node a key, its label the text, its corner and id Dumper's alt and key
+        # the old drawing: a view a key; the canvas: a node a key, its corner and id Dumper's alt and key
         def keys(nodes):
             x = (f'<hierarchy><window type="2"><node resource-id="{uat.PKG}:id/keyboard_view" package="{uat.PKG}" '
                  f'bounds="[0,0][300,100]">{nodes}</node></window></hierarchy>')
@@ -169,16 +169,14 @@ class ScreenTest(unittest.TestCase):
             self.assertEqual(old[k], new[k], k)
         # and by the scene's id
         self.assertEqual(new["bksp"], new["backspace"])
-        # an id is an alias only where no label or corner took it, whichever node came first: a key
-        # whose id is "1" drawn before q does not take q's corner's 1 (as on the views)
+        # an id is an alias only where no label or corner took it, whichever node came first
         first = '<node clickable="true" text="①" key="1" bounds="[0,0][10,10]"/>'
         clash = keys(canvas.replace('<node clickable="true" text="q"', first + '<node clickable="true" text="q"'))
         self.assertEqual(new["1"], clash["1"])
         self.assertEqual(new["q"], clash["q"])
 
     def test_the_way_back_is_tapped_by_its_id_until_the_letters_are_up(self):
-        # what a case leaves up, as Dumper writes the canvas: its way back is the scene's id back
-        # (返回, ABC before 0.6.1), the letters have the globe; the nine keys' 2 says ABC and is no way back
+        # what a case leaves up, as Dumper writes the canvas
         def screen(*keys):
             nodes = "".join(f'<node clickable="true" package="{uat.PKG}" text="{t}" key="{k}" resource-id="{r}" '
                             f'bounds="[{i * 10},0][{i * 10 + 10},10]"/>' for i, (t, k, r) in enumerate(keys))
@@ -202,8 +200,7 @@ class ScreenTest(unittest.TestCase):
                 self.assertIs(shown[taps], last)
 
     def test_the_pickers_roots_drawer_is_found_by_its_name_or_blocks(self):
-        # the ☰ where this AVD does not have it: tapped where it is; 下载 listed with no ☰ (a wide window's roots):
-        # tapped as it is (review R26 F8494); neither on screen blocks, no blind tap
+        # the ☰ tapped where it is, 下载 as it is; neither on screen blocks, no blind tap
         def screen(desc, text=""):
             node = f'<node package="com.android.documentsui" content-desc="{desc}" bounds="[10,300][110,400]"/>' if desc else ""
             if text:
@@ -227,8 +224,7 @@ class ScreenTest(unittest.TestCase):
         self.assertEqual([], tapped)
 
     def test_the_input_methods_touchable_region_is_read_from_dumpsys_input(self):
-        # InputDispatcher's window line as redroid 14 printed it; the strip's band and the keyboard's
-        # joined by |, an empty one as <empty>, the list ended by a comma
+        # InputDispatcher's window line as redroid 14 printed it
         d = uat.Device("5556")
         for dump, want in (
                 ("  3: name='Window{1 u0 InputMethod}', frame=[0,1203][1080,2340], touchableRegion="
@@ -594,6 +590,23 @@ class JvmTest(unittest.TestCase):
         _, problems = uat.tally({"HK-36": uat.NO_SCRIPT}, {"HK-36": "P1"}, set())
         self.assertEqual(["HK-36: in the .md but no script (register it, needs= where it runs)"], problems)
 
+    def test_a_case_with_a_jvm_line_and_no_script_runs_on_the_jvm_by_its_uat_tests(self):
+        self.write("uat/scripts/99-x.py", 'from uat import case\n\n\ncase("XX-03", needs="manual:x")(lambda d: None)\n')
+        self.write("uat/99-x.md", "### XX-01 [P1] a\n- **JVM**：`KeysTest.address`\n\n### XX-02 [P1] b\n- **JVM**：暂无\n\n"
+                   "### XX-03 [P1] c\n\n### XX-04 [P2] d\n- **JVM**：`KeysTest.gone`\n")
+        self.write("src/KeysTest.kt", 'package org.x\n\nclass KeysTest {\n    @Uat("XX-01")\n    fun address() {}\n\n'
+                   '    @Uat("XX-01")\n    fun bar() {}\n}\n')
+        with mock.patch.object(uat, "UAT", os.path.join(self.tmp.name, "uat")), \
+                mock.patch.object(uat, "JVM_ROOTS", [os.path.join(self.tmp.name, "src")]), \
+                mock.patch.dict(uat._JVM_FOUND, clear=True), mock.patch.dict(uat.CASES, clear=True):
+            try:
+                uat.load_scripts(files=["99-x.py"])
+                needs = {cid: c.needs for cid, c in uat.CASES.items()}
+            finally:
+                sys.modules.pop("uat_99_x", None)
+        self.assertEqual({"XX-01": "jvm:KeysTest.address、KeysTest.bar", "XX-02": uat.NO_SCRIPT, "XX-03": "manual:x",
+                          "XX-04": "jvm:没有 @Uat 测试"}, needs)
+
     def test_devices_are_emulator_console_ports_each_with_its_own_page_server(self):
         self.assertEqual(["5554", "5556", "5584"], [uat.emu_port(p) for p in ("5554", "5556", "5584")])
         for bad in ("5555", "5557", "5552", "5586", "127.0.0.1:5556", ""):
@@ -609,7 +622,7 @@ class JvmTest(unittest.TestCase):
         self.assertTrue(why.startswith("JVM"))
 
     def test_a_scripted_release_case_runs_only_in_a_release_run(self):
-        # the big-lexicon cases (WD-14d, 14h, TBL-12c; user 2026-10-30): out of the everyday run, in the release's
+        # the big-lexicon cases (WD-14d, 14h, TBL-12c): out of the everyday run, in the release's
         c = case("WD-14d", "release,scripted:x")
         device = SimpleNamespace(voice=False)
         self.assertEqual("release", uat.place(c.needs))
@@ -619,14 +632,14 @@ class JvmTest(unittest.TestCase):
             uat.BUILD = "release"
             self.assertIsNone(c.unmet(device))
             # one run by hand stays by hand
-            self.assertIs(uat.Elsewhere, case("WD-14r", "release:x").unmet(device)[0])
+            self.assertIs(uat.Elsewhere, case("WD-14v", "release:x").unmet(device)[0])
             # and the reasons say which is by hand
-            self.assertTrue(case("WD-14r", "release:x").unmet(device)[1].startswith("发版时手动"))
+            self.assertTrue(case("WD-14v", "release:x").unmet(device)[1].startswith("发版时手动"))
         finally:
             uat.BUILD = was
 
     def test_a_voice_case_without_the_voice_pack_is_reported_as_voice_where_place_puts_it(self):
-        # the voice reason, as place() files it under voice (F4263); a run with the voice pack runs it
+        # the voice reason, as place() files it under voice; a run with the voice pack runs it
         c = case("VO-01", "voice:x")
         state, why = c.unmet(SimpleNamespace(voice=False))
         self.assertEqual((uat.Elsewhere, "voice"), (state, uat.place(c.needs)))
@@ -656,9 +669,7 @@ class JvmTest(unittest.TestCase):
         self.assertGreaterEqual(d._quiet_at, t0 + uat.OLD["tap_text"] - uat.PAUSE["tap_text"])
 
 
-# adb for UpTest: answers emu avd name from $FAKE_DIR/avd (an error when empty, a hang with
-# $FAKE_DIR/hang), sys.boot_completed 1 after $FAKE_DIR/boot_after asks, whoami from $FAKE_DIR/whoami
-# (root without it), the SDK from $FAKE_DIR/sdk (36 without it), nothing to the rest; logs each call
+# adb for UpTest: answers from files in $FAKE_DIR (avd, hang, boot_after, whoami, sdk) and logs each call
 FAKE_ADB = r"""#!/bin/sh
 D=$FAKE_DIR
 [ "$1" = -s ] && shift 2
@@ -1034,8 +1045,7 @@ class ClearAndPacksTest(unittest.TestCase):
         run.assert_not_called()
 
     def test_a_pack_imported_by_hand_since_the_mark_is_imported_again(self):
-        # the app reports the build's version and the mark names the build's file, but another file of that
-        # version was imported in Settings since (a new generation); kept, the run would test that other pack
+        # another file of the same version was imported since (a new generation); kept, the run would test that pack
         sha = uat.file_sha256(__file__)
         rows = ((f"{sha} g1-1", "g2-1", "imported by hand after the runner's import: another generation"),
                 (sha, "g2-1", "a mark of the runner before generations were marked, a hand import after it"))
@@ -1066,8 +1076,7 @@ class ClearAndPacksTest(unittest.TestCase):
         self.assertIn("text pack's generation not readable", out.getvalue())
 
     def test_a_run_takes_a_gates_emulator_dropping_its_mark(self):
-        # gates.py --keep leaves 5560 up and marked; a run on it (--devices 5560) makes it the run's, so a later
-        # gate refuses it instead of killing it under the run
+        # a run on a gate's kept device makes it the run's, so a later gate refuses it instead of killing it
         d = self.device(lambda cmd: "1\n" if cmd.startswith("getprop") else "")
         stop = RuntimeError("past the devices")
         with mock.patch.object(uat, "BUILD", "debug"), mock.patch.object(uat, "Device", return_value=d), \

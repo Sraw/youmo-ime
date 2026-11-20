@@ -26,7 +26,6 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
-import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -41,14 +40,13 @@ import org.mechdancer.dependency.manager.must
 
 class PickerWindow(
     override val key: Key,
-    // asked for when the view is made, as the picker first opens: the emoji are read from their data
+    // asked for as the picker first opens: the emoji are read from their data
     private val data: () -> List<Pair<PickerData.Category, Array<String>>>,
     private val density: PickerGridView.Density,
-    internal val switchKey: KeyDef,
     private val popupPreview: Boolean = true,
     private val followKeyBorder: Boolean = true,
     private val policy: PickerPolicy = DefaultPickerPolicy(),
-    /** A key that finds emoji by the pinyin of their words ([EmojiSearchUi]). */
+    /** By the pinyin of their words. */
     private val search: Boolean = false,
 ) : InputWindow.ExtendedInputWindow<PickerWindow>(), EssentialWindow, InputBroadcastReceiver {
 
@@ -62,7 +60,7 @@ class PickerWindow(
         Emoticon
     }
 
-    /** the symbols' way, after Sogou's: [SymbolPanel]; told by the density, not a flag that must agree with it */
+    /** Sogou's way; told by the density, not a flag that must agree with it */
     private val panel = density == PickerGridView.Density.Panel
 
     private val theme by manager.theme()
@@ -75,28 +73,26 @@ class PickerWindow(
 
     private var locked by AppPrefs.getInstance().internal.symbolPanelLocked
 
-    // the category picked last kept by its id, not its place or its label, which change between versions
+    // by its id, not its place or its label, which change between versions
     private var pickedCategory by AppPrefs.getInstance().internal.symbolPanelCategory
 
     private val sidePanel by lazy { SymbolPanel(adapter.categories.size, FirstCategory, categoryOf(adapter.categories, pickedCategory)) }
 
     private lateinit var pickerLayout: PickerLayout
 
-    // the tap felt once while the panel's punctuation keys are held back
+    // felt once while the panel's punctuation keys are held back
     private var heldBackFelt = false
     private lateinit var adapter: PickerGridAdapter
 
-    /** a tab tapped: shown as picked, though a short last section cannot scroll to the top */
+    /** shown as picked, though a short last section cannot scroll to the top */
     private var tabPicked = false
 
-    // what is picked in a password, or in a field that asks not to be learned from, is not kept as recent
+    // a password, or a field that asks not to be learned from
     private var keepsNoRecent = false
 
-    // U-93's 「用我的输入习惯」, read at each opening: off, the recently used are neither shown nor kept
-    // (U-67). Read here, not pushed at the field's start: ⋯ switches it mid-field
+    // read at each opening, not pushed at the field's start: ⋯ switches it mid-field
     private val habits = AppPrefs.getInstance().internal.useHabits
 
-    /** The pinyin typed in the search, while it is open. */
     private val query = EmojiSearchQuery()
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
@@ -109,8 +105,7 @@ class PickerWindow(
 
     override fun exitAnimation(nextWindow: InputWindow): Transition? = null
 
-    // the panel keyboard's bubbles: an ASCII mark's none while what it types is not known, as its tap is dropped
-    // then (and as the text keyboards' are, KeyboardWindow's): `,` shown would be `，` typed
+    // an ASCII mark's none while what it types is not known, as its tap is dropped then: `,` shown would be `，` typed
     private val heldBackPopups: PopupActionListener by lazy {
         val shown = popup.listener
         PopupActionListener { a ->
@@ -138,11 +133,9 @@ class PickerWindow(
             is KeyAction.HostKeyAction -> {
                 // we want the behavior of CommitAction (commit the character, not through the engine),
                 // but don't want to include it in recently used list; as punctuation maps it, as its face
-                // shows it ({punct:.} in emoji.xml, emoticon.xml): 显示和输出一致. Before what it types is
-                // known (a first install, the host not up) dropped, as the text keyboards' punctuation keys are
+                // shows it. Before what it types is known (a first install, the host not up) dropped
                 if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
                 if (!punctuation.known) {
-                    // a tap felt once, as the text keyboards' held-back keys (KeyboardWindow.heldBack)
                     if (!heldBackFelt && ::pickerLayout.isInitialized) {
                         heldBackFelt = true
                         InputFeedbacks.hapticFeedback(pickerLayout)
@@ -168,7 +161,7 @@ class PickerWindow(
                     updateRecentTab()
                 }
                 commonKeyActionListener.listener.onKeyAction(it, source)
-                // a symbol picked from the panel (the keys below it send no CommitAction)
+                // the keys below it send no CommitAction
                 if (panel && sidePanel.returnsAfterPick(locked)) backToKeyboard()
             }
 
@@ -176,7 +169,6 @@ class PickerWindow(
         }
     }
 
-    // where the search's keys go: EmojiSearchQuery
     private val searchKeyActionListener = KeyActionListener { it, source ->
         val outcome = when {
             it is KeyAction.HostKeyAction -> query.type(it.act)
@@ -191,14 +183,13 @@ class PickerWindow(
         }
     }
 
-    // ⌫'s slots' 清空 and 恢复 on the query, not the field (060-keys-unify J1); the rest the field's, as elsewhere
+    // ⌫'s slots' 清空 and 恢复 on the query, not the field
     private fun queryCommand(shortcut: KeyShortcut): EmojiSearchQuery.Outcome = when ((shortcut as? KeyShortcut.Command)?.command) {
         KeyCommand.Clear -> query.clearAll()
         KeyCommand.Restore -> query.restore()
         else -> EmojiSearchQuery.Outcome.PASSED
     }
 
-    /** The search shown ([on]) from no query, or the emoji again. */
     private fun search(on: Boolean) {
         // made the first time it opens, not with the panel
         val ui = (if (on) pickerLayout.openSearch(::setUpSearch) else pickerLayout.search) ?: return
@@ -219,7 +210,7 @@ class PickerWindow(
         pickerLayout.search?.show(typed, found)
     }
 
-    /** The panel's side lists the recently used once there are any; the emoji have no side. */
+    /** The emoji have no side. */
     private fun updateRecentTab() {
         pickerLayout.side?.setShown(SymbolPanel.RECENT, sidePanel.shows(SymbolPanel.RECENT, adapter.recentEmpty))
     }
@@ -241,19 +232,18 @@ class PickerWindow(
     }
 
     private fun backToKeyboard() {
-        // after the key's own handling, not while the view it was pressed on is taken away
+        // not while the view it was pressed on is taken away
         ContextCompat.getMainExecutor(context).execute {
             // gone already (two quick picks, or the bar's back arrow): not the keyboard again
             if (windowManager.isAttached(this)) windowManager.attachWindow(KeyboardWindow)
         }
     }
 
-    // the user's symbols board as its file is now (one stat), `id@stamp`; null, the app's (061-custom-layout §8): asked as the
-    // panel is made and each time it opens, so a choice changed or a file replaced is drawn the next time it is shown
+    // one stat; asked each time it opens, so a choice changed or a file replaced is drawn the next time
     private fun customBoard(): String? =
         if (panel) AppPrefs.getInstance().keyboard.drawnPanelLayout(PanelLayouts.Panel.SYMBOLS)?.let { "${it.id}@${it.stamp}" } else null
 
-    override fun onCreateView() = PickerLayout(context, theme, switchKey, density, panel, if (search) SearchKey else null, customBoard()).apply {
+    override fun onCreateView() = PickerLayout(context, theme, density, panel, search, customBoard()).apply {
         pickerLayout = this
         val bordered = followKeyBorder && ThemeManager.shownLook(theme).keys.blocks
         adapter = PickerGridAdapter(grid, keyActionListener, popupActionListener, data(), key.name, bordered, policy)
@@ -283,7 +273,7 @@ class PickerWindow(
     }
 
     private fun show(category: Int) {
-        // what was picked since the picker opened: no finger is in the list while a tab is tapped
+        // no finger is in the list while a tab is tapped
         if (category == 0) adapter.rebuild()
         tabPicked = true
         // nothing used yet: the tab of what is shown, not one that looks empty
@@ -292,14 +282,12 @@ class PickerWindow(
         pickerLayout.grid.gridLayoutManager.scrollToPositionWithOffset(adapter.startOf(category), 0)
     }
 
-    /** The panel's [category] picked on the side. */
     private fun select(category: Int) {
         sidePanel.select(category)
         adapter.categories[category].id.takeIf { it.isNotEmpty() }?.let { pickedCategory = it }
         showOnly(category)
     }
 
-    /** The panel's [category], alone beside the side, from its top. */
     private fun showOnly(category: Int) {
         adapter.only = category
         adapter.rebuild()
@@ -316,10 +304,10 @@ class PickerWindow(
     override fun onAttached() {
         // first, so what follows is told to the board shown
         pickerLayout.drawKeys(customBoard())
-        // the punctuation as it is now: changed while another window was shown, not told here
+        // changed while another window was shown, not told here
         pickerLayout.embeddedKeyboard.onPunctuationUpdate(punctuation.mapping)
         adapter.habits = habits.getValue()
-        // a view made anew mid-field (a dark-mode switch replaces it) is told of no start: the field is asked
+        // a view made anew mid-field (a dark-mode switch) is told of no start: the field is asked
         service.currentInputEditorInfo?.let {
             keepsNoRecent = CapabilityFlags.forField(it, service.packageName).hasAny(CapabilityFlag.PasswordOrSensitive)
         }
@@ -330,14 +318,13 @@ class PickerWindow(
             pickerLayout.embeddedKeyboard.showLocked(locked)
         } else {
             search(false)
-            // opens on the first category (the common symbols), not on what was recently used
+            // opens on the common symbols, not on what was recently used
             adapter.rebuild()
             show(firstShown(adapter.categories.size))
         }
         pickerLayout.embeddedKeyboard.also {
             it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
             it.keyActionListener = keyActionListener
-            // its named keys' long presses, ，。's bubbles and the edit menu its space swipes to, as every keyboard's (060-keys-unify D5)
             it.popupActionListener = heldBackPopups
             it.inPasswordField = service.inPasswordField
         }
@@ -353,24 +340,13 @@ class PickerWindow(
     override val showTitle get() = panel
 
     companion object {
-        /** the common symbols (or the first emoji), not the recently used before them */
         private const val FirstCategory = 1
 
-        /** The category a picker of [count] opens on: no emoji (the app without their data), the recently used, the only one there is. */
+        /** No emoji (the app without their data): the only one there is. */
         internal fun firstShown(count: Int) = minOf(FirstCategory, count - 1)
 
-        /** Where the category of [id] is among [categories]; null for none (an id no longer listed, none kept). */
+        /** Null for an id no longer listed. */
         internal fun categoryOf(categories: List<PickerData.Category>, id: String): Int? =
             categories.indexOfFirst { it.id.isNotEmpty() && it.id == id }.takeIf { it >= 0 }
-
-        internal val SearchKey = KeyDef(
-            KeyDef.Appearance.Image(
-                src = R.drawable.ic_baseline_search_24,
-                variant = KeyDef.Appearance.Variant.Alternative,
-                contentDescription = R.string.emoji_search
-            ),
-            setOf(KeyDef.Behavior.Press(KeyAction.EmojiSearchAction(true))),
-            name = "search",
-        )
     }
 }

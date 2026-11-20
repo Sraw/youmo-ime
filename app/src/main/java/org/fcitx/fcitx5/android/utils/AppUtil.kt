@@ -30,19 +30,13 @@ object AppUtil {
         }
     }
 
-    /**
-     * Whether [route] is one [launchMainToDest] sends, the only ones MainActivity opens from an
-     * intent: it is exported, and a route such as the pinyin dictionaries' names any file it likes.
-     * Quick input's editor may so be opened filled in by another app: nothing is saved or deleted till
-     * the user taps it, and a content over the limit is refused (MainActivity).
-     */
+    /** MainActivity is exported, and some routes name any file: only routes [launchMainToDest] sends are opened from an intent. */
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
         SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme, SettingsRoute.Packs,
         is SettingsRoute.InputMethodConfig, is SettingsRoute.QuickPhrase -> true
         else -> false
     }
 
-    /** The resource packs' page: from the keyboard without the text pack, voice input without the voice pack. */
     fun launchMainToPacks(context: Context) =
         launchMainToDest(context, SettingsRoute.Packs)
 
@@ -58,12 +52,7 @@ object AppUtil {
     fun launchMainToInputMethodConfig(context: Context, uniqueName: String, displayName: String) =
         launchMainToDest(context, SettingsRoute.InputMethodConfig(displayName, uniqueName))
 
-    /**
-     * Quick input's page with its editor open: [entry] to change, or a new one, [content] filled in
-     * (the clipboard's 存为快速输入) with [key] as the key suggested. A content longer than the page
-     * saves is refused here, told, and the page not opened (false): the clipboard keeps clips of
-     * megabytes, which would also not fit in the Intent (TransactionTooLargeException, the process gone).
-     */
+    /** Too-long content is refused here (false): megabyte clips would not fit the Intent (TransactionTooLargeException). */
     fun launchQuickPhraseEditor(context: Context, entry: QuickPhraseEntry? = null, content: String = "", key: String = ""): Boolean {
         val text = entry?.content ?: content
         if (text.length > QuickPhraseBook.MAX_CONTENT) {
@@ -96,13 +85,7 @@ object AppUtil {
         exitProcess(0)
     }
 
-    /**
-     * Ends the process and opens the settings again, in a new one: the app's files were replaced
-     * under it. The system starts the new process for the activity asked for just before. Left for
-     * another app meanwhile, it only ends: Android 10 and later block a page an app in the
-     * background opens, and a notice to tap would need the notification permission the app does
-     * not ask for. The data is restored all the same, the toast says so, and the app opens as usual.
-     */
+    /** Kills the process after asking for the settings again; in the background it only ends, as Android 10+ blocks background starts. */
     fun restart(context: Context) {
         context.startActivity<MainActivity> {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)

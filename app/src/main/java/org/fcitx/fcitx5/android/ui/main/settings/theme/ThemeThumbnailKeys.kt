@@ -19,12 +19,7 @@ import org.fcitx.fcitx5.android.input.theme.cornerRadius
 import org.fcitx.fcitx5.android.scene.look.KeyKind
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 
-/**
- * A theme's keys in little, over its thumbnail's base: four rows as the 26 keys have them, or a layout's keys where
- * [cells] (a layout's card on 外观 → 布局, LayoutThumbnail), each kind's face in its colour, in the theme's shape (blocks
- * or flat, corners, gaps, shadow, border) at about a third of its size. A kind of an image or the picture is its colour
- * (thumbnails decode no images). The bar's strip above them is [barPx] tall, not drawn here.
- */
+/** Four rows of 26-key faces (or a layout's [cells]) in the theme's shape at about a third of size; images show as colour. */
 class ThemeThumbnailKeys(
     private val look: ThemeLook,
     private val density: Float,
@@ -35,7 +30,7 @@ class ThemeThumbnailKeys(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
 
-    // each row: the kinds and their widths in tenths of the board
+    // the kinds and their widths in tenths of the board
     private val rows = listOf(
         List(10) { KeyKind.Letter to 1f },
         List(9) { KeyKind.Letter to 1f },
@@ -43,8 +38,7 @@ class ThemeThumbnailKeys(
         listOf(KeyKind.Function to 1.5f, KeyKind.Letter to 1f, KeyKind.Space to 5f, KeyKind.Letter to 1f, KeyKind.Enter to 1.5f),
     )
 
-    // each key's face and where it goes, worked out as the bounds are set, not each frame a list of cards scrolls
-    // (a layout's up to 150 keys: R26 F8381)
+    // laid out as the bounds are set, not every frame while a list scrolls (a layout has up to 150 keys)
     private class Placed(val face: KeyFace, val kind: KeyKind, val x: Float, val y: Float)
 
     private var placed: List<Placed> = emptyList()
@@ -59,7 +53,7 @@ class ThemeThumbnailKeys(
 
     private fun place(b: Rect): List<Placed> {
         val top = b.top + barPx
-        // the shape at a little of its size: the gaps and corners as they look beside the little keys
+        // scaled with the little keys
         val d = density * SCALE
         if (cells != null) {
             val w = b.width().toFloat()
@@ -89,7 +83,7 @@ class ThemeThumbnailKeys(
             shape(canvas, it.left + x, it.top + y, it.right + x, it.bottom + y, f)
         }
         paint.style = Paint.Style.FILL
-        // an image or the picture shown through: the kind's colour, as the key draws it till the image is in
+        // an image or the picture: the kind's colour, as the key draws it till the image is in
         paint.color = ThemeColors.face(p, kind, look.keys.blocks)
         if (paint.color ushr 24 != 0) shape(canvas, area.left + x, area.top + y, area.right + x, area.bottom + y, f)
         if (f.border > 0f) {
@@ -119,7 +113,6 @@ class ThemeThumbnailKeys(
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 
     private companion object {
-        // a thumbnail is about a third of the keyboard across
         const val SCALE = 0.35f
     }
 }

@@ -11,21 +11,16 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
 import splitties.views.dsl.core.Ui
 
-/**
- * A key's preview bubble: the engine's scene of it drawn (060-render-p2 S2), [sceneView] sized by
- * the engine, its text shown [showScene].
- */
 class PopupEntryUi(override val ctx: Context, val scenes: PopupScenes) : Ui {
 
     var lastShowTime = -1L
 
-    /** The key it is shown over, to size it again as its text changes. */
+    /** To size it again as its text changes. */
     val trigger = Rect()
 
-    /** The scene drawn. */
     val sceneView: PopupSceneView = scenes.view(ctx)
 
-    /** The text and size (px; null a character's) the scene shows: what is asked again changes nothing. */
+    /** Null size: a character's. What is asked again changes nothing. */
     var sceneText: String? = null
         private set
     var sceneSize: Double? = null
@@ -33,10 +28,7 @@ class PopupEntryUi(override val ctx: Context, val scenes: PopupScenes) : Ui {
 
     override val root: View = sceneView
 
-    /**
-     * The scene of [text] at [size] px (null: a character's) over a key [keyWidth] px across: the
-     * bubble sized by the engine. False where it could not be made, the scene before kept.
-     */
+    /** False where it could not be made, the scene before kept. */
     fun showScene(text: String, size: Double?, keyWidth: Int): Boolean {
         val scene = scenes.made("bubble", scenes.builder()?.preview(text, keyWidth.toDouble(), size)) ?: return false
         sceneText = text

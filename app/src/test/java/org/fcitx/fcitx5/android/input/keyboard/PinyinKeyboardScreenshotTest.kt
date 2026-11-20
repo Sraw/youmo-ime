@@ -23,11 +23,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 全拼's 14 keys in the whole keyboard, as its 「键盘」 setting shows them, against the golden image
- * under src/test/screenshots (as [ShuangpinKeyboardScreenshotTest]); before this only checked on a device.
- * Record it again with `-Proborazzi.test.record=true` when the look changes on purpose.
- */
+/** 全拼's 14 keys in the whole keyboard against the golden; record again with `-Proborazzi.test.record=true` when the look changes on purpose. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -45,13 +41,11 @@ class PinyinKeyboardScreenshotTest {
             h.start()
             val labels = h.texts()
             for (l in listOf("QW", "ER", "OP", "AS", "L", "ZX", "BN", "M", "分词")) assertTrue("$l in $labels", l in labels)
-            // the code row a touch tall, for the syllables on it
             assertEquals(h.inputView.resources.displayMetrics.density * CodeRowHeight.STRIP_DP, h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat(), 1f)
             h.captureBoard("PinyinKeyboardScreenshotTest/keys14_light")
         }
     }
 
-    // the code row is tall in pinyin on the 14 keys, thin in English; the keys keep their height
     @Test
     fun theCodeRowFollowsTheInputMethod() {
         setting.setValue(PinyinKeyboard.Keys14)
@@ -62,7 +56,7 @@ class PinyinKeyboardScreenshotTest {
             fun row() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).height().toFloat()
             val keys = h.box(h.board).height()
             assertEquals(density * CodeRowHeight.STRIP_DP, row(), 1f)
-            val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
+            val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "En", "en")
             h.api.inputMethodEntryCached = english
             h.emit(HostEvent.InputMethodChanged(english))
             assertEquals(density * CodeRowHeight.THIN_DP, row(), 1f)
@@ -74,8 +68,7 @@ class PinyinKeyboardScreenshotTest {
         }
     }
 
-    // landscape at 很高, where the app's 120 dp binds: the area stays put, the keys give up the row's 14 dp
-    // in pinyin on the 14 keys and take it back in English, recomputed on each switch
+    // landscape at 很高, where the app's 120 dp binds: the keys give up the row's 14 dp in pinyin and take it back in English
     @Test
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun whereTheCapBindsTheKeysGiveUpTheTallRow() {
@@ -90,10 +83,9 @@ class PinyinKeyboardScreenshotTest {
                 val screenH = h.inputView.resources.displayMetrics.heightPixels
                 fun keys() = h.box(h.board).height()
                 val tall = keys()
-                // the app above the code row keeps its 120 dp
                 fun app() = h.box(h.inputView.findViewById<View>(R.id.code_row_text)).top - h.box(h.inputView).top
                 assertTrue("app ${app()} of $screenH", app() >= KeyboardHeightCap.MIN_APP_DP * density - 2)
-                val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "keyboard", false)
+                val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "En", "en")
                 h.api.inputMethodEntryCached = english
                 h.emit(HostEvent.InputMethodChanged(english))
                 assertEquals(density * (CodeRowHeight.STRIP_DP - CodeRowHeight.THIN_DP), (keys() - tall).toFloat(), 2f)

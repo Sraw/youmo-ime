@@ -37,10 +37,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/**
- * A commit deleted as soon as written is taken back, and one typed again for it is a correction
- * there (U-03, impl/design-1c.md §2): learn-ux's undo.txt, and what keeps a deletion from counting.
- */
+/** A commit deleted as soon as written is taken back, and one retyped for it is a correction there. */
 class PinyinSessionUndoTest {
 
     // dl reads 带来 first; 打了 and 点了 are picked over it
@@ -131,8 +128,7 @@ class PinyinSessionUndoTest {
         assertEquals(1, uses("dl", "打了", "da le"))
     }
 
-    // the cursor put back after 打了, 吗 still after it: 打了 deleted there is taken back (the text after
-    // the commits read as the field started: else no edit among them is known)
+    // the text after the commits read as the field started, else no edit among them is known
     @Test
     fun aCommitDeletedAmongOthersIsTakenBack() {
         session.apply(Context("给", after = "", learnFlags = 0))
@@ -167,7 +163,7 @@ class PinyinSessionUndoTest {
         assertEquals(0, corrections("m", "吗", "ma"))
     }
 
-    // 繁体 output: the editor shows 打了 as the app converted it, and the commits are compared so (review-design-1c S9)
+    // 繁体 output: the editor shows 打了 as the app converted it, and the commits are compared so
     @Test
     fun traditionalTextIsComparedSimplified() {
         val learner = Learner(data)
@@ -177,18 +173,15 @@ class PinyinSessionUndoTest {
         )
         traditional.apply(Context("给", after = "", learnFlags = 0))
         traditional.pick("dianle", "点了")
-        // an editor that reports each Backspace, in what it shows: 點了
         traditional.apply(Backspace)
         traditional.apply(Context("给點", after = "", learnFlags = 0))
         traditional.apply(Backspace)
         traditional.apply(Context("给", after = "", learnFlags = 0))
-        // taken back at the next action
         traditional.apply(Action.Refine)
         assertEquals(0, learner.habits.uses(Code(Kinds.FULL, "dianle"), Words.of("点了", "dian le")))
     }
 
-    // review-design-1c M1: punctuation passed on to the app after the commit, a panel or another input method
-    // writing: a Backspace then may delete what this session did not write, and nothing is taken back
+    // a Backspace may then delete what this session did not write
     @Test
     fun aBackspaceAfterTextNotWrittenHereTakesNothingBack() {
         session.apply(Context("给", learnFlags = 0))
@@ -204,8 +197,6 @@ class PinyinSessionUndoTest {
         assertEquals(2, uses("dl", "打了", "da le"))
     }
 
-    // a Backspace whose context says otherwise (a selection deleted elsewhere: 吗 still there) takes
-    // nothing back; an editor that reports each Backspace agrees with it, and checks what went
     @Test
     fun aContextAfterEachBackspaceChecksIt() {
         session.apply(Context("给", after = "", learnFlags = 0))
@@ -233,8 +224,6 @@ class PinyinSessionUndoTest {
         assertEquals(0, corrections("dl", "点了", "dian le"))
     }
 
-    // review-1c S4: every rewrite of the record between the delete and the retype (清掉最近, 清空学到的,
-    // 全部清空, a restore, 退回恢复前) leaves the journal empty: the retype learns nothing of the deleted
     @Test
     fun everyRewriteOfTheRecordEmptiesTheJournal() {
         val other = LearnBackup.bytes(BackupHead(0, 1, 7L, BackupHead.SAVED), LearnState(), emptyList(), emptyList())
@@ -270,8 +259,6 @@ class PinyinSessionUndoTest {
         }
     }
 
-    // review-1c S7: a character looked up and committed after 打了 was deleted: 打了 taken back, and what follows
-    // is typed after that character, no retype of 打了
     @Test
     fun aCharacterLookedUpEndsTheRun() {
         session.apply(Context("给", after = "", learnFlags = 0))
@@ -283,7 +270,7 @@ class PinyinSessionUndoTest {
         assertEquals(0, corrections("dl", "点了", "dian le"))
     }
 
-    // U-03 on the nine keys: 3253 打了 deleted, 3253 typed again for 大乐, a correction under the nine keys' code (review-1c S6)
+    // on the nine keys: 3253 打了 deleted, 3253 typed again for 大乐, a correction under the nine keys' code
     @Test
     fun aRetypeOnTheNineKeysIsACorrectionThere() {
         val t9 = PinyinSession(
@@ -299,8 +286,7 @@ class PinyinSessionUndoTest {
         assertEquals(1, learner.habits.corrections(Code(nineKeys, "3253"), Words.of("大乐", "da le")))
     }
 
-    // review-1c M1: every keyboard is told the host's context; text another keyboard committed after this one's is
-    // no deletion of this one's commits
+    // text another keyboard committed is no deletion of this one's commits
     @Test
     fun anotherKeyboardsCommitsAreNoDeletion() {
         val t9 = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())

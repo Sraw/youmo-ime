@@ -6,21 +6,14 @@ package org.fcitx.fcitx5.android.input.theme
 
 import org.fcitx.fcitx5.android.scene.rules.KeyNames as SceneKeyNames
 
-/** A key as a theme names it: [board]/[key], `qwerty/q`; [board] [KeyNames.ALL] for a function key on every board. */
+/** [board] [KeyNames.ALL] for a function key on every board. */
 data class KeyName(val board: String, val key: String) {
     override fun toString() = "$board/$key"
 }
 
-/**
- * Every key a theme can style by itself, by name: a board's prefix and the key's name on it. A key
- * in a place (a letter, a digit, a cell) is named by the place, the same whatever its letters are on
- * a scheme; a function key by its role, the same on every board. Names go into theme files, so a
- * name once released is never changed or taken away: a key a board loses keeps its name here.
- * The theme maker reads this list (its layout data) to tell a name it does not know.
- */
+/** Keys a theme can style by name: by place, or a function key by role. Names go into theme files: never changed or removed once released. The theme maker reads this list. */
 object KeyNames {
 
-    /** The board of a function key's look on every board. */
     const val ALL = "*"
 
     const val QWERTY = "qwerty"
@@ -33,7 +26,6 @@ object KeyNames {
     const val SYMBOLS = "symbols"
     const val EMOJI = "emoji"
 
-    /** Function keys, the same name on every board. */
     val ROLES: List<String> = listOf(
         "shift", "backspace", "space", "enter", "confirm", "symbols", "numbers", "back", "lang",
         "comma", "period", "semicolon", "star", "apostrophe", "reset", "lookup", "lookup-on",
@@ -42,16 +34,16 @@ object KeyNames {
 
     private val letters = ('a'..'z').map(Char::toString)
 
-    // a grid's cells, row by row
+    // row by row
     private fun cells(rows: List<Int>) = rows.flatMapIndexed { r, n -> (1..n).map { c -> "r${r + 1}c$c" } }
 
-    /** Each board's keys named by their place. */
+    /** By their place. */
     val POSITIONS: Map<String, List<String>> = linkedMapOf(
         QWERTY to letters,
         // as on a computer's 大千 keyboard: ㄅ is 1, ㄆ q
         ZHUYIN to "1234567890-qwertyuiopasdfghjkl;zxcvbnm,./".map(Char::toString),
         NINE to (1..9).map(Int::toString) + "0" + "side",
-        // its 4×5 block: the tones (c1), the groups and the slot (c2–c4), ? ! ~ (c5); ⌫, r1c5, by its role
+        // the tones (c1), the groups and the slot (c2–c4), ? ! ~ (c5); ⌫, r1c5, by its role
         ZHUYIN_NINE to cells(listOf(5, 5, 5, 5)) - "r1c5",
         K14 to cells(listOf(5, 5, 4)),
         K18 to cells(listOf(7, 6, 5)),
@@ -63,14 +55,9 @@ object KeyNames {
 
     val BOARDS: Set<String> get() = POSITIONS.keys
 
-    /**
-     * [text] read as a name; one not of the form board/key is an error. A board or key this build
-     * does not know reads (a newer app's theme): [isKnown] tells. The engine's check, which a
-     * theme's single keys are held to as they are made (scene.look's `Keys`).
-     */
+    /** Not board/key: an error. An unknown board or key reads (a newer theme): [isKnown] tells. */
     fun parse(text: String): KeyName = SceneKeyNames.split(text).let { (board, key) -> KeyName(board, key) }
 
-    /** The names a key of [board] can have: its places and every role. */
     fun on(board: String): Set<String> = POSITIONS[board].orEmpty().toSet() + ROLES
 
     fun isKnown(name: KeyName) =

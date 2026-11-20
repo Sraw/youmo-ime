@@ -13,10 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Backspace's deletions kept to put back ([ClearedText.deleting]), the field a [FakeEditor] as the
- * service reads it; a key event's Backspace taking what the editor calls one character, told here.
- */
+/** Backspace's deletions kept to put back, the field a [FakeEditor]; a key event's Backspace takes the editor's one character. */
 class DeletionRunTest {
 
     // the app's token for the input started: an EditorInfo, told by identity
@@ -28,11 +25,11 @@ class DeletionRunTest {
         textAfterCursor(after).toString(),
     )
 
-    // the field as a run reads it, the app giving at most [gives] of each side
+    // the app giving at most [gives] of each side
     private fun FakeEditor.read(before: Int, after: Int, gives: Int = Int.MAX_VALUE) =
         ClearedText.Read(field(minOf(before, gives), minOf(after, gives)), minOf(selectionStart, selectionEnd))
 
-    /** One Backspace: [units] before the cursor deleted as the editor's one character, or the selection. */
+    /** [units] before the cursor as the editor's one character, or the selection. */
     private fun FakeEditor.backspace(kept: ClearedText, units: Int = 1, gives: Int = Int.MAX_VALUE) {
         val selection = selectionStart != selectionEnd
         kept.deleting(f, selection) { b, a -> read(b, a, gives) }
@@ -312,7 +309,7 @@ class DeletionRunTest {
         assertEquals(null, kept.take(other, editor.field(), typing = false))
     }
 
-    // review M1: a clear since the run is told by the field alone, kept however the field is edited
+    // a clear since the run is told by the field alone, kept however the field is edited
     @Test
     fun aClearSinceTheRunOutlastsAnEditAsAClearAloneDoes() {
         val kept = ClearedText()
@@ -337,8 +334,7 @@ class DeletionRunTest {
         assertEquals("xyz", alone.text)
     }
 
-    // an edit drops the newest short-read clear and all kept before it, whole clears made after it
-    // staying: neither everything once a short clear is kept, nor the short clear alone
+    // an edit drops the newest short-read clear and all before it; whole clears made after it stay
     @Test
     fun anEditDropsTheNewestShortReadClearAndAllBeforeItButNotTheWholeClearsAfter() {
         val left = EditPlan.Field("", "", "")
@@ -376,8 +372,7 @@ class DeletionRunTest {
         assertEquals(accented.length - 2, editor.text.length)
     }
 
-    // review L6: the same character a long way, every length meeting the end: a few presses' search,
-    // the lengths tried counted (no clock): a search over every length past the presses tries ~700
+    // the same character a long way: a few presses' search, the lengths tried counted (no clock)
     @Test
     fun aRunFarIntoALongFieldOfOneCharacterIsToldQuickly() {
         val kept = ClearedText()
@@ -393,7 +388,7 @@ class DeletionRunTest {
         assertTrue("${characters.counted} lengths tried", characters.counted <= 10)
     }
 
-    // review M7: an app giving less than asked of a field longer than that: its start is not the read's
+    // an app giving less than asked of a longer field: its start is not the read's
     @Test
     fun anAppGivingLessThanAskedIsReadAsCutShort() {
         val kept = ClearedText()
@@ -436,8 +431,7 @@ class DeletionRunTest {
         assertEquals("abc", same.text)
     }
 
-    // review C: cut short, a ZWJ and the emoji after it count two characters, the emoji before them
-    // joined, one: the search goes on past the shorter end that counts one more than the press
+    // cut short, a ZWJ and the emoji after it count two, joined one: the search goes past the shorter end
     @Test
     fun aZwjSequenceFarIntoTheFieldIsToldPastAnEndCountingOneMore() {
         val kept = ClearedText()
@@ -448,7 +442,7 @@ class DeletionRunTest {
         assertEquals(text, editor.text)
     }
 
-    // review A2: an edit after a run drops the clears before it too, though the field reads as one left it
+    // an edit after a run drops the clears before it too, though the field reads as one left it
     @Test
     fun anEditAfterARunDropsTheClearsBeforeIt() {
         val kept = ClearedText()

@@ -11,17 +11,11 @@ import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy.ReturnAction
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * What Return and the arrow keys do in each kind of editor. Getting Return wrong is loud: a
- * search box that inserts a newline instead of searching, or a chat box that sends on every
- * line break.
- */
+/** Return and the arrows per editor kind: a search box adding a newline, a chat box sending per line break. */
 class EditorKeyPolicyTest {
 
     private val search = 3 // EditorInfo.IME_ACTION_SEARCH
     private val custom = 0x42
-
-    // region Return
 
     @Test
     fun aPlainMultilineEditorGetsEnter() {
@@ -64,10 +58,6 @@ class EditorKeyPolicyTest {
         )
     }
 
-    // endregion
-
-    // region arrows
-
     @Test
     fun anArrowMovesOrCollapses() = assertRows(
         "an arrow moves a collapsed cursor by one" to {
@@ -83,7 +73,7 @@ class EditorKeyPolicyTest {
         },
     )
 
-    /** At the start the target is -1, which the editor ignores. Pinned so a change is deliberate. */
+    /** At the start the target is -1, which the editor ignores. */
     @Test
     fun leftAtTheStartTargetsMinusOne() {
         assertEquals(
@@ -94,7 +84,6 @@ class EditorKeyPolicyTest {
 
     private val wave = String(Character.toChars(0x1F44B)) // two UTF-16 units
 
-    /** An arrow at [cursor] in [text], with the editor showing what is beside the cursor. */
     private fun arrow(direction: Direction, text: String, cursor: Int) = EditorKeyPolicy.onArrow(
         EditorTraits(), direction, cursor, cursor,
         textBefore = { text.substring((cursor - it).coerceAtLeast(0), cursor) },
@@ -136,5 +125,4 @@ class EditorKeyPolicyTest {
         )
     }
 
-    // endregion
 }

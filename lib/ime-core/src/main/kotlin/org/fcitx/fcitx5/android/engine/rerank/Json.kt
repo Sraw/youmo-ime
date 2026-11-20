@@ -4,11 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.rerank
 
-/**
- * Just enough JSON for a safetensors header: objects as maps, arrays as lists, strings, numbers
- * as doubles, true, false and null. Throws [IllegalArgumentException] on anything else, or on
- * input nested deeper than [MAX_DEPTH] or of more than [MAX_VALUES] values (the file is untrusted).
- */
+/** Just enough JSON for a safetensors header; throws [IllegalArgumentException] on anything else or past [MAX_DEPTH]/[MAX_VALUES] (the file is untrusted). */
 internal class Json private constructor(private val text: String) {
 
     private var at = 0
@@ -107,7 +103,7 @@ internal class Json private constructor(private val text: String) {
             'u' -> {
                 if (at + 4 > text.length) fail("short \\u escape")
                 val hex = text.substring(at, at + 4)
-                // toInt(16) would take a sign
+                // toInt(16) would accept a sign
                 if (!hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) fail("bad \\u escape")
                 at += 4
                 hex.toInt(16).toChar()
@@ -124,7 +120,7 @@ internal class Json private constructor(private val text: String) {
 
     companion object {
         const val MAX_DEPTH = 16
-        /** A header of a 8192-token vocabulary has some 9000; each is a boxed object. */
+        /** An 8192-token vocabulary's header has some 9000, each boxed. */
         const val MAX_VALUES = 1 shl 18
 
         fun parse(text: String): Any? = Json(text).run {

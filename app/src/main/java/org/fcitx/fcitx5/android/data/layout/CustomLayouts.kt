@@ -26,14 +26,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.UUID
 
-/**
- * The user's own layouts (061-custom-layout §4): `files/layouts/<id>.xml`, imported, exported, deleted and restored here;
- * what they are, and the rules of their names and sizes, CustomLayoutFiles' and LayoutImport's (ime-core). A file is put
- * in place whole: written beside it as `<random>.saving`, synced, and renamed over its name, under the lock the list
- * clears what a kill left of such a file under. The list reads each file once, kept by its modified time and size, off
- * the main thread. L3's CustomLayoutSource draws the keyboards from them. Every file is untrusted (one restored, or of an
- * older build's rules): what throws reading or checking one is one that does not read, never the app's crash.
- */
+/** Every file is untrusted: anything thrown reading or checking one makes it unreadable, never a crash. */
 object CustomLayouts {
     const val DIR = "layouts"
 
@@ -41,14 +34,9 @@ object CustomLayouts {
 
     private const val SAVING_LEFT_MS = 60_000L
 
-    /** Where the layouts are: the app's files' `layouts/`. */
     fun dir(context: Context = appContext): File = File(context.filesDir, DIR)
 
-    /**
-     * A layout's file as listed: its [id] (its name's), [modified] and [size] as read, and [layout] as it reads (null: it
-     * does not, shown so and only deleted), its [fragments] (the app's it includes), its keys in little ([cells]). Its
-     * text is not kept: the 信息 reads it again ([text]).
-     */
+    /** [layout] null: does not read, shown so and only deleted. [fragments]: the app's it includes. */
     class Entry(
         val id: String,
         val file: File,
@@ -58,18 +46,15 @@ object CustomLayouts {
         val fragments: Map<String, Fragment>,
         val cells: List<LayoutThumbnail.Cell>,
     ) {
-        /** Its name as shown: what is not shown ([LayoutCheck.hidden]) left out, its id where nothing is left. */
+        /** Hidden characters ([LayoutCheck.hidden]) left out, its id where nothing is left. */
         val name: String get() = layout?.name?.let(LayoutCheck::plain)?.takeIf { it.isNotBlank() } ?: id
         val family: String? get() = layout?.family
     }
 
-    // by the file's path, as last read (each read once while unchanged)
+    // by path, as last read (each read once while unchanged)
     private val kept = HashMap<String, Entry>()
 
-    /**
-     * The layouts in [dir], read where new or changed since; by name. A `.saving` left by a kill is deleted, one a minute
-     * old: one being written is younger (and written under this lock besides).
-     */
+    /** A minute-old `.saving` left by a kill is deleted (one being written is younger, and under this lock). */
     @Synchronized
     fun list(dir: File = dir(), context: Context = appContext): List<Entry> {
         val files = dir.listFiles().orEmpty()
@@ -86,7 +71,7 @@ object CustomLayouts {
 
     private fun read(f: File, modified: Long, size: Long, context: Context): Entry {
         val id = CustomLayoutFiles.idOf(f.name)!!
-        // its name its id's: a file of another id is not this layout (renamed by hand)
+        // a file of another id is not this layout (renamed by hand)
         val layout = text(f)?.let { t -> runCatching { LayoutImport.layout(t) }.onFailure { Timber.w(it, "layout %s unread", id) }.getOrNull() }
             ?.takeIf { it.id == id }
         val fragments = layout?.let { l -> runCatching { fragments(l, context) }.onFailure { Timber.w(it, "layout %s: its fragments", id) }.getOrNull() }
@@ -98,13 +83,12 @@ object CustomLayouts {
         return Entry(id, f, modified, size, layout, fragments, cells)
     }
 
-    /** [file]'s text, read as an import reads one; null where it does not read so. */
     fun text(file: File): String? =
         runCatching { file.inputStream().use { CustomLayoutFiles.read(it) } }
             .onFailure { Timber.w(it, "layout %s unread", file.name) }.getOrNull()
             .let { (it as? CustomLayoutFiles.Read.Text)?.text }
 
-    /** The app's fragments [layout] includes; null where one is not the app's (the check refuses such a layout). */
+    /** Null where one is not the app's (the check refuses such a layout). */
     fun fragments(layout: Layout, context: Context = appContext): Map<String, Fragment>? {
         val out = HashMap<String, Fragment>()
         for (src in layout.parts.filterIsInstance<Include>().map { it.src }.distinct()) {
@@ -115,14 +99,12 @@ object CustomLayouts {
         return out
     }
 
-    /** The app's boards and fragments as the check reads them: read on the first check, kept. */
     val sources: LayoutCheck.Sources by lazy {
         val app = BuiltInLayouts(appContext)
         val texts = BuiltInLayouts.RAW.keys.associateWith { app.text(it).orEmpty() }
         LayoutCheck.Sources(texts.filterKeys { it !in BuiltInLayouts.FRAGMENTS }, texts.filterKeys { it in BuiltInLayouts.FRAGMENTS })
     }
 
-    /** A file picked to import, read and checked (§4.2): what [LayoutImport.judge] makes of it, or why it was not read. */
     sealed interface Opened {
         data object TooBig : Opened
 
@@ -131,10 +113,7 @@ object CustomLayouts {
         class Judged(val text: String, val verdict: LayoutImport.Verdict) : Opened
     }
 
-    /**
-     * [input] read as a layout and checked strictly for an app of [versionName] (null: a dev build, any `min-app`) against
-     * the layouts in [dir], [theme] (the one in use) for the blank keys' warning. Off the main thread: it builds every scene.
-     */
+    /** Null [versionName]: a dev build, any `min-app`. Off the main thread: it builds every scene. */
     fun open(input: InputStream, versionName: String?, theme: Theme?, dir: File = dir()): Opened {
         val text = when (val read = CustomLayoutFiles.read(input)) {
             CustomLayoutFiles.Read.TooBig -> return Opened.TooBig
@@ -142,7 +121,7 @@ object CustomLayouts {
             is CustomLayoutFiles.Read.Text -> read.text
         }
         val installed = list(dir).map { e -> e.layout?.let(LayoutImport::installed) ?: LayoutImport.Installed(e.id, e.id, null) }
-        // a reader's or a scene's throw on a file made to: refused as one that does not read, not the app's crash
+        // a reader's or scene's throw on a crafted file: refused as unreadable, not a crash
         val verdict = runCatching {
             LayoutImport.judge(text, LayoutCheck.check(text, sources, LayoutImport.appVersion(versionName), theme, strict = true), installed)
         }.getOrElse {
@@ -152,12 +131,10 @@ object CustomLayouts {
         return Opened.Judged(text, verdict)
     }
 
-    /** [text], a layout [id], put in [dir] whole, in place of one of its id (§4.1). */
     @Throws(IOException::class)
     fun save(id: String, text: String, dir: File = dir()) = putInPlace(File(dir, CustomLayoutFiles.fileName(id)), text)
 
-    // [text] as [target] whole: written beside it, synced, renamed over it; the folder made where there is none. Under
-    // the list's lock, which deletes a `.saving` it finds (one being written here would go from under the rename)
+    // under the list's lock, which deletes any `.saving` it finds
     @Synchronized
     @Throws(IOException::class)
     private fun putInPlace(target: File, text: String) {
@@ -173,12 +150,11 @@ object CustomLayouts {
             if (!done) temp.delete()
         }
         kept.remove(target.path)
-        // a layout's: the keyboards listed anew. Not the record's (CustomLayoutFiles.CONVERTED), which is no layout: the
-        // list forgotten for it, KeyboardPicker.offers had none till listed again (R26 F8226)
+        // not the record, which is no layout: forgetting the list for it left KeyboardPicker.offers empty till relisted
         if (CustomLayoutFiles.idOf(target.name) != null) CustomKeyboards.changed(dir)
     }
 
-    /** Layout [id] taken out of [dir]: whether it is gone. The settings under its keys' names stay (§4.4, Q8). */
+    /** Settings under its keys' names stay. */
     @Synchronized
     fun delete(id: String, dir: File = dir()): Boolean {
         val file = File(dir, CustomLayoutFiles.fileName(id))
@@ -186,19 +162,12 @@ object CustomLayouts {
         return (file.delete() || !file.exists()).also { CustomKeyboards.changed(dir) }
     }
 
-    /** Layout [id]'s file in [dir], as it is, into [out] (`<名字>.layout`, §2.1). */
     @Throws(IOException::class)
     fun export(id: String, out: OutputStream, dir: File = dir()) {
         File(dir, CustomLayoutFiles.fileName(id)).inputStream().use { it.copyTo(out) }
     }
 
-    /**
-     * A backup's `layouts/` ([from], unpacked) laid over the phone's [to] (§4.5), checked for an app of [versionName]
-     * (null: a dev build): each layout of it that is one ([CustomLayoutFiles.restorable]) replaces the phone's of its id,
-     * the phone's others stay, and one of a new id is taken only while the phone holds fewer than
-     * [CustomLayoutFiles.MAX_LAYOUTS] (the phone's own kept, the rest of the backup's logged); the record of the packs
-     * converted ([CustomLayoutFiles.CONVERTED]) is both's. Nothing to do where the backup has none (0.6.0's).
-     */
+    /** Each restorable layout replaces the phone's of its id, others stay; a new id only below the limit. Record merged. */
     @Throws(IOException::class)
     fun restore(from: File, to: File, versionName: String?) {
         if (!from.isDirectory) return
@@ -227,7 +196,6 @@ object CustomLayouts {
         }
     }
 
-    /** The record of the theme packs whose layouts were put in the list ([CustomLayoutFiles.CONVERTED], §11) in [dir], read. */
     @Synchronized
     fun record(dir: File = dir()): CustomLayoutFiles.Record =
         CustomLayoutFiles.record(
@@ -235,10 +203,6 @@ object CustomLayouts {
                 ?.readBytes()?.let(CustomLayoutFiles::decode),
         )
 
-    /**
-     * [lines] (a pack's `file@stamp`, a layout's [CustomLayoutFiles.Made.line]) added to the record in [dir], its
-     * [CustomLayoutFiles.CURRENT] with them (none: that alone), put in place whole.
-     */
     @Synchronized
     @Throws(IOException::class)
     fun recordConverted(lines: List<String>, dir: File = dir()) {
@@ -247,10 +211,9 @@ object CustomLayouts {
         putInPlace(mine, CustomLayoutFiles.mergeConverted(record, (listOf(CustomLayoutFiles.CURRENT) + lines).joinToString("\n")))
     }
 
-    /** Whether a backup takes [file] of the layouts' folder: a layout's or the record, not one half written. */
+    /** A layout's or the record, not one half written. */
     fun backedUp(file: File): Boolean = CustomLayoutFiles.idOf(file.name) != null || file.name == CustomLayoutFiles.CONVERTED
 
-    /** What the list read, forgotten (tests). */
     @VisibleForTesting
     @Synchronized
     internal fun forgetAll() = kept.clear()

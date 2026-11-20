@@ -7,23 +7,15 @@ package org.fcitx.fcitx5.android.input.shortcut
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 
-/**
- * 0.5's swipe settings as 0.6's two slots a key (060-swipe-slots): 滑动 ([SwipeLayers]), the shortcuts
- * set ([KeyShortcuts]), 标点位置 and 快捷键图标位置. What a swipe did on every key is what it does
- * after; the long presses (`popup_overrides`) stay as they are, the long press's first reading them.
- */
+/** 0.5's swipe settings as 0.6's two slots a key: what a swipe did on every key it does after; long presses stay. */
 object SwipeMigration {
 
-    /** The settings that take the old ones' place: the slots, 上滑 and 下滑 on or off, where each draws. */
     data class Result(val slots: SwipeSlots, val up: Boolean, val down: Boolean, val upAt: KeyMarks.At, val downAt: KeyMarks.At)
 
-    /** A new install's: the long press's first up, its shortcut down, drawn where 标点位置 and 快捷键图标位置 were by default. */
+    /** A new install's. */
     val Fresh = Result(SwipeSlots.Default, up = true, down = true, KeyMarks.At.SymbolDefault, KeyMarks.At.ShortcutDefault)
 
-    /**
-     * [layers] as stored, or 0.5's default where an [upgraded] install never set it (null for neither, a
-     * new install: [Fresh]); [shortcuts], [symbolAt] and [shortcutAt] as stored.
-     */
+    /** [layers] null and not [upgraded]: a new install, [Fresh]. */
     fun of(layers: SwipeLayers?, upgraded: Boolean, shortcuts: KeyShortcuts, symbolAt: KeyMarks.At, shortcutAt: KeyMarks.At): Result {
         val old = layers ?: if (upgraded) SwipeLayers.Default else null
         val placesAsNew = symbolAt == Fresh.upAt && shortcutAt == Fresh.downAt
@@ -46,7 +38,7 @@ object SwipeMigration {
         )
     }
 
-    /** 0.5's [shortcuts] into [slots]: a character key's on [shortcutUp]'s way, a function key's (`fn/space.up`) its own way. */
+    /** A character key's on [shortcutUp]'s way, a function key's (`fn/space.up`) its own way. */
     fun withShortcuts(slots: SwipeSlots, shortcuts: KeyShortcuts, shortcutUp: Boolean): SwipeSlots =
         shortcuts.names.fold(slots) { s, name ->
             val slot = SwipeSlot.of(shortcuts.resolve(name))

@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 
-/** The user's own layouts as files (061-custom-layout §4): import, list, export, delete, restore. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class CustomLayoutsTest {
@@ -39,7 +38,7 @@ class CustomLayoutsTest {
     @After
     fun forget() = CustomLayouts.forgetAll()
 
-    // the app's board [base] made a layout of one's own [id], [name] and <meta version> if given
+    // the app's board [base] as a user layout [id]
     private fun own(id: String, base: String = "qwerty", name: String? = null, version: String? = null): String {
         var t = BuiltInLayouts(appContext).text(base)!!.replaceFirst("id=\"$base\"", "id=\"$id\" based-on=\"$base\"")
         if (name != null) t = t.replaceFirst(Regex("name=\"[^\"]*\""), "name=\"$name\"")
@@ -60,7 +59,7 @@ class CustomLayoutsTest {
         assertEquals("17 键", listed.name)
         assertEquals("letters", listed.family)
         assertTrue(listed.cells.isNotEmpty())
-        // again, a newer version: what it replaces said
+        // a newer version: what it replaces said
         val again = open(own("my17", name = "17 键", version = "1.2")) as CustomLayouts.Opened.Judged
         val replaces = (again.verdict as Verdict.Ok).replaces!!
         assertEquals("1.1", replaces.version)
@@ -90,7 +89,7 @@ class CustomLayoutsTest {
         File(dir, "x.saving").apply { writeText("half") }.setLastModified(System.currentTimeMillis() - 120_000)
         File(dir, "y.saving").writeText("being written")
         File(dir, "notes.txt").writeText("not a layout")
-        // a file renamed by hand: its id not its name's, listed as one that does not read (to be deleted)
+        // renamed by hand: listed as unreadable, to be deleted
         File(dir, "b.xml").writeText(own("c"))
         val first = CustomLayouts.list(dir)
         assertFalse(File(dir, "x.saving").exists())
@@ -121,7 +120,7 @@ class CustomLayoutsTest {
         val backup = File(folder.root, "backup").apply { mkdirs() }
         File(backup, "same.xml").writeText(own("same", name = "备份的"))
         File(backup, "new.xml").writeText(own("new"))
-        // not taken: renamed, not read, not a layout's name, too big
+        // not taken: renamed, unreadable, not a layout name, too big
         File(backup, "renamed.xml").writeText(own("other"))
         File(backup, "broken.xml").writeText("<keyboard")
         File(backup, "evil.txt").writeText(own("evil"))
@@ -131,9 +130,9 @@ class CustomLayoutsTest {
         val listed = CustomLayouts.list(dir)
         assertEquals(listOf("kept", "new", "same"), listed.map { it.id }.sorted())
         assertEquals("备份的", listed.single { it.id == "same" }.name)
-        // the phone's then the backup's, a line of both where it was written last (R26 F8170)
+        // the phone's then the backup's, a line of both where written last
         assertEquals("q@2\np@1\n", File(dir, CustomLayoutFiles.CONVERTED).readText())
-        // a backup of none (0.6.0's): the phone's as they were
+        // a backup with none (0.6.0's): the phone's kept
         CustomLayouts.restore(File(folder.root, "none"), dir, "0.6.1")
         assertEquals(3, CustomLayouts.list(dir).size)
     }
@@ -142,7 +141,7 @@ class CustomLayoutsTest {
     fun aRestoreKeepsThePhoneWithinTheMostLayoutsItsOwnFirst() {
         val max = CustomLayoutFiles.MAX_LAYOUTS
         val text = own("p0")
-        // the phone full but one: its files written as they are (a save each would check nothing more)
+        // the phone full but one
         dir.mkdirs()
         (1 until max).forEach { File(dir, "p$it.xml").writeText(text.replaceFirst("id=\"p0\"", "id=\"p$it\"")) }
         val backup = File(folder.root, "backup").apply { mkdirs() }
@@ -158,19 +157,16 @@ class CustomLayoutsTest {
 
     @Test
     fun aRestoreOfTheRecordAloneMakesTheFolderAndOneThatCannotFailsItself() {
-        // the phone has no layouts' folder; the backup only the record
         val backup = File(folder.root, "backup").apply { mkdirs() }
         File(backup, CustomLayoutFiles.CONVERTED).writeText("p@1\n")
         CustomLayouts.restore(backup, dir, "0.6.1")
         assertEquals("p@1\n", File(dir, CustomLayoutFiles.CONVERTED).readText())
-        // where the folder cannot be made (a file in its place): an IOException, for the import to log and go past
+        // a file where the folder should be: an IOException, logged and passed by the import
         val blocked = File(folder.root, "blocked").apply { writeText("not a folder") }
         assertTrue(runCatching { CustomLayouts.restore(backup, blocked, "0.6.1") }.exceptionOrNull() is IOException)
     }
 
-    // the record of the packs converted written (a pack's layouts listed, a restore): the keyboards as listed kept, the
-    // same list, not forgotten till listed again (R26 F8226: KeyboardPicker.offers had none meanwhile); a layout saved
-    // lists them anew
+    // the converted-packs record written: the listed keyboards stay listed (KeyboardPicker.offers had none meanwhile)
     @Test
     fun theRecordWrittenKeepsTheKeyboardsAsListed() {
         val dirWas = CustomKeyboards.dir
@@ -193,7 +189,7 @@ class CustomLayoutsTest {
     @Test
     fun aLayoutsNameIsShownWithoutWhatIsNotShown() {
         dir.mkdirs()
-        // as a restore takes it (not strict): a direction override in its name
+        // a restore is not strict: a direction override in its name
         File(dir, "rtl.xml").writeText(own("rtl", name = "a&#x202E;b"))
         assertEquals("ab", CustomLayouts.list(dir).single().name)
         File(dir, "rtl.xml").writeText(own("rtl", name = "&#x202E;"))

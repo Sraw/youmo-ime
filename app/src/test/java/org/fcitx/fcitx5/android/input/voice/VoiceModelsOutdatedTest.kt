@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
-/** When VoiceEngine.acquire lets the models read go to read them anew (F5833: a voice pack imported since). */
+/** When VoiceEngine.acquire reads the models anew (a voice pack imported since). */
 class VoiceModelsOutdatedTest {
 
     private val old = File("/packs/voice-1")

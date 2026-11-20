@@ -17,18 +17,15 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.EditTextIntPreference
 
-/** The clipboard, and the emoji's one setting under it: two small categories, one page. */
 class ClipboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().clipboard) {
 
     override fun createUi(screen: PreferenceScreen) = build(screen)
 
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
         val limit = screen.findPreference<EditTextIntPreference>(AppPrefs.getInstance().clipboard.clipboardHistoryLimit.key) ?: return
-        // a limit that deletes entries, which no undo brings back (thousands with 「无上限」 left), asks first;
-        // the old value kept till then, and on cancel
+        // a limit that deletes entries, which no undo brings back, asks first; the old value kept till then, and on cancel
         limit.setOnPreferenceChangeListener { _, value ->
             val to = value as? Int ?: return@setOnPreferenceChangeListener true
-            // raised: nothing to count, set at once
             val from = AppPrefs.getInstance().clipboard.clipboardHistoryLimit.getValue()
             if (to == CLIPBOARD_UNLIMITED || (from != CLIPBOARD_UNLIMITED && to >= from)) return@setOnPreferenceChangeListener true
             viewLifecycleOwner.lifecycleScope.launch {
@@ -49,7 +46,7 @@ class ClipboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance
     }
 
     companion object {
-        /** The page's managed preferences, as SettingsIndex reads them too. */
+        /** As SettingsIndex reads them too. */
         fun build(screen: PreferenceScreen) {
             val prefs = AppPrefs.getInstance()
             section(screen, R.string.clipboard, prefs.clipboard)

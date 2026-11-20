@@ -19,7 +19,7 @@ const val DeleteSurroundingFlag = "org.fcitx.fcitx5.android.DELETE_SURROUNDING"
 
 private val EMAIL_VARIATIONS = setOf(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS)
 
-// what a number, phone or date field says it takes: its variation and flags mean this only in their class
+// its variation and flags mean this only in their class
 private fun numberKind(type: Int, variation: Int, flags: Int): NumberKind? = when (type) {
     InputType.TYPE_CLASS_NUMBER -> {
         val signed = flags and InputType.TYPE_NUMBER_FLAG_SIGNED != 0
@@ -41,11 +41,7 @@ private fun numberKind(type: Int, variation: Int, flags: Int): NumberKind? = whe
     else -> null
 }
 
-/**
- * Decodes the bits of [EditorInfo] that [EditorKeyPolicy] and [EditingSession] act on, and voice's end
- * reads (VoiceEnd.field in ime-core: sends, isMultiLine, isShortMessage). [ownPackage]
- * given, a field of this app is sensitive as the service tells fcitx ([CapabilityFlags.forField]).
- */
+/** [ownPackage] given, a field of this app is sensitive as the service tells fcitx ([CapabilityFlags.forField]). */
 fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
     val type = inputType and InputType.TYPE_MASK_CLASS
     val variation = inputType and InputType.TYPE_MASK_VARIATION

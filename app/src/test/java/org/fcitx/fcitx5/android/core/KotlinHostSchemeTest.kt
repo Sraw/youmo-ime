@@ -34,11 +34,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.util.Collections
 
-/**
- * 双拼 down to 小鹤, 微软 and 自然码 (the user's 2026-11-01): the scheme [KotlinHost] reads from
- * androidengine.conf at each start, a new install's, an upgrade's, a dropped one's, a restored one's
- * (SchemeMigration, its rules; KotlinHostTest the rest of the host).
- */
+/** The 双拼 scheme [KotlinHost] reads from androidengine.conf at each start (SchemeMigration has the rules). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KotlinHostSchemeTest {
@@ -82,21 +78,17 @@ class KotlinHostSchemeTest {
         directBoot(false)
     }
 
-    // before the first unlock: the config none of the user's, nothing written (KotlinHostTest's direct boot case)
+    // before the first unlock: the config none of the user's, nothing written
     private val locked = { s: ScriptedEngine -> object : KotlinHost.EngineSide by s { override fun config() = HostConfig(null, writable = false) } }
 
     private fun conf() = config(EngineOptions.PATH).takeIf { it.exists() }?.readText()
 
-    /**
-     * What the host reads at a start over [conf] as stored (none: no file): an install's first run, or
-     * one from before 0.5 ([settled] false) or since; the scheme and what it said.
-     */
+    /** [settled] false: an install from before the migration. */
     private fun schemeRead(
         conf: String?,
         firstRun: Boolean,
         settled: Boolean = false,
         side: (ScriptedEngine) -> KotlinHost.EngineSide = { it },
-        // whether a keyboard is shown to say it on
         shown: Boolean = true,
     ): Read {
         fcitx.stop()
@@ -114,16 +106,13 @@ class KotlinHostSchemeTest {
         return Read(engine.settings.last().shuangpin, told.toList())
     }
 
-    /** A start's 双拼 [scheme] and the notices it [told]. */
     private data class Read(val scheme: String, val told: List<Told> = emptyList())
 
-    /** A notice, [steady] if a failure's (EngineNotices.Sayer). */
     private data class Told(val message: String, val steady: Boolean)
 
     private fun dropped(name: String) = appContext.getString(R.string.shuangpin_scheme_retired, ShuangpinNames.of(appContext, name))
 
-    // SP-27: a new install's 双拼 is 小鹤, the option's default: nothing written, nothing said, settled so a
-    // later start (no first run) is no upgrade
+    // settled, so a later start is no upgrade
     @Test
     @Uat("SP-27")
     fun aNewInstallsShuangpinIsXiaohe() {
@@ -133,19 +122,18 @@ class KotlinHostSchemeTest {
         restart()
         assertEquals(EngineSettings.XIAOHE, engine.settings.last().shuangpin)
         assertNull(conf())
-        // a 0.5 install's config with none (some other option saved): 小鹤, as it had
+        // a config with some other option saved but no scheme
         assertEquals(Read(EngineSettings.XIAOHE), schemeRead("PageSize=9\n", firstRun = false, settled = true))
         assertEquals("PageSize=9\n", conf())
     }
 
-    // SET-14: an upgrade keeps the scheme it had: none written was 自然码 (0.4's default), pinned so,
-    // written explicitly, nothing said; one stored left as it is, the file too
+    // none written was the old default 自然码: pinned so, explicitly; one stored is left as it is
     @Test
     @Uat("SET-14")
     fun anUpgradeKeepsItsScheme() {
         assertRows(listOf(null, "PageSize=9\n", "# ShuangpinProfile=Ziranma\n"), { "$it" }) { conf ->
             assertEquals(Read(EngineSettings.ZIRANMA), schemeRead(conf, firstRun = false))
-            // settled once the pin is on disk, on the writer's thread
+            // on the writer's thread
             until("settled") { internal.schemeSettled.getValue() }
             assertTrue(conf()!!.lines().contains("ShuangpinProfile=Ziranma"))
             restart()
@@ -164,8 +152,7 @@ class KotlinHostSchemeTest {
         }
     }
 
-    // direct boot: the defaults (小鹤), nothing written nor settled; the start after the unlock settles it, an
-    // upgrade's to 自然码, a new install's 小鹤
+    // the start after the unlock settles it: 自然码 for an upgrade, 小鹤 for a new install
     @Test
     fun directBootSettlesNothing() {
         assertRows(listOf(false to EngineSettings.ZIRANMA, true to EngineSettings.XIAOHE), { "first run ${it.first}" }) { (firstRun, after) ->
@@ -173,20 +160,18 @@ class KotlinHostSchemeTest {
             assertEquals(Read(EngineSettings.XIAOHE), schemeRead(null, firstRun, side = locked))
             assertFalse(internal.schemeSettled.getValue())
             directBoot(false)
-            // the process started again at the unlock, with the user's prefs (a first run's still a first run)
+            // restarted at the unlock, with the user's prefs
             fcitx.stop()
             internal.firstRun.setValue(firstRun)
             start()
             idle()
             assertEquals(after, engine.settings.last().shuangpin)
-            // the pin lands on the writer's thread: settled once it is on disk, not by the idle above
+            // on the writer's thread: settled once on disk, not by the idle above
             until("settled") { internal.schemeSettled.getValue() }
         }
     }
 
-    // the pin not on disk: a config that cannot be written (writable false), one there but not read (held:
-    // the pin dropped, not written) and a write that fails (a full disk): 自然码 pinned for the start, not
-    // settled, so the next start, the file written, still pins 自然码 and settles then
+    // not writable, held unread, a failed write: 自然码 for this start, not settled, so the next start pins again
     @Test
     fun aPinNotOnDiskIsMadeAgainAtTheNextStart() {
         val file = config(EngineOptions.PATH)
@@ -212,7 +197,7 @@ class KotlinHostSchemeTest {
                 start(row.side)
                 idle()
                 assertEquals(EngineSettings.ZIRANMA, engine.settings.last().shuangpin)
-                // the stop writes what is pending: whatever was to land has
+                // the stop writes what is pending
                 fcitx.stop()
                 assertFalse(internal.schemeSettled.getValue())
             } finally {
@@ -227,21 +212,18 @@ class KotlinHostSchemeTest {
         }
     }
 
-    // SET-15: one of the five dropped: 小鹤, written so, the user told once by the old name as news (not a
-    // failure); the next start says nothing
+    // a dropped scheme: 小鹤, written so, told once by its old name as news; the next start says nothing
     @Test
     @Uat("SET-15")
     fun aDroppedSchemeIsXiaoheAndTheUserIsToldOnce() {
         val told = internal.schemeRetiredTold
         try {
             assertRows(SchemeMigration.RETIRED, { it }) { name ->
-                // each one as the first the user is told of
                 told.setValue(false)
                 val quoted = if (' ' in name) "\"$name\"" else name
                 assertEquals(Read(EngineSettings.XIAOHE, listOf(Told(dropped(name), steady = false))), schemeRead("ShuangpinProfile=$quoted\n", firstRun = false))
                 assertTrue(told.getValue())
-                // written back as the default, which is left out: the dropped name gone (written on the
-                // writer's thread, so waited for: a slow runner reads it before the write lands)
+                // the default is left out of the file; written on the writer's thread, so waited for
                 until("「$name」 written away", { conf() }) { conf()?.contains(name) == false }
                 EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
                 said.clear()
@@ -250,7 +232,7 @@ class KotlinHostSchemeTest {
                 assertEquals(emptyList<String>(), said)
                 assertEquals(EngineSettings.XIAOHE, engine.settings.last().shuangpin)
             }
-            // told before, a config with one again (written back by hand, or not written): 小鹤, not said again
+            // told before: 小鹤, not said again
             told.setValue(true)
             assertEquals(Read(EngineSettings.XIAOHE), schemeRead("ShuangpinProfile=ABC\n", firstRun = false))
         } finally {
@@ -258,15 +240,13 @@ class KotlinHostSchemeTest {
         }
     }
 
-    // review 2: the notice queued as the host starts, the process ended before any keyboard showed: told at
-    // the next start (小鹤 already settled and written), told once it is seen and not again
+    // the process ended before any keyboard showed: told at the next start, then not again
     @Test
     fun aDroppedSchemesNoticeNotSeenIsToldAtTheNextStart() {
         assertEquals(Read(EngineSettings.XIAOHE), schemeRead("ShuangpinProfile=Ziguang\n", firstRun = false, shown = false))
         assertFalse(internal.schemeRetiredTold.getValue())
         assertEquals("Ziguang", internal.schemeRetiredUnseen.getValue())
         fcitx.stop()
-        // the process gone: what waited in memory with it
         EngineNotices.forgetToldOnce()
         said.clear()
         EngineNotices.sayer = EngineNotices.Sayer { message, _ -> said += message; true }
@@ -282,8 +262,7 @@ class KotlinHostSchemeTest {
         assertEquals(EngineSettings.XIAOHE, engine.settings.last().shuangpin)
     }
 
-    // SET-15: a backup restored over a new install's 小鹤: a 0.4 one with a dropped scheme is 小鹤 and told
-    // again, one with none 自然码, as 0.4 had (its prefs have neither flag); a 0.5 one with none 小鹤 (settled)
+    // a restore over a new install: an old backup with a dropped scheme is 小鹤 and told, one with none 自然码; a newer one with none 小鹤
     @Test
     @Uat("SET-15")
     fun aZeroFourBackupRestoredHasItsSchemeRead() {
@@ -299,8 +278,7 @@ class KotlinHostSchemeTest {
                 ),
                 { "${it.first.trim()} settled ${it.second}" },
             ) { (conf, settled, scheme) ->
-                // this phone a new install, told of a dropped scheme before (each row from its own install: the
-                // restore below writes over the prefs)
+                // each row from its own install: the restore below writes over the prefs
                 assertEquals(EngineSettings.XIAOHE, schemeRead(null, firstRun = true).scheme)
                 told.setValue(true)
                 fcitx.stop()
@@ -311,7 +289,7 @@ class KotlinHostSchemeTest {
                 val prefsFile = UserDataOrigin.preferencesFile(BuildConfig.APPLICATION_ID)
                 UserDataManager.import(backupZip("external/config/${EngineOptions.PATH}" to conf, "shared_prefs/$prefsFile" to zeroFourPrefs), dirs).getOrThrow()
                 other.deleteRecursively()
-                // the restore starts the app again, which reads the backup's settings (a JVM test's prefs are in memory: as the file has them)
+                // the restore restarts the app, which reads the backup's settings (JVM prefs are in memory)
                 raw.edit(commit = true) {
                     remove(told.key)
                     putBoolean(prefs.internal.firstRun.key, false)

@@ -12,7 +12,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The key editor's three folding cards (dev/design/061-settings-cards.md §5.1). */
+/** The key editor's three folding cards. */
 class AccordionTest {
 
     @Test

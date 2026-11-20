@@ -22,7 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/** 生僻字屏蔽's page logic (dev/design/061-rare-char-block.md §6): the grid, its rows, the drag, the edits. */
+/** 生僻字屏蔽's page logic: the grid, its rows, the drag, the edits. */
 class RarePageTest {
 
     private val levels = TestCharLevels.levels
@@ -76,8 +76,7 @@ class RarePageTest {
         },
     )
 
-    // the page turned on shows a group with characters held at its top: 扩展区, the default's, first (it was last,
-    // under 三级字's 0 held); the rest as before. Only the page's order: the grid and the file keep GRID's
+    // a group with held characters goes to the top (扩展区 first); the grid and file keep GRID's order
     @Test
     fun thePageListsTheGroupsHeldByDefaultFirstTheRestInTheirOrder() = assertRows(
         "扩展区 first, then 三级字, 繁体字, 其它表外字" to { assertEquals(listOf(Level.EXT, Level.L3, Level.TRAD, Level.OUT), RareLayout.ORDER) },
@@ -129,15 +128,14 @@ class RarePageTest {
         )
     }
 
-    // 061-settings-cards.md §3.2: a group opened from its card, alone, no head
+    // a group opened from its card, alone, no head
     @Test
     fun aGroupAloneWithoutItsHeadStartsAtItsFirstLetter() {
         val layout = RareLayout(listOf(RareLayout.Group(Level.L3, sorted.getValue(Level.L3), { grid.spelling(it)[0] }, open = true, head = false)))
         // b, 犇, z, 㑇
         assertRows(
             "letters and cells, no head" to { assertEquals(listOf("LETTER", "CELL", "LETTER", "CELL"), (0 until layout.size).map { layout.kind(it).name }) },
-            // R26 F8251: headOf, cellsOf and positionOf(cell) gone with no caller; the kinds above show no head row,
-            // the page's own cell() each cell row's character
+            // the kinds above show no head row; the page's cell() each cell row's character
             "the cells' rows and characters" to {
                 assertEquals(TestCharLevels.AT_8104, grid.chars[layout.cell(1)])
                 assertEquals(TestCharLevels.AT_6501, grid.chars[layout.cell(3)])
@@ -204,7 +202,7 @@ class RarePageTest {
     @Test
     fun thePagesEditsAreLaidOverTheChoiceAsMade() {
         val read = RareChoice.parse("# youmo-rare-chars 1\non\t1\ngroups\tEXT\n")
-        // each row its own page (R26 F8146: one shared, a row's numbers hung on the rows before it)
+        // each row its own page: one shared hung a row's numbers on the rows before
         fun edits() = RareEdits(grid, levels, read)
         assertRows(
             "as read: 扩展 B all held, the others none" to {

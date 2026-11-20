@@ -13,18 +13,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The 14 and 18 keys (061-neighbour-18key, the user's 11-16): a tap slipped onto a key of two letters goes by
- * where it fell, put onto that key's edge nearest the key hit, so the letter on that side is the one meant and
- * the far one goes against it; from a key of one letter or two, sideways, up or down. The key hit is the first.
- */
+/** A tap slipped onto a two-letter key is put onto its edge nearest the key hit, so the near letter is meant. */
 class NeighbourSlipPlaceTest {
 
     private val g14 = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14, neighbours = true)
     private val g18 = T9Segmenter(abbreviations = false, letters = NineKeyLetters.G18, neighbours = true)
 
-    // the slips over the whole of [typed] (two keys, each tapped at its place in [taps]), the key [at] tapped as
-    // [touch]: each syllable with how far it goes against where the taps fell
+    // the slips of [typed] with [at] tapped as [touch], each with how far it goes against the taps
     private fun T9Segmenter.slips(typed: String, taps: FloatArray, at: Int, touch: Touch): Map<String, Float> {
         val g = segment(typed, taps, touchesAt(2, at, touch))
         val out = HashMap<String, Float>()
@@ -55,7 +50,6 @@ class NeighbourSlipPlaceTest {
         // the mirrors: OP by its O, toward UI: i, not u; TY by its Y, toward UI: u, not i
         g14.slips(g14("j o"), floatArrayOf(MIDDLE, LEFT), 1, tap(G14, g14Code('o'), dx = -EDGE)).let { it.prefers("ji", "ju"); it.prefers("ji", "ku") }
         g14.slips(g14("j t"), floatArrayOf(MIDDLE, RIGHT), 1, tap(G14, g14Code('t'), dx = EDGE)).prefers("ju", "ji")
-        // from L, a key of one letter, toward JK: k, not j
         g14.slips(g14("l u"), LEFT, tap(G14, g14Code('l'), dx = -EDGE)).prefers("ku", "ju")
     }
 

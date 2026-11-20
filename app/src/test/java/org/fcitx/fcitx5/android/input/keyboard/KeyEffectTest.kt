@@ -43,11 +43,7 @@ import java.time.Duration
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * 060-render-p3 A3: a key's press effects on the canvas. A ripple grows from where the finger came down,
- * clipped to the key, fading; particles fly out by their press's seed; the pools never grow past their
- * most, however fast the keys are typed; 键盘动效 off or the keyboard hidden, none plays.
- */
+/** A ripple from where the finger came down, clipped to the key; particles by their press's seed; the pools never grow past their most. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
@@ -61,7 +57,7 @@ class KeyEffectTest {
     @Before
     fun decodeAtOnce() {
         ThemeAssets.runner = { it.run() }
-        // it writes a user's pack: the themes settled writable whatever ran before in this JVM (phoneStorage)
+        // it writes a user's pack: the themes settled writable whatever ran before in this JVM
         phoneStorage()
     }
 
@@ -70,12 +66,10 @@ class KeyEffectTest {
         ThemeAssets.runner = realRunner
     }
 
-    // a [px]-square PNG
     private fun png(px: Int): ByteArray = ByteArrayOutputStream().also {
         Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }.compress(Bitmap.CompressFormat.PNG, 100, it)
     }.toByteArray()
 
-    // a user's pack of material's file with [styles] last and the images ring.png and star.png; its light version
     private fun theme(vararg styles: String): Theme =
         materialPack("effects", *styles, files = mapOf("ring.png" to png(RING_PX), "star.png" to png(STAR_PX)))
 
@@ -87,8 +81,7 @@ class KeyEffectTest {
 
     private fun frames(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms))
 
-    // the clock run on by [ms] and the effects ticked there, no looper run: Robolectric's paused looper jumps its clock past an
-    // animator's frames, so a press a few ms after another would find the last ended
+    // no looper run: Robolectric's paused looper jumps its clock past an animator's frames, so a press a few ms after another would find the last ended
     private fun KeyboardCanvasView.clock(ms: Long) {
         ShadowSystemClock.advanceBy(Duration.ofMillis(ms))
         keyEffects.tick(SystemClock.uptimeMillis())
@@ -105,7 +98,6 @@ class KeyEffectTest {
         assertEquals(1, fx.playing)
         val inner = fx.rippleNodes().single()
         val clip = fx.rippleClips().single()
-        // clipped to the key's face, the image's middle where the finger came down (the test's press: the key's middle)
         assertTrue(clip.clipToOutline)
         assertEquals(k.shape.bounds.left.toFloat(), clip.left.toFloat(), 1f)
         assertEquals(k.anchor.x.toFloat(), clip.left + inner.translationX + inner.pivotX, 0.5f)
@@ -117,7 +109,6 @@ class KeyEffectTest {
         c.press("q", down = false)
         frames(400)
         assertEquals(0, fx.playing)
-        // ended: its animator too, no frame asked for
         assertTrue(!fx.running)
     }
 
@@ -132,14 +123,12 @@ class KeyEffectTest {
         val nodes = fx.particleNodes()
         assertEquals(12, nodes.size)
         fx.tick(start + e.ms / 2)
-        // the first press's flight: the seed 0's, eased 3/4 of the way
         val ends = e.ends(0)
         nodes.forEachIndexed { i, n ->
             assertEquals("x $i", (k.anchor.x - STAR_PX / 2.0 + ends[2 * i] * 0.75).toFloat(), n.translationX, 1e-2f)
             assertEquals("y $i", (k.anchor.y - STAR_PX / 2.0 + ends[2 * i + 1] * 0.75).toFloat(), n.translationY, 1e-2f)
             assertEquals(0.5f, n.alpha, 1e-3f)
         }
-        // drawn at 3 of the image's px a dp
         assertEquals(h.service.resources.displayMetrics.density / 3f, nodes[0].scaleX, 1e-4f)
         c.press("q", down = false)
         frames(500)
@@ -158,7 +147,6 @@ class KeyEffectTest {
             c.clock(10)
             assertTrue("${fx.pooled} after ${it + 1}", fx.pooled <= KeyEffects.MAX_PARTICLES)
         }
-        // every press played (typed fast too): the pool full, the oldest taken
         assertEquals(KeyEffects.MAX_PARTICLES, fx.pooled)
         assertEquals(KeyEffects.MAX_PARTICLES, fx.playing)
         frames(500)
@@ -177,7 +165,7 @@ class KeyEffectTest {
             c.clock(5)
         }
         assertEquals(KeyEffects.MAX_RIPPLES, fx.pooled)
-        // pool full, all in the same ms: the next press takes the one pressed longest ago, each in turn
+        // pool full, all in the same ms: the next press takes the one pressed longest ago
         fx.stop()
         val keys = "qwertyuio"
         keys.forEach { c.showPressed(KeyRef("$it"), true) }
@@ -186,7 +174,7 @@ class KeyEffectTest {
         assertEquals(keys.drop(1).dropLast(1).map { c.keyAt("$it")!!.shape.bounds.left.toInt() }, clips.drop(1))
     }
 
-    // API 29: a path's outline does not clip before 33, so a key not a rounded rectangle of one radius is clipped by its path
+    // below API 33 a path's outline does not clip: a key not a rounded rectangle is clipped by its path
     @Test
     @Config(sdk = [29])
     fun aPathKeysRippleIsClippedToItsShapeNotItsBox() =
@@ -201,7 +189,6 @@ class KeyEffectTest {
             val w = clip.width
             val h2 = clip.height
             val region = android.graphics.Region().apply { setPath(path, android.graphics.Region(0, 0, w, h2)) }
-            // the triangle's apex in, the box's top corners out
             assertTrue(region.contains(w / 2, h2 / 4))
             assertTrue(!region.contains(1, 1) && !region.contains(w - 2, 1))
             assertEquals(k.shape.bounds.left.toInt(), clip.left)
@@ -247,10 +234,8 @@ class KeyEffectTest {
 
     @Test
     fun aPacksEffectImagesAreHeldToTheirSideAndDecodedByPath() {
-        // the one it names decoded with the key images, by the pack's path
         val pack = particles() as Theme.Pack
         assertEquals(listOf(java.io.File(pack.dir, "star.png").path), ThemePackFiles.images(pack.drawn).map { it.file })
-        // one past the side (its bytes and type by ThemeAssetLimitsTest): refused, said why
         val side = ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE
         val zip = ByteArrayOutputStream().also { bytes ->
             ZipOutputStream(bytes).use {

@@ -27,19 +27,15 @@ import splitties.dimensions.dp
 import kotlin.math.min
 
 /**
- * A character's card, the first row of its held candidate's menu (BaseInputView.showCandidateActionMenu):
- * the character large on the left, each reading on its right (pinyin, zhuyin, up to two words), the
- * readings scrolled past [CharCardLayout.readingRows]; then the radical, strokes, parts and stroke order,
- * under them or, [twoColumns], beside them; [buttons] (上屏, 复制) last, under them all or, [twoColumns],
- * in the right column; [back] (the way back to the word card it was opened from) over it all, or over the
- * left column. What the card does not know it leaves out; a reading the word read it in ([CharCard.Row.inWord])
- * in [accent]. TalkBack reads it as one sentence ([CharCard.spoken]), the way back and the buttons each on its own.
+ * The first row of a held candidate's menu. [twoColumns]: the radical and the rest beside the readings,
+ * not under them. What the card does not know it leaves out. TalkBack reads it as one sentence, the way
+ * back and the buttons each on its own.
  */
 @SuppressLint("ViewConstructor")
 class CharCardView(
     context: Context,
     val card: CharCard,
-    /** The candidates' text size, in pixels: the character [CharCardLayout.CHAR_SCALE] times it. */
+    /** Px. */
     textSize: Float,
     twoColumns: Boolean,
     accent: Int,
@@ -49,20 +45,13 @@ class CharCardView(
 
     private val secondary = context.styledColorOrDefault(android.R.attr.textColorSecondary, Color.GRAY)
 
-    private fun text(s: CharSequence, sp: Float = TEXT_SP, color: Int? = null) = TextView(context).apply {
-        text = s
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
-        color?.let(::setTextColor)
-    }
-
-    // the readings, a row each: pinyin, zhuyin, the words
     private val readings = TableLayout(context).apply {
         card.readings.forEach { r ->
             addView(TableRow(context).apply {
                 val color = if (r.inWord) accent else null
-                addView(text(r.pinyin, color = color), cell())
-                addView(text(r.zhuyin, color = color), cell())
-                addView(text(r.examples.joinToString(" "), color = secondary), cell())
+                addView(cardText(r.pinyin, color = color), cell())
+                addView(cardText(r.zhuyin, color = color), cell())
+                addView(cardText(r.examples.joinToString(" "), color = secondary), cell())
             })
         }
     }
@@ -72,7 +61,6 @@ class CharCardView(
         bottomMargin = dp(ROW_GAP)
     }
 
-    /** The readings' scroller, as high as [CharCardLayout.readingRows] of them. */
     val readingsScroll: ScrollView = CappedScroll(context, CharCardLayout.readingRows(twoColumns)).apply {
         isVerticalScrollBarEnabled = true
         addView(readings)
@@ -84,9 +72,9 @@ class CharCardView(
             card.radical?.let { context.getString(R.string.char_card_radical) + " " + it },
             card.strokes?.let { context.getString(R.string.char_card_strokes, it) },
         ).joinToString(SPACE)
-        if (first.isNotEmpty()) addView(text(first))
-        card.partsShown()?.let { addView(text(context.getString(R.string.char_card_parts) + " " + it)) }
-        card.orderShown()?.let { addView(text(context.getString(R.string.char_card_order) + " " + it)) }
+        if (first.isNotEmpty()) addView(cardText(first))
+        card.partsShown()?.let { addView(cardText(context.getString(R.string.char_card_parts) + " " + it)) }
+        card.orderShown()?.let { addView(cardText(context.getString(R.string.char_card_order) + " " + it)) }
     }
 
     init {
@@ -95,7 +83,7 @@ class CharCardView(
         setPadding(pad, pad, pad, pad)
         val top = LinearLayout(context).apply {
             orientation = HORIZONTAL
-            addView(text(card.text, color = accent).apply {
+            addView(cardText(card.text, color = accent).apply {
                 setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize * CharCardLayout.CHAR_SCALE)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
@@ -104,7 +92,6 @@ class CharCardView(
         }
         if (info.childCount == 0) info.visibility = GONE
         if (twoColumns) {
-            // the readings as wide as they are, the rest what is left: the radical and the rest, the buttons under them
             val left = if (back == null) top else LinearLayout(context).apply {
                 orientation = VERTICAL
                 addView(back, LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -132,7 +119,6 @@ class CharCardView(
     }
 
     private companion object {
-        const val TEXT_SP = 16f
         const val PADDING = 12
         const val CELL_GAP = 12
         const val ROW_GAP = 2
@@ -141,9 +127,8 @@ class CharCardView(
 }
 
 /**
- * A scroller no higher than its first [rows] rows (and half the next, to show there are more): a card's readings,
- * a word card's characters. In the menu's ListView, which would take a vertical drag past the touch slop though it
- * cannot scroll, the drag is kept here while there is more to scroll to (review 051-hw-reading M1).
+ * Half the next row shows there are more. The menu's ListView would take a vertical drag past the touch slop
+ * though it cannot scroll: the drag is kept here while there is more to scroll to.
  */
 internal class CappedScroll(context: Context, private val rows: Int) : ScrollView(context) {
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
@@ -162,7 +147,15 @@ internal class CappedScroll(context: Context, private val rows: Int) : ScrollVie
     }
 }
 
-/** The labels a card's sentence for TalkBack reads, in the app's language ([CharCard.spoken], WordCard.spoken). */
+/** In [color] or the theme's. */
+internal fun View.cardText(s: CharSequence, color: Int? = null) = TextView(context).apply {
+    text = s
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, CARD_TEXT_SP)
+    color?.let(::setTextColor)
+}
+
+private const val CARD_TEXT_SP = 16f
+
 internal fun cardWords(context: Context): CharCard.Words {
     val strokeNames = context.resources.getStringArray(R.array.char_card_stroke_names)
     return CharCard.Words(
@@ -172,10 +165,7 @@ internal fun cardWords(context: Context): CharCard.Words {
     ) { strokeNames[it.ordinal] }
 }
 
-/**
- * TalkBack's name for what a tap on this view does ([label]: 展开词卡), and, [button], that it is one: a card's row
- * in the menu's first line, which the list marks disabled, is a view tapped on its own (061-word-card.md §3.5).
- */
+/** [button]: a card's row in the menu's first line, which the list marks disabled, is a view tapped on its own. */
 internal fun View.tapsTo(label: CharSequence, button: Boolean = true) {
     accessibilityDelegate = object : View.AccessibilityDelegate() {
         override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {

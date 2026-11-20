@@ -18,10 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * A theme the shots draw with: [file] of the test data, [styles] added at its end and [fonts] after its
- * colours; written so (FacadeShotsTest) that the theme maker's library's tests make the same one.
- */
+/** Written so (FacadeShotsTest) that the theme maker's library's tests make the same one. */
 data class ThemeSource(val file: String, val styles: List<String> = emptyList(), val fonts: String = "") {
     val text: String
         get() = if (styles.isEmpty() && fonts.isEmpty()) {
@@ -39,31 +36,26 @@ data class ThemeSource(val file: String, val styles: List<String> = emptyList(),
     }
 }
 
-/** A scene the snapshots hold: [board] in [env], drawn by [theme], written to snapshots/[name].txt. */
 class Shot(val name: String, val board: String, val env: Env, val theme: ThemeSource = ThemeSource.LIGHT) {
     val scene: Scene by lazy { Forms.scene(board, env, theme.theme) }
 }
 
-/** A popup's scene the snapshots hold: [ask] in [env], drawn by [theme], written to snapshots/[name].txt. */
 class PopupShot(val name: String, val env: Env, val ask: PopupAsk, val theme: ThemeSource = ThemeSource.LIGHT) {
     val scene: Scene by lazy { ask.scene(SceneBuilder(theme.theme, env, FakeMeasurer), env) }
 }
 
-/** A sample candidate bar's scene (T6a): not a popup ask, so not in the library's shots.json. */
 class BarShot(val name: String, make: () -> Scene) {
     val scene: Scene by lazy(make)
 }
 
-/**
- * Every scene the snapshots hold: every board of rules C in material-light in every form a phone
- * shows it in ([Forms.all]), and the states that change a board's look (dark, a table looking up,
- * 双拼's `;`, caps lock, English nine keys shifted, composing, an address field, each number pad,
- * 注 on, the symbols locked).
- */
 object Shots {
-    val forms: List<Shot> = Forms.boards.flatMap { board ->
+    val everyForm: List<Shot> = Forms.boards.flatMap { board ->
         Forms.all.map { (form, env) -> Shot("$board-$form", board, Forms.env(board, env)) }
     }
+
+    private val othersForms = setOf("block", "split", "landscape")
+
+    val forms: List<Shot> = everyForm.filter { it.board == "qwerty" || it.name.removePrefix("${it.board}-") in othersForms }
 
     val states: List<Shot> by lazy {
         val block = Forms.block
@@ -75,8 +67,6 @@ object Shots {
                 "qwerty-table-looking-up", "qwerty",
                 on("qwerty") { it.copy(input = it.input.copy(ime = "table", table = "wbx", composing = true, lookingUp = true)) },
             ),
-            // 五笔's roots over the letters, more than three in two lines (TableKeyboard.label), a letter
-            // with none itself (the app's); the letters in the corners
             Shot(
                 "qwerty-table-roots", "qwerty",
                 on("qwerty") {
@@ -87,7 +77,6 @@ object Shots {
                             other = Fixtures.qwertyAlts.keys.associate { k -> "root:$k" to k } +
                                 mapOf("root:g" to "王一\n五戋", "root:f" to "土士二干\n十寸雨", "root:q" to "金", "root:y" to "言文方"),
                         ),
-                        // the letter its corner (KeyResolver, looking up roots)
                         marks = it.marks.copy(shortcuts = it.marks.shortcuts + Fixtures.qwertyAlts.keys.map { k -> "full/$k:up" to MarkContent.Symbol(k) }),
                     )
                 },
@@ -97,7 +86,6 @@ object Shots {
                 on("qwerty") { it.copy(input = it.input.copy(ime = "shuangpin", schemeTypes = setOf("semicolon"))) },
             ),
             Shot("qwerty-caps-lock", "qwerty", on("qwerty") { it.copy(shift = Shift.Lock) }),
-            // English maps no punctuation (as the app has it): 1's face , . ? ! as it types
             Shot("nine-english-shifted", "nine", on("nine") {
                 it.copy(input = it.input.copy(ime = "english"), shift = Shift.Once, texts = it.texts.copy(punctuation = emptyMap()))
             }),
@@ -112,16 +100,11 @@ object Shots {
         ) + PADS.map { pad -> Shot("number-pad-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad)) }) }
     }
 
-    /**
-     * 060-render-p3 T4a, the text on a key: material-light with one look more each, on the block qwerty
-     * (its letters with their symbols, the space and ⌫ with their swipes, Return with its icon).
-     */
     val looks: List<Shot> by lazy {
         val block = Forms.env("qwerty", Forms.block)
         listOf(
             Shot("qwerty-align-top-left", "qwerty", block, styled("<style select=\"key\" align=\"top-left\"/>")),
             Shot("qwerty-align-top-center", "qwerty", block, styled("<style select=\"key\" align=\"top-center\"/>")),
-            // round keys (radius 50%): the glyph in from the corner's arc, not out in the box's corner
             Shot("nine-align-top-left-round", "nine", Forms.env("nine", Forms.block), styled("<style select=\"key\" align=\"top-left\" radius=\"50%\"/>")),
             Shot("qwerty-letter-spacing", "qwerty", block, styled("<style select=\"key\" letter-spacing=\"0.2em\"/>")),
             Shot(
@@ -138,7 +121,6 @@ object Shots {
                 styled("<style select=\"*/enter\" return-icon-send=\"text(发送)\"/>"),
             ),
             Shot("qwerty-hint-mark-hidden", "qwerty", block, styled("<style select=\"key hint\" hidden=\"true\"/>", "<style select=\"key mark\" hidden=\"true\"/>")),
-            // a long one smaller by itself: the function keys' text as ever
             Shot(
                 "qwerty-return-long", "qwerty", block.copy(texts = block.texts.copy(returnIcon = "send")),
                 styled("<style select=\"*/enter\" return-icon-send=\"text(发送这条消息)\"/>"),
@@ -146,13 +128,8 @@ object Shots {
         )
     }
 
-    /**
-     * 060-render-p3 T4b, a key's shape and cap: material-light with one more each on the block qwerty
-     * (a path with curves and a border, an inner shadow, a depth, and the three with a shadow together).
-     */
     val shapes: List<Shot> by lazy {
         val block = Forms.env("qwerty", Forms.block)
-        // a rectangle rounded by quadratic curves, a cubic bulging its top
         val path = "path(M0 .15 Q0 0 .15 0 C.4 .05 .6 .05 .85 0 Q1 0 1 .15 V.85 Q1 1 .85 1 H.15 Q0 1 0 .85 Z)"
         listOf(
             Shot("qwerty-path", "qwerty", block, styled("<style select=\"key\" shape=\"$path\" border=\"1dp #40000000\"/>")),
@@ -167,11 +144,8 @@ object Shots {
 
     val all: List<Shot> get() = forms + states + looks + shapes
 
-    /**
-     * Each popup ([Forms.popups]) in the forms that change how one looks: block, flat, floating (its text
-     * smaller); and on the block, T4b's: the bubble with its tail, larger and up; a path; the long press's
-     * cell in focus with its radius and border.
-     */
+    val drawn: List<Shot> get() = everyForm + states + looks + shapes
+
     val popups: List<PopupShot> = listOf("block" to Forms.block, "flat" to Forms.flat, "floating" to Forms.floating).flatMap { (form, env) ->
         Forms.popupAsks.map { (name, ask) -> PopupShot("popup-$name-$form", env, ask) }
     } + listOf(
@@ -184,11 +158,6 @@ object Shots {
         PopupShot("popup-$name-block", Forms.block, asks.getValue(if (name.startsWith("keys")) "keys" else "preview-symbol"), styled(style))
     }
 
-    /**
-     * T6a's sample candidate bar ([BarSample]) on a phone (2.75 px a dp, 候选字号 20sp): material-light's, as
-     * the app drew it before; a theme's pills on a coloured bar, the first in another colour, numbered,
-     * the comment its own colour, spaced; dotted, no lines between, padded by the theme; in dark.
-     */
     val bars: List<BarShot> = listOf(
         "default" to emptyList(),
         "capsule" to listOf(
@@ -213,23 +182,16 @@ object Shots {
 
     private val BAR = BarSample.Metrics(width = 1080.0, height = 110.0, density = 2.75, textSize = 55.0, paddingDp = 9.0, minWidthDp = 32.0)
 
-    // material-light with [styles] more, and [fonts]
     private fun styled(vararg styles: String, fonts: String = "") = ThemeSource("material-light.xml", styles.toList(), fonts)
 
-    // NumberPad's, full being every form's
     private val PADS = listOf("digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
 }
 
-/**
- * 060-render-v2 §9: [Shots], each key in its normal and pressed state, as [SceneText] writes them.
- * The JVM writes them (-Psnapshots.record=true) and both targets compare with what is committed, so
- * the JVM and JS engines agree to the hundredth of a pixel or one of them fails. A change to the
- * engine shows here as a diff to review.
- */
+/** The JVM writes them (-Psnapshots.record=true) and both targets compare with what is committed, so the JVM and JS agree. */
 class SnapshotTest {
 
     @Test
-    fun everyBoardInEveryForm() = checkAll(Shots.forms)
+    fun everyBoardInItsForms() = checkAll(Shots.forms)
 
     @Test
     fun theStatesThatChangeABoard() = checkAll(Shots.states)
@@ -248,11 +210,10 @@ class SnapshotTest {
 
     @Test
     fun noBoardWarnsInAnyForm() {
-        val warned = Shots.forms.mapNotNull { s -> s.scene.warnings.takeIf { it.isNotEmpty() }?.let { "${s.name}: $it" } }
+        val warned = Shots.everyForm.mapNotNull { s -> s.scene.warnings.takeIf { it.isNotEmpty() }?.let { "${s.name}: $it" } }
         assertTrue(warned.isEmpty(), warned.joinToString("\n"))
     }
 
-    // L-10: a snapshot no shot writes any more is stale, not kept
     @Test
     fun everySnapshotIsAShot() {
         // recording, the shots may not all be written yet (the tests run in any order)
@@ -263,7 +224,6 @@ class SnapshotTest {
         assertEquals(names.map { "$it.txt" }.sorted(), files)
     }
 
-    // each differing file named, not just the first
     private fun checkAll(shots: List<Shot>) = check(shots.map { it.name to it.scene })
 
     private fun check(shots: List<Pair<String, Scene>>) {

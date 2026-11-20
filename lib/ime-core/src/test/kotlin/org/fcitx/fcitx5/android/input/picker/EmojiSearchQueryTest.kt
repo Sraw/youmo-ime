@@ -40,7 +40,7 @@ class EmojiSearchQueryTest {
         assertEquals("", query.text)
     }
 
-    // ⌫'s slots (060-keys-unify J1): the query's, not the field's
+    // ⌫'s slots: the query's, not the field's
     @Test
     fun clearAllThenRestoreOnce() {
         query.type("xiao")

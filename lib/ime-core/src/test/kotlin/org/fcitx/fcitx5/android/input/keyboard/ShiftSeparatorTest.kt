@@ -10,7 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** KB-106: the full keyboard's Shift is 分词 while pinyin or 双拼 is typed, Shift otherwise. */
+/** The full keyboard's Shift is 分词 while pinyin or 双拼 is typed, Shift otherwise. */
 class ShiftSeparatorTest {
 
     @Test

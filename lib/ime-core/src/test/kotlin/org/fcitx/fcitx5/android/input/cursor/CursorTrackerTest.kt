@@ -10,17 +10,10 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * [CursorTracker] reconciles the cursor position the IME optimistically predicts against the
- * position the editor actually reports back. `predict` queues an expected position; `consume`
- * is fed what the editor reported and drops every prediction up to and including the match.
- */
 class CursorTrackerTest {
 
     private fun tracker(start: Int = 0, end: Int = start) =
         CursorTracker().apply { resetTo(start, end) }
-
-    // region initial state
 
     @Test
     fun startsCollapsedAtZero() {
@@ -54,8 +47,7 @@ class CursorTrackerTest {
         assertFalse(t.consume(2))
     }
 
-    // a select-all-on-focus field (an address bar) typed in, then the screen turned: input restarts
-    // with the EditorInfo of the field's first start, the whole text selected in it (seen on redroid)
+    // an address bar typed in, then the screen turned: input restarts with the first EditorInfo, all selected
     @Test
     fun inputStartedAgainKeepsTheSelectionFollowedNotTheFirstStarts() {
         val t = tracker(0)
@@ -67,10 +59,6 @@ class CursorTrackerTest {
         t.startInput(again = false, initialStart = 0, initialEnd = 5)
         assertTrue(t.latest.rangeEquals(0, 5))
     }
-
-    // endregion
-
-    // region predict
 
     @Test
     fun predictMovesLatestButNotCurrent() {
@@ -89,13 +77,7 @@ class CursorTrackerTest {
         assertTrue(t.latest.rangeEquals(3, 3))
     }
 
-    /**
-     * `predict` skips queuing a prediction equal to `latest`. That dedup is a memory
-     * optimisation only -- mutation testing confirms it has no effect observable through the
-     * public API, because duplicates are always adjacent (so `latest` is unchanged) and
-     * `consume` drains greedily from the front. These three tests therefore assert what is
-     * actually observable: repeated predictions keep the tracker in sync.
-     */
+    /** The dedup of a prediction equal to `latest` is a memory optimisation only: these assert what is observable. */
     @Test
     fun predictingThePositionAlreadyHeldStaysInSync() {
         val t = tracker(4)
@@ -135,10 +117,7 @@ class CursorTrackerTest {
         assertTrue(t.current.rangeEquals(2, 6))
     }
 
-    /**
-     * `predict(CursorRange)` queues a copy. Because `CursorRange` wraps a mutable array, the
-     * caller changing its instance afterwards must not rewrite the queued prediction.
-     */
+    /** `CursorRange` is mutable: changing the caller's instance must not rewrite the queued prediction. */
     @Test
     fun predictQueuesACopyOfTheGivenRange() {
         val t = tracker(0)
@@ -148,10 +127,6 @@ class CursorTrackerTest {
         assertTrue("the queued prediction kept its bounds", t.latest.rangeEquals(3, 3))
         assertTrue(t.consume(3))
     }
-
-    // endregion
-
-    // region predictOffset
 
     @Test
     fun predictOffsetIsRelativeToLatestNotCurrent() {
@@ -182,7 +157,6 @@ class CursorTrackerTest {
     fun predictOffsetCanMoveTheTwoBoundsIndependently() {
         val t = tracker(0)
         t.resetTo(3, 7)
-        // grow the selection to the right only
         t.predictOffset(0, 2)
         assertTrue(t.latest.rangeEquals(3, 9))
     }
@@ -195,10 +169,6 @@ class CursorTrackerTest {
         assertTrue(t.consume(5))
         assertTrue(t.current.rangeEquals(5, 5))
     }
-
-    // endregion
-
-    // region consume
 
     @Test
     fun consumingTheSinglePredictionMatches() {
@@ -215,10 +185,7 @@ class CursorTrackerTest {
         assertTrue("no prediction needed when nothing moved", t.consume(4))
     }
 
-    /**
-     * Matching a prediction in the middle drops everything queued before it and keeps what
-     * came after: the editor is behind, later predictions are still in flight.
-     */
+    /** Matching mid-queue drops everything before it and keeps what came after. */
     @Test
     fun consumingAMiddlePredictionDropsEarlierOnesAndKeepsLaterOnes() {
         val t = tracker(0)
@@ -234,11 +201,7 @@ class CursorTrackerTest {
         assertTrue(t.latest.rangeEquals(3, 3))
     }
 
-    /**
-     * A position nobody predicted means an external edit (the user tapped elsewhere, another
-     * app moved the cursor). Every prediction is stale, so the queue is emptied and `current`
-     * jumps to what the editor reported.
-     */
+    /** An unpredicted position is an external edit: the queue empties and `current` jumps. */
     @Test
     fun consumingAnUnpredictedPositionResynchronises() {
         val t = tracker(0)
@@ -264,11 +227,7 @@ class CursorTrackerTest {
         assertTrue("current is stored ascending", t.current.rangeEquals(4, 9))
     }
 
-    /**
-     * Pins an asymmetry: predictions are matched against the raw arguments, but `current` is
-     * written through `update`, which normalises. So a prediction of [4,9] is NOT matched by
-     * `consume(9, 4)` even though `current` ends up as [4,9] either way.
-     */
+    /** Predictions match raw arguments while `current` normalises: [4,9] is not matched by `consume(9, 4)`. */
     @Test
     fun consumeMatchesPredictionsBeforeNormalising() {
         val t = tracker(0)
@@ -277,10 +236,7 @@ class CursorTrackerTest {
         assertTrue("current still normalises to the same range", t.current.rangeEquals(4, 9))
     }
 
-    /**
-     * Pins the `current` fast path: when the reported position already equals `current`,
-     * `consume` returns early and leaves queued predictions in place. They remain matchable.
-     */
+    /** A report equal to `current` returns early, leaving the queue matchable. */
     @Test
     fun consumingCurrentPositionLeavesPendingPredictionsQueued() {
         val t = tracker(4)
@@ -300,14 +256,7 @@ class CursorTrackerTest {
         assertTrue(t.current.rangeEquals(2, 5))
     }
 
-    // endregion
-
-    // region queue behaviour
-
-    /**
-     * The `ArrayDeque(16)` is an initial capacity, not a bound. Predictions past the 16th must
-     * still be queued, otherwise a burst of edits would silently desynchronise the tracker.
-     */
+    /** The `ArrayDeque(16)` is a capacity, not a bound. */
     @Test
     fun queueGrowsPastItsInitialCapacity() {
         val t = tracker(0)
@@ -316,10 +265,6 @@ class CursorTrackerTest {
         assertTrue("and the first is still matchable", t.consume(1))
         assertTrue("with the rest still in flight", t.latest.rangeEquals(100, 100))
     }
-
-    // endregion
-
-    // region settled and changes
 
     /** One deleted and one put in: back where the editor reported, which it has not reported yet. */
     @Test
@@ -336,7 +281,7 @@ class CursorTrackerTest {
         assertTrue(t.settled)
     }
 
-    // what PostedCommit reads of it is only whether it is the same at two reads, not by how much it moved
+    // PostedCommit only reads whether it is the same at two reads, not by how much
     @Test
     fun changesCountsPredictionsUnexpectedReportsAndResetsButNotConfirmations() {
         val t = tracker(0)
@@ -359,11 +304,6 @@ class CursorTrackerTest {
         assertNotEquals("a reset", before, t.changes)
     }
 
-    // endregion
-
-    // region end-to-end sequences
-
-    /** Typing "abc" one character at a time, with the editor confirming each keystroke. */
     @Test
     fun typingSequenceStaysInSync() {
         val t = tracker(0)
@@ -375,7 +315,6 @@ class CursorTrackerTest {
         assertTrue(t.latest.rangeEquals(3, 3))
     }
 
-    /** The IME runs ahead of a slow editor, then the editor catches up in one report. */
     @Test
     fun editorLaggingBehindSeveralPredictionsCatchesUpAtOnce() {
         val t = tracker(0)
@@ -388,7 +327,6 @@ class CursorTrackerTest {
         assertTrue("nothing left in flight", t.latest.rangeEquals(3, 3))
     }
 
-    /** The user taps elsewhere mid-composition; the tracker must resynchronise, not drift. */
     @Test
     fun externalCursorMoveDuringCompositionResynchronises() {
         val t = tracker(0)
@@ -398,13 +336,11 @@ class CursorTrackerTest {
         assertFalse("the tap was never predicted", t.consume(50))
         assertTrue(t.current.rangeEquals(50, 50))
 
-        // subsequent typing continues from the new position
         t.predictOffset(1)
         assertTrue(t.consume(51))
         assertTrue(t.current.rangeEquals(51, 51))
     }
 
-    /** Selecting a range, then replacing it with a single character. */
     @Test
     fun replacingASelectionCollapsesTheRange() {
         val t = tracker(0)
@@ -415,5 +351,4 @@ class CursorTrackerTest {
         assertTrue(t.current.rangeEquals(4, 4))
     }
 
-    // endregion
 }

@@ -9,27 +9,18 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The space's cursor up and down (060-space-2d): vertical steps only after a sideways one. */
+/** The space's cursor up and down: vertical steps only after a sideways one. */
 class KeyGestureCrossYTest {
 
-    private fun recognizer(cross: Float = 28f) = KeyGestureRecognizer().apply {
-        touchSlop = 8f
-        viewWidth = 400
-        viewHeight = 100
-        swipeEnabled = true
-        swipeRepeatEnabled = true
-        axisLock = true
-        swipeThresholdX = 10f
-        swipeThresholdY = 30f
-        crossStepY = cross
-    }
-
-    private fun KeyGestureRecognizer.move(x: Float, y: Float) =
-        onMove(x, y, longPressTriggered = false, repeatStarted = false)
+    private fun crossing(cross: Float = 28f) =
+        recognizer(swipeRepeat = true, width = 400, height = 100, thresholdX = 10f, thresholdY = 30f).apply {
+            axisLock = true
+            crossStepY = cross
+        }
 
     @Test
     fun afterASidewaysStepUpAndDownMoveLines() {
-        val r = recognizer()
+        val r = crossing()
         r.onDown(200f, 50f)
         assertEquals(2, r.move(222f, 52f).countX)
         // counted from where the finger was at the first sideways step
@@ -45,7 +36,7 @@ class KeyGestureCrossYTest {
 
     @Test
     fun aDiagonalSampleCarriesBoth() {
-        val r = recognizer()
+        val r = crossing()
         r.onDown(200f, 50f)
         assertEquals(1, r.move(212f, 50f).countX)
         val both = r.move(242f, 20f)
@@ -56,7 +47,7 @@ class KeyGestureCrossYTest {
     @Test
     fun sidewaysStepsAreTheSameWithLinesOnOrOff() {
         val path = listOf(213f to 52f, 236f to 30f, 251f to 5f, 230f to 40f, 190f to 90f, 160f to 60f, 171f to -20f)
-        fun xs(cross: Float) = recognizer(cross).run {
+        fun xs(cross: Float) = crossing(cross).run {
             onDown(200f, 50f)
             path.map { (x, y) -> move(x, y).countX }
         }
@@ -65,7 +56,7 @@ class KeyGestureCrossYTest {
 
     @Test
     fun upFirstIsTheSwipeUpAndNoLine() {
-        val r = recognizer()
+        val r = crossing()
         r.onDown(200f, 80f)
         assertEquals(-1, r.move(202f, 45f).countY)
         assertEquals(0, r.move(260f, 0f).countCrossY)
@@ -74,7 +65,7 @@ class KeyGestureCrossYTest {
 
     @Test
     fun aSmallDriftWhileSlidingSidewaysMovesNoLine() {
-        val r = recognizer()
+        val r = crossing()
         r.onDown(200f, 50f)
         r.move(215f, 50f)
         var lines = 0
@@ -84,12 +75,12 @@ class KeyGestureCrossYTest {
 
     @Test
     fun offOrANewTouchCountsNone() {
-        val off = recognizer(cross = 0f)
+        val off = crossing(cross = 0f)
         off.onDown(200f, 50f)
         off.move(222f, 50f)
         assertEquals(0, off.move(222f, -50f).countCrossY)
 
-        val r = recognizer()
+        val r = crossing()
         r.onDown(200f, 50f)
         r.move(222f, 50f)
         r.onUp(0, longPressTriggered = false, repeatStarted = false)

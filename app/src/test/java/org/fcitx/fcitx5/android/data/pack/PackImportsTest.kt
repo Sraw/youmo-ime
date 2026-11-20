@@ -25,13 +25,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-// the files picked on the 资源包 page imported in turn: the page's side of an older pack over a newer one
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PackImportsTest {
 
-    // the page's side of an older pack over a newer one: the question published while the import waits, the
-    // answer resumes it, the question cleared; the next file asked only once the first is answered
+    // the question published while the import waits, the answer resumes it; the next file asked once the first is answered
     @Test
     fun theReplaceQuestionWaitsForThePagesAnswerOneFileAtATime() {
         val manifestOf = { version: Int -> PackManifest.parse(TestShelves.packs.manifest(PackKind.TEXT, mapOf("handwriting/test.txt" to "x".toByteArray()), version)) }

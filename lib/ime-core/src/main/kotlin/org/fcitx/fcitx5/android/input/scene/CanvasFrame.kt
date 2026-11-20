@@ -8,21 +8,12 @@ import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import kotlin.math.hypot
 
-/**
- * What a frame of the keys' canvas (the app's KeyboardCanvasView) draws of a key, as values: the
- * view only records and draws what this says.
- */
+/** What a frame of KeyboardCanvasView draws of a key, as values: the view only records and draws this. */
 object CanvasFrame {
 
-    /** A face of a key drawn this frame: its [pressed] one or not, at [alpha], recorded first where [record]. */
     data class Face(val pressed: Boolean, val alpha: Float, val record: Boolean)
 
-    /**
-     * A key's faces this frame, [pressed] or not, each [normalRecorded] / [pressedRecorded] already.
-     * The normal face always, the pressed one once it was ever recorded: a node no frame draws is
-     * taken out of the render tree and loses its recording (seen on a device: a key let go drawn as
-     * nothing), so both stay drawn and a press only changes their alpha, the face not shown at 0.
-     */
+    /** The normal face always, the pressed one once recorded: a node no frame draws loses its recording (a released key drew as nothing), so presses change alpha only. */
     fun faces(pressed: Boolean, normalRecorded: Boolean, pressedRecorded: Boolean): List<Face> =
         FACES[(if (pressed) PRESSED else 0) + (if (normalRecorded) NORMAL_RECORDED else 0) + (if (pressedRecorded) PRESSED_RECORDED else 0)]
 
@@ -31,19 +22,13 @@ object CanvasFrame {
         if (pressed || pressedRecorded) add(Face(pressed = true, alpha = if (pressed) 1f else 0f, record = !pressedRecorded))
     }
 
-    // the eight answers made once: asked for each key in each frame, a list and its faces each time
+    // the eight answers made once: asked for each key in each frame
     private const val PRESSED = 4
     private const val NORMAL_RECORDED = 2
     private const val PRESSED_RECORDED = 1
     private val FACES = List(PRESSED * 2) { i -> made(i and PRESSED != 0, i and NORMAL_RECORDED != 0, i and PRESSED_RECORDED != 0) }
 
-    /**
-     * The box a key's node is recorded in: its [bounds] and whatever of [ops] reaches past them (a
-     * shadow by its blur, a text by a generous guess of its ink with its letter spacing, stroke and
-     * shadow, either turned any way about its point where it is rotated), [pad] more round it for the edges' anti-aliasing. The node is the
-     * key's place, not the whole view's, so what a key draws is all it holds; it does not narrow what a
-     * frame redraws: a press invalidates the view, whose list of nodes is recorded again, all of it.
-     */
+    /** [bounds] and whatever of [ops] reaches past them (shadow blur, a generous text-ink guess, rotation), [pad] more for anti-aliasing. */
     fun extent(bounds: Box, ops: List<Op>, pad: Double): Box {
         var b = bounds
         for (op in ops) {
@@ -75,13 +60,13 @@ object CanvasFrame {
         return Box(b.left - pad, b.top - pad, b.right + pad, b.bottom + pad)
     }
 
-    // [box] turned any way about ([x], [y]): within the square round that point reaching its farthest corner
+    // the square round ([x], [y]) reaching its farthest corner
     private fun turned(box: Box, x: Double, y: Double): Box {
         val r = listOf(box.left, box.right).maxOf { cx -> listOf(box.top, box.bottom).maxOf { cy -> hypot(cx - x, cy - y) } }
         return Box(x - r, y - r, x + r, y + r)
     }
 
-    /** Whether [ops] show the theme's picture: drawn where the view is over it, recorded again when that moves. */
+    /** Recorded again when the view moves over the picture. */
     fun showsPicture(ops: List<Op>): Boolean = ops.any { it is Op.Picture }
 
     // a text's ink at most this many times its size above and below its baseline (accents, descenders)

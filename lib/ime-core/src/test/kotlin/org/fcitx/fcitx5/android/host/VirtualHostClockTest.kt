@@ -11,7 +11,7 @@ class VirtualHostClockTest {
 
     @Test
     fun aTimerDueWhileAnotherSpendsRunsLateNotBackInTime() {
-        // HostClock.uptimeMillis is monotonic: learning's now() and FieldPolicy read it in replays (F4008)
+        // HostClock.uptimeMillis is monotonic: learning's now() and FieldPolicy read it in replays
         val clock = VirtualHostClock()
         val seen = mutableListOf<Long>()
         clock.schedule(10) { clock.spend(1); seen += clock.uptimeMillis() }

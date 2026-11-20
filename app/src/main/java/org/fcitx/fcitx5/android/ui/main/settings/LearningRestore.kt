@@ -25,10 +25,8 @@ import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 
 /**
- * A backup restored, and the other acts on backups, from [fragment]: the backups page's and the
- * first start's (以前用过？从备份恢复, U-106), which picks the file itself, as the settings are not
- * reached before the setup is done (review-E-ui M1). [fcitx] is asked when first needed, so the
- * first start runs fcitx only for a restore; [ran] follows each act.
+ * Backup acts for the backups page and the first start (以前用过？从备份恢复, which picks the file itself as settings
+ * are not reachable before setup). [fcitx] is asked lazily, so the first start runs fcitx only for a restore.
  */
 internal class LearningRestore(
     private val fragment: Fragment,
@@ -37,10 +35,7 @@ internal class LearningRestore(
 ) {
     private val ctx get() = fragment.requireContext()
 
-    /**
-     * The one call the engine takes (HostApi.learning): a backup's op always answers a BackupResult,
-     * null only when the record is not open (LearningResult.Unavailable: the phone not unlocked yet).
-     */
+    /** Null only when the record is not open (LearningResult.Unavailable: the phone not unlocked yet). */
     suspend fun backups(op: BackupOp): BackupResult? =
         fcitx().runOnReady { learning(op) } as? BackupResult
 
@@ -61,16 +56,12 @@ internal class LearningRestore(
 
     fun confirm(title: Int, message: String, ok: () -> Unit) = confirmDialog(ctx, title, message, ok)
 
-    /**
-     * Said on [ctx] that [result] failed, [op] logged with the engine's reason: that reason is an
-     * exception's text, not for the user. A file that does not read is told apart in [from].
-     */
+    /** The engine's reason is logged only (an exception's text); an unreadable file is told apart in [from]. */
     private suspend fun failed(ctx: Context, op: BackupOp, result: BackupResult?) {
         Timber.w("learning %s failed: %s", op.javaClass.simpleName, result?.error)
         ctx.toast(if (result == null) R.string.learning_not_now else fcitx().runOnReady { failedMessage(op) })
     }
 
-    /** [op] done, said if it failed. */
     fun run(op: BackupOp, done: (BackupResult) -> Unit = {}) {
         val ctx = ctx
         fragment.lifecycleScope.withLoadingDialog(ctx) {
@@ -80,7 +71,7 @@ internal class LearningRestore(
         }
     }
 
-    /** The phone's learning as a backup, saved to [uri] the user picked; [saved] said once it is. */
+    /** [saved] said once it is. */
     fun saveCopy(uri: Uri, saved: Int) {
         val ctx = ctx
         fragment.lifecycleScope.withLoadingDialog(ctx) {
@@ -97,13 +88,12 @@ internal class LearningRestore(
         }
     }
 
-    /** A backup, a bare log, or the user dictionary's export the user picked: the engine tells which, and restores each as a restore (退回恢复前 takes it back). */
+    /** A backup, a bare log, or the user dictionary's export: the engine tells which; each a restore (退回恢复前 undoes it). */
     fun from(uri: Uri) {
         val ctx = ctx
         fragment.lifecycleScope.withLoadingDialog(ctx) {
             ctx.showingFileErrors("learning restore") {
-                // the picker takes any file: one picked by mistake (a video) is told from its head,
-                // never read whole into memory, and a backup read with a bound (review R11)
+                // the picker takes any file: a wrong one (a video) is told from its head, never read whole, a backup read with a bound
                 val bytes = withContext(Dispatchers.IO) {
                     ctx.contentResolver.openInputStreamOrThrow(uri).use { input ->
                         input.readPicked(HEAD, MAX_BACKUP) { LearnBackup.isBackup(it) || WordListFiles.isUserExport(it) }
@@ -128,13 +118,13 @@ internal class LearningRestore(
     }
 
     companion object {
-        // as much of a file as tells a backup or an export (PinyinDictionaryFragment's peek)
+        // enough to tell a backup or an export (PinyinDictionaryFragment's peek)
         private const val HEAD = 64 shl 10
 
-        // far more than years of typing make: a log's records are small
+        // far more than years of typing make
         private const val MAX_BACKUP = 64 shl 20
 
-        /** An OK/Cancel question, [ok] done on OK: the one every learning and input method page asks. */
+        /** The one every learning and input method page asks. */
         fun confirmDialog(ctx: Context, title: Int, message: CharSequence, ok: () -> Unit) {
             AlertDialog.Builder(ctx)
                 .setTitle(title)

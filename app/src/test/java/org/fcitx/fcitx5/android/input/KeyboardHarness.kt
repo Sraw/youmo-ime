@@ -74,33 +74,24 @@ import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowPopupMenu
 
 /**
- * The whole keyboard on the JVM: the real [FcitxInputMethodService] built by Robolectric, its
- * [InputView] made as on a device, on a [FakeHostApi] instead of the Kotlin host (the seam
- * [HostDaemon.testConnection]). Engine output comes from events pushed with [emit]; what the
- * keys asked of the engine is in [api]`.calls`.
- *
- * [theme] is made the active one first; null keeps what is active.
- * Needs `@Config(application = FcitxApplication::class)`; screenshots also `@GraphicsMode(NATIVE)`.
- * Call [close] at the end (an `@After`): the daemon seam is global.
+ * The real [FcitxInputMethodService] under Robolectric on a [FakeHostApi] (via [HostDaemon.testConnection]): push
+ * engine events with [emit], read what the keys asked in [api]`.calls`. [theme] null keeps the active one.
+ * Needs `@Config(application = FcitxApplication::class)` (screenshots also `@GraphicsMode(NATIVE)`); call [close]
+ * in `@After`, since the daemon seam is global.
  */
 class KeyboardHarness(
     theme: Theme? = TestThemes.PixelLight,
     im: InputMethodEntry = PINYIN,
-    /** A real host to type through (a [KotlinHost] on a scripted engine) in place of [api]; [ready] the one a job waits on, a wrapper's too. */
+    /** A real host to type through instead of [api]; [ready] is the one a job waits on, a wrapper's too. */
     host: HostApi? = null, ready: org.fcitx.fcitx5.android.core.KotlinHost? = host as? org.fcitx.fcitx5.android.core.KotlinHost,
-    /** Each input method's keyboard (I1), [NINE_KEYS] pinyin's nine keys: set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
+    /** Set before the keyboard is made, put back at [close]; null leaves the preferences as they are. */
     keyboards: ImKeyboards.Chosen? = null,
-    /**
-     * 编码行: embedded, every test's baseline (OneDefaultPreferencesShadow), unless a test asks for the
-     * strip floating (the default since 0.5.1): set before the keyboard is made, put back at [close].
-     * Only a change is made: each one rebuilds the input view of every keyboard alive.
-     */
+    /** Tests default to embedded; set before the keyboard is made, restored at [close]; set only if it differs, since a change rebuilds every input view. */
     codeRow: CodeRowStyle = CodeRowStyle.Embedded,
 ) : AutoCloseable {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    // the fields' activities, destroyed at [close]
     private val activities = mutableListOf<org.robolectric.android.controller.ActivityController<Activity>>()
     val api = FakeHostApi().apply { inputMethodEntryCached = im }
     private val controller: ServiceController<FcitxInputMethodService>
@@ -111,24 +102,22 @@ class KeyboardHarness(
     private val codeRowWas = ThemeManager.prefs.codeRow.getValue().takeIf { it != codeRow }
 
     init {
-        // both resource packs there, as on a user's phone: without the text pack the keyboard is a
-        // prompt to import it (PackGateView); a test of that, or of voice input's, puts its own
+        // both packs installed, else the keyboard is PackGateView's import prompt; a test of that puts its own
         TestShelves.use()
         keyboards?.let(::setKeyboards)
         codeRowWas?.let { ThemeManager.prefs.codeRow.setValue(codeRow) }
         val connection = host?.let { HarnessConnection(scope, it, ready) } ?: FakeHostConnection(scope, api)
         HostDaemon.testConnection = { connection }
-        // the seam is global: a harness that fails to build leaves it to no later test (no close() to call)
+        // the seam is global: a harness that fails to build must not leave it set
         try {
             theme?.let(ThemeManager::setNormalModeTheme)
             controller = Robolectric.buildService(FcitxInputMethodService::class.java).create()
             service = controller.get()
-            // the token the system gives an input method's window, without which it is never shown
-            // (InputMethod.attachToken wants a display area Robolectric has not: SoftInputWindow's own setter)
+            // without the window token it is never shown; InputMethod.attachToken wants a display area Robolectric lacks
             service.window.javaClass.getDeclaredMethod("setToken", IBinder::class.java)
                 .apply { isAccessible = true }.invoke(service.window, Binder())
             service.onCreateInputView()
-            // Robolectric clears the clipboard's listeners after each test: the app's, added once a process, again
+            // Robolectric clears the clipboard's listeners after each test; the app adds its own once a process
             service.getSystemService(android.content.ClipboardManager::class.java).let {
                 it.removePrimaryClipChangedListener(org.fcitx.fcitx5.android.data.clipboard.ClipboardManager)
                 it.addPrimaryClipChangedListener(org.fcitx.fcitx5.android.data.clipboard.ClipboardManager)
@@ -143,35 +132,27 @@ class KeyboardHarness(
         }
     }
 
-    /** The [InputView] the service made (made anew when a setting needs it, so looked up each time). */
+    /** Looked up each time: a setting may remake it. */
     val inputView: InputView get() = find(service.window.window!!.decorView) ?: error("no InputView")
 
-    /** The board under the bar: the letters, a panel, the pad (the window manager's view), docked where it is. */
+    /** Under the bar: the letters, a panel or the pad. */
     val board: View get() = inputView.findViewById(R.id.input_window)
 
-    /** The bar over the board: toolbar, candidates or a panel's title, as wide as the board or the screen. */
     val bar: View
         get() = inputView.kawaiiBar.view
 
-    /** The part a screenshot shows: bar, keys and their background, not the transparent room above. */
+    /** What a screenshot shows: bar, keys and their background, not the transparent room above. */
     val keyboard: View get() = inputView.keyboardView
 
-    /** The field being typed in: what the keyboard commits lands here, through its own InputConnection. */
     lateinit var field: EditText
         private set
 
-    /** The field's [EditorInfo], as [start] or [restart] gave it to the service. */
     lateinit var info: EditorInfo
         private set
 
     private lateinit var connection: InputConnection
 
-    /**
-     * Focus a field of this [inputType], as the app's field gaining focus would; [packageName] the
-     * app's, [fieldId] its view's (one field told from another by them, as ContextMemory.field does),
-     * [prefill] what the app put in it before it was focused. [terminal]: the field tells TYPE_NULL yet its
-     * connection takes text, as Termux's view (a BaseInputConnection over its own buffer) does.
-     */
+    /** [fieldId] tells fields apart as ContextMemory.field does; [terminal]: TYPE_NULL yet taking text, as Termux's view. */
     fun start(
         inputType: Int = InputType.TYPE_CLASS_TEXT,
         imeOptions: Int = 0,
@@ -197,13 +178,12 @@ class KeyboardHarness(
         }
         val target = field
         val made = ++connectionsMade
-        // a key the keyboard sends (←, Home, Ctrl+Z) the system hands to the focused view: Robolectric's does not
+        // the system hands sent keys to the focused view; Robolectric's connection does not
         val ic = object : android.view.inputmethod.InputConnectionWrapper(field.onCreateInputConnection(info), true) {
-            // closed (closeConnection): every call dropped, as the system's connection to a gone view drops it
+            // after closeConnection every call is dropped, as the system's connection to a gone view drops it
             private val open get() = made > closedThrough
 
             override fun sendKeyEvent(event: KeyEvent): Boolean =
-                // with Ctrl, a shortcut (Ctrl+Z), as the view root hands it on
                 open && ((event.isCtrlPressed && event.action == KeyEvent.ACTION_DOWN && target.onKeyShortcut(event.keyCode, event)) ||
                     target.dispatchKeyEvent(event))
 
@@ -245,17 +225,14 @@ class KeyboardHarness(
         connection = ic
         doStartInput(ic, info, restarting = false)
         service.onStartInputView(info, false)
-        // the window put on the screen: views attached (what a chip, a popup checks), the input area shown
+        // views attached (what a chip, a popup checks), the input area shown
         runCatching { service.showWindow(true) }.onFailure { System.err.println("showWindow: $it") }
         idle()
         relayout()
         return this
     }
 
-    /**
-     * The app closes the field's connection (its view gone, another focused) before the service is told
-     * of it: every call on it dropped from now, till the next [start].
-     */
+    /** The app closes the connection before the service is told: every call dropped till the next [start]. */
     fun closeConnection() {
         closedThrough = connectionsMade
     }
@@ -263,12 +240,7 @@ class KeyboardHarness(
     private var connectionsMade = 0
     private var closedThrough = 0
 
-    /**
-     * The app's screen made anew (a configuration it handles by recreating, a theme change): the old
-     * field's connection closed first, then a new field, its id and kind the old one's (its options, a
-     * terminal's TYPE_NULL: the field's info told it, a field of its own type or not), starting input with the old one's text and selection as its saved state brings
-     * them (no composing span).
-     */
+    /** The app's screen recreated: the old connection closed, then a same-id field with the old text and selection (no composing span). */
     fun recreate() {
         val text = field.text.toString()
         val (start, end) = field.selectionStart to field.selectionEnd
@@ -280,7 +252,7 @@ class KeyboardHarness(
         }
     }
 
-    /** The app restarting input in the same field, now of [inputType] (a WebView's field told anew). */
+    /** As a WebView's field told anew. */
     fun restart(inputType: Int = field.inputType) {
         field.inputType = inputType
         val info = EditorInfo().also {
@@ -295,10 +267,7 @@ class KeyboardHarness(
         relayout()
     }
 
-    /**
-     * The keyboard put away (back, the app hiding it), the field kept: as hideWindow, the input view
-     * finished and not started any more, so leaving the field next finishes the input only.
-     */
+    /** As hideWindow: the input view finished, so leaving the field next finishes the input only. */
     fun hide() {
         service.onFinishInputView(false)
         InputMethodService::class.java.getDeclaredField("mInputViewStarted").apply { isAccessible = true }.setBoolean(service, false)
@@ -306,7 +275,7 @@ class KeyboardHarness(
         relayout()
     }
 
-    /** The screen turned: input restarted in the same field with the same EditorInfo (resetStateForNewConfiguration). */
+    /** Input restarted with the same EditorInfo (resetStateForNewConfiguration). */
     fun turn() {
         doStartInput(connection, info, restarting = true)
         service.onStartInputView(info, true)
@@ -314,7 +283,7 @@ class KeyboardHarness(
         relayout()
     }
 
-    // InputMethodService's own entry (hidden): sets the connection the service commits through, then onStartInput
+    // InputMethodService's own hidden entry: sets the connection, then onStartInput
     private fun doStartInput(ic: InputConnection, info: EditorInfo, restarting: Boolean) {
         InputMethodService::class.java
             .getDeclaredMethod("doStartInput", InputConnection::class.java, EditorInfo::class.java, Boolean::class.javaPrimitiveType)
@@ -322,17 +291,13 @@ class KeyboardHarness(
             .invoke(service, ic, info, restarting)
     }
 
-    /** An engine event, as fcitx would send it, then everything it set off. */
     fun emit(event: HostEvent) {
         check(api.events.tryEmit(event)) { "event buffer full" }
         idle()
         relayout()
     }
 
-    /**
-     * The window is never shown under Robolectric (the input area stays hidden): the input view is
-     * laid out at the screen's size by hand, as its window would make it.
-     */
+    /** Robolectric never shows the window, so the input view is laid out at screen size by hand. */
     fun relayout() {
         val dm = service.resources.displayMetrics
         val v = inputView
@@ -344,36 +309,28 @@ class KeyboardHarness(
         idle()
     }
 
-    /**
-     * The keys shown under [root] (060-render-p2 S3), depth first: a canvas's, its scene's in its order
-     * (row by row, left to right), and the key views shown, whichever draws a keyboard. [root] may be any
-     * view with keyboards in it (the settings' preview), not only the input method's.
-     */
+    /** Depth first, each canvas's scene in its order; [root] may be any view with keyboards in it (the settings' preview). */
     fun keys(root: View = inputView): List<ShownKey> = keysOf(root) { v -> if (root === inputView) shown(v) else true }
 
-    /** The key showing [label] (its main text), in whatever keyboard or panel is up, whichever draws it. */
     fun key(label: String): ShownKey = keys().firstOrNull { it.label == label } ?: error("no key $label in ${texts()}")
 
-    /** Every key showing [label]: a split row draws G and V on both halves. */
+    /** A split row draws G and V on both halves. */
     fun keysLabelled(label: String): List<ShownKey> = keys().filter { it.label == label }
 
-    /** The key the scene names [id] (`space`, `q`; a key view's theme name), the [copy]th of a split row's two. */
+    /** [copy]: which of a split row's two. */
     fun keyNamed(id: String, copy: Int = 0): ShownKey = keys().firstOrNull { it.id == id && it.copy == copy }
         ?: error("no key named $id ($copy) in ${keys().map { it.id }}")
 
-    /** The key whose view had the id [id] (R.id.button_star), its node the same name; null for none shown. */
     fun keyWithId(id: Int): ShownKey? = service.resources.getResourceEntryName(id).let { name -> keys().firstOrNull { it.resourceName == name } }
 
-    /** The key read out as [description] (Shift, Backspace, Space's with the input method's name), whichever draws it. */
     fun describedKey(description: String): ShownKey = keys().firstOrNull { it.description == description }
         ?: error("no key described as $description in ${keys().mapNotNull { it.description }}")
 
-    /** The view (key, bar button) read out as [description]. */
     fun described(description: String): View = all(inputView)
         .firstOrNull { shown(it) && it.contentDescription?.toString() == description }
         ?: error("nothing described as $description in ${all(inputView).filter { shown(it) }.mapNotNull { it.contentDescription }.toList()}")
 
-    /** Visible up to the input view: [View.isShown] is false throughout, its window never shown. */
+    /** [View.isShown] is false throughout, the window never being shown. */
     fun shown(v: View): Boolean {
         var at: View? = v
         while (at != null && at !== inputView) {
@@ -383,14 +340,12 @@ class KeyboardHarness(
         return at != null
     }
 
-    /** A click, as a finger's tap ends, then everything it set off. */
     fun tap(v: View) {
         check(v.performClick()) { "$v took no click" }
         idle()
         relayout()
     }
 
-    /** A click on [k], as a finger's tap ends, then everything it set off. */
     fun tap(k: ShownKey) {
         check(k.click()) { "$k took no click" }
         idle()
@@ -398,12 +353,10 @@ class KeyboardHarness(
     }
 
     fun idle() {
-        // as the looper's idle(), one task at a time, so that something posting itself again for ever (a layout
-        // setting off another) fails here and now, not a test hung at 100% CPU
+        // one task at a time, so a task reposting itself for ever fails here instead of hanging at 100% CPU
         val looper = shadowOf(Looper.getMainLooper())
         var ran = 0
-        // the handwriting recognizer's reads, and the keys and settings held behind them, run on its own thread and
-        // come back posted: not idle till they are, however long that thread takes on a loaded machine
+        // the handwriting recognizer's reads come back posted from its own thread: not idle till they do
         val end = System.currentTimeMillis() + WAIT_MS
         while (true) {
             while (!looper.isIdle) {
@@ -419,38 +372,26 @@ class KeyboardHarness(
 
     private var delivered = intArrayOf(-1, -1, -1, -1)
 
-    /**
-     * The app gives nothing of what is before its cursor while set (getTextBeforeCursor, getSurroundingText and
-     * takeSnapshot null), what is after it as ever: the testbed's `null_before` field (uat/TESTBED.md).
-     */
+    /** getTextBeforeCursor, getSurroundingText and takeSnapshot give null: the testbed's `null_before` field. */
     var nothingBeforeGiven = false
 
-    /** The length each read of the text before the field's cursor asked for, in order (CommitCheck's is [CommitCheck.READ]). */
     val beforeReads = mutableListOf<Int>()
 
-    /** The mirror: nothing of what is after the cursor given (getTextAfterCursor null, and the reads of both sides), what is before it as ever. */
+    /** The mirror of [nothingBeforeGiven]. */
     var nothingAfterGiven = false
 
-    /**
-     * The field takes every write and does nothing with it while set, reads answered as ever: a WebView whose
-     * view lost the focus with the keyboard up (the screen turned, LC-24). Nothing changes, so nothing is reported.
-     */
+    /** Writes are taken and ignored, reads answered: a WebView that lost focus with the keyboard up. Nothing is reported. */
     var writesDropped = false
 
-    /** The field's selection changes not told to the service while set: its tracked selection lagging, as an editor's report can. */
+    /** Selection changes are not reported to the service, as a lagging editor's. */
     var selectionLags = false
 
-    /**
-     * As a device's EditText: a change of the composing span alone, the text and selection as they were
-     * (an app's clearComposingText), not told to the service; told with the next change that is. Off,
-     * every change is told, as Robolectric's field gives the harness no other way to tell them apart.
-     */
+    /** As a device's EditText, a change of the composing span alone is not reported till the next change that is. */
     var spanAloneUnreported = false
 
     private var deliveredText = ""
 
-    // what the system's input method manager does as the field's selection or composing text
-    // changes: Robolectric's tells the service nothing, whose tracking of the cursor would lag
+    // what the system's IMM does on selection or composing changes; Robolectric's tells the service nothing
     private fun selectionDelivered() {
         if (!::field.isInitialized || selectionLags) return
         val text = field.text
@@ -470,19 +411,16 @@ class KeyboardHarness(
         shadowOf(Looper.getMainLooper()).idle()
     }
 
-    /** Where [v] is on the screen: its left, top, right and bottom in the window. */
     fun box(v: View): Rect {
         val at = IntArray(2).also { v.getLocationInWindow(it) }
         return Rect(at[0], at[1], at[0] + v.width, at[1] + v.height)
     }
 
-    /** Where [k]'s cell is on the screen, as [box] of its view. */
     fun box(k: ShownKey): Rect = k.bounds
 
     private var downAt = 0L
 
-    // a finger on the service's input area, where the screen has it, as the window passes it on:
-    // the keyboard hands the touch to its key; the area itself takes what no view holds (FloatingHandoff)
+    // the keyboard hands the touch to its key; the area takes what no view holds (FloatingHandoff)
     private fun finger(action: Int, x: Float, y: Float) {
         val now = SystemClock.uptimeMillis()
         if (action == MotionEvent.ACTION_DOWN) downAt = now
@@ -494,7 +432,7 @@ class KeyboardHarness(
 
     private var fingerAt = 0f to 0f
 
-    /** The finger left down by [drag] (lift = false) moved on to [toX], [toY] in [steps], lifted if [lift]. */
+    /** Moves the finger [drag] left down. */
     fun move(toX: Float, toY: Float, steps: Int = 8, lift: Boolean = false) {
         val (x, y) = fingerAt
         for (i in 1..steps) {
@@ -506,10 +444,7 @@ class KeyboardHarness(
         relayout()
     }
 
-    /**
-     * A second finger put down at [x], [y] beside the one down, then both lifted, the second first; or the first
-     * first ([firstLifts]: two thumbs overlapping), each event's work done before the next.
-     */
+    /** Both lifted, the second first unless [firstLifts] (two thumbs overlapping); each event's work done before the next. */
     fun secondFingerThenLift(x: Float, y: Float, firstLifts: Boolean = false) {
         val (fx, fy) = fingerAt
         val props = Array(2) { MotionEvent.PointerProperties().apply { id = it; toolType = MotionEvent.TOOL_TYPE_FINGER } }
@@ -538,10 +473,10 @@ class KeyboardHarness(
 
     private var heldAt = 0f to 0f
 
-    /** A finger put on [v]'s middle and held there till [release]. */
+    /** Held till [release]. */
     fun press(v: View) = press(box(v))
 
-    /** A finger put on [k]'s middle and held there till [release]. */
+    /** Held till [release]. */
     fun press(k: ShownKey) = press(k.bounds)
 
     private fun press(b: Rect) {
@@ -550,18 +485,15 @@ class KeyboardHarness(
         idle()
     }
 
-    /** The finger [press] put down lifted where it is. */
     fun release() {
         finger(MotionEvent.ACTION_UP, heldAt.first, heldAt.second)
         idle()
         relayout()
     }
 
-    /** The clock run on by [ms], and what came due. */
     fun after(ms: Long) = idleFor(ms)
 
-    // as the looper's idleFor, the tasks due one at a time under the same limit as [idle]'s; the field's
-    // selection changes told to the service at its end, as [idle] does
+    // as the looper's idleFor, one task at a time under [idle]'s limit, selection changes reported at the end
     private fun idleFor(ms: Long) {
         val looper = shadowOf(Looper.getMainLooper())
         val end = SystemClock.uptimeMillis() + ms
@@ -572,15 +504,12 @@ class KeyboardHarness(
             check(++ran <= IDLE_TASKS) { "the main looper never idles: $IDLE_TASKS tasks run, more posted each time" }
             looper.runOneTask()
         }
-        // nothing due before the end left: the clock run on to it
         looper.idleFor(java.time.Duration.ofMillis(maxOf(0L, end - SystemClock.uptimeMillis())))
         selectionDelivered()
     }
 
-    /** A finger put on [v]'s middle, slid by [dx], [dy] px in a few steps, lifted. */
     fun swipe(v: View, dx: Float, dy: Float) = swipe(box(v), dx, dy)
 
-    /** A finger put on [k]'s middle, slid by [dx], [dy] px in a few steps, lifted. */
     fun swipe(k: ShownKey, dx: Float, dy: Float) = swipe(k.bounds, dx, dy)
 
     private fun swipe(b: Rect, dx: Float, dy: Float) {
@@ -597,22 +526,13 @@ class KeyboardHarness(
         relayout()
     }
 
-    /**
-     * A popup's key as shown: its label and where it is in the window; [focused], the one the finger
-     * is on (the scene's key selected); [cell], its whole cell; [size], its text's size (0 for an icon).
-     */
+    /** [focused]: the one the finger is on; [size]: its text's size (0 for an icon). */
     data class PopupKey(val text: String, val box: Rect, val focused: Boolean = false, val cell: Rect = box, val size: Float = 0f)
 
-    /**
-     * The popup's keys up now (a long press's choices), as the engine's scene draws them (060-render-p2
-     * S2: no view per key), top row first.
-     */
+    /** The scene draws them, no view per key; top row first. */
     fun popupChoices(): List<PopupKey> = all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { sceneChoices(it, box(it)) }.toList()
 
-    /**
-     * The icons shown outside the keys, as [PopupKey]s read by their descriptions: the bar's and a
-     * menu's cells (the edit menu's) the scene draws (S2).
-     */
+    /** Icons outside the keys, read by their descriptions: the bar's and a menu's cells. */
     fun shownIcons(): List<PopupKey> = all(inputView).filter { v -> v is ImageView && shown(v) }.map { PopupKey(it.contentDescription?.toString().orEmpty(), box(it)) }.toList() +
         all(inputView).filterIsInstance<PopupSceneView>().filter { shown(it) }.flatMap { v ->
             val at = box(v)
@@ -620,16 +540,12 @@ class KeyboardHarness(
                 .map { k -> PopupKey((k.a11y ?: k.label).orEmpty(), sceneBox(v, at, k)) }
         }
 
-    /**
-     * A finger held on [v] past the long press, then slid onto the popup's key showing [pick]
-     * (left where it is when null) and lifted. Returns the popup keys' labels as shown.
-     */
+    /** Held past the long press, slid onto [pick] (stays put when null) and lifted; returns the popup's labels. */
     fun longPress(v: View, pick: String? = null): List<String> = longPress(box(v), pick)
 
-    /** [longPress] on [k]. */
     fun longPress(k: ShownKey, pick: String? = null, meanwhile: () -> Unit = {}): List<String> = longPress(k.bounds, pick, meanwhile)
 
-    // [meanwhile] run once the popup is up, before the finger moves
+    // [meanwhile] runs once the popup is up, before the finger moves
     private fun longPress(b: Rect, pick: String?, meanwhile: () -> Unit = {}): List<String> {
         var x = b.exactCenterX()
         var y = b.exactCenterY()
@@ -640,7 +556,7 @@ class KeyboardHarness(
         val labels = popup.map { it.text }
         if (pick != null) {
             val t = (popup.firstOrNull { it.text == pick } ?: error("no $pick in the popup: $labels")).box
-            // in steps, as a finger slides: the popup follows each move
+            // in steps: the popup follows each move
             val (x0, y0) = x to y
             for (i in 1..4) {
                 after(16)
@@ -656,23 +572,19 @@ class KeyboardHarness(
         return labels
     }
 
-    /**
-     * A finger put on [v]'s middle, held [holdMs] (a long press), moved to [toX], [toY] (the
-     * screen's) in [steps] and lifted, or left down when [lift] is false (another finger next).
-     */
+    /** [holdMs] makes a long press; [lift] false leaves the finger down for another. */
     fun drag(v: View, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) = drag(box(v), toX, toY, holdMs, steps, lift)
 
-    /** [drag] from [k]'s middle. */
     fun drag(k: ShownKey, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) = drag(k.bounds, toX, toY, holdMs, steps, lift)
 
-    /** [drag] from the middle of [b], the screen's: where no key is (the split keyboard's gap). */
+    /** Where no key is (the split keyboard's gap). */
     fun drag(b: Rect, toX: Float, toY: Float, holdMs: Long = 0, steps: Int = 12, lift: Boolean = true) {
         val x = b.exactCenterX()
         val y = b.exactCenterY()
         finger(MotionEvent.ACTION_DOWN, x, y)
         if (holdMs > 0) {
             after(holdMs)
-            // a long press may make the keyboard anew (the docked one let go floating): laid out before the finger moves on
+            // a long press may remake the keyboard (docked let go floating): laid out before the finger moves on
             relayout()
         }
         for (i in 1..steps) {
@@ -685,33 +597,29 @@ class KeyboardHarness(
         relayout()
     }
 
-    /** [text] copied in another app: kept in the clipboard's history (on Room's threads) before this returns. */
+    /** Kept in the clipboard's history (Room's threads) before this returns. */
     fun copied(text: String) {
-        // a clip is told apart by its time (the app skips one at the time of the last): each test's
-        // clock starts over, so the app's last time, kept in its object from tests before, is forgotten
+        // the app skips a clip at the time of the last; each test's clock starts over, so forget the last time
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastClipTimestamp = -1L
-        // and its last entry, else a copy of the text a test before stored passes at once, before its own store: the
-        // next copy's store, launched while this one's waits, may take the mutex first and this one land last (MN-04)
+        // and the last entry, else a copy of a text an earlier test stored passes before its own store lands
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
         service.getSystemService(android.content.ClipboardManager::class.java)
             .setPrimaryClip(ClipData.newPlainText("", text))
         waitFor("$text stored") { org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry?.text == text }
-        // its listeners' main-thread work (queued before lastEntry is set) done before the next tap
         idle()
     }
 
-    /** The clipboard panel, from the toolbar, once [shown] is listed in it. */
     fun clipboard(shown: String? = null) {
         val clipboard = service.getString(R.string.clipboard)
         val expand = service.getString(R.string.expand_toolbar)
-        // a copy's hint coming to the bar takes the toolbar back in: expanded again till it shows
+        // a copy's hint takes the toolbar back in: expanded again till it shows
         repeat(3) {
             if (all(inputView).any { shown(it) && it.contentDescription == clipboard }) return@repeat
             all(inputView).firstOrNull { shown(it) && it.contentDescription == expand }?.let(::tap)
             after(500)
             relayout()
         }
-        // no slot for it on the bar (one-handed, floating): ⋯'s panel has it
+        // no slot on the bar (one-handed, floating): ⋯'s panel has it
         if (all(inputView).none { shown(it) && it.contentDescription == clipboard }) {
             tap(described(service.getString(R.string.status_area)))
             waitFor("$clipboard in ⋯'s panel") { relayout(); entry(clipboard) != null }
@@ -720,18 +628,14 @@ class KeyboardHarness(
         if (shown != null) waitFor("$shown listed") { entry(shown) != null }
     }
 
-    /** The clipboard panel's entry showing [text], the view taking its taps. */
     fun entry(text: String): View? = all(inputView).firstOrNull { shown(it) && it is TextView && it.text.toString() == text }
         ?.let { t -> generateSequence(t) { it.parent as? View }.firstOrNull { it.hasOnClickListeners() } }
 
-    /** Waits (Room, the IO threads) till [ok], idling the main thread meanwhile. */
+    /** Idles the main thread while Room and the IO threads work. */
     fun waitFor(what: String, ok: () -> Boolean) =
         until(what, state = { "; shown ${texts(inputView)}" }, step = { idle(); relayout() }, done = ok)
 
-    /**
-     * The popup menu up now (a long press's, the clipboard's 清空), its item [title] picked as a tap
-     * does: the app adds them all with one id, so not by id.
-     */
+    /** Picked as a tap does, by title: the app adds every item with one id. */
     fun menuPick(title: String) {
         val menu = ShadowPopupMenu.getLatestPopupMenu().menu
         val item = (0 until menu.size()).map(menu::getItem).firstOrNull { it.title.toString() == title }
@@ -745,7 +649,6 @@ class KeyboardHarness(
         relayout()
     }
 
-    /** The notice up now (提示条): its window, or null. */
     fun notice(): PopupWindow? {
         val latest = shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow
         // a menu shown over a notice is the latest popup, the notice still up under it
@@ -756,7 +659,7 @@ class KeyboardHarness(
     private var lastNotice: PopupWindow? = null
     private val menus = mutableSetOf<PopupWindow>()
 
-    /** What the notice up now says (its rows faded in, the one it replaced faded out), or none. */
+    /** Its rows faded in, not the one it replaced. */
     fun noticeTexts(): List<String> {
         after(500)
         val popup = notice() ?: return emptyList()
@@ -764,26 +667,20 @@ class KeyboardHarness(
             .map { it.text.toString() }.toList()
     }
 
-    /** Where the notice's window is on the screen: left, top, right, bottom. */
     fun noticeBox(): Rect {
         val popup = notice() ?: error("no notice")
         val lp = popup.contentView.rootView.layoutParams as WindowManager.LayoutParams
         return Rect(lp.x, lp.y, lp.x + lp.width, lp.y + lp.height)
     }
 
-    /** The clock run on [ms], and everything due in that time done. */
     fun advance(ms: Long) {
         idleFor(ms)
         relayout()
     }
 
-    /**
-     * A finger on [v]: down at the first point, then each next one [Touch.ms] after the last, up at
-     * the last. Points are in [v]'s own pixels, so a slide off the key is a point outside its size.
-     */
+    /** Points in [v]'s own pixels, each [Touch.ms] after the last; a slide off the key is a point outside its size. */
     fun touch(v: View, vararg path: Touch) = touch(finger(v, path.first()), path)
 
-    /** [touch] on [k], the points in its cell's pixels. */
     fun touch(k: ShownKey, vararg path: Touch) = touch(finger(k, path.first()), path)
 
     private fun touch(f: Finger, path: Array<out Touch>) {
@@ -794,21 +691,16 @@ class KeyboardHarness(
         f.up(path.last())
     }
 
-    /**
-     * A finger put down on [v] at [at] (in [v]'s pixels), moved and lifted by the test. Its events
-     * go in where a finger's do, at the input view, so the keyboard sees them as on a device
-     * (its own touch handling, the popup's focus) and not only the key.
-     */
+    /** Events go in at the input view, as a finger's do, so the keyboard's own touch handling sees them. */
     fun finger(v: View, at: Touch): Finger = Finger { IntArray(2).also(v::getLocationInWindow) }.also { it.send(MotionEvent.ACTION_DOWN, at) }
 
-    /** [finger] on [k], [at] in its cell's pixels. */
     fun finger(k: ShownKey, at: Touch): Finger = Finger { k.bounds.let { intArrayOf(it.left, it.top) } }.also { it.send(MotionEvent.ACTION_DOWN, at) }
 
-    /** A finger whose points are from [origin], the window's place of what it is on, read at each step. */
+    /** [origin] is re-read at each step. */
     inner class Finger(private val origin: () -> IntArray) {
         private val down = SystemClock.uptimeMillis()
 
-        /** [eventTime]: the event's own, earlier than now to tell it from the time it is handled */
+        /** [eventTime] earlier than now tells the event's time from when it is handled. */
         internal fun send(action: Int, p: Touch, eventTime: Long = SystemClock.uptimeMillis()) {
             val from = origin()
             val root = IntArray(2).also(inputView::getLocationInWindow)
@@ -829,13 +721,12 @@ class KeyboardHarness(
         }
     }
 
-    /** A point of [touch]; [ms] the time since the one before. */
+    /** [ms] since the point before. */
     data class Touch(val x: Float, val y: Float, val ms: Long = 0)
 
-    /** The middle of [v], in its own pixels, moved by [dx], [dy] dp. */
+    /** [v]'s middle in its pixels, moved by [dx], [dy] dp. */
     fun at(v: View, dx: Float = 0f, dy: Float = 0f, ms: Long = 0): Touch = at(v.width, v.height, dx, dy, ms)
 
-    /** The middle of [k]'s cell, in its pixels, moved by [dx], [dy] dp. */
     fun at(k: ShownKey, dx: Float = 0f, dy: Float = 0f, ms: Long = 0): Touch = at(k.width, k.height, dx, dy, ms)
 
     private fun at(width: Int, height: Int, dx: Float, dy: Float, ms: Long): Touch {
@@ -843,11 +734,7 @@ class KeyboardHarness(
         return Touch(width / 2f + dx * dp, height / 2f + dy * dp, ms)
     }
 
-    /**
-     * Chinese punctuation on for [im], as fcitx's punctuation addon tells it (cached too: a view made anew replays it): the
-     * keys shown as a user sees them by default (KB-76, ，。？！ on 九键's 1 and its column). [marks] empty: punctuation
-     * off, no status entry, as the addon tells that.
-     */
+    /** As fcitx's addon tells it (cached too, so a remade view replays it). [marks] empty: punctuation off. */
     fun chinesePunctuation(im: InputMethodEntry = PINYIN, marks: Map<String, String> = ChinesePunctuation.map) {
         val status = if (marks.isEmpty()) emptyList() else listOf(StatusEntry(1, "punctuation", "fcitx-punc-active", "", true))
         api.statusAreaCached = status
@@ -856,16 +743,13 @@ class KeyboardHarness(
         idle()
     }
 
-    /** The nine keys' key for [digit] (its small digit), or the column's punctuation key, whichever draws it. */
+    /** By its small digit, or the column's punctuation key. */
     // 微软's 九键双拼's 1 is marked 1; (its ; beside the digit)
     fun nineKey(digit: String): ShownKey = keys().firstOrNull { k -> (k as? SceneShownKey)?.node?.takeIf { it.copy == 0 }?.shortcut == "t9/$digit" }
-        // the old views' (no names): by the digit in its corner
+        // the old views have no names: by the digit in the corner
         ?: keys().firstOrNull { it.alt == digit || it.alt == "$digit;" } ?: error("no key $digit in ${texts()}")
 
-    /**
-     * Every text shown under [v] (visible ones only), depth first: a canvas's keys' labels, corners and
-     * marks' words (a shortcut's text) in its scene's order, as the key views' texts were in theirs.
-     */
+    /** Visible texts depth first: a canvas's labels, corners and marks' words in its scene's order. */
     fun texts(v: View = keyboard): List<String> = when {
         v.visibility != View.VISIBLE -> emptyList()
         v is KeyboardCanvasView -> v.scene?.keys.orEmpty().flatMap { k ->
@@ -877,10 +761,7 @@ class KeyboardHarness(
         else -> emptyList()
     }
 
-    /**
-     * [capture] of a keyboard drawn by the canvas: its golden is `canvas_` before the file's name (060-render-p2 S4
-     * step 8, when the views' goldens were beside them).
-     */
+    /** A canvas-drawn keyboard's golden is prefixed `canvas_`. */
     fun captureBoard(path: String, view: View = keyboard) {
         val canvas = all(view).any { it is KeyboardCanvasView && it.visibility == View.VISIBLE }
         capture(if (canvas) path.substringBeforeLast('/', "").let { if (it.isEmpty()) "canvas_$path" else "$it/canvas_${path.substringAfterLast('/')}" } else path, view)
@@ -898,7 +779,7 @@ class KeyboardHarness(
         )
     }
 
-    // a keyboard shown slides in, a panel fades: the clock run on past them so every image is the end state
+    // past slides and fades, so every image is the end state
     private fun settled() {
         idleFor(1_000)
         relayout()
@@ -907,7 +788,7 @@ class KeyboardHarness(
     private var closed = false
     private var destroyed = false
 
-    /** The service destroyed, as another keyboard picked: [close] after it all the same. */
+    /** As another keyboard picked; [close] after it all the same. */
     fun destroy() {
         if (destroyed) return
         destroyed = true
@@ -917,37 +798,30 @@ class KeyboardHarness(
     override fun close() {
         if (closed) return
         closed = true
-        // the clipboard's database outlives the test, kept open by the app's object: emptied for the next
+        // the clipboard's database outlives the test, held open by the app's object
         runBlocking {
             val cm = org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
             cm.purgeMarked(*cm.deleteAll(skipPinned = false))
         }
-        // the recognizer's reads posted back run first: their count, the JVM's, kept were they dropped with the looper.
-        // What that throws (a posted task's failure, the reads never in) is thrown once the rest is let go: a test
-        // passing does not hide it, and one failing keeps its own failure first (use's suppressed, JUnit's both)
+        // posted recognizer reads run first; what that throws is rethrown once the rest is let go, after the test's own failure
         val idleFailed = runCatching { idle() }.exceptionOrNull()
-        // destroyed first: it learns the last field's address
+        // first: it learns the last field's address
         destroy()
-        // and what its destroying set off waited for too: the keyboard taken off the window finishes what the pad
-        // holds behind the reads (afterReads), whose count a post dropped with this test's looper would keep for good
+        // and what destroying set off: taking the keyboard off finishes what the pad holds behind the reads
         val destroyFailed = runCatching { idle() }.exceptionOrNull()
-        // Robolectric keeps every dialog shown till the test method ends (ShadowDialog.shownDialogs): the
-        // input method's window, and through its mService the whole service, views and themes, of each
-        // harness a test made. ThemeMakerLayoutTest makes a hundred and more: a full run's heap out (the
-        // S4a review's OOM, a heap dump's 157 services all held there). Let go of this one's.
+        // Robolectric keeps every shown dialog, and through the IME window the whole service, till the method ends:
+        // a test of hundreds of harnesses runs the heap out
         service.window?.let { window ->
             // as many times as it was shown
             ShadowDialog.getShownDialogs().removeAll { it === window }
             if (ShadowDialog.getLatestDialog() === window) ShadowDialog.setLatestDialog(null)
         }
-        // what the address bar learned in a test's email field: not the next test's (PrefsRule restores only what a test set)
+        // the address bar's learning in a test's email field (PrefsRule restores only what a test set)
         AppPrefs.getInstance().internal.run {
             addressCounts.setValue("")
             rememberedAddresses.setValue("")
         }
-        // the field's activity destroyed: ActivityThread's list (mActivities) holds every one not destroyed till the
-        // test ends, and with it its window, views and themes, the theme's a quarter MB each in Robolectric's
-        // registry (NATIVE_THEME9_REGISTRY): ThemeMakerLayoutTest's two hundred harnesses in one test, 250 MB
+        // ActivityThread holds every undestroyed activity, its window and a quarter-MB theme each, till the test ends
         activities.forEach { it.close() }
         activities.clear()
         keyboardsWere?.let(::setKeyboards)
@@ -958,14 +832,12 @@ class KeyboardHarness(
         (idleFailed?.also { e -> destroyFailed?.let(e::addSuppressed) } ?: destroyFailed)?.let { throw it }
     }
 
-    // the daemon's connection to a real host, which answers on its own thread
     private class HarnessConnection(override val lifecycleScope: CoroutineScope, val host: HostApi, val ready: org.fcitx.fcitx5.android.core.KotlinHost?) : HostConnection {
         override fun <T> runImmediately(block: suspend HostApi.() -> T): T = runBlocking { block(host) }
-        // as the daemon's: a host not up yet (a test pressing before it starts) does it once it is
+        // as the daemon's: a host not up yet does it once it is
         override suspend fun <T> runOnReady(block: suspend HostApi.() -> T): T {
-            // the wait timed alone, not [block]; a plain error, which a cancelled job could not swallow. Timed on the
-            // caller's dispatcher: on the paused main looper that is the test's clock (after()/advance() run it on,
-            // idle() does not), not real time
+            // only the wait is timed, with a plain error a cancelled job cannot swallow; on the paused main looper it is the
+            // test's clock (after()/advance() run it, idle() does not), not real time
             ready?.let { withTimeoutOrNull(READY_TIMEOUT_MS) { it.lifecycle.whenReady { } } ?: error("the host not up in $READY_TIMEOUT_MS ms") }
             return block(host)
         }
@@ -975,19 +847,18 @@ class KeyboardHarness(
     }
 
     companion object {
-        // tasks one idle() runs before it calls the looper stuck: far more than any test posts in one go
+        // far more than any test posts in one go
         private const val IDLE_TASKS = 10_000
 
         // a host never up fails the test, not hangs it
         private const val READY_TIMEOUT_MS = 30_000L
 
-        val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "", "拼", "zh_CN", "androidengine", false)
-        val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
+        val PINYIN = InputMethodEntry(InputMethodCatalog.PINYIN, "拼音", "", "拼", "zh_CN")
+        val ENGLISH = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "En", "en")
 
-        /** Pinyin on the nine keys (0.4's 九键拼音): [PINYIN] with these [keyboards]. */
         val NINE_KEYS = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
 
-        /** [keyboards] chosen as the user would: each a preference, the keyboard made anew on a change. */
+        /** Each a preference, as the user would; a change remakes the keyboard. */
         fun setKeyboards(keyboards: ImKeyboards.Chosen) {
             val prefs = AppPrefs.getInstance().keyboard
             listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN, InputMethodCatalog.ENGLISH).forEach {
@@ -997,11 +868,7 @@ class KeyboardHarness(
 
         inline fun <reified T : View> find(v: View): T? = all(v).firstNotNullOfOrNull { it as? T }
 
-        /**
-         * [v]'s keys with words, [at] where it is in the window: a bubble's, a long press's, a
-         * menu's words (the 注's pills, an item of no icon); a menu's icons are not ([shownIcons]
-         * reads those). Top row first, then left to right; [popupChoices] the ones up now.
-         */
+        /** Keys with words, top row first; a menu's icons are [shownIcons]'s; [popupChoices] the ones up now. */
         fun sceneChoices(v: PopupSceneView, at: Rect): List<PopupKey> = v.scene?.keys.orEmpty()
             .filter { it.kind == "popup" || it.kind == "preview" || (it.kind == "menu" && it.ops(false).none { op -> op is Op.Icon }) }
             .sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
@@ -1010,17 +877,13 @@ class KeyboardHarness(
                 PopupKey(k.label.orEmpty(), sceneBox(v, at, k), KeyState.Selected in k.states, size = size)
             }
 
-        // [k]'s cell in the window, its popup view at [at]
         fun sceneBox(v: PopupSceneView, at: Rect, k: KeyNode): Rect {
             val l = at.left + v.outset.left
             val t = at.top + v.outset.top
             return Rect(l + k.bounds.left.toInt(), t + k.bounds.top.toInt(), l + k.bounds.right.toInt(), t + k.bounds.bottom.toInt())
         }
 
-        /**
-         * The keys [root] shows, depth first: each canvas's scene's in its order. [root] may be a keyboard
-         * made alone (no input view), laid out.
-         */
+        /** [root] may be a keyboard made alone (no input view), laid out. */
         fun keysOf(root: View, shown: (View) -> Boolean = { true }): List<ShownKey> = when {
             root.visibility != View.VISIBLE || !shown(root) -> emptyList()
             root is KeyboardCanvasView -> root.scene?.keys?.map { SceneShownKey(root, it.id, it.copy) }.orEmpty()
@@ -1028,23 +891,16 @@ class KeyboardHarness(
             else -> emptyList()
         }
 
-        /** The symbol grid's cells under [root], each one key's scene (060-render-p2 S6). */
         fun cells(root: View): Sequence<View> = all(root).filter { it is org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell }
 
-        /** What [cell] ([cells]) shows. */
         fun cellText(cell: View): String = (cell as org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell).keyNode?.label.orEmpty()
 
-        /**
-         * The keys' canvas under [root]: one a keyboard board draws its keys on (its nearest [BaseKeyboard] the
-         * board), not the bar's number row's (060-render-p2 S6), which is made with the bar and shown only for a
-         * password, and would otherwise be found first.
-         */
+        /** Not the bar's number row's canvas (made with the bar, shown only for a password), which would otherwise be found first. */
         fun boardCanvas(root: View): KeyboardCanvasView? = all(root).filterIsInstance<KeyboardCanvasView>().firstOrNull { c ->
             val board = generateSequence(c.parent) { it.parent }.firstOrNull { it is BaseKeyboard }
             board != null && board !is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
         }
 
-        /** [v] and every view under it, depth first. */
         fun all(v: View): Sequence<View> = sequence {
             yield(v)
             if (v is ViewGroup) for (i in 0 until v.childCount) yieldAll(all(v.getChildAt(i)))
@@ -1052,12 +908,7 @@ class KeyboardHarness(
     }
 }
 
-/**
- * [block] with the screen turned on its side (the service told of the new configuration, as the system tells it),
- * upright again after it whether it passed or not; [relayout]: laid out again once upright. A turn back failing on a
- * harness [block] broke is added to its failure, not put in its place (review R26 F8476; one copy, F8511; KeyMarksUatTest turns by restarting the input instead). Outside the
- * class, as its size allows (detekt's LargeClass).
- */
+/** Upright again after [block] whether or not it passed; a failed turn back is added to its failure. Outside the class for detekt LargeClass. */
 fun KeyboardHarness.inLandscape(relayout: Boolean = false, block: () -> Unit) {
     fun turnTo(qualifiers: String) {
         RuntimeEnvironment.setQualifiers(qualifiers)
@@ -1077,3 +928,5 @@ fun KeyboardHarness.inLandscape(relayout: Boolean = false, block: () -> Unit) {
     }
     upright()
 }
+
+fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }

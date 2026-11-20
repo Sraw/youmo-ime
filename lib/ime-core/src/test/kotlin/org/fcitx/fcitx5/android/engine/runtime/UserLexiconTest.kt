@@ -22,15 +22,7 @@ import org.junit.Test
 import java.io.IOException
 import java.nio.ByteBuffer
 
-/**
- * A word taken off the added words: forgotten if no dictionary has it, so the log's picks do not
- * make it the user's own again, whatever the log does next; kept, in pinyin and the tables, if
- * one does; while a dictionary, or what the user added, does not read, nothing is forgotten. A
- * table's pick of a word from outside it makes no phrase of the table's. A word whose first
- * character reads in it as it never does alone is imported and learned from a table's phrases as the
- * dictionary reads it, not as its pieces read. A phrase an older build of a table saved, in the
- * record as 0.4 converted it, is pinyin's word too; a table's picks leave pinyin's order.
- */
+/** A word taken off the added words is forgotten if no dictionary has it, kept if one does, and nothing is forgotten while they do not read. */
 class UserLexiconTest : EnginesFixture() {
 
     private fun Engines.pick(keys: String, text: String) {
@@ -63,7 +55,6 @@ class UserLexiconTest : EnginesFixture() {
         // the user's words coded for the table at once, not in the background
         warmUps = { it.run() },
         additions = { additions },
-        // a pick, not a code's one candidate committing itself
     ).apply { settings = settings.copy(tables = mapOf("Wubi" to TableSettings(autoSelect = false))) }
 
     private fun Engines.firstInTable(): String {
@@ -112,7 +103,7 @@ class UserLexiconTest : EnginesFixture() {
     fun aWordFromOutsideTheTablePickedThereIsNotMadeTheTablesOwn() {
         val dir = MemoryFiles()
         withTable(dir, null).use { engines ->
-            // no dictionary has 你好: the user's own, coded by the table's rule, after its own entry (U-28)
+            // no dictionary has 你好: the user's own, coded by the table's rule, after its own entry
             assertTrue(engines.addWord("你好", "ni hou"))
             assertEquals(listOf("妤", "你好"), engines.type(WUBI, "abcd").candidates)
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
@@ -130,7 +121,6 @@ class UserLexiconTest : EnginesFixture() {
     @Test
     fun aWordImportedWithNoPinyinIsReadAsItsFirstCharacterNeverIsAlone() {
         withTable(MemoryFiles(), null, LIAO_JIE_PINYIN).use { engines ->
-            // the user's own export: added as it was, not imported (U-101)
             assertEquals(Engines.Imported(added = 1, blocked = 0, unread = 0), engines.importWords(sequenceOf(WordListFiles.EXPORT_MARK, "了解")))
             assertEquals(listOf("liao jie"), engines.userWords(UserWord.Kind.ADDED).map { it.pinyin })
         }
@@ -147,7 +137,6 @@ class UserLexiconTest : EnginesFixture() {
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
             assertEquals(listOf("妤"), engines.type(WUBI, "abcd").candidates)
             engines.onEvent(WUBI, EngineEvent.RESET, 0)
-            // not blocked in pinyin, nor anywhere else (U-28)
             assertEquals(emptyList<String>(), engines.userWords(UserWord.Kind.BLOCKED).map { it.text })
         }
         withTable(dir, null, LIAO_JIE_PINYIN, LIAO_JIE_TABLE).use { engines ->
@@ -161,23 +150,20 @@ class UserLexiconTest : EnginesFixture() {
         return first
     }
 
-    // what the user's dictionaries have not known when a word added by hand is taken off: none to
-    // know them by, so the removal forgets nothing of what was learned of it (review M4, F3287)
+    // the removal forgets nothing when the dictionaries are not known
     @Test
     fun aWordTakenOffWhileTheDictionariesAreNotKnownKeepsWhatWasLearnedOfIt() {
-        // 拟好 beside it: a word added by hand alone over its keys would be first at once (U-65), with no picks to keep
+        // 拟好 beside it: a word added by hand alone over its keys would be first at once, with no picks to keep
         val made = compiled(::load) { sequenceOf("妮浩 ni'hao 0", "拟好 ni'hao 0") }
         val unreadable: () -> DictionaryFile? = { throw IOException("unreadable") }
-        // why the dictionaries are not known, the additions read then, and how many "unreadable" are told
-        // (a failure told once, however often the model is made again)
+        // why the dictionaries are not known, and how many "unreadable" are told (once, however often remade)
         class Row(val why: String, val told: IntRange, val unchecked: Boolean = false, val failing: () -> Engines.Additions?)
         val rows = listOf(
             Row("the merged file does not open", 1..1) { Engines.Additions("", "d", indexes = indexDir(), dictionary = unreadable) },
-            // not made yet (an upgrade's minute) or failed
             Row("the merged file is pending", 0..0) { Engines.Additions("", "pending", dictionary = { null }, dictionaryPending = { true }) },
             // which dictionaries the user has is not known: 妮浩 may be one's word
             Row("the additions do not read", 1..Int.MAX_VALUE) { throw IOException("unreadable") },
-            // review F3403/F3411: an unchecked throw from the open, not remembered as "no dictionaries"
+            // an unchecked throw from the open, not remembered as "no dictionaries"
             Row("the open throws unchecked", 0..0, unchecked = true) {
                 Engines.Additions("", "d", indexes = indexDir(), dictionary = throwing(IllegalStateException("bug")))
             },
@@ -211,7 +197,6 @@ class UserLexiconTest : EnginesFixture() {
 
     private fun throwing(e: RuntimeException): () -> DictionaryFile? = { throw e }
 
-    // review F3304: a model whose making failed half-way is not kept; the next need makes it whole
     @Test
     fun aUserModelWhoseMakingFailedIsMadeWholeAtTheNextNeed() {
         val assets = EngineAssets(::load, {}, null)
@@ -227,7 +212,6 @@ class UserLexiconTest : EnginesFixture() {
         assertEquals("attach", runCatching { lexicon.user() }.exceptionOrNull()?.message)
         fail = false
         val model = lexicon.user()
-        // made again and attached, not the half-made one handed on
         assertEquals(2, attached.size)
         assertTrue(model === attached[1] && model !== attached[0])
         assertTrue(model === lexicon.user())
@@ -254,8 +238,6 @@ class UserLexiconTest : EnginesFixture() {
             assertEquals(emptyList<UserWord>(), engines.userWords())
             engines.type(InputMethodCatalog.PINYIN, "nihao")
             assertTrue("not typeable", engines.candidates(InputMethodCatalog.PINYIN, 0, 20).none { it.text == "妮浩" })
-            // once to tell it is no dictionary's, once to make the model it is forgotten in, at most:
-            // made after it was taken off, not made again
             assertTrue(reads.toString(), reads <= 2)
         }
         Engines(::load, dir, additions = { additions }).use { engines ->
@@ -266,13 +248,10 @@ class UserLexiconTest : EnginesFixture() {
     private companion object {
         const val MAX_PICKS = 10
 
-        // the code abcd is 妤's and, by the rule, 你好's
         const val TABLE = "键码=abcd\n码长=4\n[组词规则]\ne2=p11+p12+p21+p22\n[数据]\nab 你\nabcd 妤\ncd 好\n"
 
-        // as TABLE, abcd 了解's by the rule
         const val LIAO_JIE_TABLE = "键码=abcd\n码长=4\n[组词规则]\ne2=p11+p12+p21+p22\n[数据]\nab 了\nabcd 妤\ncd 解\n"
 
-        // 了解 a word of the base dictionary, read liao jie; 了 alone le
         val LIAO_JIE_PINYIN: ByteArray = PinyinDataBuilder()
             .unigram("<unk>", -7f, 0f)
             .unigram("了", -2f, 0f)

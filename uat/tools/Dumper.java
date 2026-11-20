@@ -1,11 +1,4 @@
-// A UI dump server for uat.py: what `uiautomator dump --windows` writes (every window, the
-// keyboard's included), in ~0.2 s instead of ~2 s, from one long-lived UiAutomation connection.
-// Run on the device with app_process; each connection to 127.0.0.1:<port> gets one dump as XML.
-// While it runs `uiautomator dump` cannot connect (one UiAutomation at a time).
-// Built by uat.py with javac + d8; uses the hidden UiAutomation constructor by reflection.
-// Anyone on the device may connect and read every window, a WebView's password text included (PR-03
-// relies on it): for throwaway test devices only (redroid, the UAT emulator). It exits on its own
-// after IDLE_MS with no connection, so a killed runner does not leave it listening.
+// A UI dump server for uat.py; anyone on the device may read every window, so for throwaway test devices only.
 
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.UiAutomation;
@@ -29,8 +22,7 @@ public class Dumper {
 
     public static void main(String[] args) throws Exception {
         int port = Integer.parseInt(args[0]);
-        // Android 16's AccessibilityInteractionClient makes a Handler on the main looper: with none,
-        // the UiAutomation thread died on connecting (the emulator's android-36; redroid 14 did not)
+        // Android 16's AccessibilityInteractionClient needs a main looper, or the UiAutomation thread dies on connecting
         Looper.prepareMainLooper();
         HandlerThread t = new HandlerThread("uat-dumper");
         t.start();
@@ -89,8 +81,7 @@ public class Dumper {
 
     static void node(StringBuilder sb, AccessibilityNodeInfo n, int depth) {
         if (n == null || depth > 80) return;
-        // a field's text comes from the cache, which WebView leaves stale when a field is emptied
-        // (no text-changed event): read it fresh
+        // WebView leaves the cached text stale when a field is emptied: read it fresh
         if (n.isEditable()) n.refresh();
         Rect b = new Rect();
         n.getBoundsInScreen(b);
@@ -110,8 +101,7 @@ public class Dumper {
         attr(sb, "scrollable", String.valueOf(n.isScrollable()));
         attr(sb, "visible", String.valueOf(n.isVisibleToUser()));
         attr(sb, "hint", String.valueOf(n.isShowingHintText()));
-        // a key the keyboard's canvas draws (060-render-p2 S3): its scene id and its corner, which its
-        // node keeps in its extras (KeyboardCanvasView's Speech; U6: not the hint, TalkBack reads that)
+        // a key the keyboard's canvas draws: its scene id and corner, kept in the node's extras (TalkBack reads the hint)
         String key = n.getExtras().getString("youmo.key");
         if (key != null) attr(sb, "key", key);
         String alt = n.getExtras().getString("youmo.alt");

@@ -21,8 +21,7 @@ class LevelPickTest {
 
     @Test
     fun valuesOfOtherUnitsWeighAlike() {
-        // the vibration's: ms, and amplitudes of 0..255, each over its own span. 35/45 ms at the device's
-        // own amplitude (0) is 2 from the system's and from 强 alike, 1.9 from 轻: it vibrates, so not the system's
+        // ms and 0..255 amplitudes, each over its span: 35/45 ms at amplitude 0 is nearer 轻 than the system's, so it vibrates
         val vibration = listOf(listOf(0, 0, 0, 0), listOf(10, 20, 60, 90), listOf(20, 30, 128, 160), listOf(35, 45, 220, 255))
         assertEquals(1, LevelPick.nearest(listOf(35, 45, 0, 0), vibration))
     }

@@ -51,8 +51,7 @@ class PackTest {
                 "耗子好\t9\t2023\t2.000\t1.000\t2.000\t1.500\t0\n好了\t99\t2023\t2.000\t2.000\t2.000\t1.500\t0\n" +
                 // too low a pmi for its neighbours to be gathered
                 "子了\t99\t2023\t0.300\tNaN\tNaN\t1.500\t0\n" +
-                // a fragment of words the dictionary has, 你耗 and 好耗: neither run is half of 耗了 (20),
-                // both together are
+                // a fragment of words the dictionary has: neither run is half of 耗了, both together are
                 "耗了\t20\t2023\t2.000\t2.000\t2.000\t1.500\t0\n你耗了\t6\t2023\t0.500\t2.000\t2.000\t1.500\t0\n" +
                 "好耗了\t6\t2023\t0.500\t2.000\t2.000\t1.500\t0\n",
         )
@@ -67,9 +66,7 @@ class PackTest {
         assertEquals(err, 0, code)
         // 你 (99) and 好 (9) fit log10 P = -2 + 0.5 log10(c + 1) exactly; 你好, which the model lacks, does not count
         assertTrue(out, out.contains(FIT))
-        // 你耗了 and 好耗了 held together too little, while 好好 (as little) is a run of two, held to its
-        // entropy alone; 你你 too few different neighbours, 好你好 no more frequent than the model says
-        // of 好 你好, 嗯 and 丂 the model has not got (嗯 no reading either)
+        // each left out for its own reason: pmi, entropy, too few neighbours, no surprise, no model word
         assertTrue(out, out.contains("pack: 4 words, 2 left out for a character the model hardly has, 0 for want of a reading"))
         assertEquals(PASSED, tmp.root.resolve("new.words").readText())
     }
@@ -85,8 +82,7 @@ class PackTest {
 
     @Test
     fun aListOfWordsTakesWhatIsOnIt() {
-        // the pmi and entropy asked for being low; an entropy not measured no bar; 子了 read as the
-        // dictionary has the word, not as its characters alone
+        // the pmi and entropy asked for being low; 子了 read as the dictionary has the word
         val only = tmp.root.resolve("titles.txt").apply { writeText("# titles\n耗子\n好好\tzhwiki\n子了\n耗好\n# 好了\n") }.path
         val pack = tmp.root.resolve("wiki.words")
         val (code, _, err) = run("pack", "-o", pack.path, "--data", data(), "--layer", "wiki", "--min-count", "5", "--min-pmi", "0", "--min-entropy", "1", "--only", only, candidates())
@@ -96,7 +92,7 @@ class PackTest {
 
     @Test
     fun aCuratedListTakesItsWordsAsItReadsThem() {
-        // its words alone whatever the thresholds; one the candidates lack scored as the least count (5: -2 + 0.5 log10 6)
+        // its words alone whatever the thresholds; one the candidates lack scored as the least count
         val lexicon = tmp.root.resolve("add.tsv").apply { writeText("# word\treading\n好好\thao'hao\tword\n你的好\tni'di'hao\n好你\thao'ni\n") }.path
         val pack = tmp.root.resolve("new.words")
         val (code, out, err) = run("pack", "-o", pack.path, "--data", data(), "--layer", "new", "--min-count", "5", "--lexicon", lexicon, candidates())
@@ -170,8 +166,7 @@ class PackTest {
         val (code, out, err) = run("words", "-o", candidates.path, "--data", data, "--min-count", "2", "--sketch-bits", "12", shard.path)
         assertEquals(err, 0, code)
         assertTrue(out, out.contains("words: 3 runs of at least 2, 1 of them not in the data"))
-        // 好好 stands free on both sides (entropy 1.76, over the 1.5 asked) but holds together little
-        // (pmi -0.39): with its pmi read as an entropy, it would not pass
+        // 好好 stands free but holds together little: with its pmi read as an entropy it would not pass
         val pack = tmp.root.resolve("new.words")
         val (packed, packOut, packErr) = run("pack", "-o", pack.path, "--data", data, "--layer", "new", "--min-count", "2", candidates.path)
         assertEquals(packErr, 0, packed)

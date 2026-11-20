@@ -10,25 +10,17 @@ import java.util.Calendar
 import java.util.TreeSet
 
 /**
- * Text the user put under a key of letters, offered when the input read is that key: libime's
- * `customphrase` file, read as fcitx5-chinese-addons reads it, so what the user kept there
- * carries over. Where one goes differs a little: its order is its place among the candidates
- * shown, as the file says, where libime counts it among the decoder's alone (`1=A`, `2=B` over
- * `x y` show `A B x y` here, `A x B y` there).
- *
- * A line is `key,order=value`: the value is offered as the [order]th candidate; a negative order
- * keeps it but turned off. A value in double quotes is unescaped; an empty value takes the lines
- * after it, up to the next phrase, as its text. A value starting with `#` is filled in when
- * offered: `$year`, `${month_cn}` and the like (see [TextVariables]). Lines starting with `;` or `#`
- * outside a multi-line value are comments.
+ * libime's `customphrase` file, read as fcitx5-chinese-addons does, so users' phrases carry over. Unlike
+ * libime, a phrase's order is its place among the shown candidates (`1=A`, `2=B` over `x y`: `A B x y`
+ * here, `A x B y` there). Lines are `key,order=value`; a negative order disables it; an empty value takes
+ * the following lines; a value starting with `#` is filled in when offered ([TextVariables]).
  */
 class CustomPhrases private constructor(private val phrases: Map<String, List<Phrase>>) {
 
-    /** [value] under [key], at [order] (1 based), turned off if negative. */
+    /** [order] is 1-based; negative means turned off. */
     class Phrase(val key: String, val order: Int, val value: String) {
         val enabled get() = order > 0
 
-        /** Filled in when offered, with the time then. */
         val dynamic get() = value.startsWith("#")
 
         override fun toString() = "$key,$order=$value"
@@ -36,26 +28,19 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
 
     val isEmpty get() = phrases.isEmpty()
 
-    /** Whether [key] has phrases, turned on or off. */
     operator fun contains(key: String) = key in phrases
 
-    /** Every phrase, turned off too, as the settings list them: by key, then in order. */
+    /** Every phrase, turned off too, by key then order: as the settings list them. */
     val all: List<Phrase> get() = phrases.keys.sorted().flatMap { phrases.getValue(it) }
 
-    /** A [phrase] as offered: its [text], filled in if dynamic, going at [index] among the candidates. */
     class Offered(val index: Int, val text: String, val phrase: Phrase)
 
-    /** The phrases turned on under [key], each text once, as offered at [now], in order. */
     fun offered(key: String, now: Calendar): List<Offered> = offered(listOf(key), now)
 
-    /**
-     * The phrases turned on under [keys] together, each text once, as offered at [now]: in order,
-     * those of one order as [keys] has their keys, then in the file's order (A1: the keys one input
-     * typed on keys of letter groups reads as, [keysRead]).
-     */
+    /** Turned-on phrases under [keys], each text once: by order, ties by [keys]' order then the file's. */
     fun offered(keys: List<String>, now: Calendar): List<Offered> {
         val found = keys.flatMap { phrases[it].orEmpty() }.filter { it.enabled }
-        // stable: one key's are in order already, so one key alone stays as it was
+        // stable: one key's are in order already
         val ordered = if (keys.size > 1) found.sortedBy { it.order } else found
         val seen = HashSet<String>()
         return ordered.mapNotNull { p ->
@@ -64,27 +49,19 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         }
     }
 
-    /** The keys of these phrases, turned on or off, that [typed] reads as ([PhraseKeys]), sorted. */
     fun keysRead(typed: PhraseKeys): List<String> =
         typed.lengths.flatMap { keysByLength[it].orEmpty() }.filter(typed::reads).let { if (typed.lengths.first == typed.lengths.last) it else it.sorted() }
 
-    /** Whether a key of a phrase turned on starts with [prefix] (a table's code leading somewhere). */
+    /** A table's code leading somewhere. */
     fun leadsTo(prefix: String): Boolean = keysOn.ceiling(prefix)?.startsWith(prefix) == true
 
-    // asked at every key typed on keys of letter groups and on a table's: indexed once, not each phrase looked at
+    // asked every key on grouped keys and tables: indexed once
     private val keysByLength by lazy { phrases.keys.groupBy { it.length }.mapValues { (_, keys) -> keys.sorted() } }
     private val keysOn by lazy { phrases.filterValues { list -> list.any { it.enabled } }.keys.toCollection(TreeSet()) }
 
-    /**
-     * The phrases turned on under [key], each once, as offered at [now]: its text and where it
-     * goes among the candidates, 0 based, in order.
-     */
     fun lookup(key: String, now: Calendar): List<Pair<Int, String>> = offered(key, now).map { it.index to it.text }
 
-    /**
-     * These phrases with [value] the first under [key], as fcitx5-chinese-addons pins one: any
-     * other of that value under it goes, the rest keep their order.
-     */
+    /** [value] first under [key], as fcitx5-chinese-addons pins: duplicates of it there go, the rest keep order. */
     fun pinned(key: String, value: String): CustomPhrases {
         require(isKey(key)) { "not a key: $key" }
         val list = listOf(Phrase(key, 1, value)) + phrases[key].orEmpty().filter { it.value != value }
@@ -92,18 +69,17 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         return CustomPhrases(LinkedHashMap(phrases).apply { put(key, list.sortedBy { it.order }) })
     }
 
-    /** These phrases, and [builtIn]'s under each key they have none of, as offered. */
+    /** Plus [builtIn]'s under keys these have none of. */
     fun over(builtIn: CustomPhrases): CustomPhrases =
         if (builtIn.isEmpty) this else CustomPhrases(LinkedHashMap(builtIn.phrases.filterKeys { it !in phrases } + phrases))
 
-    /** These phrases with [builtIn]'s under [key] made theirs, where they have none under it. */
     fun adopting(key: String, builtIn: CustomPhrases): CustomPhrases {
         val adopted = builtIn.phrases[key]
         if (key in phrases || adopted == null) return this
         return CustomPhrases(LinkedHashMap(phrases).apply { put(key, adopted) })
     }
 
-    /** These phrases with [value] under [key] turned off: kept, as the settings can turn it on again. */
+    /** Kept, so the settings can turn it on again. */
     fun turnedOff(key: String, value: String): CustomPhrases {
         val list = phrases[key] ?: return this
         return CustomPhrases(LinkedHashMap(phrases).apply {
@@ -111,19 +87,15 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         })
     }
 
-    /** These phrases without [value] under [key]. */
     fun without(key: String, value: String): CustomPhrases {
         val left = phrases[key]?.filter { it.value != value } ?: return this
         return CustomPhrases(LinkedHashMap(phrases).apply { if (left.isEmpty()) remove(key) else put(key, left) })
     }
 
     /**
-     * [candidates] with the phrases under [key] put where they go, in the file's order among
-     * phrases of one order, each one [make]s: text, not learned (impl/PLAN.md §2.7, U-66). A
-     * candidate of the same text that reads [all] the input is not moved there: ranked before the
-     * phrase, it stays there, to be picked and learned, and the phrase is not listed again after
-     * it; ranked after, the phrase stands for it. No text is listed twice. One that reads less is
-     * left out, as the phrase is what the user meant by the key. [now] is asked only when [key] has phrases.
+     * [candidates] with [key]'s phrases placed (text, not learned). A candidate of the same text reading [all]
+     * the input ranked before its phrase stays there (to be picked and learned) and the phrase is not repeated;
+     * ranked after, the phrase stands for it. Partial readings of the same text are dropped.
      */
     fun <T> place(
         key: String,
@@ -134,10 +106,7 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         make: (String) -> T,
     ): List<T> = place(listOf(key), now, candidates, text, all, make = make)
 
-    /**
-     * [place] with the phrases under [keys] together, as [offered] has them, none before the
-     * [from]th candidate (English: the word space commits stays first).
-     */
+    /** [place] for several [keys], none before candidate [from] (English: the word space commits stays first). */
     fun <T> place(
         keys: List<String>,
         now: () -> Calendar,
@@ -154,17 +123,16 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
         val out = candidates.filterTo(ArrayList()) { text(it) !in texts || all(it) }
         var last = -1
         for ((order, phrase) in found) {
-            // found is in order: one of the same order goes after the one before it
+            // found is in order: one of the same order goes after the one before
             val at = minOf(maxOf(order, last + 1, from), out.size)
-            // the same text before it stands for it, there; nothing is added, so no phrase after it
-            // moves up a place as when the copy was added and de-duplicated away later (F3000)
+            // the same text before it stands for it: nothing added, so later phrases do not shift
             if ((0 until at).any { text(out[it]) == phrase }) {
                 last = at - 1
                 continue
             }
             out.add(at, make(phrase))
             last = at
-            // and it stands for one of its text after it: gone now, before the next is placed
+            // it stands for a same-text one after it: removed before placing the next
             for (i in out.lastIndex downTo at + 1) if (text(out[i]) == phrase) out.removeAt(i)
         }
         return out
@@ -173,12 +141,7 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
     companion object {
         val EMPTY = CustomPhrases(emptyMap())
 
-        /**
-         * The date, the time and the weekday under 日期, 时间 and 星期's initials, as Sogou has them:
-         * after the first candidate, so `rq` and space still type 日期. Offered where the user has
-         * no phrase of that key ([over]); one of them deleted from the keyboard is kept turned off
-         * in the user's file, the others with it ([PhraseBook.remove]), so it does not come back.
-         */
+        /** Date, time and weekday under `rq`, `sj`, `xq`, after the first candidate (as Sogou). Offered where the user has no phrase of that key; deleting one turns it off in the user's file so it stays gone. */
         val BUILT_IN: CustomPhrases = parse(
             """
             rq,2=#${'$'}year年${'$'}month月${'$'}day日
@@ -193,7 +156,7 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
 
         fun parse(text: String): CustomPhrases {
             val phrases = LinkedHashMap<String, MutableList<Phrase>>()
-            // the phrase taking the lines that follow, and them so far
+            // the phrase taking the following lines, and them so far
             var open: Phrase? = null
             val lines = StringBuilder()
             fun close() {
@@ -203,29 +166,25 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
                 open = null
                 lines.setLength(0)
             }
-            // as getline reads it: a newline ends the last line rather than starting another
+            // as getline: a final newline ends the last line rather than starting another
             for (line in text.removeSuffix("\n").removeSuffix("\r").lineSequence()) {
                 if (open == null && (line.startsWith(";") || line.startsWith("#"))) continue
                 val p = line(line)
                 if (p != null) {
                     close()
-                    // empty as written: `""` is an empty phrase, not the lines after it
+                    // `""` is an empty phrase, not the following lines
                     if (p.value.isEmpty() && line.endsWith('=')) open = p else phrases.getOrPut(p.key) { ArrayList() } += p
                 } else if (open != null) {
                     lines.append(line).append('\n')
                 }
             }
             close()
-            // stable: the file's order among phrases of one order
+            // stable: file order among phrases of one order
             for (list in phrases.values) list.sortBy { it.order }
             return CustomPhrases(phrases)
         }
 
-        /**
-         * [phrases] as fcitx5-chinese-addons saves them, which [parse] reads back: by key, a
-         * line each in the order given, a value fcitx would escape in quotes. An empty value is
-         * written `""`, which would otherwise take the lines after it.
-         */
+        /** As fcitx5-chinese-addons saves them, quoting values it would escape; an empty value is `""`, else it would take the following lines. */
         fun format(phrases: List<Phrase>): String {
             val out = StringBuilder()
             for ((key, list) in phrases.groupBy { it.key }.toSortedMap()) {
@@ -237,15 +196,14 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
             return out.toString()
         }
 
-        /** Whether [key] can be a phrase's: letters, as the file has them, where `'` or `;` would end it. */
+        /** Letters only: `'` or `;` would end it. */
         fun isKey(key: String) = key.isNotEmpty() && key.all { it.isAsciiLetter() }
 
-        /** A phrase line, or null if [line] is none. */
         private fun line(line: String): Phrase? {
             var i = 0
             while (i < line.length && line[i].isAsciiLetter()) i++
             if (i == 0 || i >= line.length || line[i] != ',') return null
-            // matched by letters typed in either case (English) or by keys (the nine keys'): one case kept
+            // matched in either case (English) or by keys (nine keys): one case kept
             val key = line.substring(0, i).lowercase()
             i++
             val negative = i < line.length && line[i] == '-'
@@ -253,17 +211,14 @@ class CustomPhrases private constructor(private val phrases: Map<String, List<Ph
             val digits = i
             while (i < line.length && line[i] in '0'..'9') i++
             if (i == digits || i >= line.length || line[i] != '=') return null
-            // what does not fit an int is 0 as libime reads it, and 0 is no order
+            // non-int is 0 as libime reads it, and 0 is no order
             val order = line.substring(digits, i).toIntOrNull()?.takeIf { it != 0 } ?: return null
             return Phrase(key, if (negative) -order else order, unescapeValue(line.substring(i + 1)))
         }
 
         private fun Char.isAsciiLetter() = this in 'a'..'z' || this in 'A'..'Z'
 
-        /**
-         * [content] with each `$name` or `${name}` filled in at [now] as [TextVariables.expand] fills it in: one it
-         * does not know left out, `$$` a `$`.
-         */
+        /** Fills in `$name` / `${name}` at [now] ([TextVariables.expand]); unknown ones dropped, `$$` a `$`. */
         fun evaluate(content: String, now: Calendar): String = TextVariables.expand(content, now)
     }
 }

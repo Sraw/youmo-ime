@@ -17,10 +17,7 @@ import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import java.io.File
 
-/**
- * keyboard-scene's example layouts and themes (its commonTest/data, the build says where: `scene.data`),
- * and the layouts the app draws (its commonMain/layouts, beside: qwerty.xml).
- */
+/** keyboard-scene's example layouts and themes (`scene.data`) and the app's layouts beside them. */
 object SceneData {
     private val dir = File(System.getProperty("scene.data") ?: error("scene.data not set"))
 
@@ -30,7 +27,7 @@ object SceneData {
 
     val qwerty: Layout by lazy { (LayoutReader.layout(read("qwerty.xml")) as Parsed.Ok).value }
 
-    /** Every character half the size wide, its ink the em box: what is measured does not matter here, only that both sides measure alike. */
+    /** Every character half its size wide: only that both sides measure alike matters. */
     val measurer = TextMeasurer { text, _, _, size ->
         val w = text.length * size / 2
         TextMetrics(w, Box(0.0, -size * 0.7, w, 0.0), -size, size * 0.3)

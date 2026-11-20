@@ -10,7 +10,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The simulated hands of `pinyin --taps` ([Taps]). */
 class TapsTest {
 
     private val samples = listOf(Sample("nihao", "你好", "t"), Sample("bugao", "不高", "t"), Sample("lama", "拉马", "t"))
@@ -26,8 +25,7 @@ class TapsTest {
 
     @Test
     fun aPerfectHandTapsEachLettersCentre() {
-        // n i h a o: right, right, right, left, left; L and M keys of one letter at their centre, as sent
-        // (where they fell weighs only a slip's from them)
+        // n i h a o: right, right, right, left, left; one-letter keys at their centre, as sent
         assertEquals(listOf(0.75f, 0.75f, 0.75f, 0.25f, 0.25f), taps("perfect")[0].taps)
         assertEquals(listOf(0.5f, 0.25f, 0.5f, 0.25f), taps("perfect")[2].taps)
     }
@@ -40,8 +38,7 @@ class TapsTest {
 
     @Test
     fun theHandsDrawAsTheyAreDefined() {
-        // many taps of right letters (ni ni …: n and i, 0.75) in one sample, one draw after another:
-        // each hand's mean where it says, all on the key's places
+        // many taps in one sample: each hand's mean where it says
         val many = listOf(Sample("ni".repeat(200), "你".repeat(200), "t"))
         fun mean(hand: String) = Taps.convert(many, Taps.Spec(Taps.Hand.of(hand), 1f)).single().taps!!.average()
         assertEquals(0.75, mean("sigma0.2"), 0.03)

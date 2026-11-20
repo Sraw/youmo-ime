@@ -21,19 +21,14 @@ import org.fcitx.fcitx5.android.pack.PackStatus
 import java.io.File
 
 /**
- * The device UAT's pack import (uat.py's `packs`), from the shell only (uid 2000, or root; the
- * manifest asks for DUMP too). A pack is written into the app's cache, imported through
- * [PackStore.import] as the settings page imports one (the same checks, signature and all), and
- * the copy deleted:
+ * Pack import for the device UAT, shell only (uid 2000 or root; DUMP in the manifest), through [PackStore.import]
+ * with the settings page's checks:
  *
  *     adb shell content write --uri content://<package>.uat.packs/text.youmopack < youmo-text-v1.youmopack
  *     adb shell content call --uri content://<package>.uat.packs --method import --arg text.youmopack
  *     adb shell content call --uri content://<package>.uat.packs --method state
  *
- * The UI's import goes through the system's file picker, which a test cannot drive the same on every
- * Android version; what it adds over this (the picker, the page's messages) is covered by
- * PacksFragment's Robolectric test. Debug and benchmark builds (app/build.gradle.kts gives the
- * benchmark build the debug sources too).
+ * The picker a test cannot drive on every Android version; PacksFragment's Robolectric test covers that part.
  */
 class PackImportProvider : ContentProvider() {
 
@@ -51,8 +46,7 @@ class PackImportProvider : ContentProvider() {
         return File(dir(), name)
     }
 
-    // the process started for this call (just installed, or killed): the call comes on a binder thread
-    // while the main one may still be in Application.onCreate, before the app is there to read packs
+    // a process started for this call: the binder thread may run before Application.onCreate has finished
     private fun appCreated() {
         val until = SystemClock.uptimeMillis() + APP_WAIT_MS
         while (runCatching { FcitxApplication.getInstance() }.isFailure) {
@@ -79,7 +73,6 @@ class PackImportProvider : ContentProvider() {
             "state" -> Unit
             else -> throw IllegalArgumentException("method: import or state, not $method")
         }
-        // a key a pack: Bundle[{text=v1, voice=missing, result=…}] as `content call` prints it
         for (kind in PackKind.entries) out.putString(kind.id, describe(PackStore.status(kind)))
         return out
     }
@@ -103,8 +96,7 @@ class PackImportProvider : ContentProvider() {
         shellOnly()
         val file = file(requireNotNull(uri.lastPathSegment) { "content://…uat.packs/<name>" })
         dir().mkdirs()
-        // a run stopped between its write and its import left that pack (up to some 180 MB) in the cache: one
-        // pack written at a time (uat.py, CI: write, import, the next), the others gone as a new one comes
+        // a run stopped before its import left a pack (up to ~180 MB) in the cache: one pack at a time
         if ('w' in mode) dir().listFiles()?.forEach { if (it.name != file.name) it.delete() }
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.parseMode(mode))
     }

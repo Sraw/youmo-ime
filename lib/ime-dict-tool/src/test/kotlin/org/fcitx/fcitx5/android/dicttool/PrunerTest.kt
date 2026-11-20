@@ -12,8 +12,7 @@ import kotlin.math.pow
 
 class PrunerTest {
 
-    // a after a: 0.042857 is just what backing off gives c, (1 - 0.9 - 0.042857) / (1 - 0.3 - 0.3) of 0.3,
-    // so a c tells the model nothing and a b a lot; b a is the same, but the trigram b a b needs it
+    // a after a: a c is just what backing off gives, so it tells the model nothing and a b a lot
     private val model = ArpaModel.read(
         """
         \data\
@@ -84,8 +83,7 @@ class PrunerTest {
         assertTrue(pruned.has("b", "a"))
     }
 
-    // <s> a tells the model 0.0204 nats, weighed by how often a word starts its sentence (0.1): 0.002.
-    // At <s>'s own unigram (1e-8) it would go at 1e-4 too, at SRILM's 1 stay at 5e-3
+    // <s> a's loss weighed by how often a word starts its sentence; at <s>'s own unigram or SRILM's 1 it would differ
     @Test
     fun aSentenceStartWeighsAsOftenAsAWordStartsOne() {
         assertTrue(prune(1e-4).has("<s>", "a"))

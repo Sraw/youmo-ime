@@ -66,8 +66,7 @@ class PageStrokeTouchTest {
         }
     }
 
-    // review: the page's places are the same units both ways, as StrokeShape reads them (GlideInput scales the keys'
-    // down by ROW_HEIGHT to be so): 20° off straight down is the edge of 竖 (StrokeShape.STEEP), 撇 past it
+    // the page's places are in the same units both ways, as StrokeShape reads them: 20° off straight down is 竖's edge
     @Test
     fun aStrokeNearTheEdgeOfShuIsReadInTheSameUnitsBothWays() {
         fun at(degreesOffDown: Double): Char? {
@@ -117,7 +116,7 @@ class PageStrokeTouchTest {
         assertEquals(Route.LIST, t.up(700f, 400f, 360))
         // held still past it and lifted: the cell's lift (its menu), no tap
         assertEquals(Route.LIST, touch().up(500f, 400f, 450))
-        // R26 F8291: at 长按延迟 itself not yet, past it as GlideTouch.move has a key's
+        // at 长按延迟 itself not yet, past it as GlideTouch.move has a key's
         assertEquals(Route.HOLD, touch().move(505f, 400f, 300))
         assertEquals(Route.TAP, touch().up(500f, 400f, 300))
         // 长按延迟 450: at 320 the stroke starts still
@@ -179,8 +178,7 @@ class PageStrokeTouchTest {
         assertFalse("a page not drawing", PageStrokeTouch.Hint.shows(false, 0))
     }
 
-    // the page by the keys' rule ([PageStrokeTouch.Draws.keys], BaseKeyboard's), and besides none while the keys are
-    // written on or a screen reader explores by touch (the keys' own: the ink's, hovering)
+    // the page by the keys' rule, and none while the keys are written on or a screen reader explores by touch
     @Test
     fun aPageDrawsAsTheKeysDoAndNotWhereTheyDoNot() {
         class Row(val why: String, val draws: Boolean, val keys: Boolean = draws, val set: PageStrokeTouch.Draws.() -> Unit)

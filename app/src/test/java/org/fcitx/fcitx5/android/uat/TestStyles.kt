@@ -8,11 +8,7 @@ import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyleUnder
 
-/**
- * 键盘样式 as a test sets it, as the app stores it (KeyboardStyles): [set] each shape's style (both where
- * landscape is null) over 普通, split's own under split; [clear] each shape's default by its width, as a new
- * install's. What is under is written first: the service and the input view are told of the style.
- */
+/** What is under is written first: the service and the input view are told of the style. */
 object TestStyles {
 
     fun set(style: KeyboardStyle, landscape: Boolean? = null) {
@@ -30,7 +26,6 @@ object TestStyles {
         }
     }
 
-    /** The shape's style as stored, null where none is. */
     fun stored(landscape: Boolean): KeyboardStyle? = KeyboardStyle.entries.firstOrNull { it.name == style(landscape).getValue() }
 
     private fun shapes(landscape: Boolean?) = landscape?.let(::listOf) ?: listOf(false, true)

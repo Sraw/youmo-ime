@@ -69,8 +69,7 @@ class PostedCommitTest {
         assertNull(period.takeBackUnread(last = null))
     }
 
-    // the editor did otherwise than the commit predicted (moved the cursor to the end, say), and
-    // reported it after 1 was pressed again, too late for 九键 to start over
+    // the editor moved the cursor otherwise than predicted, reported after 1 was pressed again, too late for 九键 to start over
     @Test
     fun inASensitiveFieldAReportNoneExpectedSinceTheMarkWentInDeletesNothing() {
         cursor.consume(9)
@@ -85,8 +84,7 @@ class PostedCommitTest {
         assertNull(period.takeBackUnread())
     }
 
-    // fcitx still busy with the press, the IME edited at once (the backspace swipe): the cursor
-    // is not after the mark, reported or not
+    // fcitx still busy with the press, the IME edited at once (the backspace swipe): the cursor is not after the mark
     @Test
     fun inASensitiveFieldAnEditSinceTheMarkWentInDeletesNothing() {
         cursor.consume(4)
@@ -96,8 +94,7 @@ class PostedCommitTest {
         assertNull(period.takeBackUnread())
     }
 
-    // fcitx busy (starting, or reloading): 1 pressed again before the first ， went in, which the
-    // editor then reported
+    // fcitx busy: 1 pressed again before the first ， went in, which the editor then reported
     @Test
     fun inASensitiveFieldTheMarkPutInOnlyAfterThePressGoesToo() {
         val busy = CursorTracker().apply { resetTo(3) }

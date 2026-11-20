@@ -13,11 +13,7 @@ import androidx.core.content.getSystemService
 inline val EditText.str: String
     get() = editableText.toString()
 
-/**
- * The focused field under this view (or this one) let go of, the keyboard put away: a field about to be hidden (a card
- * folded, another way picked, the search left), or the keys go on typing into a field no longer shown (the connection
- * stays with it). Nothing where none under it has the focus.
- */
+/** For a field about to be hidden: else the keys go on typing into a field no longer shown. */
 fun View.letGoOfFocusedField() {
     val focused = findFocus() ?: return
     focused.context.getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(focused.windowToken, 0)

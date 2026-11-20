@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/**
- * A common slip in typing a syllable, which [PinyinSegmenter] forgives when typos are on: the
- * slip reads as the syllable, flagged [SyllableMatches.TYPO].
- */
+/** A common syllable slip [PinyinSegmenter] forgives when typos are on, flagged [SyllableMatches.TYPO]. */
 enum class Typo {
     /** gn for ng: zhagn, xign */
     GN,
@@ -19,7 +16,7 @@ enum class Typo {
     V,
     ;
 
-    /** The syllable of initial [init] and final [fin] as this slip types it, or null if it cannot. */
+    /** Null if it cannot. */
     fun of(init: String, fin: String): String? = when (this) {
         GN -> if (fin.endsWith("ng")) init + fin.dropLast(2) + "gn" else null
         ON -> if (fin.endsWith("ong")) init + fin.dropLast(1) else null

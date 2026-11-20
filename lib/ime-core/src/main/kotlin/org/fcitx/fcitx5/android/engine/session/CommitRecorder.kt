@@ -22,32 +22,27 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
-/**
- * What a [PinyinSession] writes to the learning record ([habits], impl/design-1a.md §3), beside
- * what its user model learns: the keys [pressed] for its input, filed under [kind] ([multiTapKind]
- * where the nine keys' 连按 chose a letter, full pinyin where a glide typed them), after the word
- * [lastWord] finds before them. In 1a nothing ranks by it.
- */
+/** What a [PinyinSession] writes to the learning record ([habits]) besides its model: the keys [pressed] for its input under [kind] ([multiTapKind] for 连按 letters, full pinyin for glides), after the word [lastWord] finds. */
 internal class CommitRecorder(
     to: LearnTo,
-    /** The nine keys' letters, or a grouped keyboard's (the 14 keys'), if the session's keys are theirs: their layout's kind. */
+    /** The nine keys' or a grouped keyboard's letters if the session types on them: their layout's kind. */
     letters: NineKeyLetters?,
-    /** The user model, as `UserLexicon.user()` builds it: where a word comes from ([UserModel.origin]). */
+    /** Where a word comes from ([UserModel.origin]). */
     private val user: UserModel?,
-    /** A text the dictionary has, or the user added by hand. */
+    /** In the dictionary or added by hand. */
     private val isWord: (String) -> Boolean,
-    /** The session's keys read as syllables (its segmenter): what a commit typed again is matched by; null, none is. */
+    /** The session's segmenter, to match a retyped commit; null: none is. */
     private val segment: ((String) -> SyllableGraph)? = null,
-    /** How the model reads a text into words (`TextWords.boundaries`), as 联想 does: the 前文 is its last ([LastWord]). */
+    /** The model's word split (`TextWords.boundaries`), as 联想 uses: the 前文 is its last ([LastWord]). */
     split: ((String) -> IntArray)? = null,
-    /** A text the user added by hand, one word wherever [split] puts its pieces. */
+    /** Added by hand: one word wherever [split] cuts it. */
     isAdded: (String) -> Boolean = { false },
 ) {
     val habits = to.habits
     private val layout = letters?.tag()
-    // a grouped keyboard's keys apart from the nine keys' (qk:, not t9:); 注音九键's 连按 is under its own kind (zy:), never t9m:
+    // grouped keys apart from the nine keys' (qk:, not t9:); 注音九键's 连按 is under zy:, never t9m:
     private val grouped = layout != null && (letters?.isGrouped == true || Kinds.isZhuyin(to.kind))
-    // grouped 双拼 (to.kind sp:<scheme>) spk:<scheme>:<tag>, the 14 keys qk:<tag>, zhuyin's its own
+    // grouped 双拼 spk:<scheme>:<tag>, the 14 keys qk:<tag>, zhuyin its own
     private val kind = when {
         layout == null || Kinds.isZhuyin(to.kind) -> to.kind
         !grouped -> Kinds.nineKeys(layout)
@@ -55,19 +50,18 @@ internal class CommitRecorder(
         else -> Kinds.keys(layout)
     }
 
-    /** The layout a syllable taken off the bar is kept under ([Kinds.takeLayout]); "" where the keys have no bar. */
+    /** Where a bar-taken syllable is kept ([Kinds.takeLayout]); "" where the keys have no bar. */
     val takeLayout = layout?.let { Kinds.takeLayout(kind, it) }.orEmpty()
     private val multiTapKind = layout?.takeUnless { grouped }?.let(Kinds::nineKeysMultiTap)
     private val simplify = to.simplify
     private val lastWord = LastWord({ isWord(it) || habits.isWord(it) }, simplify, split) { isAdded(it) || habits.isWord(it) }
     val pressed = PressedKeys()
 
-    /** The field as this session wrote it: what a Backspace the app took deletes, and a commit types again (U-03). */
+    /** The field as this session wrote it: what an app Backspace deletes and a commit retypes. */
     private val journal = FieldJournal({ habits }, simplify)
 
-    // how a deleted commit is typed again: by its keys read as syllables, this session's kind by its
-    // segmenter, a glide's (full pinyin, its words' pinyin) by full pinyin's; none of a prediction or
-    // another kind (the nine keys' letters pressed in turn, a table's codes): the run of retyping ends there
+    // how a deleted commit is retyped: this session's kind by its segmenter, a glide's by full pinyin's; none for a
+    // prediction or another kind, where the retyping run ends
     private fun matcherOf(row: Row): Retype.Matcher? {
         val segment = segment ?: return null
         return when (row.code.kind) {
@@ -79,42 +73,42 @@ internal class CommitRecorder(
 
     private val fullPinyin by lazy(LazyThreadSafetyMode.NONE) { PinyinSegmenter() }
 
-    // the record of the commit being committed, and what it typed again: for the journal
+    // the commit being recorded and what it retyped: for the journal
     private var recorded: Commit? = null
     private var typedAgain: Retype.Match? = null
 
-    /** The record of the last commit, null for none: what a session over this one (a table's lookup) keeps in its journal. */
+    /** Null for none: what a session over this one (a table's lookup) keeps in its journal. */
     var lastRecorded: Commit? = null
         private set
 
-    /** What the journal deleted whole, taken back now: see FieldJournal.settle. */
+    /** See FieldJournal.settle. */
     fun settle() = journal.settle()
 
-    /** A Backspace the app took, nothing typed: see CommitJournal.backspace. */
+    /** See CommitJournal.backspace. */
     fun backspace() = journal.backspace()
 
-    /** Something went into the field this session did not write. */
+    /** Something this session did not write went into the field. */
     fun unverify() = journal.unverify()
 
-    /** A key went to the app: what was deleted stands, and what the key does there is the app's (U-03). */
+    /** A key went to the app: deletions stand, and what the key does is the app's. */
     fun passedOn() = journal.passedOn()
 
-    /** [c] told the session: see FieldJournal.told. */
+    /** See FieldJournal.told. */
     fun told(c: Action.Context, learning: Boolean) = journal.told(c, learning)
 
-    /** [text] committed by a session over this one (a character looked up): nothing of it to take back; nothing kept but [learning]. */
+    /** Committed by a session over this one (a looked-up character): nothing to take back; kept only when [learning]. */
     fun followed(text: String, learning: Boolean) = journal.followed(text, learning)
 
-    /** A context the session's engine gave itself, [before] the cursor: see CommitJournal.own. */
+    /** See CommitJournal.own. */
     fun ownContext(before: String) = journal.ownContext(before)
 
-    /** The editor's text is a field's that cleared itself (Action.Context): no word before the next commit. */
+    /** The field cleared itself (Action.Context): no word before the next commit. */
     var cleared = false
 
-    /** The text before the cursor, as far as kept: the app's, then what was committed after it. */
+    /** The text before the cursor as far as kept: the app's, then commits after it. */
     var text = ""
 
-    /** What the field's commits are not learned for ([Commit.NO_PAIRS], [Commit.NO_PREDICT]): as the last [Action.Context] said. */
+    /** What the field's commits are not learned for ([Commit.NO_PAIRS], [Commit.NO_PREDICT]), per the last [Action.Context]. */
     var learnFlags = 0
 
     /** The first candidate shown when a syllable was first taken: what an 'H' pick is weighed against. */
@@ -122,13 +116,12 @@ internal class CommitRecorder(
 
     val learns get() = habits.learns
 
-    /** [text] forgotten everywhere (U-84). */
     fun forget(text: String) = safely { habits.forget(text) }
 
-    /** The whole phrase [text]'s count forgotten (U-73), no word of that text. */
+    /** The whole phrase's count only, no word of that text. */
     fun forgetPhrase(text: String) = safely { habits.forgetPhrase(text) }
 
-    /** [block]'s value, or [otherwise]: a fault of building the rows is learning's, never the commit's (see Habits.failed). */
+    /** [block]'s value or [otherwise]: a row-building fault is learning's, never the commit's (Habits.failed). */
     inline fun <T> safely(otherwise: T, block: () -> T): T {
         if (!learns) return otherwise
         return try {
@@ -148,13 +141,13 @@ internal class CommitRecorder(
         else -> Code(kind, pressed.keys(from, to, slips))
     }
 
-    /** The app's [text] before the cursor, as what the next commit follows: [cleared] (Action.Context); none kept but [learning]. */
+    /** The app's text before the cursor, which the next commit follows; kept only when [learning]. */
     fun followText(text: String, cleared: Boolean, learning: Boolean) {
         this.cleared = cleared
         this.text = if (learning) recentTail(text) else ""
     }
 
-    /** [text] committed: what the next commit follows. */
+    /** What the next commit follows. */
     fun committed(text: String, learning: Boolean) {
         cleared = false
         this.text = if (learning) recentTail(this.text + text) else ""
@@ -165,66 +158,55 @@ internal class CommitRecorder(
         typedAgain = null
     }
 
-    /** The word before what is committed now. */
     fun prev() = if (cleared) "" else lastWord.of(text)
 
-    /** The text before what is committed now, as the record has its text (simplified): what a whole phrase goes on from (U-73). */
+    /** Simplified, as the record keeps text: what a whole phrase goes on from. */
     fun textBefore() = if (cleared) "" else simplify(text)
 
-    /** A commit of [picks], with the syllables taken of [nineKeys]. */
     fun commit(picks: List<CommitRows.Pick>, nineKeys: NineKeys?) = safely {
         val takes = if (layout == null) emptyList() else nineKeys?.takes(takeLayout).orEmpty()
         val prev = prev()
-        // a key read as the key next to it is learned as the key meant: the code typed so stays as it reads (061-neighbour-correction §8.2)
+        // a slipped key is learned as the key meant, so the code stays as it reads
         val slips = picks.fold(emptyMap<Int, Char>()) { all, p -> if (p.slips.isEmpty()) all else all + p.slips }
         val rows = CommitRows.build(prev, picks, { from, to, words -> code(from, to, words, slips) }, ::origin)
-        // commits deleted whole just before, typed again by this one: corrected to there (U-03)
+        // commits deleted whole just before and retyped by this one: corrected to it
         val deleted = journal.pending
         val again = if (deleted.isEmpty()) null else Retype.match(deleted, prev, Retype.syllables(prev, picks), rows, ::matcherOf, ::origin)
         typedAgain = again
         recorded = habits.record(rows + again?.rows.orEmpty(), takes, learnFlags)
     }
 
-    /** A syllable about to be taken of [nineKeys]: the first shown, before the first, what an 'H' pick is weighed against. */
+    /** Notes the first candidate shown before a syllable is taken: what an 'H' pick is weighed against. */
     fun taking(nineKeys: NineKeys, candidates: List<Candidate>, rest: Int, aside: (Candidate) -> Boolean) {
         if (!nineKeys.anyTaken) firstAtTake = firstShown(candidates, rest, aside)?.text
     }
 
-    /**
-     * [text] pinned first (U-83), or unpinned, under the code [at] works out, read as the entries
-     * it gives: worked out here, so a fault of it is learning's too (review-1a-r2 NIT 5).
-     */
+    /** Pins [text] first, or unpins, under the code [at] computes: computed here so its fault is learning's too. */
     fun pin(text: String, on: Boolean, at: () -> Pair<Code, List<Entry>?>) = safely {
         val (code, entries) = at()
         habits.pin(code, text, Words(entries?.let(::words).orEmpty()).reading, on)
     }
 
-    /** A prediction (联想) of [text] picked [after] the word it follows, [first] the one shown first, the rest of [continued] if a whole phrase's: see [PredictionOrder]. */
+    /** A 联想 pick after [after]; [first] the one shown first, [continued] a whole phrase's rest: see [PredictionOrder]. */
     fun prediction(text: String, after: String, first: String, continued: String = "") = safely {
-        // after nothing, no whole phrase either: PredictionOrder offers a phrase's rest only after the word it follows
+        // after nothing, no whole phrase either: PredictionOrder offers a phrase's rest only after its word
         if (after.isEmpty()) return@safely
         val row = PredictionOrder.row(text, after, first)
-        // in the journal as a commit is: deleted whole at once, the pick is taken back (U-03); the rest
-        // of a whole phrase, a use of it whole (U-73)
+        // journaled as a commit: deleted whole at once, the pick is taken back; a phrase's rest counts as a whole use
         recorded = if (continued.isEmpty()) habits.record(listOf(row), flags = learnFlags) else habits.recordContinued(listOf(row), learnFlags, continued)
     }
 
-    /** A word of a glide's other readings committed though the session held it back: as a pick of it from [first]. */
+    /** A glide alternative committed though the session held it back: as a pick from [first]. */
     fun heldBack(word: Word, first: String) = safely {
         val words = Words(listOf(word))
         val code = Code(Kinds.FULL, word.reading.replace(" ", ""))
         val corrected = if (first != word.text) Row.CORRECTED else 0
         val record = habits.record(listOf(Row(Row.PICK or Row.WHOLE or corrected, code, prev(), words, 'B', origin(words), first)), flags = learnFlags)
-        // committed by the glide, the session told it as context next: written here as a commit (S10)
+        // committed by the glide, which the session hears as context next: journaled here as a commit
         journal.own(word.text, record)
     }
 
-    /**
-     * [c], picked of [candidates] (from input place [from], [rest] places left), as
-     * learning takes it (impl/design-1a.md §3): its words, read as [entries], and where they end;
-     * what it was weighed against, the first shown ending where it ends (or, a syllable [taken],
-     * the first shown before); the first sentence shown, its words' texts by [text].
-     */
+    /** [c] picked from [candidates] (from input place [from], [rest] left) as learning takes it: its words as [entries], where they end, what it was weighed against, and the first sentence shown. */
     fun pick(
         c: Candidate,
         from: Int,
@@ -243,7 +225,7 @@ internal class CommitRecorder(
         val how = when {
             taken -> 'H'
             c.end < rest -> 'C'
-            // the first of the words shown: a pinned phrase or an emoji before it is none
+            // the first of the words shown: a pinned phrase or emoji before it is none
             c === firstShown(candidates, rest, aside) -> 'A'
             else -> 'B'
         }
@@ -253,7 +235,7 @@ internal class CommitRecorder(
         CommitRows.Pick(from, words ?: listOf(Word(c.text, "")), ends, how, reference, shown, own, slips)
     }
 
-    /** Where [words] come from: the dictionary or a user dictionary, added by hand, neither. */
+    /** Dictionary or user dictionary, added by hand, or neither. */
     private fun origin(words: Words): Int {
         val syllables = words.reading.split(' ').filter { it.isNotEmpty() }.map(Syllables::id)
         val known = if (syllables.isEmpty() || syllables.any { it < 0 }) null else user?.origin(Entry(words.text, syllables.toIntArray()))
@@ -266,13 +248,12 @@ internal class CommitRecorder(
     }
 
     companion object {
-        /** The first of [candidates] that ends [end] places on: of the words, not one [aside] (a phrase, an emoji). */
+        /** The first of [candidates] ending [end] places on, not one [aside] (a phrase, an emoji). */
         fun firstShown(candidates: List<Candidate>, end: Int, aside: (Candidate) -> Boolean) = candidates.firstOrNull { it.end == end && !aside(it) }
 
-        /** [entries] as learning has words: their syllables spelt, apart by spaces. */
+        /** Syllables space-separated. */
         fun words(entries: List<Entry>) = entries.map { e -> Word(e.text, e.spelled()) }
     }
 }
 
-/** [text] without its last character. */
 internal fun withoutLast(text: String) = if (text.isEmpty()) text else text.substring(0, text.offsetByCodePoints(text.length, -1))

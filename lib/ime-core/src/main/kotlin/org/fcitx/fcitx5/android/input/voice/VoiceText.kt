@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.voice
 
-/** What a recognized stretch of speech types. */
 object VoiceText {
 
     // a cough or a breath taken for speech comes back as one of these
@@ -12,19 +11,14 @@ object VoiceText {
     private const val PAUSES = VoiceMarks.PAUSES
     private val FILLER = Regex("^[$FILLERS$PAUSES]+$")
 
-    // a cough or throat clearing comes back as 咳咳咳… or 哼哼哼 (voice-eval's noise set: 9 of 159
-    // clips), a breath as "Huh,". Two or more of 咳/哼, so a single dictated 哼。 still types;
-    // with any other word ("哼哈哈", "嗯哼因为…") it is speech and types
+    // a cough comes back as 咳咳咳… or 哼哼哼, a breath as "Huh,"; two or more 咳/哼 so a dictated 哼。 still types
     private val COUGH = Regex("^(?=(?:.*[咳哼]){2})[咳哼$FILLERS$PAUSES]+$")
 
-    // "Hmm.", "Uh huh,": sounds, each made of these, with or without pauses between. Checked a
-    // word at a time, not as one `(sound pause*)+`: that splits "mmmm…m okay" 2^n ways before it
-    // fails, and it runs on each result the recognizer hands back
+    // checked a word at a time: one `(sound pause*)+` regex backtracks 2^n ways on "mmmm…m okay"
     private val LATIN_SOUND = Regex("h+u+h+|h+m+|u+h+|u+m+|m+h*m+|a+h+", RegexOption.IGNORE_CASE)
     private val PAUSE = Regex("[$PAUSES]+")
 
-    // longer is taken as speech, and keeps the per-word check below small: a hum of more letters
-    // ("mmm…" × 65) is typed, where the one regex dropped it; no recognizer hands one back
+    // longer is speech, keeping the per-word check small
     private const val LONGEST_SOUND = 64
 
     private fun isLatinSound(text: String): Boolean {
@@ -33,7 +27,6 @@ object VoiceText {
         return words.isNotEmpty() && words.all { isSounds(it) }
     }
 
-    // whether [word] is sounds back to back: which of its prefixes are
     private fun isSounds(word: String): Boolean {
         if (word.length > LONGEST_SOUND) return false
         val ends = BooleanArray(word.length + 1).also { it[0] = true }
@@ -49,19 +42,13 @@ object VoiceText {
     private const val CJK = "\\p{IsHan}，。！？、：；“”‘’（）《》…—"
     private val SPACE_BY_CJK = Regex("(?<=[$CJK])\\s+|\\s+(?=[$CJK])")
 
-    // and spells an abbreviation out: "C E P". Not \b: Android's regex (ICU) and Java up to 18
-    // count 了 as a word char, so 订了C had no boundary there and C E P stayed spelled; Java 19+
-    // looks at ASCII only, which hid it on the desktop
+    // and spells abbreviations out ("C E P"). Not \b: ICU and Java ≤18 count 了 as a word char, so 订了C had no boundary
     private val SPELLED = Regex("(?<![$LATIN_WORD])[A-Z](?: [A-Z](?![$LATIN_WORD]))+")
 
     // the Latin letters, digits and _ \b counts as a word's: "éA B" and "x_A B" are not spelled
     private const val LATIN_WORD = "\\p{IsLatin}0-9_"
 
-    /**
-     * [raw] as typed: no spaces in Chinese, an abbreviation in one piece (numbers are the polish
-     * tagger's, [VoicePolishTags]); null when nothing is left worth typing: punctuation alone, or a filler
-     * sound alone ("嗯。", "咳咳咳。", "Huh,"), which the recognizer writes for a noise as often as for a word.
-     */
+    /** No spaces in Chinese, an abbreviation in one piece; null for punctuation or a filler sound alone ("嗯。", "Huh,"). */
     fun clean(raw: String): String? {
         val text = raw.trim()
         if (text.isEmpty() || NOISE.any { it.matches(text) } || isLatinSound(text)) return null

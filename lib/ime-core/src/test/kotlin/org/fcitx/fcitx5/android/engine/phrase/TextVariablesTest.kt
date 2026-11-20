@@ -32,7 +32,6 @@ class TextVariablesTest {
         assertEquals("三十一", TextVariables.chineseNumber(31, leadingZero = true))
         assertEquals("", TextVariables.expand("", morning))
         assertEquals("a\$", TextVariables.expand("a\$", morning))
-        // a phrase's `#` text is filled in by the same
         assertEquals("2009年1月4日", CustomPhrases.evaluate("\$year年\$month月\$day日", morning))
     }
 
@@ -45,7 +44,7 @@ class TextVariablesTest {
         assertEquals("23:16", TextVariables.expand("\${fullhour}:\$minute", now))
     }
 
-    // what the editor marks is what typing does (061-text-variables §2.1, S2): one scan for both
+    // what the editor marks is what typing does: one scan for both
     @Test
     fun problemsAreWhatExpandDoes() {
         assertEquals(listOf(Problem("\$yaer", dropped = true)), TextVariables.problems("\$yaer年"))
@@ -67,14 +66,13 @@ class TextVariablesTest {
     fun whetherATextFillsAnythingIn() {
         assertTrue(TextVariables.fillsIn("\$year"))
         assertTrue(TextVariables.fillsIn("\$yaer"))
-        // `$$` is one `$` with variables, two without: it fills in
         assertTrue(TextVariables.fillsIn("US\$\$5"))
         assertFalse(TextVariables.fillsIn("US\$5"))
         assertFalse(TextVariables.fillsIn("\$5 \$"))
         assertFalse(TextVariables.fillsIn("plain"))
     }
 
-    // the help's table names each of them, in the editor's order (061-text-variables §5)
+    // the help's table names each of them, in the editor's order
     // contract: docs/words.md's table of the variables (its 变量 column) against TextVariables.NAMES
     @Test
     fun theHelpTablesEveryVariable() {

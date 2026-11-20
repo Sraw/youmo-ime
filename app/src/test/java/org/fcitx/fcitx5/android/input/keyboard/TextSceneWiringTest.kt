@@ -7,12 +7,10 @@ package org.fcitx.fcitx5.android.input.keyboard
 import android.text.InputType
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
@@ -38,13 +36,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The 26 keys drawn by the scene, wired from qwerty.xml's nodes (060-render-p2 U4 B), do what the
- * views' KeyDef (TextKeyboard.Layout) says, key by key, in each of its forms: pinyin, English, 双拼 with
- * `;`, a table's (五笔 with its roots and 拼, 仓颉 with its `*`), an address field's keys: shortcut, swipe axes,
- * actions, popups (a named key's long press the resolver's, left out), sound, space/backspace and enabled (confirm's
- * sound Return, as an exception). A letter's
- * press and long press are its letter in either case (TextKeyboard sends and shows them as Shift has
- * them); its bubble its letter too, whatever its face (a table's roots: TextKeyboard's Table.bubble).
+ * The 26 keys wired from qwerty.xml do what the committed wiring says ([WiringSnapshot]) in each form. A letter's
+ * press and long press are its letter in either case (TextKeyboard applies Shift), its bubble too, whatever its face.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -61,7 +54,7 @@ class TextSceneWiringTest {
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
-    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", "", name.take(1), "zh_CN", "androidengine", false)
+    private fun entry(im: String, name: String) = InputMethodEntry(im, name, "", name.take(1), "zh_CN")
 
     private fun compare(form: String, im: InputMethodEntry, table: TableKeyboard? = null, inputType: Int = InputType.TYPE_CLASS_TEXT, composing: Boolean = false): Set<String> {
         return KeyboardHarness(im = im).start(inputType).use { h ->
@@ -70,36 +63,18 @@ class TextSceneWiringTest {
             h.idle()
             h.relayout()
             val k = KeyboardHarness.all(h.keyboard).filterIsInstance<TextKeyboard>().single()
-            // a code typed: a table's keyboard shows 确定 (confirm) in Return's place
+            // a table's keyboard shows 确定 in Return's place
             if (composing) {
                 k.onReturnDrawableUpdate(ReturnKeyAppearance.Enter.copy(composing = true))
                 h.relayout()
             }
             val scene = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single().scene!!
-            val old = TextKeyboard.Layout.flatten().associateBy { it.name }
-            val wasLines = mutableListOf<String>()
-            val nowLines = mutableListOf<String>()
-            for (node in scene.keys) {
-                val was = old[node.id] ?: error("$form ${node.id}: no view's key")
+            val lines = scene.keys.map { node ->
                 val now = k.sceneKey(node)!!.def as SceneKeyDef
-                val at = "$form ${node.id}"
                 val letter = node.id.length == 1 && node.id[0] in 'a'..'z'
-                assertEquals(at, was.shortcut, now.shortcut)
-                assertEquals(at, was.swipesBothWays, now.swipesBothWays)
-                assertEquals(at, actions(was, letter), actions(now, letter))
-                assertEquals(at, popups(was, letter), popups(now, letter))
-                // confirm (a table's 确认 while composing) sounds as Return does, its view as a letter did
-                // its sound, its space's and backspace's sideways swipe, and whether it takes a touch (a blank view
-                // took none): as its view's
-                assertEquals(at, if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect, WiringSnapshot.layoutSound(now.systemSound))
-                assertEquals(at, was is SpaceKey, now.isSpace)
-                assertEquals(at, was is BackspaceKey, now.isBackspace)
-                assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
-                val sound = if (node.id == "confirm") InputFeedbacks.SoundEffect.Return else was.appearance.soundEffect
-                wasLines += WiringSnapshot.line(node.id, was.shortcut, was.swipesBothWays, actions(was, letter), popups(was, letter), sound, was is SpaceKey, was is BackspaceKey, was !is BlankKey)
-                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now, letter), popups(now, letter), WiringSnapshot.layoutSound(now.systemSound), now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
+                WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now, letter), popups(now, letter), WiringSnapshot.layoutSound(now.systemSound), now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
             }
-            WiringSnapshot.check("qwerty-${form.replace(' ', '-')}", wasLines, nowLines)
+            WiringSnapshot.check("qwerty-${form.replace(' ', '-')}", lines)
             EngineState.syllablesState.value = EngineState.SyllableState()
             scene.keys.map { it.id }.toSet()
         }
@@ -145,7 +120,6 @@ class TextSceneWiringTest {
         assertTrue(email.toString(), "at" in email)
     }
 
-    // the user's long press of q: its swipe types its first (the resolver's), not the layout's built-in 1
     @Test
     fun aLettersSwipeIsTheUsersFirst() {
         prefs.setList("full/q", listOf("⒜", "1"), first = "⒜")
@@ -153,12 +127,11 @@ class TextSceneWiringTest {
             val q = h.keys().single { it.id == "q" }
             h.swipe(q, 0f, -q.bounds.height().toFloat())
             h.idle()
-            // FakeHostApi's sendKey of 1 (by char, key name or keysym): the built-in's 1 not typed
+            // FakeHostApi's sendKey of 1 (by char, key name or keysym)
             assertTrue(h.api.calls.toString(), h.api.calls.any { "⒜" in it } && h.api.calls.none { it.startsWith("sendKey(char=1,") || it.startsWith("sendKey(key=1,") || it.startsWith("sendKey(sym=49,") })
         }
     }
 
-    // a table's roots on the letters' faces: a letter pressed shows its letter in its bubble, as its view's did, not its roots
     @Test
     fun aLetterUnderItsRootsShowsItsLetter() {
         KeyboardHarness(im = entry(InputMethodCatalog.WUBI, "五笔")).start().use { h ->
@@ -173,8 +146,7 @@ class TextSceneWiringTest {
         }
     }
 
-    // Shift redraws the letters' faces in capitals: each keeps its key (its bubble's content told it, SceneKeys.nodeKey),
-    // not one made anew, and its bubble shows the capital
+    // each letter keeps its key (SceneKeys.nodeKey), not one made anew, and its bubble shows the capital
     @Test
     fun shiftKeepsTheLettersKeys() {
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
@@ -193,8 +165,7 @@ class TextSceneWiringTest {
         }
     }
 
-    // SceneKeys alone: two nodes of a key that differ in their bubble's content alone (the face's label) are one key,
-    // the new content set on it (TextKeyboard's letters take theirs from Table.bubble, so its Shift does not show this)
+    // two nodes differing in their bubble's content alone are one key with the new content
     @Test
     fun aNodeDifferingInItsBubbleAloneKeepsItsKeyWithTheNewBubble() {
         KeyboardHarness(im = KeyboardHarness.ENGLISH).start().use { h ->
@@ -217,8 +188,7 @@ class TextSceneWiringTest {
         }
     }
 
-    // a glide read where the scene draws the letters: the letters' centres the engine gets, in key widths, as
-    // far apart as the keys shown
+    // read where the scene draws the letters: the centres as far apart as the keys shown
     @Test
     fun aGlideIsReadOnTheScene() {
         prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
@@ -239,7 +209,6 @@ class TextSceneWiringTest {
         }
     }
 
-    // split, G and V on both halves: a glide reads each of their copies where the scene draws it
     @Test
     @Config(qualifiers = "w800dp-h360dp-land")
     fun aSplitGlideReadsBothCopiesOfG() {
@@ -264,12 +233,9 @@ class TextSceneWiringTest {
         }
     }
 
-    // R25r3 F7963: the letters were found by their keys' ids (a single a–z). A letters board has a key of each of
-    // those ids, or it does not read (LayoutReader), but nothing holds the key of id q to sending q (PackLayouts.judge
-    // asks for none): with an id that is not what the key sends, the glide read another letter than a tap types.
-    // Here the app's 26 keys with every letter's id another letter's (a's z, b's y, …), and P's key sending q as Q's
-    // does: the glide is read, each letter where the key sending it is drawn, and q on Q's key alone, the first of
-    // the two in the layout's order
+    // nothing holds the key of id q to sending q (PackLayouts.judge asks none): with ids not what keys send, the glide read
+    // another letter than a tap types. Every letter's id another's and P's key sending q: each letter is read where the key
+    // sending it is drawn, q on Q's key alone, the first in the layout's order
     @Test
     @Uat("KB-33")
     fun aGlideReadsEachLetterWhereTheKeySendingItIsWhateverItsId() {
@@ -287,7 +253,6 @@ class TextSceneWiringTest {
         }
         try {
             KeyboardHarness(im = KeyboardHarness.PINYIN).start().use { h ->
-                // the source's layout is the one drawn: Q's key is named j, and no letter's key by its letter
                 assertEquals("j", h.key("q").id)
                 assertTrue(h.keys().map { it.label to it.id }.toString(), h.keys().none { k -> k.id?.singleOrNull()?.let { it in 'a'..'z' } == true && k.id == k.label })
                 val keys = "qzm".map { h.key("$it") }
@@ -302,13 +267,11 @@ class TextSceneWiringTest {
                     val read = layout.centre(c)
                     assertEquals("$c x", (k.exactCenterX() - first.exactCenterX()) / first.width(), read.first - q.first, 0.02f)
                 }
-                // P's key types q too: no p in the layout, and q is not there, nine keys from Q's
                 assertTrue("p read", 'p' !in layout)
                 val p = h.key("p").bounds
                 val across = (p.exactCenterX() - first.exactCenterX()) / first.width()
                 assertEquals("q's nearest key from P's", across, layout.distance('q', q.first + across, q.second), 0.02f)
-                // R25r4 F7971: the bubble too is the letter the key sends, not its id (Q's key is named j); a press as a
-                // tap's, glide typing off
+                // the bubble too is the letter the key sends, not its id
                 prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Off)
                 h.press(h.key("q"))
                 assertEquals(listOf("q"), h.popupChoices().map { it.text.lowercase() })
@@ -319,8 +282,7 @@ class TextSceneWiringTest {
         }
     }
 
-    // a letter's in either case: TextKeyboard sends it as Shift has it; a named key's swipe is its name's (KeySwipes asks
-    // the resolver, 060-keys-unify S6), neither the view's nor the node's: left out
+    // a letter's in either case (TextKeyboard applies Shift); a named key's swipe is the resolver's: left out
     private fun actions(def: KeyDef, letter: Boolean) = def.behaviors.filterNot { def.shortcut != null && it is KeyDef.Behavior.Swipe }.map {
         val a = when (it) {
             is KeyDef.Behavior.Press -> it.action
@@ -332,11 +294,10 @@ class TextSceneWiringTest {
         "${it::class.simpleName} ${if (letter && a is KeyAction.HostKeyAction) a.copy(act = a.act.lowercase()) else a}"
     }.toSet()
 
-    // a named key's long press is the resolver's (KeyResolving.popup), neither the view's nor the node's: left out
+    // a named key's long press is the resolver's (KeyResolving.popup): left out
     private fun popups(def: KeyDef, letter: Boolean) = def.popup.orEmpty().filterNot { def.shortcut != null && it is KeyDef.Popup.Keyboard }.map { p ->
         when (p) {
-            // a letter's bubble shows its letter as Shift has it (Table.bubble, transformAlphabet)
-            // a named key's swipe the resolver's (its first, as KeySwipes previews it): the corner either has left out
+            // a letter's bubble its letter as Shift has it (Table.bubble); a named key's swipe the resolver's: left out
             is KeyDef.Popup.AltPreview -> if (p.alternative.isEmpty() || def.shortcut != null) "bubble ${if (letter) "letter" else p.content}" else "bubble ${if (letter) "letter" else p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"

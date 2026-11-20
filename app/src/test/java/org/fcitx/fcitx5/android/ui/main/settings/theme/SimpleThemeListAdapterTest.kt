@@ -14,10 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * A slot's dialog (060-render-p3 T3 review): the theme picked is a theme, so the 浅/深 of its card shows
- * the other version unmarked and picks nothing; it once picked the version shown, unseen.
- */
+/** The pick is a theme: its card's 浅/深 shows the other version unmarked and picks nothing. */
 @RunWith(RobolectricTestRunner::class)
 class SimpleThemeListAdapterTest {
 
@@ -39,7 +36,7 @@ class SimpleThemeListAdapterTest {
         // back: marked again
         list.switchVersion(1)
         assertTrue(list.checkedAt(1))
-        // the card tapped while it shows the dark one picks that
+        // tapping the card while it shows the dark one picks that
         list.switchVersion(1)
         list.pick(1)
         assertEquals(dark, list.selectedTheme)
@@ -56,7 +53,7 @@ class SimpleThemeListAdapterTest {
         assertEquals(mine, list.selectedTheme)
         assertTrue(list.checkedAt(0))
         assertFalse(list.checkedAt(1))
-        // a card of one version has nothing to switch
+        // a one-version card has nothing to switch
         list.switchVersion(2)
         assertEquals("deep-blue", list.shownAt(2).name)
     }

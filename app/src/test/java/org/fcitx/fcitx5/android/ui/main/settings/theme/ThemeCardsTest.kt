@@ -11,7 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** The theme lists' cards (060-render-p3 T3): a built-in theme of two versions one card. */
+/** The theme lists' cards: a built-in theme of two versions one card. */
 class ThemeCardsTest {
 
     private val mine = TestThemes.PixelDark.deriveCustomNoBackground("mine")

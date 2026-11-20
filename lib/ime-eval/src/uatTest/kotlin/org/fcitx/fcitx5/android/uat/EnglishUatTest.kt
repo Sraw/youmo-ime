@@ -192,8 +192,7 @@ class EnglishUatTest {
         assertTrue("thw corrected to $text", text != "the " && text != "thw ")
     }
 
-    // the nine keys as a phone 400 dp wide has them (TouchSim's nine: keys 88 by 56 dp), [digits] each pressed in
-    // its middle but the one at [at], tapped [dx] of its width across from its middle
+    // the nine keys as TouchSim lays them, [digits] each in its middle but the one at [at], [dx] across
     private fun EngineReplay.nine(digits: String, at: Int = -1, dx: Float = 0f) {
         val board = TouchSim.board("nine")
         digits.forEachIndexed { i, d ->
@@ -203,8 +202,7 @@ class EnglishUatTest {
         }
     }
 
-    // when (9436) with its 4 slipped to 5: at 5's edge by 4 (a twentieth of the key from it), when; in 5's middle,
-    // each key's first letter: 9536 spells nothing
+    // when (9436) with 4 slipped to 5's edge by 4: when; in 5's middle, 9536 spells nothing
     @Test
     @Uat("EN-31")
     fun aNineKeyTappedAtTheEdgeOfTheNextIsReadAsIt() {

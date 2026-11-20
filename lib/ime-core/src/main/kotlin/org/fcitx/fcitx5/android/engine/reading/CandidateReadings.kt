@@ -8,37 +8,31 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
-/** What 候选词注音 shows above or beside each character of a candidate: nothing, pinyin with tones, or zhuyin. */
+/** What 候选词注音 shows per candidate character: nothing, toned pinyin, or zhuyin. */
 enum class ReadingStyle(val key: String) {
     OFF("Off"),
     PINYIN("Pinyin"),
     ZHUYIN("Zhuyin");
 
     companion object {
-        /** By [key], as the engine's config keeps it; anything else is [OFF]. */
+        /** Anything unknown is [OFF]. */
         fun of(key: String?): ReadingStyle = entries.firstOrNull { it.key == key } ?: OFF
     }
 }
 
-/** A word of a candidate as its session read it: its [text], its id in pinyin data (-1 if none), its [syllables]. */
+/** A candidate word as its session read it; [word] is its pinyin-data id, -1 if none. */
 class WordReading(val text: String, val word: Int, val syllables: IntArray)
 
 /**
- * The reading of each character of a candidate, written out ([ToneMark]) as [style] has it: one string
- * a code point, empty for a code point that is no Han character or has no syllable. A character whose
- * tone is not known (a rare one the dictionary reads a way Unihan does not: 䏝 chun) is its syllable
- * toneless in pinyin, and empty in zhuyin, where a toneless syllable reads as the first tone (the
- * user, 2026-11-14): every reading written here, a hint's too ([ofHint]), goes by that ([written]).
- *
- * A candidate whose session knows how its words were read (pinyin's: 银行 typed yinhang) goes by
- * that; any other (a table's, handwriting's, a prediction's) by its text: the longest words of the
- * model first, each read the likeliest way the dictionary has it, a character left over alone. Asked
- * for only while [style] is not [ReadingStyle.OFF].
+ * Each code point's reading of a candidate in [style], empty where not Han or unread. A character whose tone
+ * is unknown (䏝 chun) is toneless in pinyin and empty in zhuyin, where toneless would read as tone 1. A
+ * candidate whose session knows its words goes by them; others by text, longest model words first, each
+ * read the likeliest way.
  */
 class CandidateReadings(
     private val data: PinyinData,
     private val table: ReadingTable,
-    // traditional text (仓颉's, handwriting's) to simplified, a character at a time: the dictionary's (說 as 说)
+    // traditional to simplified per character, the dictionary's (說 as 说)
     private val simplify: (String) -> String = { it },
     charReadings: () -> Map<Int, IntArray>,
 ) {
@@ -46,7 +40,7 @@ class CandidateReadings(
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary, charReadings = charReadings)
     private val charReadings by lazy(LazyThreadSafetyMode.NONE, charReadings)
 
-    /** [text] written out as [style] has it, [words] how its session read it if it knows; empty if nothing of it is shown. */
+    /** Empty if nothing of [text] is shown; [words] when the session knows them. */
     fun of(text: String, style: ReadingStyle, words: List<WordReading>? = null): List<String> {
         if (style == ReadingStyle.OFF || text.none { Character.isIdeographic(it.code) || it.isSurrogate() }) return emptyList()
         val read = words?.takeIf { w -> w.joinToString("") { it.text } == text } ?: byText(simplify(text).takeIf { it.length == text.length } ?: text)
@@ -70,18 +64,14 @@ class CandidateReadings(
         return if (out.all { it.isEmpty() }) emptyList() else out
     }
 
-    /** The code point [codePoint]'s readings are [CharReadings]' of: its own, else its simplified one's where it has none (還 还). */
+    /** The code point whose [CharReadings] apply: its own, else its simplified one's (還 还). */
     fun readFrom(codePoint: Int): Int {
         if (data.charReadings.of(codePoint, card = true).isNotEmpty()) return codePoint
         val s = simplify(String(Character.toChars(codePoint)))
         return if (s.codePointCount(0, s.length) == 1) s.codePointAt(0) else codePoint
     }
 
-    /**
-     * [codePoint]'s readings ([CharReadings] of [readFrom]; [card], the card's), the one it has in a word
-     * [before] ends in first (银 then 行: háng): the longest such word of the dictionary, read as the
-     * model reads it likeliest.
-     */
+    /** [codePoint]'s readings, first the one it has in the longest dictionary word ending with [before] plus it (银 then 行: háng). */
     fun ordered(codePoint: Int, before: String = "", card: Boolean = false): List<Reading> {
         val c = String(Character.toChars(codePoint))
         val all = data.charReadings.of(readFrom(codePoint), card)
@@ -103,11 +93,7 @@ class CandidateReadings(
         return all
     }
 
-    /**
-     * [text], one character, written as [style] has it with all its readings ([ordered] after [before]):
-     * the first [MAX_SHOWN] apart by [SEPARATOR], [MORE] after them if it has more; what [of] gives for
-     * any other text, or a character of one reading.
-     */
+    /** One character with all its readings ([ordered]): the first [MAX_SHOWN] joined by [SEPARATOR], then [MORE] if more; otherwise as [of]. */
     fun allOf(text: String, style: ReadingStyle, before: String = ""): List<String> {
         if (style == ReadingStyle.OFF || text.isEmpty() || text.codePointCount(0, text.length) != 1) return of(text, style)
         val cp = text.codePointAt(0)
@@ -119,12 +105,7 @@ class CandidateReadings(
         return listOf(shown.joinToString(SEPARATOR.toString()) + if (all.size > MAX_SHOWN) MORE.toString() else "")
     }
 
-    /**
-     * [text], one character a candidate reads [first] (as [of] or [ofHint] write it in [style]), as a held
-     * candidate's compact line writes it: [first], then its other readings in [ordered]'s order, [MAX_SHOWN] in all
-     * apart by [LINE_SEPARATOR], [MORE] after them if it has more (háng / xíng…); empty where [first] is (a tone not
-     * known, in zhuyin: R25), the line then as empty as the bar above it.
-     */
+    /** A held candidate's compact line for one character read [first]: then its other readings, [MAX_SHOWN] in all, [MORE] if more (háng / xíng…); empty where [first] is. */
     fun lineOf(text: String, first: String, style: ReadingStyle): String {
         if (first.isEmpty() || text.isEmpty()) return ""
         val rest = ordered(text.codePointAt(0)).map { written(it.syllable, it.tone, style) }.filter { it.isNotEmpty() && it != first }.distinct()
@@ -132,15 +113,10 @@ class CandidateReadings(
     }
 
     /**
-     * A pinyin hint of [text] (a misreading's true "jué sè", a part's or a stroke lookup's "hao") as one reading
-     * a character, written as [style] has it (pinyin while 候选词注音 is off): the hint's own tones where it has
-     * them, else its syllables with the tones they have in [text], toneless where none is known (in zhuyin
-     * such a character has an empty reading, as in [of], and the hint is not left beside it: R25 F7970); empty
-     * if [text] is not all Han or [hint] is no syllable a character (an emoji's name stays a hint).
-     *
-     * A hint of one character's several readings ("le/liao", a polyphone a part or a stroke lookup found)
-     * is drawn as one reading too, as any candidate's is (A5, the user, 2026-11-06): the one [ordered]
-     * puts first after [before], what was put before the character (银 then 行: háng), else its commonest.
+     * A pinyin [hint] of [text] as one reading per character in [style]: the hint's tones where given, else the
+     * tones they have in [text], toneless where unknown (empty in zhuyin, as in [of]); empty if [text] is not all
+     * Han or [hint] is not one syllable a character. A several-readings hint (`le/liao`) is drawn as one, the
+     * one [ordered] puts first after [before].
      */
     fun ofHint(text: String, hint: String, style: ReadingStyle = ReadingStyle.PINYIN, before: String = ""): List<String> {
         if (hint.isBlank() || !text.codePoints().allMatch(Character::isIdeographic)) return emptyList()
@@ -151,18 +127,13 @@ class CandidateReadings(
         val toned = parts.any { p -> p.any { it.code > ASCII } }
         val ids = IntArray(parts.size) { Syllables.id(if (toned) ToneMark.parse(parts[it])?.first.orEmpty() else parts[it]) }
         if (style == ReadingStyle.PINYIN || ids.any { it < 0 }) return if (toned || ids.any { it < 0 }) parts else ofSyllables(text, parts, ids)
-        // zhuyin: each syllable's symbols, in the hint's tone or the character's
+        // zhuyin: each syllable's symbols in the hint's tone or the character's
         val known = if (toned) null else table.tones(text, ids)
         val tones = IntArray(ids.size) { if (toned) ToneMark.parse(parts[it])?.second ?: ToneMark.NONE else known?.get(it)?.toInt() ?: ToneMark.NONE }
         return ids.mapIndexed { i, id -> written(id, tones[i], style) }
     }
 
-    /**
-     * The one reading a hint of [text]'s several is drawn as ([ofHint]), [text] one character: [ordered]'s
-     * first after [before], of those [hint] lists where it is given (`xing/hang`: at most EngineAssets.MAX_READINGS
-     * of them); null for any other text, or a character the data has none of those readings of. Blocking
-     * it by its parts blocks it in this reading, the one shown (PinyinSession).
-     */
+    /** The one reading a several-readings hint of one character is drawn as: [ordered]'s first among those [hint] lists; null if none applies. Blocking by parts blocks this shown reading. */
     fun oneOf(text: String, before: String = "", hint: String? = null): Reading? {
         if (text.isEmpty() || text.codePointCount(0, text.length) != 1) return null
         val all = ordered(text.codePointAt(0), before)
@@ -171,34 +142,31 @@ class CandidateReadings(
         return all.firstOrNull { it.syllable in listed }
     }
 
-    // one character's [several] readings hinted as one, written as [style] has it: [oneOf] of them; the
-    // hint's first where the data has none of them; nothing where [style] cannot write the one chosen,
-    // as it is blocked in that one (PartsLookup.shownIn) and another drawn would say otherwise (a [Reading]
-    // has a tone always; the hint's first, read by [ofHint], may have none)
+    // [oneOf] of [several] in [style]; the hint's first if the data has none; nothing where [style] cannot
+    // write the chosen one, since it is blocked in that one (PartsLookup.shownIn) and another would contradict it
     private fun oneWritten(text: String, several: List<String>, style: ReadingStyle, before: String): List<String> {
         if (text.codePointCount(0, text.length) != 1 || several.any { p -> p.isEmpty() || !p.all(Char::isLetter) }) return emptyList()
         val one = oneOf(text, before, several.joinToString(SEPARATOR.toString())) ?: return ofHint(text, several.first(), style)
         return written(one.syllable, one.tone, style).let { if (it.isEmpty()) emptyList() else listOf(it) }
     }
 
-    // [parts], toneless syllables of [text], with the tones they have in it where known
+    // [parts], toneless syllables of [text], with their tones in it where known
     private fun ofSyllables(text: String, parts: List<String>, ids: IntArray): List<String> {
         val read = of(text, ReadingStyle.PINYIN, listOf(WordReading(text, -1, ids)))
         return parts.mapIndexed { i, p -> read.getOrNull(i)?.ifEmpty { null } ?: p }
     }
 
-    // a word's last 儿 read er, 儿化 (哪儿 nǎr, written nǎ r; ㄦ with no ˙, as Taiwan's textbooks): not a word
-    // whose 儿 is a child (女儿 nǚ ér)
+    // a word-final 儿 read er is 儿化 (哪儿 nǎ r; ㄦ without ˙), unless it means child (女儿 nǚ ér)
     private fun erhua(w: WordReading): Boolean =
         w.text.length > 1 && w.text.last() == '儿' && w.syllables.last().let { it == ER || it == R } && w.text !in CHILD
 
-    // the one place a reading is written: in zhuyin none for a tone not known, which would read as the first
+    // the one place a reading is written: in zhuyin none for an unknown tone, which would read as tone 1
     private fun written(syllable: Int, tone: Int, style: ReadingStyle): String = when (style) {
         ReadingStyle.ZHUYIN -> if (tone == ToneMark.NONE) "" else Zhuyin.of(syllable)?.let { ToneMark.zhuyin(it, tone) }.orEmpty()
         else -> ToneMark.pinyin(Syllables.spelling(syllable), tone)
     }
 
-    /** [text] as words of the model, longest first; a character no word starts with alone. */
+    /** [text] as model words, longest first; a character no word starts with alone. */
     private fun byText(text: String): List<WordReading> {
         val out = ArrayList<WordReading>()
         val index = data.wordIndex
@@ -207,7 +175,7 @@ class CandidateReadings(
             var found: WordReading? = null
             var end = minOf(text.length, at + MAX_WORD)
             while (end > at && found == null) {
-                // never through a surrogate pair
+                // never split a surrogate pair
                 if (end == text.length || !Character.isLowSurrogate(text[end])) {
                     val id = index.find(text, at, end)
                     val syllables = if (id >= 0) predictor.reading(id) else null
@@ -218,9 +186,8 @@ class CandidateReadings(
             val one = found ?: run {
                 val cp = text.codePointAt(at)
                 val c = text.substring(at, at + Character.charCount(cp))
-                // a character only the dictionary has (rare ones have a reading or two): the first of them
-                // with a tone known (䏝 zhuān, not its toneless chun), else the first; with none, a syllable
-                // no character has, so it is left unmarked
+                // a dictionary-only character: its first reading with a known tone (䏝 zhuān, not toneless chun), else
+                // the first; with none, a syllable no character has, so it stays unmarked
                 val all = charReadings[cp]
                 val toned = all?.firstOrNull { s -> table.tones(c, intArrayOf(s))?.let { it[0].toInt() != ToneMark.NONE } == true }
                 WordReading(c, -1, intArrayOf(toned ?: all?.firstOrNull() ?: UNREAD))
@@ -232,16 +199,15 @@ class CandidateReadings(
     }
 
     companion object {
-        /** Between a character's readings, as [allOf] writes them (xíng/háng) and a hint of them reads (EngineAssets.charReading). */
+        /** Between a character's readings (xíng/háng), as hints also write them (EngineAssets.charReading). */
         const val SEPARATOR = '/'
 
-        /** Between a character's readings on a held candidate's compact line ([lineOf]): háng / xíng…. */
+        /** Between readings on a held candidate's compact line ([lineOf]). */
         const val LINE_SEPARATOR = " / "
 
-        /** After them, when the character has more than are shown: hé/hè…. */
+        /** After them when there are more than shown: hé/hè…. */
         const val MORE = '…'
 
-        /** At most this many of a character's readings are shown in a candidate. */
         const val MAX_SHOWN = 2
 
         // the longest word looked for in a candidate's text, in chars
@@ -252,13 +218,13 @@ class CandidateReadings(
         private const val ERHUA_PINYIN = "r"
         private const val ERHUA_ZHUYIN = "ㄦ"
 
-        // words ending in 儿 that is a child or a son, read ér
+        // words whose final 儿 means child or son, read ér
         private val CHILD = setOf(
             "女儿", "婴儿", "幼儿", "孤儿", "男儿", "胎儿", "宠儿", "患儿", "健儿", "少儿", "弃儿", "育儿",
             "新生儿", "早产儿", "混血儿", "低能儿", "娇儿", "妻儿", "生儿",
         )
 
-        // a syllable no character has: the Latin letter A, which no Han character reads as
+        // a syllable no Han character reads as
         private val UNREAD = Syllables.id("A")
     }
 }

@@ -32,29 +32,26 @@ import java.io.IOException
 import java.text.NumberFormat
 
 /**
- * 生僻字屏蔽's page data (design §6.4), kept over a turn: the grid copied off the engine in one
- * `runOnReady`, sorted and checked for glyphs here off the main thread, the edits as the page made
- * them. The page holds no table the engine maps: a text pack changed lets that go.
+ * Kept over a turn: the grid copied off the engine in one `runOnReady`, sorted and glyph-checked off the main thread,
+ * and the page's edits. No engine-mapped table is held, so a text pack change can let it go.
  */
 class RareCharsViewModel : ViewModel() {
 
     sealed interface State {
         data object Loading : State
 
-        /** No text pack: no readings to lay the grid out by. */
+        /** No readings to lay the grid out by. */
         data object NoPack : State
 
-        /** The APK's levels' table not read: the feature is off. */
+        /** The APK's levels table not read: the feature is off. */
         data object Unavailable : State
 
         class Ready(val page: Page) : State
     }
 
     /**
-     * The grid as the page shows it: [sorted], each group's cells; [shown], those the phone can draw;
-     * [unshown], how many of each group it cannot; [samples], the few each group's card shows;
-     * [edits], the choice as read with the page's changes, saved as the page is left ([unreadable]:
-     * the file not read, nothing changed or saved).
+     * [shown]: cells the phone can draw; [unshown]: per group, those it cannot; [samples]: a card's few; [edits]: saved as
+     * the page is left ([unreadable]: nothing changed or saved).
      */
     class Page(
         val grid: RareGrid,
@@ -68,23 +65,23 @@ class RareCharsViewModel : ViewModel() {
     ) {
         val readOnly: Boolean get() = unreadable || edits.readOnly
 
-        /** Each group's cells, [sorted]'s count: not RareGrid.count's pass over the whole grid, asked twice a card a step (R26 F8326). */
+        /** [sorted]'s count, not RareGrid.count's full pass, asked twice a card a step. */
         fun total(level: Level): Int = sorted[level]?.size ?: grid.count(level)
 
-        /** The letter [cell]'s section is under: its first reading's first. */
+        /** Its first reading's first letter. */
         fun letterOf(cell: Int): Char = grid.spelling(cell).first()
     }
 
     private val _state = MutableStateFlow<State>(State.Loading)
     val state: StateFlow<State> = _state
 
-    /** The group opened from its card, its grid in the cards' place; null, the cards (061-settings-cards.md §3.2). */
+    /** Null shows the cards. */
     var opened: Level? = null
 
-    /** Where each group's grid was scrolled to, its first row shown and that row's offset, kept as it is left. */
+    /** Each grid's first row shown and its offset, kept as it is left. */
     val scrolls: MutableMap<Level, Pair<Int, Int>> = mutableMapOf()
 
-    /** The last step to take back from the title bar's ↶ (§2.4); none after a save. */
+    /** For the title bar's ↶; none after a save. */
     var undo: RareEdits.Undo? = null
 
     private var loading: Job? = null
@@ -120,26 +117,24 @@ class RareCharsViewModel : ViewModel() {
         return State.Ready(withContext(Dispatchers.Default) { page(grid, levels, choice, unreadable, hasGlyph) })
     }
 
-    /** The search typed, kept over a turn. */
     var query: String = ""
 
-    /** The search's results' scroll, kept over a turn. */
     var scroll: Parcelable? = null
 
     companion object {
-        // the file's read; a test holds it to see the page as a file it cannot read leaves it
+        // a test holds it to see the page as an unreadable file leaves it
         @VisibleForTesting
         internal var load: () -> RareChoice = { RareCharsManager.load() }
 
-        /** The page's last save, under way or done: the words page's count read after it (review N6). */
+        /** Under way or done: the words page counts after it. */
         @Volatile
         internal var saving: Deferred<Boolean>? = null
 
-        // what the phone can draw, a paint of its own (design §6.4; EngineBridge's textShows)
+        // a paint of its own (as EngineBridge's textShows)
         @VisibleForTesting
         internal var hasGlyph: (String) -> Boolean = Paint().let { paint -> { paint.hasGlyph(it) } }
 
-        /** The page over [grid]: sorted, the cells the phone cannot draw left out and counted. */
+        /** Cells the phone cannot draw are left out and counted. */
         fun page(grid: RareGrid, levels: CharLevels, choice: RareChoice, unreadable: Boolean, hasGlyph: (String) -> Boolean): Page {
             val sorted = grid.sorted()
             val shown = sorted.mapValues { (_, cells) -> cells.filter { hasGlyph(String(Character.toChars(grid.chars[it]))) }.toIntArray() }
@@ -152,13 +147,10 @@ class RareCharsViewModel : ViewModel() {
     }
 }
 
-/**
- * 生僻字屏蔽's row on 词库与短语 (§6.1): 「关」, or 「已屏蔽 N 个字」 counted over [grid] as the page
- * counts; null, the row left without, where the file or the grid cannot be read.
- */
+/** 「关」 or 「已屏蔽 N 个字」, counted as the page counts; null where the file or grid cannot be read. */
 internal suspend fun rareSummary(ctx: Context, grid: suspend () -> RareGrid?): String? {
     val levels = withContext(Dispatchers.IO) { RareCharsManager.levels } ?: return null
-    // the page just left may be writing still: what it saved counted, not what was there before
+    // the page just left may still be writing: count what it saved
     RareCharsViewModel.saving?.await()
     val choice = try {
         withContext(Dispatchers.IO) { RareCharsViewModel.load() }

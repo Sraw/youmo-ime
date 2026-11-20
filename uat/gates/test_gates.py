@@ -42,18 +42,16 @@ class FileChecksTest(unittest.TestCase):
     class FakeDevice:
         """the files restore-files left, the first start's move into host-config/host-data made"""
 
-        def __init__(self, tars, de_left=(), ext_left=(), moved=True, punc_kept=False):
+        def __init__(self, tars, ext_left=(), moved=True, punc_kept=False):
             """moved False: a v0.3.x build installed, nothing moved (gate 3's new → v0.3.x).
             punc_kept: the fixture's edited punctuation table still there; by default gone, as 0.6.1's first
             start deletes it and its backup has none for an old build to restore (ST-145)"""
-            self.tars, self.de_left, self.ext_left, self.moved = tars, de_left, ext_left, moved
+            self.tars, self.ext_left, self.moved = tars, ext_left, moved
             self.punc_kept = punc_kept
 
         def root(self, cmd):
             if cmd.startswith("ls -d "):   # what of the old copies is left on the external storage
                 return " ".join(self.ext_left)
-            if cmd.startswith("ls "):   # what of the old native data is left in user_de
-                return " ".join(self.de_left)
             path = cmd.split()[1]
             if path.endswith("/punctuation/punc.mb.zh_CN") and not self.punc_kept:
                 return ""
@@ -92,10 +90,9 @@ class FileChecksTest(unittest.TestCase):
         import tarfile
         v = os.path.join(gates.FIXTURES, "v0.3.2")
         rows = [
-            # a v0.3.x build (gate 3's new → v0.3.x) keeps config/ and data/ on the external storage (F4975)
+            # a v0.3.x build (gate 3's new → v0.3.x) keeps config/ and data/ on the external storage
             (True, []),
             # read where this build keeps them, the old build's files are not found: every host item fails
-            # (but 中文标点, which passes on no edited table)
             (False, ["性能档位", "输入法", "繁体", "自定义短语"]),
         ]
         for old, failed in rows:
@@ -104,9 +101,7 @@ class FileChecksTest(unittest.TestCase):
                 res = phase.file_checks(self.FakeDevice({phase.DATA: data, phase.EXTERNAL: ext}, moved=False), old=old)
                 self.assertEqual(failed, [r["item"].split()[0] for r in res if not r["ok"]])
 
-    def test_user_de_is_checked_only_after_a_fixture_with_a_de_tar(self):
-        de = "旧原生数据已删 (user_de descriptor.json, usr)"
-        left = (f"{phase.DE}/descriptor.json",)
+    def test_the_old_copies_are_checked_only_after_a_fixture(self):
         with tempfile.TemporaryDirectory() as tmp:
             for v, tars in (("with", ("data", "external", "de")), ("without", ("data", "external"))):
                 os.makedirs(os.path.join(tmp, v))
@@ -116,20 +111,6 @@ class FileChecksTest(unittest.TestCase):
             try:
                 self.assertEqual(["data", "external", "de"], phase.names("with"))
                 self.assertEqual(["data", "external"], phase.names("without"))
-                rows = [
-                    # gate 2, data synced by the old build gone: passes
-                    ("with", (), [True]),
-                    # left behind after the first start: fails, naming what is left
-                    ("with", left, [False]),
-                    # no de.tar: nothing put there, so listed as not checked (a pass would be unexercised)
-                    ("without", left, [None]),
-                    # gate 3 (no version): a 0.3.x build installed keeps its own synced data there
-                    (None, left, []),
-                ]
-                for version, de_left, want in rows:
-                    with self.subTest(version=version, de_left=de_left):
-                        res = phase.file_checks(self.FakeDevice({}, de_left), version)
-                        self.assertEqual(want, [r["ok"] for r in res if r["item"] == de])
                 ext = "外部存储的旧副本已删 (Android/data config、data、theme)"
                 rows = [
                     # gate 2, the move read back and the old copies deleted: passes
@@ -221,7 +202,7 @@ class TypedChecksTest(unittest.TestCase):
 
 
 class NotCheckedTest(unittest.TestCase):
-    """ok None: an item the fixture could not exercise; neither a failure nor a silent pass (F4312)"""
+    """ok None: an item the fixture could not exercise; neither a failure nor a silent pass"""
     ITEMS = [{"item": "a", "ok": True, "got": "x"}, {"item": "b", "ok": None, "got": "no de.tar"}]
 
     def gate(self, tmp, items):
@@ -299,8 +280,6 @@ class EmulatorTest(unittest.TestCase):
                 ("nothing on the port: started from the snapshot, marked, killed after", "", "", False,
                  [("up", "5560"), marked, ("down", "5560")]),
                 ("--keep: left up", "", "", True, [("up", "5560"), marked]),
-                # uat.up keeps one already up as it is: a gate after --keep (or one that stopped before down)
-                # would start on the last gate's packages, pack marks and zips
                 ("a gate's emulator left up: killed and started again, a clean device", gates.uat.AVD, "gate\n", False,
                  [("down", "5560"), ("up", "5560"), marked, ("down", "5560")]),
                 # uat.py --devices auto reaches 5560 too: its emulator was killed in the middle of its run
@@ -435,8 +414,7 @@ class EmulatorTest(unittest.TestCase):
             self.assertEqual([(gates.RELEASED, True)] * len(gates.VERSIONS)
                              + [("io.github.sraw.youmo.debug", False)] * (len(gates.VERSIONS) - len(gates.REFUSED)),
                              imports)
-            # the next release's gate adds v0.6.0 (B14): a released build with the 资源包 page gets its text pack
-            # and is checked as this build is; --old for it skipped the pack and the gate was Blocked (F7836's mirror)
+            # a released build with the 资源包 page gets its text pack and is checked as this build is
             calls.clear()
             gates.VERSIONS, gates.REFUSED = ("v0.4.0", "v0.6.0", "v0.10.0"), ()
             gates.cmd_backups(type("A", (), {"new": "new.apk"})())

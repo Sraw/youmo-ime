@@ -8,144 +8,115 @@ import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 
-/**
- * What the user asks of what was learned (PLAN §2.8, impl/streams/E-design.md): one call for them
- * all, `HostApi.learning`, so the API and its fakes stay small. Answered by a [LearningResult].
- */
+/** What the user asks of the learning, through one call (`HostApi.learning`) so the API and its fakes stay small. */
 sealed class LearningOp {
-    /**
-     * A long press on the candidate at [index] of all those of the input method in use. [text] is
-     * the candidate as the menu showed it: a list changed since names another one at [index], and
-     * the op then does nothing ([LearningResult.Unavailable]).
-     */
+    /** A long press on candidate [index]; [text] as shown: if the list changed, the op does nothing ([LearningResult.Unavailable]). */
     sealed class OnCandidate : LearningOp() {
         abstract val index: Int
         abstract val text: String
 
-        /** The same at another [index], or of another [text] (the engine's of one the host shows converted: 繁體). */
+        /** Another [index] or [text] (the engine's text of one the host shows converted: 繁體). */
         abstract fun at(index: Int, text: String = this.text): OnCandidate
     }
 
-    /**
-     * [op] with its index counted from the first candidate of the page shown, as the floating list
-     * of a hardware keyboard has it (paged), not from the first of all.
-     */
+    /** [op] with its index counted from the shown page's first candidate (a hardware keyboard's paged list). */
     data class OnPage(val op: OnCandidate) : LearningOp()
 
-    /** What the long press offers ([LearningResult.Menu]). */
     data class Menu(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /** 删除 (the user's own words, U-82 D13) or 忘掉学到的 (the dictionary's): one act, everything learned of the text forgotten (U-84). */
+    /** 删除 (the user's own words) or 忘掉学到的 (the dictionary's): forgets everything learned of the text. */
     data class Delete(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /** 屏蔽, after the confirmation the menu's [LearningResult.Menu.scope] words. */
+    /** 屏蔽, after confirming [LearningResult.Menu.scope]. */
     data class Block(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /** 固定首位 under the keys typed (U-83), in place of what was pinned there. */
+    /** 固定首位 under the typed keys, replacing any pin. */
     data class Pin(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /**
-     * 取消固定; also 从自定义词组中删除 ([LearningMenu.Row.DELETE_PHRASE]): what the candidate is
-     * (a pinned word, a custom phrase or a built-in date) tells the engine which is meant.
-     */
+    /** 取消固定, also 从自定义词组中删除: the candidate's kind tells the engine which. */
     data class Unpin(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /** 不再联想 (U-72): a prediction no longer offered after the word before it. */
+    /** 不再联想. */
     data class NoPredict(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /** 复制给开发者 (U-81, D26): the candidates of these keys, their tiers and uses, none of the text before ([LearningResult.Text]). */
+    /** 复制给开发者: the candidates of these keys with tiers and uses, no preceding text. */
     data class Report(override val index: Int, override val text: String) : OnCandidate() {
         override fun at(index: Int, text: String) = copy(index = index, text = text)
     }
 
-    /** The act [token] named ([LearningResult.Done.undo]) taken back, as though never done: the chip's 撤销. */
+    /** The chip's 撤销 of [LearningResult.Done.undo]. */
     data class Undo(val token: Long) : LearningOp()
 
-    /** U-93 「用我的输入习惯」 on or off: the sessions made anew. */
+    /** 「用我的输入习惯」 on or off: sessions are rebuilt. */
     data class UseHabits(val on: Boolean) : LearningOp()
 
-    /** U-88 清掉最近: what was typed in the [span] up to now, as though it never was. */
+    /** 清掉最近. */
     data class ClearRecent(val span: Span) : LearningOp()
 
-    /** How far back [ClearRecent] goes: [minutes], or since local midnight for [TODAY]. */
+    /** [minutes], or since local midnight for [TODAY]. */
     enum class Span(val minutes: Int) {
         TEN_MINUTES(10),
         HOUR(60),
         TODAY(-1),
     }
 
-    /** U-86 清空学到的; [all] 「全部清空」: as installed, the words added and blocked too. */
+    /** 清空学到的; [all] 「全部清空」: back to as installed, added and blocked words too. */
     data class ClearLearned(val all: Boolean) : LearningOp()
 
-    /** How much there is to keep or lose: the counts U-86's confirmation and the lexicon page show ([LearningResult.Overview]). */
+    /** The counts the clear confirmation and lexicon page show. */
     data object Overview : LearningOp()
 
-    /**
-     * Whether what is learned is saving to the disk now (LearnLog.saving; [LearningResult.Saving]): nothing
-     * counted, for the ⋯ panel, which asks each time it opens (R25 F7897).
-     */
+    /** Whether learning is saving to disk now (no counting), asked each time the ⋯ panel opens. */
     data object Saving : LearningOp()
 
-    /** A list of the lexicon page ([LearningResult.Listed]): the pins, the predictions turned off, a table's blocks under a code. */
+    /** A lexicon page list: pins, predictions off, a table's per-code blocks. */
     data class ListItems(val what: Listed) : LearningOp()
 
-    /**
-     * [words] of the lexicon page taken off their lists together (U-80: 一起删掉), as the page's
-     * delete did: added words deleted, learned ones forgotten, blocked ones shown again; undoable.
-     */
+    /** 一起删掉 on the lexicon page: added words deleted, learned ones forgotten, blocked ones shown again; undoable. */
     data class RemoveWords(val words: List<UserWord>) : LearningOp()
 
-    /** The English words [texts] corrected again (U-31 恢复), their uses kept: [org.fcitx.fcitx5.android.engine.runtime.Engines.restoreEnglishCorrection]. */
+    /** 恢复 English correction of [texts], uses kept. */
     data class RestoreCorrection(val texts: List<String>) : LearningOp()
 
-    /** [items] of a [ListItems] taken off it: unpinned, predicted again, shown again under their code. */
+    /** Removes [items] from their [ListItems] list. */
     data class RemoveItems(val items: List<ListedItem>) : LearningOp()
 
-    /** U-28: the order table [im] learned (调频) forgotten, its pins and blocks kept; in its settings. */
+    /** Forgets table [im]'s learned order (调频), keeping pins and blocks. */
     data class ResetTableOrder(val im: String) : LearningOp()
 
     enum class Listed { PINS, NO_PREDICT, TABLE_BLOCKS }
 }
 
-/** What a [LearningOp] did, or tells. */
 sealed class LearningResult {
-    /** Nothing done: no engine yet, no such candidate (the list changed), nothing learned there, or nowhere to keep it (direct boot). */
+    /** Nothing done: no engine yet, the list changed, nothing learned there, or nowhere to keep it (direct boot). */
     data object Unavailable : LearningResult()
 
-    /** Done; [undo] names it for [LearningOp.Undo], [NO_UNDO] for none. */
+    /** [undo] names it for [LearningOp.Undo]; [NO_UNDO] for none. */
     data class Done(val undo: Long = NO_UNDO) : LearningResult()
 
-    /**
-     * A long press's menu (U-82): the candidate's [text], what [kind] of word it is (which names
-     * the delete: 删除 or 忘掉学到的), the [items] offered in the menu's order, [why] it is where it
-     * is (U-81), and where a block reaches ([scope], for the confirmation).
-     */
+    /** A long-press menu: [kind] names the delete (删除 or 忘掉学到的), [items] in order, [why] the reason, [scope] where a block reaches. */
     data class Menu(val text: String, val kind: WordKind, val items: List<MenuItem>, val why: Why?, val scope: BlockScope) : LearningResult()
 
     data class Text(val text: String) : LearningResult()
 
-    /** Asked, and it could have been, but the disk failed: nothing done (a clear that did not clear says so, and a forget not taken back). */
+    /** The disk failed: nothing done. */
     data object Failed : LearningResult()
 
-    /** What was learned since [fromMinute] (epoch minutes; [ALL] for everything) is gone. */
+    /** Learned since [fromMinute] (epoch minutes; [ALL] for everything) is gone. */
     data class Cleared(val fromMinute: Int) : LearningResult()
 
-    /**
-     * How many of each the user has: their own words, the words added by hand, pinned, blocked, predictions turned off;
-     * whether habits are used (U-93); and whether what is learned is saving to the disk now (LearnLog.saving).
-     */
     data class Overview(
         val mine: Int,
         val added: Int,
@@ -156,13 +127,7 @@ sealed class LearningResult {
         val saving: Boolean = true,
     ) : LearningResult()
 
-    /**
-     * [LearningOp.Saving]'s answer: [saving] as [Overview.saving]. [rewrites] false: the record takes no rewrite
-     * (a clear, a restore, a forget taken back) till the process starts anew, its file not open again after a
-     * write that failed, or not opened at all this run (LearnLog.takesRewrites); true otherwise, a full disk too,
-     * where one goes through once there is room. So what failed while not saving is told to restart only where
-     * that helps (R25 F8037).
-     */
+    /** [rewrites] false: no rewrite (clear, restore, undo) possible till restart, so a failure says to restart only where that helps. */
     data class Saving(val saving: Boolean, val rewrites: Boolean = true) : LearningResult()
 
     data class Listed(val items: List<ListedItem>) : LearningResult()
@@ -173,43 +138,28 @@ sealed class LearningResult {
     }
 }
 
-/** What a word is to the user, which names what deleting it does (U-82). */
+/** What a word is to the user, which names what deleting it does. */
 enum class WordKind {
-    /** The dictionary's: 忘掉学到的. */
     DICTIONARY,
 
-    /** The user's own, formed as they typed: 删除. */
     MINE,
 
-    /** Added by hand: 删除. */
     ADDED,
 
-    /** Only an import has it: 删除. */
     IMPORTED,
 }
 
-/** A long press's items, in the menu's order. */
 enum class MenuItem { DELETE, BLOCK, PIN, UNPIN, DELETE_PHRASE, DELETE_COMMON_WORD, NO_PREDICT, WHY }
 
-/** Where a block reaches, for its confirmation (U-82, C12). */
 enum class BlockScope {
-    /** Typing, handwriting, voice, predictions: everywhere. */
     EVERYWHERE,
 
-    /** A table's candidate: under the code typed alone, everywhere else as it was (U-28). */
+    /** A table's candidate: blocked under the typed code alone. */
     UNDER_CODE,
 }
 
-/**
- * Why a candidate is where it is (U-81): the [tier] ranking put it in ([HabitRanker.Tier]; null
- * where the session does not say: shown as not known), its [uses] under [code] in the last 30
- * typing days, and the [code] it was ranked under; for the rest of a whole phrase (U-73), the
- * phrase ([whole]), [uses] its whole commits.
- */
+/** Why a candidate is where it is: its [tier] (null: unknown), [uses] under [code] in the last 30 typing days; for a whole phrase's rest, [whole] and its whole commits. */
 data class Why(val tier: HabitRanker.Tier?, val uses: Int = 0, val code: Code? = null, val whole: String = "")
 
-/**
- * A row of a [LearningOp.ListItems]: a pin's [code] and word, a word [blocked] under a table's
- * [code] (U-28), or a prediction turned off after [prev].
- */
+/** A pin ([code], word), a word [blocked] under a table's [code], or a prediction off after [prev]. */
 data class ListedItem(val code: Code?, val prev: String, val text: String, val reading: String = "", val blocked: Boolean = false)

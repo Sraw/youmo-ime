@@ -28,11 +28,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The keyboard's half of uat/02, and 05 cases whose engine half is lib/ime-eval's (HostCasesUatTest,
- * EnglishUatTest): what the field gets, where a glide is taken, the bar's sum, on the whole
- * keyboard over a fake engine.
- */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -52,13 +47,10 @@ class KeyboardFieldsUatTest {
         it.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
     }
 
-    // h across to o, the finger over the letters between
     private fun KeyboardHarness.glideHello(lift: Boolean = true) {
         val o = box(key("o"))
         drag(key("h"), o.exactCenterX(), o.exactCenterY(), steps = 12, lift = lift)
     }
-
-    // ------------------------------------------------------------------ 02 keyboard
 
     // fcitx hands Backspace back with nothing typed; the editor deletes what it takes for one character
     @Test
@@ -80,7 +72,6 @@ class KeyboardFieldsUatTest {
         prefs.set(AppPrefs.getInstance().keyboard.keyDrawing, KeyDrawing.Glide)
         val h = english()
         h.glideHello(lift = false)
-        // still down: nothing offered yet, the trail drawn over the keys
         assertFalse("offerGlide" in h.api.calls)
         h.capture("KeyboardFieldsUatTest/glide_trail")
     }
@@ -97,7 +88,6 @@ class KeyboardFieldsUatTest {
             harness?.close()
             val h = english(InputType.TYPE_CLASS_TEXT or variation)
             if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD) {
-                // no trail drawn: the keys as they are under the finger
                 h.glideHello(lift = false)
                 h.capture("KeyboardFieldsUatTest/password_no_trail")
                 h.release()
@@ -109,7 +99,6 @@ class KeyboardFieldsUatTest {
         harness = null
     }
 
-    // what the engine types of it: EnglishUatTest.aGlideInANoSuggestionsFieldAndWithSuggestionsOffTypesTheWord
     @Test
     @Uat("EN-19")
     fun aNoSuggestionsFieldAndSuggestionsOffStillGlide() {
@@ -128,8 +117,6 @@ class KeyboardFieldsUatTest {
         }
     }
 
-    // ------------------------------------------------------------------ 05 toolbar
-
     private fun KeyboardHarness.button(text: String): View {
         val t = KeyboardHarness.all(inputView).firstOrNull { shown(it) && it is TextView && it.text.toString() == text }
             ?: error("no $text in ${texts(inputView)}")
@@ -144,7 +131,7 @@ class KeyboardFieldsUatTest {
         h.field.setText("1+2*2")
         h.field.setSelection(5)
         h.idle()
-        // the engine commits the = typed (English passes keys on as they are)
+        // English passes keys on as they are
         h.emit(HostEvent.Commit("=", -1))
         h.tap(h.button("= 5"))
         assertEquals("5", h.field.text.toString())

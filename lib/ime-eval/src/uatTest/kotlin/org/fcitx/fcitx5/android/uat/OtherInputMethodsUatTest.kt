@@ -10,10 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/03-t9.md, 07-shuangpin.md, 08-english.md and 10-tables.md: the cases of the other input
- * methods whose 预期 is what the engine types, each from its B0 (B0-九键, B0-双拼, B0-英文, B0-五笔…).
- */
+/** The other input methods' uat/ cases whose 预期 is what the engine types, each from its B0. */
 class OtherInputMethodsUatTest {
 
     @Test

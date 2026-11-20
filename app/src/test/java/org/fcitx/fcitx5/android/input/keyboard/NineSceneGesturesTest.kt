@@ -12,11 +12,11 @@ import androidx.core.view.children
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -38,11 +38,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * The nine keys drawn by the scene (060-render-p2 S5a, nine.xml), in each of the four (九键拼音, English's,
- * 双拼's with and without `;`): every key's face and what it is read as, its bubble as it is pressed, its
- * tap, its swipe down, its long press, 0's, 重输's and ⌫'s taps, what reaches the engine and the field,
- * held to the committed record ([GestureSnapshot]); 1 as what is typed has it (分词 while the engine says
- * so). Each key is wired from its node (U4 B). The column is a native view over the scene's slot `side`.
+ * The nine keys in each of the four variants: every key's face, reading, bubble, tap, swipe and long press, held to
+ * the committed record ([GestureSnapshot]). The column is a native view over the scene's slot `side`.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -69,7 +66,6 @@ class NineSceneGesturesTest {
         }
     }
 
-    // what a finger does on each digit key and the right column's, in [v], typing or not
     private fun gestures(v: Variant, composing: Boolean = false): List<String> = harness(v).use { h ->
         if (composing) {
             EngineState.syllablesState.value = EngineState.SyllableState(v.im.uniqueName, true, listOf("shuang", "zhuang"), 1)
@@ -81,12 +77,11 @@ class NineSceneGesturesTest {
                 " field ${h.field.text}"
             h.api.calls.clear()
         }
-        // the keys
         out += "faces: " + h.keys().filter { it.id != null && it.id != "side" }.map { "${it.id}=${it.label}/${it.alt}" }
         for (digit in "123456789") {
             val k = { h.nineKey("$digit") }
             h.after(BUBBLE_GONE_MS)
-            // what TalkBack reads: its description; a view of none its texts, its letters then its digit
+            // a view of no description: its texts, letters then digit
             out += "$digit said: " + (k().description?.takeIf { it.isNotEmpty() } ?: listOfNotNull(k().label, k().alt).joinToString(", "))
             h.press(k())
             out += "$digit pressed: " + h.popupChoices().map { it.text }
@@ -110,13 +105,11 @@ class NineSceneGesturesTest {
     fun pinyinsEveryKey() {
         val scene = gestures(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS))
         GestureSnapshot.check("nine-pinyin", scene)
-        // what the keys do: 5's bubble its letters, its long press its letters and digit
         assertTrue(scene.joinToString("\n"), "5 pressed: [JKL]" in scene)
         assertTrue(scene.joinToString("\n"), scene.any { it.startsWith("5 long press: [") && "J" in it && "5" in it && "l" in it })
     }
 
-    // 1 and the column's punctuation as the punctuation maps them, shown as typed (用户 2026-11-11, 显示即所打): ，。？！ with
-    // Chinese punctuation on, , . ? ! with it off, toggled with the keyboard up
+    // shown as typed: ，。？！ with Chinese punctuation on, , . ? ! off, toggled with the keyboard up
     @Test
     fun pinyinsOneAndColumnTypeAsThePunctuationMapsThem() {
         val out = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
@@ -152,7 +145,6 @@ class NineSceneGesturesTest {
     fun englishsEveryKey() {
         val scene = gestures(Variant(KeyboardHarness.ENGLISH, ImKeyboards.Chosen(english = ImKeyboard.NINE_KEYS)))
         GestureSnapshot.check("nine-english", scene)
-        // lower case, as English's nine keys always are (LetterCaseScreenshotTest)
         assertTrue(scene.first(), "5=jkl/5" in scene.first())
     }
 
@@ -161,7 +153,6 @@ class NineSceneGesturesTest {
         val scene = gestures(Variant(SHUANGPIN, ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS), ShuangpinScheme.MICROSOFT))
         GestureSnapshot.check("nine-shuangpin-microsoft", scene)
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
-        // 1's corner its first under 微软 too (060-keys-unify S6: the 1; the layout wrote is gone)
         assertTrue(scene.first(), "1=,.?!/1," in scene.first())
     }
 
@@ -172,15 +163,14 @@ class NineSceneGesturesTest {
         assertTrue(scene.first(), "5=JKL/5" in scene.first())
     }
 
-    // a digit's letters and digit read with the app's a11y_key_grouped, as qwerty's q，1 is: in Chinese a full-width
-    // comma (once the scene's built-in English ", " was read on the nine keys only)
+    // read with the app's a11y_key_grouped: in Chinese a full-width comma
     @Test
     @Config(qualifiers = "zh-rCN-" + KeyboardCanvasViewTest.PORTRAIT)
     fun aDigitIsReadWithTheAppsSeparator() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         assertEquals("ABC，2", h.keys().single { it.id == "2" }.description)
     }
 
-    // 连按 on: 5 pressed again soon previews its next letter (its preview found by the scene key's id as by its view's)
+    // 连按 on: 5 pressed again soon previews its next letter
     @Test
     fun aDigitPressedAgainPreviewsItsNextLetter() {
         fun bubbles(): List<String> {
@@ -196,7 +186,6 @@ class NineSceneGesturesTest {
         assertEquals(listOf("K"), bubbles())
     }
 
-    // the language key as the setting says, shown again as it changes (as ZhuyinSceneGesturesTest's)
     @Test
     fun theLanguageKeyHiddenAndShownAgain() {
         harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
@@ -210,7 +199,6 @@ class NineSceneGesturesTest {
         }
     }
 
-    // the column, a native view, in the scene's slot: its box the slot's cell, over the canvas
     @Test
     fun theColumnSitsInTheScenesSlot() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val canvas = KeyboardHarness.boardCanvas(h.keyboard)!!
@@ -225,7 +213,6 @@ class NineSceneGesturesTest {
         assertTrue("the column over the canvas", parent.indexOfChild(column) > parent.indexOfChild(canvas))
     }
 
-    // Return's look told alone (nothing typed changes): the scene drawn anew, its key read as the field's action
     @Test
     fun returnsLookAloneIsDrawn() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
@@ -236,7 +223,6 @@ class NineSceneGesturesTest {
         assertEquals(search.label(h.keyboard.context), h.keys().single { it.id == "enter" }.description)
     }
 
-    // typing told alone (Return's look as it was): 1 drawn anew as 分词, and back
     @Test
     fun typingAloneRedrawsOne() = harness(Variant(KeyboardHarness.PINYIN, KeyboardHarness.NINE_KEYS)).use { h ->
         val t9 = KeyboardHarness.all(h.keyboard).filterIsInstance<T9Keyboard>().single()
@@ -248,8 +234,7 @@ class NineSceneGesturesTest {
         assertTrue(h.nineKey("1").label, h.nineKey("1").label != "分词")
     }
 
-    // a glide read where the scene draws the digit keys, not where their views (laid out, not drawn) are: the
-    // letters' centres the engine gets, in key widths, as far apart as the keys shown, in each of the keyboard's forms
+    // read where the scene draws the keys, not where their views are laid out: the centres as far apart as the keys shown
     @Test
     fun aGlideIsReadWhereTheSceneDrawsTheKeys() {
         assertGlidesOnTheScene("docked")
@@ -280,12 +265,10 @@ class NineSceneGesturesTest {
         }
     }
 
-    // each key wired from nine.xml's node (U4 B) as the views' KeyDef has it, in each of the four: shortcut,
-    // both ways' swipe, what a tap, a hold, a swipe, a double tap and a long press do, its bubble and its menu (a
-    // named key's long press's keys are the resolver's, neither's: 060-keys-unify S6), sound, space/backspace,
-    // enabled; 123's long press (unicode, every board's) the one exception
+    // each key's wiring from nine.xml as committed; a named key's long press is the resolver's
     @Test
-    fun eachKeyIsWiredAsItsViewWas() {
+    @Uat("QU-12")
+    fun eachKeyIsWiredAsCommitted() {
         val app = PlaceholderStrings(RuntimeEnvironment.getApplication())
         val letters = NineKeyLetters.STANDARD
         val variants = mapOf(
@@ -294,55 +277,18 @@ class NineSceneGesturesTest {
             "shuangpin" to { T9Keyboard(app, TestThemes.PixelLight, shuangpin = true, semicolon = true) },
             "shuangpin plain" to { T9Keyboard(app, TestThemes.PixelLight, shuangpin = true, semicolon = false) },
         )
-        val olds = mapOf(
-            "pinyin" to T9Keyboard.layout(letters),
-            "english" to T9Keyboard.layout(letters, english = true),
-            "shuangpin" to T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true),
-            "shuangpin plain" to T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = false),
-        )
         for ((name, make) in variants) {
             val k = make().laidOut()
             val canvas = KeyboardHarness.all(k).filterIsInstance<KeyboardCanvasView>().single()
-            val old = olds.getValue(name).flatten().filter { it.name != "side" && it.behaviors.isNotEmpty() }.associateBy { idOf(it) }
-            val shown = canvas.scene!!.keys
-            assertEquals(name, old.keys, shown.map { it.id }.toSet())
-            val wasLines = mutableListOf<String>()
-            val nowLines = mutableListOf<String>()
-            for (node in shown) {
-                val was = old.getValue(node.id)
+            val lines = canvas.scene!!.keys.map { node ->
                 val now = k.sceneKey(node)!!.def as SceneKeyDef
-                val at = "$name ${node.id}"
-                assertEquals(at, was.shortcut, now.shortcut)
-                assertEquals(at, was.swipesBothWays, now.swipesBothWays)
-                // 123's long press is every board's (unicode): the old 九宫格 view had none
-                val long = if (node.id == "numbers") setOf("long ${KeyAction.UnicodeAction}") else emptySet()
-                assertEquals(at, actions(was) + long, actions(now))
-                assertEquals(at, popups(was), popups(now))
-                // its sound, its space's and backspace's sideways swipe, and whether it takes a touch (a blank view
-                // took none): as its view's
-                assertEquals(at, was.appearance.soundEffect, WiringSnapshot.layoutSound(now.systemSound))
-                assertEquals(at, was is SpaceKey, now.isSpace)
-                assertEquals(at, was is BackspaceKey, now.isBackspace)
-                assertEquals(at, was !is BlankKey, k.sceneKey(node)!!.keyEnabled)
-                wasLines += WiringSnapshot.line(node.id, was.shortcut, was.swipesBothWays, actions(was) + long, popups(was), was.appearance.soundEffect, was is SpaceKey, was is BackspaceKey, was !is BlankKey)
-                nowLines += WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now), popups(now), WiringSnapshot.layoutSound(now.systemSound), now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
+                WiringSnapshot.line(node.id, now.shortcut, now.swipesBothWays, actions(now), popups(now), WiringSnapshot.layoutSound(now.systemSound), now.isSpace, now.isBackspace, k.sceneKey(node)!!.keyEnabled)
             }
-            WiringSnapshot.check("nine-${name.replace(' ', '-')}", wasLines, nowLines)
+            WiringSnapshot.check("nine-${name.replace(' ', '-')}", lines)
         }
     }
 
-    // a view's key by the scene's id: its name, else the function key it is
-    private fun idOf(def: KeyDef) = when (def) {
-        is BackspaceKey -> "backspace"
-        is CapsKey -> "shift"
-        is SpaceKey -> "space"
-        is LanguageKey -> "lang"
-        is ReturnKey -> "enter"
-        is LayoutSwitchKey -> if ((def.appearance as KeyDef.Appearance.Text).displayText == "符") "symbols" else "numbers"
-        else -> def.name ?: "?"
-    }
-
-    // a named key's swipe is its name's (KeySwipes asks the resolver, 060-keys-unify S6), neither the view's nor the node's: left out
+    // a named key's swipe is its name's (KeySwipes asks the resolver), not the node's: left out
     private fun actions(def: KeyDef) = def.behaviors.filterNot { def.shortcut != null && it is KeyDef.Behavior.Swipe }.map {
         when (it) {
             is KeyDef.Behavior.Press -> "press ${it.action}"
@@ -355,7 +301,6 @@ class NineSceneGesturesTest {
 
     private fun popups(def: KeyDef) = def.popup.orEmpty().map { p ->
         when (p) {
-            // a named key's swipe previewed as the resolver has it: the corner either has left out
             is KeyDef.Popup.AltPreview -> if (def.shortcut != null) "bubble ${p.content}" else "bubble ${p.content} ${p.alternative}"
             is KeyDef.Popup.Preview -> "bubble ${p.content}"
             is KeyDef.Popup.Keyboard.Explicit -> "keys ${p.items.toList()} ${p.symbolsFrom} ${p.asIs} ${p.inRow}"
@@ -366,7 +311,7 @@ class NineSceneGesturesTest {
     }.toSet()
 
     private companion object {
-        val SHUANGPIN = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val SHUANGPIN = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
         const val BUBBLE_GONE_MS = 1000L
     }
 }

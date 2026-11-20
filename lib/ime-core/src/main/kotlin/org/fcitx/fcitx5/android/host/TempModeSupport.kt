@@ -6,35 +6,24 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.core.FormattedText
 
-/**
- * What a temp mode ([QuickPhrase], [UnicodeInput]) asks of the host: commit through the pipeline's
- * commit filters (`InputContext::commitString`) and show its panel. The host keeps the last panel per
- * context and sends it once at the end of the event, as [KeyPipeline.updatePanel] does.
- */
+/** What a temp mode asks of the host: commit through the commit filters and show its panel, sent at the event's end. */
 interface TempModeHost {
     fun commit(ic: InputContext, text: String)
 
-    /** [text] as it is, through no commit filter (traditional, full width): the user's own quick phrase. */
+    /** Past the commit filters (traditional, full width): the user's own quick phrase. */
     fun commitAsIs(ic: InputContext, text: String) = commit(ic, text)
 
-    /**
-     * The mode's whole panel ([TempPanel.EMPTY] when it leaves: fcitx resets the input panel then,
-     * `quickphrasetempmode.cpp:67-83`, `unicodetempmode.cpp:92-100`, and the engine's panel comes back
-     * with the engine's next event).
-     */
+    /** [TempPanel.EMPTY] when it leaves: fcitx resets the panel, and the engine's comes back with its next event. */
     fun showPanel(ic: InputContext, panel: TempPanel)
 }
 
-/**
- * fcitx's input panel as a temp mode fills it: [preedit] (shown in the code row) or [clientPreedit]
- * (in the editor, when the context has [Capability.PREEDIT]), [auxUp], and the candidate list.
- */
+/** [clientPreedit] goes in the editor when the context has [Capability.PREEDIT]. */
 class TempPanel(
     val preedit: FormattedText = FormattedText.Empty,
     val clientPreedit: FormattedText = FormattedText.Empty,
     val auxUp: FormattedText = FormattedText.Empty,
     val candidates: TempCandidateList? = null,
-    /** Quick input's, not Unicode's: the app lists its candidates a row each and opens one long pressed. */
+    /** The app lists its candidates a row each and opens one long pressed. */
     val quickPhrase: Boolean = false,
 ) {
     companion object {
@@ -42,11 +31,7 @@ class TempPanel(
     }
 }
 
-/**
- * A candidate: [select] is what `PanelCandidate::select` does, null for a display-only one; [comment]
- * worked out the first time it is read (Unicode's names, for the page sent only); [asIs] shown as
- * it is put in ([PanelCandidate.asIs]).
- */
+/** [select] null: display only; [comment] computed on first read (Unicode's names, for the page sent only). */
 class TempCandidate(val text: String, comment: () -> String, internal val select: ((InputContext) -> Unit)?, val asIs: Boolean = false) {
     constructor(text: String, comment: String, select: ((InputContext) -> Unit)?) : this(text, { comment }, select)
 
@@ -54,16 +39,13 @@ class TempCandidate(val text: String, comment: () -> String, internal val select
 }
 
 /**
- * The part of fcitx's `CommonCandidateList` (`fcitx/candidatelist.cpp:365-800`) the temp modes and punctuation's marks use:
- * pages of [pageSize], a global cursor, paging that resets the cursor to the page's first
- * ([resetCursorAfterPaging], `CursorPositionAfterPaging::ResetToFirst`) or leaves it, and cursor
- * moves that run over the whole list and wrap (no placeholders, `cursorIncludeUnselected` and
- * `cursorKeepInSamePage` off, as both modes leave them).
+ * The part of fcitx's `CommonCandidateList` the temp modes and punctuation use: pages, a global cursor that
+ * wraps, paging that resets it or not; no placeholders, `cursorKeepInSamePage` off.
  */
 class TempCandidateList(
     val candidates: List<TempCandidate>,
     val pageSize: Int,
-    /** The selection keys' labels (`keyToLabel`, `candidatelist.cpp:479-516`), padded to 10 with "". */
+    /** `keyToLabel`'s, padded to 10 with "". */
     labels: List<String>,
     val layoutHint: LayoutHint = LayoutHint.NotSet,
     private val resetCursorAfterPaging: Boolean = false,
@@ -73,17 +55,16 @@ class TempCandidateList(
     var currentPage = 0
         private set
 
-    /** The cursor over the whole list, -1 for none. */
+    /** -1 for none. */
     var globalCursorIndex = -1
         private set
 
-    /** `usedNextBefore`: Up on the first page is still used once Down has been. */
+    /** Up on the first page is still used once Down has been. */
     var usedNextBefore = false
         private set
 
     val totalSize get() = candidates.size
 
-    /** The candidates on the current page. */
     val size get() = (totalSize - currentPage * pageSize).coerceIn(0, pageSize)
 
     val totalPages get() = (totalSize + pageSize - 1) / pageSize
@@ -91,7 +72,7 @@ class TempCandidateList(
     val hasPrev get() = currentPage > 0
     val hasNext get() = currentPage + 1 < totalPages
 
-    /** The cursor on the current page, -1 when it is elsewhere or none (`candidatelist.cpp:540-547`). */
+    /** -1 when it is elsewhere or none. */
     val cursorIndex: Int
         get() = if (globalCursorIndex >= 0 && globalCursorIndex / pageSize == currentPage) {
             globalCursorIndex % pageSize
@@ -125,7 +106,7 @@ class TempCandidateList(
 
     fun nextCandidate() = moveCursor(prev = false)
 
-    /** `moveCursor` (`candidatelist.cpp:709-756`) with nothing a placeholder. */
+    /** `moveCursor` with nothing a placeholder. */
     private fun moveCursor(prev: Boolean) {
         if (totalSize <= 0 || size <= 0) return
         if (cursorIndex < 0) {
@@ -141,7 +122,7 @@ class TempCandidateList(
         setPage(globalCursorIndex / pageSize)
     }
 
-    /** `setPage` (`candidatelist.cpp:778-790`) and `fixCursorAfterPaging` (`:440-462`). */
+    /** `setPage` and `fixCursorAfterPaging`. */
     private fun setPage(page: Int) {
         if (page == currentPage) return
         val old = cursorIndex
@@ -150,13 +131,9 @@ class TempCandidateList(
     }
 
     companion object {
-        /** `regularLabelSize` in `candidatelist.cpp`. */
         const val REGULAR_LABEL_SIZE = 10
 
-        /**
-         * `keyToLabel` (`candidatelist.cpp:479-516`, not Apple) for a key that types a character (the
-         * modes' selection keys are digits): modifiers as C-/A-/S-/M-, the character, ". ".
-         */
+        /** `keyToLabel` (not Apple) for a character key: modifiers as C-/A-/S-/M-, the character, ". ". */
         internal fun keyToLabel(key: Key): String {
             if (key.sym == TempKeys.NONE) return ""
             val chr = KeySyms.toUnicode(key.sym)
@@ -172,14 +149,10 @@ class TempCandidateList(
     }
 }
 
-/**
- * fcitx's `InputBuffer` (`fcitx-utils/inputbuffer.cpp`) as the temp modes use it: characters (code
- * points) with a cursor, at most [maxSize] of them (both modes set 30).
- */
+/** fcitx's `InputBuffer` as the temp modes use it: code points with a cursor, at most [maxSize] (both use 30). */
 class TempInputBuffer(private val maxSize: Int) {
     private val chars = ArrayList<Int>()
 
-    /** The cursor, in characters. */
     var cursor = 0
         private set
 
@@ -190,11 +163,11 @@ class TempInputBuffer(private val maxSize: Int) {
     val userInput: String
         get() = buildString { chars.forEach { appendCodePoint(it) } }
 
-    /** The cursor in UTF-16 units of [userInput], what [FormattedText] counts. */
+    /** In UTF-16 units, what [FormattedText] counts. */
     val cursorInString: Int
         get() = chars.subList(0, cursor).sumOf { Character.charCount(it) }
 
-    /** `typeImpl` (`inputbuffer.cpp:79-110`): false, and nothing typed, when it would pass [maxSize]. */
+    /** `typeImpl`: false, nothing typed, past [maxSize]. */
     fun type(text: String): Boolean {
         val typed = text.codePoints().toArray()
         if (maxSize > 0 && typed.size + size > maxSize) return false
@@ -215,10 +188,7 @@ class TempInputBuffer(private val maxSize: Int) {
         return true
     }
 
-    /**
-     * fcitx's `setCursor` checks the old cursor rather than the new one (`inputbuffer.cpp:144`), so a
-     * position past the end is taken and later reads run off the buffer; here it is capped at the end.
-     */
+    /** fcitx's `setCursor` checks the old cursor, so a position past the end ran off the buffer; capped here. */
     fun setCursor(position: Int) {
         cursor = position.coerceIn(0, size)
     }
@@ -229,7 +199,7 @@ class TempInputBuffer(private val maxSize: Int) {
     }
 }
 
-/** Keysyms and checks the temp modes need beyond [KeySyms] (`fcitx-utils/keysymgen.h`, `key.cpp`). */
+/** Keysyms and checks the temp modes need beyond [KeySyms]. */
 @Suppress("MagicNumber")
 internal object TempKeys {
     const val NONE = 0
@@ -247,29 +217,25 @@ internal object TempKeys {
     const val KP_RIGHT = 0xff98
     const val KP_END = 0xff9c
 
-    /** fcitx's `DefaultPrevPage`/`NextPage`/`PrevCandidate`/`NextCandidate` (`fcitx/globalconfig.cpp:129-157`), constants here. */
+    /** fcitx's `DefaultPrevPage` and kin, constants here. */
     val PREV_PAGE = Key(UP)
     val NEXT_PAGE = Key(DOWN)
     val PREV_CANDIDATE = Key(KeySyms.TAB, KeyStates.SHIFT)
     val NEXT_CANDIDATE = Key(KeySyms.TAB)
 
-    /** fcitx's `DefaultPageSize` (`globalconfig.cpp`), a constant here (design §1.4). */
+    /** fcitx's `DefaultPageSize`, a constant here. */
     const val PAGE_SIZE = 5
 
-    /** `Key::isModifier` (`key.cpp:460-467`), [Key.isModifier]'s one set. */
     fun isModifier(key: Key) = key.isModifier
 
-    /**
-     * `Key::check` (`key.cpp:385-411`) for the keys the temp modes compare with, none of which is a
-     * modifier key itself: the same sym and the same Ctrl/Alt/Shift/Super/Mod3.
-     */
+    /** `Key::check` for keys none of which is a modifier: the same sym and Ctrl/Alt/Shift/Super/Mod3. */
     fun check(key: Key, target: Key): Boolean {
         if (target.sym == NONE || target.sym == VOID_SYMBOL) return false
         val states = key.states and (KeyStates.CTRL_ALT_SHIFT or KeyStates.SUPER or KeyStates.MOD3)
         return target.sym == key.sym && target.states == states
     }
 
-    /** `Key::digit` (`key.cpp:418-429`): 0–9 for a digit or keypad digit with no modifier, else -1. */
+    /** `Key::digit`. */
     fun digit(key: Key): Int = when {
         key.states != 0 -> -1
         key.sym in KeySyms.DIGIT_0..KeySyms.DIGIT_9 -> key.sym - KeySyms.DIGIT_0
@@ -277,7 +243,7 @@ internal object TempKeys {
         else -> -1
     }
 
-    /** `Key::digitSelection` (`key.cpp:431-444`): 1 is 0, …, 0 is 9, with exactly [states] held. */
+    /** `Key::digitSelection`: 1 is 0, …, 0 is 9, with exactly [states] held. */
     fun digitSelection(key: Key, states: Int): Int {
         val held = key.states and (KeyStates.CTRL_ALT_SHIFT or KeyStates.SUPER or KeyStates.MOD3)
         if (held != states) return -1
@@ -285,6 +251,6 @@ internal object TempKeys {
         return if (idx >= 0) (idx + 9) % 10 else -1
     }
 
-    /** Text of one segment with [flags] (`Text::append`). */
+    /** `Text::append`. */
     fun text(s: String, flags: Int = 0, cursor: Int = -1) = FormattedText(arrayOf(s), intArrayOf(flags), cursor)
 }

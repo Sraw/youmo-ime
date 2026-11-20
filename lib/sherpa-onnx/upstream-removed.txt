@@ -513,6 +513,8 @@ sherpa-onnx/kotlin-api/HomophoneReplacerConfig.kt
 sherpa-onnx/kotlin-api/OfflineRecognizer.kt
 sherpa-onnx/kotlin-api/OfflineStream.kt
 sherpa-onnx/kotlin-api/WaveReader.kt
+# 0.6.3: the Kotlin VersionInfo, never called (its jni/version.cc is still compiled):
+sherpa-onnx/kotlin-api/VersionInfo.kt
 # Layer C: the build options whose sources are gone (TTS, speaker diarization, NPUs, WASM, Python,
 # C API, websocket, PortAudio, ALSA, tests) and their dependency files; the CMakeLists.txt edits are our commits:
 cmake/__init__.py

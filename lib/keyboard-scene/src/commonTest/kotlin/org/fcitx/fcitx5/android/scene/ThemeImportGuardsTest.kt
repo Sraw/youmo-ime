@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.Fixtures.problems
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.test.Test
@@ -14,8 +15,6 @@ import kotlin.test.assertTrue
 /** The guards on an imported theme's files, names, counts and values. */
 class ThemeImportGuardsTest {
     private val source = testData("material-light.xml")
-
-    private fun problems(s: String) = ThemeReader.theme(s).problems().map { it.message }
 
     // an imported theme's guards, one test each: a font or icon named twice is a problem, as a colour is
     @Test

@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.learn.Kinds
@@ -31,28 +32,15 @@ import org.junit.Test
 
 class PinyinSessionT9Test {
 
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你", -2f, 0f)
-                .unigram("米", -3f, 0f)
-                .unigram("哦", -4f, 0f)
-                .unigram("好", -2.5f, 0f)
-                .unigram("高", -3f, 0f)
-                .unigram("你好", -2.5f, 0f)
-                .unigram("米糕", -5f, 0f)
-                .unigram("爸爸", -4f, 0f)
-                .entry("你", syl("ni"))
-                .entry("米", syl("mi"))
-                .entry("哦", syl("o"))
-                .entry("好", syl("hao"))
-                .entry("高", syl("gao"))
-                .entry("你好", syl("ni", "hao"))
-                .entry("米糕", syl("mi", "gao"))
-                .entry("爸爸", syl("ba", "ba"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("你", "ni", -2f),
+        Triple("米", "mi", -3f),
+        Triple("哦", "o", -4f),
+        Triple("好", "hao", -2.5f),
+        Triple("高", "gao", -3f),
+        Triple("你好", "ni hao", -2.5f),
+        Triple("米糕", "mi gao", -5f),
+        Triple("爸爸", "ba ba", -4f),
     )
 
     private fun session(user: UserModel? = null, learner: Learner? = null, refiner: SentenceRefiner? = null) = PinyinSession(
@@ -89,7 +77,6 @@ class PinyinSessionT9Test {
         assertEquals(listOf("ni", "mi", "o", "m", "n"), s.syllables)
     }
 
-    // design-1b §6, S1: the letters and the bar go by the ranked first, the readings in the places the decoder gave them
     @Test
     fun theLettersAndTheBarFollowTheRankedFirst() {
         val learner = Learner(data)
@@ -120,32 +107,26 @@ class PinyinSessionT9Test {
         session.type("64426")
         val taken = session.apply(Action.Syllable(1))
         assertEquals("米糕", taken.candidates[0])
-        // a syllable taken stands apart
         assertEquals("mi'gao", taken.preedit)
-        // offered next: the digits after it
         assertTrue("gao" in taken.syllables && "hao" in taken.syllables)
         val back = session.apply(Backspace)
         assertEquals("你好", back.candidates[0])
         assertEquals(listOf("ni", "mi", "o", "m", "n"), back.syllables)
-        // then a digit goes
         assertEquals("ni ha", session.apply(Backspace).preedit)
     }
 
-    // review F3116 (F2672): a syllable taken off the bar is several places of its digits; a pin after it is kept
     @Test
     fun aPinIsKeptAfterASyllableTakenOffTheBar() {
         val session = session(learner = Learner(data))
         val shown = session.type("64426").candidates
         session.apply(Action.Pin(shown.indexOf("米糕")))
         session.apply(Action.Reset)
-        // ni, two digits taken as one syllable
         val typed = session.type("6464426")
         val ni = session.apply(Action.Syllable(typed.syllables.indexOf("ni")))
         assertTrue(ni.preedit, ni.preedit.startsWith("ni'"))
         assertEquals("你米糕", ni.candidates.first())
     }
 
-    // review F3182 (F2795): a glide's letter after the cursor moved is still glided: no key of the nine keys' code
     @Test
     fun aGlidedLetterAfterTheCursorMovedIsGlided() {
         val habits = RecordingHabits()
@@ -172,7 +153,6 @@ class PinyinSessionT9Test {
 
     @Test
     fun aKeyPressedAgainIsTheLetterItCameToAndNothingElse() {
-        // 6 four times fast: round to m
         val session = session()
         val m = session.press('6', 4)
         assertEquals("m", m.preedit)
@@ -180,24 +160,22 @@ class PinyinSessionT9Test {
         val s = session.type("4426")
         assertEquals("米糕", s.candidates[0])
         assertEquals("mi gao", s.preedit)
-        // 2 four times fast is a, as the key's preview showed: not baba (2026-10-19, strict)
+        // 2 four times fast is a, as the key's preview showed: not baba
         val a = session().press('2', 4)
         assertEquals("a", a.preedit)
         assertTrue("爸爸" !in a.candidates)
     }
 
-    /** Read as keys too (the 2026-10-12 hybrid), a learned 广告 overrode the h the key's preview showed. */
+    /** Read as keys too, a learned 广告 once overrode the h the key's preview showed. */
     @Test
     fun fourFourFastIsHEvenWithGuangGaoLearned() {
         val data = dataOf(Triple("广告", -2f, "guang gao"), Triple("哈哈", -2f, "ha ha"), Triple("和", -3f, "he"), Triple("会", -3f, "hui"))
         val user = UserModel(data.dictionary, data.vocabulary)
         fun session() = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, user = user, prediction = false)
-        // 4 4 slowly: two keys, 广告 picked and learned
         val slow = session()
         val keys = slow.type("44")
         assertTrue("广告" in keys.candidates)
         slow.apply(Action.Pick(keys.candidates.indexOf("广告")))
-        // 4 4 fast: h, its words alone
         val h = session().press('4', 2)
         assertEquals("h", h.preedit)
         assertTrue(h.candidates.containsAll(listOf("和", "会")))
@@ -215,7 +193,6 @@ class PinyinSessionT9Test {
         // not 744 as keys, which is shi typed whole: two letters on the way to shi, sha
         assertEquals("sh", sh.preedit)
         assertEquals("shi", sessionOf(data).type("744").preedit)
-        // backspace deletes the H whole, both its presses
         assertEquals(sessionOf(data).type("7").preedit, session.apply(Backspace).preedit)
     }
 
@@ -255,7 +232,7 @@ class PinyinSessionT9Test {
 
     @Test
     fun aWordIsPinnedUnderTheNineKeysOwnCodeALetterTypedAsItselfToo() {
-        // m i, each typed as itself: pinned under the keys as pressed, no phrase key (impl/design-1b.md §3)
+        // m i, each typed as itself: pinned under the keys as pressed, no phrase key
         val habits = RecordingHabits()
         val session = PinyinSession(data, T9Segmenter(abbreviations = false), spell = true, prediction = false, learnTo = LearnTo(habits))
         session.apply(Action.Letter('m'))
@@ -275,7 +252,6 @@ class PinyinSessionT9Test {
         val taken = session.apply(Action.Syllable(0))
         assertEquals("mi", taken.preedit)
         assertTrue(taken.syllables.isEmpty())
-        // given back as typed: still m, not any of 6
         val back = session.apply(Backspace)
         assertEquals("mi", back.syllables.first())
         assertTrue("ni" !in back.syllables)
@@ -287,10 +263,8 @@ class PinyinSessionT9Test {
         keyboard.onEvent(EngineEvent.CHAR, '6'.code)
         val n = keyboard.onEvent(EngineEvent.CHAR, Keyboard.letterKey('n', again = true))
         assertTrue(n.handled)
-        // 6 pressed again: n, in place of the 6
         assertTrue("n" in n.syllables)
         assertTrue(Keyboard.letterKey('z', again = true) in Keyboard.LETTERS && Keyboard.letterKey('a', again = false) == Keyboard.LETTERS.first)
-        // a keyboard of letters has no use for them
         val letters = Keyboard(session(), nineKeys = false)
         assertFalse(letters.onEvent(EngineEvent.CHAR, Keyboard.letterKey('m', again = false)).handled)
     }
@@ -301,7 +275,6 @@ class PinyinSessionT9Test {
         val typed = "64426".map { keyboard.onEvent(EngineEvent.CHAR, it.code) }.last()
         val s = keyboard.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(1, typed.syllablesId).code)
         assertEquals("米糕", s.candidates[0])
-        // 0 is no key on the nine keys: it ends the input as typed
         val zero = keyboard.onEvent(EngineEvent.CHAR, '0'.code)
         assertEquals("米糕", zero.commit)
     }
@@ -335,7 +308,6 @@ class PinyinSessionT9Test {
         session.type("64426")
         session.apply(Action.Syllable(1))
         assertEquals("migao", session.apply(Action.CommitRaw).commit)
-        // what no reading took is kept: digits, as typed
         session.type("64")
         session.apply(Action.Syllable(0))
         val shown = session.type("9999").preedit
@@ -346,14 +318,8 @@ class PinyinSessionT9Test {
 
     @Test
     fun aFuzzyReadingShowsAndCommitsItsWholeSyllable() {
-        val zhong = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("中", -3.5f, 0f)
-                    .entry("中", syl("zhong"))
-                    .build().toByteArray(),
-            ),
+        val zhong = pinyinDataOf(
+            Triple("中", "zhong", -3.5f),
         )
         val session = PinyinSession(zhong, T9Segmenter(setOf(Fuzzy.Z_ZH), abbreviations = false), spell = true, prediction = false)
         // 9664 types zong, and z stands for zh: zhong, not its first four letters
@@ -367,7 +333,6 @@ class PinyinSessionT9Test {
     fun startingOverWithNothingTypedIsNotTheApps() {
         val keyboard = Keyboard(session(), nineKeys = true)
         assertEquals(true, keyboard.onEvent(EngineEvent.ESCAPE, 0).handled)
-        // nor is a syllable for a session without the nine keys
         val full = Keyboard(PinyinSession(data, PinyinSegmenter(), prediction = false), nineKeys = false)
         assertEquals(false, full.onEvent(EngineEvent.CHAR, Keyboard.syllableKey(0, 0).code).handled)
         assertEquals(false, full.onEvent(EngineEvent.ESCAPE, 0).handled)
@@ -398,17 +363,14 @@ class PinyinSessionT9Test {
         val stale = session.apply(Action.Syllable(0, shown.syllablesId))
         assertEquals("ni", stale.preedit)
         assertEquals(typed.syllables, stale.syllables)
-        // picked from the list shown now, taken
         assertEquals("ni", session.apply(Action.Syllable(0, typed.syllablesId)).preedit)
         assertEquals(emptyList<String>(), session.apply(Action.Syllable(0, typed.syllablesId)).syllables)
-        // the same list again keeps its id: a word forgotten reads the input again, offering what
-        // it did, and stales no pick (a pause reads nothing again: see the test after this one)
+        // the same list keeps its id: a forget re-reads the input and stales no pick
         val again = session(learner = Learner(data), refiner = { _, _, _, _ -> 0 })
         again.type("64")
         again.apply(Action.Select(0))
         val first = again.type("64")
         val forgotten = again.apply(Action.Forget(0))
-        // the input was read again: the refiner has its readings anew
         assertTrue(forgotten.refines)
         assertEquals(first.syllables, forgotten.syllables)
         assertEquals(first.syllablesId, forgotten.syllablesId)
@@ -430,12 +392,10 @@ class PinyinSessionT9Test {
 
     @Test
     fun theKeysTypeTheLettersTheUserPutOnThem() {
-        // h moved to 6 beside m n o, i on 5 too
         val keys = NineKeyLetters.of(listOf("abc", "def", "gi", "jkli", "mnoh", "pqrs", "tuv", "wxyz"))
         fun session() = PinyinSession(data, T9Segmenter(abbreviations = false, letters = keys), spell = true, prediction = false)
         val s = session().type("65626")
         assertEquals("你好", s.candidates[0])
-        // 6's letters offered as initials, h with them
         assertTrue(s.syllables.containsAll(listOf("m", "n", "h")))
         // pressed again soon, a letter of the same key goes in place of the last: round to h
         val h = session().press('6', 4, keys)
@@ -448,23 +408,19 @@ class PinyinSessionT9Test {
         val keys = NineKeyLetters.of(listOf("abc", "def", "ghi", "jkla"))
         val session = PinyinSession(data, T9Segmenter(abbreviations = false, letters = keys), spell = true, prediction = false)
         assertEquals("a", session.apply(Action.Letter('a', again = true)).preedit)
-        // on one key: that key, any of its letters
         val one = PinyinSession(data, T9Segmenter(abbreviations = false, letters = keys), spell = true, prediction = false)
         one.apply(Action.Letter('h', again = true))
         assertTrue(one.apply(Key('4')).candidates.isNotEmpty())
     }
 
-    /** A key pressed again that no reading takes is kept as the letter it came to. */
     @Test
     fun aKeyPressedAgainKeptAsTypedIsItsLetter() {
         val session = session()
-        // no word of w, x, y or z here
         val s = session.press('9', 2)
         assertEquals("x", s.candidates[0])
         assertEquals("x", session.apply(Action.CommitRaw).commit)
     }
 
-    /** 屄 held past the first page still gave the preedit, the column and Enter its bi, 爱 first. */
     @Test
     fun theFirstReadingShownNotACoarseOneHeldPastThePageIsWhatThePreeditShows() {
         val session = sessionOf(dataOf(Triple("屄", -1f, "bi"), Triple("爱", -6f, "ai")))
@@ -475,7 +431,6 @@ class PinyinSessionT9Test {
         assertEquals("ai", session.apply(Action.CommitRaw).commit)
     }
 
-    /** Every reading of 24 held, the preedit, the column and Enter still went by 屄 while 啊 came first. */
     @Test
     fun everyReadingHeldThePreeditGoesByTheCandidateShownFirst() {
         // five of the list, read bi here, each likelier than 啊 then 4 as typed: no reading of all of it is left
@@ -501,15 +456,11 @@ class PinyinSessionT9Test {
         assertEquals("e", session.apply(Backspace).syllables[0])
     }
 
-    /**
-     * 2, a pick the keyboard did not see, then 2 2 fast: the keyboard showed c. What the preview
-     * showed wins: the 2 typed after the pick, then C in its place (2026-10-19).
-     */
+    /** What the preview showed wins: the 2 typed after the pick, then C. */
     @Test
     fun aPressAgainAfterAPickTheKeyboardDidNotSeeIsTheLetterItShowed() {
         val data = dataOf(Triple("不", -2f, "bu"), Triple("啊", -4f, "a"), Triple("出", -3f, "chu"))
         val session = sessionOf(data)
-        // nothing typed: the keyboard counted the 2 before the pick
         session.apply(Action.Letter('b', again = true))
         session.apply(Action.Letter('c', again = true))
         val s = session.type("8")
@@ -521,17 +472,13 @@ class PinyinSessionT9Test {
         assertTrue("不" !in s.candidates)
     }
 
-    // U-20 (D32 B) on the nine keys (R14 F3765, F3770): 奉化 used twice in full, by digits or by 连按,
-    // is third under a part, by digits (33644) or by 连按 (fengh); not in the first three before.
-    // 连按 is the nine keys' too. A word of the dictionary: one made of 奉 and 化 would be the
-    // user's after two, second by that
+    // third under a part, by digits (33644) or 连按 (fengh); 连按 is the nine keys' too
     @Test
     fun aWordUsedTwiceInFullGoesThirdUnderAPartOfTheDigitsOrOf连按() {
         val data = dataOf(
             Triple("风格", -1.5f, "feng ge"), Triple("风光", -1.6f, "feng guang"), Triple("丰厚", -1.7f, "feng hou"),
             Triple("凤凰", -1.8f, "feng huang"), Triple("风化", -1.9f, "feng hua"), Triple("奉化", -6f, "feng hua"), Triple("风", -2f, "feng"),
         )
-        // each letter its key pressed as often as its place there
         val fengh: Session.() -> Snapshot = { press('3', 3); press('3', 2); press('6', 2); press('4', 1); press('4', 2) }
         val fenghua: Session.() -> Snapshot = { fengh(); press('8', 2); press('2', 1) }
         val digits: Session.() -> Snapshot = { type("33644") }
@@ -558,9 +505,7 @@ class PinyinSessionT9Test {
         }
     }
 
-    // F3776: where the decoder leaves 奉化 off 33644 (more feng h… words ahead of it than a level
-    // holds), the lift walks it in. The fresh check only shows it is off the first page; that the
-    // decoder dropped it is shown by the last assertion, which fails without the walk-in
+    // the lift walks 奉化 in; the last assertion fails without the walk-in
     @Test
     fun aWordTheDecoderLeavesOffAPartIsWalkedIn() {
         val others = listOf("feng hou", "feng huang", "feng hui", "feng huo", "feng hong", "feng hun").flatMapIndexed { r, reading ->
@@ -580,7 +525,7 @@ class PinyinSessionT9Test {
         assertEquals(2, s.type("33644").candidates.indexOf("奉化"))
     }
 
-    // the 14 keys (design §1.1, §5.1): ni hao is BN UI GH AS OP's codes (g14)
+    // the 14 keys: ni hao is BN UI GH AS OP's codes (g14)
     private fun session14(habits: RecordingHabits? = null) = PinyinSession(
         data, T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), spell = true, prediction = false,
         learnTo = habits?.let { LearnTo(it) } ?: LearnTo(),
@@ -602,7 +547,6 @@ class PinyinSessionT9Test {
         val both = session.apply(Action.Syllable(ni.syllables.indexOf("hao")))
         assertEquals("你好", both.candidates[0])
         assertTrue(both.syllables.isEmpty())
-        // last taken, first given back: hao, then ni
         val back = session.apply(Backspace)
         assertTrue(back.syllables.toString(), "hao" in back.syllables && "ni" !in back.syllables)
         assertEquals(s.syllables, session.apply(Backspace).syllables)
@@ -620,20 +564,16 @@ class PinyinSessionT9Test {
 
     @Test
     fun aKeyThatReadsNothingShowsAndCommitsAsItsFirstLetter() {
-        // UI alone: no syllable starts with u or i
         val session = session14()
         val ui = session.type(g14("ui"))
         assertEquals("u", ui.preedit)
-        // nor the decoder's candidate kept as typed
         assertTrue(ui.candidates.toString(), ui.candidates.none { c -> c.any { it.code in NineKeyLetters.CODES } })
         val commit = session.apply(Action.CommitRaw).commit
         assertEquals("u", commit)
         assertTrue(commit.none { it.code in NineKeyLetters.CODES })
-        // nor through a keyboard's Enter
         val keyboard = Keyboard(session14(), nineKeys = true)
         keyboard.onEvent(EngineEvent.CHAR, g14Code('u').code)
         keyboard.onEvent(EngineEvent.CHAR, g14Code('b').code)
-        // UI as typed, BN read: n (嗯)
         val entered = keyboard.onEvent(EngineEvent.ENTER, 0).commit
         assertEquals("un", entered)
     }

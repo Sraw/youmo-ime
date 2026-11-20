@@ -24,7 +24,7 @@ class SymbolPanelTest {
         assertEquals(3, panel.selected)
     }
 
-    // user 2026-11-13: while no category was ever picked, the recently used once there are any; a pick is remembered
+    // while no category was ever picked, the recently used once there are any; a pick is remembered
     @Test
     fun tillACategoryIsPickedItOpensOnTheRecentlyUsedOnceThereAreAny() {
         assertRows(
@@ -44,7 +44,7 @@ class SymbolPanelTest {
         }
     }
 
-    // user 2026-11-14: the pick kept across restarts, the app passing what it stored back in
+    // the pick kept across restarts, the app passing what it stored back in
     @Test
     fun aRememberedPickOpensAsAPickMadeInThisRun() {
         assertRows(

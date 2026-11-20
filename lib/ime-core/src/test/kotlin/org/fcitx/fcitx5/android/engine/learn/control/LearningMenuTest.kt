@@ -28,7 +28,6 @@ class LearningMenuTest {
             MenuItem.DELETE_PHRASE to Row.DELETE_PHRASE, MenuItem.DELETE_COMMON_WORD to Row.DELETE_COMMON_WORD, MenuItem.NO_PREDICT to Row.NO_PREDICT,
             MenuItem.WHY to Row.WHY,
         )
-        // each item its row, in the menu's order whatever the enum's
         assertEquals(MenuItem.entries.map(rows::getValue), LearningMenu.rows(menu(WordKind.DICTIONARY)))
         for (kind in listOf(WordKind.MINE, WordKind.ADDED, WordKind.IMPORTED)) assertEquals(Row.DELETE, LearningMenu.rows(menu(kind)).first())
     }
@@ -62,7 +61,7 @@ class LearningMenuTest {
             assertEquals(if (tier in afterWord) reasons.getValue(tier) else Reason.PREDICTION, LearningMenu.reason(Why(tier, 3, predicted)))
         }
         assertEquals(Reason.PREDICTION, LearningMenu.reason(Why(null, 0, predicted)))
-        // the rest of a whole phrase (U-73): that it was put in whole, whatever its tier
+        // the rest of a whole phrase: that it was put in whole, whatever its tier
         assertEquals(Reason.PHRASE, LearningMenu.reason(Why(Tier.USED, 3, predicted, "你好呀亲爱的")))
         // a 联想's, as the session gives it: EnginesLearningTest.aPredictionsWhyIsThatItFollowsTheWordBefore
         assertEquals(Reason.UNKNOWN, LearningMenu.reason(Why(null)))

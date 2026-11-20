@@ -7,18 +7,12 @@ package org.fcitx.fcitx5.android.data.theme
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import java.io.File
 
-/**
- * The built-in themes read from their files (keyboard-scene src/commonMain/themes) as the app reads
- * them ([BuiltinThemeFiles.read]), no Context needed: for tests that are no Robolectric app's. Monet's
- * with no system colours, its fallbacks; Transparent's two, test data (src/commonTest/data). Each by
- * its 0.5 name, the presets' it replaces.
- */
+/** Built-in themes read from keyboard-scene's files with no Context; Monet with its fallbacks; each by its 0.5 name. */
 object TestThemes {
 
     // app/build.gradle.kts sets it; the module's directory else
     private val src = File(System.getProperty("scene.src") ?: "../lib/keyboard-scene/src")
 
-    /** [path]'s versions (of src/), with [system]'s colours. */
     fun read(path: String, system: SystemColors = SystemColors.NONE): List<Theme.Builtin> =
         BuiltinThemeFiles.read(File(src, path).readText(), system)
 
@@ -27,7 +21,7 @@ object TestThemes {
     private val material by lazy { builtin("material") }
     private val pixel by lazy { builtin("pixel") }
     private val nord by lazy { builtin("nord") }
-    // read anew each time: a Monet theme's look is made once, of what ThemeLookMigration keeps then
+    // read anew each time: a Monet look is made once, of what ThemeLookMigration keeps then
     private val monet get() = builtin("monet")
     private val transparent by lazy { read("commonTest/data/transparent.xml") }
 
@@ -45,7 +39,7 @@ object TestThemes {
     val TransparentLight get() = transparent[0]
     val TransparentDark get() = transparent[1]
 
-    /** The app's built-in themes, as it lists them (Monet's first), each version by its 0.5 name. */
+    /** As the app lists them (Monet's first). */
     val builtins: List<Pair<String, Theme.Builtin>> by lazy {
         listOf(
             "MonetLight" to MonetLight, "MonetDark" to MonetDark,

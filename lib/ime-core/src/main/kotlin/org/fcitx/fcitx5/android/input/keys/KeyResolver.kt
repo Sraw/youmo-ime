@@ -24,32 +24,23 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.keys.NodeFacts
 
-/** What a key's long press, swipes and marks depend on that changes while a keyboard shows (§1.2). */
+/** What a key's long press, swipes and marks depend on that changes while a keyboard shows. */
 data class KeyState(
-    /** Shift on: the full keyboard's letters' capitals' lists. */
     val caps: Boolean = false,
-    /** A table looking up roots: a letter's roots, its long press showing them and its corner the letter. */
     val roots: ((Char) -> String?)? = null,
-    /** The punctuation the engine types now (`.` 。): an item typed as a key shown as it would be typed. */
+    /** The punctuation the engine types now (`.` 。): an item typed as a key is shown as it would be typed. */
     val punctuation: Map<String, String> = emptyMap(),
-    /** A table's keys labelled with its roots or their names: a letter's corner the letter (its long press as ever). */
+    /** A table's keys labelled with its roots: a letter's corner the letter. */
     val letterCorners: Boolean = false,
     val ways: KeySwipe.Ways = KeySwipe.Ways.Both,
     val spots: KeyMarks.Spots = KeyMarks.Spots(KeyMarks.At.SymbolDefault, KeyMarks.At.ShortcutDefault),
-    /**
-     * The minute (since the epoch) where the user's lists or slots fill in variables ([KeyResolver.fillsIn],
-     * 061-text-variables §2.3), else 0: a new minute is another state, its values filled in anew.
-     */
+    /** The minute where the user's lists or slots fill in variables ([KeyResolver.fillsIn]), else 0: a new minute is a new state. */
     val minute: Long = 0,
 )
 
-/**
- * A key's long press as it opens: its [items], the first [inRow] of them the row, [focus] under the finger (the
- * first, wherever it is: in the row, among the symbols), [own] the row's middle (its default's, the keypad digit
- * or the corner; -1 with no row): where the row centres when the first is not in it.
- */
+/** [focus] the first item, under the finger; [own] the row's middle (-1 with no row), where the row centres when the first is not in it. */
 sealed interface KeyPopup {
-    /** [templates]: by each item, the text of variables it was filled in from (null: none; empty: no item of any). */
+    /** [templates]: by item, the variables text it was filled in from (null: none; empty: no item has any). */
     data class Items(
         val items: List<Item>,
         val labels: List<String>,
@@ -59,17 +50,13 @@ sealed interface KeyPopup {
         val templates: List<String?> = emptyList(),
     ) : KeyPopup
 
-    /** A table's roots of the letter, shown alone. */
     data class Roots(val text: String) : KeyPopup
 }
 
-/**
- * A key's list as the settings' editor starts it (060-row-unlock §1): its [items] as the key pops up (its own
- * letters and digit as any other item), its [first]'s text (null: none), and what the user set of it, null for none.
- */
+/** As the settings' editor starts it: [first] null for none, [user] null when unset. */
 data class KeyEdit(val items: List<String>, val first: String?, val user: UserList?) {
     companion object {
-        /** The [First] an edited list stores for the editor's [first]: `*` for the list's first item, `!` for none, else the item. */
+        /** `*` for the list's first item, `!` for none, else the item. */
         fun firstToStore(first: String?, items: List<String>): First = when (first) {
             null -> First.None
             UserList.firstOf(First.Default, items) -> First.Default
@@ -78,12 +65,7 @@ data class KeyEdit(val items: List<String>, val first: String?, val user: UserLi
     }
 }
 
-/**
- * A key as everything reads it: its long press ([popup], null with none), its [first] (what its swipe's
- * 长按首选 types, its corner shows, the long press opens on), [firstShown] as drawn, its two swipe slots
- * ([swipe]) and their marks; [corner] what its first's mark shows (a labelled table's letter itself), as a screen reader says it;
- * [firstTemplate] the text of variables its first was filled in from, null for none.
- */
+/** [first]: what 长按首选 types, the corner shows and the long press opens on; [corner] as a screen reader says it. */
 data class ResolvedKey(
     val id: KeyId,
     val popup: KeyPopup?,
@@ -96,36 +78,25 @@ data class ResolvedKey(
     val firstTemplate: String? = null,
 )
 
-/**
- * Every key of a keyboard as its defaults ([KeyDefaults], by the [variant] and the layout's [nodes]) and the
- * user's [lists] and [slots] make it (060-keys-unify §3): one rule for every key on every keyboard. A key's
- * list is made once; what [KeyState] changes (capitals, the punctuation shown, roots) is laid on it as asked,
- * each key's kept for the last state asked. Main thread only: its caches are not guarded.
- */
+/** Every key from its defaults and the user's [lists] and [slots], one rule for all; [KeyState] laid on per call. Main thread only: caches unguarded. */
 class KeyResolver(
     private val variant: KeyboardVariant,
     private val lists: KeyLists,
     private val slots: SwipeSlots,
-    /** The layout's named keys ([DefaultMarks.nodes]): the layout's name of each and what its node says. */
     private val nodes: List<Pair<String, NodeFacts>>,
-    /** What variables are filled in with: the device's time, a test's. */
     private val clock: LearnClock = JvmClock,
 ) {
-    /**
-     * Whether an item of [lists] or a text of [slots] fills in variables (061-text-variables): then [KeyState.minute]
-     * is asked for, each minute's values made anew; else it is 0, nothing made again for the time.
-     */
+    /** Then [KeyState.minute] is asked for, each minute's values made anew. */
     val fillsIn: Boolean = lists.lists.values.any { l -> l.marks.values.any { it == ItemMark.Variables } } || slots.fillsIn
 
-    // the minute the lists of variables in [made] were filled in for
     private var madeMinute = 0L
 
     private val facts: Map<KeyId, NodeFacts> = nodes.associate { (name, f) -> KeyId.of(name) to f }
 
-    // by the key, then Shift: the lists the user's are laid on are fixed while the keyboard shows
+    // by the key, then Shift: fixed while the keyboard shows
     private val made = HashMap<Pair<KeyId, Boolean>, Made?>()
 
-    // each key as resolved for [resolvedFor], the state last asked: made again only for another
+    // made again only for another state
     private val resolved = HashMap<KeyId, ResolvedKey>()
     private var resolvedFor: KeyState? = null
 
@@ -135,14 +106,11 @@ class KeyResolver(
     private var readingsFor: KeyState? = null
     private var readingsMade: Map<String, String>? = null
 
-    /** The default list [id] has here, with no setting of the user's (the editor's start, `KeyLists.with`'s). */
+    /** With no user setting (the editor's start, `KeyLists.with`'s). */
     fun defaultOf(id: KeyId, caps: Boolean = false): DefaultList? =
         KeyDefaults.of(id, variant, facts[id] ?: NodeFacts(), caps = caps && id.form == FULL)
 
-    /**
-     * [id]'s list as the editor starts it: as the key pops up here with no Shift, the user's own where set, its items as
-     * written (an item of variables its text of them, none left out for filling in the same as another).
-     */
+    /** As the key pops up with no Shift, the user's own where set, items of variables as their text. */
     fun edit(id: KeyId): KeyEdit {
         val user = lists[id]
         if (user != null && !user.off) {
@@ -153,11 +121,7 @@ class KeyResolver(
         return KeyEdit(m?.items.orEmpty().map { it.text }, m?.first?.text, user)
     }
 
-    /**
-     * What picking [item] types now (061-text-variables §2.3, M4): one filled in from [template] (as the long press
-     * or the swipe it was picked from has it: [KeyPopup.Items.templates], [ResolvedKey.firstTemplate]) filled in again
-     * at this moment, so a value drawn before midnight types the date after; any other its text.
-     */
+    /** Filled in again now from [template], so a value drawn before midnight types the date after. */
     fun output(item: Item, template: String?): String = template?.let { TextVariables.expand(it, clock.calendar()) } ?: item.text
 
     fun resolve(id: KeyId, state: KeyState): ResolvedKey {
@@ -170,7 +134,6 @@ class KeyResolver(
 
     private fun resolved(id: KeyId, state: KeyState): ResolvedKey {
         if (state.minute != madeMinute) {
-            // filled in for another minute: made again as asked
             made.keys.removeAll { (key, _) -> lists[key]?.marks?.containsValue(ItemMark.Variables) == true }
             madeMinute = state.minute
         }
@@ -182,9 +145,7 @@ class KeyResolver(
             m == null -> null
             else -> KeyPopup.Items(items, items.map { DefaultMarks.shown(it, state.punctuation) }, m.inRow, m.focus, m.own, m.templates)
         }
-        // a first KeyOutput cannot make (a theme's `send=` of no action) is none, for the corner, the swipe's slot and
-        // the keyboard's swipe (KeyResolving.swipe) alike; one the app cannot map (an unknown sym or command, an
-        // `action:` with no placeholder) still shows a corner while the swipe types nothing
+        // a first KeyOutput cannot make is none for the corner and swipes; one the app cannot map still shows a corner, its swipe typing nothing
         val first = m?.first?.let { items.getOrNull(m.items.indexOf(it)) }?.takeIf { KeyOutput.of(it) != null }
         val shown = first?.let { DefaultMarks.shown(it, state.punctuation) }?.takeIf { it.isNotEmpty() }
         val swipe = KeySwipe.Key(SwipeSlots.typesAChar(id.name), slots.resolve(id.name, true), slots.resolve(id.name, false), hasFirst = first != null)
@@ -196,11 +157,7 @@ class KeyResolver(
         return ResolvedKey(id, popup, first, shown, swipe, mark(swipe.up, firstMark), mark(swipe.down, firstMark), corner, firstTemplate)
     }
 
-    /**
-     * Every named key's [ResolvedKey.corner] by its name, as Texts.alts reads them (a screen reader's 「Q W，1」, 060-keys-unify
-     * §3.4): only where a way draws it (its slot the first's, the way on, its place not 无: as Content.ways and the
-     * marks' slots draw it), as the corner a sighted user sees; a key with none left out. Made again only for another [state].
-     */
+    /** Every drawn corner by key name, as Texts.alts reads them for a screen reader; made again only for another [state]. */
     fun readings(state: KeyState): Map<String, String> {
         if (state == readingsFor) readingsMade?.let { return it }
         val up = state.ways.up && state.spots.symbol != KeyMarks.At.None
@@ -214,11 +171,7 @@ class KeyResolver(
         return made
     }
 
-    /**
-     * The marks of every named key, as the scene draws them: made again only for another [state].
-     * [MarkSettings.charShortcuts] here is only "no roots shown"; the keyboard's own rule (its labels the roots
-     * table's and roots on) is the caller's to lay over it, as SceneBoard, KeyCaps and SwipeFates do.
-     */
+    /** [MarkSettings.charShortcuts] is only "no roots shown": SceneBoard, KeyCaps and SwipeFates lay the keyboard's rule over it. */
     fun marks(state: KeyState): MarkSettings {
         if (state == marksFor) marksMade?.let { return it }
         val marks = HashMap<String, MarkContent>()
@@ -252,25 +205,19 @@ class KeyResolver(
         else -> SceneMarks.content(slot.shortcut, clock::calendar) ?: MarkContent.Empty
     }
 
-    // a character key (any but fn/'s, as the scene has it: Content) of `mark="false"` (注音's) draws and says no first of its
-    // defaults', any of a list the user set all the same (060-s6-review L4)
+    // a character key of `mark="false"` (注音's) draws and says no default first; a user list's still shows
     private fun firstHidden(id: KeyId): Boolean = facts[id]?.markOff == true && !id.isFunction && lists[id] == null
 
-    /**
-     * [templates]: by each item, the text of variables it is filled in from, null for none (empty where no item is).
-     * [unmarked]: by the index of an item marked as it is, the item it is unmarked: what it is where the engine would
-     * not turn it into Chinese punctuation anyway (English, punctuation off: 061-no-cn-punct S4).
-     */
+    /** [unmarked]: what an as-is item is where the engine would not convert it anyway (English, punctuation off). */
     private class Made(
         val items: List<Item>, val inRow: Int, val first: Item?, val focus: Int, val own: Int,
         val templates: List<String?> = emptyList(), val unmarked: Map<Int, Item> = emptyMap(),
     ) {
-        /** [items] as typed with [punctuation]: one marked as it is, itself only where its text is converted. */
+        /** One marked as it is stays itself only where its text is converted. */
         fun items(punctuation: Map<String, String>): List<Item> =
             if (unmarked.isEmpty()) items else items.mapIndexed { i, it -> unmarked[i]?.takeIf { _ -> it.text !in punctuation } ?: it }
     }
 
-    // the first as written, then the item kept of its text (none where it fills in nothing)
     private fun firstOf(user: UserList, texts: List<String>, all: List<Item?>, items: List<Item>): Item? {
         if (user.first == First.Default) return items.firstOrNull()
         val firstText = all.getOrNull(texts.indexOf(UserList.firstOf(user.first, texts)))?.text
@@ -282,13 +229,12 @@ class KeyResolver(
         val user = lists[id] ?: return d?.takeIf { it.items.isNotEmpty() }?.let(::madeOf)
         if (user.off) return null
         val row = d?.row.orEmpty()
-        // stored as typed lower case (a letter's): Shift's list has its capitals, one of variables as written
+        // stored lower case: Shift's list has its capitals, one of variables as written
         fun shown(t: String) = if (caps && user.marks[t] != ItemMark.Variables) upper(t) else t
         val texts = user.items.filterNot { skipped(id, it) }
         val commit = d?.symbols?.firstOrNull()?.commit?.takeIf { it == Commit.AsIs } ?: Commit.AsKey
         val now by lazy { clock.calendar() }
-        // each committed as the default's item of its text is, else as the default's symbols are (§3.1); one marked
-        // as it is (061-no-cn-punct), one of variables filled in now and as it is (061-text-variables §2.3)
+        // committed as the default's item of its text, else as its symbols are
         fun plain(s: String) = d?.items?.firstOrNull { it.text == s } ?: Item(s, commit)
         val all = texts.map { t ->
             val s = shown(t)
@@ -305,8 +251,7 @@ class KeyResolver(
         val templates = kept.map { i -> texts[i].takeIf { user.marks[it] == ItemMark.Variables } }.takeIf { t -> t.any { it != null } }.orEmpty()
         val unmarked = kept.withIndex().filter { (_, i) -> user.marks[texts[i]] == ItemMark.AsIs }.associate { (at, i) -> at to plain(all[i]!!.text) }
         val first = firstOf(user, texts, all, items)
-        // the row: the leading items of the default's row, or a single ASCII letter or digit (a letter of another
-        // 按键字母 or scheme); none (-1), all as symbols (060-row-unlock §1.3)
+        // the row: the default row's leading items, or a single ASCII letter or digit; none (-1), all as symbols
         val rowTexts = row.map { it.text }.toSet()
         val inRow = if (row.isEmpty()) 0 else items.takeWhile { it.text in rowTexts || own(it.text) }.size
         val focus = first?.let(items::indexOf)?.takeIf { it >= 0 } ?: 0
@@ -320,8 +265,7 @@ class KeyResolver(
         return Made(d.items, if (d.row.isEmpty()) -1 else d.row.size, d.first, focus, own)
     }
 
-    // the one exception (060-row-unlock §2): the 18 keys' L group types `;` only where the scheme does (KeyDefaults'
-    // rule), and its capital `:` is shown only there
+    // the one exception: the 18 keys' L group types `;` only where the scheme does, and shows `:` only there
     private fun skipped(id: KeyId, text: String): Boolean =
         text == ":" && variant.form == KeyboardVariant.Form.Grouped18 && !variant.semicolon && facts[id]?.letters?.contains(';') == true
 

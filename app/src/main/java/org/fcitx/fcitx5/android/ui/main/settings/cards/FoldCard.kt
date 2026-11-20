@@ -29,26 +29,18 @@ import splitties.dimensions.dp
 import splitties.resources.styledDrawable
 import com.google.android.material.R as MaterialR
 
-/**
- * A card that folds (dev/design/061-settings-cards.md §2.2, §5.1): a title row always shown — [title], what is
- * set now ([summary]), an ⓘ where it has [info], an arrow — over [content], shown while [expanded]. The title row
- * is one target and one node, a button named [title] that says its summary and whether it is open; the ⓘ is a
- * node of its own. The content scrolls inside the card when an [AccordionLayout] caps it.
- */
+/** The title row is one target and node, a button saying its summary and state; the ⓘ is its own node. */
 class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
 
     val view: MaterialCardView = settingsCard(ctx)
 
-    /** What the card holds: its owner adds to it. */
     val content = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(ctx.dp(EDGE_DP), 0, ctx.dp(EDGE_DP), ctx.dp(12))
     }
 
-    /** The title tapped (an [AccordionLayout] opens or folds the card). */
     var onTitle: (() -> Unit)? = null
 
-    /** The ⓘ tapped. */
     var onInfo: (() -> Unit)? = null
 
     private val titleView = TextView(ctx).apply {
@@ -73,7 +65,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
-    // the long hint folded behind the ⓘ, at the top of the content
     private val infoView = TextView(ctx).apply {
         text = info
         textSize = 12f
@@ -82,7 +73,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         visibility = View.GONE
     }
 
-    /** The ⓘ, where the card has [info]: a 48 dp button in the title row, said 说明. */
     val infoButton: ImageButton? = info?.let {
         ImageButton(ctx).apply {
             setImageResource(R.drawable.ic_outline_info_24)
@@ -93,7 +83,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         }
     }
 
-    /** The title row: the card's target and node. */
     val header: LinearLayout = object : LinearLayout(ctx) {
         override fun getAccessibilityClassName(): CharSequence = Button::class.java.name
 
@@ -111,7 +100,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         }
     }
 
-    // the content's own scroll: capped by the accordion when the titles stay put, else as high as the content
     private val scroll = object : NestedScrollView(ctx) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val c = cap
@@ -119,15 +107,10 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         }
     }
 
-    /** The most the content shows before it scrolls inside the card; null, all of it. Set by [applyCap]. */
     var cap: Int? = null
         private set
 
-    /**
-     * [cap] set from an [AccordionLayout]'s measure, which measures again at once: no requestLayout there (asked
-     * mid-measure, it asks for another pass up to the window). The card's views are only marked to be measured
-     * anew, their measure otherwise kept for the same spec; [AccordionLayout] marks its column.
-     */
+    /** From an [AccordionLayout]'s measure: no requestLayout (mid-measure it asks another pass up to the window). */
     internal fun applyCap(px: Int?) {
         if (cap == px) return
         cap = px
@@ -138,14 +121,12 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         }
     }
 
-    /** The content's height as measured, its scroll's: the part of the card that is not its title row. */
     val contentHeight: Int get() = if (scroll.isVisible) scroll.measuredHeight else 0
 
     var expanded: Boolean = false
         set(value) {
             field = value
-            // folded over a focused field (下滑's text, typed in, then another title tapped): the keyboard put
-            // away and the focus let go, or the keys went on typing into a field no longer shown
+            // folded over a focused field: drop focus, else the keys type into a hidden field
             if (!value) scroll.letGoOfFocusedField()
             scroll.isVisible = value
             if (!value) infoShown = false
@@ -153,7 +134,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
             say()
         }
 
-    /** The ⓘ's text shown at the top of the content. */
     var infoShown: Boolean
         get() = infoView.isVisible
         set(value) {
@@ -162,7 +142,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
 
     private var summaryText: CharSequence = ""
 
-    /** What is set now, one line by the title; [icon] before it (a command's, as the key draws it). */
     fun summary(text: CharSequence, icon: Drawable? = null) {
         summaryText = text
         summaryView.text = text
@@ -175,7 +154,6 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
         say()
     }
 
-    /** The summary as shown: a test's. */
     val summaryShown: CharSequence get() = summaryText
 
     private fun say() {
@@ -223,14 +201,7 @@ class FoldCard(ctx: Context, val title: String, info: CharSequence? = null) {
     }
 }
 
-/**
- * The key editor's cards, one open at a time ([Accordion]; §5.1), in one tree that never changes: the titles
- * stay on screen and the open card scrolls inside itself while it has [Accordion.MIN_CONTENT_DP] (× the font
- * scale) of room; with less (a phone on its side, the keyboard up) the whole scrolls, the open card uncapped.
- * Only the cap changes between the two: no view moves to another parent, so a focused field keeps its input
- * connection. The editor opens on the first card, or with all folded when the whole scrolls; after that a
- * change of room leaves the open card as it is.
- */
+/** Only the cap changes, never a parent, so a focused field keeps its input connection. */
 class AccordionLayout(ctx: Context, val cards: List<FoldCard>) : NestedScrollView(ctx) {
 
     private var accordion = Accordion(cards.size, Accordion.opening(fixedTitles = true))
@@ -239,11 +210,9 @@ class AccordionLayout(ctx: Context, val cards: List<FoldCard>) : NestedScrollVie
 
     private val minContent = (ctx.dp(Accordion.MIN_CONTENT_DP) * ctx.resources.configuration.fontScale).toInt()
 
-    /** Whether the titles stay put (the open card capped) as last measured. */
     var fixedTitles = true
         private set
 
-    // what opens decided (decide)
     private var decided = false
 
     val open: Int? get() = accordion.open
@@ -265,7 +234,6 @@ class AccordionLayout(ctx: Context, val cards: List<FoldCard>) : NestedScrollVie
         show()
     }
 
-    /** [card] holds an error: opened, whatever was. */
     fun showError(card: Int) {
         accordion.showError(card)
         show()
@@ -304,9 +272,7 @@ class AccordionLayout(ctx: Context, val cards: List<FoldCard>) : NestedScrollVie
         }
     }
 
-    // the first bounded measure decides what opens: all folded where the whole scrolls; true where that changed
-    // the cards, to be measured again at once (folded in the first layout instead, a landscape dialog kept the
-    // open card's height, empty)
+    // true where the cards changed and must be remeasured at once (folding in the first layout left an empty open card)
     private fun decide(): Boolean {
         if (decided) return false
         decided = true

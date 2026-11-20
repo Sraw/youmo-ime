@@ -4,30 +4,19 @@
  */
 package org.fcitx.fcitx5.android.engine.phrase
 
-/**
- * Where a word's emoji go among the candidates, in pinyin and the tables alike: those of the first
- * candidate's text ([EmojiData.of]), at most [MAX], after the first [AFTER], so the likeliest
- * readings stay where space and the eye are, the emoji next. An emoji is text, as a phrase is:
- * nothing is learned of it.
- */
+/** Where emoji go among pinyin and table candidates: the first candidate's ([EmojiData.of]), at most [MAX], after the first [AFTER]; never learned. */
 object EmojiCandidates {
     const val AFTER = 2
     const val MAX = 2
 
-    /**
-     * [candidates] with the emoji of the first's [text] among them, made by [make]; none if the
-     * first is not [whole] (a word of the start of the input only) or [candidates] has them all.
-     */
+    /** None if the first is not [whole] (a word from the input's start) or all are listed already. */
     fun <T> place(candidates: List<T>, emoji: (String) -> List<String>, text: (T) -> String, whole: (T) -> Boolean = { true }, make: (String) -> T): List<T> =
         placed(candidates, candidates.firstOrNull(), emoji, text, whole, make = make).first
 
     /**
-     * [candidates] with the emoji of [of] (the candidate shown first, [whole]) after the first
-     * [AFTER], and the emoji added, so what is listed of them is told, not worked out again.
-     * None added, [candidates] is returned itself, not a copy: PinyinSession.place reuses what it
-     * worked out for that list by that identity.
-     * A word [lifted] to the emoji's place (third; fourth behind a pin or behind words HabitRanker
-     * floors there, HabitRanker.LIFTED_TO) keeps it, the emoji right after it: the user's own habit before an aside (R15, user 2026-10-25).
+     * [candidates] with [of]'s emoji after the first [AFTER], plus the emoji added. With none added, returns
+     * [candidates] itself: PinyinSession.place reuses work by that identity. A word [lifted] to the emoji's
+     * place keeps it, the emoji right after: the user's habit beats an aside.
      */
     fun <T> placed(
         candidates: List<T>,
@@ -42,18 +31,13 @@ object EmojiCandidates {
         val first = of?.takeIf(whole) ?: return candidates to emptyList()
         val added = pick(text(first), emoji, phrases) { e -> candidates.any { text(it) == e } }
         if (added.isEmpty()) return candidates to added
-        // the lifted words are one run (HabitRanker.raise): a pin before it starts it a place later,
-        // several used twice take places after it; the emoji go after the whole run, never inside it
+        // the lifted words are one run (HabitRanker.raise): the emoji go after it, never inside
         var at = (AFTER..minOf(AFTER + 1, candidates.size - 1)).firstOrNull { lifted(candidates[it]) } ?: minOf(AFTER, candidates.size)
         while (at < candidates.size && lifted(candidates[at])) at++
         return candidates.subList(0, at) + added.map(make) + candidates.subList(at, candidates.size) to added
     }
 
-    /**
-     * The emoji of [word] to list, at most [MAX], none [listed] already: pinyin's and the tables' rule.
-     * Before them the texts of the built-in phrases [word] stands for ([PhraseBook.builtInsOf]: 日期's
-     * dates), all of them: placed as the emoji are, so the input methods with no `rq` have them too.
-     */
+    /** [word]'s emoji to list (at most [MAX], none [listed] already), preceded by the built-in phrases it stands for (日期's dates), so methods without `rq` get them too. */
     fun pick(word: String, emoji: (String) -> List<String>, phrases: (String) -> List<String> = { emptyList() }, listed: (String) -> Boolean): List<String> =
         phrases(word).filterNot(listed) + emoji(word).take(MAX + AFTER).filterNot(listed).take(MAX)
 }

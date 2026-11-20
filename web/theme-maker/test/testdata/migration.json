@@ -1,0 +1,286 @@
+{
+    "from": {
+        "name": "old",
+        "isDark": true,
+        "backgroundImage": {
+            "croppedFilePath": "old-cropped.png",
+            "srcFilePath": "old-src",
+            "brightness": 55,
+            "cropRect": {
+                "bottom": 1400,
+                "left": 10,
+                "right": 1090,
+                "top": 20
+            },
+            "cropRotation": 90
+        },
+        "backgroundColor": -16777216,
+        "barColor": 1275068416,
+        "keyboardColor": 0,
+        "keyBackgroundColor": 452984831,
+        "keyTextColor": -1,
+        "candidateTextColor": -1,
+        "candidateLabelColor": -1,
+        "candidateCommentColor": -1711276033,
+        "altKeyBackgroundColor": 218103807,
+        "altKeyTextColor": -1711276033,
+        "accentKeyBackgroundColor": -10577930,
+        "accentKeyTextColor": -1,
+        "keyPressHighlightColor": 520093696,
+        "keyShadowColor": 0,
+        "popupBackgroundColor": -14540254,
+        "popupTextColor": -1,
+        "spaceBarColor": 452984831,
+        "dividerColor": 536870911,
+        "clipboardEntryColor": 855638015,
+        "genericActiveBackgroundColor": -10577930,
+        "genericActiveForegroundColor": -1,
+        "version": "2.1"
+    },
+    "to": {
+        "version": "3.0",
+        "name": "old",
+        "isDark": true,
+        "palette": {
+            "backgroundColor": -16777216,
+            "barColor": 1275068416,
+            "keyboardColor": 0,
+            "keyBackgroundColor": 452984831,
+            "keyTextColor": -1,
+            "candidateTextColor": -1,
+            "candidateLabelColor": -1,
+            "candidateCommentColor": -1711276033,
+            "altKeyBackgroundColor": 218103807,
+            "altKeyTextColor": -1711276033,
+            "accentKeyBackgroundColor": -10577930,
+            "accentKeyTextColor": -1,
+            "keyPressHighlightColor": 520093696,
+            "keyShadowColor": 0,
+            "popupBackgroundColor": -14540254,
+            "popupTextColor": -1,
+            "spaceBarColor": 452984831,
+            "dividerColor": 536870911,
+            "clipboardEntryColor": 855638015,
+            "genericActiveBackgroundColor": -10577930,
+            "genericActiveForegroundColor": -1,
+            "keyBorderColor": 0,
+            "keyHintColor": -1711276033,
+            "toolbarIconColor": -1711276033
+        },
+        "picture": {
+            "src": "old-src",
+            "portrait": {
+                "file": "old-cropped.png",
+                "cropRect": {
+                    "bottom": 1400,
+                    "left": 10,
+                    "right": 1090,
+                    "top": 20
+                },
+                "rotation": 90
+            },
+            "landscape": null,
+            "brightness": 55,
+            "blurDp": 0
+        },
+        "base": {
+            "type": "picture"
+        },
+        "bar": {
+            "type": "transparent"
+        },
+        "keys": {
+            "blocks": true,
+            "radiusDp": 4,
+            "borderDp": 0,
+            "shadowDp": 1,
+            "gap": {
+                "h": 3,
+                "v": 7,
+                "hLand": 3,
+                "vLand": 4
+            },
+            "press": "tint",
+            "letter": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "function": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "space": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "enter": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "overrides": {}
+        },
+        "text": {
+            "keyFont": null,
+            "candidateFont": null,
+            "keyWeight": 400,
+            "candidateWeight": 400,
+            "keyScale": 100
+        }
+    },
+    "partialFrom": {
+        "name": "old",
+        "isDark": true,
+        "backgroundImage": {
+            "croppedFilePath": "old-cropped.png",
+            "srcFilePath": "old-src",
+            "cropRect": {
+                "left": 10,
+                "top": 20
+            }
+        },
+        "backgroundColor": -16777216,
+        "barColor": 1275068416,
+        "keyboardColor": 0,
+        "keyBackgroundColor": 452984831,
+        "keyTextColor": -1,
+        "candidateTextColor": -1,
+        "candidateLabelColor": -1,
+        "candidateCommentColor": -1711276033,
+        "altKeyBackgroundColor": 218103807,
+        "altKeyTextColor": -1711276033,
+        "accentKeyBackgroundColor": -10577930,
+        "accentKeyTextColor": -1,
+        "keyPressHighlightColor": 520093696,
+        "keyShadowColor": 0,
+        "popupBackgroundColor": -14540254,
+        "popupTextColor": -1,
+        "spaceBarColor": 452984831,
+        "dividerColor": 536870911,
+        "clipboardEntryColor": 855638015,
+        "genericActiveBackgroundColor": -10577930,
+        "genericActiveForegroundColor": -1,
+        "version": "2.1"
+    },
+    "partialTo": {
+        "version": "3.0",
+        "name": "old",
+        "isDark": true,
+        "palette": {
+            "backgroundColor": -16777216,
+            "barColor": 1275068416,
+            "keyboardColor": 0,
+            "keyBackgroundColor": 452984831,
+            "keyTextColor": -1,
+            "candidateTextColor": -1,
+            "candidateLabelColor": -1,
+            "candidateCommentColor": -1711276033,
+            "altKeyBackgroundColor": 218103807,
+            "altKeyTextColor": -1711276033,
+            "accentKeyBackgroundColor": -10577930,
+            "accentKeyTextColor": -1,
+            "keyPressHighlightColor": 520093696,
+            "keyShadowColor": 0,
+            "popupBackgroundColor": -14540254,
+            "popupTextColor": -1,
+            "spaceBarColor": 452984831,
+            "dividerColor": 536870911,
+            "clipboardEntryColor": 855638015,
+            "genericActiveBackgroundColor": -10577930,
+            "genericActiveForegroundColor": -1,
+            "keyBorderColor": 0,
+            "keyHintColor": -1711276033,
+            "toolbarIconColor": -1711276033
+        },
+        "picture": {
+            "src": "old-src",
+            "portrait": {
+                "file": "old-cropped.png",
+                "cropRect": {
+                    "bottom": -1,
+                    "left": 10,
+                    "right": -1,
+                    "top": 20
+                },
+                "rotation": 0
+            },
+            "landscape": null,
+            "brightness": 70,
+            "blurDp": 0
+        },
+        "base": {
+            "type": "picture"
+        },
+        "bar": {
+            "type": "transparent"
+        },
+        "keys": {
+            "blocks": true,
+            "radiusDp": 4,
+            "borderDp": 0,
+            "shadowDp": 1,
+            "gap": {
+                "h": 3,
+                "v": 7,
+                "hLand": 3,
+                "vLand": 4
+            },
+            "press": "tint",
+            "letter": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "function": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "space": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "enter": {
+                "fill": {
+                    "type": "color"
+                },
+                "pressed": {
+                    "type": "darken"
+                }
+            },
+            "overrides": {}
+        },
+        "text": {
+            "keyFont": null,
+            "candidateFont": null,
+            "keyWeight": 400,
+            "candidateWeight": 400,
+            "keyScale": 100
+        }
+    }
+}

@@ -38,18 +38,9 @@ import java.io.IOException
 import java.io.InputStream
 import kotlin.concurrent.thread
 
-/**
- * The app's resource packs (dev/design/060-asset-packs.md): ime-core's [PackShelf] in the
- * device-protected `files/packs` (read before the first unlock, kept by an upgrade), trusting the
- * keys this build was made with (`BuildConfig.PACK_KEYS`: a release build the release key only) and
- * requiring what its code reads (`PACK_<ID>_FORMAT`, `PACK_<ID>_MIN_VERSION`, app/packs.properties).
- *
- * Read through [AppData]; shown and imported on the 资源包 page (PacksFragment); without the text
- * pack the keyboard asks for it (PackGateView), without the voice pack voice input does (VoiceFeature).
- */
+/** In device-protected `files/packs` (read before first unlock, kept across upgrades). */
 object PackStore {
 
-    /** What is there: each pack's status, and [generation], counted up by every import that changed one. */
     class State(val statuses: Map<PackKind, PackStatus>, val generation: Int) {
         fun status(kind: PackKind): PackStatus = statuses.getValue(kind)
 
@@ -59,31 +50,26 @@ object PackStore {
     private val root: File
         get() = File(appContext.createDeviceProtectedStorageContext().filesDir, "packs")
 
-    // loaded when first asked (FcitxApplication asks off the main thread at the start): the
-    // leftovers of an import killed midway deleted, each manifest's signature checked
+    // loaded when first asked (FcitxApplication asks off the main thread at start)
     @Volatile
     private var opened: PackShelf? = null
 
     private val shelf: PackShelf
         get() = opened ?: synchronized(this) {
             opened ?: PackShelf(root, trustedKeys(), requirements()).also {
-                // leftovers deleted after, on their own thread: a main-thread wait here is the load alone
+                // leftovers deleted afterwards on their own thread, so a main-thread wait is the load alone
                 it.load(tidy = false)
                 Timber.i("packs: %s", PackKind.entries.joinToString { k -> "${k.id} ${describe(it.status(k))}" })
                 opened = it
-                // not after an import: it would delete the generation the import replaced, which the old
-                // host may still read till [changed] restarts it ([PackShelf.sweep] deletes it then). The
-                // check under the shelf's own lock, the one its import takes: an import begun after it waits
+                // not after an import: it would delete the generation the old host may read till [changed] restarts it
                 thread(name = "packs-tidy") { tidyAtStart(it) }
             }
         }
 
-    // an import begun since the start: the start's tidy left to the next start (one refused or failed
-    // too: what it left is deleted then, no harm meanwhile)
+    // an import begun since the start: the start's tidy waits for the next start
     @Volatile
     private var imported = false
 
-    /** The start's tidy of [shelf]: none once an import has [begun] ([imported]); a test's, which runs no start. */
     @VisibleForTesting
     internal fun tidyAtStart(shelf: PackShelf, begun: () -> Boolean = { imported }) = synchronized(shelf) { if (!begun()) shelf.tidy() }
 
@@ -98,41 +84,23 @@ object PackStore {
 
     fun ready(kind: PackKind) = status(kind) is PackStatus.Ready
 
-    /** The directory of [kind]'s files, if ready; else null. */
     fun dir(kind: PackKind): File? = shelf.dir(kind)
 
-    /** Loads the shelf now: on a worker at the app's start, so the keyboard's first look need not wait on it. */
     fun warmUp() {
         mutableState.value
     }
 
-    /**
-     * Tests: [shelf] in place of the device's, as if just loaded (the keyboard's tests one with both
-     * packs, KeyboardHarness; the gate's, one without the text pack). The engine is not restarted.
-     */
     @VisibleForTesting
     fun useShelf(shelf: PackShelf) {
         opened = shelf
         mutableState.value = State(snapshot(), mutableState.value.generation + 1)
     }
 
-    /**
-     * Whether [verifyInBackground] runs: not in the JVM tests (app/build.gradle.kts sets
-     * `youmo.packs.verify=off`), where a thread reading packs 30 s after a test's start would land
-     * in another's; PacksUatTest calls [verifyDue] itself.
-     */
+    /** Off in JVM tests: a thread reading packs 30 s after a test's start would land in another. */
     @VisibleForTesting
     var verifiesInBackground = System.getProperty("youmo.packs.verify") != "off"
 
-    /**
-     * The packs in use read through when due ([PackShelf.due]: the first start after an import,
-     * then every 30 days; a start reads their sizes only), on a thread of the lowest priority,
-     * [VERIFY_AFTER_MS] after the start: not competing with the keyboard's first look. Hundreds of
-     * MB read, so the 30 days' read waits for the phone to be charging (checked every
-     * [CHARGING_POLL_MS] while the process lives); the first one after an import does not wait. One
-     * found damaged is not used (the keyboard's gate, the page say 已损坏，请重新导入), the engine
-     * made anew without it.
-     */
+    /** The 30-day read (hundreds of MB) waits for charging; the post-import one does not. */
     fun verifyInBackground() {
         if (!verifiesInBackground) return
         thread(name = "packs-verify", priority = Thread.MIN_PRIORITY, isDaemon = true) {
@@ -146,10 +114,7 @@ object PackStore {
         }
     }
 
-    /**
-     * [verifyInBackground]'s one pass, now, on this thread: each pack due read through, one due
-     * only for its age only if [charging]. True if one is left waiting for the charger.
-     */
+    /** True if one is left waiting for the charger. */
     @VisibleForTesting
     fun verifyDue(charging: () -> Boolean): Boolean {
         var waiting = false
@@ -164,13 +129,11 @@ object PackStore {
         return waiting
     }
 
-    /** Every pack in use read through, due or not, now, on this thread: true if one was found damaged. */
     @VisibleForTesting
     fun verifyNow(): Boolean {
         return damaged(PackKind.entries.filter { shelf.verify(it) })
     }
 
-    // [kinds] found damaged by a read through: said, and the rest told; true if any
     private fun damaged(kinds: List<PackKind>): Boolean {
         if (kinds.isEmpty()) return false
         Timber.w("resource packs damaged: %s", kinds.joinToString { it.id })
@@ -178,21 +141,12 @@ object PackStore {
         return true
     }
 
-    // generations already read through after a failure of the host on them, this process: an
-    // engine's failure that is no pack's (a bug) does not cost a read of hundreds of MB at each
+    // per process: a non-pack engine failure (a bug) does not cost a read of hundreds of MB each time
     private val readAfterFailure = HashSet<File>()
 
     /**
-     * The host failed on [kind]'s pack ([e]: an engine that could not load, its start that threw):
-     * its files read through now, on the caller's thread (the host's), before the keyboard asks
-     * for them again, so a pack damaged since its last read is [PackStatus.Damaged] (the gate, not
-     * an engine failing at each start, a process ending at each start). Not for a pack missing
-     * ([PackUnavailableException]); once a generation a process; nor for one read through in the
-     * last [RECENTLY_MS] or since this process started ([processStartedAt]): a start failing at
-     * each start (a crash loop) does not read hundreds of MB at each. Found damaged, what reads the
-     * pack looks again by [state], and the host is restarted ([restartHost]) on a thread of its
-     * own: its engines loaded before stop using the damaged files. Not on this one, the host's
-     * (restartIfRunning waits for the host it would be stopping). True if found damaged.
+     * A pack damaged since its last read becomes [PackStatus.Damaged] (the gate) rather than an engine failing at each
+     * start. Limited so a crash loop does not read hundreds of MB each time; restarted off the host's thread (it waits).
      */
     fun verifyAfterFailure(kind: PackKind, e: Throwable): Boolean {
         if (e.causes().any { it is PackUnavailableException }) return false
@@ -218,13 +172,12 @@ object PackStore {
             } catch (@Suppress("TooGenericExceptionCaught") t: RuntimeException) {
                 Timber.e(t, "host not restarted after a pack found damaged")
             }
-            // counted after the restart, as changed() does: the keyboard's field focused again on the new host, not the one going
+            // counted after the restart, as changed() does: the field refocuses on the new host
             mutableState.update { State(snapshot(), it.generation + 1) }
         }
         return true
     }
 
-    /** Tests: when this process started, epoch ms (as the clock reads now: the boot's elapsed time the base). */
     @VisibleForTesting
     var processStartedAt: () -> Long = {
         System.currentTimeMillis() - (SystemClock.elapsedRealtime() - Process.getStartElapsedRealtime())
@@ -233,14 +186,7 @@ object PackStore {
     private fun charging(): Boolean =
         appContext.getSystemService(Context.BATTERY_SERVICE)?.let { (it as BatteryManager).isCharging } == true
 
-    /**
-     * [uri] (a file the user picked) imported; [progress] told on the worker as it copies. A pack older than
-     * the one there replaces it only if [replaceNewer] (its manifest, the one there's) says so, asked before
-     * anything is copied (pending L8: a few hundred MB put in by a wrong tap in the downloads); else kept. One
-     * this build cannot use is not asked about: refused as [Refusal.Incompatible] as any other.
-     * With a pack there the file is opened twice (its head, then the import): a provider whose stream
-     * opens only once is refused as unreadable then.
-     */
+    /** [replaceNewer] is asked before copying (hundreds of MB by a wrong tap). A stream that opens once is refused with a pack there. */
     suspend fun import(
         resolver: ContentResolver,
         uri: Uri,
@@ -249,15 +195,13 @@ object PackStore {
     ): ImportResult =
         withContext(Dispatchers.IO) {
             try {
-                // its head only, read once more by the import: what it would replace known first. Nothing
-                // there, nothing to replace: the file opened once (a provider that gives its stream only once)
+                // the head only, read again by the import; with nothing installed the file is opened once
                 val manifest = if (PackKind.entries.none { shelf.installed(it) != null }) {
                     null
                 } else {
                     resolver.openInputStream(uri)?.use { shelf.manifestOf(it.buffered(BUFFER)) }
                 }
-                // one this build cannot use is not offered as the replacement: the import below refuses it at
-                // once, as it did only after 替换 (UAT 0.6.1)
+                // one this build cannot use is not offered: the import below refuses it at once
                 val newer = manifest?.takeIf(shelf::usable)?.let { shelf.installed(it.kind) }?.takeIf { it.version > manifest.version }
                 if (manifest != null && newer != null && !replaceNewer(manifest, newer)) {
                     return@withContext ImportResult.KeptNewer(manifest, newer).also { Timber.i("pack import: %s", describe(it)) }
@@ -271,14 +215,13 @@ object PackStore {
             }
         }
 
-    /** [input] imported, one import at a time; the settings page's, and the debug build's UAT import. */
     suspend fun import(input: InputStream, progress: (Long, Long) -> Unit = { _, _ -> }): ImportResult = importing.withLock {
         withContext(Dispatchers.IO) {
             imported = true
             val result = shelf.import(input.buffered(BUFFER), progress)
             Timber.i("pack import: %s", describe(result))
             if (result is ImportResult.Imported) {
-                // imported whatever comes of telling the rest: the pack is in use from the next start
+                // imported whatever comes of telling the rest: in use from the next start
                 try {
                     changed(listOf(result.manifest.kind))
                 } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
@@ -289,17 +232,11 @@ object PackStore {
         }
     }
 
-    /** Tests: what restarts the host after a change ([HostDaemon.restartIfRunning]); true once it is up anew. */
     @VisibleForTesting
     var restartHost: () -> Boolean = HostDaemon::restartIfRunning
 
-    // [kinds] changed: the engine made anew on the new files if the text pack is among them; whatever
-    // reads the packs looks again ([state]'s generation, or [dir] asked again)
     private fun changed(kinds: List<PackKind>) {
-        // the host restarted first: its engines (mapped on the old pack, or not made without one)
-        // made anew. The state after it, so what the keyboard queues on it (its field focused again)
-        // waits for the new host, not the one going. A restart that throws is no reason not to count.
-        // The host reads no voice pack: a voice pack's change does not restart it (and lose what is being composed)
+        // the host restarts first, so engines are remade on the new pack. The host reads no voice pack: no restart to lose composing
         val restartsHost = PackKind.TEXT in kinds
         val restarted = restartsHost && try {
             restartHost()
@@ -307,11 +244,9 @@ object PackStore {
             Timber.e(e, "host not restarted after a pack change")
             false
         }
-        // an import and a verify may both count: neither count lost
+        // an import and a verify may both count: neither lost
         mutableState.update { State(snapshot(), it.generation + 1) }
-        // the generation replaced, once the host is up on the new one (restartIfRunning waits for
-        // it, if restarted) and the rest told to look again: a file of it opened only now would have been gone.
-        // A host not up anew in time may still read it: left for the next start's load
+        // a host not up in time may still read the replaced generation, so it is left for the next start's load
         if (restarted || !restartsHost) shelf.sweep()
     }
 
@@ -325,7 +260,7 @@ object PackStore {
         PackKind.VOICE to PackRequirement(BuildConfig.PACK_VOICE_FORMAT, BuildConfig.PACK_VOICE_MIN_VERSION),
     )
 
-    // for the log: no paths, no names of the user's
+    // for the log: no paths, no user names
     private fun describe(status: PackStatus) = when (status) {
         PackStatus.Missing -> "missing"
         is PackStatus.Ready -> "v${status.manifest.version} (format ${status.manifest.format})"

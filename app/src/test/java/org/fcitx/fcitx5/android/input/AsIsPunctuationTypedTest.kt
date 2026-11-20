@@ -9,19 +9,14 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.HostApi
-import org.fcitx.fcitx5.android.core.HostConfig
 import org.fcitx.fcitx5.android.core.KotlinHost
-import org.fcitx.fcitx5.android.core.keyboardOn
-import org.fcitx.fcitx5.android.core.startedHost
+import org.fcitx.fcitx5.android.core.tinyEngineSide
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.runtime.Engines
-import org.fcitx.fcitx5.android.engine.runtime.EnginesHost
-import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.fcitx.fcitx5.android.input.keys.KeyLists
@@ -29,11 +24,9 @@ import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.keys.KeyId
-import org.fcitx.fcitx5.android.until as waitUntil
-import org.fcitx.fcitx5.android.utils.appContext
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -42,27 +35,23 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
-import java.util.concurrent.Executor
 
-/**
- * A long press's `.` marked 不转中文标点 (061-no-cn-punct, uat KB-98–100) typed through the Kotlin host to a real engine
- * (a tiny dictionary): `.` under Chinese punctuation, the candidate first while pinyin is typed; English's the same
- * marked or not.
- */
+/** A long press's `.` marked 不转中文标点, through the host to a tiny real engine; the candidate goes first while pinyin is typed. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class AsIsPunctuationTypedTest {
 
-    private lateinit var home: File
-    private lateinit var fcitx: KotlinHost
-    private lateinit var h: KeyboardHarness
+    @get:Rule
+    val host = HostKeyboardRule("as-is") {
+        internal.keyLists.setValue(listsWere)
+        internal.keySwipes.setValue(swipesWere)
+    }
+    private val h get() = host.h
+    private val fcitx get() = host.fcitx
     private val internal get() = AppPrefs.getInstance().internal
     private var listsWere = ""
     private var swipesWere = ""
-
-    // a host and keyboard up, to close
-    private var up = false
 
     private val pinyin = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
@@ -78,24 +67,13 @@ class AsIsPunctuationTypedTest {
         .build()
         .toByteArray()
 
-    private fun side(home: File) = object : KotlinHost.EngineSide {
-        val engines = Engines(
-            blobs = { path ->
-                when (path) {
-                    InputMethodCatalog.PINYIN_DATA -> ByteBuffer.wrap(pinyin)
-                    InputMethodCatalog.ENGLISH_DATA -> ByteBuffer.wrap(english)
-                    else -> throw FileNotFoundException(path)
-                }
-            },
-            userDir = null,
-            warmUps = Executor(Runnable::run),
-        )
-        override val host: EngineHost = EnginesHost(engines)
-        override fun data() = HostConfig(File(home, "data"), writable = true)
-        override fun config() = HostConfig(File(home, "config"), writable = true)
-        override fun start() = Unit
-        override fun close() = Unit
-    }
+    private fun side(home: File) = tinyEngineSide(home, { path ->
+        when (path) {
+            InputMethodCatalog.PINYIN_DATA -> ByteBuffer.wrap(pinyin)
+            InputMethodCatalog.ENGLISH_DATA -> ByteBuffer.wrap(english)
+            else -> throw FileNotFoundException(path)
+        }
+    })
 
     @Before
     fun keep() {
@@ -103,48 +81,30 @@ class AsIsPunctuationTypedTest {
         swipesWere = internal.keySwipes.getValue()
     }
 
-    @After
-    fun tearDown() {
-        if (up) {
-            h.close()
-            fcitx.stop()
-            home.deleteRecursively()
-            up = false
-        }
-        internal.keyLists.setValue(listsWere)
-        internal.keySwipes.setValue(swipesWere)
-    }
-
-    private fun until(what: String, state: () -> String = { "" }, done: () -> Boolean) =
-        waitUntil(what, state, step = { h.idle() }, done = done)
-
-    // the comma key's list `.` `,` `?`, `.` marked where [marked], its first where [first]
     private fun commaList(marked: Boolean, first: String? = null) {
         val list = UserList(false, listOf(".", ",", "?"), first?.let(First::Literal) ?: First.Default, if (marked) mapOf("." to ItemMark.AsIs) else emptyMap())
         internal.keyLists.setValue(KeyLists.of(mapOf(KeyId("fn/comma") to list)).serialize())
     }
 
-    // the host's answers to select and reset in before the job could wait on them, as on a loaded machine: the job,
-    // on the main thread here, went on at once and put its text in ahead of the engine's commit still on its way (.你)
+    // the host answers before the job can wait, as on a loaded machine: the job once put its text ahead of the engine's commit (.你)
     private fun answeringAtOnce(host: KotlinHost): HostApi = object : HostApi by host {
         override suspend fun select(idx: Int, text: String?) = runBlocking { host.select(idx, text) }
         override suspend fun reset(drop: Boolean) = runBlocking { host.reset(drop) }
     }
 
     private fun on(im: String, atOnce: Boolean = false) {
-        home = File(appContext.filesDir, "as-is").apply { deleteRecursively() }
-        // the unit tests have no assets, the built-in table with them: the marks it converts as the user's table
-        File(home, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }.writeText(". 。\n, ，\n? ？\n( （\n) ）\n")
-        fcitx = startedHost(side(home))
-        h = keyboardOn(fcitx, if (atOnce) answeringAtOnce(fcitx) else fcitx)
-        up = true
+        host.up({ home ->
+            // unit tests have no assets: the marks it converts as the user's table
+            File(home, "data/punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }.writeText(". 。\n, ，\n? ？\n( （\n) ）\n")
+            side(home)
+        }) { if (atOnce) answeringAtOnce(it) else it }
         h.start()
         h.service.postFcitxJob {
             setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH))
             activateIme(im)
         }
-        until(im) { fcitx.inputMethodEntryCached.uniqueName == im }
-        until("its keys") {
+        host.until(im) { fcitx.inputMethodEntryCached.uniqueName == im }
+        host.until("its keys") {
             h.relayout()
             comma() != null
         }
@@ -155,9 +115,8 @@ class AsIsPunctuationTypedTest {
 
     private fun typeLetters(word: String) {
         for (c in word) h.tap(h.keys().first { it.label.equals(c.toString(), ignoreCase = true) })
-        // pinyin's in the preedit, English's in the field as it is composed: all of it, the host past the last key
-        // (its first letter alone shown, the next was still on its way as the case went on to the long press)
-        until("$word typed", { "preedit [${fcitx.inputPanelCached.preedit}] field [${h.field.text}]" }) {
+        // all of it, the host past the last key (once only the first letter showed when the long press came)
+        host.until("$word typed", { "preedit [${fcitx.inputPanelCached.preedit}] field [${h.field.text}]" }) {
             fcitx.inputPanelCached.preedit.toString() == word || h.field.text.toString() == word
         }
     }
@@ -168,9 +127,8 @@ class AsIsPunctuationTypedTest {
         commaList(marked = true)
         on(InputMethodCatalog.PINYIN)
         val shown = h.longPress(comma()!!, pick = ".")
-        // drawn as typed: the marked one as it is, the others as the punctuation
         assertEquals(setOf(".", "，", "？"), shown.toSet())
-        until("typed", { h.field.text.toString() }) { h.field.text.isNotEmpty() }
+        host.until("typed", { h.field.text.toString() }) { h.field.text.isNotEmpty() }
         assertEquals(".", h.field.text.toString())
     }
 
@@ -181,18 +139,16 @@ class AsIsPunctuationTypedTest {
         on(InputMethodCatalog.PINYIN)
         typeLetters("ni")
         h.longPress(comma()!!, pick = ".")
-        until("你. typed", { h.field.text.toString() }) { h.field.text.toString() == "你." }
+        host.until("你. typed", { h.field.text.toString() }) { h.field.text.toString() == "你." }
     }
 
-    // the job's host calls done before it waited on them: the candidate, which the engine's commit puts in, still first
-    // (the .你 order race fixed in d8876b6e6)
     @Test
     fun theCandidateGoesFirstWhenTheHostAnswersAtOnce() {
         commaList(marked = true)
         on(InputMethodCatalog.PINYIN, atOnce = true)
         typeLetters("ni")
         h.longPress(comma()!!, pick = ".")
-        until("both typed", { h.field.text.toString() }) { h.field.text.length == 2 }
+        host.until("both typed", { h.field.text.toString() }) { h.field.text.length == 2 }
         assertEquals("你.", h.field.text.toString())
     }
 
@@ -204,7 +160,7 @@ class AsIsPunctuationTypedTest {
         on(InputMethodCatalog.PINYIN)
         typeLetters("ni")
         h.swipe(comma()!!, 0f, -comma()!!.height * 1.3f)
-        until("你. typed", { h.field.text.toString() }) { h.field.text.toString() == "你." }
+        host.until("你. typed", { h.field.text.toString() }) { h.field.text.toString() == "你." }
     }
 
     @Test
@@ -214,10 +170,9 @@ class AsIsPunctuationTypedTest {
         on(InputMethodCatalog.PINYIN)
         typeLetters("ni")
         h.longPress(comma()!!, pick = "。")
-        until("你。 typed", { h.field.text.toString() }) { h.field.text.toString() == "你。" }
+        host.until("你。 typed", { h.field.text.toString() }) { h.field.text.toString() == "你。" }
     }
 
-    // review S4: English types the same, a word just typed or not, marked or not
     @Test
     @Uat("KB-100")
     fun englishTypesTheSameMarkedOrNot() {
@@ -227,24 +182,21 @@ class AsIsPunctuationTypedTest {
             if (word) typeLetters("hello")
             h.longPress(comma()!!, pick = ".")
             h.idle()
-            until("typed", { h.field.text.toString() }) { "." in h.field.text && fcitx.inputPanelCached.preedit.isEmpty() }
+            host.until("typed", { h.field.text.toString() }) { "." in h.field.text && fcitx.inputPanelCached.preedit.isEmpty() }
             h.after(200)
-            return h.field.text.toString().also { tearDown() }
+            return h.field.text.toString().also { host.down() }
         }
         for (word in listOf(false, true)) assertEquals("a word typed: $word", typed(marked = false, word), typed(marked = true, word))
     }
 
-    // the comma key's list `(` `,` `?`, `(` marked 原样 where [marked]
     private fun bracketList(marked: Boolean) {
         val list = UserList(false, listOf("(", ",", "?"), First.Default, if (marked) mapOf("(" to ItemMark.AsIs) else emptyMap())
         internal.keyLists.setValue(KeyLists.of(mapOf(KeyId("fn/comma") to list)).serialize())
     }
 
-    // the field with | at the cursor
     private fun shown() = h.field.text.toString().let { t -> t.substring(0, h.field.selectionStart) + "|" + t.substring(h.field.selectionStart) }
 
-    // FB9: an item typed as it is (原样) goes in paired as one typed through the engine does, after the candidate;
-    // Backspace in the empty pair takes both
+    // 原样 goes in paired as one typed through the engine, after the candidate; Backspace in the empty pair takes both
     @Test
     @Uat("KB-110")
     fun aMarkedBracketGoesInPairedAfterTheCandidate() {
@@ -252,17 +204,16 @@ class AsIsPunctuationTypedTest {
         on(InputMethodCatalog.PINYIN)
         // nothing typed: committed by the service itself, not through the engine
         h.longPress(comma()!!, pick = "(")
-        until("() typed", { shown() }) { shown() == "(|)" }
+        host.until("() typed", { shown() }) { shown() == "(|)" }
         h.tap(h.keyWithId(R.id.button_backspace)!!)
-        until("the pair gone", { shown() }) { shown() == "|" }
+        host.until("the pair gone", { shown() }) { shown() == "|" }
         typeLetters("ni")
         h.longPress(comma()!!, pick = "(")
-        until("你() typed", { "${shown()} preedit [${fcitx.inputPanelCached.preedit}]" }) { shown() == "你(|)" }
+        host.until("你() typed", { "${shown()} host.preedit [${fcitx.inputPanelCached.preedit}]" }) { shown() == "你(|)" }
         h.tap(h.keyWithId(R.id.button_backspace)!!)
-        until("the pair gone", { shown() }) { shown() == "你|" }
+        host.until("the pair gone", { shown() }) { shown() == "你|" }
     }
 
-    // English types it the same, marked (committed as it is) or not (through the engine)
     @Test
     @Uat("KB-111")
     fun englishPairsTheBracketMarkedOrNot() {
@@ -270,9 +221,9 @@ class AsIsPunctuationTypedTest {
             bracketList(marked)
             on(InputMethodCatalog.ENGLISH)
             h.longPress(comma()!!, pick = "(")
-            until("typed", { shown() }) { "(" in h.field.text }
+            host.until("typed", { shown() }) { "(" in h.field.text }
             h.after(200)
-            return shown().also { tearDown() }
+            return shown().also { host.down() }
         }
         assertEquals("(|)", typed(marked = false))
         assertEquals("(|)", typed(marked = true))

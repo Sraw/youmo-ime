@@ -167,13 +167,13 @@
 - **前提**：B0，展开竖拿（673×841 dp）；**键盘高度** 跟随主题（内置主题是标准）。
 - **操作**：回测试页点「普通文本」框，看键盘；转成横拿再看。
 - **预期**：竖拿时键盘按横屏排：字母分体，间距是横屏的；高度和横拿一样（标准档键区 4 × 56 dp，键盘约 312 dp 含导航条），不是竖屏的 30%（约 252 dp）。
-- **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`（673×841 dp 竖拿：横屏、大屏、键区 4 × 56 dp、主题 `@landscape`、自动分体、设置页的一对屏两个都是横屏）、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`（841×673 dp 横拿：同样 4 × 56 dp）、`WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright`（展开候选的列数取横屏那个设置）；设备上看一次（`wm size 1767x2208` + `wm density 420`）。
+- **JVM**：`WideScreenUatTest.anUnfoldedFoldableUprightIsLaidOutTurned`（673×841 dp 竖拿：横屏、大屏、键区 4 × 56 dp、主题 `@landscape`、自动分体、设置页的一对屏两个都是横屏）、`WideScreenUatTest.theUnfoldedFoldableTurnedIsAsHigh`（841×673 dp 横拿：同样 4 × 56 dp）、`WideScreenUatTest.theExpandedCandidatesTakeTheTurnedColumnsUpright`（展开候选是横屏的 8 列）；设备上看一次（`wm size 1767x2208` + `wm density 420`）。
 
 ### LS-34 [P1] 折叠屏外屏、手机竖拿不变
 - **前提**：B0，外屏（412 dp 宽）或普通手机竖拿。
 - **操作**：回测试页点「普通文本」框，看键盘。
 - **预期**：和 0.6.0 一样：竖屏的高度（标准档屏高 30%）、间距，字母不分体。
-- **JVM**：`WideScreenUatTest.theOuterScreenIsAPhoneUprightAsBefore`（412×891 dp：不是横屏、屏高 30%、没有 `@landscape`、不分体）、`WideScreenUatTest.theOuterScreensExpandedCandidatesTakeTheUprightColumns`（展开候选的列数取竖屏那个设置）；设备上不跑。
+- **JVM**：`WideScreenUatTest.theOuterScreenIsAPhoneUprightAsBefore`（412×891 dp：不是横屏、屏高 30%、没有 `@landscape`、不分体）、`WideScreenUatTest.theOuterScreensExpandedCandidatesTakeTheUprightColumns`（展开候选是竖屏的 6 列）；设备上不跑。
 
 ### LS-35 [P1] 打开键盘时折叠、展开马上重排
 - **前提**：折叠屏模拟器（或用 `wm size` 在 412 dp 宽和 673 dp 宽之间换），B0，外屏。
@@ -257,7 +257,7 @@
 - **前提**：常见手机（1080×2340@440，393×851 dp），B0；宿主是 webview_shell 打开 uat 的测试页 `fields.html`。
 - **操作**：横屏，点 textarea；三键导航、手势导航各看一次；手势导航时打 `nihao` 不选。
 - **预期**：三键导航时键盘约 232 dp、每行约 48 dp、应用窗口约 137 dp（网页 innerHeight 约 65）；手势导航时键盘约 249 dp、每行约 40 dp、应用窗口至少 120 dp（网页至少 48）。打拼音时浮在上方的编码行盖住应用最下面 18 dp，输入框所在那一行仍看得见。
-- **JVM**：ime-core `KeyboardHeightCapTest.whereTheFloorBindsTheKeysGiveWay`（可用 321 dp → 键区 161）、app `ImeRoomViewTest.theAppKeeps120dpUnderEachBackground`、`ImeRoomViewTest.theBarsInsetsComingWorkTheKeysOutAgain`（导航条的高后到时按键重算，差 1 dp 以内不重算）；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
+- **JVM**：ime-core `KeyboardHeightCapTest.whereTheFloorBindsTheKeysGiveWay`（可用 321 dp → 键区 161）、app `ImeRoomViewTest.theAppKeeps120dpUnderTheBar`、`ImeRoomViewTest.theBarsInsetsComingWorkTheKeysOutAgain`（导航条的高后到时按键重算，差 1 dp 以内不重算）；设备上的数是 2026-11-14 在模拟器上量的（API 29/33/34/36，见 061-landscape-height-impl-report），不在每次 UAT 里跑。
 
 ### LS-48 [P1] 横屏「很高」
 - **前提**：同 LS-47，**键盘高度** 选"很高"。

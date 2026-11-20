@@ -18,11 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
-/**
- * A key tapped off-centre in a table (061-neighbour-table): read as the key next to it only where
- * it would make an empty code (空码) or commit a code (顶字) and that key leads on; a code with
- * entries, and typing on target, as without a place; a code so read never commits itself.
- */
+/** A key tapped off-centre in a table is read as its neighbour only for an empty code or a 顶字, and never commits the code. */
 class TableSlipTest {
 
     // a QWERTY key 36 by 50 dp: w left of e, r right of it, d below
@@ -45,14 +41,11 @@ class TableSlipTest {
     @Test
     @Uat("TBL-54")
     fun aKeyThatMakesAnEmptyCodeIsReadAsTheOneItsTapLeansTo() {
-        // abe leads nowhere; the tap at e's right edge, toward r
         val (_, s) = session().tap("ab", 'e', e(0.45f))
         assertEquals("abr", s.preedit)
         assertEquals(listOf("甲", "甲甲"), s.candidates)
-        // toward w the other way, toward d down
         assertEquals("abw", session().tap("ab", 'e', e(-0.45f)).second.preedit)
         assertEquals("abd", session().tap("ab", 'e', e(0.1f, 0.45f)).second.preedit)
-        // a tap in the key's middle: as typed
         assertEquals("abe", session().tap("ab", 'e', e(0f)).second.preedit)
         // the slips off (纠正错拼和按偏的键): the empty code as typed, which a space drops
         val off = session(slips = false)
@@ -68,7 +61,6 @@ class TableSlipTest {
         val nowhereRight = dictionary("ab 丙", "abw 乙", "abww 乙乙", "abd 丁", "abdd 丁丁")
         // r would be nearer, but abr leads nowhere: the next nearest that leads on
         assertEquals("abd", session(dictionary = nowhereRight).tap("ab", 'e', e(0.45f, 0.35f)).second.preedit)
-        // none around leads on: the empty code as typed
         val none = dictionary("ab 丙", "abc 甲")
         assertEquals("abe", session(dictionary = none).tap("ab", 'e', e(0.45f)).second.preedit)
     }
@@ -103,17 +95,14 @@ class TableSlipTest {
     @Uat("TBL-55")
     fun theWildcardIsNeverReadAsAnotherKey() {
         val wild = TableOptions(noMatchAutoSelectLength = 0, matchingKey = 'z')
-        // a code with the wildcard in it: as typed
         assertEquals("aze", session(wild).tap("az", 'e', e(0.49f)).second.preedit)
     }
 
     // 五笔's way (顶字): a key leading nowhere commits the first candidate and starts the next code
     private val wubi = dictionary("w 人", "wq 你", "wqiy 你", "wqvb 你好", "o 火", "oo 炎", "u 立", "uu 闭", "y 主")
 
-    // o tapped toward i on its left, [dx] across it
     private fun oTowardI(dx: Float) = Touch(dx, 0f, 36f, 50f, listOf(Near('i', -1f, 0f), Near('p', 1f, 0f)))
 
-    // u tapped toward y on its left
     private fun uTowardY(dx: Float) = Touch(dx, 0f, 36f, 50f, listOf(Near('y', -1f, 0f), Near('i', 1f, 0f)))
 
     private fun language(): TableLanguage = handwritingData.let { TableLanguage(TextWords(it.model, it.wordIndex)) }
@@ -131,12 +120,10 @@ class TableSlipTest {
         val (nearer, after) = session(TableOptions.WUBI, dictionary = wubi).tap("wq", 'o', oTowardI(-0.44f))
         assertEquals("", nearer)
         assertEquals("wqi", after.preedit)
-        // at the very edge toward i: wqi, nothing committed
         val (edge, read) = session(TableOptions.WUBI, dictionary = wubi).tap("wq", 'o', oTowardI(-0.49f))
         assertEquals("", edge)
         assertEquals("wqi", read.preedit)
-        // a part of a code showing a character first (wqi: 他 of wqii), then the next code's key: the same, a tap
-        // off-centre (i costing −1.13, read under the empty code's −1.5) is the next code's
+        // i's slip (−1.13) is read under the empty code's −1.5, so it is the next code's
         val (part, next) = session(TableOptions.WUBI, dictionary = wubi).tap("wqi", 'o', oTowardI(-0.3f))
         assertEquals("他", part)
         assertEquals("o", next.preedit)
@@ -159,7 +146,6 @@ class TableSlipTest {
         val (commit, s) = TableSession(rare, TableOptions.WUBI, language = language(), slips = TableSlips.SLIPS).tap("wq", 'o', oTowardI(-0.49f))
         assertEquals("人", commit)
         assertEquals("o", s.preedit)
-        // the other way round: wqi read
         val common = dictionary("wq 夔", "wqiy 人", "o 火", "oo 炎")
         val (none, read) = TableSession(common, TableOptions.WUBI, language = language(), slips = TableSlips.SLIPS).tap("wq", 'o', oTowardI(-0.49f))
         assertEquals("", none)
@@ -199,7 +185,6 @@ class TableSlipTest {
         // Backspace as after a key that tops (顶字): the key's code goes, then the field's
         assertEquals("", session.apply(Backspace).preedit)
         assertFalse(session.apply(Backspace).handled)
-        // a key that goes on (abd's d): no commit
         val on = session(full, dictionary = dictionary("ab 丙", "abw 乙", "abwd 乙丁", "d 丁"))
         on.tap("ab", 'e', e(-0.45f))
         assertEquals("", on.apply(Key('d')).commit)
@@ -218,7 +203,6 @@ class TableSlipTest {
         val s = session.apply(Key('r'))
         assertEquals("", s.commit)
         assertEquals("abrr", s.preedit)
-        // it waits: a key that cannot go on commits it
         assertEquals("甲甲", session.apply(Key('x')).commit)
     }
 
@@ -306,7 +290,6 @@ class TableSlipTest {
         val erbi = dictionary("ab 丙", "abr 甲", "abp 乙", "r 白", "e 月", "ee 朋")
         // ab is a whole code, but 二笔 tops nothing: e off-centre is read at the floor of an empty code
         assertEquals("abr", session(TableOptions.ERBI, dictionary = erbi).tap("ab", 'e', e(0.3f)).second.preedit)
-        // where the table tops (五笔), the same tap is the next code's
         assertEquals("丙", session(TableOptions.WUBI, dictionary = erbi).tap("ab", 'e', e(0.3f)).first)
         // [ (拼音反查) at its edge toward p: no key of the codes, never read; it commits what is typed, the app's
         val bracket = Touch(-0.49f, 0f, 36f, 50f, listOf(Near('p', -1f, 0f), Near(']', 1f, 0f)))

@@ -2,27 +2,17 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>ComplexCondition:IdleUi.kt:IdleUi$!fromUser || disableAnimation || (state == State.InlineSuggestion || currentState == State.InlineSuggestion) || (state == State.NumberRow || currentState == State.NumberRow)</ID>
-    <ID>ComplexCondition:PopupKeyboardUi.kt:PopupKeyboardUi$newRow &lt; -2 || newRow &gt; rowCount + 1 || newColumn &lt; -2 || newColumn &gt; columnCount + 1</ID>
     <ID>CyclomaticComplexMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
-    <ID>CyclomaticComplexMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
     <ID>CyclomaticComplexMethod:EditingSessionOverRealEditorTest.kt:EditingSessionOverRealEditorTest$@Test fun randomSessions</ID>
     <ID>CyclomaticComplexMethod:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
-    <ID>CyclomaticComplexMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
-    <ID>CyclomaticComplexMethod:StatusIconMapping.kt:StatusIconMapping$@DrawableRes fun fromEntry: Int</ID>
     <ID>LargeClass:FcitxInputMethodService.kt:FcitxInputMethodService : LifecycleInputMethodService</ID>
     <ID>LongMethod:CapabilityFlag.kt:CapabilityFlags.Companion$fun fromEditorInfo: CapabilityFlags</ID>
-    <ID>LongMethod:ConfigDescriptor.kt:ConfigDescriptor.Companion$override fun parse: Either&lt;ParseException, ConfigDescriptor&lt;*, *&gt;&gt;</ID>
-    <ID>LongMethod:PreferenceScreenFactory.kt:PreferenceScreenFactory$private fun general</ID>
     <ID>LoopWithTooManyJumpStatements:GridDecoration.kt:GridDecoration$for</ID>
     <ID>NestedBlockDepth:FcitxInputMethodService.kt:FcitxInputMethodService$private fun handleFcitxEvent</ID>
-    <ID>NestedBlockDepth:StatusAreaWindow.kt:StatusAreaWindow.&lt;no name provided&gt;$override fun onItemClick</ID>
     <ID>TooGenericExceptionCaught:ClipboardManager.kt:ClipboardManager$exception: Exception</ID>
     <ID>TooGenericExceptionCaught:DeveloperFragment.kt:DeveloperFragment$e: Exception</ID>
     <ID>TooGenericExceptionCaught:PinyinDictionaryFragment.kt:PinyinDictionaryFragment$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:PreferenceScreenFactory.kt:PreferenceScreenFactory$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RecentlyUsed.kt:RecentlyUsed$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:ScrollbarDrawable.kt:e: Exception</ID>
     <ID>TooGenericExceptionCaught:ThemeListFragment.kt:ThemeListFragment$e: Exception</ID>
   </CurrentIssues>
 </SmellBaseline>

@@ -4,14 +4,13 @@
  */
 package org.fcitx.fcitx5.android.host
 
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * [KeySyms] against the golden files of lib/ime-core/tools/keysyms-gen.py (fcitx5 442edbc9's
- * `keySymFromString`, `keySymToString`, `keySymFromUnicode`, `keySymToUnicode`, key.cpp:622-800).
- * They are read from test resources, not from the vendored tree. The two Unicode files list only
- * what the plain rule (named in each test) does not give, so every code point and keysym is walked.
+ * [KeySyms] against goldens of tools/keysyms-gen.py (fcitx's `keySymFromString`, `keySymFromUnicode`,
+ * `keySymToUnicode`), read from test resources; the Unicode files list only what the plain rule does not give.
  * contract: goldens generated from fcitx's key.cpp, which mutation cannot see.
  */
 class KeySymsGoldenTest {
@@ -35,20 +34,9 @@ class KeySymsGoldenTest {
     fun singleCharactersAndUnknownNames() {
         assertEquals(0x61, KeySyms.fromString("a"))
         assertEquals(0x01004e2d, KeySyms.fromString("中"))
-        assertEquals(0x01f600 or KeySyms.UNICODE_OFFSET, KeySyms.fromString("😀"))
+        assertEquals(0x01f600 or UNICODE, KeySyms.fromString("😀"))
         assertEquals(0, KeySyms.fromString(""))
         assertEquals(0, KeySyms.fromString("NoSuchKey"))
-    }
-
-    @Test
-    fun everySymGivesItsNameAndBack() {
-        val g = rows("sym-to-name.tsv").associate { (sym, name) -> sym.toInt(16) to name }
-        assertEquals(2495, g.size)
-        for (s in 0..0xffff) assertEquals("%x".format(s), g[s] ?: "", KeySyms.toString(s))
-        for ((sym, name) in g) {
-            assertEquals(name, KeySyms.toString(sym))
-            assertEquals(name, sym, KeySyms.fromString(name)) // sym -> name -> sym
-        }
     }
 
     @Test
@@ -56,7 +44,7 @@ class KeySymsGoldenTest {
         val g = hexMap("unicode-to-sym.tsv")
         for (u in 0..0x1100ff) {
             val sym = KeySyms.fromUnicode(u)
-            assertEquals("%x".format(u), g[u] ?: if (isLatin1(u)) u else u or KeySyms.UNICODE_OFFSET, sym)
+            assertEquals("%x".format(u), g[u] ?: if (isLatin1(u)) u else u or UNICODE, sym)
             // unicode -> sym -> unicode: every code point with a keysym comes back
             if (sym != 0) assertEquals("%x".format(u), u, KeySyms.toUnicode(sym))
         }

@@ -15,17 +15,7 @@ import org.fcitx.fcitx5.android.engine.table.TableSession
 import org.fcitx.fcitx5.android.engine.table.TableSlips
 import java.util.Locale
 
-/**
- * A table's codes tapped with a place (061-neighbour-table): each word of some text, cut and typed
- * as [TableRun] types it (its cheapest code; a pick, a space, nothing where it commits itself, or the
- * next word's first key where that commits it, 顶字), each key tapped as [TouchSim] taps the QWERTY
- * keys, clean or with one of the code's keys slipped onto a key next to it. Each word in a fresh
- * session, typed by someone who does not look: what was planned is done whatever the keys showed,
- * anything left over committed by a space. Typed with [slips] and without, the same taps. Or, [units]'
- * `prefix`, by one who stops where the word shows first: the shortest part of one of its codes (a whole
- * code too) that shows it first, then the next word's first key where that commits it (顶字), else a space;
- * a word that commits itself sooner, or never shows first, is left out.
- */
+/** A table's codes tapped with a place ([TouchSim]), with [slips] and without on the same taps. */
 class TableSlipRun(
     private val table: CodeTable,
     private val options: TableOptions,
@@ -67,8 +57,7 @@ class TableSlipRun(
     // a word's shortest part, "" where it has none: worked out once
     private val parts = HashMap<String, String>()
 
-    // the shortest part of [word]'s codes (a whole one too) that shows it first, typed alone; "" where none does
-    // before one commits it by itself (the whole-code plan's way)
+    // the shortest part of [word]'s codes that shows it first; "" where none does before one commits itself
     private fun shortestPart(word: String): String {
         val tried = run.codesOf(word).flatMap { code -> (1..code.length).map { code.substring(0, it) } }.distinct().sortedBy { it.length }
         for (part in tried) {
@@ -109,8 +98,7 @@ class TableSlipRun(
                 committed.append(shown.commit)
                 left = p.next.toString()
             }
-            // meant to commit itself: where it did not (a key read as its neighbour waits to be seen, or a code
-            // slipped onto another), the next word's first key comes, as typed without looking
+            // meant to commit itself but did not: the next word's first key comes, as typed without looking
             p.typed.auto -> if (shown?.preedit.orEmpty().isNotEmpty() && p.follow != null) {
                 shown = session.apply(Action.Key(p.follow, touch = unit.nextTouch))
                 committed.append(shown.commit)
@@ -154,7 +142,6 @@ class TableSlipRun(
         return !range.isEmpty() && dictionary.codeLength(range.first) == before.length
     }
 
-    /** Counts over clean and slipped taps. */
     data class Outcome(
         val clean: Int,
         val cleanChanged: Int,
@@ -242,7 +229,7 @@ class TableSlipRun(
             }
             if (keys.length >= perSample) flush()
         }
-        // the last words, short of a line: typed too (review F8207)
+        // the last words, short of a line: typed too
         if (keys.isNotEmpty()) flush()
         return lines
     }

@@ -11,32 +11,16 @@ import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import java.util.Calendar
 
 /**
- * What lifting the finger after a vertical swipe on a key does (060-swipe-slots): every key has an up
- * slot and a down slot ([SwipeSlot]), and 上滑 and 下滑 each on or off ([Ways]).
- *
- * A character key (a letter, a digit of the nine keys, a group, a zhuyin key): swiped a way that is
- * off, or to a slot with nothing (empty, its long press's first where its long press is off), it is a
- * tap: the letter is typed here, not left to the key's own tap, as a swipe that long has left the key,
- * and a touch that left its key is no tap (ST-15). With both ways off a swipe off the key is how a
- * press is taken back, as it always was.
- *
- * A function key (space, backspace, …): a way off, or a slot with nothing, leaves the key as it always was.
- *
- * Swiped past the threshold and back before the lift is cancelled, on every key.
+ * The lift after a vertical swipe on a key: each key has an up and a down slot, 上滑 and 下滑 each on or off. A
+ * character key swiped a way that is off or to an empty slot types itself here (a touch that left its key is no
+ * tap); both ways off, a swipe off is how a press is taken back. A function key is left as it was. Swiped and back is cancelled.
  */
 object KeySwipe {
 
-    /**
-     * A key's two slots; [char] for a character key, [hasFirst] whether its long press has a first
-     * (what [SwipeSlot.First] types).
-     */
+    /** [hasFirst]: its long press has a first ([SwipeSlot.First]'s). */
     data class Key(val char: Boolean, val up: SwipeSlot, val down: SwipeSlot, val hasFirst: Boolean = true) {
         companion object {
-            /**
-             * A key no layout names (a panel's, 注音九键's ˉ): no slot of its own to set, its long press's
-             * first the way [orientation] puts every key's preset, nothing the other way; 翻转 flips it
-             * with them; no corner drawn (a mark is a named key's, 060-keys-unify S6).
-             */
+            /** A key no layout names (a panel's, 注音九键's ˉ): its first the way [orientation] puts presets, flipped with them; no corner. */
             fun unnamed(orientation: SwipeOrientation, hasFirst: Boolean): Key {
                 val firstUp = orientation == SwipeOrientation.FirstUp
                 return Key(
@@ -49,7 +33,6 @@ object KeySwipe {
         }
     }
 
-    /** 上滑 and 下滑 on or off. */
     data class Ways(val up: Boolean, val down: Boolean) {
         val allOff: Boolean get() = !up && !down
 
@@ -59,35 +42,27 @@ object KeySwipe {
     }
 
     sealed interface Outcome {
-        /** The long press's first typed. */
         data object Symbol : Outcome
 
-        /** [shortcut] run (a command, a text): never [KeyShortcut.None]. */
+        /** Never [KeyShortcut.None]. */
         data class Shortcut(val shortcut: KeyShortcut) : Outcome
 
-        /** The key's own character, as a tap. */
         data object Tap : Outcome
 
-        /** Nothing at all, the key's tap neither. */
+        /** The key's tap neither. */
         data object Cancel : Outcome
 
-        /** Not the swipe's: the key's own handling (a tap, or nothing) stands. */
+        /** The key's own handling (a tap, or nothing) stands. */
         data object None : Outcome
     }
 
-    /** What the key's preview shows while the finger is down. */
     sealed interface Preview {
         data object Own : Preview
         data object Symbol : Preview
         data class Shortcut(val shortcut: KeyShortcut) : Preview
     }
 
-    /**
-     * The lift of a touch on [key] that swiped [totalY] steps (down positive), having [swiped] past
-     * the threshold at some point; [consumed] when a long press took the touch already, [cancelled]
-     * when the system took it; in a [password] field, where a command reading the field is not run. A text of
-     * variables that fills in nothing at [now] (all names not known) is a slot with nothing.
-     */
+    /** In a [password] field a command reading the field is not run; a variables text that fills nothing is an empty slot. */
     @Suppress("LongParameterList")
     fun decide(
         key: Key,
@@ -121,7 +96,7 @@ object KeySwipe {
         else -> Outcome.Shortcut(shortcut)
     }
 
-    /** What [key] previews having swiped [totalY] steps so far: what its lift would do. */
+    /** What its lift would do. */
     fun preview(key: Key, ways: Ways, totalY: Int, password: Boolean, now: () -> Calendar): Preview =
         when (val outcome = decide(key, ways, totalY, swiped = true, consumed = false, cancelled = false, password, now)) {
             Outcome.Symbol -> Preview.Symbol

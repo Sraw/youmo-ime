@@ -14,7 +14,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Quick input with the user's own entries (design 051-quickphrase §1.2–1.7). */
+/** Quick input with the user's own entries. */
 class QuickPhraseMineTest {
 
     private val gh = QuickPhraseEntry("gh", "https://github.com/Sraw/youmo-ime/releases/latest")
@@ -70,8 +70,7 @@ class QuickPhraseMineTest {
         assertEquals(addr, rig.quickPhrase.entryAt(rig.ic, 1)!!.entry)
     }
 
-    // design 060-quick-input-folders: #wz百度 and #wz新浪 of before are #wz with two notes, both found
-    // by #wz, each shown with its note; one whose old key was all Chinese is listed but found by none
+    // the old #wz百度 and #wz新浪 are #wz with two notes, both found by #wz; an all-Chinese old key is found by none
     @Test
     @Uat("QU-25", "QU-27")
     fun notesShowBesideTheContentAndAKeylessOneIsListedButNeverFound() {
@@ -143,7 +142,7 @@ class QuickPhraseMineTest {
         assertEquals(listOf(gh, addr), book.mine)
     }
 
-    // review L3: an entry deleted from its card goes from the list at once, what is typed kept
+    // an entry deleted from its card goes from the list at once, what is typed kept
     @Test
     @Uat("QU-17")
     fun refreshedAfterAReloadTheListIsTheNewBooks() {

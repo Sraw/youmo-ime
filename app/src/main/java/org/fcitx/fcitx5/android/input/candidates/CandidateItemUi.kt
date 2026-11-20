@@ -7,7 +7,9 @@ package org.fcitx.fcitx5.android.input.candidates
 
 import android.content.Context
 import android.graphics.Typeface
+import android.text.SpannableStringBuilder
 import android.util.TypedValue
+import androidx.annotation.ColorInt
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
 import org.fcitx.fcitx5.android.core.CandidateWord
@@ -30,18 +32,13 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.gravityCenter
 import kotlin.math.roundToInt
 
-/**
- * A candidate in the bar or the expanded candidates, drawn as the theme has it ([bar], 060-render-p3 T6a):
- * its fill and pressed colour, its colours and font, the first of the list in its own; the number or dot
- * before it its label-style asks for.
- */
 class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarLook = SceneBar.of(ctx, theme)) : Ui {
 
     private val textSp = ThemeManager.prefs.candidateTextSize.getValue()
 
     private val text = view(::AutoScaleTextView) {
         scaleMode = AutoScaleTextView.Mode.Proportional
-        // 候选字号: the bar, its 联想 and the expanded grid; the view is made anew when it changes
+        // the view is made anew when 候选字号 changes
         textSize = textSp.toFloat() // sp
         isSingleLine = true
         gravity = gravityCenter
@@ -62,16 +59,15 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
         })
     }
 
-    // the smallest a reading is drawn (hints', and a handwritten character's several)
     private val floor get() = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, CandidateBarHeight.HINT_FLOOR_SP, ctx.resources.displayMetrics)
 
-    // the look last drawn: the first's and the others' drawables and font, set again only as it changes
+    // set again only as it changes
     private var shown: CandidateLook = bar.plain
 
     // none for a holder cleared (index -1): it is let go of, not shown
     private fun label(index: Int) = if (index < 0) "" else SceneBar.label(bar.labelStyle, index)
 
-    /** Draws [candidate], the [index]th of the list (from 0; -1 none: drawn as any but the first, no label). */
+    /** [index] -1: drawn as any but the first, no label. */
     fun updateCandidate(candidate: CandidateWord, index: Int = -1) {
         val look = bar.candidate(first = index == 0, selected = false)
         if (look != shown) {
@@ -82,10 +78,8 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
         val fg = look.color.value
         val altFg = look.commentColor.value
         val label = label(index)
-        // pinyin above the words: the text centred below it, in the bar made taller for it (CandidateBarHeight),
-        // a candidate of no reading (an emoji, a word in English) too, so it stands on its neighbours' baseline
-        // (the user, 2026-11-14); zhuyin beside them and, the setting off, a hint's reading above them in the
-        // bar's own height take no room above, where plain words stand
+        // a candidate of no reading (an emoji, English) is centred below the room too, so it stands on its neighbours'
+        // baseline; zhuyin, or a hint's reading, take no room above
         val style = EngineState.candidateReading.value
         val hint = style == ReadingStyle.OFF
         text.setPadding(0, if (style == ReadingStyle.PINYIN) (text.textSize * CandidateBarHeight.READING_LINE).roundToInt() else 0, 0, 0)
@@ -101,16 +95,15 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme, val bar: BarL
                     ReadingSpan.annotate(this, candidate.text, candidate.readings, altFg, floor = floor)
                 }
             }
-            if (candidate.comment.isNotBlank()) {
-                if (candidate.spaceBetweenComment) {
-                    append(" ")
-                }
-                color(altFg) {
-                    append(candidate.comment)
-                }
-            }
+            appendComment(candidate, altFg)
         }
-        // the theme's number or dot is not read out, only the candidate (a screen reader's, as before it)
+        // the theme's number or dot is not read out, only the candidate
         text.contentDescription = if (label.isEmpty()) null else text.text.subSequence(label.length, text.text.length)
     }
+}
+
+internal fun SpannableStringBuilder.appendComment(candidate: CandidateWord, @ColorInt fg: Int) {
+    if (candidate.comment.isBlank()) return
+    if (candidate.spaceBetweenComment) append(" ")
+    color(fg) { append(candidate.comment) }
 }

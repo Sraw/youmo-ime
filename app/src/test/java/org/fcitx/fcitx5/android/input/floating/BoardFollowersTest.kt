@@ -11,7 +11,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import androidx.constraintlayout.widget.ConstraintLayout
 import org.fcitx.fcitx5.android.data.theme.TestThemes
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -22,7 +22,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import java.util.concurrent.TimeUnit
 
-/** N6: docked, the handle (始终显示悬浮条) goes with the board at a side, as the bars do, its grip at the board's middle. */
+/** Docked, the handle (始终显示悬浮条) goes with the board at a side, its grip at the board's middle. */
 @RunWith(RobolectricTestRunner::class)
 class BoardFollowersTest {
 
@@ -31,7 +31,6 @@ class BoardFollowersTest {
 
     private val root = ConstraintLayout(context)
 
-    // the board one-handed at the right, 400 of 1000 wide
     private val board = View(context).apply { id = View.generateViewId() }
 
     private val strip = FloatingHandle(context, TestThemes.PixelDark, FloatingHandleSide.Bottom, FloatingHandle.Mode.Docked { x, _, _ -> detached += x })
@@ -60,7 +59,6 @@ class BoardFollowersTest {
         layOut()
         assertEquals(600 to 1000, strip.left to strip.right)
         assertEquals("no side padding at a side", 0, strip.paddingLeft)
-        // held at the board's middle (local 200): it lets go
         strip.onTouchEvent(MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 200f, 12f, 0))
         shadowOf(Looper.getMainLooper()).idleFor(ViewConfiguration.getLongPressTimeout() + 50L, TimeUnit.MILLISECONDS)
         assertEquals(1, detached.size)

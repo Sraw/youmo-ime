@@ -13,8 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-// a blocked English word (no reading) says how its case is matched, as EnglishBlocks matches it: one all in
-// lower case in any case, any other only as written (R20 F6404)
+// one all in lower case is blocked in any case, any other only as written
 @RunWith(RobolectricTestRunner::class)
 class EnglishBlockDetailTest {
 
@@ -27,11 +26,9 @@ class EnglishBlockDetailTest {
         val any = res.getString(R.string.english_block_detail)
         val exact = res.getString(R.string.english_block_detail_exact)
         assertRows(
-            // all in lower case: blocked in any case (Hello, HELLO too)
             "hello" to { assertEquals(any, detail("hello")) },
-            // a capital inside: only as written
             "iPhone" to { assertEquals(exact, detail("iPhone")) },
-            // a capital first only is still not all lower case (text == text.lowercase()): as written
+            // a capital first only is still not all lower case: as written
             "Hello" to { assertEquals(exact, detail("Hello")) },
         )
     }

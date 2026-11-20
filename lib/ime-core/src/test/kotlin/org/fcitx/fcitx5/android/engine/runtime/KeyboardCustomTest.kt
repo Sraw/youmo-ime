@@ -24,7 +24,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A layout's own letter groups typed (060-render-p3 T9a): the sample 17 keys, a tap's place across and down, the built-in keys' codes as they were. */
+/** A layout's own letter groups typed: the sample 17 keys, a tap's place across and down, the built-in keys' codes as they were. */
 class KeyboardCustomTest {
     @After
     fun noneInUse() {
@@ -40,7 +40,6 @@ class KeyboardCustomTest {
         assertEquals(null, SceneGroups.mismatch(SceneGroups.of(k17Layout), NineKeyLetters.custom(SceneGroups.written(k17Layout))))
         val leaning = SceneGroups.leaningOf(k17, k17Layout)
         assertTrue("pqrs" in leaning && "bn" in leaning && "abc" !in leaning)
-        // comparing sets no keyboard in use
         val other = NineKeyLetters.custom(SceneGroups.written(k17Layout).reversed())
         SceneGroups.letters(SceneGroups.written(k17Layout).reversed())
         SceneGroups.mismatch(SceneGroups.written(k17Layout).reversed(), other)
@@ -62,8 +61,7 @@ class KeyboardCustomTest {
         assertEquals(NineKeyLetters.G14, SceneGroups.letters(SceneGroups.written(SceneData.read("k14.xml").let { (LayoutReader.layout(it) as Parsed.Ok).value }, frags())))
     }
 
-    // how the grouped keyboards take a layout (060-render-p3 T9b): theirs as always; a layout's own on pinyin's alone;
-    // any other refused with why, the keyboard's built-in layout drawn
+    // a layout's own groups only on pinyin's; any other refused with why, the built-in layout drawn
     @Test
     fun aGroupedKeyboardTakesItsOwnTheLayoutsOwnOrRefuses() {
         fun layout(name: String) = (LayoutReader.layout(SceneData.read(name)) as Parsed.Ok).value
@@ -78,7 +76,6 @@ class KeyboardCustomTest {
         assertTrue("pq rs" in own.written)
         assertEquals(SceneGroups.written(k17Layout), own.written)
         assertEquals(own.letters, (SceneGroups.taken(k17Layout, NineKeyLetters.G18, own = true) as SceneGroups.Taken.Own).letters)
-        // on 双拼's: refused, said why
         val sp = SceneGroups.taken(k17Layout, NineKeyLetters.G14, own = false) as SceneGroups.Taken.Refused
         assertTrue(sp.why, "pinyin's alone" in sp.why)
         // the other built-in keyboard's groups in its place: refused, never its codes
@@ -90,8 +87,7 @@ class KeyboardCustomTest {
         assertTrue(bad.why, "make no keyboard" in bad.why)
     }
 
-    // 061-custom-layout §6 (L4): the 18 or 14 keys' groups on other keys are those keyboards, on 双拼's too; the codes go by
-    // the group, whichever key it is on, and the lean= written stays the layout's
+    // the codes go by the group, whichever key it is on
     @Test
     @Uat("PY-154", "SP-51")
     fun theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod() {
@@ -107,13 +103,12 @@ class KeyboardCustomTest {
         assertEquals(SceneGroups.Taken.BuiltIn, SceneGroups.taken(swapped, NineKeyLetters.G18, own = true, frags()))
         assertEquals(null, SceneGroups.mismatch(groups, NineKeyLetters.G18))
         assertEquals(SceneGroups.leaning(swapped, frags()), SceneGroups.leaningOf(NineKeyLetters.G18, swapped, frags()))
-        // the 14 keys' groups backwards: the 14 keys
         val g14 = NineKeyLetters.G14.tag().split(',')
         assertEquals(null, SceneGroups.mismatch(g14.reversed(), NineKeyLetters.G14))
         assertTrue(SceneGroups.mismatch(g14.reversed(), NineKeyLetters.G18) != null)
     }
 
-    // review L3: each group's key by its id, in the groups' order, two keys of the same letters each its own
+    // each group's key by its id, in the groups' order, two keys of the same letters each its own
     @Test
     fun theKeysOfTheGroupsAreNamedInTheirOrder() {
         assertEquals(17, SceneGroups.ids(k17Layout).size)
@@ -121,7 +116,6 @@ class KeyboardCustomTest {
         val twice = (LayoutReader.layout(SceneData.read("k17.xml").replace("letters=\"xyz\"", "letters=\"ab c\"")) as Parsed.Ok).value
         assertEquals(listOf("abc", "abc"), SceneGroups.of(twice).takeLast(2))
         assertEquals(listOf("r3c4", "r3c5"), SceneGroups.ids(twice).takeLast(2))
-        // the grouped bottom row's keys are of no group
         val k14 = (LayoutReader.layout(SceneData.read("k14.xml")) as Parsed.Ok).value
         assertEquals(SceneGroups.of(k14, frags()).size, SceneGroups.ids(k14, frags()).size)
     }
@@ -141,9 +135,7 @@ class KeyboardCustomTest {
             assertEquals(xs / 16f, NineKeyLetters.placeX(place), 0f)
             assertEquals(ys / 8f, NineKeyLetters.placeY(place), 0f)
         }
-        // one dimensional: the middle row
         assertEquals(Keyboard.tapKey(code("pqrs"), 0.25f, 0.5f), Keyboard.tapKey(code("pqrs"), 0.25f))
-        // the session gets the code and the place as one
         val session = RecordedSession(PinyinSession(sessionTestData(), T9Segmenter(abbreviations = false, letters = k17), spell = true, prediction = false))
         Keyboard(session, nineKeys = false).onEvent(EngineEvent.CHAR, Keyboard.tapKey(code("pqrs"), 1f, 1f))
         assertEquals(Action.Key(code("pqrs"), at = NineKeyLetters.place(1f, 1f)), session.actions.single())
@@ -157,7 +149,6 @@ class KeyboardCustomTest {
         assertEquals('r', Keyboard.typedLetter(Keyboard.tapKey(pqrs, 0.1f, 1f)))
         assertEquals('s', Keyboard.typedLetter(Keyboard.tapKey(pqrs, 0.9f, 0.9f)))
         assertEquals('c', Keyboard.typedLetter(Keyboard.tapKey(code("abc"), 1f, 0.5f)))
-        // the code alone: its first letter
         assertEquals('x', Keyboard.typedLetter(code("xyz").code))
     }
 
@@ -166,7 +157,6 @@ class KeyboardCustomTest {
         val leaning = SceneGroups.leaning(k17Layout)
         assertFalse("abc" in leaning)
         assertTrue("pqrs" in leaning && "bn" in leaning)
-        // one letter: nothing to lean to
         assertFalse("m" in leaning)
     }
 
@@ -181,7 +171,6 @@ class KeyboardCustomTest {
         }
         assertNotNull(last)
         assertEquals("你好", last!!.candidates.first())
-        // p typed on the two row key reads as p too
         val again = PinyinSession(sessionTestData(), T9Segmenter(abbreviations = false, letters = k17), spell = true, prediction = false)
         assertTrue(k17.keysOf('p').length == 2)
         assertTrue(Keyboard(again, nineKeys = false).onEvent(EngineEvent.CHAR, Keyboard.tapKey(code("pqrs"), 0f, 0f)).handled)

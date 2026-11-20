@@ -43,13 +43,12 @@ import splitties.dimensions.dp
 import java.time.Duration
 import java.util.Locale
 
-/** 生僻字屏蔽's cards (dev/design/061-settings-cards.md §2.4, §2.8, §3.2): ↶, each group's place, what is read out. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class RareCharsCardsUatTest : RarePageUat() {
 
-    // 061-settings-cards.md §2.4: the title bar's ↶ takes back the last step, the snackbar long gone; a save clears it
+    // the title bar's ↶ takes back the last step, the snackbar long gone; a save clears it
     @Test
     @Uat("WD-63")
     fun theTitleBarsUndoTakesBackTheLastStepTillASave() {
@@ -101,7 +100,6 @@ class RareCharsCardsUatTest : RarePageUat() {
         }
     }
 
-    // §3.2: each group's grid where it was left, over the cards and a turn; back to the cards from the up arrow too
     @Test
     fun eachGroupKeepsWhereItWasScrolledAndATurnKeepsTheGroup() {
         api.rareGridAnswer = many
@@ -134,8 +132,7 @@ class RareCharsCardsUatTest : RarePageUat() {
         }
     }
 
-    // §2.6, §3.1: a card's description two lines at most, never cut, in each language: four across a phone on its side
-    // (the page 600 dp wide), and two across one upright at the font 1.3 times
+    // four across a phone on its side, two across one upright at the font 1.3 times
     @Test
     fun eachGroupsDescriptionFitsTwoLinesUncut() {
         val app = RuntimeEnvironment.getApplication()
@@ -166,7 +163,6 @@ class RareCharsCardsUatTest : RarePageUat() {
         assertEquals(emptyList<String>(), cut)
     }
 
-    // the cards at night, in the largest font and on the side (§8.1): switched on, 其它表外字 partly held
     @Test
     @Uat("LS-53")
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-night-440dpi")
@@ -188,7 +184,6 @@ class RareCharsCardsUatTest : RarePageUat() {
         st.capture("RareCharsCardsUatTest/$name")
     }
 
-    // 061-settings-cards.md §2.8: a card two nodes read one after the other, the cards a list; the letters as an adjustable (review N12)
     @Test
     @Uat("AX-21")
     fun theCardsAndTheLettersAreReadOut() {
@@ -199,7 +194,6 @@ class RareCharsCardsUatTest : RarePageUat() {
                 val body = body(R.string.rare_group_ext)
                 val info = node(body)
                 assertEquals(Button::class.java.name, info.className)
-                // held by default, off or on
                 assertEquals(s(R.string.rare_chars_card_a11y, s(R.string.rare_group_ext), "1", "1"), info.contentDescription.toString())
                 assertEquals(s(R.string.rare_chars_card_open), info.actionList.single { it.id == AccessibilityNodeInfo.ACTION_CLICK }.label)
                 assertTrue(KeyboardHarness.all(body).drop(1).all { it.importantForAccessibility == View.IMPORTANT_FOR_ACCESSIBILITY_NO || it !is TextView })

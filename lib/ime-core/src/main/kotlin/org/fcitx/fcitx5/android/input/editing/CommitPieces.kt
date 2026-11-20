@@ -7,47 +7,27 @@ package org.fcitx.fcitx5.android.input.editing
 import java.text.BreakIterator
 
 /**
- * A long text cut into pieces the editor can be sent one by one ([EditingSession.commitText]).
- *
- * `commitText` reaches the editor as a one-way binder call, and one-way calls to a process share
- * half of its 1 MB binder buffer, room for some 250 000 characters: a clip of 297 000 pasted from
- * the clipboard panel (a parcel of 567 KB) failed (`FAILED BINDER TRANSACTION`) and nothing went
- * in, though the system's clipboard held it and the editor's own paste took it. Pieces of [MAX]
- * UTF-16 units go in one after another. Cut between characters (grapheme clusters): never inside
- * a surrogate pair, whose lone half a WebView would turn into U+FFFD, nor a CRLF, a letter and its
- * combining marks, an emoji's ZWJ sequence.
- *
- * A piece's buffer is held from its sending till the editor's binder thread has taken it, a few
- * milliseconds, not till its main thread has laid it out: pieces sent back to back overflow it (450 000
- * characters as 14 pieces lost 3 in the middle) and a piece [GAP_MS] after the last does not. One
- * that fails all the same is sent again after a pause; the keyboard's main thread pauses
- * [RETRY_BUDGET_MS] in all at most, then gives up on the rest (an editor that never takes them).
- * Waiting for the editor to answer a read instead held the keyboard as long as the editor took to
- * lay each piece out, up to 2 s a read: 450 000 characters, 1.1 to 2 s on the emulator.
+ * A long text cut for [EditingSession.commitText]: one-way binder calls share half the editor process's 1 MB buffer,
+ * so a 297 000-character paste failed whole. Pieces of [MAX] units, cut between grapheme clusters (a WebView turns a
+ * lone surrogate half into U+FFFD). Sent back to back they overflow the buffer; [GAP_MS] apart they do not. A failed
+ * piece is retried after a pause, at most [RETRY_BUDGET_MS] in all. Waiting on a read instead held the keyboard up to 2 s.
  */
 object CommitPieces {
 
-    /**
-     * UTF-16 units a piece holds at most: a parcel of 256 KB, half the room; a text this long or
-     * shorter goes in one call, as it always did (200 000 characters went whole). Each piece costs
-     * the editor a layout of its own, the later ones over more text.
-     */
+    /** Half the buffer; a text this long or shorter goes in one call, as it always did. */
     const val MAX = 128 * 1024
 
-    /** Milliseconds between two pieces: the editor's binder thread takes the last meanwhile. */
+    /** The editor's binder thread takes the last meanwhile. */
     const val GAP_MS = 16L
 
-    /** Milliseconds the pauses after failed pieces may add up to, in one commit. */
+    /** In one commit. */
     const val RETRY_BUDGET_MS = 1000L
 
-    /** The first pause after a failed piece, doubled each failure up to [LAST_RETRY_MS]. */
+    /** Doubled each failure up to [LAST_RETRY_MS]. */
     const val FIRST_RETRY_MS = 8L
     const val LAST_RETRY_MS = 128L
 
-    /**
-     * [text] in order, each piece [max] units at most, cut where a character ends (where a code
-     * point ends, if one character is longer than [max]); [text] alone if it fits.
-     */
+    /** Cut where a character ends (a code point, if one character is longer than [max]); [text] alone if it fits. */
     fun split(text: String, max: Int = MAX): List<String> {
         require(max >= 2) { "a piece holds a surrogate pair at least" }
         if (text.length <= max) return listOf(text)

@@ -26,10 +26,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.fcitx.fcitx5.android.scene.theme.KeyboardSizes as ThemeSizes
 
-/**
- * The keyboard's size following the theme, as it changes (060-render-p3 T5): 跟随主题 picked or left
- * alone (a level whose numbers are stored already changes only it), and another theme in the preview.
- */
+/** The keyboard's size following the theme: 跟随主题 picked or left alone, and another theme in the preview. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -51,7 +48,6 @@ class ThemeSizesUatTest {
 
     private val keyboard get() = AppPrefs.getInstance().keyboard
 
-    // a theme of a 紧凑 height
     private fun compactTheme() {
         KeyboardArea.themeSizes = { ThemeSizes(height = Twin(20.0, 34.0)) }
     }
@@ -77,7 +73,6 @@ class ThemeSizesUatTest {
         assertNotSame("out of 紧凑 by the flag alone", small, h.keyboard)
     }
 
-    // the preview's q, as the engine drew it
     private fun q(st: SettingsHarness) = KeyboardHarness.keysOf(st.activity.window.decorView) { it.isShown }.first { it.label == "q" }
 
     @Test
@@ -91,7 +86,6 @@ class ThemeSizesUatTest {
         val height = small.height
         prefs.set(keyboard.keyboardHeightFollowTheme, false)
         st.idle()
-        // 标准's keys: taller, their text no longer 紧凑's 0.9
         assertTrue("${q(st).height} of $height", q(st).height > height)
         assertEquals(size / 0.9f, q(st).let { it.textSize(it.label)!! }, 0.5f)
     }
@@ -104,7 +98,6 @@ class ThemeSizesUatTest {
             ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
             ThemeManager.prefs.followSystemDayNightTheme.setValue(ThemeManager.prefs.followSystemDayNightTheme.defaultValue)
         }
-        // the dark one's keyboard taller, the light one's none
         KeyboardArea.themeSizes = {
             if (ThemeManager.activeTheme.name == TestThemes.PixelDark.name) ThemeSizes(height = Twin(45.0, 60.0)) else ThemeSizes()
         }
@@ -113,7 +106,6 @@ class ThemeSizesUatTest {
         val height = q(st).height
         ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
         st.idle()
-        // 45% over 30%: the rows half as tall again, the bar aside
         assertTrue("${q(st).height} of $height", q(st).height > height * 1.3f)
     }
 }

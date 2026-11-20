@@ -8,25 +8,22 @@ import org.fcitx.fcitx5.android.input.scene.SceneAction
 import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.Item
 
-/**
- * What a long press's item, a swipe's first, types (060-keys-unify §3.1, M1): the one way, whatever popup or
- * swipe chose it, so how an item is committed is the item's, never the popup's.
- */
+/** What a long press's item or a swipe's first types: one way, whatever popup chose it. */
 sealed interface KeyOutput {
-    /** One code point typed as a key would (through the keyboard's own reading: 九键's letters, 注音's symbols). */
+    /** One code point typed as a key, through the keyboard's own reading (九键 letters, 注音 symbols). */
     data class Press(val text: String) : KeyOutput
 
-    /** Committed as it is: an as-is item, or one of more code points. */
+    /** An as-is item, or one of several code points. */
     data class Text(val text: String) : KeyOutput
 
-    /** A keypad's digit: its candidate picked while typing, else the digit (D7). */
+    /** Its candidate picked while typing, else the digit. */
     data class Keypad(val digit: Char) : KeyOutput
 
-    /** A layout's `<item send=…>`: the action it names. */
+    /** A layout's `<item send=…>`. */
     data class Action(val action: SceneAction) : KeyOutput
 
     companion object {
-        /** [item]'s; null for an action no build reads. */
+        /** Null for an action no build reads. */
         fun of(item: Item): KeyOutput? = when (val c = item.commit) {
             Commit.AsKey -> if (item.text.codePointCount(0, item.text.length) == 1) Press(item.text) else Text(item.text)
             Commit.AsIs -> Text(item.text)

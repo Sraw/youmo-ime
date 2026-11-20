@@ -16,10 +16,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.nio.file.Files
 
-/**
- * The import's own "a file in its folder" check, behind the engine reader's (which since R20 refuses
- * `..` and any `/` first, so no import reaches this one): a name out of the folder, or a link out of it, is none.
- */
+/** Behind the engine reader's check, which refuses `..` and any `/` first: a name or link out of the folder is none. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemePackInsideTest {

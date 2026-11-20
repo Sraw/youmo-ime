@@ -29,7 +29,7 @@ fun Project.epn(env: String, prop: String) =
 /** [value] trimmed, a leading `~/` taken as [home] (as it is, a `$` in it no group reference): a machine setting's path */
 internal fun homed(value: String, home: String): String = value.trim().replaceFirst(Regex("^~(?=/)"), Regex.escapeReplacement(home))
 
-/** [project]'s packs.properties (the packs' versions), read once for all of them a plugin asks [packsProperty] (R26 F8282) */
+/** [project]'s packs.properties (the packs' versions), read once for all of them a plugin asks [packsProperty] */
 internal fun packsProperties(project: Project): Properties =
     Properties().apply { project.file("packs.properties").inputStream().use(::load) }
 

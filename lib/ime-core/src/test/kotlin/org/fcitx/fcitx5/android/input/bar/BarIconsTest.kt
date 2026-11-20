@@ -11,7 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 061-toolbar-icons §2.3: every icon of the bar and the panels has a theme's name, one name to one thing done. */
+/** Every icon of the bar and the panels has a theme's name, one name to one thing done. */
 class BarIconsTest {
 
     private val all = (BarIcons.BAR + BarIcons.PANELS).distinct()
@@ -26,7 +26,7 @@ class BarIconsTest {
         assertEquals(listOf("trad-simp", "trad-simp-off"), listOf(BarIcons.tradSimp(true).name, BarIcons.tradSimp(false).name))
         for (i in all) assertTrue(i.name, i.name in Icons.ALL)
         assertTrue(BarIcons.BAR.containsAll(ToolbarButton.entries.map(BarIcons::of)))
-        // the buttons beside the keys too (the user's 凡是画这个动作图标的地方): read ahead with the bar
+        // the buttons beside the keys too: read ahead with the bar
         assertTrue(BarIcons.BAR.containsAll(listOf(BarIcons.ONE_HANDED_EXIT, BarIcons.TOUCH_KEYBOARD, BarIcons.CANDIDATES_PREV, BarIcons.CANDIDATES_NEXT)))
         assertEquals(listOf("one-handed-exit", "touch-keyboard", "candidates-prev", "candidates-next"),
             listOf(BarIcons.ONE_HANDED_EXIT, BarIcons.TOUCH_KEYBOARD, BarIcons.CANDIDATES_PREV, BarIcons.CANDIDATES_NEXT).map { it.name })
@@ -43,8 +43,7 @@ class BarIconsTest {
         assertEquals("habits-off", BarIcons.of(ToolbarButton.Habits).name)
     }
 
-    // the bar shares a name with a shortcut's command only where it does that command's job (§2.2), and no name
-    // stands for two images of its own here (one thing done)
+    // the bar shares a command's name only where it does that command's job; no name stands for two images
     @Uat("ST-129")
     @Test
     fun aNameIsOneThingDone() {

@@ -26,11 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/**
- * What is typed ([SceneEnvs.typing]) reaches every keyboard shown, not only KeyboardWindow's (060-render-p3
- * T5): the number row's, the expanded candidates', the emoji search's; one shown again after it changed
- * catches up, and nothing changed makes no scene anew.
- */
+/** What is typed ([SceneEnvs.typing]) reaches every keyboard shown; one shown again catches up; nothing changed makes no scene. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class TypingWatchTest {
@@ -53,7 +49,6 @@ class TypingWatchTest {
 
     @Test
     fun eachKeyboardShownDrawsWhatIsTypedNow() {
-        // in the input method, where what is typed is the theme's (SceneEnvs.of): its window
         val h = KeyboardHarness().also { h = it }
         h.start()
         val box = FrameLayout(h.service)
@@ -69,20 +64,16 @@ class TypingWatchTest {
             val canvas = KeyboardHarness.all(kb).filterIsInstance<KeyboardCanvasView>().single()
             val first = canvas.scene
             assertNotNull(name, first)
-            // told the same again: the same scene
             SceneEnvs.typing = SceneEnvs.typing?.toSet()
             assertSame(name, first, canvas.scene)
-            // shown: told
             SceneEnvs.typing = setOf("field=password", "test=$i")
             val told = canvas.scene
             assertNotSame(name, first, told)
-            // not shown as it changes, then shown again: made anew as it is
             box.removeView(kb)
             SceneEnvs.typing = setOf("field=url", "test=$i")
             show(kb)
             val again = canvas.scene
             assertNotSame(name, told, again)
-            // shown again with nothing changed: as it was
             box.removeView(kb)
             show(kb)
             assertSame(name, again, canvas.scene)

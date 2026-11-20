@@ -43,11 +43,7 @@ import org.robolectric.shadows.ShadowDialog
 import java.io.File
 import java.nio.file.Files
 
-/**
- * 资源包 (dev/design/060-asset-packs.md, uat/14 ST-60…, uat/12 VO-34): the keyboard without the text
- * pack, voice input without the voice pack, and the page that shows and imports them. The import's
- * checks themselves are PackShelfTest's (lib/ime-core); here the app's side of them.
- */
+/** The keyboard without the text pack, voice input without the voice pack, and the page that imports them. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -62,8 +58,8 @@ class PacksUatTest {
         intent?.component?.className == MainActivity::class.java.name &&
             intent.getParcelableExtra<SettingsRoute>(MainActivity.EXTRA_SETTINGS_ROUTE) == SettingsRoute.Packs
 
-    // the test shelves back after each test, failed or not: a SettingsHarness test or one reading PackStore
-    // without a KeyboardHarness (whose init sets them) would else see the shelf a test before it left
+    // a SettingsHarness test or one reading PackStore without a KeyboardHarness would else see the shelf a test before
+    // it left
     @After
     fun packsBack() {
         TestShelves.use()
@@ -75,25 +71,22 @@ class PacksUatTest {
         KeyboardHarness().use { h ->
             h.start()
             assertNull("both packs there: no gate", gate(h))
-            // the text pack gone (as on a phone upgraded from 0.5.x): the keyboard made anew under the gate
             TestShelves.use(text = false, voice = true)
             h.idle()
             val gate = checkNotNull(gate(h)) { "no gate" }
             assertTrue(h.shown(gate))
-            // over all of the keys, the bar's too: nothing of the keyboard is left to touch
             assertTrue("${gate.height} < ${h.keyboard.height}", gate.height >= h.keyboard.height && gate.width >= h.keyboard.width)
             assertEquals(h.service.getString(R.string.pack_text_needed), gate.contentDescription)
             assertTrue(KeyboardHarness.all(gate).any { (it as? android.widget.TextView)?.text == h.service.getString(R.string.pack_gate_hint) })
             h.capture("PacksUatTest/gate")
-            // a finger's touch, in where a finger's go (the input view): the gate takes it, no key
-            // under it types, and the page opens
+            // a finger's touch where a finger's go: the gate takes it, no key under it types, and the page opens
             h.api.calls.clear()
             val f = h.finger(gate, h.at(gate, dx = -120f, dy = 60f))
             f.up(h.at(gate, dx = -120f, dy = 60f))
             h.idle()
             assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("sendKey") })
             assertTrue(openedPacks(opened()))
-            // its button: the system's keyboard picker, not the page (the gate covers the bar's ways out)
+            // the system's keyboard picker, not the page (the gate covers the bar's ways out)
             val switch = KeyboardHarness.all(gate).first { (it as? android.widget.TextView)?.text == h.service.getString(R.string.pack_gate_switch) }
             assertTrue(h.shown(switch))
             var picked = 0
@@ -109,8 +102,8 @@ class PacksUatTest {
             assertEquals(1, picked)
             assertNull(opened())
             assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("sendKey") })
-            // imported: the keyboard again, and the app bound and its field focused again in fcitx,
-            // which the import restarted (without it the space read （不可用） on a device till another app)
+            // the app bound and its field focused again in fcitx, which the import restarted (without it the space read
+            // （不可用） on a device till another app)
             (h.service.onCreateInputMethodInterface() as android.view.inputmethod.InputMethod)
                 .bindInput(android.view.inputmethod.InputBinding(null, null, UID, 0))
             h.idle()
@@ -137,7 +130,6 @@ class PacksUatTest {
             val shelf = PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements)
             shelf.load()
             assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 1).inputStream()) is ImportResult.Imported)
-            // the app now wants version 2 of the same format: what was imported stays, but is not used
             val strict = PackShelf(
                 root,
                 listOf(TestShelves.packs.publicKey),
@@ -163,8 +155,7 @@ class PacksUatTest {
             TestShelves.use(text = true, voice = false)
             h.idle()
             assertNull("the keyboard types without the voice pack", gate(h))
-            // holding the space (voice input, the default): nothing, as 0.5.x's text build; no notice, nothing opened,
-            // and lifted it types one space as a tap would (R27 F8580: none or two passed before)
+            // holding the space (voice input, the default): nothing; lifted it types one space as a tap would
             val space = h.keyNamed("space")
             h.api.calls.clear()
             val f = h.finger(space, h.at(space))
@@ -177,7 +168,6 @@ class PacksUatTest {
             assertEquals(h.api.calls.toString(), 1, spaces.size)
             assertEquals(emptyList<String>(), h.noticeTexts())
             assertNull(opened())
-            // the bar's microphone: the notice says which pack, and the page opens; no permission asked
             val mic = KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription == h.service.getString(R.string.voice_input) }
             h.tap(mic)
             h.idle()
@@ -186,16 +176,13 @@ class PacksUatTest {
         }
     }
 
-    // this build takes voice packs from v2 (0.6.0's): a v1 kept from 0.6.0's first test build stays installed
-    // but unused, the microphone says which version to import and opens the page, the space does nothing as
-    // without the pack, nothing reads its models, and importing v2 is the way back
+    // this build takes voice packs from v2: a v1 stays installed but unused, the microphone says which version to
+    // import, and importing v2 is the way back
     @Test
     @Uat("VO-34")
     fun aVoicePackOlderThanTheAppTakesAsksForTheNewOneAndVoiceStaysOff() {
         val dir = Files.createTempDirectory("packs").toFile()
-        // this build's requirements, as PackStore makes them
         val app = TestShelves.requirements + (PackKind.VOICE to PackRequirement(BuildConfig.PACK_VOICE_FORMAT, BuildConfig.PACK_VOICE_MIN_VERSION))
-        // the v1 imported under the test build that took it; then this app's start
         val old = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
         assertTrue(old.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
         assertTrue(old.import(TestShelves.pack(PackKind.VOICE, version = 1, format = BuildConfig.PACK_VOICE_FORMAT).inputStream()) is ImportResult.Imported)
@@ -205,8 +192,7 @@ class PacksUatTest {
                 h.start()
                 PackStore.useShelf(shelf)
                 h.idle()
-                // what the keyboard shows taken first, the space held before the microphone opens anything; the
-                // table only reads them, so no row stands on another's (review R26 F8179)
+                // the table only reads them, so no row stands on another's
                 val status = shelf.status(PackKind.VOICE)
                 val voiceDir = PackStore.dir(PackKind.VOICE)
                 val gated = gate(h)
@@ -240,8 +226,6 @@ class PacksUatTest {
                         assertEquals(h.service.getString(R.string.pack_status_needs_update, 2, 1), needed)
                     },
                 )
-                // then the imports, in order: the old v1 again is refused, saying v2 is needed, the one there staying;
-                // v2 over it makes voice ready
                 val again = shelf.import(TestShelves.pack(PackKind.VOICE, version = 1, format = BuildConfig.PACK_VOICE_FORMAT).inputStream())
                 assertEquals(
                     "v1 again: refused",
@@ -259,7 +243,6 @@ class PacksUatTest {
         }
     }
 
-    // a voice pack newer than this app reads: the microphone says to update the app, not the pack
     @Test
     fun aVoicePackForANewerAppAsksForTheAppsUpdate() {
         val dir = Files.createTempDirectory("packs").toFile()
@@ -267,7 +250,6 @@ class PacksUatTest {
         newer.load()
         assertTrue(newer.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
         assertTrue(newer.import(TestShelves.pack(PackKind.VOICE, version = 5, format = 2).inputStream()) is ImportResult.Imported)
-        // this app reads format 1
         val shelf = PackShelf(dir, listOf(TestShelves.packs.publicKey), TestShelves.requirements).apply { load() }
         assertTrue(shelf.status(PackKind.VOICE) is PackStatus.NeedsNewerApp)
         try {
@@ -298,7 +280,6 @@ class PacksUatTest {
             assertEquals("${st.s(R.string.pack_status_missing)}\n${st.s(R.string.pack_voice_use)}", voice.summary.toString())
             assertNotNull(st.preferences().firstOrNull { it.key == PacksFragment.IMPORT_KEY })
             assertTrue(st.page is PreferenceFragmentCompat)
-            // imported elsewhere (the UAT's import, another page): the rows follow
             TestShelves.use()
             st.idle()
             assertEquals("${st.s(R.string.pack_status_ready, 1)}\n${st.s(R.string.pack_voice_use)}", voice.summary.toString())
@@ -323,14 +304,11 @@ class PacksUatTest {
             assertEquals(st.s(R.string.pack_imported, st.s(R.string.pack_text), 1), lines[0])
             assertEquals(st.s(R.string.pack_not_a_pack, "photo.jpg"), lines[1])
             assertTrue(lines[2], lines[2].startsWith(st.s(R.string.pack_no_space, "big.youmopack", "", "").substringBefore("：").substringBefore(":")))
-            // an older version over a newer one: imported, and said so; over an older one, as any import
             val v1 = org.fcitx.fcitx5.android.pack.PackManifest.parse(manifest)
             val v3 = org.fcitx.fcitx5.android.pack.PackManifest.parse(TestShelves.packs.manifest(PackKind.TEXT, mapOf("handwriting/test.txt" to "y".toByteArray()), version = 3))
             assertEquals(st.s(R.string.pack_imported_older, st.s(R.string.pack_text), 1, 3), PackImports.describe(app, PackImports.Outcome("a", ImportResult.Imported(v1, v3))))
             assertEquals(st.s(R.string.pack_imported, st.s(R.string.pack_text), 3), PackImports.describe(app, PackImports.Outcome("a", ImportResult.Imported(v3, v1))))
-            // the same version copied anew (one damaged, mended): imported, nothing newer replaced
             assertEquals(st.s(R.string.pack_imported, st.s(R.string.pack_text), 1), PackImports.describe(app, PackImports.Outcome("a", ImportResult.Imported(v1, v1))))
-            // all imported: the results say the files may be deleted now (the app never deletes them)
             val good = outcomes.take(1)
             PackImports.finished(good)
             st.idle()
@@ -340,7 +318,6 @@ class PacksUatTest {
             assertFalse(shown, st.s(R.string.pack_unchanged_hint) in shown)
             dialog.dismiss()
             st.idle()
-            // the hint by what came of the files: "done, may be deleted" only where each is in; "unchanged" where none was taken
             val kept = PackImports.Outcome("old.youmopack", ImportResult.KeptNewer(v1, v3))
             val already = PackImports.Outcome("same.youmopack", ImportResult.AlreadyThere(v1))
             fun hintShown(results: List<PackImports.Outcome>): List<Boolean> {
@@ -397,9 +374,8 @@ class PacksUatTest {
                 PackStore.useShelf(shelf)
                 h.idle()
                 assertNull(gate(h))
-                // as copied: nothing found
                 assertFalse(PackStore.verifyNow())
-                // a byte of the text pack's changed, its size not: what a start does not see
+                // a byte changed, its size not: what a start does not see
                 val damaged = shelf.dir(PackKind.TEXT)!!
                 val file = File(damaged, "handwriting/test.txt")
                 file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
@@ -407,14 +383,11 @@ class PacksUatTest {
                 h.idle()
                 assertEquals(h.service.getString(R.string.pack_text_damaged), gate(h)?.contentDescription)
                 assertEquals(app.getString(R.string.pack_status_damaged, 1), PackImports.describe(app, PackStore.status(PackKind.TEXT)))
-                // the voice pack as it was
                 assertTrue(PackStore.ready(PackKind.VOICE))
-                // the same pack imported again: copied anew (not 已经导入过), the keyboard back
                 val again = runBlocking { PackStore.import(TestShelves.pack(PackKind.TEXT).inputStream()) }
                 assertTrue("$again", again is ImportResult.Imported)
                 h.idle()
                 assertNull(gate(h))
-                // the generation replaced deleted once the host is restarted on the new one
                 assertFalse(damaged.exists())
             }
         } finally {
@@ -422,22 +395,17 @@ class PacksUatTest {
         }
     }
 
-    // a shelf of its own, on [root] (a restart: another on the same root), its clock [now]
     private fun shelfAt(root: File, now: () -> Long = System::currentTimeMillis) =
         PackShelf(root, listOf(TestShelves.packs.publicKey), TestShelves.requirements, clock = now).apply { load() }
 
-    // a byte of [shelf]'s [kind] pack changed, its size not: what a start does not see
+    // a byte changed, its size not: what a start does not see
     private fun damage(shelf: PackShelf, kind: PackKind) {
         val path = if (kind == PackKind.TEXT) "handwriting/test.txt" else "voice/test.txt"
         val file = File(shelf.dir(kind)!!, path)
         file.writeBytes(file.readBytes().also { it[0] = (it[0].toInt() xor 1).toByte() })
     }
 
-    /**
-     * Review M-1, M-2: read through at the first start after the import, found damaged then; that
-     * kept, so the next start's keyboard is under the gate at once (not an engine failing at each
-     * start); imported again, mended, and so after a restart too.
-     */
+    /** Found damaged at the first start after the import, kept so: the next start's keyboard is under the gate at once. */
     @Test
     @Uat("ST-65")
     fun aPackFoundDamagedIsStillSoAfterARestartTillImportedAgain() {
@@ -450,11 +418,9 @@ class PacksUatTest {
                 for (kind in PackKind.entries) assertTrue(shelf.import(TestShelves.pack(kind).inputStream()) is ImportResult.Imported)
                 PackStore.useShelf(shelf)
                 damage(shelf, PackKind.TEXT)
-                // the first pass after the import reads both, charging or not
                 assertFalse(PackStore.verifyDue { false })
                 h.idle()
                 assertEquals(h.service.getString(R.string.pack_text_damaged), gate(h)?.contentDescription)
-                // the process restarted: its load says damaged, no read through needed
                 PackStore.useShelf(shelfAt(root))
                 h.idle()
                 assertEquals(h.service.getString(R.string.pack_text_damaged), gate(h)?.contentDescription)
@@ -474,7 +440,6 @@ class PacksUatTest {
         }
     }
 
-    /** Review M-1: read through again after 30 days, but only with the phone charging. */
     @Test
     fun aPackReadThroughA30DaysAgoWaitsForTheCharger() {
         val root = Files.createTempDirectory("packs").toFile()
@@ -487,12 +452,10 @@ class PacksUatTest {
             PackStore.useShelf(shelf)
             assertFalse(PackStore.verifyDue { error("not asked: the first read does not wait") })
             damage(shelf, PackKind.TEXT)
-            // read days ago: nothing due
             now += 10L * 24 * 60 * 60 * 1000
             assertFalse(PackStore.verifyDue { error("not asked: nothing due") })
             assertTrue(PackStore.ready(PackKind.TEXT))
             now += 30L * 24 * 60 * 60 * 1000
-            // due, not charging: left waiting
             assertTrue(PackStore.verifyDue { false })
             assertTrue(PackStore.ready(PackKind.TEXT))
             val generation = PackStore.state.value.generation
@@ -506,11 +469,7 @@ class PacksUatTest {
         }
     }
 
-    /**
-     * Review M-2: the host failing on the text pack (an engine that cannot load, a start that
-     * throws) reads it through there and then: damaged, it is said so; once a generation a process;
-     * a pack missing is not read.
-     */
+    /** The host failing on the text pack reads it through there and then, once a generation a process; a pack missing is not read. */
     @Test
     fun theHostFailingOnTheTextPackReadsItThroughOnce() {
         val root = Files.createTempDirectory("packs").toFile()
@@ -528,32 +487,26 @@ class PacksUatTest {
             val failure = java.io.IOException("Map failed")
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertNull(shelf.verifiedAt(PackKind.TEXT))
-            // that generation read through once this process: not again at each failure
             unreadable = false
             damage(shelf, PackKind.TEXT)
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertTrue(PackStore.ready(PackKind.TEXT))
-            // imported again (damaged after): read through, found so, the state counted up
             assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT, version = 2).inputStream()) is ImportResult.Imported)
             damage(shelf, PackKind.TEXT)
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, RuntimeException(org.fcitx.fcitx5.android.data.pack.PackUnavailableException(PackKind.TEXT, PackStatus.Missing))))
             val generation = PackStore.state.value.generation
             assertTrue(restartedOn.isEmpty())
             assertTrue(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
-            // review r4 LOW-2: the host restarted (the engines it loaded off the damaged files), not
-            // on the caller's thread, the host's, which restartIfRunning would wait for
+            // on the host's thread, not the caller's, which restartIfRunning would wait for
             val on = restartedOn.poll(5, java.util.concurrent.TimeUnit.SECONDS)
             assertNotNull(on)
             assertTrue(on !== Thread.currentThread())
             assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
-            // counted on the restart's thread, after it
             val until = System.currentTimeMillis() + 5000
             while (PackStore.state.value.generation == generation && System.currentTimeMillis() < until) Thread.sleep(10)
             assertTrue(PackStore.state.value.status(PackKind.TEXT) is PackStatus.Damaged)
             assertEquals(generation + 1, PackStore.state.value.generation)
-            // no pack in use now: nothing to read
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
-            // once
             assertNull(restartedOn.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS))
         } finally {
             PackStore.restartHost = restart
@@ -562,11 +515,7 @@ class PacksUatTest {
         }
     }
 
-    /**
-     * Review r4 LOW-1: read through in the last 10 minutes, or since this process started, the pack
-     * is not read again after a failure (a crash loop reading 311 MB at each start); older than
-     * both, it is.
-     */
+    /** Read through in the last 10 minutes, or since this process started, it is not read again after a failure (a crash loop). */
     @Test
     fun aPackReadThroughLatelyIsNotReadAgainAfterAFailure() {
         val root = Files.createTempDirectory("packs").toFile()
@@ -579,26 +528,21 @@ class PacksUatTest {
             assertTrue(shelf.import(TestShelves.pack(PackKind.TEXT).inputStream()) is ImportResult.Imported)
             PackStore.useShelf(shelf)
             val failure = java.io.IOException("Map failed")
-            // just read through, the process started long before: within 10 minutes
             PackStore.processStartedAt = { real - 60 * 60 * 1000L }
             assertFalse(shelf.verify(PackKind.TEXT))
             damage(shelf, PackKind.TEXT)
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertTrue(PackStore.ready(PackKind.TEXT))
-            // read 5 minutes ago (the mark as a start reads it), before the process started 2 minutes
-            // ago: within 10 minutes all the same
             File(shelf.dir(PackKind.TEXT)!!, PackShelf.VERIFIED).writeText("${real - 5 * 60 * 1000L}")
             PackStore.useShelf(shelfAt(root))
             PackStore.processStartedAt = { real - 2 * 60 * 1000L }
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertTrue(PackStore.ready(PackKind.TEXT))
-            // read 20 minutes ago (the mark as a start reads it), after the process started 30 minutes ago
             File(shelf.dir(PackKind.TEXT)!!, PackShelf.VERIFIED).writeText("${real - 20 * 60 * 1000L}")
             PackStore.useShelf(shelfAt(root))
             PackStore.processStartedAt = { real - 30 * 60 * 1000L }
             assertFalse(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertTrue(PackStore.ready(PackKind.TEXT))
-            // read 20 minutes ago, before the process started (5 minutes ago): read again, found
             PackStore.processStartedAt = { real - 5 * 60 * 1000L }
             assertTrue(PackStore.verifyAfterFailure(PackKind.TEXT, failure))
             assertTrue(PackStore.status(PackKind.TEXT) is PackStatus.Damaged)
@@ -610,7 +554,6 @@ class PacksUatTest {
         }
     }
 
-    /** The clock set back: a mark later than now does not count as read since the process started. */
     @Test
     fun aMarkLaterThanNowDoesNotSkipTheReadAfterAFailure() {
         val root = Files.createTempDirectory("packs").toFile()
@@ -635,7 +578,6 @@ class PacksUatTest {
         }
     }
 
-    /** Review L-7: what tells the rest of an import failing leaves it imported, counted all the same. */
     @Test
     fun anImportWhoseRestartFailsIsImportedAndCounted() {
         val restart = PackStore.restartHost
@@ -654,10 +596,7 @@ class PacksUatTest {
         }
     }
 
-    /**
-     * Review L-2: the host not up anew in time (still starting, on what files is not known): the
-     * pack it replaced is not deleted under it, but by the next start's load.
-     */
+    /** The host not up anew in time: the pack it replaced is not deleted under it, but by the next start's load. */
     @Test
     fun aPackReplacedWhileTheHostIsNotUpAnewIsDeletedByTheNextStart() {
         val restart = PackStore.restartHost
@@ -679,7 +618,7 @@ class PacksUatTest {
         }
     }
 
-    /** Review L-5: no pass of its own in the JVM tests (one landing 30 s on in another test); the tests above call it. */
+    /** No pass of its own in the JVM tests (one landing 30 s on in another test); the tests above call it. */
     @Test
     fun thePacksAreNotReadThroughInTheBackgroundInTheseTests() {
         assertFalse(PackStore.verifiesInBackground)

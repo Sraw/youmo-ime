@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Quick input's temp mode contract; lines are `modules/quickphrase/quickphrasetempmode.cpp`'s. */
+/** Quick input's temp mode, as fcitx's `QuickPhraseTempMode`. */
 class QuickPhraseTest {
 
     private class Mem(private val files: Map<String, String>) : PkgDataDir {
@@ -38,7 +38,6 @@ class QuickPhraseTest {
     @Test
     @Uat("HK-38")
     fun superGraveAndSuperSemicolonTriggerOnPressOnly() {
-        // :86-94, quickphrase.h:35-39
         assertFalse(rig.release(TempKeys.GRAVE, KeyStates.SUPER).filtered)
         assertFalse(rig.quickPhrase.isActive(rig.ic))
         val e = trigger()
@@ -56,8 +55,7 @@ class QuickPhraseTest {
 
     @Test
     fun theTableIsAskedForAtTheFirstLookupNotBefore() {
-        // the app loads it on a thread of its own at start (KotlinHost.startup): nothing may wait on it
-        // sooner; quick input opened lists the user's entries, its first lookup
+        // loaded on its own thread at start: nothing waits on it sooner; opening lists the user's entries, its first lookup
         var asked = 0
         val rig = TempModeRig(QuickPhraseTable.EMPTY, { null }, tableSource = { asked++; table })
         rig.press('a'.code)
@@ -85,7 +83,7 @@ class QuickPhraseTest {
 
     @Test
     fun digitsSelectOnThePageElseType() {
-        // :103-115: digit selection with no modifier, page-relative; past the page, typed
+        // digit selection with no modifier, page-relative; past the page, typed
         trigger()
         rig.type("xy")
         rig.press(KeySyms.KP_0 + 2)
@@ -102,7 +100,6 @@ class QuickPhraseTest {
 
     @Test
     fun returnCommitsWhatWasTyped() {
-        // :175-186
         trigger()
         rig.type("zq")
         rig.press(KeySyms.RETURN)
@@ -120,7 +117,7 @@ class QuickPhraseTest {
         val list = rig.panel.candidates!!
         assertEquals(12, list.totalSize)
         assertEquals(listOf("v1", "v10", "v11", "v12", "v2"), rig.page)
-        // Up on the first page before any Down: not taken by the list, types nothing (:121-133)
+        // Up on the first page before any Down: not taken by the list, types nothing
         val before = rig.log.size
         rig.press(TempKeys.UP)
         assertEquals(0, rig.panel.candidates!!.currentPage)
@@ -218,7 +215,6 @@ class QuickPhraseTest {
 
     @Test
     fun aTapWithoutClientPreeditLeaves() {
-        // :331-343
         trigger()
         rig.type("ab")
         val e = rig.pipeline.invokeAction(rig.ic, InvokeActionEvent(InvokeActionEvent.Action.LeftClick, 1))
@@ -228,7 +224,7 @@ class QuickPhraseTest {
 
     @Test
     fun returnCommitsWhatIsTypedAndNothingWhenNothingIs() {
-        // :175-180 with no prefix or alt (the trigger passes none here)
+        // no prefix or alt (the trigger passes none here)
         trigger()
         rig.press(KeySyms.RETURN)
         assertFalse(rig.quickPhrase.isActive(rig.ic))
@@ -277,8 +273,7 @@ class QuickPhraseTest {
         assertEquals("a⏎", QuickPhraseExcerpt.of("a\r\nb"))
     }
 
-    // nothing typed, Space leaves and types itself; an entry the user lit (Tab, the next candidate)
-    // is the one Space then commits, not a space
+    // nothing typed, Space leaves and types itself; an entry the user lit is the one Space commits
     @Test
     @Uat("QU-22")
     fun spaceWithNothingTypedCommitsTheEntryLitElseASpace() {
@@ -294,8 +289,7 @@ class QuickPhraseTest {
         assertEquals(listOf(" ", "mine"), rig.commits())
     }
 
-    // the book changed while the list is open (an entry deleted from its card): the list made
-    // again stays on the page the user was on
+    // the book changed while the list is open: the list made again stays on the user's page
     @Test
     @Uat("QU-17")
     fun aListMadeAgainKeepsItsPage() {
@@ -309,8 +303,7 @@ class QuickPhraseTest {
         assertEquals(page, rig.page)
     }
 
-    // entries deleted from their cards while the list is open, the lit one on the last page: the list
-    // made again, now shorter, goes to its last page and lights its last entry, not past either
+    // entries deleted on the last page: the shorter list goes to its last page and entry, not past
     @Test
     @Uat("QU-17")
     fun aListMadeAgainShorterKeepsTheLastPageAndLitIndexItStillHas() {

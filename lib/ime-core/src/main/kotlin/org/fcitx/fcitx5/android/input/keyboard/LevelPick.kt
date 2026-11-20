@@ -6,19 +6,10 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import kotlin.math.abs
 
-/**
- * Which of a few named levels some int preferences are at (键盘高度, 振动强度 ...): the level is stored
- * nowhere, it is the nearest to what they hold. The settings list shows it, and the keyboard asks the
- * same of the height (紧凑 or not, [KeyboardHeightLevels]), so the two never disagree.
- */
+/** Levels are stored nowhere: the nearest to what the preferences hold, the same answer for settings and keyboard. */
 object LevelPick {
 
-    /**
-     * The index of the level of [levels] (each a value per preference, in [held]'s order) nearest
-     * [held]: each preference's distance over how far apart the levels set it, so one in ms and one of
-     * 0..255 weigh alike. Exactly halfway between two, the earlier in [levels] (an old 23% / 38%
-     * height is 紧凑).
-     */
+    /** Distances scaled by how far apart the levels set each preference; a tie goes to the earlier (an old 23% / 38% is 紧凑). */
     fun nearest(held: List<Int>, levels: List<List<Int>>): Int {
         require(levels.isNotEmpty() && levels.all { it.size == held.size }) { "levels of ${held.size} values" }
         val spans = held.indices.map { k -> levels.maxOf { it[k] } - levels.minOf { it[k] } }

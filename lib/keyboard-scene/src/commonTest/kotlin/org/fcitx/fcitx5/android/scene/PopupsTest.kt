@@ -26,7 +26,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/** The popups' scenes (rules D §4): their sizes, as theme 3.0's views had them, and their looks the theme's. */
 class PopupsTest {
     private val d = Forms.DENSITY
     private val theme = Fixtures.materialLight
@@ -42,11 +41,8 @@ class PopupsTest {
     @Test
     fun aBubbleIsAsWideAsTheKeyItsTextOrTheLeastWhicheverIsWidest() {
         val b = builder()
-        // a narrow key, one letter: the least
         assertEquals(px(Popups.PREVIEW_MIN_WIDTH_DP), b.preview("g", 20.0).ok().width)
-        // a wide key
         assertEquals(300.0, b.preview("g", 300.0).ok().width)
-        // words wider than the key: their width and 6 dp a side
         val size = 16 * d
         val words = b.preview("abcdefghij", 20.0, size).ok()
         assertEquals(ceil(10 * 0.6 * size) + 2 * px(Popups.TEXT_PADDING_DP), words.width)
@@ -78,7 +74,6 @@ class PopupsTest {
         assertEquals(Popups.MIN_WORDS_DP * d * 0.9, least, 1e-9)
     }
 
-    // 060-render-p2 §5.3: the bubble's corners the keys' (the theme's radius), its shadow drawn
     @Test
     fun theBubbleIsThemeShapedAndShadowed() {
         val bubble = builder().preview("g", 100.0).ok().keys.single()
@@ -98,7 +93,6 @@ class PopupsTest {
         FakeMeasurer,
     )
 
-    // 060-render-p3 T4b: `shape="bubble"`, a rounded head over the key, a tail down from its middle
     @Test
     fun aBubblesHeadIsItsTopRowItsTailDownToTheKey() {
         val plain = builder().preview("g", 100.0).ok()
@@ -112,23 +106,18 @@ class PopupsTest {
         assertEquals(Box(0.0, 0.0, 100.0, row + tail), shape.bounds)
         assertTrue(shape.contains(50.0, row + tail - 2) && !shape.contains(30.0, row + 2), "the tail in the middle, narrow")
         assertFalse(shape.contains(0.5, 0.5), "its corners the theme's radius")
-        // drawn: its shadow, its fill, all the bubble's shape; the text in the head
         val ops = bubble.ops(false)
         assertEquals(Op.Fill(shape, color("popupBackground")), ops[1])
         assertEquals(shape.moved(0.0, 2 * d), assertIs<Op.Shadow>(ops[0]).shape)
         assertEquals(plain.texts().single(), s.texts().single())
-        // tail="false": the head alone, rounded
         val head = styled("<style select=\"preview\" shape=\"bubble\" tail=\"false\"/>").preview("g", 100.0).ok().keys.single()
         assertEquals(Shape.Rect(Box(0.0, 0.0, 100.0, row), List(4) { 4 * d }), head.shape)
-        // the tail a third of a narrow head at most, clear of its corners
         val narrow = styled("<style select=\"preview\" shape=\"bubble\" radius=\"50%\"/>").preview("g", 20.0).ok().keys.single()
         assertIs<Shape.Rect>(narrow.shape, "no room for a tail between the corners")
-        // a path: the theme's outline in the bubble's box
         val path = styled("<style select=\"preview\" shape=\"path(M0 0 H1 V.5 L.5 1 L0 .5 Z)\"/>").preview("g", 100.0).ok().keys.single()
         assertEquals(Box(0.0, 0.0, 100.0, plain.height), assertIs<Shape.Path>(path.shape).bounds)
     }
 
-    // a bubble's border inside it, its middle half its width in, as a rectangle's is: its tail's too
     @Test
     fun aBubblesBorderIsInsideIt() {
         val bubble = styled("<style select=\"preview\" shape=\"bubble\" border=\"2dp #ff000000\"/>").preview("g", 100.0).ok().keys.single()
@@ -154,7 +143,6 @@ class PopupsTest {
         }
     }
 
-    // `size`: the whole bubble larger (its text, padding, width and top row, the row up), `offset` it moved
     @Test
     fun aBubblesSizeAndOffset() {
         val plain = builder().preview("g", 100.0).ok()
@@ -165,31 +153,27 @@ class PopupsTest {
         val t = big.texts().single()
         assertEquals(plain.texts().single().size * 1.5, t.size, 1e-9)
         assertEquals(row * 1.5 / 2 - (-1.05 * t.size + 0.3 * t.size) / 2, t.baseline, 1e-9)
-        // its width whole pixels, as the view's is: up to the next where scaled to a fraction
         assertEquals(ceil(px(Popups.PREVIEW_MIN_WIDTH_DP) * 1.6), styled("<style select=\"preview\" size=\"160%\"/>").preview("g", 1.0).ok().width, 1e-9)
         val words = styled("<style select=\"preview\" size=\"120%\"/>").preview("abcdefghij", 20.0, 16 * d).ok()
         assertEquals(ceil(ceil(10 * 0.6 * 16 * d * 1.2) + 2 * px(Popups.TEXT_PADDING_DP) * 1.2), words.width, 1e-9)
         val larger = styled("<style select=\"preview\" size=\"130%\"/>")
         assertEquals(129.0, larger.preview("g", 97.0).ok().width, "the least, 99 px, by 1.3: 128.7")
         assertEquals(257.0, larger.preview("g", 197.0).ok().width, "the key's 197 px by 1.3: 256.1")
-        // up: the scene taller by it, the bubble as tall, clear of the key's bottom
         val up = styled("<style select=\"preview\" offset=\"-4dp\"/>").preview("g", 100.0).ok()
         val by = px(4.0)
         assertEquals(plain.height + by, up.height)
         assertEquals(plain.keys.single().shape, up.keys.single().shape)
-        // down: the scene shorter, the bubble as tall, its bottom past the scene's (the app draws it in the room round it)
+        // its bottom past the scene's: the app draws it in the room round it
         val down = styled("<style select=\"preview\" offset=\"4dp\"/>").preview("g", 100.0).ok()
         assertEquals(plain.height - by, down.height)
         assertEquals(plain.keys.single().shape, down.keys.single().shape)
         assertEquals(plain.height, down.keys.single().ops(false).filterIsInstance<Op.Fill>().single().shape.bounds.bottom)
-        // a bubble's head moved down as much, its tail too, the scene's top moved
         val bubble = styled("<style select=\"preview\" shape=\"bubble\" offset=\"4dp\"/>").preview("g", 100.0).ok()
         assertEquals(plain.height - by, bubble.height)
         val path = styled("<style select=\"preview\" shape=\"path(M0 0 H1 V1 H0 Z)\" offset=\"4dp\"/>").preview("g", 100.0).ok()
         assertEquals(Box(0.0, 0.0, 100.0, plain.height), path.keys.single().shape.bounds, "a path as tall too")
     }
 
-    // `popup:selected`: the cell in focus a face, its radius and border the theme's (theme 3.0's had neither)
     @Test
     fun aLongPresssSelectedCellHasItsRadiusAndBorder() {
         val b = styled("<style select=\"popup:selected\" radius=\"6dp\" border=\"1dp #ff112233\" inner-shadow=\"0 1dp 0 #40000000\"/>")
@@ -203,12 +187,10 @@ class PopupsTest {
         assertEquals(d, stroke.width)
         assertEquals(Argb(0xFF112233.toInt()), stroke.color)
         assertEquals(fill.shape.bounds.inset(d / 2, d / 2, d / 2, d / 2), stroke.shape.bounds)
-        // the others: their text only, as ever
         assertEquals(listOf("Text"), s.keys.first { it.label == "b" }.ops(false).map { it::class.simpleName })
     }
 
-    // the panel's border, inner shadow and shape its own: the cell in focus takes them only from a style naming
-    // `:selected`, its fill and radius as they cascade (decided 2026-11-09)
+    // the cell in focus takes the panel's border, inner shadow and shape only from a style naming `:selected`
     @Test
     fun aLongPresssSelectedCellTakesItsBorderOnlyFromSelected() {
         val panel = "<style select=\"popup\" radius=\"5dp\" border=\"2dp #ff445566\" inner-shadow=\"0 1dp 0 #40000000\" shape=\"path(M0 0 H1 V1 Z)\"/>"
@@ -222,7 +204,6 @@ class PopupsTest {
         val plain = cell(panel)
         assertEquals(listOf("Fill", "Text"), plain.ops(false).map { it::class.simpleName })
         assertEquals(List(4) { 5 * d }, assertIs<Shape.Rect>(plain.shape).radii, "a rectangle, the panel's radius")
-        // a later style of the panel as specific as `popup:selected` (a scene's) does not take its border away
         val selected = cell("<style select=\"popup:selected\" border=\"1dp #ff112233\"/>\n<style select=\"@dark popup\" border=\"3dp #ff000000\"/>\n$panel")
         val stroke = selected.ops(false).filterIsInstance<Op.Stroke>().single()
         assertEquals(d, stroke.width)
@@ -239,19 +220,14 @@ class PopupsTest {
         assertEquals(ceil(4 * 0.6 * size) + 2 * pad, keys.width)
         assertEquals(size, keys.size)
         assertEquals(px(Popups.KEY_HEIGHT_DP), keys.height)
-        // one letter: the least width
         assertEquals(px(Popups.KEY_MIN_WIDTH_DP), b.popupKeys(listOf("a", "b"), 2, 2000.0).ok().width)
-        // no room known: as wide as they want
         assertEquals(keys.width, b.popupKeys(labels, 3, null).ok().width)
-        // too wide for the room: narrower, the text smaller alike
         val narrow = b.popupKeys(labels, 3, 3 * 100.0).ok()
         assertEquals(100.0, narrow.width)
         assertEquals(size * 100 / keys.width, narrow.size, 1e-9)
-        // never below the least size (what is wider still is cut as drawn)
         assertEquals(px(Popups.MIN_WORDS_DP), b.popupKeys(labels, 3, 3 * 50.0).ok().size)
     }
 
-    // 061-text-variables §2.3: a value filled in, 64 characters at most, shrunk to the least size, then cut, said whole
     @Test
     fun aLabelTooWideIsShrunkThenCutAndSaidWhole() {
         val b = builder()
@@ -266,30 +242,25 @@ class PopupsTest {
         assertTrue(text.text.endsWith("…"), text.text)
         assertTrue(long.startsWith(text.text.removeSuffix("…")))
         assertTrue(text.text.length < long.length)
-        // one that fits: whole
         assertEquals("a", s.keys.single { it.label == "a" }.ops(false).filterIsInstance<Op.Text>().single().text)
     }
 
-    // a long label is cut by halving, not a start at a time from the longest (R26 F8295): a label of 64 x's measured a
-    // handful of times, not some fifty; the start kept still the longest that fits
+    // a long label is cut by halving: a label of 64 x's measured a handful of times, not some fifty
     @Test
     fun aLongLabelIsCutInAFewMeasures() {
         val long = "x".repeat(64)
         val measured = ArrayList<String>()
         val counting = TextMeasurer { text, font, weight, size -> FakeMeasurer.measure(text, font, weight, size).also { if ('x' in text) measured += text } }
         val b = builder(measurer = counting)
-        // a key wide enough for a few x's and the 「…」 (60 is not one x's at the least size)
         val keys = b.popupKeys(listOf(long), 1, 300.0).ok()
         measured.clear()
         val text = b.popup(listOf(long), listOf(listOf(0)), keys, selected = -1).ok().keys.single().ops(false).filterIsInstance<Op.Text>().single().text
         val kept = text.removeSuffix("…")
         assertTrue(text.endsWith("…") && kept.isNotEmpty() && long.startsWith(kept), text)
         assertTrue(measured.size <= 10, "${measured.size} measures: $measured")
-        // one x more was measured, and is not what is drawn: it did not fit
         assertTrue("x".repeat(kept.length + 1) + "…" in measured, "$measured")
     }
 
-    // cut between characters as seen, never inside a flag, a family, an accent or a keycap
     @Test
     fun aLabelIsCutBetweenCharactersAsSeen() {
         val family = "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67"
@@ -316,7 +287,6 @@ class PopupsTest {
         val labels = listOf("a", "b", "c", "d", "e", "f", "g")
         val b = builder()
         val keys = b.popupKeys(labels, 4, null).ok()
-        // the 4 columns round the 2nd, the top row's last slot empty
         val s = b.popup(labels, listOf(listOf(2, 0, 1, 3), listOf(6, 4, 5, -1)), keys, selected = 0).ok()
         assertEquals(4 * keys.width, s.width)
         assertEquals(2 * keys.height, s.height)
@@ -324,10 +294,8 @@ class PopupsTest {
         assertEquals(7, byLabel.size)
         assertEquals(Box(keys.width, keys.height, 2 * keys.width, 2 * keys.height), byLabel.getValue("a").bounds)
         assertEquals(Box(0.0, 0.0, keys.width, keys.height), byLabel.getValue("g").bounds)
-        // the panel the base: its shadow and fill once, under all the keys
         assertEquals(listOf("Shadow", "Fill"), s.base.map { it::class.simpleName })
         assertEquals(color("popupBackground"), (s.base[1] as Op.Fill).color)
-        // the key in focus filled and coloured as selected; the others their text only
         val a = byLabel.getValue("a")
         assertEquals(setOf(KeyState.Selected), a.states)
         assertEquals(color("genericActiveBackground"), (a.ops(false).first() as Op.Fill).color)
@@ -349,27 +317,22 @@ class PopupsTest {
         assertEquals(px(Popups.MENU_SELECTED_DP), cut.shape.bounds.width, 1.0)
         assertEquals(px(Popups.MENU_FACE_DP), all.shape.bounds.width, 1.0)
         assertTrue(cut.shape.bounds.width > all.shape.bounds.width)
-        // round: the theme's 50%
         val face = assertIs<Shape.Rect>(all.shape)
         assertEquals(face.box.width / 2, face.radii[0], 1e-9)
-        // the others the long press's colours, the one in focus Return's (0.6.1)
         assertEquals(listOf(color("accentKey")), cut.ops(false).filterIsInstance<Op.Fill>().map { it.color })
         assertEquals(color("accentKeyText"), cut.ops(false).filterIsInstance<Op.Icon>().single().tint)
         assertEquals(listOf(color("popupBackground")), all.ops(false).filterIsInstance<Op.Fill>().map { it.color })
-        // an icon at its own size in the middle, the theme's colour
         val icon = all.ops(false).filterIsInstance<Op.Icon>().single()
         assertEquals("select-all", icon.name)
         assertEquals(Box(cell / 2 - 12 * d, cell / 2 - 12 * d, cell / 2 + 12 * d, cell / 2 + 12 * d), icon.box)
         assertEquals(color("popupText"), icon.tint)
-        // disabled: 30% of itself
         assertEquals(setOf(KeyState.Disabled), copy.states)
         val faded = copy.ops(false).filterIsInstance<Op.Fill>().single().color
         assertEquals(Argb(color("popupBackground").value and 0xFFFFFF or (77 shl 24)), faded)
         assertEquals("全选", all.a11y)
     }
 
-    // the cell in focus disabled (复制 in a password field, the finger on it): still Return's colour and larger, faded,
-    // so the pick shows though it does nothing; a disabled one beside it the long press's colour faded
+    // the cell in focus disabled still Return's colour, faded, so the pick shows though it does nothing
     @Test
     @Uat("KB-105")
     fun aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded() {
@@ -386,7 +349,6 @@ class PopupsTest {
         assertEquals(faded(color("popupText")), cut.ops(false).filterIsInstance<Op.Icon>().single().tint)
     }
 
-    // a faded cell's picture and image as they are, the colour over the one and under the other faded
     @Test
     fun aFadedPictureOrImageFadesItsColour() {
         val env = Forms.block
@@ -408,7 +370,6 @@ class PopupsTest {
         val wide = floor(cell * Popups.MENU_WORDS_WIDTH)
         assertEquals(wide, b.menuKeys(cells).ok().width)
         assertEquals(3 * wide, s.width)
-        // in [order]: 拼音 first
         assertEquals("拼音", s.keys.first().label)
         val pill = s.keys.first().shape.bounds
         assertEquals(wide - 2 * px(Popups.MENU_PILL_SIDE_DP), pill.width, 1e-9)
@@ -416,7 +377,6 @@ class PopupsTest {
         assertEquals(Popups.MENU_TEXT_DP * d, text.size, 1e-9)
     }
 
-    // 060-render-p3 T4a review: a theme's letter-spacing and each script's font measured in the popups as on the keys
     @Test
     fun aPopupsTextIsMeasuredAsAKeys() {
         val styled = ThemeReader.theme(

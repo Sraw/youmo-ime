@@ -5,8 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.learn.RecordingHabits
@@ -28,41 +27,22 @@ import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
-/**
- * A key read as the key next to it, as a session has it (061-neighbour-correction §8): the word so
- * read is learned under the keys meant, the code shows them, and what the keys read as typed is
- * not raised by a slip.
- */
+/** A slipped key: the word is learned under the keys meant, and the keys as typed are not raised. */
 class PinyinSessionSlipTest {
 
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你好", -3f, 0f)
-                .unigram("他", -2.5f, 0f)
-                .unigram("呀", -3f, 0f)
-                .unigram("吗", -2.5f, 0f)
-                .unigram("们", -3f, 0f)
-                .unigram("本", -3.5f, 0f)
-                .unigram("我", -2f, 0f)
-                .unigram("那", -3f, 0f)
-                .entry("你好", syl("ni", "hao"))
-                .entry("他", syl("ta"))
-                .entry("呀", syl("ya"))
-                .entry("吗", syl("ma"))
-                .entry("们", syl("men"))
-                .entry("本", syl("ben"))
-                .entry("我", syl("wo"))
-                .entry("那", syl("na"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("你好", "ni hao", -3f),
+        Triple("他", "ta", -2.5f),
+        Triple("呀", "ya", -3f),
+        Triple("吗", "ma", -2.5f),
+        Triple("们", "men", -3f),
+        Triple("本", "ben", -3.5f),
+        Triple("我", "wo", -2f),
+        Triple("那", "na", -3f),
     )
 
-    // the slips a session learns and pins, legal ones too: read over -4, as 双拼's 18 and 14 keys read them; 全拼's own
-    // floor, -1.75, reads no legal slip at all
+    // read over -4, as 双拼's grouped keys do; 全拼's -1.75 reads no legal slip
     private val loose = SlipCost()
 
     private fun session(segmenter: Segmenter, habits: RecordingHabits, spell: Boolean = false) =
@@ -82,11 +62,9 @@ class PinyinSessionSlipTest {
     fun aWordReadThroughASlipIsLearnedUnderTheKeyMeant() {
         val habits = RecordingHabits()
         val s = session(PinyinSegmenter(neighbours = true), habits)
-        // s tapped at its left edge, toward a
         val touches = qwerty("nihso").toMutableList().also { it[3] = TouchBoxes.tap(TouchBoxes.QWERTY, 's', dx = -0.45f) }
         val shown = s.tap("nihso", touches)
         assertEquals("你好", shown.candidates[0])
-        // the code shows the keys meant
         assertEquals("ni hao", shown.preedit)
         s.pick("你好")
         assertEquals(listOf("nihao"), habits.codes())
@@ -103,8 +81,7 @@ class PinyinSessionSlipTest {
         assertEquals(listOf("nihao"), habits.codes())
     }
 
-    // on 双拼 (小鹤, tama typed as in 全拼), which reads a slip that also spells as typed: 全拼 reads none since the
-    // user's 11-16 floors (PinyinSegmenter.SLIP)
+    // 全拼 reads none under its floors (PinyinSegmenter.SLIP)
     @Test
     @Uat("PY-140")
     fun aLegalSlipPickedIsLearnedUnderTheKeysMeantNotThoseTyped() {
@@ -116,8 +93,7 @@ class PinyinSessionSlipTest {
         assertTrue(habits.codes().toString(), habits.codes().all { "tama" !in it } && habits.codes().any { "yama" in it })
     }
 
-    // §8.3: 呀 picked twice with t tapped toward y (then 吗) is learned under ya; tama tapped so again
-    // still has 他 before 呀 (learned under the keys typed, 呀 would be raised there: the first of ta)
+    // learned under ya, so tama still has 他 before 呀
     @Test
     @Uat("PY-140")
     fun aLegalSlipPickedRaisesNothingUnderTheKeysTyped() {
@@ -132,8 +108,7 @@ class PinyinSessionSlipTest {
             s.pick("呀")
             assertEquals("呀吗", s.apply(Action.Select(0)).commit)
             s.apply(Action.Reset)
-            // the habits are looked up under the keys typed (HabitOrder's level, rest and arcs), the picks
-            // recorded under the keys meant: once (选一次排前) and twice (连选两次排第一) raise nothing here
+            // habits are looked up under the keys typed, picks recorded under the keys meant
             assertTrue("after ${it + 1}", order().let { (ta, ya) -> ya > ta && ta >= 0 })
             s.apply(Action.Reset)
         }
@@ -162,7 +137,7 @@ class PinyinSessionSlipTest {
         assertEquals(listOf(g14("m e b")), habits.codes())
     }
 
-    // 061-neighbour-groups: 双拼's 18 keys, 小鹤 [BN][F] (ben) with BN tapped toward M: 们 learned under [M][F], its codes
+    // 双拼's 18 keys, 小鹤 [BN][F] (ben) with BN tapped toward M: 们 learned under [M][F], its codes
     @Test
     @Uat("SP-48")
     fun onShuangpinsEighteenKeysTheKeyMeantIsLearnedAsItsCode() {
@@ -176,8 +151,7 @@ class PinyinSessionSlipTest {
         assertEquals(listOf("mf".map(letters::key).joinToString("")), habits.codes())
     }
 
-    // and 大千's: ㄇㄚ with ㄇ tapped toward ㄋ, 那 learned under ㄋㄚ (a slip that also spells as typed, read over -4:
-    // 大千's own floor, -1.75, reads none such, EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff)
+    // 大千's own floor reads no such slip, hence -4 here
     @Test
     @Uat("PY-150")
     fun onDachenTheSymbolMeantIsLearnedAsItsCode() {
@@ -191,7 +165,7 @@ class PinyinSessionSlipTest {
         assertEquals(listOf("${ZhuyinKeys.symbolCode('ㄋ')}$a"), habits.codes())
     }
 
-    // N2-A: the code shows the syllable as meant, not the keys: 小鹤 tq (tiu spells nothing) with q tapped by a is ta
+    // the code shows the syllable as meant, not the keys: 小鹤 tq (tiu spells nothing) with q tapped by a is ta
     @Test
     @Uat("SP-42")
     fun shuangpinsCodeShowsTheSyllableAsMeant() {
@@ -211,8 +185,6 @@ class PinyinSessionSlipTest {
         assertEquals("wo", shown.preedit)
     }
 
-    // a slip in a commit made in parts is filed by its place in the whole input, so it swaps a key of the part
-    // it falls in and of no other: each part's code has the keys meant in its own range alone
     @Test
     fun aCommitInPartsHasEachPartsSlipInItsOwnCode() {
         val towardY = qwerty("tama").toMutableList().also { it[0] = TouchBoxes.tap(TouchBoxes.QWERTY, 't', dx = 0.35f) }
@@ -235,7 +207,6 @@ class PinyinSessionSlipTest {
         assertEquals(second.codes().toString(), listOf("ta", "ma", "ma"), second.codes().filter { it.length == 2 })
     }
 
-    // a pin of a word read through a slip is filed under the keys meant, as its pick is learned: ta tapped on target keeps 他 first
     @Test
     fun aWordReadThroughASlipIsPinnedUnderTheKeysMeant() {
         val habits = RecordingHabits()
@@ -246,9 +217,7 @@ class PinyinSessionSlipTest {
         assertTrue(habits.pins.toString(), habits.pins.single().contains(":ya ") && habits.pins.single().endsWith(" on"))
     }
 
-    // a word of the user's own (made of picks, twice) read only through legal slips is not raised by being
-    // theirs: 全拼's habits read the keys as typed in whole syllables once the graph has a slip
-    // (hasOtherReadings; in 0.6.0 全拼's graph was never swapped)
+    // once the graph has a slip, habits read the keys as typed in whole syllables
     @Test
     fun aWordOfTheUsersReadOnlyThroughLegalSlipsIsNotRaised() {
         val learner = Learner(data)

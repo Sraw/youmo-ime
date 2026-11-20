@@ -26,10 +26,7 @@ import org.junit.Test
 import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 
-/**
- * Another input method's list imported (U-101, U-102, D24, C19): its words typed after the
- * dictionary's of the same keys, never in a sentence, the user's once typed twice; undone by batch.
- */
+/** Another input method's list imported: after the dictionary's words, never in a sentence, undone by batch. */
 class EnginesImportTest {
 
     private val pinyin = PinyinDataBuilder()
@@ -46,7 +43,6 @@ class EnginesImportTest {
         .entry("小", syl("xiao"))
         .entry("明", syl("ming"))
         .entry("吃饭", syl("chi", "fan"))
-        // zi read exactly, and zhi that z⇄zh reaches it by (review R11 F2741)
         .unigram("资", -1.5f, 0f)
         .unigram("支", -3f, 0f)
         .entry("资", syl("zi"))
@@ -60,9 +56,7 @@ class EnginesImportTest {
     private val list = sequenceOf(
         "# a list of another input method's",
         "汪晓明 wang'xiao'ming 5",
-        // a higher count: first of the imported
         "'wang'xiao'ming 王晓鸣 9",
-        // the dictionary's: left as it is
         "小明 xiao'ming 3",
         "!明 ming",
     )
@@ -79,8 +73,6 @@ class EnginesImportTest {
         reset()
     }
 
-    // review R11 F2741 (PLAN §2.3): an imported word goes after the dictionary's read exactly, but before
-    // one reached only through a fuzzy reading, not after them all
     @Test
     fun anImportedWordGoesBeforeADictionaryWordReachedOnlyByAFuzzyReading() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -106,7 +98,6 @@ class EnginesImportTest {
             engines.reset()
             assertTrue("汪晓明" in longer)
             assertTrue(longer.filter { "晓" in it }.all { it == "汪晓明" || it == "王晓鸣" })
-            // 简拼 too, after the dictionary's
             val short = engines.all("wxm")
             engines.reset()
             assertTrue("$short", short.indexOf("王小明") < short.indexOf("汪晓明"))
@@ -131,27 +122,24 @@ class EnginesImportTest {
             val batch = engines.importBatches().single()
             assertEquals("a.txt" to 2, batch.file to batch.count)
             assertEquals(1, batch.left)
-            // undone: the word only imported goes, the user's stays
             assertEquals(1, engines.dropImport(batch.id))
             val after = engines.all("wangxiaoming")
             engines.reset()
             assertFalse("王晓鸣" in after)
             assertEquals("汪晓明", after.first())
             assertEquals(emptyList<ImportLayer.Batch>(), engines.importBatches())
-            // 撤销
             assertTrue(engines.restoreImport(batch.id))
             assertEquals(listOf("王晓鸣"), engines.importedWords().map { it.text })
             assertTrue("王晓鸣" in engines.all("wangxiaoming"))
             engines.reset()
         }
-        // kept in the record
         Engines(::load, dir).use { again ->
             assertEquals(listOf("王晓鸣"), again.importedWords().map { it.text })
             assertTrue("王晓鸣" in again.all("wangxiaoming"))
         }
     }
 
-    // review-G S4 and NIT: a word the dictionary has in another reading, and a line of no Chinese, are no words to import
+    // a word the dictionary has in another reading, and a line of no Chinese, are no words to import
     @Test
     fun aDictionaryWordMisreadOrALatinLineIsNotImported() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -162,7 +150,6 @@ class EnginesImportTest {
         }
     }
 
-    // review-G NIT: picked once, an imported word is filed as read where it was typed
     @Test
     fun anImportedWordPickedIsFiledAsTyped() {
         val dir = MemoryFiles()
@@ -181,13 +168,11 @@ class EnginesImportTest {
             assertEquals(Engines.Imported(added = 1, blocked = 0, unread = 0), engines.importWords(export, "export.txt"))
             assertEquals(listOf("汪晓明"), engines.userWords(UserWord.Kind.ADDED).map { it.text })
             assertEquals(emptyList<ImportLayer.Word>(), engines.importedWords())
-            // a list then: 王晓鸣 imported, 汪晓明 added already
             assertEquals(1, engines.importWords(list, "a.txt").imported)
             assertEquals(listOf("王晓鸣"), engines.importedWords().map { it.text })
         }
     }
 
-    // review-G S1: as after a restart, a word typed once and its list undone is no word: the list imports it again
     @Test
     fun aWordTypedOnceIsImportedAgainAfterItsListIsUndone() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -200,7 +185,7 @@ class EnginesImportTest {
         }
     }
 
-    // review-G S6: 导入的词 lists only those not yet the user's: no word added by hand or blocked since
+    // 导入的词 lists only those not yet the user's: no word added by hand or blocked since
     @Test
     fun theWordsImportedLeaveOutThoseAddedByHandOrBlocked() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -213,7 +198,7 @@ class EnginesImportTest {
         }
     }
 
-    // review-G S9: a page of them put in at a code, by their order; the rest where the decoder has them, after
+    // a page of them put in at a code, by their order; the rest where the decoder has them, after
     @Test
     fun aPageOfImportedWordsAtACodeGoesByTheirOrder() {
         val many = listOf("汪晓明", "王晓鸣", "望小名", "忘晓铭", "网晓敏", "旺小鸣", "往晓明", "枉小铭", "罔晓名", "亡小敏", "惘晓鸣", "尪小明")
@@ -227,9 +212,7 @@ class EnginesImportTest {
         }
     }
 
-    // review-G M1: a rewrite (U-88's, a restore's) makes the record's imported words anew, their
-    // places numbered again: the model is made again with them, so a batch dropped after it is gone,
-    // and a list imported then is typed as its own words, no old place standing for another's
+    // a rewrite renumbers the imported words' places and the model is made again with them
     @Test
     fun aRewrittenRecordsImportsAreTheModelsToo() {
         val other = LearnBackup.bytes(BackupHead(0, 1, 7L, BackupHead.SAVED), LearnLog(null, FakeClock()).apply { open() }.state, emptyList(), emptyList())
@@ -254,7 +237,7 @@ class EnginesImportTest {
         }
     }
 
-    // review-G S8: U-86's 全部清空 takes every batch with it
+    // 全部清空 takes every batch with it
     @Test
     fun clearingAllTakesTheImportsToo() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -266,8 +249,7 @@ class EnginesImportTest {
         }
     }
 
-    // an undo while typing, words imported: the session and its input stay, the record's places
-    // the model's still (review-G M1), the list read anew by AGAIN
+    // the session and its input stay
     @Test
     fun anUndoWhileTypingKeepsTheInput() {
         Engines(::load, MemoryFiles()).use { engines ->
@@ -286,7 +268,7 @@ class EnginesImportTest {
         }
     }
 
-    // review-int S3 (U-82, D13): an imported word not yet typed is the user's to 删除, said imported
+    // an imported word not yet typed is the user's to 删除, said imported
     @Test
     fun anImportedWordIsDeletedAsTheUsers() {
         Engines(::load, MemoryFiles()).use { engines ->

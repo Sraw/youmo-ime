@@ -68,13 +68,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowToast
 
-/** The pages as the preferences [InputMethodSettings.create] makes of them, over fcitx's config. */
 @RunWith(RobolectricTestRunner::class)
-// the real application, which initialises the AppPrefs the nine keys' page reads
+// the real application initialises the AppPrefs the nine keys' page reads
 @Config(application = FcitxApplication::class)
 class InputMethodSettingsScreenTest {
-    // the app's own preferences the tests set: back to their defaults whether a test passed or not,
-    // or a failure leaks its value into the tests after it in this JVM
+    // reset whether a test passed or not, or a failure leaks into later tests in this JVM
     @After
     fun restorePrefs() {
         AppPrefs.getInstance().keyboard.run {
@@ -102,18 +100,15 @@ class InputMethodSettingsScreenTest {
 
     private fun PreferenceGroup.titled(@StringRes title: Int) = all().single { it.title == placeholder(title) }
 
-    // a page's keys, a group's after its name and a slash, to see what a save holds
     private fun Map<String, String>.flattened(): String = entries.joinToString("") {
         "${it.key}=${it.value}\n"
     }
 
-    // what the engine reads once [im]'s page saves [cfg]: the host's partial save, then its settings
-    // (that the host keeps these keys, the options androidengine.h declares, is AndroidEngineHeaderTest's to hold)
+    // AndroidEngineHeaderTest holds that the host keeps these keys
     private fun engineReads(im: String, cfg: Map<String, String>) = EngineOptions().apply { setPage(im, ConfigTree.of(cfg)) }.toSettings()
 
     private val defaults = EngineOptions().toSettings()
 
-    // the English page's word list, opened as the app's settings open a page
     @Test
     fun theEnglishPageOpensItsWordList() {
         val opened = ArrayList<SettingsRoute>()
@@ -125,7 +120,6 @@ class InputMethodSettingsScreenTest {
         assertEquals(listOf<SettingsRoute>(SettingsRoute.UserWordList("LEARNED", english = true)), opened)
     }
 
-    // 恢复码表顺序: asked first, then the page's input method's order reset on the fcitx thread
     @Test
     fun aTablesOrderIsResetOnceConfirmed() {
         val acted = ArrayList<InputMethodSettings.Action>()
@@ -146,7 +140,7 @@ class InputMethodSettingsScreenTest {
         val fcitx = FakeHostApi()
         assertTrue(runBlocking { acted.single().run(fcitx, wubi) })
         assertEquals(listOf("learning(ResetTableOrder(im=$wubi))"), fcitx.calls)
-        // F2673: the engine not there, not done; what is shown says which
+        // the engine not there: not done, and said so
         fcitx.learned = { LearningResult.Unavailable }
         assertFalse(runBlocking { acted.single().run(fcitx, wubi) })
         told.single()(true)
@@ -169,8 +163,7 @@ class InputMethodSettingsScreenTest {
         }
     }
 
-    // the keyboard's own, in the 九键 section of pinyin's and English's pages (11-01): in the app's preferences,
-    // nothing of it in fcitx's config
+    // the app's preferences, nothing in fcitx's config
     @Test
     fun multiTapOnTheNineKeysPageIsTheAppsPreference() {
         val pref = AppPrefs.getInstance().keyboard.t9MultiTap
@@ -183,13 +176,11 @@ class InputMethodSettingsScreenTest {
         assertEquals(T9MultiTap.Off, pref.getValue())
         assertEquals(0, saved)
         assertTrue(AppPrefs.T9_MULTI_TAP !in cfg.flattened())
-        // on pinyin's page, its section hidden while the keyboard is the 26 keys
         AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Full)
         val row = screen(InputMethodCatalog.PINYIN).findPreference<ListPreference>(AppPrefs.T9_MULTI_TAP)!!
         assertFalse(row.parent!!.isVisible)
     }
 
-    // how 九键英文 types: the app's preference, as multi-tap, on English's page
     @Test
     fun nineKeyEnglishTypingIsTheAppsPreference() {
         val keyboard = AppPrefs.getInstance().keyboard
@@ -200,7 +191,7 @@ class InputMethodSettingsScreenTest {
         keyboard.t9EnglishTyping.setValue(T9EnglishTyping.Predictive)
     }
 
-    // as multi-tap: handwriting's own, nothing of it in fcitx's config; on the shared page's 手写 (061-handwriting-toolbar §3.9)
+    // handwriting's own, nothing in fcitx's config
     @Test
     @Uat("ST-121")
     fun thePauseOnTheSharedPageIsTheAppsPreference() {
@@ -217,7 +208,6 @@ class InputMethodSettingsScreenTest {
         assertNull(screen(InputMethodCatalog.PINYIN).findPreference<ListPreference>(AppPrefs.HANDWRITING_PAUSE))
     }
 
-    // as multi-tap: the keyboard's own, nothing of it in fcitx's config
     @Test
     fun autoCapsOnTheEnglishPageIsTheAppsPreference() {
         val pref = AppPrefs.getInstance().keyboard.englishAutoCaps
@@ -232,8 +222,6 @@ class InputMethodSettingsScreenTest {
         assertTrue(AppPrefs.ENGLISH_AUTO_CAPS !in cfg.flattened())
     }
 
-    // 在键上划: one list of 滑行输入, 笔画筛选 and off, its summary the choice alone; a choice stored as it is picked
-    // (键盘手写 is the toolbar's 手写 now, 061-handwriting-toolbar)
     @Test
     @Uat("ST-121")
     fun keyDrawingIsOneChoiceSummarizedByItself() {
@@ -253,8 +241,7 @@ class InputMethodSettingsScreenTest {
         }
     }
 
-    // 笔画筛选灵敏度 there while 笔画筛选 is chosen, 首页单字 then or while a key's swipe is a stroke: each shown or
-    // hidden at once as 在键上划 changes; 首页单字 关 or 1 to 5, 2 by default
+    // 笔画筛选灵敏度 shows while 笔画筛选 is chosen, 首页单字 then or while a swipe is a stroke, toggled as 在键上划 changes
     @Test
     @Uat("ST-135")
     fun theStrokeRowsAreThereWhileStrokesAreDrawn() {
@@ -299,7 +286,6 @@ class InputMethodSettingsScreenTest {
         assertEquals("${pref.entry}\n${placeholder(length.summary)}", pref.summary?.toString())
     }
 
-    // as a list without an explanation shows it, not as "null"
     @Test
     fun aValueNotAmongTheChoicesIsNotSetAboveTheExplanation() {
         val length = InputMethodSettings.SHARED.flat().first { it is Choice && it.key == EngineSettings.MODEL_LEVEL } as Choice
@@ -308,7 +294,7 @@ class InputMethodSettingsScreenTest {
         assertEquals("${placeholder(androidx.preference.R.string.not_set)}\n${placeholder(length.summary)}", pref.summary?.toString())
     }
 
-    // MyListPreferenceDialogFragment offers Default only when hasDefault() is true: these lists have no default to go back to
+    // MyListPreferenceDialogFragment offers Default only when hasDefault() is true
     @Test
     fun aChoiceHasNoDefaultToGoBackTo() {
         appInputMethods.forEach { page -> screen(page).lists().forEach { assertFalse("$page ${it.key}", it.hasDefault()) } }
@@ -316,9 +302,7 @@ class InputMethodSettingsScreenTest {
         assertTrue(given.hasDefault())
     }
 
-    // a key the engine does not read is a switch that does nothing; the shared page and the physical
-    // keyboard's save into pinyin's config, whose shared keys are the addon's own, read by every
-    // session (EngineSettings, one for all: pinyin's, a table's, handwriting's)
+    // a key the engine does not read is a dead switch; shared keys go into pinyin's config, which every session reads
     @Test
     fun aChangeIsSavedWhereTheEngineReadsIt() {
         val cfg = mutableMapOf<String, String>()
@@ -333,8 +317,7 @@ class InputMethodSettingsScreenTest {
         assertEquals(defaults.copy(prediction = false, typos = false, pageSize = 5, modelLevel = ModelLevel.LOW), engineReads(InputMethodCatalog.PINYIN, cfg))
     }
 
-    // a page saves what it shows alone: the addon keeps the rest (a partial load), so a table's page
-    // opened before the shared one does not write back the prediction it read then
+    // a page saves only what it shows, so a table page opened earlier does not write back stale prediction
     @Test
     fun aPageSavesOnlyWhatItShows() {
         val cfg = mutableMapOf<String, String>().apply {
@@ -350,30 +333,26 @@ class InputMethodSettingsScreenTest {
             this["${EngineSettings.FUZZY}/${Fuzzy.L_N.name}"] = "True"
             this[EngineSettings.EMOJI] = "False"
         }
-        // pinyin's own (拆字) stays on its page; a pair of the fuzzy ones, not the group's name alone
+        // fuzzy ones as pairs, not the group's name alone
         assertEquals("${EngineSettings.EMOJI}=False\n${EngineSettings.FUZZY}/${Fuzzy.L_N.name}=True\n", InputMethodSettings.only(InputMethodSettings.SHARED, shared).flattened())
     }
 
-    // the shared page says under each what it is no use to; an input method's page, its own alone, says nothing of the kind
+    // the shared page says what each is no use to; an input method's own page says nothing of the kind
     @Test
     @Uat("ST-124")
     fun aSharedOptionSaysUnderItWhatItIsNoUseTo() {
         val shared = create(InputMethodSettings.SHARED)
-        // in the Chinese input methods' section, whose title says English: only the exception within it
         assertEquals(placeholder(R.string.im_prediction_summary), shared.titled(R.string.im_prediction).summary?.toString())
-        // emoji for every Chinese input method now (handwriting, which had none, is the toolbar's over them)
         assertEquals(placeholder(R.string.im_emoji_summary), shared.titled(R.string.im_emoji).summary?.toString())
         assertNull(shared.titled(R.string.auto_pairs).summary)
-        // 在键上划: the choice alone, which input methods each reaches is the docs'
         val drawing = shared.findPreference<ListPreference>(AppPrefs.KEY_DRAWING)!!
         assertEquals(drawing.entry.toString(), drawing.summary?.toString())
         val level = shared.findPreference<ListPreference>(EngineSettings.MODEL_LEVEL)!!
         assertEquals("${level.entry}\n${placeholder(R.string.im_model_level_summary)}", level.summary?.toString())
-        // pinyin's own: not for the 14 keys (the hardware keyboard still types full pinyin)
+        // not for the 14 keys (the hardware keyboard still types full pinyin)
         assertEquals("${placeholder(R.string.im_chaizi_summary)}\n${placeholder(R.string.im_not_for)}", screen(InputMethodCatalog.PINYIN).titled(R.string.im_chaizi).summary?.toString())
     }
 
-    // every input method's page opens the shared one from its first row
     @Test
     fun eachPageOpensTheSharedOneFromItsFirstRow() {
         val ctx = PlaceholderStrings(RuntimeEnvironment.getApplication())
@@ -396,7 +375,6 @@ class InputMethodSettingsScreenTest {
         val page = screen("engine-wubi", wubi)
         page.titled(R.string.im_auto_select).callChangeListener(false)
         page.titled(R.string.im_order_by_use).callChangeListener(false)
-        // a table's page is its group of the addon's config
         val group = InputMethodCatalog.TABLES.getValue("engine-wubi").group
         assertEquals(
             defaults.tables.getValue(group).copy(autoSelect = false, orderByUse = false),
@@ -419,7 +397,7 @@ class InputMethodSettingsScreenTest {
         assertEquals(placeholder(R.string.im_section_words), outer.getPreference(0).title?.toString())
     }
 
-    // 双拼's 14 keys, then 微软 chosen on the page: the keyboard row says the 18 keys, the ones typed on and stored
+    // 双拼's 14 keys, then 微软 chosen: the keyboard row says the 18 keys
     @Test
     @Uat("SP-26")
     fun theFourteenKeysUnderMicrosoftShowAsTheEighteen() {
@@ -434,8 +412,7 @@ class InputMethodSettingsScreenTest {
         }
     }
 
-    // R26 F8379: a layout of the user's that reads and draws, chosen for an input method it is not of now (a grouped one for
-    // English): its row says it cannot be used here, not that its file does not read
+    // a readable user layout chosen for an input method it does not fit now: said unusable here, not unreadable
     @Test
     @Uat("ST-191")
     fun aLayoutThatReadsButIsNotOfThisInputMethodIsSaidSo() {
@@ -452,7 +429,6 @@ class InputMethodSettingsScreenTest {
             val labels = row.entries.map { it.toString() }
             assertTrue(labels.toString(), placeholder(R.string.keyboard_custom_unusable) in labels)
             assertFalse(labels.toString(), placeholder(R.string.keyboard_custom_unread) in labels)
-            // chosen still, said by its name and the keyboard typed instead: the full one, English's own
             assertEquals("Custom:mine", row.value)
             val real = InputMethodSettings.create(PreferenceManager(appContext), InputMethodSettings.of(InputMethodCatalog.ENGLISH)!!, mutableMapOf(), {}, open = {})
                 .findPreference<ListPreference>(AppPrefs.ENGLISH_KEYBOARD)!!

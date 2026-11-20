@@ -22,14 +22,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** A candidate of the floating bar, once recycled, keeps nothing of the candidate it showed. */
 @RunWith(RobolectricTestRunner::class)
 class PagedCandidatesUiTest {
 
-    /**
-     * Splitties' recyclerView inflates its scrollbars layout, which :app's unit tests do not have
-     * (isIncludeAndroidResources): a plain RecyclerView stands in for it.
-     */
+    // Splitties' recyclerView inflates a scrollbars layout :app's unit tests lack (isIncludeAndroidResources)
     private class PlainRecyclerViews(base: Context) : ContextWrapper(base) {
         private val inflater = object : LayoutInflater(this) {
             override fun cloneInContext(newContext: Context): LayoutInflater = this
@@ -42,14 +38,13 @@ class PagedCandidatesUiTest {
     }
 
     @Test
-    // View.hasOnLongClickListeners is API 30: the check, not the code under test; the app for AppPrefs (ThemeManager)
+    // View.hasOnLongClickListeners is API 30: the check's, not the code's
     @Config(sdk = [35], application = FcitxApplication::class)
     fun aRecycledCandidateHoldsNeitherItsTapNorItsLongPress() {
         val ui = PagedCandidatesUi(
             PlainRecyclerViews(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, {},
             onCandidateClick = { _, _ -> }, onCandidateAction = { _, _, _ -> }, onPrevPage = {}, onNextPage = {}
         )
-        // no page before or after: the list is the candidate alone
         val data = HostEvent.Paged(
             listOf(CandidateWord("1", "你", "")), 0, hasPrev = false, hasNext = false
         )

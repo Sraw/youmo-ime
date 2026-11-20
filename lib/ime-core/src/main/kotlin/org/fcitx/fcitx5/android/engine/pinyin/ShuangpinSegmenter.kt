@@ -10,29 +10,13 @@ import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import java.util.TreeMap
 
 /**
- * Cuts 双拼 into the same [SyllableGraph] that [PinyinSegmenter] makes of full pinyin, so the
- * decoder needs nothing else. From each position the graph gets:
- * - the syllables the next two keys type, with their [Fuzzy] partners;
- * - failing that, or with one key left before the end or a separator, the one key for every
- *   syllable typed starting with it: [Kind.PARTIAL] at the end (`x` on the way to `xn` 小),
- *   [Kind.INITIAL] elsewhere; and a, e, o alone for 啊, 呃, 哦 where they type no initial, as
- *   in libime (`hka` 好啊 in 微软);
- * - an upper-case letter for the Latin letter, as in full pinyin.
- *
- * Where a key and the next make a syllable, the key is read alone too, as the initial of every
- * syllable typed starting with it ([Kind.INITIAL] flagged [SyllableMatches.ABBREV], which costs
- * [org.fcitx.fcitx5.android.engine.lattice.Penalties.abbrev] on top of the initial's): 简拼 in the
- * middle, as Rime's double_pinyin `abbrev`. So `ufmuh` in 自然码 is 什么时候, shen typed whole
- * and the rest by initials though mu and shang are pairs, while `xm` still reads 先 first: the
- * language model chooses. The pair alone was libime's reading; the abbreviation is priced so
- * that input typed in whole syllables reads as it did
- * (dev/design/061-shuangpin-abbrev-measure.md); [abbreviations] off is that old reading, for
- * measuring against. The one slip read with [typos] is ü typed with its own key after j, q, x, y
- * (`jv` for ju), which libime reads too. With [neighbours], two keys read too as the syllable
- * they make with one of them slipped from a key around it, as likely as where it was tapped says
- * ([SlipCost]; 061-neighbour-correction §4.2): legal, costing more, where the keys as typed make
- * a syllable or are both read alone (简拼, §4.5). A key with no place reads no slip: nearly any
- * two keys make a syllable, so a slip cannot be told from what was typed without one.
+ * Cuts 双拼 into the same [SyllableGraph] as [PinyinSegmenter]: per position the syllables the next two
+ * keys type (with [Fuzzy] partners), else one key as [Kind.PARTIAL] at the end or [Kind.INITIAL]; a, e,
+ * o alone as in libime; upper case as Latin letters. With [abbreviations], a key that pairs with the next
+ * is also read alone as an initial ([SyllableMatches.ABBREV], priced so whole-syllable input reads as
+ * before): mid-input 简拼 like Rime's `abbrev` (`ufmuh` 什么时候). [typos] reads `jv` for ju. With
+ * [neighbours], a pair also reads with one key slipped ([SlipCost]); a key without a tap place reads no
+ * slip, since nearly any two keys make a syllable.
  */
 class ShuangpinSegmenter(
     private val scheme: ShuangpinScheme,
@@ -107,12 +91,12 @@ class ShuangpinSegmenter(
 
     override fun reads(c: Char) = scheme.types(c)
 
-    // 微软 types ing on `;`: a final, so read only as a syllable's second key; at a
-    // syllable's start it is the punctuation key, as in Microsoft Pinyin (`ni;` is 你；)
+    // 微软 types ing on `;`: a final, read only as a syllable's second key; at a syllable start it is
+    // punctuation, as in Microsoft Pinyin (`ni;` is 你；)
     override fun readsAfter(before: String, c: Char): Boolean {
         if (!scheme.types(c) || c in 'a'..'z' || scheme.typesInitial(c)) return true
-        // the graph walks only positions reached: an edge there ending on c is a syllable it ends.
-        // Read in whole syllables: `lj;` is lan and `;`, not the l alone a 简拼 reads and `j;` (jing)
+        // the graph walks only reached positions: an edge ending on c is a syllable it ends. Whole syllables
+        // only: `lj;` is lan and `;`, not l alone and `j;`
         val graph = segment(before + c).withoutOtherReadings()
         return graph.end >= 2 && graph.edges(graph.end - 2).any { graph.to(it) == graph.end && graph.kind(it) == Kind.SYLLABLE }
     }
@@ -142,11 +126,7 @@ class ShuangpinSegmenter(
         vowels[key]?.let { edges.add(at, 1, Kind.SYLLABLE, it) }
     }
 
-    /**
-     * Adds the edge of the syllables the two keys at [at] make with one of them read as a key
-     * around it where it was tapped, those [pair] (what they make as typed) has left out, each at
-     * its cheapest slip; ü's slip (a [SyllableMatches.TYPO]) is not slipped again.
-     */
+    /** Adds an edge of the syllables the two keys at [at] make with one slipped to a neighbour, those [pair] lacks, each at its cheapest; ü's typo is not slipped again. */
     private fun slipped(input: String, at: Int, pair: SyllableMatches?, touches: Array<Touch?>, edges: GraphEdges) {
         val legal = pair != null || leads[input[at].code] != null && leads[input[at + 1].code] != null
         // made at the first slip read: none on most keys
@@ -161,7 +141,7 @@ class ShuangpinSegmenter(
         edges.add(at, 2, Kind.SYLLABLE, SyllableMatches(best.keys.toIntArray(), best.values.map { it.flags }.toIntArray()), slip = slips.build())
     }
 
-    // [best] (made if none and one is read) with the syllables the two keys at [at] make with the [j]th read as [near], where [touch] says it may be
+    // [best] plus the syllables the keys at [at] make with key [j] read as [near], where [touch] allows
     private fun slipOnto(input: String, at: Int, j: Int, touch: Touch, near: Near, pair: SyllableMatches?, legal: Boolean, best: TreeMap<Int, Slip>?): TreeMap<Int, Slip>? {
         val d = near.char
         val a = if (j == 0) d.code else input[at].code
@@ -179,15 +159,12 @@ class ShuangpinSegmenter(
         return out
     }
 
-    // a syllable's cheapest slip so far: its cost, which of the two keys, the key meant, its match's flags
     private class Slip(val cost: Float, val at: Int, val meant: Char, val flags: Int)
 
     private companion object {
-        /** Keys are ASCII; see [ShuangpinScheme.isKey]. */
         const val KEYS = 128
 
-        // the loosest floor that turns no sentence typed on target (a tap in the key's middle, σ 0.15) wrong, the
-        // user's 11-16 rule; over -4 one did in each scheme (061-neighbour-18key-impl-report §5)
+        // the loosest floor that turns no on-target sentence wrong (σ 0.15); over -4 one did in each scheme
         val SLIP = SlipCost(floor = -3.75f)
 
         fun single(syllable: Int) = SyllableMatches(intArrayOf(syllable), intArrayOf(0))

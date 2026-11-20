@@ -20,12 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * Shift on by itself at a sentence start ([TextKeyboard.applyAutoCaps]), as [AutoCaps] decides: one
- * letter capitalised, then lower case again; off again where no sentence starts; Shift or caps lock
- * the user turned on left as they are. Each state goes to AutoCaps and back as itself, whatever
- * order either enum declares them in.
- */
+/** Each state goes to AutoCaps and back as itself, whatever order either enum declares them in. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class TextKeyboardCapsTest {
@@ -37,12 +32,11 @@ class TextKeyboardCapsTest {
     }.laidOut()
 
     private fun type(letter: String): String {
-        // laid out again: the scene made anew for what Shift or a sentence start changed
         keyboard.laidOut().shownKeys().first { it.id == letter.lowercase() }.click()
         return typed.last()
     }
 
-    // Shift tapped, or long pressed (caps lock) as a screen reader does it on its node
+    // long pressed (caps lock) as a screen reader does it on its node
     private fun shift(long: Boolean = false) {
         val key = keyboard.shownKeys().first { it.id == "shift" } as SceneShownKey
         if (!long) {
@@ -58,7 +52,6 @@ class TextKeyboardCapsTest {
         keyboard.applyAutoCaps(true)
         assertEquals("Q", type("Q"))
         assertEquals("q", type("Q"))
-        // a letter deleted back: no sentence starts there
         keyboard.applyAutoCaps(true)
         keyboard.applyAutoCaps(false)
         assertEquals("q", type("Q"))
@@ -76,7 +69,7 @@ class TextKeyboardCapsTest {
         assertEquals("Q", type("Q"))
     }
 
-    // every row's letters, the bottom one too: the 双拼 `;` key after L once ended the pass there
+    // the bottom row too: the 双拼 `;` key after L once ended the pass there
     private fun letters() = keyboard.laidOut().shownKeys().sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
         .map { it.label }.filter { it.length == 1 && it[0] in 'a'..'z' || it in ('A'..'Z').map(Char::toString) }.joinToString("")
 
@@ -88,7 +81,7 @@ class TextKeyboardCapsTest {
         assertEquals("qwertyuiopasdfghjklzxcvbnm", letters())
     }
 
-    // a key of no name (a theme's letter without shortcut=): its built-in list in capitals under Shift, as its face
+    // a theme's letter without shortcut=: its built-in list in capitals under Shift, as its face
     @Test
     fun aKeyOfNoNamesListFollowsShift() {
         val shown = ArrayList<PopupAction>()

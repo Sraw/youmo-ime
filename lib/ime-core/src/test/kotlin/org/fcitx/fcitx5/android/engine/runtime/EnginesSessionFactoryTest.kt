@@ -16,11 +16,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * What the sessions made between two [Engines.invalidate]s share (F2 S8, review A 2.3): one
- * ChineseLanguage for handwriting and the tables, one list of coarse words for every Chinese session,
- * pinyin's too; made anew once what they were made of changes.
- */
+/** What the sessions made between two [Engines.invalidate]s share, made anew once what they were made of changes. */
 class EnginesSessionFactoryTest : EnginesFixture() {
 
     private fun Engines.resetEach(vararg ims: String) = ims.forEach { onEvent(it, EngineEvent.RESET, 0) }
@@ -32,7 +28,6 @@ class EnginesSessionFactoryTest : EnginesFixture() {
             assertEquals(1, engines.factory.languagesMade)
             assertEquals(1, engines.factory.coarseMade)
             val language = engines.factory.language()
-            // asked again, the one made
             assertSame(language, engines.factory.language())
             assertEquals(1, engines.factory.languagesMade)
         }
@@ -45,9 +40,7 @@ class EnginesSessionFactoryTest : EnginesFixture() {
             engines.resetEach(InputMethodCatalog.WUBI)
             val language = engines.factory.language()
             engines.invalidate()
-            // no session till the next key: none to ask of
             assertTrue(engines.candidates(InputMethodCatalog.PINYIN, 0, 5).isEmpty())
-            // what was typed dropped, a new session made
             assertEquals("h", engines.type(InputMethodCatalog.PINYIN, "h").preedit)
             engines.resetEach(InputMethodCatalog.WUBI)
             assertNotSame(language, engines.factory.language())
@@ -56,7 +49,6 @@ class EnginesSessionFactoryTest : EnginesFixture() {
         }
     }
 
-    // a word added drops the sessions (UserLexicon): the coarse words then leave it out, made anew
     @Test
     fun aWordAddedMakesTheCoarseWordsAnew() {
         Engines(::load, null, warmUps = inPlace).use { engines ->
@@ -68,9 +60,6 @@ class EnginesSessionFactoryTest : EnginesFixture() {
         }
     }
 
-    // a long press's delete of a word added by hand keeps the sessions (UserLexicon.unAdd): handwriting
-    // and the tables keep the list they were made with, a pinyin session made after makes its own
-    // without the word held back, as each did before the split
     @Test
     fun aWordAddedByHandDeletedLeavesTheSharedListAndANewPinyinSessionMakesItsOwn() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -87,14 +76,12 @@ class EnginesSessionFactoryTest : EnginesFixture() {
             assertSame(language, engines.factory.language())
             assertEquals(2, engines.factory.coarseMade)
             assertNotSame(language.coarse, engines.factory.lastCoarse)
-            // what the user sees of it: pinyin typed again offers it no more as the word added (above 你好), only as
-            // the sentence 拟 and 好 make, below
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertEquals("你好", engines.type(InputMethodCatalog.PINYIN, "nihao").candidates.first())
         }
     }
 
-    // U-93: habits off, the sessions read a fresh user model, and their language is another; on again, another still
+    // habits off, the sessions read a fresh user model, and their language is another; on again, another still
     @Test
     fun turningTheHabitsOffOrOnMakesTheLanguageAnew() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -112,7 +99,7 @@ class EnginesSessionFactoryTest : EnginesFixture() {
         }
     }
 
-    // the host's flags, kept for the engines it makes anew in the same field (review B 3.8)
+    // the host's flags, kept for the engines it makes anew in the same field
     @Test
     fun theFieldsFlagsAreTheHostsOneCopy() {
         val flags = FieldFlags()
@@ -134,7 +121,6 @@ class EnginesSessionFactoryTest : EnginesFixture() {
         }
         Engines(::load, dir, warmUps = inPlace, fieldFlags = flags).use { engines ->
             engines.context(InputMethodCatalog.ENGLISH, "", learnFlags = 0)
-            // youmo typed after the, the user's to follow it
             repeat(3) {
                 engines.afterThe()
                 engines.type(InputMethodCatalog.ENGLISH, "youmo")

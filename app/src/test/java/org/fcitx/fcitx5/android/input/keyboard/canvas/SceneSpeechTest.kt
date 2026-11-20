@@ -39,11 +39,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/**
- * A screen reader's keys on the canvas (060-render-p2 S3, [KeyboardCanvasView]'s Speech): all a
- * node says from the scene and its key, key by key, in every state the 26 keys show (compared with
- * what the key views said till S8a deleted them).
- */
+/** All a screen reader's node says, key by key, in every state the 26 keys show (as the removed key views said it). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class SceneSpeechTest {
@@ -69,12 +65,11 @@ class SceneSpeechTest {
 
     private fun KeyboardHarness.textKeyboard(): TextKeyboard = KeyboardHarness.all(inputView).filterIsInstance<TextKeyboard>().first()
 
-    /** What a screen reader is told of a key: what the table checks. */
     private data class Told(
         val label: String,
         val alt: String?,
         val resourceName: String?,
-        /** The words read, in no order: the order is apart ([theLetterReadBeforeItsCorner]). */
+        /** In no order: the order is [theLetterReadBeforeItsCorner]'s. */
         val reads: List<String>,
         val className: String?,
         val clickable: Boolean,
@@ -84,15 +79,12 @@ class SceneSpeechTest {
         val actions: Set<Int>,
     )
 
-    // the node's actions but the helper's own (focus, selection) and the text's (a description's
-    // granularity, which a view adds for any): what a key can be made to do
+    // less the helper's own (focus, selection) and the description's granularity, which a view adds for any
     private fun AccessibilityNodeInfo.keyActions(): Set<Int> = actionList.map { it.id }
         .filter { it == AccessibilityNodeInfo.ACTION_CLICK || it == AccessibilityNodeInfo.ACTION_LONG_CLICK }.toSet()
 
-    // a description's parts ("Space, Pinyin", "q, 1"), in no order
     private fun words(said: String): List<String> = said.split(", ").sorted()
 
-    /** The canvas's virtual nodes, by scene id and copy: the new drawing's. */
     private fun KeyboardHarness.sceneTold(): Map<String, Told> {
         val c = canvas()
         val provider = c.accessibilityNodeProvider!!
@@ -106,7 +98,6 @@ class SceneSpeechTest {
         }.toMap()
     }
 
-    /** [action] done to key [id] as a screen reader does it, to its virtual node. */
     private fun KeyboardHarness.act(id: String, action: Int): Boolean {
         val c = canvas()
         val done = c.accessibilityNodeProvider!!.performAction(c.scene!!.keys.indexOfFirst { it.id == id }, action, null)
@@ -114,8 +105,7 @@ class SceneSpeechTest {
         return done
     }
 
-    // the keyboard told, [set] done to it: its table added to [compared]; each letter a clickable, enabled
-    // key with its own words, class and click (a drawn key has no view id, so no resource name)
+    // a drawn key has no view id, so no resource name
     private fun tell(
         im: InputMethodEntry = KeyboardHarness.PINYIN,
         inputType: Int = InputType.TYPE_CLASS_TEXT,
@@ -129,10 +119,9 @@ class SceneSpeechTest {
             h.sceneTold()
         }
         compared += scene.values
-        // the 26 keys all there, each with its words
         assertTrue(scene.keys.toString(), ('a'..'z').all { scene.keys.any { k -> k.equals("$it#0", ignoreCase = true) } })
         for ((key, told) in scene.filterKeys { it.length == 3 && it[0].isLetter() && it.endsWith("#0") }) {
-            // its words name its letter (reads is never empty: no description reads "null", an empty one [""]; R20 F6606)
+            // reads is never empty: no description reads "null", an empty one [""]
             val named = "null" !in told.reads && told.reads.any { it.contains(key[0], ignoreCase = true) }
             assertTrue("$key: $told", told.clickable && told.enabled && named && told.className != null &&
                 AccessibilityNodeInfo.ACTION_CLICK in told.actions)
@@ -141,10 +130,8 @@ class SceneSpeechTest {
 
     private val compared = mutableListOf<Told>()
 
-    private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+    private val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
 
-    // the keys' table, one keyboard and state at a time: text, corner, resource name, what is read, class,
-    // clicks, enabled, state, actions; each letter whole (tell), and the states and names below told
     @Test
     fun theKeysTold() {
         tell()
@@ -154,7 +141,6 @@ class SceneSpeechTest {
         tell { h -> assertTrue(h.act("shift", AccessibilityNodeInfo.ACTION_LONG_CLICK)) }
         tell(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         tell(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
-        // Return's words with its action (A4.4), an app's own label for its own action (A4.2)
         tell(imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH)
         tell(imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEND)
         tell(prefill = { it.setImeActionLabel("Post it", 100) })
@@ -162,7 +148,6 @@ class SceneSpeechTest {
             EngineState.tableKeyboardState.value = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)
             h.idle()
         }
-        // and they were told something: Shift's two states, corners, the names UAT finds keys by
         val c = RuntimeEnvironment.getApplication()
         assertTrue(compared.any { it.state == c.getString(R.string.a11y_state_shift_once) })
         assertTrue(compared.any { it.state == c.getString(R.string.a11y_state_caps_lock) })
@@ -173,9 +158,7 @@ class SceneSpeechTest {
         assertTrue(compared.map { it.reads }.toString(), compared.any { "Post it" in it.reads })
     }
 
-    // 标点位置 无: the views hid the letters' corners, so a reader was told none; the scene draws none,
-    // and its nodes say none and give none in their extras (nor does the harness's alt). With the
-    // corners where they were, the same keys told them
+    // 标点位置 无: the views hid the corners, so a reader was told none; the nodes say none either, nor in their extras
     @Test
     fun aCornerNotDrawnNotTold() {
         prefs.set(AppPrefs.getInstance().keyboard.swipeUpPosition, KeyMarkPosition.None)
@@ -194,18 +177,15 @@ class SceneSpeechTest {
         assertTrue(compared.count { it.alt != null } >= 26)
     }
 
-    // a letter's node read as the scene says it, letter then corner (the engine's a11y_key_grouped, as
-    // the grouped keys' descriptions were). Its view had no description: TalkBack read its two texts in
-    // the order the view gave them, by place (ViewGroup's top to bottom, then start to end): on a
-    // device letter first (API 36 emulator's dump, S3), the same as the node; here, in Robolectric's
-    // text sizes, letter first at SDK 29 and corner first at 30 and up
+    // letter then corner (a11y_key_grouped). The old view read its two texts by place: letter first on a device, but in
+    // Robolectric's text sizes corner first from SDK 30
     @Test
     fun theLetterReadBeforeItsCorner() {
         val node = harness().use { h -> h.canvas().spoken("q") }
         assertEquals("q, 1", node)
     }
 
-    /** A scaled parent (the theme page's half-size preview) puts the keys where they are drawn, not where they would be unscaled. */
+    /** A scaled parent (the theme page's half-size preview) puts the keys where they are drawn. */
     @Test
     fun aKeyIsOnScreenWhereAScaledParentDrawsIt() {
         harness().use { h ->
@@ -226,8 +206,6 @@ class SceneSpeechTest {
         }
     }
 
-    // what a reader hears of a click: the clicked or long-clicked event of the key, a tap's, the reader's own
-    // click's and long click's, the same with either drawing (U6's "TalkBack reads it as before")
     @Test
     fun aClickToldAsTheViewsToldIt() {
         val scene = run {
@@ -236,7 +214,6 @@ class SceneSpeechTest {
                 ViewCompat.setAccessibilityDelegate(h.textKeyboard(), object : AccessibilityDelegateCompat() {
                     override fun onRequestSendAccessibilityEvent(host: ViewGroup, child: View, event: AccessibilityEvent): Boolean {
                         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED || event.eventType == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED) {
-                            // the words in no order, as in the table (theLetterReadBeforeItsCorner)
                             val words = event.contentDescription?.toString()?.let(::words) ?: event.text.map { it.toString() }.sorted()
                             events += "${AccessibilityEvent.eventTypeToString(event.eventType)} $words"
                         }
@@ -249,18 +226,15 @@ class SceneSpeechTest {
                 assertTrue(h.act("w", AccessibilityNodeInfo.ACTION_CLICK))
                 assertTrue(h.act("e", AccessibilityNodeInfo.ACTION_LONG_CLICK))
                 h.idle()
-                // backspace has no long click: refused, nothing told
                 assertFalse(h.act("backspace", AccessibilityNodeInfo.ACTION_LONG_CLICK))
                 events
             }
         }
         assertTrue(scene.toString(), scene.size >= 4)
-        // the reader's long click told as a long click of e, not a click
         assertTrue(scene.toString(), scene.any { it.startsWith("TYPE_VIEW_LONG_CLICKED") && "e" in words(it.substringAfter(" [").removeSuffix("]")) })
     }
 
-    // a split row's second G and V (landscape): a tap on one, or TalkBack's click or long click on its
-    // node, told on its own node, not the first copy's, as its own view told its own
+    // a split row's second G and V told on their own node, not the first copy's
     @Test
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun aSplitRowsSecondCopyToldOnItsOwnNode() = harness().use { h ->
@@ -297,11 +271,8 @@ class SceneSpeechTest {
         }
     }
 
-    // TalkBack reading a key's words a character, word or paragraph at a time (its "read by" menu):
-    // a view did it on its description (View.traverseAtGranularity), the node on its own the same
-    // way: each move's events (the selection's, the text traversed: from, to, which way, by what),
-    // whether it moved, and where the cursor is told on the node after, for each key a view described.
-    // A letter's view had no description, so nothing to move in; its node has, a reader gets more
+    // TalkBack's "read by" a character, word or paragraph: a view did it on its description (View.traverseAtGranularity),
+    // the node the same way; a letter's view had no description, its node has, so a reader gets more
     @Test
     fun theWordsReadAPieceAtATime() {
         val ids = listOf("shift", "backspace", "space", "lang", "enter")
@@ -341,7 +312,6 @@ class SceneSpeechTest {
                 // a line, a page: not a view's; no arguments, nothing
                 told += "line ${act(id, AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, by(AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE))}"
                 told += "none ${act(id, AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY, null)}"
-                // the cursor put where the reader says, a selection refused
                 val at = android.os.Bundle().apply {
                     putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 2)
                     putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, 2)
@@ -357,18 +327,16 @@ class SceneSpeechTest {
             told
         }
         assertTrue(scene.toString(), scene.count { it.startsWith("TYPE_VIEW_TEXT_TRAVERSED") } > 20)
-        // the cursor put where the reader said, the wider selection refused, the cursor left at 2
         assertTrue(scene.toString(), "set true false 2" in scene)
     }
 
-    // a node says what the scene says, its extras the key's id and corner
     @Test
     fun aNodeIsTheScenes() = harness().use { h ->
         val told = h.sceneTold()
         assertTrue(told.toString(), told.values.none { "view" in it.reads || it.label == "view" || it.alt == "view" || !it.enabled })
         val c = h.canvas()
         val q = c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(c.scene!!.keys.indexOfFirst { it.id == "q" })!!
-        // the corner in the extras, as U6 has it, the key's id beside it: not in the hint, which TalkBack would read
+        // the corner in the extras, not in the hint, which TalkBack would read
         assertEquals("q", q.extras.getString(SceneA11y.EXTRA_KEY))
         assertEquals(c.alt("q"), q.extras.getString(SceneA11y.EXTRA_ALT))
         assertTrue(q.extras.getString(SceneA11y.EXTRA_ALT).isNullOrEmpty().not())

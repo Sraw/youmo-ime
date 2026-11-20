@@ -11,13 +11,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import java.util.Locale
 
-/**
- * What 笔画筛选 costs and finds (design i2-stroke-filter §5.5): each sample typed into [session],
- * then up to [MAX_STROKES] strokes of its first character drawn (the mainland's order, else the table's first), timed as each
- * stroke's snapshot is made (the page the bar shows), and after the first stroke the rest looked
- * through to [lookAhead] (what a candidate list scrolled to the end asks). Whether that character starts the first
- * candidate, by strokes drawn, is what they find.
- */
+/** What 笔画筛选 costs and finds: each sample typed, then up to [MAX_STROKES] strokes of its first character drawn and timed. */
 class StrokeRun(
     session: Session,
     private val strokes: Strokes,
@@ -28,11 +22,7 @@ class StrokeRun(
 
     private val filter = StrokeFilter(session, { strokes }, lookAhead = lookAhead) { cp, drawn -> charInfo.orderStartsWith(cp, drawn) }
 
-    /**
-     * A sample's: microseconds of each stroke drawn, of the pause's [Action.Refine] after the first
-     * (the host sends it while the user pauses), of looking through to the end, and the strokes
-     * after which its first character was first (0 already, -1 never).
-     */
+    /** A sample's: microseconds of each stroke, the pause's refine and the look-ahead; the strokes after which it was first (-1 never). */
     data class Outcome(val strokeMicros: List<Long>, val refineMicros: Long, val scanMicros: Long, val firstAfter: Int)
 
     data class Result(

@@ -4,10 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-/**
- * The side 单手 puts the whole keyboard at ([SplitKeyboard.placement]), remembered (`one_handed_side`) for both
- * shapes. Named as 0.6.0's 单手模式 stored it (`one_handed`, Off as well), which KeyboardStyleMigration reads.
- */
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
+
+/** Named as 0.6.0's 单手模式 stored it (`one_handed`, Off as well), which KeyboardStyleMigration reads. */
 enum class OneHanded(val dock: SplitKeyboard.Dock) {
     Right(SplitKeyboard.Dock.RIGHT),
     Left(SplitKeyboard.Dock.LEFT),

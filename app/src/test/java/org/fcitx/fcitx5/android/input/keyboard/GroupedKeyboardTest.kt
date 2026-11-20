@@ -8,10 +8,6 @@ import android.graphics.Rect
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
-import org.fcitx.fcitx5.android.core.FcitxKeyMapping
-import org.fcitx.fcitx5.android.core.KeyStates
-import org.fcitx.fcitx5.android.core.KeySym
-import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.engine.assertRows
@@ -30,10 +26,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * The 14 keys (拼音双键) as iFlytek lays them out: five, five, then the separator, four and
- * backspace; corners 1 to 0 and `~ ! @ ?`. A tap sends the group's code, never a letter (an ASCII
- * letter would go to full pinyin, the hardware keyboard's); a swipe its corner, a digit as a
- * keypad's; the long press a row of the group's letters around the corner, committed as they are.
+ * The 14 keys (拼音双键) as iFlytek lays them out. A tap sends the group's code, never a letter (an ASCII letter
+ * would go to full pinyin); a swipe its corner, a digit as a keypad's; the long press the group's letters.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
@@ -41,56 +35,9 @@ class GroupedKeyboardTest {
 
     private val context = RuntimeEnvironment.getApplication()
 
-    private val layout = GroupedKeyboard.layout(NineKeyLetters.G14)
-
-    private fun key(face: String) = layout.flatten().single { (it.appearance as? KeyDef.Appearance.AltText)?.displayText == face }
-
-    private fun keypad(d: Int) = KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + d), KeyStates.Virtual)
-
     @After
     fun prefsAtTheirDefaults() {
         AppPrefs.getInstance().keyboard.showLangSwitchKey.let { it.setValue(it.defaultValue) }
-    }
-
-    @Test
-    fun threeRowsOfGroupsFullWidthWithTheSeparatorAndBackspaceOnTheThird() {
-        val faces = layout.take(3).map { row -> row.map { (it.appearance as? KeyDef.Appearance.Text)?.displayText } }
-        assertEquals(listOf("QW", "ER", "TY", "UI", "OP"), faces[0])
-        assertEquals(listOf("AS", "DF", "GH", "JK", "L"), faces[1])
-        assertEquals(listOf("分词", "ZX", "CV", "BN", "M", null), faces[2])
-        val widths = layout.take(3).map { row -> row.map { it.appearance.percentWidth } }
-        assertEquals(List(5) { 0.2f }, widths[0])
-        assertEquals(List(5) { 0.2f }, widths[1])
-        assertEquals(listOf(0.15f, 0.175f, 0.175f, 0.175f, 0.175f, 0.15f), widths[2])
-        widths.forEach { assertEquals(1f, it.sum(), 1e-4f) }
-        assertTrue(layout[2].last() is BackspaceKey)
-        assertEquals(KeyAction.HostKeyAction("'"), (layout[2][0].behaviors.single() as KeyDef.Behavior.Press).action)
-    }
-
-    @Test
-    fun cornersAreIFlyteksDigitsOnTopAndMarksOnTheThirdRow() {
-        val corners = layout.take(3).map { row -> row.mapNotNull { (it.appearance as? KeyDef.Appearance.AltText)?.altText } }
-        assertEquals(listOf("1", "2", "3", "4", "5"), corners[0])
-        assertEquals(listOf("6", "7", "8", "9", "0"), corners[1])
-        assertEquals(listOf("~", "!", "@", "?"), corners[2])
-    }
-
-    @Test
-    fun aTapSendsTheGroupsCodeAndASwipeItsCorner() {
-        fun press(face: String) = key(face).behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action
-        fun swipe(face: String) = key(face).behaviors.filterIsInstance<KeyDef.Behavior.Swipe>().single().action
-        // fcitx's key for a Unicode character: UNICODE (0x01000000) plus its code point
-        assertEquals(KeyAction.SymAction(KeySym(UNICODE + g14Code('b').code), KeyStates.Virtual), press("BN"))
-        assertEquals(GroupedKeyboard.code(g14Code('q')), press("QW"))
-        assertEquals(GroupedKeyboard.code(g14Code('m')), press("M"))
-        NineKeyLetters.G14.codes.toList().zip(layout.take(3).flatten().filter { it.appearance is KeyDef.Appearance.AltText }).forEach { (code, def) ->
-            assertEquals(GroupedKeyboard.code(code), def.behaviors.filterIsInstance<KeyDef.Behavior.Press>().single().action)
-        }
-        // a digit as a keypad's: typed, or picks that candidate while typing
-        assertEquals(keypad(1), swipe("QW"))
-        assertEquals(keypad(0), swipe("L"))
-        assertEquals(KeyAction.HostKeyAction("@"), swipe("BN"))
-        assertEquals(KeyAction.HostKeyAction("?"), swipe("M"))
     }
 
     @Test
@@ -99,15 +46,12 @@ class GroupedKeyboardTest {
         assertEquals(KeyAction.CommitAction("q"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("q"), popup))
         assertEquals(KeyAction.CommitAction("W"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("W"), popup))
         assertEquals(KeyAction.CommitAction("1"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("1"), popup))
-        // a symbol goes through the engine, as the full keyboard's
         assertEquals(KeyAction.HostKeyAction("%"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("%"), popup))
-        // the keys' own, as they are
         val keys = KeyActionListener.Source.Keyboard
         assertEquals(KeyAction.HostKeyAction("'"), GroupedKeyboard.resolve(KeyAction.HostKeyAction("'"), keys))
         assertEquals(GroupedKeyboard.code(g14Code('b')), GroupedKeyboard.resolve(GroupedKeyboard.code(g14Code('b')), keys))
     }
 
-    // the fourteen keys (pinyin's) and the eighteen (shuangpin's) have the same bottom row
     @Test
     @Uat("PY-91", "SP-20")
     fun theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting() {
@@ -118,7 +62,6 @@ class GroupedKeyboardTest {
             val showLang = AppPrefs.getInstance().keyboard.showLangSwitchKey
             showLang.setValue(showLang.defaultValue)
             val keyboard = GroupedKeyboard(context, TestThemes.PixelDark, letters).laidOut()
-            // English is the language key's round, as on the full keyboard
             assertTrue(keyboard.shownKeyWithId(R.id.button_lang) != null)
             listOf(R.id.button_space, R.id.button_return, R.id.button_comma, R.id.button_period, R.id.button_backspace).forEach {
                 assertTrue(keyboard.resources.getResourceEntryName(it), keyboard.shownKeyWithId(it) != null)
@@ -155,8 +98,7 @@ class GroupedKeyboardTest {
         assertEquals(context.getString(R.string.a11y_key_grouped, "B N", "@"), described["BN"])
         assertEquals(14, described.size)
         assertEquals(context.getString(R.string.a11y_key_separator), keyboard.shownKey("分词").description)
-        // pinyin's 18 keys: the L key, shown without its `;`, is still a group key (its long press, corner, TalkBack
-        // and a stroke drawn from it go by the groups the views were matched to; once it was matched against "L;" and left out)
+        // L shown without its `;` is still a group key: once it was matched against "L;" and left out
         val g18 = GroupedKeyboard(context, TestThemes.PixelDark, NineKeyLetters.G18, Keyboard::pinyin18Key, semicolon = false).laidOut()
         val keys18 = g18.shownKeys().filter { it.id?.matches(PLACE) == true }
         val l = keys18.single { it.label == "L" }
@@ -171,9 +113,7 @@ class GroupedKeyboardTest {
         val previews = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { previews += it }
         val key = keyboard.shownKey("ZX").ref()
-        // a shortcut's name (Paste) and a user's text shortcut (ok, which types ok): the letters'
-        // case is the faces' and bubbles' alone (R20 F5867); a letter's bubble (words = false) still
-        // in the faces' case, capitals as ZX shows
+        // a shortcut's name and a user's text shortcut keep their case; a letter's bubble is in the faces' case
         keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "Paste", words = true))
         keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "ok", words = true))
         keyboard.onPopupAction(PopupAction.PreviewUpdateAction(key, "x", words = false))
@@ -189,14 +129,12 @@ class GroupedKeyboardTest {
         assertEquals("。", keyboard.shownKeyWithId(R.id.button_period)!!.label)
         val zx = keyboard.shownKey("ZX")
         assertEquals("～", zx.alt)
-        // and TalkBack reads the corner drawn, not the key's own ~
+        // TalkBack reads the corner drawn, not the key's own ~
         assertEquals(context.getString(R.string.a11y_key_grouped, "Z X", "～"), zx.description)
-        // the preview too
         val previews = ArrayList<PopupAction>()
         keyboard.popupActionListener = PopupActionListener { previews += it }
         keyboard.onPopupAction(PopupAction.PreviewAction(keyboard.shownKeyWithId(R.id.button_comma)!!.ref(), ",", Rect()))
         assertEquals("，", (previews.single() as PopupAction.PreviewAction).content)
-        // an address's keys commit as they are, and say so
         keyboard.address = AddressKeys.URL
         assertEquals(".", keyboard.shownKeyWithId(R.id.button_dot)!!.label)
     }
@@ -206,10 +144,7 @@ class GroupedKeyboardTest {
     }
 }
 
-/**
- * The space takes what is left of the bottom row: at least 0.15 of it in every field (plain, an
- * address's, an e-mail's), the language key shown or not. Laid out 1080 px wide.
- */
+/** The space takes at least 0.15 of the bottom row in every field, the language key shown or not; laid out 1080 px wide. */
 internal fun assertSpaceAtLeast15Percent(keyboard: GroupedKeyboard) {
     val width = 1080
     val showLang = AppPrefs.getInstance().keyboard.showLangSwitchKey

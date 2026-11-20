@@ -12,19 +12,14 @@ import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 import java.util.TreeMap
 
-/**
- * One of fcitx's PkgData directories (`StandardPathsType::PkgData`): the user's
- * (`files/data`) first, then the app's built-in data. Paths are relative, `/`-separated.
- */
+/** fcitx's PkgData: the user's (`files/data`) first, then the app's. Paths relative, `/`-separated. */
 interface PkgDataDir {
-    /** The file at [path], null when there is none. */
     fun read(path: String): ByteArray?
 
-    /** The names of the files directly in [dir], null or empty when there are none. */
+    /** Null or empty when there are none. */
     fun list(dir: String): Collection<String>?
 }
 
-/** A [PkgDataDir] on disk. */
 class FilePkgDataDir(private val root: File) : PkgDataDir {
     override fun read(path: String): ByteArray? = File(root, path).takeIf { it.isFile }?.readBytes()
 
@@ -33,24 +28,16 @@ class FilePkgDataDir(private val root: File) : PkgDataDir {
 }
 
 /**
- * The quick phrase table, fcitx's `BuiltInQuickPhraseProvider` (`modules/quickphrase/quickphraseprovider.cpp:29-104`).
- *
- * Loading (`reloadConfig`, `:43-70`): `data/QuickPhrase.mb` from the first directory that has it, then
- * every `data/quickphrase.d/<name>.mb` by file name — a name in an earlier directory hides the same name in
- * a later one (`StandardPaths::locate`, `fcitx-utils/standardpaths.cpp:201-229`) — skipping a file
- * when `<name>.disable` is in any of the directories. Each line (`load`, `:72-104`): trimmed, valid
- * UTF-8, the key up to the first whitespace, the value after the whitespace, through
- * `unescapeForValue`; anything else is skipped.
- *
- * The table is a multimap: keys in byte order of their UTF-8 (code point order), one key's values
- * in the order they were read. [populate] (`:29-42`) gives every entry whose key starts with the input.
+ * fcitx's `BuiltInQuickPhraseProvider`: `data/QuickPhrase.mb` from the first directory that has it, then each
+ * `data/quickphrase.d/<name>.mb` (an earlier directory's name hides a later's; `<name>.disable` anywhere skips it).
+ * Lines trimmed, valid UTF-8, key up to whitespace, value through `unescapeForValue`. A multimap in code point order.
  */
 class QuickPhraseTable private constructor(private val map: TreeMap<String, MutableList<String>>) {
 
-    /** Every (key, value), in table order: what [populate] gives for the empty input. */
+    /** What [populate] gives for the empty input. */
     fun entries(): Sequence<Pair<String, String>> = map.asSequence().flatMap { (key, values) -> values.asSequence().map { key to it } }
 
-    /** `populate`: (key, value) of every entry whose key starts with [input], in table order. */
+    /** In table order. */
     fun populate(input: String): List<Pair<String, String>> {
         val out = ArrayList<Pair<String, String>>()
         for ((key, values) in map.tailMap(input, true)) {
@@ -66,7 +53,7 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
         private const val EXTENSION = ".mb"
         private const val DISABLE = ".disable"
 
-        /** Code point order, which is UTF-8 byte order, what `std::string` compares. */
+        /** Code point order is UTF-8 byte order, what `std::string` compares. */
         val CODE_POINT_ORDER = Comparator<String> { a, b ->
             var i = 0
             var j = 0
@@ -80,10 +67,10 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             (a.length - i).compareTo(b.length - j)
         }
 
-        /** No phrases: quick input with nothing to offer, what the host starts with when no file reads. */
+        /** What the host starts with when no file reads. */
         val EMPTY = QuickPhraseTable(TreeMap(CODE_POINT_ORDER))
 
-        /** Loads from [dirs], the user's first. */
+        /** The user's first. */
         fun load(dirs: List<PkgDataDir>): QuickPhraseTable {
             val map = TreeMap<String, MutableList<String>>(CODE_POINT_ORDER)
             dirs.firstNotNullOfOrNull { it.read(MAIN) }?.let { loadInto(map, it) }
@@ -104,18 +91,14 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             return QuickPhraseTable(map)
         }
 
-        /** The (key, value) of each line of a `.mb` file's [bytes] as [load] reads it, in order; lines it skips left out. */
+        /** Lines [load] skips left out. */
         fun parse(bytes: ByteArray): List<Pair<String, String>> {
             val out = ArrayList<Pair<String, String>>()
             eachLine(bytes) { out += it }
             return out
         }
 
-        /**
-         * [parse], and every line [load] skips only for having no whitespace, trimmed, valid UTF-8, to
-         * [bare] in its place among the others: the user's own file marks its version and its folders
-         * with such lines ([QuickPhraseFiles]), which fcitx and older builds pass over.
-         */
+        /** Lines [load] skips only for having no whitespace go to [bare] in place: the user's file marks its version and folders so ([QuickPhraseFiles]). */
         internal fun parse(bytes: ByteArray, bare: (String) -> Unit, each: (Pair<String, String>) -> Unit) =
             eachLine(bytes, bare, each)
 
@@ -127,12 +110,12 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
 
         private fun isWhitespace(b: Byte) = b == ' '.code.toByte() || b in 0x09..0x0d
 
-        /** `load` (`quickphraseprovider.cpp:72-104`), line by line on `\n`. */
+        /** `load`, line by line on `\n`. */
         private fun loadInto(map: TreeMap<String, MutableList<String>>, bytes: ByteArray) =
             eachLine(bytes) { (key, value) -> map.getOrPut(key) { ArrayList(1) }.add(value) }
 
         private inline fun eachLine(bytes: ByteArray, noinline bare: ((String) -> Unit)? = null, each: (Pair<String, String>) -> Unit) {
-            // one decoder for the file: made per line, it was most of a cold start's 0.4 s on a debug build
+            // one decoder for the file: one per line was most of a cold start
             val decoder = Charsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
@@ -164,7 +147,7 @@ class QuickPhraseTable private constructor(private val map: TreeMap<String, Muta
             return text.substring(0, pos) to value
         }
 
-        /** `utf8::validate`: null when the bytes are not valid UTF-8. */
+        /** `utf8::validate`: null when not valid UTF-8. */
         private fun decodeStrict(decoder: CharsetDecoder, bytes: ByteArray, from: Int, to: Int): String? = try {
             decoder.reset().decode(ByteBuffer.wrap(bytes, from, to - from)).toString()
         } catch (_: CharacterCodingException) {

@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.scene.engine.Expand
 import org.fcitx.fcitx5.android.scene.engine.Place
 
 /**
- * LayoutCheck's `split-scaled` warning (L8): a `split="halves"` row that, split, has other than 9 or 10 keys to halve in
+ * LayoutCheck's `split-scaled` warning: a `split="halves"` row that, split, has other than 9 or 10 keys to halve in
  * one of the scenes it is checked in. The engine scales such a row instead of halving it (Place, a scene's warning
  * only), so the user, who meant halves, is told: its line, the keys it has there and that scene's name, once a row.
  */
@@ -17,7 +17,7 @@ internal object ScaledRows {
         if (layout.onSplit != OnSplit.Split) return emptyList()
         val out = LinkedHashMap<Int, LayoutCheck.Finding>()
         // every scene split: its when= (an input method's key, `!split`) as a split board has it; a part at a time, a
-        // fragment's row (its line the fragment's) told at the <include> that brings it (review N1)
+        // fragment's row (its line the fragment's) told at the <include> that brings it
         for (scene in scenes) for (part in layout.parts) {
             val line = when (part) {
                 is Row -> part.line

@@ -12,7 +12,6 @@ import org.mechdancer.dependency.DynamicScope
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.plusAssign
 
-/** An input-layer component built the way InputView builds it: a [DynamicScope], no Android. */
 class PunctuationComponentTest {
 
     private class Recorder : UniqueComponent<Recorder>(), InputBroadcastReceiver {
@@ -54,8 +53,7 @@ class PunctuationComponentTest {
         assertEquals(emptyList<Map<String, String>>(), f.recorder.updates)
     }
 
-    // the keys shown as the engine types in the status's own call, before any key after it: off and on switch
-    // there and then; a status not told (null, replayed before the host said) keeps them (060-render-p2 S7a)
+    // off and on switch in the status's own call; a status not told (null, replayed before the host said) keeps them
     @Test
     fun offAndOnSwitchInTheCallItselfAndNotToldKeeps() {
         val f = Fixture()
@@ -71,7 +69,6 @@ class PunctuationComponentTest {
         assertEquals(listOf(mapOf("," to "，"), emptyMap(), mapOf("," to "，")), f.recorder.updates)
     }
 
-    // a new host's keys typing themselves are told anew: what an earlier one told goes (060-render-p2 S7a)
     @Test
     fun theKeysTypingThemselvesClearedShowTheTableAgain() {
         val f = Fixture()
@@ -82,8 +79,7 @@ class PunctuationComponentTest {
         assertEquals("，", f.punctuation.transform(","))
     }
 
-    // full width on or off, Chinese punctuation on or off, a key typing itself: each key shown as typed, the
-    // engine's commit filter turning marks and own characters alike (S7a: , shown, ， U+FF0C typed)
+    // each key shown as typed: the engine's commit filter turns marks and own characters alike (, shown, ， typed)
     @Test
     fun fullWidthTurnsWhatEachKeyTypes() {
         val f = Fixture()
@@ -95,7 +91,6 @@ class PunctuationComponentTest {
         f.punctuation.update(marks, fullWidth = true)
         assertEquals("，", f.punctuation.transform(","))
         assertEquals("。", f.punctuation.transform("."))
-        // after a letter . types itself, full width
         f.punctuation.updateAsTyped(setOf("."))
         assertEquals("\uFF0E", f.punctuation.transform("."))
         assertEquals("\uFF0E", f.punctuation.mapping["."])
@@ -107,7 +102,6 @@ class PunctuationComponentTest {
         assertFalse(f.punctuation.enabled)
     }
 
-    // a status not told keeps what is known; told, known (the keys no longer held back)
     @Test
     fun knownOnceTold() {
         val f = Fixture()

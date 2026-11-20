@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
-/**
- * Counts (or other floats) by a long key, in open addressing: the decoder looks one up for
- * nearly every word it scores, and a HashMap would box each key.
- */
+/** Counts by a long key in open addressing: the decoder looks one up for nearly every word it scores, and a HashMap would box each key. */
 internal class Counts {
     private var keys = LongArray(INITIAL) { EMPTY }
     private var values = FloatArray(INITIAL)
@@ -17,7 +14,6 @@ internal class Counts {
 
     operator fun get(key: Long): Float = getOrDefault(key, 0f)
 
-    /** The count of [key], or [default] if it has none. */
     fun getOrDefault(key: Long, default: Float): Float {
         val mask = keys.size - 1
         var i = slot(key, mask)
@@ -40,7 +36,6 @@ internal class Counts {
         values[i] = count
     }
 
-    // the slot of key, taken for it if it has none
     private fun slotOf(key: Long): Int {
         require(key != EMPTY) { "key $key" }
         if ((size + 1) * 4 > keys.size * 3) resize(keys.size * 2)
@@ -54,7 +49,6 @@ internal class Counts {
         return i
     }
 
-    /** Whether a key [test] says so has a count, going no further than the first. */
     fun any(test: (Long) -> Boolean): Boolean {
         for (k in keys) if (k != EMPTY && test(k)) return true
         return false
@@ -64,17 +58,15 @@ internal class Counts {
         for (i in keys.indices) if (keys[i] != EMPTY) visit(keys[i], values[i])
     }
 
-    /** Drops every count. */
     fun clear() {
         keys = LongArray(INITIAL) { EMPTY }
         values = FloatArray(INITIAL)
         size = 0
     }
 
-    /** Drops the counts whose key [drop] says; seldom done, so it is a rebuild. */
+    /** Drops the counts [drop] says; seldom done, so a rebuild. */
     fun removeIf(drop: (Long) -> Boolean) = rebuild { key, v -> v.takeUnless { drop(key) } }
 
-    /** Each count as [map] makes it anew, or dropped where it gives null. */
     private inline fun rebuild(map: (Long, Float) -> Float?) {
         val oldKeys = keys
         val oldValues = values

@@ -4,8 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
-import org.fcitx.fcitx5.android.engine.data.PinyinData
-import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.RecordingHabits
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
@@ -15,32 +14,17 @@ import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.nio.ByteBuffer
 
-/**
- * The 14 keys' session reading where each key was tapped (design k14-tap-position §2): BN UI GH
- * AS OP is 不好 at the keys' centres, 你好 tapped on n, i, h, a and o; the places follow the input
- * through its edits, and learning files the keys alone.
- */
+/** The 14 keys' session reads where each key was tapped: 不好 at the centres, 你好 tapped on n, i, h, a, o. */
 class PinyinSessionTapsTest {
 
     // 不好 0.7 above 你好, as the model has them (−4.45 to −5.15)
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你", -2.5f, 0f)
-                .unigram("不", -2.5f, 0f)
-                .unigram("好", -2.5f, 0f)
-                .unigram("不好", -3f, 0f)
-                .unigram("你好", -3.75f, 0f)
-                .entry("你", syl("ni"))
-                .entry("不", syl("bu"))
-                .entry("好", syl("hao"))
-                .entry("不好", syl("bu", "hao"))
-                .entry("你好", syl("ni", "hao"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("你", "ni", -2.5f),
+        Triple("不", "bu", -2.5f),
+        Triple("好", "hao", -2.5f),
+        Triple("不好", "bu hao", -3f),
+        Triple("你好", "ni hao", -3.75f),
     )
 
     private fun session(habits: RecordingHabits? = null) = PinyinSession(
@@ -72,7 +56,6 @@ class PinyinSessionTapsTest {
         s.tap(nihao, onNihao)
         repeat(3) { s.apply(Backspace) }
         assertEquals("你好", s.tap(nihao.drop(2), onNihao.copyOfRange(2, 5)).candidates[0])
-        // GH left out, then typed before AS
         val t = session()
         t.tap(nihao.removeRange(2, 3), floatArrayOf(0.75f, 0.75f, 0.25f, 0.25f))
         repeat(2) { t.apply(Action.Step(-1)) }
@@ -81,8 +64,6 @@ class PinyinSessionTapsTest {
 
     @Test
     fun aKeyTypedBeforeTheDecidingOnesMovesTheirPlacesAlong() {
-        // code review N2: BN typed last, at its centre, before UI tapped at its right edge (i: a whole
-        // α against bu, over the 0.75 the model has 不好 by); only UI's place, moved one along, makes 你好 first
         val s = session()
         s.tap(nihao.drop(1), floatArrayOf(1f, 0.75f, 0.25f, 0.25f))
         repeat(4) { s.apply(Action.Step(-1)) }
@@ -91,7 +72,7 @@ class PinyinSessionTapsTest {
 
     @Test
     fun afterAPartCommittedTheRestKeepItsPlaces() {
-        // code review N3: BN UI twice, bu then ni; 不 picked, the second BN UI reads by its own places
+        // BN UI twice, bu then ni; 不 picked, the second BN UI reads by its own places
         val s = session()
         val both = s.tap(nihao.take(2).repeat(2), floatArrayOf(0.25f, 0.25f, 0.75f, 0.75f))
         val rest = s.apply(Action.Pick(both.candidates.indexOf("不")))
@@ -104,7 +85,6 @@ class PinyinSessionTapsTest {
         val shown = s.tap(nihao, onNihao)
         val hao = s.apply(Action.Syllable(shown.syllables.indexOf("bu")))
         assertEquals("不好", hao.candidates[0])
-        // bu given back: the keys as tapped, 你好 again
         assertEquals("你好", s.apply(Backspace).candidates[0])
     }
 
@@ -120,7 +100,6 @@ class PinyinSessionTapsTest {
         val right = learned(onNihao)
         assertTrue(right, right.contains(NineKeyLetters.G14.tag()))
         assertEquals(right, learned(floatArrayOf(1f, 1f, 0.9f, 0f, 1f)))
-        // the code the same where the first shown was another
         val code = { rows: String -> rows.substringBefore('|') }
         assertEquals(code(right), code(learned(null)))
         assertEquals(code(right), code(learned(onBuhao)))

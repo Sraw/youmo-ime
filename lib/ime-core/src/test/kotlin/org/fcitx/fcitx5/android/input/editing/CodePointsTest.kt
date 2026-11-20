@@ -52,11 +52,7 @@ class CodePointsTest {
         assertEquals(3, CodePoints.lengthOfFirst(text, 2))
     }
 
-    /**
-     * An unpaired surrogate is malformed text, which the editor refuses to delete by code point,
-     * so there is no length: null. Includes surrogates in the wrong order, and a half pair next
-     * to an ordinary character.
-     */
+    /** An unpaired surrogate (or a pair in the wrong order) is malformed text, which the editor won't delete by code point: null. */
     @Test
     fun anUnpairedSurrogateHasNoLength() {
         assertNull(CodePoints.lengthOfLast("a$high", 1))

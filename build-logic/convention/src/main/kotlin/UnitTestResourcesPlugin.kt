@@ -24,12 +24,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-/**
- * Gives Robolectric the app's resources without its assets. `isIncludeAndroidResources = true`
- * would make the unit tests depend on merged assets, which drag in the engine data; the linked
- * resources (res + manifest, no assets) that the R class already needs are enough. This writes
- * the `test_config.properties` AGP would, pointing at them, onto the unit tests' classpath.
- */
+/** Gives Robolectric the app's resources without its assets, so unit tests do not depend on the engine data. */
 @Suppress("unused")
 class UnitTestResourcesPlugin : Plugin<Project> {
 
@@ -68,9 +63,7 @@ abstract class UnitTestResourcesTask : DefaultTask() {
     @get:Input
     abstract val customPackage: Property<String>
 
-    // Robolectric reads assets only from the resource APK (android_merged_assets is ignored with
-    // binary resources): these are copied into a copy of it
-    // optional: the plugin sets it only when the tests have an assets folder
+    // Robolectric reads assets only from the resource APK, so these are copied into a copy of it; optional, set only with an assets folder
     @get:InputDirectory
     @get:Optional
     @get:PathSensitive(PathSensitivity.RELATIVE)
@@ -81,8 +74,7 @@ abstract class UnitTestResourcesTask : DefaultTask() {
 
     @TaskAction
     fun write() {
-        // one .ap_ and one manifest per ABI split when several ABIs are built (CI builds all four);
-        // they differ only in the version code, which Robolectric does not read: any one will do
+        // one .ap_ per ABI split, differing only in the version code, which Robolectric does not read
         val apk = firstOf(linkedResources.asFileTree.files) { it.name.endsWith(".ap_") }
         val manifest = firstOf(manifests.asFileTree.files) { it.name == "AndroidManifest.xml" }
         val withAssets = outputDir.file("test-resources.ap_").get().asFile

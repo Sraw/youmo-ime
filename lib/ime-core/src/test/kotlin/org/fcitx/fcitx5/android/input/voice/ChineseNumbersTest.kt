@@ -16,8 +16,7 @@ class ChineseNumbersTest {
 
     private fun rows(kind: Kind, vararg pairs: Pair<String, String>) = pairs.map { (said, written) -> Triple(kind, said, written) }
 
-    // every row of the test checked, the failing ones listed together (review F5854, F6561); each row's
-    // why is the comment above its group
+    // every row checked, the failing ones listed together; each row's why is the comment above its group
     private fun check(vararg groups: List<Triple<Kind, String, String>>) =
         assertRows(groups.flatMap { it }, { (kind, said, _) -> "$said as $kind" }) { (kind, said, written) ->
             assertEquals(written, ChineseNumbers.written(said, kind))
@@ -52,7 +51,7 @@ class ChineseNumbersTest {
     @Test
     @Uat("VO-06")
     fun digitsAreDigitByDigit() = check(
-        // with 点: read as a model, an address's parts (review F6386)
+        // with 点: read as a model, an address's parts
         rows(Kind.DIGITS, "幺三八幺二三四五六七八" to "13812345678", "四七二九幺五" to "472915", "三零二" to "302", "一九二点一六八" to "192.168"),
         // a place among them: read as a value
         rows(Kind.DIGITS, "一百二十三" to "123", "三万" to "3万", "十二" to "12"),
@@ -69,7 +68,7 @@ class ChineseNumbersTest {
             Kind.TIME,
             "十点十五" to "10:15", "八点十" to "8:10", "三点四十" to "3:40", "八点五分" to "8:05", "十点零五分" to "10:05",
             "八点半" to "8点半", "八点一刻" to "8点一刻", "八点" to "8点", "七点整" to "7点整", "十一" to "11",
-            // an hour alone, 24 too (review F5962)
+            // an hour alone, 24 too
             "二十四点" to "24点",
         ),
         // past a day's hours or an hour's minutes, or 分 with no minutes: as said
@@ -90,10 +89,9 @@ class ChineseNumbersTest {
         check(
             rows(Kind.VALUE, "一点二点三" to "一点二点三", "万一" to "万一", "二十三四" to "二十三四", "一千零" to "一千零", "三点十" to "三点十"),
             rows(Kind.TIME, "八点七十" to "八点七十", "万点" to "万点"),
-            // 24 is an hour alone (24:30 is no clock's, review F5962, the user's decision 2026-11-09), a quarter
-            // one or three, a lone minute character maybe 八点五十 misheard (the user's decision: 八点五 as said)
+            // 24 is an hour alone (24:30 is no clock's), a quarter one or three, a lone minute character maybe misheard: as said
             rows(Kind.TIME, "二十四点三十" to "二十四点三十", "二十四点半" to "二十四点半", "八点九刻" to "八点九刻", "八点五" to "八点五"),
-            // 两 is no digit said one by one (review F6171)
+            // 两 is no digit said one by one
             rows(Kind.VALUE, "三点两" to "三点两"),
             rows(Kind.PERCENT, "百分之几" to "百分之几", "百分之百" to "百分之百"),
             rows(Kind.RATIO, "三四" to "三四", "几比二" to "几比二"),
@@ -103,7 +101,7 @@ class ChineseNumbersTest {
         assertEquals(Kind.PERCENT, Kind.of("percent"))
     }
 
-    // review F5809: %02d wrote 10:٠٥ with the phone in Arabic or Persian
+    // %02d wrote 10:٠٥ with the phone in Arabic or Persian
     @Test
     fun digitsWhateverThePhonesLanguage() {
         val format = Locale.getDefault(Locale.Category.FORMAT)
@@ -120,7 +118,7 @@ class ChineseNumbersTest {
         }
     }
 
-    // review F6387: a newer tagger's class: its runs as said, not the polish failing to load
+    // a newer tagger's class: its runs as said, not the polish failing to load
     @Test
     fun aClassThisBuildDoesNotKnowIsNone() {
         assertEquals(Kind.NONE, Kind.of("ordinal"))

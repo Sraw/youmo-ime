@@ -53,10 +53,7 @@ import java.util.concurrent.CountDownLatch
 import kotlin.concurrent.thread
 import kotlinx.coroutines.runBlocking
 
-/**
- * Quick input's settings page (uat/11 QU-15, QU-19) over a fake engine and the real files: add,
- * change, delete, search, the built-in tables' switches, the editor kept over the activity made anew.
- */
+/** Quick input's settings page over a fake engine and the real files. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -132,7 +129,7 @@ class QuickPhraseSettingsUatTest {
         ok()
         saved("added", listOf(addr, gh))
         until("listed") { addr.content in shown() }
-        // its key in another case is the same entry (review L11), refused, the editor left open
+        // its key in another case is the same entry, refused, the editor left open
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
         st.idle()
         val again = dialog()
@@ -142,21 +139,18 @@ class QuickPhraseSettingsUatTest {
         assertEquals(s(R.string.quick_phrase_duplicate), fields(again)[1].error)
         again.cancel()
         st.idle()
-        // changed on its row
         row(addr.content).performClick()
         st.idle()
         assertEquals(listOf("addr", addr.content), fields().take(2).map { it.text.toString() })
         fill(null, "上海市")
         ok()
         saved("changed", listOf(QuickPhraseEntry("addr", "上海市"), gh))
-        // the search finds content, case aside
         val search = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<EditText>().first { it.isShown }
         search.setText("GITHUB")
         st.idle()
         until("searched") { gh.content in shown() && "上海市" !in shown() }
         search.setText("")
         st.idle()
-        // deleted from its editor, then undone from the snackbar
         row("上海市").performClick()
         st.idle()
         val change = dialog()
@@ -178,15 +172,13 @@ class QuickPhraseSettingsUatTest {
         return KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<Chip>().first { it.isShown && it.text.toString() == label }
     }
 
-    // a list dialog's item tapped: the folder picker, a folder chip's menu
     private fun pickItem(index: Int) {
         val list = dialog().listView
         list.performItemClick(list.adapter.getView(index, null, list), index, list.adapter.getItemId(index))
         st.idle()
     }
 
-    // design 060-quick-input-folders: a key is ASCII, told as it is typed; the note and the folder saved
-    // with the entry; a folder's chip shows its entries alone; renamed and deleted, no entry is lost
+    // a key is ASCII, told as it is typed; a folder's chip shows its entries alone; renamed and deleted, no entry is lost
     @Test
     @Uat("QU-15", "QU-25", "QU-26")
     fun aKeyIsAsciiANoteAndAFolderAreSavedAndFolderChipsSortThePage() {
@@ -196,7 +188,6 @@ class QuickPhraseSettingsUatTest {
         fields().single().setText("网址")
         ok()
         until("the folder made") { QuickPhraseManager.loadAll().folders == listOf("网址") }
-        // made from its chip, the page shows it: the new entry goes in it
         until("its chip picked") { chip("网址").isChecked }
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
         st.idle()
@@ -215,7 +206,6 @@ class QuickPhraseSettingsUatTest {
         chip(s(R.string.quick_phrase_unfiled)).performClick()
         st.idle()
         until("those in none") { gh.content in shown() && baidu.content !in shown() }
-        // moved out of its folder from its editor: the folder picker
         chip(s(R.string.quick_phrase_all)).performClick()
         st.idle()
         row(baidu.content).performClick()
@@ -227,7 +217,6 @@ class QuickPhraseSettingsUatTest {
         pickItem(0)
         ok(change)
         saved("out of the folder", listOf(baidu.copy(folder = ""), gh))
-        // renamed, then deleted: the entries all kept
         QuickPhraseManager.put(baidu.copy(folder = ""), baidu, now = 9)
         chip(s(R.string.quick_phrase_unfiled)).performClick()
         st.idle()
@@ -245,7 +234,6 @@ class QuickPhraseSettingsUatTest {
         until("deleted, its entry kept") { QuickPhraseManager.loadAll().let { it.folders.isEmpty() && it.entries.toSet() == setOf(baidu.copy(folder = ""), gh) } }
     }
 
-    // a folder renamed while its chip is the one picked: the page stays on it under its new name, not on 全部
     @Test
     @Uat("QU-26")
     fun aFolderRenamedWhileShownStaysShown() {
@@ -261,9 +249,8 @@ class QuickPhraseSettingsUatTest {
         until("renamed and still shown") { QuickPhraseManager.loadAll().folders == listOf("站点") && chip("站点").isChecked }
     }
 
-    // the code review of 060-quick: a folder renamed to another's name or a shelf's is told and kept;
-    // an entry deleted in its folder and undone goes back into it; the keyboard's 编辑 of an entry
-    // the page moved since edits the one there, not a new one
+    // a folder renamed to another's name or a shelf's is told and kept; an entry deleted in its folder and undone goes
+    // back into it; the keyboard's 编辑 of an entry the page moved edits the one there
     @Test
     @Uat("QU-26")
     fun aFolderNameTakenIsToldAndADeletionUndoneAndAKeyboardsEditKeepTheFolder() {
@@ -288,7 +275,6 @@ class QuickPhraseSettingsUatTest {
         dialog().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
         st.idle()
         assertEquals(listOf("网址", "空的"), QuickPhraseManager.loadAll().folders)
-        // deleted in its folder, undone: back in it
         chip("网址").performClick()
         st.idle()
         row(gh.content).performClick()
@@ -300,7 +286,6 @@ class QuickPhraseSettingsUatTest {
         KeyboardHarness.all(st.activity.window.decorView).first { it.isShown && it is TextView && it.text.toString() == s(R.string.undo) }.performClick()
         st.idle()
         saved("undone into its folder", listOf(filed, addr))
-        // the keyboard's card read it before it was filed: 编辑 opens the one there, saved in place
         st.open(SettingsRoute.QuickPhrase(edit = true, key = gh.key, content = gh.content, existing = true))
         until("the editor up") {
             (ShadowDialog.getLatestDialog() as? AlertDialog)?.takeIf { it.isShowing }?.let { fields(it).size == 3 } == true
@@ -312,8 +297,7 @@ class QuickPhraseSettingsUatTest {
         until("changed in place") { QuickPhraseManager.load().toSet() == setOf(filed.copy(content = "https://github.com/sraw"), addr) }
     }
 
-    // design 060-quick-input-folders: a file of before read converted; the one whose key was all Chinese
-    // listed and said, kept, and given a key on the page
+    // a file of before read converted; the one whose key was all Chinese listed, kept, and given a key on the page
     @Test
     @Uat("QU-27")
     fun aFileOfBeforeIsConvertedAndItsKeylessOnesAreListedToBeGivenAKey() {
@@ -335,13 +319,11 @@ class QuickPhraseSettingsUatTest {
         until("given a key, nothing left to") {
             QuickPhraseManager.load().any { it.key == "dz" && it.note == "地址" } && s(R.string.quick_phrase_keyless_banner, 1) !in shown()
         }
-        // written as version 2 now
         assertTrue(File(dir, QuickPhraseBook.MINE).readText().startsWith(QuickPhraseFiles.HEADER + "\n"))
         assertTrue(chip(s(R.string.quick_phrase_all)).isChecked)
     }
 
-    // review H1: the switches were bound again from the page's first read, so one turned off sprang
-    // back on and could not be turned on again
+    // the switches were once bound again from the page's first read: one turned off sprang back on
     @Test
     @Uat("QU-15")
     fun aBuiltInTableTurnedOffStaysOffAndTurnsOnAgain() {
@@ -357,18 +339,18 @@ class QuickPhraseSettingsUatTest {
         until("turned on") { QuickPhraseManager.builtInOn("latex.mb") }
         st.idle()
         assertTrue(switch(R.string.quick_phrase_built_in_latex).isChecked)
-        // review L-1: turned twice before either is saved, read back as last turned
+        // turned twice before either is saved, read back as last turned
         val emoji = switch(R.string.quick_phrase_built_in_emoji)
         val told = st.api.calls.count { it == "reloadConfig()" }
         emoji.performClick()
         emoji.performClick()
-        // both saves done (each tells the keyboard once it is written), not just the main looper idle
+        // each tells the keyboard once it is written, not just the main looper idle
         until("both turns saved") { st.api.calls.count { it == "reloadConfig()" } >= told + 2 }
         assertTrue(QuickPhraseManager.builtInOn("emoji.mb"))
         assertTrue(switch(R.string.quick_phrase_built_in_emoji).isChecked)
     }
 
-    // review M1: no field cuts what is filled in; too long is told at OK, nothing saved
+    // no field cuts what is filled in; too long is told at OK, nothing saved
     @Test
     @Uat("QU-19")
     fun aContentTooLongIsToldAtOkAndNeverCut() {
@@ -382,7 +364,6 @@ class QuickPhraseSettingsUatTest {
         ok(d)
         assertTrue(d.isShowing)
         assertEquals(s(R.string.quick_phrase_content_too_long, QuickPhraseBook.MAX_CONTENT), fields(d)[1].error)
-        // a key filled in is not cut either: one past the limit kept, told at OK
         val tooLongKey = "k".repeat(QuickPhraseBook.MAX_KEY + 1)
         fill(tooLongKey, "x".repeat(QuickPhraseBook.MAX_CONTENT), d)
         assertEquals(tooLongKey, fields(d)[0].text.toString())
@@ -394,8 +375,7 @@ class QuickPhraseSettingsUatTest {
         saved("the longest", listOf(QuickPhraseEntry(longest, "x".repeat(QuickPhraseBook.MAX_CONTENT)), gh))
     }
 
-    // review L1: an entry the keyboard saved meanwhile, unknown to the page, is refused by the file's
-    // check: told, the editor left open with what was typed
+    // an entry the keyboard saved meanwhile, unknown to the page, is refused by the file's check
     @Test
     fun aDuplicateOnlyTheFileKnowsKeepsTheEditorOpen() {
         open(gh)
@@ -410,8 +390,7 @@ class QuickPhraseSettingsUatTest {
         assertTrue(d.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
     }
 
-    // review M3: the editor, with what was typed, shown again by the activity made anew; Back with
-    // something changed asks first
+    // the editor shown again by the activity made anew; Back with something changed asks first
     @Test
     @Uat("QU-19")
     fun theEditorAndWhatWasTypedOutliveTheActivityMadeAnew() {
@@ -458,15 +437,13 @@ class QuickPhraseSettingsUatTest {
         assertEquals(d, ShadowDialog.getLatestDialog())
     }
 
-    // review M-1: OK tapped, the activity made anew while the file is written: the save, finished,
-    // is not offered again as an editor whose OK would say 已经有了
+    // the activity made anew while the file is written: the save, finished, is not offered again as an editor
     @Test
     fun anEntryBeingSavedOverARotationIsNotEditedAgain() {
         open(gh)
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
         st.idle()
         fill(addr.key, addr.content)
-        // the files' lock held: the save waits
         holdingTheFiles {
             ok()
             assertTrue(dialog().isShowing)
@@ -478,8 +455,7 @@ class QuickPhraseSettingsUatTest {
         assertEquals(0, ShadowDialog.getShownDialogs().count { it.isShowing })
     }
 
-    // review M-2: pasted beyond any use, kept over a rotation one past the limit (a Bundle holds no
-    // more), still told too long at OK
+    // kept over a rotation one past the limit (a Bundle holds no more), still told too long at OK
     @Test
     fun aHugePasteIsKeptOverARotationOnlyOnePastTheLimit() {
         open(gh)
@@ -497,8 +473,7 @@ class QuickPhraseSettingsUatTest {
         assertEquals(listOf(gh), QuickPhraseManager.load())
     }
 
-    // review L-2, L-3: 取消 with something changed asks too; the question goes with the page, the
-    // editor shown again with what was typed
+    // the question goes with the page, the editor shown again with what was typed
     @Test
     fun cancelWithSomethingChangedAsksAndTheQuestionGoesWithThePage() {
         open(gh)
@@ -516,7 +491,6 @@ class QuickPhraseSettingsUatTest {
         val again = dialog()
         assertEquals(listOf("gh", "https://gitlab.com"), fields(again).take(2).map { it.text.toString() })
         assertEquals(1, ShadowDialog.getShownDialogs().count { it.isShowing })
-        // 取消 with nothing changed closes at once
         fill(null, gh.content, again)
         again.getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
         st.idle()
@@ -524,15 +498,13 @@ class QuickPhraseSettingsUatTest {
         assertEquals(0, ShadowDialog.getShownDialogs().count { it.isShowing })
     }
 
-    // an import's toast counts every line it skipped: one whose key cannot be a key (empty, spaces,
-    // too long) was once dropped unsaid, and a file of only such lines was told "no quick input here"
+    // an import's toast counts every line it skipped, a key that cannot be one too
     @Test
     @Uat("QU-15")
     fun theImportToastCountsEveryLineSkipped() {
         val app = RuntimeEnvironment.getApplication()
         fun said(id: Int, vararg args: Any): String = app.getString(id, *args)
-        // a picture picked for the file, end to end: its lines are no lines (no value after a space,
-        // or not UTF-8), so nothing at all is counted
+        // a picture picked for the file: its lines are no lines, so nothing at all is counted
         val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52) +
             ByteArray(64) { (0x80 + it).toByte() } + byteArrayOf(0x20, 0xc3.toByte(), 0x0a, 0x49, 0x45, 0x4e, 0x44)
         val dir = kotlin.io.path.createTempDirectory().toFile()
@@ -570,10 +542,8 @@ class QuickPhraseSettingsUatTest {
     }
 
     /**
-     * [block] run with the files' lock held by another thread, [atRelease] run there before letting it
-     * go; that thread returned. Waits only because QuickPhraseManager's methods are @Synchronized on the
-     * object itself: moved to a private lock, nothing waits and the tests using this no longer test
-     * their race. Released whatever [block] throws, never left held for the rest of the JVM's tests.
+     * [block] run with the files' lock held by another thread. Waits only because QuickPhraseManager's methods are
+     * @Synchronized on the object itself: moved to a private lock, the tests using this no longer test their race.
      */
     private fun holdingTheFiles(atRelease: () -> Unit = {}, block: () -> Unit): Thread {
         val release = CountDownLatch(1)
@@ -602,8 +572,7 @@ class QuickPhraseSettingsUatTest {
 
     private fun shownDialogs() = ShadowDialog.getShownDialogs().filter { it.isShowing }
 
-    // the keyboard asking for the page again while its editor has something typed: once the page was
-    // opened anew over it, what was typed dropped unasked; asked now, and a request too long ignored
+    // the keyboard asking for the page again while its editor has something typed: asked now, a request too long ignored
     @Test
     @Uat("QU-19", "QU-21")
     fun theKeyboardAskingAgainOverAChangedEditorAsksFirst() {
@@ -612,7 +581,6 @@ class QuickPhraseSettingsUatTest {
         st.idle()
         val typing = dialog()
         fill("k", "typed here", typing)
-        // kept editing: the request let go, the editor as it was
         ask("from the clipboard")
         val first = dialog()
         assertNotSame(typing, first)
@@ -621,26 +589,21 @@ class QuickPhraseSettingsUatTest {
         st.idle()
         assertTrue(typing.isShowing)
         assertEquals(listOf("k", "typed here"), fields(typing).take(2).map { it.text.toString() })
-        // discarded: the request's editor
         ask("from the clipboard")
         dialog().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
         st.idle()
         assertFalse(typing.isShowing)
         val asked = dialog()
         assertEquals(listOf("", "from the clipboard"), fields(asked).take(2).map { it.text.toString() })
-        // nothing changed in it: the page opened anew for the next request, asking nothing
         ask("again")
         until("the next request's editor") { fields().take(2).map { it.text.toString() } == listOf("", "again") }
         assertEquals(1, shownDialogs().size)
-        // longer than quick input takes (another app's): ignored, the editor up left be
         ask("长".repeat(QuickPhraseBook.MAX_CONTENT + 1))
         assertEquals(listOf("", "again"), fields().take(2).map { it.text.toString() })
         assertEquals(1, shownDialogs().size)
     }
 
-    // the keyboard asking while the editor restored after a rotation is not shown again yet (the page
-    // still reading its files): once dropped unasked, the page opened anew over what was typed; held
-    // till the editor is up, over another rotation too, then asked over it
+    // asking while the editor restored after a rotation is not shown yet: held till the editor is up, then asked over it
     @Test
     @Uat("QU-21")
     fun theKeyboardAskingBeforeARestoredEditorIsShownAsksOverItOnceItIs() {
@@ -648,7 +611,6 @@ class QuickPhraseSettingsUatTest {
         KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<FloatingActionButton>().single().performClick()
         st.idle()
         fill("k", "typed here")
-        // the page made anew waits reading the files, its editor not shown again yet
         holdingTheFiles {
             st.recreate()
             ask("from the clipboard")
@@ -664,9 +626,8 @@ class QuickPhraseSettingsUatTest {
         assertEquals(listOf("", "from the clipboard"), fields().take(2).map { it.text.toString() })
     }
 
-    // a switch turned twice while the files are busy: the first turn's read back, reaching the main
-    // thread after both were written, once bound the switch to the first turn before the second's
-    // flipped it back; it shows the second turn throughout
+    // a switch turned twice while the files are busy: the first turn's read back, arriving after both were written,
+    // once bound the switch to the first turn
     @Test
     @Uat("QU-15")
     fun aSwitchTurnedTwiceWhileTheFilesAreBusyNeverShowsTheFirstTurn() {
@@ -678,17 +639,15 @@ class QuickPhraseSettingsUatTest {
             emoji().performClick()
             emoji().performClick()
         }
-        // both written and read back off the main thread before it runs any of what they post: the
-        // page's changes run one at a time in order, so one run after them returns once both have
-        // posted their read back to the main thread
+        // the page's changes run one at a time in order, so one run after them returns once both have posted their read
+        // back to the main thread
         runBlocking(QuickPhraseFragment.changes) {}
         val looper = shadowOf(Looper.getMainLooper())
         assertTrue("both turns written", QuickPhraseManager.builtInOn("emoji.mb"))
         assertFalse("their read backs posted", looper.isIdle)
         val list = KeyboardHarness.all(st.activity.window.decorView).filterIsInstance<RecyclerView>().first()
         val shown = mutableListOf<Boolean>()
-        // a task at a time, the list laid out after each (as a frame would be between any two): what
-        // the switch shows after each read back applied
+        // a task at a time, the list laid out after each (as a frame would be between any two)
         repeat(200) {
             if (!looper.isIdle) looper.runOneTask()
             list.measure(
@@ -704,9 +663,8 @@ class QuickPhraseSettingsUatTest {
         assertTrue(QuickPhraseManager.builtInOn("emoji.mb"))
     }
 
-    // OK tapped on a changed entry, the activity made anew while the keyboard saved the very same entry
-    // first: the page's save refused as a duplicate, the old one still there. Once taken as saved
-    // (已保存, the editor gone, what was typed lost); now the editor given again with it
+    // the page's save refused as a duplicate of the keyboard's same entry: once taken as saved and what was typed lost;
+    // now the editor given again
     @Test
     fun aChangeRefusedAsADuplicateOverARotationIsEditedAgain() {
         open(gh, addr)
@@ -714,7 +672,6 @@ class QuickPhraseSettingsUatTest {
         st.idle()
         val typed = QuickPhraseEntry("new", "typed")
         fill(typed.key, typed.content)
-        // the keyboard's save of the same entry made before the page's
         val keyboard = holdingTheFiles(atRelease = { QuickPhraseManager.put(null, typed, now = 9) }) {
             ok()
             st.recreate()

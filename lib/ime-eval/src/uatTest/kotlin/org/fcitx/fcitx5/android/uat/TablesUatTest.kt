@@ -19,11 +19,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/10-tables.md: what the tables type, each case from its B0 (B0-五笔, B0-二笔…). A setting the
- * table's page sets is set as the page writes it (EngineSettings.tables, by the table's group); a
- * long press's menu is done as the menu does it (HostApi.learning).
- */
+/** uat/10-tables.md: what the tables type, each case from its B0, settings set as the table's page writes them. */
 class TablesUatTest {
 
     // the hint the bar shows beside [text] on the page, null when it is not there
@@ -114,9 +110,7 @@ class TablesUatTest {
         expectAmong("你")
     }
 
-    // A3: 仓颉's and 二笔's matching key is * (TableOptions), typed as the keyboard sends it (S held, or a
-    // hardware keyboard's shifted 8) through the whole host, its punctuation module after the engine: a
-    // code, not the punctuation's ×; 五笔's is z, its * the punctuation's
+    // 仓颉's and 二笔's matching key is *, typed as the keyboard sends it through the whole host: a code, not the punctuation's ×
     @Test
     @Uat("TBL-45")
     fun cangjieAndErbiStarIsAWildcard() = assertRows(
@@ -406,8 +400,7 @@ class TablesUatTest {
         expectPreedit("onf")
     }
 
-    // B5: the 拼 key (Keyboard.LOOKUP) of a table's keyboard: pinyin till it is pressed again, 拼 before
-    // the code row; 二笔 and 仓颉 as 五笔, whose z still looks up a word alone
+    // the 拼 key of a table's keyboard: pinyin till it is pressed again
     @Test
     @Uat("TBL-47")
     fun theLookUpKeyLooksUpByPinyinTillPressedAgain() = assertRows(

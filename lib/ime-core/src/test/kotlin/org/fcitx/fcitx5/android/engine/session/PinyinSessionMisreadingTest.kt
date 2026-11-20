@@ -58,7 +58,6 @@ class PinyinSessionMisreadingTest {
         assertEquals("bō rě", s.hints[0])
         assertEquals("bō rě", session.candidates(0, 1).single().hint)
         session.apply(Action.Reset)
-        // by its reading, separated or not: nothing to show
         assertEquals(emptyList<String>(), session.type("bore").hints)
         session.apply(Action.Reset)
         session.type("bo're")
@@ -74,9 +73,6 @@ class PinyinSessionMisreadingTest {
     @Test
     fun eachSyllableMayBeTypedByItsStart() {
         val session = PinyinSession(data, PinyinSegmenter(), prediction = false)
-        // the whole misreading, a syllable half typed, 简拼 and mixed, the last syllables untyped
-        // offered, with its hint; xinxinxue (its last syllable untyped) is not offered by the fixture,
-        // and the hint never lifts a word into the candidates: there neither word nor hint
         val rows = listOf("xinxinxuezi" to true, "xinxinxuez" to true, "xxxuez" to true, "xxxz" to true, "xinxinxue" to false, "banr" to true)
         assertRows(rows, { it.first }) { (keys, offered) ->
             session.apply(Action.Reset)

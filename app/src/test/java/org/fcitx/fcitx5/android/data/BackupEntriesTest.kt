@@ -26,7 +26,7 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/** A whole backup's entries counted before any is unpacked ([UserDataManager.extractWithinRoom]); UserDataManagerTest is too large for more. */
+/** Entries counted before any is unpacked; UserDataManagerTest is too large for more. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class BackupEntriesTest {
@@ -34,9 +34,7 @@ class BackupEntriesTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    // R25 PR-52a: a zip of more entries than the cap is refused by its central directory, before any is unpacked
-    // (101 entries written first took half a minute); one whose central directory says fewer than it has is still
-    // stopped as its entries are unpacked. The zip's copy beside the folder goes either way
+    // too many entries refused by the central directory before unpacking; one that lies is stopped while unpacking
     @Test
     @Uat("PR-52")
     fun aBackupOfTooManyEntriesIsRefusedBeforeAnyIsUnpacked() {
@@ -45,9 +43,9 @@ class BackupEntriesTest {
             z.closeEntry()
         }
         fun zip(n: Int) = ByteArrayOutputStream().also { out -> ZipOutputStream(out).use { z -> repeat(n) { entry(z, it) } } }.toByteArray()
-        // the end record's offset of the central directory (no comment: the last 22 bytes)
+        // no comment: the last 22 bytes
         fun cdOffset(b: ByteArray) = java.nio.ByteBuffer.wrap(b, b.size - 6, 4).order(java.nio.ByteOrder.LITTLE_ENDIAN).int
-        // eleven entries, the central directory of the first alone: the eleven local ones before it
+        // eleven local entries, the central directory of the first alone
         val lying = zip(11).let { all ->
             val one = zip(1)
             val head = all.copyOf(cdOffset(all))
@@ -85,14 +83,13 @@ class BackupEntriesTest {
         }
     }.toByteArray()
 
-    // what was read of a stream: a file not a zip is refused on its first bytes, nothing more read or written
+    // a non-zip is refused on its first bytes
     private class Counted(private val bytes: ByteArray) : InputStream() {
         var read = 0
         override fun read(): Int = if (read < bytes.size) bytes[read++].toInt() and 0xff else -1
     }
 
-    // review 061-small S2–S4: the copy only of a zip, not past a cap nor half the room; its end record read off the
-    // file's end (zip64's past 65 535 entries); one without an end record, or with one that does not hold, no backup
+    // copied only within a cap and half the room; no end record, or an inconsistent one, is no backup
     @Test
     @Uat("PR-52")
     fun aFileIsCopiedOnlyIfAZipOfSizeAndRoomAndReadByItsEndRecord() {
@@ -151,8 +148,7 @@ class BackupEntriesTest {
         )
     }
 
-    // a zip's end read from bytes made by hand: the classic record ([total] entries, a directory of [size] at
-    // [offset]), zip64's locator pointing at [recordAt] and the record it points to, each where given
+    // hand-made end records: classic, zip64's locator at [recordAt] and its record, each where given
     private fun le(n: Int, v: Long) = ByteArray(n) { (v ushr (8 * it)).toByte() }
     private fun end(total: Int, size: Long, offset: Long) =
         le(4, 0x06054b50) + le(2, 0) + le(2, 0) + le(2, total.toLong()) + le(2, total.toLong()) + le(4, size) + le(4, offset) + le(2, 0)
@@ -161,8 +157,7 @@ class BackupEntriesTest {
         le(4, 0x06064b50) + le(8, 44) + le(2, 45) + le(2, 45) + le(4, 0) + le(4, 0) + le(8, total) + le(8, total) + le(8, size) + le(8, offset)
     private fun entriesOf(bytes: ByteArray) = ZipEnd.entries(folder.newFile().apply { writeBytes(bytes) })
 
-    // a field of the classic record full is zip64's only with its locator there (or all three full); a zip64
-    // record that does not hold is no backup
+    // a full classic field is zip64's only with its locator (or all three full); an inconsistent zip64 record is no backup
     @Test
     @Uat("PR-52")
     fun aFullFieldIsReadFromZip64OnlyWhereItsRecordIsThereAndHolds() {

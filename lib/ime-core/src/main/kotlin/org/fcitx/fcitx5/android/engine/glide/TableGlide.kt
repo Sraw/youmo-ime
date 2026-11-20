@@ -8,17 +8,9 @@ import org.fcitx.fcitx5.android.engine.data.runEnd
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 
 /**
- * A table's glide typing (码表滑行, 五笔 and the rest): the codes a finger's path across the keys
- * may be, a code a glide. The table's entries are walked in their codes' order as a trie, each key
- * held to the path by [GlidePath]; each code that fits is scored by its likeliest entry ([score],
- * the word model's) less what fitting it cost. A reading's keys are the code, its word that entry.
- * [version]: what changes [score] or [blocked] for words the user has no count of (added, forgotten,
- * blocked), and changes when a word gets its first count; [learned], a word the user has counts of,
- * asked as an entry is first scored for a [version]: its [score] is asked again each glide that
- * reaches it, as every word learned moves it. An approximation: an entry with no count whose
- * likeliest split has a counted word in it (你们 as 你 + 们) keeps its score till [version] changes.
- * A [blocked] entry (asked with its code, as a table blocks under a code) is never a code's;
- * [version] includes what the blocks are, so a new block scores it anew.
+ * Table glide typing (五笔 etc.): a code per glide, walking the table's entries in code order as a trie. An
+ * approximation: an uncounted entry whose likeliest split has a counted word (你们 as 你 + 们) keeps its score
+ * until [version] changes. [blocked] is asked with the code, as a table blocks under a code.
  */
 class TableGlide(
     private val dictionary: TableDictionary,
@@ -29,19 +21,15 @@ class TableGlide(
     private val blocked: (code: String, text: String) -> Boolean = { _, _ -> false },
 ) {
 
-    // each entry's [score] (-∞ blocked), as first asked (NaN till then): the same every glide till
-    // [version] changes, and a glide scores every entry of every code it fits; made at the first
-    // glide, as most never glide a table. [counted]: each entry [learned] as its score was worked
-    // out, scored again each glide, no walk of the user's counts a glide
+    // each entry's score as first asked, kept till [version] changes; built at the first glide, as most never
+    // glide a table. [counted] ones are rescored each glide
     private var scores: FloatArray? = null
     private var counted: BooleanArray? = null
     private var scoredFor: Any? = null
 
-    /** The search steps ([GlidePath.steps]) the last decode took: for ime-eval to measure. */
     var lastSteps = 0
         private set
 
-    /** The [limit] likeliest codes of [path] over [layout], best first. */
     fun decode(path: FloatArray, layout: GlideLayout, limit: Int): List<GlideReading> {
         if (limit <= 0 || dictionary.size == 0) return emptyList()
         val glide = GlidePath(path, layout, weights, MAX_KEYS)
@@ -68,7 +56,6 @@ class TableGlide(
             return found
         }
 
-        // the entries from [from] to [to], their codes alike for [depth] keys: those of no more first
         private fun visit(depth: Int, from: Int, to: Int) {
             var pos = from
             while (pos < to && dictionary.codeLength(pos) == depth) pos++
@@ -82,7 +69,6 @@ class TableGlide(
             }
         }
 
-        // the code of the entries [from] to [to], by the likeliest of them not blocked: none, no code
         private fun keep(from: Int, to: Int, cost: Float) {
             var best = from
             var bestScore = Float.NEGATIVE_INFINITY
@@ -110,7 +96,7 @@ class TableGlide(
     }
 
     companion object {
-        /** Keys a code has at most that a glide looks for: 五笔's four, 仓颉's five, a phrase's longer in some. */
+        /** 五笔's four, 仓颉's five, longer for some phrases. */
         const val MAX_KEYS = 8
     }
 }

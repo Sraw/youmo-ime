@@ -17,10 +17,7 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 
-/**
- * [LearnLog] and [LearnState]: what is learned live is what a start replays, and what a fold at
- * any cut leaves; expiry by typing day; what an undo puts back.
- */
+/** [LearnLog] and [LearnState]: what is learned live is what a start replays and what a fold at any cut leaves. */
 class LearnLogTest {
     private val dir = MemoryFiles()
 
@@ -31,8 +28,7 @@ class LearnLogTest {
 
     private fun open(compactAt: Long = 1L shl 30) = LearnLog(file(), clock, errors::add, compactAt = compactAt).also { it.open() }
 
-    // a few days of typing: corrections, a word formed, pins, a forget, an undo, a table's and the bar's
-    // [skewed] (review-1a-core S6): the clock set back 5 minutes, three days ahead then put right, a zone left
+    // a few days of typing; [skewed]: the clock set back, then ahead three days, then right, a zone left
     private fun script(log: LearnLog, skewed: Boolean = false): List<Long> {
         val seqs = ArrayList<Long>()
         fun commit(vararg rows: Row, takes: List<Take> = emptyList()) = log.record(rows.toList(), takes)!!.also { seqs += it.seq }
@@ -59,7 +55,7 @@ class LearnLogTest {
         clock.days(2)
         commit(row("ni", "拟", "ni"))
         commit(Row(Row.PICK or Row.WHOLE, Code(Kinds.table("engine-wbx"), "wqiy"), "", Words.of("你好"), 'A', Row.DICTIONARY, ""))
-        // blocks under a table's code: one kept, one lifted (review C S9, N7), through a snapshot's row 65 too
+        // blocks under a table's code: one kept, one lifted, through a snapshot's row 65 too
         val habits = LogHabits({ log })
         habits.blockUnder(Code(Kinds.table("engine-wbx"), "wqiy"), "你好", on = true)
         habits.blockUnder(Code(Kinds.table("engine-wbx"), "aaaa"), "工", on = true)
@@ -87,12 +83,9 @@ class LearnLogTest {
         val state = open().also(::script).state
         // corrected to twice in a row with no use between: the first under ni
         assertEquals(Words.of("拟", "ni"), state.firsts[LearnState.FirstKey(Code(Kinds.FULL, "ni"), "")]?.first)
-        // committed on two typing days within 30: the user's word
         assertEquals(Mine.FORMED, state.mine["拟再"]?.how)
-        // forgotten everywhere
         assertTrue(state.stats.keys.none { it.text == "见" })
         assertTrue(state.pairs.keys.none { it.next == "见" })
-        // the undone commit counts nothing
         assertTrue(state.stats.keys.none { it.text == "在" })
         assertEquals(1, state.bars[Take("abc", "64", "ni")]?.count)
         assertTrue(state.pins.isEmpty())
@@ -119,7 +112,6 @@ class LearnLogTest {
             if (!LearnLog.fold(bytes, cut, out)) continue
             folded++
             assertEquals("cut $cut", live, LearnLog.replay(out.toByteArray()).dump())
-            // and folded again, later
             val again = ByteArrayOutputStream()
             LearnLog.fold(out.toByteArray(), cut + 2 * LearnClock.DAY_MINUTES, again)
             assertEquals("cut $cut, again", live, LearnLog.replay(again.toByteArray().takeIf { it.isNotEmpty() } ?: out.toByteArray()).dump())
@@ -127,8 +119,6 @@ class LearnLogTest {
         assertTrue(folded > 10)
     }
 
-    // review-1a-core M2: a record this build cannot read (an undo putting back a row of a later
-    // build) is kept as it is through a start, a fold and the next start
     @Test
     fun aRecordNotReadIsKeptThroughAFold() {
         open().also(::script).close()
@@ -145,7 +135,6 @@ class LearnLogTest {
         }
         file().append().use { it.write(later) }
         val live = open().also { it.close() }.state.dump()
-        // a later build's, not this one's failing
         assertTrue(errors.isEmpty())
         assertTrue(contains(file().read(), later))
         val out = ByteArrayOutputStream()
@@ -154,8 +143,7 @@ class LearnLogTest {
         assertEquals(live, LearnLog.replay(out.toByteArray()).dump())
     }
 
-    // review-1a-core S2: a row of a later build naming a kind by its id still names it after a
-    // fold that names kinds of its own
+    // a row of a later build naming a kind by its id still names it after a fold that names kinds of its own
     @Test
     fun aRowNotReadKeepsItsKindThroughAFold() {
         val bytes = ByteArrayOutputStream()
@@ -201,7 +189,6 @@ class LearnLogTest {
         val live = log.state.dump()
         log.close()
         assertEquals(live, replayed())
-        // folded, not one record a commit
         val records = ArrayList<Byte>()
         LearnRecords.FORMAT.read(file().read()) { type, _ -> records += type }
         assertTrue(LearnRecords.HEAD in records)
@@ -258,25 +245,20 @@ class LearnLogTest {
         assertNotEquals(before, live)
     }
 
-    // a commit deleted as written is taken back only in the tail: the last hour, or the same day (PLAN §2.5)
     @Test
     fun onlyACommitOfTheTailIsTakenBackAsDeleted() {
         val log = LearnLog(null, clock)
         val a = log.record(listOf(row("ni", "你", "ni")))!!
         clock.minutes(90)
-        // ten in the morning and an hour and a half on: the same day
         assertTrue(log.undoRecent(a.seq))
         val b = log.record(listOf(row("ni", "你", "ni")))!!
         clock.minutes(15 * 60)
-        // the next day and over an hour: learned as it was
         assertFalse(log.undoRecent(b.seq))
         assertEquals(1, log.state.stats.size)
-        // still one of the last few: taken back where asked outright
         assertTrue(log.undo(b.seq))
     }
 
-    // R11 F2799: an Undo too long for a record (the commit and its befores) is not written, and the
-    // commit stays one to take back, not silently dropped from the list
+    // the commit stays one to take back, not silently dropped
     @Test
     fun anUndoTooLongToWriteKeepsTheCommitListed() {
         val errors = ArrayList<IOException>()
@@ -286,12 +268,11 @@ class LearnLogTest {
         assertEquals(100, c.rows.size)
         assertFalse(log.undo(c.seq))
         assertFalse(log.undo(c.seq))
-        // each try said why: the second found the commit still there
         assertEquals(2, errors.size)
         assertEquals(100, log.state.firsts.size)
     }
 
-    // R11 F2688: rows too long for 200 of them in one Absorbed are taken in all, not dropped whole
+    // rows too long for 200 of them in one Absorbed are taken in all, not dropped whole
     @Test
     fun longAbsorbedRowsAreSplitNotDropped() {
         val errors = ArrayList<IOException>()
@@ -302,7 +283,6 @@ class LearnLogTest {
         assertEquals(200, log.state.mine.size)
     }
 
-    // F3145: one row too long for any record is left out and told once, not at each halving
     @Test
     fun aRowTooLongForAnyRecordIsToldOnce() {
         val errors = ArrayList<IOException>()
@@ -318,7 +298,6 @@ class LearnLogTest {
     @Test
     fun aCommitOfTheLastHourIsTakenBackAcrossMidnight() {
         val log = LearnLog(null, clock)
-        // ten in the morning to 23:50
         clock.minutes(13 * 60 + 50)
         val c = log.record(listOf(row("ni", "你", "ni")))!!
         clock.minutes(20)
@@ -326,7 +305,7 @@ class LearnLogTest {
         assertTrue(log.state.stats.isEmpty())
     }
 
-    // review-1c S4: a rewrite takes nothing kept back any more, and is told; a commit is taken back as itself, not its seq's
+    // a rewrite takes nothing kept back any more, and is told; a commit is taken back as itself, not its seq's
     @Test
     fun aRewriteEndsTakingBackAndACommitIsTakenBackAsItself() {
         val log = LearnLog(null, clock)
@@ -364,7 +343,6 @@ class LearnLogTest {
         log.record(listOf(corrected("ni", "拟", "ni")))
         val now = log.state.firsts[key]
         log.undo(a.seq)
-        // b changed the row last: a's before is not put back over it
         assertEquals(now, log.state.firsts[key])
     }
 
@@ -390,7 +368,6 @@ class LearnLogTest {
         assertEquals(Mine.TAKEN_IN, log.state.mine["拟好"]?.how)
         assertEquals(3, log.state.wordUses["拟好"]?.get("ni hao")?.sumFrom(0))
         assertEquals(1, log.state.wordUses["你好"]?.get("ni hao")?.sumFrom(0))
-        // taken in again: nothing more
         log.absorb(listOf(uses("拟好", 5)))
         assertEquals(3, log.state.wordUses["拟好"]?.get("ni hao")?.sumFrom(0))
         val live = log.state.dump()
@@ -414,7 +391,6 @@ class LearnLogTest {
         val forming = commit(Row.PICK or Row.WHOLE)
         assertTrue("拟再" in log.state.mine)
         assertEquals(mapOf("拟" to 1, "再" to 1, "拟再" to 1), uses())
-        // its undo takes back what it counted
         log.undo(forming.seq)
         assertEquals(mapOf("拟" to 1, "再" to 1), uses())
     }
@@ -436,13 +412,11 @@ class LearnLogTest {
             clock.days(1)
             log.record(listOf(row("zai", "再", "zai")))
         }
-        // typing day 30: 拟's last use was day 1, 29 days ago
         assertTrue(log.state.stats.keys.any { it.text == "拟" })
         clock.days(1)
         log.record(listOf(row("zai", "再", "zai")))
         assertFalse(log.state.stats.keys.any { it.text == "拟" })
         assertTrue(log.state.firsts.isEmpty())
-        // calendar days without typing are no typing days
         clock.days(100)
         log.record(listOf(row("zai", "再", "zai")))
         assertEquals(30, log.state.stats.values.single().uses.sumFrom(Int.MIN_VALUE))
@@ -495,8 +469,7 @@ class LearnLogTest {
         assertEquals(c, LearnRecords.decode(LearnRecords.encode(c)))
     }
 
-    // review-int-records S1: what replaying a rewrite changed is not handed on with the next record (a forget
-    // in the tail would take a word added since out of the user's again)
+    // a rewrite's replay is not handed on, or a forget in the tail would undo a word added since
     @Test
     fun aRewriteHandsTheNextRecordNoneOfItsReplaysChanges() {
         val log = open()
@@ -511,7 +484,6 @@ class LearnLogTest {
         log.close()
     }
 
-    // review-int-records S4: words taken in keep their sequence: no commit after them shares one
     @Test
     fun aCommitAfterWordsTakenInIsPastTheirSequence() {
         val log = open()
@@ -523,12 +495,10 @@ class LearnLogTest {
         log.close()
     }
 
-    // review-uat-fixes S9: what pinyin spells of English's words is made again as they change, not at
-    // each pinyin commit
+    // what pinyin spells of English's words is made again as they change, not at each pinyin commit
     @Test
     fun englishsWordsChangeWithEnglishsRecordsAloneNotPinyins() {
         val log = LearnLog(null, clock)
-        // the first: a typing day begun
         log.record(listOf(row("nihao", "你好", "ni hao")))
         val at = log.state.englishVersion
         log.record(listOf(row("nihao", "你好", "ni hao")))
@@ -537,7 +507,6 @@ class LearnLogTest {
         assertTrue(log.state.englishVersion > at)
     }
 
-    // F3137: a table's per-code block changes the version a cache of them keys on
     @Test
     fun aTableBlockChangesItsVersion() {
         val state = LearnState()
@@ -546,7 +515,7 @@ class LearnLogTest {
         assertTrue(state.tableBlocksVersion > at)
     }
 
-    // F3195: a snapshot's English pair (a restore, a fold read afresh) changes what English's model reads too
+    // a snapshot's English pair (a restore, a fold read afresh) changes what English's model reads too
     @Test
     fun anEnglishPairRowChangesEnglishsVersion() {
         val state = LearnState()
@@ -569,7 +538,6 @@ class LearnLogTest {
         log.record(listOf(row("de", "的", "de", prev = "你")), flags = Commit.NO_PAIRS)
         log.record(listOf(row("de", "的", "de", prev = "他")))
         assertEquals(setOf("他"), log.state.pairs.keys.map { it.prev }.toSet())
-        // the word and its order are learned there all the same
         assertEquals(3, log.state.stats.values.sumOf { it.uses.sumFrom(Int.MIN_VALUE) })
     }
 
@@ -602,8 +570,7 @@ class LearnLogTest {
         assertTrue(changes.recount)
     }
 
-    // R25 F8064: a record whose file did not open learns in memory, and no rewrite of it is written till a start
-    // opens it. It said it took rewrites, so a restore that failed there was told to try again, at every try
+    // a restore there must not be told it succeeded
     @Uat("WD-46")
     @Test
     fun aRecordWhoseFileDidNotOpenTakesNoRewrite() {
@@ -616,13 +583,12 @@ class LearnLogTest {
         val inMemory = LearnLog(null).also { it.open() }
         assertTrue(inMemory.rewrite(copied))
         assertTrue(inMemory.takesRewrites)
-        // and a file open takes them
         val opened = LearnLog(MemoryFiles().file(LearnLog.FILE)).also { it.open() }
         opened.use { open ->
             assertTrue(open.rewrite(copied))
             assertTrue(open.takesRewrites)
         }
-        // closed, as one that did not open: nothing is written till it is opened again (R25 F8075)
+        // closed, as one that did not open: nothing is written till it is opened again
         assertFalse(opened.takesRewrites)
         assertFalse(opened.rewrite(copied))
     }

@@ -24,12 +24,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The keys' swipe marks ([KeyMarks]): each in the corner its own setting gives it (KeyMarks.settled:
- * 快捷键标记位置, by default top left; 标点位置, by default top right), a text shortcut's whole shrunk,
- * the function keys' up and down; against the goldens under
- * src/test/screenshots, recorded again with `-Proborazzi.test.record=true` when the look changes on purpose.
- */
+/** The keys' swipe marks, each in its setting's corner; record again with `-Proborazzi.test.record=true` when the look changes on purpose. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -46,7 +41,6 @@ class KeyShortcutsScreenshotTest {
         position.setValue(position.defaultValue)
     }
 
-    // [moved]: a keyboard the canvas draws where it is on (060-render-p2 S4: the 14 keys), its golden `canvas_`
     private fun shot(name: String, theme: Theme = TestThemes.PixelLight, moved: Boolean = false) =
         KeyboardHarness(theme, KeyboardHarness.PINYIN).use { h ->
             h.start()
@@ -58,7 +52,6 @@ class KeyShortcutsScreenshotTest {
         prefs.internal.keySwipes.setValue(SwipeSlots.Default.with("full/q", up = false, SwipeSlot.Text("你好")).serialize())
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
-            // a's select all top left, its @ top right: the two settings' defaults
             assertNotNull("a's symbol shown", h.key("a").alt)
             assertTrue(h.texts().contains("你好"))
             h.capture("KeyShortcutsScreenshotTest/default_light")
@@ -76,7 +69,7 @@ class KeyShortcutsScreenshotTest {
 
     @Test
     fun theFirstDownDrawsItAtTheDownPlace() {
-        // the places are the ways' (上滑图标位置 top right, 下滑图标位置 top left): flipped, the symbol top left, the shortcut top right
+        // the places are the ways' (上滑 top right, 下滑 top left): flipped, the symbol top left
         prefs.internal.keySwipes.setValue(SwipeSlots.Default.applied(SwipeOrientation.FirstDown).serialize())
         shot("first_down")
     }
@@ -89,13 +82,11 @@ class KeyShortcutsScreenshotTest {
         shot("keys14", moved = true)
     }
 
-    // the space swiped up: the edit menu over it, paste (straight up) picked, the cells the finger reaches next beside it
     @Test
     @Uat("KB-105")
     fun theEditMenuOverTheSpace() {
         KeyboardHarness(TestThemes.PixelLight, KeyboardHarness.PINYIN).use { h ->
             h.start()
-            // the icons up outside the keys: the bar's, then the menu's cells as well, whichever draws them
             fun icons() = h.shownIcons().size
             val before = icons()
             val space = h.keyNamed("space")
@@ -108,8 +99,7 @@ class KeyShortcutsScreenshotTest {
         }
     }
 
-    // landscape's keys are low: each mark in its setting's corner, a 底部 one moved to a free corner
-    // (KeyMarks.onKeys), the symbol never under the letter
+    // landscape's low keys: a 底部 mark moved to a free corner (KeyMarks.onKeys), the symbol never under the letter
     @Test
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
     fun landscapeAndTheSymbolUnderTheLetterThere() {

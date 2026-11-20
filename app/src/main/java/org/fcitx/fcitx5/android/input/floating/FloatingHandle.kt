@@ -29,13 +29,9 @@ import org.fcitx.fcitx5.android.utils.borderlessRippleDrawable
 import splitties.dimensions.dp
 
 /**
- * The floating keyboard's handle ([FloatingKeyboard]), a strip along its bottom, as Gboard's, or its
- * top ([FloatingHandleSide]): a finger on it drags the keyboard, its button at the right end docks it again,
- * the one at the left end resizes it ([Mode.Floating], 061-floating-resize). At the bottom it is the keyboard's own colour, under the keys; at the top a
- * shade of the bar's, told apart from the bar under it.
- *
- * Docked (始终显示悬浮条, [Mode.Docked]): nothing at its right end (the user's choice), no drag;
- * its grip held for the system's long-press time ([GripPress]) lets the keyboard go floating.
+ * The floating keyboard's handle, a strip along its bottom (as Gboard's) or top: a finger on it drags the
+ * keyboard, its right button docks it, its left one resizes it. Docked (始终显示悬浮条): no button, no
+ * drag; its grip held for the system's long-press time lets the keyboard go floating.
  */
 @SuppressLint("ViewConstructor")
 class FloatingHandle(
@@ -46,13 +42,9 @@ class FloatingHandle(
     look: WindowLooks.Handle = SceneWindow.plainHandle(theme, side == FloatingHandleSide.Top),
 ) : FrameLayout(context) {
 
-    /** Which of the two it is: one or the other's callbacks, never a mix. */
+    /** One or the other's callbacks, never a mix. */
     sealed interface Mode {
-        /**
-         * The floating keyboard's: [onDrag] told how far the finger moved since the last, in pixels;
-         * [onDrop] when the drag ends, lifted if the finger let go (not a second finger, nor the
-         * system taking the touch); [onDock] its button pressed; [resize] its resize button's.
-         */
+        /** [onDrop] lifted if the finger let go (not a second finger, nor the system taking the touch). */
         class Floating(
             val onDrag: (dx: Float, dy: Float) -> Unit,
             val onDrop: (lifted: Boolean) -> Unit,
@@ -60,19 +52,11 @@ class FloatingHandle(
             val resize: Resizing,
         ) : Mode
 
-        /**
-         * The docked keyboard's: [onDetach] told where the finger holding the grip is (raw) and which
-         * touch and finger it is, to let the keyboard go floating under it; TalkBack's long press, no
-         * touch, the grip's middle and none.
-         */
+        /** TalkBack's long press, no touch: the grip's middle and none. */
         class Docked(val onDetach: (rawX: Float, rawY: Float, touch: HandoffTouch?) -> Unit) : Mode
     }
 
-    /**
-     * The floating keyboard resized by the button at the strip's left end: [start] as a finger goes down on it, [move]
-     * by how far it moved since, px, [end] as it lifts or is taken (a second finger, the system); TalkBack's 放大 and
-     * 缩小 a [step] each, false at its limit already.
-     */
+    /** [end] as it lifts or is taken (a second finger, the system); [step] false at its limit already. */
     interface Resizing {
         fun start()
         fun move(dx: Float, dy: Float)
@@ -88,15 +72,14 @@ class FloatingHandle(
 
     private val press = GripPress(ViewConfiguration.get(context).scaledTouchSlop.toFloat(), dp(GripPress.GRIP_TOUCH_DP).toFloat())
 
-    // the touch holding the grip: its finger (the keys may hold others, split away from here)
+    // the keys may hold other fingers, split away from here
     private var touch: HandoffTouch? = null
 
     private val detach = Runnable { if (press.fire()) (mode as? Mode.Docked)?.run { onDetach(lastX, lastY, touch) } }
 
-    // a short bar, a pill: the handle's whole strip drags, this only shows that it does
+    // the whole strip drags, this only shows that it does
     private val grip = View(context).apply { isClickable = false }
 
-    // floating, the button that docks the keyboard again
     private val dock = (mode as? Mode.Floating)?.let { floating ->
         ImageView(context).apply {
             background = borderlessRippleDrawable(theme.keyPressHighlightColor)
@@ -107,9 +90,7 @@ class FloatingHandle(
         }
     }
 
-    // floating, the button that resizes the keyboard, at the left end (a physical left: the keyboard's corner there
-    // moves, the opposite one stays), as wide as the dock button: with the grip's touch between, 232 of the 260 dp it
-    // can shrink to (061-floating-resize §2.4)
+    // a physical left: the keyboard's corner there moves, the opposite one stays
     private val resizer = (mode as? Mode.Floating)?.resize?.let { resize ->
         MirroredIcon(context).apply {
             background = borderlessRippleDrawable(theme.keyPressHighlightColor)
@@ -149,13 +130,11 @@ class FloatingHandle(
         }
     }
 
-    // the look it is dressed in last ([dress])
     private var dressed: WindowLooks.Handle? = null
 
     init {
-        // one finger at a time on the whole strip: split, a second finger on the strip while the first resizes (or on
-        // the resize button while it drags) would start a drag (a resize) of its own beside the first, and the two
-        // fight over the keyboard; unsplit it comes to the first's view as a second finger, which ends it
+        // split, a second finger on the strip while the first resizes (or the reverse) would start one of its own and
+        // the two fight over the keyboard; unsplit it comes to the first's view as a second finger, which ends it
         isMotionEventSplittingEnabled = false
         addView(grip, LayoutParams(0, 0, Gravity.CENTER))
         dress(look)
@@ -168,17 +147,15 @@ class FloatingHandle(
                 true
             }
         }
-        // physical right, as the resize button is physical left: END is the left in a right-to-left language, under it
+        // physical right: END is the left in a right-to-left language
         dock?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.RIGHT or Gravity.CENTER_VERTICAL)) }
         resizer?.let { addView(it, LayoutParams(dp(DOCK_WIDTH_DP), dp(HEIGHT_DP), Gravity.LEFT or Gravity.CENTER_VERTICAL)) }
     }
 
     /**
-     * As [look], the theme's `handle` (060-render-p3 T7a, `SceneWindow.handle`) worked out by who holds
-     * it: the docked one's as its board is placed (`@one-handed`, `@split`). Worked out there, as the
-     * scenes are of the settings, which a view of its own does not read. Not set, at the top a shade of
-     * the bar (in a theme whose bar is the keyboard's colour it was not told apart), at the bottom the
-     * keyboard's own under it.
+     * Worked out by who holds it (the docked one's as its board is placed): a view of its own does not read
+     * the settings the scenes are of. Not set, at the top a shade of the bar (told apart from a bar of the
+     * keyboard's colour), at the bottom the keyboard's own.
      */
     fun dress(look: WindowLooks.Handle) {
         if (look == dressed) return
@@ -196,8 +173,6 @@ class FloatingHandle(
         drawDock(look.iconColor.value)
     }
 
-    // the dock and resize buttons' icons, a theme's `floating-dock` and `floating-resize` too (061-toolbar-icons), in the
-    // handle's icon colour
     private fun drawDock(@ColorInt color: Int) {
         listOf(dock to BarIcons.FLOATING_DOCK, resizer to BarIcons.FLOATING_RESIZE).forEach { (view, icon) ->
             view ?: return@forEach
@@ -207,7 +182,6 @@ class FloatingHandle(
         }
     }
 
-    /** An icon drawn [mirrored] left to right or not, its background (the ripple) as it is: the resize button's ⤢ as ⤡. */
     @SuppressLint("AppCompatCustomView")
     class MirroredIcon(context: Context) : ImageView(context) {
         var mirrored = false
@@ -227,24 +201,20 @@ class FloatingHandle(
     }
 
     /**
-     * The resize button's arrow along the diagonal the keyboard grows on now ([FloatingKeyboard.growsDown]), told as it
-     * is placed, dragged or resized, so it is right before the next touch: ⤢ as it grows [down] and left, mirrored to ⤡
-     * as it grows up and left: a theme's `floating-resize` mirrored the same. The image mirrored as drawn, not the view:
-     * a mirrored view's touches come mirrored too (rawX with them on Android 10), which would turn the resize around.
+     * Told as it is placed, dragged or resized, so it is right before the next touch. The image is mirrored
+     * as drawn, not the view: a mirrored view's touches come mirrored too (rawX with them on Android 10).
      */
     fun showGrowth(down: Boolean) {
         resizer?.mirrored = !down
     }
 
-    /** The dock button's icon as drawn now (null: none, or the theme's not read yet). */
+    /** Null: none, or the theme's not read yet. */
     @get:VisibleForTesting
     internal val dockDrawable: Drawable? get() = dock?.drawable
 
-    /** The dock button (null docked). */
     @get:VisibleForTesting
     internal val dockButton: ImageView? get() = dock
 
-    /** The resize button (null docked). */
     @get:VisibleForTesting
     internal val resizeButton: MirroredIcon? get() = resizer
 
@@ -303,8 +273,7 @@ class FloatingHandle(
     }
 
     companion object {
-        // the strip's and so the dock button's height: 48 took a row's room from the keyboard. The
-        // button is wider for it, the strip having nothing else beside the bar
+        // 48 took a row's room from the keyboard
         const val HEIGHT_DP = 24
         const val DOCK_WIDTH_DP = 56
         private const val DOCK_PADDING_DP = 3

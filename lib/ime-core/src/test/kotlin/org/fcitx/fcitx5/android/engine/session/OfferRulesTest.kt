@@ -22,7 +22,6 @@ class OfferRulesTest {
         val offers: Set<Offer>,
     )
 
-    // what the rules offer, and each question asked at most once and only where it decides something
     @Test
     fun eachOfferAsItsQuestionIsAnsweredEachAskedOnlyWhenItDecides() = assertRows(
         listOf(

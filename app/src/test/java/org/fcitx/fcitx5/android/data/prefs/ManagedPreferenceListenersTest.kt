@@ -14,12 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * A listener called on a change may remove itself or add another, as the input view made anew on a
- * theme change does with its own: the settings crashed after a reset, a ConcurrentModificationException
- * of the set being gone through. In each test both listeners remove themselves, so whichever is
- * called first changes the set before the other is reached.
- */
+/** A listener may remove itself or add another as it is called: the settings once crashed with a ConcurrentModificationException. */
 @RunWith(RobolectricTestRunner::class)
 class ManagedPreferenceListenersTest {
 
@@ -57,7 +52,6 @@ class ManagedPreferenceListenersTest {
         sample.registerOnChangeListener(second)
         sample.fireChange(sample.flag.key)
         assertEquals(listOf("first", "second"), called.sorted())
-        // the one added is called from the next change on
         called.clear()
         sample.fireChange(sample.flag.key)
         assertEquals(listOf("added"), called)

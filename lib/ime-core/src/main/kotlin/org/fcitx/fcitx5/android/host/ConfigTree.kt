@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
-/**
- * fcitx's `RawConfig` (`fcitx-config/rawconfig.cpp`): a named node with a value and children in
- * the order they were made, reached by a path of names joined by `/`. [implicit] is what
- * `Configuration::save` sets for an option at its default (`configuration.cpp:126-139`): written as
- * a comment, so a file says nothing of it. The app's pages read and write its [leaves] ([of]).
- */
+/** fcitx's `RawConfig`: children in the order made, reached by `/` paths. [implicit] is `Configuration::save`'s mark for an option at its default, written as a comment. */
 class ConfigTree(val name: String = "", var value: String = "") {
     var implicit: Boolean = false
     private val children = LinkedHashMap<String, ConfigTree>()
@@ -17,21 +12,21 @@ class ConfigTree(val name: String = "", var value: String = "") {
     val subItems: Collection<ConfigTree> get() = children.values
     val hasSubItems: Boolean get() = children.isNotEmpty()
 
-    /** The node at [path] (`a/b`), null if there is none (`RawConfig::get(path)`). */
+    /** `RawConfig::get(path)`. */
     fun find(path: String): ConfigTree? {
         var at = this
         for (part in path.split('/')) at = at.children[part] ?: return null
         return at
     }
 
-    /** The node at [path], made on the way if it is not there (`RawConfig::get(path, true)`). */
+    /** `RawConfig::get(path, true)`. */
     operator fun get(path: String): ConfigTree {
         var at = this
         for (part in path.split('/')) at = at.children.getOrPut(part) { ConfigTree(part) }
         return at
     }
 
-    /** Values by path (`Fuzzy/L_N`), every node with no children, in order: what a comparison of two trees needs. */
+    /** Every childless node's value by path, in order. */
     fun leaves(): Map<String, String> = LinkedHashMap<String, String>().also { out ->
         fun walk(node: ConfigTree, prefix: String) {
             for (child in node.children.values) {
@@ -43,7 +38,6 @@ class ConfigTree(val name: String = "", var value: String = "") {
     }
 
     companion object {
-        /** The tree whose [leaves] are [leaves]: each made at its path, in order. */
         fun of(leaves: Map<String, String>): ConfigTree = ConfigTree().also { tree ->
             leaves.forEach { (path, value) -> tree[path].value = value }
         }

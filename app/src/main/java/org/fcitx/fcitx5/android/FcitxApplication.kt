@@ -5,12 +5,10 @@
 package org.fcitx.fcitx5.android
 
 import android.app.Application
-import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.os.Environment
 import android.os.Process
@@ -23,9 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.daemon.HostDaemon
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
@@ -37,7 +32,6 @@ import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.ui.main.LogActivity
 import org.fcitx.fcitx5.android.utils.AppUtil
 import org.fcitx.fcitx5.android.utils.Locales
-import org.fcitx.fcitx5.android.utils.notificationManager
 import org.fcitx.fcitx5.android.utils.setupForest
 import org.fcitx.fcitx5.android.utils.startActivity
 import org.fcitx.fcitx5.android.utils.userManager
@@ -50,8 +44,7 @@ class FcitxApplication : Application() {
 
     val coroutineScope = MainScope() + CoroutineName("FcitxApplication")
 
-    // [block] on an IO thread, the broadcast held open (goAsync) until it is done: a receiver's onReceive runs on the main
-    // thread, where waiting for the host (HostDaemon.stopFcitx/restartFcitx) could block it into an ANR
+    // waiting for the host on the main thread could ANR: goAsync and work on IO
     private fun BroadcastReceiver.offMain(block: () -> Unit) {
         val pending = goAsync()
         coroutineScope.launch(Dispatchers.IO) {
@@ -78,10 +71,9 @@ class FcitxApplication : Application() {
             if (intent.action != Intent.ACTION_USER_UNLOCKED) return
             if (!isDirectBootMode) return
             Timber.d("Device unlocked, app will exit now and restart to normal mode")
-            // off the main thread: stopFcitx waits (up to seconds) for a host still starting to be up first
+            // stopFcitx waits (up to seconds) for a starting host to be up first
             offMain {
                 HostDaemon.getFirstConnectionOrNull()?.also {
-                    // try to shutdown fcitx gracefully
                     HostDaemon.stopFcitx()
                 }
                 AppUtil.exit()
@@ -94,7 +86,6 @@ class FcitxApplication : Application() {
             if (intent.action != ACTION_RESTART_FCITX_INSTANCE) return
             if (HostDaemon.getFirstConnectionOrNull() != null) {
                 Timber.i("Received broadcast '${intent.action}', try to restart fcitx instance ...")
-                // off the main thread: restartFcitx waits (up to seconds) for a host still starting to be up first
                 offMain { HostDaemon.restartFcitx() }
             } else {
                 Timber.i("Received broadcast '${intent.action}', but there's no fcitx instance")
@@ -114,7 +105,6 @@ class FcitxApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // settings screens follow the wallpaper palette on Android 12+; the keyboard has its own themes
         DynamicColors.applyToActivitiesIfAvailable(this)
         if (!userManager.isUserUnlocked) {
             isDirectBootMode = true
@@ -160,10 +150,9 @@ class FcitxApplication : Application() {
         Timber.d("isDirectBootMode=$isDirectBootMode")
 
         AppPrefs.init(sharedPrefs)
-        resetHiddenSettings(AppPrefs.getInstance(), isDirectBootMode) { importedUserDataMarker(this) }
-        // what 0.4 kept and nothing reads now: a 0.4 backup restored brings it back, gone at the restart after
+        afterImport(AppPrefs.getInstance(), isDirectBootMode) { importedUserDataMarker(this) }
+        // a restored 0.4 backup brings it back, gone at the restart after
         if (!isDirectBootMode) AppPrefs.getInstance().dropRetired()
-        // record last pid for crash logs
         AppPrefs.getInstance().internal.pid.apply {
             val currentPid = Process.myPid()
             lastPid = getValue()
@@ -174,14 +163,7 @@ class FcitxApplication : Application() {
         ThemeManager.init(resources.configuration)
         Locales.onLocaleChange(resources.configuration)
         registerReceiver(shutdownReceiver, IntentFilter(Intent.ACTION_SHUTDOWN))
-        // the app posts no notifications (and asks for no permission to): an older version's channels go
-        deleteNotificationChannels(notificationManager, sharedPrefs)
-        thread(name = "native-data-cleanup", priority = Thread.MIN_PRIORITY) {
-            deleteNativeData(createDeviceProtectedStorageContext().dataDir)
-        }
-        // the resource packs read (an import killed midway cleaned up, the signatures checked) before
-        // the keyboard first asks: it would wait on this on the main thread. Their files' contents
-        // read through later, in the background (a damaged pack then said so)
+        // the keyboard's first ask would wait on it on the main thread
         thread(name = "packs-load") {
             runCatching { PackStore.warmUp() }.onFailure { Timber.e(it, "resource packs not read") }
             PackStore.verifyInBackground()
@@ -189,16 +171,11 @@ class FcitxApplication : Application() {
         if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()
             ThemeManager.syncToDeviceEncryptedStorage()
-            // fcitx's data settled (an older build's moved in) off the main thread before an editor or the
-            // host asks: they would wait on its copy, an editor on the main thread. Whoever asks first moves
-            // it, the others wait (HostConfigDir), so this changes when, never where. Only with the external
-            // storage there: away, a settle copies nothing (it waits for it, or makes an empty home), so
-            // there is nothing to get ahead of; and a JVM test, whose storage reads as away till the test
-            // sets it up (phoneStorage), has no settle racing that
+            // settled off the main thread before an editor or the host would wait on its copy; only with external storage present
             val external = getExternalFilesDir(null)
             if (external != null && Environment.getExternalStorageState(external) == Environment.MEDIA_MOUNTED) {
                 thread(name = "user-data-settle") {
-                    // one that fails is asked again, and told, by whoever needs it next: no crash report from here
+                    // retried, and told, by whoever needs it next
                     runCatching { HostConfigDir.inUse(ConfigHome.DATA) }.onFailure { Timber.w(it, "user data not settled early") }
                 }
             }
@@ -227,59 +204,12 @@ class FcitxApplication : Application() {
 
         fun getLastPid() = lastPid
 
-        /**
-         * The settings without a UI back to their defaults: once, and after an import of the user's
-         * data, whose [marker] then goes (in [directBoot] these are the device's copy, and the
-         * import's marker cannot be read)
-         */
-        internal fun resetHiddenSettings(prefs: AppPrefs, directBoot: Boolean, marker: () -> File) {
-            val imported = if (directBoot) null else marker().takeIf { it.exists() }
-            prefs.resetHiddenSettings(again = imported != null)
-            imported?.delete()
+        internal fun afterImport(prefs: AppPrefs, directBoot: Boolean, marker: () -> File) {
+            if (directBoot) return
+            val imported = marker().takeIf { it.exists() } ?: return
+            prefs.afterImport()
+            imported.delete()
         }
-
-        /**
-         * The notification channels an older version made deleted, once, [prefs] noting it: after
-         * that the list is empty, and asking the system for it is a call on the main thread at every
-         * start, the keyboard's too.
-         */
-        internal fun deleteNotificationChannels(manager: NotificationManager, prefs: SharedPreferences) {
-            if (prefs.getBoolean(NOTIFICATION_CHANNELS_DELETED, false)) return
-            manager.notificationChannels.forEach { manager.deleteNotificationChannel(it.id) }
-            prefs.edit { putBoolean(NOTIFICATION_CHANNELS_DELETED, true) }
-        }
-
-        private const val NOTIFICATION_CHANNELS_DELETED = "notification_channels_deleted"
-
-        /**
-         * What 0.3.x's native host copied out of the APK into [dir] (device-protected storage):
-         * fcitx's data under `usr/` (7.4 MB from 0.3.2), `learn/`, `README.md`, each listed in `descriptor.json`.
-         * Nothing reads them since the Kotlin host, which reads the APK's assets. Only the listed paths
-         * go, files first, then their directories if empty; the descriptor last, once each was tried (one
-         * that will not go is logged and left), so a start that stops halfway does the rest next time, and
-         * its absence makes every later start a no-op.
-         */
-        internal fun deleteNativeData(dir: File) {
-            val descriptor = dir.resolve(NATIVE_DESCRIPTOR)
-            if (!descriptor.exists()) return
-            val listed = runCatching {
-                Json.parseToJsonElement(descriptor.readText()).jsonObject.getValue("files").jsonObject
-                    .mapValues { it.value.jsonPrimitive.content }
-            }.getOrElse {
-                Timber.w(it, "native data descriptor unreadable, left alone")
-                return
-            }
-            // a blank hash is a directory
-            val (dirs, files) = listed.entries.partition { it.value.isBlank() }
-            files.forEach { dir.resolve(it.key).delete() }
-            dirs.map { it.key }.sortedByDescending { it.count { c -> c == '/' } }
-                .forEach { dir.resolve(it).delete() } // only when empty
-            // tried once: a file that will not go is logged and left, not tried again at every start
-            files.filter { dir.resolve(it.key).exists() }.forEach { Timber.w("native data left: %s", it.key) }
-            descriptor.delete()
-        }
-
-        private const val NATIVE_DESCRIPTOR = "descriptor.json"
 
         private const val MAX_STACKTRACE_SIZE = 128000
 

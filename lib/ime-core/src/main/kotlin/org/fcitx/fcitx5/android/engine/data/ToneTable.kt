@@ -9,14 +9,7 @@ import org.fcitx.fcitx5.android.engine.reading.ReadingTable
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
 import java.nio.ByteBuffer
 
-/**
- * The tones section of pinyin data ([PinyinDataBuilder.charTone], [PinyinDataBuilder.wordTones]):
- * for each character read as a syllable, its usual tone and every tone it may have; for the few
- * words whose tones are not their characters' usual ones (爱好 ài hào, 东西 dōng xi), those.
- *
- * A character's key is its code point times [KEY_SPAN] plus the syllable, sorted; a word's
- * exceptions are runs of syllables and tones, sorted by word id, a word having one a reading.
- */
+/** Tones per character and syllable (key code point * [KEY_SPAN] + syllable, sorted), and per word where they differ from the characters' usual ones (爱好 ài hào). */
 class ToneTable internal constructor(
     private val charKeys: BitPacked,
     private val charTones: ByteBuffer,
@@ -44,7 +37,6 @@ class ToneTable internal constructor(
         return if (at < charKeys.size && charKeys[at] == key) charTones.get(at).toInt() and 0xff else 0
     }
 
-    /** The usual tone of [codePoint] read as [syllable], or [ToneMark.NONE]. */
     fun usual(codePoint: Int, syllable: Int): Int = packed(codePoint, syllable) and USUAL_MASK
 
     override fun allows(codePoint: Int, syllable: Int, tone: Int): Boolean {
@@ -80,17 +72,15 @@ class ToneTable internal constructor(
         return null
     }
 
-    /** How many characters and word exceptions it has: what the compile reports. */
     val characters: Int get() = charKeys.size
     val exceptions: Int get() = words.size
 
     companion object {
-        // a syllable id below this, as Syllables.count is; a code point below MAX_CODE_POINT, which
-        // covers CJK up to Extension H, so a key fits an Int
+        // above every syllable id; code points up to CJK Extension H times this still fit an Int
         internal const val KEY_SPAN = 512
         internal const val MAX_CODE_POINT = 0x40000
 
-        // a character's byte: the usual tone in the low three bits, then one bit for each tone 1–5
+        // a character's byte: usual tone in the low three bits, then one bit per tone 1-5
         internal const val USUAL_MASK = 7
         internal const val MASK_SHIFT = 3
     }

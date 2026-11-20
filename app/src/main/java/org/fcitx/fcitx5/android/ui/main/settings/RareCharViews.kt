@@ -21,14 +21,12 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 
 /**
- * A cell of 生僻字屏蔽's grid (design §6.2): its first reading small above, the character large; held
- * back, faded and struck through, not by colour alone. One view drawing two lines, ~35,000 of
- * them scrolled: no layout of its own, the paints the grid's ([Paints], one set for all). Read
- * out as a check box, checked when held. Its size follows the font's scale, as its text does.
+ * A 生僻字屏蔽 grid cell: reading small above, character large; held back means faded and struck through, not colour
+ * alone. One view drawing two lines (~35,000 scrolled): no layout of its own, shared [Paints]. Read as a check box.
  */
 class RareCharCell(context: Context, private val paints: Paints) : View(context) {
 
-    /** The paints every cell draws with: made once a grid, not once a cell. */
+    /** Made once a grid, not once a cell. */
     class Paints(context: Context) {
         private val scale = context.resources.configuration.fontScale
         val char = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -53,7 +51,7 @@ class RareCharCell(context: Context, private val paints: Paints) : View(context)
     var held: Boolean = false
         private set
 
-    // what a screen reader says, made when first asked, not at each bind of a scroll
+    // made when first asked, not at each bind of a scroll
     private var describe: () -> String = { "" }
     private var description: String? = null
 
@@ -63,7 +61,6 @@ class RareCharCell(context: Context, private val paints: Paints) : View(context)
         isFocusable = true
     }
 
-    /** Shows [char], read [reading], [held] or not; [describe], what a screen reader says of it. */
     fun show(char: String, reading: String, held: Boolean, describe: () -> String) {
         this.char = char
         this.reading = reading
@@ -73,7 +70,7 @@ class RareCharCell(context: Context, private val paints: Paints) : View(context)
         invalidate()
     }
 
-    /** Held or let through by the user: redrawn, and a screen reader told (its checked state changed). */
+    /** Redrawn, and a screen reader told. */
     fun setHeld(held: Boolean) {
         if (held == this.held) return
         this.held = held
@@ -81,8 +78,7 @@ class RareCharCell(context: Context, private val paints: Paints) : View(context)
         sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
     }
 
-    // the description made only once a screen reader asks: not a getContentDescription() override,
-    // which lint refuses (GetContentDescriptionOverride), but the node and the events it reads
+    // lazily for a screen reader: lint refuses a getContentDescription() override (GetContentDescriptionOverride)
     private fun described(): String = description ?: describe().also { description = it }
 
     override fun onInitializeAccessibilityEvent(event: AccessibilityEvent) {
@@ -122,7 +118,7 @@ class RareCharCell(context: Context, private val paints: Paints) : View(context)
     }
 
     companion object {
-        /** About 48dp a cell across at the font's normal scale: 7 columns on 360dp. */
+        /** 7 columns on 360dp at normal font scale. */
         private const val WIDTH_DP = 48
         private const val HEIGHT_DP = 56
         private const val CHAR_SP = 24
@@ -133,19 +129,17 @@ class RareCharCell(context: Context, private val paints: Paints) : View(context)
         private const val HELD_ALPHA = 90
         private const val FULL = 255
 
-        /** How many cells across [widthDp] takes at [fontScale]: the cell as wide as its text is large; one at least. */
+        /** As wide as its text is large; one at least. */
         fun columns(widthDp: Int, fontScale: Float): Int = (widthDp / (WIDTH_DP * fontScale)).toInt().coerceAtLeast(1)
 
-        /** How many rows of cells [heightDp] shows at [fontScale]: one at least. */
+        /** One at least. */
         fun rows(heightDp: Int, fontScale: Float): Int = (heightDp / (HEIGHT_DP * fontScale)).toInt().coerceAtLeast(1)
     }
 }
 
 /**
- * The letters down the grid's right edge (design §6.4; the app had no fast scroller): held and
- * dragged, the list goes to the letter under the finger ([onLetter]), where RareLayout says, once a
- * frame at most however fast the finger moves. Read out as an adjustable: a screen reader's swipes
- * up and down go to the next and the previous letter.
+ * Letters down the grid's right edge: dragged, the list goes to the letter under the finger ([onLetter]), at most once
+ * a frame. Read as an adjustable: a screen reader's swipes go to the next and previous letter.
  */
 class LetterScroller(context: Context) : View(context) {
 
@@ -153,8 +147,7 @@ class LetterScroller(context: Context) : View(context) {
         set(value) {
             field = value
             visibility = if (value.isEmpty()) GONE else VISIBLE
-            // another group or search: at its top, not at the letter the last one was gone to (said, and stepped
-            // from by a screen reader's swipe: R26 F8325)
+            // another group or search starts at its top, not at the last letter gone to
             last = null
             current = null
             invalidate()
@@ -168,8 +161,7 @@ class LetterScroller(context: Context) : View(context) {
         color = context.styledColor(android.R.attr.colorPrimary)
     }
 
-    // the letter last gone to this touch; the one the finger is on, gone to at the next frame; the
-    // letter a screen reader is told it is at
+    // the letter last gone to this touch; also the one a screen reader is told it is at
     private var last: Char? = null
     private var current: Char? = null
         set(value) {
@@ -193,7 +185,7 @@ class LetterScroller(context: Context) : View(context) {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
-    // the letter it is at read out after what it is, as a seek bar's value is
+    // read out after what it is, as a seek bar's value is
     private fun sayCurrent() = ViewCompat.setStateDescription(this, (current ?: letters.firstOrNull())?.uppercase())
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

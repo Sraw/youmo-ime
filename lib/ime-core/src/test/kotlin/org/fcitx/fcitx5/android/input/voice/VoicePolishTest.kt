@@ -14,8 +14,7 @@ import org.junit.Test
 
 class VoicePolishTest {
 
-    // contract: a fixture written by polish_golden.py (resources/voice/polish-golden.tsv), which mutation cannot see.
-    // resources/voice/polish_golden.py: voice-eval's tags.py and fusion_exp.py's freeze rule on fixed texts
+    // contract: a fixture written by resources/voice/polish_golden.py (voice-eval's tags.py and fusion_exp.py's freeze rule)
     private val golden = javaClass.getResourceAsStream("/voice/polish-golden.tsv")!!.bufferedReader().readLines()
         .filter { it.isNotEmpty() }.map { it.split('\t') }
 
@@ -58,8 +57,7 @@ class VoicePolishTest {
 
     @Test
     fun englishLettersAreKeptAndAFullStopGetsNoMarkAfter() {
-        // the tagger on a OnePlus 6T (2026-11-06): 「I'm sorry.」 labelled del on the second r and 。
-        // after the full stop, typed 「I'm sory」 once the end's marks went
+        // the tagger on a 6T labelled del on the second r and 。 after the full stop: 「I'm sory」 once the end's marks went
         val text = VoicePolishTags.norm("I'm sorry.")
         val op = IntArray(text.size)
         op[6] = VoicePolishTags.DEL
@@ -75,7 +73,6 @@ class VoicePolishTest {
         val zafter = intArrayOf(0, 0, tags.afters.indexOf("。"))
         tags.guarded(zh, zop, zafter)
         assertEquals("两个。", tags.apply(zh, zop, zafter))
-        // the stream guards what the model says: 「I'm sorry.」 polished as it was said
         val stream = VoicePolishStream(tags, { t ->
             VoicePolishStream.Labels(IntArray(t.size) { if (t[it] == 'r'.code) VoicePolishTags.DEL else 0 }, IntArray(t.size) { if (t[it] == '.'.code) tags.afters.indexOf("。") else 0 })
         })
@@ -134,7 +131,6 @@ class VoicePolishTest {
         val tagger = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size) { 1 }) }
         val stream = VoicePolishStream(tags, tagger, freezeAfter = 1, window = 8)
         assertEquals(VoicePolishStream.Shown("我，想，", "去"), stream.update("我想去"))
-        // the frozen 我 stays as it was
         assertEquals(VoicePolishStream.Shown("我，", ""), stream.update("我"))
         // . then ...: one 「…」 in place of the 「.」, tagged again; the frozen 好 keeps its labels
         assertEquals(VoicePolishStream.Shown("好，", "."), stream.update("好."))
@@ -195,7 +191,7 @@ class VoicePolishTest {
         assertEquals("用Maps和3 D打印", tags.apply(normed, op, keep, spaced))
     }
 
-    // the number head (060-voice-tagger.md 数字头): num classes as N.json has them
+    // the number head: num classes as N.json has them
     private val numTags = VoicePolishTags(
         listOf("keep", "del"),
         listOf("", "，", "。"),
@@ -213,7 +209,6 @@ class VoicePolishTest {
         // a mark after a character ends the number there: two runs, 点五 no number
         val after = IntArray(text.size).also { it[5] = 1 }
         assertEquals("涨了3%，点五共12个", numTags.apply(text, none, after, num = classes("..666661.11.")))
-        // none given: as the tagger without the head
         assertEquals("涨了百分之三点五共十二个", numTags.apply(text, none, none))
         assertThrows(IllegalArgumentException::class.java) { numTags.apply(text, none, none, num = IntArray(1)) }
         assertThrows(IllegalArgumentException::class.java) { VoicePolishTags(listOf("keep", "del"), listOf(""), listOf("value")) }
@@ -232,25 +227,22 @@ class VoicePolishTest {
 
     @Test
     fun aNumbersCharacterIsNeverDeletedNorAnIdiomMarkedANumber() {
-        // N-kd3b (060-voice-tagger.md): 「一点一点」 lost an 一 to a del, 「十全十美」 written 10全十美
+        // 「一点一点」 lost an 一 to a del, 「十全十美」 written 10全十美
         val slowly = codePoints("一点一点黑")
         val op = intArrayOf(VoicePolishTags.DEL, VoicePolishTags.DEL, 0, 0, VoicePolishTags.DEL)
         val none = IntArray(slowly.size)
         val after = none.copyOf()
         numTags.guarded(slowly, op, after)
-        // the number's characters kept; any other still goes
         assertEquals("一点一点", numTags.apply(slowly, op, after))
         val perfect = codePoints("十全十美三个")
         val num = classes("1.1.1.")
         numTags.guarded(perfect, IntArray(perfect.size), IntArray(perfect.size), num)
-        // the idiom no number, the 三 after it still one
         assertEquals("十全十美3个", numTags.apply(perfect, IntArray(perfect.size), IntArray(perfect.size), num = num))
         // a number's character replaced still is: only deleting one is undone (二个 written 两个)
         val two = codePoints("二个")
         val twoOp = intArrayOf(tags.ops.indexOf("两"), 0)
         tags.guarded(two, twoOp, IntArray(two.size))
         assertEquals("两个", tags.apply(two, twoOp, IntArray(two.size)))
-        // the stream guards the model's numbers too
         val stream = VoicePolishStream(numTags, { w ->
             VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
         })
@@ -259,8 +251,7 @@ class VoicePolishTest {
 
     @Test
     fun aHotwordsDigitsAreNeverDeleted() {
-        // the tagger's vocabulary has the ASCII digits 1–8 alone: 0 and 9 read as <unk>, and what it labels one is no
-        // reading of it; a hotword or English the recognizer writes with digits keeps them all, as a Chinese number's
+        // the vocabulary has ASCII digits 1–8 alone (0 and 9 are <unk>): digits the recognizer wrote are kept
         fun deletesDigits() = VoicePolishStream(tags, { t ->
             VoicePolishStream.Labels(IntArray(t.size) { if (t[it] in '0'.code..'9'.code || t[it] == '嗯'.code) VoicePolishTags.DEL else 0 }, IntArray(t.size))
         })
@@ -269,7 +260,7 @@ class VoicePolishTest {
             "digits between Chinese characters, every one of them" to { assertEquals("我住在3号楼2单元", deletesDigits().finish("我住在3号楼2单元")) },
             "a run of digits and letters, the filler before it still dropped" to { assertEquals("在B站2233看到的", deletesDigits().finish("嗯在B站2233看到的")) },
         )
-        // a digit's replacement still applies: only deleting it is undone (as a Chinese number's character)
+        // a digit's replacement still applies: only deleting it is undone
         val two = VoicePolishTags.norm("2个")
         val twoOp = intArrayOf(tags.ops.indexOf("两"), 0)
         tags.guarded(two, twoOp, IntArray(two.size))
@@ -278,16 +269,14 @@ class VoicePolishTest {
 
     @Test
     fun anIdiomCutByAStreamWindowsStartIsStillNoNumber() {
-        // a dictation longer than a window: the second step's window starts at 32, inside 十全十美 at 30..33,
-        // and its tail tagged without its head was written 十全10美
+        // the second step's window starts inside 十全十美, whose tail tagged alone was written 十全10美
         val before = "好".repeat(30)
         val after = "好".repeat(70)
         val stream = VoicePolishStream(numTags, { w ->
             VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code) 1 else 0 })
         })
         assertEquals(before + "十全十美" + after, stream.finish(before + "十全十美" + after))
-        // a number at the window's start, an idiom ending just before it, still is one: only an idiom
-        // across the start unmarks (the 十 at 32 is first tagged in the second window, with 全十美 before it)
+        // only an idiom across the window's start unmarks a number there
         val numbered = VoicePolishStream(numTags, { w ->
             VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { if (w[it] == '十'.code && it + 1 < w.size && w[it + 1] == '个'.code) 1 else 0 })
         })
@@ -331,7 +320,6 @@ class VoicePolishTest {
         for (c in VoiceLive.ENDS) assertTrue("$c", "$c" in VoicePolishTags.NUMBER_BREAKS)
     }
 
-    // review F5866
     @Test
     fun aNumberGoingOnPastTheFrozenEndShowsWholeInTheRest() {
         val tagger = VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size), IntArray(w.size) { 3 }) }
@@ -348,7 +336,7 @@ class VoicePolishTest {
         return t.apply(text, keep, keep, VoicePolishTags.spaces(raw, text), num, VoicePolishTags.asciiMarks(raw, text))
     }
 
-    // review F5885/F6280/F6490 (English marks and their spaces), F6513 (a full width mark said in Chinese stays)
+    // English marks and their spaces; a full width mark said in Chinese stays
     @Test
     @Uat("VO-36")
     fun aMarkKeepsTheWidthTheRecognizerWroteItIn() = assertRows(
@@ -372,7 +360,7 @@ class VoicePolishTest {
         "a non-breaking space is one to spaces as to norm (F6490)" to { assertEquals("Windows 11", keptWhole("Windows\u00a011")) },
     )
 
-    // review F6280: nothing after 。 either (。。 would read as an ellipsis)
+    // nothing after 。 either (。。 would read as an ellipsis)
     @Test
     @Uat("VO-36")
     fun nothingIsWrittenAfterAFullStop() {
@@ -382,7 +370,7 @@ class VoicePolishTest {
         assertEquals(0, after[1])
     }
 
-    // review F6272: the polished prefix shown is cached while its characters, spaces and marks' widths hold
+    // the polished prefix shown is cached while its characters, spaces and marks' widths hold
     @Test
     fun theShownPrefixFollowsAChangeInsideIt() {
         fun stream() = VoicePolishStream(tags, { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }, freezeAfter = 1, window = 8)

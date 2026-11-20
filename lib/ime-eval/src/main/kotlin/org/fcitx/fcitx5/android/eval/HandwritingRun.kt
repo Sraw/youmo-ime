@@ -16,13 +16,7 @@ import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import java.io.File
 import java.util.Locale
 
-/**
- * Characters written one at a time, read as the recognizer has them (the training sources'
- * `lmdata.py`: a row is its source, the text before it, the characters, and each one's readings
- * `c:score ...`), then read again as a sentence by [HandwritingDecoder] at each ink weight. Counted per character: right once the run is written
- * (what space then puts in), right as it is written (the last character of what shows, each time
- * one is added), and among the first ten offered for the last.
- */
+/** Characters written one at a time, then read as a sentence by [HandwritingDecoder] at each ink weight. */
 internal class HandwritingRun(private val data: PinyinData) {
 
     class Row(val before: String, val text: String, val positions: List<InkReading>) {
@@ -61,10 +55,7 @@ internal class HandwritingRun(private val data: PinyinData) {
         coarse = coarse, inkWeight = weight, alternatives = alternatives,
     )
 
-    /**
-     * [pick], given the text before and a decoding, says which of its [HandwritingDecoder.Decoding.best]
-     * to put first, as a sentence model does (the 性能档位): none keeps the decoder's.
-     */
+    /** [pick] says which of the decoding's best to put first, as a sentence model does; none keeps the decoder's. */
     fun sentences(rows: List<Row>, decoder: HandwritingDecoder, pick: ((String, HandwritingDecoder.Decoding) -> Int)? = null): Tally = Tally().also { t ->
         fun text(before: String, d: HandwritingDecoder.Decoding) = if (pick == null) d.text else d.best.getOrElse(pick(before, d)) { d.text }
         for (r in rows) {
@@ -84,11 +75,7 @@ internal class HandwritingRun(private val data: PinyinData) {
         /** How many of the last character's candidates count as offered ("last in ten"). */
         private const val FIRST_OFFERED = 10
 
-        /**
-         * The 性能档位's high, as [HandwritingSession][org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession]
-         * has it: [first]'s pick, unless [refiner] picks another in the slices a pause gives it.
-         * By [RefineSlices], the session's own rule, rather than a copy of it to drift.
-         */
+        /** The 性能档位's high: [first]'s pick unless [refiner] picks another within a pause's slices ([RefineSlices]). */
         fun refined(refiner: SentenceRefiner, first: (String, HandwritingDecoder.Decoding) -> Int): (String, HandwritingDecoder.Decoding) -> Int =
             { before, d ->
                 var picked = first(before, d)

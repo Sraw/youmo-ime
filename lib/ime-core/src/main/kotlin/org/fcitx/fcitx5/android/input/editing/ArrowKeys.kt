@@ -9,45 +9,31 @@ import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy.ArrowAction
 import org.fcitx.fcitx5.android.input.editing.EditorKeyPolicy.Direction
 
 /**
- * The arrow keys over a run of presses, which the editor's cursor reports lag behind: a
- * space-bar swipe sends a press a step, and a slow editor (a WebView, a long document) reports a
- * step well after the next one is pressed.
- *
- * Each press moves on from where the presses before it put the cursor, not from [selection],
- * which only a report moves: [EditorKeyPolicy.onArrow] steps the width of the code point at the
- * editor's live cursor, and added to an older position that width can land between the halves
- * of an emoji. And the text beside the cursor is read once a report and walked here, rather than
- * at every press: each read waits on the app's UI thread.
- *
- * The presses start over from [selection] when the editor reports a cursor none of them put
- * there and the IME did not expect (the user or the app moved it), when [selection] moves
- * between reports (an edit of the IME's own), and at [forget].
+ * Arrow presses run ahead of the editor's cursor reports (a space-bar swipe, a slow WebView): each moves on from where
+ * the presses before put the cursor, not from [selection], or a code point's width added to an older position could
+ * split an emoji. Text beside the cursor is read once a report (each read waits on the app's UI thread). Starts over
+ * from [selection] on an unexpected report, on [selection] moving between reports, and at [forget].
  */
 class ArrowKeys(
     private val selection: CursorTracker,
     private val readAhead: Int = READ_AHEAD,
 ) {
 
-    /** Where the presses put the cursor, oldest first, that the editor has not reported yet. */
+    /** Oldest first, not yet reported. */
     private val moves = ArrayDeque<Int>()
 
-    /** [CursorTracker.latest] as last seen here. */
     private var seenStart = -1
     private var seenEnd = -1
 
-    /** Text read beside the cursor since the last report, from [textStart] in the editor. */
+    /** From [textStart] in the editor. */
     private var text: CharSequence? = null
     private var textStart = 0
 
-    /** [text] is empty, the editor having nothing before (after) [textStart]: an end of the text. */
+    /** An end of the text. */
     private var noneBefore = false
     private var noneAfter = false
 
-    /**
-     * [EditorKeyPolicy.onArrow] from where the presses so far put the cursor. [textBefore] and
-     * [textAfter] read the editor at its live cursor, as `getTextBeforeCursor`/`getTextAfterCursor`
-     * do, and are only called past what was read since the last report.
-     */
+    /** [textBefore]/[textAfter] read at the live cursor, only past what was read since the last report. */
     fun onArrow(
         traits: EditorTraits,
         direction: Direction,
@@ -61,9 +47,7 @@ class ArrowKeys(
         val last = moves.lastOrNull()
         val start = last ?: latest.start
         val end = last ?: latest.end
-        // a target past an end of the text, where nothing was stepped over, the editor ignores:
-        // no move to wait for. A selection collapses to one of its own ends. A read the app left
-        // unanswered (null) tells nothing: the unit still moved is taken to be text, unless before 0
+        // a target past an end the editor ignores: no move to wait for; an unanswered read (null) counts the unit as text, unless before 0
         var steps = start != end
         val action = EditorKeyPolicy.onArrow(
             traits, direction, start, end,
@@ -74,7 +58,7 @@ class ArrowKeys(
         return action
     }
 
-    /** The editor reported its cursor at [start] to [end], which [selection] has taken in. */
+    /** [selection] has taken it in. */
     fun cursorReported(start: Int, end: Int) {
         // the text may have changed with it
         text = null
@@ -88,13 +72,12 @@ class ArrowKeys(
         seenEnd = selection.latest.end
     }
 
-    /** Forgets the presses and what they read, for a new input. */
+    /** For a new input. */
     fun forget() {
         moves.clear()
         text = null
     }
 
-    /** Up to [length] units before [p], as `getTextBeforeCursor` there gives them. */
     private fun before(p: Int, length: Int, read: (Int) -> CharSequence?): CharSequence? {
         val t = text
         val i = p - textStart
@@ -110,7 +93,6 @@ class ArrowKeys(
         return got.subSequence((got.length - length).coerceAtLeast(0), got.length)
     }
 
-    /** Up to [length] units after [p], as `getTextAfterCursor` there gives them. */
     private fun after(p: Int, length: Int, read: (Int) -> CharSequence?): CharSequence? {
         val t = text
         val i = p - textStart
@@ -127,7 +109,7 @@ class ArrowKeys(
     }
 
     companion object {
-        /** Units read on a side at a time: a run of presses rarely goes further between two reports. */
+        /** A run of presses rarely goes further between two reports. */
         const val READ_AHEAD = 32
     }
 }

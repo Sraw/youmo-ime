@@ -1,4 +1,4 @@
-// 按键音 (060-theme-sounds-icons §1.5): a sound file for each of the five kinds of key (<sounds>, <sound key src>),
+// 按键音: a sound file for each of the five kinds of key (<sounds>, <sound key src>),
 // each checked by the engine's readSound (SoundFile: what the app imports, its formats and limits) before it goes
 // in, listened to here by WebAudio alone (decodeAudioData fetches nothing, so the page's CSP stays as it is). Taps on
 // the preview make no sound: the app plays them. A key the app does not know yet (a later app's) is kept and listed.

@@ -46,10 +46,7 @@ import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/**
- * 060-render-p3 A4: the animated picture plays only while it is shown and motion is allowed: the keyboard
- * hidden or its view gone (a theme changed), 键盘动效 off, battery saver on, it is stopped.
- */
+/** The animated picture plays only while shown and motion is allowed (键盘动效 on, battery saver off). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class AnimatedPictureTest {
@@ -60,7 +57,6 @@ class AnimatedPictureTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    // frames that only say whether they play
     private class FakeFrames : Drawable(), Animatable {
         var running = false
         var starts = 0
@@ -90,8 +86,7 @@ class AnimatedPictureTest {
         return PictureBaseView(activity).also {
             it.background = d
             root.addView(it, FrameLayout.LayoutParams(400, 100))
-            // the window shown, as its ViewRootImpl has it and tells the views in it (Robolectric's stays GONE,
-            // and a view hidden in a window not shown tells nothing)
+            // set the window visible as ViewRootImpl would: Robolectric's stays GONE, and a hidden window tells its views nothing
             ReflectionHelpers.setField(ReflectionHelpers.getField<Any>(it, "mAttachInfo"), "mWindowVisibility", View.VISIBLE)
             it.onVisibilityAggregated(true)
         }
@@ -155,14 +150,14 @@ class AnimatedPictureTest {
         assertEquals(0, frames.starts)
     }
 
-    // placed by the canvas, not by the frames' bounds: API 29's AnimatedImageDrawable ignores its bounds
+    // by the canvas, not the frames' bounds: API 29's AnimatedImageDrawable ignores its bounds
     @Test
     fun itsFramesAreLaidAsCenterCropLaysThem() {
         val frames = FakeFrames()
         val board = AnimatedBoardDrawable(frames, 100, appContext)
         board.setBounds(0, 0, 400, 100)
         assertEquals(android.graphics.Rect(0, 0, 200, 100), frames.bounds)
-        // the canvas's moves until the frames are drawn (Robolectric's canvas keeps no matrix)
+        // Robolectric's canvas keeps no matrix
         val moves = mutableListOf<String>()
         val canvas = object : Canvas() {
             override fun translate(dx: Float, dy: Float) {
@@ -175,11 +170,9 @@ class AnimatedPictureTest {
         }
         frames.onDraw = { moves += "draw" }
         board.draw(canvas)
-        // 200×100 over 400×100: twice, its top and bottom cut
         assertEquals(listOf("translate 0.0 -50.0", "scale 2.0 2.0", "draw"), moves)
     }
 
-    // a file that is no animated WebP, or past the limits: drawn still (no frames made)
     @Test
     fun aPictureThatCannotPlayIsDrawnStill() {
         val still = folder.newFile("still.webp").apply { writeBytes(ByteArray(64)) }
@@ -192,8 +185,7 @@ class AnimatedPictureTest {
 
     private fun picture(f: File, animated: Boolean) = Picture(f.path, Crop(f.path, null, 0), null, 100, 0, animated)
 
-    // the keyboard made: nothing read or decoded on the main thread; the frames handed over on it once
-    // decoded, not to a keyboard let go meanwhile, nor for a picture not animated
+    // nothing decoded on main; frames handed over only to a keyboard still there, and only for an animated picture
     @Test
     fun theFramesAreDecodedOffTheMainThread() {
         val io = Executors.newSingleThreadExecutor()
@@ -211,7 +203,6 @@ class AnimatedPictureTest {
             assertTrue(load(base, picture(File(p.src), false)).isEmpty())
             waitFor { got.isNotEmpty() }
             assertEquals(listOf(false), decodedOn)
-            // a keyboard let go before its frames came: none handed over
             val gone = shown(ColorDrawable(0))
             (gone.parent as FrameLayout).removeView(gone)
             gone.layout(0, 0, 400, 100)

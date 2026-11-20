@@ -4,18 +4,14 @@
  */
 package org.fcitx.fcitx5.android.input.picker
 
-/**
- * The emoji picker as one list: each category that has anything, a header and then its items.
- * A tab scrolls to where its category starts, and shows as current while the list's top row is
- * one of the category's. The symbol panel shows [only] one category, its items and no header.
- */
+/** The emoji picker as one list of headed categories; a tab is current while the top row is its category's. The symbol panel shows [only] one, no header. */
 class PickerSections(lists: List<List<String>>, only: Int? = null) {
 
     class Row(val text: String, val category: Int, val header: Boolean)
 
     val rows: List<Row>
 
-    /** an empty category (nothing used recently yet) starts where the next one does */
+    /** An empty category starts where the next one does. */
     private val starts: IntArray
 
     init {
@@ -35,7 +31,7 @@ class PickerSections(lists: List<List<String>>, only: Int? = null) {
 
     fun startOf(category: Int): Int = starts[category]
 
-    /** the category of the row at [position]; the first for none (an empty list) */
+    /** The first for an empty list. */
     fun categoryAt(position: Int): Int = rows.getOrNull(position)?.category ?: 0
 
     companion object {

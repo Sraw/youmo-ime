@@ -25,7 +25,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
@@ -53,19 +53,9 @@ import timber.log.Timber
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
-/**
- * How a way the user set is drawn on its keyboards (the engine's [org.fcitx.fcitx5.android.scene.KeyNode.fates]):
- * each keyboard of the input methods the user has on, made as the input view makes it (its own keyboard class:
- * its input method's name on the space, the punctuation it types, the hold-to-talk badge, the language key), at the
- * size the input view gives it on this display upright and turned (KeyboardArea.screens: the height settings, the
- * bar, the code row, 紧凑, one-handed, floating, split). One scene a keyboard an orientation gives every key's ways.
- *
- * [Page.jobs] reads what the scenes are made of on the main thread; [made] makes them, on one other thread (the page's:
- * its measurer is no other's); [note] says what the page shows of them.
- */
+/** Scenes are built on the page's one thread (its measurer is no other's); [note] says what the page shows. */
 object SwipeFates {
 
-    /** One keyboard's scene to make: [label] the keyboard the page names, [landscape] the turned one. */
     class Job internal constructor(
         val label: String,
         val landscape: Boolean,
@@ -73,19 +63,14 @@ object SwipeFates {
         internal val env: Env,
         internal val layout: SceneLayout,
         internal val measurer: TextMeasurer,
-        // a table's every root on the letters: its letters' ways drawn nowhere (TextKeyboard.charShortcutMarks)
+        // a table's every root on the letters: its letters' ways drawn nowhere
         internal val rootsShown: Boolean,
-        // the page's own cascades (the theme's looks worked out): only the page's thread works them out, not
-        // SceneThemes' kept ones the input view and the main thread work out at the same time
+        // the page's own: only its thread works them out, not SceneThemes' shared ones
         internal val cascades: Cascades,
         internal val ways: Set<Boolean>,
     )
 
-    /**
-     * What a [Job]'s scene shows: each key's (by its shortcut name) ways' fates; null, no scene made. [ways] the
-     * ways drawn at all (on, their place not 无): a way not among them has no fate to tell; [roots] the keys (by their
-     * shortcut names) a shape code's roots fill, their ways drawn nowhere as the user chose (全部字根).
-     */
+    /** Fates by shortcut name; null, no scene made. [roots]: keys a shape code's roots fill, their ways drawn nowhere. */
     class Seen(
         val label: String,
         val landscape: Boolean,
@@ -94,17 +79,11 @@ object SwipeFates {
         val roots: Set<String> = emptySet(),
     )
 
-    /** A keyboard the user types on: its own class, made once, as told its input method. */
     private class Shown(val label: String, val keyboard: BaseKeyboard, val ime: InputMethodEntry?, val codeRow: ImKeyboards.Layout, val rootsShown: Boolean)
 
-    /** A keyboard made for an input method, before the page names it. */
-    // [custom] the name of the layout of the user's it draws (061-custom-layout §9), if any
+    // [custom]: the user layout it draws, if any
     private class Made(val ime: InputMethodEntry?, val keyboard: BaseKeyboard, val layout: ImKeyboards.Layout, val roots: Boolean, val custom: String? = null)
 
-    /**
-     * A settings page's keyboards: one a keyboard of [imes] (the input methods on), [tableLabels] each table's
-     * 按键显示 (its KeyLabels key); none on, the full keyboard. Made on the main thread, as the page opens.
-     */
     class Page(private val ctx: Context, imes: List<InputMethodEntry>, tableLabels: Map<String, String?>) {
         private val theme: Theme = ThemeManager.activeTheme
         private val look = ThemeManager.shownLook(theme)
@@ -112,13 +91,12 @@ object SwipeFates {
         // the page's thread's alone: a measurer keeps a Paint and what it measured
         private val measurer = measurer(theme, look)
 
-        // the keyboards: they listen to the settings while held, so let go with the page ([release])
+        // they listen to the settings while held, so let go with the page ([release])
         private var shown: List<Shown> = shown(imes, tableLabels)
 
-        // made on the main thread, used on the page's thread alone (one at a time: its executor's)
+        // made on the main thread, used on the page's thread alone
         private var cascades: Cascades? = null
 
-        /** The keyboards let go: the page is gone. */
         fun release() {
             shown = emptyList()
         }
@@ -128,19 +106,17 @@ object SwipeFates {
             val prefs = AppPrefs.getInstance().keyboard
             val scheme = EngineState.shuangpinScheme
             val on = imes.ifEmpty { listOf(null) }
-            // one keyboard a layout, told each input method's own as its scene is asked of ([jobs])
             val keyboards = HashMap<String, BaseKeyboard>()
             val chosen = prefs.imKeyboards()
             val made = on.mapNotNull { ime ->
                 val layout = ImKeyboards.layoutOf(ime?.uniqueName ?: InputMethodCatalog.ENGLISH, chosen, scheme)
                 val name = ime?.let { lettersOf(it.uniqueName, chosen, scheme) } ?: nameOf(layout, scheme)
                 val keyboard = keyboards[name] ?: makers[KeyboardNames.base(name)]?.invoke(KeyboardNames.custom(name))?.also { keyboards[name] = it } ?: return@mapNotNull null
-                // the roots fill the full keyboard's letters alone (a table on the nine keys has none drawn)
+                // roots fill only the full keyboard's letters
                 val roots = layout == ImKeyboards.Layout.TEXT && ime != null && ime.uniqueName in InputMethodCatalog.TABLES &&
                     KeyLabels.of(tableLabels[ime.uniqueName].orEmpty()) == KeyLabels.ROOTS && !keyboardCompact()
                 Made(ime, keyboard, layout, roots, ime?.let { ImKeyboards.shown(it.uniqueName, chosen, scheme).custom?.name })
             }
-            // a board named by its page's name, a layout of the user's by its own; two input methods on one, each by its own too
             val names = made.map { it.custom ?: boardName(ctx, it.keyboard.themeBoard) }
             return made.mapIndexed { i, m ->
                 val board = names[i]
@@ -149,7 +125,6 @@ object SwipeFates {
             }
         }
 
-        /** The scenes of every keyboard upright and turned, the ways as [slots] has them: read here, on the main thread. */
         fun jobs(slots: SwipeSlots): List<Job> {
             val sceneTheme = SceneThemes.of(theme, look) ?: return emptyList<Job>().also { Timber.w("swipe fates: no scene theme of %s", theme.name) }
             val (upright, turned) = KeyboardArea.screens(ctx)
@@ -168,8 +143,7 @@ object SwipeFates {
                 listOf(upright, turned).mapNotNull { screen ->
                     val size = size(screen, s.keyboard.themeBoard, s.codeRow, rows)
                     val (layout, env) = s.keyboard.shownAs(look, size.width, size.height) ?: return@mapNotNull null
-                    // the marks as the keyboard's resolver makes them (key_lists' firsts, the nine keys' letters as the user
-                    // set them, t9_letters), the ways as [slots] has them
+                    // as the keyboard's resolver makes them
                     val marks = SceneBoard.resolver(layout, s.ime?.uniqueName.orEmpty(), KeyCaps.nineLetters(), slots)
                         .marks(KeysState(punctuation = punctuation, ways = on, spots = spots))
                         .let { if (it.charShortcuts == !s.rootsShown) it else it.copy(charShortcuts = !s.rootsShown) }
@@ -184,7 +158,6 @@ object SwipeFates {
         }
     }
 
-    /** [job]'s scene made: on the page's thread. */
     fun made(job: Job): Seen {
         val built = SceneBuilder(job.theme, job.env, job.measurer, cascades = job.cascades).build(job.layout.layout, job.layout.fragments)
         val scene = when (built) {
@@ -192,8 +165,7 @@ object SwipeFates {
             is Parsed.Failed -> return Seen(job.label, job.landscape, null, job.ways).also { Timber.e("swipe fates: no scene of %s: %s", job.layout.id, built.problems) }
         }
         val keys = scene.keys.filter { it.copy == 0 && it.shortcut != null }
-        // a table's roots shown: its character keys' ways drawn nowhere, as the scene has it (`full/j`); the function
-        // keys (`fn/space`) keep theirs
+        // roots shown: character keys' ways drawn nowhere; the function keys keep theirs
         val roots = if (job.rootsShown) keys.mapNotNullTo(HashSet()) { it.shortcut?.takeUnless { n -> KeyId(n).isFunction } } else emptySet()
         val fates = keys.associate { node ->
             node.shortcut!! to if (node.shortcut in roots) mapOf(true to MarkFate.Dropped, false to MarkFate.Dropped) else node.fates
@@ -201,22 +173,17 @@ object SwipeFates {
         return Seen(job.label, job.landscape, fates, job.ways, roots)
     }
 
-    /**
-     * The size of the keys of a board ([board]: KeyNames') on [s], as InputView gives it; [floating] its text scale, [split]
-     * the letters halved, [resize] the floating keyboard resized (all of it drawn as much bigger: SceneEnvs.of's density).
-     */
+    /** As InputView gives it on [s] (all drawn as much bigger: SceneEnvs.of's density). */
     @VisibleForTesting
     internal data class Size(val width: Int, val height: Int, val floating: Double?, val split: Boolean, val resize: Double = 1.0)
 
-    // InputView.updateKeyboardSize and placement: floating as narrow and short as there, docked one-handed or at a
-    // side as SplitKeyboard puts it, a docked handle counted in the cap, [rows] the board's (注音's five give way less)
+    // as InputView.updateKeyboardSize places it
     @VisibleForTesting
     internal fun size(s: KeyboardArea.Screen, board: String?, codeRow: ImKeyboards.Layout, rows: Double = KeyboardHeightCap.DEFAULT_ROWS): Size {
         val prefs = ThemeManager.prefs
-        // each screen by its own shape's 键盘样式: upright floating, turned split (061-wide-keyboard-style)
+        // each screen by its own shape's 键盘样式
         val style = KeyboardStyles.of(s)
         if (style.floating) {
-            // as resized on [s]'s shape, its own (KeyboardArea.floatingSize)
             val floating = KeyboardArea.floatingSize(s)
             return Size(s.dp(floating.widthDp.toDouble()), floating.keysHeightPx, floating.textScale.toDouble(), false, floating.resize.toDouble())
         }
@@ -232,21 +199,14 @@ object SwipeFates {
         }
     }
 
-    /**
-     * What the page says of way [up] of the key of [name] (`full/j`; a function key's `fn/space`, or the page's bare
-     * `space`, read as its one name [KeyId.of] as the scenes name it), set, as [seen]:
-     * nothing where every keyboard that has the key draws it as set, or a scene was not made (no claim then); the
-     * keyboards differing, the one that draws it worst, by its name.
-     */
+    /** Null where every keyboard with the key draws it as set or a scene was not made; else the worst, by name. */
     fun note(ctx: Context, seen: List<Seen>, name: String, up: Boolean): String? {
         val shortcut = KeyId.of(name).name
-        // a scene not made: no claim; a way off or placed 无: drawn nowhere as the user chose, nothing to say
+        // a scene not made: no claim; a way off or placed 无: drawn nowhere as the user chose
         if (seen.any { it.fates == null || up !in it.ways }) return null
         val per = seen.groupBy { it.label }.mapNotNull { (label, both) ->
             val roots = both.any { shortcut in it.roots }
-            // no fate: the engine gave the way none (set to 空, no first to draw, its marks hidden by the theme): no
-            // claim, only a way actually dropped is 画不下; under the roots, which fill the key, it is theirs ([made]
-            // gives a rooted key's ways Dropped; a Seen made otherwise is held to the same)
+            // no fate: the engine gave the way none, so no claim; under the roots, which fill the key, it is theirs
             fun fate(landscape: Boolean): MarkFate? = both.firstOrNull { it.landscape == landscape }?.fates?.get(shortcut)?.let {
                 it[up] ?: MarkFate.Dropped.takeIf { roots }
             }
@@ -256,12 +216,12 @@ object SwipeFates {
         }
         if (per.isEmpty()) return null
         val (label, worst, roots) = per.maxBy { (_, f) -> rank(f.first) * RANKS + rank(f.second) }
-        // the roots fill the key: not drawn, as the user chose, not for want of room
+        // the roots fill the key: not drawn as the user chose, not for want of room
         val text = (if (roots) ctx.getString(R.string.swipe_fate_roots) else note(ctx, worst.first, worst.second)) ?: return null
         return if (per.map { it.second to it.third }.distinct().size > 1) ctx.getString(R.string.swipe_fate_on, label, text) else text
     }
 
-    // how far from as set: none, shortened, a sign, not drawn
+    // distance from as set: none, shortened, a sign, not drawn
     private fun rank(f: MarkFate?): Int = when (f) {
         null, MarkFate.AsSet -> 0
         is MarkFate.Shortened -> 1
@@ -271,7 +231,6 @@ object SwipeFates {
 
     private const val RANKS = 4
 
-    /** What the page says of [upright] and [turned]: nothing where both are drawn as set. */
     fun note(ctx: Context, upright: MarkFate?, turned: MarkFate?): String? {
         val a = upright.shown()
         val b = turned.shown()
@@ -290,10 +249,8 @@ object SwipeFates {
         return ctx.getString(R.string.swipe_fate_both, part(a), part(b))
     }
 
-    // drawn as set, or not drawn at all for nothing set: no note
     private fun MarkFate?.shown(): MarkFate? = takeUnless { it == null || it == MarkFate.AsSet }
 
-    /** A board's name as the shortcut pages call it. */
     fun boardName(ctx: Context, board: String?): String = ctx.getString(
         when (board) {
             KeyNames.NINE -> R.string.shortcut_page_nine
@@ -306,7 +263,7 @@ object SwipeFates {
         },
     )
 
-    /** The measurer a page's thread measures [theme]'s text with: its own, made here (the test's seam: [SceneBoard.measurerFor]). */
+    /** The test's seam: [SceneBoard.measurerFor]. */
     private fun measurer(theme: Theme, look: ThemeLook): TextMeasurer =
         SceneBoard.measurerFor?.invoke() ?: AndroidTextMeasurer(SceneFonts.of(theme, look))
 }

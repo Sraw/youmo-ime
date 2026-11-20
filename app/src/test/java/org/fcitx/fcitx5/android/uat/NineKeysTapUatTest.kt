@@ -44,11 +44,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * uat/03's presses in time on the nine keys: 连按 (a key pressed again soon), 1's punctuation, and
- * English's letters typed one at a time, as the keyboard reads them on the clock and what it then
- * sends or commits itself. What the engine makes of the keys sent is NineKeysUatTest's (:lib:ime-eval).
- */
+/** 连按, 1's punctuation and English's letters on the nine keys, as the keyboard reads them on the clock. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -59,7 +55,6 @@ class NineKeysTapUatTest {
 
     private var h: KeyboardHarness? = null
 
-    // pinyin on the nine keys, English on them too (B0-九键英文)
     private fun harness(inputType: Int = InputType.TYPE_CLASS_TEXT) = KeyboardHarness(
         im = KeyboardHarness.PINYIN,
         keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS, english = ImKeyboard.NINE_KEYS),
@@ -69,7 +64,6 @@ class NineKeysTapUatTest {
         it.api.enabledIme = it.api.availableIme
     }.start(inputType)
 
-    // fcitx's Chinese punctuation on, as its addon tells it: 1 types ，。？！
     private fun KeyboardHarness.chinese() = apply { chinesePunctuation() }
 
     @After
@@ -79,12 +73,10 @@ class NineKeysTapUatTest {
         EngineState.englishTypingState.value = false
     }
 
-    // the globe to English, on its nine keys
     private fun KeyboardHarness.english() {
         emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
     }
 
-    // [keys] (digits, or ⇧) tapped [gap] ms apart
     private fun KeyboardHarness.presses(keys: String, gap: Long) {
         keys.forEachIndexed { i, k ->
             if (i > 0) advance(gap)
@@ -93,11 +85,9 @@ class NineKeysTapUatTest {
         advance(PAUSE)
     }
 
-    // what was sent the engine: each key down, as fcitx's key names or a Unicode sym
-    private fun KeyboardHarness.sent() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
+    private fun KeyboardHarness.sentKeys() = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
         .map { Regex("key=(.+?),").find(it)?.groupValues?.get(1) ?: Regex("sym=(\\d+)").find(it)!!.groupValues[1] }
 
-    // pinyin's nine keys send a code of their own for each digit (Keyboard.pinyinNineKey)
     private fun nine(digits: String) = digits.map { (UNICODE + Keyboard.pinyinNineKey(it)).toString() }
 
     private fun letterAgain(c: Char) = (UNICODE + Keyboard.letterKey(c, again = true)).toString()
@@ -110,11 +100,9 @@ class NineKeysTapUatTest {
         api.calls.clear()
     }
 
-    // FB9: what 1 types goes in as typed, a bracket paired. Not a uat case: the shipped table puts none on 1
-    // (，。？！), so a user never sees it; a map that does stands for it, the path the same whatever it types. A
-    // multi-tap run's later taps replace what the first typed (replacing set) and are never paired. So a run whose
-    // first mark is an opening bracket would pair it and leave the closer behind when a later tap replaces it; no
-    // shipped table has one
+    // what 1 types goes in as typed, a bracket paired; no shipped table puts one on 1. A multi-tap run's later taps
+    // replace what the first typed and are never paired, so a run starting with an opening bracket would leave its
+    // closer behind
     @Test
     fun onesMarkGoesInAsTypedABracketPaired() {
         val h = harness()
@@ -133,22 +121,19 @@ class NineKeysTapUatTest {
         assertEquals("。", h.text)
         h.clear()
         h.presses("44", SLOW)
-        assertEquals(nine("44"), h.sent())
+        assertEquals(nine("44"), h.sentKeys())
         h.clear()
-        // the engine's answer to the first 4 (composing): the second press is h, typed as itself
         h.presses("44", QUICK)
-        assertEquals(nine("4") + letterAgain('h'), h.sent())
+        assertEquals(nine("4") + letterAgain('h'), h.sentKeys())
         h.clear()
         h.presses("7", 0)
         h.presses("44", QUICK)
         h.tap(h.keyWithId(R.id.button_backspace)!!)
-        // Backspace is no digit: sent, the engine takes the letter off whole (NineKeysUatTest)
-        assertEquals(nine("74") + listOf(letterAgain('h'), FcitxKeyMapping.FcitxKey_BackSpace.toString()), h.sent())
+        assertEquals(nine("74") + listOf(letterAgain('h'), FcitxKeyMapping.FcitxKey_BackSpace.toString()), h.sentKeys())
     }
 
-    // fcitx's 「字母或数字后用半角标点」 on (punctuation.conf, no setting in the app): after a digit 1's run is
-    // half-width, its second tap taking back the , the first committed (the run replaces what was typed, not the
-    // previous mark mapped again)
+    // fcitx's 「字母或数字后用半角标点」 on: after a digit 1's run is half-width, its second tap taking back the , the
+    // first committed
     @Test
     @Uat("T9-19b")
     fun afterADigitWithHalfWidthOnOnesSecondTapReplacesTheCommaTyped() {
@@ -161,28 +146,24 @@ class NineKeysTapUatTest {
             val h = KeyboardHarness(host = fcitx, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)).also { this.h = it }
             h.service.postFcitxJob { activate(1, "org.example.app") }
             h.start()
-            // the host's thread done with what it was given and what it told back shown
             fun hostDone() {
                 val done = AtomicBoolean()
                 h.service.postFcitxJob { done.set(true) }
                 until("the host's queue done", step = { h.idle() }) { done.get() }
                 h.idle()
             }
-            // the activation, before the first swipe
             hostDone()
             val three = h.nineKey("3")
             h.swipe(three, 0f, -three.bounds.height().toFloat())
             until("3 typed", step = { h.idle() }) { h.text == "3" }
             hostDone()
-            // after the digit the marks are half width: 1 shows , first
             assertEquals(',', h.nineKey("1").label.first())
             h.advance(PAUSE)
             h.tap(h.nineKey("1"))
             until(", typed", step = { h.idle() }) { h.text == "3," }
-            // the engine's answer to the , in (it is no digit: full width again) before the second tap, as on a
-            // slow machine; the run still types half width (CI 43196090467: 3。)
+            // the engine's answer to the , (no digit: full width again) before the second tap, as on a slow machine; the run
+            // still types half width
             hostDone()
-            // the race's order held: the full-width map is back (1 shows ， first) before the second tap
             assertEquals('，', h.nineKey("1").label.first())
             h.advance(QUICK)
             h.tap(h.nineKey("1"))
@@ -208,7 +189,7 @@ class NineKeysTapUatTest {
         assertEquals("，，", h.text)
         h.clear()
         h.presses("44", FAST)
-        assertEquals(nine("44"), h.sent())
+        assertEquals(nine("44"), h.sentKeys())
     }
 
     @Test
@@ -216,10 +197,9 @@ class NineKeysTapUatTest {
     fun englishsOneWithNothingTypedCyclesItsMarks() {
         val h = harness()
         h.english()
-        // pinyin's , . ? ! (用户 2026-11-11), as English's punctuation (none mapped) types them
         h.presses("11", FAST)
         assertEquals(".", h.text)
-        assertTrue(h.sent().toString(), h.sent().isEmpty())
+        assertTrue(h.sentKeys().toString(), h.sentKeys().isEmpty())
     }
 
     @Test
@@ -230,8 +210,7 @@ class NineKeysTapUatTest {
         h.english()
         for (run in listOf("44", "33", "555", "555", "666")) h.presses(run, FASTER)
         assertEquals("hello", h.text)
-        // nothing for the engine to read: no candidates (NineKeysUatTest)
-        assertTrue(h.sent().toString(), h.sent().isEmpty())
+        assertTrue(h.sentKeys().toString(), h.sentKeys().isEmpty())
     }
 
     @Test
@@ -241,7 +220,7 @@ class NineKeysTapUatTest {
         h.english()
         h.presses("44", FASTER)
         assertEquals("h", h.text)
-        assertTrue(h.sent().toString(), h.sent().isEmpty())
+        assertTrue(h.sentKeys().toString(), h.sentKeys().isEmpty())
     }
 
     @Test
@@ -256,12 +235,10 @@ class NineKeysTapUatTest {
     private fun KeyboardHarness.textView(text: String): TextView =
         KeyboardHarness.all(inputView).filterIsInstance<TextView>().last { shown(it) && it.text.toString() == text }
 
-    // a long press on [key], the finger moved onto the popup's [label] and let go
     private fun KeyboardHarness.longPressTo(key: ShownKey, label: String) {
         val f = finger(key, at(key))
         advance(700)
         f.move(at(key))
-        // the popup's cells, whichever draws it: from the digit's (where the finger starts) to [label]'s
         fun centre(text: String) = popupChoices().last { it.text == text }.cell.let { it.exactCenterX() to it.exactCenterY() }
         val from = centre("4")
         val to = centre(label)
@@ -271,7 +248,6 @@ class NineKeysTapUatTest {
         f.up(p)
     }
 
-    // the word's end each way (the engine's commit of it: NineKeysUatTest)
     @Test
     @Uat("T9-36")
     fun anEnglishWordIsEndedByEnterTheColumnZeroOrAHeldDigit() {
@@ -284,20 +260,20 @@ class NineKeysTapUatTest {
             h.idle()
         }
         typing()
-        assertEquals(listOf("4663").flatMap { d -> d.map { (UNICODE + Keyboard.nineKey(it, upper = false)).toString() } }, h.sent())
+        assertEquals(listOf("4663").flatMap { d -> d.map { (UNICODE + Keyboard.nineKey(it, upper = false)).toString() } }, h.sentKeys())
         h.tap(h.keyWithId(R.id.button_return)!!)
-        assertEquals(FcitxKeyMapping.FcitxKey_Return.toString(), h.sent().last())
+        assertEquals(FcitxKeyMapping.FcitxKey_Return.toString(), h.sentKeys().last())
         typing()
         h.tap(h.textView(","))
-        assertEquals(",", h.sent().last())
+        assertEquals(",", h.sentKeys().last())
         typing()
         h.tap(h.key("0"))
-        assertEquals("0", h.sent().last())
+        assertEquals("0", h.sentKeys().last())
         typing()
         h.longPressTo(h.nineKey("4"), "4")
-        // the keypad's 4 (060-keys-unify L7, D7): the engine picks the fourth word with it, nothing ended first
+        // the keypad's 4: the engine picks the fourth word with it, nothing ended first
         assertTrue(h.api.calls.toString(), "reset()" !in h.api.calls)
-        assertEquals(FcitxKeyMapping.FcitxKey_KP_4.toString(), h.sent().last())
+        assertEquals(FcitxKeyMapping.FcitxKey_KP_4.toString(), h.sentKeys().last())
     }
 
     private companion object {

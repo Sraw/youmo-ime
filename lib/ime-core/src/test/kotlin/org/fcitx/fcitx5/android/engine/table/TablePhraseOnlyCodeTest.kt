@@ -15,11 +15,7 @@ import org.junit.Test
 import java.util.Calendar
 import java.util.GregorianCalendar
 
-/**
- * A code the table has nothing under, reached by a phrase alone: the phrase is shown, first as
- * the only candidate, but a phrase never commits itself (A1): space, a selection key, a key no
- * code starts and a key past the longest code drop the code as one with no candidate; a tap takes the phrase.
- */
+/** A code reached by a phrase alone shows it first but never commits it; a tap takes the phrase. */
 class TablePhraseOnlyCodeTest {
     private val day = { GregorianCalendar(2026, Calendar.OCTOBER, 31) }
 

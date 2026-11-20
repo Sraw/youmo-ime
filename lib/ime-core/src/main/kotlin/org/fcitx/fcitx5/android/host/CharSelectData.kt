@@ -6,10 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 import java.math.BigInteger
 
-/**
- * The names [CharSelectData.name] makes up for ranges the data does not list
- * (`charselectdata.cpp:189-245`); the app passes its translations, `%X` is the code point in hex.
- */
+/** Names for ranges the data does not list; `%X` is the code point in hex. */
 data class CharNames(
     val cjkIdeograph: String = "CJK UNIFIED IDEOGRAPH-%X",
     val hangulSyllable: String = "HANGUL SYLLABLE %s",
@@ -24,18 +21,9 @@ data class CharNames(
 )
 
 /**
- * fcitx's `CharSelectData` (`modules/unicode/charselectdata.cpp`, from KDE's kcharselect), over the
- * same `charselectdata` file (design Q4): character names, and the search the Unicode temp mode runs.
- *
- * The file is little-endian: at 4/8 the name table (8-byte records: code point, offset of the
- * name, which starts one byte in), at 12/16 the details (29-byte records: aliases, notes,
- * approximate equivalents, equivalents and "see also"), at 36 to the end Unihan (32-byte records:
- * seven string offsets). The index (`createIndex`, `:480-588`) maps every whitespace-separated word
- * of all of these to the code points it describes, the words sorted ignoring ASCII case.
- *
- * The caller loads [data] lazily, as fcitx does at the first trigger (`unicodetempmode.cpp:143-152`).
- * Names are read from it directly; the search's index (some 10 MB of words) is built at the first
- * [find] or [prepare], once, from any thread.
+ * fcitx's `CharSelectData` (KDE's kcharselect) over the same `charselectdata` file, little-endian: names at 4/8
+ * (8-byte records), details at 12/16 (29-byte records), Unihan from 36 (32-byte records). Names are read directly;
+ * the search's index (some 10 MB) is built once at the first [find] or [prepare], from any thread.
  */
 class CharSelectData(private val data: ByteArray, private val names: CharNames = CharNames()) {
 
@@ -49,7 +37,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         Index(Array(sorted.size) { sorted[it].key }, Array(sorted.size) { sorted[it].value.toArray() })
     }
 
-    /** The search's index built now, so that the first [find] does not wait for it. */
+    /** So that the first [find] does not wait for it. */
     fun prepare() {
         index
     }
@@ -82,7 +70,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
 
     private fun cString(at: Int) = String(data, at, cStringEnd(at) - at, Charsets.UTF_8)
 
-    /** `appendToIndex` (`:469-478`): each whitespace-separated word of the C string at [at]. */
+    /** `appendToIndex`. */
     private fun appendToIndex(index: HashMap<String, IntList>, unicode: Int, at: Int) {
         appendWords(index, unicode, cString(at))
     }
@@ -103,7 +91,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         val detailsEnd = u32(16)
         for (pos in 0 until (detailsEnd - detailsBegin) / 29) {
             val r = detailsBegin + pos * 29
-            // fcitx reads the record's code point as 32 bits here (`:513-514`) and as 16 elsewhere
+            // fcitx reads the record's code point as 32 bits here and as 16 elsewhere
             val unicode = u32(r)
             // aliases, notes, approximate equivalents, equivalents: (count byte, offset) pairs
             for ((countAt, offsetAt) in DETAIL_LISTS) {
@@ -113,8 +101,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
                     offset = cStringEnd(offset) + 1
                 }
             }
-            // "see also": fcitx advances the equivalents' offset instead of this one (`:567-571`), so
-            // every entry indexes the first code point, as four hex digits
+            // "see also": fcitx advances the equivalents' offset instead, so every entry indexes the first code point
             val seeAlsoCount = u8(r + 28)
             val seeAlsoOffset = u32(r + 24)
             repeat(seeAlsoCount) {
@@ -133,7 +120,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         }
     }
 
-    /** `name` (`:183-267`). */
+    /** `name`. */
     @Suppress("MagicNumber", "CyclomaticComplexMethod", "ComplexCondition")
     fun name(unicode: Int): String {
         val result = when {
@@ -154,7 +141,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         return result.ifEmpty { names.notAssigned }
     }
 
-    /** UAX #15's syllable name (`:200-221`); past the last syllable, none. */
+    /** UAX #15's syllable name; past the last syllable, none. */
     @Suppress("MagicNumber")
     private fun hangul(unicode: Int): String {
         val s = unicode - 0xAC00
@@ -165,7 +152,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         return names.hangulSyllable.format(JAMO_L[l] + JAMO_V[v] + JAMO_T[t])
     }
 
-    /** The binary search of the name table (`:229-251`), unsigned as the code points are. */
+    /** Unsigned, as the code points are. */
     @Suppress("MagicNumber")
     private fun listedName(unicode: Int): String {
         val begin = u32(4)
@@ -185,15 +172,9 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
     }
 
     /**
-     * `find` (`:313-383`): what the Unicode search lists for [needle], in order.
-     *
-     * The needle's whitespace runs become one space and it is split into words; a needle of one
-     * byte is searched as its code, `U+` and four lowercase hex digits. Each word that is a number
-     * (`0x`/`u+`/`U+` and at least four hex digits: that, and the same digits read as decimal; else
-     * the word as decimal, as `std::stoul` reads it) puts that code point first, in word order,
-     * repeats kept. Then the code points every word is a case-insensitive prefix of a word of,
-     * ascending, without those already listed. The values are fcitx's `uint32_t`s (bits in an
-     * [Int]): a number may be no character at all, which the caller drops.
+     * `find`: a one-byte needle is searched as `U+` and four hex digits. A word that is a number puts that code point
+     * first (in word order, repeats kept); then the code points every word prefixes a word of, ascending. Values are
+     * fcitx's `uint32_t`s: a number may be no character, which the caller drops.
      */
     @Suppress("MagicNumber", "ReturnCount")
     fun find(needle: String): IntArray {
@@ -223,7 +204,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         return (numbers + rest).toIntArray()
     }
 
-    /** `matchingChars` (`:385-404`): every word starting with [s], ignoring ASCII case. */
+    /** `matchingChars`: ignoring ASCII case. */
     private fun matchingChars(s: String): java.util.TreeSet<Int> {
         val result = java.util.TreeSet<Int>(Integer::compareUnsigned)
         var lo = 0
@@ -242,7 +223,6 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
     }
 
     companion object {
-        /** (count, offset) of aliases, notes, approximate equivalents and equivalents in a details record. */
         private val DETAIL_LISTS = listOf(8 to 4, 13 to 9, 18 to 14, 23 to 19)
 
         private val JAMO_L = arrayOf(
@@ -279,7 +259,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
         private fun startsWithIgnoringAsciiCase(word: String, s: String): Boolean =
             word.length >= s.length && (0 until s.length).all { foldAscii(word[it].code) == foldAscii(s[it].code) }
 
-        /** `stringutils::split(s, FCITX_WHITESPACE)`: words, empty ones skipped. */
+        /** `stringutils::split(s, FCITX_WHITESPACE)`: empty words skipped. */
         private fun splitWhitespace(s: String): List<String> {
             val out = ArrayList<String>()
             var start = -1
@@ -295,7 +275,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
             return out
         }
 
-        /** `Simplified` (`:269-292`): each run of whitespace becomes one space; nothing trimmed. */
+        /** `Simplified`: each whitespace run becomes one space; nothing trimmed. */
         private fun simplify(s: String): String = buildString {
             var lastIsSpace = false
             for (c in s) {
@@ -309,7 +289,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
             }
         }
 
-        /** `IsHexString` (`:294-311`): `0x`, `0X`, `u+` or `U+`, then hex digits, six characters at least. */
+        /** `IsHexString`: `0x`, `0X`, `u+` or `U+`, then hex digits, six characters at least. */
         @Suppress("MagicNumber")
         private fun isHexString(s: String): Boolean {
             if (s.length < 6) return false
@@ -322,12 +302,7 @@ class CharSelectData(private val data: ByteArray, private val names: CharNames =
 
         private val ULONG_RANGE = BigInteger.ONE.shiftLeft(64)
 
-        /**
-         * `std::stoul(s, &end, base)` with `end == s.size()`, cast to `uint32_t`, for a word with no
-         * whitespace: an optional sign (a minus wraps around, `strtoul`), for base 16 an optional `0x`,
-         * then at least one digit and nothing else; null where fcitx catches the exception (no
-         * digits, or past `unsigned long`'s 64 bits) or `end` falls short.
-         */
+        /** `std::stoul` with `end == s.size()`, cast to `uint32_t` (a minus wraps); null where fcitx catches or `end` falls short. */
         @Suppress("MagicNumber", "ReturnCount")
         private fun stoul(s: String, base: Int): Int? {
             var i = 0

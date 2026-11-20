@@ -48,7 +48,7 @@ class CustomPhraseManagerTest {
         // the editor put b first: the file unchanged, its list is saved as it is
         var saved = CustomPhraseManager.saveOver(base, listOf(b, a), file)
         assertEquals(listOf(b, a), saved)
-        // saved twice, 信箱 put before 邮箱 of the same key: what was saved is the file, nothing merged
+        // saved twice: what was saved is the file, nothing merged
         val a2 = PinyinCustomPhrase("yx", 1, "信箱")
         saved = CustomPhraseManager.saveOver(saved, listOf(b, a, a2), file)
         saved = CustomPhraseManager.saveOver(saved, listOf(b, a2, a), file)
@@ -84,7 +84,6 @@ class CustomPhraseManagerTest {
         val pinned = PinyinCustomPhrase("yx", 1, "信箱")
         CustomPhraseManager.save(listOf(a, b), file)
         val base = CustomPhraseManager.load(file)
-        // the editor adds c, the engine not reloaded
         CustomPhraseManager.save(listOf(a, b, c), file)
         // a phrase new to its key pinned, then the one it went above pinned back
         CustomPhraseManager.saveKeysOver(base, listOf(b, pinned, a), file)

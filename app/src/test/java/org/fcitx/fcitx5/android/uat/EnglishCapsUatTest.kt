@@ -23,17 +23,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * uat/08-english.md's capitals: what the keyboard sends as the field asks (AutoCaps, read from the
- * editor's getCursorCapsMode). What English does with the keys is EnglishUatTest's (:lib:ime-eval);
- * here the text it would commit is put in the field as the engine's commit would.
- */
+/** What the keyboard sends as the field asks (AutoCaps); the text English would commit is put in the field by hand. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class EnglishCapsUatTest {
 
-    // the harness open, closed after each test (the tests name theirs h)
     private var open: KeyboardHarness? = null
 
     @After
@@ -45,10 +40,8 @@ class EnglishCapsUatTest {
         it.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
     }
 
-    // the letter key [c] whichever case it shows
     private fun KeyboardHarness.letter(c: Char): ShownKey = keys().first { it.label.equals(c.toString(), ignoreCase = true) }
 
-    // the characters of the keys sent down, in order
     private fun KeyboardHarness.typed(): String = api.calls.filter { it.startsWith("sendKey") && "up=false" in it }.joinToString("") { call ->
         Regex("(?:char|key)=([^,]+),").find(call)?.groupValues?.get(1)
             ?: Regex("sym=(\\d+)").find(call)?.groupValues?.get(1)?.toInt()?.toChar()?.toString()
@@ -62,7 +55,6 @@ class EnglishCapsUatTest {
         h.tap(h.letter('h'))
         h.tap(h.letter('i'))
         assertEquals("Hi", h.typed())
-        // English's commit of "hi", space and . (EnglishUatTest EN-06): the field reads "Hi. "
         h.field.setText("Hi. ")
         h.field.setSelection(4)
         h.idle()
@@ -71,7 +63,7 @@ class EnglishCapsUatTest {
         assertEquals("HiOk", h.typed())
     }
 
-    // a fake engine that keeps the glides offered: whether each came with Shift on
+    // keeps the glides offered: whether each came with Shift on
     private val fake = FakeHostApi().apply { inputMethodEntryCached = KeyboardHarness.ENGLISH }
     private val glides = ArrayList<Glide>()
     private val keepingGlides = object : HostApi by fake {
@@ -86,7 +78,6 @@ class EnglishCapsUatTest {
         drag(letter(from), end.exactCenterX(), end.exactCenterY(), steps = 12)
     }
 
-    // the field's text as the engine's commits leave it (EnglishUatTest EN-21), the cursor at its end
     private fun KeyboardHarness.typedIn(text: String) {
         field.setText(text)
         field.setSelection(text.length)
@@ -102,10 +93,8 @@ class EnglishCapsUatTest {
                 .start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
             check(fake.events.tryEmit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH)))
             h.idle()
-            // a sentence's start: Shift on by itself
             h.glide('h', 'o')
             h.typedIn("Hello ")
-            // mid-sentence: off
             h.glide('l', 'n')
             h.typedIn("Hello London. ")
             h.glide('i', 'm')
@@ -114,7 +103,6 @@ class EnglishCapsUatTest {
             assertEquals(listOf(true, false, true, false), glides.map { it.shift })
             h.close()
             glides.clear()
-            // nothing capitalised where the field asks none; Shift tapped, the glide takes it
             val q = KeyboardHarness(im = KeyboardHarness.ENGLISH, host = keepingGlides).also { open = it }
                 .start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
             check(fake.events.tryEmit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH)))

@@ -13,54 +13,39 @@ import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneBehavior
 import org.fcitx.fcitx5.android.scene.KeyNode
 
-/**
- * The keys a keyboard's scene draws (060-render-p2 S1, S4) and the touch that finds them, each a
- * [SceneKey] wired as BaseKeyboard wires a view ([wire]), made from its layout's node (U4 B,
- * [byNodes]). [keyboard]: whose window the keys' timers live as long as. [layout]: the layout the scene drawn now
- * was made of, as the keyboard reads it (BaseKeyboard.keyMarks): a key is one layout's, none kept for another's.
- */
+/** A key is one layout's, none kept for another's. */
 internal class SceneKeys(
     private val keyboard: View,
     private val layout: () -> SceneLayout? = { null },
     private val wire: (SceneKey, KeyDef) -> Unit,
 ) {
 
-    /** What a touch on the canvas finds; null while the views draw the keys. */
+    /** Null while the views draw the keys. */
     var touch: SceneTouch? = null
         private set
 
-    // the keys made from the scene's nodes ([byNodes]), each with what it was made from: a node
-    // that does the same in a scene made anew keeps its key (a finger on it, its timers)
+    // a node that does the same in a scene made anew keeps its key (a finger on it, its timers)
     private val byNode = HashMap<KeyRef, Kept>()
 
-    // a key with what it was made from: what its node does, and what else of the node the keyboard's table read ([SceneKeyDef.Table.reads])
     private class Kept(val does: SceneBehavior, val read: Any?, val key: SceneKey)
 
-    // the layout the keys kept were made for
     private var madeFor: SceneLayout? = null
 
-    /** None: the views draw the keys again. */
     fun none() {
         byNode.clear()
         madeFor = null
         touch = null
     }
 
-    /**
-     * The keys of [view], each made as the scene first has its node, wired as the node says with
-     * [table] the keyboard's own words ([SceneKeyDef]); [replaced] told of a key a node no longer does as
-     * (its gestures cancelled). The keys of nodes gone from the scene are kept (060-render-p2: a to-do).
-     */
+    /** [replaced] told of a key a node no longer does as (its gestures cancelled). Keys of nodes gone are kept. */
     fun byNodes(view: KeyboardCanvasView, table: SceneKeyDef.Table, replaced: (SceneKey) -> Unit) {
         none()
         touch = SceneTouch(view, keyFor = { node -> nodeKey(view, node, table, replaced) }, shown = { true })
     }
 
     private fun nodeKey(view: KeyboardCanvasView, node: KeyNode, table: SceneKeyDef.Table, replaced: (SceneKey) -> Unit): SceneKey {
-        // R25r3 F7962: another layout drawn (a pack's refused here and the app's own of its id in its place, or the
-        // pack's again) keeps none of the last one's keys. A node of the same id that does the same there is not the
-        // same key: a group's code is its layout's (a pack's own groups' or the built-in ones', GroupedKeyboard.codeOf),
-        // and a kept key went on sending the other layout's, which the engine reads as nothing or as another keyboard's
+        // another layout drawn keeps none of the last one's keys: a group's code is its layout's, and a kept key went on
+        // sending the other layout's, which the engine reads as nothing or as another keyboard's
         val drawn = layout()
         if (drawn !== madeFor) {
             byNode.values.forEach { gone(it.key, replaced) }
@@ -68,11 +53,10 @@ internal class SceneKeys(
             madeFor = drawn
         }
         val ref = KeyRef.scene(node.id, node.copy)
-        // as its board pops up: the number pad's no preview, no long press's keys
+        // the number pad's no preview, no long press's keys
         val b = SceneKeyDef.onBoard(SceneBehavior.of(node), view.scene)
         val read = table.reads(node)
-        // a node that differs in its bubble's content alone (Shift's case, a face redrawn) keeps its key, the bubble told;
-        // not one whose table made its actions from something of the node that changed (注音's code is its face's)
+        // differing in its bubble alone (Shift's case) keeps its key; not one whose table read something of the node that changed
         byNode[ref]?.takeIf { it.does.sansBubble() == b.sansBubble() && it.read == read }?.let { kept ->
             kept.key.bubble = SceneKeyDef.bubbleOf(b, node, table)
             byNode[ref] = Kept(b, read, kept.key)
@@ -86,7 +70,7 @@ internal class SceneKeys(
         }
     }
 
-    // the key it was: its timers stopped (a repeat, a long press pending), as a key's are when its touch is taken
+    // its timers stopped (a repeat, a long press pending), as when its touch is taken
     private fun gone(old: SceneKey, replaced: (SceneKey) -> Unit) {
         old.keyGesture.cancelGestures()
         replaced(old)
@@ -94,6 +78,5 @@ internal class SceneKeys(
 
     private fun SceneBehavior.sansBubble() = copy(bubble = bubble?.copy(content = ""))
 
-    /** The key wired for [node]: what a screen reader's actions on it do. */
     fun of(node: KeyNode): SceneKey? = touch?.keyOf(node)
 }

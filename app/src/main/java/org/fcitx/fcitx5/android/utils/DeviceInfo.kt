@@ -44,7 +44,7 @@ object DeviceInfo {
             }"
         )
         // 横屏 as the keyboard has it (a foldable's inner screen and a tablet are, held either way): the display's, as
-        // the input method's window is, not this page's window, half the display in a split screen (R26 F8329)
+        // the input method's window is, not this page's window, half the display in a split screen
         appendLine(
             "Window width: ${context.resources.configuration.screenWidthDp} dp, " +
                 "keyboard landscape: ${KeyboardArea.landscape(KeyboardArea.displayContext(context))}",

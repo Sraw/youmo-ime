@@ -59,7 +59,7 @@ class TableSlipRunTest {
         val fields = lines[0].split('\t')
         assertEquals("abe ", fields[0])
         assertEquals(listOf("-", "-", eTowardR.text(), "-"), fields[4].split(' '))
-        // review F8207: the last words, short of a line, written too: eight keys a line, twelve typed
+        // the last words, short of a line, written too: eight keys a line, twelve typed
         assertEquals(listOf("abe abe ", "abe "), run.touchedSet(listOf(u, u, u), perSample = 8).map { it.substringBefore('\t') })
     }
 
@@ -71,8 +71,7 @@ class TableSlipRunTest {
             .entry("ab", "丙").entry("abr", "甲").entry("cd", "丁").entry("cde", "丁丁")
             .build().toByteArray().let { CodeTable.load(ByteBuffer.wrap(it)) }
         val run = TableSlipRun(withDing, options, TableSlips.SLIPS)
-        // 丁 shows first at c already: typed so, no whole code of it; 甲 is first only at abr, where it commits
-        // itself (its one candidate): left out, the whole-code plan's
+        // 丁 shows first at c already; 甲 only where it commits itself: left out
         val parts = run.units(listOf("丁甲"), "s0.2", slip = false, seed = 1, prefix = true)
         assertEquals(listOf("c"), parts.map { it.planned.code })
         assertEquals(1, run.partial(parts))

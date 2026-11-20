@@ -15,11 +15,8 @@ import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
 /**
- * A theme's icon ([PackIcons.Outline]) in [tint] (its icon-color), rastered once at [pixelWidth] × [pixelHeight]
- * (the size it shows at, the canvas's scale applied, as a vector drawable's raster is) and drawn as that bitmap
- * in its bounds after: a key's display list redrawn each frame does not fill thousands of curves again.
- * The paths drawn as the web's preview draws them (CanvasPainter.icon): placed by [SvgSubset.Icon.fit], one
- * without a colour of its own in the tint, one with its own colour faded by the tint's alpha, each times its opacity.
+ * Rastered once at the size it shows at and drawn as that bitmap after: a key's display list redrawn each frame
+ * does not fill thousands of curves again. The paths drawn as the web's preview draws them (CanvasPainter.icon).
  */
 class PackIconDrawable(private val outline: PackIcons.Outline, private val tint: Argb, private val pixelWidth: Int, private val pixelHeight: Int) : Drawable() {
 
@@ -47,7 +44,7 @@ class PackIconDrawable(private val outline: PackIcons.Outline, private val tint:
         raster?.let { canvas.drawBitmap(it, null, bounds, paint) }
     }
 
-    // its raster's size: an ImageView's wrap_content (a bar's or a panel's icon) as a vector's 24 dp would be
+    // an ImageView's wrap_content as a vector's 24 dp would be
     override fun getIntrinsicWidth(): Int = pixelWidth
 
     override fun getIntrinsicHeight(): Int = pixelHeight

@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android
 
-/**
- * The UAT case(s) (the uat/ case files) this test asserts the 预期 of, on the JVM instead of a device.
- * `uat/tools/uat.py jvm` finds them in the sources and records their JUnit results by id.
- */
+/** The UAT case ids this test asserts on the JVM; `uat/tools/uat.py jvm` finds them and records results by id. */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 annotation class Uat(vararg val ids: String)

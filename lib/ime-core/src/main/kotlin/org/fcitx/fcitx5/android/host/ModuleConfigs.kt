@@ -6,13 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
-/**
- * The two module files whose state the host keeps, read and written with fcitx's INI rules
- * ([IniFile]): `conf/punctuation.conf` (`ca/punctuation/punctuation.h:36-46`) and
- * `conf/chttrans.conf`'s `EnabledIM` (`ca/chttrans/chttrans.h:46-66`). What else a file holds (the
- * hotkeys, chttrans' engine and OpenCC profiles, which the host does not read, design §2.2) is kept as
- * it is; a value at its default is written commented out, as fcitx writes it.
- */
+/** `conf/punctuation.conf` and `conf/chttrans.conf`'s `EnabledIM` by fcitx's INI rules ([IniFile]); the rest of each file kept, defaults written commented out. */
 object ModuleConfigs {
     const val PUNCTUATION = "conf/punctuation.conf"
     const val CHTTRANS = "conf/chttrans.conf"
@@ -24,7 +18,7 @@ object ModuleConfigs {
     private const val TRUE = "True"
     private const val FALSE = "False"
 
-    /** punctuation.conf ([text] null: no file): a bool that is not `True`/`False` exactly is its default (`marshallfunction.cpp:21-32`). */
+    /** A bool not exactly `True`/`False` is its default, as fcitx marshals it. */
     fun punctuation(text: String?): PunctuationConfig {
         val tree = IniFile.read(text.orEmpty())
         val default = PunctuationConfig()
@@ -35,7 +29,7 @@ object ModuleConfigs {
         )
     }
 
-    /** [old] (null: no file) with [config]'s three values set. */
+    /** [old] null: no file. */
     fun punctuationText(old: String?, config: PunctuationConfig): String {
         val tree = IniFile.read(old.orEmpty())
         val default = PunctuationConfig()
@@ -45,17 +39,14 @@ object ModuleConfigs {
         return IniFile.write(tree)
     }
 
-    /**
-     * chttrans.conf's `EnabledIM` (`EnabledIM/0`, `/1`, … till the first missing, `marshallfunction.h:70-88`),
-     * upstream Fcitx5's names as this engine's ([InputMethodCatalog.fromUpstream]).
-     */
+    /** `EnabledIM/0`, `/1`, … till the first missing, upstream names mapped ([InputMethodCatalog.fromUpstream]). */
     fun chttrans(text: String?): Set<String> {
         val list = IniFile.read(text.orEmpty()).find(ENABLED_IM) ?: return emptySet()
         return generateSequence(0) { it + 1 }.map { list.find(it.toString()) }.takeWhile { it != null }
             .mapNotNull { it?.value?.let(InputMethodCatalog::fromUpstream) }.toCollection(LinkedHashSet())
     }
 
-    /** [old] (null: no file) with `EnabledIM` set to [enabled], the rest of the file kept. */
+    /** [old] null: no file; the rest of it kept. */
     fun chttransText(old: String?, enabled: Set<String>): String {
         val read = IniFile.read(old.orEmpty())
         val tree = ConfigTree()

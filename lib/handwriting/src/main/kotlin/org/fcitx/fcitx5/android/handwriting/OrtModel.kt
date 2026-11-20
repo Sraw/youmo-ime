@@ -9,24 +9,16 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-/**
- * One onnxruntime model of one input, floats ([run]) or int64s ([runLongs], the voice polish
- * tagger's character ids), and float outputs, an ORT-format file (a resource pack's): mapped and
- * read where it lies, not onto the heap. [run] may be called from any thread, also at once; [close]
- * waits for runs under way. The mapping the session reads in place is held by the native side (a
- * global reference) till [close], not by a field here that R8 could drop.
- */
+/** One ORT model mapped in place; [run] is thread-safe and [close] waits for runs under way. */
 class OrtModel private constructor(private var handle: Long) : AutoCloseable {
 
     // how many outputs it has: runLongs' room for their dimensions
     private val outputs = nativeOutputs(handle)
 
-    /** An output: [values] row-major, its [shape]. */
     class Output(val values: FloatArray, val shape: LongArray)
 
     private val lock = ReentrantReadWriteLock()
 
-    /** The model run on [x], of [shape]. */
     fun run(x: FloatArray, shape: LongArray): Output = lock.read {
         check(handle != 0L) { "closed" }
         val dims = LongArray(MAX_RANK)
@@ -56,10 +48,7 @@ class OrtModel private constructor(private var handle: Long) : AutoCloseable {
             System.loadLibrary("youmo-handwriting")
         }
 
-        /**
-         * The model in [bytes], a direct buffer (a mapped file), used in place: not changed while open.
-         * The whole buffer is the model, whatever its position and limit.
-         */
+        /** The model in [bytes], a direct buffer used whole in place: not changed while open. */
         fun open(bytes: ByteBuffer, threads: Int = 1): OrtModel {
             require(bytes.isDirect) { "a direct buffer: the session reads it in place" }
             return OrtModel(nativeOpen(bytes, threads))

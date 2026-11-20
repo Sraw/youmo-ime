@@ -94,10 +94,8 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
             // filter out back/home/volume buttons and combination keys
             if (e.unicodeChar != 0) {
                 typingDevice = e.deviceId
-                // evaluate virtual keyboard visibility when pressing physical keyboard while InputView visible
                 evaluateOnKeyDownInner(service)
             }
-            // no need to force show InputView since it's already visible
             return false
         } else {
             // force show InputView when focusing on text input (likely inputType is not TYPE_NULL)
@@ -139,28 +137,26 @@ class InputDeviceManager(private val onChange: (Boolean) -> Unit) {
         }
     }
 
-    /** The keyboard last typed on, which taken away brings the touch keyboard back. */
+    /** Taken away, it brings the touch keyboard back. */
     private var typingDevice = KeyCharacterMap.VIRTUAL_KEYBOARD
 
     fun onDeviceRemoved(deviceId: Int) {
         if (deviceId != typingDevice) return
         typingDevice = KeyCharacterMap.VIRTUAL_KEYBOARD
-        // a Bluetooth keyboard gone to sleep is removed as an unplugged one is: logged, for a touch
-        // keyboard that came up by itself
+        // a Bluetooth keyboard gone to sleep is removed as an unplugged one is
         Timber.d("Keyboard %d gone: the touch keyboard back", deviceId)
-        // hidden or not: shown next, it is the touch keyboard (made visible in a hidden window, harmless)
+        // shown next, it is the touch keyboard (made visible in a hidden window, harmless)
         isVirtualKeyboard = true
     }
 
-    /** The touch keyboard asked for (the floating window's button): until a hardware key is typed again. */
+    /** Until a hardware key is typed again. */
     fun showTouchKeyboard() {
         if (!startedInputView) return
         touchKeyboardAsked = true
         isVirtualKeyboard = true
     }
 
-    // the button's ask, which the system's say (a keyboard attached: no touch keyboard) does not
-    // undo at the next tap or field: a hardware key typed does
+    // not undone by the system's say (a keyboard attached) at the next tap or field: a hardware key typed does
     private var touchKeyboardAsked = false
 
     private fun systemShowsTouchKeyboard(service: FcitxInputMethodService) =

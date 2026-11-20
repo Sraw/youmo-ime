@@ -7,16 +7,10 @@ package org.fcitx.fcitx5.android.engine.rerank
 import java.nio.ByteBuffer
 
 /**
- * Multiplies an int8 matrix by a vector: `y[r] = scales[r] × (row r · x)` for each of [rows] rows
- * of [columns], [q] row-major in its `rows × columns` bytes from index 0, read with absolute gets
- * whatever its position; [x] and [y] are different arrays, as y is written while x is still read.
- * Nearly all of a sentence model's time is spent here; the app does it in C++, as ART runs the
- * loop in [JVM] several times slower than a vectorised one — too slow for the large model in the
- * pauses between keys. The app's [q] is the model file as mapped, its megabytes not copied: a
- * direct buffer, which the app's kernel takes only with a capacity of exactly `rows × columns`.
- * Implementations add in [JVM]'s order but may fuse each multiply-add (the app's does on arm64),
- * so a result may differ from [JVM]'s in its last bits: NativeMatrixKernelTest allows 1e-5 of the
- * sum of its terms' sizes.
+ * `y[r] = scales[r] × (row r · x)` over int8 [q] row-major from index 0 (absolute gets); [x] and [y] must
+ * differ. Nearly all sentence-model time is here; the app does it in C++, as ART runs [JVM] too slowly. The
+ * app's [q] is the mapped model file, a direct buffer whose capacity must be exactly `rows × columns`. Results
+ * may differ from [JVM]'s in the last bits (fused multiply-add): NativeMatrixKernelTest allows 1e-5.
  */
 fun interface MatrixKernel {
     @Suppress("LongParameterList")

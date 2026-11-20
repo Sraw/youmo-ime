@@ -26,46 +26,38 @@ import java.nio.ByteBuffer
 import java.util.concurrent.Executor
 import java.util.zip.CRC32
 
-/**
- * The table input methods of [Engines], each loaded at first need and kept, with what the user
- * taught it: those of [TABLES] from the app's assets ([blobs]), the phrases each saved in an older
- * build as the learning record keeps them ([state], [SavedPhrases]). It shares the user's words ([lexicon]) with each
- * table, coded by its rules ([shared]), and forgets in every table, loaded or not, what is forgotten
- * anywhere ([forgetInTables]). Run on the fcitx thread, as [Engines] is.
- */
+/** The table input methods, each loaded at first need and kept with what the user taught it (older builds' saved phrases from the record, [SavedPhrases]). Shares the user's words coded per table ([shared]) and forgets in every table what is forgotten anywhere ([forgetInTables]). On the fcitx thread. */
 internal class TableRegistry(
     private val blobs: Blobs,
     private val onError: (IOException) -> Unit,
-    // where the user's words are coded for a table, off the input thread
+    // codes the user's words for a table, off the input thread
     private val coding: Executor,
     private val assets: EngineAssets,
     private val lexicon: UserLexicon,
-    // whether the learning record has a text, used or pinned anywhere: something to forget (impl/design-1b.md §3)
+    // whether the record has a text used or pinned anywhere: something to forget
     private val knows: (String) -> Boolean = { false },
-    // the learning record's state, which keeps the phrases the tables saved in an older build (LearnState.tableWords)
+    // the record's state, holding older builds' table phrases (LearnState.tableWords)
     private val state: () -> LearnState = { LearnState() },
-    // those phrases taken out of the record (LearnLog.dropTableWords)
+    // removes those phrases from the record (LearnLog.dropTableWords)
     private val dropSaved: (List<TableWordRow>) -> Unit = {},
-    // where the tables' indexes of the dictionaries the user merged ([UserModel.dictionaryFile])
-    // are kept: coded per table on disk ([CodedIndex]), never as objects (0.3.1 ran out of heap
-    // so); null keeps none, and the tables offer none of the file's words
+    // where per-table on-disk indexes of merged dictionaries live ([CodedIndex]; objects once exhausted the heap);
+    // null keeps none and tables offer none of the file's words
     private val indexes: () -> UserFiles? = { null },
 ) {
 
-    /** A table and what the user taught it: both outlive the sessions made over them. */
+    /** Both outlive the sessions made over them. */
     class Table(
         val dictionary: TableDictionary,
         val saved: SavedPhrases,
-        // the table's data as loaded: what its index of a merged file is keyed on
+        // the loaded table data: its merged-file index is keyed on it
         val data: ByteBuffer? = null,
     ) {
         var shared: SharedWords? = null
 
-        // the user's words coded for this table: those of their dictionaries, made once a user
-        // model, with those add() listed since apart ([later], from [listedFrom] in listedSince);
-        // and those they made or typed, as of its changes then
+        // the user's words coded for this table: dictionaries' per user model, with later add()s apart ([later]), and
+        // made or typed words as of its changes then
         var listed: CodedWords? = null
-        // the dictionaries' words, 300k and more, coded off the input thread: a second, more on a phone
+        // dictionaries' words (300k+) coded off the input thread: a second or more on a phone
         var coding: InBackground<Listed>? = null
         var later: CodedWords? = null
         var own: CodedWords? = null
@@ -80,14 +72,9 @@ internal class TableRegistry(
 
     private val listedSince get() = lexicon.listedSince
 
-    /**
-     * One user lexicon for every input method: [table] offers the words the user made, added or
-     * typed with pinyin, coded by its rules, as of now; the phrases it saved in an older build
-     * are pinyin's words (told once); what is blocked or forgotten anywhere is so here, but for
-     * the table's own entries, which a block from pinyin leaves (C12).
-     */
+    /** One user lexicon for every input method: [table] offers the user's words coded by its rules; older saved phrases are pinyin's words; blocks and forgets anywhere apply here, except to the table's own entries, which a pinyin block leaves. */
     fun shared(table: Table, im: String): SharedWords = table.shared ?: object : SharedWords {
-        // a word added by hand that the file has too comes from both: offered once (review F3303)
+        // an added word also in the file comes from both: offered once
         override fun words(prefix: String): List<Pair<String, String>> {
             val listed = coded().flatMap { it.words(prefix) }
             val merged = mergedNow()?.let { (index, file) -> index.exact(prefix, file) }.orEmpty()
@@ -96,11 +83,11 @@ internal class TableRegistry(
         override fun longer(prefix: String, byLength: Boolean) =
             mergedNow()?.let { (index, file) -> index.longer(prefix, byLength, file) }.orEmpty()
         override fun leadsAnywhere(prefix: String) = coded().any { it.leadsAnywhere(prefix) } || mergedNow()?.first?.leadsAnywhere(prefix) == true
-        // the gate outside isBlockedWord, which asks two characters at least: a character held back is held alone too
+        // the gate besides isBlockedWord (two characters at least): a lone held character is held too
         override fun blocked(text: String) = lexicon.isBlockedWord(text) || lexicon.gate().holds(text)
         override fun blockable(text: String) = text.codePointCount(0, text.length) >= 2 && assets.pinyinOf(text) != null
         override fun forget(text: String) = lexicon.forgetEverywhere(text)
-        // as pinyin offers to forget: what the record has, or a word added by hand (PY-33)
+        // as pinyin offers to forget: what the record has, or an added word
         override fun learned(text: String) =
             knows(text) || lexicon.addedOf(text).isNotEmpty() || lexicon.user().let { m -> m.entriesOf(text).any { m.hasLearned(listOf(it)) } }
         override fun prepare() {
@@ -117,8 +104,7 @@ internal class TableRegistry(
                 table.own = null
                 table.codedFor = model
             }
-            // all coded again only once words were listed other than by add() (a reload's dictionaries),
-            // in the background: till then the table offers its own words and those below, not these
+            // recoded only once words were listed other than by add() (a reload's dictionaries), in the background
             val listed = table.listed?.takeIf { model.listings - table.listedAt == listedSince.size - table.listedFrom }
                 ?: coded(table, model)?.also { table.listed = it }
                 ?: CodedWords(table.dictionary, emptyList())
@@ -136,20 +122,18 @@ internal class TableRegistry(
         }
     }.also { table.shared = it }
 
-    /** [im]'s shared words, if its session made them, started coding for the user model as it now is. */
+    /** Starts coding [im]'s shared words for the current user model, if its session made them. */
     fun prepare(im: String) {
         tables[im]?.shared?.prepare()
     }
 
-    // [table]'s listed words for [model] as it now lists them, once coded on [coding]; null till then.
-    // Asked for by the listings not add()'s (a reload's dictionaries): one add() made is coded apart (later)
+    // [table]'s listed words for [model], once coded on [coding]; null till then. add()s are coded apart (later)
     private fun coded(table: Table, model: UserModel): CodedWords? {
         val coding = table.coding ?: InBackground<Listed>(coding) { onError(IOException("coding the user's words for a table", it)) }.also { table.coding = it }
         val dictionary = table.dictionary
         val made = coding.get(model to model.listings - listedSince.size) {
-            // the merged file's words are not listed but left to its index (1.9 million of them were
-            // 250 MB a table); one also added by hand is coded here too, offered whether the index
-            // opens or not ([words] shows it once)
+            // merged-file words are left to its index (1.9 million were 250 MB a table); one also added by hand is coded
+            // here too, offered once ([words])
             val texts = model.listedTexts()
             val at = model.listings
             val from = listedSince.size
@@ -163,13 +147,10 @@ internal class TableRegistry(
         return made.words
     }
 
-    // the listed words coded, and the listings and add()s they were read at
+    // the coded words and the listings and add()s read at
     internal class Listed(val words: CodedWords, val at: Int, val from: Int)
 
-    /**
-     * What add() listed since [table]'s [listed] were coded, coded alone; a text listed before in
-     * another reading left out, coded already, there or in the merged file's [index].
-     */
+    /** add()s since [table]'s [listed] were coded, coded alone; texts already coded in another reading or in the merged [index] left out. */
     private fun listedLater(table: Table, listed: CodedWords, index: Pair<CodedIndex, DictionaryFile>?): CodedWords {
         val texts = listedSince.subList(table.listedFrom, listedSince.size).filterNot { text ->
             table.dictionary.encode(text)?.let { code ->
@@ -179,11 +160,7 @@ internal class TableRegistry(
         return CodedWords(table.dictionary, texts)
     }
 
-    /**
-     * [shared] while 「不用我的输入习惯」 is on (U-93): the blocks, and the words of the dictionaries
-     * the user turned on, a setting, not a habit, as pinyin's [UserLexicon.freshUser] keeps them
-     * (review F3412); none of the user's own, added or learned.
-     */
+    /** [shared] while habits are off: blocks and enabled dictionaries' words (a setting, not a habit), none of the user's own. */
     fun dictionariesOnly(table: Table, im: String): SharedWords = object : SharedWords by shared(table, im) {
         private fun mergedNow() = merged(table, im, lexicon.freshUser())
         override fun words(prefix: String) = mergedNow()?.let { (index, file) -> index.exact(prefix, file) }.orEmpty()
@@ -196,12 +173,7 @@ internal class TableRegistry(
         }
     }
 
-    /**
-     * [table]'s index of the file merged into [model], opened (or built, a first time or for
-     * another file or table data) on [coding]; null till then, or with no file or place for it.
-     * An OutOfMemoryError there is reported, not a dead input method ([InBackground]), though the
-     * build is bounded ([CodedIndex.RUN]) so it should never come.
-     */
+    /** [table]'s index of the merged file, opened or built on [coding]; null till then or with no file or place. An OOM is reported, not fatal ([InBackground]), though [CodedIndex.RUN] bounds the build. */
     private fun merged(table: Table, im: String, model: UserModel): Pair<CodedIndex, DictionaryFile>? {
         val file = model.dictionaryFile ?: return null
         val dir = indexes() ?: return null
@@ -220,10 +192,10 @@ internal class TableRegistry(
         return index to file
     }
 
-    // the whole buffer, its position left as it was: CRC32.update(ByteBuffer) is API 26, minSdk 29 (review F3268)
+    // the whole buffer, position kept: CRC32.update(ByteBuffer) is API 26, minSdk 29
     private fun crc32(buffer: ByteBuffer): Long = CRC32().apply { update(buffer.duplicate().also { (it as Buffer).clear() }) }.value
 
-    /** Forgets [texts] in every table that saved them, loaded or not: a phrase saved there would be offered again. */
+    /** In every table that saved them, loaded or not, as a saved phrase would be offered again. */
     fun forgetInTables(texts: Collection<String>) {
         val forgotten = texts.toSet()
         val rows = state().tableWords.entries.mapNotNull { (key, since) ->
@@ -233,9 +205,8 @@ internal class TableRegistry(
         drop(rows)
     }
 
-    // out of the record; counted where a table offered it, the table's own entry not standing for it.
-    // A table not loaded is not loaded to tell (五笔's data, on the fcitx thread): its rows count, no
-    // undo then the safe answer
+    // out of the record, counted where a table offered it; an unloaded table is not loaded to tell, so its rows
+    // count (no undo is the safe answer)
     private fun drop(rows: List<TableWordRow>) {
         if (rows.isEmpty()) return
         dropSaved(rows)
@@ -244,19 +215,11 @@ internal class TableRegistry(
         }
     }
 
-    /**
-     * How many phrases the tables forgot (here, or a long press in one), counted up since these
-     * tables were made and never reset: read before and after a call to tell whether it forgot
-     * any. An undo cannot take them back, so none is offered.
-     */
+    /** Phrases the tables forgot, counted up and never reset: compare before and after a call; such forgets cannot be undone. */
     var forgets = 0
         private set
 
-    /**
-     * Of [texts], those [im] cannot take (D8, TBL-12), each with the table's word it gives way to:
-     * the word's code is one the table has a lone entry of, its code whole, that commits itself
-     * under [options], so a session never offers the word there (TableSession's rank).
-     */
+    /** Of [texts], those [im] cannot take, with the table word they give way to: their code is a lone, whole, self-committing entry under [options], so the word is never offered. */
     fun sameCode(im: String, options: TableOptions, texts: Collection<String>): Map<String, String> {
         if (!options.autoSelect || options.autoSelectLength == 0) return emptyMap()
         val dictionary = table(im).dictionary
@@ -264,7 +227,7 @@ internal class TableRegistry(
         return texts.mapNotNull { text -> lone(dictionary, options, text)?.let { text to it } }.toMap()
     }
 
-    // the table's word alone under [text]'s code, that code whole and committing itself; null if none
+    // the lone word under [text]'s whole self-committing code; null if none
     private fun lone(dictionary: TableDictionary, options: TableOptions, text: String): String? {
         if (text.codePointCount(0, text.length) < 2) return null
         val code = dictionary.encode(text) ?: return null
@@ -283,10 +246,7 @@ internal class TableRegistry(
         Table(dictionary, SavedPhrases(dictionary, im, state, ::drop), data)
     }
 
-    /**
-     * Into [into], the characters past the basic plane of every one of [TABLES]' entries, each table
-     * read for this and let go (not loaded for typing); one that cannot be read told and passed over.
-     */
+    /** Adds to [into] the beyond-BMP characters of every [TABLES] entry, each table read and let go; unreadable ones told and skipped. */
     fun beyondBasic(into: MutableSet<Int>) {
         for (method in TABLES.values) {
             val table = readAlone(method.file) ?: continue
@@ -294,7 +254,7 @@ internal class TableRegistry(
         }
     }
 
-    // the table of [file] read on its own; null, told, if it cannot be (as EngineAssets.readOr)
+    // null, told, if it cannot be read (as EngineAssets.readOr)
     private fun readAlone(file: String): CodeTable? {
         val failed = try {
             return CodeTable.load(blobs.load("$TABLE_DIR/$file"), verify = false)
@@ -309,7 +269,7 @@ internal class TableRegistry(
         return null
     }
 
-    /** After the engines were closed: each table loads again. */
+    /** After the engines closed: each table loads again. */
     fun closed() {
         tables.clear()
     }

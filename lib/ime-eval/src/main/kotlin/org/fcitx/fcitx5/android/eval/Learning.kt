@@ -14,17 +14,7 @@ import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.WordPack
 
-/**
- * What learning from the user gains, typed through [KeystrokeRun] with the engine learning all
- * along, as it does for a user (an [EvalUser]: the learning record, ranked by):
- * - the [Halves.TUNE] half typed once, then again, then a third time: what a user who types the
- *   same things again sees (their names, their phrases), a text put together twice their word;
- * - the [Halves.HELD_OUT] half, from nothing learned and after the tune half: what carries over
- *   to text not typed before, which learning must not make worse.
- * Each against the same typed by an engine that learns nothing.
- *
- * Each engine is a session as the app makes one: with rerankers of its own when given.
- */
+/** What learning gains: [Halves.TUNE] typed three times, then [Halves.HELD_OUT], each against an engine that learns nothing. */
 class Learning(
     private val data: PinyinData,
     private val segmenter: Segmenter,

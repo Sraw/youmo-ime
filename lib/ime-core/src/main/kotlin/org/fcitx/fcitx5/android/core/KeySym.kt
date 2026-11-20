@@ -12,6 +12,6 @@ value class KeySym(val sym: Int) {
 
     override fun toString() = "0x" + sym.toString(16).padStart(4, '0')
 
-    // for the Android side's extensions (KeySym.fromKeyEvent in :app)
+    // extended on the Android side (KeySym.fromKeyEvent in :app)
     companion object
 }

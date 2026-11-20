@@ -31,9 +31,7 @@ class PinyinSessionEmojiTest {
         assertEquals("你好", s.candidates[0])
         assertEquals(listOf("👋", "🙋"), s.candidates.subList(2, 4))
         assertFalse("🤝" in s.candidates)
-        // 你 reads ni alone: none of its
         assertFalse("🫵" in s.candidates)
-        // nothing to pin, forget nor block
         assertEquals(emptySet<Offer>(), session.offers(2))
         assertEquals("👋", session.apply(Select(2)).commit)
     }
@@ -54,12 +52,10 @@ class PinyinSessionEmojiTest {
 
     @Test
     fun theEmojiAreThoseOfTheCandidateShownFirst() {
-        // a phrase pinned ahead of 你好: its emoji, not 你好's
         val book = PhraseBook(CustomPhrases.parse("nihao,1=嗨"))
         val more = emoji + ("嗨" to listOf("🙌"))
         val s = PinyinSession(data, PinyinSegmenter(), pageSize = 20, phraseBook = book, emoji = { more[it].orEmpty() }).type("nihao")
         assertEquals("嗨", s.candidates[0])
-        // after the first two read, the phrase ahead of them
         assertEquals("🙌", s.candidates[3])
         assertFalse("👋" in s.candidates)
     }

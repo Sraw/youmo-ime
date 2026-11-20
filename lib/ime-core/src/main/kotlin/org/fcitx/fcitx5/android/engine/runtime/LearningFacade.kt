@@ -11,7 +11,6 @@ import org.fcitx.fcitx5.android.engine.learn.LearnClock
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.MineRow
-import org.fcitx.fcitx5.android.engine.learn.LearnRecord.TableWordRow
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.WordUseRow
 import org.fcitx.fcitx5.android.engine.learn.LearnState
 import org.fcitx.fcitx5.android.engine.learn.LogHabits
@@ -29,7 +28,6 @@ import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.platform.UserFiles
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.store.RecordStore
-import org.fcitx.fcitx5.android.engine.table.OlderTableLog
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.io.ByteArrayOutputStream
@@ -39,13 +37,9 @@ import java.util.concurrent.Executor
 import kotlin.math.roundToInt
 
 /**
- * The learning record and all that is done with it, for [Engines]: the one holder of `learn.log`
- * (impl/design-1a.md), opened at its first use ([learnLog]: a key's session made, a list asked for),
- * never as the engines are made, for opening it writes (a backup's claim, review B 1.3); its
- * backups, the stashes a settings restore leaves, the user's acts on what was learned, the words
- * imported, U-93's switch, and the counts of the user model of the moment. [invalidate] makes the
- * sessions anew where what they read changed; [shown] and [first] are the session an input method
- * shows now and its first candidate, for a long press's acts. On the engines' thread.
+ * The learning record and everything done with it for [Engines]: sole holder of `learn.log`, opened at first use
+ * ([learnLog]), never at engine creation since opening writes; plus backups, restore stashes, user acts, imports,
+ * the habits switch and the user model's counts. [invalidate] remakes sessions on changes. On the engines' thread.
  */
 internal class LearningFacade(
     private val userDir: UserFiles?,
@@ -66,34 +60,27 @@ internal class LearningFacade(
     private val unkept: () -> Unit = {},
     private val openAppend: (LogFile) -> OutputStream = LogFile::append,
 ) {
-    // the imported words (U-101): in the learning record, told to the user model
+    // imported words: in the learning record, told to the user model
     val imports = ImportLayer(::learnLog, { lexicon.user() }, { lexicon.isBlockedWord(it) }, invalidate, learnClock)
 
-    // the learning record (impl/design-1a.md), opened before the user model, which is made from it
-    // (impl/design-1b.md §4)
+    // the learning record, opened before the user model made from it
     private var learnLog: LearnLog? = null
 
-    // the counts of the user model of the moment, kept as the record changes
+    // the current user model's counts, kept as the record changes
     private var habitCounts: HabitCounts? = null
 
-    // a long press's forget in handwriting or a table: the tables', and the learning record's, as the model's
+    // a long press's forget in handwriting or a table: the tables' and the record's, as the model's
     fun forgottenEverywhere(text: String) {
         tables.forgetInTables(listOf(text))
         habits.forget(text)
     }
 
-    /** The record, opened at its first use. */
+    /** Opened at first use. */
     fun learnLog(): LearnLog = learnLog ?: run {
         val log = LearnLog(userDir?.file(LearnLog.FILE), learnClock, onError = onError, background = compactions, unkept = unkept, openAppend = openAppend)
         learnLog = log
-        // 0.4 stopped before it put an older build's learning in place (its mark left): told once, as none reads it
-        // now; the mark left for a 0.4 put back
-        userDir?.file(OLD_CONVERTING)?.takeIf { it.taken() && !it.beside(TOLD).taken() }?.let {
-            onError(IOException("$it: 0.4 had not put an older build's learning in place; not read since 0.4"))
-            runCatching { it.beside(TOLD).createNew() }
-        }
         try {
-            // a clear killed before it deleted the older builds' files it set aside: deleted now
+            // a clear killed before deleting its set-aside copies: delete them now
             if (control.resumeDrop()) control.finishDrop()
             log.open()
         } catch (e: IOException) {
@@ -105,92 +92,17 @@ internal class LearningFacade(
         opened.listener = ::changed
         control.attach(opened)
         backups.claim(opened)
-        keepOlderTablePhrases(opened)
         opened
     }
 
-    /**
-     * Once, at the first open of a build past 0.4 (its mark beside the record then): the phrases 0.4's
-     * tables offered from their logs that the record has not, put into it (F2 review). Not marked if a
-     * table's data did not load, to be tried again at the next open, nor with no log to read (none
-     * comes after: a restore leaves a zip's in its stash); a clear deletes the logs it reads.
-     */
-    private fun keepOlderTablePhrases(log: LearnLog) {
-        val dir = userDir ?: return
-        val mark = dir.file(Engines.TABLE_LOGS_READ)
-        if (!log.onDisk || mark.taken() || TABLES.keys.none { OlderTableLog.file(dir, it).exists() }) return
-        try {
-            val rows = olderTablePhrases(dir, log.state) ?: return
-            // marked only once on disk: a write that failed reads them again at the next open. The mark
-            // not made after the rows went in reads them again too, what was forgotten since back:
-            // accepted, as rare as a file that cannot be made, and a clear retires the logs
-            if (log.absorb(rows)) mark.createNew()
-        } catch (e: IOException) {
-            onError(IOException("the tables' older logs not read", e))
-        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            // a bug, not the disk's: told, as learnLog() tells its own, not thrown at the key that opened the record
-            onError(IOException("the tables' older logs not read", e))
-        }
-    }
-
-    // a stash's [state] with the phrases its tables' older logs in [dir] offered, unless its record is of a build that
-    // read them already (its TABLE_LOGS_READ beside it: what was forgotten since stays so). A table that did not load
-    // keeps the stash aside, as the phone's own are read again at the next open
-    @Throws(IOException::class)
-    private fun withOlderTablePhrases(dir: UserFiles, state: LearnState) {
-        if (dir.file(Engines.TABLE_LOGS_READ).taken()) return
-        val rows = olderTablePhrases(dir, state) ?: throw IOException("$dir: a table did not load, its older logs not read")
-        rows.forEach { state.apply(it) }
-    }
-
-    /**
-     * What 0.4's tables offered as saved phrases from their logs in [dir] (OlderTableLog) and [state]
-     * has not: 0.3.0's picks of what the table has not (vbvn 好女), which 0.4 converted to counts
-     * alone, or a phrase saved its conversion missed. Null if a table's data did not load.
-     */
-    @Throws(IOException::class)
-    private fun olderTablePhrases(dir: UserFiles, state: LearnState): List<TableWordRow>? {
-        val rows = ArrayList<TableWordRow>()
-        val logs = TABLES.keys.mapNotNull { im -> OlderTableLog.file(dir, im).takeIf { it.exists() }?.let { im to olderPhrases(it) } }
-        for ((im, phrases) in logs.filter { it.second.isNotEmpty() }) {
-            val dictionary = try {
-                tables.table(im).dictionary
-            } catch (e: IOException) {
-                onError(IOException("${OlderTableLog.file(dir, im)}: not read, its table did not load", e))
-                return null
-            } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-                // its data not the table's: as one not loaded
-                onError(IOException("${OlderTableLog.file(dir, im)}: not read, its table did not load", e))
-                return null
-            }
-            for ((code, text) in phrases) {
-                if (dictionary.indexOf(code, text) < 0 && Triple(im, code, text) !in state.tableWords) rows += TableWordRow(im, code, text, state.day)
-            }
-        }
-        return rows
-    }
-
-    // a log whose bytes are not a log's: told and taken as read, none offered from it, so it is not told again at
-    // every start. A read the disk failed throws on (not marked, tried again at the next open, as a table not loaded)
-    @Throws(IOException::class)
-    private fun olderPhrases(file: LogFile): List<Pair<String, String>> {
-        val bytes = file.read()
-        return try {
-            OlderTableLog.phrases(bytes)
-        } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            onError(IOException("$file: not read, not a table's log", e))
-            emptyList()
-        }
-    }
-
-    // a fault of the record's: learned in memory this run (review-1a-app S1)
+    // the record faulted: learn in memory this run
     private fun notOpened(log: LearnLog, e: Exception) {
         onError(IOException("the learning record not opened", e))
         runCatching { log.close() }
         learnLog = LearnLog(null, learnClock, onError = onError, unkept = unkept)
     }
 
-    // the learning backups (U-100, U-106; impl/streams/D-design.md): made every few typing days and when asked, listed, merged in when restored
+    // learning backups: made every few typing days and on request, listed, merged on restore
     private val backups: BackupControl = BackupControl(
         Backups(userDir?.dir(Backups.DIR), Backups.installId(installFile, onError), onError, compactions, learnClock),
         learnClock,
@@ -205,7 +117,7 @@ internal class LearningFacade(
             lexicon.removeWords(added.map { it.word(UserWord.Kind.ADDED) } + blocked.map { it.word(UserWord.Kind.BLOCKED) })
         },
         importLines = { lexicon.wordImport.importWords(it) },
-        // read off the keyboard's thread: a log read while a record is appended reads up to the last whole one
+        // read off the keyboard thread: a log read during an append reads up to the last whole record
         logBytes = userDir?.let { dir -> { dir.file(LearnLog.FILE).takeIf { it.exists() }?.read() } },
         addresses = addresses,
         putAddresses = putAddresses,
@@ -215,11 +127,9 @@ internal class LearningFacade(
 
     private fun ListedWord.word(kind: UserWord.Kind) = UserWord(text, Syllables.spaced(code), kind)
 
-    // the learning record rewritten whole by [transform] (LearnLog.rewrite), the sessions made anew on it. A record
-    // that did not open learns in memory, where a rewrite does not last: an error then, so a restore says so and a
-    // settings zip's stash is kept for the next start (what is written is on disk, or it was not written).
-    // The file is compared with what [transform] wrote: a transform that writes a header alone would not match
-    // (the store marks such a log emptied behind it, R25 F8000), but a restore and a revert always write HEAD (BackupControl)
+    // rewrites the record via [transform] and remakes sessions. A record that never opened learns in memory, where
+    // a rewrite would not last: an error then, so a restore says so and a settings stash is kept. The file is
+    // compared with what [transform] wrote (restores and reverts always write HEAD)
     private fun rewriteLearning(transform: (ByteArray, OutputStream) -> Boolean): Boolean {
         var wrote: ByteArray? = null
         val done = learnLog().rewrite { log, out ->
@@ -233,42 +143,38 @@ internal class LearningFacade(
         return true
     }
 
-    // the settings backups' learning, left by the app while the engine was stopped (RestoreStash)
+    // learning left by a settings restore while the engine was stopped (RestoreStash)
     private val stashes = StashIntake(
         userDir, onError,
-        // a 0.4 zip's: the phrases its tables offered from their logs, beside its learning, as the phone's at its first open
-        read = { dir -> RestoreStash.read(dir, onError).also { withOlderTablePhrases(dir, it.state) } },
+        read = { dir -> RestoreStash.read(dir, onError) },
         merge = { backup, time -> backups.restore(backup, since = time) },
     )
 
-    /** Each stash a settings restore left merged in, then gone: last, as the engines are made, every part made by then (review B 1.2). */
+    /** Merges and removes each restore stash: last, once every part is made. */
     fun takeStashes() = stashes.takeAll()
 
-    /** A user model made: the user's own words in it, and the counts, as the record has them. */
+    /** Gives a new user model the user's words and counts from the record. */
     fun attach(model: UserModel) {
         val log = learnLog()
         habitCounts = HabitCounts(model).also { it.attach(log.state) }
         model.predictionsOff = ::predictionOff
     }
 
-    /** U-72: what the user turned off after a word, as the record has it now (a rewrite makes its state anew). */
+    /** Whether the user turned predictions off after [prev], as the record says now. */
     fun predictionOff(prev: String, next: String) = learnLog?.state?.noPredict?.contains(prev to next) == true
 
-    // the user's acts on what was learned (impl/streams/E-design.md): the older builds' logs go with what is cleared
+    // the user's acts on what was learned
     private val control = LearningControl(::learnLog, learnClock, legacy = ::retired, copies = { userDir?.let(::keptAside).orEmpty() }, onError = onError)
 
-    // what a clear deletes of the older builds' files: the tables' logs with a clear of everything, or once read
-    // into the record (TABLE_LOGS_READ), not before: their phrases are the user's still (F2 review B2)
+    // a table's old log only with a clear of everything or once read into the record: before, its phrases are the user's still
     private fun retired(all: Boolean): List<LogFile> {
         val dir = userDir ?: return legacyFiles
-        val tableLogs = if (all || dir.file(Engines.TABLE_LOGS_READ).taken()) TABLES.keys.map { OlderTableLog.file(dir, it) } else emptyList()
+        val tableLogs = if (all || dir.file(Engines.TABLE_LOGS_READ).taken()) TABLES.keys.map { dir.file(it.removePrefix("engine-") + ".user") } else emptyList()
         return LearningControl.retired(dir, tableLogs) + legacyFiles
     }
 
-    // the record's copies kept aside whole (RecordStore.KeptAside): a clear, of everything or of any time, means
-    // gone, and a copy cannot lose a time alone (user's decision decode-3; apart from the older builds' files,
-    // which only a clear of today or more takes: R25 F7925). Listed, by the name a clear sets
-    // aside renames from, so that one a clear killed half-way left is found again (LearningControl.resumeDrop)
+    // the record's whole set-aside copies (RecordStore.KeptAside): a clear means gone, and a copy cannot lose one
+    // period alone. Listed by the name a clear renames from, so one a killed clear left is found (LearningControl.resumeDrop)
     private fun keptAside(dir: UserFiles): List<LogFile> =
         dir.files().map { it.removeSuffix(LearningControl.CLEARED) }.distinct()
             .filter { RecordStore.isAside(LearnLog.FILE, it) }.map(dir::file)
@@ -278,18 +184,13 @@ internal class LearningFacade(
             shown, lexicon, ::learnLog, control,
             habits = { useHabits }, useHabits = { useHabits = it }, dropSessions = invalidate,
             first = first, tableForgets = { tables.forgets },
-            // a clear forgets the backups that hold what it clears first, and saves one of what is left after (C25)
+            // a clear forgets backups holding what it clears first, and saves one of what is left after
             backups = backups, backup = backups::run, restoreCorrection = { english.restoreCorrection(it) },
             resetTableOrder = ::resetTableOrder,
         )
     }
 
-    /**
-     * U-93 「用我的输入习惯」: off, the sessions are made as installed but for the blocks (C26): no
-     * learning record read or written, no word of the user's, added by hand or pinned, no custom
-     * phrase, nothing English learned (impl/streams/E-design.md §4). Nothing recorded, no typing day
-     * passes. The sessions are made anew for a change, what was typed dropped.
-     */
+    /** 「用我的输入习惯」: off, sessions are made as installed except blocks: no record read or written, no user words, phrases or English learning, no typing days. Changing it remakes sessions. */
     var useHabits = true
         set(value) {
             if (value == field) return
@@ -297,19 +198,19 @@ internal class LearningFacade(
             invalidate()
         }
 
-    /** Does [op] in [im]: see [Engines.learning]. */
+    /** See [Engines.learning]. */
     fun apply(im: String?, op: LearningOp, shown: (String) -> String = { it }, act: (event: Int, index: Int, text: String) -> Boolean): LearningResult = ops.apply(im, op, shown, act)
 
-    /** [words] each dated as the learning record has it (U-80). */
+    /** Dated as the record has them. */
     fun dated(words: List<UserWord>): List<UserWord> = ops.dated(words)
 
-    /** The habits the sessions are made with: none while the user turns them off. */
+    /** None while the user turns them off. */
     fun habitsNow(): Habits = if (useHabits) openHabits() else Habits.OFF
 
-    /** The record's habits, the record opened before they are asked (its listener set, the counts attached). */
+    /** The record opened first (its listener set, counts attached). */
     fun openHabits(): Habits = habits.also { learnLog() }
 
-    // what a record changed: the model's words and counts, and a text forgotten off the words added by hand (U-82)
+    // what a record changed: the model's words and counts, and a forgotten text off the added words
     private fun changed(changes: LearnState.Changes) {
         val log = learnLog ?: return
         habitCounts?.apply(log.state, changes)
@@ -317,21 +218,18 @@ internal class LearningFacade(
         if (changes.commits.isNotEmpty()) backups.afterCommit()
     }
 
-    /** The counts a new typing day changed, made anew (HabitCounts.settle): as a field starts, rather than on a key. */
+    /** Remakes the counts a new typing day changed (HabitCounts.settle): as a field starts, not on a key. */
     fun settle() {
         learnLog?.let { log -> habitCounts?.settle(log.state) }
     }
 
-    /** Texts blocked: unpinned under every code, the block winning (impl/design-1b.md §3). */
+    /** Blocked texts unpinned under every code: the block wins. */
     fun unpinEverywhere(texts: Collection<String>) {
         val pins = learnLog().state.pins.filter { it.value.text in texts }
         for ((code, words) in pins) habits.pin(code, words.text, words.reading, on = false)
     }
 
-    /**
-     * Words made the user's own where they are not yet, an export's count each as uses today where
-     * none are: how many were not.
-     */
+    /** Makes words the user's own where not yet, an export's count as today's uses where none: how many were new. */
     fun own(words: Map<UserModel.Entry, Float>): Int {
         val log = learnLog()
         val state = log.state
@@ -349,24 +247,15 @@ internal class LearningFacade(
 
     val habits: Habits = LogHabits(::learnLog, onError)
 
-    /**
-     * 恢复码表顺序 (U-28): what table [im] learned of the order by use is forgotten, what was pinned
-     * and blocked under its codes kept; nothing for an input method no table is.
-     */
+    /** 恢复码表顺序: forgets table [im]'s learned order, keeping pins and blocks; nothing for non-tables. */
     fun resetTableOrder(im: String) {
         if (im in TABLES) openHabits().resetTableOrder(im)
     }
 
-    /** The record closed, opened anew at its next use. */
+    /** Reopened at its next use. */
     fun close() {
         learnLog?.let { closeQuietly(it, onError) }
         learnLog = null
         habitCounts = null
-    }
-
-    private companion object {
-        // beside the record while 0.4 converted an older build's learning, gone once it was in place
-        const val OLD_CONVERTING = "learn.converting"
-        const val TOLD = ".told"
     }
 }

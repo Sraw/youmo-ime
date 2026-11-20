@@ -12,14 +12,7 @@ import org.fcitx.fcitx5.android.engine.reading.CardReading
 import org.fcitx.fcitx5.android.input.voice.VoiceEdits
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 
-/**
- * [HostApi] whose engine calls go to a real [engines]: what a settings page reads and changes
- * (readings, the user's words, English's words, imports, learning) is the engine's own answer, not
- * a table a test fills in, as [FakeHostApi.readings] is. Everything else is [fake]'s: the config,
- * the input methods, the keys (recorded in [FakeHostApi.calls]), the panel; typing through the
- * engine is lib/ime-eval's EngineReplay. [im] is the input method a learning op acts in, as
- * Fcitx's does in the one in use.
- */
+/** [HostApi] whose lexicon and learning calls go to a real [engines]; the rest is [fake]'s. [im] is the input method a learning op acts in. */
 class EngineBackedHostApi(
     val engines: Engines,
     val fake: FakeHostApi = FakeHostApi(),

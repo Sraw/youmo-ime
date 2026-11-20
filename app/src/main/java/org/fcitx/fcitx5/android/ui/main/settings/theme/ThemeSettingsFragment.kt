@@ -14,7 +14,6 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceCategory
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceFragment
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 
-/** The look's second tab, 大小与样式: the theme's preferences, and the animations' switch of the app's. */
 class ThemeSettingsFragment : ManagedPreferenceFragment(ThemeManager.prefs) {
 
     private val followSystemDayNightTheme = ThemeManager.prefs.followSystemDayNightTheme
@@ -57,11 +56,10 @@ class ThemeSettingsFragment : ManagedPreferenceFragment(ThemeManager.prefs) {
     }
 
     companion object {
-        /** The page's managed preferences, as SettingsIndex reads them too. */
+        /** As SettingsIndex reads them too. */
         fun build(screen: PreferenceScreen) {
             ThemeManager.prefs.createUi(screen)
-            // the app's (AppPrefs.Advanced, whose only one shown it is), how the keyboard looks as it moves.
-            // All of Advanced: a preference of it made visible later shows here too, so give it a page first
+            // all of Advanced: a preference of it made visible later shows here too, so give it a page first
             val animation = ManagedPreferenceCategory.addSection(screen, R.string.section_animation)
             AppPrefs.getInstance().advanced.createUi(animation, ManagedPreferenceCategory.ALL)
         }

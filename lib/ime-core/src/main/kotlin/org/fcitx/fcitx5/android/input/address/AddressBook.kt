@@ -4,34 +4,21 @@
  */
 package org.fcitx.fcitx5.android.input.address
 
-/** An email address put in an email field, and how many times. */
 data class RememberedAddress(val address: String, val count: Int)
 
 /**
- * What the address suggestions learned, as the field is left ([left]): how often each suffix of
- * the lists ended an address ([counts], an email's by `@qq.com`, a URL's by `.com`), and, where the
- * user keeps them (on by default), the whole email addresses ([addresses], the latest used first, at
- * most [MAX_ADDRESSES]). Of a URL nothing but its suffix; nothing of a name but in a whole address.
- * Nothing of a field that asks not to be learned from, nor of a password: the caller asks no [left]
- * there.
- *
- * Kept as two strings ([serializeCounts], [serializeAddresses]), one entry a line, its count first
- * and a tab: neither a suffix nor an address has a tab or a line break ([isAddress]).
+ * What address suggestions learned as a field is left: how often each suffix ended an address, and where kept (on by
+ * default) whole email addresses, latest first. Of a URL only its suffix. Nothing from fields that ask not to be learned
+ * from; the caller asks no [left] there. Stored one entry a line, count first and a tab (neither has a tab: [isAddress]).
  */
 class AddressBook(
     val counts: Map<String, Int> = emptyMap(),
     val addresses: List<RememberedAddress> = emptyList(),
 ) {
 
-    /** How often [suffix] (`@qq.com`, `.com`) ended an address. */
     fun count(suffix: String): Int = counts[suffix] ?: 0
 
-    /**
-     * The book after [field] was left with [text] in it: each whole address in an email field
-     * counts its suffix where [lists] have it, and is remembered where [remember], but those it
-     * [started] with (a reply's 收件人, the app's), each as many times as it had them; a URL counts
-     * its host's longest suffix of [lists], but not a host it [started] with. A suffix no longer in the lists keeps no count.
-     */
+    /** Those it [started] with (a reply's 收件人, a browser's page) are not counted; a suffix gone from the lists keeps no count. */
     fun left(field: AddressField, text: CharSequence, lists: AddressLists, remember: Boolean, started: CharSequence = ""): AddressBook {
         val listed = lists.email.mapTo(HashSet()) { AddressLists.EMAIL_MARK + it } + lists.url
         val counted = counts.filterKeys { it in listed }.toMutableMap()
@@ -54,17 +41,12 @@ class AddressBook(
 
     private fun hostOf(text: CharSequence) = text.toString().trim().substringAfter("://").takeWhile { it !in "/?#:" }.lowercase()
 
-    /** The book without [address]. */
     fun forget(address: String) = AddressBook(counts, addresses.filterNot { it.address.equals(address, ignoreCase = true) })
 
-    /** The book with no address: what the suffixes counted stays. */
+    /** The suffixes' counts stay. */
     fun forgetAddresses() = AddressBook(counts, emptyList())
 
-    /**
-     * This book with [other], a backup's, put back into it: each suffix's larger count, and the
-     * addresses of both, this book's first in its order, then the others' new to it, one in both
-     * with the larger count; [MAX_ADDRESSES] at most. Nothing is lost by putting the same back twice.
-     */
+    /** A backup's put back: larger counts, this book's addresses first; putting the same back twice loses nothing. */
     fun merged(other: AddressBook): AddressBook {
         val counted = counts.toMutableMap()
         other.counts.forEach { (key, n) -> counted.merge(key, n, ::maxOf) }
@@ -84,14 +66,10 @@ class AddressBook(
 
         private const val MAX_LENGTH = 254
 
-        /**
-         * At most this many suffixes counted, the most used: with [MAX_ADDRESSES] of [MAX_LENGTH] each,
-         * what [serializeCounts] and [serializeAddresses] write stays under the 64 KB a learning backup's
-         * string may be (`writeUTF`), whatever the prefs hold (a 备份全部 zip from elsewhere).
-         */
+        /** So what is written stays under a learning backup string's 64 KB (`writeUTF`), whatever the prefs hold. */
         const val MAX_COUNTS = 64
 
-        /** A whole email address: a name, one `@`, a domain of labels with a dot in it, no space nor separator. */
+        /** A name, one `@`, a domain with a dot, no space nor separator. */
         fun isAddress(s: String): Boolean {
             if (s.length > MAX_LENGTH || s.any { AddressSuggestions.isSeparator(it) || it in "<>\"" }) return false
             val at = s.indexOf('@')
@@ -123,10 +101,7 @@ class AddressBook(
             return (listOf(RememberedAddress(address, (old?.count ?: 0) + 1)) + kept.filter { it !== old }).take(MAX_ADDRESSES)
         }
 
-        /**
-         * The book [serializeCounts] and [serializeAddresses] wrote: a line that is not one dropped,
-         * [MAX_COUNTS] and [MAX_ADDRESSES] at most, none longer than [MAX_LENGTH].
-         */
+        /** A bad line dropped; bounded as written. */
         fun parse(counts: String, addresses: String): AddressBook = AddressBook(
             entries(counts).filter { (_, key) -> key.isNotEmpty() && key.length <= MAX_LENGTH && '\t' !in key }
                 .groupBy({ it.second }, { it.first }).mapValues { it.value.max() }

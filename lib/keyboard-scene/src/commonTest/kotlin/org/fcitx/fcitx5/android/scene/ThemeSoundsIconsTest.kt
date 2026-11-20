@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.Fixtures.problems
+import org.fcitx.fcitx5.android.scene.Fixtures.warnings
+import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.test.Test
@@ -15,17 +18,7 @@ class ThemeSoundsIconsTest {
 
     private val source = testData("material-light.xml")
 
-    private fun problems(s: String) = ThemeReader.theme(s).problems().map { it.message }
-
-    private fun withStyle(style: String) = source.replace("</theme>", "$style\n</theme>")
-
-    private fun warnings(s: String): List<String> {
-        val t = ThemeReader.theme(s)
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
-
-    // 060-theme-sounds-icons §1.1: <sounds>, last; a class a <sound>, a later version's warned of and kept
+    // <sounds>, last; a class a <sound>, a later version's warned of and kept
     @Test
     fun soundsAreRead() {
         fun with(sounds: String) = source.replace("</theme>", "$sounds\n</theme>")
@@ -62,7 +55,7 @@ class ThemeSoundsIconsTest {
         assertTrue(ThemeReader.theme(with("$icon<sounds/>")) is Parsed.Ok)
     }
 
-    // 060-theme-sounds-icons §2.1: icon() names the app's icons or the theme's own; an <icon> drawn nowhere warned of
+    // icon() names the app's icons or the theme's own; an <icon> drawn nowhere warned of
     @Test
     fun aThemesOwnIcons() {
         val star = "<icon name=\"star\" src=\"star.svg\"/>"

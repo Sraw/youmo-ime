@@ -9,7 +9,7 @@ import org.fcitx.fcitx5.android.scene.skin.assertRows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-// 横屏: held sideways, or 600 dp wide either way up (061-wide-as-landscape §2.1)
+// 横屏: held sideways, or 600 dp wide either way up
 class ScreenShapeTest {
 
     // a device each: turned, its width, dp; whether it is 横屏

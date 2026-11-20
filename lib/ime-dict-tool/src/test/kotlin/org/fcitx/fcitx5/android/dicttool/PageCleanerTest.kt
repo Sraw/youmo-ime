@@ -82,8 +82,7 @@ class PageCleanerTest {
     @Test
     fun aLongPageIsHeldToTheVarietyOfOneOf2000() {
         val cleaner = PageCleaner(sketchBits = 12)
-        // a thousand different sentences, 25,000 Han characters of 2000 different ones: under one in
-        // ten, as any long article's are
+        // a thousand different sentences of 2000 different characters: under one in ten, as long articles are
         val long = (0 until 1000).joinToString("\n") { i -> (0 until 25).map { '一' + (i * 26 + it) % 2000 }.joinToString("") + "。" }
         assertEquals(long, cleaner.clean(long))
         // two over and over is left out however long

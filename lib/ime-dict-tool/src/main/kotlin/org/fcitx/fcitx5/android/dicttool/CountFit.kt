@@ -6,13 +6,7 @@ package org.fcitx.fcitx5.android.dicttool
 
 import kotlin.math.log10
 
-/**
- * A dictionary's counts put on the model's unigram scale: log10 P = [a] + [b] · log10(count + 1),
- * fitted by least squares over the words in both. A word the model lacks is then scored by its
- * count rather than as the unknown word, which puts a word the dictionary saw a thousand times
- * above one it saw ten times (a crawl's candidates against the mixed model: a slope near 0.5, so a
- * hundredfold count is a whole order of probability).
- */
+/** A dictionary's counts on the model's unigram scale, log10 P = [a] + [b] · log10(count + 1), fitted by least squares. */
 class CountFit private constructor(val a: Double, val b: Double) {
 
     fun prob(count: Long): Float = (a + b * log10(count + 1.0)).toFloat()

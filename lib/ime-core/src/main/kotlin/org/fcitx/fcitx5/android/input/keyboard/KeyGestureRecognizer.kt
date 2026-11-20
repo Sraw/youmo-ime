@@ -7,49 +7,29 @@ package org.fcitx.fcitx5.android.input.keyboard
 import kotlin.math.abs
 
 /**
- * The bookkeeping behind a key's touch gestures, with no Android types involved.
- *
- * A key has to decide, from a stream of touch samples, whether the finger left the key, how
- * many swipe steps were crossed on each axis, whether a tap still counts as a click after all
- * that, and whether two taps were close enough together to be a double tap. That is arithmetic
- * over coordinates and timestamps, and it is where the subtle bugs live -- but in a `View` it
- * can only be exercised on a device.
- *
- * What stays outside: the timers themselves (they are coroutines on the view's lifecycle),
- * haptics, sound, pressed state, and `performClick`. This class does not start or run timers;
- * it only says *when* they should be cancelled, and it is told after the fact whether a long
- * press or a repeat actually fired.
- *
- * All times are caller-supplied milliseconds, so tests control the clock exactly.
+ * A key's touch-gesture arithmetic, outside the View so it can be tested: left the key, swipe steps,
+ * click, double tap. It runs no timers, only says when to cancel them; times are caller-supplied ms.
  */
 class KeyGestureRecognizer {
 
-    /** Which pending timers this sample invalidates. */
     data class MoveOutcome(
-        /** The finger has just left the key's (slop-expanded) bounds on this sample. */
+        /** Left the key's slop-expanded bounds on this sample. */
         val movedOutsideNow: Boolean,
-        /** Swipe steps crossed on each axis since the previous sample. */
         val countX: Int,
         val countY: Int,
-        /** Vertical steps of [crossStepY] once this touch has taken a sideways step; 0 without one. */
+        /** Vertical steps of [crossStepY] once this touch has taken a sideways step. */
         val countCrossY: Int = 0,
-        /** Whether the caller should dispatch a Move gesture for this sample at all. */
         val dispatchMove: Boolean,
-        /** Pending long-press / repeat timers that this sample invalidates. */
         val cancelLongPress: Boolean,
         val cancelRepeat: Boolean,
-        /** Whether the key should stop rendering as pressed. */
         val releasePressedState: Boolean,
     )
 
     data class UpOutcome(
-        /** A plain click should be performed. */
         val performClick: Boolean,
         /** ...and it completes a double tap rather than starting one. */
         val isDoubleTap: Boolean,
     )
-
-    // region configuration, mirrored from the view
 
     var touchSlop: Float = 0f
     var viewWidth: Int = 0
@@ -61,33 +41,18 @@ class KeyGestureRecognizer {
     var swipeRepeatEnabled: Boolean = false
     var doubleTapEnabled: Boolean = false
 
-    /**
-     * One axis a touch: the first move past the slop picks X or Y by which it went further, and
-     * the other counts no steps for the rest of the touch. For a key swiped both ways (the space
-     * moves the cursor sideways and has a shortcut up), so a cursor moved and then lifted a little
-     * is no swipe up, nor a swipe up drifting sideways a cursor move.
-     */
+    /** One axis per touch, picked at the first move past the slop: a cursor moved then lifted a little is no swipe up. */
     var axisLock: Boolean = false
 
     var swipeThresholdX: Float = 24f
     var swipeThresholdY: Float = 24f
 
-    /**
-     * Once a touch has taken a sideways step, its vertical steps of this size ([MoveOutcome.countCrossY]),
-     * counted from where the finger was then: the space's cursor moved up and down after it moved
-     * sideways, so a touch going up first is still the key's swipe up. 0 counts none.
-     */
+    /** After a sideways step, vertical steps of this size: the space's cursor moves up and down. 0 counts none. */
     var crossStepY: Float = 0f
 
-    /** How close two taps must be to count as a double tap. */
     var doubleTapTimeoutMs: Long = 0L
 
-    /**
-     * The configuration above, as it stood when the touch went down. A setting that changes
-     * mid-touch (a preference flipped while a finger is on the key) takes effect from the next
-     * touch, so one gesture is never judged half by one rule and half by another -- a swipe
-     * cannot stop counting halfway, nor a key's state be left for a reset that no longer runs.
-     */
+    /** Frozen at touch-down: a setting flipped mid-touch never judges half a gesture by another rule. */
     private data class Settings(
         val longPress: Boolean,
         val repeat: Boolean,
@@ -106,14 +71,9 @@ class KeyGestureRecognizer {
         swipeThresholdX, swipeThresholdY, crossStepY, doubleTapTimeoutMs,
     )
 
-    /** Frozen at [onDown]; between touches the live configuration applies. */
     private var frozen: Settings? = null
 
     private val settings: Settings get() = frozen ?: live()
-
-    // endregion
-
-    // region state
 
     var touchMovedOutside: Boolean = false
         private set
@@ -124,7 +84,6 @@ class KeyGestureRecognizer {
     var swipeRepeatTriggered: Boolean = false
         private set
 
-    // one axis of a swipe each: where the finger last was, what is carried toward the next step, the steps so far
     private val swipeX = SwipeSteps()
     private val swipeY = SwipeSteps()
 
@@ -135,7 +94,7 @@ class KeyGestureRecognizer {
 
     val swipeTotalY: Int get() = swipeY.total
 
-    /** Whether this touch's vertical swipe reached a step at some point, though it may be back at 0: swiped and taken back. */
+    /** Reached a step at some point, though maybe back at 0: swiped and taken back. */
     var swipedY: Boolean = false
         private set
 
@@ -145,16 +104,13 @@ class KeyGestureRecognizer {
 
     private var maybeDoubleTap = false
 
-    // where the touch went down and where it is now, for a drag past the slop on a key whose
-    // swipe repeats
+    // for a drag past the slop on a key whose swipe repeats
     private var downX = 0f
     private var downY = 0f
     private var lastX = 0f
     private var lastClickTime = 0L
 
-    // endregion
-
-    /** The key's bounds are expanded by [touchSlop] on every side, matching the view. */
+    /** Expanded by [touchSlop] on every side, matching the view. */
     fun pointInView(x: Float, y: Float): Boolean =
         -touchSlop <= x && -touchSlop <= y &&
                 x < (viewWidth + touchSlop) && y < (viewHeight + touchSlop)
@@ -170,10 +126,7 @@ class KeyGestureRecognizer {
         }
     }
 
-    /**
-     * Records that the gesture listener consumed an event, which disqualifies the eventual
-     * tap from becoming a click.
-     */
+    /** A consumed gesture keeps the tap from being a click. */
     fun markGestureConsumed() {
         gestureConsumed = true
     }
@@ -181,11 +134,7 @@ class KeyGestureRecognizer {
     private fun draggedPastSlop(x: Float) =
         settings.swipe && settings.swipeRepeat && abs(x - downX) > touchSlop
 
-    /**
-     * Whether the long press timer, now due, may fire: not when the finger has already dragged
-     * sideways past the slop on a key whose swipe repeats. Asked at the timer as well as on each
-     * move, so the outcome does not hang on which comes first, the timer or the next sample.
-     */
+    /** Asked at the timer as on each move, so the outcome does not hang on which comes first. */
     fun longPressMayFire(): Boolean = !draggedPastSlop(lastX)
 
     fun onMove(x: Float, y: Float, longPressTriggered: Boolean, repeatStarted: Boolean): MoveOutcome {
@@ -203,12 +152,8 @@ class KeyGestureRecognizer {
             if (repeatStarted || !settings.swipe) releasePressed = true
         }
 
-        // A drag sideways past the slop on a key whose swipe repeats (the space's cursor, the
-        // backspace's selection) is that swipe, though its first step is not reached yet: a slow
-        // one took longer than the long press to reach it, and the long press then took the touch
-        // (PY-41: 330 px in 4 s moved no cursor, where 300 px in 2.5 s did). Only the long
-        // press: a pending repeat (holding the backspace) is cancelled by a real swipe step, as
-        // before, so a finger that drifts a little still deletes on.
+        // a slow sideways drag past the slop on a repeating swipe is that swipe though no step is reached yet:
+        // it cancels the long press. A pending repeat is still cancelled only by a real step
         lastX = x
         if (!longPressTriggered && !repeatStarted && draggedPastSlop(x)) {
             cancelLongPress = settings.longPress
@@ -227,8 +172,7 @@ class KeyGestureRecognizer {
             )
         }
 
-        // both axes read the *previous* anchor, so consume before moving it; while the axis is
-        // to be picked, neither moves: the axis picked counts from where the touch went down
+        // both axes read the *previous* anchor, so consume before moving it; none moves while the axis is unpicked
         val held = axisPending(x, y)
         val countX = stepsX(x, held)
         val countY = stepsY(y, held)
@@ -250,8 +194,7 @@ class KeyGestureRecognizer {
         )
     }
 
-    // [axisLock]: whether the axis is still to be picked, the finger within the slop of where it went
-    // down; picked, once past it, by which way it went further
+    // [axisLock]: still unpicked within the slop; picked by which way it went further
     private fun axisPending(x: Float, y: Float): Boolean {
         if (!settings.axisLock || lockedAxis != Axis.Undecided) return false
         val dx = abs(x - downX)
@@ -261,7 +204,6 @@ class KeyGestureRecognizer {
         return false
     }
 
-    // a move's steps sideways, and its anchor moved on; none [held] or locked to the other axis
     private fun stepsX(x: Float, held: Boolean): Int {
         if (held) return 0
         val steps = if (lockedAxis == Axis.Y) 0 else swipeX.consume(x, settings.swipeThresholdX)
@@ -279,13 +221,7 @@ class KeyGestureRecognizer {
 
     private fun stepsCrossY(y: Float, countX: Int): Int = crossY.step(y, countX, settings.crossStepY)
 
-    /**
-     * Decides what a finger lift means. Call before [resetForNextTouch]: the decision depends
-     * on state this touch accumulated.
-     *
-     * @param nowMs the lift's time on a clock that does not jump (the touch's eventTime), used
-     * only for the double-tap window
-     */
+    /** Call before [resetForNextTouch]. [nowMs] on a clock that does not jump (the eventTime). */
     fun onUp(nowMs: Long, longPressTriggered: Boolean, repeatStarted: Boolean): UpOutcome {
         val shouldPerformClick = !(touchMovedOutside ||
                 longPressTriggered ||
@@ -305,10 +241,7 @@ class KeyGestureRecognizer {
         return UpOutcome(performClick = true, isDoubleTap = isDoubleTap)
     }
 
-    /**
-     * Clears per-touch state. Double-tap state deliberately survives -- that is what lets the
-     * *next* touch complete a double tap.
-     */
+    /** Double-tap state survives: that is what lets the next touch complete one. */
     fun resetForNextTouch() {
         val settings = settings
         frozen = null
@@ -325,7 +258,6 @@ class KeyGestureRecognizer {
         gestureConsumed = false
     }
 
-    /** A cancelled gesture also forgets the pending double tap. */
     fun cancel() {
         val doubleTap = settings.doubleTap
         resetForNextTouch()

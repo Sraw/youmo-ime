@@ -102,7 +102,7 @@ class VoiceChoiceTest {
         assertEquals("开放了", choose(heard, blocked, language))
     }
 
-    // 生僻字屏蔽 (dev/design/061-rare-char-block.md §5.3): a hypothesis with a character held back passed over
+    // 生僻字屏蔽: a hypothesis with a character held back passed over
     @Test
     fun aHypothesisWithACharacterHeldBackIsPassedOver() {
         val held = { t: String -> "𤝰" in t }

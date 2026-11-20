@@ -18,7 +18,6 @@ class EnglishBlockOffersTest {
 
     private val data = EnglishDecoderTest.data()
 
-    // the nine keys' first word is the decoder's, not letters the user typed: it can be blocked like any other (R20 F5865)
     @Test
     @Uat("EN-28")
     fun theNineKeysFirstWordCanBeBlocked() {
@@ -32,7 +31,7 @@ class EnglishBlockOffersTest {
         assertFalse("the" in after.candidates)
     }
 
-    // a glide's other blocked leaves the rest offered: one of them still takes the glided word's place (R20 F6046)
+    // a glide's other blocked leaves the rest offered: one of them still takes the glided word's place
     @Test
     @Uat("EN-28")
     fun aGlidesOtherBlockedLeavesTheRestToPick() {
@@ -52,7 +51,7 @@ class EnglishBlockOffersTest {
         assertEquals("hello ".length, picked.deleteBefore)
     }
 
-    // the word the glide committed is in the text, as letters typed are: not offered 屏蔽, a Block of it does nothing (R20 F6632)
+    // the word the glide committed is in the text, as letters typed are: not offered 屏蔽, a Block of it does nothing
     @Test
     @Uat("EN-28")
     fun aGlidesCommittedWordIsNotBlocked() {

@@ -1,4 +1,4 @@
-// 背景 (060-render-p3 §5.1 panel 2): the keyboard's picture, a crop for portrait and one for landscape (a box of
+// 背景: the keyboard's picture, a crop for portrait and one for landscape (a box of
 // the keyboard's shape, moved and zoomed on the picture; each cut its own file, as the app draws the cut), its
 // brightness and blur, the keys see-through to it.
 (function (root) {
@@ -7,7 +7,7 @@
   const F = root.YoumoForm;
   const ORIENTATIONS = [['portrait', '竖屏'], ['landscape', '横屏']];
   const THROUGH = 'picture(0dp, 100%, #66ffffff)';
-  // the keys 透出 makes see-through (060-render-p3 §5.1 panel 2), each with the colour it has again when turned off
+  // the keys 透出 makes see-through, each with the colour it has again when turned off
   const THROUGH_KEYS = [['key', 'key'], ['key.function', 'altKey'], ['key.enter', 'accentKey'], ['key.space', 'key']];
 
   // [xml] with every THROUGH_KEYS style see-through ([on]), or those whose fill [was] says back to their colour

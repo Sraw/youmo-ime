@@ -19,10 +19,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * The shared page saves what it shows alone: pinyin's own options, read with it from pinyin's
- * config, may have been changed on pinyin's page since, and writing them back would undo that.
- */
+/** Pinyin's own options, read with the shared ones, may have been changed on pinyin's page since: not written back. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SharedInputSavesTest {
@@ -40,8 +37,7 @@ class SharedInputSavesTest {
         assertNull(saved[EngineSettings.CHAIZI])
     }
 
-    // pinyin's page open behind the shared one read the shared options before they changed there:
-    // its save, of what it shows alone, leaves them as the shared page set them (the host's partial load)
+    // pinyin's page open behind read the shared options before they changed: its save leaves them as set
     @Test
     fun aPageOpenBehindTheSharedOneDoesNotWriteBackWhatItRead() {
         val options = EngineOptions()

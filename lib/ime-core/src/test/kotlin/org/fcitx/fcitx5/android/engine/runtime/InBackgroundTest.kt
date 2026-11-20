@@ -44,7 +44,6 @@ class InBackgroundTest {
         val b = InBackground<String>(later) { errors += it }
         b.get(1) { { "old" } }
         b.get(2) { { "new" } }
-        // the newer made first, then the older: the newer stays
         later.run(1)
         later.run(0)
         assertEquals("new", b.get(2) { { "again" } })
@@ -56,7 +55,7 @@ class InBackgroundTest {
 
     @Test
     fun aMakeThatFailedIsReportedNotThrownAndNotMadeAgainForItsKey() {
-        // F2441: it runs on a bare thread, where a throw would kill the input method
+        // it runs on a bare thread, where a throw would kill the input method
         val later = Later()
         val b = InBackground<String>(later) { errors += it }
         b.get(1) { { throw IllegalStateException("no") } }
@@ -64,7 +63,6 @@ class InBackgroundTest {
         assertEquals(listOf("no"), errors.map { it.message })
         assertNull(b.get(1) { { "a" } })
         assertTrue(later.queued.isEmpty())
-        // another key is made as ever
         assertNull(b.get(2) { { "b" } })
         later.run(0)
         assertEquals("b", b.get(2) { { "c" } })
@@ -72,7 +70,7 @@ class InBackgroundTest {
 
     @Test
     fun anErrorInAMakeIsReportedToo() {
-        // 0.3.1: an OutOfMemoryError coding a merged dictionary for a table, uncaught, crash-looped the input method
+        // an OutOfMemoryError coding a merged dictionary for a table, uncaught, once crash-looped the input method
         val later = Later()
         val b = InBackground<String>(later) { errors += it }
         b.get(1) { { throw OutOfMemoryError("heap") } }
@@ -83,7 +81,7 @@ class InBackgroundTest {
 
     @Test
     fun aMakeOfAKeyNoLongerAskedForStopsAndIsDroppedEvenIfTheKeyIsAskedAgain() {
-        // F2471: a superseded coding stops early; its partial value never fills a later ask
+        // a superseded coding stops early; its partial value never fills a later ask
         val later = Later()
         val b = InBackground<String>(later) { errors += it }
         var seen = true

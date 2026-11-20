@@ -16,11 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * A view made anew by a setting ends what was typed (A2): the engine's reset drops its context, and
- * the field stays, so no input restarts to tell it. Told after the end, the next word keeps its 前文
- * (ranking, 联想, learning); of the two ends dark mode brings, the last tell after the last end.
- */
+/** The engine's reset on a remade view drops its context and no input restart tells it again: told after the end, the next word keeps its 前文. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")

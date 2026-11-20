@@ -64,8 +64,7 @@ class EnginesTest : EnginesFixture() {
         assertEquals("你", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code).commit)
     }
 
-    // a key that picks says so (the router's log of what to type again ends at it: review2 M2);
-    // a key that types does not
+    // a key that picks says so (the router's log of what to type again ends at it); a key that types does not
     @Test
     fun aKeysPickIsToldAsOne() {
         val engines = Engines(::load, null)
@@ -78,7 +77,7 @@ class EnginesTest : EnginesFixture() {
         assertFalse("nothing typed: the app's digit", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, '1'.code).picked)
     }
 
-    // in the learning record under the user directory (PLAN §2.2), read again as English is next typed
+    // in the learning record under the user directory, read again as English is next typed
     @Test
     fun theEnglishWordsLearnedAreKeptAcrossAStart() {
         val first = Engines(::load, root)
@@ -102,7 +101,6 @@ class EnginesTest : EnginesFixture() {
         assertFalse(engines.addEnglishWord("'em"))
         assertEquals(listOf("Youmo" to true, "the" to false), engines.englishWords().map { it.text to it.neverCorrected })
         assertEquals(listOf(2f, 1f), engines.englishWords().map { it.count })
-        // the user's: not corrected, offered by its keys
         assertTrue("Youmo" in engines.type(InputMethodCatalog.ENGLISH, "you").candidates)
         engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code)
         engines.forgetEnglishWords(listOf("Youmo"))
@@ -130,14 +128,12 @@ class EnginesTest : EnginesFixture() {
         val s = engines.type(InputMethodCatalog.WUBI, "vbg")
         assertEquals(listOf("好", "妤"), s.candidates)
         assertEquals(listOf("", "f"), s.hints)
-        // wubi's pinyin lookup shares the pinyin data
         assertEquals(listOf("${InputMethodCatalog.TABLE_DIR}/wbx.data"), loaded)
     }
 
     @Test
     fun theTextBeforeTheCursorIsTheContextOfWhatIsTypedNext() {
         val engines = Engines(::load, null, warmUps = inPlace)
-        // no keyboard yet: nothing to tell
         engines.context(InputMethodCatalog.PINYIN, "好")
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         engines.context(InputMethodCatalog.PINYIN, "好")
@@ -161,11 +157,9 @@ class EnginesTest : EnginesFixture() {
     fun whatIsPickedIsKeptUnderTheUserDirectory() {
         val dir = MemoryFiles()
         Engines(::load, dir).use { engines ->
-            // picked until it leads
             engines.pickUntilFirst("拟")
         }
         assertTrue(dir.file(LearnLog.FILE).length() > 0)
-        // and read back: 拟 still comes first
         Engines(::load, dir).use { engines ->
             assertEquals("拟", engines.type(InputMethodCatalog.PINYIN, "ni").candidates.first())
         }
@@ -192,7 +186,6 @@ class EnginesTest : EnginesFixture() {
             }
             assertEquals("你", engines.type(InputMethodCatalog.PINYIN, "ni").candidates.first())
         }
-        // nor in the learning record
         val kept = logged(dir)
         assertTrue(kept.wordUses.isEmpty() && kept.stats.isEmpty())
     }
@@ -246,7 +239,6 @@ class EnginesTest : EnginesFixture() {
             assertEquals(2, reads)
             assertEquals(listOf("你", "拟", "泥"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
             assertEquals(1, dictionaryReads)
-            // the dictionaries too
             additions = added("", "")
             engines.reload()
             assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
@@ -276,7 +268,6 @@ class EnginesTest : EnginesFixture() {
         engines.reload()
         val shown = engines.type(InputMethodCatalog.PINYIN, "ni").candidates
         assertEquals("拟", shown.first())
-        // the model made again of the dictionaries now
         assertTrue("尼" in shown && "泥" !in shown)
     }
 
@@ -299,11 +290,6 @@ class EnginesTest : EnginesFixture() {
         assertEquals(listOf("好你"), engines.type(InputMethodCatalog.WUBI, "vbw").candidates)
     }
 
-    /**
-     * What one pinyin learned leaves another's short input as the model has it (D32: 全拼 does not
-     * change 双拼's order, 简拼's first is the model's), though that one read the same keys in the
-     * same context before; forgotten, each is as it was, past the sentences too.
-     */
     @Test
     fun aPickInOnePinyinLeavesAnothersShortInputAndIsForgottenInBoth() {
         val chars = "你拟泥尼逆腻昵倪妮霓"
@@ -339,8 +325,7 @@ class EnginesTest : EnginesFixture() {
         assertEquals(setOf(Offer.PIN, Offer.BLOCK), engines.offers(InputMethodCatalog.PINYIN, 1))
         assertEquals(listOf("拟", "你"), engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PIN, 1).candidates)
         assertTrue(saved.isEmpty())
-        // 双拼 pins under its own codes (impl/design-1b.md §3); n is read alone, 简拼 in the middle, for
-        // the words typed only, which a pinned one is and 你, never typed, is not
+        // n is read alone for typed words only, which the pinned one is and 你 is not
         assertEquals(listOf("你", "拟", "拟i"), engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates)
         engines.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
@@ -350,8 +335,7 @@ class EnginesTest : EnginesFixture() {
         assertEquals(emptyList<IOException>(), errors)
     }
 
-    // 常用词 (060-common-words): read from the additions, offered in 全拼 and 双拼 by their keys, none
-    // while the habits are off (借手机), a replacement deleted saved whole; a reload reads the file again
+    // offered by their keys, none with habits off; a reload reads the file again
     @Test
     fun theCommonWordsAreTheAdditionsAndOffWithTheHabits() {
         val saved = ArrayList<String>()
@@ -362,7 +346,7 @@ class EnginesTest : EnginesFixture() {
             engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
             assertEquals("泥", engines.type(InputMethodCatalog.SHUANGPIN, "ni").candidates.first())
             engines.onEvent(InputMethodCatalog.SHUANGPIN, EngineEvent.RESET, 0)
-            // zhuyin's keys are no pinyin the user knows the words by: none there (060-common-words §3)
+            // zhuyin's keys are no pinyin the user knows the words by: none there
             val ni = "${ZhuyinKeys.symbolCode('ㄋ')}${ZhuyinKeys.symbolCode('ㄧ')}"
             val zhuyin = engines.type(InputMethodCatalog.ZHUYIN, ni).candidates
             assertTrue(zhuyin.toString(), "你" in zhuyin && "泥" !in zhuyin)
@@ -382,8 +366,6 @@ class EnginesTest : EnginesFixture() {
         }
     }
 
-    // a pin and a custom phrase of the same text under the code (a 0.4.0 install moved its order-1 phrases
-    // to pins, and the user may add the phrase back): shown once, the pin first, ahead of the phrase before it
     @Test
     fun aPhraseOfThePinsTextIsShownOnce() {
         val dir = MemoryFiles()
@@ -393,7 +375,6 @@ class EnginesTest : EnginesFixture() {
             close()
         }
         val additions = { Engines.Additions("nh,1=你会\nnh,2=你好\n", "", { }, dictionary = { null }) }
-        // the phrase there beside the pin: both of 你好
         Engines(::load, dir, additions = additions).use { engines ->
             val shown = engines.type(InputMethodCatalog.PINYIN, "nh").candidates
             assertEquals("你好", shown.first())
@@ -422,7 +403,6 @@ class EnginesTest : EnginesFixture() {
     ) { userLogThatCannotBeRead(it.second()) }
 
     private fun userLogThatCannotBeRead(dir: UserFiles) {
-        // a directory where the log should be
         dir.dir(LearnLog.FILE).mkdirs()
         val errors = ArrayList<IOException>()
         Engines(::load, dir, onError = { errors += it }).use { engines ->
@@ -440,7 +420,6 @@ class EnginesTest : EnginesFixture() {
     fun whatATableLearnsOutlivesASettingChangedAndARestart() {
         val dir = MemoryFiles()
         Engines(::load, dir).use { engines ->
-            // pinned first under the code typed, ordered by use or not (U-28)
             engines.type(InputMethodCatalog.WUBI, "va")
             assertTrue(Offer.PIN in engines.offers(InputMethodCatalog.WUBI, 1))
             assertEquals(listOf("二", "一", "三"), engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.PIN, 1).candidates.take(3))
@@ -454,8 +433,7 @@ class EnginesTest : EnginesFixture() {
         }
         Engines(::load, dir).use { engines ->
             assertEquals(listOf("员", "叫"), byUse(engines, true))
-            // 恢复码表顺序 forgets the order learned by use, not what was pinned
-            // the one entry the app has (U-28's 恢复码表顺序 in a table's settings)
+            // 恢复码表顺序 (a table's settings) forgets the order learned by use, not what was pinned
             assertEquals(LearningResult.Done(), engines.learning(null, LearningOp.ResetTableOrder(InputMethodCatalog.WUBI)))
             assertEquals("二", engines.type(InputMethodCatalog.WUBI, "va").candidates.first())
             assertEquals(setOf(Offer.UNPIN, Offer.BLOCK), engines.offers(InputMethodCatalog.WUBI, 0))
@@ -468,7 +446,7 @@ class EnginesTest : EnginesFixture() {
             engines.settings = EngineSettings(pageSize = 3, tables = mapOf("Wubi" to TableSettings(orderByUse = false)))
             engines.type(InputMethodCatalog.WUBI, "va")
             assertEquals("二", engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.PICK, 1).commit)
-            // 调频 off: the pick is kept but not used, so nothing offered to forget (U-28)
+            // 调频 off: the pick is kept but not used, so nothing offered to forget
             assertEquals(listOf("一", "二", "三"), engines.type(InputMethodCatalog.WUBI, "va").candidates)
             assertFalse(Offer.FORGET in engines.offers(InputMethodCatalog.WUBI, 1))
             engines.onEvent(InputMethodCatalog.WUBI, EngineEvent.RESET, 0)
@@ -481,14 +459,12 @@ class EnginesTest : EnginesFixture() {
     @Test
     fun aKeySlippedIsReadAsMeantUnlessSlipsAreOff() {
         val engines = Engines(::load, null)
-        // p is next to o
         assertEquals("好", engines.type(InputMethodCatalog.PINYIN, "hap").candidates.first())
         engines.settings = EngineSettings(typos = false)
         assertEquals(listOf("hap"), engines.type(InputMethodCatalog.PINYIN, "hap").candidates)
     }
 
-    // 061-neighbour-groups: 双拼's 18 keys and 大千 read a key tapped by its neighbour's edge as that key unless 纠错 is
-    // off. 小鹤 [JK][XC] with JK tapped toward H is hao; 大千 ㄒㄠ (xao spells nothing) with ㄒ tapped toward ㄏ is hao
+    // 小鹤 [JK][XC] toward H is hao; 大千 ㄒㄠ toward ㄏ is hao
     @Test
     @Uat("PY-150", "SP-48")
     fun shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff() {
@@ -515,13 +491,10 @@ class EnginesTest : EnginesFixture() {
     fun settingsShapeTheSessionsMadeAfterThem() {
         val engines = Engines(::load, null)
         assertEquals(EngineSettings.DEFAULT_PAGE_SIZE, engines.type(InputMethodCatalog.WUBI, "va").candidates.size)
-        // only the letters as typed
         assertEquals(listOf("li"), engines.type(InputMethodCatalog.PINYIN, "li").candidates)
         engines.settings = EngineSettings(pageSize = 3, fuzzy = setOf(Fuzzy.L_N))
-        // made again: what was typed is gone
         assertEquals(listOf("一", "二", "三"), engines.type(InputMethodCatalog.WUBI, "va").candidates)
         assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "li").candidates)
-        // the same settings again leave the input as it is
         engines.settings = EngineSettings(pageSize = 3, fuzzy = setOf(Fuzzy.L_N))
         assertEquals("你", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, ' '.code).commit)
     }
@@ -564,7 +537,6 @@ class EnginesTest : EnginesFixture() {
 
     @Test
     fun aCharacterLookedUpByItsStrokesIsReadAfterTheTextBeforeIt() {
-        // 你 after 你好, 拟 after 好 alone
         val data = PinyinDataBuilder()
             .unigram("<unk>", -7f, 0f)
             .unigram("你", -2f, 0f)
@@ -579,7 +551,6 @@ class EnginesTest : EnginesFixture() {
             .build()
             .toByteArray()
         val engines = Engines({ if (it == InputMethodCatalog.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null, warmUps = inPlace)
-        // the decoder's reading alone
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
         engines.context(InputMethodCatalog.PINYIN, "你")
@@ -597,7 +568,6 @@ class EnginesTest : EnginesFixture() {
             engines.removeWord(UserWord("拟", "ni", UserWord.Kind.ADDED))
             assertEquals("拟", engines.type(InputMethodCatalog.PINYIN, "ni").candidates.first())
         }
-        // nor forgotten in the log
         Engines(::load, dir).use { engines ->
             assertEquals("拟", engines.type(InputMethodCatalog.PINYIN, "ni").candidates.first())
         }
@@ -617,11 +587,9 @@ class EnginesTest : EnginesFixture() {
             .build()
             .toByteArray()
         val engines = Engines({ if (it == InputMethodCatalog.PINYIN_DATA) ByteBuffer.wrap(data) else load(it) }, null)
-        // the decoder's reading alone, on a page of two
         engines.settings = EngineSettings(pageSize = 2, modelLevel = ModelLevel.LOW, typos = false)
         assertFalse("小穴" in engines.type(InputMethodCatalog.PINYIN, "xiaoxue").candidates)
         assertTrue(engines.addWord("小穴", "xiao xue"))
-        // the session made again knows it the user's
         assertTrue("小穴" in engines.type(InputMethodCatalog.PINYIN, "xiaoxue").candidates)
     }
 
@@ -630,7 +598,6 @@ class EnginesTest : EnginesFixture() {
         val dir = MemoryFiles()
         val log = dir.file(LearnLog.FILE)
         Engines(::load, dir).use { engines ->
-            // 拟 then 好, over the decoder's 你好, twice: the user's word 拟好
             repeat(2) {
                 engines.type(InputMethodCatalog.PINYIN, "nihao")
                 engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, engines.candidates(InputMethodCatalog.PINYIN, 0, 20).indexOfFirst { it.text == "拟" })
@@ -646,15 +613,13 @@ class EnginesTest : EnginesFixture() {
             assertTrue(after.size > before.size)
             assertArrayEquals(before, after.copyOf(before.size))
         }
-        // and forgotten still when the log is read back
         assertEquals(emptyList<UserWord>(), Engines(::load, dir).use { it.userWords() })
     }
 
     @Test
     fun aCandidateForgottenInAnyPinyinIsForgottenInTheTablesToo() {
         val wubi = InputMethodCatalog.WUBI
-        // a phrase, as a table saves no single character (TableRegistry.forgetInTables loads none for one)
-        // the log forgets nothing by itself: 你好 is 五笔's by abcd
+        // a table saves no single character, and the log forgets nothing by itself
         val kept = MemoryFiles()
         olderPhrases(kept, "abcd" to "你好")
         Engines(::load, kept).use {
@@ -666,7 +631,6 @@ class EnginesTest : EnginesFixture() {
             // a phrase 五笔 saved, its table not loaded: loaded to forget it
             olderPhrases(dir, "abcd" to "你好")
             Engines(::load, dir).use { engines ->
-                // learned here first, to be forgotten
                 engines.type(im, keys)
                 val picked = engines.candidates(im, 0, 20).indexOfFirst { it.text == "你好" }
                 assertEquals(im, "你好", engines.onEvent(im, EngineEvent.PICK, picked).commit)
@@ -699,7 +663,6 @@ class EnginesTest : EnginesFixture() {
         }
     }
 
-    // the nine keys' 重输 with nothing typed: not the app's
     @Test
     fun nineKeysStartOverWithNothingTypedIsTheirs() {
         assertTrue(Engines(::load, null).onEvent(InputMethodCatalog.T9, EngineEvent.ESCAPE, 0).handled)
@@ -707,7 +670,7 @@ class EnginesTest : EnginesFixture() {
 
     @Test
     fun wubiIsOfferedFirstToBeAdded() {
-        // the nine keys a keyboard of pinyin now (I1), no input method to add
+        // the nine keys a keyboard of pinyin now, no input method to add
         val offered = listOf("engine-erbi", "engine-cangjie", InputMethodCatalog.WUBI, "engine-ziranma", InputMethodCatalog.SHUANGPIN)
         assertEquals(
             listOf(InputMethodCatalog.WUBI, "engine-erbi", "engine-cangjie", "engine-ziranma", InputMethodCatalog.SHUANGPIN),
@@ -715,11 +678,7 @@ class EnginesTest : EnginesFixture() {
         )
     }
 
-    /**
-     * In an address field a character goes in as it is unless the input method reads it as a key
-     * ([InputMethodCatalog.readsAsKey], told whether something is typed): the pinyins' `'` only while
-     * something is, as their sessions read it. Taken as text, it put xi'an in as xi' and an.
-     */
+    /** In an address field a character is text unless the input method reads it as a key ([InputMethodCatalog.readsAsKey]). */
     @Test
     fun aPinyinsSeparatorIsAKeyWhereItsSessionReadsIt() {
         val separator = '\''.code
@@ -740,8 +699,7 @@ class EnginesTest : EnginesFixture() {
         const val MAX_SLICES = 10_000
     }
 
-    // a syllable taken off the nine keys' bar is a pick of the list shown: the host's 清除 log ends there,
-    // as a list id sent again would be one the session has moved past
+    // the host's 清除 log ends there, as the list id sent is one the session moved past
     @Test
     @Uat("KB-62")
     fun aSyllableTakenOffTheBarIsAPick() {

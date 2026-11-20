@@ -33,7 +33,6 @@ class TableEmojiTest {
         val s = session().type("a").second
         assertEquals(listOf("工", "戈", "🔧", "🛠️", "式"), s.candidates)
         assertEquals(listOf("", "", "", "", "a"), s.hints)
-        // an entry of an emoji's text, listed once
         assertFalse("⚒️" in s.candidates)
         assertEquals(1, session().type("a").second.candidates.count { it == "🔧" })
         assertEquals(listOf("工", "戈", "式", "🔧"), session(emptyMap()).type("a").second.candidates)
@@ -55,7 +54,6 @@ class TableEmojiTest {
         assertEquals(emptySet<Any>(), t.offers(0))
         val picked = t.apply(Select(0))
         assertEquals("📢", picked.commit)
-        // the word deleted first: the emoji in its place
         assertEquals("叫".length, picked.deleteBefore)
         assertFalse(picked.predicting && "📢" in picked.candidates)
     }
@@ -69,7 +67,6 @@ class TableEmojiTest {
         assertEquals("a", s.preedit)
         assertFalse("📢" in s.candidates)
         assertEquals(0, s.deleteBefore)
-        // nothing to offer of a word with no emoji
         val u = session(emptyMap())
         assertFalse("📢" in u.type("kkkk").second.candidates)
     }
@@ -158,7 +155,6 @@ class TableEmojiTest {
         plain.type("g")
         assertEquals(emptySet<Any>(), t.offers(0))
         assertEquals(plain.offers(0), t.offers(1))
-        // turning over the list as one
         assertEquals(listOf(follows), t.apply(NextPage).candidates)
         // a long press on it does to that prediction what it does without the emoji
         t.apply(Action.Forget(1))

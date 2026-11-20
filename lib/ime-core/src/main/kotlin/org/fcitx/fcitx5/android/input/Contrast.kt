@@ -8,31 +8,20 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 
-/**
- * WCAG 2 contrast between colours (0xAARRGGBB: the first laid over the second as it is drawn, its
- * alpha counted; the second taken as opaque, what is under it not known here), and a colour kept
- * legible on another: 撤销 in a theme's accent on its
- * popup colour, which on some built-in themes (MaterialLight 1.75:1) is barely seen.
- */
+/** WCAG 2 contrast (the first colour drawn over the second, the second opaque), and keeping 撤销's accent legible on its popup (MaterialLight is 1.75:1). */
 object Contrast {
 
-    /** What normal-size text needs (WCAG AA): 14 sp bold is not large text. */
+    /** WCAG AA: 14 sp bold is not large text. */
     const val TEXT = 4.5
 
     fun ratio(a: Int, b: Int): Double {
-        // a translucent accent reads as what it makes of the background (F3477: 0x990d47a1 on
-        // white is 3.2:1 drawn, 9:1 with alpha ignored)
+        // a translucent accent reads as what it makes of the background (0x990d47a1 on white: 3.2:1 drawn, 9:1 alpha ignored)
         val la = luminance(over(a, b))
         val lb = luminance(b)
         return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
 
-    /**
-     * [colour] if it is legible on [background] ([min]), else blended toward [toward] (the text's
-     * colour, so the hue stays as far as it can) a tenth at a time till it is; with [toward] not
-     * legible either, toward whichever of black and white is, which always is. Kept as it is when
-     * legible already; a blended one is opaque.
-     */
+    /** Else blended a tenth at a time toward [toward] (keeping the hue), or toward black or white if [toward] fails too; a blended one is opaque. */
     fun legible(colour: Int, background: Int, toward: Int, min: Double = TEXT): Int {
         // as it is, alpha too: a custom theme's translucent accent that reads, drawn, stays translucent
         if (ratio(colour, background) >= min) return colour
@@ -47,7 +36,7 @@ object Contrast {
         return extreme
     }
 
-    /** [fg] drawn over [bg] (its alpha dropped): opaque. */
+    /** Its alpha dropped: opaque. */
     private fun over(fg: Int, bg: Int): Int = blend(bg, fg, ((fg ushr 24) and 0xff) / 255.0)
 
     private fun blend(a: Int, b: Int, t: Double): Int {

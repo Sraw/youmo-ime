@@ -27,7 +27,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** What a table learns (U-28): rows under the code typed, pins and blocks there alone, never pinyin's order. */
+/** What a table learns: rows under the code typed, pins and blocks there alone, never pinyin's order. */
 class TableHabitsTest {
 
     private val wubi = dictionary("a 工", "a 戈", "aa 式", "aaaa 工", "aaaa 恭恭敬敬", "aaad 工期", "wqiy 你", "wun 们", "kkkk 叫", "kkkk 员", "g 高")
@@ -45,7 +45,6 @@ class TableHabitsTest {
     private fun session(options: TableOptions = TableOptions.WUBI.copy(autoSelect = false), shared: SharedWords = SharedWords.NONE) =
         TableSession(wubi, options, shared = shared, language = learning(learner, habits))
 
-    // review R11 F2741 (G4a): a field cleared since leaves no word before the next pick
     @Test
     fun aClearedFieldLeavesNoWordBeforeThePick() {
         val t = session()
@@ -57,9 +56,6 @@ class TableHabitsTest {
         assertTrue(recorded.all { it.prev == "" })
     }
 
-    // F2739 (原 TBL-39): 员 corrected to once, then shown first (here by a pin; 调频's models do it on a
-    // phone); 叫, the table's own first, picked over it is a use of it: the streak restarts, so 员 needs
-    // two more picks to be first
     @Test
     fun theTablesOwnFirstPickedOverAnotherShownFirstRestartsTheStreak() {
         val t = session(TableOptions.WUBI.copy(autoSelect = false, orderByUse = true))
@@ -86,7 +82,6 @@ class TableHabitsTest {
         assertEquals("员", learner.habits.first(code, "")?.text)
     }
 
-    // 原 TBL-39: the own first picked while a pin shows another first leaves, once unpinned, the own first first
     @Test
     fun theOwnFirstPickedUnderAPinIsStillFirstOnceUnpinned() {
         val t = session(TableOptions.WUBI.copy(autoSelect = false, orderByUse = true))
@@ -121,17 +116,15 @@ class TableHabitsTest {
         val (pick, whole) = recorded
         assertEquals(Code(kind, "aaaa"), pick.code)
         assertEquals("", pick.prev)
-        // picked over the first shown: corrected
         assertEquals(Row.PICK or Row.CORRECTED, pick.flags)
         assertEquals("工", pick.shown)
         assertEquals('B', pick.how)
         assertEquals(Code(kind, ""), whole.code)
         assertEquals("高", whole.prev)
         assertTrue(whole.whole)
-        // its words have no reading: never pinyin's order (D28)
         assertEquals("", whole.words.list.single().reading)
         assertEquals(0f, learner.model.count(handwritingData.wordIndex.find("高")), 0f)
-        // the whole commit, under no keys, has its words' uses and pairs alone: no STAT of its own (review C S8)
+        // the whole commit, under no keys, has its words' uses and pairs alone: no STAT of its own
         val state = learner.log.state
         assertTrue(state.stats.keys.none { it.code == Code(kind, "") })
         assertTrue("恭恭敬敬" in state.wordUses)
@@ -147,7 +140,6 @@ class TableHabitsTest {
         assertEquals(emptySet<Offer>(), t.offers(0))
     }
 
-    // review R11 F2683: learning off (a password field), a long press changes nothing learned
     @Test
     fun aPinBlockOrForgetChangesNothingWhereLearningIsOff() {
         val t = session()
@@ -181,7 +173,6 @@ class TableHabitsTest {
             assertEquals(listOf("恭恭敬敬", "工"), t.apply(Pin(1)).candidates)
             assertEquals(setOf(Offer.UNPIN, Offer.BLOCK), t.offers(0))
             t.apply(Reset)
-            // there alone: aaa leads to it as before
             assertEquals("工", t.type("aaa").second.candidates.first())
             t.apply(Reset)
             assertEquals("恭恭敬敬", t.type("aaaa").second.candidates.first())
@@ -195,7 +186,6 @@ class TableHabitsTest {
         val t = session()
         t.type("aaaa")
         t.apply(Pin(1))
-        // pinned, then blocked: the block wins, the pin goes
         assertEquals(listOf("工"), t.apply(Block(0)).candidates)
         assertEquals(null, learner.habits.pinned(Code(kind, "aaaa")))
         t.apply(Reset)
@@ -240,16 +230,14 @@ class TableHabitsTest {
 
     @Test
     fun aWordFromOutsideTheTableNeverTakesAUniqueFullCodesPlace() {
-        // 你们 is the user's, coded wqiy by no rule: say it were
         val shared = object : SharedWords by SharedWords.NONE {
             override fun words(prefix: String) = if ("wqiy".startsWith(prefix)) listOf("wqiy" to "你们") else emptyList()
             override fun leadsAnywhere(prefix: String) = "wqiy".startsWith(prefix)
         }
-        // wqiy alone in the table commits itself, as one who types it blind expects (D8)
+        // wqiy alone in the table commits itself, as one who types it blind expects
         assertEquals("你", session(TableOptions.WUBI, shared).type("wqiy").first)
         // where nothing commits itself, the word is offered after the table's own
         assertEquals(listOf("你", "你们"), session(shared = shared).type("wqiy").second.candidates)
-        // nor where the code leads on: wqi is no full code
         assertEquals(listOf("你", "你们"), session(TableOptions.WUBI, shared).type("wqi").second.candidates)
     }
 
@@ -259,8 +247,6 @@ class TableHabitsTest {
         override fun leadsAnywhere(prefix: String) = "kkkk".startsWith(prefix)
     }
 
-    // review R11 F2722/F2723: 调频 off, the words from outside the table among themselves 「首选以外」,
-    // in the places they left; the table's own stay where they are
     @Test
     fun withoutOrderByUseTheWordsFromOutsideTheTableAreOrderedAmongThemselves() {
         val t = session(TableOptions.WUBI.copy(autoSelect = false, orderByUse = false), outside)
@@ -270,7 +256,6 @@ class TableHabitsTest {
         assertEquals(listOf("叫", "员", "员叫", "叫员"), t.type("kkkk").second.candidates)
     }
 
-    // review R11 F2723: 调频 on, a word of the user's from pinyin not used here is not first for being theirs
     @Test
     fun withOrderByUseAWordOfTheUsersFromPinyinNotUsedHereIsAfterTheTablesOwn() {
         val mine = object : Habits by habits {
@@ -281,7 +266,6 @@ class TableHabitsTest {
         assertEquals(listOf("叫", "员"), t.type("kkkk").second.candidates.take(2))
     }
 
-    // review C S3: 「用我的输入习惯」 off, the habits are none, but a block stays (U-93, C26)
     @Test
     fun aBlockUnderACodeStaysWithTheHabitsOff() {
         learner.habits.blockUnder(Code(kind, "aaaa"), "恭恭敬敬", on = true)
@@ -290,8 +274,7 @@ class TableHabitsTest {
         assertEquals(listOf("工"), off.type("aaaa").second.candidates)
     }
 
-    // review C N1: a lone entry blocked under its code leaves the words from outside in, the one there
-    // then the code's alone; a row the table has twice is still one entry alone
+    // a row the table has twice is still one entry alone
     @Test
     fun aLoneEntryBlockedOrTwiceIsStillWhatD8Means() {
         val shared = object : SharedWords by SharedWords.NONE {
@@ -306,7 +289,7 @@ class TableHabitsTest {
         assertEquals("他", TableSession(twice, TableOptions.WUBI, shared = shared, language = language).type("wqiy").first)
     }
 
-    // review C N2: a code with the matching key is no code to learn under; the whole commit still is
+    // a code with the matching key is no code to learn under; the whole commit still is
     @Test
     fun aWildcardCodeIsNotLearnedUnder() {
         val t = session()
@@ -315,7 +298,7 @@ class TableHabitsTest {
         assertTrue(recorded.single().whole)
     }
 
-    // review C S4: a field that keeps no pairs (U-91) gets none from a table either
+    // a field that keeps no pairs gets none from a table either
     @Test
     fun aFieldsLearningFlagsHoldInATable() {
         val t = session()
@@ -340,27 +323,24 @@ class TableHabitsTest {
         assertEquals(listOf("工", "恭恭敬敬"), none.apply(Block(1)).candidates)
     }
 
-    // TBL-15 (review-int-runtime M1): 调频 on, a code's words by the user's picks under it, as pinyin's (U-02)
+    // 调频 on, a code's words by the user's picks under it, as pinyin's
     @Test
     fun withOrderByUseAWordPickedTwiceRunningUnderItsCodeIsFirstThere() {
         val t = session()
         assertEquals(listOf("叫", "员"), t.type("kkkk").second.candidates)
         assertEquals(Tier.DICTIONARY, t.why(0)!!.tier)
         t.apply(Select(1))
-        // once: before those not used, the first kept
         assertEquals(listOf("叫", "员"), t.type("kkkk").second.candidates)
-        // what 为什么排在这 says: used here once, under the code typed (U-81)
         val why = t.why(1)!!
         assertEquals(Tier.USED, why.tier)
         assertEquals(1, why.uses)
         assertEquals(Code(kind, "kkkk"), why.code)
         assertEquals("员", t.apply(Select(1)).commit)
-        // twice running over the first: first
         assertEquals(listOf("员", "叫"), t.type("kkkk").second.candidates)
         assertEquals(Tier.FIRST_HERE, t.why(0)!!.tier)
     }
 
-    // verify-int-step1a G1: 一、二级简码 stay in order under 调频 whatever is picked, and say no why (原 TBL-13)
+    // 一、二级简码 stay in order under 调频 whatever is picked, and say no why
     @Test
     fun withOrderByUseAShortCodesWordsNeverMove() {
         val short = dictionary("a 工", "a 戈", "aa 式", "aa 戒", "aaaa 工")
@@ -378,7 +358,7 @@ class TableHabitsTest {
         }
     }
 
-    // 调频 off: the table's own order stays whatever is picked (U-28)
+    // 调频 off: the table's own order stays whatever is picked
     @Test
     fun withoutOrderByUseATablesOwnWordsKeepTheirPlace() {
         val t = session(TableOptions.WUBI.copy(autoSelect = false, orderByUse = false))

@@ -22,7 +22,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A 14-key tap with where it fell, [Keyboard.tapKey] (design k14-tap-position §1.3): one character, a code and a place; pinyin's 18 keys' the same ([Keyboard.pinyin18Tap]). */
+/** A 14-key tap with where it fell, [Keyboard.tapKey]: one character, a code and a place; pinyin's 18 keys' the same ([Keyboard.pinyin18Tap]). */
 class KeyboardTapsTest {
 
     private fun recorded() = RecordedSession(PinyinSession(sessionTestData(), T9Segmenter(abbreviations = false, letters = NineKeyLetters.G14), spell = true, prediction = false))
@@ -45,8 +45,6 @@ class KeyboardTapsTest {
         assertEquals(Action.Key(g14Code('b'), at = 0.75f), session.actions.single())
     }
 
-    // 061-neighbour-18key: pinyin's 18 keys' tap, a block of its own past the 14 keys' (双拼's 18 keys send the same
-    // G18 codes as codes): the G18 code and its place back, whatever the session
     @Test
     @Uat("PY-152")
     fun aPinyinEighteenKeysTapComesBackAsItsG18CodeAndPlace() {
@@ -91,11 +89,9 @@ class KeyboardTapsTest {
             Keyboard.PINYIN_NINE, Keyboard.PINYIN_18, Keyboard.SHUANGPIN_14, Keyboard.TAPS, Keyboard.TAPS_18, Keyboard.PLACES,
             Keyboard.ZHUYIN_NINE, Keyboard.ZHUYIN_FULL,
         )
-        // no two blocks overlap, the taps included
         for ((i, a) in ranges.withIndex()) for (b in ranges.drop(i + 1)) {
             assertTrue("$a $b", a.last < b.first || a.first > b.last)
         }
-        // past the BMP: no syllable, no code
         assertTrue(Keyboard.TAPS.first > Char.MAX_VALUE.code)
         assertTrue(Character.getType(Keyboard.TAPS.last) == Character.PRIVATE_USE.toInt())
     }
@@ -105,12 +101,10 @@ class KeyboardTapsTest {
         val rows = listOf(
             Keyboard.tapKey(g14Code('b'), 0.75f) to 'n',
             Keyboard.tapKey(g14Code('b'), 0.25f) to 'b',
-            // the centre: the first letter, as the code alone
             Keyboard.tapKey(g14Code('b'), 0.5f) to 'b',
             Keyboard.tapKey(g14Code('q'), 1f) to 'w',
             g14Code('b').code to 'b',
             g14Code('u').code to 'u',
-            // a key of one letter
             Keyboard.tapKey(g14Code('l'), 0.9f) to 'l',
             // pinyin's 18 keys' taps (Keyboard.pinyin18Tap): the letter of the half tapped, as the 14 keys'
             Keyboard.pinyin18Tap(NineKeyLetters.G18.key('b'), 0.75f) to 'n',
@@ -130,8 +124,7 @@ class KeyboardTapsTest {
         }
     }
 
-    // 061-neighbour-correction: the key's payload carries where it was tapped and the keys around it, to the
-    // session with the key: a letter's, 九键's digit's (its code), a 14-key tap's with its place
+    // a letter's, 九键's digit's and a 14-key tap's touch all reach the session
     @Test
     fun aKeysTouchGoesToTheSessionWithIt() {
         val touch = TouchBoxes.tap(TouchBoxes.QWERTY, 's', dx = -0.4f)

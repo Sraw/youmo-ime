@@ -16,6 +16,7 @@ import android.view.ViewOutlineProvider
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.ViewTreeObserver.OnPreDrawListener
 import android.view.WindowInsets
+import android.view.inputmethod.CursorAnchorInfo
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.Size
@@ -61,33 +62,25 @@ class CandidatesView(
 
     private val candidatesPrefs = AppPrefs.getInstance().candidates
     private val orientation by candidatesPrefs.orientation
-    private val windowMinWidth by candidatesPrefs.windowMinWidth
-    private val windowPadding by candidatesPrefs.windowPadding
-    private val windowRadius by candidatesPrefs.windowRadius
     private val fontSize by candidatesPrefs.fontSize
-    private val itemPaddingVertical by candidatesPrefs.itemPaddingVertical
-    private val itemPaddingHorizontal by candidatesPrefs.itemPaddingHorizontal
 
     private var inputPanel = HostEvent.InputPanel.EMPTY
     private var paged = HostEvent.Paged.EMPTY
 
     override val pagedCandidates = true
 
-    /** Shift+Delete with a candidate highlighted (U-82): deleted, or what it learned forgotten. Whether one was. */
+    /** Deleted, or what it learned forgotten. Whether one was highlighted. */
     fun forgetHighlighted(): Boolean {
         val word = paged.candidates.getOrNull(paged.cursorIndex) ?: return false
         forgetCandidate(paged.cursorIndex, word.text)
         return true
     }
 
-    /**
-     * horizontal, bottom, top
-     */
+    /** horizontal, bottom, top */
     private val anchorPosition = floatArrayOf(0f, 0f, 0f)
     private val parentSize = floatArrayOf(0f, 0f)
 
-    // the cursor's place as the editor told it; false where the bottom-left corner stands in for it
-    // (updateCursorAnchor(parent)): no CursorAnchorInfo, or its cursor out of sight
+    // false where the bottom-left corner stands in: no CursorAnchorInfo, or its cursor out of sight
     private var cursorKnown = false
 
     private var shouldUpdatePosition = false
@@ -98,7 +91,7 @@ class CandidatesView(
     private var savedButtonY by internalPrefs.keyboardButtonY
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
 
-    // the lone button under a finger that moved past the slop; where the finger and button were at its down
+    // past the slop; where the finger and button were at its down
     private var dragging = false
     private val dragStart = floatArrayOf(0f, 0f, 0f, 0f)
 
@@ -128,7 +121,7 @@ class CandidatesView(
     private val receiverPlace = intArrayOf(0, 0, 0, 0)
     private var receiverShown = false
     private val placeReceiver = Runnable {
-        // no window to put it over (the IME window not up, HK-30): BadTokenException. Placed at the next draw
+        // the IME window not up: BadTokenException. Placed at the next draw
         if (!isAttachedToWindow) return@Runnable
         receiverShown = true
         touchEventReceiverWindow.showAt(receiverPlace[0], receiverPlace[1], receiverPlace[2], receiverPlace[3])
@@ -136,9 +129,7 @@ class CandidatesView(
 
     private val setupTextView: TextView.() -> Unit = {
         textSize = fontSize.toFloat()
-        val v = dp(itemPaddingVertical)
-        val h = dp(itemPaddingHorizontal)
-        setPadding(h, v, h, v)
+        setPadding(dp(4), dp(2), dp(4), dp(2))
     }
 
     private val preeditUi = PreeditUi(ctx, theme, setupTextView)
@@ -151,8 +142,7 @@ class CandidatesView(
         onNextPage = { fcitx.launchOnReady { it.offsetCandidatePage(1) } }
     )
 
-    // the touch keyboard back, as Gboard's floating button has it: an app that tells no input method
-    // of a tap in its field (Chrome) leaves no other way to it but the system's settings
+    // as Gboard's floating button: an app that tells no IME of a tap in its field (Chrome) leaves no other way
     private val keyboardButton = imageView {
         showTouchKeyboardIcon(this)
         background = borderlessRippleDrawable(theme.keyPressHighlightColor)
@@ -162,13 +152,13 @@ class CandidatesView(
         setOnTouchListener(::onButtonTouch)
     }
 
-    // its icon a theme's `touch-keyboard` too (061-toolbar-icons)
+    // a theme's `touch-keyboard` too
     private fun showTouchKeyboardIcon(v: ImageView) {
         BarIconDrawables.show(v, PackIcons.of(theme), BarIcons.TOUCH_KEYBOARD, theme.altKeyTextColor, v.dp(TOUCH_KEYBOARD_ICON_DP)) { showTouchKeyboardIcon(v) }
     }
 
     override fun onStartHandleFcitxEvent() {
-        // read together; one the host changes meanwhile has its event come after, to the collector
+        // read together; a change meanwhile has its event come after, to the collector
         val (panel, page) = fcitx.runImmediately { inputPanelCached to pagedCached }
         handleFcitxEvent(panel)
         handleFcitxEvent(page)
@@ -189,16 +179,15 @@ class CandidatesView(
     }
 
     /**
-     * The code moved into the app's field or out of it (FcitxInputMethodService.codeInFieldNow), or a commit
-     * kept: drawn anew. Only as the floating window: with the touch keyboard up it takes no events and stays
-     * GONE (updateUi shows it), else its lone button came up over the app; drawn when it takes them again
+     * Only as the floating window: with the touch keyboard up it takes no events and stays GONE, else its
+     * lone button came up over the app; drawn when it takes them again.
      */
     fun codePlaceChanged() {
         if (handleEvents) updateUi()
     }
 
     private fun updateUi() {
-        // the code in the field (编码行 输入框里, the hardware keyboard's too): the window draws none of it
+        // the code in the field: the window draws none of it
         preeditUi.update(service.forStrip(inputPanel))
         preeditUi.root.visibility = if (preeditUi.visible) VISIBLE else GONE
         candidatesUi.update(paged, orientation)
@@ -209,11 +198,9 @@ class CandidatesView(
     }
 
     /**
-     * Shown with nothing typed too, the keyboard button alone beside the cursor (updatePosition); where
-     * the editor tells no cursor, at the top right rather than the bottom-left corner that stands in for
-     * the cursor, where it would cover an app's own button and take its taps (or where the user dragged
-     * it then). Hidden is INVISIBLE, not GONE: RecyclerView won't update its items when ancestor view
-     * is GONE
+     * Shown with nothing typed too, the keyboard button alone beside the cursor. With no cursor told, at
+     * the top right, not the bottom-left stand-in, where it would cover an app's button. Hidden is
+     * INVISIBLE, not GONE: RecyclerView won't update its items when ancestor view is GONE.
      */
     private fun updateVisibility() {
         visibility = VISIBLE
@@ -228,7 +215,7 @@ class CandidatesView(
             return
         }
         if (!isAttachedToWindow) {
-            // a hardware key with the IME window not up (split screen, HK-30): placed at its first draw
+            // a hardware key with the IME window not up (split screen): placed at its first draw
             shouldUpdatePosition = true
             return
         }
@@ -249,7 +236,7 @@ class CandidatesView(
         placeAt(tX, tY, w, h)
     }
 
-    // as the candidates go: under the cursor, above it where there is more room there
+    // above it where there is more room there
     private fun underCursor(selfWidth: Float, selfHeight: Float): Pair<Float, Float> {
         val (parentWidth, parentHeight) = parentSize
         val (horizontal, bottom, top) = anchorPosition
@@ -269,10 +256,8 @@ class CandidatesView(
         return tX to tY
     }
 
-    // nothing typed: the button alone beside the cursor, on its line, after it, where it fits. Under
-    // the cursor it covered a note's next line and took its taps; in a corner, an app's own button
-    // (a chat's send); before the cursor, what was just typed. Where it does not fit, under it as
-    // the candidates go. No cursor: FloatingButtonPlacement's top right, or where it was dragged
+    // nothing typed: after the cursor on its line, where it fits. Under it, it covered a note's next line;
+    // in a corner, an app's button (a chat's send); before it, what was just typed
     private fun placeAlone(w: Int, h: Int) {
         val selfWidth = w.toFloat()
         val selfHeight = h.toFloat()
@@ -299,22 +284,18 @@ class CandidatesView(
 
     private fun area() = Area(parentSize[0], parentSize[1], topInsets.toFloat(), parentSize[1] - bottomInsets)
 
-    // translationX counts from the right edge in RTL, where the view is laid out; places, from the left
+    // translationX counts from the right edge in RTL; places, from the left
     private fun toLeft(tX: Float, w: Int) =
         FloatingButtonPlacement.toLeft(tX, w.toFloat(), parentSize[0], layoutDirection == LAYOUT_DIRECTION_RTL)
 
     private fun toTranslation(left: Float, w: Int) =
         FloatingButtonPlacement.toTranslation(left, w.toFloat(), parentSize[0], layoutDirection == LAYOUT_DIRECTION_RTL)
 
-    /**
-     * The lone button dragged: past the touch slop a finger moves it, and its tap is off. Events come
-     * through touchEventReceiverWindow, which moves along, so raw (screen) places measure the drag.
-     */
+    /** Events come through touchEventReceiverWindow, which moves along, so raw (screen) places measure the drag. */
     @SuppressLint("ClickableViewAccessibility")
     private fun onButtonTouch(v: View, e: MotionEvent): Boolean {
         val ending = e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL
-        // a drag is on only while the button is alone: updateUi (and forgetCursor, a hide, a detach)
-        // ends it as the button stops being so
+        // a drag is on only while the button is alone: updateUi ends it as that stops
         if (ending && dragging) {
             dragging = false
             dropButton()
@@ -371,8 +352,8 @@ class CandidatesView(
         translationY = tY
         // update touchEventReceiverWindow's position after CandidatesView's
         val sameSize = w == receiverPlace[2] && h == receiverPlace[3]
-        // a jump past the button's own size (a tap elsewhere in the text) is no scroll: its window
-        // left behind would take the app's taps there while taps on the button drawn went through
+        // a jump past the button's size (a tap elsewhere) is no scroll: the window left behind would take the
+        // app's taps while taps on the button went through
         val near = FloatingButtonPlacement.isScroll(
             tX.roundToInt() - receiverPlace[0], tY.roundToInt() - receiverPlace[1], w, h, sameSize
         )
@@ -381,8 +362,7 @@ class CandidatesView(
         receiverPlace[2] = w
         receiverPlace[3] = h
         removeCallbacks(placeReceiver)
-        // the button alone follows the cursor as the app scrolls, a report each frame maybe: its window,
-        // a relayout in the system's process at every move, follows once the cursor rests
+        // following a scroll: its window (a relayout in the system's process each move) follows once the cursor rests
         if (receiverShown && near && keyboardButtonAlone()) {
             postDelayed(placeReceiver, RECEIVER_SETTLE_MS)
         } else {
@@ -405,19 +385,51 @@ class CandidatesView(
         parentSize[0] = parentWidth
         parentSize[1] = parentHeight
         cursorKnown = true
-        // shown or not as the floating window: GONE, the touch keyboard's, stays so
+        // GONE, the touch keyboard's, stays so
         if (handleEvents) updateVisibility()
         updatePosition()
     }
 
-    /** A new field: no cursor known till it reports one, not the last field's. */
+    // [x, bottom, x, top] in the window, then over the screen
+    private val cursorPoints = floatArrayOf(0f, 0f, 0f, 0f)
+
+    /** To the bottom-left corner where [info] has no valid place. */
+    fun updateCursorAnchor(info: CursorAnchorInfo, @Size(2) decorLocation: FloatArray, @Size(2) parent: FloatArray) {
+        val bounds = info.getCharacterBounds(0)
+        if (bounds != null) {
+            // anchor to start of composing span instead of insertion mark if available
+            val horizontal = if (layoutDirection == View.LAYOUT_DIRECTION_RTL) bounds.right else bounds.left
+            cursorPoints[0] = horizontal
+            cursorPoints[1] = bounds.bottom
+            cursorPoints[2] = horizontal
+            cursorPoints[3] = bounds.top
+        } else {
+            cursorPoints[0] = info.insertionMarkerHorizontal
+            cursorPoints[1] = info.insertionMarkerBottom
+            cursorPoints[2] = info.insertionMarkerHorizontal
+            cursorPoints[3] = info.insertionMarkerTop
+        }
+        if (cursorPoints.any(Float::isNaN)) {
+            // anchor candidates view to bottom-left corner in case CursorAnchorInfo is invalid
+            updateCursorAnchor(parent)
+            return
+        }
+        // params of `Matrix.mapPoints` must be [x0, y0, x1, y1]
+        info.matrix.mapPoints(cursorPoints)
+        val (xOffset, yOffset) = decorLocation
+        cursorPoints[0] -= xOffset
+        cursorPoints[1] -= yOffset
+        cursorPoints[2] -= xOffset
+        cursorPoints[3] -= yOffset
+        updateCursorAnchor(cursorPoints, parent)
+    }
+
     fun forgetCursor() {
         cursorKnown = false
         dragging = false
         placement.newField()
         if (handleEvents) updateVisibility()
-        // placed anew now, not at a draw that may not come while it is shown already: an editor that
-        // never reports its cursor still gets the top right; left for the next draw if it cannot be yet
+        // now, not at a draw that may not come while shown: an editor that never reports still gets the top right
         shouldUpdatePosition = true
         updatePosition()
     }
@@ -443,12 +455,10 @@ class CandidatesView(
         // invisible by default
         visibility = INVISIBLE
 
-        minWidth = dp(windowMinWidth)
-        padding = dp(windowPadding)
+        padding = dp(4)
         background = GradientDrawable().apply {
             setColor(theme.backgroundColor)
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(windowRadius).toFloat()
         }
         clipToOutline = true
         outlineProvider = ViewOutlineProvider.BACKGROUND
@@ -510,10 +520,8 @@ class CandidatesView(
     }
 
     private companion object {
-        // the cursor at rest this long: the lone button's touch window moved to it
         const val RECEIVER_SETTLE_MS = 150L
 
-        // the keyboard button's icon: a vector's own
         const val TOUCH_KEYBOARD_ICON_DP = 24
     }
 }

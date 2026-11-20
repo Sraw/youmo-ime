@@ -15,7 +15,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 语音先问再记's following of voice's text (061-voice-learn-from-edits.md §2–§3). */
+/** 语音先问再记's following of voice's text. */
 class VoiceEditsTest {
 
     private class Words : VoiceEdits.Words {
@@ -38,8 +38,7 @@ class VoiceEditsTest {
         }
     }
 
-    // the characters' readings, and what [set] sets: a row that sets the user's words has its own (R26 F8147: rows set
-    // and reset one shared, and a row failed before its reset left them set for the rows after it)
+    // the characters' readings, and what [set] sets; each row its own, so a failed row leaves no state behind
     private fun words(set: Words.() -> Unit = {}) = Words().apply {
         for ((c, readings) in listOf(
             '我' to listOf("wo" to 3), '找' to listOf("zhao" to 3), '了' to listOf("le" to 0, "liao" to 3),
@@ -56,8 +55,7 @@ class VoiceEditsTest {
     private val traditional = mapOf('靜' to '静', '許' to '许')
     private fun edits(words: Words = this.words) = VoiceEdits(words) { s -> s.map { traditional[it] ?: it }.joinToString("") }
 
-    // voice's [said] in an empty field, its last [n] deleted by Backspace, [typed] typed into the gap by pinyin:
-    // what is asked once the field reads as followed
+    // voice's [said] in an empty field, its last [n] backspaced, [typed] by pinyin: what is asked once followed
     private fun VoiceEdits.retype(said: String, n: Int, typed: String, after: String = ""): VoiceEdits.Ask? {
         said(said, said)
         repeat(n) { backspace() }
@@ -356,13 +354,13 @@ class VoiceEditsTest {
         "an emoji at the cursor: its Backspace waits, the next one ends the window" to {
             val e = edits()
             e.said("我找徐静😀", "我找徐静😀")
-            // the steps of one scenario, in order: each needs the one before (R26 F8499)
+            // the steps of one scenario, in order: each needs the one before
             e.backspace()
             assertTrue("still open, waiting", e.open)
             e.backspace()
             assertFalse("the next Backspace, not knowing where it is: over", e.open)
         },
-        // R26 F8293: any emoji in the window made every Backspace end it
+        // any emoji in the window made every Backspace end it
         "an emoji elsewhere in the window: a Backspace over Chinese is counted" to {
             val w = edits()
             w.said("😀我找徐静", "😀我找徐静")
@@ -370,7 +368,7 @@ class VoiceEditsTest {
             w.committed("徐婧", typed = true)
             assertEquals("徐静", w.putIn("徐婧").ask?.heard)
         },
-        // R26 F8439: the unit a Backspace takes at a gap is the one before the gap, not the cursor's
+        // the unit a Backspace takes at a gap is the one before the gap, not the cursor's
         "an emoji before a gap: its Backspace waits, the next one ends the window" to {
             val g = edits()
             g.said("我😀找", "我😀找")

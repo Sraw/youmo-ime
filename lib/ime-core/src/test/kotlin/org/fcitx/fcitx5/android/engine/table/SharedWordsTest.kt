@@ -28,14 +28,11 @@ class SharedWordsTest {
         override fun forget(text: String) {
             forgotten += text
         }
-        // the user's words: learned, till forgotten
         override fun learned(text: String) = text in words && text !in forgotten
     }
 
     @Test
     fun theUsersWordsAreCodedByTheRulesNoneTheTableHasSo() {
-        // 你好 the table's own; 我们 trwu, listed twice, coded once; 们 a character; 好你 vbwq; x has
-        // no code
         val coded = CodedWords(wubi, listOf("你好", "我们", "们", "好你", "我们", "x你"))
         assertEquals(listOf("trwu" to "我们"), coded.words("tr"))
         assertEquals(listOf("vbwq" to "好你"), coded.words("vbw"))
@@ -47,9 +44,8 @@ class SharedWordsTest {
     @Test
     fun sharedWordsComeAfterTheTablesOwnAndBlockedOnesUnderTheCodeBlockedThere() {
         val shared = Fake(wubi, listOf("你门", "你们"))
-        // nothing commits itself: wqwu's one entry would, and no word from outside the table takes its place (D8)
+        // nothing commits itself: wqwu's one entry would, and no word from outside the table takes its place
         val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), shared = shared, language = learning())
-        // 你门 is wqwu as 你们 is: the table's first
         assertEquals(listOf("你们", "你门"), session.type("wqwu").second.candidates)
         assertEquals(setOf(Offer.FORGET, Offer.PIN, Offer.BLOCK), session.offers(1))
         assertEquals(listOf("你们"), session.apply(Block(1)).candidates)
@@ -57,7 +53,6 @@ class SharedWordsTest {
         assertEquals(emptyList<String>(), shared.forgotten)
         session.apply(Action.Backspace)
         assertEquals(listOf("你们", "你门"), session.candidates(0, 2).map { it.text })
-        // kept in the learning record, not in the code typed then
         session.apply(Action.Reset)
         assertEquals(listOf("你们"), session.type("wqwu").second.candidates)
     }
@@ -67,11 +62,10 @@ class SharedWordsTest {
         val shared = Fake(wubi, listOf("你门"))
         val session = TableSession(wubi, TableOptions.WUBI.copy(autoSelect = false), shared = shared, language = learning())
         session.type("wqwu")
-        // the table's own, nothing learned of it: nothing to forget (U-28)
         assertFalse(Offer.FORGET in session.offers(0))
         session.apply(Forget(0))
         assertEquals(emptyList<String>(), shared.forgotten)
-        // picked, the table ordering by use: what every input method learned of it forgotten by all (U-84)
+        // picked, the table ordering by use: what every input method learned of it forgotten by all
         session.apply(Action.Select(0))
         session.type("wqwu")
         assertTrue(Offer.FORGET in session.offers(0))
@@ -87,7 +81,6 @@ class SharedWordsTest {
         val texts = List(CodedWords.STOP_CHECK) { "x你" } + "我们"
         assertEquals(1, CodedWords(wubi, texts).size)
         assertEquals(1, CodedWords(wubi, texts) { true }.size)
-        // wanted at the first check, not at the one before the word
         var checks = 0
         assertEquals(0, CodedWords(wubi, texts) { checks++ == 0 }.size)
         assertEquals(0, CodedWords(wubi, listOf("我们")) { false }.size)

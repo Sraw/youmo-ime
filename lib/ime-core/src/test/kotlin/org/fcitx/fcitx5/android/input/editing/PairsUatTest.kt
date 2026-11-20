@@ -9,10 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * uat/02-keyboard.md's brackets: what the service does with the long-pressed bracket (the pairs
- * first, else committed) and with ⌫ (the pair's first, then the deletion), on a FakeEditor.
- */
+/** The UAT's brackets on a FakeEditor: a long-pressed bracket (the pair, else committed) and ⌫ (the pair's first, then deletion). */
 class PairsUatTest {
 
     private val editor = FakeEditor("", 0)

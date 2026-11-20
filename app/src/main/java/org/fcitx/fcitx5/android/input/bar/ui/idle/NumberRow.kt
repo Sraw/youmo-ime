@@ -7,12 +7,9 @@ package org.fcitx.fcitx5.android.input.bar.ui.idle
 import android.annotation.SuppressLint
 import android.content.Context
 import android.view.MotionEvent
-import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.KeyAction
-import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.scene.engine.Env
@@ -23,11 +20,11 @@ import timber.log.Timber
 import kotlin.math.abs
 
 @SuppressLint("ViewConstructor")
-class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
+class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme) {
 
     private var gestureStartEvent: MotionEvent? = null
 
-    // a swipe this far collapses the row: read once, not at each move (the bar height is a preference)
+    // read once, not at each move (the bar height is a preference)
     private val collapseDistance = dp(KawaiiBarComponent.heightDp(ctx))
 
     var onCollapseListener: (() -> Unit)? = null
@@ -54,8 +51,7 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
         gestureStartEvent = null
     }
 
-    // the keys drawn by the scene take every touch here (BaseKeyboard routes them to the scene's keys,
-    // SceneTouch): the swipe that collapses the row is told apart first, before the keys see the move,
+    // the scene's keys take every touch here: the collapsing swipe is told apart before the keys see the move,
     // and the key under the finger let go of (a cancel: nothing typed)
     private var collapsing = false
 
@@ -69,7 +65,6 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
             }
             MotionEvent.ACTION_MOVE -> if (!collapsing && checkGesture(event)) {
                 collapsing = true
-                // the keys' touch ends as the system's cancel ends a view's
                 val cancel = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
                 super.onTouchEvent(cancel)
                 cancel.recycle()
@@ -88,14 +83,12 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
                 if (was) return true
             }
         }
-        // the swipe taken: the rest of its touch is the row's
         return if (collapsing) true else super.onTouchEvent(event)
     }
 
-    // laid on the bar, no keyboard's fill under the digits
     override val sceneDrawsBase: Boolean get() = false
 
-    // no marks: the row's keys reach no shortcut; a bar's, not resized with a floating keyboard (only wider)
+    // a bar's, not resized with a floating keyboard
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
         SceneEnvs.of(this, look, theme.isDark, width, height, Input(), marks = SceneEnvs.NO_MARKS, resized = false)
 
@@ -105,24 +98,6 @@ class NumberRow(ctx: Context, theme: Theme) : BaseKeyboard(ctx, theme, Layout) {
     }
 
     companion object {
-        /** The row's layout, drawn by the scene (060-render-p2 S6). */
         const val LAYOUT = "number-row"
-
-        val Layout = listOf(
-            listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0").map { digit ->
-                KeyDef(
-                    KeyDef.Appearance.Text(
-                        displayText = digit,
-                        textSize = 21f,
-                        border = KeyDef.Appearance.Border.Off,
-                        margin = false
-                    ),
-                    setOf(
-                        KeyDef.Behavior.Press(KeyAction.SymAction(KeySym(digit.codePointAt(0))))
-                    ),
-                    arrayOf(KeyDef.Popup.Preview(digit))
-                )
-            }
-        )
     }
 }

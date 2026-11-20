@@ -32,7 +32,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowPopupMenu
 
-/** UAT cases of the notices, the docked keyboard's handle and the floating one (uat/19). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -60,7 +59,6 @@ class MotionNoticeUatTest {
         h.tap(h.described(s(R.string.status_area)))
     }
 
-    // a status area entry, by its title
     private fun entry(title: String): View {
         val t = KeyboardHarness.all(h.inputView).firstOrNull { h.shown(it) && it is TextView && it.text.toString() == title }
             ?: error("no $title in ${h.texts(h.inputView)}")
@@ -70,7 +68,6 @@ class MotionNoticeUatTest {
     private val screenW get() = h.service.resources.displayMetrics.widthPixels
     private val screenH get() = h.service.resources.displayMetrics.heightPixels
 
-    // the keys' area: the keyboard's own box, whatever it floats in
     private fun keys() = h.box(h.board)
 
     private fun grip(): View? = KeyboardHarness.find<FloatingHandle>(h.inputView)?.takeIf { h.shown(it) }
@@ -86,7 +83,6 @@ class MotionNoticeUatTest {
         assertEquals(listOf(s(R.string.learning_habits_off_said)), h.noticeTexts().filter { it.isNotEmpty() })
         if (h.notice() == null) statusArea()
         h.tap(entry(s(R.string.learning_habits_on)))
-        // the same window, its words replaced: one notice on the screen
         assertSame(first, h.notice())
         assertTrue(first!!.isShowing)
         assertEquals(listOf(s(R.string.learning_habits_on_said)), h.noticeTexts().filter { it.isNotEmpty() })
@@ -104,7 +100,6 @@ class MotionNoticeUatTest {
         h.service.say(R.string.text_copied)
         h.idle()
         val chip = h.noticeBox()
-        // below the whole of it, its handle too
         val bottom = maxOf(kb.bottom, h.box(grip()!!).bottom)
         assertTrue("notice $chip, keyboard $kb to $bottom", chip.top >= bottom - 4)
         assertTrue("$chip", chip.bottom <= screenH)
@@ -149,15 +144,13 @@ class MotionNoticeUatTest {
         h.copied("公园")
         h.clipboard("公园")
         deleteByMenu("公园")
-        // marked on Room's thread, then said; the list drops it after (Paging's load anew): else "back" below passes on
-        // the list as it was, the undo not yet in, and the close's clearing may run before it and leave 公园 to the next
+        // marked on Room's thread, then said; the list drops it after: else "back" below passes on the list as it was, and
+        // the close's clearing may run before it and leave 公园 to the next
         h.waitFor("the notice") { h.notice() != null }
         h.waitFor("公园 gone") { h.entry("公园") == null }
         val said = h.noticeTexts()
         assertTrue(said.toString(), s(R.string.undo) in said && h.service.resources.getString(R.string.num_items_deleted, 1) in said)
-        // over the keys, where every notice is, not a bar at the bottom
         assertTrue("${h.noticeBox()}", h.noticeBox().bottom <= h.box(h.board).top + 4)
-        // 撤销 on the notice's own colour: no patch of another behind it
         val popup = h.notice()!!
         val undo = KeyboardHarness.all(popup.contentView).filterIsInstance<TextView>().last { it.text.toString() == s(R.string.undo) }
         assertTrue(undo.background == null || undo.background !is android.graphics.drawable.ColorDrawable)
@@ -180,10 +173,8 @@ class MotionNoticeUatTest {
             ThemeManager.setNormalModeTheme(TestThemes.PixelDark)
             deleteAndUndo("dark")
         } finally {
-            // the rest of the test in the light one
             ThemeManager.setNormalModeTheme(TestThemes.PixelLight)
         }
-        // deletes while it shows add up: a swipe, then a long press, one 撤销 for both
         h.start()
         h.copied("公园")
         h.copied("散步")
@@ -212,7 +203,6 @@ class MotionNoticeUatTest {
         val g = grip()!!
         assertEquals(plain, h.key("q").height)
         assertTrue("${h.box(g)} ${keys()}", h.box(g).centerY() > keys().bottom - 10)
-        // nothing at its right end: no dock button docked
         assertFalse(KeyboardHarness.all(g).any { it.contentDescription == s(R.string.floating_keyboard_dock) })
         h.capture("MotionNoticeUatTest/handle_bottom")
         prefs.set(ThemeManager.prefs.floatingHandle, FloatingHandleSide.Top)
@@ -238,7 +228,6 @@ class MotionNoticeUatTest {
         assertTrue("${keys()}", floating())
         val there = keys()
         assertTrue("$there", there.top < screenH * 0.65)
-        // dragged to the bottom: docked again, the handle still there
         val fg = grip()!!
         h.drag(fg, h.box(fg).exactCenterX(), screenH - 2f)
         h.after(500)

@@ -91,8 +91,7 @@ class UndoChipPlacementTest {
         "a tie is up and down" to {
             assertEquals(Slide.Up, floating(landscape, Box(700, 250, 1700, 750)).slide)
         },
-        // a hair left of the middle (0.07 of half the width) and dead centre up and down, so the side
-        // wins; but the 300 wide chip fits neither in the 80 to its right nor anything to its left
+        // a hair left of the middle, centred up and down, so the side wins; but the 300 wide chip fits neither side
         "no room on the side toward the middle tries the other axis" to {
             assertEquals(Place(350, 140, Slide.Up), floating(Box(0, 0, 1080, 1000), Box(0, 250, 1000, 750)))
         },

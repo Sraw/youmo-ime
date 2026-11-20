@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.Learner
@@ -18,10 +19,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 双拼's 简拼 in the middle on the 18, 14 and nine keys (自然码, 061-sp-abbrev §3.1): a key read alone where it and the
- * next make a syllable reads the words the user typed, as on 26 keys, placed as there (§3.3).
- */
+/** 双拼's 简拼 in the middle on the 18, 14 and nine keys reads the user's typed words, as on 26 keys. */
 class PinyinSessionAbbrevGroupedTest {
 
     private val data = pinyinDataOf(
@@ -58,7 +56,6 @@ class PinyinSessionAbbrevGroupedTest {
         for (letters in keyboards) {
             val learner = Learner(data)
             val s = session(letters, learner)
-            // never typed: not by its initials
             assertTrue("$letters", "什么时候" !in s.shown("ufmuh", letters))
             s.pick("ufmeuihb", letters, "什么时候")
             // uf, then m, u, h alone: no whole syllables to the end, so first
@@ -70,7 +67,6 @@ class PinyinSessionAbbrevGroupedTest {
         }
     }
 
-    // habits off the session has no word typed (SessionFactory): no key is read alone
     @Test
     @Uat("SP-46")
     fun withNoHabitsAKeyIsNotReadAlone() {
@@ -80,7 +76,7 @@ class PinyinSessionAbbrevGroupedTest {
         }
     }
 
-    // the nine keys' 1 is the separator: x then m begun reads the whole dictionary, the word typed first (§3.1)
+    // the nine keys' 1 is the separator: x then m begun reads the whole dictionary, the word typed first
     @Test
     @Uat("SP-58")
     fun theNineKeysOneKeyReadsAsTheSeparator() {

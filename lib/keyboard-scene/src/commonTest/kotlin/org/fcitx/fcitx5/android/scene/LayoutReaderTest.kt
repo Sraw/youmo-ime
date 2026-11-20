@@ -24,7 +24,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// layout-1.xsd as the engine reads it; what the XSD cannot say checked on reading (060-render-xsd README)
 class LayoutReaderTest {
     private val ns = LayoutReader.NAMESPACE
 
@@ -45,14 +44,11 @@ class LayoutReaderTest {
         assertEquals(listOf(RowSplit.Halves, RowSplit.Halves, RowSplit.Halves, RowSplit.Scale), rows.map { it.split })
         val q = rows[0].cells.first() as Key
         assertEquals(Text.Binding("case", "q"), q.attrs.label)
-        // its corner, swipe and long press by its name (060-keys-unify S6): none written
         assertNull(q.attrs.alt)
-        // a table's roots over the letter where it shows them
         assertEquals(Text.Binding("root", "q"), q.variants.single().attrs.label)
         assertEquals("q", q.attrs.actions["send"])
         assertNull(q.attrs.actions["swipe-up"])
         assertEquals("full/q", q.attrs.shortcut)
-        // a theme's own layout still writes them: its keys' defaults (C3)
         val theirs = LayoutReader.layout(board("<row><key id=\"q\" label=\"q\" alt=\"{alt:q}\" swipe-up=\"1\" shortcut=\"q\"/></row>")).ok().parts.filterIsInstance<Row>().single().cells.single() as Key
         assertEquals(Text.Binding("alt", "q"), theirs.attrs.alt)
         assertEquals("1", theirs.attrs.actions["swipe-up"])
@@ -64,7 +60,6 @@ class LayoutReaderTest {
         assertEquals(true, semicolon.attrs.splitAfter)
         assertEquals(false, semicolon.attrs.mark)
         val enter = rows[3].cells.first { it.id == "enter" } as Key
-        // the page shown last, as ReturnKey's menu opens it (picker: with no name)
         assertEquals("picker:", enter.menu.single().action)
         val domain = rows[3].cells.first { it.id == "domain" } as Key
         assertEquals(listOf(".com", ".cn", ".net", ".org"), domain.popup?.items?.map { it.first })
@@ -116,33 +111,27 @@ class LayoutReaderTest {
         assertNull(LayoutReader.action("launch:rockets"))
         val p = problems(board("<row><key id=\"a\" label=\"a\" send=\"launch:rockets\"/></row>"))
         assertTrue(p.single().contains("send="), "$p")
-        // review L-2: one character, `:` too, is a key the input method is sent (HostKeyAction)
         assertEquals(":", LayoutReader.action(":"))
         assertNull(LayoutReader.action("::"))
-        // the placeholders P2 settles, each by name: no action:anything
         assertEquals("action:tone-5", LayoutReader.action("action:tone-5"))
         assertEquals("action:zhuyin-slot", LayoutReader.action("action:zhuyin-slot"))
         assertNull(LayoutReader.action("action:tone"))
         assertNull(LayoutReader.action("action:tone-6"))
         assertNull(LayoutReader.action("action:anything"))
-        // a group's code is its letters=, no action (060-render-v2 §15)
         assertNull(LayoutReader.action("action:group"))
-        // code: a Unicode scalar value, U+10FFFF at most and no surrogate (review S4a)
         for (ok in listOf("code:U+0000", "code:U+D7FF", "code:U+E000", "code:U+10FFFF")) assertEquals(ok, LayoutReader.action(ok))
         for (bad in listOf("code:U+110000", "code:U+FFFFFF", "code:U+D800", "code:U+DBFF", "code:U+DC00", "code:U+DFFF", "code:U+12", "code:U+d800")) {
             assertNull(LayoutReader.action(bad), bad)
         }
         assertEquals(0x10FFFF, LayoutReader.codePoint("code:U+10FFFF"))
         assertNull(LayoutReader.codePoint("code:U+DFFF"))
-        // a layout named; emoji search on or off and nothing else
         assertNull(LayoutReader.action("layout:"))
         assertEquals("emoji-search:off", LayoutReader.action("emoji-search:off"))
         assertNull(LayoutReader.action("emoji-search:maybe"))
         assertNull(LayoutReader.action("emoji-search:"))
     }
 
-    // 0.6.0's handwriting keyboard's 注 (role and action `reading`), gone with it: a layout written for it still reads,
-    // warned of, the key doing nothing of it (061-handwriting-toolbar §7)
+    // 0.6.0's handwriting keyboard's 注: a layout written for it still reads, warned of, the key doing nothing of it
     @Test
     fun theHandwritingKeyboardsReadingKeyIsWarnedOfAndRead() {
         val l = LayoutReader.layout(
@@ -155,21 +144,16 @@ class LayoutReaderTest {
         assertEquals(emptyList(), l.problems().map { it.toString() })
         assertEquals(5, l.warnings().size, "${l.warnings()}")
         assertTrue(l.warnings().all { "注 is gone" in it.message }, "${l.warnings()}")
-        // a menu of its 注 items alone (0.6.0's handwriting.xml has one): no menu, each item warned of, still read (R26 F8209)
         val only = LayoutReader.layout(
             board("<row><key id=\"a\" label=\"注\"><menu><item label=\"y\" do=\"reading:tone\"/><item label=\"z\" do=\"reading:style\"/></menu></key></row>"),
         )
         assertEquals(emptyList(), only.problems().map { it.toString() })
         assertEquals(2, only.warnings().size, "${only.warnings()}")
         assertEquals(emptyList(), (only.ok().parts.filterIsInstance<Row>().single().cells.single() as Key).menu)
-        // a menu of no items at all still a problem
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><menu></menu></key></row>")).isNotEmpty())
-        // what is not 0.6.0's still a problem: a role of reading: has no such style
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" role=\"reading:tone\"/></row>")).isNotEmpty())
     }
 
-    // a key's preview= (060-render-p2 S4d: 注音九键's tones and ? ! ~ on, its slot off) read with its actions,
-    // on or off and nothing else
     @Test
     fun aKeysPreviewIsOnOrOff() {
         val nine = Forms.layout("zhuyin-nine").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>().associateBy { it.id }
@@ -181,16 +165,13 @@ class LayoutReaderTest {
         assertTrue(p.single().contains("preview"), "$p")
     }
 
-    // 060-render-v2 §15: a key's letters as one group, the key's own (no variant's, no default's), row
-    // by row as they sit on the key; a tap leaning to where it fell unless lean="off"
+    // a key's letters as one group, the key's own (no variant's, no default's), row by row as they sit on the key
     @Test
     fun aGroupKeysLettersAreItsOwn() {
         val k18 = Forms.layout("k18").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
         assertEquals(Letters(listOf("we")), k18.single { it.id == "r1c2" }.letters)
-        // L; whatever its face shows (pinyin's L): the group the engine reads its code by
         assertEquals("l;", k18.single { it.id == "r2c6" }.letters?.group)
         assertNull(k18.single { it.id == "apostrophe" }.letters)
-        // the 18 keys' lean too since 061-neighbour-18key (they had lean="off"), as the 14 keys' two letters a row
         assertEquals(listOf("we", "rt", "io", "sd", "fg", "jk", "l;", "xc", "bn"), k18.filter { it.leans }.map { it.letters!!.group })
         val k14 = Forms.layout("k14").parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Key>()
         assertEquals(Letters(listOf("as")), k14.single { it.id == "r2c1" }.letters)
@@ -210,15 +191,13 @@ class LayoutReaderTest {
             val p = problems(board("<row><key id=\"g\" label=\"x\" letters=\"$twice\"/></row>"))
             assertTrue(p.single().contains("twice"), "$p")
         }
-        // lean= is on or off, a group key's alone
         assertTrue(problems(board("<row><key id=\"g\" label=\"x\" letters=\"ab\" lean=\"no\"/></row>")).single().contains("lean="))
         assertTrue(problems(board("<row><key id=\"g\" label=\"x\" lean=\"off\"/></row>")).single().contains("lean="))
-        // a variant's or the defaults' letters= is none of theirs
         assertTrue(problems(board("<row><key id=\"g\" label=\"x\" letters=\"a\"><variant when=\"ime=pinyin\" letters=\"b\"/></key></row>")).isNotEmpty())
         assertTrue(problems(board("<defaults letters=\"a\"/><row><key id=\"g\" label=\"x\"/></row>")).isNotEmpty())
     }
 
-    // review L-7: a board split in halves has no one side; asking which is refused until it means something
+    // a board split in halves has no one side; asking which is refused until it means something
     @Test
     fun splitSideIsRefusedOnABoardSplitInHalves() {
         val asks = "<row><key id=\"a\" label=\"a\" send=\"commit:a\" when=\"split-side=left\"/></row>"
@@ -261,17 +240,14 @@ class LayoutReaderTest {
 
     @Test
     fun anIdTwiceIsFineWhereEachHasACondition() {
-        // the number pad's `-`: at one place or another as the pad is; the engine checks those shown (Expand)
         val ok = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\" when=\"pad=phone\"/></row>")
         assertEquals(emptyList(), problems(ok))
         val half = board("<row><key id=\"a\" label=\"a\" when=\"pad=signed\"/></row>\n<row><key id=\"a\" label=\"b\"/></row>")
         assertTrue(problems(half).single().contains("used twice"))
-        // a row's when= makes its keys as conditional: a number board's rows of one pad and another's
         val rows = board("<row when=\"pad=signed\"><key id=\"a\" label=\"a\"/></row>\n<row when=\"pad=phone\"><key id=\"a\" label=\"b\"/></row>")
         assertEquals(emptyList(), problems(rows))
     }
 
-    // a layout of its own's (0.6.1, 061-custom-layout §2.2): <meta> first, based-on=, a number board's pads=
     @Test
     fun aLayoutOfItsOwnSaysWhoMadeItWhatItIsBasedOnAndItsPads() {
         val row = "<row><key id=\"a\" label=\"a\"/></row>"
@@ -283,14 +259,12 @@ class LayoutReaderTest {
         assertEquals(1, l.parts.size, "<meta> is no part")
         assertNull(Fixtures.qwerty.meta)
         assertNull(Fixtures.qwerty.basedOn)
-        // <meta> once and first, <defaults> then after it; its texts 1–64, min-app a version
         assertTrue(problems(board("$row\n$meta")).single().contains("<meta> must come first"))
         assertTrue(problems(board("$meta\n$meta\n$row")).single().contains("twice"))
         assertTrue(problems(board("<meta min-app=\"next\"/>\n$row")).single().contains("min-app"))
         assertTrue(problems(board("<meta author=\"${"x".repeat(65)}\"/>\n$row")).single().contains("author"))
         assertTrue(problems(board("<meta><x/></meta>\n$row")).single().contains("not allowed"))
         assertTrue(problems(board(row, " based-on=\"Qwerty\"")).single().contains("based-on"))
-        // pads=: a number board's, the pads NumberPad opens, each once
         val number = { pads: String -> board(row, " pads=\"$pads\"").replace("family=\"symbols\"", "family=\"number\"") }
         assertEquals(listOf("full", "decimal"), LayoutReader.layout(number("full decimal")).ok().pads)
         assertTrue(problems(number("full abacus")).single().contains("abacus"))
@@ -323,7 +297,6 @@ class LayoutReaderTest {
     fun popupsAreChecked() {
         assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\"><popup from=\"nine\"/></key></row>")))
         assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"a\"><popup preset=\"q\" symbols-from=\"2\"/></key></row>")))
-        // a preset names a key; options are of their kind; items only for a list
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup preset=\"a b\"/></key></row>")).isNotEmpty())
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup from=\"none\" preset=\"q\"/></key></row>")).isNotEmpty())
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\"><popup symbols-from=\"many\"/></key></row>")).isNotEmpty())
@@ -334,7 +307,7 @@ class LayoutReaderTest {
     @Test
     fun badBindingsAndNumbersAreProblems() {
         assertTrue(problems(board("<row><key id=\"a\" icon=\"x\" a11y=\"{nonsense}\"/></row>")).isNotEmpty())
-        // a number the JVM and JS would read differently is not one (M3)
+        // a number the JVM and JS would read differently is not one
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" width=\"1e1\"/></row>")).isNotEmpty())
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" width=\"0x10\"/></row>")).isNotEmpty())
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" width=\" 2\"/></row>")).isNotEmpty())
@@ -342,9 +315,8 @@ class LayoutReaderTest {
         assertTrue(problems(board("<row><key id=\"a\" label=\"a\" rows=\"+2\"/></row>")).isNotEmpty())
         assertEquals(Text.Binding("punct", "，"), LayoutReader.text("{punct:，}"))
         assertNull(LayoutReader.text("{punct: }"))
-        // a run of marks a face's alone (九键 1's ,.?!); a corner and what is said one, as the betas' readers took it
         assertEquals(emptyList(), problems(board("<row><key id=\"a\" label=\"{punct:,.?!}\"/></row>")))
-        // marks of the basic plane alone, so the JVM and the theme maker's JS count a run alike
+        // basic plane alone, so the JVM and the theme maker's JS count a run alike
         assertTrue(problems(board("<row><key id=\"a\" label=\"{punct:\uD83D\uDE00}\"/></row>")).isNotEmpty())
         for (attr in listOf("alt", "a11y")) {
             assertTrue(problems(board("<row><key id=\"a\" label=\"a\" $attr=\"{punct:,.}\"/></row>")).isNotEmpty(), attr)
@@ -352,8 +324,7 @@ class LayoutReaderTest {
         }
     }
 
-    // L8: {group:} takes one or two letters; a group of three or more (17 键's HJK) is written out, letters= its letters,
-    // as the layout maker writes it (layout-edit.js groupLabel)
+    // {group:} takes one or two letters; three or more are written out, letters= its letters (layout-edit.js groupLabel)
     @Test
     fun aGroupBindingIsOfOneOrTwoLettersAndLongerGroupsAreWrittenOut() {
         assertEquals(Text.Binding("group", "qw"), LayoutReader.text("{group:qw}"))
@@ -368,17 +339,14 @@ class LayoutReaderTest {
 
     @Test
     fun aComposedKeyWrittenWithNoNameIsNamedAsTheAppsAre() {
-        // a theme pack's nine keys and 注音九键 of before 060-keys-unify: no shortcut=, named by their place (060-s6-review M3)
         fun names(family: String, rows: String) = LayoutReader.layout("<keyboard xmlns=\"$ns\" id=\"t\" name=\"t\" family=\"$family\" columns=\"10\">$rows</keyboard>")
             .ok().parts.filterIsInstance<Row>().flatMap { r -> r.cells.filterIsInstance<Key>().map { it.attrs.shortcut } }
         val nine = "<row><key id=\"1\" label=\"1\"><popup from=\"nine\"/></key><key id=\"2\" label=\"ABC\" shortcut=\"t9/9\"><popup from=\"nine\"/></key>" +
             "<key id=\"x\" label=\"x\"><popup from=\"nine\"/></key><key id=\"3\" label=\"3\"/></row>"
         assertEquals(listOf("t9/1", "t9/9", null, null), names("nine", nine))
-        // not the nine keys' family: as written
         assertEquals(listOf(null, "t9/9", null, null), names("symbols", nine))
         val groups = "<row><key id=\"a\" label=\"ㄅㄉㄚ\"><popup from=\"group\"/></key><key id=\"b\" label=\"ㄍ\" shortcut=\"zy9/7\"><popup from=\"group\"/></key>" +
             "<key id=\"c\" label=\"ㄓ\"><popup from=\"group\"/></key></row>"
-        // counted in order, a named one too
         assertEquals(listOf("zy9/1", "zy9/7", "zy9/3"), names("zhuyin-nine", groups))
         // a name another key wrote is not given twice (two keys would share one list): left unnamed, warned
         val taken = "<row><key id=\"a\" label=\"ㄅㄉㄚ\" shortcut=\"zy9/2\"><popup from=\"group\"/></key><key id=\"b\" label=\"ㄍ\"><popup from=\"group\"/></key>" +

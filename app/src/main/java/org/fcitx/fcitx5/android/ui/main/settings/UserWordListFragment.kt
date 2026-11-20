@@ -86,20 +86,7 @@ import timber.log.Timber
 import java.io.IOException
 import kotlin.math.roundToInt
 
-/**
- * One list of the user dictionary ([UserWord.Kind]): searched as the user types, a word acted on
- * by a tap, several deleted at once after a long press. A list may run to thousands: a
- * [RecyclerView] makes views for the rows on screen only, and the search runs off the main
- * thread, the list shown whole again rather than diffed, as a search changes most of it.
- *
- * With [SettingsRoute.UserWordList.english], the English words the user typed instead (the
- * English page's list): no pinyin, a word added as typed twice, forgotten as a learned one is.
- * What differs between the lists is the [WordSource] the route picks, once.
- *
- * A list whose words are dated (U-80: the learning record says when each was last used) may be
- * shown latest learned first, or only the words not used for long ([LexiconView]), to clear
- * them out together.
- */
+/** Thousands of rows: a search shows the list whole again rather than diffing (a search changes most of it). */
 class UserWordListFragment : Fragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
@@ -109,15 +96,13 @@ class UserWordListFragment : Fragment() {
         if (args.english) EnglishWords else PinyinWords(UserWord.Kind.valueOf(args.kind))
     }
 
-    // the blocked words' rows to the predictions turned off and to the tables' blocks under a code
     private var noPredict: TextView? = null
     private var tableBlocks: TextView? = null
 
     private var all = emptyList<UserWord>()
-    // 生僻字屏蔽 (§5.4): what it holds back, for the rows and the add dialog to say; none for the lists not marked
     private var rare = CharGate.NONE
     private val marksRare get() = (source as? PinyinWords)?.kind?.let { it != UserWord.Kind.BLOCKED } == true
-    // D8: a word's 「五笔：与 X 同码」 lines, for each table that cannot take it
+    // a word's 「五笔：与 X 同码」 lines, per table that cannot take it
     private var sameCode = emptyMap<String, String>()
     private var shown = emptyList<UserWord>()
     private var query = ""
@@ -155,8 +140,6 @@ class UserWordListFragment : Fragment() {
             setPaddingDp(20, 4, 20, 8)
             setTextColor(ctx.styledColor(android.R.attr.textColorSecondary))
         }
-        // U-72 「屏蔽的词里一并列出」: the predictions turned off, a page of their own, reached from here
-        // (review-E-ui S4); as the words a table blocks under a code (U-28), where there are any
         if (!args.english && args.kind == UserWord.Kind.BLOCKED.name) {
             noPredict = entryRow(ctx, LearningOp.Listed.NO_PREDICT)
             tableBlocks = entryRow(ctx, LearningOp.Listed.TABLE_BLOCKS).apply { visibility = View.GONE }
@@ -193,7 +176,6 @@ class UserWordListFragment : Fragment() {
         }
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-            // the last rows clear of the button, which clears the navigation bar
             recycler.bottomPadding = bottom + if (fab != null) ctx.dp(88) else 0
             fab?.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = bottom + ctx.dp(16) }
             insets
@@ -249,7 +231,7 @@ class UserWordListFragment : Fragment() {
         setOnClickListener { navigateWithAnim(SettingsRoute.LearnedItems(what.name)) }
     }
 
-    // counted again each time the page shows: back from that page, some may be predicted or shown again
+    // each time the page shows: back from that page, some may be predicted or shown again
     private fun countEntryRows() {
         val row = noPredict ?: return
         lifecycleScope.launch {
@@ -267,7 +249,7 @@ class UserWordListFragment : Fragment() {
     private fun load() {
         lifecycleScope.launch {
             all = onFcitx("Reading user words failed") { source.words(this) }.getOrElse { return@launch }
-            // a file read and parsed: off the main thread (runOnReady runs on the caller's)
+            // off the main thread (runOnReady runs on the caller's)
             if (marksRare) rare = withContext(Dispatchers.IO) { RareCharsManager.gate() }
             // by word and reading: a learned word's count may have changed since it was picked
             val picked = selected.mapTo(HashSet()) { it.text to it.pinyin }
@@ -279,7 +261,7 @@ class UserWordListFragment : Fragment() {
         }
     }
 
-    // the user's own words only (added, learned): a blocked word is offered nowhere anyway
+    // the user's own words only: a blocked word is offered nowhere anyway
     private suspend fun loadSameCodes() {
         if (args.english || args.kind == UserWord.Kind.BLOCKED.name) return
         val texts = all.map { it.text }
@@ -296,7 +278,6 @@ class UserWordListFragment : Fragment() {
         adapter.notifyDataSetChanged()
     }
 
-    // an item of the menu ticked or not, the list shown again for it
     private fun Menu.check(@StringRes title: Int, checked: Boolean, set: (Boolean) -> Unit) {
         add(title).apply {
             isCheckable = true
@@ -310,20 +291,17 @@ class UserWordListFragment : Fragment() {
         }
     }
 
-    /** [all] narrowed to [query]: a word with it in, or a pinyin with it in, spaces and `'` aside. */
     private fun filter(immediately: Boolean) {
         filtering?.cancel()
-        // a load that ends after the page is left has nothing to show
+        // a load ending after the page is left has nothing to show
         val owner = viewLifecycleOwnerLiveData.value ?: return
         filtering = owner.lifecycleScope.launch {
-            // a search as the user types, not one a keystroke
             if (!immediately) delay(SEARCH_DELAY)
             val q = searchKey(query)
             val words = if (source.dated) LexiconView.arrange(all, recentFirst, unusedOnly) else all
             shown = if (q.isEmpty()) words else withContext(Dispatchers.Default) { searchWords(words, q) }
             adapter.notifyDataSetChanged()
             countView.text = when {
-                // 只看很久没用的 left none: the page has words all the same
                 words.isEmpty() && all.isNotEmpty() -> getString(R.string.learning_filter_unused_none, all.size)
                 words.isEmpty() -> getString(R.string.word_list_empty)
                 q.isEmpty() -> resources.getQuantityString(R.plurals.word_list_count, words.size, words.size)
@@ -357,7 +335,6 @@ class UserWordListFragment : Fragment() {
 
     private fun remove(words: List<UserWord>) {
         val ctx = requireContext()
-        // thousands at once take a moment: the added words' model is made again without them
         lifecycleScope.withLoadingDialog(ctx) {
             try {
                 val undo = viewModel.fcitx.runOnReady { source.remove(this, words) }
@@ -369,7 +346,7 @@ class UserWordListFragment : Fragment() {
             } catch (e: CancellationException) {
                 throw e
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                // a word list that could not be written: shown, where uncaught it would close the app
+                // shown, where uncaught it would close the app
                 Timber.w(e, "Removing user words failed")
                 ctx.toast(e)
             }
@@ -378,14 +355,14 @@ class UserWordListFragment : Fragment() {
 
     private suspend fun words() = viewModel.fcitx.runOnReady { source.words(this) }
 
-    // U-80: removed together, and back together while nothing else was learned since
+    // back together while nothing else was learned since
     private fun offerUndo(n: Int, token: Long) {
         val root = view ?: return
         Snackbar.make(root, resources.getQuantityString(R.plurals.learning_removed, n, n), Snackbar.LENGTH_LONG)
             .setAction(R.string.learning_undo) {
                 val fcitx = viewModel.fcitx
                 val app = root.context.applicationContext
-                // on the connection's scope, as PinyinDictionaryFragment.drop: the page may be left as it is tapped
+                // on the connection's scope: the page may be left as it is tapped
                 fcitx.lifecycleScope.launch {
                     val undone = try {
                         fcitx.runOnReady { learning(LearningOp.Undo(token)) }
@@ -396,8 +373,6 @@ class UserWordListFragment : Fragment() {
                         app.toast(e)
                         return@launch
                     }
-                    // as the chip's undo says it (BaseInputView.learningUndo): a removal the record could not take back
-                    // is said, not the words just left out (R25r8 F8053)
                     when (undone) {
                         LearningResult.Unavailable -> app.toast(R.string.learning_undo_gone)
                         LearningResult.Failed -> app.toast(R.string.learning_undo_failed)
@@ -409,21 +384,15 @@ class UserWordListFragment : Fragment() {
             .show()
     }
 
-    // U-31 恢复: corrected again, still listed with its count
     private fun restoreCorrection(word: UserWord) {
         lifecycleScope.launch {
             onFcitx(SAVING_FAILED) { learning(LearningOp.RestoreCorrection(listOf(word.text))) }.getOrElse { return@launch }
-            // read again as load() reads it: one that fails is shown, not thrown (review R11)
+            // a failure is shown, not thrown
             load()
         }
     }
 
-    /**
-     * [block] on fcitx. Where it failed (a word list that could not be read or written, fcitx
-     * stopping), [failed] is logged and the error shown, where uncaught it would close the app, as
-     * [remove] shows it. A [Result], not null for a failure: what [block] gives may itself be null
-     * (a word of no known pinyin).
-     */
+    /** Logged and shown where uncaught it would close the app; a [Result] as [block] may itself give null. */
     private suspend fun <T> onFcitx(failed: String, block: suspend HostApi.() -> T): Result<T> {
         val ctx = requireContext()
         return try {
@@ -437,7 +406,6 @@ class UserWordListFragment : Fragment() {
         }
     }
 
-    /** What can be done to [word]: edited where its list lets it be, corrected again (English's), taken off its list. */
     private fun act(word: UserWord) {
         val held = rare.heldIn(word.text)
         val actions = buildList {
@@ -452,7 +420,7 @@ class UserWordListFragment : Fragment() {
                 when (actions[which]) {
                     R.string.rare_allow_one, R.string.rare_allow_these -> allowRare(held) { load() }
                     R.string.edit -> edit(R.string.edit, word) { text, pinyin ->
-                        // added before the old is taken off: a word that does not read so leaves both be
+                        // added before the old is removed: a word that does not read so leaves both be
                         addUserWord(text, pinyin).also { if (it) removeUserWords(listOf(word)) }
                     }
                     R.string.english_restore_correction -> restoreCorrection(word)
@@ -462,7 +430,6 @@ class UserWordListFragment : Fragment() {
             .show()
     }
 
-    /** Lets [chars] through (§5.4) and has the engine read it; [then], once it has. */
     private fun allowRare(chars: List<String>, then: () -> Unit) {
         val levels = RareCharsManager.levels ?: return
         val ctx = requireContext().applicationContext
@@ -485,7 +452,6 @@ class UserWordListFragment : Fragment() {
         is PinyinWords -> edit(title, null) { text, pinyin -> list.add(this, text, pinyin) }
     }
 
-    /** Asks for an English word, kept open with an error under it while it is none. */
     private fun addEnglish(@StringRes title: Int) {
         val ctx = requireContext()
         val (layout, field) = ctx.materialTextInput { hint = getString(R.string.word_text) }
@@ -519,11 +485,7 @@ class UserWordListFragment : Fragment() {
             }
     }
 
-    /**
-     * Asks for a word and its pinyin, prefilled with [word]'s, and hands them to [save]; kept
-     * open, with an error under the pinyin, while they do not read together. Left blank, the
-     * pinyin is filled in as the dictionary reads the word, for the user to check and save.
-     */
+    /** Blank pinyin is filled in for the user to check. */
     private fun edit(title: Int, word: UserWord?, save: suspend HostApi.(String, String) -> Boolean) {
         val ctx = requireContext()
         val (textLayout, textField) = ctx.materialTextInput { hint = getString(R.string.word_text) }
@@ -540,14 +502,14 @@ class UserWordListFragment : Fragment() {
             textField.setText(it.text)
             pinyinField.setText(it.pinyin)
         }
-        // §5.4: a held character said at once, with a button to let it through; saving not stopped
+        // a held character said at once, with a button to let it through; saving not stopped
         val allow = MaterialButton(ctx, null, MaterialR.attr.materialButtonOutlinedStyle).apply { visibility = View.GONE }
         fun sayRare() {
             val held = rare.heldIn(textField.str)
             textLayout.helperText = held.takeIf { it.isNotEmpty() }?.let { getString(R.string.rare_add_hint, it.joinToString("、")) }
             allow.visibility = if (held.isEmpty()) View.GONE else View.VISIBLE
             allow.setText(if (held.size > 1) R.string.rare_allow_these else R.string.rare_allow_this)
-            // the list behind read again too: a word of it with the character no longer marked (review N9)
+            // the list behind is reread too: its words with the character are no longer marked
             allow.setOnClickListener {
                 allowRare(held) {
                     sayRare()
@@ -578,7 +540,6 @@ class UserWordListFragment : Fragment() {
                 }
                 val dialog = this
                 if (pinyin.isBlank()) {
-                    // read as the dictionary reads it, shown for the user to check before saving
                     lifecycleScope.launch {
                         val guessed = onFcitx("Reading a word's pinyin failed") { pinyinOf(text) }.getOrElse { return@launch }
                         if (guessed == null) {
@@ -594,7 +555,6 @@ class UserWordListFragment : Fragment() {
                     pinyinField.error = getString(R.string.word_pinyin_invalid)
                     return@onClick false
                 }
-                // unchanged: nothing to do
                 if (word != null && WordLists.entry(word.text, word.pinyin) == entry) return@onClick true
                 lifecycleScope.launch {
                     val saved = onFcitx(SAVING_FAILED) { save(text, pinyin) }.getOrElse { return@launch }
@@ -663,11 +623,6 @@ class UserWordListFragment : Fragment() {
     }
 }
 
-/**
- * What differs between the lists [UserWordListFragment] shows: its title and labels, where its
- * words come from and go, and what a row says of one. [addLabel] is null for a list nothing is
- * added to by hand; [editable], whether a word's text and pinyin may be edited.
- */
 internal sealed class WordSource(
     @StringRes val title: Int,
     @StringRes val searchHint: Int,
@@ -675,18 +630,17 @@ internal sealed class WordSource(
     @StringRes val removeLabel: Int,
     @PluralsRes val confirmRemove: Int,
     val editable: Boolean,
-    /** Whether its words have the day last used ([UserWord.lastUsed]): sorted and filtered by it. */
     val dated: Boolean = false,
 ) {
     abstract suspend fun words(fcitx: HostApi): List<UserWord>
 
-    /** [words] taken off: the token that takes it back ([LearningOp.Undo]), [LearningResult.NO_UNDO] for none. */
+    /** Returns the undo token, or [LearningResult.NO_UNDO]. */
     abstract suspend fun remove(fcitx: HostApi, words: List<UserWord>): Long
 
     abstract fun detail(res: Resources, word: UserWord): String
 }
 
-/** One list of pinyin's user dictionary: the words learned come from typing alone, a blocked one is unblocked, not edited. */
+/** A blocked one is unblocked, not edited. */
 internal class PinyinWords(val kind: UserWord.Kind) : WordSource(
     title = UserWordsFragment.title(kind),
     searchHint = R.string.search_words_hint,
@@ -713,7 +667,6 @@ internal class PinyinWords(val kind: UserWord.Kind) : WordSource(
     override suspend fun remove(fcitx: HostApi, words: List<UserWord>): Long =
         (fcitx.learning(LearningOp.RemoveWords(words)) as? LearningResult.Done)?.undo ?: LearningResult.NO_UNDO
 
-    /** A word typed in, put on this list: added, or blocked. */
     suspend fun add(fcitx: HostApi, text: String, pinyin: String) =
         if (kind == UserWord.Kind.BLOCKED) fcitx.blockUserWord(text, pinyin) else fcitx.addUserWord(text, pinyin)
 
@@ -722,19 +675,17 @@ internal class PinyinWords(val kind: UserWord.Kind) : WordSource(
             val times = word.count.roundToInt().coerceAtLeast(1)
             res.getQuantityString(R.plurals.word_typed_times, times, word.pinyin, times)
         } else if (word.kind == UserWord.Kind.BLOCKED && word.pinyin.isEmpty()) {
-            // English's, no reading: how its case is matched (EnglishBlocks): one all in lower case in any case,
-            // any other (iPhone) as written
+            // all-lower-case matches any case, any other (iPhone) as written
             res.getString(if (word.text == word.text.lowercase()) R.string.english_block_detail else R.string.english_block_detail_exact)
         } else {
             word.pinyin
         }
         if (word.lastUsed == UserWord.NEVER) return said
-        // a day, not a time: the record keeps no more (U-80)
+        // a day, not a time: the record keeps no more
         return res.getString(R.string.learning_last_used, said, formatLocalDay(word.lastUsed))
     }
 }
 
-/** The English words the user typed or added: no pinyin to edit, forgotten as a learned word is. */
 internal object EnglishWords : WordSource(
     title = R.string.english_words,
     searchHint = R.string.search_english_words_hint,
@@ -750,7 +701,7 @@ internal object EnglishWords : WordSource(
         return LearningResult.NO_UNDO
     }
 
-    // whether it is still corrected, before a count: an added word may never have been typed
+    // whether it is still corrected first: an added word may never have been typed
     override fun detail(res: Resources, word: UserWord): String {
         if (word.neverCorrected) return res.getString(R.string.english_word_learned)
         val times = word.count.roundToInt().coerceAtLeast(1)
@@ -758,17 +709,11 @@ internal object EnglishWords : WordSource(
     }
 }
 
-// spaces and the `'` that parts syllables: a pinyin is found however the user spaces it
 private val SEARCH_IGNORED = Regex("[\\s']")
 
-/** [query] as [searchWords] matches it: in lower case, spaces and `'` aside. */
 internal fun searchKey(query: String): String = query.trim().lowercase().replace(SEARCH_IGNORED, "")
 
-/**
- * The [words] with [key] (a [searchKey]) in the word or in its pinyin, each read as a key is
- * (an English don't as dont, a pinyin however spaced): those that start with it first, as typing a
- * word's start should find it at the top, each part in the order of [words].
- */
+/** Read as a key is (don't as dont, pinyin however spaced); prefix matches first. */
 internal fun searchWords(words: List<UserWord>, key: String): List<UserWord> {
     val (starting, within) = words.mapNotNull { word ->
         val text = searchKey(word.text)

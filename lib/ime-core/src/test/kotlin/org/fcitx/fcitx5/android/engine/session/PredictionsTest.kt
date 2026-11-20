@@ -40,12 +40,11 @@ class PredictionsTest {
         assertEquals("山", p.pick(0))
         assertEquals("山", p.lastEntry?.text)
         assertEquals("高山", p.before)
-        // after 高, by its text: 联想's alone, never the decoder's (review-C S1)
         assertTrue(learner.used().containsAll(setOf("山", "高 山")))
         assertEquals(emptySet<String>(), user.learned())
     }
 
-    // review F3183: why is the offer's, after 高, though the predictor went on after another word since
+    // why is the offer's, after 高, though the predictor went on after another word since
     @Test
     fun whyIsTheOffersCodeNotThePredictorsLast() {
         p.wrote("高", null)
@@ -55,7 +54,7 @@ class PredictionsTest {
         assertEquals(PredictionOrder.code("高"), p.why(0)?.code)
     }
 
-    // USER-DECISIONS 2026-10-20: a message sent leaves no word before, though its text still scores
+    // a message sent leaves no word before, though its text still scores
     @Test
     fun aClearedFieldHasNoWordBeforeUntilSomethingIsPutIn() {
         p.learnFrom(Action.Context("高山", cleared = true))
@@ -74,7 +73,7 @@ class PredictionsTest {
         assertEquals("高", p.wordBefore())
     }
 
-    // review-1a-r2 S1: a context that says no flags (the engine's own) keeps the field's
+    // a context that says no flags (the engine's own) keeps the field's
     @Test
     fun aContextOfNoFlagsKeepsTheFieldsFlags() {
         p.learnFrom(Action.Context("", learnFlags = Commit.NO_PREDICT))
@@ -84,8 +83,7 @@ class PredictionsTest {
         assertEquals(0, p.learnFlags)
     }
 
-    // U-70: filed under the word the predictions follow, though nothing learned says how it reads
-    // (handwriting's 高, put in by its text): what an elder writes on with, a character at a time
+    // filed under the word followed though nothing says how it reads (handwriting's 高)
     @Test
     fun aPickIsFiledUnderTheWordItFollowsByItsText() {
         p.wrote("高", null)
@@ -96,10 +94,9 @@ class PredictionsTest {
         assertTrue(state.pairs.keys.any { it.prev == "高" && it.next == "山" && it.nextReading.isEmpty() })
     }
 
-    // U-70, as pinyin's: picked once before those never picked, twice running first
+    // as pinyin's: picked once before those never picked, twice running first
     @Test
     fun whatIsOfferedIsInTheUsersOrder() {
-        // 人, picked after 高 once when it was offered
         learner.habits.record(listOf(PredictionOrder.row("人", "高", "山")))
         p.wrote("高", null)
         p.predict()
@@ -138,7 +135,6 @@ class PredictionsTest {
         p.goOnFrom("x😀" + "a".repeat(Predictions.WORDS_KEPT - 1))
         assertFalse(Character.isLowSurrogate(p.before[0]))
         assertTrue(p.before.length < Predictions.WORDS_KEPT)
-        // nothing learned: nothing offered, nor told a sentence model
         p.predict()
         assertTrue(p.offered.isEmpty())
         assertEquals("", p.context)
@@ -163,7 +159,6 @@ class PredictionsTest {
         assertNull(p.lastEntry)
         assertEquals("😀高", p.before)
         p.deleted()
-        // a character past the BMP goes whole
         p.deleted()
         assertEquals("", p.before)
         p.deleted()
@@ -181,7 +176,6 @@ class PredictionsTest {
         ) { learning }
         q.wrote("高", null)
         q.predict()
-        // never picked: nothing learned of it to forget
         assertEquals(setOf(Offer.BLOCK), q.offers(0))
         assertFalse(q.press(0, Offer.FORGET))
         q.pick(0)
@@ -197,7 +191,6 @@ class PredictionsTest {
         learning = false
         assertEquals(emptySet<Offer>(), q.offers(0))
         assertFalse(q.press(0, Offer.BLOCK))
-        // none without a way to block
         learning = true
         assertFalse(Offer.BLOCK in p.apply { wrote("高", null); predict() }.offers(0))
     }
@@ -217,7 +210,6 @@ class PredictionsTest {
         assertTrue(blocked.isEmpty())
     }
 
-    // U-73: a whole phrase put in three times, by its text (handwriting's), goes on after its start;
     // picked, it is used whole once more, and why says so
     @Test
     fun aWholePhraseGoesOnAfterItsStart() {
@@ -237,7 +229,6 @@ class PredictionsTest {
         assertEquals("高山人天", p.before)
     }
 
-    // U-73: nothing where nothing is learned, nor in a search field
     @Test
     fun noPhraseWhereNothingIsLearnedOrPredicted() {
         repeat(Predictor.PAIRS) {
@@ -253,8 +244,7 @@ class PredictionsTest {
         assertEquals(emptyList<Any>(), p.continued("高", "高"))
     }
 
-    // a handwriting's or a table's word the model has not, last: its phrase all the same, its pick
-    // learned after it (review of 051-predict; pinyin goes on from its own word)
+    // its phrase all the same, its pick learned after it
     @Test
     fun aPhraseGoesOnAfterAWordTheModelHasNot() {
         repeat(Predictor.PAIRS) {
@@ -273,8 +263,6 @@ class PredictionsTest {
         assertTrue(p.offered.isEmpty())
     }
 
-    // review of 051-predict (2): what is put in where nothing is learned (a password) is not kept as the
-    // word a phrase goes on after, the learning back on or not
     @Test
     fun aPasswordsTextIsNoWordAPhraseGoesOnAfter() {
         repeat(Predictor.PAIRS) {

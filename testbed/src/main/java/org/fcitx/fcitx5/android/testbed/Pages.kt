@@ -165,8 +165,7 @@ object Pages {
         field("chat_clear", "聊天：发送后 text.clear()，不重启输入", ime = EditorInfo.IME_ACTION_SEND) {
             onAction = { text.clear(); true }
         }
-        // setText makes the framework restart the input itself: at once up to Android 10, deferred from
-        // API 30 (Editor.scheduleRestartInputForSetText), through invalidateInput from API 34 (no new connection)
+        // setText makes the framework restart input: at once up to Android 10, deferred from 30, invalidateInput from 34
         field("chat_settext", "聊天：发送后 setText(\"\")（框架自己让输入法重来：10 直接重启，30 起延后，34 起 invalidateInput）", ime = EditorInfo.IME_ACTION_SEND) {
             onAction = { setText(""); true }
         }
@@ -308,8 +307,7 @@ object Pages {
             }
             loadUrl("file:///android_asset/web.html")
         }
-        // the page left: its renderer and scripts gone with it, not logging into the next page's log
-        // (detached first: a WebView destroyed while still in the window is warned against)
+        // the page left: the WebView detached and destroyed, not logging into the next page
         onLeave += {
             (web.parent as? ViewGroup)?.removeView(web)
             web.destroy()

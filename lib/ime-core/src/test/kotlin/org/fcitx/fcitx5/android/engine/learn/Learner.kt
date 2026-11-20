@@ -9,11 +9,7 @@ import org.fcitx.fcitx5.android.engine.platform.LogFile
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
 
-/**
- * A user learning as `Engines` has one (impl/design-1b.md §3, §4): an in-memory learning record
- * ([log], on a [clock] the test moves), its [habits], and the [model] the decoder reads, its own
- * words and counts kept from the record. A session made with [learnTo] and [model] learns into it.
- */
+/** A user learning as `Engines` has one: an in-memory record on a test [clock], its [habits], and the [model]. */
 internal class Learner(data: PinyinData, val clock: FakeClock = FakeClock(), settles: Boolean = true, file: LogFile? = null) {
     val model = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
     val log = LearnLog(file, clock).apply { open() }

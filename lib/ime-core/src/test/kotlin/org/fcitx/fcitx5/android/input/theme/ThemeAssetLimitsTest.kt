@@ -28,7 +28,7 @@ class ThemeAssetLimitsTest {
         assertNull(l.keyImage(1024, 1024, l.MAX_KEY_IMAGE_BYTES))
         assertEquals(ThemeAssetLimits.Breach.KeyImageSide, l.keyImage(10, 1025, 1))
         assertEquals(ThemeAssetLimits.Breach.KeyImageSize, l.keyImage(10, 10, l.MAX_KEY_IMAGE_BYTES + 1))
-        // A3: an effect's image, 256 px a side and 128 KB at most, PNG or WebP
+        // an effect's image, 256 px a side and 128 KB at most, PNG or WebP
         assertNull(l.effectImage("star.png", 256, 256, 128L * 1024))
         assertNull(l.effectImage("ring.WEBP", 10, 10, 1))
         assertEquals(ThemeAssetLimits.Breach.EffectImageSide, l.effectImage("star.png", 257, 10, 1))

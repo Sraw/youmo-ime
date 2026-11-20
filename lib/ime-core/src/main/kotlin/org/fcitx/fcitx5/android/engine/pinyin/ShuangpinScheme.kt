@@ -7,18 +7,10 @@ package org.fcitx.fcitx5.android.engine.pinyin
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Companion.SEPARATOR
 
 /**
- * A 双拼 scheme: the key for each initial and each final, so that every syllable is two keys,
- * initial then final. [keys] lists them as `zh=v ai=d ...`; an initial or a one-letter final
- * not listed is typed with its own letter.
- *
- * Syllables with no initial (a, ai, er ...) are typed as [zero] says, in libime's notation:
- * each letter in it is a key that stands for "no initial" before the final's key (`o` in 微软:
- * `oj` for an), and `*` puts the final's first letter there instead, doubled for a one-letter
- * final (小鹤: `aa` a, `ah` ang). A two-letter one may also be typed as spelt (`ai`, `ou`):
- * always with `*`, otherwise wherever those two keys type no syllable exactly.
- *
- * The built-in schemes are three of libime's, with its tables, so a user's choice carries over: 0.5
- * dropped the other five (the user's 2026-11-01), a config naming one read as 小鹤 (SchemeMigration).
+ * A 双拼 scheme: a key for each initial and final, so every syllable is two keys; [keys] as `zh=v ai=d ...`,
+ * unlisted one-letter parts typed as themselves. [zero] (libime's notation) says how initial-less
+ * syllables are typed: its letters stand for "no initial" (`o` in 微软: `oj` an), `*` puts the final's
+ * first letter there (小鹤: `aa`, `ah`). The built-ins are three of libime's tables, so choices carry over.
  */
 class ShuangpinScheme(keys: String, val zero: String) {
 
@@ -27,7 +19,7 @@ class ShuangpinScheme(keys: String, val zero: String) {
 
     internal val zeroKeys: String = zero.replace("*", "")
 
-    /** Whether a syllable with no initial is led by its final's first letter (`*`). */
+    /** Initial-less syllables led by the final's first letter (`*`). */
     internal val leadVowel: Boolean = '*' in zero
 
     init {
@@ -42,10 +34,10 @@ class ShuangpinScheme(keys: String, val zero: String) {
         require(zeroKeys.all(::isKey)) { "bad zero keys $zero" }
     }
 
-    /** Whether [c] types something: a letter, or another key the scheme gives a part (`;` in 微软). */
+    /** A letter, or another key the scheme uses (`;` in 微软). */
     fun types(c: Char): Boolean = c in 'a'..'z' || c in zeroKeys || initials.values.any { c in it } || finals.values.any { c in it }
 
-    /** The keys that type [init] followed by [fin], in the order a user would reach for them. */
+    /** In the order a user would reach for them. */
     internal fun codes(init: String, fin: String): List<String> {
         val finalKeys = finalKeys(fin)
         val codes = ArrayList<String>()
@@ -61,10 +53,7 @@ class ShuangpinScheme(keys: String, val zero: String) {
         return codes
     }
 
-    /**
-     * How [syllable] is typed, or null if it is no initial plus a final (the Latin letters, 嗯).
-     * Where a scheme accepts several ways, the one it teaches.
-     */
+    /** Null if not initial plus final (Latin letters, 嗯); the scheme's taught way where several work. */
     fun encode(syllable: Int): String? {
         val (init, fin) = SpellingIndex.split(Syllables.spelling(syllable)) ?: return null
         val spelt = fin.takeIf { init.isEmpty() && it.length == 2 }
@@ -73,16 +62,16 @@ class ShuangpinScheme(keys: String, val zero: String) {
         return codes(init, fin).firstOrNull() ?: spelt
     }
 
-    /** Whether [key] types an initial, so that alone it is the start of a syllable and never one whole. */
+    /** Alone it starts a syllable, never is one whole. */
     internal fun typesInitial(key: Char): Boolean =
         initials.values.any { key in it } || key.toString() in SpellingIndex.INITIALS
 
-    /** The initials [key] types, in [SpellingIndex.INITIALS]' order: 自然码's v zh, and v itself none. */
+    /** In [SpellingIndex.INITIALS]' order: 自然码's v types zh, and v itself none. */
     internal fun initialsOn(key: Char): List<String> = SpellingIndex.INITIALS.filter { key in initialKeys(it) }
 
     internal fun initialKeys(init: String): String {
         val mapped = initials[init].orEmpty()
-        // libime reads a letter as its own initial even when it also types another one
+        // libime reads a letter as its own initial even when it also types another
         return if (init.length == 1 && init !in mapped) mapped + init else mapped
     }
 
@@ -92,7 +81,7 @@ class ShuangpinScheme(keys: String, val zero: String) {
         private val FINALS: Set<String> =
             (0 until Syllables.count).mapNotNullTo(HashSet()) { SpellingIndex.split(Syllables.spelling(it))?.second }
 
-        /** Keys a scheme may use: lower-case ASCII and punctuation (微软 types ing with `;`). */
+        /** Lower-case ASCII and punctuation (微软 types ing with `;`). */
         internal fun isKey(c: Char) = c.code in '!'.code..'~'.code && !c.isUpperCase() && c != SEPARATOR
 
         // tables from libime's shuangpindata.h

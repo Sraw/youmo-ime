@@ -16,11 +16,7 @@ import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * The models as packaged (the voice pack, imported on the device first), through the streaming recognizer as the listener uses it, on a recording
- * in place of the microphone (an emulator has none): the sherpa-onnx test sentence, twice, with
- * silence around, a window at a time, segments closed where the endpoint rules say.
- */
+/** The packaged models through the streaming recognizer on a recording (an emulator has no microphone). Needs the voice pack. */
 class VoiceEngineTest {
 
     private val test = InstrumentationRegistry.getInstrumentation().context
@@ -29,9 +25,7 @@ class VoiceEngineTest {
     fun aRecordingIsRecognizedAsItStreamsBothTimes() {
         val texts = hear(VoiceHotwords.Words.NONE)
         assertTrue(texts.toString(), texts.isNotEmpty())
-        // 开饭时间早上九点至下午五点, the numbers made digits, twice, the segments joined as the
-        // listener joins them. The first syllable comes back 开饭, 开放 or 菜饭 as the chunk falls:
-        // how well it is heard is the evaluation sets' to measure
+        // the first syllable comes back 开饭, 开放 or 菜饭 as the chunk falls; accuracy is the eval sets' to measure
         val live = VoiceLive()
         texts.forEach(live::closed)
         val typed = live.finish().orEmpty()
@@ -40,11 +34,7 @@ class VoiceEngineTest {
 
     @Test
     fun theUsersWordsAreListenedFor() {
-        // the pack's hotwords read from the voice pack, the user's put in for each stretch: 早上, said,
-        // scored the higher for the bonus. (It was 开饭 made of the first stretch's 开放, but with
-        // a beam of 16 the search keeps 开放 heard, rightly. Not 开放 either: the pack has 开放时间,
-        // and a hotword ending where a longer one goes on takes the search back to the start of
-        // the graph, the longer one's bonus lost.)
+        // not 开放 for a hotword: the pack has 开放时间, and a hotword ending inside a longer one loses that one's bonus
         val word = UserWord("早上", "zao shang", UserWord.Kind.ADDED)
         val with = topScore(VoiceHotwords.ofUser(listOf(word)))
         val without = topScore(VoiceHotwords.Words.NONE)
@@ -53,8 +43,7 @@ class VoiceEngineTest {
 
     @Test
     fun theLastWordsGraphIsTakenAgainForTheSameWordsOnly() {
-        // the recognizer keeps the graph of the words last asked for: the same words take it again,
-        // others (苹果, not said) get their own, without the bonus on 早上, and 早上 its graph back
+        // the recognizer keeps the last graph: other words (苹果, not said) get their own, without 早上's bonus
         val said = VoiceHotwords.ofUser(listOf(UserWord("早上", "zao shang", UserWord.Kind.ADDED)))
         val unsaid = VoiceHotwords.ofUser(listOf(UserWord("苹果", "ping guo", UserWord.Kind.ADDED)))
         val first = topScore(said)
@@ -66,12 +55,10 @@ class VoiceEngineTest {
 
     @Test
     fun aBlockedWordStandingAloneIsNotWritten() {
-        // 开放, said in each stretch, blocked: split char by char, it stands as words wherever it
-        // is, and another hypothesis or the search again wins
+        // blocked words are split char by char, so another hypothesis wins
         val blocked = hear(VoiceHotwords.Words(hotwords = "", blocked = "开 放")) { IntArray(it.length + 1) { i -> i } }
         assertTrue(blocked.toString(), blocked.isNotEmpty())
         assertTrue(blocked.toString(), blocked.none { "开放" in it })
-        // the rest still heard
         assertTrue(blocked.toString(), blocked.all { "时间早上九点" in it || "时间早上9点" in it })
     }
 
@@ -90,7 +77,7 @@ class VoiceEngineTest {
 
     @Test
     fun theBlockInTheSearchTakesAWordWithinTheSentenceToo() {
-        // 早上, not where the sentence starts: its tokens there are blocked as at the start
+        // not at the sentence start: its tokens there are blocked as at the start
         val blocked = VoiceHotwords.Words(hotwords = "", blocked = "早 上")
         val recognizer = VoiceEngine.acquire().recognizer
         try {
@@ -126,7 +113,6 @@ class VoiceEngineTest {
                 VoiceRerank.distinct(heard.nbest.indices.map { VoiceRerank.Hypothesis(heard.nbest[it], heard.nbestScores[it]) }),
             )
             assertTrue(candidates.toString(), candidates.size > 1)
-            // a model sure of the last of them, each bare text asked about
             val last = VoiceRerank.bare(candidates.last().text)
             var asked = emptyList<String>()
             val sure = object : VoiceChoice.Language {
@@ -155,7 +141,6 @@ class VoiceEngineTest {
         }
     }
 
-    // split: TextWords.boundaries in place of the engine's
     private fun hear(hotwords: VoiceHotwords.Words, split: (String) -> IntArray = { IntArray(0) }): List<String> {
         val recognizer = VoiceEngine.acquire().recognizer
         try {
@@ -166,7 +151,7 @@ class VoiceEngineTest {
         }
     }
 
-    /** [samples] decoded whole in [stream], as the listener's last segment: the tail padded, the input finished */
+    /** Decoded whole as the listener's last segment: tail padded, input finished. */
     private fun result(recognizer: OnlineRecognizer, stream: OnlineStream, samples: FloatArray): OnlineRecognizerResult {
         try {
             stream.acceptWaveform(samples, VoiceEngine.SAMPLE_RATE)
@@ -179,11 +164,7 @@ class VoiceEngineTest {
         }
     }
 
-    /**
-     * [samples] as the listener hears them, a window at a time, through the listener's own loop
-     * ([VoiceSegments], as VoiceListener drives it): each segment's result, closed at an endpoint or
-     * at the end. A loop of its own here left VoiceSegments on the real recognizer untested (voice-12).
-     */
+    /** Through the listener's own loop ([VoiceSegments]) so that loop is tested on the real recognizer. */
     private fun segments(recognizer: OnlineRecognizer, stream: OnlineStream, samples: FloatArray): List<OnlineRecognizerResult> {
         val out = mutableListOf<OnlineRecognizerResult>()
         try {
@@ -210,7 +191,6 @@ class VoiceEngineTest {
         return out
     }
 
-    /** 16-bit mono PCM, its header skipped, as floats */
     private fun wav(name: String): FloatArray {
         val bytes = test.assets.open(name).use { it.readBytes() }
         val pcm = ByteBuffer.wrap(bytes, WAV_HEADER, bytes.size - WAV_HEADER).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
@@ -219,11 +199,10 @@ class VoiceEngineTest {
 
     companion object {
         private const val WAV_HEADER = 44
-        // the same decode twice, give or take float sums; another graph is off by VoiceHotwords.SCORE a token
+        // another graph is off by VoiceHotwords.SCORE a token
         private const val SAME_SCORE = 1e-3f
     }
 
-    // the recognizer's order, and split as [split] says
     private fun language(split: (String) -> IntArray) = object : VoiceChoice.Language {
         override suspend fun boundaries(texts: List<String>) = texts.associateWith(split)
         override suspend fun logProbs(texts: List<String>) = null

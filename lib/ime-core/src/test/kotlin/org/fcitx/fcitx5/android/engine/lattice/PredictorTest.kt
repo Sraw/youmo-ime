@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.lattice
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -65,8 +66,6 @@ class PredictorTest {
 
     private val predictor = Predictor(data.model, data.vocabulary, data.dictionary)
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
     private fun id(word: String) = (0 until data.vocabulary.size).first { data.vocabulary.word(it) == word }
 
     private fun texts(c: List<Candidate>) = c.map { it.text }
@@ -74,7 +73,6 @@ class PredictorTest {
     @Test
     fun theWordsSeenAfterTheLastOneComeMostProbableFirst() {
         val after = predictor.predict(NO_WORD, id("你"))
-        // ， · and <unk> are more probable, and no words
         assertEquals(listOf("好", "吗", "A股", "马克·吐温"), texts(after))
         assertEquals(listOf("二〇二六"), texts(predictor.predict(NO_WORD, id("好"))))
         val context = data.model.context(NO_WORD, id("你"))
@@ -97,7 +95,7 @@ class PredictorTest {
         }
         val after = Predictor(data.model, data.vocabulary, data.dictionary, user).predict(NO_WORD, id("你"))
         assertEquals(listOf("好", "吗", "A股", "马克·吐温"), texts(after))
-        // 好 among them, the first offered, which also tells whether any word is: the old loop looked at it twice
+        // 好 among them, the first offered, which also tells whether any word is: looked at once
         assertEquals(looked.distinct(), looked)
         assertTrue(id("好") in looked)
     }
@@ -107,7 +105,6 @@ class PredictorTest {
         val after = predictor.predict(id("我"), id("再"))
         assertEquals(listOf("见", "吗"), texts(after))
         assertEquals(-0.25f, after[0].score, 0f)
-        // 吗 was never seen after 我 再: the backoff of 我 再 on top
         assertEquals(-0.5f - 1f, after[1].score, 1e-6f)
     }
 
@@ -120,7 +117,6 @@ class PredictorTest {
 
     @Test
     fun aTieGoesToTheWordSeenFirst() {
-        // 你 comes before 好 in the vocabulary, and both follow 吗 at -1
         assertEquals(listOf("你"), texts(predictor.predict(NO_WORD, id("吗"), limit = 1)))
         assertEquals(listOf("你", "好"), texts(predictor.predict(NO_WORD, id("吗"))))
     }
@@ -136,7 +132,6 @@ class PredictorTest {
     fun anUnseenWordEndsInItsLastTwoCharactersOrItsLast() {
         assertEquals(id("再见"), predictor.tail("说再见", syl("shuo", "zai", "jian")))
         assertEquals(id("见"), predictor.tail("看见", syl("kan", "jian")))
-        // the end read otherwise is not the model's word
         assertEquals(NO_WORD, predictor.tail("说再见", syl("shuo", "zai", "jie")))
         // read as the model's word but written otherwise: the last character alone
         assertEquals(id("见"), predictor.tail("说在见", syl("shuo", "zai", "jian")))
@@ -152,14 +147,12 @@ class PredictorTest {
         val user = UserModel(data.dictionary, data.vocabulary)
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
         assertEquals("再", texts(predicting.predict(NO_WORD, id("我"))).first())
-        // 见 after 我, which the model never saw: twice is not enough (U-71), three times puts it after 再 at -0.5
+        // 见 after 我, which the model never saw: twice is not enough, three times puts it after 再 at -0.5
         user.setPredicted(id("我"), id("见"), Predictor.PAIRS - 1f)
         assertEquals(listOf("再"), texts(predicting.predict(NO_WORD, id("我"))))
         user.setPredicted(id("我"), id("见"), Predictor.PAIRS.toFloat())
         assertEquals(listOf("再", "见"), texts(predicting.predict(NO_WORD, id("我"))))
-        // at a weight that counts for more than the model, before it
         assertEquals(listOf("见", "再"), texts(Predictor(data.model, data.vocabulary, data.dictionary, user, userWeight = 1f).predict(NO_WORD, id("我"))))
-        // a word the user made, after another and before another
         val own = user.own(Entry("见见", syl("jian", "jian")))
         user.setPredicted(id("我"), own, 3f)
         assertTrue("见见" in texts(predicting.predict(NO_WORD, id("我"))))
@@ -167,7 +160,6 @@ class PredictorTest {
         assertEquals(listOf("你"), texts(predicting.predict(NO_WORD, own)))
         // with what the model has after the end of it, as likely as each is
         assertEquals(listOf("见", "你", "吗"), texts(predicting.predict(NO_WORD, own) { id("再") }))
-        // blocked, it is offered no more
         user.block(Entry("见", syl("jian")))
         assertTrue("见" !in texts(predicting.predict(NO_WORD, id("我"))))
     }
@@ -179,7 +171,6 @@ class PredictorTest {
         user.predictionsOff = { prev, next -> prev == "你" && next == "好" }
         assertEquals(listOf("吗", "A股", "马克·吐温"), texts(predicting.predict(NO_WORD, id("你"))))
         assertEquals(null, predicting.candidate(id("你"), id("好")))
-        // after another word, as before
         assertEquals(listOf("你", "好"), texts(predicting.predict(NO_WORD, id("吗"))))
         assertEquals("好", predicting.candidate(id("吗"), id("好"))?.text)
     }
@@ -189,7 +180,7 @@ class PredictorTest {
         val user = UserModel(data.dictionary, data.vocabulary)
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
         user.predictionsOff = { prev, next -> prev == "你" && next == "好" }
-        // the word as put in was 你, the decoder's piece 吗 (F2657): 不再联想 stays filed under 你
+        // the word as put in was 你, the decoder's piece 吗: 不再联想 stays filed under 你
         predicting.predict(NO_WORD, id("吗"), learnedAfter = id("你"))
         assertEquals("你", predicting.after)
         assertEquals(null, predicting.candidate(id("你"), id("好")))
@@ -202,7 +193,7 @@ class PredictorTest {
         val user = UserModel(data.dictionary, data.vocabulary)
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
         user.setPredicted(id("我"), id("见"), Predictor.PAIRS.toFloat())
-        // learnedAfter NO_WORD falls back to prev for both the filing and the counts (F2996)
+        // learnedAfter NO_WORD falls back to prev for both the filing and the counts
         assertEquals(listOf("再", "见"), texts(predicting.predict(NO_WORD, id("我"), learnedAfter = NO_WORD)))
         assertEquals("我", predicting.after)
     }
@@ -211,7 +202,6 @@ class PredictorTest {
     fun aWordIsACandidateAfterAnyWordUnlessNotOffered() {
         val user = UserModel(data.dictionary, data.vocabulary)
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
-        // never seen after 见, a word all the same
         val c = predicting.candidate(id("见"), id("再"))
         assertEquals("再", c?.text)
         assertEquals(listOf(id("再")), c?.words?.toList())
@@ -256,7 +246,6 @@ class PredictorTest {
     fun aWordIsReadAsTheDictionaryReadsItBest() {
         assertEquals(syl("zai", "jian").toList(), predictor.reading(id("再见"))?.toList())
         assertEquals(syl("ni").toList(), predictor.reading(id("你"))?.toList())
-        // no reading of its characters is the dictionary's word
         assertEquals(null, predictor.reading(id("吗")))
         assertEquals(null, Predictor(data.model, data.vocabulary).reading(id("你")))
         val user = UserModel(data.dictionary, data.vocabulary)
@@ -290,7 +279,6 @@ class PredictorTest {
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user)
         // 见 has only punctuation after it
         assertEquals(listOf("再"), texts(predicting.predict(NO_WORD, id("见")) { id("我") }))
-        // 再 only what the user blocked
         user.block(Entry("见", syl("jian")))
         assertEquals(listOf("吗"), texts(predicting.predict(NO_WORD, id("再")) { id("我") }))
     }
@@ -328,8 +316,6 @@ class PredictorTest {
         assertEquals(listOf("好", "吗"), texts(predicting.predict(NO_WORD, id("你"), limit = 2)))
     }
 
-    // typed at two readings of the user's, one text takes one place, as the more typed of them,
-    // whichever is offered first (the other then drops, or is replaced)
     @Test
     fun aTextTypedAtTwoReadingsTakesOnePlaceAsTheMoreTyped() {
         val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
@@ -350,19 +336,16 @@ class PredictorTest {
         assertEquals(listOf("吗", "A股", "马克·吐温"), texts(after))
     }
 
-    // typed once, it is the user's: predicted as any other
     @Test
     fun aCoarseWordTheUserTypedIsPredicted() {
         val user = UserModel(data.dictionary, data.vocabulary)
         val coarse = CoarseWords.of({ data.wordIndex.find(it) }, listOf("见"))
         val predicting = Predictor(data.model, data.vocabulary, data.dictionary, user, coarse = coarse)
         assertEquals(listOf("吗"), texts(predicting.predict(NO_WORD, id("再"))))
-        // after no word: 见 after 再 is the model's alone
         user.learn(null, listOf(Entry("见", syl("jian"))))
         assertEquals(listOf("见", "吗"), texts(predicting.predict(NO_WORD, id("再"))))
     }
 
-    // review-G S3: a word only imported is no 联想 till the user's, though typed after the word before
     @Test
     fun aWordOnlyImportedIsNotPredictedTillTheUsers() {
         val user = UserModel(data.dictionary, data.vocabulary)

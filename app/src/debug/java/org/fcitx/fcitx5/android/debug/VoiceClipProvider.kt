@@ -16,8 +16,7 @@ import timber.log.Timber
 import java.io.File
 
 /**
- * The device UAT's clip microphone ([VoiceClipMic]), from the shell only (uid 2000, or root; the
- * manifest asks for DUMP too):
+ * The device UAT's clip microphone ([VoiceClipMic]), shell only (uid 2000 or root; DUMP in the manifest):
  *
  *     adb shell content write --uri content://<package>.voiceclip/a.wav < a.wav   # into files/voiceclips/
  *     adb shell content call --uri content://<package>.voiceclip --method queue --arg a.wav,800,b.wav
@@ -25,8 +24,7 @@ import java.io.File
  *     adb shell content call --uri content://<package>.voiceclip --method state
  *     adb shell content call --uri content://<package>.voiceclip --method clear
  *
- * A queue's names are files in files/voiceclips/ (16 MB at most), its numbers pauses in ms (to
- * 60 s); from it on every talk hears the clips, not the microphone, till cleared. Debug builds only.
+ * Numbers are pauses in ms (to 60 s); clips at most 16 MB. Till cleared, every talk hears the clips.
  */
 class VoiceClipProvider : ContentProvider() {
 
@@ -39,7 +37,7 @@ class VoiceClipProvider : ContentProvider() {
 
     private fun dir() = File(requireNotNull(context).filesDir, "voiceclips")
 
-    // a name in files/voiceclips/, no path out of it; no absolute paths either: the app's own files are enough
+    // no path out of files/voiceclips/, absolute ones included
     private fun clip(name: String): File {
         require('/' !in name && name != "." && name != "..") { "a name, not a path: $name" }
         return File(dir(), name)
@@ -56,7 +54,7 @@ class VoiceClipProvider : ContentProvider() {
         shellOnly()
         when (method) {
             "queue" -> {
-                // all of it read before any is queued: a clip missing leaves the queue as it was
+                // all read before any is queued: a missing clip leaves the queue as it was
                 val parts = arg.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.map(::part)
                 VoiceClipMic.queue(parts)
                 Timber.w("voice clip microphone: queued %s", arg)

@@ -15,26 +15,18 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
-/**
- * A file the user picked, to read: an IOException, not null, from a provider that gives no stream, and for one
- * [MainActivity.importable] refuses (a scheme but `content:` and `file:`, a `file:` path into the app's own
- * directories, read with the app's rights: L2 security review N5).
- */
+/** An IOException instead of null for no stream, and for what [MainActivity.importable] refuses (app-private `file:` paths). */
 internal fun ContentResolver.openInputStreamOrThrow(uri: Uri): InputStream =
     openInputStream(checked(uri)) ?: throw IOException("cannot read $uri")
 
-/** A file the user picked, to write: an IOException, not null, from a provider that gives no stream, and as above. */
+/** As above, to write. */
 internal fun ContentResolver.openOutputStreamOrThrow(uri: Uri): OutputStream =
     openOutputStream(checked(uri)) ?: throw IOException("cannot write $uri")
 
-// the pickers give content: ones; a file: one comes of another app's ACTION_VIEW (old file managers), MainActivity's rule
+// pickers give content:; a file: comes from another app's ACTION_VIEW (old file managers)
 private fun checked(uri: Uri): Uri = uri.takeIf { MainActivity.importable(appContext, it) } ?: throw IOException("not opened: ${uri.scheme}")
 
-/**
- * [block], which reads or writes a file the user picked; what goes wrong there is logged as [what]
- * and shown, not thrown: an IOException, or the SecurityException of a file the picker gave that
- * its provider will not open after all.
- */
+/** Logged and shown, not thrown: an IOException, or the SecurityException of a provider refusing a picked file. */
 internal inline fun Context.showingFileErrors(what: String, block: () -> Unit) {
     try {
         block()

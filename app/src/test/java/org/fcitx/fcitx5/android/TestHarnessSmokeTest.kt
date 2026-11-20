@@ -25,15 +25,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * Proves the unit test harness itself works, so a failure here points at the build setup
- * rather than at product code. Delete nothing from this file without a replacement --
- * each test guards one tool the rest of the suite relies on.
- */
+/** Proves the unit test harness itself works; each test guards one tool the rest of the suite relies on. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TestHarnessSmokeTest {
 
-    /** kotlinx-coroutines-test: virtual time, so timeout logic can be tested without waiting. */
     @Test
     fun coroutinesTestVirtualClockAdvancesWithoutRealDelay() = runTest {
         val wallClockStart = System.currentTimeMillis()
@@ -45,7 +40,6 @@ class TestHarnessSmokeTest {
         )
     }
 
-    /** kotlinx-coroutines-test: explicit time control, needed for long-press/repeat logic. */
     @Test
     fun coroutinesTestAdvanceTimeByIsExplicit() = runTest {
         var fired = false
@@ -62,7 +56,6 @@ class TestHarnessSmokeTest {
         block()
     }
 
-    /** Turbine: assert on Flow emissions, needed for event-stream tests. */
     @Test
     fun turbineObservesFlowEmissions() = runTest {
         val flow = MutableSharedFlow<Int>(extraBufferCapacity = 4)
@@ -83,15 +76,11 @@ class TestHarnessSmokeTest {
         Assert.assertEquals("stubbed", greeting.text())
     }
 
-    // final, as a Kotlin class is unless declared open
     private class Greeting(private val name: String) {
         fun text() = "hello, $name"
     }
 
-    /**
-     * Plain JUnit, so it runs in both tasks whatever the SDKs: with 29 gone from `robolectric.properties`,
-     * testDebugUnitTestAt29 would filter every Robolectric test out and still pass.
-     */
+    /** Plain JUnit, so it runs whatever the SDKs: with 29 gone from `robolectric.properties`, testDebugUnitTestAt29 would filter every Robolectric test out and still pass. */
     class RobolectricSdks {
         @Test
         fun theTestsRunAtMinSdkAndTheScreenshotsOne() {
@@ -103,12 +92,6 @@ class TestHarnessSmokeTest {
         }
     }
 
-    /**
-     * Robolectric: a real Context and real framework behaviour on the JVM.
-     *
-     * `robolectric.properties` runs every Robolectric test that pins no other at SDK 29 (minSdk) and
-     * 35; see there for why.
-     */
     @RunWith(RobolectricTestRunner::class)
     class RobolectricSmoke {
         @Test
@@ -118,10 +101,7 @@ class TestHarnessSmokeTest {
             Assert.assertTrue("running at an SDK robolectric.properties lists", Build.VERSION.SDK_INT in setOf(29, SCREENSHOT_SDK))
         }
 
-        /**
-         * Canary: remove the @Ignore after upgrading Robolectric. If it passes, raise the pin in
-         * `robolectric.properties` to the app's compileSdk.
-         */
+        /** Canary: remove the @Ignore after upgrading Robolectric. If it passes, raise the pin in `robolectric.properties`. */
         @Ignore("Robolectric 4.17 crashes at SDK 36 on JDK 21; retry after upgrading it")
         @Test
         @Config(sdk = [36])
@@ -131,7 +111,6 @@ class TestHarnessSmokeTest {
 
         @Test
         fun realFrameworkBehaviourNotStubs() {
-            // android.text.TextUtils is a real implementation here, not a `Stub!` throw
             Assert.assertTrue(android.text.TextUtils.isEmpty(""))
             Assert.assertFalse(android.text.TextUtils.isEmpty("a"))
         }

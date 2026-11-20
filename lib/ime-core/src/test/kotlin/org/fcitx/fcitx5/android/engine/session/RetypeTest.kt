@@ -22,7 +22,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Handwriting's retype (U-03, U-29, F2655): a character written again in what the deleted one's ink read as. */
+/** Handwriting's retype: a character written again in what the deleted one's ink read as. */
 class RetypeTest {
 
     private var seq = 0L
@@ -55,10 +55,8 @@ class RetypeTest {
         assertEquals(1, m.typedAgain)
         val row = m.rows.single()
         assertEquals(code("入", "人", "八"), row.code)
-        // no word before: keyed rows have none
         assertEquals("", row.prev)
         assertEquals("人", row.words.text)
-        // corrected as against the first shown then
         assertEquals(Row.PICK or Row.CORRECTED, row.flags)
         assertEquals("入", row.shown)
         assertFalse(row.whole)
@@ -102,7 +100,7 @@ class RetypeTest {
         assertEquals(code("天", "夫"), second.rows.single().code)
     }
 
-    // review F2655 S: 你好 deleted, written again as 你 and then 好: a row each, the rest waiting between
+    // 你好 deleted, written again as 你 and then 好: a row each, the rest waiting between
     @Test
     fun aCommitWrittenAgainACharacterAtATimeGoesOnWhereItStopped() {
         val ni = listOf("你", "妳")
@@ -129,11 +127,7 @@ class RetypeTest {
         assertTrue(m.rows.isEmpty())
     }
 
-    // 双拼 keys deleted, then a word typed again: whole syllables take only what they read whole, as
-    // HabitOrder keeps the syllables' first there (061-sp-abbrev §3.3); keys not all pairs are read by initials too.
-    // The grouped keyboards' graphs read keys alone too (§3.1), a pair of keys as tens of syllables: they take what the
-    // 26 keys take (R27 F8539). But the nine keys' ufmuh: h shares ghi with i, so uh reads shi whole there and, as
-    // on any keyboard, the whole syllable is tried before the keys alone: 什么是 of 什么时候 (3), the code not reading whole
+    // 双拼 keys deleted, then retyped: whole syllables take only what they read whole; the nine keys' uh reads shi whole first
     @Test
     fun shuangpinKeysThatReadWholeTakeNoWordTheirKeysAloneSpell() {
         fun units(vararg syllables: String) = Retype.Units(syllables.map { "字" }, syllables.map(Syllables::id).toIntArray(), emptyMap(), whole = true)
@@ -144,8 +138,7 @@ class RetypeTest {
             listOf("ufmuh", "shen", "me", "shi", "hou") to 4, // 什么时候: h begun, m alone in the middle
             listOf("x'm", "xia", "mian") to 2,
         )
-        // the 26 keys (no letters) and the grouped keyboards, whose codes keep the separator as it is, as the session
-        // gives it the segmenter (the nine keys' 1 key made one)
+        // the 26 keys and the grouped keyboards, whose codes keep the separator as the session gives it
         val keyboards = listOf<Pair<NineKeyLetters?, Segmenter>>(null to ShuangpinSegmenter(ShuangpinScheme.ZIRANMA)) +
             listOf(NineKeyLetters.G18, NineKeyLetters.G14, NineKeyLetters.NINE_SP).map { it to GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, it) }
         val want = HashMap<String, Int?>()

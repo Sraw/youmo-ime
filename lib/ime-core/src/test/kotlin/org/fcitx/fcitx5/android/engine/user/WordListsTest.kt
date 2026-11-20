@@ -43,7 +43,6 @@ class WordListsTest {
         assertEquals(entry("西安", "xi", "an"), WordLists.entry("西安", "xi'an"))
         assertEquals(entry("绿", "lv"), WordLists.entry("绿", "lü"))
         assertEquals(entry("略", "lve"), WordLists.entry("略", "lue"))
-        // run together, lue is split out as libime spells it too
         assertEquals(entry("忽略", "hu", "lve"), WordLists.entry("忽略", "hulue"))
     }
 
@@ -53,12 +52,11 @@ class WordListsTest {
         assertNull(WordLists.entry("你好", "nizz"))
         assertNull(WordLists.entry("", "ni"))
         assertNull(WordLists.entry("你", ""))
-        // fang'an or fan'gan, xi'an or xia'n: no telling which
         assertNull(WordLists.entry("方案", "fangan"))
         assertNull(WordLists.entry("西安", "xian"))
     }
 
-    // review R11 F2933: a delete taken back puts each word where it was, in order, past the end at the end
+    // a delete taken back puts each word where it was, in order, past the end at the end
     @Test
     fun wordsPutBackGoWhereTheyWereAndAreKept() {
         val dir = MemoryFiles()
@@ -69,7 +67,6 @@ class WordListsTest {
         val d = entry("拟", "ni")
         lists.addAll(listOf(a, b, c, d))
         lists.removeAll(listOf(a, c, d))
-        // out of order, one there still, one past the end
         val back = lists.putBack(listOf(IndexedValue(9, d), IndexedValue(2, c), IndexedValue(1, b), IndexedValue(0, a)))
         assertEquals(listOf(a, c, d), back)
         assertEquals(listOf(a, b, c, d), lists.addedWords)
@@ -114,7 +111,6 @@ class WordListsTest {
     @Test
     fun aListThatCannotBeWrittenIsKeptInMemory() {
         val errors = ArrayList<IOException>()
-        // a file where the directory should be
         val root = MemoryFiles().apply { file("lists").createNew() }
         val lists = WordLists(root.dir("lists"), errors::add)
         assertTrue(lists.add(entry("你好", "ni", "hao")))
@@ -135,8 +131,7 @@ class WordListsTest {
         assertEquals(listOf(entry("拟", "ni"), entry("好", "hao")), WordLists(dir).blockedWords)
     }
 
-    // R25 F7821: 全部清空 is no ordinary change: the lines this build does not read go too, or a later build's
-    // block is back with that build; a list of such lines alone is emptied as well
+    // the lines this build does not read go too, or a later build's block comes back
     @Test
     @Uat("WD-25")
     fun aClearEmptiesTheListsAndTheLinesThatDoNotRead() {
@@ -149,13 +144,11 @@ class WordListsTest {
         lists.clear()
         assertEquals(emptyList<UserModel.Entry>(), lists.addedWords)
         assertEquals(mapOf(WordLists.ADDED to "", WordLists.BLOCKED to ""), dir.all.mapValues { it.value.decodeToString() })
-        // gone for good: the next change does not write them back
         assertTrue(lists.block(entry("拟", "ni")))
         assertEquals("拟 ni\n", dir.file(WordLists.BLOCKED).read().decodeToString())
     }
 
-    // R25 F7961: 全部清空 is as just installed (F7821): a list whose file did not read was skipped, its file left
-    // to bring its words back at a start that reads it, the user told all was cleared
+    // a list whose file did not read is deleted too, or a later start brings its words back
     @Test
     @Uat("WD-25")
     fun aClearDeletesAListThatDidNotRead() = assertRows(
@@ -163,7 +156,6 @@ class WordListsTest {
             val files = MemoryFiles()
             files.file(WordLists.ADDED).write("你好 ni'hao\n".toByteArray())
             var failing = true
-            // a disk whose reads fail for a while (EIO)
             val dir = object : UserFiles by files {
                 override fun file(name: String): LogFile = files.file(name).let { f ->
                     if (!failing) f else object : LogFile by f {
@@ -199,7 +191,6 @@ class WordListsTest {
 
     @Test
     fun aListThatDidNotReadIsNotWrittenOver() {
-        // a symbolic link: on the disk
         val disk = folder.newFolder()
         val dir = JvmFiles(disk)
         val link = File(disk, WordLists.ADDED)
@@ -213,7 +204,6 @@ class WordListsTest {
         assertEquals(2, errors.size)
         assertTrue(Files.isSymbolicLink(link.toPath()))
         assertFalse(dir.file("${WordLists.ADDED}.new").exists())
-        // the other list is written as ever
         assertTrue(lists.block(entry("拟", "ni")))
         assertEquals("拟 ni\n", dir.file(WordLists.BLOCKED).read().decodeToString())
         assertEquals(2, errors.size)
@@ -228,7 +218,6 @@ class WordListsTest {
     private fun listThatCannotBeRenamedIn(dir: UserFiles) {
         val errors = ArrayList<IOException>()
         val lists = WordLists(dir, errors::add)
-        // where the list goes, a directory
         dir.dir(WordLists.ADDED).mkdirs()
         assertTrue(lists.add(entry("你好", "ni", "hao")))
         assertEquals(1, errors.size)
@@ -240,7 +229,6 @@ class WordListsTest {
         fun nis(chars: Int) = UserModel.Entry("你".repeat(chars), IntArray(chars) { Syllables.id("ni") })
         assertEquals(nis(WORD), WordLists.entry("你".repeat(WORD), "ni".repeat(WORD)))
         assertNull(WordLists.entry("你".repeat(WORD + 1), "ni".repeat(WORD + 1)))
-        // apart, nothing to split: as long as it is
         assertEquals(nis(WORD + 1), WordLists.entry("你".repeat(WORD + 1), "ni ".repeat(WORD + 1)))
         assertNull(WordLists.entry("你好", "a".repeat(100_000)))
     }
@@ -274,37 +262,31 @@ class WordListsTest {
         val stock = WordLists.entry("A股", "A'gu")!!
         assertEquals("A股 A'gu", "${stock.text} ${stock.apostrophed()}")
         assertEquals(stock, WordLists.entry("A股", "A gu"))
-        // typed in capitals, a word of pinyin still reads
         assertEquals(entry("你好", "ni", "hao"), WordLists.entry("你好", "Ni Hao"))
-        // a capital where the word has no letter: the syllable
         assertEquals(entry("啊", "a"), WordLists.entry("啊", "A"))
     }
 
     private companion object {
-        // the longest word whose pinyin, run together, is split
         const val WORD = 32
     }
 
-    // an emoji blocked in its word's reading: its syllables, not one a code point (review H1, R2)
     @Test
     fun aBlockedEmojiReadsAsItsWordWhateverItsCodePoints() {
         assertEquals("hao", WordLists.blockedEntry("👍🏻", "hao")?.spelled())
         assertEquals("ni hao", WordLists.blockedEntry("😃", "ni'hao")?.spelled())
-        // a letter not ASCII is no word's (ℹ️, review R3): read so too
         assertEquals("xin", WordLists.blockedEntry("ℹ️", "xin")?.spelled())
-        // a keycap (1️⃣, #️⃣) is no word though its digit is: read as an emoji, no table hides it (R20 F6481)
+        // a keycap (1️⃣, #️⃣) is no word though its digit is: read as an emoji, no table hides it
         assertFalse(WordLists.isWordly("1️⃣"))
         assertFalse(WordLists.isWordly("#️⃣"))
         assertEquals("yi", WordLists.blockedEntry("1️⃣", "yi")?.spelled())
         // a text of letters or digits as any word: a syllable a character, or none
         assertNull(WordLists.blockedEntry("abc", "a'o"))
-        // a file's line read so, its cost a number or none
         val dir = MemoryFiles()
         dir.file(WordLists.BLOCKED).write("👍🏻 hao\n😃 ni'hao 0\n👌 hao x\nℹ️ xin\n".toByteArray())
         assertEquals(listOf("👍🏻", "😃", "ℹ️"), WordLists(dir).blockedWords.map { it.text })
     }
 
-    // a Latin candidate blocked in pinyin is written as its upper-case letter syllables: it reads back after a restart (R20 F5772)
+    // a Latin candidate blocked in pinyin is written as its upper-case letter syllables: it reads back after a restart
     @Test
     @Uat("PY-117")
     fun aBlockedLatinWordReadsBackAsItsLetters() {

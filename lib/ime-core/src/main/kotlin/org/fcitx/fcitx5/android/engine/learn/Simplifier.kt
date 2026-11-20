@@ -7,19 +7,16 @@ package org.fcitx.fcitx5.android.engine.learn
 import java.nio.charset.Charset
 
 /**
- * Traditional characters to simplified, a character at a time, for the app's text learning reads
- * (the spec's §3 點了 is 点了): OpenCC's character tables, as the app ships them (`learn/` among its
- * assets, OpenCC 1.2.0's, the version fcitx's chttrans has). The engine commits simplified text,
- * chttrans converting it after; the app's text may have come through it, or been written
- * traditional. A phrase OpenCC converts as a whole (軟體 for 软件) stays as it is.
+ * Traditional characters to simplified, one at a time, for app text learning reads (點了 is 点了): OpenCC's
+ * character tables as the app ships them (`learn/` in its assets, OpenCC 1.2.0, fcitx chttrans's version).
+ * The engine commits simplified text and chttrans converts after, so the app's text may be traditional.
+ * Phrases OpenCC converts whole (軟體 for 软件) stay as they are.
  *
- * Text is traditional if a character of it is one simplified text never has; simplified text is
- * left as it is. A character simplified text has too is changed only in traditional text
- * (review-1a-r2 S3): one OpenCC's traditional-to-simplified table keeps as one of its own readings
- * (乾坤, 覆盖, 慰藉, 瞭望 in simplified, 乾淨, 由於 in traditional: 乾 is 干, 於 is 于), and one of
- * GB2312, simplified text's set (哪吒, 菸, 後). One OpenCC's simplified-to-traditional table has as
- * a simplified one (緼) is never changed. gbks2t.tab read backwards got these wrong (機 to 几, 覆 to
- * 复), a table of every traditional form a simplified one may have.
+ * Text is traditional if one of its characters never appears in simplified text; simplified text is left
+ * alone. A character simplified text also has is changed only in traditional text: one OpenCC's T2S table
+ * keeps as one of its own readings (乾坤, 覆盖, 慰藉, 瞭望 in simplified; 乾淨, 由於 in traditional: 乾 is
+ * 干, 於 is 于), and one in GB2312 (哪吒, 菸, 後). One OpenCC's S2T table has as simplified (緼) is never
+ * changed. Reading gbks2t.tab backwards got these wrong (機 to 几, 覆 to 复).
  */
 class Simplifier private constructor(private val map: Map<Int, Int>, private val inTraditional: Map<Int, Int>) {
 
@@ -49,21 +46,20 @@ class Simplifier private constructor(private val map: Map<Int, Int>, private val
         val NONE = Simplifier(emptyMap(), emptyMap())
 
         /**
-         * Reads OpenCC's `TSCharacters.txt` ([traditional]: a line per character, a tab, its
-         * simplified ones apart by spaces, the usual first) and `STCharacters.txt` ([simplified],
-         * the other way): each traditional character to its first simplified one; one whose first is
-         * itself (覆, 藉, 阪) stays as it is, not taken to a later one. Lines of `#` and of a phrase are skipped.
+         * Reads OpenCC's `TSCharacters.txt` ([traditional]: per line a character, a tab, its simplified ones
+         * space-separated, the usual first) and `STCharacters.txt` ([simplified], the reverse): each traditional
+         * character to its first simplified one; one whose first is itself (覆, 藉, 阪) stays, not mapped to a
+         * later one. `#` lines and phrases are skipped.
          */
         fun read(traditional: ByteArray, simplified: ByteArray): Simplifier {
             val simplifiedAlready = HashSet<Int>()
             for ((key, _) in entries(simplified)) simplifiedAlready += key
-            // a JVM or phone without the charset: none of them is taken for GB2312's
+            // a JVM or phone without the charset: nothing counts as GB2312
             val gb2312 = if (Charset.isSupported(GB2312)) Charset.forName(GB2312).newEncoder() else null
             val map = HashMap<Int, Int>()
             val inTraditional = HashMap<Int, Int>()
             for ((key, values) in entries(traditional)) {
-                // OpenCC's first value, unless that is the character itself (覆 覆 复: 覆蓋 is 覆盖, not 复盖;
-                // 藉, 阪 stay too): verify-1a-r2 S3
+                // OpenCC's first value unless it is the character itself (覆 覆 复: 覆蓋 is 覆盖, not 复盖; 藉, 阪 stay too)
                 val to = values.firstOrNull()?.takeIf { it != key }
                 if (to == null || key in simplifiedAlready) continue
                 val shared = key in values || gb2312?.canEncode(String(Character.toChars(key))) == true
@@ -73,7 +69,7 @@ class Simplifier private constructor(private val map: Map<Int, Int>, private val
         }
 
         private const val GB2312 = "GB2312"
-        // the table's lines as a character and the single characters it goes to
+        // each table line as a character and the single characters it maps to
         private fun entries(table: ByteArray): Sequence<Pair<Int, List<Int>>> =
             String(table, Charsets.UTF_8).lineSequence().mapNotNull { line ->
                 val tab = line.indexOf('\t')

@@ -26,26 +26,21 @@ class EnginesTableKeyboardTest : EnginesFixture() {
             assertSame(TableRoots.WUBI86, keyboard.roots)
             assertEquals(KeyLabels.NONE, keyboard.labels)
             assertFalse(keyboard.lookingUp)
-            // its keys are letters alone
             assertTrue(keyboard.keys.toString(), keyboard.keys.isEmpty())
             // the 拼 key: on, and so told, for the next keyboard asking too
             engines.onEvent(wubi, EngineEvent.CHAR, Keyboard.LOOKUP)
             assertTrue(engines.tableKeyboard(wubi)!!.lookingUp)
             assertTrue("你" in engines.type(wubi, "ni").candidates)
             engines.onEvent(wubi, EngineEvent.RESET, 0)
-            // a setting changed, the sessions made anew: still on
             engines.settings = EngineSettings(tables = mapOf("Wubi" to TableSettings(keyLabels = KeyLabels.ROOTS)))
             val again = engines.tableKeyboard(wubi)!!
             assertTrue(again.lookingUp)
             assertEquals(KeyLabels.ROOTS, again.labels)
-            // not a table
             assertNull(engines.tableKeyboard(InputMethodCatalog.PINYIN))
         }
     }
 
-    // asked as the keyboard shows, before the input method's activate made its session: its roots
-    // alone, its table not read, so one that cannot be read throws nothing here (the host latches it
-    // as it answers); the same answer asked again
+    // the host latches an unreadable table as it answers, so nothing throws here
     @Test
     fun beforeItsSessionATableTellsItsRootsWithoutReadingIt() {
         Engines(::load, null).use { engines ->

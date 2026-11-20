@@ -36,12 +36,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.roundToInt
 
-/**
- * 060-render-p3 T4a: a theme's `stroke` and `text-shadow` as [ScenePainter] draws them, the qwerty's text
- * over a picture (what a theme of see-through keys shows): the outline round the glyphs under their
- * fill, the shadow under both, and neither without them. The picture is written to
- * build/t4a/stroke-shadow.png (and stroke-shadow-none.png) to be looked at.
- */
+/** `stroke` and `text-shadow` over a picture; written to build/t4a/stroke-shadow.png (and -none.png) to be looked at. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 // the layouts are the app's (SceneLayouts reads its prefs)
@@ -53,11 +48,10 @@ class TextStrokeShadowPictureTest {
     private val env = Env(
         1080.0, 720.0, density,
         texts = Texts(imeName = "拼音"),
-        // the top row's digits as their corners
         marks = MarkSettings(shortcuts = "qwertyuiop".zip("1234567890").associate { (k, v) -> "full/$k:up" to MarkContent.Symbol("$v") }),
     )
 
-    // grey bands and rings: nothing of the text's red, white or blue in it
+    // nothing of the text's red, white or blue in it
     private fun picture(w: Int, h: Int): Bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { b ->
         val c = Canvas(b)
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -77,7 +71,6 @@ class TextStrokeShadowPictureTest {
         val layout = requireNotNull(SceneLayouts.of(context, "qwerty"))
         val scene = SceneBuilder(theme, env, AndroidTextMeasurer(fonts)).build(layout.layout, layout.fragments).getOr { error("$it") }
         val b = picture(scene.width.roundToInt(), scene.height.roundToInt())
-        // the keys' text and icons only: their faces see-through, the picture under them
         val ops = scene.keys.flatMap { k -> k.ops(false).filter { it is Op.Text || it is Op.Icon } }
         ScenePainter(View(context), look, BoardImages.NONE, fonts).draw(Canvas(b), ops)
         return b to ops.filterIsInstance<Op.Text>()
@@ -88,7 +81,6 @@ class TextStrokeShadowPictureTest {
         File(dir, name).outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    // pixels about [op]'s glyphs (its advance across, its size up and down) that [what] holds for
     private fun count(b: Bitmap, op: Op.Text, what: (Int) -> Boolean): Int {
         val reach = (4 * density).roundToInt()
         val w = AndroidTextMeasurer(SceneFonts(look)).measure(op.text, op.font, op.weight, op.size).advance
@@ -118,10 +110,8 @@ class TextStrokeShadowPictureTest {
         assertTrue("the outline round q", count(b, q, ::red) > 40)
         assertTrue("its fill over the outline", count(b, q, ::white) > 40)
         assertTrue("its shadow under both", count(b, q, ::blue) > 40)
-        // the space's name too, its Han characters
         val name = texts.first { it.text == "拼音" }
         assertTrue(count(b, name, ::red) > 40 && count(b, name, ::blue) > 40)
-        // none set: neither
         val (plain, plainTexts) = drawn("<style select=\"key, key label, key mark\" color=\"#ffffffff\"/>")
         save(plain, "stroke-shadow-none.png")
         val bare = plainTexts.first { it.text == "q" }
@@ -139,14 +129,13 @@ class TextStrokeShadowPictureTest {
 
     @Test
     fun paintMeasuresLetterSpacing() {
-        // Paint's own: as the engine's arithmetic (TextMeasurer's default, the web page's) has it, near enough,
-        // and kept apart from the unspaced
+        // Paint's own, near the engine's arithmetic (TextMeasurer's default, the web page's)
         val m = AndroidTextMeasurer(SceneFonts(look))
         val arithmetic = TextMeasurer { text, font, weight, size -> m.measure(text, font, weight, size) }
         val plain = m.measure("abc", "system", 400, 60.0)
         val spaced = m.measure("abc", "system", 400, 60.0, 0.2)
         val reckoned = arithmetic.measure("abc", "system", 400, 60.0, 0.2)
-        // the advance: Android 10 leaves the last character's space off it (its ink the same), later ones keep it
+        // Android 10 leaves the last character's spacing off the advance, later ones keep it
         assertTrue("${spaced.advance} of ${reckoned.advance}", spaced.advance in reckoned.advance - 0.2 * 60 - 1..reckoned.advance + 1)
         assertEquals(reckoned.ink.left, spaced.ink.left, 1.0)
         assertEquals(reckoned.ink.right, spaced.ink.right, 1.0)
@@ -157,7 +146,7 @@ class TextStrokeShadowPictureTest {
 
     @Test
     fun aTransparentTextsShadowIsDrawn() {
-        // as CSS has it: the fill not there, its shadow is (setShadowLayer's took the fill's alpha: none)
+        // as CSS has it: the fill absent, its shadow is (setShadowLayer's took the fill's alpha)
         val (b, texts) = drawn("<style select=\"key, key label, key mark\" color=\"#00000000\" text-shadow=\"2dp 2dp 2dp #ff0000ff\"/>")
         val q = texts.first { it.text == "q" }
         assertTrue(count(b, q, ::blue) > 40)
@@ -171,8 +160,7 @@ class TextStrokeShadowPictureTest {
 
     private fun Bitmap.pixels(): IntArray = IntArray(width * height).also { getPixels(it, 0, width, 0, 0, width, height) }
 
-    // a text outlined and blurred-shadowed, then one plain: the plain one as drawn alone (no mask, no
-    // shadow layer, no stroke kept from the one before)
+    // nothing kept from the op before: no mask, shadow layer or stroke
     @Test
     fun nothingOfAnOpIsLeftForTheNext() {
         val white = Argb(Color.WHITE)
@@ -186,8 +174,7 @@ class TextStrokeShadowPictureTest {
         for (y in 0 until 200) for (x in 200 until w) assertEquals("($x, $y)", alone[y * w + x], both[y * w + x])
     }
 
-    // a text in two runs with a thick outline: the second's outline not over the first's fill, as Paint.content
-    // orders them (every outline, then every fill); one run after the other would cover it
+    // every outline, then every fill (Paint.content): one run after the other would cover the first's fill
     @Test
     fun runsOutlinedKeepEachFill() {
         val m = AndroidTextMeasurer(SceneFonts(look))
@@ -204,8 +191,6 @@ class TextStrokeShadowPictureTest {
         val wFill = ops(listOf(fill(b))).pixels()
         val two = twoPass.pixels()
         val one = oneByOne.pixels()
-        // the first H's fill (where the second's is not): all there two-pass, a part of it under the second's outline
-        // one run by one (an outline wider than an H's sides)
         val aFill = alone.indices.filter { white(alone[it]) && !white(wFill[it]) }
         assertTrue(aFill.size > 40)
         assertEquals(aFill.size, aFill.count { white(two[it]) })

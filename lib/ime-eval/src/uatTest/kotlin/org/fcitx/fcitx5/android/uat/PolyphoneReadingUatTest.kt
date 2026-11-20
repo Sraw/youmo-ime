@@ -13,9 +13,7 @@ import org.junit.Test
 /** 候选词注音 of polyphones, with the app's data (A5): one reading above each, toned, as its word has it. */
 class PolyphoneReadingUatTest {
 
-    // a polyphone found by its strokes or parts: one reading above it, toned, none beside, the one it has
-    // after what was picked before it, else its commonest; typed, each in a word as the word has it (A5,
-    // the user, 2026-11-06: 了 and 能 had le/liao, neng/nai beside them)
+    // a polyphone found by strokes or parts: one toned reading above it, by context or else its commonest
     @Test
     @Uat("PY-111", "PY-118")
     fun aPolyphoneIsReadOnceAboveAsItsWordHasIt() {

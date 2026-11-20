@@ -12,7 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The user's quick phrases (design 051-quickphrase §3.1–3.2): files, order, matching keys. */
+/** The user's quick phrases: files, order, matching keys. */
 class QuickPhraseBookTest {
 
     private class Mem(private val files: Map<String, String>) : PkgDataDir {
@@ -43,15 +43,15 @@ class QuickPhraseBookTest {
         assertTrue(text.startsWith(QuickPhraseFiles.HEADER + "\naddr \"北京市海淀区\\n3 号楼 502\"\n"))
     }
 
-    // review L5, L11: Notepad's BOM is no part of a key; the same key in another case is the same entry
+    // Notepad's BOM is no part of a key; the same key in another case is the same entry
     @Test
     fun mineFileDropsABomTooLongContentAndCaseOnlyDuplicates() {
         val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
         val long = QuickPhraseEntry("long", "x".repeat(QuickPhraseBook.MAX_CONTENT + 1))
         val text = QuickPhraseFiles.formatMine(listOf(gh, hi, hi.copy(key = "HI"), long, addr)).toByteArray()
         assertEquals(listOf(gh, hi, addr), QuickPhraseFiles.parseMine(bom + text))
-        assertEquals("gh", QuickPhraseFiles.parseLines(bom + text).first().key)
-        assertEquals(5, QuickPhraseFiles.parseLines(text).size)
+        assertEquals("gh", QuickPhraseFiles.parse(bom + text).entries.first().key)
+        assertEquals(5, QuickPhraseFiles.parse(text).entries.size)
         assertTrue(hi.sameAs(hi.copy(key = "hI")))
         assertFalse(hi.sameAs(hi.copy(content = "您好")))
         // the book of such a file lists the first alone
@@ -134,8 +134,7 @@ class QuickPhraseBookTest {
         assertEquals(listOf(true, false), book.find(keys("gh")).map { it.mine })
         // mine case aside; the built-in ones' case as fcitx has it
         assertEquals(listOf(hi, QuickPhraseEntry("hi", "lower")), book.find(keys("hi")).map { it.entry })
-        // the nine keys' 44: gh, hi, ig all read
-        // (the built-in ones in code point order: capitals first)
+        // the nine keys' 44: gh, hi, ig all read (the built-in ones in code point order: capitals first)
         assertEquals(listOf(gh, hi, QuickPhraseEntry("Hi", "hello"), QuickPhraseEntry("ghost", "👻"), QuickPhraseEntry("hi", "lower")), book.find(nine("44")).map { it.entry })
         // 借手机: none of mine
         assertEquals(listOf(QuickPhraseEntry("ghost", "👻")), book.find(keys("gh"), withMine = false).map { it.entry })

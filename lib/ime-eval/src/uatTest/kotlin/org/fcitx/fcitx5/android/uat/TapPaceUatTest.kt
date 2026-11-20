@@ -7,12 +7,7 @@ package org.fcitx.fcitx5.android.uat
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * What a pause shows may depend on how fast the keys before it came, by decision (dev/review/DECISIONS.md
- * 2026-10-25): the pause's refining goes on from the work slices between keys did, 64 slices at most,
- * as 0.3.x did. Found by parity sequence r2-7560 (a recording no longer kept); the host's refine slices
- * costing time on the [HostReplay.clock]: its sixth word 「send」 with a slice between taps, 「sen d」 without.
- */
+/** What a pause shows may depend on how fast the keys before it came: the refine goes on from the slices between keys. */
 class TapPaceUatTest {
     private fun typed(gapMillis: Long): List<String> {
         val r = HostReplay(

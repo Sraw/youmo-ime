@@ -26,7 +26,7 @@ class ScriptsTest {
 
     @Test
     fun theFullWidthBlocksHalfWidthKanaAndHangulAreNotHan() {
-        // ！Ａ and ｢ (a half-width CJK bracket) are a CJK font's; ｶ and ﾡ (half-width katakana, Hangul) are not (F6589)
+        // ！Ａ and ｢ (a half-width CJK bracket) are a CJK font's; ｶ and ﾡ (half-width katakana, Hangul) are not
         assertEquals(Scripts.Script.Han, Scripts.of(0xFF01))
         assertEquals(Scripts.Script.Han, Scripts.of(0xFF21))
         assertEquals(Scripts.Script.Han, Scripts.of(0xFF62))

@@ -4,69 +4,42 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
-/**
- * The parts of the focused editor's `EditorInfo` that decide how Backspace, Return and the
- * arrow keys act, decoded out of their bit fields.
- *
- * Keeping the decoding on the Android side and the decisions here means the decisions can be
- * tested for every kind of editor without constructing one.
- */
+/** The `EditorInfo` bits that decide Backspace, Return and arrows, decoded on the Android side so the decisions test without an editor. */
 data class EditorTraits(
-    /**
-     * `TYPE_NULL`: the editor is not a text field (a terminal, a game), so keys must reach it
-     * as raw key events rather than as text edits.
-     */
+    /** `TYPE_NULL` (a terminal, a game): keys must go as raw key events. */
     val isRawKeyInput: Boolean = false,
-    /** A URL field. Browsers use the arrow keys there to accept an address-bar suggestion. */
+    /** Browsers use the arrows there to accept an address-bar suggestion. */
     val isUri: Boolean = false,
-    /** An email address field. */
     val isEmail: Boolean = false,
-    /** A password's, its characters hidden or shown (a shown one is only sensitive to fcitx). */
+    /** Characters hidden or shown (a shown one is only sensitive to fcitx). */
     val isPassword: Boolean = false,
-    /** A number, phone or date field. */
     val isNumber: Boolean = false,
-    /** What kind of number a number, phone or date field says it takes; null for any other field. */
+    /** Null for any other field. */
     val number: NumberKind? = null,
-    /** A search field: its action is the search key. */
     val isSearch: Boolean = false,
-    /**
-     * A password, or a field that asks not to be learned from: its text is not read, not even to
-     * step over an emoji; but by the address bar in an email's or a URL's field (incognito), which
-     * reads at most 256 units either side of the cursor to suggest and keeps nothing (AddressStrip).
-     */
+    /** Not read, not even to step over an emoji, but by the address bar (≤256 units either side, nothing kept). */
     val isSensitive: Boolean = false,
-    /**
-     * The editor opted in, through `privateImeOptions`, to having Backspace done as an edit
-     * rather than a key event: the selection, or else one code point before the cursor (an
-     * unpaired surrogate still goes as a key event). Almost nothing does: our own key-binding
-     * preference, whose text is key names, is the one known user.
-     */
+    /** Opted in via `privateImeOptions` to Backspace as an edit; only our own key-binding preference does. */
     val acceptsDeleteSurrounding: Boolean = false,
-    /** `IME_FLAG_NO_ENTER_ACTION`: Return must stay a plain Enter. */
     val noEnterAction: Boolean = false,
-    /** The id of an action the editor labelled itself, or null when it has none. */
     val customActionId: Int? = null,
-    /** The action from `imeOptions`, or null when it is `UNSPECIFIED` or `NONE`. */
+    /** Null when `UNSPECIFIED` or `NONE`. */
     val imeAction: Int? = null,
-    /** Its action is `SEND`, in `imeOptions` or as its own labelled one: a message is written there. */
+    /** `SEND`, in `imeOptions` or its own labelled action. */
     val sends: Boolean = false,
-    /** A text field that takes more than one line (`TYPE_TEXT_FLAG_MULTI_LINE` or `_IME_MULTI_LINE`). */
     val isMultiLine: Boolean = false,
-    /** `TYPE_TEXT_FLAG_MULTI_LINE` alone: the field itself shows lines (the space's slide moves among them); `_IME_MULTI_LINE` is only the keyboard's. */
+    /** `TYPE_TEXT_FLAG_MULTI_LINE` alone: the field shows lines (the space's slide moves among them). */
     val showsLines: Boolean = false,
-    /** `TYPE_TEXT_VARIATION_SHORT_MESSAGE`: an SMS or a chat's message. */
     val isShortMessage: Boolean = false,
 )
 
-/** What a number, phone or date field declares it takes, out of its class, variation and flags. */
 enum class NumberKind {
-    /** Digits alone: neither signed nor decimal. */
+    /** Neither signed nor decimal. */
     INTEGER,
     SIGNED,
     DECIMAL,
     SIGNED_DECIMAL,
 
-    /** A number password: a PIN. */
     PIN,
     PHONE,
     DATE,
@@ -74,14 +47,11 @@ enum class NumberKind {
     DATETIME,
 }
 
-/** Decisions for keys whose meaning depends on the editor. */
 object EditorKeyPolicy {
 
     sealed interface ReturnAction {
-        /** Send a plain Enter key event; the editor decides what a newline means. */
         data object SendEnter : ReturnAction
 
-        /** Run the editor's action (search, send, go, ...) instead of inserting a newline. */
         data class PerformEditorAction(val actionId: Int) : ReturnAction
     }
 
@@ -96,27 +66,15 @@ object EditorKeyPolicy {
     enum class Direction { Left, Right }
 
     sealed interface ArrowAction {
-        /** Pass the arrow through as a key event. */
         data object SendKey : ArrowAction
 
-        /** Collapse the selection to [position]. */
         data class MoveCursor(val position: Int) : ArrowAction
     }
 
     /**
-     * An arrow moves a collapsed cursor by one code point, never between the halves of a
-     * surrogate pair (an emoji), where the next commit would split it; on a selection it
-     * collapses to the side it points at without moving further, as it does in desktop editors.
-     *
-     * [textBefore] and [textAfter] give up to that many units beside the cursor, as
-     * `getTextBeforeCursor`/`getTextAfterCursor` do; only the side moved over is asked, and only
-     * for a collapsed cursor. Where that tells nothing (null, no text, a lone half) the move is
-     * one unit. That cursor must be the one at [start]: [ArrowKeys] keeps it so over a run of
-     * presses the editor has not reported yet.
-     *
-     * The target can be -1 at the very start of the text (or past the end, at the end). The
-     * editor ignores an out-of-range selection, so the key simply does nothing there, as it
-     * always has.
+     * An arrow moves a collapsed cursor one code point, never splitting a surrogate pair; on a selection it collapses
+     * to that side. Where the text tells nothing the move is one unit. [start] must be the cursor [ArrowKeys] tracks;
+     * -1 or past the end is ignored by the editor.
      */
     fun onArrow(
         traits: EditorTraits,

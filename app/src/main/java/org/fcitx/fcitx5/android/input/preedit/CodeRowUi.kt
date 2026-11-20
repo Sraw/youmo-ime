@@ -24,27 +24,21 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.wrapContent
 
 /**
- * The row above the candidates for the code being typed ([PreeditComponent]): [PreeditUi]'s line
- * below put after the one above, for a row of one line's height ([CodeRow]); scrolled to keep the
- * cursor in sight, and a tap on it is [onTap]'s. The 14 or 18 keys' syllables ([syllables]) share the row
- * at its right end, in a part of their own: a tap on either is never the other's. [wrap]: as wide
- * as its text, for the floating strip ([FloatingCodeStrip]), which caps it; else across the whole row.
+ * The line below put after the one above, for a row of one line's height; scrolled to keep the cursor in
+ * sight. The syllables share the row at its right end: a tap on either is never the other's. [wrap]: as
+ * wide as its text, for the floating strip, which caps it.
  */
 class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView: TextView.() -> Unit) :
     PreeditUi(ctx, theme, setupTextView) {
 
-    /** Where in the preedit a tap on the row puts the cursor, in code points (HostApi.moveCursor). */
+    /** In code points (HostApi.moveCursor). */
     var onTap: ((Int) -> Unit)? = null
 
-    /**
-     * The row's line below starts with a notice to tap, [notice] units of it (set before [update]; 0 for
-     * none: what a field dropped, kept): a tap on it is [onNotice]'s, a screen reader's click on the row too.
-     * The rest of the line below is aux as ever, no tap's.
-     */
+    /** [notice] units of the line below (0 for none): a tap on it is [onNotice]'s, a screen reader's click on the row too. */
     var onNotice: (() -> Unit)? = null
     var notice = 0
 
-    // where the line below starts in the row's one line, as lines() made it and as drawn (the cursor's | before it)
+    // as lines() made it and as drawn (the cursor's | before it)
     private var belowAt = 0
     private var belowShown = 0
 
@@ -57,17 +51,15 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
         add(upView, lParams(wrapContent, matchParent))
     }
 
-    /** The syllables to take (拼音选择栏) at the row's right end, the 14 or 18 keys': gone else, the code taking the whole row. */
     val syllables = SyllableStrip(ctx, theme)
 
     override val root: View = LinearLayout(ctx).apply {
         orientation = LinearLayout.HORIZONTAL
-        // wrapped, the code shrinks, not the syllables, where both are more than the strip's cap
+        // wrapped, the code shrinks, not the syllables
         add(row, LinearLayout.LayoutParams(if (wrap) wrapContent else 0, matchParent, 1f))
         add(syllables, LinearLayout.LayoutParams(wrapContent, matchParent))
     }
 
-    // what the line above shows: the length of aux and the preedit
     private var auxShown = 0
     private var preeditShown = ""
     private var revealing = false
@@ -80,7 +72,6 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
                 val layout = upView.layout ?: return false
                 val offset = layout.getOffsetForHorizontal(0, e.x - upView.totalPaddingLeft)
                 // an offset is the character edge nearest the tap: the notice's from before its first to after its last
-                // (past the end of the row's text is its end: the notice's where it ends the row)
                 if (notice > 0 && offset in belowShown..belowShown + notice) {
                     onNotice?.invoke()
                     return true
@@ -91,7 +82,7 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
             }
         })
         upView.setOnTouchListener { _, e -> taps.onTouchEvent(e) }
-        // touches are the detector's; this is a screen reader's double tap, while the notice is there
+        // touches are the detector's; this is a screen reader's double tap
         upView.setOnClickListener { if (notice > 0) onNotice?.invoke() }
         upView.isClickable = false
     }
@@ -108,7 +99,7 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
         belowShown = belowAt + if (cursorShown in 0..belowAt) 1 else 0
         auxShown = inputPanel.auxUp.length
         preeditShown = inputPanel.preedit.toString()
-        // once laid out with the new text; one waiting at a time, while the window draws nothing
+        // one waiting at a time, while the window draws nothing
         if (visible && !revealing) {
             revealing = true
             upView.doOnPreDraw {
@@ -118,11 +109,10 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
         }
     }
 
-    // the row scrolled to show the cursor with some of the text around it, the end if it is there
     private fun reveal() {
         val layout = upView.layout ?: return
         val x = if (cursorShown < 0) upView.width else upView.totalPaddingLeft + layout.getPrimaryHorizontal(cursorShown).toInt()
-        // the keyboard's side padding is on the root, outside the row (BoardFollowers.place)
+        // the keyboard's side padding is on the root, outside the row
         val seen = row.width
         val to = CodeRow.scrollFor(x, ctx.dp(REVEAL_MARGIN), row.scrollX, seen) ?: return
         row.scrollTo(to, 0)
@@ -131,7 +121,6 @@ class CodeRowUi(ctx: Context, theme: Theme, wrap: Boolean = false, setupTextView
     companion object {
         private const val REVEAL_MARGIN = 32
 
-        // between the line above and the line below
         private const val GAP = "  "
     }
 }

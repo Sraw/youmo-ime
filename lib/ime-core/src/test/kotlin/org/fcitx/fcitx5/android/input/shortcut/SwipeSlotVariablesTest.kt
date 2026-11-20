@@ -17,7 +17,7 @@ import org.junit.Test
 import java.util.Calendar
 import java.util.GregorianCalendar
 
-// a swipe's text of variables (061-text-variables §2.4, §4.2, M5): `vtext:`, the mark kept every way it goes
+// a swipe's text of variables: `vtext:`, the mark kept every way it goes
 class SwipeSlotVariablesTest {
     private val now = GregorianCalendar(2026, Calendar.NOVEMBER, 14, 9, 5)
     private val vars = SwipeSlot.Text("\${fullhour}:\$minute", variables = true)
@@ -76,7 +76,7 @@ class SwipeSlotVariablesTest {
         assertEquals("09:06", s.typed(GregorianCalendar(2026, Calendar.NOVEMBER, 14, 9, 6)))
         assertEquals(MarkContent.Text("09…", "0…"), SceneMarks.content(s) { now })
         assertNull(SceneMarks.content(KeyShortcut.Text("\$yaer", variables = true)) { now })
-        // R26 F8250: the clock asked of a text of variables alone, not of every mark made
+        // the clock asked of a text of variables alone, not of every mark made
         var asked = 0
         val counted = { asked++; now }
         SceneMarks.content(KeyShortcut.Text("\$minute"), counted)
@@ -90,8 +90,7 @@ class SwipeSlotVariablesTest {
         assertEquals(MarkContent.Text("09…", "0…"), marks.shortcuts["full/q:down"])
     }
 
-    // R26 F8457: a board's marks made across a minute's turn show one time, the clock read once, and not at all where no
-    // mark has variables
+    // a board's marks made across a minute's turn show one time, the clock read once, none where no mark has variables
     @Test
     fun aBoardsMarksShowOneTime() {
         var asked = 0

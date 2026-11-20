@@ -6,13 +6,10 @@ package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 
-/** A word as learned: its text, simplified, and its reading, spelt syllables joined by spaces; "" where none (a table's code, letters). */
+/** A word as learned: simplified text and its reading (spelt syllables space-separated; "" for none: a table code, letters). */
 data class Word(val text: String, val reading: String)
 
-/**
- * Words as the user chose them, counted by their text and reading together: 点｜了 picked as two
- * words and 点了 once it is a word are one row (PLAN §2.1), the words kept to find the row again.
- */
+/** Words as chosen, counted by text and reading together: 点｜了 picked as two words and 点了 once a word are one row; the words find the row again. */
 class Words(val list: List<Word>) {
     val text: String = list.joinToString("") { it.text }
     val reading: String = list.map { it.reading }.filter { it.isNotEmpty() }.joinToString(" ")
@@ -32,70 +29,65 @@ data class Code(val kind: String, val keys: String) {
 }
 
 /**
- * The kinds of [Code], named in the log: never renamed, or every row learned under one is
- * orphaned. A 双拼 scheme by the name libime's config gives it (`EngineSettings.SCHEMES`), the
- * nine keys by their letters ([org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.tag]).
+ * The kinds of [Code], stored in the log: never rename one, or every row under it is orphaned. A 双拼
+ * scheme by its libime config name (`EngineSettings.SCHEMES`), the nine keys by their letters
+ * ([org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.tag]).
  */
 object Kinds {
     const val FULL = "qp"
     const val HANDWRITING = "hw"
-    /** 联想 picked, in any input method: keyed by the word it follows, by its text, never pinyin's order (review C S1). */
+    /** 联想 picked, in any input method: keyed by the word it follows, by text, never pinyin's order. */
     const val PREDICTION = "pred"
     private const val TABLE = "tb:"
     private const val SHUANGPIN = "sp:"
     private const val KEYS = "qk:"
     private const val SHUANGPIN_KEYS = "spk:"
 
-    /** Pinyin typed in zhuyin, 注音九键's and 大千's: their keys' codes ([org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys]) under a kind each. */
+    /** Zhuyin keyboards (注音九键, 大千): their key codes ([org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys]), a kind each. */
     const val ZHUYIN_NINE = "zy:nine"
     const val ZHUYIN_DACHEN = "zy:dachen"
 
-    /** Whether [kind] is a zhuyin keyboard's ([ZHUYIN_NINE], [ZHUYIN_DACHEN]): keys of symbols, filed by the code itself as 双拼's are. */
+    /** Zhuyin keys are symbols, filed by the code itself as 双拼's are. */
     fun isZhuyin(kind: String) = kind.startsWith("zy:")
 
     fun shuangpin(scheme: String) = "$SHUANGPIN$scheme"
     fun nineKeys(layout: String) = "t9:$layout"
     fun nineKeysMultiTap(layout: String) = "t9m:$layout"
 
-    /** A grouped keyboard's keys, [tag] its groups (NineKeyLetters.tag, `qw,er,…,m` the 14 keys'): apart from qp and t9. */
+    /** A grouped keyboard's keys, [tag] its groups (NineKeyLetters.tag, `qw,er,…,m` for 14 keys): apart from qp and t9. */
     fun keys(tag: String) = "$KEYS$tag"
 
     /**
-     * 双拼 on a grouped keyboard: [scheme] as [shuangpin]'s, [tag] the keys' (NineKeyLetters.G18
-     * or NINE_SP): apart from sp: and from each other, a scheme's keys meaning other syllables on
-     * each. Not under `sp:`: whatever asks whether a kind is 双拼's asks [isShuangpin].
+     * 双拼 on a grouped keyboard: [scheme] as in [shuangpin], [tag] the keys' (NineKeyLetters.G18 or
+     * NINE_SP): apart from sp: and from each other, as a scheme's keys mean other syllables on each. Not under
+     * `sp:`: ask [isShuangpin] whether a kind is 双拼's.
      */
     fun shuangpinKeys(scheme: String, tag: String) = "$SHUANGPIN_KEYS$scheme:$tag"
 
-    /** Whether [kind] is 双拼's, on any keyboard ([shuangpin], [shuangpinKeys]): two keys a syllable. */
+    /** 双拼 on any keyboard ([shuangpin], [shuangpinKeys]). */
     fun isShuangpin(kind: String) = kind.startsWith(SHUANGPIN) || kind.startsWith(SHUANGPIN_KEYS)
 
-    /** [kind]'s 双拼 scheme ([shuangpin], [shuangpinKeys]), or null for any other kind. */
+    /** Null for a non-双拼 kind. */
     fun shuangpinScheme(kind: String): String? = when {
         kind.startsWith(SHUANGPIN_KEYS) -> kind.removePrefix(SHUANGPIN_KEYS).substringBefore(':')
         kind.startsWith(SHUANGPIN) -> kind.removePrefix(SHUANGPIN)
         else -> null
     }
 
-    /**
-     * The layout a syllable taken from a bar ([Take]) of [kind] is kept under: a grouped 双拼
-     * kind's `<scheme>:<tag>`, its scheme's keys reading other syllables than another's; the
-     * keys' [tag] for any other (the nine keys', the 14 keys').
-     */
+    /** The layout a bar-taken syllable ([Take]) is kept under: `<scheme>:<tag>` for grouped 双拼 (its keys read other syllables than another scheme's); the keys' [tag] otherwise. */
     fun takeLayout(kind: String, tag: String) = if (kind.startsWith(SHUANGPIN_KEYS)) kind.removePrefix(SHUANGPIN_KEYS) else tag
 
-    /** The grouped keyboard's tag of a [keys] or [shuangpinKeys] kind, null for another kind. */
+    /** For a [keys] or [shuangpinKeys] kind; null for others. */
     fun keysTag(kind: String): String? = when {
         kind.startsWith(KEYS) -> kind.removePrefix(KEYS)
-        // a scheme's name has no colon (EngineSettings.SCHEMES), the tag no colon either
+        // neither a scheme's name (EngineSettings.SCHEMES) nor the tag has a colon
         kind.startsWith(SHUANGPIN_KEYS) -> kind.substringAfter(':').substringAfter(':', "").ifEmpty { null }
         else -> null
     }
 
     /**
-     * The grouped keyboard the keys of a [keys] or [shuangpinKeys] kind were typed on, to show its codes as
-     * letters (`bn ui`): a `qk:` kind's [NineKeyLetters.filedAs] (G14, G18, a layout's own by its tag), a
-     * `spk:` kind's [NineKeyLetters.grouped] (G18, G14, NINE_SP); null for any other kind.
+     * The grouped keyboard a [keys] or [shuangpinKeys] kind was typed on, to show its codes as letters
+     * (`bn ui`): a `qk:` kind's [NineKeyLetters.filedAs], a `spk:` kind's [NineKeyLetters.grouped]; null for others.
      */
     fun keysOf(kind: String): NineKeyLetters? = keysTag(kind)?.let { tag ->
         if (kind.startsWith(KEYS)) NineKeyLetters.filedAs(tag) else NineKeyLetters.grouped(tag)
@@ -103,23 +95,18 @@ object Kinds {
 
     fun table(im: String) = "$TABLE$im"
 
-    /** The keyboard [kind] is typed on: the nine keys' 连按 theirs (U-20 links the spellings of one keyboard). */
+    /** The keyboard [kind] is typed on (nine-key 连按 maps to the nine keys): spellings of one keyboard are linked. */
     fun keyboard(kind: String) = if (kind.startsWith(NINE_MULTI_TAP)) "t9:" + kind.removePrefix(NINE_MULTI_TAP) else kind
 
     private const val NINE_MULTI_TAP = "t9m:"
 
-    /** The table input method a table's [kind] is of. */
     fun tableOf(kind: String) = kind.removePrefix(TABLE)
 
-    /** Whether [kind] is a table's, handwriting's or 联想's: their words have no reading, and are counted by their text. */
+    /** A table's, handwriting's or 联想's: words without a reading, counted by text. */
     fun byText(kind: String) = kind == HANDWRITING || kind == PREDICTION || kind.startsWith(TABLE)
 }
 
-/**
- * One learning row of a commit (PLAN §2.1): [words] under [code] after [prev] ("" for none), how
- * they were committed ([how], 'A' to 'H' of the spec's §1), what the user picked from shown
- * first there ([shown]), and where the text comes from ([origin], at the time of writing).
- */
+/** One learning row: [words] under [code] after [prev] ("" for none), [how] committed ('A' to 'H'), [shown] first then, [origin] of the text when written. */
 class Row(
     val flags: Int,
     val code: Code,
@@ -143,13 +130,13 @@ class Row(
         const val PICK = 1
         /** Level 2: the whole commit. */
         const val WHOLE = 2
-        /** Level 3: a word of a pick the first shown has as a word too. */
+        /** Level 3: a pick's word the first shown also has as a word. */
         const val WORD = 4
         const val LEVELS = PICK or WHOLE or WORD
         const val CORRECTED = 8
-        /** U-03: what was retyped after an undo, counted under the undone commit's code (1c). */
+        /** Retyped after an undo, counted under the undone commit's code. */
         const val RETYPED = 16
-        /** A pick of the decoder's or table's own first while another was shown first (F2739): a use of the original first. */
+        /** A pick of the decoder's or table's own first while another was shown first: a use of the original first. */
         const val OWN_FIRST = 32
 
         /** [how]: the first shown put in. */
@@ -164,16 +151,16 @@ class Row(
     }
 }
 
-/** A syllable taken from the nine keys' bar, for its digits, that the commit kept; [layout] as Kinds.takeLayout has it. */
+/** A nine-key bar syllable the commit kept, for its digits; [layout] as Kinds.takeLayout gives it. */
 data class Take(val layout: String, val digits: String, val syllable: String)
 
-/** A first, the words corrected to since it was last used, the typing day last typed, and the commit that changed it last. */
+/** A first, the words corrected to since it was last used, the last typing day, and the commit that last changed it. */
 data class First(val first: Words?, val set: List<Words>, val lastDay: Int, val lastBy: Long)
 
-/** Text committed once, not yet the user's word (U-06). */
+/** Text committed once, not yet the user's word. */
 data class Pending(val reading: String, val firstDay: Int, val lastBy: Long)
 
-/** The user's word: how it became one, since when, and when last used. */
+/** The user's word: how it became one, since when, last used. */
 data class Mine(
     val reading: String,
     val how: Int,
@@ -187,21 +174,21 @@ data class Mine(
         const val FORMED = 0
         const val FORMED_FROM_IMPORT = 1
         const val CONVERTED = 2
-        /** Brought in whole: a learned word of the user's own export, a phrase a table saved. */
+        /** Brought in whole: a word from the user's export, a phrase a table saved. */
         const val TAKEN_IN = 3
     }
 }
 
-/** A row as it was before a commit changed it, null for none: what an [LearnRecord.Undo] puts back. */
+/** A row before a commit changed it (null for none): what [LearnRecord.Undo] restores. */
 sealed class Before {
     data class OfFirst(val code: Code, val prev: String, val value: First?) : Before()
     data class OfPending(val text: String, val value: Pending?) : Before()
     data class OfMine(val text: String, val value: Mine?) : Before()
 }
 
-/** What `learn.log` holds ([LearnRecords]): events, then, compacted, a snapshot's rows. */
+/** What `learn.log` holds ([LearnRecords]): events, then after compaction a snapshot's rows. */
 sealed class LearnRecord {
-    /** The epoch minute it was written at, for the cuts; null for one that has none. */
+    /** The epoch minute written, for the cuts; null if none. */
     open val minute: Int? get() = null
 
     data class Commit(
@@ -212,13 +199,13 @@ sealed class LearnRecord {
         val flags: Int,
         val rows: List<Row>,
         val takes: List<Take> = emptyList(),
-        /** A 联想 picked that went on with a whole phrase learned (U-73): that phrase, used whole once more; "" for none. */
+        /** A 联想 pick continued with a whole learned phrase: that phrase, used whole once more; "" for none. */
         val continued: String = "",
     ) : LearnRecord() {
         companion object {
-            /** A field of URLs, e-mail, numbers, phone numbers or dates: no pairs learned (U-91). */
+            /** A field of URLs, e-mail, numbers, phone numbers or dates: no pairs learned. */
             const val NO_PAIRS = 1
-            /** A search field: learned, not predicted (U-91). */
+            /** A search field: learned, not predicted. */
             const val NO_PREDICT = 2
 
             /** Either: no pairs learned, as 联想 goes by them. */
@@ -239,15 +226,12 @@ sealed class LearnRecord {
     data class Pin(override val minute: Int, val day: Int, val code: Code, val text: String, val reading: String, val on: Boolean) : LearnRecord()
     data class Forget(override val minute: Int, val day: Int, val text: String) : LearnRecord()
 
-    /**
-     * A whole phrase (U-73) deleted from its long press: its count alone, no word of the same text
-     * (one added by hand, imported, a table's saved): those are not what was deleted. Type 16.
-     */
+    /** A whole phrase deleted from its long press: its count alone, not words of the same text (added, imported, a table's saved). Type 16. */
     data class PhraseForget(override val minute: Int, val text: String) : LearnRecord()
     data class NoPredict(override val minute: Int, val prev: String, val text: String, val on: Boolean) : LearnRecord()
     data class TableOrderReset(override val minute: Int, val im: String) : LearnRecord()
 
-    /** [text] blocked under the table [im]'s [code] alone ([on]), or no more: see [TableBlockRow]. */
+    /** [text] blocked under table [im]'s [code] alone ([on]), or unblocked: see [TableBlockRow]. */
     data class TableBlock(override val minute: Int, val im: String, val code: String, val text: String, val on: Boolean) : LearnRecord()
 
     data class EnCommit(
@@ -272,10 +256,7 @@ sealed class LearnRecord {
     data class EnForget(override val minute: Int, val word: String) : LearnRecord()
     data class EnAdd(override val minute: Int, val word: String, val on: Boolean) : LearnRecord()
 
-    /**
-     * The English [word] corrected again (U-31 恢复): that it is never corrected, or was added by
-     * hand, taken off; its uses and pairs kept.
-     */
+    /** 恢复: the English [word] may be corrected again (never-corrected and added flags off); uses and pairs kept. */
     data class EnCorrect(override val minute: Int, val word: String) : LearnRecord()
     data class Restored(override val minute: Int) : LearnRecord()
     data class ImportBatch(val id: Int, val file: String, val localDay: Int, val count: Int) : LearnRecord()
@@ -283,11 +264,9 @@ sealed class LearnRecord {
     data class ImportUndo(val batch: Int) : LearnRecord()
 
     /**
-     * What an older build changed of its files since they were last converted (a downgrade, then
-     * this build again; review-1a-app S4): the user's words, the tables' saved words and the
-     * English words' flags it [added] (where none is kept already), and those it [removed]: a
-     * word of the user's forgotten everywhere, a table's word, an English word. Rows of
-     * [MineRow], [TableWordRow] and [EnWordRow] only; counts are not carried.
+     * What an older build changed in its files since last converted (a downgrade, then this build again):
+     * the user's words, tables' saved words and English word flags it [added] (where not kept already), and
+     * those it [removed]. Only [MineRow], [TableWordRow] and [EnWordRow] rows; counts are not carried.
      */
     data class Absorbed(override val minute: Int, val added: List<LearnRecord>, val removed: List<LearnRecord>) : LearnRecord()
 
@@ -304,7 +283,7 @@ sealed class LearnRecord {
         val convertedTables: String = "",
     ) : LearnRecord()
 
-    /** [firstSeq]: the commit that first used [words] under [code] (impl/design-1b.md §4); 0 in a row of 1a's. */
+    /** [firstSeq]: the commit that first used [words] under [code]; 0 in an older row. */
     class StatRow(val code: Code, val words: Words, val uses: DayCounts, val corrections: DayCounts, val older: Int, val firstSeq: Long = 0) : LearnRecord() {
         override fun equals(other: Any?) = other is StatRow && code == other.code && words.list == other.words.list &&
             uses == other.uses && corrections == other.corrections && older == other.older && firstSeq == other.firstSeq
@@ -326,13 +305,13 @@ sealed class LearnRecord {
     }
     data class EnPairRow(val prev: String, val word: String, val count: Int, val lastDay: Int) : LearnRecord()
     data class TableWordRow(val im: String, val code: String, val text: String, val since: Int) : LearnRecord()
-    /** [prev] "" for a whole phrase (U-73) turned off everywhere: a word's 联想 always follows one. */
+    /** [prev] "" for a whole phrase turned off everywhere: a word's 联想 always follows one. */
     data class NoPredictRow(val prev: String, val text: String) : LearnRecord()
 
-    /** A whole commit's text of 3 to [Phrases.MAX] letters (U-73), committed whole [count] times, last on typing day [lastDay]. Type 49. */
+    /** A whole commit's text of 3 to [Phrases.MAX] letters, committed whole [count] times, last on typing day [lastDay]. Type 49. */
     data class PhraseRow(val text: String, val count: Int, val lastDay: Int) : LearnRecord()
 
-    /** [text] not offered under the table [im]'s [code] alone (U-28 屏蔽): pinyin's blocks never hide a table's own entries (C12). */
+    /** 屏蔽: [text] not offered under table [im]'s [code] alone; pinyin's blocks never hide a table's own entries. */
     data class TableBlockRow(val im: String, val code: String, val text: String) : LearnRecord()
     object Cut : LearnRecord() {
         override fun toString() = "Cut"
@@ -341,9 +320,9 @@ sealed class LearnRecord {
     data class ImportedRow(val batch: Int, val order: Int, val text: String, val reading: String) : LearnRecord()
 
     /**
-     * A word of the whole commits, [text] read [reading] ("" for a table's, handwriting's), used on
-     * each typing day of [uses] (impl/design-1b.md §4): what the decoder's counts are made of. Not
-     * made again from the other rows, which keep no level: kept as it is in a snapshot.
+     * A word of the whole commits, [text] read [reading] ("" for tables, handwriting), used on each typing day
+     * of [uses]: what the decoder's counts are made of. Cannot be rebuilt from other rows (which keep no
+     * level), so a snapshot keeps it as it is.
      */
     class WordUseRow(val text: String, val reading: String, val uses: DayCounts) : LearnRecord() {
         override fun equals(other: Any?) = other is WordUseRow && text == other.text && reading == other.reading && uses == other.uses
@@ -351,7 +330,7 @@ sealed class LearnRecord {
         override fun toString() = "WordUseRow($text, $reading, $uses)"
     }
 
-    /** The calendar day ([localDay]) typing day [day] was: what a word's last use (U-80) shows. Stream E's, type 80. */
+    /** The calendar day ([localDay]) typing day [day] was: shown as a word's last use. Type 80. */
     data class DateRow(val day: Int, val localDay: Int) : LearnRecord()
 
     /** A record of a type this build does not know: kept as it is, so a fold here loses nothing a later build wrote. */

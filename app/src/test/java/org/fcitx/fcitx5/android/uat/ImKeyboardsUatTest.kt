@@ -34,12 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The keyboards I1 adds (uat/06 PY-105, uat/07 SP-26): pinyin's 18 keys and 双拼's 14, each its
- * own input method's choice, their keys sending codes of their own (Keyboard.pinyin18Key,
- * Keyboard.shuangpin14Key) that no other session reads. What the engine makes of them is
- * EnginesImKeyboardsTest's (ime-core) and the measured `t9 --keys 18`, `shuangpin --keys 14` (ime-eval).
- */
+/** Pinyin's 18 keys and 双拼's 14, their keys sending codes of their own that no other session reads. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -51,9 +46,9 @@ class ImKeyboardsUatTest {
     private var harness: KeyboardHarness? = null
     private val h: KeyboardHarness get() = harness!!
 
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
 
-    // the process's scheme as the test found it: a later test reads it
+    // a later test reads it
     private val schemeWas = EngineState.shuangpinScheme
 
     @After
@@ -62,7 +57,7 @@ class ImKeyboardsUatTest {
         EngineState.shuangpinScheme = schemeWas
     }
 
-    // the engine told [settings], as the host tells it a change (EngineBridge is no AutoCloseable)
+    // EngineBridge is no AutoCloseable
     private fun configured(settings: EngineSettings) {
         val bridge = EngineBridge()
         try {
@@ -79,15 +74,13 @@ class ImKeyboardsUatTest {
         it.start()
     }
 
-    // the keys' faces, in order
-    // the group keys shown, named by their place (r1c1…) whichever draws them (060-render-p2 S4a)
+    // named by their place (r1c1…) whichever draws them
     private fun groups() = h.keys().filter { it.id?.matches(PLACE) == true }
 
     private fun faces() = groups().map { it.label }
 
     private fun face(group: String) = groups().first { it.label == group }
 
-    // the keysyms sent down, as `sym=<n>,`
     private fun sents() = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }.map { Regex("sym=\\d+,").find(it)?.value ?: it }
 
     private fun sym(code: Int) = "sym=${UNICODE + code},"
@@ -104,13 +97,10 @@ class ImKeyboardsUatTest {
         val groups = NineKeyLetters.G18.tag().split(',').map { it.replace(";", "").uppercase() }
         assertEquals(groups, faces())
         h.captureBoard("ImKeyboardsUatTest/pinyin18")
-        // B N: the group's code as pinyin's 18 keys send it, not 双拼's
         h.tap(face("BN"))
         assertEquals(listOf(sym(Keyboard.pinyin18Key(NineKeyLetters.G18.key('n')))), sents())
-        // the syllable strip's tall code row, as on the 14 keys
         h.relayout()
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), row(), 1f)
-        // 双拼 keeps its own keyboard, the full one
         h.api.inputMethodEntryCached = shuangpin
         h.emit(HostEvent.InputMethodChanged(shuangpin))
         assertTrue(h.texts().toString(), listOf("q", "w", "e").all { it in h.texts() })
@@ -129,17 +119,14 @@ class ImKeyboardsUatTest {
         assertEquals(listOf(sym(Keyboard.shuangpin14Key(NineKeyLetters.G14.key('n')))), sents())
         h.relayout()
         assertEquals(CodeRowHeight.STRIP_DP.toFloat(), row(), 1f)
-        // 微软 types ; (ing), no key of the 14 has it: the engine configured so (as the host does on the
-        // settings page's change) stores the 18 keys, the nearest, and the input view made anew for that
-        // preference (FcitxInputMethodService.recreateInputViewPrefs) shows them; HostCore tells the change
-        // as the keyboard's too (ChineseModulesHostTest)
+        // 微软 types ; (ing), no key of the 14 has it: the engine stores the 18 keys, and the input view made anew for that
+        // preference shows them
         configured(EngineSettings(shuangpin = "MS"))
         assertEquals(ShuangpinScheme.MICROSOFT, EngineState.shuangpinScheme)
         assertEquals(ShuangpinKeyboard.Keys18, AppPrefs.getInstance().keyboard.shuangpinKeyboard.getValue())
         h.close()
         start(shuangpin)
         assertEquals(NineKeyLetters.G18.tag().split(',').map { it.uppercase() }, faces())
-        // a scheme with the 14 keys again leaves the 18 keys as stored
         configured(EngineSettings())
         assertEquals(ShuangpinKeyboard.Keys18, AppPrefs.getInstance().keyboard.shuangpinKeyboard.getValue())
     }

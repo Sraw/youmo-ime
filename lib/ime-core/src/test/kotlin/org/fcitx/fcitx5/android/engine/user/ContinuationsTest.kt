@@ -9,7 +9,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** [Continuations]: what is left of a whole phrase after the text before ends its start (U-73). */
+/** [Continuations]: what is left of a whole phrase after the text before ends its start. */
 class ContinuationsTest {
 
     private val c = Continuations().apply { set("你好呀亲爱的", 3, 5, LEAST) }
@@ -22,18 +22,14 @@ class ContinuationsTest {
     fun afterEachStartTheRest() {
         assertEquals(listOf("好呀亲爱的"), rests("你", "你", 0))
         assertEquals(listOf("呀亲爱的"), rests("你好", "你好", 0))
-        // picked 你 then 好: the text before is 你好 all the same
         assertEquals(listOf("呀亲爱的"), rests("你好", "好", 0, 1))
         assertEquals(listOf("亲爱的"), rests("你好呀", "呀", 0, 2))
     }
 
     @Test
     fun onlyFromAWordsStartCoveringTheLastWord() {
-        // C51: the last word is the start, whatever is before it
         assertEquals(listOf("好呀亲爱的"), rests("谢谢你", "你", 0, 2))
-        // 迷你 is the last word, not 你
         assertEquals(emptyList<String>(), rests("迷你", "迷你", 0))
-        // a start inside the last word put in is none
         assertEquals(emptyList<String>(), rests("迷你", "迷你", 0, 1))
     }
 
@@ -45,7 +41,6 @@ class ContinuationsTest {
 
     @Test
     fun theLastWordsOwnStartCountsWhereTheSplitPutItInAnother() {
-        // the split had 谢你 as one word; 你 was put in last
         assertEquals(listOf("好呀亲爱的"), rests("谢你", "你", 0))
     }
 
@@ -79,7 +74,6 @@ class ContinuationsTest {
         assertEquals(3, found.single().count)
     }
 
-    // two phrases left with the same rest are one candidate: the one used most (review of 051-predict)
     @Test
     fun oneRestOnceTheMostUsedPhrase() {
         c.set("好呀亲爱的", 5, 1, LEAST)
@@ -87,12 +81,10 @@ class ContinuationsTest {
         assertEquals(listOf("亲爱的"), found.map { it.rest })
         assertEquals("好呀亲爱的", found.single().whole)
         c.set("好呀亲爱的", 3, 1, LEAST)
-        // as many uses: the last used
         assertEquals("你好呀亲爱的", c.find("你好呀", intArrayOf(0, 1, 2), "呀", 2) { true }.single().whole)
     }
 
-    // the tail was measured in UTF-16 units against a limit in code points: a character outside the
-    // BMP counted twice, or cut in half
+    // the tail is cut by code points: a non-BMP character never counted twice or halved
     @Test
     fun theTailIsAPhrasesLengthNoCharacterCut() {
         assertEquals("你好", Continuations.tail("你好"))
@@ -101,7 +93,6 @@ class ContinuationsTest {
         // 𠀀 (two chars) one code point as Phrases counts: twelve in all, kept whole
         val ext = "𠀀" + "好".repeat(11)
         assertEquals(ext, Continuations.tail(ext))
-        // thirteen: the first goes whole, never half of it
         assertEquals("好".repeat(12), Continuations.tail("𠀀" + "好".repeat(12)))
     }
 

@@ -6,21 +6,7 @@ package org.fcitx.fcitx5.android.dicttool
 
 import org.fcitx.fcitx5.android.engine.phrase.EmojiData
 
-/**
- * The engine's `emoji.data` ([EmojiData]) from its sources: Unicode's emoji-test.txt, which emoji
- * there are, how each is written in full (U+FE0F where it is text by default: ☺️, 🤦‍♂️) and the
- * panel's groups; CLDR's Chinese annotations (`common/annotations/zh.xml`, Unicode-3.0), each
- * emoji's keywords and its name (`type="tts"`); and this project's edits (`lexicon/emoji.tsv`),
- * which put the internet's words in (点赞, 狗头) and take out what CLDR has that a user would not
- * mean (加油 ⛽).
- *
- * Under a word, an emoji whose name it is comes first (笑脸 😃 before an emoji that has 笑脸 as one
- * of its keywords), then the rest as CLDR lists them; an edit's emoji come before both. Only words
- * of Han characters are kept, a keyword such as `OK` being no reading pinyin gives; a single
- * character only as an emoji's name (猫 🐈, 火 🔥) or an edit, CLDR's single-character keywords
- * (是 🫡, 你 🫵, 上 ⬆️) being the commonest characters, whose emoji no one means as often as they
- * are typed. CLDR names symbols too (`{`, `■`): only what emoji-test.txt has is kept.
- */
+/** The engine's `emoji.data` from emoji-test.txt, CLDR's Chinese annotations and `lexicon/emoji.tsv`, Han words only. */
 internal object EmojiAnnotations {
 
     class Annotation(val emoji: String, val keywords: List<String>, val name: String?)
@@ -28,8 +14,7 @@ internal object EmojiAnnotations {
     /** emoji-test.txt's emoji: the panel's [groups] ([EmojiData.GROUPS]), and each written in full by how it is written bare. */
     class Emoji(val groups: List<Pair<String, List<String>>>, val full: Map<String, String>)
 
-    // emoji-test.txt's groups by the ids the panel knows them by; Component (the skin tones and
-    // hair alone) is none: the panel puts a tone on an emoji itself
+    // the panel's groups; Component (skin tones alone) is none, as the panel tones an emoji itself
     private val GROUP_IDS = mapOf(
         "Smileys & Emotion" to "smileys", "People & Body" to "people", "Animals & Nature" to "nature",
         "Food & Drink" to "food", "Travel & Places" to "travel", "Activities" to "activities",
@@ -38,10 +23,7 @@ internal object EmojiAnnotations {
 
     private val TONES = 0x1F3FB..0x1F3FF
 
-    /**
-     * emoji-test.txt's fully qualified emoji, by group; an emoji with a skin tone is in no group
-     * (the panel's long press makes those), but is known in full too.
-     */
+    /** emoji-test.txt's fully qualified emoji by group; a toned emoji is in no group (the long press makes those). */
     fun emoji(test: String): Emoji {
         val groups = LinkedHashMap<String, MutableList<String>>()
         val full = HashMap<String, String>()
@@ -76,12 +58,7 @@ internal object EmojiAnnotations {
         return keywords.map { (cp, k) -> Annotation(cp, k, names[cp]) }
     }
 
-    /**
-     * The words of [annotations] and [edits] (lexicon/emoji.tsv's lines), the edits' emoji written
-     * in full as [emoji] has them: `word<TAB>emoji...` puts those first under the word,
-     * `-word<TAB>emoji...` takes them out of it, `-word` alone takes the word out. `#` starts a comment.
-     * A taking out that finds nothing to take (CLDR has dropped the word or the emoji) goes to [stale].
-     */
+    /** The words of [annotations] and [edits] (`word\temoji`, `-word\temoji`, `-word`); an edit that finds nothing goes to [stale]. */
     fun words(annotations: List<Annotation>, edits: List<String>, emoji: Emoji, stale: (String) -> Unit = {}): Map<String, List<String>> {
         val named = LinkedHashMap<String, MutableList<String>>()
         val keyed = LinkedHashMap<String, MutableList<String>>()
@@ -110,10 +87,7 @@ internal object EmojiAnnotations {
         return words.mapValues { (_, e) -> e.distinct().take(EmojiData.MAX_EMOJI) }.filterValues { it.isNotEmpty() }
     }
 
-    /**
-     * A word pinyin can give: Han characters only, by code point (扩展B's are two chars), as long as
-     * a keyword is in chars, as EmojiData's reader counts it.
-     */
+    /** A word pinyin can give: Han characters only, by code point, as EmojiData's reader counts it. */
     private fun isWord(w: String) =
         w.length in 1..EmojiData.MAX_WORD && w.codePoints().allMatch { Character.UnicodeScript.of(it) == Character.UnicodeScript.HAN }
 

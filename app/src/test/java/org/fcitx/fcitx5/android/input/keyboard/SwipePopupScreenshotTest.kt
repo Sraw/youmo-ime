@@ -29,12 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * What a swipe shows while the finger is still down: a letter's shortcut named in its bubble, at
- * the size of the keys' words and no wider than [SwipePreviewLabel] lets it be; the edit menu up
- * where the notices go, clear of the finger. Against the goldens under src/test/screenshots,
- * recorded again with `-Proborazzi.test.record=true` when the look changes on purpose.
- */
+/** A swipe's bubble while the finger is down, and the edit menu clear of the finger; record with `-Proborazzi.test.record=true`. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -43,14 +38,13 @@ class SwipePopupScreenshotTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // q a long text, w 快速输入, e 恢复刚删除的: the longest words a bubble shows
+    // the longest words a bubble shows
     private fun longShortcuts() = prefs.setShortcuts(KeyShortcuts.Empty
             .with("full/q", KeyShortcut.Text("我的邮箱是 someone@example.com"))
             .with("full/w", KeyShortcut.Command(KeyCommand.QuickInput))
             .with("full/e", KeyShortcut.Command(KeyCommand.Restore))
             )
 
-    // [label]'s key swiped down (its shortcut, by default) past the threshold and held there, the bubble shown
     private fun KeyboardHarness.held(label: String, name: String) {
         val key = key(label)
         val finger = finger(key, at(key))
@@ -59,8 +53,7 @@ class SwipePopupScreenshotTest {
         finger.up(at(key))
     }
 
-    // [label]'s key swiped up to its symbol (its long press's first) and held: a character in the bubble, scaled
-    // as the keys' text (紧凑, floating). Held still, the long press would show its keys over it before the shot
+    // held still, the long press would show its keys over it before the shot
     private fun KeyboardHarness.symbolHeld(label: String, name: String) {
         val key = key(label)
         val finger = finger(key, at(key))
@@ -79,10 +72,9 @@ class SwipePopupScreenshotTest {
 
     private fun shoot(suffix: String) {
         longShortcuts()
-        // the keys drawn by the canvas, their popups by the engine (060-render-p2 S2); canvas_ kept so the goldens' names stay as recorded
+        // canvas_ kept so the goldens' names stay as recorded
         val prefix = "canvas_"
-        // the edit menu's test copies "hello": its entry, kept in the app's object, would show in the bar of a later shot,
-        // and one stored late (the clipboard's own thread, a test run before in the same JVM) would still reach the bar
+        // the edit menu's test copies "hello": kept in the app's object, or stored late by a test before, it would show in a later shot's bar
         org.fcitx.fcitx5.android.data.clipboard.ClipboardManager.lastEntry = null
         prefs.set(AppPrefs.getInstance().clipboard.clipboardSuggestion, false)
         KeyboardHarness(TestThemes.PixelLight).use { h ->
@@ -96,8 +88,6 @@ class SwipePopupScreenshotTest {
         }
     }
 
-    // the bubbles and the edit menu the engine's scenes (060-render-p2 S2, §5.3's differences from the views'
-    // that were: their text dp, not sp; their shadow drawn)
     @Test
     @Uat("KB-105")
     fun uprightOnTheCanvas() = shoot("port")
@@ -122,7 +112,7 @@ class SwipePopupScreenshotTest {
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
     fun turnedOnTheCanvas() = shoot("land")
 
-    // team-lead, 0.5.1: the letter in the bubble scaled as the keys' text, 紧凑 0.9 of the standard's
+    // 紧凑 0.9 of the standard's
     @Test
     fun theLetterIsScaledAsTheKeys() {
         fun letterPx(): Float = KeyboardHarness(TestThemes.PixelLight).use { h ->
@@ -139,7 +129,6 @@ class SwipePopupScreenshotTest {
         assertEquals(standard * 0.9f, letterPx(), 0.5f)
     }
 
-    // what the bubbles say: the words fitted, a cut text told by its ellipsis
     @Test
     @Uat("KB-65")
     fun theBubbleSaysTheShortcutFitted() {
@@ -160,8 +149,7 @@ class SwipePopupScreenshotTest {
         }
     }
 
-    // KB-62: the edit menu over the app, above the keyboard, not under the finger; the notice there put
-    // away; a cell left and lift copies, as when it was over the key
+    // the edit menu over the app, not under the finger; the notice there put away; a cell left and lift copies
     @Test
     @Uat("KB-62")
     fun theEditMenuIsAboveTheKeyboardAndPicksAsBefore() {
@@ -170,7 +158,6 @@ class SwipePopupScreenshotTest {
             h.service.say(R.string.text_copied)
             h.after(500)
             assertNotNull("a notice up first", h.notice())
-            // the icons outside the keys: the bar's, then the menu's cells as well
             val before = h.shownIcons().toSet()
             val space = h.keyWithId(R.id.button_space)!!
             val finger = h.finger(space, h.at(space))
@@ -189,8 +176,7 @@ class SwipePopupScreenshotTest {
         }
     }
 
-    // KB-62: a failure said as a key failed is not put away by the menu (it would be lost unread): hidden
-    // under it, back as it goes with nothing picked
+    // a failure said as a key failed is not put away by the menu (lost unread): hidden under it, back as it goes
     @Test
     @Uat("KB-62")
     fun aFailureIsHiddenUnderTheEditMenuAndBackAsItGoes() {
@@ -206,7 +192,6 @@ class SwipePopupScreenshotTest {
             h.after(500)
             assertNotNull("still up", h.notice())
             assertFalse("hidden under the menu", said.isShown)
-            // down off the key: nothing picked, the menu gone
             finger.move(h.at(space, dy = 200f, ms = 16))
             finger.up(h.at(space, dy = 200f))
             h.idle()
@@ -215,8 +200,7 @@ class SwipePopupScreenshotTest {
         }
     }
 
-    // TalkBack on the edit menu: each cell is read by its name as the settings and the swipe's preview
-    // say it (全选, 剪切 ...), never the command's enum name
+    // each cell read by its name (全选, 剪切 ...), never the command's enum name
     @Test
     @Uat("KB-62")
     fun theEditMenusCellsAreReadByTheirLabels() {
@@ -234,8 +218,7 @@ class SwipePopupScreenshotTest {
         }
     }
 
-    // review L1: the menu taken down with everything (another window, the keyboard's onDetached): the
-    // failure back then, and the finger lifted after does not bring it back a second time
+    // the menu taken down with everything: the failure back once, not again at the lift
     @Test
     fun aFailureIsBackWhenTheMenuGoesWithEverythingAndOnlyOnce() {
         KeyboardHarness(TestThemes.PixelLight).use { h ->

@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.daemon.launchOnReady
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
@@ -26,9 +25,6 @@ import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
 import org.fcitx.fcitx5.android.input.candidates.SceneBar
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.FlexboxVerticalDecoration
-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AlwaysFillWidth
-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.AutoFillWidth
-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode.NeverFillWidth
 import org.fcitx.fcitx5.android.input.dependency.UniqueViewComponent
 import org.fcitx.fcitx5.android.input.dependency.context
 import org.fcitx.fcitx5.android.input.dependency.fcitx
@@ -47,9 +43,7 @@ class HorizontalCandidateComponent :
     private val inputView by manager.inputView()
     private val bar: KawaiiBarComponent by manager.must()
 
-    private val fillStyle by AppPrefs.getInstance().keyboard.horizontalCandidateStyle
-
-    // English is typed: its words in three slots, as Gboard has them (the word typed, then the likeliest two)
+    // its words in three slots, as Gboard has them (the word typed, then the likeliest two)
     private var english = false
 
     override fun onImeUpdate(ime: InputMethodEntry) {
@@ -98,7 +92,6 @@ class HorizontalCandidateComponent :
         CandidateRowLayoutManager().apply { onLaidOut = ::refreshExpanded }
     }
 
-    // the theme's candidates (T6a): the line between them, the room beside it
     private val barLook by lazy { SceneBar.of(context, theme) }
 
     private val gap by lazy { SceneBar.px(context, barLook.gapDp) }
@@ -128,21 +121,15 @@ class HorizontalCandidateComponent :
         val total = data.total
         if (english) {
             layoutManager.minWidth = view.width / ENGLISH_SLOTS - dividerDrawable.intrinsicWidth - gap
-            // fewer words keep their slots, not the whole bar
             val grows = candidates.size >= ENGLISH_SLOTS
             layoutManager.grows = { grows }
         } else {
             layoutManager.minWidth = 0
-            layoutManager.grows = when (fillStyle) {
-                NeverFillWidth -> { _ -> false }
-                // each word its natural width, as many as fit, stretched over the small leftover beside ⌄
-                // only when more wait behind it: a short list that fits whole stays packed
-                AutoFillWidth -> { shown -> CandidateSpacing.stretches(shown, total) }
-                AlwaysFillWidth -> { _ -> true }
-            }
+            // stretched over the small leftover beside ⌄ only when more wait behind it: a short list that fits whole stays packed
+            layoutManager.grows = { shown -> CandidateSpacing.stretches(shown, total) }
         }
         adapter.updateCandidates(candidates, total)
-        // an empty list told at once, as before: the layout after it may wait for the next frame
+        // an empty list told at once: the layout after it may wait for the next frame
         if (candidates.isEmpty()) {
             refreshExpanded(0)
         }

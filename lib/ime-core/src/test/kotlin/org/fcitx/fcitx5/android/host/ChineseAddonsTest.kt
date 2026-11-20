@@ -10,12 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Punctuation, fullwidth, chttrans and the status area on the [KeyPipeline], as fcitx's
- * chinese-addons do them. Lines: `ca/…` is upstream fcitx5-chinese-addons 0d3fd040 `modules/…`
- * (`lib/ime-core/tools/upstream.sh chinese-addons`), `ae/…` is `app/src/main/cpp/androidengine/…`
- * at the tag `native-last`.
- */
+/** Punctuation, fullwidth, chttrans and the status area on the [KeyPipeline], as fcitx's chinese-addons. */
 class ChineseAddonsTest {
 
     private val log = mutableListOf<String>()
@@ -75,7 +70,7 @@ class ChineseAddonsTest {
     }
 
     init {
-        // the order fcitx registers them in (specs/host.md); the hotkeys after fullwidth's conversion
+        // fcitx's registration order; the hotkeys after fullwidth's conversion
         pipeline = KeyPipeline(
             engine, output,
             postHooks = listOf(fullWidth.keyHook, punctuation.hotkey, chttrans.hotkey),
@@ -88,14 +83,12 @@ class ChineseAddonsTest {
         chineseActivated()
     }
 
-    /** What the host does as it activates a Chinese input method (`ae/androidengine.cpp:500-509`). */
+    /** As AndroidEngine::activate does for a Chinese input method. */
     private fun chineseActivated() = statusArea.setInputMethodActions(ic, listOf("chttrans", "punctuation", "fullwidth"))
 
     private fun press(sym: Int, states: Int = 0) = pipeline.dispatch(ic, KeyEvent(Key(sym, states), release = false))
     private fun release(sym: Int, states: Int = 0) = pipeline.dispatch(ic, KeyEvent(Key(sym, states), release = true))
     private fun state() = punctuation.state(ic)
-
-    // ---- punctuation
 
     @Test
     fun `quotes alternate per context and reset starts again (ca punctuation cpp 469-502, 287-302)`() {
@@ -240,7 +233,7 @@ class ChineseAddonsTest {
         assertTrue("the status area shown anew", "status" in log)
         press('.'.code, KeyStates.CTRL)
         assertEquals(listOf(Tip.PunctuationDisabled, Tip.PunctuationEnabled), tips)
-        // English: its status area is empty (ae/androidengine.cpp:500), the key goes back
+        // English: its status area is empty, the key goes back
         statusArea.setInputMethodActions(ic, emptyList())
         log.clear()
         val en = press('.'.code, KeyStates.CTRL)
@@ -286,8 +279,6 @@ class ChineseAddonsTest {
         )
         assertEquals(listOf(PunctuationEntry("/", "、")), p.entries)
     }
-
-    // ---- fullwidth
 
     @Test
     fun `an untaken space commits U+3000, accepted not filtered, ReservedLast still runs (ca fullwidth cpp 37-53)`() {
@@ -335,8 +326,6 @@ class ChineseAddonsTest {
         assertEquals("punctuation saw the ASCII z", 'z'.code, state().lastIsEngOrDigit)
     }
 
-    // ---- chttrans
-
     @Test
     fun `Ctrl+Shift+F toggles the current input method, saved, with a tip, the panel sent (ca chttrans cpp 97-131, 198-213)`() {
         log.clear()
@@ -381,7 +370,7 @@ class ChineseAddonsTest {
         assertEquals(listOf("頭", "髮後"), shown.strings.toList())
         assertEquals(listOf(1, 2), shown.flags.toList())
         assertEquals(3, shown.cursor)
-        // a candidate is checked against the text as shown (native-last:app/src/main/cpp/androidfrontend/androidfrontend.cpp:302-305)
+        // a candidate is checked against the text as shown
         assertEquals("漢", pipeline.filterOutput(ic, FormattedText(arrayOf("汉"), intArrayOf(0), -1)).toString())
     }
 
@@ -392,8 +381,6 @@ class ChineseAddonsTest {
         pipeline.commit(ic, "头发")
         assertEquals("commit 头发", log.last { it.startsWith("commit") })
     }
-
-    // ---- status area
 
     @Test
     fun `status area lists the three in androidengine's order and a tap toggles (ae androidengine cpp 500-509, native-lib cpp 344-350)`() {
@@ -419,13 +406,13 @@ class ChineseAddonsTest {
         assertEquals(listOf(true, false, true), statusArea.entries(ic).map { it.active })
         assertTrue("a tap never tips", tips.isEmpty())
         statusArea.activate(ic, 99)
-        // a switch clears the list (fcitx/instance.cpp:2491): the modules leave that context alone
+        // a switch clears the list: the modules leave that context alone
         statusArea.setInputMethodActions(ic, emptyList())
         assertFalse(fullWidth.inWhiteList(ic) || punctuation.inWhiteList(ic))
         assertEquals(emptyList<StatusEntry>(), statusArea.entries(ic))
     }
 
-    // told per context: another context in the same state is told too; one not focused told when turned off (R20 F6380)
+    // told per context: another in the same state too; one not focused told when turned off
     @Test
     fun `another context in the same state is told its keys`() {
         pipeline.focusIn(ic)
@@ -444,7 +431,7 @@ class ChineseAddonsTest {
     }
 
     companion object {
-        // ca/punctuation/punc.mb.zh_CN, the lines these tests read
+        // punc.mb.zh_CN, the lines these tests read
         const val TABLE = ". 。\n, ，\n? ？\n\" “ ”\n' ‘ ’\n[ 【\n[ 「\n[ 『\n[ ［\n"
     }
 }

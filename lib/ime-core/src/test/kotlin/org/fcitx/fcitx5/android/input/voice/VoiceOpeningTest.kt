@@ -81,7 +81,7 @@ class VoiceOpeningTest {
         steps += "after"
     }
 
-    // R20 F5963: a return out of use with the stop failing: told, not thrown over the return
+    // a return out of use with the stop failing: told, not thrown over the return
     @Test
     fun aReturnOutOfUseWithTheStopFailingTellsIt() {
         val told = mutableListOf<String>()
@@ -90,7 +90,7 @@ class VoiceOpeningTest {
         assertEquals(listOf("stop"), told)
     }
 
-    // review F6388: the same throwable again is not suppressed into itself; another is
+    // the same throwable again is not suppressed into itself; another is
     @Test
     fun aThrowableIsNotSuppressedIntoItself() {
         val e = IllegalStateException("first")

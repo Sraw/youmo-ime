@@ -15,12 +15,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import kotlin.random.Random
 
-/**
- * Run alone by `boundedHeapTest`, in a JVM of 48 MB (build.gradle.kts): 0.3.1 listed a merged
- * dictionary's words as objects, about 450 bytes each, and a 1.9-million-word one ran a phone's
- * 256 MB heap out on every focus. 2 million words (rime-frost has 1.9) must compile in 48 MB,
- * open (mapped, checked) and be found there.
- */
+/** Run alone by `boundedHeapTest` in 48 MB: 2 million words compile, open and are found. */
 class DictionaryFileBoundedHeapTest {
 
     @get:Rule
@@ -53,13 +48,11 @@ class DictionaryFileBoundedHeapTest {
         assertEquals(result.words, d.size)
     }
 
-    // 2 million words of one reading: held to be ranked, all of them were too many (part B's find);
-    // those kept the best ranked, not the first to come (review NIT 1)
+    // those kept are the best ranked, not the first to come
     @Test
     fun manyWordsOfOneReadingCompileInASmallHeapTheRestPastTheCapUnread() {
         val file = File(folder.root, "one.ymd")
         fun text(i: Int) = String(charArrayOf((0x4E00 + i % 20000).toChar(), (0x4E00 + i / 20000).toChar()))
-        // weighted by i: the last to come rank best
         val words = (0 until WORDS).asSequence().map { i -> text(i) + " shi'shi " + (i + 1) }
         val result = DictionaryCompiler.compile(listOf(words), file)
         assertEquals(DictionaryCompiler.MAX_PER_READING, result.words)

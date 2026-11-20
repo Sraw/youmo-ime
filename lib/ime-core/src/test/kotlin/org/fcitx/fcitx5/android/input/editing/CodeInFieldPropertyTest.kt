@@ -10,23 +10,11 @@ import org.junit.Test
 import kotlin.random.Random
 
 /**
- * dev/design/061-code-in-field.md §0 as a property: whatever the app does to the field between the
- * keyboard's writes (inserts, deletes, drops the span, selects, rewrites, will not be read) and however
- * the editor's reports come (late, a write or more behind, after the app's own), no character the
- * keyboard did not write is deleted or replaced by it, nor moved out of order.
- *
- * The app's characters and the keyboard's are of one small alphabet, so text read back alike proves
- * nothing: [FakeEditor.owners] says whose each character is. The editor's reports queue as a real
- * editor's do (one when its selection or span changed) and reach the session in order, at random
- * later steps; the app's own change is reported, with all queued before it, before the keyboard acts
- * again (§4.3's first residual assumption, the one window this does not cover), but for the span ended
- * with no report over the cursor, as EditText's clearComposingText ends it (LC-30). Not over the app's
- * own selection (an address bar's completion): a commit there replaces what is selected.
- *
- * One thing the app does not do here: delete the code, or part of it, and keep the rest of its text. A
- * read back proves the text where the code is, not who wrote it (§6.3): the app's own text left there
- * alike to the code, its span dropped and the cursor where it was, reads back as the code and goes
- * with it. Clearing the field (all its text) stands in for that.
+ * Code in the field as a property: whatever the app does between the keyboard's writes and however late the editor
+ * reports, no character the keyboard did not write is deleted, replaced or reordered by it ([FakeEditor.owners] says
+ * whose each is). The app's own change is reported before the keyboard acts again, but for a span ended unreported
+ * (EditText's clearComposingText). Not covered: the app deleting part of the code and keeping the rest (a read back
+ * cannot tell who wrote it); clearing the field stands in.
  */
 class CodeInFieldPropertyTest {
 
@@ -36,7 +24,7 @@ class CodeInFieldPropertyTest {
         repeat(RUNS) { Run(random, it).steps() }
     }
 
-    /** One field and its session, [STEPS] random steps of the keyboard, the app and the editor's reports. */
+    /** [STEPS] random steps of the keyboard, the app and the editor's reports. */
     private class Run(private val random: Random, private val run: Int) {
         private val e: FakeEditor
         private val s: EditingSession
@@ -63,7 +51,6 @@ class CodeInFieldPropertyTest {
 
         private fun appChars() = e.text.filterIndexed { i, _ -> e.owners[i] == FakeEditor.APP }.uppercase()
 
-        // the editor's report of a change, on its way
         private fun queue() {
             val now = now()
             if (now.contentEquals(reported)) return
@@ -75,7 +62,7 @@ class CodeInFieldPropertyTest {
 
         private fun session() = "ses ${s.composing} ${s.kind} '${s.composingText}' lat ${s.selection.latest} queued ${reports.size}"
 
-        // the log joined only when it fails: joined at every step it was the most of the test's work (R26 F8173)
+        // the log joined only when it fails: joined at every step it was most of the test's work
         private fun held() {
             val chars = appChars()
             if (expected != chars) assertEquals("run $run:\n${log.joinToString("\n")}", expected, chars)
@@ -83,7 +70,7 @@ class CodeInFieldPropertyTest {
 
         private fun deliver() {
             val r = reports.removeFirst()
-            s.onCursorUpdate(r[0], r[1], r[2], r[3], false)
+            s.onCursorUpdate(r[0], r[1], r[2], r[3])
             queue()
             log += "report ${r.joinToString()} -> ${state()} ${session()}"
             held()
@@ -130,8 +117,7 @@ class CodeInFieldPropertyTest {
                     app(if (clear) "clear" else "delete $a..$b") { e.appReplace(if (clear) 0 else a, if (clear) length else b, "") }
                 }
                 7 -> app("drop span") { e.appDropSpan() }
-                // as EditText's clearComposingText in a search box (LC-30): the span alone gone, no report of
-                // it; over the cursor alone, the app's selection after a span gone unreported the class's note
+                // as EditText's clearComposingText in a search box: the span alone gone, unreported; over the cursor alone
                 14 -> if (e.selectionStart == e.selectionEnd) app("drop span, unreported") {
                     e.appDropSpan()
                     reported = now()
@@ -154,8 +140,7 @@ class CodeInFieldPropertyTest {
                     keyboard("write '$code' at $at") { s.writeCode(FormattedText(arrayOf(code), intArrayOf(0), at)) }
                 }
                 9 -> keyboard("leave") { s.leaveComposition(fallBack = random.nextBoolean()) }
-                // the engine's commit replaces its code in the field, as the Commit event does; one over
-                // the app's selection replaces it, the user's own choice, not a deletion of the keyboard's
+                // the commit replaces its code; one over the app's selection replaces it, the user's choice, not the keyboard's deletion
                 10 -> if (s.codeInField || e.selectionStart == e.selectionEnd) keyboard("commit") { s.commitText("你") }
                 11 -> keyboard("code emptied") { s.writeCode(FormattedText.Empty) }
                 12 -> {

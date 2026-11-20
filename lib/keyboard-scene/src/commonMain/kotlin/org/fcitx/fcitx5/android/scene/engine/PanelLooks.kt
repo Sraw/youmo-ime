@@ -12,23 +12,13 @@ import org.fcitx.fcitx5.android.scene.theme.Selector
 import org.fcitx.fcitx5.android.scene.theme.Value
 
 /**
- * The app's own panels over the keyboard, made of views of its own (060-render-p3 T7b; §16: their
- * native parts know the theme's colours and a few properties): the clipboard's entries, the emoji
- * and symbol picker's categories, the editing panel's buttons, the voice mask. What a theme sets
- * is its own, as it says; what it does not, the default rule below, the look the app had worked
- * out itself, so a theme that sets none of it, theme 3.0's among them, looks as it did. And the ink
- * of handwriting written over the letters ([pad]).
- *
- * [scenes] are the screen's and the settings' (the window's: what is typed aside).
+ * The app's own panels over the keyboard, made of views of its own: what a theme sets is its own; what it does not, the
+ * look the app had worked out itself, so a theme that sets none of it looks as it did.
  */
 class PanelLooks(private val cascades: Cascades) {
     private val theme = cascades.theme
 
-    /**
-     * A clipboard entry (`clipboard`): its card's fill, corners and text colour. Not set: the
-     * `clipboardEntry` colour, half as round as the keys (as the user's 按键圆角 has them, whatever
-     * `@flat`; a pill's keys, a pill), the keys' text colour.
-     */
+    /** Not set: the `clipboardEntry` colour, half as round as the keys (whatever `@flat`). */
     fun clipboard(scenes: Set<String>): Clipboard {
         val v = cascades.of(scenes).of(CLIPBOARD)
         val radius = (v[RADIUS] as? Value.OfRadius)?.radius ?: keyRadius(scenes).let { it.copy(corners = it.corners.map { c -> c / 2 }) }
@@ -40,13 +30,7 @@ class PanelLooks(private val cascades: Cascades) {
         )
     }
 
-    /**
-     * The picker's (`picker`): its [Picker.fill] under the grid (not set: none, the keyboard's
-     * under it), its bar of categories (`picker categories`) and the one shown (`picker:selected
-     * categories`), the symbols' column down its [side] or the emoji's tabs in the bar. Not set: the
-     * column the bar's colour and the one shown the keyboard's, the tabs on the bar's own; their
-     * text the keys' text colour, faded but the one shown (by [SIDE_FADE], [TAB_FADE]).
-     */
+    /** Not set: the column the bar's colour and the one shown the keyboard's; their text faded but the one shown. */
     fun picker(scenes: Set<String>, side: Boolean): Picker {
         val cascade = cascades.of(scenes)
         val v = cascade.of(CATEGORIES)
@@ -60,18 +44,12 @@ class PanelLooks(private val cascades: Cascades) {
             ),
             selected = Categories(
                 fill = fill(shown) ?: variable(KEYBOARD).takeIf { side },
-                // the app's of before: the keys' text made opaque (alpha(1f))
                 color = color(shown[COLOR]) ?: Argb((text.value and RGB) or (OPAQUE shl ALPHA)),
             ),
         )
     }
 
-    /**
-     * The editing panel's buttons (`editing`): their fill and corners. Not set: the keys' colours (the
-     * function keys' for the ones that act on the selection), drawn as blocks with the keys' shadow, or,
-     * the keys flat (`@flat`), as a grid of lines; [Editing.radiusDp] null, the app's own of before.
-     * A fill set is drawn as blocks, whatever the keys.
-     */
+    /** Not set: the keys' colours, as blocks or, the keys flat, a grid of lines. A fill set is drawn as blocks, whatever the keys. */
     fun editing(scenes: Set<String>): Editing {
         val v = cascades.of(scenes).of(EDITING)
         val radius = (v[RADIUS] as? Value.OfRadius)?.radius
@@ -79,18 +57,12 @@ class PanelLooks(private val cascades: Cascades) {
         return Editing(
             fill = fill(v),
             radiusDp = radius?.corners?.max(),
-            // not set, a pill as the keys are
             round = (radius ?: keys).half,
             keyRadiusDp = keys.corners.max(),
         )
     }
 
-    /**
-     * The voice mask (`voice`): its colour over the keys, its frosted glass's blur (dp, 0: none, the keys
-     * plain under it), its microphone's bubble (`voice mic`) and the sound's bars in it. Not set: the
-     * keyboard's colour less translucent by [MASK_ALPHA] (VoiceStyle.mask's), the glass of before
-     * ([Voice.blurDp] null), the bubble the accent colour at [MIC_ALPHA], the bars it.
-     */
+    /** Not set: the keyboard's colour less translucent by [MASK_ALPHA] (VoiceStyle.mask's), the bubble the accent colour. */
     fun voice(scenes: Set<String>): Voice {
         val cascade = cascades.of(scenes)
         val v = cascade.of(VOICE)
@@ -104,63 +76,48 @@ class PanelLooks(private val cascades: Cascades) {
         )
     }
 
-    /**
-     * The ink handwriting is written in over the letters (the toolbar's 手写, 061-handwriting-toolbar §7): what
-     * the handwriting pad's style (`handwriting/pad`, theme 3.0's look `letter`) sets, its keyboard gone. [Pad.color]
-     * null where it sets none: the app's, the letters' text unless the colour shows on them (HandwritingMode.inkColor).
-     */
+    /** [Pad.color] null where it sets none: the app's (HandwritingMode.inkColor). */
     fun pad(scenes: Set<String>): Pad {
         val v = cascades.of(scenes).of(PAD)
         return Pad(color(v[INK_COLOR]), (v[INK_WIDTH] as? Value.Number)?.number)
     }
 
-    // the keys' corners as the user's 按键圆角 has them, the letters' (WindowLooks.cornerDp's): `@flat` keys' faces are
-    // square whatever it says, but what is round about them, their popups and panels, is as round as it
+    // `@flat` keys' faces are square whatever 按键圆角 says, but their popups and panels are as round as it
     private fun keyRadius(scenes: Set<String>) = KeyLook(cascades.of(scenes - FLAT).of(KEY), theme).radius
 
     private fun color(v: Value?): Argb? = (v as? Value.OfColor)?.color?.let(theme::color)
 
-    // a solid fill's colour: what a view's background takes (a picture's or an image's are the scene's alone)
+    // a picture's or an image's fill is the scene's alone
     private fun fill(v: Map<String, Value>): Argb? = KeyLook(v, theme).fill?.let { f -> (f as? Fill.Solid)?.color?.let(theme::color) }
 
-    // one of the colours every theme has (ThemeReader.REQUIRED_COLORS)
     private fun variable(name: String): Argb = theme.colors[name] ?: Argb.TRANSPARENT
 
-    /** A clipboard entry: its card's [fill], corners (dp; [round] a pill), its text's [color]. */
     data class Clipboard(val fill: Argb, val radiusDp: Double, val round: Boolean, val color: Argb)
 
-    /** The picker: what is under its grid ([fill], null none), its categories, and the one shown of them. */
     data class Picker(val fill: Argb?, val categories: Categories, val selected: Categories)
 
-    /** The picker's categories: their background ([fill], null none) and text or icon [color]. */
     data class Categories(val fill: Argb?, val color: Argb)
 
-    /**
-     * The editing panel's buttons: their [fill] (null: the keys' colours as before), corners ([radiusDp] null: the
-     * app's of before, of the keys' [keyRadiusDp]; [round] a pill).
-     */
     data class Editing(val fill: Argb?, val radiusDp: Double?, val round: Boolean, val keyRadiusDp: Double)
 
-    /** The ink over the letters: its colour and width (dp), null where the theme sets none. */
     data class Pad(val color: Argb?, val widthDp: Double?)
 
-    /** The voice mask: its colour ([fill]), its glass's blur (dp; null the app's own), its microphone's bubble and bars. */
     data class Voice(val fill: Argb, val blurDp: Double?, val micFill: Argb, val micColor: Argb)
 
     companion object {
-        /** The symbols' column of categories, not the one shown: the keys' text at 60% (PickerSideUi's INACTIVE). */
+        /** PickerSideUi's INACTIVE. */
         const val SIDE_FADE = 153
 
-        /** The emoji's tabs, not the one shown: at 50% (0.5 × 255, rounded as the app's `alpha()`). */
+        /** Rounded as the app's `alpha()`. */
         const val TAB_FADE = 128
 
-        /** The voice mask's alpha of the keyboard's colour's, of 255 (VoiceStyle.MASK_ALPHA). */
+        /** VoiceStyle.MASK_ALPHA */
         const val MASK_ALPHA = 0xE0
 
-        /** The voice microphone's bubble not set: the accent colour at this alpha (the overlays' PILL_ALPHA). */
+        /** The overlays' PILL_ALPHA. */
         const val MIC_ALPHA = 0x29
 
-        /** [color] less translucent by [MASK_ALPHA]: its alpha × 0xE0 / 0xFF, in whole numbers (VoiceStyle.mask's). */
+        /** In whole numbers, as VoiceStyle.mask's. */
         fun mask(color: Argb): Argb = Argb((color.value and RGB) or ((color.alpha * MASK_ALPHA / BYTE) shl ALPHA))
 
         private const val RGB = 0xFFFFFF
@@ -188,7 +145,6 @@ class PanelLooks(private val cascades: Cascades) {
         private val VOICE = Selector.Target("voice")
         private val MIC = Selector.Target("voice", part = "mic")
 
-        // the keys whose corners the panels' follow: the letters (WindowLooks')
         private val KEY = Selector.Target("key", classes = setOf("letter"))
     }
 }

@@ -14,17 +14,9 @@ import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
 /**
- * A Chinese input method's [session], written on over its keys (手写, the toolbar's: designs
- * 060-kbd-handwriting §5, 061-handwriting-toolbar), as [GlideSession][org.fcitx.fcitx5.android.engine.glide.GlideSession] glides on one: an
- * [Action.Ink] goes to a [HandwritingSession] of its own, made at the first ([handwriting]), as
- * handwriting's own is. While that shows anything (what is written, or what may follow it, 联想), every
- * action is its: the candidates, space, enter, backspace are handwriting's. A letter then puts the
- * best sentence in and is typed into [session], both in one snapshot; what was put in is told
- * [session] as what it goes on from.
- *
- * A first stroke while [session] has something typed (from before handwriting was on, a hardware key,
- * a swipe's command) puts that in first as space would, its first candidate, and is written then, both
- * in one snapshot. What [session] offers after a word (联想) goes as writing starts.
+ * A Chinese input method's [session] written on over its keys (the toolbar's 手写): [Action.Ink] goes to its own
+ * [HandwritingSession], which takes every action while it shows anything. A letter puts its best sentence in and
+ * types into [session]; a first stroke while [session] has input puts that in first, as space would.
  */
 class InkOver(
     val session: Session,
@@ -33,40 +25,31 @@ class InkOver(
 
     private var made: HandwritingSession? = null
 
-    /** The handwriting written here, made now if it was not. */
     fun handwriting(): HandwritingSession = made ?: makeHandwriting().also {
         it.learning = session.learning
         flags?.let(it::fieldFlags)
         made = it
-        // what it goes on from: the text before, as told [session]
         it.apply(Action.Context(written))
     }
 
-    /** The handwriting written here, if any was. */
     val handwritingMade: HandwritingSession? get() = made
 
-    // what each last showed
     private var inner: Snapshot? = null
     private var inked: Snapshot? = null
 
     private var flags: Int? = null
 
-    // the text before the cursor as far as a context goes, for the handwriting made later and for [session] after it puts text in
     private var written = ""
 
-    /** Whether the handwriting shows anything: then every action is its. */
     val inking: Boolean get() = inked?.let { it.preedit.isNotEmpty() || it.candidates.isNotEmpty() } == true
 
-    // whether [session] has input typed, not what the handwriting shows: put in before a stroke is written
     private val typing: Boolean get() = !inking && innerTyped(inner)
 
     private fun innerTyped(s: Snapshot?) = s != null && s.preedit.isNotEmpty() && !s.predicting
 
-    // [session] put text in or deleted since the handwriting last heard of the text before
     private var innerWrote = false
 
-    // the last action was the handwriting's: what is read again is its, though it shows nothing now (its 联想
-    // turned off, then taken back: offered again, as on 0.6.0's handwriting input method)
+    // the last action was the handwriting's: a reread is its, though it shows nothing now
     private var lastInk = false
 
     override var learning: Boolean
@@ -84,7 +67,6 @@ class InkOver(
         else -> inkApply(action)
     }
 
-    // a reset drops what is written (清除, Escape, the backspace swipe), as pinyin's code
     private fun both(action: Action): Snapshot {
         written = if (action is Action.Context) action.before.takeLast(Action.Context.HOST_CHARS) else ""
         made?.apply(action)
@@ -92,11 +74,7 @@ class InkOver(
         return innerApply(action).also { innerWrote = false }
     }
 
-    /**
-     * The input ended (the field left, the keyboard hidden or made anew, the cursor moved): what is written
-     * kept, its sentence put in as it shows, as the handwriting input method's composing text was (DECISIONS
-     * A2, 061-handwriting-toolbar LC-35); then a reset, pinyin's code going as ever.
-     */
+    /** The input ended: what is written is put in as shown, then a reset for [session]. */
     fun endInput(): Snapshot {
         val put = if (inking) inkApply(Action.CommitRaw) else null
         val after = both(Action.Reset)
@@ -104,19 +82,14 @@ class InkOver(
     }
 
     private fun ink(action: Action.Ink): Snapshot {
-        // a reading of a piece ended already (put in by a letter, taken back: the pad's word on it came late)
-        // writes nothing, and the handwriting drops it: what [session] shows stays, its input not put in by
-        // it nor its 联想 gone (review F8186: 中 written, a hardware n typed, 中's late reading put n's first in)
-        // (an Ink of no piece shows what was held: never late itself)
+        // a reading of a piece already ended (the pad's word came late) is dropped: [session] keeps its input, else 中's
+        // late reading would put a hardware n's first candidate in
         if (!inking && action.piece != HandwritingSession.NO_PIECE && action.piece <= handwriting().ended) {
             return still(handwriting().apply(action))
         }
-        // what [session] has typed put in first, as space would: the stroke is the next character's
         val put = if (typing) putTyped() else null
         if (!inking) {
-            // what [session] offered goes: told the text before again, its input none
             if (inner?.predicting == true) innerApply(Action.Context(written))
-            // a new sentence goes on from the text before the cursor, as [session] left it (design §5)
             if (innerWrote) made?.apply(Action.Context(written))
             innerWrote = false
         }
@@ -124,17 +97,13 @@ class InkOver(
         return put?.let { then(it, written) } ?: written
     }
 
-    // [session]'s last snapshot shown again, nothing written anew by it; [dropped]'s where it has none
     private fun still(dropped: Snapshot): Snapshot = inner?.copy(commit = "", deleteBefore = 0, picked = false) ?: dropped
 
-    // a letter typed while the handwriting shows: its best sentence put in, then the letter [session]'s
     private fun letter(action: Action): Snapshot {
         val put = inkApply(Action.CommitRaw)
         return then(put, innerApply(action))
     }
 
-    // [session]'s input put in as space would, its first candidate each time (a pinyin's may take part of
-    // it), as typed if one leaves it as it was (no candidate)
     private fun putTyped(): Snapshot {
         var put = innerApply(Action.Select(0))
         var picks = 1
@@ -147,8 +116,7 @@ class InkOver(
         return if (typing) then(put, innerApply(Action.CommitRaw)) else put
     }
 
-    // [first]'s and [after]'s writes as one, [after]'s shown: what [after] deletes comes off what [first] put in
-    // first, then off the text before it
+    // [after]'s deletes come off [first]'s text first, then off the text before it
     private fun then(first: Snapshot, after: Snapshot): Snapshot {
         val n = first.commit.codePointCount(0, first.commit.length)
         val cut = minOf(after.deleteBefore, n)
@@ -168,11 +136,9 @@ class InkOver(
         val changed = it.commit.isNotEmpty() || it.deleteBefore > 0
         if (changed) innerWrote = true
         wrote(it)
-        // what [session] put in told the handwriting at once: its journal then knows the text after its
-        // sentence is not its own, and a backspace deletes that first (U-03)
+        // tell the handwriting at once, so its journal knows the text after its sentence is not its own
         if (it.commit.isNotEmpty()) made?.apply(Action.Context(written))?.let { h -> inked = h }
-        // a backspace the app does (nothing typed): the handwriting hears of it too, to take back a
-        // sentence it put in and that is deleted at once (U-03, its FieldJournal)
+        // the handwriting hears an app backspace too, to take back a sentence it put in (FieldJournal)
         if (action == Action.Backspace && !it.handled) made?.apply(action)?.let { h -> inked = h }
     }
 
@@ -182,7 +148,6 @@ class InkOver(
         inked = s
         lastInk = true
         wrote(s)
-        // what it put in told [session], as the text it goes on from
         if (s.commit.isNotEmpty()) inner = session.apply(Action.Context(written))
         return s
     }
@@ -208,7 +173,6 @@ class InkOver(
 
     override fun blockScope(index: Int): BlockScope? = shown.blockScope(index)
 
-    // what shows asked alone: the handwriting's nothing to read again is not [session]'s snapshot, which does not show
     override fun reread(): Snapshot? = if (inking || lastInk) made?.reread()?.also { inked = it } else session.reread()
 
     override val rereads: Boolean get() = if (inking || lastInk) true else session.rereads
@@ -223,14 +187,12 @@ class InkOver(
         made?.fieldFlags(flags)
     }
 
-    // both hear of a key the app took: the handwriting's journal and 联想 as on its own keyboard
     override fun passedOn() {
         if (!inking) session.passedOn()
         made?.passedOn()
     }
 
     private companion object {
-        // a pinyin's input picked a word at a time: more than its longest is typed as it is
         const val MAX_PICKS = 16
     }
 }

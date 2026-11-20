@@ -16,12 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * Every layout the app is built with reads (060-render-p2 S7, U8): a keyboard whose layout does not
- * read draws nothing (no fall back to its views), so one that does not is a packaging error, caught
- * here. Each raw `scene_layout_*` resource is one [BuiltInLayouts.RAW] names, and each reads, the
- * fragments it includes with it; a fragment reads as the layouts including it read.
- */
+/** A layout that does not read draws nothing (no fall back), so one shipped unreadable is a packaging error caught here. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SceneLayoutsTest {
@@ -30,7 +25,7 @@ class SceneLayoutsTest {
     @Test
     fun everyBuiltInLayoutReads() {
         val context = RuntimeEnvironment.getApplication()
-        // the resources as built, by their names: one copied in and not named in RAW is never read
+        // one copied in and not named in RAW is never read
         val built = R.raw::class.java.fields.filter { it.name.startsWith(PREFIX) }
             .associate { it.name.removePrefix(PREFIX).replace('_', '-') to it.getInt(null) }
         assertTrue("no scene layouts built", built.isNotEmpty())
@@ -39,7 +34,7 @@ class SceneLayoutsTest {
         SceneLayouts.fallback = ::BuiltInLayouts
         val read = (BuiltInLayouts.RAW.keys - BuiltInLayouts.FRAGMENTS).mapNotNull { id -> SceneLayouts.of(context, id)?.let { id to it } }.toMap()
         val included = read.values.flatMap { l -> l.layout.parts.filterIsInstance<Include>().map { it.src } }.toSet()
-        // the fragments are said so: read as a layout (the import's blank-key check did) each is logged as broken
+        // read as a layout, each fragment would be logged as broken
         assertEquals(included, BuiltInLayouts.FRAGMENTS)
         for (id in BuiltInLayouts.RAW.keys) {
             if (id in included) {

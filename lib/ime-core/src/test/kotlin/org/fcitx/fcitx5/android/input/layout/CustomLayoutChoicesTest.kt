@@ -16,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-// a layout of the user's read to be drawn (061-custom-layout L3): what the keyboard options make of it
+// a user layout read to be drawn: what the keyboard options make of it
 class CustomLayoutChoicesTest {
 
     private val dir = File(CustomLayoutFilesTest.LAYOUTS)
@@ -34,7 +34,7 @@ class CustomLayoutChoicesTest {
         assertEquals("letters", qwerty.family)
         assertEquals("qwerty", qwerty.basedOn)
         assertEquals("1-2", qwerty.stamp)
-        // the full keyboard's ; and * for a table: a table may use it (Q6)
+        // the full keyboard's ; and * for a table: a table may use it
         assertTrue(qwerty.tableExtras)
         val k18 = read(own("k18")).choice
         assertEquals(NineKeyLetters.G18.tag().split(','), k18.groups)
@@ -61,7 +61,7 @@ class CustomLayoutChoicesTest {
 
     @Test
     fun aNumberBoardIsForThePadsItNamesAndDrawnThere() {
-        // 061-custom-layout §7 (L5): 123's alone where it names none; the pads it names, each held to its keys as it is checked
+        // 123's alone where it names none; the pads it names, each held to its keys
         val full = read(own("number")).choice
         assertTrue(full.drawn)
         assertEquals("number", full.family)

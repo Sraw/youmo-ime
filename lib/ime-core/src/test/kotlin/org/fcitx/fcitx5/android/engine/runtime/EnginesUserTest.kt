@@ -18,17 +18,17 @@ import org.junit.Test
 /** What the engine hands on of the user's typing: an English correction tapped back, the words voice listens for. */
 class EnginesUserTest : EnginesFixture() {
 
-    // U-31: the cursor put back after a correction, English offers the word typed, shown by the key the host sends
+    // the cursor put back after a correction, English offers the word typed, shown by the key the host sends
     @Test
     fun aTapAfterACorrectionOffersTheWordTypedForARecallToShow() {
         val engines = Engines(::load, null)
-        // a word before it: a correction with nothing known before it is none to tap back to (review-B S1)
+        // a word before it: a correction with nothing known before it is none to tap back to
         engines.type(InputMethodCatalog.ENGLISH, "fed")
         engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code)
         engines.type(InputMethodCatalog.ENGLISH, "teh")
         assertEquals("the ", engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code).commit)
         engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.RESET, 0)
-        // review-B M2: told while pinyin is shown, English offers nothing, and so takes the next context
+        // told while pinyin is shown, English offers nothing, and so takes the next context
         assertFalse(engines.context(InputMethodCatalog.PINYIN, "I fed the "))
         assertTrue(engines.context(InputMethodCatalog.ENGLISH, "I fed the "))
         val shown = engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, Keyboard.RECALL)
@@ -40,7 +40,7 @@ class EnginesUserTest : EnginesFixture() {
         engines.close()
     }
 
-    // U-30, D29: voice listens for 我的词 alone: a text committed once is none yet, twice it is
+    // voice listens for 我的词 alone: a text committed once is none yet, twice it is
     @Test
     fun voiceListensForAWordOnlyOnceItIsTheUsers() {
         Engines(::load, null).use { engines ->
@@ -58,7 +58,6 @@ class EnginesUserTest : EnginesFixture() {
         }
     }
 
-    // review-int S1: an undo in English keeps the session and the word typed, its candidates read anew
     @Test
     fun anUndoInEnglishKeepsTheWordTyped() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -76,7 +75,6 @@ class EnginesUserTest : EnginesFixture() {
         }
     }
 
-    // U-31 §3 (EN-24): a word English learned is typed in 全拼's 中英混输, as written there; forgotten, it goes
     @Test
     fun aWordEnglishLearnedIsTypedInPinyin() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -98,18 +96,15 @@ class EnginesUserTest : EnginesFixture() {
         onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
     }
 
-    // review-uat-fixes S10: what EN-24 says of it, each
     @Test
     fun englishsWordsInPinyinGoWithTheHabitsAndTheSetting() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
             engines.inEnglish("GitHub")
             assertTrue("GitHub" in engines.pinyin("github"))
-            // 不用我的输入习惯: none of English's learning either
             engines.learning(null, LearningOp.UseHabits(false))
             assertFalse("GitHub" in engines.pinyin("github"))
             engines.learning(null, LearningOp.UseHabits(true))
             assertTrue("GitHub" in engines.pinyin("github"))
-            // 中英混输 off: no letters spelled
             engines.settings = EngineSettings(latinWords = false)
             assertFalse("GitHub" in engines.pinyin("github"))
         }
@@ -126,7 +121,6 @@ class EnginesUserTest : EnginesFixture() {
         }
     }
 
-    // a string of pinyin typed in English (by a slip) does not go before what pinyin reads it as
     @Test
     fun pinyinTypedInEnglishGoesAfterWhatItReads() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -135,7 +129,6 @@ class EnginesUserTest : EnginesFixture() {
         }
     }
 
-    // two spellings of one word learned: one offered, the one used more (review-uat-fixes N11)
     @Test
     fun aWordLearnedTwoWaysIsOfferedOnce() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -147,7 +140,6 @@ class EnginesUserTest : EnginesFixture() {
         }
     }
 
-    // review-int S4: English offers no next word in a search field, as pinyin no 联想 (U-91)
     @Test
     fun englishOffersNoNextWordInASearchField() {
         Engines(::load, MemoryFiles(), warmUps = inPlace).use { engines ->
@@ -157,7 +149,6 @@ class EnginesUserTest : EnginesFixture() {
                 engines.type(InputMethodCatalog.ENGLISH, "the")
                 return engines.onEvent(InputMethodCatalog.ENGLISH, EngineEvent.CHAR, ' '.code).candidates
             }
-            // youmo typed after the, the user's to follow it
             repeat(3) {
                 afterThe(0)
                 engines.type(InputMethodCatalog.ENGLISH, "youmo")
@@ -168,8 +159,7 @@ class EnginesUserTest : EnginesFixture() {
         }
     }
 
-    // review-int S5: English first used after the field's context (told pinyin's keyboard alone) takes its
-    // flags, not an empty field: a word typed after the text there is no sentence's start, and no next word shown
+    // a word after the text there is no sentence's start, and no next word shown
     @Test
     fun englishMadeAfterASearchFieldsContextTakesItsFlagsAlone() {
         Engines(::load, null, warmUps = inPlace).use { engines ->

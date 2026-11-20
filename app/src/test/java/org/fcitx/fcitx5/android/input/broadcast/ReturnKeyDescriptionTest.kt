@@ -12,11 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * The Return key must look like, and be announced as, what pressing it does. Both come from
- * `EditorKeyPolicy.onReturn`, the same decision the key press uses, so each case here is an
- * editor for which icon, label and behaviour could otherwise drift apart.
- */
+/** Icon, label and announcement all come from `EditorKeyPolicy.onReturn`, the decision the press uses. */
 class ReturnKeyDescriptionTest {
 
     private fun appearance(block: EditorInfo.() -> Unit) =
@@ -48,7 +44,6 @@ class ReturnKeyDescriptionTest {
         assertEquals(ReturnKeyAppearance.Enter, appearance { imeOptions = EditorInfo.IME_ACTION_NONE })
     }
 
-    /** IME_FLAG_NO_ENTER_ACTION: the key inserts a newline, and says so. */
     @Test
     fun noEnterActionIsEnterEvenWithAnAction() {
         assertEquals(
@@ -57,10 +52,7 @@ class ReturnKeyDescriptionTest {
         )
     }
 
-    /**
-     * A terminal or game (TYPE_NULL) gets a raw Enter key whatever action it declares; showing
-     * "Done" there would announce an action that a press does not perform.
-     */
+    /** TYPE_NULL gets a raw Enter whatever action it declares: "Done" would announce what a press does not do. */
     @Test
     fun aRawKeyEditorIsEnterEvenWithAnAction() {
         assertEquals(
@@ -72,7 +64,6 @@ class ReturnKeyDescriptionTest {
         )
     }
 
-    /** An editor that names its own action ("Post") performs it, so it is announced by that name. */
     @Test
     fun aCustomActionIsAnnouncedByTheEditorsOwnLabel() {
         val a = appearance {

@@ -18,20 +18,16 @@ import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 
 /**
- * The scene engine's environment for any keyboard the canvas draws (060-render-p2 §4): what the
- * screen and the settings make of every keyboard alike, the keyboard's own [Input], [Shift], texts
- * and marks given. One-handed and at a side InputView places the keyboard already (its side buttons
- * are views, the popups placed in the window): the keys fill what the view was given, so both FULL.
+ * One-handed and at a side InputView places the keyboard already (its side buttons are views, the popups
+ * placed in the window): the keys fill what the view was given, so both FULL.
  */
 object SceneEnvs {
-    /** No marks on any key: the cells, the panels, the rows that show no shortcuts. */
+    /** The cells, the panels, the rows that show no shortcuts. */
     val NO_MARKS = MarkSettings(shortcuts = emptyMap())
 
     /**
-     * What is typed now as a theme's scenes (`im=wubi`, `field=password`; SceneTyping): KeyboardWindow's
-     * as the input method and the field change (main thread). Null before it tells: then, and outside
-     * the input method (a settings page), what each keyboard's Input says. Each keyboard shown is told
-     * ([watch]), the number row's and the expanded candidates' too, not only KeyboardWindow's.
+     * Main thread. Null before KeyboardWindow tells: then, and outside the input method (a settings page),
+     * what each keyboard's Input says. Each keyboard shown is told ([watch]), not only KeyboardWindow's.
      */
     var typing: Set<String>? = null
         set(value) {
@@ -43,7 +39,6 @@ object SceneEnvs {
 
     private val watching = LinkedHashSet<() -> Unit>()
 
-    /** [onTyping] called as [typing] changes, till [unwatch]: a keyboard's while it is shown (BaseKeyboard). */
     fun watch(onTyping: () -> Unit) {
         watching += onTyping
     }
@@ -52,12 +47,7 @@ object SceneEnvs {
         watching -= onTyping
     }
 
-    /**
-     * [view]'s keys at [width] × [height] px in [look] ([dark] its theme's): landscape as the screen is,
-     * compact as the height setting is (KeyboardHeightLevels.isCompact), floating's text scale only in the input
-     * method (not a settings page's preview), [split] where the keyboard splits its letters. Floating resized, the
-     * keys drawn all as much bigger or smaller; not [resized], a bar's (its number row): the bars only get wider (Q6).
-     */
+    /** Floating's text scale only in the input method, not a settings preview. Not [resized]: a bar's, which only gets wider. */
     fun of(
         view: View,
         look: ThemeLook,
@@ -73,8 +63,7 @@ object SceneEnvs {
     ): Env {
         val context = view.context
         val floating = if (context.inInputMethod() && KeyboardStyles.floating(context)) KeyboardArea.floatingSize(KeyboardArea.screen(context)) else null
-        // floating resized, its keys' gaps, corners, text and marks all as much bigger or smaller: a dp of the scene's
-        // that many px, so the scene in dp is the default size's and the keys keep their shape (061-floating-resize §2.1)
+        // a dp of the scene's that many px, so the scene in dp is the default size's and the keys keep their shape
         val resize = if (resized) floating?.resize ?: 1f else 1f
         return Env(
             width.toDouble(), height.toDouble(), view.resources.displayMetrics.density.toDouble() * resize,

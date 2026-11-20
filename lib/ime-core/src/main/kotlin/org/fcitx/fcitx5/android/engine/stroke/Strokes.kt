@@ -8,20 +8,12 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.SourceException
 import java.io.BufferedReader
 
-/**
- * Characters by their strokes in writing order, each one of 横竖撇捺折 typed as `h s p n z`
- * (点 is 捺): what to type for a character one cannot read. Those whose strokes start with what
- * was typed are found, the commonest first ([score], higher for commoner, as the pinyin model
- * has them); those it does not know after, fewest strokes first, so a rare character typed whole
- * is the first of them.
- */
+/** Characters by their strokes typed `h s p n z` (点 is 捺): those starting so, commonest first by [score], unknown ones after by fewest strokes. */
 class Strokes(private val table: CodeTable, private val score: (String) -> Float) {
 
-    // every entry, the likeliest first: ranked once, then filtered by what was typed
     private val order: IntArray by lazy(LazyThreadSafetyMode.NONE) {
         require(table.size < 1 shl INDEX_BITS) { "${table.size} entries" }
-        // a sort of plain numbers, as it runs when the user first types the key: score (negated, its
-        // bits ordered as the value is, being no less than 0), strokes, then the table's order
+        // a sort of plain longs (it runs at the first key): score negated (non-negative, so bits order as values), strokes, table order
         val keys = LongArray(table.size) {
             val score = score(table.text(it)).takeIf(Float::isFinite) ?: Float.NEGATIVE_INFINITY
             val length = minOf(table.codeLength(it), (1 shl LENGTH_BITS) - 1)
@@ -32,11 +24,8 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
         IntArray(keys.size) { (keys[it] and INDEX_MASK).toInt() }
     }
 
-    // every entry by its character, then the table's order: what a character is written as, for
-    // 笔画筛选 (StrokeFilter); made at its first stroke, ~170 000 entries' indexes, ~680 KB. The
-    // characters are read off the table, not made strings of: the first stroke waits for this
+    // every entry by its character, for 笔画筛选: ~170 000 indexes, ~680 KB, made at the first stroke without making strings
     private val byChar: IntArray by lazy(LazyThreadSafetyMode.NONE) {
-        // the character above the index's bits: one sort of plain numbers, as for [order]
         val keys = LongArray(table.size) { (table.textChar(it, 0).code.toLong() shl INDEX_BITS) or it.toLong() }
         keys.sort()
         IntArray(keys.size) { (keys[it] and INDEX_MASK).toInt() }
@@ -44,13 +33,12 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
 
     private fun charAt(i: Int) = table.textChar(byChar[i], 0)
 
-    /** Each entry's character as a code point (repeats as the table has them): what 生僻字屏蔽 counts (RareGrid). */
+    /** Each entry's character as a code point (repeats as the table has them), for 生僻字屏蔽 (RareGrid). */
     fun codePoints(): Sequence<Int> = (0 until table.size).asSequence().map { e ->
         val c = table.textChar(e, 0)
         if (Character.isHighSurrogate(c)) Character.toCodePoint(c, table.textChar(e, 1)) else c.code
     }
 
-    // where [c]'s entries start in [byChar], or where they would
     private fun firstOf(c: Char): Int {
         var lo = 0
         var hi = byChar.size
@@ -61,10 +49,7 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
         return lo
     }
 
-    /**
-     * Whether [c] is written in an order that starts with [strokes] (a character of more than one
-     * order, 望's two, in either): false for one the table has not, or nothing drawn.
-     */
+    /** Whether [c] is written in an order starting with [strokes] (either of 望's two); false if unknown or nothing drawn. */
     fun startsWith(c: Char, strokes: CharSequence): Boolean {
         if (strokes.isEmpty()) return false
         var i = firstOf(c)
@@ -75,7 +60,6 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
         return false
     }
 
-    /** The orders [c] is written in, as the table has them: none for a character it has not. */
     fun ordersOf(c: Char): List<String> {
         val orders = ArrayList<String>()
         var i = firstOf(c)
@@ -83,10 +67,7 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
         return orders
     }
 
-    /**
-     * The characters whose strokes start with [strokes], the likeliest first, each once; none for
-     * nothing typed. Made as they are gone through: the first stroke has thousands, a page shows a few.
-     */
+    /** The characters whose strokes start with [strokes], likeliest first, each once, made as they are gone through. */
     fun find(strokes: String): Sequence<String> {
         if (strokes.isEmpty()) return emptySequence()
         val range = table.prefixRange(strokes)
@@ -95,7 +76,6 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
             val seen = HashSet<String>()
             val ranked = order.iterator()
             var left = range.last - range.first + 1
-            // till the range is all gone through: the rest of the order has none of it
             while (left > 0) {
                 val i = ranked.nextInt()
                 if (i !in range) continue
@@ -111,19 +91,16 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
         private const val LENGTH_BITS = 8
         private const val INDEX_MASK = (1L shl INDEX_BITS) - 1
 
-        /** The keys of the strokes, 横竖撇捺折. */
         const val KEYS = "hspnz"
 
-        /** The strokes as they show in the preedit, a key each. */
         const val SHOWN = "一丨丿丶乛"
 
         fun shown(strokes: CharSequence) = strokes.map { SHOWN[KEYS.indexOf(it)] }.joinToString("")
 
         /**
-         * A Rime dictionary of strokes (rime-stroke's `stroke.dict.yaml`): a header, `...`, then
-         * `字<TAB>strokes` a line, a weight after it ignored. Only characters of the BMP are kept.
+         * A Rime stroke dictionary (rime-stroke's `stroke.dict.yaml`); only BMP characters are kept.
          *
-         * @throws SourceException on a line that is not one
+         * @throws SourceException on a malformed line
          */
         fun read(text: BufferedReader, source: String): CodeTable.Builder {
             val builder = CodeTable.Builder()
@@ -141,7 +118,7 @@ class Strokes(private val table: CodeTable, private val score: (String) -> Float
                         if (fields[0].isEmpty() || strokes.isEmpty() || strokes.any { it !in KEYS }) {
                             throw SourceException(source, number, "expected \"字<TAB>strokes\": $line")
                         }
-                        // past the BMP (Ext B on) a phone's fonts show next to none of them
+                        // past the BMP a phone's fonts show next to none of them
                         if (fields[0].length == 1) {
                             builder.entry(strokes, fields[0])
                             longest = maxOf(longest, strokes.length)

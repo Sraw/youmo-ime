@@ -80,15 +80,9 @@ abstract class BaseDynamicListUi<T>(
     }
 
     sealed class Mode<T> {
-        /**
-         * Pick one from a list of [T]
-         */
         data class ChooseOne<T>(val candidatesSource: BaseDynamicListUi<T>.() -> Array<T>) :
             Mode<T>()
 
-        /**
-         * Enter a string that can be converted into [T]
-         */
         data class FreeAdd<T>(
             val hint: String,
             val converter: (String) -> T,
@@ -97,23 +91,15 @@ abstract class BaseDynamicListUi<T>(
 
         class Immutable<T> : Mode<T>()
 
-        /**
-         * Do nothing
-         */
         class Custom<T> : Mode<T>()
     }
 
-    /**
-     * whether to show "undo" snackbar after item update
-     */
     var enableUndo = true
 
-    /**
-     * suspend "undo" snackbar temporarily to prevent undo undo
-     */
+    // to prevent undo undo
     private var suspendUndo = false
 
-    /** What the bar of the batch [addItems] with a message is adding says, in place of 已添加 N 个项目; null otherwise. */
+    /** Replaces 已添加 N 个项目 on the bar while a batch [addItems] with a message adds. */
     private var addedMessage: String? = null
 
     init {
@@ -157,7 +143,7 @@ abstract class BaseDynamicListUi<T>(
                 updateFAB()
                 showSnackbar(ctx.getString(R.string.removed_n_items, indexed.size)) {
                     val removed = indexed.sortedBy { it.first }
-                    // the undo of a batch added: one insertion again, not thousands, each drawn and told
+                    // a batch's undo is one insertion again, not thousands each drawn and told
                     val tail = removedTail(entries.size, removed)
                     if (tail != null) {
                         addItems(tail)
@@ -177,10 +163,7 @@ abstract class BaseDynamicListUi<T>(
         })
     }
 
-    /**
-     * Adds [items] as [addItems] does, its undo bar saying [message] instead: an import's count, which a toast of its
-     * own under the bar went unseen (WD-37).
-     */
+    /** The undo bar says [message] (an import's count): a separate toast under the bar went unseen. */
     fun addItems(items: List<T>, message: String) {
         addedMessage = message
         try {
@@ -190,7 +173,7 @@ abstract class BaseDynamicListUi<T>(
         }
     }
 
-    /** [long]: a message of a sentence or two (an import's, its over-limit text ~80 characters), given time and lines to be read. */
+    /** [long]: a sentence or two, given time and lines to be read. */
     private fun showSnackbar(text: String, long: Boolean = false, action: () -> Unit) {
         if (suspendUndo) return
         val snackbar = Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
@@ -330,9 +313,7 @@ abstract class BaseDynamicListUi<T>(
             gravity = gravityEndBottom
             margin = dp(16)
             behavior = object : HideViewOnScrollBehavior<FloatingActionButton>(EDGE_BOTTOM) {
-                /**
-                 * the `translationY` FAB needs to be shown above the snackbar
-                 */
+                /** The `translationY` FAB needs to be shown above the snackbar. */
                 var scrollInOffset = 0f
 
                 @SuppressLint("RestrictedApi")
@@ -399,13 +380,8 @@ abstract class BaseDynamicListUi<T>(
 
 }
 
-/**
- * The items of [removed], lowest index first, if they were the end of a list now [size] long, as
- * the undo of a batch added leaves them: to be put back in one insertion. Null for others, put
- * back where each was.
- */
+/** Non-null only when [removed] were the tail of a list now [size] long (a batch add's undo): one insertion back. */
 internal fun <T> removedTail(size: Int, removed: List<Pair<Int, T>>): List<T>? =
     if (removed.firstOrNull()?.first == size && removed.last().first - size == removed.lastIndex) removed.map { it.second } else null
 
-/** Lines a long undo bar's message may take: the import's over-limit text is two or three. */
 private const val LONG_TEXT_LINES = 4

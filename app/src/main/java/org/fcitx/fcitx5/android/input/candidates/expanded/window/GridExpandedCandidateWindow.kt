@@ -6,30 +6,177 @@
 package org.fcitx.fcitx5.android.input.candidates.expanded.window
 
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ShapeDrawable
+import android.graphics.drawable.shapes.RectShape
+import android.util.DisplayMetrics
+import android.view.Gravity
+import android.view.View
+import android.view.accessibility.AccessibilityManager
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearSmoothScroller
+import androidx.recyclerview.widget.RecyclerView
+import androidx.transition.Slide
+import androidx.transition.Transition
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.daemon.launchOnReady
+import org.fcitx.fcitx5.android.data.pack.PackStore
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
+import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesAttached
+import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesDetached
+import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
+import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
+import org.fcitx.fcitx5.android.input.broadcast.PreeditEmptyStateComponent
+import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.SceneBar
+import org.fcitx.fcitx5.android.input.candidates.expanded.CandidatesPagingSource
+import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.candidates.expanded.GridPagingCandidateViewAdapter
 import org.fcitx.fcitx5.android.input.candidates.expanded.SpanHelper
 import org.fcitx.fcitx5.android.input.candidates.expanded.decoration.GridDecoration
+import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateComponent
+import org.fcitx.fcitx5.android.input.dependency.fcitx
+import org.fcitx.fcitx5.android.input.dependency.imeScope
+import org.fcitx.fcitx5.android.input.dependency.inputMethodService
+import org.fcitx.fcitx5.android.input.dependency.inputView
+import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.handwriting.HandwritingRecognition
+import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
+import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.keyboard.PageStrokeTouch
+import org.fcitx.fcitx5.android.input.motion.Motion
+import org.fcitx.fcitx5.android.input.wm.InputWindow
+import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.pack.PackKind
+import org.fcitx.fcitx5.android.utils.interpolator
+import org.fcitx.fcitx5.android.utils.motionSettings
+import org.mechdancer.dependency.manager.must
+import splitties.dimensions.dp
+import kotlin.math.max
+import kotlin.math.min
 
 class GridExpandedCandidateWindow :
-    BaseExpandedCandidateWindow<GridExpandedCandidateWindow>() {
-
-    private val gridSpanCount by lazy { spanCount(context) }
+    InputWindow.SimpleInputWindow<GridExpandedCandidateWindow>(), InputBroadcastReceiver {
 
     companion object {
-        /** The grid's columns: 横屏's setting where [context]'s window is 横屏 (KeyboardArea), a wide one upright too. */
-        fun spanCount(context: Context): Int = AppPrefs.getInstance().keyboard.run {
-            if (KeyboardArea.landscape(context))
-                expandedCandidateGridSpanCountLandscape
-            else
-                expandedCandidateGridSpanCount
-        }.getValue()
+        /** More where the window is 横屏, a wide one upright too. */
+        fun spanCount(context: Context): Int = if (KeyboardArea.landscape(context)) 8 else 6
     }
 
-    override val adapter by lazy {
+    private val imeScope by manager.imeScope()
+    private val theme by manager.theme()
+    private val fcitx by manager.fcitx()
+    private val inputView by manager.inputView()
+    private val commonKeyActionListener: CommonKeyActionListener by manager.must()
+    private val bar: KawaiiBarComponent by manager.must()
+    private val horizontalCandidate: HorizontalCandidateComponent by manager.must()
+    private val windowManager: InputWindowManager by manager.must()
+    private val returnKeyDrawable: ReturnKeyDrawableComponent by manager.must()
+    private val preeditEmptyState: PreeditEmptyStateComponent by manager.must()
+    private val service by manager.inputMethodService()
+    private val prefs = AppPrefs.getInstance()
+
+    // 移除动画 does not scale RecyclerView's scroller, as it does an animator
+    private val animates: Boolean get() = motionSettings().animates
+
+    private lateinit var candidateLayout: ExpandedCandidateLayout
+
+    private val barLook by lazy { SceneBar.of(context, theme) }
+
+    private val dividerDrawable by lazy {
+        ShapeDrawable(RectShape()).apply {
+            val intrinsicSize = max(1, context.dp(1))
+            intrinsicWidth = intrinsicSize
+            intrinsicHeight = intrinsicSize
+            // none drawn: its room kept
+            paint.color = barLook.divider?.value ?: Color.TRANSPARENT
+        }
+    }
+
+    private fun newDivider() = GridDecoration(dividerDrawable)
+
+    private fun firstFullyVisible() = layoutManager.findFirstCompletelyVisibleItemPosition()
+
+    private fun lastFullyVisible() = layoutManager.findLastCompletelyVisibleItemPosition()
+
+    override fun enterAnimation(lastWindow: InputWindow): Transition = Slide(Gravity.TOP).apply {
+        duration = Motion.Long.enter(motionSettings())
+        interpolator = Motion.Curve.Enter.interpolator
+    }
+
+    override fun exitAnimation(nextWindow: InputWindow): Transition = Slide(Gravity.TOP).apply {
+        duration = Motion.Long.exit(motionSettings())
+        interpolator = Motion.Curve.Exit.interpolator
+    }
+
+    final override fun onCreateView(): View {
+        adapter.bar = barLook
+        candidateLayout = ExpandedCandidateLayout(context, theme, barLook).apply {
+            recyclerView.apply {
+                adapter = this@GridExpandedCandidateWindow.adapter
+                layoutManager = this@GridExpandedCandidateWindow.layoutManager
+                addItemDecoration(newDivider())
+                addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                        val count = this@GridExpandedCandidateWindow.layoutManager.itemCount
+                        embeddedKeyboard.showPages(up = firstFullyVisible() > 0, down = lastFullyVisible() < count - 1)
+                    }
+                })
+                draws = ::drawsStrokes
+                lift = { context.dp(prefs.keyboard.strokeLift.getValue().dp) }
+                longPressMillis = { prefs.keyboard.longPressDelay.getValue().toLong() }
+                stroked = { commonKeyActionListener.listener.onKeyAction(KeyAction.SymAction.stroke(it), KeyActionListener.Source.Keyboard) }
+            }
+        }
+        return candidateLayout
+    }
+
+    // read as a finger comes down: the setting first, so a page of one who never chose it reads nothing more
+    private fun drawsStrokes(): Boolean {
+        if (prefs.keyboard.keyDrawing.getValue() != KeyDrawing.StrokeFilter) return false
+        val (entry, panel) = fcitx.runImmediately { inputMethodEntryCached to inputPanelCached }
+        val im = entry.uniqueName
+        val handwriting = prefs.internal.handwritingOpen.getValue()
+        return PageStrokeTouch.Draws().apply {
+            chosen = true
+            password = service.inPasswordField
+            address = service.inAddressField
+            composing = !preeditEmptyState.isEmpty
+            tempMode = panel.auxUp.isNotEmpty()
+            this.im = im
+            // the keyboard under the page draws none (注音's): the page none either
+            filters = (windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow).filtersStrokes()
+            handwritingOpen = handwriting
+            textPack = PackStore.ready(PackKind.TEXT)
+            // asked only if it writes: a keyboard of one who never writes makes no recognizer
+            recognizerLoadable = handwriting && HandwritingRecognition.shared.loadable
+            exploring = context.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+        }.on
+    }
+
+    private val keyActionListener = KeyActionListener { it, source ->
+        if (it is KeyAction.LayoutSwitchAction) {
+            when (it.act) {
+                ExpandedCandidateLayout.Keyboard.UpBtnLabel -> prevPage()
+                ExpandedCandidateLayout.Keyboard.DownBtnLabel -> nextPage()
+            }
+        } else {
+            commonKeyActionListener.listener.onKeyAction(it, source)
+        }
+    }
+
+    val adapter by lazy {
         object : GridPagingCandidateViewAdapter(theme) {
             override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
                 super.onBindViewHolder(holder, position)
@@ -43,15 +190,109 @@ class GridExpandedCandidateWindow :
         }
     }
 
-    override val layoutManager by lazy {
-        GridLayoutManager(context, gridSpanCount).apply {
+    val layoutManager by lazy {
+        GridLayoutManager(context, spanCount(context)).apply {
             spanSizeLookup = SpanHelper(adapter, this)
         }
     }
 
-    override fun newDivider() = GridDecoration(dividerDrawable)
+    private var offsetJob: Job? = null
 
-    override fun firstFullyVisible() = layoutManager.findFirstCompletelyVisibleItemPosition()
+    private val candidatesPager by lazy {
+        Pager(
+            config = PagingConfig(
+                pageSize = 48,
+                enablePlaceholders = false
+            ),
+            pagingSourceFactory = {
+                CandidatesPagingSource(
+                    fcitx,
+                    total = horizontalCandidate.adapter.total,
+                    offset = adapter.offset
+                )
+            }
+        )
+    }
+    private var candidatesSubmitJob: Job? = null
 
-    override fun lastFullyVisible() = layoutManager.findLastCompletelyVisibleItemPosition()
+    private fun prevPage() = smoothScrollTo(max(firstFullyVisible() - 1, 0), LinearSmoothScroller.SNAP_TO_END)
+
+    private fun nextPage() {
+        val count = layoutManager.itemCount
+        // the first page not loaded yet (Down is enabled till then): -1 would throw
+        if (count == 0) return
+        smoothScrollTo(min(lastFullyVisible() + 1, count - 1), LinearSmoothScroller.SNAP_TO_START)
+    }
+
+    private fun smoothScrollTo(position: Int, snap: Int) {
+        layoutManager.startSmoothScroll(object : LinearSmoothScroller(context) {
+            override fun getVerticalSnapPreference() = snap
+            override fun calculateSpeedPerPixel(dm: DisplayMetrics?) =
+                if (!animates) Float.MIN_VALUE else super.calculateSpeedPerPixel(dm)
+        }.apply { targetPosition = position })
+    }
+
+    override fun onAttached() {
+        bar.expandButtonStateMachine.push(ExpandedCandidatesAttached)
+        // above the keyboard for the hint's own 2 s; counted only once said. Not over a notice with 撤销, which it
+        // would lapse, the act then standing untaken: said at a later opening instead
+        val shown = prefs.internal.strokePageHintShown
+        if (PageStrokeTouch.Hint.shows(drawsStrokes(), shown.getValue()) && !inputView.holdsUndo &&
+            inputView.say(context.getString(R.string.stroke_page_hint), ms = PageStrokeTouch.Hint.MILLIS)
+        ) {
+            shown.setValue(shown.getValue() + 1)
+        }
+        candidateLayout.embeddedKeyboard.also {
+            it.onReturnDrawableUpdate(returnKeyDrawable.appearance)
+            it.keyActionListener = keyActionListener
+        }
+        offsetJob = imeScope.launch {
+            horizontalCandidate.expandedCandidateOffset.collect {
+                // strokes drawn here, pinyin typed still (filtered all away): the page stays, its ⌫ takes the stroke back
+                if (it <= 0 && (preeditEmptyState.isEmpty || !drawsStrokes())) {
+                    windowManager.attachWindow(KeyboardWindow)
+                } else {
+                    candidateLayout.resetPosition()
+                    adapter.refreshWithOffset(max(it, 0))
+                }
+            }
+        }
+        candidatesSubmitJob = imeScope.launch {
+            candidatesPager.flow.collectLatest {
+                adapter.submitData(it)
+            }
+        }
+    }
+
+    fun bindCandidateUiViewHolder(holder: CandidateViewHolder) {
+        holder.itemView.setOnClickListener {
+            fcitx.launchOnReady(holder.pick())
+        }
+        holder.itemView.setOnLongClickListener {
+            inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
+            true
+        }
+    }
+
+    fun recycleCandidateViewHolder(holder: CandidateViewHolder) {
+        holder.itemView.setOnClickListener(null)
+        holder.itemView.setOnLongClickListener(null)
+    }
+
+    override fun onDetached() {
+        bar.expandButtonStateMachine.push(
+            ExpandedCandidatesDetached,
+            ExpandedCandidatesEmpty to (horizontalCandidate.adapter.total == adapter.offset)
+        )
+        candidatesSubmitJob?.cancel()
+        offsetJob?.cancel()
+        candidateLayout.embeddedKeyboard.keyActionListener = null
+    }
+
+    override fun onPreeditEmptyStateUpdate(empty: Boolean) {
+        if (empty) {
+            windowManager.attachWindow(KeyboardWindow)
+        }
+    }
+
 }

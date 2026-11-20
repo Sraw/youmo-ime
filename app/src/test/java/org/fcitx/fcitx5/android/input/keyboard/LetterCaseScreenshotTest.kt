@@ -25,11 +25,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 拼音键字母大小写 (keyboard.letterCase): a Chinese input method's letter faces and press bubbles in the
- * case it says, Shift or not; English's as Shift has them whatever it says; what a screen reader hears
- * and what a key types as they were. Golden images under src/test/screenshots/LetterCaseScreenshotTest.
- */
+/** 拼音键字母大小写: a Chinese input method's faces and bubbles in the case it says; English's as Shift has them; screen reader and typing unchanged. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -76,7 +72,7 @@ class LetterCaseScreenshotTest {
             h.shift()
             val q = h.letter("q")
             assertEquals("q", q.label)
-            // Shift on, its key says so; the letters small (taken before a letter's tap uses Shift up)
+            // taken before a letter's tap uses Shift up
             h.captureBoard("LetterCaseScreenshotTest/pinyin_lower_shift")
             h.press(q)
             assertEquals(listOf("q"), h.popupChoices().map { it.text })
@@ -95,7 +91,6 @@ class LetterCaseScreenshotTest {
         }
     }
 
-    // English types what it shows: Shift's case, whatever the setting
     @Test
     @Uat("KB-68")
     fun englishIgnoresIt() {
@@ -133,7 +128,6 @@ class LetterCaseScreenshotTest {
         }
     }
 
-    // English's 九键 types its letters as Shift has them: its faces so whatever the setting (forIme)
     @Test
     @Uat("KB-68")
     fun englishNineKeysIgnoreIt() {
@@ -148,7 +142,6 @@ class LetterCaseScreenshotTest {
         }
     }
 
-    // one keyboard, the input method switched under it: English's faces Shift's, pinyin's the setting's again
     @Test
     @Uat("KB-68")
     fun switchingInputMethodsInOneKeyboard() {
@@ -162,7 +155,7 @@ class LetterCaseScreenshotTest {
         }
     }
 
-    // what a tap sends is as it was under 跟随 Shift: the setting draws, never types
+    // the setting draws, never types
     @Test
     @Uat("KB-68")
     fun whatIsTypedIsUnchanged() {
@@ -191,11 +184,10 @@ class LetterCaseScreenshotTest {
         assertEquals(nine, typed(LetterCaseChoice.Lower, false, KeyboardHarness.NINE_KEYS, "2"))
     }
 
-    // 五笔's roots shown: z has none, its letter drawn as the setting says, read as following Shift has it
     @Test
     @Uat("KB-68")
     fun aTableLetterWithNoRootIsReadAsEver() {
-        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
         fun z() = KeyboardHarness(TestThemes.PixelLight, wubi).start().use { h ->
             EngineState.tableKeyboardState.value = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.ROOTS, TableRoots.WUBI86)
             h.idle()
@@ -204,7 +196,6 @@ class LetterCaseScreenshotTest {
         }
         val (face, heard) = z()
         assertEquals("z", face)
-        // its letter read first, as ever ("z", then its corner)
         assertTrue("$heard", heard!!.startsWith("z"))
         setting.setValue(LetterCaseChoice.Upper)
         assertEquals("Z" to heard, z())

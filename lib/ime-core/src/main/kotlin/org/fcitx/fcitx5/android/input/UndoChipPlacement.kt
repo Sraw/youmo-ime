@@ -6,33 +6,24 @@ package org.fcitx.fcitx5.android.input
 
 import kotlin.math.abs
 
-/**
- * Where the keyboard's notice (the undo chip) goes, in the window's pixels, and which way it slides
- * out of the keyboard as it comes (specs/app.md, "Notices": always out of the keyboard,
- * toward the screen's middle, where the eyes are).
- */
+/** Where the keyboard's notice goes, in window pixels, sliding out of the keyboard toward the screen's middle. */
 object UndoChipPlacement {
 
-    /** Which way the chip moves as it comes; it goes back the other way, into the keyboard. */
+    /** It goes back the other way, into the keyboard. */
     enum class Slide { Up, Down, Left, Right }
 
-    /** A rectangle in the window's pixels. */
+    /** Window pixels. */
     data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
         val width get() = right - left
         val height get() = bottom - top
     }
 
-    /** The chip's top-left corner, and the way it slides out. */
     data class Place(val left: Int, val top: Int, val slide: Slide)
 
     /**
-     * Where the chip's top goes docked (user decision 2026-10-22, 原 PY-80: over the bar it hid the
-     * second candidate). With no candidates shown it sits over the bar, near its top ([barTop] + [gap]).
-     * With candidates it goes above the keyboard ([aboveTop] - [gap] - [chipHeight]): over the app,
-     * under no key and no candidate the user is about to tap. Not the toolbar row: while composing
-     * that row is the candidates. With no room above (a window at the screen's top), below
-     * [belowBottom] when there is somewhere below and the whole chip fits there above [bottomLimit]
-     * (the lowest window y it may reach, the navigation bar left out), else over the bar after all.
+     * Docked: with no candidates, over the bar near its top; with candidates, above the keyboard over the app (over the
+     * bar it hid the second candidate). No room above: below [belowBottom] if the chip fits above [bottomLimit], else
+     * over the bar after all.
      */
     fun top(
         candidates: Boolean,
@@ -52,11 +43,7 @@ object UndoChipPlacement {
         }
     }
 
-    /**
-     * Docked: [top]'s place, across the middle of a window [windowWidth] wide. Up out of the
-     * keyboard, or down when it went below it. [stripTop]: the floating code strip's top while it
-     * shows over the keyboard, which the chip goes above too.
-     */
+    /** Across the middle; up out of the keyboard, or down when below. [stripTop]: the floating code strip's, which it goes above too. */
     fun docked(
         windowWidth: Int,
         chipWidth: Int,
@@ -76,13 +63,9 @@ object UndoChipPlacement {
     }
 
     /**
-     * Floating: on the side of [keyboard] toward the middle of [screen] (the room the keyboard may
-     * float in, status and navigation bars left out), sliding that way. Off the middle, each axis by
-     * the part of half the screen it is off by; the one off more wins, up and down on a tie, as
-     * docked: a keyboard pinned to the top has it below, pinned left to its right, pinned right to
-     * its left, low on the screen above. Where the chip does not fit (the screen's edge), the
-     * opposite side, then the other axis's; with no room anywhere, over the keyboard's top. The
-     * floating code strip ([strip], while it shows) counts as part of the keyboard: never under the chip.
+     * Floating: on the side of the keyboard toward [screen]'s middle, the axis it is further off on winning (up and down
+     * on a tie); not fitting, the opposite side, then the other axis's, then over the keyboard's top. The floating code
+     * [strip] counts as the keyboard's.
      */
     fun floating(screen: Box, board: Box, chipWidth: Int, chipHeight: Int, gap: Int, strip: Box? = null): Place {
         val keyboard = if (strip == null) board else Box(
@@ -101,7 +84,7 @@ object UndoChipPlacement {
         return Place(centred(keyboard.left, keyboard.right, chipWidth, screen.left, screen.right), keyboard.top + gap, Slide.Down)
     }
 
-    // how far [twiceCentre]/2 is from [twiceMiddle]/2, as a part of half of [size]: -1 to 1 on the screen
+    // -1 to 1 on the screen
     private fun off(twiceCentre: Int, twiceMiddle: Int, size: Int): Float =
         if (size <= 0) 0f else (twiceCentre - twiceMiddle).toFloat() / size
 
@@ -116,7 +99,7 @@ object UndoChipPlacement {
             ?.let { Place(it, centred(keyboard.top, keyboard.bottom, h, screen.top, screen.bottom), slide) }
     }
 
-    // [size] centred on [from]..[to], kept within [min]..[max] while it fits
+    // kept within [min]..[max] while it fits
     private fun centred(from: Int, to: Int, size: Int, min: Int, max: Int): Int =
         ((from + to - size) / 2).coerceAtMost(max - size).coerceAtLeast(min)
 }

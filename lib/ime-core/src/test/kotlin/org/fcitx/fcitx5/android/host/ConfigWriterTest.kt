@@ -43,8 +43,7 @@ class ConfigWriterTest {
 
     @Test
     fun `a state change is written without a settings page closing or a stop`() {
-        // native fcitx saved state like 繁體 only at MainActivity.onStop: a process killed from
-        // the keyboard lost it. Here the change alone is enough, once the background thread runs
+        // native fcitx saved state like 繁體 only at MainActivity.onStop, lost to a kill: here the change alone is enough
         val writer = ConfigWriter(true, tasks::add, ConfigWriter.files(tmp.root) { _, e -> throw e })
         writer.write("conf/chttrans.conf") { "[EnabledIM]\n0=engine-pinyin\n" }
         runTasks()
@@ -92,7 +91,7 @@ class ConfigWriterTest {
 
     @Test
     fun `before unlock nothing is written, flush included`() {
-        // design §2.2: direct boot reads only; the process is stopped at unlock (FcitxApplication.kt:53-62)
+        // direct boot reads only; the process is stopped at unlock
         val root = tmp.newFolder("config")
         val writer = ConfigWriter(false, tasks::add, ConfigWriter.files(root) { _, e -> throw e })
         writer.write("conf/androidengine.conf") { "PageSize=5\n" }
@@ -105,7 +104,7 @@ class ConfigWriterTest {
 
     @Test
     fun `a file held is not written, what was pending for it dropped, the others written`() {
-        // A4: a file there that could not be read is held, so the defaults read in its place never replace it
+        // a file there that could not be read is held, so the defaults read in its place never replace it
         val writer = ConfigWriter(true, tasks::add, record)
         writer.write("conf/androidengine.conf") { "PageSize=9" }
         writer.hold("conf/androidengine.conf")
@@ -128,7 +127,7 @@ class ConfigWriterTest {
         assertEquals(listOf("conf/androidengine.conf" to "PageSize=7"), written)
     }
 
-    // review F4900: the held check while a drain writes had no test that failed without it
+    // the held check while a drain writes had no test that failed without it
     @Test
     fun `a file held while a drain writes the batch it is in is not written`() {
         // a reload failing on another thread after the batch was taken, before the file's turn in it

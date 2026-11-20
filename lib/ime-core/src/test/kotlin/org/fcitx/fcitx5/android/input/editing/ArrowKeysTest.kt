@@ -10,16 +10,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Arrow presses ahead of the editor's cursor reports, as a space-bar swipe in a slow editor sends
- * them: none may land between the halves of an emoji, where the next commit would split it, and
- * the editor is read once a report rather than once a press, each read being a wait on the app.
- */
+/** Arrow presses ahead of the cursor reports: none lands inside an emoji, and the editor is read once a report, not a press. */
 class ArrowKeysTest {
 
     private val wave = String(Character.toChars(0x1F44B)) // two UTF-16 units
 
-    /** The service's side: the editor, the session's cursor, and the reports not delivered yet. */
     private class Arrows(text: String, cursor: Int = text.length, readAhead: Int = ArrowKeys.READ_AHEAD) {
         val editor = FakeEditor(text, cursor)
         val session = EditingSession(editor).apply { selection.resetTo(cursor) }
@@ -43,20 +38,19 @@ class ArrowKeysTest {
             }
         }
 
-        /** A press whose reads the app does not answer in time: they come back null. */
+        /** Its reads come back null. */
         fun pressUnanswered(direction: Direction) {
             editor.revealLimit = null
             press(direction)
             editor.revealLimit = Int.MAX_VALUE
         }
 
-        /** The editor reports a cursor, as `onUpdateSelection` passes it on. */
+        /** As `onUpdateSelection` passes it on. */
         fun report(start: Int, end: Int = start) {
-            session.onCursorUpdate(start, end, -1, -1, ignoreSystemCursor = false)
+            session.onCursorUpdate(start, end, -1, -1)
             keys.cursorReported(start, end)
         }
 
-        /** The editor catches up on [n] of the presses. */
         fun reportPresses(n: Int = reports.size) = repeat(n) { report(reports.removeFirst()) }
     }
 
@@ -131,7 +125,7 @@ class ArrowKeysTest {
         assertTrue("one read for the way back: ${a.reads - atStart}", a.reads <= atStart + 1)
     }
 
-    /** The app placed the cursor elsewhere, say: the presses go on from there. */
+    /** The app placed the cursor elsewhere: the presses go on from there. */
     @Test
     fun aReportOfACursorNoPressPutThereStartsThePressesOver() {
         val a = Arrows("abcdef")

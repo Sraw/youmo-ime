@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.view.MotionEvent
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.assertRows
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,10 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * A double tap is timed by the touches' own clock (their eventTime), not the wall clock, which jumps
- * when the system time is set. Under the app, whose preferences the gesture view reads.
- */
+/** A double tap is timed by the touches' eventTime, not the wall clock, which jumps when the system time is set. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class CustomGestureViewTest {
@@ -40,28 +38,25 @@ class CustomGestureViewTest {
     }
 
     @Test
-    fun twoTapsCloseInTheirEventTimeAreADoubleTap() {
-        view().apply {
-            tapAt(1_000L)
-            tapAt(1_050L)
+    fun twoTapsAreADoubleTapByTheirEventTime() {
+        fun taps(second: Long, clicked: Int, doubled: Int) = {
+            clicks = 0
+            doubleTaps = 0
+            view().apply {
+                tapAt(1_000L)
+                tapAt(second)
+            }
+            assertEquals(clicked, clicks)
+            assertEquals(doubled, doubleTaps)
         }
-        assertEquals(1, clicks)
-        assertEquals(1, doubleTaps)
+        assertRows(
+            "close in their event time: a double tap" to taps(1_050L, clicked = 1, doubled = 1),
+            "far apart, however soon they arrive: two taps" to taps(11_000L, clicked = 2, doubled = 0),
+        )
     }
 
-    @Test
-    fun twoTapsFarApartInTheirEventTimeAreTwoTapsHoweverSoonTheyArrive() {
-        view().apply {
-            tapAt(1_000L)
-            tapAt(11_000L)
-        }
-        assertEquals(2, clicks)
-        assertEquals(0, doubleTaps)
-    }
-
-    // where the finger came down goes with a click no plain tap made: a swipe's whose slot is nothing
-    // (KeySwipe.Outcome.Tap, at its Up) and a stroke lifted short (GlideTouch.Route.TAP_KEY); a swipe's
-    // own touch, past the threshold, still has none
+    // where the finger came down goes with a click no plain tap made: a swipe whose slot is nothing and a stroke lifted
+    // short; a swipe's own touch past the threshold has none
     @Test
     fun aSwipesTapAndAStrokeLiftedShortHaveWhereTheFingerCameDown() {
         val at = ArrayList<Pair<Float, Float>>()

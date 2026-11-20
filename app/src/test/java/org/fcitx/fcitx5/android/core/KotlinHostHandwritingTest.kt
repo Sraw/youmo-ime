@@ -30,11 +30,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 import java.util.Collections
 
-/**
- * 0.6.0's 手写 input method moved onto the toolbar (061-handwriting-toolbar §6): what [KotlinHost] reads at
- * each start of a profile that lists it, an upgrade's or a restored backup's (HandwritingRetire, its rules;
- * KotlinHostTest the rest of the host).
- */
+/** The retired 手写 input method as [KotlinHost] reads a profile that lists it (HandwritingRetire has the rules). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KotlinHostHandwritingTest {
@@ -71,7 +67,7 @@ class KotlinHostHandwritingTest {
     fun tearDown() {
         fcitx.stop()
         home.deleteRecursively()
-        // the singleton's prefs outlive the test: a notice one left unseen is not the next one's
+        // the singleton's prefs outlive the test
         AppPrefs.getInstance().internal.run {
             for (p in listOf(handwritingOpen, handwritingRetired, keyHandwritingUnseen)) p.setValue(false)
             handwritingRetiredUnseen.setValue("")
@@ -81,7 +77,6 @@ class KotlinHostHandwritingTest {
         EngineNotices.forgetToldOnce()
     }
 
-    // 0.6.0's profile with its 手写 input method: [first] it, else after pinyin and English
     private fun zeroSixProfile(first: Boolean): String {
         val items = if (first) listOf(HandwritingRetire.OLD, InputMethodCatalog.ENGLISH)
         else listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, HandwritingRetire.OLD)
@@ -102,8 +97,7 @@ class KotlinHostHandwritingTest {
         listen()
     }
 
-    // PR-55, PR-56: 0.6.0's 手写 is the toolbar's now: gone from the list (pinyin in its place where it was first,
-    // and the toolbar's 手写 turned on there), the profile written without it, the user told once
+    // pinyin takes its place where it was first, with the toolbar's 手写 on; written without it, told once
     @Test
     @Uat("PR-55", "PR-56")
     fun zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce() = runBlocking {
@@ -132,8 +126,7 @@ class KotlinHostHandwritingTest {
         )
     }
 
-    // PR-58: 0.6.0's handwriting turned traditional: where pinyin took its first place it is pinyin's 繁体 now
-    // (the user's Q12); where handwriting was not first that 繁体 is gone and the notice says so
+    // where pinyin took its first place it is pinyin's 繁体 now; elsewhere that 繁体 is gone and the notice says so
     @Test
     @Uat("PR-58")
     fun zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace() = runBlocking {
@@ -156,8 +149,7 @@ class KotlinHostHandwritingTest {
         )
     }
 
-    // §6.1: a 0.6.0 profile read after handwriting was retired once (a 0.6.0 backup restored, handwriting added back
-    // there): told again, neither pinned again nor turned on, what the user did with the button since kept
+    // retired again (an old backup restored): told again, but the user's button choice since is kept
     @Test
     fun handwritingRetiredAgainIsToldButNotPinnedOrTurnedOnAgain() = runBlocking {
         val internal = AppPrefs.getInstance().internal
@@ -179,9 +171,7 @@ class KotlinHostHandwritingTest {
         }
     }
 
-    // PR-57: a 0.6.0 backup restored over a 0.6.1 that retired handwriting: the backup's settings replace the phone's
-    // (UserDataManagerTest.aBackupsSettingsReplaceThePhonesThoseAtTheirDefaultsIncluded), 0.6.0's without the marks
-    // of that, so the profile it brings is retired as an upgrade's: pinned, turned on where it was first, told
+    // an old backup's prefs lack the retirement marks, so its profile retires as an upgrade's: pinned, turned on where first, told
     @Test
     @Uat("PR-57")
     fun aRestoredBackupsHandwritingIsRetiredAsAnUpgradesIs() = runBlocking {
@@ -191,7 +181,7 @@ class KotlinHostHandwritingTest {
         internal.handwritingOpen.setValue(false)
         internal.toolbarButtons.setValue(ToolbarConfig(ToolbarConfig.DEFAULT.items.filterNot { it is ToolbarConfig.Item.Button && it.button == ToolbarButton.Handwriting }).serialize())
         try {
-            // the import: a 0.6.0 prefs file has neither key
+            // an old prefs file has neither key
             rawPrefs().edit().remove(internal.handwritingRetired.key).remove(internal.toolbarButtons.key).commit()
             assertFalse(internal.handwritingRetired.getValue())
             start()
@@ -207,8 +197,7 @@ class KotlinHostHandwritingTest {
         }
     }
 
-    // before the first unlock (direct boot) the prefs and the config are not the user's: a 0.6.0 profile is read
-    // without handwriting but nothing is written, pinned, turned on or noted to be told
+    // in direct boot the prefs and config are not the user's: read without handwriting, nothing written or noted
     @Test
     fun directBootRetiresHandwritingWritingNothing() = runBlocking {
         val internal = AppPrefs.getInstance().internal
@@ -233,7 +222,7 @@ class KotlinHostHandwritingTest {
         }
     }
 
-    // 0.6.0's handwriting pad's 注 key's style, read by nothing now: dropped as the app starts (AppPrefs.dropRetired)
+    // read by nothing now: dropped at start (AppPrefs.dropRetired)
     @Test
     fun theHandwritingPadsReadingStyleIsDropped() {
         val raw = rawPrefs()
@@ -242,7 +231,7 @@ class KotlinHostHandwritingTest {
         assertFalse(raw.contains("last_candidate_reading"))
     }
 
-    // MN-25: handwriting gone from the list and 键盘手写 gone from 在键上划 at once: each its own notice
+    // each its own notice
     @Test
     @Uat("MN-25")
     fun bothHandwritingNoticesAreToldEachOnce() = runBlocking {
@@ -266,7 +255,6 @@ class KotlinHostHandwritingTest {
         }
     }
 
-    // ST-122: 0.6.0's 手写 is no input method to add (the + list) nor one in use
     @Test
     @Uat("ST-122")
     fun handwritingIsNoInputMethodToAdd() = runBlocking {
@@ -276,7 +264,7 @@ class KotlinHostHandwritingTest {
         assertFalse(HandwritingRetire.OLD in fcitx.enabledIme().map { it.uniqueName })
     }
 
-    // MN-24: the notice queued as the host starts, the process gone before a keyboard showed: told at the next start
+    // the process gone before a keyboard showed: told at the next start
     @Test
     @Uat("MN-24")
     fun theHandwritingNoticeNotSeenIsToldAtTheNextStart() = runBlocking {
@@ -300,7 +288,6 @@ class KotlinHostHandwritingTest {
     }
 
     private companion object {
-        // KotlinHost's profile, under the config home
         const val PROFILE = "profile"
     }
 }

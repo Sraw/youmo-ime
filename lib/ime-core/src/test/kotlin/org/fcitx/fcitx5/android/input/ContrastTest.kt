@@ -33,7 +33,7 @@ class ContrastTest {
         },
     )
 
-    /** F3477: alpha was ignored, so 0x990d47a1 (9:1 opaque, 3.2:1 drawn on white) was kept unread. */
+    /** Alpha was ignored, so 0x990d47a1 (9:1 opaque, 3.2:1 drawn on white) was kept unread. */
     @Test
     fun aTranslucentColourIsJudgedAsDrawn() {
         val translucent = 0x990d47a1.toInt()

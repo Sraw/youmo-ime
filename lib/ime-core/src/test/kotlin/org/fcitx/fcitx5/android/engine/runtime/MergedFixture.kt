@@ -14,11 +14,7 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import java.io.File
 import java.nio.ByteBuffer
 
-/**
- * [Engines.Additions.dictionary] of [lines], compiled as the app compiles the dictionaries the user
- * merged, against the pinyin data [load] gives (its words kept out of the file's trie): each time it
- * is asked, so [lines] can count the reads or throw as an unreadable dictionary would.
- */
+/** [Engines.Additions.dictionary] of [lines], compiled at each ask, so [lines] can count reads or throw. */
 internal fun compiled(load: (String) -> ByteBuffer, lines: () -> Sequence<String>): () -> DictionaryFile? = {
     val file = File.createTempFile("merged", ".ymd").apply { deleteOnExit() }
     val data = PinyinData.load(load(InputMethodCatalog.PINYIN_DATA), verify = false)

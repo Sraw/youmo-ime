@@ -15,7 +15,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** The bottom row's keys either side of the space, as the field is. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class TextKeyboardAddressTest {

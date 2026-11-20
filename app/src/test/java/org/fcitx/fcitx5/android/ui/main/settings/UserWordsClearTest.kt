@@ -12,7 +12,7 @@ import org.junit.Test
 
 class UserWordsClearTest {
 
-    // F2730: 全部清空's warning counts the tables' blocks under a code with the blocked words
+    // 全部清空's warning counts the tables' blocks under a code with the blocked words
     @Test
     fun theBlockedThatComeBackAreTheWordsAndTheTablesBlocks() {
         val blocks = LearningResult.Listed(listOf(ListedItem(null, "", "寸", blocked = true)))

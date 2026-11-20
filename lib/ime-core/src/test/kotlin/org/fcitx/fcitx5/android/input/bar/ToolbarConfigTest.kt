@@ -40,8 +40,7 @@ class ToolbarConfigTest {
         )
     }
 
-    // 061-handwriting-toolbar Q2: pinned by default; where it does not write (English, a password) greyed in its
-    // place, not left out, so nothing moves as 中/英 switch (the user's call, 2026-11-15)
+    // pinned by default; greyed in place where it does not write (English, a password), so nothing moves as 中/英 switch
     @Test
     @Uat("TB-55", "TB-67")
     fun handwritingIsPinnedByDefaultAndGreyedWhereItDoesNotWrite() {
@@ -53,7 +52,6 @@ class ToolbarConfigTest {
         for (row in listOf(715, 825, 1080, 2072)) {
             assertEquals(row.toString(), ToolbarConfig.DEFAULT.layout(everything).slots(row, 110), ToolbarConfig.DEFAULT.layout(none).slots(row, 110))
         }
-        // on the toolbar the same
         val onToolbar = ToolbarConfig.parse("undo,handwriting,|,emoji")
         assertEquals(listOf(Undo, Handwriting, More), onToolbar.layout(none).toolbar)
         // a bar the user set before 0.6.1: it comes in hidden, before the divider
@@ -61,16 +59,15 @@ class ToolbarConfigTest {
         assertEquals(Item.Button(Handwriting, false), old.items[old.items.indexOf(Item.Divider) - 1])
     }
 
-    // FB11 (the user's call, 2026-11-15): the toolbar with nothing to show here, the menu key is ⋯ itself
+    // the toolbar with nothing to show here: the menu key is ⋯ itself
     @Test
     @Uat("TB-69")
     fun aToolbarWithNothingToShowIsMoreAlone() {
-        // the default has some
         assertFalse(ToolbarConfig.DEFAULT.layout(everything).moreOnly)
         // none ticked; none before the divider
         assertTrue(ToolbarConfig.parse("-undo,-redo,-cursor_move,-clipboard,|,emoji,voice,hide").layout(everything).moreOnly)
         assertTrue(ToolbarConfig.parse("|,undo,emoji,voice,hide").layout(everything).moreOnly)
-        // what is ticked of no use here: by the situation (簡繁 without chttrans, 单手 floating)
+        // ticked but of no use here (簡繁 without chttrans, 单手 floating)
         val situational = ToolbarConfig.parse("trad_simp,one_handed,|,emoji")
         assertTrue(situational.layout(everything.copy(tradSimp = false, oneHanded = false)).moreOnly)
         assertFalse(situational.layout(everything.copy(tradSimp = false)).moreOnly)
@@ -85,7 +82,7 @@ class ToolbarConfigTest {
         assertEquals(emptyList<ToolbarButton>(), layout.slots(715, 110).overflow)
     }
 
-    // 061-handwriting-toolbar §6.3: pinned for one who wrote with 0.6.0's handwriting, once, the user's order kept
+    // pinned once for one who wrote with 0.6.0's handwriting, the user's order kept
     @Test
     fun pinningHandwritingPutsItFirstAfterTheDivider() {
         val old = ToolbarConfig.parse("undo,-redo,|,voice,hide")
@@ -141,7 +138,6 @@ class ToolbarConfigTest {
     fun noDividerEverythingIsOnTheToolbar() {
         val config = ToolbarConfig.parse("emoji,undo")
         assertEquals(Layout(listOf(Emoji, Undo, More), emptyList()), config.layout(everything))
-        // a list made without one, the same
         assertEquals(Layout(listOf(Undo, More), emptyList()), ToolbarConfig(listOf(Item.Button(Undo, true))).layout(everything))
     }
 
@@ -171,8 +167,7 @@ class ToolbarConfigTest {
 
     @Test
     fun quickInputIsNotOnTheBarTillTickedNeverArrangedNorArranged() {
-        // the user's call (2026-11-02): one to add, on neither build's bar by default, a bar never
-        // arranged (new or upgraded) nor one arranged before 0.5.1
+        // on neither build's bar by default, a bar never arranged nor one arranged before 0.5.1
         fun quick(c: ToolbarConfig) = c.items.single { it is Item.Button && it.button == ToolbarButton.QuickPhrase }
         assertEquals(Item.Button(ToolbarButton.QuickPhrase, false), quick(ToolbarConfig.parse("")))
         assertFalse(ToolbarButton.QuickPhrase in ToolbarConfig.parse("").layout(everything).toolbar)
@@ -193,7 +188,7 @@ class ToolbarConfigTest {
         }
     }
 
-    // every one at the right stays there however narrow the bar (the user's call, 2026-11-15): none goes onto the toolbar
+    // every one at the right stays there however narrow the bar: none goes onto the toolbar
     @Test
     @Uat("TB-57")
     fun everyPinnedOneStaysAtTheRight() {
@@ -201,8 +196,7 @@ class ToolbarConfigTest {
         assertEquals(Layout(listOf(Undo, More), listOf(Emoji, Voice, Hide, Theme)), config.layout(everything))
     }
 
-    // the bar split into slots of one width (the user's call, 2026-11-15): as many as fit at about a button's own, the
-    // toolbar open or shut alike; the toolbar's that have no slot in ⋯'s panel, none scrolled; the right's all kept
+    // slots of one width, as many as fit at about a button's own, open or shut alike; the right's all kept
     @Test
     @Uat("TB-02", "TB-22")
     fun theBarIsSplitIntoEqualSlotsTheToolbarsOverflowInMore() {
@@ -226,15 +220,12 @@ class ToolbarConfigTest {
         val many = Layout(listOf(More), listOf(Emoji, Handwriting, Voice, Hide, Undo, Redo, CursorMove, Clipboard, Theme, Habits))
         assertEquals(ToolbarConfig.Slots(13, 55, listOf(More), emptyList()), many.slots(715, 110))
         assertEquals("not laid out yet", ToolbarConfig.Slots(0, 110, layout.toolbar, emptyList()), layout.slots(0, 110))
-        // the slots fill the bar, what is left over less than a pixel a slot: each as wide as it can be (R26 F8471; R26
-        // F8260: the slots' x, open or shut, are the view's, not Slots'; this checks only the widths)
+        // the slots fill the bar, less than a pixel a slot left over (the x positions are the view's; only widths here)
         val s = layout.slots(1080, 110)
         assertTrue("all fit", s.count * s.cellPx <= 1080 && 1080 - s.count * s.cellPx < s.count)
     }
 
-    // 手写 shown at the right after 表情, where a new install has it, in a bar arranged before it was there to choose: 0.6.0's
-    // (none in it), or the first test build's written unticked before the divider as parse put it, the first time only;
-    // one the user took off since (unticked at the right, or moved onto the toolbar) left so
+    // 手写 shown at the right after 表情 in a bar arranged before it existed, the first time only; one the user moved since left so
     @Test
     @Uat("TB-66")
     fun aBarArrangedBeforeHandwritingGetsItAfterTheEmoji() {

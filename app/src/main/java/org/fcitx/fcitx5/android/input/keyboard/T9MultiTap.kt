@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 
-/** 连按 on the nine keys, off or how soon a key pressed again is its next letter ([MultiTap]). */
 enum class T9MultiTap(override val stringRes: Int, val timeout: Long) : ManagedPreferenceEnum {
     Off(R.string.t9_multi_tap_off, 0),
     Fast(R.string.t9_multi_tap_fast, 400),

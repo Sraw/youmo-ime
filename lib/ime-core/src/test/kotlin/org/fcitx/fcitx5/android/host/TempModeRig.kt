@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.host
 
-/**
- * A pipeline with the two temp modes registered as fcitx loads them (quick phrase, then Unicode), an
- * engine that records what reaches it, and a host that keeps commits and the last panel.
- */
+/** The two temp modes registered as fcitx loads them, a recording engine, a host keeping commits and the last panel. */
 internal class TempModeRig(
     table: QuickPhraseTable,
     data: () -> ByteArray?,
@@ -18,7 +15,7 @@ internal class TempModeRig(
 ) {
     val log = mutableListOf<String>()
 
-    /** What went out past the commit filters ([TempModeHost.commitAsIs]), each also in [commits]. */
+    /** Past the commit filters, each also in [commits]. */
     val asIs = mutableListOf<String>()
     val engineKeys = mutableListOf<Int>()
     var panel: TempPanel = TempPanel.EMPTY
@@ -76,7 +73,7 @@ internal class TempModeRig(
     val aux get() = panel.auxUp.toString()
     val page get() = panel.candidates?.let { l -> (0 until l.size).map { l.candidate(it).text } }.orEmpty()
 
-    /** The candidate at [globalIndex] of the shown list tapped, as the panel's list picks it; false for none. */
+    /** As the panel's list picks it; false for none. */
     fun tap(globalIndex: Int): Boolean {
         val c = panel.candidates?.candidates?.getOrNull(globalIndex) ?: return false
         c.select?.invoke(ic)

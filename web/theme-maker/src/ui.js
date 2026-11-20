@@ -1,6 +1,4 @@
-// youmo-ui: the maker's page (060-render-p3 §5.1, M1): the top bar, the preview the engine draws, the preview's
-// environment, the three ways to start, open and save, the draft, undo and redo, the problems. The document and
-// what is done to it are youmo-maker's (node tests them); this part is the controls.
+// youmo-ui: the theme maker page's controls; the document and its edits are youmo-maker's (node tests them).
 (function () {
   'use strict';
   const E = globalThis['youmo-engine'] && globalThis['youmo-engine'].YoumoEngine;
@@ -12,12 +10,10 @@
   const FORMAT = json('youmo-format');
   const EXAMPLES = json('youmo-examples');
   const ICONS = json('youmo-engine-icons');
-  // the icon page's groups, the bar's own image of a name whose key's differs, the menu key's ⌄ turned (061-toolbar-icons)
   const BAR_ICONS = json('youmo-bar-icons');
-  // the theme's own icons as the engine reads them, by their files' bytes (M.iconsOf)
   const iconCache = new WeakMap();
   const iconsNow = () => M.iconsOf(E, ICONS, history.current, iconCache);
-  // the bar's: the app's there (hide-keyboard's ▾) under the theme's own
+  // the app's bar icons (hide-keyboard's ▾) under the theme's own
   const BAR_BASE = Object.assign({}, ICONS, BAR_ICONS.toolbarFallback);
   const barIconsNow = () => M.iconsOf(E, BAR_BASE, history.current, iconCache);
   const $ = (id) => document.getElementById(id);
@@ -32,30 +28,28 @@
   let env = Object.assign({}, M.ENV);
   let scene = null;
   let pressed = null;
-  let picked = null; // the key tapped last: {board, key, layout}, the 按键 page's 选中的这个键 (layout: the one drawn, an id or own's)
-  // the layout 环境 › 键盘 › 打开 .layout opened (061-custom-layout §10): `{id, name, layout}`, drawn while 键盘 is OWN
+  let picked = null; // the key tapped last: {board, key, layout} (layout: the one drawn, an id or own's)
   let own = null;
   const OWN = '@own';
   const OPEN_LAYOUT = '@open';
   const boardDrawn = () => (env.board === OWN && own ? own.layout : env.board);
   const boardName = () => (env.board === OWN && own ? own.id : env.board);
-  let theme = null; // the engine's reading of the document as the preview last drew it
+  let theme = null;
   let tab = PANELS.length ? PANELS[0].id : 'source';
   let assets = { key: null, images: {}, fonts: {}, cuts: {} };
   let loading = 0; // which loadAssets is the latest: an older one finishing late is dropped
-  let edited = false; // the draft is kept only once the user has changed something
+  let edited = false;
   let keeping = null;
-  let problems = []; // the problems the preview last listed: a tab shows those of its styles
-  let barH = 0; // the bar's sample's height over the keys on the preview canvas (px), the keys under it
-  let playing = null; // 试一下's frame: {key, scale, sink, alpha, appear} while it plays
-  // the pictures picked this session as they were picked (L9): a cut is made from them, not from the re-encoded file.
-  // By the saved file's content id: `{bytes, scale}` (the picked one's decoded width over the saved one's)
+  let problems = [];
+  let barH = 0;
+  let playing = null;
+  // pictures picked this session: cuts are made from them, not from the re-encoded file
   const originals = new Map();
   const store = (() => { try { return M.idbStore(window.indexedDB); } catch (e) { return null; } })();
 
   function toast(text) {
     const t = $('toast');
-    // inside a dialog open (the top layer): under it, a toast behind a tall dialog is never seen
+    // inside an open dialog (the top layer): else a toast behind a tall dialog is never seen
     const host = document.querySelector('dialog[open]') || document.body;
     if (t.parentNode !== host) host.append(t);
     t.textContent = text;
@@ -64,7 +58,6 @@
     toast.timer = setTimeout(() => t.classList.remove('on'), 3500);
   }
 
-  // ---- the document ----
 
   function set(d, { fresh = false } = {}) {
     if (fresh || !history) history = new M.History(d);
@@ -73,14 +66,12 @@
     changed(fresh);
   }
 
-  // the draft written a moment after the last change, not on every key
   function keep() {
     if (!store || !edited || !history) return;
     clearTimeout(keeping);
     keeping = setTimeout(keepNow, 500);
   }
-  // the draft written now (the page hidden or closed: a change of the last moment is kept too); a store that
-  // refuses (its quota) said once, the page going on without drafts
+  // a store refusing (quota) is said once and the page goes on without drafts
   let keepFailed = false;
   function keepNow() {
     clearTimeout(keeping);
@@ -96,7 +87,6 @@
     const d = history.current;
     if ($('source').value !== d.xml) $('source').value = d.xml;
     $('name').textContent = M.themeName(d.xml) || '（无名）';
-    // the page answers only once there is a document (m1-review L6): until then its buttons are inert
     $('top').inert = $('main').inert = false;
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
@@ -104,23 +94,18 @@
     return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(external); } });
   }
 
-  // the tab's field typed in since its last commit (input after its change): Ctrl+Z there is the field's own undo
-  // (m3 L-a), and only its text is kept over a rebuild (m3 L-b: a field committed shows the document's value)
+  // Ctrl+Z there is the field's own undo, and only its text survives a rebuild
   let dirty = null;
 
-  // a field the user types in: what a value written over it would take the typing from
   const typedIn = (el) => !!el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|range|color|file)$/.test(el.type)));
   const CONTROLS = 'input, select, textarea, button';
 
-  // [to] made to show what [from] (the tab drawn anew, off the page) shows, its nodes kept: a control's value,
-  // a text; a part with no control replaced whole by the new one (its handlers, a canvas drawn). False where the controls differ (one more stop, a field
-  // gone): the tab is then drawn anew. [skip] keeps its value (the field being typed in).
+  // keeps [to]'s nodes; false where the controls differ (the tab is redrawn); [skip] keeps the field being typed in
   function sync(to, from, skip) {
     if (to.nodeType !== from.nodeType || to.nodeName !== from.nodeName) return false;
     if (to.nodeType === Node.TEXT_NODE) { if (to.data !== from.data) to.data = from.data; return true; }
     if (to.nodeType !== Node.ELEMENT_NODE) return true;
-    // a control's handlers hold what it was drawn for: the row's name (a colour's, a stop's), a box's data-key
-    // (a picture decoded, its crop). Another, and the part is put in whole, never kept with old handlers
+    // a control's handlers hold what it was drawn for: where that differs the part is replaced, never kept with stale handlers
     const what = (e) => (e.matches('label.row') ? e.querySelector('.what')?.textContent ?? null : null);
     if (to.dataset.key !== from.dataset.key || what(to) !== what(from)) {
       if (to.contains(skip)) return false;
@@ -147,10 +132,7 @@
     return true;
   }
 
-  // the tab after a change: a value edited changes values in place, never the tab under the user (a tab drawn
-  // anew took the field or box just tapped, its focus and its click, or the characters typed into it: on touch
-  // the old field's change comes once the new one is tapped). The field being typed in keeps what it has, but
-  // not where the change is not its own ([external]: undo, redo, a draft): then it shows the document's.
+  // values change in place, never the tab under the user: a redrawn tab took the tapped field, its focus or typing
   function refreshTab(external = false) {
     const el = $('tab-' + tab);
     const panel = PANELS.find((p) => p.id === tab);
@@ -167,17 +149,13 @@
     const key = el.contains(active) && active.matches(CONTROLS) ? controlKey(active) : null;
     const same = el.childNodes.length === fresh.childNodes.length && [...fresh.childNodes].every((n, i) => sync(el.childNodes[i], n, skip));
     if (!same) { rebuildSoon(); return; }
-    // a row or box put in whole took the focused control with it (用这个裁切's button): focus its like in the new one
     if (key && !el.contains(document.activeElement)) {
       const again = [...el.querySelectorAll(CONTROLS)].find((c) => controlKey(c) === key);
       if (again) again.focus({ preventScroll: true });
     }
   }
 
-  // a change that adds or takes away controls (a border's colour once it has a width) draws the tab anew, but a task
-  // later: on touch the old field's change comes inside the next tap's mousedown, before focus moves, so drawn at
-  // once the tab lost the field tapped. By then the focus is on it: showTab focuses its like by controlKey, and what
-  // was typed into it and not yet committed is kept with its caret
+  // redrawn a task later: on touch the old field's change fires inside the next tap's mousedown, before focus moves
   let rebuilding = null;
   function rebuildSoon() {
     clearTimeout(rebuilding);
@@ -194,7 +172,6 @@
     }, 0);
   }
 
-  // a control's place in a tab, the same in the tab drawn anew: its row's label, its place in the row (else its text)
   function controlKey(c) {
     const row = c.closest('label.row, .group, p, li, tr');
     const what = row && row.querySelector('.what');
@@ -202,25 +179,22 @@
     return c.tagName + '|' + (what ? what.textContent : '') + '|' + inRow + '|' + (what ? '' : c.textContent || c.type);
   }
 
-  // the theme's files as the painter takes them: its images decoded, its fonts loaded under a family of their own
-  // an image is decoded only where its header says the app would take it: a pack's bytes are not trusted, and a
-  // decode past the browser's memory takes the tab down (a draft restored would do it again each time)
+  // decoded only where the header says the app would take it: pack bytes are untrusted, and a huge decode kills the tab
   async function loadAssets(d) {
-    // the same files (an edit of theme.xml copies the object, not the bytes): nothing decoded again
+    // a theme.xml edit copies the object, not the bytes: nothing decoded again
     const same = (a, b) => a === b || (a && Object.keys(a).length === Object.keys(b).length && Object.keys(b).every((k) => a[k] === b[k]));
-    // the latest all the same: an older one still decoding is dropped when it lands
     if (same(assets.key, d.files)) { ++loading; return true; }
     const mine = ++loading;
     const images = {};
     const fonts = {};
     const cuts = {};
-    const added = new Set(); // the fonts this call put in document.fonts
+    const added = new Set();
     const safe = new Set(M.decodableImages(L, FORMAT, d));
     for (const [name, bytes] of Object.entries(d.files)) {
       try {
         if (IMAGE.test(name)) {
           if (!safe.has(name)) continue;
-          // a file of the same bytes as before: its bitmap kept, not decoded again (a cropper holds it)
+          // a cropper holds the bitmap, so the same bytes keep it
           const kept = assets.key && assets.key[name] === bytes && assets.cuts[name];
           const bmp = kept || await createImageBitmap(new Blob([bytes]));
           images[name] = { image: bmp, width: bmp.width, height: bmp.height };
@@ -237,16 +211,14 @@
           fonts[name] = family;
         }
       } catch (e) {
-        // a file the browser cannot decode: the engine draws without it, as the app would refuse it on import
+        // undecodable: the engine draws without it, as the app would refuse it on import
       }
     }
     if (mine !== loading) {
       const ours = Object.values(assets.cuts);
       for (const b of Object.values(cuts)) if (!ours.includes(b)) b.close();
-      // the fonts this call added that the shown files do not use: out of the page (kept in faces, so a newer
-      // call that found one there puts it back when it lands)
+      // kept in faces, so a newer call that found one there puts it back when it lands
       const shown = new Set(Object.values(assets.fonts));
-      // (a newer call that landed first may have let one go already: no face left, nothing to take out)
       for (const family of added) {
         const face = faces.get(family);
         if (face && !shown.has(family)) document.fonts.delete(face);
@@ -254,7 +226,6 @@
       return false;
     }
     for (const b of Object.values(assets.cuts)) if (!Object.values(cuts).includes(b)) b.close();
-    // a font no file has any more (replaced, deleted, undone) is let go
     const families = new Set(Object.values(fonts));
     for (const [family, face] of faces) {
       if (!families.has(family)) { document.fonts.delete(face); faces.delete(family); } else if (!document.fonts.has(face)) document.fonts.add(face);
@@ -262,12 +233,10 @@
     assets = { key: d.files, images, fonts, cuts };
     return true;
   }
-  const faces = new Map(); // the fonts this page added to document.fonts, by family
+  const faces = new Map();
 
-  // the <font name=… src=…> of the theme, by the CSS family its file was loaded under
   function fontFamilies(xml) {
     const out = {};
-    // as XML has them: in any order, either quote, entities read, comments skipped
     for (const f of F.elements(xml, 'font')) {
       const a = Object.fromEntries(f.attrs);
       if (a.name && assets.fonts[a.src]) out[a.name] = assets.fonts[a.src];
@@ -275,17 +244,14 @@
     return out;
   }
 
-  // the theme's picture, the scene's size: its orientation's cut (made the keyboard's shape by the 背景 page's crop)
-  // centre-cropped, blurred and dimmed as asked; read by the engine, as the app reads it
   function pictureOf() {
     const p = theme && theme.info(env.dark).picture;
     if (!p) return null;
     const cuts = p.cuts || {};
-    // the window's 横屏 (a tablet upright is), as the app picks the cut: not the device turned alone
+    // by the window's landscape (a tablet upright is), as the app picks the cut
     const file = cuts[M.shape(E, env).landscape ? 'landscape' : 'portrait'] || cuts.portrait || cuts.landscape;
     const bmp = file && assets.cuts[file];
     if (!bmp || !scene) return null;
-    // made once for a bitmap, a size and a blur and brightness: not blurred again on every preview (each tap)
     if (pictures.bmp !== bmp || pictures.w !== scene.width || pictures.h !== scene.height || pictures.density !== env.density) Object.assign(pictures, { bmp, w: scene.width, h: scene.height, density: env.density, made: new Map() });
     const made = pictures.made;
     return (blurDp, brightness) => {
@@ -298,8 +264,7 @@
       c.height = pictures.h;
       const g = c.getContext('2d');
       const px = b * env.density;
-      // centre-cropped to the canvas as the app crops it (never made bigger for the blur); where the browser has
-      // no filter, unblurred (the dimming is drawn, below)
+      // where the browser has no filter, unblurred
       const m = 'filter' in g && px > 0 ? Math.ceil(px * 3) : 0;
       const s = Math.max(c.width / bmp.width, c.height / bmp.height);
       const dw = bmp.width * s;
@@ -309,8 +274,7 @@
       if (!m) {
         g.drawImage(bmp, dx, dy, dw, dh);
       } else {
-        // the blur's edge as the app's (its box blur clamps there): the same crop on a canvas m px larger each
-        // side, its edge rows and columns stretched out over that margin, blurred, and its middle taken
+        // the edges stretched over a margin before blurring, as the app's box blur clamps there
         const big = document.createElement('canvas');
         big.width = c.width + 2 * m;
         big.height = c.height + 2 * m;
@@ -335,7 +299,6 @@
   }
   const pictures = { bmp: null, w: 0, h: 0, density: 0, made: new Map() };
 
-  // [picture] (pictureOf's) as a part of the scene at [x, y] ([w] × [h] px) sees it: that part of it, not the whole squeezed in
   function pictureAt(picture, x, y, w, h) {
     if (!picture) return null;
     return (blurDp, brightness) => {
@@ -348,8 +311,6 @@
     };
   }
 
-  // the bar's sample over the keys (环境 → 候选栏样例): the candidates typing, the toolbar's buttons idle; the code
-  // being typed over it. Its height in px, 0 for none
   const PREEDIT_DP = 24;
   function barOf(m) {
     if (!env.bar || !theme) return null;
@@ -372,7 +333,6 @@
     const lk = bar.looks;
     ctx.save();
     if (bar.pre) {
-      // the code being typed: its text, the underline fcitx asks for, the cursor at its end
       const size = Math.round(14 * dp);
       ctx.font = size + 'px ' + fonts.key;
       ctx.fillStyle = css(lk.preedit.color) || '#000';
@@ -394,8 +354,7 @@
     ctx.translate(0, bar.pre);
     if (env.bar === 'typing') E.paint(bar.scene, ctx, state);
     else {
-      // idle: the bar's base and five toolbar buttons (a circle, or the toolbar's radius), the third (the clipboard) on;
-      // each its icon as the app draws it, the theme's or the app's (the menu key's ⌄ turned where it is the app's)
+      // the menu key's ⌄ turned where it is the app's
       const h = bar.scene.height;
       if (lk.bar) { ctx.fillStyle = css(lk.bar); ctx.fillRect(0, 0, bar.scene.width, h); }
       const size = Math.min(h - 8 * dp, 36 * dp);
@@ -422,7 +381,6 @@
     ctx.restore();
   }
 
-  // a panel over the keys (环境 → 面板样例): blocks of what the app's views take of the theme (the engine's looks)
   function drawPanel(ctx, lk, w, h) {
     const dp = env.density;
     const round = (x, y, ww, hh, r, fill) => { if (!fill) return; ctx.fillStyle = css(fill); ctx.beginPath(); ctx.roundRect(x, y, ww, hh, Math.max(0, r)); ctx.fill(); };
@@ -467,7 +425,6 @@
     ctx.restore();
   }
 
-  // the popup 环境 → 显示 asks for, over the key picked (or the keyboard's middle key): `{scene, x, y}` px on the keys
   function popupOf(m) {
     if (!env.show || !scene || !theme) return null;
     const keys = scene.json().keys;
@@ -488,7 +445,6 @@
     return { scene: p, x, y };
   }
 
-  // the measurer of the theme's fonts, kept while they are the same (its measures cached)
   let measured = { key: null, canvas: null, fonts: null, m: null };
   function measurerFor(canvas, xml) {
     const fonts = Object.assign({ key: '"Youmo Latin", "Youmo Han", sans-serif' }, fontFamilies(xml));
@@ -498,8 +454,7 @@
   }
   let checked = null;
 
-  // a number board of the user's as the app shows it from 123 (a pad named, as exportCheck does for the app's): not the
-  // engine's warning of a pad not given
+  // a pad named, as the app shows it from 123: avoids the engine's no-pad warning
   function ownEnv(board) {
     const e = M.envJson(E, env);
     if (typeof board === 'object' && board.family === 'number') e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: 'full' });
@@ -510,7 +465,7 @@
     const canvas = $('preview');
     const m = measurerFor(canvas, d.xml);
     const fonts = measured.fonts;
-    // a tap changes only what is pressed: the theme read and the scene built as they were
+    // a tap changes only what is pressed: the theme read and the scene built are reused
     const envKey = JSON.stringify(env);
     const board = boardDrawn();
     const r = checked && checked.d === d && checked.env === envKey && checked.board === board && checked.m === m ? checked.r : M.check(E, d, board, ownEnv(board), m.ok ? m.measurer : null);
@@ -525,7 +480,6 @@
       bar = barOf(m.ok ? m.measurer : null);
       popup = popupOf(m.ok ? m.measurer : null);
     } catch (e) {
-      // a sample the engine could not make: the keys drawn without it
     }
     barH = bar ? bar.height : 0;
     canvas.width = scene.width;
@@ -550,10 +504,7 @@
     ctx.restore();
   }
 
-  // ---- 试一下 (动效): the press and its release, the bubble appearing, by requestAnimationFrame ----
 
-  // a frame of what plays ([c]: what play made once for it): the keys, the played key drawn pressed (scaled and sunk
-  // about its middle, see-through as it fades back), the bubble over it as it appears
   function playFrame(ctx, c) {
     ctx.drawImage(c.keys, 0, 0);
     const [l, t, r, b] = c.bounds;
@@ -585,10 +536,6 @@
     linear: (x) => x, ease: (x) => x * x * (3 - 2 * x), 'ease-in': (x) => x * x, 'ease-out': (x) => 1 - (1 - x) * (1 - x), 'ease-in-out': (x) => (x < 0.5 ? 2 * x * x : 1 - 2 * (1 - x) * (1 - x)),
   };
 
-  /**
-   * [m] (动效's sample: transition, scale, sink, appear) played on the preview: pressed at once (never faded in),
-   * held, then faded back over the transition's time; the bubble appearing over its own. Stops when done.
-   */
   let plays = 0;
   function play(m) {
     if (!scene) return;
@@ -600,7 +547,7 @@
     const ease = EASE[m.transition ? m.transition.easing : 'linear'] || EASE.linear;
     const pressMs = Math.min(80, back || 80);
     const appearMs = m.appear ? m.appear.ms : 0;
-    // drawn once for the play, not each frame (the theme read again, the scene built again: frames dropped on a phone)
+    // prepared once per play, not per frame (else frames drop on a phone)
     measurerFor($('preview'), history.current.xml);
     const state = { pressed: null, icons: iconsNow(), images: assets.images, fonts: measured.fonts };
     const picture = pictureOf();
@@ -617,7 +564,7 @@
     const canvas = $('preview');
     const ctx = canvas.getContext('2d');
     const t0 = performance.now();
-    // played again before it is done: the one before stops (two loops would draw over each other)
+    // the earlier loop stops (two would draw over each other)
     const mine = ++plays;
     const step = (now) => {
       if (mine !== plays) return;
@@ -626,7 +573,6 @@
       const release = t < HOLD ? 0 : back ? Math.min(1, (t - HOLD) / back) : 1;
       playing = {
         key: k.id,
-        // the press's scale and sink come in over at most 80 ms (§4.1), its colour at once
         scale: 1 + (m.scale / 100 - 1) * pressIn * (1 - ease(release)),
         sink: m.sink * pressIn * (1 - ease(release)),
         alpha: 1 - ease(release),
@@ -674,22 +620,17 @@
     ta.scrollTop = Math.max(0, (line - 3) * (parseFloat(getComputedStyle(ta).lineHeight) || 17));
   }
 
-  // ---- files ----
 
   function pick(input) {
     return new Promise((ok) => {
       input.value = '';
       input.onchange = () => ok(input.files[0] || null);
-      input.oncancel = () => ok(null); // the dialog closed with nothing picked
+      input.oncancel = () => ok(null);
       input.click();
     });
   }
 
-  /**
-   * 环境 › 键盘 › 打开 .layout… (061-custom-layout §10): a layout of the user's drawn with the theme, its keys picked by
-   * its own id (`<id>/<key>`, a style the app also gives the keys it keeps of its based-on board). Not kept in the draft:
-   * a draft restored draws 26 键.
-   */
+  /** Not kept in the draft: a restored draft draws 26 键. */
   async function openLayout() {
     const f = await pick($('layout-input'));
     if (!f) return;
@@ -699,7 +640,6 @@
       toast('打不开这个布局：' + (e.message || e));
       return;
     }
-    // a key picked on a layout of this id is of the one replaced: picked anew
     if (picked && picked.board === own.id) picked = null;
     const sel = $('env-board');
     for (const o of [...sel.options]) if (o.value === OWN) o.remove();
@@ -708,7 +648,6 @@
     fillEnvForm();
     keep();
     if (history) { preview(); showTab(); }
-    // a file of the layout maker before L8 is drawn, but the app's import still refuses it as it is
     if (own.oldFaces) toast(own.oldFaces + ' 个分组键显示的字是旧版布局制作页写的 {group:…}（超过两个字母，App 读不了），这里按大写字母画；在布局制作页打开再保存一次，App 才能导入');
   }
 
@@ -719,7 +658,7 @@
       const { doc, notes } = await M.open(E, L, FORMAT, new Uint8Array(await f.arrayBuffer()));
       set(doc);
       $('new-panel').close();
-      // every note in one toast: one after another, only the last would be seen
+      // one after another, only the last toast would be seen
       const said = [];
       for (const n of notes) {
         if (n.kind === 'converted') said.push('这是 ' + n.from + ' 主题，已转成 4.0');
@@ -733,15 +672,10 @@
   }
 
 
-  // the picture decoded (upright, as its EXIF says), drawn at sizeOf its decoded sides and encoded: JPEG, or PNG
-  // where any pixel is see-through
-  // [rect] (l t r b of the decoded picture): only that part of it
-  // ([bytes] may be a bitmap decoded already: it is drawn, and stays the caller's to close; [jpg] then says
-  // whether it was decoded from a JPEG)
+  // decoded upright (EXIF); JPEG, or PNG where any pixel is see-through. A bitmap [bytes] stays the caller's to close
   async function encodePicture(bytes, sizeOf, quality, rect = null, jpg = false) {
     const given = bytes instanceof ImageBitmap;
     const bmp = given ? bytes : await createImageBitmap(new Blob([bytes]));
-    // a JPEG has no alpha: its pixels are not looked through
     const opaque = given ? jpg : L.imageType(bytes) === 'jpg';
     try {
       const [l, t, r, b] = rect || [0, 0, bmp.width, bmp.height];
@@ -764,19 +698,16 @@
     }
   }
 
-  // a picture the user picks as the 背景 page takes it: the picture made a file the app takes, and a cut of the
-  // keyboard's shape for each orientation, cropped at its middle (the 背景 page moves them)
   async function choosePicture() {
     const f = await pick($('image-input'));
     if (!f) return null;
     try {
       const picked = new Uint8Array(await f.arrayBuffer());
-      // decoded once for the file and both cuts (after pictureFile's checks of its header: never one too big)
+      // decoded once, after pictureFile's header checks (never one too big)
       let bmp = null;
       const jpg = L.imageType(picked) === 'jpg';
       try {
-        // an animated WebP the app plays is kept as it is (it plays centred, filling the keyboard: the crop is only
-        // the still cuts'); its first frame is what the cuts are made of
+        // an animated WebP is kept as is (it plays centred, filling the keyboard); its first frame makes the cuts
         const animated = M.keepsAnimated(FORMAT.limits, picked);
         const made = animated ? { bytes: picked, type: 'webp' }
           : await M.pictureFile(L, FORMAT, picked, async (bytes, sizeOf, quality) => encodePicture(bmp ??= await createImageBitmap(new Blob([bytes])), sizeOf, quality, null, jpg));
@@ -792,8 +723,7 @@
           const c = await encodePicture(bmp, (w, h) => L.resizeInside(w, h, side, side), M.PICTURE_SAVE.quality, rect.map((v) => v * scale), jpg);
           cuts[o] = { bytes: c.bytes, type: c.type, rect };
         }
-        // the picked picture kept for this session's cuts (a cut of the saved JPEG would be a second generation):
-        // the one before let go only now that this one is made
+        // a cut of the saved JPEG would be second generation
         originals.clear();
         originals.set(L.contentId(made.bytes), { bytes: picked, scale });
         return { type: made.type, src: made.bytes, cuts, animated };
@@ -806,10 +736,8 @@
     }
   }
 
-  // [rect] of the picture [bytes] as a file of its own, encoded as every picture is
   async function cutOf(bytes, rect) {
     const side = Math.min(M.PICTURE_SAVE.longSide, FORMAT.limits.pictureSide);
-    // [rect] is of the saved picture; the picked one it was made from (this session's) is cut instead, at its scale
     const first = originals.get(L.contentId(bytes));
     const from = first ? first.bytes : bytes;
     const at = first ? rect.map((v) => v * first.scale) : rect;
@@ -823,12 +751,10 @@
     if (!made) return;
     const bg = PANELS.find((p) => p.id === 'background').ops;
     const colors = PANELS.find((p) => p.id === 'colors').ops;
-    // 浅/深 (060-render-p3 §5.1 新建 2): the version shown and the colours worked out of the picture for it
     const dark = !!(document.querySelector('input[name="image-tone"]:checked') || {}).value?.startsWith('dark');
     env.dark = dark;
     fillEnvForm();
     let d = bg.setPicture(M.fromBuiltin(E, chosen ? chosen.value : 'material'), made);
-    // sampled from the picture just made (the preview's is still the last one's until it is drawn), as one step
     const cut = made.cuts.portrait || { bytes: made.src };
     const bmp = await createImageBitmap(new Blob([cut.bytes]));
     d = colors.fromPictureAll(d, samplesOf(bmp), dark);
@@ -840,7 +766,6 @@
     toast('图片已做键盘背景：在「背景」里调裁切，「配色」里可以从图片取色');
   }
 
-  // ---- the editing's tabs ----
 
   const asDoc = (x) => M.doc(x.xml, x.files, x.layouts);
 
@@ -851,7 +776,7 @@
     envJson: (e = env) => M.envJson(E, e),
     theme: () => theme,
     picked: () => picked,
-    // an op that throws (a document it cannot change: no <theme>) says so instead of failing silently
+    // says so instead of failing silently
     apply: (fn) => {
       if (!history) return;
       let next;
@@ -866,8 +791,7 @@
     rerender: () => showTab(),
     problems: () => problems,
     play,
-    // the preview as an image at most [width] px across and [bytes] long (信息's preview image): a PNG where one fits,
-    // else WebP at falling quality, then smaller, until it does (a picture background's PNG is past the App's 512 KB)
+    // PNG where it fits, else WebP at falling quality (a picture background's PNG is past the app's 512 KB)
     async previewImage(width, bytes = Infinity) {
       const c = $('preview');
       const encode = async (w, type, q) => {
@@ -894,7 +818,6 @@
     goToLine,
     bitmap: (name) => assets.cuts[name] || null,
     iconGroups: () => BAR_ICONS.groups,
-    // a name whose app's image on the bar is not the key's: a theme's icon of it makes the two alike
     barOwnImage: (name) => name in BAR_ICONS.toolbarFallback,
     choosePicture,
     cutPicture: (src, rect) => cutOf(history.current.files[src], rect),
@@ -904,7 +827,6 @@
       const f = await pick(input);
       return f ? { name: f.name, bytes: await f.arrayBuffer() } : null;
     },
-    // the portrait cut's colours, a few hundred of its pixels
     async pictureSamples() {
       const p = theme && theme.info(env.dark).picture;
       const bmp = p && assets.cuts[(p.cuts || {}).portrait || p.src];
@@ -912,7 +834,6 @@
     },
   };
 
-  // a few hundred of [bmp]'s pixels, `[[r, g, b]]`
   function samplesOf(bmp) {
     const c = document.createElement('canvas');
     c.width = 24;
@@ -925,7 +846,6 @@
     return out;
   }
 
-  // the tab shown drawn anew from the document (the source tab is the text area, kept as it is typed)
   function showTab() {
     for (const b of $('tabs').children) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
     for (const el of document.querySelectorAll('#edit .tab')) el.hidden = el.id !== 'tab-' + tab;
@@ -933,8 +853,7 @@
     if (!panel || !history) return;
     const el = $('tab-' + tab);
     const scroll = $('edit').scrollTop;
-    // the control that had focus (a select just changed, a box ticked) has it again in the tab drawn anew, where
-    // it still is: found by its row and place (controlKey), not its index (a row added or gone moves that)
+    // found by row and place (controlKey), not index: rows added or removed shift that
     const key = el.contains(document.activeElement) && document.activeElement.matches(CONTROLS) ? controlKey(document.activeElement) : null;
     el.textContent = '';
     try {
@@ -947,8 +866,7 @@
     $('edit').scrollTop = scroll;
   }
 
-  // 保存 (060-render-p3 M4): checked first on every board, light and dark, and as the app imports. An error stops
-  // it (the problems list shows them all, each a click from its line); warnings are listed, the user's to ignore
+  // an error stops it; warnings are the user's to ignore
   async function save() {
     if (!history) return;
     const d = history.current;
@@ -969,7 +887,7 @@
     }
     const { name, bytes } = M.save(L, d);
     const a = document.createElement('a');
-    // octet-stream, as the app exports it: a browser adds no .zip to a name it takes for a zip (specs/app.md)
+    // a browser adds no .zip to a name it takes for a zip
     a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
     a.download = name;
     document.body.append(a);
@@ -979,7 +897,6 @@
     toast(/Android|iPhone/.test(navigator.userAgent) ? '已保存 ' + name + '。打开幽默输入法 → 主题 → 新增主题 → 导入主题文件' : '已保存 ' + name);
   }
 
-  // ---- the environment ----
 
   function fillEnvForm() {
     $('env-device').value = env.device;
@@ -1010,7 +927,6 @@
       if (e && /env-(w|h|density)/.test(e.target.id)) env.device = 'custom';
     }
     if ($('env-board').value === OPEN_LAYOUT) {
-      // 打开 .layout…: the board shown till one is opened
       $('env-board').value = env.board;
       openLayout();
     }
@@ -1023,10 +939,9 @@
     if (history) { preview(); showTab(); }
   }
 
-  // ---- start ----
 
   function wire() {
-    // the page hidden or closed: the draft written now, not half a second later (a tab closed is gone by then)
+    // now, not debounced: a closed tab is gone by then
     window.addEventListener('pagehide', () => { if (keeping) keepNow(); });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && keeping) keepNow(); });
     for (const d of M.DEVICES) $('env-device').add(new Option(d.label + '（' + d.w + '×' + d.h + '）', d.id));
@@ -1039,7 +954,7 @@
     $('env').addEventListener('click', () => $('env-panel').showModal());
     $('dark').addEventListener('click', () => { env.dark = !env.dark; readEnvForm(); });
 
-    // the picture's colours: a radio group, so a touch picks one (a button's focus is no choice on a phone)
+    // a radio group, so a touch picks one (a button's focus is no choice on a phone)
     for (const id of E.themes()) {
       const label = document.createElement('label');
       const r = document.createElement('input');
@@ -1071,7 +986,6 @@
       b.addEventListener('click', () => { set(M.fromBuiltin(E, id)); $('new-panel').close(); });
       cards.append(b);
     }
-    // the panels' tabs before the source's, in their order
     for (const p of PANELS) {
       const b = Object.assign(document.createElement('button'), { textContent: p.label });
       b.setAttribute('role', 'tab');
@@ -1100,27 +1014,24 @@
     $('edit').addEventListener('input', (e) => { if (typedIn(e.target)) dirty = e.target; });
     $('edit').addEventListener('change', (e) => { if (e.target === dirty) dirty = null; }, true);
     // typed back to what it was: no change event, so the field is let go on leaving it
-    // (only then: a field left with other text commits by its change, which needs it still dirty)
     let focusValue = null;
     $('edit').addEventListener('focusin', (e) => { focusValue = e.target.value; });
     $('edit').addEventListener('focusout', (e) => { if (e.target === dirty && e.target.value === focusValue) dirty = null; });
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey) || e.target === $('source') || e.target === dirty) return;
-      // not under a dialog: the save's would write what it checked, not what an undo made
+      // the save would write what it checked, not what an undo made
       if (document.querySelector('dialog[open]')) return;
-      // by the letter whatever the case (Shift, Caps Lock make it 'Z')
+      // Shift and Caps Lock make it 'Z'
       const k = e.key.toLowerCase();
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); $('undo').click(); }
       else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); $('redo').click(); }
     });
-    // the source read again as it is typed: one undo step per pause, not per letter
     let typing = null;
     $('source').addEventListener('input', () => {
       clearTimeout(typing);
       typing = setTimeout(() => { if (history) set(M.doc($('source').value, history.current.files, history.current.layouts)); }, 400);
     });
 
-    // a key tapped is the key picked (the editing's 按键 goes to it, M2); held, it shows pressed
     const canvas = $('preview');
     const keyAt = (e) => {
       if (!scene) return null;
@@ -1135,7 +1046,6 @@
       if (pressed) picked = { board: boardName(), key: pressed, layout: boardDrawn() };
       $('picked').textContent = picked ? '选中的键：' + picked.key + '（' + (BOARD_LABEL[picked.board] || (own && own.id === picked.board ? own.name : picked.board)) + '）' : '';
       preview();
-      // the tab follows another key picked, its values put in place (a field being typed in keeps its text)
       if (picked !== before && (!before || before.key !== picked.key || before.board !== picked.board)) refreshTab();
     });
     const up = () => { if (pressed && history) { pressed = null; preview(); } };
@@ -1152,7 +1062,7 @@
     try {
       await Promise.all(['400', '700'].flatMap((w) => [document.fonts.load(w + ' 20px "Youmo Latin"', 'a'), document.fonts.load(w + ' 20px "Youmo Han"', '中')]));
     } catch (e) {
-      // drawn in the fallback font: measured the same, a little off from the phone's
+      // fallback font: measured the same, a little off from the phone's
     }
     const kept = store ? await M.draft(store) : null;
     if (kept) {
@@ -1164,8 +1074,7 @@
       const answer = await new Promise((ok) => $('restore-panel').addEventListener('close', () => ok($('restore-panel').returnValue), { once: true }));
       if (answer === 'restore') {
         try {
-          // only what the form offers now (a board since gone: nothing drawn, an empty select); a layout opened is
-          // not kept (OWN, OPEN_LAYOUT not offered): its board the default's
+          // a board since gone would draw nothing
           const offered = (id) => [...$(id).options].map((o) => o.value).filter((v) => v !== OWN && v !== OPEN_LAYOUT);
           if (kept.env) {
             env = M.restoreEnv(kept.env, {

@@ -26,7 +26,6 @@ class GlideDecoderTest {
         assertEquals("hello", words("helo").first())
         assertEquals("the", words("the").first())
         assertEquals("from", words("from").first())
-        // a doubled letter passed once
         assertEquals("see", words("se").first())
     }
 
@@ -36,13 +35,11 @@ class GlideDecoderTest {
         assertFalse("hell" in words("helo"))
         assertTrue("help" in words("helo"))
         assertFalse("they" in words("the"))
-        // form's o before its r: a path from f by r to o has none
         assertFalse("form" in words("from"))
     }
 
     @Test
     fun aKeyMissedByAFingerStillCounts() {
-        // each point a third of a key off
         val off = path("the").mapIndexed { i, v -> if (i % 2 == 0) v + 0.3f else v - 0.3f }.toFloatArray()
         assertEquals("the", data.word(decoder.decode(off, GlideLayout.QWERTY, start, 1).single().word))
     }
@@ -51,14 +48,12 @@ class GlideDecoderTest {
     fun noPathNoWords() {
         assertTrue(decoder.decode(floatArrayOf(1f, 1f), GlideLayout.QWERTY, start, 5).isEmpty())
         assertTrue(decoder.decode(path("the"), GlideLayout.QWERTY, start, 0).isEmpty())
-        // a letter the layout lacks: no word has it
         val noH = GlideLayout(mapOf('t' to (4.5f to 0.7f), 'e' to (2.5f to 0.7f)))
         assertTrue(decoder.decode(path("the"), noH, start, 5).none { data.word(it.word) == "the" })
     }
 
     @Test
     fun theModelWeighsWordsOfLikeShapes() {
-        // its and it's: one path, it's the likelier
         assertEquals(listOf("it's", "its"), words("its").filter { it == "it's" || it == "its" })
     }
 

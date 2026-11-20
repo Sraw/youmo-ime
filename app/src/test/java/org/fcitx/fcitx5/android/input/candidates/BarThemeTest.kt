@@ -4,8 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.candidates
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.drawable.ColorDrawable
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -16,7 +14,6 @@ import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.CandidateWord
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -25,17 +22,18 @@ import org.fcitx.fcitx5.android.input.bar.CandidateSpacing
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateLayout
 import org.fcitx.fcitx5.android.input.candidates.floating.LabeledCandidateItemUi
-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.keyboard.canvas.AndroidTextMeasurer
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneFonts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemes
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneThemesRule
+import org.fcitx.fcitx5.android.input.keyboard.canvas.drawn
+import org.fcitx.fcitx5.android.input.keyboard.canvas.keepPicture
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.BarLook
 import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.uat.PrefsRule
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -47,14 +45,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 import kotlin.math.abs
 
 /**
- * 060-render-p3 T6a in the app: the candidate bar, the expanded candidates and the physical keyboard's
- * window drawn as the theme has its candidates ([BarLook]); a theme that sets none of it, every built-in
- * theme of 3.0's look, has the bar of before (its pixels: BarUatTest's and CandidateHintsUatTest's goldens);
- * and the bar's views hold each candidate where the engine's sample bar has it, in its colours.
+ * The candidate bar, the expanded candidates and the hardware keyboard's window as the theme has them; a theme
+ * setting none of it (every built-in) the bar of before; the bar's views where the engine's sample bar has them.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -64,17 +59,8 @@ class BarThemeTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    private val realSource = SceneThemes.source
-
-    @After
-    fun tearDown() {
-        SceneThemes.source = realSource
-    }
-
-    // a theme 3.0's file and [styles] in it
-    private fun styled(styles: String) {
-        SceneThemes.source = { look, name, dark -> LookTheme.xml(look, name, dark).replace("</theme>", "$styles\n</theme>") }
-    }
+    @get:Rule
+    val themes = SceneThemesRule()
 
     private val ctx get() = RuntimeEnvironment.getApplication()
 
@@ -84,9 +70,6 @@ class BarThemeTest {
 
     private fun text(item: ViewGroup): TextView = item.getChildAt(0) as TextView
 
-    private fun draw(v: View): Bitmap = Bitmap.createBitmap(maxOf(1, v.width), maxOf(1, v.height), Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
-
-    // the colour each run of a candidate's text is drawn in, by its text
     private fun runs(t: TextView): List<Pair<String, Int>> {
         val s = t.text as Spanned
         return s.getSpans(0, s.length, ForegroundColorSpan::class.java).map { s.subSequence(s.getSpanStart(it), s.getSpanEnd(it)).toString() to it.foregroundColor }
@@ -94,32 +77,25 @@ class BarThemeTest {
 
     private fun KeyboardHarness.candidates(words: List<String>) = shown(words.map { CandidateWord("", it, "") })
 
-    private fun KeyboardHarness.shown(words: List<CandidateWord>) {
+    // [total] past the words: the bar stretches what it shows (CandidateSpacing.stretches)
+    private fun KeyboardHarness.shown(words: List<CandidateWord>, total: Int = words.size) {
         api.candidates = words.toTypedArray()
-        emit(HostEvent.Candidates(words.size, api.candidates.toList()))
+        emit(HostEvent.Candidates(total, api.candidates.toList()))
         after(300)
         relayout()
     }
 
-    // the picture for the reviewer's eye, in place of an emulator's (060-render-p3 T6a's)
-    // only asked for (-Dyoumo.keepBar=true): not written on every run, CI's too
-    private fun keep(v: View, name: String) {
-        if (!java.lang.Boolean.getBoolean("youmo.keepBar")) return
-        val dir = File("build/t6a-bar").also { it.mkdirs() }
-        File(dir, "$name.png").outputStream().use { draw(v).compress(Bitmap.CompressFormat.PNG, 100, it) }
-    }
+    // only with -Dyoumo.keepBar=true: not written on every run
+    private fun keep(v: View, name: String) = keepPicture(java.lang.Boolean.getBoolean("youmo.keepBar"), v, "build/t6a-bar", name)
 
     @Test
     fun aThemeOfNoneOfItIsTheBarOfBefore() {
-        // every built-in theme, its look made a 4.0 theme as the app makes it: the bar of its 3.0 colours
         for (theme in ThemeManager.BuiltinThemes) {
             assertEquals(theme.name, SceneBar.plain(theme), SceneBar.of(ctx, theme))
         }
-        // a look that made no theme: the same, worked out of its colours
         SceneThemes.source = { _, _, _ -> "not a theme" }
         val theme = ThemeManager.activeTheme
         assertEquals(SceneBar.plain(theme), SceneBar.of(ctx, theme))
-        // the item drawn as before: the pressed colour over the cell, no fill
         val ui = CandidateItemUi(ctx, theme)
         assertTrue(ui.root.background is android.graphics.drawable.StateListDrawable)
         ui.updateCandidate(CandidateWord("", "你", ""), 0)
@@ -128,29 +104,24 @@ class BarThemeTest {
 
     @Test
     fun theBarIsTheThemes() {
-        styled(CAPSULES)
-        prefs.set(AppPrefs.getInstance().keyboard.horizontalCandidateStyle, HorizontalCandidateMode.NeverFillWidth)
+        themes.styled(CAPSULES)
         KeyboardHarness().use { h ->
             h.start()
             h.candidates(WORDS)
             val rv = bar(h)
             val items = items(rv)
             assertEquals(WORDS.size, items.size)
-            // numbered, the number in its own colour; the first in white on the accent
             assertEquals(listOf("1 " to BLUE, "你" to WHITE), runs(text(items[0])))
             assertEquals(listOf("2 " to BLUE, "呢" to INK), runs(text(items[1])))
-            // a screen reader reads the candidate, not the number before it
             assertEquals("呢", text(items[1]).contentDescription.toString())
-            // a pill inset 6dp top and bottom: its fill at the middle near its top, the bar's base beside it
             val d = h.service.resources.displayMetrics.density
             val top = (6 * d).toInt() + 2
-            assertEquals(ACCENT, draw(items[0]).getPixel(items[0].width / 2, top))
-            assertEquals(WHITE, draw(items[1]).getPixel(items[1].width / 2, top))
-            assertEquals("the inset's room: no fill", 0, draw(items[1]).getPixel(items[1].width / 2, 1))
-            // 4dp more between two, no line drawn there
+            assertEquals(ACCENT, drawn(items[0]).getPixel(items[0].width / 2, top))
+            assertEquals(WHITE, drawn(items[1]).getPixel(items[1].width / 2, top))
+            assertEquals("the inset's room: no fill", 0, drawn(items[1]).getPixel(items[1].width / 2, 1))
             val room = items[1].left - items[0].right
             assertEquals((4 * d).toInt() + maxOf(1, (1 * d).toInt()), room)
-            val barBitmap = draw(h.inputView)
+            val barBitmap = drawn(h.inputView)
             val at = IntArray(2).also(rv::getLocationInWindow)
             val y = at[1] + rv.height / 2
             assertEquals("the bar's base between, no line", BASE, barBitmap.getPixel(at[0] + items[0].right + room / 2, y))
@@ -160,7 +131,7 @@ class BarThemeTest {
 
     @Test
     fun theExpandedCandidatesAreTheThemes() {
-        styled(CAPSULES)
+        themes.styled(CAPSULES)
         KeyboardHarness().use { h ->
             h.start()
             h.candidates(List(60) { "字$it" })
@@ -169,7 +140,6 @@ class BarThemeTest {
             h.relayout()
             val layout = h.inputView.findViewById<ViewGroup>(R.id.expanded_candidate_view)
             assertEquals(PANEL, (layout.background as ColorDrawable).color)
-            // the cells: their numbers, of the whole list (the bar's first past what it showed), their fill
             val cells = KeyboardHarness.all(layout).filter { it is TextView && h.shown(it) && (it.text as? Spanned)?.toString()?.contains("字") == true }.toList()
             assertTrue(cells.size > 10)
             for (c in cells.map { it as TextView }) {
@@ -180,8 +150,7 @@ class BarThemeTest {
             }
             val cell = cells.first().parent as View
             val d = h.service.resources.displayMetrics.density
-            assertEquals(WHITE, draw(cell).getPixel(cell.width / 2, (6 * d).toInt() + 2))
-            // no line beside the keys' column: transparent
+            assertEquals(WHITE, drawn(cell).getPixel(cell.width / 2, (6 * d).toInt() + 2))
             assertNull((layout as ExpandedCandidateLayout).embeddedKeyboard.background)
             keep(h.inputView, "expanded")
         }
@@ -189,37 +158,32 @@ class BarThemeTest {
 
     @Test
     fun thePhysicalKeyboardsWindowIsTheThemes() {
-        styled(CAPSULES)
+        themes.styled(CAPSULES)
         val theme = ThemeManager.activeTheme
         val ui = LabeledCandidateItemUi(ctx, theme, {})
         ui.root.layoutParams = ViewGroup.LayoutParams(200, 100)
         ui.root.measure(View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY))
         ui.update(CandidateWord("1.", "你", ""), active = true, first = true)
-        // selected: the theme's :selected; its label the theme's number style (fcitx's own label)
         assertEquals(listOf("1." to SELECTED, "你" to SELECTED), runs(ui.root))
         ui.root.layout(0, 0, 200, 100)
-        assertEquals(SELECTED_FILL, draw(ui.root).getPixel(100, 50))
+        assertEquals(SELECTED_FILL, drawn(ui.root).getPixel(100, 50))
         ui.update(CandidateWord("2.", "呢", ""), active = false, first = false)
         assertEquals(listOf("2." to BLUE, "呢" to INK), runs(ui.root))
-        assertEquals(WHITE, draw(ui.root).getPixel(100, 50))
-        // dot: a dot for fcitx's label
-        styled("<style select=\"candidate\" label-style=\"dot\"/>")
+        assertEquals(WHITE, drawn(ui.root).getPixel(100, 50))
+        themes.styled("<style select=\"candidate\" label-style=\"dot\"/>")
         val dotted = LabeledCandidateItemUi(ctx, theme, {})
         dotted.update(CandidateWord("1.", "你", ""), active = false)
         assertEquals("• 你", dotted.root.text.toString())
         assertEquals("the dot not read out", "你", dotted.root.contentDescription.toString())
-        // fcitx's own label read as ever
         assertNull(ui.root.contentDescription)
     }
 
-    // a candidate's font named as the keys' are (SceneFonts); a <font> of a 4.0 theme's own the system's till T8a
     @Test
     fun aCandidatesFontIsNamedAsTheKeys() {
         val shown = ThemeManager.shownLook(ThemeManager.activeTheme)
         val look = shown.copy(text = shown.text.copy(keyFont = "/t/k.ttf", candidateFont = "/t/c.ttf", candidateWeight = 700))
         assertEquals("/t/c.ttf", SceneFonts.path(look, LookTheme.CANDIDATE_FONT))
-        // the typeface the bar resolves for `candidate` at the look's weight (SceneBar.typeface) is the one the
-        // code being typed is drawn in (ThemeAssets.candidateTypeface): one font, not two alike
+        // one font, not two alike: the bar's for `candidate` (SceneBar.typeface) is the code's (ThemeAssets.candidateTypeface)
         assertSame(
             ThemeAssets.candidateTypeface(look),
             ThemeAssets.typeface(look, SceneFonts.path(look, LookTheme.CANDIDATE_FONT), look.text.candidateWeight),
@@ -229,13 +193,11 @@ class BarThemeTest {
         assertNull(SceneFonts.path(look, "kai"))
     }
 
-    // each tool button asks for the bar's look as it is made (T6b review): one worked out while nothing changed,
-    // another for another theme's file
     @Test
     fun theBarsLookIsWorkedOutOnceWhileTheSame() {
         val first = SceneBar.of(ctx, ThemeManager.activeTheme)
         assertSame(first, SceneBar.of(ctx, ThemeManager.activeTheme))
-        styled(CAPSULES)
+        themes.styled(CAPSULES)
         val capsules = SceneBar.of(ctx, ThemeManager.activeTheme)
         assertTrue(capsules !== first)
         assertEquals(0xFF00897B.toInt(), capsules.first.fill!!.value)
@@ -243,20 +205,19 @@ class BarThemeTest {
 
     @Test
     fun aHolderBoundElsewhereTakesThatPlacesLook() {
-        styled(CAPSULES)
+        themes.styled(CAPSULES)
         val holder = CandidateViewHolder(CandidateItemUi(ctx, ThemeManager.activeTheme))
         val word = CandidateWord("", "你", "")
         holder.update(0, word)
         assertEquals(listOf("1 " to BLUE, "你" to WHITE), runs(text(holder.ui.root as ViewGroup)))
-        // the same candidate, now second: its number and the plain look, though the candidate is the same
+        // the same candidate, now second: its number and the plain look
         holder.update(1, word)
         assertEquals(listOf("2 " to BLUE, "你" to INK), runs(text(holder.ui.root as ViewGroup)))
-        // cleared as it is let go of: no number drawn, nothing to read out
         holder.clear()
         assertEquals("", text(holder.ui.root as ViewGroup).text.toString())
         assertNull(text(holder.ui.root as ViewGroup).contentDescription)
         // with no labels, third to fourth is no change: not drawn again
-        styled("<style select=\"candidate\" color=\"#263238\"/>")
+        themes.styled("<style select=\"candidate\" color=\"#263238\"/>")
         val plain = CandidateViewHolder(CandidateItemUi(ctx, ThemeManager.activeTheme))
         plain.update(2, word)
         val shown = text(plain.ui.root as ViewGroup).text
@@ -264,27 +225,23 @@ class BarThemeTest {
         assertTrue(shown === text(plain.ui.root as ViewGroup).text)
     }
 
-    // 060-render-p3 T6a's check: the bar's views place each candidate where the engine's sample bar does, as
-    // wide, in its colours (structure, not pixels: each box within a pixel, each colour the same), of a theme
-    // of none of it, the pills and a dotted, padded one; the sample is the bar at its words' own widths
-    // (NeverFillWidth), and a bar filling its width stretches each candidate, no narrower than the sample's
+    // structure, not pixels: each box within a pixel and each colour the same as the engine's sample bar; a bar
+    // with more behind stretches each candidate, no narrower than the sample's
     @Test
     fun theBarsViewsAreTheEnginesSampleBar() {
         for ((name, styles) in listOf("none" to null, "capsules" to CAPSULES, "dotted" to DOTTED)) {
-            for (mode in listOf(HorizontalCandidateMode.NeverFillWidth, HorizontalCandidateMode.AlwaysFillWidth)) {
-                if (styles == null) SceneThemes.source = realSource else styled(styles)
-                prefs.set(AppPrefs.getInstance().keyboard.horizontalCandidateStyle, mode)
-                sampleBar("$name $mode", stretched = mode != HorizontalCandidateMode.NeverFillWidth)
+            for (stretched in listOf(false, true)) {
+                if (styles == null) themes.real() else themes.styled(styles)
+                sampleBar("$name stretched=$stretched", stretched)
             }
         }
     }
 
     private fun sampleBar(what: String, stretched: Boolean) = KeyboardHarness().use { h ->
         h.start()
-        // three samples that fit the bar in every theme here, the one of a comment (油墨 yóu mò) among them
         val samples = listOf(0, 3, 2).map { BarSample.SAMPLES[it] }
         assertTrue(samples[1].comment.isNotEmpty())
-        h.shown(samples.map { CandidateWord("", it.words, it.comment) })
+        h.shown(samples.map { CandidateWord("", it.words, it.comment) }, total = if (stretched) samples.size + 1 else samples.size)
         val rv = bar(h)
         val items = items(rv)
         val theme = ThemeManager.activeTheme
@@ -307,12 +264,11 @@ class BarThemeTest {
             }
             val ops = key.faces.getValue(emptySet())
             ops.filterIsInstance<Op.Fill>().singleOrNull()?.let { fill ->
-                assertEquals("$what $i's fill", fill.color.value, draw(v).getPixel(v.width / 2, (fill.shape.bounds.top + 2).toInt()))
+                assertEquals("$what $i's fill", fill.color.value, drawn(v).getPixel(v.width / 2, (fill.shape.bounds.top + 2).toInt()))
             }
-            // the comment's space is the sample's run's and no span of the view's: the runs by their text, trimmed
+            // the comment's space is the sample's run's, no span of the view's: the runs compared trimmed
             val texts = ops.filterIsInstance<Op.Text>().map { it.text.trim() to it.color.value }
             assertEquals("$what $i's text", texts, runs(text(v)).map { (t, c) -> t.trim() to c })
-            // and the whole, spaces and all: what trimming the runs would let by
             assertEquals("$what $i's whole text", ops.filterIsInstance<Op.Text>().joinToString("") { it.text }, text(v).text.toString())
         }
     }
@@ -328,7 +284,6 @@ class BarThemeTest {
         private const val SELECTED = 0xFFFFEB3B.toInt()
         private const val SELECTED_FILL = 0xFF3E2723.toInt()
 
-        // a theme's pills (060-render-p3 T6a's capsule theme): numbered, the first accented, 4dp apart, no lines
         private val CAPSULES = """
             <style select="bar" fill="#eceff1"/>
             <style select="candidate" fill="#ffffff" color="#263238" radius="50%" inset="6dp 2dp" gap="4dp" label-style="number"/>
@@ -339,7 +294,6 @@ class BarThemeTest {
             <style select="candidates-panel" fill="#cfd8dc"/>
         """.trimIndent()
 
-        // dots before the words, more room each side, a bold font, the comment its own colour
         private val DOTTED = """
             <style select="candidate" label-style="dot" padding="0 14dp" weight="700"/>
             <style select="candidate comment" color="#c62828"/>

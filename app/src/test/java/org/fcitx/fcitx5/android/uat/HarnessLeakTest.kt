@@ -18,18 +18,15 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * A closed harness leaves no activity alive. Both OOMs of a full run (3 GB) were a harness's
- * Android objects kept past its close: the input method's window in ShadowDialog's list (S4a), then
- * (S4c's gate) a [SettingsHarness]'s MainActivity never destroyed, its RecyclerViews in GapWorker's
- * list on the main thread (lives the whole test JVM), through their window holding every view the
- * theme page's previews ever made; and each [KeyboardHarness]'s field activity, in ActivityThread's
- * list till the test ends, with its themes (a quarter MB each in Robolectric).
+ * A closed harness leaves no activity alive: a full run's OOMs were a harness's Android objects kept past its close
+ * (ShadowDialog's list, GapWorker's list holding a RecyclerView's window, ActivityThread's activities with their
+ * themes).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class HarnessLeakTest {
 
-    // ActivityThread's activities not destroyed: what holds an activity, its window and themes till the test ends
+    // what holds an activity, its window and themes till the test ends
     private fun liveActivities(): List<Activity> {
         val thread = RuntimeEnvironment.getActivityThread()
         val f = thread.javaClass.getDeclaredField("mActivities").apply { isAccessible = true }
@@ -54,7 +51,7 @@ class HarnessLeakTest {
         assertTrue(decor.isAttachedToWindow)
         st.close()
         assertTrue(activity.isDestroyed)
-        // off its window: a RecyclerView detached leaves GapWorker's list
+        // a RecyclerView detached leaves GapWorker's list
         assertFalse(decor.isAttachedToWindow)
         assertEquals(emptyList<Activity>(), liveActivities())
     }

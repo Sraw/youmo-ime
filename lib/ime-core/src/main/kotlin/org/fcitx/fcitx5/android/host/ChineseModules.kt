@@ -6,32 +6,25 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
-/**
- * What the modules start from: their files as the host read them, and where their data comes from.
- * [converter] and [charSelectData] are read the first time they are needed (traditional turned on,
- * Unicode opened), as fcitx loads OpenCC and `charselectdata` lazily.
- */
+/** [converter] and [charSelectData] are read on first need, as fcitx loads OpenCC and `charselectdata` lazily. */
 class ModuleInputs(
     val punctuationProfile: PunctuationProfile,
     val punctuationConfig: PunctuationConfig = PunctuationConfig(),
     val chttransEnabled: Set<String> = emptySet(),
     val converter: () -> ChineseConverter? = { null },
     val quickPhraseTable: QuickPhraseTable = QuickPhraseTable.EMPTY,
-    /** Where quick input gets its book at its first lookup: [quickPhraseTable] alone, or one still loading elsewhere. */
+    /** [quickPhraseTable] alone, or one still loading elsewhere. */
     val quickPhrases: () -> QuickPhraseBook = QuickPhraseBook(quickPhraseTable).let { book -> { book } },
     val quickPhraseHooks: QuickPhraseHooks = QuickPhraseHooks.NONE,
     val charSelectData: () -> ByteArray? = { null },
-    /** The clipboard's latest text, which Unicode lists the characters of when opened. */
+    /** Unicode lists its characters when opened. */
     val clipboard: () -> String = { "" },
 )
 
 /**
- * The modules the app's fcitx loads, plugged into the host in fcitx's registration order
- * (`specs/host.md`): chinese-addons' punctuation, fullwidth and chttrans with their status area,
- * then quickphrase and unicode as temp modes. A Chinese input method activated puts the three
- * toggles in the status area (`androidengine.cpp:497-510`); any other clears them
- * (`instance.cpp:2491`). Each module's saved state is told through [HostServices.persistConf] as it
- * changes; [conf] gives the file's text for the writer to save.
+ * The modules the app's fcitx loads, in fcitx's registration order: punctuation, fullwidth, chttrans with their
+ * status area, then quickphrase and unicode as temp modes. Saved state goes through [HostServices.persistConf]; [conf]
+ * gives the file's text to save.
  */
 class ChineseModules(private val inputs: ModuleInputs, private val strings: HostStrings = HostStrings.ENGLISH) {
 
@@ -48,12 +41,11 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
     lateinit var statusArea: StatusArea
         private set
 
-    /** What [HostCore] takes as its `modules`: made once, with the core's services. */
+    /** Made once, with the core's services. */
     fun build(services: HostServices): HostModules {
         val tip: (Tip) -> Unit = { services.tip(strings.tip(it)) }
         statusArea = StatusArea(services::updateStatusArea)
-        // registration order gives the status ids 1..: punctuation, fullwidth, chttrans here (fcitx
-        // loads them in name order, chttrans first); the ids only need to be stable within a run
+        // registration order gives the status ids 1..; they only need to be stable within a run (fcitx loads by name)
         punctuation = Punctuation(
             inputs.punctuationProfile, inputs.punctuationConfig, statusArea, tip,
             save = { services.persistConf(ModuleConfigs.PUNCTUATION) },
@@ -63,7 +55,7 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
         chttrans = Chttrans(
             inputs.chttransEnabled, statusArea, services::inputMethod, { InputMethodCatalog.listed(it)?.language },
             inputs.converter, tip,
-            // `updateUserInterface(InputPanel)` then `updatePreedit()` (`chttrans.cpp:214-215`)
+            // `updateUserInterface(InputPanel)` then `updatePreedit()`
             { ic ->
                 services.updatePanel(ic)
                 services.updatePreedit(ic)
@@ -103,7 +95,7 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
         )
     }
 
-    /** The text of the module file at [path] as it should now be, [old] its current text; null for a file no module keeps. */
+    /** Null for a file no module keeps. */
     fun conf(path: String, old: String?): String? = when (path) {
         ModuleConfigs.PUNCTUATION -> ModuleConfigs.punctuationText(old, punctuation.config)
         ModuleConfigs.CHTTRANS -> ModuleConfigs.chttransText(old, chttrans.enabledIm)
@@ -111,7 +103,7 @@ class ChineseModules(private val inputs: ModuleInputs, private val strings: Host
     }
 
     companion object {
-        // `androidengine.cpp:500-509`'s order
+        // AndroidEngine::activate's order
         private val CHINESE_ACTIONS = listOf("chttrans", "punctuation", "fullwidth")
     }
 }

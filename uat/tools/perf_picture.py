@@ -1,4 +1,4 @@
-"""The animated picture of KeyboardPerfBaselineTest's A4 rows (design 060-render-p3 §4.3): a gradient
+"""The animated picture of KeyboardPerfBaselineTest's A4 rows: a gradient
 sliding and dots moving, 720x480 (the longest side an animated picture plays at), each frame 50 ms (20 fps, the fastest A4 plays). Needs Pillow with WebP.
 
   python3 uat/tools/perf_picture.py app/src/androidTest/assets/perf-picture.webp 30 50   # frames, quality

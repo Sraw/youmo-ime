@@ -29,11 +29,7 @@ class CandidatesPagingSource(val fcitx: HostConnection, val total: Int, val offs
     override fun getRefreshKey(state: PagingState<Int, CandidateWord>) = null
 
     companion object {
-        /**
-         * Where the page after [loaded] candidates asked for from [startIndex], [pageSize] of
-         * them, starts; null when that page was the last: it reached [total], where that is
-         * known (above 0), or else came back short.
-         */
+        /** Null when that page was the last: it reached [total], where that is known (above 0), or else came back short. */
         fun nextKey(startIndex: Int, loaded: Int, pageSize: Int, total: Int): Int? = when {
             total > 0 -> if (startIndex + pageSize >= total) null else startIndex + pageSize
             loaded < pageSize -> null

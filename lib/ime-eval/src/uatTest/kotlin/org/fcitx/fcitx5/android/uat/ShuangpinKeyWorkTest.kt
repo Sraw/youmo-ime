@@ -21,21 +21,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * What a 双拼 key takes of the decoder on the app's data, counted ([PinyinDecoder.Work]), held under
- * a ceiling: no case of uat/. 简拼 in the middle reads every key alone too, and on a phone a key
- * went from 10 to 20 ms with nothing in the tests to say so (the test dictionary's words are few
- * and short; a time on an emulator on a fast host shows a millisecond in ten as none). Since then
- * a key alone reads only the words the user typed or chose (DECISIONS 0.6.1 双拼中间简拼改 U), so
- * what it takes grows with those: measured with the 3000 likeliest words typed, and with none. The counts
- * are the same on every machine, so a change that makes a key read or score much more fails here.
- * And each key's reading, built on the key before, is what a decoder made afresh reads, on the
- * app's words: long ones, hundreds a reading, which the unit tests' dictionary has not.
- */
+/** A 双拼 key's decoder work on the app's data, held under a ceiling, and its reading equal to a fresh decoder's. */
 class ShuangpinKeyWorkTest {
 
-    // 小鹤, as lib/ime-eval/data/shuangpin-xiaohe.tsv types its sentences, their syllables on end: [keys] keys
-    // a line, in whole syllables, or the first whole and the rest by their initials
+    // 小鹤 sentences, their syllables on end: [keys] keys a line, whole or the first whole and the rest by initials
     private fun inputs(keys: Int, lines: Int, initials: Boolean): List<String> {
         val pairs = File("data/shuangpin-xiaohe.tsv").readLines().filter { it.isNotBlank() && !it.startsWith("#") }
             .map { it.split('\t') }.filter { it[0].length == 2 * it[1].length }.flatMap { it[0].chunked(2) }
@@ -60,11 +49,9 @@ class ShuangpinKeyWorkTest {
         override fun toString() = "a key: %.0f arcs, %.0f steps, %.0f scored, %.0f first words scored".format(arcs, steps, scored, first)
     }
 
-    // types [inputs] a key at a time on one decoder: each key read as a decoder made afresh reads it, and what a key took
-    // [tapped]: each key tapped in a place, cleanly (TouchSim), and read as the key next to it too by where it fell;
-    // [letters]: on a grouped keyboard, each key its group's code
+    // types [inputs] a key at a time on one decoder, each key read as a fresh decoder reads it; [tapped] with a place
     private fun type(inputs: List<String>, abbreviations: Boolean = true, user: UserModel? = null, tapped: Boolean = false, letters: NineKeyLetters? = null): Taken {
-        // the taps are the full keyboard's, and a grouped keyboard's segmenter reads no key next to another (R27 F8565)
+        // the taps are the full keyboard's, and a grouped keyboard's segmenter reads no key next to another
         require(letters == null || !tapped) { "tapped on the full keyboard only" }
         val segmenter = if (letters == null) {
             ShuangpinSegmenter(ShuangpinScheme.XIAOHE, abbreviations = abbreviations, neighbours = tapped)
@@ -115,11 +102,10 @@ class ShuangpinKeyWorkTest {
         assertTrue("$taken", taken.steps <= INITIALS_STEPS && taken.scored <= INITIALS_SCORED && taken.arcs <= INITIALS_ARCS && taken.first <= INITIALS_FIRST)
     }
 
-    // both of 0.6.1's other readings at once, as a phone types: words typed, and each key tapped in
-    // a place (what the 6T's time of a key is measured on)
+    // both other readings at once, as a phone types: words typed, and each key tapped in a place
     @Test
     fun aKeyTappedWithWordsTypedTakesNoMoreThanItDid() {
-        // both readings', asserted once (R27 F8564)
+        // both readings', asserted once
         val over = ArrayList<String>()
         for (initials in listOf(false, true)) {
             val taken = type(inputs(KEYS, LINES, initials), user = typed(HISTORY), tapped = true)
@@ -134,11 +120,10 @@ class ShuangpinKeyWorkTest {
         assertEquals(emptyList<String>(), over)
     }
 
-    // the 18, 14 and nine keys read a key alone too since 061-sp-abbrev, the words typed only: what a key takes
-    // there, whole syllables and by initials (the nine keys' codes read many syllables, so much more than the others)
+    // the 18, 14 and nine keys read a key alone too, for typed words only
     @Test
     fun aKeyOnTheGroupedKeyboardsTakesNoMoreThanItDid() {
-        // each keyboard's, asserted once: the first over its cap hid the rest (R27 F8564)
+        // each keyboard's, asserted once: the first over its cap hid the rest
         val over = ArrayList<String>()
         for ((letters, caps) in GROUPED_CAPS) {
             for ((initials, cap) in listOf(false to caps.first, true to caps.second)) {
@@ -150,10 +135,7 @@ class ShuangpinKeyWorkTest {
         assertEquals(emptyList<String>(), over)
     }
 
-    // what marking every typed word's nodes anew takes, said (the host's time; a phone's is several times
-    // it): done as a word goes, not as one comes, which PinyinSessionAbbrevTest holds by the times the nodes
-    // are marked anew (a count). Said, not asserted: the only wall-clock comparison of this file, which a
-    // loaded machine's GC or JIT could turn over (review F8174)
+    // what marking every typed word's nodes anew takes, said, not asserted: a wall-clock comparison a loaded machine could turn over
     @Test
     fun markingTheTypedWordsNodesAnewIsTimed() {
         val data = UatEngines.pinyinData
@@ -178,8 +160,6 @@ class ShuangpinKeyWorkTest {
         }
     }
 
-    // nothing typed yet (a new install, the habits off): the keys read alone find no word, and a key
-    // takes little more than without them
     @Test
     fun aKeyWithNothingTypedTakesLittleMoreThanWithoutTheKeysReadAlone() {
         val user = UatEngines.pinyinData.let { UserModel(it.dictionary, it.vocabulary, index = it.wordIndex) }
@@ -203,8 +183,7 @@ class ShuangpinKeyWorkTest {
         const val MANY = 12000
         const val ROUNDS = 20
 
-        // tapped in a place: a tenth over what each was when measured (2537 arcs, 97 steps, 3792 scored
-        // whole; 4029, 157, 6979 by initials)
+        // tapped in a place: a tenth over what each was when measured
         const val TAPPED_WHOLE_ARCS = 2790.0
         const val TAPPED_WHOLE_STEPS = 107.0
         const val TAPPED_WHOLE_SCORED = 4170.0
@@ -230,8 +209,7 @@ class ShuangpinKeyWorkTest {
         const val INITIALS_FIRST = 79.0
         const val OFF_FIRST = 68.0
 
-        // a quarter over what each was when measured (arcs, steps), whole syllables and by initials: 18 keys 3138, 139
-        // and 3867, 173; 14 keys 4344, 215 and 4661, 221; nine keys 8426, 495 and 8166, 513
+        // a quarter over what each was when measured (arcs, steps), whole syllables and by initials
         val GROUPED_CAPS = mapOf(
             NineKeyLetters.G18 to ((3920.0 to 174.0) to (4830.0 to 216.0)),
             NineKeyLetters.G14 to ((5430.0 to 269.0) to (5830.0 to 276.0)),

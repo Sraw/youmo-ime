@@ -18,7 +18,6 @@ class EnglishTextTest {
         assertEquals(emptyList<String>(), EnglishText.context("", start = false))
         assertEquals(listOf(EnglishText.START, "Hello"), EnglishText.context("Hello "))
         assertEquals(listOf("Hello"), EnglishText.context("Hello ", start = false))
-        // after a full stop it is known all the same
         assertEquals(listOf(EnglishText.START), EnglishText.context("hello. ", start = false))
     }
 
@@ -36,7 +35,6 @@ class EnglishTextTest {
         // any Unicode space separates words; U+2028, U+2029 and U+0085 break lines as \n does
         "unicode spaces separate and unicode line breaks end a sentence" to {
             assertEquals(listOf("^Hi there", "^Fine", "^Ok", "^Yes"), runs("Hi\u00A0there.\u2003Fine\u2028Ok\u2029Yes"))
-            // a vertical tab and a form feed are line breaks too
             assertEquals(listOf("^Hi", "^Yes", "^Ok"), runs("Hi\u000BYes\u000COk"))
             assertEquals(listOf(START), EnglishText.context("Hi.\u00A0"))
             assertEquals(listOf(START), EnglishText.context("Hi\u0085"))
@@ -58,10 +56,8 @@ class EnglishTextTest {
         "no etc. and I end a sentence" to {
             assertEquals(listOf("^I said no", "^Then so do I", "^Pens etc", "^Last"), runs("I said no. Then so do I. Pens etc. Last"))
             assertEquals(listOf(START), EnglishText.context("So do I. "))
-            // a number after No. breaks the run as it did
             assertEquals(listOf("^No", "is here"), runs("No. 5 is here"))
         },
-        // e.g, example.com: no word the keyboard types whole
         "a full stop inside a word spoils it" to {
             assertEquals(listOf("^see", "for more"), runs("see example.com for more"))
         },
@@ -78,7 +74,6 @@ class EnglishTextTest {
         assertEquals(listOf(START), EnglishText.context("Hi. "))
         assertEquals(listOf("you"), EnglishText.context("I have 3 you, "))
         assertEquals(emptyList<String>(), EnglishText.context("I have 3 "))
-        // the next key goes on with the word
         assertEquals(emptyList<String>(), EnglishText.context("Hello"))
     }
 

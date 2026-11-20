@@ -4,6 +4,9 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.Fixtures.problems
+import org.fcitx.fcitx5.android.scene.Fixtures.warnings
+import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.theme.Cascade
@@ -23,18 +26,6 @@ import kotlin.test.assertTrue
 
 // 060-render-p3 T5 of theme-4.xsd: what is typed as a theme's scenes, the cascades they make, the keyboard's size
 class ThemeScenesTest {
-    private val source = testData("material-light.xml")
-
-    private fun problems(s: String) = ThemeReader.theme(s).problems().map { it.message }
-
-    private fun withStyle(style: String) = source.replace("</theme>", "$style\n</theme>")
-
-    private fun warnings(s: String): List<String> {
-        val t = ThemeReader.theme(s)
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
-
     @Test
     fun typedScenesSelectAsTheEnvironmentIs() {
         val t = ThemeReader.theme(

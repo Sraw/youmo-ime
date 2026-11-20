@@ -48,7 +48,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** UAT cases of the keyboard turned sideways (uat/16), at redroid's screen turned: 851 × 393 dp. */
+/** At redroid's screen turned: 851 × 393 dp. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w851dp-h393dp-land-440dpi")
@@ -74,7 +74,6 @@ class LandscapeUatTest {
 
     private fun x(k: ShownKey) = k.bounds.left
 
-    // the keys labelled [label], whichever draws them (a key view, the canvas's scene)
     private fun keys(label: String) = h.keysLabelled(label)
 
     private fun split() = keys("g").size == 2
@@ -107,19 +106,15 @@ class LandscapeUatTest {
         h.start()
         val width = h.keyboard.width
         fun row(letters: String) = letters.map { c -> keys(c.toString()).map(::x).sorted() }
-        // G and V on both halves
         assertEquals(2, row("g").single().size)
         assertEquals(2, row("v").single().size)
         val top = row("qwertyuiop").map { it.single() }
-        // five a side, a gap in the middle wider than a key's own gap
         val keyWidth = h.key("q").width
         val left = top.take(5)
         val right = top.drop(5)
         assertTrue("$top", left.last() + keyWidth < width / 2 && right.first() > width / 2)
         assertTrue("$top", right.first() - left.last() > 2 * keyWidth)
-        // both halves' keys equally wide
         assertEquals(keyWidth, h.key("p").width)
-        // the space across the middle
         val space = h.keyNamed("space")
         assertTrue(x(space) < width / 2 && x(space) + space.width > width / 2)
         h.capture("LandscapeUatTest/split")
@@ -146,7 +141,6 @@ class LandscapeUatTest {
         h.start()
         h.swipe(h.key("o"), 0f, -h.key("o").height * 1.3f)
         h.longPress(h.key("q"), "Q")
-        // typed into the engine (pinyin takes them as keys); the engine's commit is its own
         val typed = sent()
         assertEquals(typed.toString(), 2, typed.size)
         assertTrue(typed.toString(), "key=9," in typed[0])
@@ -220,7 +214,6 @@ class LandscapeUatTest {
         assertEquals(h.service.getString(R.string.split_dock_move_right), a.contentDescription)
         assertTrue(h.box(a).left >= b.right)
         h.tap(h.key(h.service.getString(R.string.picker_back)))
-        // turned and back: a keyboard made anew
         h.close()
         harness = null
         h.start()
@@ -299,7 +292,6 @@ class LandscapeUatTest {
         assertTrue("$b", onRight(b))
         for (k in listOf("MNO", "GHI", "GHI", "ABC", "MNO")) h.tap(h.key(k))
         assertEquals(sent().toString(), 5, sent().size)
-        // the bar over it as narrow, as far right, with candidates too
         h.api.candidates = arrayOf(CandidateWord("", "你好", ""))
         h.emit(HostEvent.Candidates(1, h.api.candidates.toList()))
         val word = KeyboardHarness.all(h.inputView).firstOrNull { h.shown(it) && it is TextView && it.text.toString() == "你好" }
@@ -371,7 +363,7 @@ class LandscapeUatTest {
     @Test
     @Uat("LS-27", "LS-48")
     fun tallestLeavesTheApp120dp() {
-        // 很高: 4 × 59 dp asked; the app keeps 120 dp of the input method's window over the bar (061-landscape-height §5.2)
+        // the app keeps 120 dp of the input method's window over the bar
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         h.start()
         val density = h.service.resources.displayMetrics.density
@@ -389,8 +381,7 @@ class LandscapeUatTest {
         h.start()
         val words = arrayOf("你好", "拟好", "你", "呢", "泥", "尼", "妮", "倪", "逆", "腻")
         h.api.candidates = Array(words.size) { CandidateWord("", words[it], "") }
-        // more wait behind ⌄, as for a real nihao: only then do the shown words share the bar's width.
-        // A list that fits whole stays packed at its natural width (the user's compact decision, 2026-10-25)
+        // more wait behind ⌄: only then do the shown words share the bar's width; a list that fits whole stays packed
         h.emit(HostEvent.Candidates(words.size + 50, h.api.candidates.toList()))
         val shown = KeyboardHarness.all(h.inputView).filter { h.shown(it) && it is TextView && it.text.toString() in words }.toList()
         assertEquals("你好", (shown.minBy(::x) as TextView).text.toString())
@@ -406,7 +397,6 @@ class LandscapeUatTest {
         val middle = width / 2
         for (c in "women") {
             val k = keys(c.toString()).single()
-            // w and e on the left half, o, m and n on the right
             assertEquals("$c", c in "we", x(k) < middle)
             h.tap(k)
         }
@@ -416,11 +406,10 @@ class LandscapeUatTest {
         assertEquals(typed.toString(), 6, typed.size)
     }
 
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
 
     private fun grouped(): Rect = h.box(KeyboardHarness.find<GroupedKeyboard>(h.inputView) ?: error("no grouped keyboard"))
 
-    // typing, as fcitx tells it: the code row's text and the strip's syllables
     private fun typing(im: String) {
         val typed = FormattedText(arrayOf("bn ui"), intArrayOf(0), 5)
         h.api.inputPanelCached = HostEvent.InputPanel(typed, FormattedText.Empty, FormattedText.Empty)
@@ -445,7 +434,6 @@ class LandscapeUatTest {
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
         h.start()
         val keys = grouped()
-        // a thumb's width at one side, as the nine keys
         assertTrue("$keys of $width", keys.width() < width * 0.5 && (onRight(keys) || onLeft(keys)))
         typing(InputMethodCatalog.PINYIN)
         rowFollows(keys)
@@ -464,7 +452,6 @@ class LandscapeUatTest {
         val dp = h.service.resources.displayMetrics.density
         h.close()
         harness = null
-        // each its own start, so one that fails does not hide the others
         assertRows(
             "one-handed: narrower than the screen, the code row over it" to {
                 prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
@@ -525,11 +512,10 @@ class LandscapeUatTest {
         val scheme = EngineState.shuangpinScheme
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         prefs.later { EngineState.shuangpinScheme = scheme }
-        harness = KeyboardHarness(im = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false))
+        harness = KeyboardHarness(im = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN"))
         h.start()
         assertTrue(split())
         assertFalse(h.keys().any { it.id == "semicolon" })
-        // L ends its row where the row above ends
         assertTrue(abs(h.box(h.key("l")).right - h.box(h.key("p")).right) <= 12)
         val popup = h.longPress(h.key("l"), null)
         assertTrue(popup.toString(), ";" in popup || "；" in popup)

@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 /**
  * The built-in layouts (src/commonMain/layouts) leave every key's long press, swipe and corner to its name (060-keys-unify
  * §6.5): one rule for every key on every keyboard, KeyDefaults' and the user's. A theme's own layout may write them (its
- * keys' defaults, C3): this reads the app's alone.
+ * keys' defaults): this reads the app's alone.
  */
 class BuiltInLayoutLintTest {
 
@@ -56,7 +56,7 @@ class BuiltInLayoutLintTest {
     @Test
     fun noKeyWritesASwipeNorACorner() {
         // a key's first is its long press's (KeyDefaults, the user's key_lists): the swipe types it, the corner draws it; a
-        // function key's marks are its slots' commands (SlotDefaults), which a corner written would sit on (060-s6-review L10)
+        // function key's marks are its slots' commands (SlotDefaults), which a corner written would sit on
         val wrong = keys.flatMap { k -> k.all.flatMap { a -> listOfNotNull("swipe-up".takeIf { it in a.actions }, "alt".takeIf { a.alt != null }) }.map { "${k.where}: $it" } }
         assertEquals(emptyList(), wrong)
     }
@@ -98,7 +98,7 @@ class BuiltInLayoutLintTest {
         // full, 九键, 14 and 18 键, 注音九键 and 大千, the number pad's digits, the function keys
         val FORMS = setOf("full", "t9", "g14", "g18", "zy9", "zyfull", "num", KeyId.FUNCTION)
 
-        // the keys out of the keys' model, with the reason each is (060-keys-unify §5): a panel's own way about (back,
+        // the keys out of the keys' model, with the reason each is: a panel's own way about (back,
         // lock, search, the emoji and emoticon tabs, the candidates' pages), 手写's 注 (its long press a menu), a table's
         // 拼 lookup (one keyboard's, a table's own), the bar's number row (on the bar, no long press nor slots), the number
         // pad's operators and marks (no list, §5; named with the editor's page for them, 0.6.1), 表情搜索's letters (they

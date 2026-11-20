@@ -15,36 +15,25 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * A text the user set on a key's swipe is drawn on every key of every board, at every place, in every form
- * (0.6.0-beta2: 全键盘 j's 下滑 text left out, k's drawn): as the app gives it (two characters and 「…」), else a
- * step down where it has no room (its first character and 「…」, then the short-text icon: SceneBuilder, MarkContent.Text.ladder),
- * at the shortcuts' size; a main character never moves for it. One the user set beats a built-in mark it meets
- * (KeyMarkYield.Mark.user).
- */
+/** A text the user set on a key's swipe is drawn on every key of every board, or a step down where it has no room; a main character never moves for it. */
 class SwipeTextsDrawnTest {
 
-    // the forms, and the upright ones on a 360 dp phone too (a 1080 px screen at 3x): narrower keys, where j's
-    // descender met a mark at 底部, 左下 or 右下
+    // a 360 dp phone too: narrower keys, where j's descender met a mark at 底部, 左下 or 右下
     private val forms: Map<String, Env> = Forms.all + Forms.all.filterValues { !it.landscape }.map { (n, e) -> "$n@360dp" to e.copy(density = NARROW) }
 
     private val boards = listOf("qwerty", "nine", "k14", "k18", "zhuyin", "zhuyin-nine", "number", "symbols")
 
-    // the character keys (`full/j`); a function key's marks have their own tests (BackspaceMarksTest)
     private fun names(s: Scene) = s.keys.mapNotNull { k -> k.shortcut?.takeIf { !KeyId(it).isFunction }?.let { k to it } }
 
     @Test
     fun aSetTextIsDrawnOnEveryKey() = assertRows(
         listOf(
-            // the other way off: nothing but the key's own glyph in its way
             "aSetTextIsDrawnOnEveryKey" to false,
-            // the other way on and built in (the corner symbol, a preset icon): it is the one left out
             "aSetTextBeatsTheBuiltInMarkItMeets" to true,
         ),
         { it.first },
     ) { (_, otherOn) -> assertEquals(NO_ROOM, missing(otherOn)) }
 
-    // j and k's down 「现在怎么样了」 (as the app gives it, 「现在…」, its shorter 「现…」) on a 360 dp phone's qwerty
     private fun owners(at: KeyMarks.At, keys: List<String> = listOf("full/j", "full/k")): Scene {
         val env = Forms.env("qwerty", Forms.all.getValue("block").copy(density = NARROW))
         val marks = MarkSettings(
@@ -55,10 +44,8 @@ class SwipeTextsDrawnTest {
         return Forms.scene("qwerty", env.copy(marks = marks))
     }
 
-    // a key's texts and icons' names as drawn
     private fun texts(s: Scene, name: String) = s.keys.first { it.shortcut == name }.ops(false).mapNotNull { (it as? Op.Text)?.text ?: (it as? Op.Icon)?.name }
 
-    // j's or k's down text as drawn: [text] (as the app gives it) and its [shorter], with 下滑 at [at]
     private fun rung(key: String, at: KeyMarks.At, text: String, shorter: String?, form: String = "block"): List<String> {
         val env = Forms.env("qwerty", Forms.all.getValue(form).copy(density = NARROW))
         val marks = MarkSettings(upAt = at.yielded, downAt = at, shortcuts = Fixtures.presetMarks + ("$key:down" to MarkContent.Text(text, shorter)), user = setOf("$key:down"))
@@ -69,19 +56,15 @@ class SwipeTextsDrawnTest {
 
     @Test
     fun eachRungAsItsRoomHasIt() {
-        // the synthetic measurer's (360 dp): room as it is floating; split, j's descender at 底部 leaves room for one
-        // character; compact, for the sign alone
         assertEquals(listOf("j", "现在…"), rung("full/j", KeyMarks.At.Bottom, "现在…", "现…", "floating"))
         assertEquals(listOf("j", "现…"), rung("full/j", KeyMarks.At.Bottom, "现在…", "现…", "split"))
         assertEquals(listOf("k", "现在…"), rung("full/k", KeyMarks.At.Bottom, "现在…", "现…", "split"))
         assertEquals(listOf("j", SIGN), rung("full/j", KeyMarks.At.Bottom, "现在…", "现…", "compact"))
-        // a step no narrower is skipped: the sign next
         assertEquals(listOf("j", SIGN), rung("full/j", KeyMarks.At.Bottom, "现在…", "现在怎么…", "split"))
     }
 
     @Test
     fun eachKeySaysHowItsSetWayIsDrawn() {
-        // KeyNode.fates, what the settings page tells: each rung of eachRungAsItsRoomHasIt, and a way left out
         fun fates(board: String, key: String, form: String, density: Double? = NARROW): Map<Boolean, MarkFate> {
             val f = Forms.all.getValue(form)
             val env = Forms.env(board, if (density == null) f else f.copy(density = density))
@@ -94,7 +77,6 @@ class SwipeTextsDrawnTest {
         assertEquals(mapOf(false to MarkFate.AsSet), fates("qwerty", "full/j", "floating"))
         assertEquals(mapOf(false to MarkFate.Shortened("现…")), fates("qwerty", "full/j", "split"))
         assertEquals(mapOf(false to MarkFate.Sign), fates("qwerty", "full/j", "compact"))
-        // an up way's fate is under true; a key with both ways set has both, each its own
         val both = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW)).let { env ->
             val marks = MarkSettings(
                 upAt = KeyMarks.At.Bottom, downAt = KeyMarks.At.TopLeft,
@@ -104,9 +86,7 @@ class SwipeTextsDrawnTest {
             Forms.scene("qwerty", env.copy(marks = marks)).keys.first { it.shortcut == "full/j" }.fates
         }
         assertEquals(mapOf(true to MarkFate.Sign, false to MarkFate.AsSet), both)
-        // a way the user did not set says nothing
         assertEquals(emptyMap(), Forms.scene("qwerty", Forms.env("qwerty", Forms.all.getValue("block"))).keys.first { it.shortcut == "full/a" }.fates)
-        // 大千 compact on a 360 dp phone: no room even for the sign on some key (NO_ROOM)
         val env = Forms.env("zhuyin", forms.getValue("compact@360dp"))
         val dropped = Forms.scene("zhuyin", env).keys.mapNotNull { it.shortcut }.filter { !KeyId(it).isFunction }.any { k ->
             val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("$k:down" to MarkContent.Text("现在…", "现…")), user = setOf("$k:down"))
@@ -117,7 +97,6 @@ class SwipeTextsDrawnTest {
 
     @Test
     fun theSignIsDrawnAsTheShortcutIconsAre() {
-        // compact, 底部: j's sign at c's copy icon's size and colour, as every shortcut icon is
         val env = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW))
         val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
         val s = Forms.scene("qwerty", env.copy(marks = marks))
@@ -130,8 +109,7 @@ class SwipeTextsDrawnTest {
 
     @Test
     fun aThemesOwnSignKeepsItsWholeSquareApart() {
-        // compact, 底部: the built-in sign's two lines fit under j's descender; a theme's own short-text art, its ink
-        // not known, is kept apart as its whole square: clear of j's letter, or left out
+        // a theme's own short-text art, its ink not known, is kept apart as its whole square
         val env = Forms.env("qwerty", Forms.all.getValue("compact").copy(density = NARROW))
         val marks = MarkSettings(upAt = KeyMarks.At.Bottom.yielded, downAt = KeyMarks.At.Bottom, shortcuts = Fixtures.presetMarks + ("full/j:down" to MarkContent.Text("现在…", "现…")), user = setOf("full/j:down"))
         fun j(theme: Theme) = Forms.scene("qwerty", env.copy(marks = marks), theme).keys.first { it.shortcut == "full/j" }
@@ -156,20 +134,17 @@ class SwipeTextsDrawnTest {
         )
         val own = sign(themed)
         assertTrue(own == null || own.top >= ink(themed).bottom || own.left >= ink(themed).right || own.right <= ink(themed).left, "a theme's sign over j: $own")
-        // left out, the settings say so; drawn, as the sign
         assertEquals(mapOf(false to if (own == null) MarkFate.Dropped else MarkFate.Sign), themed.fates)
     }
 
     @Test
     fun aTextWithRoomIsNotDrawnShorter() {
-        // 左上, the default: k has room for 「现在…」 as the app gives it
         val s = owners(KeyMarks.At.TopLeft)
         assertTrue("现在…" in texts(s, "full/k"), "k: ${texts(s, "full/k")}")
     }
 
     @Test
     fun oneKeyDrawnShorterLeavesEveryOtherMarkAsItWas() {
-        // 底部: whichever of j and k is drawn shorter, the others keys' marks are as with no text on j or k
         val with = owners(KeyMarks.At.Bottom)
         val without = owners(KeyMarks.At.Bottom, keys = emptyList())
         val others = with.keys.filter { it.shortcut != "full/j" && it.shortcut != "full/k" }.map { it.shortcut to it.ops(false) }
@@ -188,8 +163,6 @@ class SwipeTextsDrawnTest {
 
     private class Way(val at: KeyMarks.At, val up: Boolean, val otherOn: Boolean)
 
-    // every character key of [board] with a text [n] characters long on its way [w], set by the user: whether each
-    // draws it, as the app shows it (two characters, then 「…」) or a step down (one and 「…」, the sign)
     private fun allDrawn(board: String, env: Env, keys: Set<String>, w: Way, n: Int): Boolean {
         val way = if (w.up) "up" else "down"
         val text = TEXT.take(n)
@@ -212,16 +185,10 @@ class SwipeTextsDrawnTest {
         const val NARROW = 3.0
         val SIGN = MarkContent.Text.SIGN.name
 
-        // the owner's text: 1 to 3 characters (more than two drawn as two and 「…」, the app's KeyMarkText, so
-        // any longer is drawn as three is)
         const val TEXT = "现在怎么样了"
         const val LONGEST = 3
 
-        // the 360 dp results are the synthetic measurer's (Forms), not a phone's fonts: on the emulator (360 dp, 底部) j
-        // shows the sign, k 「现在…」; 紧凑 + 单手 both the sign.
-        // where not even the sign (an icon, its ink a band as wide as two characters) has room on a key at some
-        // place, so KeyMarkYield leaves it out: 大千's 11 keys across, compact on a 360 dp phone (its letters never
-        // move for a mark)
+        // the synthetic measurer's results (Forms), not a phone's fonts: where not even the sign has room
         val NO_ROOM = listOf("compact@360dp").flatMap { f -> listOf("1", "2", "long").map { "zhuyin $f $it" } }
     }
 }

@@ -19,9 +19,7 @@ class EmojiCandidatesTest {
     @Test
     fun theFirstsEmojiGoAfterTheSecondAtMostTwo() {
         assertEquals(listOf("哈哈", "蛤蛤", "😃", "😄", "哈"), place("哈哈", "蛤蛤", "哈"))
-        // fewer candidates: after them all
         assertEquals(listOf("哈哈", "😃", "😄"), place("哈哈"))
-        // the second's are none
         assertEquals(listOf("蛤蛤", "哈哈", "哈"), place("蛤蛤", "哈哈", "哈"))
         assertEquals(emptyList<String>(), place())
     }
@@ -70,8 +68,7 @@ class EmojiCandidatesTest {
             "a pin first: the lifted word fourth (docs/pinyin.md), the emoji after it" to {
                 assertEquals(listOf("凤", "凤凰", "丰厚", "奉化", "🐦"), EmojiCandidates.placed(listOf("凤", "凤凰", "丰厚", "奉化"), "凤凰", { bird[it].orEmpty() }, { it }, { true }, lifted = { it == "奉化" }) { it }.first)
             },
-            // HabitRanker's [DICTIONARY, FLOORED, FLOORED, LIFTED, …] (HabitRankerTest): no pin, but
-            // the lifted word fourth all the same; with none lifted the emoji would be third, before them
+            // the lifted word fourth though no pin; with none lifted the emoji would be third
             "floored words ahead: the lifted word fourth, the emoji fifth" to {
                 assertEquals(listOf("凤凰", "丰厚", "峰会", "奉化", "🐦", "风华"), placed("凤凰", "丰厚", "峰会", "奉化", "风华"))
             },

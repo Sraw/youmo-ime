@@ -13,14 +13,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import kotlin.random.Random
 
-/**
- * Pinyin glide typing measured: each input of a pinyin set cut into its syllables (the longest
- * first), then into the dictionary's words its expected text is (the longest first), each glided
- * as [GlideRun.path] glides a word ([syllables] above 0: that many syllables a glide instead, words
- * or not), its keys as [spelling] types them over [layout] (双拼's, the nine keys'); right if the
- * first reading's keys are those glided, top3 if among the first three. [table]: each word glided
- * as its code in that table instead, where the table has it so, right by the code.
- */
+/** Pinyin glide typing measured: each word of a sample glided as [GlideRun.path] does, in [spelling]'s keys over [layout]. */
 internal class PinyinGlideRun(private val data: PinyinData, private val weights: GlidePath.Weights = PinyinGlide.WEIGHTS) {
 
     fun run(
@@ -77,8 +70,7 @@ internal class PinyinGlideRun(private val data: PinyinData, private val weights:
     // a key the layout lacks (微软's ; for ing) or all on one key: no glide types it
     private fun glidable(keys: String, layout: GlideLayout) = keys.all { it in layout } && keys.map { layout.centre(it) }.toSet().size >= 2
 
-    // [split] cut into the dictionary's words that [text] is, the longest first; null where its
-    // syllables are not one a character, or a character's is no word
+    // [split] cut into the dictionary's words that [text] is, the longest first; null where none fits
     private fun words(split: List<String>, text: String): List<List<String>>? {
         if (split.size != text.length) return null
         val ids = split.map { Syllables.id(it) }

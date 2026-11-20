@@ -14,10 +14,6 @@ import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 
-/**
- * A view taking a key's touch: the adapter of [KeyGesture], which has the gesture's bookkeeping and
- * timers, to a view's touch, its listeners and its pressed state.
- */
 open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
 
     enum class GestureType { Down, Move, Up }
@@ -33,9 +29,9 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
         val totalY: Int,
         /** an Up for a touch the system took away (ACTION_CANCEL): end what it shows, type nothing */
         val cancelled: Boolean = false,
-        /** the vertical swipe reached a step at some point this touch, though [totalY] may be back at 0 */
+        /** reached a step at some point this touch, though [totalY] may be back at 0 */
         val swipedY: Boolean = false,
-        /** vertical steps after a sideways one ([KeyGestureRecognizer.crossStepY]), finger up negative */
+        /** finger up negative */
         val countCrossY: Int = 0,
     )
 
@@ -51,13 +47,11 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
         findViewTreeLifecycleOwner()?.lifecycleScope!!
     }
 
-    /** The touch's bookkeeping and timers, whatever draws the key. */
     val keyGesture = KeyGesture(this, ViewConfiguration.get(ctx).scaledTouchSlop.toFloat())
 
-    /** the finger on this key, by the id the keyboard's touch gives it */
     val touchPointer get() = keyGesture.touchPointer
 
-    /** Where across the key the touch that clicks it came down, for the click listener alone ([KeyGesture.clickAt]). */
+    /** For the click listener alone. */
     val clickAt get() = keyGesture.clickAt
 
     var longPressEnabled by keyGesture::longPressEnabled
@@ -68,7 +62,6 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
     var swipeThresholdX by keyGesture::swipeThresholdX
     var swipeThresholdY by keyGesture::swipeThresholdY
 
-    /** One axis a touch ([KeyGestureRecognizer.axisLock]): a key swiped sideways and up. */
     var axisLock by keyGesture::axisLock
     var doubleTapEnabled by keyGesture::doubleTapEnabled
     var soundEffect by keyGesture::soundEffect
@@ -102,7 +95,6 @@ open class CustomGestureView(ctx: Context) : FrameLayout(ctx), KeyGesture.Key {
         super.setOnLongClickListener(l)
     }
 
-    // the touch's ends, as a view has them
     final override val keyWidth get() = width
     final override val keyHeight get() = height
     final override val keyEnabled get() = isEnabled

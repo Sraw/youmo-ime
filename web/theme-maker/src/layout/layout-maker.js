@@ -1,7 +1,4 @@
-// youmo-layout-maker: what the layout maker's page does to a .layout (061-custom-layout §12), apart from the page so node
-// tests it. The page never reads or lays out a layout itself: each change is the engine's to read again (readOwnLayout),
-// check (checkLayout) and draw (buildScene). Here: a new layout from the app's boards, the file opened and saved, the
-// checker's findings in words, the preview's environment as the engine's EnvJson.
+// youmo-layout-maker: the page never reads or lays out a layout itself: each change goes back through the engine.
 (function (root) {
   'use strict';
 
@@ -12,38 +9,32 @@
 
   const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-  /** The app's boards one starts from (LayoutCheck.BASES), as the 新建 dialog names them. */
   const BASE_LABEL = { qwerty: '26 键', k14: '14 键', k18: '18 键', nine: '九键', number: '数字键盘', symbols: '符号面板' };
   const FAMILY_LABEL = { letters: '字母', grouped: '字母分组', nine: '九键', number: '数字', symbols: '符号' };
-  /** The number pads (LayoutReader.PADS): what a field asks for, the pad shown. */
   const PAD_LABEL = {
     full: '完整', digits: '只有数字', signed: '数字和正负号', decimal: '数字和小数点', 'signed-decimal': '正负号和小数点',
     phone: '电话', datetime: '日期时间',
   };
   const ROLE_LABEL = { symbols: '符', back: '返回', numbers: '123' };
-  /** LayoutCheck.kept's slots (LayoutReader's kinds) and keys (its roles, else a digit key's id) a board must keep. */
   const SLOT_LABEL = {
     'handwriting-pad': '手写区', 'nine-side': '九键左边的符号列', 'handwriting-candidates': '手写候选栏', 'symbol-categories': '符号面板的分类栏', 'symbol-grid': '符号面板的符号格子',
   };
   const KEY_LABEL = { backspace: '删除', enter: '回车', lang: '地球键' };
   const BOARD_LABEL = { Number: '数字键盘', Symbol: '符号面板' };
-  /** The app's boards a key's name is of (LayoutCheck's held), as the app's key page names them. */
   const APP_BOARD_LABEL = {
     qwerty: '全键盘', k14: '14 键', k18: '18 键', nine: '九键', zhuyin: '注音全键盘', 'zhuyin-nine': '注音九键', number: '数字键盘', symbols: '符号面板',
     emoji: '表情', emoticon: '颜文字', 'emoji-search': '表情搜索', 'expanded-side': '展开候选', 'number-row': '数字行',
   };
 
-  // ---- the checker's findings in words (LayoutCheck.KEYS: the test holds the table to the engine's list) ----
+  // LayoutCheck.KEYS in words: the test holds the table to the engine's list
 
   const q = (s) => '「' + s + '」';
-  // an app board's name amid Chinese, as the app's LayoutTexts.spaced writes it (R26 F8374): a space on a side where it
-  // starts or ends with a digit or a Latin letter (是 18 键的键), none beside a Chinese one (是数字行的键)
+  // as the app's LayoutTexts.spaced: a space beside a digit or a Latin letter, none beside a Chinese one
   const boardName = (board) => {
     const n = APP_BOARD_LABEL[board] || board;
     return (/^[0-9A-Za-z]/.test(n) ? ' ' : '') + n + (/[0-9A-Za-z]$/.test(n) ? ' ' : '');
   };
   const WORDS = {
-    // errors
     read: ([msg]) => '读不进来：' + msg,
     newer: ([v]) => '需要幽默输入法 ' + v + ' 或更新（min-app）',
     'id-length': ([id, max]) => 'id' + q(id) + '太长：最多 ' + max + ' 个字符',
@@ -68,7 +59,6 @@
     groups: ([why]) => '字母分组不对：' + why,
     'hidden-chars': ([field]) => field + '里有看不见的字符（控制字符、方向字符、零宽字符或换行）',
     command: ([key, action]) => '键' + q(key) + '的 ' + action + ' 是命令：字母键和空格只能用底稿同一个键上有的命令',
-    // warnings
     'no-way': (boards) => '没有键能切到' + boards.map((b) => BOARD_LABEL[b] || b).join('、'),
     narrow: ([key]) => '键' + q(key) + '很窄，可能不好按',
     commits: ([n]) => n + ' 个键点按打出写死的文字（导入时 App 会列给用户看）',
@@ -83,13 +73,11 @@
     'split-scaled': ([n, where]) => '分体时这一行在「' + where + '」有 ' + n + ' 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小',
   };
 
-  /** A finding of checkLayout (`{line, key, args}`) in words; one of a key the table lacks, as the engine has it. */
   function words(f) {
     const say = WORDS[f.key];
     return say ? say(Array.from(f.args || [])) : f.key + (f.args && f.args.length ? '：' + Array.from(f.args).join(' ') : '');
   }
 
-  /** A report's findings as the page lists them: `[{level, line, message}]`, errors first. */
   function findings(report) {
     const out = [];
     for (const f of report.errors || []) out.push({ level: 'error', line: f.line || 0, message: words(f) });
@@ -97,11 +85,9 @@
     return out;
   }
 
-  // ---- the <keyboard> and its <meta> ----
 
   const keyboardOf = (xml) => F.elements(xml, 'keyboard')[0] || null;
 
-  /** The <keyboard>'s id, name, family, based-on and <meta>'s attributes; null where there is no <keyboard>. */
   function info(xml) {
     const k = keyboardOf(xml);
     if (!k) return null;
@@ -110,7 +96,7 @@
     return { id: a.id ?? null, name: a.name ?? null, family: a.family ?? null, basedOn: a['based-on'] ?? null, meta: m ? Object.fromEntries(m.attrs) : {} };
   }
 
-  // a value written between double quotes: ' escaped as well, so no reader takes part of it for a quote of its own
+  // ' escaped too, so no reader takes part of the value for a quote
   const attrValue = (v) => escape(v).replace(/'/g, '&apos;');
 
   // [tag] with attribute [name] [value] (null: gone): changed in place, else added at its end. Its attributes gone
@@ -390,7 +376,7 @@
     return out;
   }
 
-  // PackLayouts.convert's why in words (review S2); one not known here as it said it
+  // PackLayouts.convert's why in words; one not known here as it said it
   function refusal(why) {
     const w = why || '';
     let m;
@@ -416,7 +402,7 @@
    * of [bases] (the app's listed boards, in their order) its `layouts/` has a file of, made one of the user's as the
    * app makes it on import (E.convertPackLayout, PackLayouts.convert, with the pack's fragments): `{board, ok, id, name,
    * text}`, or `{board, ok: false, why}`. [theme] the pack's theme read (its name and `<meta>` the layout's); [version]
-   * the app's. The conversion's `renames` (the user's settings of a key renamed carried over, L6) are the app's alone:
+   * the app's. The conversion's `renames` (the user's settings of a key renamed carried over) are the app's alone:
    * the page has none to carry.
    */
   function themeBoards(E, d, theme, bases, version) {

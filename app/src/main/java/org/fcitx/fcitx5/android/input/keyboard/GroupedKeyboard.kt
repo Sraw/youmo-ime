@@ -6,31 +6,23 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import androidx.annotation.Keep
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineState
-import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
-import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyAppearance
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
-import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
-import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.SceneGroups
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
-import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.scene.KeyNode
 import org.fcitx.fcitx5.android.scene.Scene
@@ -38,58 +30,24 @@ import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
-import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
 
 /**
- * Pinyin on the 14 keys of two letters each (拼音双键), as iFlytek lays them out: QW ER TY UI OP,
- * AS DF GH JK L, then the separator (分词), ZX CV BN M and backspace; the full keyboard's bottom
- * row, with no 中/英 (English is the language key's round, as on the full keyboard).
- *
- * A key's tap sends its group's code ([NineKeyLetters.G14]'s, private use), which the engine reads as any of the
- * group's letters, as 九键's digits; on a key of two letters with where across it the finger came
- * down ([Keyboard.tapKey], [pressed]), so the letter on that side weighs more (讯飞's 你好 for
- * nihao); its candidates and the syllables on the code row come back
- * through the engine ([EngineState.syllables]). A swipe types its
- * corner, iFlytek's: 1 to 0 on the top two rows (a keypad's digit, which picks that candidate while
- * typing), `~ ! @ ?` on the third. Its long press offers a row of its letters in capitals, the
- * corner and its letters (Q W 1 q w), the one chosen committed as it is after what is typed, and
- * above them what the full keyboard's long press of its letters offers besides. No glide, no Shift:
- * capitals are English's; but a stroke drawn over them while pinyin is typed (笔画筛选) filters
- * the candidates as on the full keyboard.
- *
- * [NineKeyLetters.G18]: 双拼's 18 keys, Q WE RT Y U IO P, A SD FG H JK L;, Z XC V BN M, laid out
- * and typed the same way, its corners 1 to 0 then marks (iFlytek has no 18 keys to follow). 双拼's
- * taps send the code alone; pinyin's go with where across the key they fell, as the 14 keys' do
- * ([Keyboard.pinyin18Tap], 061-neighbour-18key).
- *
- * [wire]: what a group's code goes out as. Pinyin's 14 keys and 双拼's 18 send the group's code itself;
- * pinyin's 18 keys ([NamePinyin18]) and 双拼's 14 ([NameShuangpin14]) send codes of their own
- * ([Keyboard.pinyin18Key], [Keyboard.shuangpin14Key]), each read by its input method's own session
- * of that keyboard (I1); of them pinyin's 18 keys' taps alone carry a place ([tapped]). [semicolon]: whether a group shows its `;` (双拼's, ing to 微软); pinyin's 18 keys have none, their L key L alone, its long press no `;` or `:`.
- *
- * The keys are its layout's (`k14`, `k18`, a theme's in their place), their groups checked as it is made
- * ([grouping], SceneGroups.taken; 060-render-p3 T9b): the built-in groups, typed as above; where
- * `ownGroups` (pinyin's keyboards), a layout's own groups (a theme's 17 keys), typed on a keyboard of their
- * own ([NineKeyLetters.custom]: codes of its own, sent as they are, a tap's place across and down its key,
- * [EngineState.ownKeys] telling the engine); any other grouping logged and gone by, the built-in layout drawn.
+ * A tap sends its group's code (private use), read by the engine as any of its letters, with where across
+ * the key it fell so that side's letter weighs more (讯飞's 你好 for nihao). A layout's own groups (a theme's
+ * 17 keys) go on codes of their own; any other grouping is logged and the built-in layout drawn.
  */
 @SuppressLint("ViewConstructor")
 class GroupedKeyboard private constructor(
     context: Context,
     theme: Theme,
-    // the built-in keyboard this one is (G14, G18): its layout's id, its theme board, its keys' names
     private val builtInLetters: NineKeyLetters,
-    // named apart from the properties below, which an initializer would otherwise not see (review L4: the
-    // 18 keys' wire reached a layout's own codes through sceneTable)
+    // named apart from the properties below, which an initializer would otherwise not see
     private val builtInWire: (Char) -> Int,
     private val builtInSemicolon: Boolean,
     private val grouping: Grouping,
-) : BaseKeyboard(
-    context, theme, layout(builtInLetters, builtInWire, builtInSemicolon),
-    themeBoard = shapeOf(builtInLetters).board,
-), TypingKeys {
+) : BaseKeyboard(context, theme, themeBoard = layoutOf(builtInLetters)), TypingKeys {
 
     constructor(
         context: Context,
@@ -97,112 +55,60 @@ class GroupedKeyboard private constructor(
         letters: NineKeyLetters = NineKeyLetters.G14,
         wire: (Char) -> Int = Char::code,
         semicolon: Boolean = true,
-        /** Whether a layout's own groups are typed as such (pinyin's 14 and 18 keys); else they are gone by, as 双拼's. */
         ownGroups: Boolean = false,
-        /** A layout of the user's drawn in place of the app's (`id@stamp`, [BaseKeyboard.customLayout]); null for the app's. */
         custom: String? = null,
     ) : this(context, theme, letters, wire, semicolon, grouping(context, letters, ownGroups, custom = custom))
 
-    // whether [layout] is the one of the layout's own groups: not the app's own of its id, drawn where the engine
-    // refused the pack's (SceneBoard.ownLayout), whose keys are the built-in groups' and are typed as such
+    // not the app's own of its id, drawn where the engine refused the pack's (SceneBoard.ownLayout): those
+    // keys are the built-in groups'
     private fun ownOn(layout: SceneLayout?): Boolean = grouping.own != null && layout === grouping.layout
 
-    // the keys drawn are the layout's own groups'
     private val ownDrawn: Boolean get() = ownOn(drawnLayout)
 
-    // what the engine reads this keyboard's codes and record by: the built-in groups', or the layout's own; the
-    // built-in ones as the layout drawn writes them, equal to them (their codes) with each key's letters where
-    // they are on it (NineKeyLetters.rowsOf, for where a tap falls: review L4 S1)
+    // the built-in ones as the drawn layout writes them, with each key's letters where they are on it
+    // (NineKeyLetters.rowsOf, for where a tap falls)
     private val letters: NineKeyLetters get() = if (ownDrawn || drawnLayout === grouping.layout) grouping.letters else builtInLetters
 
-    // a layout's own groups' codes go as they are (NineKeyLetters.CUSTOM_BLOCK); the built-in ones' as [wire] has them
     private val wire: (Char) -> Int get() = if (ownDrawn) Char::code else builtInWire
 
-    // a layout's own groups shown as written, a `;` among them too
     private fun semicolonOn(layout: SceneLayout?): Boolean = builtInSemicolon || ownOn(layout)
 
-    // the layout's own groups in the engine's order: a layout's own key's code is its group's place among them
     private val groups: List<String> = grouping.letters.tag().split(',')
 
-    // a layout's own groups' keys, in the same order: the place of a key whose letters another key has too (review L3)
     private val ownIds: List<String> = grouping.layout?.takeIf { grouping.own != null }?.let { SceneGroups.ids(it.layout, it.fragments) }.orEmpty()
 
     companion object {
         const val Name14 = "Grouped14"
 
-        /** 双拼's 18 keys ([NineKeyLetters.G18]) under a scheme that types `;` (微软's ing): L; shows it. */
         const val Name18 = "Grouped18"
 
-        /** 双拼's 18 keys under any other scheme: L alone, as pinyin's, its code the same. */
         const val Name18Plain = "Grouped18Plain"
 
-        /** Pinyin's 18 keys: [NineKeyLetters.G18]'s groups, sent as [Keyboard.pinyin18Key]. */
         const val NamePinyin18 = "GroupedPinyin18"
 
-        /** 双拼's 14 keys: [NineKeyLetters.G14]'s groups, sent as [Keyboard.shuangpin14Key]. */
         const val NameShuangpin14 = "GroupedShuangpin14"
 
-        /**
-         * How a grouped keyboard types and draws its layout ([grouping]): [letters] what the engine reads its
-         * codes by, each key's letters as [layout] writes them ([NineKeyLetters.rowsOf]: across, or stacked
-         * down, the built-in groups' too), [own] a layout's own groups as written (null for the built-in
-         * ones), [layout] what is drawn.
-         */
         internal class Grouping(val letters: NineKeyLetters, val own: List<String>?, val layout: SceneLayout?)
 
-        /**
-         * The layout of the keyboard [builtIn] (G14, G18) as its source has it, its groups held to [builtIn]'s
-         * (SceneGroups.taken, 060-render-p3 T9b): [builtIn]'s; a layout's own where [own] lets them be; any other
-         * logged with why, and the layout as the app has it drawn instead ([SceneLayouts.builtIn]), the block gone by.
-         */
         internal fun grouping(context: Context, builtIn: NineKeyLetters, own: Boolean, log: Boolean = true, custom: String? = null): Grouping {
             val id = layoutOf(builtIn)
-            // a layout of the user's that does not read or is refused: the app's drawn (logged as it was read)
             val shown = custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, id) ?: return Grouping(builtIn, null, null)
             return when (val taken = SceneGroups.taken(shown.layout, builtIn, own, shown.fragments)) {
-                // equal to [builtIn], its letters' rows the layout's (NineKeyLetters.custom)
                 SceneGroups.Taken.BuiltIn -> Grouping(NineKeyLetters.custom(SceneGroups.written(shown.layout, shown.fragments)), null, shown)
                 is SceneGroups.Taken.Own -> Grouping(taken.letters, taken.written, shown)
                 is SceneGroups.Taken.Refused -> {
-                    // a settings page asks on each refresh ([KeyboardLabels]): the keyboard made logs it
+                    // a settings page asks on each refresh ([KeyboardLabels]): only the keyboard made logs it
                     if (log) Timber.e("scene layout %s: %s", id, taken.why)
                     Grouping(builtIn, null, SceneLayouts.builtIn(context, id))
                 }
             }
         }
 
-        private const val SIDE = 0.15f
-
-        /**
-         * How [letters]' groups lie: the groups in each of the three rows, a row's key widths, and their corners;
-         * the keyboard's name in a theme ([board]) and its keys' shortcuts' ([preset]).
-         */
-        private class Shape(val rows: List<Int>, val widths: List<Float>, val corners: List<String>, val board: String, val preset: String)
-
-        private fun shapeOf(letters: NineKeyLetters) = when (letters) {
-            NineKeyLetters.G14 -> Shape(listOf(5, 5, 4), listOf(0.2f, 0.2f, 0.175f), KeyDefaults.CORNERS14, KeyNames.K14, KeyShortcutPreset.GROUPED14)
-            // seven on top as wide as each other, six under them, five between the separator and backspace
-            NineKeyLetters.G18 -> Shape(listOf(7, 6, 5), listOf(1f / 7, 1f / 6, 0.14f), KeyDefaults.CORNERS18, KeyNames.K18, KeyShortcutPreset.GROUPED18)
-            else -> error("no grouped keyboard of ${letters.tag()}")
-        }
-
-        // the separator's label: 九键's 1 while typing
-        private const val SEPARATOR = "分词"
-
-        /** A group's code as the engine reads it: a Unicode character, as 九键's syllables are sent. */
         internal fun code(c: Char, wire: (Char) -> Int = Char::code) = KeyAction.SymAction(KeySym(UNICODE + wire(c)), KeyStates.Virtual)
 
         /**
-         * [action], a group's [code], as tapped at [at] across its key ([Keyboard.tapKey]) where its
-         * layout has the group lean ([leaning]: its key's lean=, 060-render-v2 §15) and the engine
-         * places a tap of its code (the 14 keys' and a layout's own groups', and pinyin's 18 keys' as
-         * [Keyboard.pinyin18Tap]: 双拼's 18 keys, the same codes, send the code, 061-neighbour-18key); a key
-         * of one letter too where any group leans, for a slip from it onto one that does.
-         * A layout's own group's code goes with where [down] the key it fell too (060-render-p3 T9b), its
-         * cell the scene's; a click no touch made (NaN), its code alone. A built-in group's two letters a
-         * layout stacks ([letters]' [NineKeyLetters.rowsOf]: Q over W) go by [down] instead of [at]: the
-         * engine and [Keyboard.typedLetter] read a built-in code's place as along its letters, the first
-         * at 0, so the top one is the first (review L4 S1).
+         * A built-in group the layout stacks (Q over W) goes by [down]: the engine reads a built-in code's place along
+         * its letters, so the top one is first. A click no touch made (NaN) is the code alone.
          */
         internal fun tapped(action: KeyAction, at: Float, letters: NineKeyLetters, leaning: Set<String>, down: Float = Float.NaN): KeyAction {
             val sym = (action as? KeyAction.SymAction)?.sym?.sym ?: return action
@@ -210,8 +116,7 @@ class GroupedKeyboard private constructor(
             // pinyin's 18 keys' code past the BMP (Keyboard.PINYIN_18): its G18 code
             val pinyin18 = Keyboard.keyedChar(wired)?.takeIf { wired in Keyboard.PINYIN_18 }
             val c = pinyin18 ?: wired.takeIf { it in 0..Char.MAX_VALUE.code }?.toChar() ?: return action
-            // a key of one letter (Q, A, the 18 keys' L; …) weighs nothing of its own, but where it was tapped
-            // weighs the letters of a key it slipped from onto (T9Segmenter): placed where any group leans
+            // a one-letter key weighs nothing itself, but where it was tapped weighs a key it slipped from (T9Segmenter)
             val placed = pinyin18 != null || Keyboard.placesTaps(c)
             val leans = letters.isCode(c) && placed && (letters.letters(c) in leaning || leaning.isNotEmpty() && !letters.weighs(c))
             val own = c.code in NineKeyLetters.CUSTOM_BLOCK
@@ -223,92 +128,18 @@ class GroupedKeyboard private constructor(
             return action.copy(sym = KeySym(UNICODE + sent), states = KeyStates.Virtual)
         }
 
-        // a digit as a keypad's, as 九键's swipe sends it: typed, or its candidate picked while typing
-        private fun corner(text: String): KeyAction = text.single().let { c ->
-            if (c in '0'..'9') {
-                KeyAction.SymAction(KeySym(FcitxKeyMapping.FcitxKey_KP_0 + (c - '0')), KeyStates.Virtual)
-            } else {
-                KeyAction.HostKeyAction(text)
-            }
+        internal fun layoutOf(letters: NineKeyLetters): String = when (letters) {
+            NineKeyLetters.G14 -> KeyNames.K14
+            NineKeyLetters.G18 -> KeyNames.K18
+            else -> error("no grouped keyboard of ${letters.tag()}")
         }
 
-        // named by its place ([name], r1c1…): the same key whatever letters a scheme puts on it
-        @Suppress("LongParameterList")
-        private fun groupKey(form: String, group: String, code: Char, corner: String, width: Float, wire: (Char) -> Int, name: String): KeyDef {
-            return KeyDef(
-                KeyDef.Appearance.AltText(displayText = group.uppercase(), altText = corner, textSize = 20f, percentWidth = width),
-                setOf(
-                    KeyDef.Behavior.Press(code(code, wire)),
-                    KeyDef.Behavior.Swipe(corner(corner)),
-                ),
-                arrayOf(KeyDef.Popup.AltPreview(group.uppercase(), corner)),
-                name = name,
-                // its letters, a `;` of 18's L; left off or not
-                shortcut = KeyShortcuts.charKey(form, group.lowercase().replace(";", "")),
-            )
-        }
-
-        /** The layouts their keys are drawn from (lib/keyboard-scene's k14.xml, k18.xml). */
-        internal fun layoutOf(letters: NineKeyLetters): String = shapeOf(letters).board
-
-        /** [letters]' groups as their keys show them: without `;` unless [semicolon]. */
         private fun groupsOf(letters: NineKeyLetters, semicolon: Boolean) =
             letters.tag().split(',').map { if (semicolon) it else it.replace(";", "") }
 
         /**
-         * The keys: [letters]' groups in their rows, each with its corner (their names, the images a theme
-         * gives them: the scene draws and wires the keys), sent as [wire] has them; a group's `;` left off but with [semicolon].
-         */
-        internal fun layout(letters: NineKeyLetters, wire: (Char) -> Int = Char::code, semicolon: Boolean = true): List<List<KeyDef>> {
-            val groups = groupsOf(letters, semicolon)
-            val shape = shapeOf(letters)
-            val first = shape.rows.runningFold(0, Int::plus)
-            fun row(r: Int) = (first[r] until first[r + 1]).map {
-                groupKey(
-                    shape.preset,
-                    groups[it], letters.codes[it], shape.corners[it], shape.widths[r], wire, "r${r + 1}c${it - first[r] + 1}",
-                )
-            }
-            return listOf(
-                row(0),
-                row(1),
-                listOf(
-                    KeyDef(
-                        KeyDef.Appearance.Text(
-                            SEPARATOR, 16f, percentWidth = SIDE,
-                            variant = KeyDef.Appearance.Variant.Alternative,
-                            contentDescription = R.string.a11y_key_separator,
-                        ),
-                        // while typing the separator; else the full keyboard's ', typed by the app
-                        setOf(KeyDef.Behavior.Press(KeyAction.HostKeyAction("'"))),
-                        name = "apostrophe",
-                        shortcut = "separator",
-                    ),
-                ) + row(2) + BackspaceKey(SIDE),
-                bottomRow(),
-            )
-        }
-
-        /** The bottom row, the zhuyin keyboards' too: 符 123 , (or the address keys) space . 中/英 return. */
-        internal fun bottomRow(): List<KeyDef> = listOf(
-            LayoutSwitchKey("符", PickerWindow.Key.Symbol.name, 0.12f, longPress = KeyAction.QuickPhraseAction),
-            LayoutSwitchKey("123", NumberKeyboard.Name, 0.12f, longPress = KeyAction.UnicodeAction),
-            SymbolKey(",", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_comma, shortcut = "comma"),
-            AddressKey("/", R.id.button_slash),
-            AddressKey("@", R.id.button_at),
-            // what is left of the row: at least 0.15 in every field (no 中/英: the space needs the width)
-            SpaceKey(),
-            SymbolKey(".", 0.1f, KeyDef.Appearance.Variant.Alternative, viewId = R.id.button_period, shortcut = "period"),
-            AddressKey(".", R.id.button_dot),
-            AddressKey(AddressKeys.DOMAINS.first(), R.id.button_domain, 0.14f, AddressKeys.DOMAINS),
-            LanguageKey(),
-            ReturnKey(),
-        )
-
-        /**
-         * What [action] from [source] types: a letter or digit of a long press committed as it is
-         * (as 九键's): what is typed goes in first, and an ASCII letter sent as a key would be the
-         * hardware keyboard's, full pinyin's. Anything else as it is.
+         * A long press's letter or digit is committed as it is (as 九键's): an ASCII letter sent as a key would
+         * be the hardware keyboard's, full pinyin's.
          */
         internal fun resolve(action: KeyAction, source: KeyActionListener.Source): KeyAction {
             if (source != KeyActionListener.Source.Popup) return action
@@ -317,29 +148,15 @@ class GroupedKeyboard private constructor(
         }
     }
 
-    /** What the bottom row has either side of the space, as the field is: as the full keyboard's ([AddressKeys]). */
     override var address: AddressKeys = AddressKeys.NONE
         set(value) {
             field = value
             canvas?.invalidateScene()
         }
 
-    private val showLangSwitchKey = AppPrefs.getInstance().keyboard.showLangSwitchKey
-
-    @Keep
-    private val showLangSwitchKeyListener = ManagedPreference.OnChangeListener<Boolean> { _, _ ->
-        canvas?.invalidateScene()
-    }
-
-    init {
-        showLangSwitchKey.registerOnChangeListener(showLangSwitchKeyListener)
-    }
-
-    // the groups' keys where the scene draws them: each key's letters= (060-render-v2 §15), its first letter's
     private fun groupPlaces(): List<Pair<Char, ScenePlace>> =
         canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id, k.copy == 1) } }
 
-    // no glide: a stroke drawn alone (笔画筛选), over the group keys, each its first letter's
     override val glide = glideInput(
         letters = { groupPlaces() },
         enabled = { false },
@@ -347,20 +164,17 @@ class GroupedKeyboard private constructor(
 
     override val strokesDrawn get() = true
 
-    // each group key, as its code is read by the engine (061-neighbour-correction, 061-neighbour-groups): the group's code
-    // itself, not what [wire] sends it as. Pinyin's 18 keys' and 双拼's 14 keys' wire is past the BMP (Keyboard.keyedChar
-    // reads it back as the code), which as a Char was another character, no key the engine reads
+    // the group's code itself, not what [wire] sends: pinyin 18's and 双拼 14's wire is past the BMP, no
+    // key the engine reads as a Char
     override fun typingKeys(): List<Pair<Char, KeyRef>> = canvas?.shownKeys.orEmpty().mapNotNull { k ->
         k.letters?.let { l -> codeOf(l.group, k.id)?.let { it to KeyRef(k.id, k.copy == 1) } }
     }
 
-    // a built-in group's codes whose letters the layout stacks: their taps go by where down they fell ([tapped]), a
-    // slip onto them alike (review L4); a layout's own groups' codes carry both dimensions, their rows the engine's
+    // their taps go by where down they fell ([tapped]); a layout's own codes carry both dimensions
     override fun stackedKeys(): Set<Char> = if (ownDrawn) emptySet() else letters.codes.filter { letters.rowsOf(it).size > 1 }.toSet()
 
-    // the code of the key [id] of [group]'s letters: the built-in keyboard's of its first letter (as always), a
-    // layout's own its key's place among the engine's groups (a letter may be on more than one key of its own,
-    // the same letters too); a key not found by its id (one of a when=, its id another's too), its group's first place
+    // a layout's own: its key's place among the engine's groups (a letter may be on more than one key); a key not
+    // found by id (one of a when=), its group's first place
     private fun codeOf(group: String, id: String): Char? = if (!ownDrawn) {
         letters.key(group[0])
     } else {
@@ -368,21 +182,16 @@ class GroupedKeyboard private constructor(
         place.takeIf { it >= 0 }?.let(letters.codes::get)
     }
 
-    // a group key's (letters=) code (060-render-v2 §15): the code of the engine's group its first letter is in,
-    // sent as [wire] has it (a tap's place added by [pressed]); its long press the resolver's, by its name
     override val sceneTable = object : SceneKeyDef.Table {
         override fun group(letters: String, node: KeyNode): KeyAction? = codeOf(letters, node.id)?.let { code(it, wire) }
     }
 
-    // the corners as the full keyboard's and the comma and full stop as typed: ， and 。 in Chinese, as
-    // BaseKeyboard's keysPunctuation has them (the address keys commit as they are, and say so)
+    // ， and 。 in Chinese, as keysPunctuation has them (the address keys commit as they are, and say so)
     private fun mapped(p: String) = keysPunctuation.getOrDefault(p, p)
 
-    // the bubbles as the letters' case and the punctuation have them; public for its test, which has no touch to open one
     public override fun onPopupAction(action: PopupAction) {
         val shown = when (action) {
             is PopupAction.PreviewAction -> action.copy(content = previewOf(cased(action.content), action.key, { it }, ::mapped))
-            // a swipe's shortcut named (words) shows as the user named it: the case rule is the letters'
             is PopupAction.PreviewUpdateAction -> if (action.shown) action
             else action.copy(content = previewOf(if (action.words) action.content else cased(action.content), action.key, { it }, ::mapped))
             else -> action
@@ -394,52 +203,30 @@ class GroupedKeyboard private constructor(
         super.onAction(resolve(action, source), source)
     }
 
-    // a tap as [tapped] reads it: a leaning group's code with where it fell (a swipe's own tap too, its clickAt set
-    // before the Up is sent), a key of one letter with it where any group leans; a click no touch made (TalkBack) as
-    // the code alone
     override fun pressed(key: KeyRef, clickAt: Float, clickDown: Float, action: KeyAction): KeyAction = tapped(action, clickAt, letters, leaning, clickDown)
 
-    // the groups whose taps lean (按落点加权): the layout's lean=, whichever draws the keys, its groups the
-    // keyboard's (060-render-v2 §15); a layout of other groups, or none read: as built in (SceneGroups.leaningOf)
+    // the layout's lean= (按落点加权); a layout of other groups, or none read: as built in (SceneGroups.leaningOf)
     private val leaning: Set<String> get() {
         val layout = drawnLayout ?: grouping.layout
         leaningKept?.takeIf { it.first === layout }?.let { return it.second }
         return SceneGroups.leaningOf(letters, layout?.layout, layout?.fragments.orEmpty()).also { leaningKept = layout to it }
     }
 
-    // [leaning] of the layout last drawn: the app's own in place of a pack's refused one has its own
     private var leaningKept: Pair<SceneLayout?, Set<String>>? = null
-
-    // Return as last shown: its icon on the scene's key too
-    private var returnAppearance = ReturnKeyAppearance.Enter
-
-    override fun onReturnDrawableUpdate(appearance: ReturnKeyAppearance) {
-        returnAppearance = appearance
-        canvas?.invalidateScene()
-    }
-
-    // the input method shown, for whether a stroke is drawn (笔画筛选)
-    private var imeName = ""
 
     override val keysIm: String get() = imeName
 
-    // 拼音键字母大小写 (made anew when it changes): the groups' faces and bubbles in capitals but where it says otherwise
     private val letterCase by AppPrefs.getInstance().keyboard.letterCase
     private val upper: Boolean get() = LetterCaseRule.upper(letterCase.case, Shift.None, shiftless = true)
 
-    // a group's letters in a bubble as the face has them; a corner as it is
     private fun cased(content: String) =
         if (content.isNotEmpty() && content.all { it.isLetter() || it == ';' }) LetterCaseRule.shown(content, upper) else content
 
     override fun onInputMethodUpdate(ime: InputMethodEntry) {
-        imeName = ime.uniqueName
+        super.onInputMethodUpdate(ime)
         showInputMethodName(ime)
-        canvas?.invalidateScene()
     }
 
-    // what the keys show now as the scene engine's environment (k14.xml's, k18.xml's and grouped-bottom.xml's
-    // when= and bindings): the 18 keys' L; under a scheme that types `;`, an address's keys, the language
-    // key, the space's microphone; the corners, the comma and the full stop as punctuation maps them
     override fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env {
         val state = TextBoardState(
             semicolonScheme = groupsOf(if (ownOn(layout)) grouping.letters else builtInLetters, semicolonOn(layout)).any { ';' in it },
@@ -448,37 +235,28 @@ class GroupedKeyboard private constructor(
             holdVoice = holdsToTalk,
         )
         val texts = Texts(
-            // the corners as said (Texts.alts by key name)
             alts = keyReadings(layout),
             imeName = shownImeName.orEmpty(),
             letterCase = letterCase.case,
             comma = mapped(","),
             period = mapped("."),
-            returnLabel = returnAppearance.label(context).toString(),
-            returnIcon = SceneIcons.returnName(returnAppearance.icon),
             confirm = context.getString(R.string.key_confirm),
             punctuation = keysPunctuation,
             // the formats as they are: the engine fills their places (getString with no arguments formats nothing)
             a11yGrouped = context.getString(R.string.a11y_key_grouped),
             a11ySpace = context.getString(R.string.a11y_key_space_with_ime),
-        )
+        ).withReturn()
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = state.input(), texts = texts, marks = keyMarks(layout))
     }
 
-    // a layout's own groups told the engine as this keyboard is shown, before any of its keys is tapped
-    // (KeyboardWindow attaches a keyboard as it makes it): a keyboard kept while another's own groups were
-    // shown tells its own again (EngineState.ownKeys). Not as it is made: one made and never shown (a
-    // preview) would change the groups the keyboard shown is read by. A built-in grouping leaves it as it is, on
-    // purpose (sticky): only a layout of its own sends the codes those groups read, so the stale ones read nothing.
-    // Nor where the engine refused the layout and the app's own of its id is drawn (SceneBoard.ownLayout): its keys
-    // send the built-in groups' codes, and the pack's groups told would be read by nothing typed here
+    // told before any key is tapped, and again by a keyboard kept while another's own groups were shown. Not as
+    // made: a preview never shown would change the groups. Nor where the engine refused the layout
     override fun onAttach() {
         super.onAttach()
         attached = true
         tellOwnKeys()
     }
 
-    // shown (onAttach) and not taken off since: a scene made then (onSceneBuilt) may tell the groups anew
     private var attached = false
 
     override fun onDetach() {
@@ -486,7 +264,6 @@ class GroupedKeyboard private constructor(
         super.onDetach()
     }
 
-    // the pack's groups told as it was shown, then its layout refused as the scene was made: taken back
     private fun tellOwnKeys() {
         val own = grouping.own ?: return
         if (ownDrawn) EngineState.ownKeys = own else if (EngineState.ownKeys === own) EngineState.ownKeys = null
@@ -497,7 +274,7 @@ class GroupedKeyboard private constructor(
         if (attached) tellOwnKeys()
     }
 
-    // last: the scene reads the state above (the keys drawn by the scene engine, each as its layout says)
+    // last: the scene reads the state above
     init {
         drawKeysWithScene(grouping.layout)
     }

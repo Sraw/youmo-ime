@@ -8,21 +8,15 @@ import android.content.Context
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
-/**
- * An input method's name in the app's language. fcitx names them in its own (the phone's, read as
- * it starts, while the app may speak another), and the app's own input methods in Chinese only;
- * an input method the app does not know keeps fcitx's name.
- */
+/** fcitx names input methods in the phone's language at its start (the app may speak another) and ours in Chinese only. */
 object InputMethodNames {
 
-    /** fcitx's English (US) keyboard: the engine's English, [InputMethodCatalog.ENGLISH], under the name fcitx gives it. */
     const val KEYBOARD = InputMethodCatalog.ENGLISH
 
-    // the other tables' ids are the keys of InputMethodCatalog.TABLES, which has a constant for Wubi alone: the test holds them together
+    // the other tables' ids are InputMethodCatalog.TABLES' keys: the test holds them together
     private val names = mapOf(
         InputMethodCatalog.PINYIN to R.string.im_pinyin,
-        // no input methods of their own: pinyin's and 双拼's keyboards, as a setting's "not for" names
-        // them (拼音 · 九键); 九键拼音, 0.4's input method, is pinyin's nine keys now (I1)
+        // no input methods of their own: pinyin's and 双拼's keyboards, as a setting's "not for" names them
         InputMethodCatalog.T9 to R.string.im_t9,
         InputMethodCatalog.PINYIN_KEYS18 to R.string.im_pinyin_keys18,
         InputMethodCatalog.PINYIN_KEYS to R.string.im_pinyin_keys,

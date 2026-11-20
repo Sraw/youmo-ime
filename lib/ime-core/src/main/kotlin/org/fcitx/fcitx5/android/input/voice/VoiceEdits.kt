@@ -8,109 +8,75 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.session.Action
 
 /**
- * 语音先问再记 (061-voice-learn-from-edits.md): what voice input put in the field ([said]), followed
- * as the user changes it, and a word of it deleted and typed again the same length, every character
- * read the same, tones and all, asked about: 「让语音记住『徐婧』？」. Nothing is learned here; the
- * user's tap adds the word by hand ([Engines.voiceRemember][org.fcitx.fcitx5.android.engine.runtime.Engines.voiceRemember]).
- *
- * Told every change the engines see, in order, on the engine's thread: voice's text with what was
- * read either side of the cursor once it was in ([said]), a Backspace the app took ([backspace]),
- * a commit of the engines' ([committed], pinyin's and handwriting's [typed] ones those an edit is
- * made of), anything else that went in ([putIn]), and the host's contexts ([context]). Kept on
- * [Engines][org.fcitx.fcitx5.android.engine.runtime.Engines], not a session: a word added drops
- * them all (review R8). Only in memory; whatever does not match ends it (CommitJournal's rule: not
- * sure, not asked).
- *
- * The field's text is followed as cells, one a UTF-16 unit, each what voice wrote there ([Cell.heard])
- * and what it is now; a stretch deleted is a gap ([gapAt], [gone]) that what is typed next fills.
+ * 语音先问再记: follows voice's text in the field and asks about a word of it deleted and retyped with the
+ * same readings, tones and all; the user's tap adds it ([Engines.voiceRemember][org.fcitx.fcitx5.android.engine.runtime.Engines.voiceRemember]).
+ * Told every change on the engine's thread; kept on Engines, not a session, since a word added drops them all.
+ * Memory only; anything that does not match ends it. The text is followed as cells, one a UTF-16 unit.
  */
 class VoiceEdits(
     private val words: Words,
     private val simplify: (String) -> String = { it },
 ) {
-    /** What the engine knows of the user's words and of characters, asked once an edit is made. */
     interface Words {
-        /** [c]'s readings, all of them ([VoiceHomophones.reading]), null for none */
         fun readings(c: Char): IntArray?
 
-        /**
-         * the user's words: added by hand, learned (not those used once), blocked. Read once an edit
-         * is made: what [takes] asks of for that edit is these (review S7: the table built once).
-         */
+        /** Read once an edit is made: [takes] asks of these, so the table is built once. */
         fun mine(): Mine
 
-        /** [text]'s reading as the dictionary spells it (`xu jing`), null if it cannot */
         fun pinyinOf(text: String): String?
 
-        /**
-         * Whether voice, with [word] read [pinyin] added by hand beside the user's words, [replacing]
-         * (one this window added, its prompt's [Ask.replaces]) taken off them, would put it in for
-         * [heard] at [at] in [text] (VoiceHomophones' rules, unchanged): asked only then.
-         */
+        /** Whether voice, with [word] added and [replacing] removed, would put it in for [heard] (VoiceHomophones' rules). */
         fun takes(text: String, at: Int, heard: String, word: String, pinyin: String, replacing: String?): Boolean
     }
 
     class Mine(val added: Set<String>, val learned: Set<String>, val blocked: Set<String>)
 
-    /**
-     * What to say: [word] read [pinyin] for voice to put in where it heard [heard]; [replaces], one
-     * this window's prompt added at the same place, taken off the added words as this one goes in
-     * (review M4). [hint]: no word, the once-only 「把整个词删掉重打，语音才能记住」 instead.
-     */
+    /** [replaces]: this window's earlier prompt at the same place, removed as this one goes in. [hint]: the once-only 「把整个词删掉重打，语音才能记住」. */
     class Ask(
         val word: String,
         val pinyin: String,
         val heard: String,
         val replaces: String?,
         val hint: Boolean,
-        // the cells it is over, by their ids: where a later one replaces it
         internal val cells: Set<Int> = emptySet(),
     )
 
-    /** What [putIn] answers: whether a window is still open, and what to ask (confirmed by [confirm] first). */
+    /** Whether a window is still open, and what to ask once [confirm]ed. */
     class Reply(val open: Boolean, val ask: Ask?)
 
     // [syllable]: the one the user typed for it (a pinyin commit's reading), -1 for none known
     private class Cell(val id: Int, val heard: Char, var now: Char, val syllable: Int = -1)
 
-    // null: no window
     private var cells: MutableList<Cell>? = null
     private var nextId = 0
 
-    // where the cursor is among [cells] (a gap's typed text counted in), -1 while not known: voice's
-    // text in, its anchor not read yet, or a Backspace over what cannot be counted
+    // -1 while not known: voice's anchor not read yet, or a Backspace over what cannot be counted
     private var cursor = -1
 
-    // the gap: what was deleted ([gone], in order) at [gapAt], what is typed into it so far
     private var gapAt = -1
     private val gone = ArrayList<Cell>()
     private val fill = StringBuilder()
 
-    // the syllable typed for each of [fill], -1 where none is known (handwriting's)
     private val fillSyllables = ArrayList<Int>()
 
     // the gap is a selection still in the field: typed over, it is what is replaced
     private var selection = false
 
-    // the engines' commits made while open, in order, for the app's report of each ([putIn]): each
-    // text, simplified, and the ask its edit made
+    // the engines' commits made while open, for the app's report of each ([putIn])
     private val claimed = ArrayDeque<Pair<String, Ask?>>()
 
-    // the ask the last report handed out, till the app's read [confirm]s it
+    // till the app's read [confirm]s it
     private var pending: Ask? = null
 
-    // the words asked about in this window: not asked again in it
     private val asked = HashSet<String>()
 
-    // the words this window's prompts added: by the cells they are over
     private val remembered = ArrayList<Pair<Set<Int>, String>>()
 
     val open: Boolean get() = cells != null
 
-    /** The once-only hint ([Ask.hint]) said already: not looked for (review S7). */
     var hinted = false
 
-    /** Nothing followed any more: learning off, another field, input finished. */
+    /** Learning off, another field, or input finished. */
     fun clear() {
         cells = null
         cursor = -1
@@ -121,11 +87,7 @@ class VoiceEdits(
         remembered.clear()
     }
 
-    /**
-     * One talk's text [text] in the field, [before] the cursor read once it was in (null: not read).
-     * Joined to the window's if it goes on at its end, else a window of its own; an anchor that does
-     * not match waits for the next [context] (review R6).
-     */
+    /** [before]: read once it was in (null: not read). Joins the window if it goes on at its end; a mismatched anchor waits for [context]. */
     fun said(text: String, before: String?) {
         val said = simplify(text)
         if (said.isEmpty()) return
@@ -136,7 +98,7 @@ class VoiceEdits(
             cursor = cells.size
             trim()
             pending = null
-            // what was typed before it and never reported (a talk on meanwhile) is no report to wait for
+            // what was typed before and never reported (a talk on meanwhile) is no report to wait for
             claimed.clear()
             return
         }
@@ -146,7 +108,6 @@ class VoiceEdits(
         cursor = if (read != null && endsWithPart(read, fieldText())) this.cells!!.size else -1
     }
 
-    // the last MAX_CHARS of it kept
     private fun trim() {
         val cells = cells ?: return
         val over = cells.size - MAX_CHARS
@@ -155,15 +116,11 @@ class VoiceEdits(
         if (cursor >= 0) cursor -= over
     }
 
-    /** A Backspace the app took (nothing typed): the character before the cursor deleted. */
     fun backspace() {
         val cells = cells ?: return
         pending = null
         if (cursor < 0) return clear()
-        // what a Backspace takes away of an emoji sequence is the editor's to say: where the unit it takes
-        // is one, the cursor is not known. The cells still hold what it took, so the next context finds
-        // no cursor in them and ends the window, as a Backspace before that does. Only that unit decides:
-        // an emoji elsewhere in the window changes nothing of what this one takes (R26 F8293)
+        // where the unit a Backspace takes is part of an emoji sequence, the editor decides: the cursor is unknown
         val taken = when {
             selection -> null
             fill.isNotEmpty() -> fill[fill.length - 1]
@@ -200,18 +157,11 @@ class VoiceEdits(
         }
     }
 
-    /**
-     * The engines committed [text]; [typed]: pinyin's or handwriting's, of the keys or the pen, not
-     * a prediction (联想) nor a table's (Q5); [reading]: the syllables typed for it (`xu jing`), null
-     * where not known (handwriting's), a word asked about read so (review S2). Into the gap it fills
-     * it; anything else, and anything but Chinese (a mark, a digit), ends the window. Told before the
-     * app puts it in: the app's report ([putIn]) comes after.
-     */
+    /** [typed]: from keys or pen, not 联想 nor a table's; [reading] the syllables typed. Anything but Chinese into the gap ends the window. */
     fun committed(text: String, typed: Boolean, reading: String? = null) {
         if (cells == null) return
         pending = null
         val t = simplify(text)
-        // a mark, a digit: no word typed again
         val typedChinese = typed && t.all(::han)
         if (cursor < 0 || gapAt < 0 || !typedChinese) return clear()
         selection = false
@@ -221,7 +171,7 @@ class VoiceEdits(
         else repeat(t.length) { fillSyllables += -1 }
         cursor = gapAt + fill.length
         if (fill.length > gone.size) return clear()
-        // the Chinese deleted typed again, what followed it (a sentence's mark) not yet: judged now (review S5)
+        // Chinese typed again with what followed it (a mark) not yet: judged now
         val chineseGone = gone.indexOfFirst { !han(it.now) }.let { if (it < 0) gone.size else it }
         if (fill.length < chineseGone || (fill.length < gone.size && fill.length != chineseGone)) {
             claimed.addLast(t to null)
@@ -230,8 +180,7 @@ class VoiceEdits(
         claimed.addLast(t to filled())
     }
 
-    // the gap's deleted cells back with what was typed into them, each keeping what voice wrote there; the
-    // rest of it, if any, still deleted: what to ask
+    // what was deleted and not refilled is what to ask
     private fun filled(): Ask? {
         val cells = cells ?: return null
         val at = gapAt
@@ -248,11 +197,7 @@ class VoiceEdits(
         return decide(at, n)
     }
 
-    /**
-     * The app put [text] in the field: an engine's commit told already ([committed]), or something
-     * else (punctuation, an emoji, a paste, 联想), which ends the window. With what to ask, if the
-     * edit it made has a word to: for the app to read the field and [confirm].
-     */
+    /** The app put [text] in: an engine's commit told already, or anything else, which ends the window. */
     fun putIn(text: String): Reply {
         if (cells == null) return Reply(false, null)
         val t = simplify(text)
@@ -265,10 +210,7 @@ class VoiceEdits(
         return Reply(true, head.second)
     }
 
-    /**
-     * The field [before] and [after] the cursor, read as the prompt is to show (review M6): [Ask]
-     * if they are as followed, else nothing, the window over.
-     */
+    /** Checked against the field as the prompt is to show: [Ask] if as followed, else the window ends. */
     fun confirm(before: String?, after: String?): Ask? {
         val ask = pending ?: return null
         pending = null
@@ -285,49 +227,39 @@ class VoiceEdits(
         return ask
     }
 
-    /** [ask]'s word added: one asked at the same place again takes its place (review M4). */
+    /** One asked at the same place again takes its place. */
     fun remembered(ask: Ask) {
         if (ask.hint) return
         remembered.removeAll { it.second == ask.replaces || it.second == ask.word }
         remembered += ask.cells to ask.word
     }
 
-    /** [word] taken off the added words again (its prompt's 撤销). */
     fun forgot(word: String) {
         remembered.removeAll { it.second == word }
     }
 
-    // [said] going on at the window's end, the cursor there, nothing being changed in it, [read] ending so
     private fun goesOn(cells: List<Cell>, read: String?, said: String): Boolean {
         if (gapAt >= 0 || cursor != cells.size) return false
         return read != null && endsWithPart(read, fieldText() + said)
     }
 
-    /**
-     * The host's context: the field [before] and [after] the cursor (or a selection), as
-     * [Action.Context][org.fcitx.fcitx5.android.engine.session.Action.Context] has them. The cursor
-     * found in the text followed, a stretch of it found deleted (a long press, a cut, Delete) or
-     * selected; else the window ends.
-     */
+    /** The cursor found in the followed text, a stretch found deleted or selected; else the window ends. */
     fun context(before: String, after: String?, selected: Boolean, editorSaid: Boolean, cleared: Boolean) {
         if (cells == null) return
         pending = null
         if (cleared || (before.isEmpty() && !editorSaid)) return clear()
         val b = simplify(before)
         val a = after?.let(simplify)
-        // a word typed into the gap part way: only where it goes on
         if (fill.isNotEmpty()) {
             if (selected || !at(b, a, fieldText(), cursor)) clear()
             return
         }
         val waiting = cursor < 0
-        // a selection not typed over, the cursor put elsewhere: its text is still there
         if (selection) restoreGap()
         val text = fieldText()
         if (selected) return selectedIn(deleted(b, a, text)?.takeUnless { waiting })
         val k = cursorIn(b, a, text)
         if (k >= 0) {
-            // the gap is kept only where the cursor still is
             if (gapAt >= 0 && k != gapAt) closeGap()
             cursor = k
             return
@@ -336,11 +268,9 @@ class VoiceEdits(
         deletedIn(deleted(b, a, text) ?: return clear())
     }
 
-    // [span] of the window selected (null: not found): taken out as a gap a word typed fills
     private fun selectedIn(span: Pair<Int, Int>?) {
         val cells = cells ?: return
         val (from, to) = span ?: return clear()
-        // a gap left as it was: what was deleted stays so
         closeGap()
         selection = true
         gapAt = from
@@ -348,7 +278,6 @@ class VoiceEdits(
         cursor = from
     }
 
-    // [span] of the window found deleted: the gap's, if it is beside it, else a gap of its own
     private fun deletedIn(span: Pair<Int, Int>) {
         val cells = cells ?: return
         val (from, to) = span
@@ -371,7 +300,6 @@ class VoiceEdits(
         cursor = gapAt
     }
 
-    // the field's text of the window as followed: a gap's typed text in it, a selection's too
     private fun fieldText(): String {
         val cells = cells ?: return ""
         val out = StringBuilder(cells.size + fill.length)
@@ -383,7 +311,6 @@ class VoiceEdits(
         return out.toString()
     }
 
-    // the deleted stays deleted: the gap forgotten, the cells as they are
     private fun closeGap() {
         gapAt = -1
         gone.clear()
@@ -392,29 +319,24 @@ class VoiceEdits(
         selection = false
     }
 
-    // a selection's cells back where they were
     private fun restoreGap() {
         val cells = cells ?: return
         cells.addAll(gapAt, gone)
         closeGap()
     }
 
-    // [k] the cursor in [text]: [b] ends with what is before it, [a] (if read) starts with what is after
     private fun at(b: String, a: String?, text: String, k: Int) =
         k in 0..text.length && endsWithPart(b, text.substring(0, k)) && (a == null || startsWithPart(a, text.substring(k)))
 
-    // where the cursor is in [text]: the one place both sides match; with nothing read after it, the
-    // furthest the text before it reaches. -1 for none, or more than one
+    // the one place both sides match; with nothing read after, the furthest the before-text reaches; -1 for none or several
     private fun cursorIn(b: String, a: String?, text: String): Int {
         if (a == null) return (text.length downTo 1).firstOrNull { endsWithPart(b, text.substring(0, it)) } ?: -1
         val found = (0..text.length).filter { at(b, a, text, it) }
         return found.singleOrNull() ?: -1
     }
 
-    // the stretch of [text], not empty, the field has not: [b] ends with what is before it, [a] starts with
-    // what is after. What is around the window is not known, so of those that fit, the one that keeps the
-    // most of it (a stretch of the window's end deleted with what follows fits as well); one keeping none
-    // of it is not told from the cursor put elsewhere
+    // of the stretches that fit, the one keeping most of the window (what surrounds it is unknown); one keeping
+    // none cannot be told from the cursor put elsewhere
     private fun deleted(b: String, a: String?, text: String): Pair<Int, Int>? {
         if (a == null) return null
         var best: Pair<Int, Int>? = null
@@ -435,7 +357,6 @@ class VoiceEdits(
         return best.takeIf { !tie }
     }
 
-    // an edit of [n] cells from [at] made: what to ask, if anything (§2.4, §3)
     private fun decide(at: Int, n: Int): Ask? {
         val cells = cells ?: return null
         val heard = String(CharArray(cells.size) { cells[it].heard })
@@ -450,17 +371,16 @@ class VoiceEdits(
         val spans = LinkedHashSet<IntRange>()
         // (a) the user's word over it, the longest
         ownOver(now, core, mine)?.let { spans += it }
-        // (b) 2–4 characters deleted: the changed ones first, then all typed (review R4)
+        // (b) 2–4 characters deleted: the changed ones first, then all typed
         if (n in 2..MAX_TYPED && y.all(::han)) {
             if (core.count() >= 2) spans += core
             spans += at until at + n
         }
         for (span in spans) asking(span, heard, now, mine)?.let { return it }
-        // one character typed again: the way to have it remembered said once, where it would work (review R2)
+        // one character typed again: say once how to have it remembered, where it would work
         return if (n == 1 && !hinted) hintAround(core.first, heard, now, mine) else null
     }
 
-    // the stretch of [x] (at [at] of the window) that [y] changed: the same characters at its ends left out
     private fun changed(x: String, y: String, at: Int): IntRange {
         val n = x.length
         var p = 0
@@ -470,7 +390,6 @@ class VoiceEdits(
         return at + p until at + n - s
     }
 
-    // the hint, if a word around the one character [c] typed again would be asked about
     private fun hintAround(c: Int, heard: String, now: String, mine: Mine): Ask? {
         val around = listOf(c - 1..c, c..c + 1, c - 2..c, c - 1..c + 1, c..c + 2)
         for (span in around) {
@@ -480,7 +399,6 @@ class VoiceEdits(
         return null
     }
 
-    // the longest word of the user's (added or learned) in [now] over [core], at most MAX_WORD characters
     private fun ownOver(now: String, core: IntRange, mine: Mine): IntRange? {
         for (len in MAX_WORD downTo maxOf(2, core.count())) {
             for (from in maxOf(0, core.last + 1 - len)..minOf(core.first, now.length - len)) {
@@ -491,7 +409,6 @@ class VoiceEdits(
         return null
     }
 
-    // [span] of the window asked about, if it passes every check of §3
     private fun asking(span: IntRange, heard: String, now: String, mine: Mine): Ask? {
         val w = now.substring(span.first, span.last + 1)
         val xw = heard.substring(span.first, span.last + 1)
@@ -500,16 +417,14 @@ class VoiceEdits(
         if (mine.blocked.any { it.isNotEmpty() && it in w }) return null
         val pinyin = pinyinOf(span, heard, now, w) ?: return null
         val ids = span.mapTo(HashSet()) { cells!![it].id }
-        // one added at the place before is off the words as this goes in: voice judged without it (review M4)
+        // voice is judged without the earlier one at the same place, which goes as this goes in
         val replaces = remembered.firstOrNull { (over, word) -> word != w && over.any(ids::contains) }?.second
         if (!words.takes(heard, span.first, xw, w, pinyin, replaces)) return null
         return Ask(w, pinyin, xw, replaces, hint = false, cells = ids)
     }
 
-    // [w]'s syllables: the one typed for a character where it is known and the character may read so (one
-    // changed: as what voice heard there reads too), else its reading where it has one, else the
-    // dictionary's for the word if it is among them. A typed syllable none of those readings has (a
-    // reading the tables lack) asks nothing: what it would add, voice could not hear as typed
+    // the typed syllable where the char may read so, else its reading, else the dictionary's for the word. A typed
+    // syllable none of those has asks nothing: voice could not hear it as typed
     private fun pinyinOf(span: IntRange, heard: String, now: String, w: String): String? {
         val cells = cells ?: return null
         val each = span.map { k ->
@@ -528,7 +443,7 @@ class VoiceEdits(
         return Syllables.spelled(syllables.size) { syllables[it] }
     }
 
-    // the readings [x] and [y] share, tones and all (one not known taken as any of its syllable)
+    // one not known taken as any of its syllable
     private fun same(x: Char, y: Char): List<Int> {
         val rx = words.readings(x) ?: return emptyList()
         val ry = words.readings(y) ?: return emptyList()
@@ -536,13 +451,11 @@ class VoiceEdits(
     }
 
     companion object {
-        /** what is kept of voice's text: its last characters */
         const val MAX_CHARS = 256
 
-        // as long as a word of the user's may be (VoiceHomophones' MAX_WORD)
+        // as VoiceHomophones' MAX_WORD
         private const val MAX_WORD = 12
 
-        // deleted and typed again, a word asked about whole (§3 b)
         private const val MAX_TYPED = 4
 
         // as VoiceHomophones.reading packs them: a syllable times 8 plus its tone
@@ -558,11 +471,10 @@ class VoiceEdits(
             it != Character.FORMAT.toInt() && it != Character.NON_SPACING_MARK.toInt() && it != Character.ENCLOSING_MARK.toInt()
         } && c !in '︀'..'️'
 
-        // [read] (what the host read before the cursor) ends with [s], or with as much of it as was read
+        // or with as much of [s] as was read
         internal fun endsWithPart(read: String, s: String) =
             if (read.length >= s.length) read.endsWith(s) else read.length >= READ_CHARS && s.endsWith(read)
 
-        // [read] (after the cursor) starts with [s], or with as much of it as was read
         internal fun startsWithPart(read: String, s: String) =
             if (read.length >= s.length) read.startsWith(s) else read.length >= READ_CHARS && s.startsWith(read)
     }

@@ -8,81 +8,70 @@ import org.fcitx.fcitx5.android.engine.learn.LearnRecord.Commit
 import java.io.IOException
 
 /**
- * The user's habits as a session sees them (PLAN §2.8): what it records a commit into and,
- * from step 1b, ranks by; never the log itself. [OFF] is U-93's 「用我的输入习惯」 off: nothing
- * learned, nothing of it read (blocked words stay blocked, as they live in `WordLists`); a
- * session made with one is made anew when the setting changes.
+ * The user's habits as a session sees them: what it records commits into and ranks by; never the log
+ * itself. [OFF] is 「用我的输入习惯」 off: nothing learned or read (blocked words stay, living in
+ * `WordLists`); sessions made with one are remade when the setting changes.
  */
 interface Habits {
-    /** Whether commits are learned. */
     val learns: Boolean
 
-    /** The typing day it is (PLAN §2.2 打字日). */
+    /** The typing day (打字日). */
     val today: Int
 
     fun record(rows: List<Row>, takes: List<Take> = emptyList(), flags: Int = 0): Commit?
 
-    /** A 联想 picked ([rows]) that went on with the whole phrase [continued] (U-73): a use of it whole. Each its own, none dropped by default. */
+    /** A 联想 pick ([rows]) continued with the whole phrase [continued]: a use of it whole. */
     fun recordContinued(rows: List<Row>, flags: Int, continued: String): Commit?
     fun pin(code: Code, text: String, reading: String, on: Boolean)
     fun forget(text: String)
 
-    /** Forgets the whole phrase [text] (U-73): its count, no word of that text. */
+    /** Forgets the whole phrase [text]: its count, no word of that text. */
     fun forgetPhrase(text: String)
 
-    /** A fault of learning's own ([e]), never the user's commit's: reported, and nothing more learned this run. */
+    /** A fault of learning's own, never the commit's: reported, and nothing more learned this run. */
     fun failed(e: RuntimeException) = Unit
 
-    /** How often [words] were used under [code] in the last 30 typing days. */
+    /** In the last 30 typing days. */
     fun uses(code: Code, words: Words): Int
 
-    /** How often [words] were corrected to under [code], while still in use there. */
+    /** While still in use there. */
     fun corrections(code: Code, words: Words): Int
 
-    /** The user's own first under [code] after [prev], if any. */
     fun first(code: Code, prev: String): Words?
 
     fun pinned(code: Code): Words?
 
-    /** The words used under [code] in the last 30 typing days, to put among the candidates where the decoder lacks them. */
+    /** Used under [code] in the last 30 typing days, to inject where the decoder lacks them. */
     fun used(code: Code): List<Words>
 
-    /** The commit that first used [words] under [code] (STAT's firstSeq), 0 if none or not known: what breaks a tie of uses. */
+    /** The commit that first used [words] under [code] (firstSeq), 0 if none or unknown: breaks ties of uses. */
     fun firstUse(code: Code, words: Words): Long
 
-    /** The commit [text] became the user's word in, or -1 if it is none of theirs: their words' order (U-10). */
+    /** The commit [text] became the user's word in, or -1: the order of their words. */
     fun mineOrder(text: String): Long
 
-    /** Whether anything is learned of [text]: what forgetting it would forget (U-84). */
+    /** Anything learned of [text]: what forgetting it would forget. */
     fun knows(text: String): Boolean
 
-    /** Where [text] goes among the imported words ([ImportedWords.order]), -1 if it is none. */
+    /** [ImportedWords.order], -1 if none. */
     fun importOrder(text: String): Long = -1L
 
-    /** Whether [text] is a word for [LastWord]: the user's. */
+    /** A word for [LastWord]: the user's. */
     fun isWord(text: String): Boolean
 
-    /**
-     * [words] across the spellings of one keyboard [kind] (U-20, D32 B): its uses in the last 30
-     * typing days under the codes spelling it in full, its corrections under the 简拼 ones ([SpelledForm]).
-     */
+    /** [words] across one keyboard [kind]'s spellings: uses (last 30 typing days) under codes spelling it in full, corrections under 简拼 ones ([SpelledForm]). */
     fun spelled(kind: String, words: Words): Spelled = Spelled.NONE
 
-    /** The words of [kind] with a count of [spelled], typed under codes whose first key is [first]: to put in where the decoder lacks them. */
+    /** [kind]'s words with a [spelled] count, typed under codes starting with [first]: to inject where the decoder lacks them. */
     fun spelledFrom(kind: String, first: Char): List<SpelledWord> = emptyList()
 
-    /** What [spelled] tells: uses spelt in full, corrections under 简拼. */
     data class Spelled(val fullUses: Int, val initialsCorrections: Int) {
         companion object {
             val NONE = Spelled(0, 0)
         }
     }
 
-    /**
-     * A word of [spelledFrom] with its [spelled] and its reading's syllables, worked out once a
-     * record as it is: each level of each key asks of every word under its first key, and a heavy
-     * user's split them all again there (S15 B5.1).
-     */
+    /** A [spelledFrom] word with its counts and syllables, computed once per record state: every level of every key asks for all words under its first key. */
     class SpelledWord(val words: Words, val spelled: Spelled) {
         val syllables: List<String> = words.reading.split(' ')
         val letters: Int = syllables.sumOf { it.length }
@@ -91,27 +80,27 @@ interface Habits {
     /** How often each syllable was taken for [digits] on the nine keys of [layout]. */
     fun bar(layout: String, digits: String): Map<String, Int>
 
-    /** Takes [commit] back (U-03), if it is one of the last few and in the tail: whether it was. */
+    /** Takes [commit] back if one of the last few and in the tail; whether it was. */
     fun undo(commit: Commit): Boolean = false
 
-    /** Which writing of the record this is ([LearnLog.rewrites]): another, and commits a session kept from before are not the record's. */
+    /** Which writing of the record this is ([LearnLog.rewrites]): on a change, commits a session kept are no longer the record's. */
     val rewrites: Long get() = 0
 
-    /** The pins under codes of [kind] and the user's firsts there of several characters: what the user's sentences keep (U-08, D33). */
+    /** Pins under [kind]'s codes and the user's multi-character firsts: what the user's sentences keep. */
     fun kept(kind: String): List<Kept> = emptyList()
 
-    /** [words] kept under [code]: a pin ([prev] null), or the user's first after [prev]. */
+    /** A pin ([prev] null), or the user's first after [prev]. */
     class Kept(val code: Code, val prev: String?, val words: Words)
 
-    // no defaults: a wrapper that forgot one would lose the user's blocks, or drop a block or a reset unsaid
+    // no defaults below: a wrapper that forgot one would silently lose the user's blocks or resets
 
-    /** The texts a table's [code] ([Kinds.table]) shows no more, blocked there alone (U-28). */
+    /** Texts blocked under a table's [code] ([Kinds.table]) alone. */
     fun blockedUnder(code: Code): Set<String>
 
     /** Blocks [text] under a table's [code] alone, or ([on] false) lets it show there again. */
     fun blockUnder(code: Code, text: String, on: Boolean)
 
-    /** 恢复码表顺序: forgets the order the table [im] learned, its uses and firsts; not its pins, nor its blocks. */
+    /** 恢复码表顺序: forgets table [im]'s learned order (uses, firsts); not its pins or blocks. */
     fun resetTableOrder(im: String)
 
     object OFF : Habits {
@@ -139,10 +128,9 @@ interface Habits {
 }
 
 /**
- * These habits as [HabitRanker] reads them: one view for every ranker, so none drifts from the
- * others (review R11 F2720). Without [pins] nothing is pinned (the tables, handwriting); without
- * [mine] the user's words are no tier (handwriting ranks characters); without [imports] neither
- * are the imported words.
+ * These habits as [HabitRanker] reads them: one view for every ranker so none drifts. Without [pins]
+ * nothing is pinned (tables, handwriting); without [mine] the user's words are no tier (handwriting ranks
+ * characters); without [imports] neither are imported words.
  */
 fun Habits.rankView(pins: Boolean = true, mine: Boolean = true, imports: Boolean = true): HabitRanker.View {
     val h = this
@@ -159,9 +147,8 @@ fun Habits.rankView(pins: Boolean = true, mine: Boolean = true, imports: Boolean
 }
 
 /**
- * [Habits] over [log], opened when first asked for (see [LearnLog.open]). A write that fails
- * other than on the disk (a bug of the record's) turns learning off for the run, reported to
- * [onError] once (review-1a-app S1): typing goes on as if it were off.
+ * [Habits] over [log], opened on first use ([LearnLog.open]). A write failing other than on disk (a
+ * record bug) turns learning off for the run, reported to [onError] once: typing goes on as if off.
  */
 class LogHabits(private val log: () -> LearnLog, private val onError: (IOException) -> Unit = {}) : Habits {
     private val state get() = log().state
@@ -225,8 +212,8 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
 
     override fun mineOrder(text: String) = state.mine[text]?.sinceSeq ?: -1L
 
-    // a long press's question, asked a few times a press (review-int-runtime N5): the texts the rows
-    // hold, gone through once a state as it is. A word imported is the user's to delete, typed or not (U-82, D13)
+    // asked a few times per long press: the texts the rows hold, gathered once per state. An imported word is
+    // the user's to delete, typed or not
     override fun knows(text: String): Boolean {
         val s = state
         return text in s.mine || s.imports.placesOf(text).isNotEmpty() || text in s.pending || text in s.wordUses || text in rowTexts(s)
@@ -255,8 +242,7 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
 
     override fun isWord(text: String) = text in state.mine
 
-    // read off the state's rows of the word, and of the keyboard and first key: no index to make
-    // again after each commit (R14 F3733)
+    // read off the state's rows for the word, keyboard and first key: no index rebuilt after each commit
     override fun spelled(kind: String, words: Words): Habits.Spelled {
         val s = state
         val keyboard = Kinds.keyboard(kind)
@@ -274,7 +260,7 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
         return if (uses == 0 && corrections == 0) Habits.Spelled.NONE else Habits.Spelled(uses, corrections)
     }
 
-    // spelledFrom's words by keyboard and first key, of the state as it is: each level of a key asks
+    // spelledFrom's words by keyboard and first key, per state: every level of a key asks
     private var fromOf: LearnState? = null
     private var fromAt = -1L
     private var fromDay = 0
@@ -294,12 +280,11 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
     }
 
     private fun spelledFrom(s: LearnState, kind: String, keyboard: String, first: Char): List<Habits.SpelledWord> {
-        // a digit on the nine keys: the words of each letter on its key
+        // a nine-key digit: the words of each letter on its key
         val firsts = SpelledForm.nineKeyLetters(keyboard, first).ifEmpty { first.toString() }
         val words = LinkedHashSet<Words>()
         for (c in firsts) for (stat in s.spelledFrom(keyboard, c).values) words += stat.words
-        // only those that move a word: walked each key, so none that would not. Their counts kept,
-        // as the keyboard has them (kind's own: the same keyboard's)
+        // only those that move a word: walked every key. Counts as the keyboard has them (kind's own)
         return words.mapNotNull { w ->
             spelled(kind, w).takeIf { it.fullUses >= HabitRanker.FULL_USES || it.initialsCorrections > 0 }?.let { Habits.SpelledWord(w, it) }
         }
@@ -309,13 +294,12 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
 
     override fun blockedUnder(code: Code): Set<String> = state.tableBlocks[Kinds.tableOf(code.kind) to code.keys].orEmpty()
 
-    // the bar's picks by their keys, worked out once a state as it is: asked each key of the nine
-    // keys (review-1b N7)
+    // the bar's picks by keys, once per state: asked on every nine-key key
     private var indexed: LearnState? = null
     private var indexedAt = -1L
     private var barsByKeys = emptyMap<Pair<String, String>, Map<String, Int>>()
 
-    // what sentences keep by kind, worked out once a state as it is: asked each key
+    // what sentences keep, by kind, once per state: asked every key
     private var keptOf: LearnState? = null
     private var keptAt = -1L
     private var keptByKind = emptyMap<String, List<Habits.Kept>>()
@@ -325,7 +309,7 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
         if (s !== keptOf || s.version != keptAt) {
             keptOf = s
             keptAt = s.version
-            // a character alone is the sentence's to read (得 pinned, wodeshu still 我的书): the user, 2026-10-21
+            // a lone character is the sentence's to read (得 pinned, wodeshu still 我的书)
             val all = s.pins.mapNotNull { (code, words) -> words.takeIf(::several)?.let { Habits.Kept(code, null, it) } } +
                 s.firsts.mapNotNull { (key, f) -> f.first?.takeIf(::several)?.let { Habits.Kept(key.code, key.prev, it) } }
             keptByKind = all.groupBy { it.code.kind }
@@ -347,8 +331,7 @@ class LogHabits(private val log: () -> LearnLog, private val onError: (IOExcepti
 }
 
 /**
- * How a session learns into the record: its [habits]; [kind], what its keys are filed under
- * ([Kinds]: 双拼's scheme; the nine keys' is their layout's, from the session's segmenter);
- * [simplify], traditional characters of the app's text to simplified ones ([Simplifier]).
+ * How a session learns into the record: [kind] files its keys ([Kinds]: 双拼's scheme; the nine keys'
+ * layout); [simplify] maps the app's traditional characters to simplified ([Simplifier]).
  */
 class LearnTo(val habits: Habits = Habits.OFF, val kind: String = Kinds.FULL, val simplify: (String) -> String = { it })

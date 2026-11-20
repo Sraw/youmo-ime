@@ -4,15 +4,15 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Row
 import org.fcitx.fcitx5.android.engine.learn.Word
-import org.fcitx.fcitx5.android.engine.session.pinyinDataOf
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** [HistoryLines]: the step `ime-eval --history` and the device's EngineEvalRunner share (R27 F8532). */
+/** [HistoryLines]: the step `ime-eval --history` and the device's EngineEvalRunner share. */
 class HistoryLinesTest {
 
     private val data = pinyinDataOf(

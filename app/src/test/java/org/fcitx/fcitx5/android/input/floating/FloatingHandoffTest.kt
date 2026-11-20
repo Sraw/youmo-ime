@@ -14,11 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * The docked keyboard's long press makes the input view anew under a finger still down: the
- * framework's own dispatch (not a fake) sends the old view a cancel as it is taken out, and the
- * rest of the touch to the frame, where the handoff passes it on.
- */
+/** The input view made anew under a finger still down: the framework sends the old view a cancel, the rest of the touch goes to the frame. */
 @RunWith(RobolectricTestRunner::class)
 class FloatingHandoffTest {
 
@@ -52,7 +48,6 @@ class FloatingHandoffTest {
         }
     }
 
-    // the finger down on the docked keyboard, held: the view made anew, as setInputView does
     private fun heldThenMadeAnew() {
         frame.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, 500f, 1900f))
         frame.removeAllViews()
@@ -69,7 +64,6 @@ class FloatingHandoffTest {
         assertEquals("the old view was told the touch is gone", listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_CANCEL), oldSaw)
         assertEquals(listOf(-20f to -100f, -10f to -50f), drags)
         assertEquals(listOf(true), drops)
-        // done: the next touch is nothing of the handoff's
         frame.dispatchTouchEvent(event(MotionEvent.ACTION_DOWN, 10f, 10f))
         frame.dispatchTouchEvent(event(MotionEvent.ACTION_UP, 10f, 10f))
         assertEquals(listOf(true), drops)
@@ -88,8 +82,7 @@ class FloatingHandoffTest {
         assertEquals(emptyList<Boolean>(), drops)
     }
 
-    // M1: a thumb (pointer 0) rests on a key while the other hand holds the grip (pointer 1); the frame
-    // gets the touch unsplit, both fingers in it
+    // a thumb (pointer 0) on a key while the other hand holds the grip (pointer 1), unsplit
     private fun fingers(action: Int, downTime: Long, vararg at: Triple<Int, Float, Float>): MotionEvent {
         val props = at.map { MotionEvent.PointerProperties().apply { id = it.first; toolType = MotionEvent.TOOL_TYPE_FINGER } }
         val coords = at.map { MotionEvent.PointerCoords().apply { x = it.second; y = it.third; pressure = 1f; size = 1f } }
@@ -124,8 +117,7 @@ class FloatingHandoffTest {
         assertEquals(listOf(true), drops)
     }
 
-    // MN-11 on redroid: adb's `input motionevent` sends each event on its own, each with its own
-    // down time, the gesture all the same; telling the touch by down time dropped the whole drag
+    // adb's `input motionevent` sends each event with its own down time: telling the touch by down time dropped the drag
     @Test
     fun movesEachWithTheirOwnDownTimeStillDragIt() {
         handOffTheSecondFinger()
@@ -136,8 +128,7 @@ class FloatingHandoffTest {
         assertEquals(listOf(true), drops)
     }
 
-    // S1: its end never came here; a new touch on the input view (the keys taking it) ends it, so a
-    // view made anew under a later touch never passes that touch on as this drag
+    // its end never came: a new touch on the input view ends it, so a later remade view never passes that on as this drag
     @Test
     fun aNewTouchOnTheInputViewEndsOneWhoseEndNeverCame() {
         handOffTheSecondFinger()
@@ -146,7 +137,6 @@ class FloatingHandoffTest {
         frame.dispatchTouchEvent(fingers(MotionEvent.ACTION_UP, 5L, Triple(1, 0f, 0f)))
         assertEquals(emptyList<Pair<Float, Float>>(), drags)
         assertEquals(emptyList<Boolean>(), drops)
-        // another frame's new touch is nothing of this one's
         handOffTheSecondFinger()
         FloatingHandoff.newTouch(FrameLayout(context))
         frame.dispatchTouchEvent(fingers(MotionEvent.ACTION_UP, 5L, Triple(1, 0f, 0f)))

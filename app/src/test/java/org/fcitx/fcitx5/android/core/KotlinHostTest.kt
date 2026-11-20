@@ -12,16 +12,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.UserDataManager
-import org.fcitx.fcitx5.android.data.UserDataOrigin
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
-import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -52,11 +49,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 
-/**
- * [KotlinHost] behind [HostApi], as the daemon starts it: its calls on the host thread, the settings pages' round trip through
- * androidengine.conf, the module files read again, and keys through the real host to a scripted
- * engine (the app's data is not on the JVM's classpath).
- */
+/** [KotlinHost] as the daemon starts it, keys going to a scripted engine (the app's data is not on the JVM classpath). */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KotlinHostTest {
@@ -72,7 +65,7 @@ class KotlinHostTest {
     @Before
     fun setUp() {
         home = File(appContext.filesDir, "kotlin-host").apply { deleteRecursively() }
-        // a fresh install each case: AppPrefs outlives a case's sandbox, with the last one's first run done
+        // AppPrefs outlives a case's sandbox, with the last one's first run done
         AppPrefs.getInstance().internal.firstRun.setValue(true)
         start()
     }
@@ -80,9 +73,9 @@ class KotlinHostTest {
     private fun start(side: (ScriptedEngine) -> KotlinHost.EngineSide = { it }) {
         engine = ScriptedEngine(home)
         val readies = events.list().count { it is HostEvent.Ready }
-        // the first run is the case's setUp's (or the case's own) to set: a restart is none
+        // the first run is the case's to set: a restart is none
         fcitx = startedHost(side(engine), firstRun = false) { host -> scope.launch { host.eventFlow.collect(events::add) } }
-        // isReady turns a few calls before Ready is emitted on the host thread: a slow runner read no event yet
+        // isReady turns a few calls before Ready is emitted
         until("the Ready event") { events.list().count { it is HostEvent.Ready } > readies }
     }
 
@@ -96,17 +89,15 @@ class KotlinHostTest {
         fcitx.stop()
         scope.cancel()
         home.deleteRecursively()
-        // the singleton's prefs outlive the test: a notice one left unseen is not the next one's
-        AppPrefs.getInstance().internal.nineKeysUnseen.setValue(false)
+        // the singleton's prefs outlive the test
         AppPrefs.getInstance().internal.themeLayoutsUnseen.setValue("")
         AppPrefs.getInstance().keyboard.pinyinKeyboard.run { setValue(defaultValue) }
-        AppPrefs.getInstance().internal.nineKeysMerged.run { setValue(defaultValue) }
         // published by the host, read by the keyboard window: not the next test's
         EngineState.traditionalIms = null
         EngineState.ownKeys = null
         NineKeyLetters.clearInUse()
         EngineNotices.sayer = null
-        // the notices it told till seen (nine keys merged) wait in the object: not the next class's to say
+        // they wait in the object: not the next class's to say
         EngineNotices.forgetToldOnce()
         directBoot(false)
     }
@@ -115,12 +106,10 @@ class KotlinHostTest {
     fun readyIsTheFirstEventAndPinyinLeadsTheGroupOnTheFirstRun() = runBlocking {
         assertTrue(events.list().first() is HostEvent.Ready)
         assertEquals(InputMethodCatalog.PINYIN, fcitx.enabledIme().first().uniqueName)
-        // UAT decision 6: no options file yet, so the engine is told the host options' defaults, which the
-        // engine replay's UatEngines.BASELINE reads too (but for 双拼's scheme)
+        // no options file yet: the host options' defaults, which UatEngines.BASELINE reads too (but for 双拼's scheme)
         assertEquals(EngineOptions().toSettings(), engine.settings.last())
     }
 
-    // a settings page reads every option of its input method and saves what it shows
     @Test
     fun anInputMethodsPageSavesReadsBackAndSurvivesARestart() = runBlocking {
         val page = fcitx.imOptions(InputMethodCatalog.PINYIN)!!
@@ -140,8 +129,7 @@ class KotlinHostTest {
         assertEquals(emptyList<PunctuationMapEntry>(), fcitx.punctuationMap("ja_JP"))
     }
 
-    // the keyboard's punctuation popups read it so (PunctuationManager.load); the built-in table is an
-    // app asset, not on the JVM's classpath: a user's file there is what is read (none is saved since 0.6.1)
+    // the built-in table is an app asset, not on the JVM classpath: a user's file is what is read
     @Test
     fun theUsersTableIsTheMapRead() = runBlocking {
         val table = listOf(PunctuationMapEntry("(", "（", ""), PunctuationMapEntry(",", "，", ""))
@@ -149,12 +137,9 @@ class KotlinHostTest {
         assertEquals("（", fcitx.punctuationMap(ZH_CN).first { it.key == "(" }.mapping)
     }
 
-    // contract: the files of installs upgraded from 0.3.2 and 0.4.0 as those builds wrote them (fcitx
-    // up to 0.3.2, the Kotlin host's same INI in 0.4.0, the last build with config/ and data/ on external
-    // storage; uat/fixtures/upgrade/v0.3.2/README.md steps 2, 3, 6, 9, v0.4.0's 2, 3, 6, 9): read in place,
-    // as the host reads them once ConfigHome has moved them (that move is ConfigHomeTest's). Each row is
-    // its own install; first run stays false as an upgrade's prefs have it, else the first run's move of
-    // pinyin to the group's head would hide a group read in the wrong order
+    // contract: the host's files as 0.3.2 and 0.4.0 wrote them (uat/fixtures/upgrade/*/README.md), read in place: the format
+    // later builds keep, not the upgrade from those builds (that goes through 0.6.2). Each row its own install; first run
+    // false as an upgrade's, else moving pinyin to the head would hide a group read in the wrong order
     @Test
     fun anUpgradedInstallsSettingsAreWhatItSet() = assertRows(listOf("v0.3.2", "v0.4.0"), { it }) { version ->
         runBlocking {
@@ -183,12 +168,7 @@ class KotlinHostTest {
 
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
-    /**
-     * A file the host keeps that it cannot read this run: [file] holds [text],
-     * the user is told [notice], [shown] is what the run has instead, and what [edit] saves from it (a row whose file
-     * has no setter to save through leaves it out) leaves the file as it was; [after] checks anything more once the
-     * file reads again.
-     */
+    /** A file the host cannot read this run: [notice] told, [shown] used instead, [edit]'s save leaves the file as it was; [after] checks more once it reads again. */
     private class Unreadable(
         val why: String,
         val file: () -> File,
@@ -199,7 +179,7 @@ class KotlinHostTest {
         val after: suspend () -> Unit = {},
     )
 
-    // A4: a file there that cannot be read is not its defaults: it is never written over this run, and the user is told
+    // a file there that cannot be read is not its defaults: never written over this run, the user told
     @Test
     @Uat("PR-42")
     fun anUnreadableFileIsNeverWrittenOverAndTheUserIsTold() {
@@ -264,8 +244,7 @@ class KotlinHostTest {
         }
     }
 
-    // A4: the config or fcitx's data not moved yet and the external storage away
-    // (ConfigHome.Problem.EXTERNAL_AWAY): read, nothing written, the user told
+    // not moved yet and the external storage away: read, nothing written, the user told
     @Test
     @Uat("PR-42")
     fun filesNotSettledAreReadButNotWrittenAndTheUserIsTold() = assertRows(
@@ -319,9 +298,8 @@ class KotlinHostTest {
         }
     }
 
-    // a stat that fails (the external storage's FUSE) reads as no file: the defaults loaded and written
-    // over it at the next change. Held instead, the user told; a file truly not there is the defaults, written
-    // [file]: where the row's host writes the config when not the home's, checked there
+    // a failed stat (external storage's FUSE) reads as no file, so the defaults would be written over it: held, told.
+    // [file]: where the row's host writes the config when not the home's
     private class StatCase(
         val why: String,
         val prepare: () -> Unit,
@@ -331,11 +309,9 @@ class KotlinHostTest {
         val file: (() -> File)? = null,
     )
 
-    // F4897: a config whose stat failed was taken for no file and the defaults written over it
     @Test
     fun aConfigFileNotStattedIsHeld() {
-        // these rows take a directory's search permission away, which root keeps: checked once
-        // here, as a skip (F4987), not a row that passes having checked nothing
+        // these rows remove a directory's search permission, which root keeps: a skip there, not a pass that checked nothing
         val probe = File(home, "probe").apply { mkdirs() }
         assumeTrue("a directory not searchable (not as root)", probe.setExecutable(false) && !probe.canExecute())
         probe.setExecutable(true)
@@ -343,7 +319,7 @@ class KotlinHostTest {
         statRows(permissionRows)
     }
 
-    // the rows that change no permission bits run as root too (F5004)
+    // the rows that change no permission bits run as root too
     @Test
     fun aConfigNotThereIsTheDefaultsAndAHomeNotMovedIsHeld() = statRows(otherRows)
 
@@ -361,7 +337,7 @@ class KotlinHostTest {
         StatCase("the home not moved and not there (its storage away): held, never the defaults written",
             prepare = {}, held = true,
             side = { s -> object : KotlinHost.EngineSide by s { override fun config() = HostConfig(File(home, "away"), writable = true, ConfigHome.Problem.NOT_MOVED) } },
-            // F4976: checked where this host writes, not the moved home's file a deleted home never has
+            // checked where this host writes, not the moved home's file a deleted home never has
             file = { File(home, "away/${EngineOptions.PATH}") }),
     )
 
@@ -395,7 +371,7 @@ class KotlinHostTest {
         }
     }
 
-    // held through a file that did not read, then found cleanly gone at a reload: the defaults, safe to write again
+    // found cleanly gone at a reload: the defaults, safe to write again
     @Test
     fun aHeldConfigFoundGoneAtAReloadIsWrittenAgain() = runBlocking {
         fcitx.stop()
@@ -423,7 +399,7 @@ class KotlinHostTest {
         val check: suspend KotlinHost.() -> Unit,
     )
 
-    // a reload's new table, config and status are one event: the status sent once, with the new marks (S7a)
+    // one event: the status sent once, with the new marks
     @Test
     fun reloadConfigSendsTheStatusOnce() = runBlocking {
         fcitx.activate(1, "org.example")
@@ -446,7 +422,7 @@ class KotlinHostTest {
         fcitx.activate(1, "org.example")
         fcitx.focus(true)
         assertEquals("fcitx-chttrans-inactive", trad().icon)
-        // what the keyboard's 注音 hint reads: the list as started, read again, toggled
+        // what the keyboard's 注音 hint reads
         assertEquals(emptySet<String>(), EngineState.traditionalIms)
         config(ModuleConfigs.CHTTRANS).apply { parentFile!!.mkdirs() }
             .writeText(ModuleConfigs.chttransText(null, setOf(InputMethodCatalog.PINYIN)))
@@ -463,24 +439,23 @@ class KotlinHostTest {
         fcitx.activate(1, "org.example")
         fcitx.setCapFlags(CapabilityFlags.DefaultFlags)
         fcitx.focus(true)
-        // told as the frontend tells a focused context's input method (androidfrontend.cpp:376-379)
+        // as androidfrontend tells a focused context's input method
         assertEquals(InputMethodCatalog.PINYIN, fcitx.inputMethodEntryCached.uniqueName)
         events.clear()
         "nihao".forEach { fcitx.sendKey(it, 0u, 0, false, 0) }
         val list = events.list().filterIsInstance<HostEvent.Candidates>().last()
         assertEquals(ScriptedEngine.WORDS, list.candidates.map { it.text })
         assertEquals("nihao", fcitx.inputPanelCached.preedit.toString())
-        // kept for a view made anew (A2): the list as the bar last had it
+        // kept for a remade view
         assertEquals(list, fcitx.candidatesCached)
         fcitx.select(0, null)
         assertEquals("你好", events.list().filterIsInstance<HostEvent.Commit>().single().text)
-        // the panel cleared after the commit, as the addon's show() of an empty snapshot clears it
+        // as the addon's show() of an empty snapshot clears it
         assertEquals("", fcitx.inputPanelCached.preedit.toString())
         assertEquals(0, events.list().filterIsInstance<HostEvent.Candidates>().last().candidates.size)
         assertEquals(0, fcitx.candidatesCached.candidates.size)
     }
 
-    // the hardware keyboard's page in place of the bulk list: the list the bar had is no longer the engine's
     @Test
     fun aPageSentDropsTheCachedListAndAListThePage() = runBlocking {
         fcitx.activate(1, "org.example")
@@ -498,8 +473,7 @@ class KotlinHostTest {
         assertEquals(ScriptedEngine.WORDS, fcitx.candidatesCached.candidates.map { it.text })
     }
 
-    // A2 review: a view made anew after a restart (the app's language changed) before the new host
-    // speaks replays the caches; the stopped one's code row and candidates are not shown again
+    // a view remade after a restart before the new host speaks replays the caches: not the stopped one's
     @Test
     fun aStoppedHostLeavesNothingCachedToReplay() = runBlocking {
         fcitx.activate(1, "org.example")
@@ -518,9 +492,7 @@ class KotlinHostTest {
         start()
     }
 
-    // PR-10: a restore stops the host (its pending writes flushed), replaces the settings files and
-    // starts the app again (BackupFragment.kt:71-82); the host started then reads the backup's, a file
-    // the backup has not (pruned, UserDataManager.pruneAbsent) at its default
+    // a restore flushes and stops the host, replaces the files and restarts (BackupFragment); a file the backup lacks reads as default
     @Test
     fun aRestoredBackupsSettingsAreWhatTheNextStartReads() = runBlocking {
         suspend fun pageSize() = fcitx.imOptions(InputMethodCatalog.PINYIN)!!["PageSize"]
@@ -533,7 +505,7 @@ class KotlinHostTest {
             other.deleteRecursively()
             start()
         }
-        // set on the phone after the backup was made and not yet on disk: stop() writes it, the restore replaces it
+        // set after the backup and not yet on disk: stop() writes it, the restore replaces it
         setPageSize("9")
         restore("external/config/${EngineOptions.PATH}" to "PageSize=5\n")
         assertEquals("5", pageSize())
@@ -543,86 +515,7 @@ class KotlinHostTest {
         assertEquals("7", pageSize())
     }
 
-    // 0.4's profile with 拼音 and 九键拼音 both on, 九键拼音 the default (NineKeysMergeTest has every case)
-    private val zeroFourProfile = """
-        [Groups/0]
-        Name=Default
-        Default Layout=us
-        DefaultIM=${InputMethodCatalog.PINYIN}
-
-        [Groups/0/Items/0]
-        Name=${InputMethodCatalog.T9}
-
-        [Groups/0/Items/1]
-        Name=${InputMethodCatalog.PINYIN}
-
-        [Groups/0/Items/2]
-        Name=${InputMethodCatalog.ENGLISH}
-
-        [GroupOrder]
-        0=Default
-
-    """.trimIndent()
-
-    // SET-13: an upgrade from 0.4 with both pinyins on: one pinyin on the nine keys, the profile written
-    // without the old name, the user told once; the next start has nothing to merge, says nothing
-    @Test
-    @Uat("SET-13")
-    fun zeroFoursNineKeysPinyinBecomesPinyinsKeyboardAndTheUserIsToldOnce() = runBlocking {
-        val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
-        val merged = AppPrefs.getInstance().internal.nineKeysMerged
-        zeroFourInstalled()
-        val steady = HostLog<Boolean>()
-        EngineNotices.sayer = EngineNotices.Sayer { message, isSteady -> said.add(message); steady.add(isSteady); true }
-        start()
-        idle()
-        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), fcitx.enabledIme().map { it.uniqueName })
-        assertEquals(PinyinKeyboard.NineKeys, keyboard.getValue())
-        assertTrue(merged.getValue())
-        assertEquals(listOf(appContext.getString(R.string.nine_keys_merged)), said.list())
-        // news, not a failure: the plain notice
-        assertEquals(listOf(false), steady.list())
-        fcitx.save()
-        assertFalse(config(PROFILE).readText(), InputMethodCatalog.T9 in config(PROFILE).readText())
-        said.clear()
-        restart()
-        idle()
-        assertEquals(emptyList<String>(), said.list())
-        assertEquals(PinyinKeyboard.NineKeys, keyboard.getValue())
-        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), fcitx.enabledIme().map { it.uniqueName })
-    }
-
-    // review 2: the merge's notice queued as the host starts, the process ended before any keyboard showed
-    // (the user opened settings first, then swiped the app away): told at the next start, once it is seen
-    @Test
-    fun theMergesNoticeNotSeenIsToldAtTheNextStart() = runBlocking {
-        val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
-        val merged = AppPrefs.getInstance().internal.nineKeysMerged
-        val unseen = AppPrefs.getInstance().internal.nineKeysUnseen
-        val notice = appContext.getString(R.string.nine_keys_merged)
-        zeroFourInstalled()
-        // no keyboard: said nowhere
-        EngineNotices.sayer = EngineNotices.Sayer { _, _ -> false }
-        start()
-        idle()
-        assertTrue(merged.getValue())
-        assertTrue(unseen.getValue())
-        // the process gone: what waited in memory with it
-        fcitx.stop()
-        EngineNotices.forgetToldOnce()
-        listen()
-        start()
-        idle()
-        assertEquals(listOf(notice), said.list())
-        assertFalse(unseen.getValue())
-        said.clear()
-        restart()
-        idle()
-        assertEquals(emptyList<String>(), said.list())
-    }
-
-    // the theme packs' boards listed and chosen at the start (ThemeLayoutsToList, 061-custom-layout §11): what was made
-    // said as it is, once seen
+    // the theme packs' boards listed and chosen at the start (ThemeLayoutsToList): said once seen
     @Test
     @Uat("ST-175")
     fun theThemeLayoutsChosenAreToldOnce() = runBlocking {
@@ -638,111 +531,13 @@ class KotlinHostTest {
         assertEquals("", unseen.getValue())
     }
 
-    // a 0.4 install's files with both pinyins on, no merge done yet; the host stopped, listened to
-    private fun zeroFourInstalled() {
-        fcitx.stop()
-        home.deleteRecursively()
-        AppPrefs.getInstance().internal.firstRun.setValue(false)
-        AppPrefs.getInstance().keyboard.pinyinKeyboard.setValue(PinyinKeyboard.Full)
-        AppPrefs.getInstance().internal.nineKeysMerged.setValue(false)
-        config(PROFILE).apply { parentFile!!.mkdirs() }.writeText(zeroFourProfile)
-        EngineNotices.forgetToldOnce()
-        said.clear()
-        listen()
-    }
-
-    // the profile not written back (the config not writable): merged again as each start reads it, yet
-    // pinyin's keyboard left as the user set it since and nothing told again (Internal.nineKeysMerged)
-    @Test
-    fun aMergeNotWrittenBackIsNotDoneOverTheUsersKeyboard() = runBlocking {
-        val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
-        val notice = appContext.getString(R.string.nine_keys_merged)
-        val unwritable = { s: ScriptedEngine ->
-            object : KotlinHost.EngineSide by s {
-                override fun config() = HostConfig(File(home, "config"), writable = false, ConfigHome.Problem.EXTERNAL_AWAY)
-            }
-        }
-        zeroFourInstalled()
-        start(unwritable)
-        idle()
-        assertEquals(PinyinKeyboard.NineKeys, keyboard.getValue())
-        assertEquals(1, said.list().count { it == notice })
-        fcitx.save()
-        assertTrue(InputMethodCatalog.T9 in config(PROFILE).readText())
-        keyboard.setValue(PinyinKeyboard.Full)
-        said.clear()
-        fcitx.stop()
-        start(unwritable)
-        idle()
-        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), fcitx.enabledIme().map { it.uniqueName })
-        assertEquals(PinyinKeyboard.Full, keyboard.getValue())
-        assertEquals(0, said.list().count { it == notice })
-    }
-
-    // before the first unlock the config is none of the user's (HostConfigDir: no folder): nothing merged,
-    // set, written or told; the start after the unlock merges
-    @Test
-    fun inDirectBootNothingIsMergedTillTheUnlock() = runBlocking {
-        val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
-        val merged = AppPrefs.getInstance().internal.nineKeysMerged
-        zeroFourInstalled()
-        directBoot(true)
-        start { s -> object : KotlinHost.EngineSide by s { override fun config() = HostConfig(null, writable = false) } }
-        idle()
-        assertEquals(PinyinKeyboard.Full, keyboard.getValue())
-        assertFalse(merged.getValue())
-        assertFalse(appContext.getString(R.string.nine_keys_merged) in said.list())
-        assertEquals(zeroFourProfile, config(PROFILE).readText())
-        directBoot(false)
-        restart()
-        idle()
-        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), fcitx.enabledIme().map { it.uniqueName })
-        assertEquals(PinyinKeyboard.NineKeys, keyboard.getValue())
-        assertTrue(merged.getValue())
-    }
-
-    // PR-47: a 0.4 backup restored on 0.5 (the restore starts the app again, BackupFragment): its profile
-    // read as the upgrade reads it, pinyin on the nine keys again though the 26 keys were chosen since
-    @Test
-    @Uat("PR-47")
-    fun aZeroFourBackupRestoredMergesItsNineKeysPinyinAgain() = runBlocking {
-        val prefs = AppPrefs.getInstance()
-        val keyboard = prefs.keyboard.pinyinKeyboard
-        val raw = rawPrefs()
-        // merged on this phone before, the 26 keys chosen since
-        keyboard.setValue(PinyinKeyboard.Full)
-        prefs.internal.nineKeysMerged.setValue(true)
-        fcitx.stop()
-        val other = File(home.parentFile, "kotlin-host-restore").apply { deleteRecursively() }
-        val zeroFourPrefs = """<map><string name="pinyin_keyboard">Full</string><boolean name="english_on_nine_keys" value="true" /></map>"""
-        val dirs = dirsUnder(other, external = home, config = File(home, "config"))
-        val prefsFile = UserDataOrigin.preferencesFile(BuildConfig.APPLICATION_ID)
-        UserDataManager.import(backupZip("external/config/$PROFILE" to zeroFourProfile, "shared_prefs/$prefsFile" to zeroFourPrefs), dirs).getOrThrow()
-        assertEquals(zeroFourPrefs, File(dirs.sharedPrefs, prefsFile).readText())
-        other.deleteRecursively()
-        // the restore starts the app again, which reads those settings (a JVM test's prefs are in memory: as
-        // the file has them) and drops the retired ones (FcitxApplication), then the host merges
-        raw.edit(commit = true) {
-            remove(prefs.internal.nineKeysMerged.key)
-            putString(keyboard.key, "Full")
-            putBoolean("english_on_nine_keys", true)
-        }
-        prefs.dropRetired()
-        assertFalse(raw.contains("english_on_nine_keys"))
-        start()
-        idle()
-        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), fcitx.enabledIme().map { it.uniqueName })
-        assertEquals(PinyinKeyboard.NineKeys, keyboard.getValue())
-        assertTrue(prefs.internal.nineKeysMerged.getValue())
-    }
-
-    // a startup that throws reaches the thread's uncaught handler (the process ends), not the executor's silence (F3803)
+    // reaches the uncaught handler (the process ends), not the executor's silence
     @Test
     fun aStartupThatThrowsReachesTheUncaughtHandler() {
         fcitx.stop()
         val caught = CompletableFuture<Throwable>()
         val old = Thread.getDefaultUncaughtExceptionHandler()
-        // fcitx-main has no handler of its own: its group passes the throw to the default one
+        // fcitx-main has no handler of its own: its group passes the throw to the default
         Thread.setDefaultUncaughtExceptionHandler { _, e -> caught.complete(e) }
         try {
             val failing = object : KotlinHost.EngineSide by ScriptedEngine(home) {
@@ -753,8 +548,7 @@ class KotlinHostTest {
                 dead.start()
                 assertEquals("no engine", caught.get(WAIT_MILLIS, TimeUnit.MILLISECONDS).message)
             } finally {
-                // left STARTING, which stop() skips: its thread and clipboard listener would outlive
-                // the test and be seen by the next ones (process-wide counts, F4296)
+                // left STARTING, which stop() skips: its thread and clipboard listener would outlive the test
                 dead.tearDownFailedStart()
             }
         } finally {
@@ -763,7 +557,6 @@ class KotlinHostTest {
         start() // tearDown stops this one
     }
 
-    // a stop whose last step throws still ends STOPPED: the host starts again (F3799)
     @Test
     fun aStopWhoseCloseThrowsStillLetsTheHostStartAgain() {
         fcitx.stop()
@@ -783,16 +576,12 @@ class KotlinHostTest {
     private companion object {
         const val WAIT_MILLIS = 10_000L
         const val ZH_CN = "zh_CN"
-
-        // KotlinHost's profile, under the config home
-        const val PROFILE = "profile"
     }
 
     @Test
     fun wordBoundariesGoATextAtATimeAndStopWhenTheCallerGivesUp() {
         val texts = listOf("今天", "天气", "很好")
         val split = { t: List<String> -> t.associateWith { intArrayOf(0, it.length) } }
-        // the same as all at once
         val all = runBlocking { aTextAtATime(texts, split) }
         assertEquals(split(texts).mapValues { it.value.toList() }, all.mapValues { it.value.toList() })
         // the caller gone after the first: the rest are not split

@@ -21,10 +21,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.Timeout
 
-/**
- * Where what is typed shows is the input method's (androidengine's composesText, kept by the Kotlin
- * host): English's word in the app, every code above the candidates.
- */
+/** The input method decides where its code shows (androidengine's composesText): English's word in the app, every code above the candidates. */
 class HostPreeditTest {
 
     @get:Rule
@@ -55,10 +52,6 @@ class HostPreeditTest {
     @After
     fun restoreEnabledIME() = harness.afterTest()
 
-    /**
-     * In a field that takes composing text, English's word goes into it and pinyin's code above the
-     * candidates: the input method's, there being no fcitx-wide preedit option on the Kotlin host.
-     */
     @Test
     fun eachInputMethodsPreeditStaysWhereItPutsIt(): Unit = runBlocking {
         fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive, CapabilityFlag.Preedit))
@@ -83,10 +76,7 @@ class HostPreeditTest {
         }
     }
 
-    /**
-     * Quick phrase's and Unicode's code shows above the candidates in English too, started from the
-     * keyboard or by Ctrl+Shift+U, never in the app's text (androidengine's composesText).
-     */
+    /** Never in the app's text, whether started from the keyboard or by Ctrl+Shift+U. */
     @Test
     fun quickPhraseAndUnicodeCodeStayAboveTheCandidatesInEnglish(): Unit = runBlocking {
         fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive, CapabilityFlag.Preedit))
@@ -95,7 +85,7 @@ class HostPreeditTest {
             fcitx.activateIme(InputMethodNames.KEYBOARD)
             awaitQuiet()
             val triggers = listOf<Pair<String, suspend () -> Unit>>(
-                // the keyboard's is the search, what is typed after it; Ctrl+Shift+U's the code, "U+…"
+                // the keyboard's shows the search typed after it; Ctrl+Shift+U's the code, "U+…"
                 "keyboard's Unicode" to suspend { fcitx.triggerUnicode(); fcitx.sendKey('a') },
                 "Ctrl+Shift+U" to suspend { fcitx.sendKey("U", KeyState.Ctrl_Shift.state) },
                 "keyboard's quick phrase" to suspend { fcitx.triggerQuickPhrase(); fcitx.sendKey('a') }
@@ -116,7 +106,6 @@ class HostPreeditTest {
         }
     }
 
-    /** A shortcut turns the flag off for a code it may start; English's next word still goes in the app. */
     @Test
     fun englishsWordGoesInTheAppAfterAShortcut(): Unit = runBlocking {
         fcitx.setCapFlags(CapabilityFlags(CapabilityFlag.Sensitive, CapabilityFlag.Preedit))

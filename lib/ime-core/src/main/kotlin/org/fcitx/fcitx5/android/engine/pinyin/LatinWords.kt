@@ -6,17 +6,12 @@ package org.fcitx.fcitx5.android.engine.pinyin
 
 import org.fcitx.fcitx5.android.engine.data.PinyinDictionary
 
-/**
- * The Latin words of a dictionary, spelt with the Latin-letter syllables (iPhone as I'P'H'O'N'E,
- * the `latin` layer of lexicon/latin.words): what [PinyinSegmenter] looks for in what is typed,
- * in lower case, so `iphone` reaches iPhone. Words of one letter are left out, as every letter
- * typed would be one.
- */
+/** A dictionary's Latin words (iPhone as I'P'H'O'N'E), for [PinyinSegmenter] to find in lower-case input; one-letter words left out. */
 class LatinWords private constructor(private val dictionary: PinyinDictionary, val size: Int) {
 
-    /** The length of each word [input] spells from [at], two letters or more, in lower case. */
+    /** The length of each 2+-letter word [input] spells from [at]. */
     fun forEachAt(input: String, at: Int, visit: (length: Int) -> Unit) {
-        // down the dictionary's trie a letter at a time: a key press makes no string
+        // down the trie a letter at a time: a key press makes no string
         var node = dictionary.root
         var end = at
         while (end < input.length && input[end] in 'a'..'z') {
@@ -27,17 +22,15 @@ class LatinWords private constructor(private val dictionary: PinyinDictionary, v
     }
 
     companion object {
-        /** The letter syllable ([Syllables]' upper-case A to Z) of [c], a lower-case letter. */
+        /** [Syllables]' upper-case letter syllable for lower-case [c]. */
         fun syllable(c: Char): Int = FIRST + (c - 'a')
 
         private val FIRST = Syllables.id("A")
 
-        /** Whether [syllable] is a letter's. */
         fun isLetter(syllable: Int) = syllable in FIRST until FIRST + LETTERS
 
         private const val LETTERS = 26
 
-        /** The words of [dictionary] spelt with letter syllables alone. */
         fun of(dictionary: PinyinDictionary): LatinWords {
             var size = 0
             fun visit(node: Int, depth: Int) {
@@ -53,11 +46,7 @@ class LatinWords private constructor(private val dictionary: PinyinDictionary, v
     }
 }
 
-/**
- * The user's Latin words, as [LatinWords] are the dictionary's, for [PinyinSegmenter]: English's
- * learned words (U-31 §3), in lower case, which pinyin's model lists spelt by their letters.
- * Small, and [set] anew as English learns; read on the thread that sets it.
- */
+/** The user's Latin words (English's learned, lower case) for [PinyinSegmenter]; small, [set] anew as English learns, read on the setting thread. */
 class UserLatinWords {
     private class Node {
         val next = HashMap<Char, Node>(2)
@@ -66,7 +55,6 @@ class UserLatinWords {
 
     private var root = Node()
 
-    /** The words, in lower case. */
     var words: Set<String> = emptySet()
         private set
 
@@ -81,7 +69,6 @@ class UserLatinWords {
         }
     }
 
-    /** The length of each word [input] spells from [at], two letters or more, as [LatinWords.forEachAt]. */
     fun forEachAt(input: String, at: Int, visit: (length: Int) -> Unit) {
         var node = root
         var end = at

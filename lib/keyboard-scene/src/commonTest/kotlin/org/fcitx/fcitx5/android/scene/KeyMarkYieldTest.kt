@@ -17,12 +17,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The yield (rules B §7, 060-render-p2 S4e): a mark gives way in its own corner only, never smaller;
- * a class of glyphs one size, [KeyMarkYield.MAX_CLASS_SHRINK] smaller at most; what still meets left
- * out. A key here is a face [w] × [h] px at [d] px a dp, the yield's room 2 dp and 1 dp in, the marks'
- * edge a quarter dp in, a mark an 8 dp icon 2 dp and 1 dp in.
- */
+/** The yield: a mark gives way in its own corner only, never smaller; a class of glyphs one size; what still meets left out. */
 class KeyMarkYieldTest {
 
     private class Key(val w: Double, val h: Double, val d: Double, val radii: List<Double> = List(4) { 0.0 }) {
@@ -40,10 +35,8 @@ class KeyMarkYieldTest {
             return Ink(x, y, x + size, y + size)
         }
 
-        // a glyph [gw] × [gh] px in the middle
         fun glyph(gw: Double, gh: Double) = Ink((w - gw) / 2, (h - gh) / 2, (w + gw) / 2, (h + gh) / 2)
 
-        // a letter's: [glyph], smaller about its middle on its bottom, never moved
         fun letter(glyph: Ink, marks: List<Mark>) = Member(glyph, (glyph.left + glyph.right) / 2, glyph.bottom, marks, room, edge, moves = false)
     }
 
@@ -53,11 +46,9 @@ class KeyMarkYieldTest {
 
     private fun near(e: Double, a: Double, what: String) = assertTrue(abs(e - a) < 0.02, "$what: expected $e, was $a")
 
-    // a glyph as tall as the key, over the top right icon's room by [over] dp
     private fun tall(k: Key, over: Double) = Ink(k.room.left, -k.h / 8, k.room.right - k.size - 1.0 * k.d + over * k.d, k.h * 9 / 8)
 
-    // a glyph moved back within its room after the yield (SceneBuilder's within, rules B §8a, 060-render-p2 S7a): its
-    // marks as they were where none meets it there; else placed again about it, none meeting it, the glyph unmoved
+    // a glyph moved back within its room after the yield: its marks as they were where none meets it there
     @Test
     fun aGlyphMovedBackIntoItsRoomHasItsMarksPlacedAgain() {
         for (d in densities) {
@@ -67,10 +58,8 @@ class KeyMarkYieldTest {
             val board = KeyMarkYield.board(listOf(member), 1.0 * d)
             val settled = board.keys.single()
             assertEquals(marks.map { it.ink }, settled.marks, "kept at $d")
-            // moved a little: none meets it, the marks as they were
             val little = settled.glyph.moved(1.0 * d, 0.0)
             assertEquals(settled.copy(glyph = little), KeyMarkYield.again(member, little, board, settled, 1.0 * d), "a little at $d")
-            // moved up into the top right symbol's corner: it gives way (or is left out), never meets the glyph
             val far = Ink(k.room.right - 14 * d, k.room.top, k.room.right, k.room.top + 10 * d)
             val again = KeyMarkYield.again(member, far, board, settled, 1.0 * d)
             assertEquals(far, again.glyph, "unmoved at $d")
@@ -93,8 +82,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun aMarkIsNeverInAnotherCorner() {
-        // a glyph growing over each corner's icon: each icon in its own corner, its class's size (its own down
-        // to the floor), or left out
         val cases = densities.flatMap { d -> listOf(0.0, 4.0).flatMap { r -> corners.map { Triple(d, r, it) } } }
         for ((d, r, slot) in cases) {
             val k = Key(30 * d, 24 * d, d, r)
@@ -116,9 +103,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun aMarkEatsItsInsetBeforeTheGlyphIsSmallerAndIsLeftOutPastTheCap() {
-        // the glyph too wide for the icon by its side inset to the edge or less: the icon goes as far sideways
-        // as it must, the glyph its size; more, the glyph smaller, no more than the cap; more still, the icon left
-        // out and the glyph its size
+        // the icon moves sideways as far as it must; more, the glyph smaller within the cap; more still, the icon left out
         for (d in densities) for (r in listOf(0.0, 4.0)) {
             val k = Key(30 * d, 40 * d, d, r)
             val rp = r * d
@@ -135,11 +120,9 @@ class KeyMarkYieldTest {
                     near(k.room.right + over * d - KeyMarkYield.FIT_SLACK, assertNotNull(m, "kept $at").right, "out as far as it must $at")
                     near(k.room.top, m.top, "its top inset kept $at")
                 } else if (m != null) {
-                    // in along the arc, or the glyph smaller
                     assertTrue(!m.meets(s.glyph, 1.0 * d - KeyMarkYield.FIT_SLACK), "clear $at")
                     assertTrue(m.right <= k.w - 0.25 * d + 1e-6, "no further than the edge $at")
                 } else {
-                    // past saving: its class asks nothing of it, the glyph its size (060-render-p2 S4e)
                     near(glyph.width, s.glyph.width, "left out, the glyph its size $at")
                     gone++
                 }
@@ -161,7 +144,6 @@ class KeyMarkYieldTest {
             near(clear.glyph.width * g.scale, g.keys[0].glyph.width, "the clear key's glyph as much smaller $at")
             near(lean.width * g.scale, g.keys[1].glyph.width, "the needing key's $at")
             assertNotNull(g.keys[0].marks[0], "the clear key's mark kept $at")
-            // nothing needing: no smaller; one no shrink saves: none for it, its mark left out, the others kept
             assertEquals(1.0, KeyMarkYield.group(listOf(clear), 1.0 * d).scale, at)
             val hopeless = k.letter(Ink(k.room.left, -k.h, k.room.right, 2 * k.h), listOf(k.mark(Slot.TopRight)))
             val h = KeyMarkYield.group(listOf(clear, hopeless), 1.0 * d)
@@ -173,8 +155,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun aClassNeedsNoMoreThanItsNeediestKeyAndNeverJumps() {
-        // a letter growing a px at a time over its mark: the class smaller by about as much each time, never a
-        // step of more than a px's worth, then capped and the mark left out (for good)
+        // a letter growing a px at a time over its mark: the class never smaller by a step of more than a px's worth
         for (d in densities) for (r in listOf(0.0, 4.0)) {
             val k = Key(30 * d, 40 * d, d, r)
             var last: KeyMarkYield.Group? = null
@@ -186,10 +167,8 @@ class KeyMarkYieldTest {
                 val at = "at $d, r $r, $px px"
                 val m = g.keys[0].marks[0]
                 if (m == null) gone = true else assertTrue(!gone, "left out, then kept again $at")
-                // smaller about its middle: a px more of it on one side, two px of its width
                 val was = last?.scale ?: g.scale
                 assertTrue(abs(was - g.scale) <= 2.0 / glyph.width + 0.002, "no jump in size $at: $was to ${g.scale}")
-                // a px out, and down along the arc as it goes, steeper near its end: no more than a dp
                 val om = last?.keys?.get(0)?.marks?.get(0)
                 if (om != null && m != null) assertTrue(abs(m.left - om.left) <= 1.0 + 1e-6 && abs(m.top - om.top) <= d, "the mark a px out at most $at: $om to $m")
                 last = g
@@ -201,7 +180,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun theMostExpendableIsLeftOutFirst() {
-        // a key's glyph over its three marks' corners: the down shortcut first, then the shortcut, the symbol last
         for (d in densities) {
             val k = Key(30 * d, 24 * d, d)
             val marks = listOf(
@@ -209,35 +187,29 @@ class KeyMarkYieldTest {
                 k.mark(Slot.TopLeft, KeyMarkYield.DROP_SHORTCUT),
                 k.mark(Slot.BottomLeft, KeyMarkYield.DROP_DOWN_SHORTCUT),
             )
-            // over the left ones only: both left out, the symbol kept
             val left = Ink(-k.w, -k.h, k.w / 2 - 2 * d, 2 * k.h)
             val s = KeyMarkYield.key(left, marks, k.room, 1.0 * d, k.edge)
             assertNotNull(s.marks[0], "the symbol kept at $d")
             assertNull(s.marks[1], "the shortcut left out at $d")
             assertNull(s.marks[2], "the down shortcut left out at $d")
-            // over all: all left out, the symbol too (the long press still works)
             val all = KeyMarkYield.key(Ink(-k.w, -k.h, 2 * k.w, 2 * k.h), marks, k.room, 1.0 * d, k.edge)
             assertEquals(listOf<Ink?>(null, null, null), all.marks, "at $d")
-            // two meeting each other: theMarkMostExpendableIsLeftOutFirst
         }
     }
 
     @Test
     fun twoMarksMeetingEachOtherEatTheirInsetsBeforeEitherIsLeftOut() {
-        // the small phone's ⌫: 2.75 px a dp, two 8 dp icons in a face half a px short of the room they need: they
-        // eat half a px of their insets and both are kept
+        // the small phone's ⌫: two icons half a px short of room eat half a px of their insets and both are kept
         val d = 2.75
         val k = Key(54 * d, 2 * 8 * d + 2 * d - 0.5, d)
         val s = KeyMarkYield.key(k.glyph(2.0, 2.0), listOf(k.mark(Slot.TopLeft), k.mark(Slot.BottomLeft, KeyMarkYield.DROP_DOWN_SHORTCUT)), k.room, d, k.edge)
         val up = assertNotNull(s.marks[0])
         val down = assertNotNull(s.marks[1])
         assertTrue(up.bottom <= down.top + 1e-6, "apart: $up, $down")
-        // half a px out into their insets in all, no further than their edges
         near(0.5, (k.room.top - up.top) + (down.bottom - k.room.bottom), "half a px out")
         assertTrue(up.top >= 0.25 * d - 1e-6 && down.bottom <= k.h - 0.25 * d + 1e-6, "within the edges: $up, $down")
     }
 
-    // the marks of [s] each with its corners within [k]'s arcs (dp: top left, top right, bottom right, bottom left)
     private fun withinArcs(k: Key, s: KeyMarkYield.Settled, at: String) = s.marks.filterNotNull().forEach { m ->
         for ((n, c) in listOf(m.left to m.top, m.right to m.top, m.right to m.bottom, m.left to m.bottom).withIndex()) {
             val r = k.radii[n] * k.d
@@ -251,8 +223,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun aMarkInARoundedCornerKeepsItsCornersWithinTheArcs() {
-        // faces rounded 4 and 6 dp (all four corners, or one), short and tall: every mark's corners, its far
-        // ones too (a short key's top mark reaches its bottom arc), within the arcs, however it gave way
+        // a short key's top mark reaches its bottom arc: every mark's corners within the arcs, however it gave way
         for (d in densities) for (h in listOf(10.0, 12.0, 14.5, 16.0, 20.0, 40.0)) for (radii in listOf(List(4) { 4.0 }, List(4) { 6.0 }, listOf(0.0, 4.0, 0.0, 0.0))) {
             val k = Key(30 * d, h * d, d, radii)
             for ((over, slot) in listOf(0.0, 0.5, 1.0, 2.0, 3.0).flatMap { o -> corners.map { o to it } }) {
@@ -266,8 +237,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun theMarkMostExpendableIsLeftOutFirst() {
-        // a key so short its top and bottom icons meet, a dot of a glyph: the bottom one left out, whichever
-        // its corner and whichever comes first, the symbol before none and the down shortcut before the shortcut
+        // a key so short its top and bottom icons meet: the bottom one left out, whichever its corner and comes first
         for (d in densities) {
             val k = Key(30 * d, 12 * d, d)
             val g = k.glyph(2.0, 2.0)
@@ -286,8 +256,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun aShortKeysTopMarkGoesAsideNoFurtherThanItsBottomArc() {
-        // a face 10 dp tall rounded 4 dp, a glyph as tall as it over the top right icon's room: the icon aside,
-        // its bottom right corner (below the bottom arc's top) kept within that arc too, and clear of the glyph
         for (d in densities) for (over in listOf(0.5, 1.0, 1.5)) {
             val k = Key(30 * d, 10 * d, d, 4.0)
             val s = KeyMarkYield.key(tall(k, over), listOf(k.mark(Slot.TopRight)), k.room, 1.0 * d, k.edge)
@@ -299,8 +267,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun aMarkPlacedOutOfItsArcIsMovedInTheLeast() {
-        // a 16 dp icon 2 dp in from the side of a face 19 dp tall rounded 8: its bottom corner out of the bottom
-        // arc as placed, nothing meeting it: moved in the least
         val d = 2.0
         val k = Key(56 * d, 19 * d, d, 8.0)
         val ink = Ink(4 * d, 2 * d, 20 * d, 18 * d)
@@ -312,9 +278,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun aMarkStillMeetingTheGlyphGoesInAlongTheArcBeforeItIsLeftOut() {
-        // a top left icon in a corner rounded 4 dp, a letter the room's width under it, its top a tenth of a px
-        // higher at a time: the icon up, then in along the arc, never a jump, then the class (and the icon)
-        // smaller, then left out
+        // the icon up, then in along the arc, never a jump, then the class smaller, then left out
         for (d in densities) {
             val k = Key(24 * d, 15 * d, d, 4.0)
             val gap = 1.0 * d
@@ -327,13 +291,10 @@ class KeyMarkYieldTest {
                 val glyph = Ink(k.room.left, top, k.room.right, k.room.bottom)
                 val g = KeyMarkYield.group(listOf(k.letter(glyph, listOf(k.mark(Slot.TopLeft)))), gap)
                 val at = "at $d, the glyph's top at $top"
-                // a tenth of a px of the glyph's top a step, the glyph smaller about its bottom: no more than
-                // about that tenth over its height, never a jump
                 scale?.let { assertTrue(abs(g.scale - it) <= 0.1 / (glyph.bottom - glyph.top) * 1.25 + 1e-3, "the class's step $at: $it to ${g.scale}") }
                 scale = g.scale
                 val m = g.keys[0].marks[0]
                 if (m == null) {
-                    // the class asking the less of it the further past saving it (060-render-p2 S4e)
                     assertTrue(g.scale >= least - 1e-9 && g.scale <= 1.0, "left out, the class within its cap $at: ${g.scale}")
                     gone = true
                 } else {
@@ -354,8 +315,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun onlyTheMarkClassThatMeetsIsSmaller() {
-        // a short key's symbol (top right) meeting the other's below it; a roomy key's top left shortcut:
-        // the symbols smaller, the shortcuts their size (060-render-p2 S4e M3)
         for (d in densities) {
             val k = Key(30 * d, 15 * d, d)
             val glyph = k.glyph(2 * d, 2 * d)
@@ -369,9 +328,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun aClassStillSavedAloneIsNotLetGoWithTheOther() {
-        // the review's probe: 2 px a dp, a 60 by 80 key, a symbol top right and a shortcut top left, a glyph
-        // under both growing leftwards 0.05 px at a time: the symbols' class a little smaller each step, never
-        // a jump; the symbol left out only where it is so alone too (060-render-p2 S4e)
+        // the symbols' class a little smaller each step, never a jump; the symbol left out only where it would be alone too
         val d = 2.0
         val k = Key(60.0, 80.0, d)
         for (r in listOf(43.0, 44.0, 45.0, 46.0, 47.0)) {
@@ -391,7 +348,6 @@ class KeyMarkYieldTest {
         }
     }
 
-    // a key [hDp] dp tall at [d] with its two left icons, a small glyph in its middle that meets neither
     private fun stacked(d: Double, hDp: Double): Pair<Key, Member> {
         val k = Key(30 * d, hDp * d, d)
         val glyph = k.glyph(2 * d, 2 * d)
@@ -401,14 +357,9 @@ class KeyMarkYieldTest {
 
     @Test
     fun aMarkClassIsOneSizeTheMostAnyKeyNeedsUpToItsCap() {
-        // a roomy key and a short one whose two 8 dp icons, their insets eaten to a quarter dp, still meet: every
-        // shortcut as much smaller, about its corner, the least that parts the short key's; past the cap the
-        // down one left out, the class asking the less of the short key the further past (none a band past it,
-        // so it never jumps where the key stops being saved); the symbols, none meeting, their size
+        // past the cap the class asks less of the short key the further past, so no jump where the key stops being saved
         for (d in densities) {
             val roomy = stacked(d, 40.0).second
-            // the short key needs (h - 0.5) / 16 of its icons' size: that down to the floor, then a band below it
-            // where it asks the less the further down, none past it
             val floor = KeyMarkYield.MIN_MARK_SCALE
             val band = KeyMarkYield.HOPELESS_BAND
             fun asked(n: Double) = if (n >= floor) n else 1 - (1 - floor) * ((n - floor + band) / band).coerceIn(0.0, 1.0)
@@ -422,7 +373,6 @@ class KeyMarkYieldTest {
                 val inks = b.keys.flatMap { it.marks }.filterNotNull()
                 assertTrue(inks.all { abs(it.height - inks.first().height) < 1e-9 }, "one size $at: $inks")
                 near(8 * d * b.shortcut, inks.first().height, "the class's $at")
-                // the roomy key's icons smaller about their corners: their outer corners where they were
                 val r = b.keys[0].marks
                 near(roomy.marks[0].ink.left, r[0]!!.left, "top's left $at")
                 near(roomy.marks[0].ink.top, r[0]!!.top, "top's top $at")
@@ -440,8 +390,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun aGlyphClassGivesWayBeforeAMarkClass() {
-        // a letter over its symbol by a little: the letters smaller within their cap, the symbols their size;
-        // over by more than the letters' cap clears, the symbols then smaller too
         for (d in densities) {
             val k = Key(30 * d, 40 * d, d)
             var within = 0
@@ -465,8 +413,7 @@ class KeyMarkYieldTest {
 
     @Test
     fun aKeyIsDrawnAsItsEdgesBeforeTheirRoundingSettled() {
-        // the same key a fraction of a px off (its edges on whole pixels): an icon that stayed where the key has
-        // it, one that moved where it went before the rounding, its glyph moved as far
+        // the same key a fraction of a px off (its edges on whole pixels): icons and glyph moved as far
         for (d in densities) {
             val (_, was) = stacked(d, 40.0)
             val key = was.copy(marks = was.marks.map { it.copy(ink = it.ink.moved(0.4, -0.3)) })
@@ -506,7 +453,6 @@ class KeyMarkYieldTest {
 
     @Test
     fun aShortenedKeyAsksNothingOfTheShortcuts() {
-        // a short key's two left icons meet: the shortcuts all smaller, unless it is shortened (its text a step down)
         val short = stacked(1.0, 15.5).second
         val roomy = stacked(1.0, 40.0).second
         assertTrue(KeyMarkYield.board(listOf(roomy, short), 1.0).shortcut < 1.0, "as it is: the shortcuts asked smaller")

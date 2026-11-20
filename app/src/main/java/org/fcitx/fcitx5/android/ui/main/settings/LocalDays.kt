@@ -11,14 +11,10 @@ import java.util.TimeZone
 
 private const val DAY_MS = 86_400_000L
 
-// one for every row of a list of thousands, made again only if the language changed; read on the main thread alone
+// one for a list of thousands, made again only if the language changed; main thread alone
 private var dayFormat: Pair<Locale, DateFormat>? = null
 
-/**
- * [day], a local day as the record counts them (days since 1970-01-01 on the phone's calendar),
- * as a date. Formatted in UTC: the day is already local, and formatted in the phone's zone it
- * read as the day before west of UTC.
- */
+/** Formatted in UTC: the day is already local, and formatted in the phone's zone it read as the day before west of UTC. */
 internal fun formatLocalDay(day: Int): String {
     val locale = Locale.getDefault()
     val format = dayFormat?.takeIf { it.first == locale }?.second

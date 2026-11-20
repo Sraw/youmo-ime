@@ -27,7 +27,6 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowPopupMenu
 
-/** uat/05's 切词 of entries the panel lists but does not split whole, and pieces picked by a sweep: ToolbarUatTest's harness, a class of its own for size. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
@@ -46,7 +45,6 @@ class ClipboardSplitUatTest {
 
     private fun s(id: Int) = h.service.getString(id)
 
-    // an entry's long press, which its row takes, not the text in it
     private fun held(text: View) {
         generateSequence(text) { it.parent as? View }.first { it.isLongClickable }.performLongClick()
         h.idle()
@@ -71,8 +69,7 @@ class ClipboardSplitUatTest {
         list.scrollToPosition(list.adapter!!.itemCount - 1)
         h.waitFor("the note at the end") { cut in h.texts(h.inputView) }
         h.tap(h.described(s(R.string.back_to_clipboard)))
-        // the panel's list loaded before the next clip: one stored while its first page loads may
-        // miss the page's invalidation and never be listed (CI, once in two runs)
+        // one stored while the first page loads may miss its invalidation and never be listed
         h.waitFor("the clipboard again") { startingWith("看看 abc") != null }
         // a password shown as dots: its pieces would show it
         ClipboardManager.lastClipTimestamp = -1L
@@ -90,11 +87,9 @@ class ClipboardSplitUatTest {
         assertFalse(titles.toString(), s(R.string.clipboard_split) in titles)
     }
 
-    // a 切词 piece's cell, which takes its taps
     private fun piece(text: String): View =
         generateSequence(h.entry(text)!!) { it.parent as? View }.first { it.isClickable }
 
-    // the place in the order shown on [text]'s piece, null for one not picked
     private fun place(text: String): String? = KeyboardHarness.all(piece(text)).filterIsInstance<TextView>()
         .firstOrNull { it.visibility == View.VISIBLE && it.text.toString() != text }?.text?.toString()
 
@@ -109,16 +104,12 @@ class ClipboardSplitUatTest {
         h.waitFor("the pieces shown") { h.entry("x.com") != null }
         fun over(text: String) = h.box(piece(text)).let { it.exactCenterX() to it.exactCenterY() }
         fun sweep(from: String, to: String) = over(to).let { (x, y) -> h.drag(piece(from), x, y) }
-        // a finger down, still: a tap, as before
         sweep("li", "li")
         assertEquals(listOf("1", null, null), listOf("li", "@", "x.com").map(::place))
-        // up and down: the grid's, no pick
         over("@").let { (x, y) -> h.drag(piece("@"), x, y + h.box(piece("@")).height() * 2) }
         assertEquals(listOf("1", null, null), listOf("li", "@", "x.com").map(::place))
-        // from a picked piece: the range dropped
         sweep("li", "@")
         assertEquals(listOf(null, null, null), listOf("li", "@", "x.com").map(::place))
-        // right to left: the range picked in the text's order
         sweep("x.com", "li")
         assertEquals(listOf("1", "2", "3"), listOf("li", "@", "x.com").map(::place))
         h.tap(h.entry(s(R.string.clipboard_split_commit))!!)

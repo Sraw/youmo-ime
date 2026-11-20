@@ -16,12 +16,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import kotlin.random.Random
 
-/**
- * Run alone by `boundedHeapTest`, in a JVM of 48 MB (build.gradle.kts): 0.3.1 coded a merged
- * dictionary's words for a table into a TreeMap, about 250 MB for rime-frost's 1.9 million, and
- * the OutOfMemoryError killed the input method. 2 million words must be coded for a table in 48
- * MB, the index opened, and each word found under its code.
- */
+/** Run alone by `boundedHeapTest` in 48 MB: 2 million words coded for a table, each found under its code. */
 class CodedIndexBoundedHeapTest {
 
     @get:Rule
@@ -75,7 +70,6 @@ class CodedIndexBoundedHeapTest {
     }
 
     private companion object {
-        // 1415² words: just over 2 million
         const val CHARS = 1415
         const val WARM = 25
         const val KEYS = 100

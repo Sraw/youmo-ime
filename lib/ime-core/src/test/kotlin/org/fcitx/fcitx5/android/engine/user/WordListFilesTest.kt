@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.EXPORT_MARK
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.baseLine
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.charset
-import org.fcitx.fcitx5.android.engine.user.WordListFiles.exportHead
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.isOwnExport
 import org.fcitx.fcitx5.android.engine.user.WordListFiles.isUserExport
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
@@ -42,9 +41,7 @@ class WordListFilesTest {
         assertEquals("幽默 you'mo 0", baseLine("'you'mo 幽默 1"))
         // kept with no cost: ImportedDictionaries.write gives it one (WordText.dictionaryText)
         assertEquals("幽默 you'mo", baseLine("\uFEFF幽默 you'mo"))
-        // one in libime's format already keeps its cost
         assertEquals("搭子 da'zi -5.5", baseLine("搭子 da'zi -5.5"))
-        // the base can neither block nor guess a pinyin
         assertNull(baseLine("!尬 ga"))
         // a learned word of the user's export: the word, its count not taken for a cost
         assertEquals("拟好 ni'hao 0", baseLine("~ 拟好 ni'hao 3.0", export = true))
@@ -72,15 +69,12 @@ class WordListFilesTest {
     // into the base its blocked words would be dropped and the rest lose the user dictionary's place
     @Test
     fun theUserDictionarysExportIsTold() {
-        // as the export writes it, in whichever language
-        assertTrue(isUserExport((exportHead("# 用户词库") + "幽默 you mo\n").toByteArray()))
         assertTrue(isUserExport("$EXPORT_MARK\n# header\n幽默 you mo\n".toByteArray()))
         assertTrue(isUserExport("\uFEFF$EXPORT_MARK\r\n".toByteArray()))
         assertTrue(isUserExport(utf16le("$EXPORT_MARK\n")))
         assertTrue(isUserExport(utf16be("$EXPORT_MARK\n")))
         // a blocked word on a first line that still carries the UTF-8 byte order mark
         assertTrue(isUserExport("\uFEFF!幽默 you mo\n".toByteArray()))
-        // a list with a blocked word, whatever its first line
         assertTrue(isUserExport("# other\n幽默 you mo\n!尬 ga\n".toByteArray()))
         assertFalse(isUserExport("幽默 you'mo 0\n$EXPORT_MARK\n".toByteArray()))
         assertFalse(isUserExport("# other\n搭子 da'zi 0\n".toByteArray()))

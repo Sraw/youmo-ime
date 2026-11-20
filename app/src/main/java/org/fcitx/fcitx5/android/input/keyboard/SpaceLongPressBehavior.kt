@@ -13,17 +13,10 @@ enum class SpaceLongPressBehavior(override val stringRes: Int) : ManagedPreferen
     ToggleActivate(R.string.space_behavior_activate),
     ShowPicker(R.string.space_behavior_picker),
 
-    /**
-     * the default: hold to talk, with the voice pack imported; without it holding the space does
-     * nothing, as 0.5.x's text build did: no notice, no badge, a slow drag's cursor not taken
-     * (the toolbar's microphone is what asks for the pack)
-     */
+    /** Without the voice pack holding the space does nothing: no notice, no badge, a slow drag's cursor not taken. */
     Voice(R.string.voice_input);
 
-    /**
-     * Whether holding the space talks: with the voice pack ready ([voiceReady], PackStore's), and never
-     * in a password field, as a password is not to be said aloud.
-     */
+    /** Never in a password field. */
     fun talks(voiceReady: Boolean, inPasswordField: Boolean): Boolean =
         this == Voice && voiceReady && !inPasswordField
 }

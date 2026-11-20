@@ -18,13 +18,7 @@ import java.io.File
 import java.io.IOException
 import java.util.Locale
 
-/**
- * The voice post-processing measured on recorded stretches (voice-eval's `seg_app.py`: a clip a
- * line, each stretch's n-best, the app's rerank and its time): no recognizer runs, so a change to
- * [VoicePost] is measured in seconds. Against the set's reference text, which carries punctuation:
- * the error rate on the words alone (CER, as voice-eval's MER), on the written text (the three kinds
- * of mark as tokens too), how the marks inside the text land (P/R/F1 by kind) and how a text ends.
- */
+/** The voice post-processing measured on recorded stretches, no recognizer: CER on words and on written text, the marks' P/R/F1. */
 internal object VoicePostRun {
 
     /** The marks scored, by kind; any other mark (quotes, brackets, dashes) is left out of both texts. */
@@ -37,7 +31,7 @@ internal object VoicePostRun {
         '？' to Mark.QUESTION, '?' to Mark.QUESTION,
     )
 
-    /** [text] as words (a Han character, or a run of Latin letters and digits, lower case), each with the mark after it. */
+    /** [text] as words (a Han character, or a lower-cased run of Latin letters and digits), each with the mark after it. */
     class Tokens(val words: List<String>, val after: List<Mark?>)
 
     fun tokens(text: String): Tokens {
@@ -69,7 +63,6 @@ internal object VoicePostRun {
 
     private fun Char.isLatinWord() = this < '\u0080' && isLetterOrDigit() || this in 'Ａ'..'Ｚ' || this in 'ａ'..'ｚ' || this in '０'..'９'
 
-    /** Counts over a set, or over several. */
     class Score {
         var clips = 0
         var stretches = 0
@@ -85,13 +78,10 @@ internal object VoicePostRun {
         var endsSame = 0
         var doubled = 0
 
-        /** clips of a set with written references that have none (written_refs.py could not make one): left out */
+        /** clips of a set with written references that have none: left out */
         var unwritten = 0
 
-        /**
-         * `--source tagged`: clips voice-eval gave no labels, windows of the app's stream not found in its labelled text,
-         * and clips labelled longer than the app's window ([Replay]: their labels saw more than the app's model would)
-         */
+        /** `--source tagged`: clips with no labels, windows not found in the labelled text, and clips longer than a window ([Replay]) */
         var untagged = 0
         var unfound = 0
         var long = 0
@@ -105,10 +95,7 @@ internal object VoicePostRun {
         }
     }
 
-    /**
-     * One clip scored: [ref] the reference, [hyp] what was typed. Numbers are the tagger's (not run here):
-     * both are left as written.
-     */
+    /** One clip scored: [ref] the reference, [hyp] what was typed. Numbers are the tagger's (not run here): both left as written. */
     fun score(ref: String, hyp: String, into: Score) {
         val r = tokens(ref)
         val h = tokens(hyp)
@@ -176,33 +163,13 @@ internal object VoicePostRun {
         return previous[b.size]
     }
 
-    /**
-     * A clip of a `seg_app.py` file: its reference and stretches, the [source] text of each (`app`, the rerank's; `top`, the
-     * recognizer's first). The reference is the written one where written_refs.py made it (marks in, fillers and stammers out:
-     * what should be typed), else the set's own ([written] false).
-     */
+    /** A `seg_app.py` clip: its reference ([written] if written_refs.py's) and the [source] text of each stretch. */
     class Clip(val wav: String, val ref: String, val written: Boolean, val stretches: List<VoicePost.Stretch>, val tagged: Tagged? = null)
 
-    /**
-     * What the polish tagger made of a clip, run by voice-eval on the text the app's tagger sees (the
-     * stretches' `app` texts joined, normed: VoicePolishStream's), for `--source tagged`: [text]'s code
-     * points and a label each, indices into the tagger json's `ops`, `after` and `num`. The clip's
-     * `"tagged": {"text": …, "op": […], "after": […], "num": […]}`.
-     */
+    /** The polish tagger's labels for a clip, run by voice-eval, for `--source tagged`. */
     class Tagged(val text: IntArray, val labels: VoicePolishStream.Labels)
 
-    /**
-     * [tagged]'s labels for each window the app's stream asks about, found in its text from where the
-     * last one was; one not found (the texts differ) all kept, counted in [misses].
-     *
-     * The labels are the whole clip's, tagged once by voice-eval, not the app's: on the phone the model
-     * sees only the window it is asked about ([VoicePolishStream.WINDOW] characters at most, nothing after
-     * its end) and a character's labels are kept once [VoicePolishStream.FREEZE_AFTER] follow it. So a label
-     * here may have seen more context than the app's would; clips longer than a window, where that is
-     * largest, are counted in the run's `tagged:` line (`long`). A window whose text also comes earlier
-     * from where the last one was (a stammer of a whole window, 对对对…) takes the first one's labels:
-     * nothing counts that.
-     */
+    /** [tagged]'s labels for each window the stream asks about; one not found is all kept and counted in [misses]. */
     class Replay(private val tagged: Tagged) : VoicePolishStream.Tagger {
         var misses = 0
             private set
@@ -224,16 +191,10 @@ internal object VoicePostRun {
         }
     }
 
-    /**
-     * A file of the run's input that cannot be read as one: said as a failed run (`voice-post: <message>`, exit 1),
-     * not a stack trace. Only [read] and [tags] throw it, so an IllegalArgumentException anywhere else is the
-     * tool's own and still ends the run loudly.
-     */
+    /** An unreadable input file: a failed run (`voice-post: <message>`, exit 1), not a stack trace. Only [read] and [tags] throw it. */
     class BadInput(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-    // what a json not of the shape asked for throws: not json or a json shape the accessors refuse (both
-    // IllegalArgumentException, kotlinx's SerializationException among them; a label not a number too), a key missing;
-    // and a file not there or not readable (a path mistyped, the likeliest wrong input: R25r5 F8020)
+    // a json of the wrong shape (kotlinx's SerializationException is an IllegalArgumentException), a key missing, a file unreadable
     private inline fun <T> parsing(where: String, block: () -> T): T = try {
         block()
     } catch (e: IOException) {
@@ -244,17 +205,14 @@ internal object VoicePostRun {
         throw BadInput("$where: ${e.message}", e)
     }
 
-    /**
-     * The tag tables of a polish tagger's json (the voice pack's `polish-tagger.json`), as VoicePolisher reads them;
-     * a file VoicePolishTags refuses (as the app's tagger would fail to load) is [BadInput].
-     */
+    /** The tag tables of a polish tagger's json, as VoicePolisher reads them; one VoicePolishTags refuses is [BadInput]. */
     fun tags(file: File): VoicePolishTags = parsing(file.name) {
         val o = Json.parseToJsonElement(file.readText()).jsonObject
         fun strings(key: String) = o.getValue(key).jsonArray.map { it.jsonPrimitive.content }
         VoicePolishTags(strings("ops"), strings("after"), strings("num"))
     }
 
-    /** [file]'s clips; a line that is not one ([BadInput]) is named by the file and its line number. */
+    /** [file]'s clips; a bad line ([BadInput]) is named by file and line number. */
     fun read(file: File, source: String): List<Clip> = parsing(file.name) { file.readLines() }.withIndex().filter { it.value.isNotBlank() }.map { (i, line) ->
         parsing("${file.name}:${i + 1}") { clip(file, line, source) }
     }
@@ -275,7 +233,7 @@ internal object VoicePostRun {
                 fun ints(key: String) = t.getValue(key).jsonArray.map { it.jsonPrimitive.content.toInt() }.toIntArray()
                 val text = t.getValue("text").jsonPrimitive.content.codePoints().toArray()
                 val labels = VoicePolishStream.Labels(ints("op"), ints("after"), ints("num"))
-                // a label a character, or Replay would fail halfway through the run on a slice past the end
+                // a label a character, or Replay would fail halfway through the run
                 if (labels.op.size != text.size || labels.after.size != text.size || labels.num.size != text.size) {
                     throw BadInput(
                         "${file.name}: ${o.getValue("wav").jsonPrimitive.content}: tagged has ${text.size} characters and " +
@@ -294,15 +252,7 @@ internal object VoicePostRun {
     }
 
 
-    /**
-     * Scores each file of [paths] and all together; [misses], a TSV of the clips whose written text is not the reference's;
-     * [texts], one of every clip scored (what a layer after these, voice-eval's, starts from).
-     * [polish]: with `--source tagged`, the tagger's tables and whether its labels are [VoicePolishTags.guarded]
-     * as the app's are: the whole of the app's post-processing but the homophones (the engine's), so a
-     * retrained tagger is scored much as the user gets it, and each guard is measured by turning them off.
-     * Not quite: the labels are the whole clip's, not the app's windows' ([Replay]); the `tagged:` line
-     * after the table counts the clips longer than a window.
-     */
+    /** Scores each file of [paths] and all together; [misses] and [texts] are TSVs of clips. */
     fun run(
         paths: List<String>,
         source: String,
@@ -328,8 +278,7 @@ internal object VoicePostRun {
             val name = File(path).name.removePrefix("seg-").removeSuffix(".jsonl")
             val score = Score()
             val clips = read(File(path), source)
-            // a set with written references: a clip without one would be scored against no marks at all;
-            // left out of every column, the CER too (not to be set beside a run before written references)
+            // with written references, a clip without one would be scored against no marks, so it is left out
             val scored = if (clips.any { it.written }) clips.filter { it.written } else clips
             score.unwritten = clips.size - scored.size
             for (clip in scored) {
@@ -350,7 +299,7 @@ internal object VoicePostRun {
             all.add(score)
         }
         if (paths.size > 1) out.appendLine(row("all", all))
-        // after the table, not a column of it: the table's columns are what voice-eval reads
+        // after the table: its columns are what voice-eval reads
         if (polish != null) out.appendLine("tagged: guard=${polish.guard} untagged=${all.untagged} unfound=${all.unfound} long=${all.long}")
     }
 
@@ -362,7 +311,7 @@ internal object VoicePostRun {
     fun row(name: String, s: Score): String {
         fun pct(n: Int, d: Int) = if (d == 0) "-" else String.format(Locale.ROOT, "%.2f%%", 100.0 * n / d)
         fun prf(tp: Int, fp: Int, fn: Int): String {
-            // no mark in the references nor the text: nothing to score (a set without written references)
+            // nothing to score (a set without written references)
             if (tp + fp + fn == 0) return "-"
             val p = if (tp + fp == 0) 0.0 else tp.toDouble() / (tp + fp)
             val r = if (tp + fn == 0) 0.0 else tp.toDouble() / (tp + fn)

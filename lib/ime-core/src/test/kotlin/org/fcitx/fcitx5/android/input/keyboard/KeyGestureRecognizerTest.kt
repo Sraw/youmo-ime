@@ -10,39 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Every one of these used to require a device: the logic lived inside a `View`, driven by
- * `MotionEvent`s and a real clock. The swipe arithmetic in particular (fractional remainders
- * carried between samples, both axes reading the same anchor) is the sort of thing that is
- * nearly impossible to exercise by hand on an emulator.
- */
 class KeyGestureRecognizerTest {
-
-    /** A key 100x50, slop 8, swipe thresholds 24, swipe enabled, everything else off unless a test says otherwise. */
-    private fun recognizer(
-        swipe: Boolean = true,
-        longPress: Boolean = false,
-        repeat: Boolean = false,
-        swipeRepeat: Boolean = false,
-        doubleTap: Boolean = false,
-    ) = KeyGestureRecognizer().apply {
-        touchSlop = 8f
-        viewWidth = 100
-        viewHeight = 50
-        swipeEnabled = swipe
-        longPressEnabled = longPress
-        repeatEnabled = repeat
-        swipeRepeatEnabled = swipeRepeat
-        doubleTapEnabled = doubleTap
-        swipeThresholdX = 24f
-        swipeThresholdY = 24f
-        doubleTapTimeoutMs = 300L
-    }
-
-    private fun KeyGestureRecognizer.move(x: Float, y: Float) =
-        onMove(x, y, longPressTriggered = false, repeatStarted = false)
-
-    // region bounds
 
     @Test
     fun theKeyIsItsAreaGrownByTheSlop() = assertRows(
@@ -52,7 +20,6 @@ class KeyGestureRecognizerTest {
             assertTrue(r.pointInView(50f, 25f))
             assertTrue(r.pointInView(99f, 49f))
         },
-        // The hit area is grown by the touch slop on every side.
         "the slop margin counts as inside" to {
             val r = recognizer()
             assertTrue("left edge minus slop", r.pointInView(-8f, 25f))
@@ -68,10 +35,6 @@ class KeyGestureRecognizerTest {
             assertFalse(r.pointInView(50f, 58f))
         },
     )
-
-    // endregion
-
-    // region leaving the key
 
     @Test
     fun leavingTheKeyIsReportedOnceAndCancelsPendingTimers() {
@@ -98,10 +61,7 @@ class KeyGestureRecognizerTest {
         assertFalse(outcome.cancelRepeat)
     }
 
-    /**
-     * A swipeable key keeps looking pressed when the finger wanders off, because the swipe is
-     * still in progress; a plain key does not.
-     */
+    /** A swipeable key keeps looking pressed when the finger wanders off; a plain key does not. */
     @Test
     fun leavingReleasesThePressedLookOnlyWhenThereIsNoSwipe() {
         val swipeable = recognizer(swipe = true)
@@ -120,10 +80,6 @@ class KeyGestureRecognizerTest {
         val outcome = r.onMove(200f, 25f, longPressTriggered = false, repeatStarted = true)
         assertTrue(outcome.releasePressedState)
     }
-
-    // endregion
-
-    // region swipe arithmetic
 
     @Test
     fun movementBelowTheThresholdCountsNothing() {
@@ -150,10 +106,7 @@ class KeyGestureRecognizerTest {
         },
     )
 
-    /**
-     * The remainder carries forward, so a slow drag still accumulates: three 10px samples add
-     * up to 30px, which crosses the 24px threshold once.
-     */
+    /** The remainder carries forward: three 10px samples cross the 24px threshold once. */
     @Test
     fun theRemainderCarriesAcrossSamplesSoASlowDragStillCounts() {
         val r = recognizer()
@@ -192,10 +145,7 @@ class KeyGestureRecognizerTest {
         assertEquals(1, r.swipeTotalY)
     }
 
-    /**
-     * Both axes are consumed against the *previous* anchor before it advances. If the anchor
-     * moved between the two calls, a diagonal swipe would mis-count.
-     */
+    /** Both axes consume against the *previous* anchor, or a diagonal swipe mis-counts. */
     @Test
     fun aDiagonalSwipeCountsBothAxesAgainstTheSameAnchor() {
         val r = recognizer()
@@ -205,10 +155,7 @@ class KeyGestureRecognizerTest {
         assertEquals(1, outcome.countY)
     }
 
-    /**
-     * Each axis carries its own remainder. If they shared one, a sub-threshold drag on X would
-     * push Y over its threshold -- a diagonal wobble would type a symbol the user never swiped for.
-     */
+    /** Each axis has its own remainder, or a diagonal wobble types a symbol. */
     @Test
     fun theCarriedRemaindersDoNotLeakBetweenAxes() {
         val r = recognizer()
@@ -251,7 +198,6 @@ class KeyGestureRecognizerTest {
         assertEquals(0, r.swipeTotalX)
     }
 
-    /** Once a long press or repeat owns the gesture, movement stops producing swipe steps. */
     @Test
     fun swipeStepsStopOnceALongPressHasFired() {
         val r = recognizer(longPress = true)
@@ -297,10 +243,6 @@ class KeyGestureRecognizerTest {
         assertTrue(r.swipeRepeatTriggered)
     }
 
-    // endregion
-
-    // region what counts as a click
-
     @Test
     fun whatTheKeyDidInsteadIsNotAlsoAClick() = assertRows(
         "a long press is not also a click" to {
@@ -313,7 +255,6 @@ class KeyGestureRecognizerTest {
             r.onDown(50f, 25f)
             assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = true).performClick)
         },
-        // Long-press backspace: hold, repeat fires, lift produces no extra click.
         "holding for repeat does not also click on release" to {
             val r = recognizer(swipe = false, repeat = true)
             r.onDown(50f, 25f)
@@ -340,10 +281,7 @@ class KeyGestureRecognizerTest {
         },
     )
 
-    /**
-     * The consumed flag is cleared between touches on every key, not only on keys that swipe:
-     * else a gesture a listener consumed on any other key would block the click on every later tap.
-     */
+    /** The consumed flag clears between touches on every key, not only swiping ones. */
     @Test
     fun onAKeyThatDoesNotSwipeTheConsumedFlagIsClearedForTheNextTouch() {
         val r = recognizer(swipe = false)
@@ -367,7 +305,6 @@ class KeyGestureRecognizerTest {
         assertTrue(r.onUp(2000L, longPressTriggered = false, repeatStarted = false).performClick)
     }
 
-    /** A swipe the listener ignored still leaves the tap eligible to be a click. */
     @Test
     fun anUnconsumedSwipeStillAllowsTheClick() {
         val r = recognizer(swipeRepeat = false)
@@ -375,10 +312,6 @@ class KeyGestureRecognizerTest {
         r.move(24f, 0f)
         assertTrue(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
     }
-
-    // endregion
-
-    // region double tap
 
     @Test
     fun twoTapsInsideTheWindowAreADoubleTap() {
@@ -414,10 +347,7 @@ class KeyGestureRecognizerTest {
         assertFalse(r.onUp(1301L, longPressTriggered = false, repeatStarted = false).isDoubleTap)
     }
 
-    /**
-     * A touch that is not a click (here one that wandered off the key) disarms a pending double
-     * tap: on shift, tap, wander, tap within the window must not lock caps.
-     */
+    /** A touch that is no click disarms a pending double tap: shift, tap, wander, tap must not lock caps. */
     @Test
     fun aNonClickBetweenTwoTapsDisarmsTheDoubleTap() {
         val r = recognizer(doubleTap = true)
@@ -435,7 +365,6 @@ class KeyGestureRecognizerTest {
         assertTrue("which it starts", r.onUp(1300L, longPressTriggered = false, repeatStarted = false).isDoubleTap)
     }
 
-    /** Three quick taps are one double tap then a fresh single, not two overlapping doubles. */
     @Test
     fun threeQuickTapsDoNotProduceTwoDoubleTaps() {
         val r = recognizer(doubleTap = true)
@@ -472,10 +401,6 @@ class KeyGestureRecognizerTest {
         assertTrue(outcome.performClick)
         assertFalse(outcome.isDoubleTap)
     }
-
-    // endregion
-
-    // region resetting
 
     @Test
     fun resetClearsEveryPerTouchField() {
@@ -528,11 +453,6 @@ class KeyGestureRecognizerTest {
         assertEquals("the carried remainder must not leak into the next touch", 0, r.move(20f, 0f).countX)
     }
 
-    // endregion
-
-    // region realistic sequences
-
-    /** Swipe up on a letter key to type its digit: two steps up, no click on release. */
     @Test
     fun swipingUpForTheAlternateSymbolSuppressesTheClick() {
         val r = recognizer(swipe = true, swipeRepeat = true)
@@ -542,10 +462,8 @@ class KeyGestureRecognizerTest {
         assertFalse(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
     }
 
-    /** Tap and drag slightly, staying within threshold: still an ordinary click. */
     @Test
     fun aSlightlyImpreciseTapIsStillAClick() {
-        // a clean tap, on a recognizer of its own
         val clean = recognizer()
         clean.onDown(50f, 25f)
         assertTrue(clean.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
@@ -556,10 +474,6 @@ class KeyGestureRecognizerTest {
         assertTrue(r.onUp(1000L, longPressTriggered = false, repeatStarted = false).performClick)
         assertEquals(0, r.swipeTotalX)
     }
-
-    // endregion
-
-    // region settings changing mid-touch
 
     @Test
     fun turningSwipeOffMidTouchDoesNotStopTheSwipe() {
@@ -595,7 +509,6 @@ class KeyGestureRecognizerTest {
         assertEquals(3, r.onMove(50f + 3 * 24f, 50f, longPressTriggered = false, repeatStarted = false).countX)
     }
 
-    /** The long-press timer was started at DOWN; leaving the key must still cancel it. */
     @Test
     fun turningLongPressOffMidTouchStillCancelsItsTimer() {
         val r = recognizer(swipe = false, longPress = true)
@@ -644,7 +557,6 @@ class KeyGestureRecognizerTest {
         assertTrue(r.onUp(1100L, longPressTriggered = false, repeatStarted = false).isDoubleTap)
     }
 
-    /** A cancel mid-touch forgets the armed double tap even if double tap was turned off meanwhile. */
     @Test
     fun aCancelUsesTheTouchsSettingsToo() {
         val r = recognizer(swipe = false, doubleTap = true).apply { doubleTapTimeoutMs = 300 }
@@ -659,7 +571,6 @@ class KeyGestureRecognizerTest {
         assertFalse(r.onUp(1100L, longPressTriggered = false, repeatStarted = false).isDoubleTap)
     }
 
-    /** The touch that swiped is cleaned up as a swiping touch, even if swipe is off by then. */
     @Test
     fun aSwipeCutShortBySettingsStillLeavesNoTotalsBehind() {
         val r = recognizer(swipe = true)
@@ -671,5 +582,4 @@ class KeyGestureRecognizerTest {
         assertEquals(0, r.swipeTotalX)
     }
 
-    // endregion
 }

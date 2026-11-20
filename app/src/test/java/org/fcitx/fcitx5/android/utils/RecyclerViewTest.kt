@@ -33,8 +33,7 @@ class RecyclerViewTest {
         }
     }
 
-    // a list added after the window's insets went out asks for them again once attached (a ViewPager2 page
-    // made when its tab is first picked), and its bottom padding is the navigation bar's
+    // a list attached after insets went out asks again, and pads for the navigation bar
     @Test
     fun aListAddedLateAsksForTheInsetsAndPadsTheNavigationBar() {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
@@ -44,8 +43,7 @@ class RecyclerViewTest {
         assertEquals(0, list.asked)
         root.addView(list)
         assertTrue("asked once attached", list.asked > 0)
-        // from the window's root, as the system gives them: below API 30 compat reads the navigation bar off the
-        // system window insets cut to the stable ones, so both are set (a navigation bar alone is 0 at SDK 29)
+        // below API 30 compat reads the nav bar off system insets cut to stable ones, so both are set
         val nav = Insets.of(0, 0, 0, 48)
         @Suppress("DEPRECATION")
         val insets = WindowInsetsCompat.Builder()
@@ -54,11 +52,9 @@ class RecyclerViewTest {
             .setStableInsets(nav)
             .build()
         val platform = insets.toWindowInsets()!!
-        // below API 30 compat also cuts them to the root's stable insets (View.getRootWindowInsets, the view root's
-        // last insets), which a test window never got: set them there as the system would
+        // below API 30 compat also cuts them to the root's stable insets, which a test window never got
         val viewRoot = activity.window.decorView.parent
-        // a hidden field of ViewRootImpl (API 29's and Robolectric's), read by View.getRootWindowInsets: renamed or
-        // gone in a later SDK or Robolectric, this says so rather than failing on a missing navigation bar
+        // a hidden ViewRootImpl field: if renamed in a later SDK, this fails clearly
         val lastInsets = runCatching { viewRoot.javaClass.getDeclaredField("mLastWindowInsets") }.getOrElse {
             throw AssertionError("ViewRootImpl.mLastWindowInsets not found in ${viewRoot.javaClass}: the test sets the root's insets there", it)
         }

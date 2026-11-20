@@ -8,15 +8,11 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.min
 
-/** A recognizer network: its output's values row-major, run on [x] of [shape]. */
 fun interface InkNet {
     fun run(x: FloatArray, shape: LongArray): FloatArray
 }
 
-/**
- * What the pad's ink was read as: characters, best first, [scores] the recognizer's
- * log-probabilities, which the text before may weigh again ([HandwritingSession]).
- */
+/** Characters, best first; [scores] are log-probabilities the text before may re-weigh ([HandwritingSession]). */
 class InkReading(val texts: List<String>, val scores: DoubleArray) {
     init {
         require(texts.size == scores.size) { "a score for each reading" }
@@ -27,12 +23,7 @@ class InkReading(val texts: List<String>, val scores: DoubleArray) {
     }
 }
 
-/**
- * The handwriting recognizers, run as the training code runs them (the recognizers' training
- * sources: `diag.py`): one character by its image ([image]) and its pen path
- * ([path]), their log-softmaxes weighed [IMAGE] to 1 − [IMAGE] with each class's log frequency
- * ([prior]) times [PRIOR]. Strokes are x, y pairs in any one unit.
- */
+/** The recognizers run as the training code (`diag.py`) does: image and path log-softmaxes weighed [IMAGE] to 1 − [IMAGE], plus log frequency times [PRIOR]. */
 class InkRecognizer(
     private val image: InkNet,
     private val path: InkNet,
@@ -45,7 +36,6 @@ class InkRecognizer(
         require(prior.size == classes.size) { "a frequency for each character" }
     }
 
-    /** The [count] likeliest characters [strokes] may be. */
     fun character(strokes: List<FloatArray>, count: Int = CHARACTERS): InkReading {
         val n = classes.size
         val a = image.run(InkFeatures.charImage(strokes), longArrayOf(1, 1L + InkFeatures.DIRS, SIZE, SIZE))
@@ -63,15 +53,10 @@ class InkRecognizer(
         const val IMAGE = 0.7
         const val PRIOR = 0.2
 
-        /** A character is offered so many readings. */
         const val CHARACTERS = 20
 
         private const val SIZE = InkFeatures.SIZE.toLong()
 
-        /**
-         * The classes [chars] lists, a code point each (one beyond the BMP is two Chars), a line
-         * break ending it, as a text file's may, none.
-         */
         internal fun classesOf(chars: String): List<String> {
             val text = chars.trimEnd('\r', '\n')
             val out = ArrayList<String>(text.length)
@@ -84,10 +69,7 @@ class InkRecognizer(
             return out
         }
 
-        /**
-         * The indices of [s]'s [count] largest, largest first, equal ones in index order: a stable
-         * sort's first [count], picked in one pass rather than sorting thousands of classes a stroke.
-         */
+        /** Indices of [s]'s [count] largest, ties in index order, in one pass rather than sorting thousands per stroke. */
         internal fun top(s: DoubleArray, count: Int): IntArray {
             require(count >= 0) { "$count readings" }
             val best = IntArray(min(count, s.size))
@@ -106,7 +88,6 @@ class InkRecognizer(
             return best
         }
 
-        /** [v]'s [n] values from [at] made log-probabilities, in place. */
         internal fun logSoftmax(v: FloatArray, at: Int, n: Int) {
             var max = Float.NEGATIVE_INFINITY
             for (i in at until at + n) if (v[i] > max) max = v[i]

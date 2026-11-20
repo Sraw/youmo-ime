@@ -14,17 +14,11 @@ import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
 import java.io.IOException
 
-/**
- * 常用词' file (dev/design/060-common-words.md), beside the custom phrases in fcitx's pinyin data,
- * where the engine reads it: the same text as an export ([CommonWords.format]). The settings page
- * and the keyboard (a replacement deleted) both write it, each laying its changes over the file as
- * it is then ([saveOver]).
- */
+/** Both the settings page and the keyboard write the file, each merging its changes over the current file ([saveOver]). */
 object CommonWordsManager {
 
     const val FILE = "pinyin/commonwords.txt"
 
-    /** The file is a later version's ([CommonWords.newer]), left as it is. */
     class Newer : IOException("common words: written by a later version, not saved over")
 
     private fun file() = file(HostConfigDir.inUse(ConfigHome.DATA))
@@ -38,31 +32,23 @@ object CommonWordsManager {
         return file(home)
     }
 
-    /**
-     * The words the file has; none if there is none. A line not read (no reading) is left out.
-     * One [saveOver] under way is waited for: a page made again (turned, reopened) reads what the last one saved.
-     * @throws IOException if there is one that cannot be read
-     */
+    /** Waits for a [saveOver] under way, so a recreated page reads the last save. */
     @Synchronized
     fun load(from: File = file()): CommonWords = if (from.isFile) CommonWords.parse(from.readText()).words else CommonWords.EMPTY
 
-    /**
-     * Saves [mine], what a writer has since it read [base], over the file as it is now
-     * ([CommonWords.merged]); returns what the file then has, the next save's base.
-     * @throws IOException if the file cannot be read or written, or a later version wrote it
-     */
+    /** Returns what the file then has: the next save's base. */
     @Synchronized
     fun saveOver(base: CommonWords, mine: CommonWords, to: File? = null): CommonWords {
         val target = to ?: fileToSave()
         val theirs = load(target)
-        // a later version's: this one reads none of it, and would write it all away
+        // this build reads none of it, and would write it all away
         if (theirs.newer) throw Newer()
         val merged = CommonWords.merged(base, mine, theirs)
         write(merged, target)
         return merged
     }
 
-    /** Writes [words], whole or not at all. */
+    /** Whole or not at all. */
     @Synchronized
     fun write(words: CommonWords, to: File? = null) {
         val target = to ?: fileToSave()

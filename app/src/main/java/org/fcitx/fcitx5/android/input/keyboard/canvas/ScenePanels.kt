@@ -12,16 +12,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyInk
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
-/**
- * The app's panels as the theme in use has them (060-render-p3 T7b, [PanelLooks]): the clipboard's
- * entries, the picker's categories, the editing panel's buttons, the voice mask. A theme that sets none
- * of it, a theme 3.0's among them, has the engine's default rules: the look the app worked out itself
- * before. A look that made no theme (SceneThemes logs it; no key is drawn either) has that look of
- * before worked out here, of its keys and colours.
- *
- * The scenes are the window's ([SceneWindow.scenes]): the screen's and the settings', not floating nor
- * the board's place (a panel is over every board), nor what is typed.
- */
+/** A look that made no theme has the look of before worked out here. Not floating nor the board's place: a panel is over every board. */
 object ScenePanels {
 
     private fun looks(theme: Theme): PanelLooks? =
@@ -31,12 +22,10 @@ object ScenePanels {
 
     private fun keyRadiusDp(theme: Theme) = ThemeManager.shownLook(theme).keys.radiusDp.toDouble()
 
-    /** A clipboard entry's card. */
     fun clipboard(context: Context, theme: Theme): PanelLooks.Clipboard =
         looks(theme)?.clipboard(scenes(context, theme))
             ?: PanelLooks.Clipboard(Argb(theme.clipboardEntryColor), keyRadiusDp(theme) / 2, false, Argb(theme.keyTextColor))
 
-    /** The picker's, its categories the symbols' column down its [side] or the emoji's tabs. */
     fun picker(context: Context, theme: Theme, side: Boolean): PanelLooks.Picker =
         looks(theme)?.picker(scenes(context, theme), side) ?: Argb(theme.keyTextColor).let { text ->
             val fade = if (side) PanelLooks.SIDE_FADE else PanelLooks.TAB_FADE
@@ -48,36 +37,26 @@ object ScenePanels {
             )
         }
 
-    /** The editing panel's buttons. */
     fun editing(context: Context, theme: Theme): PanelLooks.Editing =
         looks(theme)?.editing(scenes(context, theme)) ?: PanelLooks.Editing(null, null, false, keyRadiusDp(theme))
 
-    /**
-     * An editing button's corners, px: the theme's ([PanelLooks.Editing.radiusDp]; [PanelLooks.Editing.round],
-     * a pill), else the app's of before, twice the keys' radius in dp as as many px (ThemeColors.buttonRadius's:
-     * kept as it looked).
-     */
+    /** Px; else the app's of before, twice the keys' radius in dp as as many px (kept as it looked). */
     fun editingRadius(context: Context, look: PanelLooks.Editing): Float = when {
         look.round -> PILL
         else -> look.radiusDp?.let { px(context, it) } ?: (look.keyRadiusDp * 2).toFloat()
     }
 
-    /** A clipboard entry's corners, px. */
     fun clipboardRadius(context: Context, look: PanelLooks.Clipboard): Float = if (look.round) PILL else px(context, look.radiusDp)
 
     // splitties' dp of a Float: not truncated
     private fun px(context: Context, dp: Double) = (dp * context.resources.displayMetrics.density).toFloat()
 
-    /** The voice mask. */
     fun voice(context: Context, theme: Theme): PanelLooks.Voice =
         looks(theme)?.voice(scenes(context, theme)) ?: Argb(theme.accentKeyBackgroundColor).let { accent ->
             PanelLooks.Voice(PanelLooks.mask(Argb(theme.keyboardColor)), null, Argb((accent.value and RGB) or (PanelLooks.MIC_ALPHA shl ALPHA)), accent)
         }
 
-    /**
-     * The ink written on the letter keys (the toolbar's 手写) and its width, dp: the theme's `handwriting/pad` ink where
-     * it shows on the letter keys (HandwritingMode.inkColor), else the letters' own colour; its width else [KeyInk.INK_DP].
-     */
+    /** Where the theme's `handwriting/pad` ink shows on the letter keys, else the letters' own colour. */
     fun ink(context: Context, theme: Theme): Pair<Int, Float> {
         val pad = looks(theme)?.pad(scenes(context, theme))
         val color = HandwritingMode.inkColor(pad?.color?.value, theme.keyTextColor, theme.keyBackgroundColor)
@@ -88,6 +67,6 @@ object ScenePanels {
     private const val ALPHA = 24
     private const val OPAQUE = 0xFF
 
-    // a pill's corners: GradientDrawable draws none rounder than half its shorter side (API 29's too)
+    // GradientDrawable draws none rounder than half its shorter side (API 29's too)
     private const val PILL = 10_000f
 }

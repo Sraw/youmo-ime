@@ -33,11 +33,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * A theme 4.0 pack's first frame of a process guarded ([PackDrawGuard]): marked as the keyboard's canvas draws it,
- * the mark gone once the frame is drawn, one left by a process that died with it resetting the settings naming
- * the pack at the next start.
- */
+/** Marked as the canvas draws its first frame, cleared once drawn; one left by a dead process resets its settings next start. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class)
@@ -52,7 +48,7 @@ class PackDrawGuardTest {
         phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
-        // the theme in use the normal mode's, not the day's or night's
+        // the normal mode's theme, not the day's or night's
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         ThemeManager.refreshThemes()
         marks.mkdirs()
@@ -72,7 +68,7 @@ class PackDrawGuardTest {
         ThemeManager.refreshThemes()
     }
 
-    // the pack `mine` of two versions (the built-in Nord's file under that name), imported and listed
+    // a two-version pack `mine` (Nord's file), imported and listed
     private fun placed(): List<Theme.Pack> {
         val xml = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_nord).replace("name=\"nord\"", "name=\"mine\"")
         val zip = ByteArrayOutputStream().also { bytes ->
@@ -85,9 +81,8 @@ class PackDrawGuardTest {
         return opened.commit().getOrThrow().also { ThemeManager.packPlaced(it[0].file) }
     }
 
-    // a frame of the window drawn on the RenderThread (hardware), in ViewRootImpl.performDraw's order: the commit
-    // callbacks registered till now taken first, then the keyboard's canvas [c] recorded; what is returned runs
-    // once this frame is committed ([commit]). Robolectric's own windows draw no frame, so none is drawn otherwise
+    // a RenderThread frame in ViewRootImpl.performDraw's order: commit callbacks taken first, then [c] recorded; the result
+    // runs once committed. Robolectric's windows draw no frame otherwise
     private fun frame(c: KeyboardCanvasView): List<Runnable> {
         val taken = ReflectionHelpers.callInstanceMethod<ArrayList<Runnable>?>(c.viewTreeObserver, "captureFrameCommitCallbacks").orEmpty()
         val node = RenderNode("frame")
@@ -104,7 +99,7 @@ class PackDrawGuardTest {
     fun aPackThatTookTheKeyboardDownIsNotDrawnAgainOnItsOwn() {
         val dark = placed()[1]
         val key = PackDrawGuard.key(dark)
-        // its theme built, for a keyboard made while hidden or a settings page's sizes, no frame drawn: nothing marked
+        // built for a hidden keyboard or a settings page, no frame drawn: nothing marked
         assertNotNull(SceneThemes.of(dark, ThemeManager.shownLook(dark)))
         ThemeManager.setNormalModeTheme(dark)
         SceneBar.heightPercent(appContext)
@@ -113,10 +108,10 @@ class PackDrawGuardTest {
             val c = KeyboardHarness.boardCanvas(h.inputView)!!
             assertNotNull(c.scene)
             assertFalse(mark.exists())
-            // its first frame: marked till the RenderThread has drawn it (its glyphs, its pictures)
+            // its first frame: marked till the RenderThread has drawn it
             val first = frame(c)
             assertEquals("mine", mark.readText())
-            // that frame committed: its callback was registered as it drew, so it goes with the next frame
+            // committed: its callback was registered as it drew, so it goes with the next frame
             commit(first)
             assertTrue(mark.exists())
             // which is asked for (a keyboard shown and hidden untouched would draw no other)
@@ -130,35 +125,35 @@ class PackDrawGuardTest {
             commit(frame(c))
             assertFalse(mark.exists())
             assertTrue(PackDrawGuard.confirmed(key))
-            // drawn once in this process: the frame the second asked for drawn, not marked again, none more asked for
+            // drawn once this process: not marked again, none more asked for
             h.after(50)
             commit(frame(c))
             assertFalse(mark.exists())
             h.after(50)
             assertFalse("no frame more asked for", c.isDirty)
         }
-        // a frame drawn on a bitmap (software) is drawn then and there: no mark left
+        // a software (bitmap) frame is drawn then and there: no mark left
         PackDrawGuard.reset()
         KeyboardHarness(theme = dark).start().use { h ->
             softwareFrame(KeyboardHarness.boardCanvas(h.inputView)!!)
             assertFalse(mark.exists())
             assertTrue(PackDrawGuard.confirmed(key))
         }
-        // imported again (another file time): guarded again
+        // reimported (another file time): guarded again
         val again = key.copy(stamp = key.stamp + 1)
         assertTrue(PackDrawGuard.drawing(again))
         PackDrawGuard.frameDrawn(again)
-        // its first frame of a process recorded, never committed: the process went down with it
+        // recorded, never committed: the process went down with it
         PackDrawGuard.reset()
         KeyboardHarness(theme = dark).start().use { h -> frame(KeyboardHarness.boardCanvas(h.inputView)!!) }
         assertTrue(mark.exists())
-        // the next start before the first unlock (the files not settled): nothing to reset, the mark kept for after
+        // before the first unlock: nothing to reset, the mark kept for after
         directBoot(true)
         assertFalse(ThemeFilesManager.writable)
         ThemeManager.consultPackCrash()
         assertTrue(mark.exists())
         assertEquals(dark.name, ThemeManager.prefs.normalModeTheme.getValue().name)
-        // settled: the settings naming it back to their defaults, the pack kept
+        // settled: its settings back to defaults, the pack kept
         directBoot(false)
         ThemeManager.consultPackCrash()
         assertFalse(mark.exists())
@@ -167,8 +162,7 @@ class PackDrawGuardTest {
         assertEquals(listOf("mine#light", "mine#dark"), ThemeManager.Packs.map { it.name })
     }
 
-    // a device that calls back no frame's commit: a few frames asked for (PackDrawGuard.MAX_ASKED), then none more,
-    // the mark kept till a later frame's commit
+    // a device calling back no commit: MAX_ASKED frames asked, then none, the mark kept till a later commit
     @Test
     fun framesAskedForAPackPendingStopAfterAFew() {
         val dark = placed()[1]

@@ -4,7 +4,11 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.Fixtures.icons
+import org.fcitx.fcitx5.android.scene.Fixtures.near
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.ops
+import org.fcitx.fcitx5.android.scene.Fixtures.texts
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.IconSizes
@@ -27,23 +31,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// small compact's keyboard width, px at Forms.DENSITY: 990 px at 2.75 px a dp
 private const val SMALL_COMPACT_WIDTH = 990.0 * 2.625 / 2.75
 
-// 060-render-v2 §6 step 5: labels, icons and marks where theme 3.0's views put them (rules B §5–§7)
 class ContentTest {
     private val env = Fixtures.portrait
     private val d = Fixtures.DENSITY
 
-    private fun near(e: Double, a: Double, what: String = "") = assertTrue(abs(e - a) < 0.01, "$what: expected $e, was $a")
-
-    private fun ops(s: Scene, id: String, pressed: Boolean = false) = s.keys.first { it.id == id }.ops(pressed)
-
     private val movingIcons = setOf("delete-sweep", "restore", "select-all", "content-copy", "content-paste", "content-cut", "undo", "redo")
-
-    private fun texts(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Text>()
-
-    private fun icons(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Icon>()
 
     private fun face(s: Scene, id: String) = (s.keys.first { it.id == id }.shape as Shape.Rect).box
 
@@ -54,9 +48,7 @@ class ContentTest {
         val size = 23 * d
         near(size, q.size)
         val f = face(s, "q")
-        // a single character: its ink (0.05 of the size in, FakeMeasurer) centred across
         near(f.centerX - (0.6 * size - 0.1 * size) / 2 - 0.05 * size, q.x, "x")
-        // the font's extent (1.05 above, 0.3 below) centred up and down
         near(f.centerY - (1.35 * size) / 2 + 1.05 * size, q.baseline, "baseline")
         assertEquals(400, q.weight)
         assertEquals(Fixtures.materialLight.colors["keyText"], q.color)
@@ -81,14 +73,12 @@ class ContentTest {
         near(size, one.size)
         assertEquals(700, one.weight)
         val f = face(s, "q")
-        // TopRight: 4 dp in from the face's right, its ink's right; its box's top at the face's top
         val inkRight = one.x + 0.6 * 1.05 * size - 0.05 * size
         near(f.right - 4 * d, inkRight, "right")
         near(f.top + 1.05 * size, one.baseline, "top")
         assertEquals(Fixtures.materialLight.colors["keyHint"], one.color)
     }
 
-    // [box] in [at]'s part of the face [f]: its side (the middle for 底部 and 顶部) and its half
     private fun assertAt(at: KeyMarks.At, box: Box, f: Box, what: String) {
         val x = (box.left + box.right) / 2 - (f.left + f.right) / 2
         val y = (box.top + box.bottom) / 2 - (f.top + f.bottom) / 2
@@ -106,9 +96,7 @@ class ContentTest {
 
     @Test
     fun aFunctionKeysMarksEachWhereItsWaysSettingSays() {
-        // beta2: 上滑 右上, 下滑 右下 drew ⌫'s 恢复 (down) top right and 清除 (up) bottom right. Every 上滑 × 下滑, on
-        // tall keys and low ones (横屏, 紧凑: a 底部 the first of 右上 右下 左上 左下 the other way's is not, a 顶部 of 右上 左上 右下 左下), and
-        // 翻转上下滑 (the two places, the long press's way and every key's two swipes swapped): the marks stay
+        // a released build drew ⌫'s marks swapped: every 上滑 × 下滑, tall and low keys, flipped or not, the marks stay
         val places = KeyMarks.At.entries.filter { it != KeyMarks.At.None }
         val seen = mutableSetOf<Triple<String, Boolean, KeyMarks.At>>()
         val forms = listOf("tall" to Fixtures.portrait, "landscape" to Fixtures.landscape, "compact" to Fixtures.compact)
@@ -116,7 +104,6 @@ class ContentTest {
         val flippedPreset = Fixtures.presetMarks.mapKeys { (k, _) -> if (k.endsWith(":up")) k.dropLast(3) + ":down" else k.dropLast(5) + ":up" }
         for ((form, base) in forms) for ((up, down) in combos) {
             val low = form != "tall"
-            // each the first corner the other way's setting is not; a 顶部 and a 底部 each its own edge's right corner
             fun shown(at: KeyMarks.At, other: KeyMarks.At) = when {
                 !low || !at.middle -> at
                 other.middle -> if (at == KeyMarks.At.Top) KeyMarks.At.TopRight else KeyMarks.At.BottomRight
@@ -132,7 +119,6 @@ class ContentTest {
             for ((name, at) in listOf("delete-sweep" to upShown, "restore" to downShown)) {
                 val box = icons[name]
                 if (at == KeyMarks.At.None) assertEquals(null, box, "$form $up $down: $name not drawn")
-                // drawn wherever set, on every form: no pair of places the yield drops one of on these keys
                 assertTrue(at == KeyMarks.At.None || box != null, "$form $up $down: $name drawn at $at")
                 if (box == null) continue
                 assertAt(at, box, f, "$form $up $down: $name")
@@ -156,7 +142,6 @@ class ContentTest {
         near(floor(11 * d + 0.5), redo.box.width)
         val backspace = icons(s, "backspace").map { it.name }
         assertEquals(listOf("backspace", "delete-sweep", "restore").sorted(), backspace.sorted())
-        // each at its own way's place: up 右上, down 左上 by default
         val bf = face(s, "backspace")
         val up = icons(s, "backspace").first { it.name == "delete-sweep" }.box
         val down = icons(s, "backspace").first { it.name == "restore" }.box
@@ -167,12 +152,8 @@ class ContentTest {
 
     @Test
     fun aShortBackspaceKeepsBothItsIconsEveryShortcutAsMuchSmaller() {
-        // 注音大千 on a 360 dp phone at 440 dpi, compact, a little taller than 20%: a ⌫ face 45.5 px tall. Its two
-        // 8 dp icons, 22 px each, need 44 with nothing between them and the face's 4 dp corners: every shortcut
-        // icon of the board as much smaller (060-render-p2 S4e), no more than the marks' cap, both drawn one over
-        // the other; at 20% (43.5 px) past the cap, the down one left out
+        // 注音大千 compact on a 360 dp phone: ⌫'s two icons crowd its face; smaller within the cap, then the down one left out
         val d = 2.75
-        // the two one over the other (上滑 左上, 下滑 左下), as a function key's are where the settings say so
         fun scene(h: Double) = Forms.scene("zhuyin", Forms.env("zhuyin", Fixtures.compact.copy(width = 990.0, height = h, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft))))
         assertEquals(setOf("backspace", "delete-sweep"), icons(scene(407.0), "backspace").map { it.name }.toSet(), "at 20%")
         val s = scene(420.0)
@@ -189,10 +170,7 @@ class ContentTest {
 
     @Test
     fun twoIconsOneOverTheOtherAreKeptApartWithinTheirFaceOrOneLeftOut() {
-        // whatever the density and the keyboard's size, a ⌫'s two icons, where both are drawn, are apart, their
-        // boxes a quarter dp in from the face's top and bottom and their corners within the face's rounded ones;
-        // drawn no smaller than the marks' cap; one left out only where that is not enough
-        // the theme's 4 dp corners, and square ones (where the quarter dp is what stops them)
+        // at any density and size ⌫'s two icons are apart and within the face's corners, no smaller than the cap
         val edgeDp = 0.25
         var kept = 0
         var smaller = 0
@@ -226,14 +204,12 @@ class ContentTest {
             assertTrue(down.bottom <= f.bottom - edgeDp * d + 0.01, "down in its face $at: $down")
             iconsWithinArcs(key, at)
         }
-        // the sweep met all three: kept as they were, kept smaller, one left out
         assertTrue(kept - smaller >= 20 && smaller >= 10 && left >= 10, "kept $kept (smaller $smaller), left out $left")
     }
 
     @Test
     fun aCompactZhuyinBackspacesIconNeverFlickers() {
-        // compact and small compact zhuyin, a px shorter at a time where ⌫'s icons crowd it: its sweep icon
-        // never somewhere, then elsewhere, then back, both steps over 1.5 px (060-render-p2 S4e)
+        // a px shorter at a time: its sweep icon never jumps back and forth
         val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for ((form, d, hi) in listOf(Triple(Forms.compact, 2.75, 324), Triple(small, 2.75, 324), Triple(Forms.compact, 3.5, 412), Triple(small, 3.5, 412))) {
             val k = d / Forms.DENSITY
@@ -255,11 +231,7 @@ class ContentTest {
 
     @Test
     fun aFloatingBoardsClassesShrinkSmoothlyAndItsIconsKeepWithinTheArcs() {
-        // floating qwerty, k14, k18, zhuyin and floating compact zhuyin nine at 2, 2.75 and 3.5 px a dp, from their
-        // height down to 55% a px at a time: every text and icon at most about 2% smaller or larger a px (an
-        // icon's whole px: a px of it, 2.2% of a 46 px one), and every shortcut and ⌫ icon within its face's
-        // arcs (060-render-p2 S4e); some against them (within the half px the yields keep off the face's edges,
-        // the most a pixel's rounding moves them), or the arcs were never in play
+        // a px shorter at a time: every text and icon changes little a px, every icon within its face's arcs
         val boards = listOf("qwerty", "k14", "k18", "zhuyin").map { it to false } + ("zhuyin-nine" to true)
         var against = 0
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for ((board, compact) in boards) against += sweepSmoothly(d, board, Forms.floating.copy(compact = compact))
@@ -268,9 +240,6 @@ class ContentTest {
 
     @Test
     fun theFloatingBoardsTheSweepLeavesOutKeepTheirIconsWithinTheArcs() {
-        // what the sweep above does not run: floating compact qwerty, k14 and zhuyin at every density,
-        // and every floating board at 2.625 and 3.0 px a dp; from their height down to 55% of it, and a px or two
-        // less, every shortcut's and ⌫'s icon within its face's arcs (R20 F6519: the check F5911 merged away)
         val heights = listOf(1.0, 0.9, 0.8, 0.7, 0.65, 0.6, 0.55).flatMap { part -> listOf(0.0, 1.0, 2.0).map { px -> part to px } }
         val compactBoards = listOf("qwerty", "k14", "zhuyin")
         val runs = listOf(2.0, 2.625, 2.75, 3.0, 3.5).flatMap { d -> compactBoards.map { Triple(d, it, true) } } +
@@ -289,14 +258,11 @@ class ContentTest {
 
     @Test
     fun aCompactBoardsClassesShrinkSmoothlyAndItsIconsKeepWithinTheArcs() {
-        // the same for compact and small compact qwerty, k14 and k18; where a key's face is shorter than its
-        // text (small compact k18 near 55%: 21 px of face, 36 px of text) the text gives a px for each px of
-        // face: up to 3.75% a px there, only ever smaller (060-render-p2 S4e)
+        // where a key's face is shorter than its text, the text gives a px for each px of face: only ever smaller
         val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("qwerty", "k14", "k18")) sweepSmoothly(d, board, form)
     }
 
-    // the icons against the arcs on the way
     private fun sweepSmoothly(d: Double, board: String, form: Env): Int {
         val k = d / Forms.DENSITY
         val top = form.height * k
@@ -321,9 +287,6 @@ class ContentTest {
 
     @Test
     fun aTablesRootsInLinesKeepTheirSymbolTheClasssSize() {
-        // floating qwerty at 0.7 of its height, 五笔's roots over the letters (g's in two lines: it yields not),
-        // h's symbol a wide one that needs the symbols smaller: g's symbol as much smaller as j's
-        // (060-render-p2 S4e M2)
         val e0 = Forms.env("qwerty", Forms.floating.copy(height = Forms.floating.height * 0.7))
         val e = e0.copy(
             input = e0.input.copy(ime = "table", table = "wbx", roots = true),
@@ -342,8 +305,6 @@ class ContentTest {
 
     @Test
     fun aCompactZhuyinsIconsKeepWithinTheArcsHalfAPxAtATime() {
-        // compact and small compact zhuyin and zhuyin nine at every density, from their height down to 55%
-        // half a px at a time (between whole px of keyboard too): every icon within the arcs (060-render-p2 S4e)
         val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (d in listOf(1.5, 2.0, 2.75, 3.5)) for (form in listOf(Forms.compact, small)) for (board in listOf("zhuyin", "zhuyin-nine")) halfPxWithinArcs(d, board, form)
     }
@@ -359,8 +320,6 @@ class ContentTest {
 
     @Test
     fun aBackspacesIconKeepsWithinTheArcsBetweenWholePx() {
-        // compact and small compact zhuyin where the rv4e sweep had ⌫'s and the space's icons out of the arcs
-        // without onto's last within (between whole px of keyboard): within them (060-render-p2 S4e M1)
         val small = Forms.compact.copy(width = SMALL_COMPACT_WIDTH, height = 407.0 * 2.625 / 2.75)
         for (form in listOf(Forms.compact, small)) for ((d, h) in listOf(3.5 to 409.2, 3.5 to 414.2, 2.75 to 322.8, 2.75 to 325.8, 2.75 to 326.8)) {
             val k = d / Forms.DENSITY
@@ -371,8 +330,6 @@ class ContentTest {
         }
     }
 
-    // a text's size (its scale too), an icon's width, by key and what it is; whether it is the key's
-    // glyph (its largest text) and taller than the key's face
     private fun sized(key: KeyNode, op: Op): Pair<String, Pair<Double, Boolean>>? {
         val face = (key.shape as? Shape.Rect)?.box?.height ?: Double.MAX_VALUE
         val glyph = key.ops(false).filterIsInstance<Op.Text>().maxOfOrNull { it.size }
@@ -383,10 +340,7 @@ class ContentTest {
         }
     }
 
-    // the marks the bounds below were measured with: the firsts as typed (`?`, not Chinese punctuation's wide `？`), the
-    // shortcut icons the full keyboard's letters', ⌫'s and the space's. The app's own (a 14/18 键 and 注音 key's icons, the
-    // wide corners) step further: small compact qwerty at 2 px a dp its letters 5% in a px, floating 注音 at 3.5 its ⌫ and
-    // space icons 1.1 px larger every 5 px shorter (060-keys-unify S6, measured; left to the render's own work)
+    // the marks the bounds below were measured with; the app's own marks step further
     private fun measuredMarks(board: String, e: Env): Env = e.copy(
         marks = e.marks.copy(
             shortcuts = DefaultMarks.shortcuts(Forms.layout(board), Forms.fragments)
@@ -394,20 +348,11 @@ class ContentTest {
         ),
     )
 
-    // a px of keyboard, at [d] px a dp: at most 0.04 / d from [o] to [v] (2% at 2 px a dp: the less a px is
-    // of a dp, the less it moves), or a px for an icon (whole px); a glyph taller than its face more, up to
-    // 0.075 / d, only smaller (the face's px it gives, and its class's need fading in as its marks' does: small
-    // compact k18 at 2 px a dp gives 3.6% at 196 px with FIT_SLACK, 2.8% without; growing, as any)
     private fun smallStep(id: String, o: Double, v: Pair<Double, Boolean>, d: Double, smallCompact: Boolean, at: String): Boolean {
         val (now, tall) = v
-        // (0.042: small compact k18's '1' at 2 px a dp gives 2.06% at 187 px with FIT_SLACK, 1.9% at most without;
-        // both bounds measured, not derived: a change to FIT_SLACK, the marks or the fonts re-measures them)
+        // both bounds measured, not derived: a change to FIT_SLACK, the marks or the fonts re-measures them
         val most = 0.042 / d
         if (tall && o - now > most * o) {
-            // the measured case of an icon taller than its face: small compact qwerty, k14, k18 near 55% (at 1.5 px a
-            // dp 140 px, a 14 px ⌫ face under a 36 px icon), ⌫'s two marks side by side on top (上滑 右上, 下滑 左上):
-            // the face no longer holds them beside it and the icons' class goes to its cap in a step (measured: one
-            // a sweep at 1.5 to 2.75 px a dp, two at 3.5; the caller allows two)
             val icon = " I " in id
             if (icon) assertTrue(smallCompact, "$id $o to $now, an icon taller than its face, $at")
             assertTrue(o - now <= (if (icon) KeyMarkYield.MAX_CLASS_SHRINK else 0.075 / d) * o + 1e-6, "$id $o to $now, taller than its face, $at")
@@ -418,7 +363,6 @@ class ContentTest {
         return false
     }
 
-    // [key]'s shortcut and ⌫ icons' box corners within its face's rounded ones (less the border); how many against them
     private fun iconsWithinArcs(key: KeyNode, at: String): Int {
         val shape = key.shape as? Shape.Rect ?: return 0
         val f = shape.box
@@ -443,9 +387,7 @@ class ContentTest {
 
     @Test
     fun aLettersSymbolGoesUpOrAsideOnceAsTheBoardGetsShorter() {
-        // floating qwerty at 2 px a dp a px shorter at a time, v's face 63 px down to 47 (51 and 52 by turns,
-        // the rows' rounding): '?' goes up out of v's way, then aside, and never back; the way is v's at its
-        // size, not the letters' as they get smaller
+        // '?' goes up out of v's way, then aside, and never back
         val d = 2.0
         val k = d / Forms.DENSITY
         val heights = mutableSetOf<Double>()
@@ -467,9 +409,7 @@ class ContentTest {
 
     @Test
     fun theLettersOfAShortFloatingBoardAreSmallerOnlyOnceTheirIconsHaveEatenTheirInsets() {
-        // a floating board three quarters its height: the top left icons eat their insets before every letter is
-        // smaller (0.942 to 0.953 of the letters with no shortcuts drawn at 2 to 3.5 px a dp; 0.911 to 0.922
-        // were the icons kept to their rooms)
+        // the top left icons eat their insets before every letter is smaller
         for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
             val k = d / Forms.DENSITY
             val form = Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k * 0.75, density = d, compact = true)
@@ -481,9 +421,6 @@ class ContentTest {
 
     @Test
     fun aBorderKeepsTheIconsOffIt() {
-        // the small phone's ⌫ as above, its face square, a 1 dp border (all of the inset): the icons eat none of
-        // it, drawn smaller rather than on the line (45.5 px of face), their size taller (49.5); at 20% (43.5) the
-        // down one left out
         val d = 2.75
         fun theme(border: String) = ThemeReader.theme(
             testData("material-light.xml").replace("</theme>", "<style select=\"key\" radius=\"0dp\" border=\"$border\"/>\n</theme>"),
@@ -502,9 +439,6 @@ class ContentTest {
 
     @Test
     fun aFloatingBoardsBackspaceOneOverTheOtherKeepsBothItsIconsTheirClassOneSize() {
-        // 上滑 左上, 下滑 左下: every floating board at every density, its height: ⌫'s two left icons, their size, meet its icon where
-        // it is; it goes aside (its class no smaller than the cap) and both are drawn, the shortcut icons one
-        // size, no larger than theirs (060-render-p2 S4e)
         for (d in listOf(2.0, 2.625, 2.75, 3.5)) for (board in listOf("qwerty", "k14", "k18", "zhuyin-nine", "number", "symbols")) {
             val k = d / Forms.DENSITY
             val e = Forms.env(board, Forms.floating.copy(width = Forms.floating.width * k, height = Forms.floating.height * k, density = d, marks = MarkSettings(upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.BottomLeft)))
@@ -522,9 +456,7 @@ class ContentTest {
 
     @Test
     fun aBackspacesIconsMoveWithItsFaceAPxAtATimeNeverAWholeInsetAtOnce() {
-        // the keyboard a px shorter at a time, from where the icons sit as they were to where one is left out:
-        // each kept icon and the glyph move no more than that px (the insets eaten a share at a time, worked
-        // out on the edges before they are put on whole pixels)
+        // each kept icon and the glyph move no more than a px of keyboard (insets eaten a share at a time)
         for (d in listOf(2.0, 2.625, 2.75, 3.0, 3.5)) {
             var last: Map<String, Box>? = null
             var px = 0
@@ -568,10 +500,8 @@ class ContentTest {
 
     @Test
     fun eachWayDrawsItsSlotAtItsPlace() {
-        // 060-swipe-slots: the long press's first down (top right), a text up (top left); a symbol given, a way set to nothing
         val marks = MarkSettings(
             upAt = KeyMarks.At.TopLeft, downAt = KeyMarks.At.TopRight, firstUp = false,
-            // q's first down, as KeyResolver puts it for 翻转上下滑
             shortcuts = mapOf("full/q:up" to MarkContent.Text("你好…"), "full/q:down" to MarkContent.Symbol("1"), "full/w:up" to MarkContent.Symbol("!"), "full/w:down" to MarkContent.Empty),
         )
         val s = Fixtures.scene(env.copy(marks = marks))
@@ -582,14 +512,12 @@ class ContentTest {
         val w = texts(s, "w").map { it.text }
         assertEquals(listOf("!", "w").sorted(), w.sorted(), "a symbol given drawn, the corner set to nothing not")
         assertTrue(texts(s, "w").first { it.text == "!" }.x < face(s, "w").centerX, "a symbol at its own way's place, the top left")
-        // a way off draws nothing
         val upOff = Fixtures.scene(env.copy(marks = env.marks.copy(upOn = false)))
         assertTrue(texts(upOff, "q").none { it.text == "1" })
         assertEquals("select-all", icons(upOff, "a").single().name)
         val downOff = Fixtures.scene(env.copy(marks = env.marks.copy(downOn = false)))
         assertTrue(icons(downOff, "a").isEmpty())
         assertTrue(icons(downOff, "backspace").none { it.name == "restore" })
-        // two on one key's ways, both shortcuts: each at its own place
         val two = Fixtures.scene(env.copy(marks = MarkSettings(shortcuts = mapOf("full/a:up" to MarkContent.Icon("undo"), "full/a:down" to MarkContent.Icon("redo")))))
         val a = icons(two, "a").associate { it.name to it.box }
         assertTrue(a.getValue("undo").left > a.getValue("redo").left, "up at the top right, down at the top left")
@@ -613,8 +541,7 @@ class ContentTest {
 
     @Test
     fun theLabelAboveASymbolBelowCentresToTheSymbolsExtent() {
-        // M2: the symbol's TextView stood by the font's extent (1.05 of its size above the baseline), not its ink
-        // no shortcuts: nothing meets, so the letters are their size
+        // the symbol's TextView stood by the font's extent (1.05 of its size above the baseline), not its ink
         val s = Fixtures.scene(env.copy(marks = env.marks.copy(upAt = KeyMarks.At.Bottom, charShortcuts = false)))
         val f = face(s, "q")
         val one = texts(s, "q").first { it.text == "1" }
@@ -626,7 +553,6 @@ class ContentTest {
 
     @Test
     fun aBadgeStaysWhereTheLabelIsHiddenOrThereIsNone() {
-        // M6: a theme hiding the label keeps the badge and the shortcuts (rules B §5), the badge where it was
         val voice = env.copy(input = Input(holdVoice = true))
         val shown = icons(Fixtures.scene(voice), "space").first { it.name == "voice" }
         val t = ThemeReader.theme(testData("material-light.xml").replace("</theme>", "<style select=\"*/space label\" hidden=\"true\"/>\n</theme>")).ok()
@@ -634,7 +560,6 @@ class ContentTest {
         assertTrue(texts(hidden, "space").isEmpty())
         assertEquals(shown.box, icons(hidden, "space").first { it.name == "voice" }.box)
         assertEquals("cursor-move", icons(hidden, "space").last().name, "the shortcut still drawn")
-        // an input method with no name: the badge alone, its 3 dp after it still counted
         val nameless = Fixtures.scene(voice.copy(texts = voice.texts.copy(imeName = "")))
         val badge = icons(nameless, "space").first { it.name == "voice" }
         near(face(nameless, "space").centerX - 1.5 * d, badge.box.centerX, "15 dp and 3 dp centred")
@@ -642,7 +567,6 @@ class ContentTest {
 
     @Test
     fun anIconAloneIsDrawnAtItsOwnSize() {
-        // L2: ImageKeyView's wrap_content, the drawable's size
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
                 "<row><key id=\"a\" icon=\"wide\" a11y=\"a\" width=\"5\"/><key id=\"b\" icon=\"lock\" a11y=\"b\" width=\"5\"/></row></keyboard>",
@@ -678,16 +602,12 @@ class ContentTest {
 
     @Test
     fun crowdedLettersShrinkTogetherRuleB7Yield() {
-        // shorter and shorter keys: every letter one size at each height (060-render-p2 S4e). 540 px across: the
-        // fixture's letters wider than their room too (rule B §8a), past the class's cap: the class at its cap,
-        // the rest each shrunk alone alike, so one size still, the same at every height (nothing left for the
-        // height to take); so short its symbols meet their letters, those symbols left out
+        // shorter and shorter keys: every letter one size at each height
         val all = mutableSetOf<Double>()
         for (h in 240..400 step 8) {
             val s = Fixtures.scene(env.copy(width = 540.0, height = h.toDouble()))
             val letters = s.keys.filter { it.kind == "letter" && it.role == null }
             val sizes = letters.map { k -> k.ops(false).filterIsInstance<Op.Text>().first { it.text == k.id }.size }.toSet()
-            // one class, one scale: the same size to the last bit
             assertEquals(1, sizes.size, "at $h: $sizes")
             assertTrue(sizes.single() < 23 * d * (1 - KeyMarkYield.MAX_CLASS_SHRINK), "past the class's cap at $h")
             all += sizes.single()
@@ -696,7 +616,6 @@ class ContentTest {
         assertEquals(1, all.size, "every height: $all")
     }
 
-    // a table's roots over the letters (TextKeyboard): `when=roots`, `{root:x}`; the letter in the corner
     @Test
     fun aTablesRootsInLinesInOneLinesHeightShrunkToTheFace() {
         val roots = env.copy(
@@ -705,16 +624,12 @@ class ContentTest {
                 alts = Fixtures.qwertyAlts.keys.associate { k -> "full/$k" to k },
                 other = mapOf("root:q" to "金", "root:w" to "人亻八\n癶", "root:e" to "月彡乃用"),
             ),
-            // the letter its corner (KeyResolver, looking up roots)
             marks = env.marks.copy(shortcuts = env.marks.shortcuts + Fixtures.qwertyAlts.keys.map { k -> "full/$k:up" to MarkContent.Symbol(k) }),
         )
         val s = Fixtures.scene(roots)
         val size = 23 * d
-        // a name: one character, as a letter is drawn, the letter in its corner
         near(size, texts(s, "q").first { it.text == "金" }.size)
         assertTrue(texts(s, "q").any { it.text == "q" })
-        // in two lines, each at 0.55 of the size, one under the other, centred across; three wide
-        // characters at that wider than the face less 6 dp a side: the two shrunk into it alike
         val w = texts(s, "w").filter { it.text != "w" }
         assertEquals(listOf("人亻八", "癶"), w.map { it.text })
         val f = face(s, "w")
@@ -724,12 +639,9 @@ class ContentTest {
         near(1.35 * w[0].size, w[1].baseline - w[0].baseline, "a line's height")
         near(f.centerX, w[0].x + 3 * w[0].size / 2, "centred")
         near(f.centerX, w[1].x + w[1].size / 2, "centred")
-        // four roots on a line of the full size are wider than the face less 6 dp a side: shrunk into
-        // it (and with the letters then, out of their corners' way: one line's ink is measured)
         val e = texts(s, "e").single { it.text == "月彡乃用" }
         assertTrue(4 * e.size <= room + 0.01, "shrunk to the face: ${4 * e.size}")
         assertTrue(4 * e.size > room * 0.7, "not past the letters' yield: ${4 * e.size}")
-        // no roots: the letters as ever
         assertTrue(texts(Fixtures.scene(env), "w").any { it.text == "w" })
     }
 
@@ -739,9 +651,7 @@ class ContentTest {
         assertEquals(2, Content.codePoints("ab"))
         assertEquals(1, Content.codePoints("\uD83D"))
     }
-    // 060-render-p2 S4f: a phone upright 393 dp at 2.75, "@" as wide as Roboto's at the bottom left and 全选 at
-    // the bottom: the yields keep them apart with the icon where it is placed, drawn on whole pixels ([Content]'s
-    // laidOut) almost a px further left, back onto the "@" they had moved left of it
+    // pixel snapping ([Content]'s laidOut) must not move the yielded icon back onto the "@"
     @Test
     fun aKeysMarksStayApartWhereItsIconIsLaidOutOnWholePixels() {
         val wide = object : TextMeasurer {

@@ -15,7 +15,6 @@ class DayCountsTest {
         val c = DayCounts.of(3 to 1, 7 to 2)
         c.add(5, 4)
         c.add(1, 1)
-        // past the first arrays' two
         assertEquals("[1:1,3:1,5:4,7:2]", c.toString())
         assertEquals(7, c.lastDay)
     }
@@ -28,7 +27,6 @@ class DayCountsTest {
         c.add(5, -9)
         assertTrue(c.isEmpty())
         assertEquals(Int.MIN_VALUE, c.lastDay)
-        // less than none of a day not counted: nothing
         c.add(4, -1)
         assertTrue(c.isEmpty())
     }

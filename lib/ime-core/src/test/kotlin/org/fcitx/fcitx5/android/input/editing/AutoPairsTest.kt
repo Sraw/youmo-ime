@@ -19,7 +19,7 @@ class AutoPairsTest {
         val session = EditingSession(editor).also { it.selection.resetTo(cursor) }
         val pairs = session.pairs
 
-        /** Typed as the service types it: the pairs first, else committed. */
+        /** The pairs first, else committed, as the service types. */
         fun type(text: String) {
             for (c in text) if (!pairs.type(c.toString())) session.commitText(c.toString())
         }
@@ -30,27 +30,23 @@ class AutoPairsTest {
             assertTrue(session.backspace(EditorTraits(acceptsDeleteSurrounding = true)))
         }
 
-        /** The editor reports where its cursor is, as it does after each change. */
+        /** As the editor does after each change. */
         fun report() {
             session.onCursorUpdate(
                 editor.selectionStart, editor.selectionEnd, editor.composingStart, editor.composingEnd,
-                ignoreSystemCursor = false,
             )
         }
 
-        /** The user puts the cursor at [p], and the editor reports it. */
         fun moveTo(p: Int) {
             editor.setSelection(p, p)
             report()
         }
 
-        /** The session expects the cursor where the editor has it. */
         fun assertInStep() = assertTrue(
             "predicted ${session.selection.latest}, editor at ${editor.selectionStart}",
             session.selection.latest.rangeEquals(editor.selectionStart, editor.selectionEnd),
         )
 
-        /** The text with `|` where the cursor is. */
         val shown get() = editor.text.substring(0, editor.selectionStart) + "|" + editor.text.substring(editor.selectionStart)
     }
 
@@ -63,7 +59,7 @@ class AutoPairsTest {
         assertEquals("（好|）", t.shown)
     }
 
-    /** Typing in a pair, what neither closes it nor opens one is committed without asking the editor. */
+    /** Committed without asking the editor. */
     @Test
     fun aCharacterThatNeitherClosesNorOpensReadsNothing() {
         val t = Typing("")
@@ -85,8 +81,7 @@ class AutoPairsTest {
         assertEquals("（《书》）|", n.shown)
     }
 
-    // English takes back the space it put after a word, the bracket typed in its place with one
-    // after it: the closing one put in is stepped over, not typed again
+    // English takes back its space after a word for the bracket: the closing one put in is stepped over
     @Test
     fun aClosingOneCommittedWithMoreAfterItStepsOverTheOnePutIn() {
         val t = Typing("")
@@ -155,7 +150,7 @@ class AutoPairsTest {
         assertEquals("don't|", a.shown)
     }
 
-    /** The symbol panel's brackets and quotes (0.6.1): each pairs, its closing one steps over, Backspace takes both. */
+    /** The symbol panel's brackets and quotes: each pairs, its closing one steps over, Backspace takes both. */
     @Test
     @Uat("PAN-30")
     fun theSymbolPanelsBracketsPairEach() {
@@ -174,7 +169,7 @@ class AutoPairsTest {
         }
     }
 
-    /** A full-width ＂ is an ASCII " in this: it opens where something starts, closes after a word. */
+    /** A full-width ＂ is an ASCII " here: it opens where something starts, closes after a word. */
     @Test
     fun aFullWidthQuoteOpensAndClosesAsTheAsciiOne() {
         val t = Typing("说 ")
@@ -239,17 +234,16 @@ class AutoPairsTest {
     fun theCursorMovedToTheStartForgetsThePairs() {
         val t = Typing("")
         t.type("“")
-        t.session.onCursorUpdate(1, 1, -1, -1, ignoreSystemCursor = false)
+        t.session.onCursorUpdate(1, 1, -1, -1)
         t.editor.setSelection(0, 0)
-        t.session.onCursorUpdate(0, 0, -1, -1, ignoreSystemCursor = false)
+        t.session.onCursorUpdate(0, 0, -1, -1)
         assertFalse(t.pairs.quoteOpen)
-        // the app deleted what was before a closing one put in: one typed there is typed, not
-        // stepped over
+        // the app deleted what was before a closing one put in: one typed there is typed, not stepped over
         val d = Typing("")
         d.type("（")
-        d.session.onCursorUpdate(1, 1, -1, -1, ignoreSystemCursor = false)
+        d.session.onCursorUpdate(1, 1, -1, -1)
         d.editor.deleteSurroundingText(1, 0, inCodePoints = false)
-        d.session.onCursorUpdate(0, 0, -1, -1, ignoreSystemCursor = false)
+        d.session.onCursorUpdate(0, 0, -1, -1)
         d.type("）")
         assertEquals("）|）", d.shown)
     }
@@ -277,10 +271,9 @@ class AutoPairsTest {
         // fcitx reset meanwhile: the quote key gives “ again
         t.type("“")
         assertEquals("“好”|", t.shown)
-        // which fcitx now counts open: quoteOpen says so till the cursor report, where the service
-        // sees it fall and resets fcitx; else the next quote would be a lone ”
+        // fcitx counts it open till the cursor report, where the service resets it; else the next quote is a lone ”
         assertTrue(t.pairs.quoteOpen)
-        t.session.onCursorUpdate(3, 3, -1, -1, ignoreSystemCursor = false)
+        t.session.onCursorUpdate(3, 3, -1, -1)
         assertFalse(t.pairs.quoteOpen)
         // fcitx's own ” closed what it counted: nothing to reset
         val s = Typing("")
@@ -339,13 +332,13 @@ class AutoPairsTest {
     fun aTapWithinWhatIsComposedBetweenThemKeepsThePairs() {
         val t = Typing("")
         t.type("“")
-        t.session.onCursorUpdate(1, 1, -1, -1, ignoreSystemCursor = false)
+        t.session.onCursorUpdate(1, 1, -1, -1)
         t.session.setComposingText(FormattedText(arrayOf("ni"), intArrayOf(0), -1))
         t.session.composing.update(1, 3)
-        t.session.onCursorUpdate(2, 2, 1, 3, ignoreSystemCursor = false)
+        t.session.onCursorUpdate(2, 2, 1, 3)
         assertTrue(t.pairs.quoteOpen)
         // out of it: gone
-        t.session.onCursorUpdate(0, 0, 1, 3, ignoreSystemCursor = false)
+        t.session.onCursorUpdate(0, 0, 1, 3)
         assertFalse(t.pairs.quoteOpen)
     }
 }

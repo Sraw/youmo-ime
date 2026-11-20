@@ -8,10 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.random.Random
 
-/**
- * [CodePoints] over random UTF-16 -- letters, surrogate pairs and lone surrogates in any mix --
- * against an oracle built on the JDK's own code point walk. Seeded, so a failure reproduces.
- */
+/** [CodePoints] over random UTF-16 against the JDK's code point walk; seeded, so a failure reproduces. */
 class CodePointsPropertyTest {
 
     private val high = '\uD83D'
@@ -28,14 +25,14 @@ class CodePointsPropertyTest {
         }
     }
 
-    /** Letters and surrogate pairs in any mix, anywhere in the text, and no lone surrogate. */
+    /** No lone surrogate. */
     private fun Random.wellFormed(maxLength: Int): String = buildString {
         repeat(nextInt(maxLength + 1)) {
             if (nextBoolean()) append(high).append(low) else append('a' + nextInt(26))
         }
     }
 
-    /** Walks [count] code points back from the end; null on meeting an unpaired surrogate. */
+    /** Null on an unpaired surrogate. */
     private fun oracleLast(text: String, count: Int): Int? {
         var i = text.length
         repeat(count) {

@@ -16,12 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * contract: ime-core's list against the app's strings.xml in every language, which mutation cannot see.
- * audit-061 core-input-12: ime-core's folder names a quick-input folder cannot have (QuickPhraseFiles.RESERVED_FOLDERS)
- * are written out there, every language's at once (a file goes to a phone in another language as it is). They are
- * the shelves the page shows, in each language the app has: a shelf renamed in strings.xml and not there fails here.
- */
+/** contract: ime-core's reserved folder names against the app's shelf names in every language, which mutation cannot see. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class QuickPhraseReservedFoldersTest {

@@ -12,10 +12,7 @@ import org.fcitx.fcitx5.android.host.HostStrings
 import org.fcitx.fcitx5.android.host.Tip
 import org.fcitx.fcitx5.android.host.UnicodeStrings
 
-/**
- * The texts fcitx took from gettext (its own, chinese-addons' and our `po/`), from the app's
- * resources, so they read as the native host's did in each of the app's languages.
- */
+/** The texts fcitx took from gettext, from the app's resources. */
 class AppHostStrings(context: Context) : HostStrings {
     private val res = context.resources
 

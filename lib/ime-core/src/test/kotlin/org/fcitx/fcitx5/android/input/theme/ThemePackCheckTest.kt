@@ -25,8 +25,7 @@ private const val LAYOUTS = "../keyboard-scene/src/commonMain/layouts"
 
 class ThemePackCheckTest {
 
-    // the default look as 4.0: [before] ahead of its first style (a picture, fonts), [styles] after its
-    // styles, [after] at its end (icons), [meta] before its colours, [colors] over its colours
+    // the default look: [before] ahead of its first style, [styles] after them, [after] at its end, [meta]/[colors] around its colours
     private fun theme(
         styles: String = "",
         meta: String = "",
@@ -103,8 +102,7 @@ class ThemePackCheckTest {
         // an image only pressed, or on another key: blank
         assertEquals(1, found("""<style select="*/enter:pressed" fill="image(e.png, 0 0 0 0, 3x)"/>""" + hide))
         assertEquals(1, found("""<style select="*/space" fill="image(e.png, 0 0 0 0, 3x)"/>""" + hide))
-        // the image not the face that wins: a later tie, a board's own key, a scene, two scenes, a board's every
-        // key in a scene, flat, a class the key has
+        // the image not the face that wins: a later tie, a board's own key, scenes, flat, a class the key has
         for (
             over in listOf(
                 """<style select="*/enter" fill="#ffffffff"/>""",
@@ -142,8 +140,7 @@ class ThemePackCheckTest {
         assertTrue("$ms ms", ms < CHECK_BUDGET_MS)
     }
 
-    // the worst a pack can ask short of being refused: the largest built-in theme, its key styles naming scenes
-    // whose sets to try come near the most tried, within the time an import may take
+    // the worst a pack can ask short of refusal: the largest built-in theme with scene sets near the cap, within import time
     @Test
     fun theCheckTakesLittleTimeAtItsWorst() {
         val scenes = (1..4).flatMap { listOf("im=s$it", "keyboard=k$it") } + listOf("dark", "flat", "landscape", "compact", "split")

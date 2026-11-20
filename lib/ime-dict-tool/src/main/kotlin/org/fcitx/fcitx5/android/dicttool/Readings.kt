@@ -7,15 +7,7 @@ package org.fcitx.fcitx5.android.dicttool
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
-/**
- * The reading of a run of characters, as the dictionary reads its words: the run is cut into the
- * fewest words the dictionary has, each read as the dictionary reads it likeliest. Read character
- * by character instead, 长期服用 came out zhang'qi'fu'yong and 行业标杆 xing'ye'biao'gan: in a
- * pack, words under readings no one types, pushing out what is typed (dev/TRAINING-PLAN.md 12.10).
- * Most readings weigh the same (a weight marks a polyphone's rarer one only), so ties are broken:
- * between two readings of a word, the one more of its characters are likeliest read as alone;
- * between two cuts, the likelier reading weights, then the words the model finds commoner.
- */
+/** The reading of a run of characters: cut into its fewest words, each read likeliest. */
 internal class Readings(private val data: PinyinData) {
     private class Reading(val syllables: IntArray, val weight: Float, val agreement: Int)
 

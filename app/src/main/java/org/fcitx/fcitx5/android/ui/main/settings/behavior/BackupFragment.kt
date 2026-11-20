@@ -44,10 +44,7 @@ import org.fcitx.fcitx5.android.utils.setup
 import org.fcitx.fcitx5.android.utils.toast
 import timber.log.Timber
 
-/**
- * The whole of the user's data in and out, as one file: where it lies on the phone is no business
- * of theirs (fcitx's global options and its data folder are not shown either).
- */
+/** All user data in and out as one file: where it lies on the phone is not the user's business. */
 class BackupFragment : PaddingPreferenceFragment() {
 
     private val viewModel: MainViewModel by activityViewModels()
@@ -66,19 +63,16 @@ class BackupFragment : PaddingPreferenceFragment() {
                 val ctx = requireContext()
                 val cr = ctx.contentResolver
                 lifecycleScope.withLoadingDialog(ctx) {
-                    // no check of the file's name: a provider may name it otherwise or not at all (the picker's
-                    // GetContent), and what is not a backup is refused by its contents (no metadata.json)
-                    // outlives the page, which a rotation cancels: once the engine's files are
-                    // replaced the app must exit, else fcitx comes back writing to the old ones
+                    // no name check: providers may name it otherwise; a non-backup is refused by content (no metadata.json)
+                    // outlives the page: once the engine's files are replaced the app must exit, else fcitx writes to the old ones
                     val failed = FcitxApplication.getInstance().coroutineScope.async(Dispatchers.Main.immediate) {
                         try {
                             val metadata = withContext(Dispatchers.IO) {
-                                // stop fcitx before overwriting files: off the main thread, as a host still
-                                // starting is waited for; one that stays starting would read and write them
-                                // as they are replaced, so the import stops there (audit-061 app-rest-2)
+                                // stop fcitx before overwriting, off the main thread: a host stuck starting would read and write them as replaced, so
+                                // the import stops there
                                 if (!HostDaemon.stopFcitx()) errorRuntime(R.string.exception_user_data_host_starting)
                                 ClipboardManager.closeDatabase()
-                                // closed whatever fails, before the zip is read too (review 061-small N9)
+                                // closed whatever fails, before the zip is read too
                                 cr.openInputStreamOrThrow(uri).use { UserDataManager.import(it).getOrThrow() }
                             }
                             val exportTime = formatDateTime(metadata.exportTime)
@@ -88,7 +82,7 @@ class BackupFragment : PaddingPreferenceFragment() {
                             AppUtil.restart(ctx.applicationContext)
                             null
                         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                            // whatever the provider or the zip threw: shown, after the clipboard is reopened and fcitx restarted
+                            // whatever was thrown: shown, after the clipboard is reopened and fcitx restarted
                             restartAfterFailedImport({ ClipboardManager.reopenDatabase() }) { HostDaemon.startFcitx() }
                             e
                         }
@@ -102,10 +96,7 @@ class BackupFragment : PaddingPreferenceFragment() {
                 val ctx = requireContext()
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
-                        // the learning as a backup, merged, not laid over, when imported: taken once a
-                        // file is picked, not before the picker, so a page made anew while it was open
-                        // (rotation, the process killed) still writes it (review R11 F3094); held only
-                        // till written, the user's whole typing history
+                        // taken once a file is picked, not before, so a page recreated under the picker still writes it; held only till written
                         val learning = viewModel.fcitx.runOnReady {
                             save()
                             (learning(BackupOp.Copy) as? BackupResult)?.bytes
@@ -114,11 +105,11 @@ class BackupFragment : PaddingPreferenceFragment() {
                             val outputStream = ctx.contentResolver.openOutputStreamOrThrow(uri)
                             UserDataManager.export(outputStream, exportTimestamp, learning).getOrThrow()
                         }
-                        // said, as a restore is: the picker closes on its own and nothing else shows it worked
+                        // said: the picker closes on its own and nothing else shows it worked
                         val name = withContext(Dispatchers.IO) { ctx.contentResolver.queryFileName(uri) }
                         ctx.toast(ctx.getString(R.string.user_data_exported, name ?: uri.lastPathSegment.orEmpty()))
                     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                        // whatever the provider threw: told, the page left as it was
+                        // told, the page left as it was
                         Timber.w(e, "Failed to export the user's data")
                         ctx.toast(e)
                     }
@@ -145,9 +136,7 @@ class BackupFragment : PaddingPreferenceFragment() {
                     .setTitle(R.string.import_user_data)
                     .setMessage(R.string.confirm_import_user_data)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
-                        // every file: the picker shows by type, and a backup renamed (.bak) or named by where it was
-                        // kept is no application/zip to it, greyed out; what is no backup is refused by its contents
-                        // (R25r2 F7854)
+                        // every file: a renamed backup is no application/zip to the picker; a non-backup is refused by content
                         importLauncher.launch("*/*")
                     }
                     .setNegativeButton(android.R.string.cancel, null)
@@ -156,7 +145,7 @@ class BackupFragment : PaddingPreferenceFragment() {
         })
     }
 
-    // drawn here by hand: the search finds them by these, their titles and their keys
+    // hand-drawn here: the search finds them by these
     companion object : SearchablePage {
         @StringRes val EXPORT_USER_DATA = R.string.export_user_data
         @StringRes val EXPORT_USER_DATA_SUMMARY = R.string.export_user_data_summary
@@ -172,9 +161,8 @@ class BackupFragment : PaddingPreferenceFragment() {
 }
 
 /**
- * Brings back what a failed import stopped: the clipboard if it can, and fcitx whatever became of it,
- * as reopening the clipboard may still throw (counting its clips, say); the import's error is the one shown.
- * fcitx is started first in any case: an Error is then rethrown, and so is a cancellation, which ends the coroutine quietly.
+ * Restarts fcitx first in any case, then reopens the clipboard if it can (that may throw); the import's error is the one
+ * shown. An Error or a cancellation is rethrown.
  */
 internal suspend fun restartAfterFailedImport(reopenClipboard: suspend () -> Unit, startFcitx: () -> Unit) {
     try {

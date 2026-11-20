@@ -42,12 +42,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The panels' function keys as every keyboard's (060-keys-unify §6.2, D5, J1–J3): ⌫'s, the space's and Return's
- * slots and marks on the symbol panel, the emoji, the emoticons, the expanded candidates and the emoji search
- * (whose 清空 and 恢复 are its query's); their ，。 long presses; the action long presses the number pad and the
- * symbol panel's 123 gained; a password field's 清空 not run there either; a list of 16 shown whole.
- */
+/** The panels' function keys as every keyboard's: ⌫'s, the space's and Return's slots and marks, their ，。 long presses. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -73,7 +68,6 @@ class PanelKeysUatTest {
         return KeyboardHarness().also { made = it }.start(inputType, prefill = { it.setText(written); it.setSelection(written.length) })
     }
 
-    // the panels, each opened from the letters
     private fun KeyboardHarness.symbols() = tap(key("符"))
 
     private fun KeyboardHarness.emoji() = tap(described(service.getString(R.string.a11y_key_emoji)))
@@ -97,7 +91,6 @@ class PanelKeysUatTest {
 
     private fun KeyboardHarness.searchKeys(s: EmojiSearchUi) = keys(s.keyboard)
 
-    // the panel's key named [name] (fn/backspace…) among [keys]
     private fun List<ShownKey>.named(name: String): SceneShownKey =
         filterIsInstance<SceneShownKey>().single { k -> k.node.copy == 0 && k.node.shortcut?.let { KeyId.of(it).name } == name }
 
@@ -128,7 +121,6 @@ class PanelKeysUatTest {
             h.swipeDown(h.named("fn/backspace"))
             h.waitFor("$panel: put back") { h.field.text.toString() == written }
         }
-        // the symbol panel's space: up, the edit menu, held open under the finger
         val h = harness()
         h.symbols()
         val space = h.named("fn/space")
@@ -142,7 +134,7 @@ class PanelKeysUatTest {
         assertEquals(written, h.field.text.toString())
     }
 
-    // J1: the search's ⌫ clears and restores what is searched for, not the field
+    // the search's ⌫ clears and restores what is searched for, not the field
     @Test
     @Uat("PAN-25")
     fun theSearchsSlotsAreItsQuerys() {
@@ -158,7 +150,6 @@ class PanelKeysUatTest {
         assertEquals("the field not the query: kept", written, h.field.text.toString())
         h.swipeDown(h.searchKeys(s).named("fn/backspace"))
         assertEquals("xiao", query())
-        // nothing taken: 恢复 again does nothing, nor 清空 of an empty query to the field
         h.swipeDown(h.searchKeys(s).named("fn/backspace"))
         assertEquals("xiao", query())
         "xiao".forEach { _ -> h.tap(h.searchKeys(s).named("fn/backspace")) }
@@ -167,13 +158,11 @@ class PanelKeysUatTest {
         assertFalse(h.api.calls.toString(), "clearTyped()" in h.api.calls)
     }
 
-    // PAN-26: the emoticons' ，。 and the emoji's 。 long pressed: the letters' lists
     @Test
     @Uat("PAN-26")
     fun punctuationLongPress() {
-        // the same items; laid out from where the key is, so their order on the screen is not compared
+        // laid out from where the key is, so their order on the screen is not compared
         fun KeyboardHarness.held(name: String) = longPress(named(name)).sorted()
-        // Chinese punctuation on: shown as it types (KB-83), so what is picked is what is typed
         fun chinese() = harness().also { h ->
             h.chinesePunctuation(KeyboardHarness.PINYIN, zh)
         }
@@ -188,7 +177,6 @@ class PanelKeysUatTest {
         h = chinese()
         h.emoji()
         assertEquals(period, h.held("fn/period"))
-        // as the letters' ，: held and let go, its first typed as the punctuation has it and as it was shown
         val key = h.named("fn/period")
         val before = h.field.text.toString()
         val f = h.finger(key, h.at(key))
@@ -201,8 +189,7 @@ class PanelKeysUatTest {
         assertEquals(before + focused, h.field.text.toString())
     }
 
-    // a password field: a command that reads the field (复制, set on ⌫'s 上滑) not run from a panel either, as on
-    // the letters (KeySwipe); a plain field's copied, the same swipe
+    // a password field: a command that reads the field not run from a panel either
     @Test
     @Uat("PAN-27")
     fun aPasswordIsNotCopiedFromAPanel() {
@@ -223,7 +210,6 @@ class PanelKeysUatTest {
         assertEquals("-", copied(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD))
     }
 
-    // J2: the number pad's space and !?#, the symbol panel's 123, held: what they do on every keyboard
     @Test
     @Uat("PAN-28")
     fun actionLongPressesEverywhere() {
@@ -238,7 +224,6 @@ class PanelKeysUatTest {
         assertTrue(h.api.calls.toString(), "triggerUnicode()" in h.api.calls)
     }
 
-    // J2: the number pad's space held does what the letters' does
     @Test
     @Uat("PAN-28")
     fun numberPadsSpaceHeldAsTheLetters() {
@@ -246,7 +231,7 @@ class PanelKeysUatTest {
         prefs.set(AppPrefs.getInstance().keyboard.spaceKeyLongPressBehavior, SpaceLongPressBehavior.Enumerate)
         fun held(inputType: Int): List<String> {
             val h = harness(inputType)
-            // two to go between: with one, the prompt to add more (SpaceLongPressNextImTest)
+            // with one, the prompt to add more (SpaceLongPressNextImTest)
             h.api.enabledIme = arrayOf(KeyboardHarness.PINYIN, KeyboardHarness.ENGLISH)
             h.api.calls.clear()
             h.longPress(h.named("fn/space"))
@@ -258,8 +243,8 @@ class PanelKeysUatTest {
         assertEquals(letters, held(InputType.TYPE_CLASS_NUMBER))
     }
 
-    // J3: ，'s list at the most a key holds (16, KeyLists.MAX_ITEMS; four rows of five, no row of its own), every item on the screen, the last picked: the finger slid
-    // from the item first under it, the popup's focus moving by PopupFocus.STEP, not by where its cells are
+    // ，'s list at the most a key holds, the last picked: the popup's focus moves by PopupFocus.STEP, not by where its
+    // cells are
     private fun aLayerOf16() {
         val items = (0 until KeyLists.MAX_ITEMS).map { "${'Ａ' + it % 26}${it / 26}" }
         prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.of(mapOf(KeyId("fn/comma") to UserList(false, items))).serialize())

@@ -1,4 +1,4 @@
-// 字和图标 (060-render-p3 §5.1 panel 4): the main word, the mark, the shortcut, the root, the hint, the badge apart
+// 字和图标: the main word, the mark, the shortcut, the root, the hint, the badge apart
 // (a key's parts), each its colour, font (the theme's own, at most 4 uploaded), weight, size, place, spacing, outline
 // and shadow; the app's icons replaced by name, each an SVG of filled paths (what the app imports: SvgSubset, the
 // engine's readIcon says what is wrong with one). Controls read the document when used (30-keys.js says why).

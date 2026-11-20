@@ -14,24 +14,17 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * The horizontal bar's one row of candidates: as many as fit, each at its own width and at least
- * [minWidth], then, when [grows] says so for the count shown, the leftover shared out among them (a lone word wider than the bar shrunk to it).
- * Placed as FlexboxLayoutManager's first line was (wrap, flex-start, stretch, every flexGrow 1): its
- * sizes, its sharing and rounding, its RTL; without its lines past the first or its caches, the most of
- * a key's layout while typing (design 060-perf-cands).
+ * Placed as FlexboxLayoutManager's first line was (wrap, flex-start, stretch, every flexGrow 1): its sizes,
+ * sharing, rounding and RTL, without its lines past the first or its caches.
  */
 class CandidateRowLayoutManager : RecyclerView.LayoutManager() {
 
-    /** The least width of a candidate, px. */
     var minWidth = 0
 
-    /** Whether the [Int] candidates shown share the leftover width. */
     var grows: (Int) -> Boolean = { true }
 
-    /** Called with the count shown after each layout. */
     var onLaidOut: (Int) -> Unit = {}
 
-    // a child's decorations, read in each layout
     private val decor = Rect()
 
     override fun generateDefaultLayoutParams() =
@@ -92,11 +85,7 @@ class CandidateRowLayoutManager : RecyclerView.LayoutManager() {
         }
     }
 
-    /**
-     * As FlexboxHelper.expandFlexItems / shrinkFlexItems with every flexGrow and flexShrink 1: each its
-     * float share of the leftover or the overflow, the rounding carried, the last taking the rest; a word
-     * shrunk below [minWidth] held there and the rest shrunk again.
-     */
+    /** As FlexboxHelper.expandFlexItems / shrinkFlexItems with every flexGrow and flexShrink 1; one held at [minWidth]. */
     private fun share(main: Int, used: Int, shown: Int, grow: Boolean) {
         val frozen = BooleanArray(shown)
         var line = used

@@ -18,7 +18,7 @@ import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.session.sessionTestData
-import org.fcitx.fcitx5.android.engine.session.syl
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -28,8 +28,7 @@ import java.nio.ByteBuffer
 
 class StrokesTest {
 
-    // 一 h, 十 hs, 土 hsh, 王 hhsh, 丰 hhhs, 干 hhs; rare, unknown to the model: 㐄 hzs and 亖 hhhh, of
-    // more strokes but first by code; 𠀀 hzs, past the BMP, is not kept
+    // 㐄 and 亖 are rare but first by code; 𠀀, past the BMP, is not kept
     private val dict = """
         # Rime dictionary: stroke
         ---
@@ -59,7 +58,6 @@ class StrokesTest {
         val h = s.find("h")
         val all = listOf("一", "十", "干", "王", "土", "丰", "㐄", "亖")
         assertEquals(all, h.toList())
-        // gone through again, it finds them all again
         assertEquals(all, h.toList())
         assertEquals(listOf("干", "王", "丰", "亖"), s.find("hh").toList())
         assertEquals(listOf("㐄"), s.find("hzs").toList())
@@ -131,9 +129,7 @@ class StrokesTest {
     private fun lookup(pinyin: Pinyin = Pinyin(), strokes: Strokes? = strokes()) =
         StrokeLookup(pinyin, { strokes }, reading = { if (it == "王") "wang" else "" }, pageSize = 3)
 
-    // the stroke filter asks the lookup whether a key ends the input: pinyin's own answer passes
-    // through, so a key pinyin reads but refuses where it stands still ends it; u while idle starts a
-    // lookup whatever pinyin says of it
+    // pinyin's answer passes through; u while idle starts a lookup whatever pinyin says
     @Test
     fun whetherAKeyEndsTheInputIsPinyinsSaveUWhileIdle() {
         val l = lookup(Pinyin().apply { refuses = setOf('a', 'u') })
@@ -166,12 +162,10 @@ class StrokesTest {
         l.apply(Action.Key('u'))
         l.apply(Action.Key('h'))
         l.apply(Action.Key('h'))
-        // not a stroke: what was typed is pinyin's, as typed
         assertEquals("uhha", l.apply(Action.Key('a')).preedit)
         assertEquals("uhha".map { Action.Key(it) }, pinyin.actions)
         assertEquals(listOf(Choice("拼")), l.candidates(0, 1))
         assertEquals(setOf(Offer.FORGET), l.offers(0))
-        // pinyin's from then on, u too
         assertEquals("uhhau", l.apply(Action.Key('u')).preedit)
     }
 
@@ -186,7 +180,6 @@ class StrokesTest {
         "uhh".forEach { l.apply(Action.Key(it)) }
         assertEquals("uhha", l.apply(Action.Key('a')).preedit)
         assertEquals(listOf("uhha"), handed)
-        // the pinyin shows what was typed: u is its own
         l.apply(Action.Key('u'))
         assertEquals(listOf(Action.Key('u')), pinyin.actions)
     }
@@ -207,7 +200,6 @@ class StrokesTest {
             val pinyin = PinyinSession(data, PinyinSegmenter(latin = LatinWords.of(data.dictionary)))
             val l = if (handedOver) StrokeLookup(pinyin, { strokes() }, retype = pinyin::typeAll) else StrokeLookup(pinyin, { strokes() })
             l.apply(Action.Key('u'))
-            // s is 丨, b no stroke
             assertEquals("u丨", l.apply(Action.Key('s')).preedit)
             val s = l.apply(Action.Key('b'))
             assertEquals("$handedOver", "USB", s.candidates.first())
@@ -268,13 +260,10 @@ class StrokesTest {
         l.apply(Action.Select(0))
         "uh".forEach { l.apply(Action.Key(it)) }
         assertEquals("uh", l.apply(Action.CommitRaw).commit)
-        // nor from letters committed as typed
         "zai".forEach { l.apply(Action.Key(it)) }
         assertEquals("", contexts.last())
     }
 
-    // engine-01 (R25 F7850): a key passed on to the app is pinyin's to drop its context by, a lookup on or
-    // not; the lookup ends with it, none of its keys typed into the pinyin
     @Test
     fun aKeyPassedOnReachesThePinyinAndEndsALookup() {
         var passed = 0
@@ -296,9 +285,6 @@ class StrokesTest {
         assertEquals("u一", l.apply(Action.Key('h')).preedit)
     }
 
-    // engine-01 (R25 F7850, F7877): handed back mid-lookup, its keys as typed; otherwise as the pinyin hands
-    // back, a piece picked put in and the keys after it back, not all of it as keys (Session's default).
-    // Nothing is typed in the pinyin after, so u starts a lookup, as after any other end of its input
     @Test
     fun handedBackALookupIsItsKeysAndThePinyinIsAsThePinyinHandsBack() {
         val pinyin = PinyinSession(sessionTestData(), PinyinSegmenter())
@@ -321,7 +307,6 @@ class StrokesTest {
         l.apply(Action.Key('h'))
         assertEquals("一", l.apply(Action.Pick(0)).commit)
         assertEquals(Action.Context("一"), pinyin.actions.last())
-        // pinyin again
         assertEquals("u", l.apply(Action.Key('u')).preedit)
         l.apply(Action.Backspace)
         assertEquals("n", l.apply(Action.Key('n')).preedit)
@@ -362,7 +347,6 @@ class StrokesTest {
         val comma = l.apply(Action.Key(','))
         assertEquals("一", comma.commit)
         assertFalse(comma.handled)
-        // a selection past the page, a refine: nothing
         l.apply(Action.Key('u'))
         l.apply(Action.Key('h'))
         assertEquals("u一", l.apply(Action.Select(5)).preedit)
@@ -379,17 +363,14 @@ class StrokesTest {
         l.apply(Action.Key('u'))
         l.apply(Action.Key('h'))
         assertEquals("u一丨", l.apply(Action.Key('s')).preedit)
-        // a tap after the u: before the first stroke
         val tapped = l.apply(Action.Cursor(1))
         assertTrue(tapped.handled)
         assertEquals(1, tapped.cursor)
         assertTrue("the pinyin is not told", pinyin.actions.none { it is Action.Cursor })
-        // nothing before it to delete: the u stays
         assertEquals("u一丨", l.apply(Action.Backspace).preedit)
         val mended = l.apply(Action.Key('h'))
         assertEquals("u一一丨", mended.preedit)
         assertEquals(2, mended.cursor)
-        // at the end again: backspace deletes the last stroke
         assertEquals(-1, l.apply(Action.Step.END).cursor)
         assertEquals("u一一", l.apply(Action.Backspace).preedit)
         // a letter ends the lookup where the cursor is: u, then the a, then the strokes
@@ -406,7 +387,6 @@ class StrokesTest {
     fun anArrowMovesTheCursorAStrokeAtATimeAndBackspaceThereDeletesTheStrokeBeforeIt() {
         val l = lookup()
         "uhsp".forEach { l.apply(Action.Key(it)) }
-        // between 丨 and 丿
         assertEquals(3, l.apply(Action.Step(-1)).cursor)
         val deleted = l.apply(Action.Backspace)
         assertEquals("u一丿", deleted.preedit)
@@ -425,7 +405,6 @@ class StrokesTest {
             l.apply(Action.Step.START)
             l.apply(Action.Key('a'))
             val fixed = l.apply(Action.Key('n'))
-            // as if typed so, the cursor after the n
             val typed = PinyinSession(data, PinyinSegmenter())
             "uanhh".forEach { typed.apply(Action.Key(it)) }
             val expected = typed.apply(Action.Step(-2))
@@ -447,7 +426,6 @@ class StrokesTest {
         assertEquals(listOf("㐄", "亖"), last.candidates)
         assertFalse(last.hasNextPage)
         assertEquals(8, last.total)
-        // no page past the last
         assertEquals(2, l.apply(Action.NextPage).page)
         assertEquals(listOf(Choice("十"), Choice("干")), l.candidates(1, 2))
         assertEquals(8, l.candidates(0, 20).size)
@@ -460,7 +438,6 @@ class StrokesTest {
         val comma = l.apply(Action.Key(','))
         assertEquals("u", comma.commit)
         assertFalse(comma.handled)
-        // strokes no character has
         l.apply(Action.Key('u'))
         l.apply(Action.Key('z'))
         assertEquals(emptyList<String>(), l.apply(Action.Key('z')).candidates)

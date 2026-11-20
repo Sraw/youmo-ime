@@ -31,21 +31,16 @@ import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.util.concurrent.Executor
 
-/**
- * One [Engines] over the app's own data (what `:app` compiles into its assets, given by the build
- * as `uat.assets`), shared by every case: the data is read once, a few seconds, and each case
- * starts from [fresh], as a device's case starts from `pm clear`.
- */
+/** One [Engines] over the app's own data (`uat.assets`), shared by every case: read once, each case starting from [fresh] as from `pm clear`. */
 object UatEngines {
-    /** Learning's clock: the system's, moved on by [days] (a case's typing days, U-42's expiry); back to now on [fresh]. */
+    /** Learning's clock: the system's, moved on by [days]; back to now on [fresh]. */
     object Clock : EngineClock {
         @Volatile private var shift = 0L
 
         override fun now() = System.currentTimeMillis() + shift
         override fun offset(at: Long) = JvmClock.offset(at)
 
-        // the system's, as the engines' own would be, moved on by a replay's user away ([away]): the
-        // engines' timing (a table's space taken after a commit) sees the time pass as the host does
+        // moved on by a replay's user away ([away]), so engine timing (a table's space after a commit) sees time pass
         @Volatile private var ahead = 0L
 
         override fun uptimeMillis() = JvmClock.uptimeMillis() + ahead
@@ -76,10 +71,9 @@ object UatEngines {
         return RandomAccessFile(file, "r").use { it.channel.map(FileChannel.MapMode.READ_ONLY, 0, it.length()) }
     }
 
-    /** The app's pinyin data, as the engines map it: what a case reads off it directly (a character's tones). */
+    /** The app's pinyin data, for what a case reads off it directly (a character's tones). */
     val pinyinData: PinyinData by lazy { PinyinData.load(data(InputMethodCatalog.PINYIN_DATA)) }
 
-    /** A file of uat/fixtures, as a device's case pushes it. */
     fun fixture(name: String): File =
         File(checkNotNull(System.getProperty("uat.fixtures")) { "no uat.fixtures given: run by Gradle (:lib:ime-eval:uatTest)" }, name)
 
@@ -87,22 +81,22 @@ object UatEngines {
         Runtime.getRuntime().addShutdownHook(Thread { dir.deleteRecursively() })
     }
 
-    /** The custom phrases file, as the app keeps it (`dz,1=北京市海淀区` a line): read by the engine on [Engines.reload]. */
+    /** The custom phrases file (`dz,1=北京市海淀区` a line), read on [Engines.reload]. */
     var phrases: String = ""
 
-    /** The common words file, as the app keeps it (an export's text): read by the engine on [Engines.reload]. */
+    /** The common words file (an export's text), read on [Engines.reload]. */
     var commonWords: String = ""
 
-    /** 生僻字屏蔽's file, as the app keeps it (`pinyin/rarechars.txt`'s text): read by the engine on [Engines.reload]. */
+    /** 生僻字屏蔽's file (`pinyin/rarechars.txt`'s text), read on [Engines.reload]. */
     var rareChars: String = ""
 
     // what a case's user dir errors were: a case fails on one, as the app would log and go on
     private val errors = ArrayList<IOException>()
 
-    /** Where the tables keep their index of [dictionary]'s words, beside it as the app keeps them; null for none. */
+    /** Where the tables keep their index of [dictionary]'s words; null for none. */
     var indexes: File? = null
 
-    /** The merged dictionary the base takes in (the app's merged.ymd), null for none imported: read at [Engines.reload]. */
+    /** The merged dictionary (the app's merged.ymd), null for none: read at [Engines.reload]. */
     var dictionary: (() -> DictionaryFile?) = { null }
 
     // each data file mapped once, as the app maps it once: a new Engines reads the same buffers
@@ -110,14 +104,11 @@ object UatEngines {
 
     private fun mappedOnce(path: String): ByteBuffer = synchronized(mapped) { mapped.getOrPut(path) { load(path) } }.duplicate()
 
-    /** The app's data file at [path] (`engine/pinyin.data`), as the engines map it. */
     fun data(path: String): ByteBuffer = mappedOnce(path)
 
-    // where the install's id is kept, beside the user directory as the app's no-backup directory is: a restart keeps it, a fresh install not;
-    // removed whole at exit, as deleteOnExit leaves a directory that is not empty
+    // the install id beside the user directory, kept over a restart; removed whole at exit, as deleteOnExit skips a non-empty directory
     private val installFile: File = File(tempDir("uat-install"), "install-id")
 
-    /** A temporary directory removed with all in it when the JVM exits. */
     fun tempDir(prefix: String): File = Files.createTempDirectory(prefix).toFile().also { dir ->
         Runtime.getRuntime().addShutdownHook(Thread { dir.deleteRecursively() })
     }
@@ -144,18 +135,12 @@ object UatEngines {
         clock = Clock,
     )
 
-    /** The engines of the case running: [fresh]'s. */
     var engines: Engines = make().also { it.settings = BASELINE }
         private set
 
-    /**
-     * The engines as a fresh install has them, as `pm clear` leaves the app: a new [Engines] over
-     * an empty user directory (one kept would keep its words lists and tables in memory), the
-     * data mapped before kept. Fails if the case before left an error of the user's files behind.
-     */
+    /** The engines as `pm clear` leaves them, the mapped data kept; fails if the case before left an error of the user's files. */
     fun fresh(): Engines {
-        // what the case before left running (a record's compaction, an automatic backup, a table's
-        // coding) done first: written after the wipe, it would be the next case's
+        // the case before's background work (compaction, backup, a table's coding) done first, or it lands in the next
         settle()
         engines.close()
         settle()
@@ -173,18 +158,10 @@ object UatEngines {
         return engines
     }
 
-    /**
-     * The baselines' settings, B0's: what the app pushes on a new install, its host's fresh options (KotlinHost's EngineOptions, as
-     * EngineSettings), read from them so the replays' defaults cannot drift from the device's (for
-     * the tables 调频 off, 自动上屏 on, 编码提示 the preset's, not TableOptions' presets). That the app
-     * pushes these and adds nothing at their default is EngineBridgeTest's. 双拼's scheme as the
-     * baselines that add 双拼 set it (B0-双拼 chooses 自然码, the cases written for its keys), not a new
-     * install's 小鹤 (SchemeMigration; KotlinHostSchemeTest.aNewInstallsShuangpinIsXiaohe).
-     */
+    /** B0's settings, read from the host's fresh options so the replays cannot drift from the device; 双拼 is the baselines' 自然码. */
     val BASELINE: EngineSettings
         get() = EngineOptions().toSettings().copy(shuangpin = EngineSettings.ZIRANMA)
 
-    /** The app started again (a force stop): the engines read the user's files afresh, nothing wiped. */
     fun restart(): Engines {
         val settings = engines.settings
         settle()
@@ -194,31 +171,22 @@ object UatEngines {
         return engines
     }
 
-    /**
-     * A glide across the centres of [keys] on [layout] ([shift]: Shift on, as TextKeyboard hands one
-     * over where it is on), as the engine read it: what the GLIDE key carries. EngineReplay's and
-     * HostReplay's one rule, as [ink] is.
-     */
+    /** A glide across [keys]' centres on [layout] as the engine read it (what the GLIDE key carries): both replays' one rule, as [ink]. */
     fun glide(engines: Engines, im: String, keys: String, layout: GlideLayout, shift: Boolean = false) =
         checkNotNull(engines.glide(im, Glide(keys.flatMap { layout.centre(it).toList() }.toFloatArray(), layout, shift = shift))) { "$im does not glide" }
 
-    /**
-     * The recognizer's [readings] (best first, scored as it ranks them) for a new ink piece, after
-     * [last] (the replay's last written), written over the keys of [im] and after what the pad ended: what the Ink key carries.
-     * EngineReplay's and HostReplay's one rule, so their handwriting cannot drift apart (F4299).
-     */
+    /** The recognizer's [readings] for a new ink piece after [last], over [im]'s keys: both replays' one rule. */
     fun ink(engines: Engines, im: String, readings: List<String>, last: Int): Action.Ink {
         val piece = maxOf(last + 1, engines.inkEnded + 1)
         return Action.Ink(piece, InkReading(readings, DoubleArray(readings.size) { -it.toDouble() })).also { engines.ink(it, shown = true, im = im) }
     }
 
-    /** The learning record as the engines wrote it ([LearnLog.FILE]), its background work done first; empty for none yet. */
+    /** The learning record ([LearnLog.FILE]) after background work; empty for none yet. */
     fun learningRecord(): ByteArray {
         settle()
         return File(userDir, LearnLog.FILE).takeIf { it.isFile }?.readBytes() ?: ByteArray(0)
     }
 
-    /** Until the engines' background work is done, as the device's idle signal waits for it. */
     fun settle() {
         val until = System.nanoTime() + SETTLE_NANOS
         while (BackgroundWork.busy > 0) {

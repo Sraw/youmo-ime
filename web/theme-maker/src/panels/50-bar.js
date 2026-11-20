@@ -1,4 +1,4 @@
-// 栏 (060-render-p3 §5.1 panel 5): the candidate bar, its candidates and their parts, the lines between them, the
+// 栏: the candidate bar, its candidates and their parts, the lines between them, the
 // expanded candidates' panel, the code being typed and the toolbar's buttons (T6a, T6b: what BarLook reads). The
 // preview shows the bar above the keyboard (环境 → 候选栏样例).
 (function (root) {

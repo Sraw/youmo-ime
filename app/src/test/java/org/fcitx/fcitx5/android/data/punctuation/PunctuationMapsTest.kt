@@ -31,8 +31,7 @@ class PunctuationMapsTest {
         assertEquals(emptyList<PunctuationMapEntry>(), maps().load("zh_TW"))
     }
 
-    // A4: a table the user edited that does not read is the built-in one on the keyboard, the user told,
-    // the file as it was (nothing writes a table since 0.6.1: R26 F8279)
+    // a table the user edited that does not read is the built-in one on the keyboard, the user told, the file as it was
     @Test
     fun `a user file that cannot be read is told and kept`() {
         val file = File(tmp.root, "punctuation/punc.mb.zh_CN")
@@ -63,15 +62,14 @@ class PunctuationMapsTest {
 
     @Test
     fun `a user file that cannot be read leaves the built-in table`() {
-        // F3903: an unreadable file is not "no punctuation"
+        // an unreadable file is not "no punctuation"
         val file = File(tmp.root, "punctuation/punc.mb.zh_CN").apply { parentFile!!.mkdirs(); writeText(", 、\n") }
         file.setReadable(false)
         assumeFalse("root reads it anyway", file.canRead())
         assertEquals(3, maps().load("zh_CN").size)
     }
 
-    // what the upgrade's reset and a restore go by: done only where no table is left, and a directory that
-    // cannot be listed is not taken for an empty one
+    // a directory that cannot be listed is not taken for an empty one
     @Test
     fun `dropping the edited tables says whether none is left`() {
         val data = tmp.newFolder("data")

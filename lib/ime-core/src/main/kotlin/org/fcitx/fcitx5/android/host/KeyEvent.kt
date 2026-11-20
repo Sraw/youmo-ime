@@ -7,29 +7,17 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.engine.session.Action
 
 /**
- * One key through the pipeline, fcitx's `KeyEvent` (`fcitx/event.h:360-386`).
- *
- * [key] is [origKey] normalized ([Key.normalize]); handlers match on [key], the hand-back to the
- * application carries [origKey] as it came in (`androidfrontend.cpp:385-392` passes the raw key).
- *
- * Two flags, as fcitx has them, and they mean different things:
- * - [filtered]: no later handler sees the key ([KeyPipeline] stops at the first one that filters);
- * - [accepted]: the key is used up and not handed back to the application.
- * A temp mode filters every key but accepts only those it uses (`tempmodemanager.cpp:63-72`); the
- * fullwidth key conversion accepts without filtering (`fullwidth.cpp:51`), so the key still reaches
- * ReservedLast.
+ * fcitx's `KeyEvent`: handlers match on [key] ([origKey] normalized); the hand-back carries [origKey]. [filtered]: no
+ * later handler sees it; [accepted]: not handed back. A temp mode filters every key but accepts only those it uses;
+ * fullwidth accepts without filtering, so the key still reaches ReservedLast.
  */
 class KeyEvent(
     val origKey: Key,
     val release: Boolean,
-    /** From the on-screen keyboard rather than a physical one. */
     val virtual: Boolean = false,
-    /** The physical key's event time, to replay it; -1 when there is none. */
+    /** -1 when there is none. */
     val timestamp: Int = -1,
-    /**
-     * What the engine reads at the key, sent with it: the handwriting pad's reading at its Ink key,
-     * a glide at its Glide key (Keyboard.INK, Keyboard.GLIDE). In the key, it cannot come apart from it.
-     */
+    /** The handwriting pad's reading or a glide, carried in the key so it cannot come apart from it. */
     val payload: Action? = null,
 ) {
     val key: Key = origKey.normalize()
@@ -53,10 +41,10 @@ class KeyEvent(
     }
 }
 
-/** A key the engine sends on to the application (`InputContext::forwardKey`), e.g. a cursor move. */
+/** `InputContext::forwardKey`, e.g. a cursor move. */
 class ForwardKeyEvent(val key: Key, val release: Boolean)
 
-/** An invoke action on the code row / preedit (`InvokeActionEvent`): a tap at [cursor]. */
+/** A tap at [cursor] on the code row / preedit. */
 class InvokeActionEvent(val action: Action, val cursor: Int) {
     enum class Action { LeftClick, RightClick }
 

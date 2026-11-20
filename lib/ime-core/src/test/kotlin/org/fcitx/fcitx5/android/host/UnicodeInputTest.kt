@@ -12,7 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 
-/** Unicode input's temp mode contract; lines are `modules/unicode/unicodetempmode.cpp`'s. */
+/** Unicode input's temp mode, as fcitx's `UnicodeTempMode`. */
 class UnicodeInputTest {
 
     companion object {
@@ -30,7 +30,7 @@ class UnicodeInputTest {
 
     @Test
     fun theDataIsReadAtTheFirstTriggerOnlyAndOnce() {
-        // nothing held until Unicode is used, as fcitx's CharSelectData::load (charselectdata.cpp:76-101)
+        // nothing held until Unicode is used, as fcitx's CharSelectData::load
         assertEquals(0, loads)
         assertTrue(search().accepted)
         assertEquals(1, loads)
@@ -54,7 +54,6 @@ class UnicodeInputTest {
 
     @Test
     fun searchOpensOnTheClipboardsCharacters() {
-        // :107-122, :342-395
         assertTrue(search().accepted)
         assertTrue(rig.unicode.isActive(rig.ic))
         assertEquals("Unicode: (Type to search unicode by code or description)", rig.aux)
@@ -73,7 +72,7 @@ class UnicodeInputTest {
 
     @Test
     fun aLoneSurrogateInTheClipboardIsNotListed() {
-        // :368-386: fcitx skips text that is not valid UTF-8; an unassigned one is listed by the data's name for it (F3904)
+        // fcitx skips text that is not valid UTF-8; an unassigned one is listed by the data's name for it
         val odd = TempModeRig(QuickPhraseTable.load(emptyList()), { DATA }, clipboard = "\uD800x\u0378")
         assertTrue(odd.press('u'.code, KeyStates.CTRL_ALT_SHIFT).accepted)
         assertEquals(listOf("x", "\u0378"), odd.page)
@@ -133,16 +132,14 @@ class UnicodeInputTest {
 
     @Test
     fun aCodeListsItsCharacterFirst() {
-        // charselectdata.cpp:313-383: U+4E2D, then 0x4E2D read as decimal is not a number
+        // U+4E2D, then 0x4E2D read as decimal is not a number
         search()
         rig.type("U+4E2D")
         assertEquals("中", rig.page.first())
         search()
         rig.press(KeySyms.ESCAPE)
         search()
-        // past Unicode: no character for the number (F3930). The data lists it as fcitx's find does
-        // (charselectdata.cpp:336-347, the hex and the decimal reading); the list drops it, so the
-        // decimal reading (110000 = U+1ADB0) is first
+        // past Unicode: no character; listed as fcitx's find does (hex and decimal), dropped, so 110000 = U+1ADB0 is first
         assertTrue(0x110000 in CharSelectData(DATA).find("U+110000"))
         assertFalse(UnicodeInput.isValid(0x110000))
         rig.type("U+110000")
@@ -195,7 +192,6 @@ class UnicodeInputTest {
 
     @Test
     fun directTypesAHexCode() {
-        // :250-296
         assertTrue(direct().accepted)
         assertEquals("U+", rig.preedit)
         assertEquals(TextFormatFlag.DontCommit.flag, rig.panel.preedit.flags[0])

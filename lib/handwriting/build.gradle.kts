@@ -5,12 +5,7 @@
 
 import com.android.build.gradle.tasks.ExternalNativeBuildJsonTask
 
-/*
- * The handwriting recognizers' runtime: onnxruntime (MIT) and a small JNI to it (OrtModel). The
- * onnxruntime is the build sherpa-onnx links for voice input, the same file (csukuangfj's
- * onnxruntime-libs v1.30.0, SHA-256 checked), so the APK packs one copy of it
- * (pickFirst in the app). Its ORT-format models are mapped from their pack file, not read onto the heap.
- */
+// The handwriting recognizers' runtime: onnxruntime (the copy sherpa-onnx links) and a small JNI to it.
 plugins {
     id("youmo.lib-convention")
 }
@@ -18,8 +13,7 @@ plugins {
 val ortVersion = "1.30.0"
 val ortSha256 = "150d1fd3356220e7539e17cb4ec81a7f6649218e5d2bab5afbeef6e23daf9641"
 
-// sherpa-onnx's CMake pins the archive on its own; the app keeps whichever copy comes first, so the
-// two pins are held equal here: one bumped alone would ship a library the other was not built for
+// the app keeps whichever copy comes first, so this pin and sherpa-onnx's are held equal
 for (abi in listOf("arm", "aarch64", "x86_64", "i686")) {
     val pin = rootProject.file("lib/sherpa-onnx/src/main/cpp/cmake/onnxruntime-android-$abi.cmake")
     check(pin.readText().contains("SHA256=$ortSha256")) { "onnxruntime: $pin pins another archive than lib/handwriting" }

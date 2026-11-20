@@ -29,11 +29,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-/**
- * The user's own layouts in a backup (061-custom-layout §4.5): `layouts/` with the record of the packs converted, and a
- * restore that lays them over the phone's as theme packs are; an older backup has none and leaves the phone's.
- * UserDataManagerTest is too large for more.
- */
+/** Restored over the phone's as theme packs are; an older backup has none and leaves the phone's. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class BackupLayoutsTest {
@@ -49,7 +45,7 @@ class BackupLayoutsTest {
     private fun metadata(versionCode: Long = BuildConfig.VERSION_CODE.toLong()) =
         """{"packageName":"${BuildConfig.APPLICATION_ID}","versionCode":$versionCode,"versionName":"1","exportTime":0}""".encodeToByteArray()
 
-    // [dirs] exported, named as the app's (the package Robolectric runs as need not be the one the import checks for)
+    // named as the app's (Robolectric's package need not be the one the import checks)
     private fun exported(dirs: UserDataManager.Dirs) = ByteArrayOutputStream().also { bytes ->
         val export = ByteArrayOutputStream().also { UserDataManager.export(it, 0L, dirs).getOrThrow() }
         ZipInputStream(export.toByteArray().inputStream()).use { from ->
@@ -77,7 +73,7 @@ class BackupLayoutsTest {
         val old = install("old")
         CustomLayouts.save("mine", own("mine", "备份的"), old.layouts)
         File(old.layouts, CustomLayoutFiles.CONVERTED).writeText("p@1\n")
-        // half written when the backup was made: not taken
+        // half written when backed up: not taken
         File(old.layouts, "x.saving").writeText("half")
         val zip = exported(old)
         val layouts = entries(zip.inputStream()).filterKeys { it.startsWith("layouts/") }
@@ -98,7 +94,7 @@ class BackupLayoutsTest {
     fun aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays() {
         val phone = install("phone")
         CustomLayouts.save("phones", own("phones"), phone.layouts)
-        // as 0.6.0 made it: no layouts/
+        // an older backup: no layouts/
         val older = ByteArrayOutputStream().also { bytes ->
             ZipOutputStream(bytes).use { zip ->
                 zip.putNextEntry(ZipEntry("metadata.json"))
@@ -107,7 +103,7 @@ class BackupLayoutsTest {
         }.toByteArray()
         UserDataManager.import(older.inputStream(), phone).getOrThrow()
         assertEquals(listOf("phones"), CustomLayouts.list(phone.layouts).map { it.id })
-        // forged: a file of another id (its name not its layout's), one that does not read; one that does is taken
+        // forged: another id's name, an unreadable one; a readable one is taken
         val forged = ByteArrayOutputStream().also { bytes ->
             ZipOutputStream(bytes).use { zip ->
                 zip.putNextEntry(ZipEntry("metadata.json"))
@@ -124,13 +120,12 @@ class BackupLayoutsTest {
         assertTrue(CustomLayouts.list(phone.layouts).all { it.layout != null })
     }
 
-    // review MUST 1: the layouts' restore fails after the settings, databases and themes are the backup's; it is
-    // logged, the engine's import after it still made, the restore not failed half done
+    // the layouts' restore failing last is logged; the engine's import still runs, the restore not failed half done
     @Test
     @Uat("PR-64")
     fun aRestoreWhoseLayoutsFailIsNotFailedForThem() {
         val phone = install("phone")
-        // no layouts' folder can be made: a file where it would be
+        // a file where the folder would be
         phone.layouts.parentFile!!.mkdirs()
         phone.layouts.writeText("in the way")
         val zip = ByteArrayOutputStream().also { bytes ->

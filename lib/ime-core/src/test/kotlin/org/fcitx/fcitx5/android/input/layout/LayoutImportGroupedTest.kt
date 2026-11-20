@@ -14,11 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * The grouped layouts the pinyin and 双拼 UAT imports (uat/fixtures/layouts, 061-custom-layout L4), judged as the import
- * judges them (LayoutImportTest's way): the 17 keys of their own groups, the 18 keys with Q and WE swapped, which are the
- * 18 keys.
- */
+/** The grouped layouts the pinyin and 双拼 UAT imports, judged as the import does: 17 keys of their own groups, 18 keys with Q and WE swapped. */
 class LayoutImportGroupedTest {
 
     private val boards = File(CustomLayoutFilesTest.LAYOUTS).listFiles()!!.filter { it.name.endsWith(".xml") }

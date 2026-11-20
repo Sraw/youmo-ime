@@ -10,45 +10,29 @@ import org.fcitx.fcitx5.android.engine.store.Unsaved
 import org.fcitx.fcitx5.android.engine.store.replaceFile
 import java.io.IOException
 
-/**
- * The English words the user blocked: never offered, completed, predicted, glided or corrected to.
- * A file of its own in [dir] ([FILE], a word a line as written), beside pinyin's `words.blocked`,
- * whose entries need a reading English has none of; with no [dir], kept in memory. A word blocked
- * in lower case is blocked in any (the: The, THE, as a sentence's start or capitals show it); one
- * with a capital in it as written alone (US, not us; review L1).
- */
+/** English words the user blocked, a file of their own ([FILE]; pinyin's needs readings). Lower case blocks any case (the: The); a capital only as written (US, not us). */
 class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOException) -> Unit = {}) {
-    // a file that did not read is not written over: what is in memory is not all of it
+    // a file that did not read is not written over: memory is not all of it
     private var unread = false
-    // lines this build does not take for a word (a later build's, say), written back as they were (decode-9)
+    // lines this build cannot read (a later build's) are written back as they were
     private val unknown = ArrayList<String>()
     private val words: LinkedHashSet<String> = read()
 
-    /** The words blocked, as written when blocked. */
     val blocked: List<String> get() = words.toList()
 
-    /** Whether [text] is blocked: as written, or in lower case where it was blocked so. */
     fun has(text: String): Boolean = words.isNotEmpty() && (text in words || text.any(Char::isUpperCase) && text.lowercase() in words)
 
-    /** Blocks each of [texts] that English types ([EnglishText.isWord]), as written: those newly blocked. */
     fun block(texts: Collection<String>): List<String> =
         texts.filter { EnglishText.isWord(it) && words.add(it) }.also { if (it.isNotEmpty()) write() }
 
-    /**
-     * Blocks [shown] as written, the first form of it [known] has (review L1): as shown, its first
-     * letter small (The at a sentence's start: the), all small (THE in capitals: the); as shown for none.
-     */
+    /** Blocks the first form of [shown] that [known] has: as shown, first letter lowered, all lowered. */
     fun blockShown(shown: String, known: (String) -> Boolean): List<String> =
         block(listOf(sequenceOf(shown, shown.replaceFirstChar(Char::lowercaseChar), shown.lowercase()).firstOrNull(known) ?: shown))
 
-    /** Offers each of [texts] again, as written: those that were blocked. */
     fun unblock(texts: Collection<String>): List<String> =
         texts.filter { words.remove(it) }.also { if (it.isNotEmpty()) write() }
 
-    /**
-     * U-86 「全部清空」: no word blocked, and the lines not taken for a word gone with them; a file that did
-     * not read deleted unread (R25 F7961), as [WordLists.clear][org.fcitx.fcitx5.android.engine.user.WordLists.clear].
-     */
+    /** Clears all, unknown lines too; a file that did not read is deleted unread. */
     fun clear() {
         if (unread) {
             words.clear()
@@ -88,12 +72,11 @@ class EnglishBlocks(private val dir: UserFiles?, private val onError: (IOExcepti
         }
         try {
             dir.mkdirs()
-            // the whole list or the one before it, never half of one
+            // the whole list or the one before it, never half
             replaceFile(file, dir.file("$FILE.new")) { temp ->
                 temp.write((words + unknown).joinToString("") { "$it\n" }.toByteArray())
             }
         } catch (e: IOException) {
-            // kept in memory till the next start, as WordLists'
             onError(Unsaved("$file not written", e))
         }
     }

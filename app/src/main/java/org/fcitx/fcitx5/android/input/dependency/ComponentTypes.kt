@@ -10,11 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 
 /**
- * A component's type as the scope keys it ([IUniqueComponent.defaultType]), found once per class.
- * The library walks the class's supertypes with kotlin-reflect for every instance, each time an
- * input view is made: about a fifth of making one on the 6T (060-render-perf-2 §2, #6). The answer
- * is the class's alone, so one lookup serves every instance after.
- * (A map, not ClassValue: that is API 34.)
+ * Found once per class: the library walks the class's supertypes with kotlin-reflect for every instance, each time
+ * an input view is made. (A map, not ClassValue: that is API 34.)
  */
 object ComponentTypes {
     private val types = ConcurrentHashMap<Class<*>, KClass<out IUniqueComponent<*>>>()
@@ -23,7 +20,6 @@ object ComponentTypes {
         types.getOrPut(component.javaClass) { component.defaultType() }
 }
 
-/** [UniqueComponent] with its type from [ComponentTypes]. */
 abstract class TypedComponent<T : TypedComponent<T>> : UniqueComponent<T>() {
     final override val type: KClass<out IUniqueComponent<*>> get() = ComponentTypes.of(this)
 }

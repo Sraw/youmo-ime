@@ -15,14 +15,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * What a run of deletions reads of the field before it deletes ([readAround]), which 恢复 puts back:
- * the editor's text around the selection in one trip where it gives it, else each side read apart.
- */
+/** In one trip where the editor gives the text around the selection, else each side read apart. */
 @RunWith(RobolectricTestRunner::class)
 class FieldReadTest {
 
-    // an editor giving [around] at once (null: none), and the sides and selection read apart
     private class Editor(
         val around: SurroundingText?,
         val beforeText: String?,
@@ -86,7 +82,7 @@ class FieldReadTest {
                     Editor(null, null, "", "ef"), false, Build.VERSION_CODES.S,
                     null, tracked,
                 ),
-            // at SDK 29 too (robolectric.properties): a row for a later level needs calls 29 lacks, its own row runs there
+            // a row for a later SDK needs calls 29 lacks; its own row runs at 29
             ).filter { it.sdk <= Build.VERSION.SDK_INT },
             { it.why },
         ) { row ->

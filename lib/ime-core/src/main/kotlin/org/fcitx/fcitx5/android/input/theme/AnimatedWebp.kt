@@ -4,27 +4,17 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
-/**
- * An animated WebP's header, read chunk by chunk without decoding a frame (060-render-p3 A4): its
- * canvas, its frames and the shortest time one is shown. Only each chunk's head is read (8 bytes,
- * and a frame's 16 more), so a file of a few MB costs a few hundred small reads, not its bytes.
- */
+/** An animated WebP's header read chunk head by chunk head, no frame decoded: a few-MB file costs a few hundred small reads. */
 object AnimatedWebp {
 
-    /** Reads [into].size bytes at [at] into [into]; how many it read (fewer at the end). */
+    /** How many it read (fewer at the end). */
     fun interface Source {
         fun read(at: Long, into: ByteArray): Int
     }
 
     class Header(val width: Int, val height: Int, val frames: Int, val shortestFrameMs: Int)
 
-    /**
-     * [source] ([length] bytes) as an animated WebP: null where it is none (not RIFF/WEBP, no VP8X with
-     * its animation flag, no frame) or is cut short. Stops counting past [maxFrames] (the count then more
-     * than it, which is all a limit needs). VP8X only as the first chunk (libwebp's rule). At most
-     * [maxFrames] plus [OTHER_CHUNKS] chunks of any kind are walked, more refused (null): a file padded
-     * with half a million empty chunks is not walked chunk by chunk.
-     */
+    /** Null where not animated WebP or cut short. Counting stops past [maxFrames]; VP8X only first (libwebp's rule); at most [maxFrames] + [OTHER_CHUNKS] chunks walked, so padding with empty chunks is refused. */
     fun header(source: Source, length: Long, maxFrames: Int = Int.MAX_VALUE): Header? {
         val head = ByteArray(RIFF_HEAD)
         if (source.read(0, head) < RIFF_HEAD || !head.text(0, "RIFF") || !head.text(WEBP_AT, "WEBP")) return null
@@ -66,7 +56,6 @@ object AnimatedWebp {
         return Header(width, height, frames, shortest)
     }
 
-    /** [file] as [header] reads a [Source]: each chunk's head read where it is, not the file's bytes. */
     fun header(file: java.io.File, maxFrames: Int = Int.MAX_VALUE): Header? = java.io.RandomAccessFile(file, "r").use { f ->
         header({ at, into ->
             f.seek(at)
@@ -80,7 +69,6 @@ object AnimatedWebp {
         }, f.length(), maxFrames)
     }
 
-    /** [bytes] as [header] reads a file. */
     fun header(bytes: ByteArray, maxFrames: Int = Int.MAX_VALUE): Header? = header({ at, into ->
         if (at >= bytes.size) 0 else minOf(into.size, bytes.size - at.toInt()).also { bytes.copyInto(into, 0, at.toInt(), at.toInt() + it) }
     }, bytes.size.toLong(), maxFrames)
@@ -90,7 +78,7 @@ object AnimatedWebp {
     private fun ByteArray.le24(at: Int) = u8(at) or (u8(at + 1) shl 8) or (u8(at + 2) shl 16)
     private fun ByteArray.le32(at: Int) = (le24(at).toLong() or (u8(at + 3).toLong() shl 24))
 
-    /** Chunks walked besides the frames: VP8X, ICCP, ANIM, EXIF, XMP and a few unknown ones. */
+    /** VP8X, ICCP, ANIM, EXIF, XMP and a few unknown ones. */
     const val OTHER_CHUNKS = 64
 
     private const val BYTE = 0xff

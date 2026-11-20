@@ -6,15 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.core.FormattedText
 
-/**
- * An [OutputFilter] that rewrites a [FormattedText] as one string: chttrans's
- * (`ca/modules/chttrans/chttrans.cpp:133-183`). The segments are joined, [convert]ed as a whole (a
- * phrase can span two), then cut back into segments of the old segments' lengths in characters
- * (code points), each keeping its format flags; the last segments come out shorter, or empty, when
- * the result is shorter, and characters past the old total are dropped when it is longer, as in
- * fcitx. The cursor keeps its count of characters, capped at the new length; a cursor at or before
- * the start (0, -1) is kept as is.
- */
+/** chttrans's filter: segments joined, [convert]ed whole (a phrase can span two), cut back to the old lengths in code points with their flags, the tail shorter or dropped as in fcitx; the cursor's count capped, one at or before the start kept. */
 class WholeTextFilter(private val applies: (InputContext) -> Boolean, private val convert: (String) -> String) : OutputFilter {
 
     override fun filter(ic: InputContext, text: FormattedText): FormattedText {

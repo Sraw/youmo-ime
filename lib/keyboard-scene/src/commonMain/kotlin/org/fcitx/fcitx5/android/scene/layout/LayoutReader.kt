@@ -13,12 +13,7 @@ import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
 import org.fcitx.fcitx5.android.scene.xml.XmlElement
 
-/**
- * A layout file read and checked: what layout-1.xsd says of its words, plus what the XSD cannot (060
- * README: ids unique, an icon key's a11y, a letters board's 26 letters, one fill a row at most is not
- * asked: fills share). What depends on the environment (a row's widths, an include's fragment) is the
- * engine's to check as it expands.
- */
+/** A layout file read and checked; what depends on the environment (a row's widths, an include's fragment) is the engine's to check. */
 object LayoutReader {
     const val NAMESPACE = "https://youmo-ime/layout/1"
 
@@ -32,7 +27,7 @@ object LayoutReader {
         is Parsed.Ok -> fragment(xml.value)
     }
 
-    /** [root] read; whatever goes wrong reading it is a problem of the file (as [org.fcitx.fcitx5.android.scene.theme.ThemeReader.theme]). */
+    /** Whatever goes wrong reading it is a problem of the file (as [org.fcitx.fcitx5.android.scene.theme.ThemeReader.theme]). */
     @Suppress("TooGenericExceptionCaught")
     fun layout(root: XmlElement): Parsed<Layout> = try {
         readLayout(root)
@@ -88,7 +83,6 @@ object LayoutReader {
         return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups, basedOn, meta, pads) }
     }
 
-    // pads= (061-custom-layout §7): a number board's, each a pad NumberPad opens, once
     private fun pads(a: Attributes, family: String?): List<String>? {
         val pads = a.matching("pads", PAD_LIST, "number pads apart by a space (${PADS.joinToString(" ")})")?.split(' ') ?: return null
         pads.filter { it !in PADS }.forEach { a.problem("pads=: \"$it\" is not one of ${PADS.joinToString("|")}") }
@@ -98,11 +92,8 @@ object LayoutReader {
     }
 
     /**
-     * A nine key's and 注音九键's group's long press is made by its name alone (`<popup from="nine"/"group">`, KeyDefaults):
-     * one written with no `shortcut=` (a theme pack's of before 060-keys-unify) named as the app's are, a digit's `t9/<id>`,
-     * the groups `zy9/1`… in their order, so it has the long press, the corner and the swipe the user's list gives it
-     * (060-s6-review M3); a key named already kept as it is. A name another key has written already is not given
-     * again (two keys of one name would share one list, slot and mark): the key is left unnamed, with a warning.
+     * A nine key's or 注音九键 group's long press is made by its name alone: one written with no `shortcut=` is named as the
+     * app's are. A name another key has already is not given again (two keys would share one list): unnamed, with a warning.
      */
     private fun composedNamed(family: String?, parts: List<Part>, p: Problems): List<Part> {
         if (family != "nine" && family != "zhuyin-nine") return parts
@@ -148,9 +139,7 @@ object LayoutReader {
         if (a.string("xmlns") != NAMESPACE) a.problem("xmlns= must be $NAMESPACE")
     }
 
-    // ids unique within the file, but where each has a when=, its own or its row's (the number pad's `-`, at a place
-    // a pad; a custom number board's rows of one pad and another's, 061-custom-layout §7): the engine checks those
-    // shown are (Expand)
+    // the engine checks those shown are unique (Expand)
     private fun checkKeys(rows: List<Row>, p: Problems) {
         rows.flatMap { r -> r.cells.map { it to (it.condition != null || r.condition != null) } }.filter { it.first.id != null }
             .groupBy { it.first.id }.forEach { (id, cells) ->
@@ -158,7 +147,6 @@ object LayoutReader {
             }
     }
 
-    // `<meta>` (0.6.1, 061-custom-layout §2.2): once, before anything else; its texts as a theme's (ThemeReader)
     private fun meta(parent: XmlElement, p: Problems): LayoutMeta? {
         val all = parent.all("meta")
         if (all.size > 1) p.add(all[1].line, "<meta> given twice")
@@ -178,7 +166,7 @@ object LayoutReader {
         return meta
     }
 
-    // `split-side` is the side a board split goes to; one split in halves is on both, which no row can be yet
+    // one split in halves is on both sides, which no row can be yet
     private fun splitSides(rows: List<Row>, p: Problems) {
         fun Condition?.asks() = this?.anyOf.orEmpty().any { group -> group.any { it.name == "split-side" } }
         val lines = rows.filter { it.condition.asks() }.map { it.line } + rows.flatMap { r ->
@@ -190,7 +178,6 @@ object LayoutReader {
     private fun defaults(parent: XmlElement, p: Problems): KeyAttrs {
         val all = parent.all("defaults")
         if (all.size > 1) p.add(all[1].line, "<defaults> given twice")
-        // first, or after <meta> where a keyboard has one
         if (all.isNotEmpty() && parent.children.firstOrNull { it.name != "meta" } !== all[0]) p.add(all[0].line, "<defaults> must come first")
         val d = all.firstOrNull() ?: return KeyAttrs()
         val a = Attributes(d, p)
@@ -232,7 +219,7 @@ object LayoutReader {
     private fun gap(el: XmlElement, p: Problems): Gap {
         val a = Attributes(el, p)
         val gap = Gap(a.matching("id", IDENT, "a name"), width(a) ?: Width.Units(1.0), condition(a), el.line)
-        // a 0.6.0 file's look (a blank key's face, drawn no more: Gap) still reads, a pack's layout kept as it was
+        // a 0.6.0 file's look still reads, a pack's layout kept as it was
         a.oneOf("look", KINDS)
         classes(a)
         a.done()
@@ -284,7 +271,6 @@ object LayoutReader {
         return Key(id.orEmpty(), condition, attrs, popup, menu, el.line, variants, letters, lean)
     }
 
-    // a <variant>: a when= and what it changes (no id, no width: the key stays where it is)
     private fun variant(el: XmlElement, p: Problems): Variant? {
         val a = Attributes(el, p)
         val condition = condition(a) ?: null.also { a.required("when") }
@@ -326,7 +312,7 @@ object LayoutReader {
             a.done()
             if (label != null && action != null) MenuItem(label, icon, action) else null
         }
-        // a menu of 0.6.0's 注 items alone (its handwriting.xml's) is none, each item warned of: still read (R26 F8209)
+        // a menu of 0.6.0's 注 items alone is none, each item warned of: still read
         if (items.isEmpty() && !gone) p.add(el.line, "<menu> has no items")
         return items
     }
@@ -345,7 +331,6 @@ object LayoutReader {
 
     private fun face(a: Attributes): Face? = a.value("face", "default|keep|none|special") { raw -> Face.entries.firstOrNull { it.xml == raw } }
 
-    // the look and actions a key and <defaults> share (keyLook, keyActions)
     private fun look(a: Attributes): KeyAttrs = KeyAttrs(
         label = a.value("label", "text or one binding", ::text),
         alt = a.value("alt", "text or one binding ({punct:} of one character)", ::oneMark),
@@ -365,23 +350,20 @@ object LayoutReader {
             listOfNotNull(
                 a.oneOf("swipe-axis", listOf("vertical", "both"))?.let { "swipe-axis" to it },
                 a.boolean("repeat")?.let { "repeat" to it.toString() },
-                // the bubble as it is pressed, where its kind says otherwise: on a function key (注音九键's tones, ? ! ~), off a letter key (its slot)
                 a.oneOf("preview", ON_OFF)?.let { "preview" to it },
             ),
-        // one name a key (060-keys-unify): a function key's `comma` is `fn/comma`, as the settings store it
+        // a function key's `comma` is `fn/comma`, as the settings store it
         shortcut = a.matching("shortcut", SHORTCUT, "a shortcut name")?.let { KeyId.of(it).name },
         mark = a.boolean("mark"),
         splitAfter = a.oneOf("split", listOf("after"))?.let { true },
     )
 
-    /** [raw] as text: a binding where it is one of the list, as written where it has no braces. */
     fun text(raw: String): Text? = when {
         '{' !in raw && '}' !in raw -> Text.Literal(raw)
         else -> binding(raw)?.takeIf { it.name !in Text.ICONS }
     }
 
-    // a corner or what a screen reader says: one mark of {punct:} (a run of them, 九键 1's `,.?!`, its face's alone; the
-    // betas' readers took one, 060-keys-unify review L3)
+    // a run of {punct:} is the face's alone: older readers took one
     private fun oneMark(raw: String): Text? = text(raw)?.takeUnless { it is Text.Binding && it.name == Text.PUNCT && it.arg.orEmpty().length > 1 }
 
     private fun binding(raw: String): Text.Binding? {
@@ -390,7 +372,7 @@ object LayoutReader {
         val arg = m.groupValues[2].takeIf { it.isNotEmpty() }
         val ok = when {
             arg == null -> name in Text.PLAIN || name in Text.ICONS
-            // marks of the basic plane alone: 1 to 4 counted alike on the JVM (code points) and JS (UTF-16 units)
+            // basic plane alone: 1 to 4 counted alike on the JVM (code points) and JS (UTF-16 units)
             name == Text.PUNCT -> PUNCT_ARG.matches(arg) && arg.none { it.isSurrogate() }
             name == Text.GROUP -> GROUP_ARG.matches(arg)
             name in Text.WITH_LETTER -> LETTER_ARG.matches(arg)
@@ -405,11 +387,7 @@ object LayoutReader {
         else -> binding(raw)?.takeIf { it.name in Text.ICONS }
     }
 
-    /**
-     * Whether [name] is 0.6.0's handwriting keyboard's 注 (role `reading`, action `reading` or `reading:<style>`), gone
-     * with that keyboard (061-handwriting-toolbar §7): a layout written for it still read, with a warning, that
-     * attribute nothing.
-     */
+    /** A layout written for 0.6.0's handwriting keyboard's 注 still reads, with a warning, that attribute nothing. */
     private fun retired(a: Attributes, name: String): Boolean {
         val raw = a.string(name) ?: return false
         if (raw != "reading" && (name == "role" || !raw.startsWith("reading:"))) return false
@@ -417,19 +395,14 @@ object LayoutReader {
         return true
     }
 
-    /** [raw] where it is a word of the action vocabulary (layout-1.xsd's `action`). */
     fun action(raw: String): String? = raw.takeIf { a -> ACTION_PATTERNS.any { it.matches(a) } && (!a.startsWith("code:") || codePoint(a) != null) }
 
-    /** The vocabulary's bare words, an action each with no argument (`caps` aside): never text to type (KeyDefaults.itemOf). */
     val WORDS = listOf(
         "lang", "ime-picker", "quickphrase", "unicode", "panel-back", "panel-lock", "space-long-press", "begin-selection-swipe",
         "delete-selection", "move-selection", "lookup",
     )
 
-    /**
-     * The code point of a `code:U+…` action: a Unicode scalar value, U+10FFFF at most and no surrogate
-     * (a half of a pair is no character to send); null for any other.
-     */
+    /** A half of a surrogate pair is no character to send. */
     fun codePoint(raw: String): Int? = raw.removePrefix("code:").takeIf { it.startsWith("U+") && it.length in CODE_DIGITS }
         ?.substring(2)?.takeIf { d -> d.all { it in '0'..'9' || it in 'A'..'F' } }?.toInt(HEX)
         ?.takeIf { it <= MAX_CODE_POINT && it !in SURROGATES }
@@ -438,27 +411,21 @@ object LayoutReader {
     private const val MAX_CODE_POINT = 0x10FFFF
     private val SURROGATES = 0xD800..0xDFFF
 
-    // "U+" and 4 to 6 hex digits
     private val CODE_DIGITS = 6..8
 
-    // a board may be 100 columns: the boards but the letters give widths in hundredths of the row (rules C)
     private const val MAX_UNITS = 100.0
     private const val MAX_RATIO = 4.0
     private const val MAX_TEXT_DP = 64.0
     private const val DEFAULT_COLUMNS = 10.0
     private val IDENT = Regex("[a-z0-9]+(-[a-z0-9]+)*")
 
-    /** The number pads a field may open (NumberPad), what `pad=` asks and `pads=` names (061-custom-layout §7). */
     val PADS = listOf("full", "digits", "signed", "decimal", "signed-decimal", "phone", "datetime")
     private val PAD_LIST = Regex("[a-z-]+( [a-z-]+)*")
     private const val MAX_META = 64
     private const val MAX_DESCRIPTION = 200
     private val APP_VERSION = Regex("[0-9]{1,4}\\.[0-9]{1,4}\\.[0-9]{1,4}")
-    // KeyNames': 大千's `/` and the number pad's are keys too (a theme's `zhuyin//` is its own: Selector)
     private val KEY_ID = Regex("(?!view:)\\S{1,32}")
     private val CLASSES = Regex("[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*")
-    // a group of the 14/18 keys' kind: NineKeyLetters.MAX letters at most, ; (双拼's ing) one of them;
-    // a row a space apart (060-render-v2 §15: where they sit on the key)
     private const val LETTERS_MAX = 5
     private val LETTERS = Regex("[a-z;]+( [a-z;]+)*")
     private val SHORTCUT = Regex("([a-z0-9-]+/)?\\S{1,32}")
@@ -480,15 +447,11 @@ object LayoutReader {
         "preview" to Regex(".{1,16}"), "preview-alt" to Regex(".{1,16}"),
     )
     private val ACTION_PATTERNS = listOf(
-        // one character, sent to the engine as typed: `:` too (the 18 keys' M swipes it, HostKeyAction(":"))
+        // `:` too (the 18 keys' M swipes it, HostKeyAction(":"))
         Regex("\\S"),
         Regex("(sym|picker|shortcut):[A-Za-z0-9_.-]*"),
-        // a layout named; emoji search on or off, as the app has it (KeyAction.EmojiSearchAction)
         Regex("layout:[A-Za-z0-9_.-]+"),
         Regex("emoji-search:(on|off)"),
-        // what the app does that is no key: a table of the app's says (060-render-p2 U4): a zhuyin
-        // symbol, tone 1–5 (ˉ ˊ ˇ ˋ ˙), 注音九键's slot. A group's code is no action: the key's
-        // letters= say it (060-render-v2 §15)
         // the longer name first: Kotlin/JS matches the first alternative that starts a match, then wants it whole
         Regex("action:(zhuyin-slot|zhuyin|tone-[1-5]|page-up|page-down)"),
         Regex("commit:.+"),

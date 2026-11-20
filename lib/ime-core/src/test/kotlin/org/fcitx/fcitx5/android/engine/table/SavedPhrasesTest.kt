@@ -17,7 +17,7 @@ class SavedPhrasesTest {
 
     private val wubi = dictionary("a 工", "aaaa 工", "aaaa 恭恭敬敬", "aaad 工期", "wqiy 你", "wun 们", "vbg 好")
 
-    // the record of 0.4, its tables' saved phrases converted into it once
+    // an older build's record, its tables' saved phrases converted into it once
     private fun log(vararg saved: Pair<String, String>) = savedLog(*saved, im = WUBI)
 
     private fun phrases(log: LearnLog, table: TableDictionary = wubi) = table.savedIn(log, WUBI)
@@ -57,13 +57,11 @@ class SavedPhrasesTest {
         val saved = phrases(log)
         assertTrue(saved.isSaved("wqwu", "你们"))
         saved.forget("wqwu", "你们")
-        // nothing saved of it: nothing written
         val records = log.state.tableWords.size
         saved.forget("aaaa", "工")
         assertEquals(records, log.state.tableWords.size)
         assertFalse(saved.isSaved("wqwu", "你们"))
         assertEquals(setOf("你好"), log.state.tableWords.keys.map { it.third }.toSet())
-        // the record read again, the same
         assertEquals(listOf("wqvb" to "你好"), phrases(log).saved(""))
     }
 

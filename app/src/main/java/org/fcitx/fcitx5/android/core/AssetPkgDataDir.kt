@@ -8,7 +8,7 @@ import android.content.res.AssetManager
 import org.fcitx.fcitx5.android.host.PkgDataDir
 import java.io.IOException
 
-/** The built-in fcitx data under the APK's assets ([root]; `app/src/main/host-assets.md`), read in place, never copied out. */
+/** The built-in fcitx data under the APK's assets, read in place, never copied out. */
 class AssetPkgDataDir(private val assets: AssetManager, private val root: String) : PkgDataDir {
     override fun read(path: String): ByteArray? = try {
         assets.open("$root/$path").use { it.readBytes() }

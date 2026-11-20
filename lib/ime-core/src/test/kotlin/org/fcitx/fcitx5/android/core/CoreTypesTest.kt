@@ -9,13 +9,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The core types the app shows: the UI's views of entries and words, key states.
- */
 class CoreTypesTest {
 
     private val word = CandidateWord("1", "你好", "nǐ hǎo")
-    private val entry = InputMethodEntry("pinyin", "拼音", "", "", "拼", "zh_CN", "androidengine", true, "", "", "")
+    private val entry = InputMethodEntry("pinyin", "拼音", "", "拼", "zh_CN")
 
     @Test
     fun entriesAndWordsAsTheUiShowsThem() {
@@ -24,7 +21,6 @@ class CoreTypesTest {
         assertEquals("你好", word.copy(comment = " ").textWithComment())
         assertEquals("拼音", entry.displayName)
         assertEquals("x", InputMethodEntry("x").displayName)
-        assertEquals(InputMethodSubMode(), InputMethodEntry("a", "b", "", "", "", "", "", false).subMode)
         assertEquals("0x0061", KeySym(0x61).toString())
     }
 

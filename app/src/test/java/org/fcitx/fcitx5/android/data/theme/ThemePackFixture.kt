@@ -7,17 +7,15 @@ package org.fcitx.fcitx5.android.data.theme
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.core.zipOf
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.robolectric.annotation.Config
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
-// an image is a file of "<w>x<h>", a font one of "font": what an import reads of them, off Android
+// an image is a "<w>x<h>" file, a font one of "font": what an import reads of them, off Android
 private object PackProbe : ThemeFilesManager.AssetProbe {
     override fun imageSize(file: File): Pair<Int, Int>? = file.readText().split('x').takeIf { it.size == 2 }
         ?.let { (w, h) -> w.toIntOrNull()?.let { a -> h.toIntOrNull()?.let { b -> a to b } } }
@@ -25,8 +23,7 @@ private object PackProbe : ThemeFilesManager.AssetProbe {
     override fun fontReads(file: File) = file.readText() == "font"
 }
 
-/** What the theme pack tests share: an empty theme folder, the probe off Android, a sample pack and its zips. */
-// at night: the packs' dark versions the tests use are the ones a slot naming either shows (ThemeManager.systemVersion)
+// at night: tests use the packs' dark versions (ThemeManager.systemVersion)
 @Config(qualifiers = "night")
 abstract class ThemePackFixture {
 
@@ -37,7 +34,6 @@ abstract class ThemePackFixture {
     private val realRecheck = ThemePackFiles.recheck
     private val realOnRefused = ThemePackFiles.onRefused
 
-    // the settings as they were before the test, put back after it
     private var followBefore = false
     private var normalBefore: Theme? = null
 
@@ -45,18 +41,18 @@ abstract class ThemePackFixture {
     fun empty() {
         followBefore = ThemeManager.prefs.followSystemDayNightTheme.getValue()
         normalBefore = ThemeManager.prefs.normalModeTheme.getValue()
-        // a listing's check again at once: what it refuses is left out of that listing
+        // recheck at once: what it refuses is left out of that listing
         ThemePackFiles.recheck = { it.run() }
-        // the checks an earlier test of this process asked or refused, and its listing's themes, not this one's
+        // an earlier test's checks and listing, not this one's
         ThemePackFiles.forgetListings()
         phoneStorage()
         dir.deleteRecursively()
         dir.mkdirs()
         ThemeFilesManager.probe = PackProbe
-        // a release's: a debug build's own name (past its tag) checks no min-app
+        // a release's: a debug build's name checks no min-app
         ThemeFilesManager.versionName = "0.6.0"
         ThemeFilesManager.replacingFile().delete()
-        // the theme in use the normal mode's, not the day's or night's
+        // the normal mode's theme, not the day's or night's
         ThemeManager.prefs.followSystemDayNightTheme.setValue(false)
         ThemeFilesManager.listThemes()
         ThemeManager.refreshThemes()
@@ -75,8 +71,7 @@ abstract class ThemePackFixture {
         ThemeManager.refreshThemes()
     }
 
-    // a built-in theme's file of two versions, as a user's of [name]: [meta] before its colours, [before] ahead of
-    // its first style (a picture, fonts), [styles] and [icons] at its end
+    // a two-version built-in theme as a user's [name]: [meta] before its colours, [before] ahead of its first style
     protected val nord by lazy { BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_nord) }
 
     protected fun xml(name: String = "mine", meta: String = "", before: String = "", styles: String = "", icons: String = ""): String {
@@ -96,30 +91,22 @@ abstract class ThemePackFixture {
         icons = """<icon name="star" src="star.svg"/>""",
     )
 
-    // [more] over the sample's own of their names
     protected fun sample(xml: String = sampleXml, vararg more: Pair<String, String>) = zip(*(sampleEntries(xml).toMap() + more).toList().toTypedArray())
 
     protected fun sampleEntries(xml: String) = arrayOf(
         "theme.xml" to xml, "preview.png" to "100x50", "photo.jpg" to "3000x2000", "p.webp" to "1080x720", "l.webp" to "2000x700",
         "enter.png" to "64x64", "round.ttf" to "font", "star.svg" to svg, "layouts/" to "", "layouts/qwerty.xml" to "<layout/>",
-        // what it does not name, and a Mac's attributes: not taken
+        // unnamed files and a Mac's attributes: not taken
         "readme.txt" to "hello", "__MACOSX/._enter.png" to "attr",
     )
 
-    protected fun zip(vararg entries: Pair<String, String>) = ByteArrayOutputStream().also { bytes ->
-        ZipOutputStream(bytes).use { zip ->
-            for ((name, text) in entries) {
-                zip.putNextEntry(ZipEntry(name))
-                if (!name.endsWith("/")) zip.write(text.encodeToByteArray())
-            }
-        }
-    }.toByteArray()
+    protected fun zip(vararg entries: Pair<String, String>) = zipOf(*entries)
 
     protected fun open(bytes: ByteArray, themes: List<Theme> = ThemeManager.getAllThemes()) = ThemeFilesManager.openTheme(bytes.inputStream(), themes)
 
     protected fun opened(bytes: ByteArray) = open(bytes).getOrThrow() as ThemeFilesManager.Opened.Pack
 
-    // imported and listed, as the settings' list does after ([ThemeManager.packPlaced])
+    // as the settings' list does after ([ThemeManager.packPlaced])
     protected fun placed(bytes: ByteArray) = opened(bytes).commit().getOrThrow().also { ThemeManager.packPlaced(it[0].file) }
 
     protected fun refusal(bytes: ByteArray, themes: List<Theme> = ThemeManager.getAllThemes()) = open(bytes, themes).exceptionOrNull()!!.message

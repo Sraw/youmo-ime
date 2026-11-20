@@ -44,7 +44,6 @@ class CommonWordsTest {
         val asked = ArrayList<List<String>>()
         val r = CommonWords.parse("米字旁 米\n木字旁 木\n米字旁 糸\n") { texts -> asked += texts; mapOf("米字旁" to "mi zi pang", "木字旁" to null) }
         assertEquals(listOf(listOf("米字旁", "木字旁")), asked)
-        // two lines of one word are one, its replacements in turn
         assertEquals(listOf("米字旁[mi'zi'pang] 米 糸"), r.words.words.map { it.toString() })
         assertEquals(listOf(2 to Problem.NO_PINYIN), r.skipped.map { it.line to it.problem })
     }
@@ -76,7 +75,6 @@ class CommonWordsTest {
     @Test
     fun pastTheMostWordsTheRestAreSkipped() {
         val lines = (0 until CommonWords.MAX_WORDS + 2).joinToString("\n") { "你好[ni'hao] r$it" }
-        // one word, its lines merged: no limit reached
         assertEquals(1, read(lines).words.words.size)
         val many = (0 until CommonWords.MAX_WORDS + 2).joinToString("\n") { "${'一' + it}[yi] r" }
         val r = read(many)
@@ -114,7 +112,6 @@ class CommonWordsTest {
         val file = CommonWords.of(listOf(word("木字旁", "mu'zi'pang", "木"), word("米字旁", "mi'zi'pang", "糸"), word("中国", "zhong'guo", "华")))
         val i = phone.importing(file)
         assertEquals(listOf("米字旁[mi'zi'pang] 糸", "木字旁[mu'zi'pang] 木", "中国[zhong'guo] 华"), i.words.words.map { it.toString() })
-        // the same word as it was is no update
         assertEquals(1 to 1, i.added to i.updated)
         assertTrue(i.full.isEmpty())
     }
@@ -137,9 +134,7 @@ class CommonWordsTest {
             ),
         )
         val index = words.index(pinyin)
-        // 米字旁边's first three is 米字旁's whole: the whole first
         assertEquals(listOf("米", "糸", "边"), index.found(listOf("mizipang")).map { it.text })
-        // two words' initials: as listed, 米 once, as 木字旁's
         assertEquals(listOf("木" to "木字旁", "米" to "木字旁", "糸" to "米字旁"), index.found(listOf("mzp")).map { it.text to it.word })
         assertEquals(emptyList<String>(), index.found(listOf("mizipan")).map { it.text })
     }
@@ -157,7 +152,6 @@ class CommonWordsTest {
         val mu = word("木字旁", "mu'zi'pang", "木")
         val zg = word("中国", "zhong'guo", "华")
         val base = CommonWords.of(listOf(mi, mu))
-        // the file unchanged since: mine as it is
         val mine = CommonWords.of(listOf(mu, zg))
         assertEquals(mine.words, CommonWords.merged(base, mine, base).words)
         // the keyboard took 米 off 米字旁 meanwhile, and 木字旁 out; the page added 中国 and changed nothing else
@@ -191,7 +185,6 @@ class CommonWordsTest {
         assertEquals(listOf("mizipang", "mzp"), keys("米字旁", "mi'zi'pang", two = false))
         assertEquals(listOf("lvese", "luese", "ls"), keys("略色", "lve'se", two = true))
         assertEquals(listOf("nve", "nue"), keys("虐", "nve", two = true))
-        // 绿's lv has no other way: lu is another syllable
         assertEquals(listOf("lv"), keys("绿", "lv", two = true))
     }
 
@@ -210,7 +203,6 @@ class CommonWordsTest {
         assertTrue(r.words.isEmpty && r.words.newer)
         assertEquals(listOf(1 to Problem.NEWER), r.skipped.map { it.line to it.problem })
         assertTrue(runCatching { r.words.format() }.isFailure)
-        // a merge over it keeps it so: the writer refuses
         assertTrue(CommonWords.merged(CommonWords.EMPTY, CommonWords.of(listOf(word("中国", "zhong'guo", "华"))), r.words).newer)
     }
 
@@ -227,7 +219,6 @@ class CommonWordsTest {
 
     @Test
     fun aCommentTheUserWroteIsKeptAfterTheWordsRead() {
-        // comments were left out before the lines kept, so a save lost them
         val r = read("# youmo-common-words 1\n# my radicals\n米字旁 米\n中国[zhong'guo]\t华\n#後\n")
         assertEquals(listOf("# my radicals", "米字旁 米", "#後"), r.words.unread)
         assertEquals("# youmo-common-words 1\n中国[zhong'guo]\t华\n# my radicals\n米字旁 米\n#後\n", r.words.format())
@@ -236,7 +227,6 @@ class CommonWordsTest {
     @Test
     @Uat("WD-44")
     fun aReplacementTwoWordsGiveIsTakenOffBoth() {
-        // it was taken off the first word only, so the candidate deleted stayed under the same key
         val words = CommonWords.of(listOf(word("木字旁", "mu'zi'pang", "木", "米"), word("米字旁", "mi'zi'pang", "米", "糸")))
         val mi = words.index(pinyin).found(listOf("mzp")).single { it.text == "米" }
         assertEquals(listOf("木字旁", "米字旁"), mi.words)

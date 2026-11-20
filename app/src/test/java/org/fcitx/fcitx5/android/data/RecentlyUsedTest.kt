@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-// the real application, whose preferences keep the items; the picker shows every one kept
+// the real application, whose preferences keep the items
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class RecentlyUsedTest {
@@ -26,7 +26,6 @@ class RecentlyUsedTest {
         val recent = RecentlyUsed("emoji", 3)
         listOf("a", "b", "c", "d", "e").forEach { recent.insert(it, habits = true) }
         assertEquals(listOf("e", "d", "c"), recent.items(habits = true))
-        // picked again, it comes first and none goes
         recent.insert("c", habits = true)
         assertEquals(listOf("c", "e", "d"), recent.items(habits = true))
         assertEquals(listOf("c", "e", "d"), RecentlyUsed("emoji", 3).items(habits = true))
@@ -38,7 +37,7 @@ class RecentlyUsedTest {
         assertEquals(listOf("d", "c"), RecentlyUsed("symbol", 2).items(habits = true))
     }
 
-    // U-67: not while the habits are off; cleared with what was learned, every picker's, the one open too
+    // not while the habits are off; cleared with what was learned, every picker's, the one open too
     @Test
     fun noneWhileTheHabitsAreOffAndAllClearedWithWhatWasLearned() {
         val emoji = RecentlyUsed("emoji", 5)
@@ -56,7 +55,7 @@ class RecentlyUsedTest {
         assertEquals(emptyList<String>(), RecentlyUsed("symbol", 5).items(habits = true))
     }
 
-    // review-E-engine M1: a picker open while 清掉最近 ran saves what it last read, the cleared items with it, at its next pick
+    // a picker open while 清掉最近 ran once saved the cleared items back at its next pick
     @Test
     fun aPickAfterAClearKeepsOnlyItself() {
         val open = RecentlyUsed("emoji", 5)

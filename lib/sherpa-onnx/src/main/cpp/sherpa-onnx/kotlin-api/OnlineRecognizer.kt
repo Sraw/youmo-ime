@@ -1,7 +1,5 @@
 package com.k2fsa.sherpa.onnx
 
-import android.content.res.AssetManager
-
 data class EndpointRule(
     var mustContainNonSilence: Boolean,
     var minTrailingSilence: Float,
@@ -59,17 +57,12 @@ data class OnlineRecognizerResult(
 )
 
 class OnlineRecognizer(
-    assetManager: AssetManager? = null,
     val config: OnlineRecognizerConfig,
 ) {
     private var ptr: Long
 
     init {
-        ptr = if (assetManager != null) {
-            newFromAsset(assetManager, config)
-        } else {
-            newFromFile(config)
-        }
+        ptr = newFromFile(config)
         require(ptr != 0L) {
             "Invalid OnlineRecognizerConfig: failed to create native OnlineRecognizer"
         }
@@ -106,11 +99,6 @@ class OnlineRecognizer(
 
     private external fun delete(ptr: Long)
 
-    private external fun newFromAsset(
-        assetManager: AssetManager,
-        config: OnlineRecognizerConfig,
-    ): Long
-
     private external fun newFromFile(
         config: OnlineRecognizerConfig,
     ): Long
@@ -127,9 +115,6 @@ class OnlineRecognizer(
         init {
             System.loadLibrary("sherpa-onnx-jni")
         }
-
-        @JvmStatic
-        external fun prependAdspLibraryPath(newPath: String) // for qnn
     }
 }
 

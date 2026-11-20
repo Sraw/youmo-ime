@@ -27,7 +27,7 @@ class ZhuyinKeysTest {
         }
     }
 
-    // the gestures' presets name 大千's keys by the computer keyboard's (design 051 §1.3)
+    // the gestures' presets name 大千's keys by the computer keyboard's
     @Test
     fun dachenByQwertyHasEverySymbolAndTheFourTones() {
         val keys = ZhuyinKeys.DACHEN_QWERTY
@@ -76,7 +76,6 @@ class ZhuyinKeysTest {
         }
         assertEquals(InputMethodCatalog.ZHUYIN_NINE, KeyboardPair.pinyinKeyed(Keyboard.zhuyinNineKey(0)))
         assertEquals(InputMethodCatalog.ZHUYIN, KeyboardPair.pinyinKeyed(Keyboard.zhuyinKey('ㄅ')))
-        // a ㄅ as text (the symbols page) is no key of theirs
         assertNull(KeyboardPair.pinyinKeyed('ㄅ'.code))
         assertFalse(InputMethodCatalog.isCode('ㄅ'.code))
     }

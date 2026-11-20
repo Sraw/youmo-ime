@@ -37,7 +37,7 @@ interface PickerPolicy {
 class DefaultPickerPolicy : PickerPolicy {
     override fun filter(raw: String) = true
     override fun transform(raw: String) = raw
-    // the built-in long press (060-keys-unify C1), committed as shown as the cell is
+    // committed as shown as the cell is
     override fun popup(raw: String): KeyDef.Popup.Keyboard? =
         PickerLongPress[raw]?.let { KeyDef.Popup.Keyboard.Explicit(it, asIs = true) }
 
@@ -48,20 +48,9 @@ class DefaultPickerPolicy : PickerPolicy {
  * Emoji policy: filter unsupported glyph, transform skintone, rebuild on preference changes
  */
 class EmojiPickerPolicy : PickerPolicy {
-    data class Prefs(
-        val hideUnsupportedEmojis: Boolean,
-        val defaultSkinTone: EmojiModifier.SkinTone
-    )
+    private val defaultSkinTone by AppPrefs.getInstance().symbols.defaultEmojiSkinTone
 
-    private val symbolPrefs = AppPrefs.getInstance().symbols
-    private val hideUnsupportedEmojis by symbolPrefs.hideUnsupportedEmojis
-    private val defaultSkinTone by symbolPrefs.defaultEmojiSkinTone
-
-    private val prefs get() = Prefs(hideUnsupportedEmojis, defaultSkinTone)
-
-    override fun filter(raw: String): Boolean {
-        return if (hideUnsupportedEmojis) EmojiModifier.isValidEmoji(raw) else true
-    }
+    override fun filter(raw: String): Boolean = EmojiModifier.isValidEmoji(raw)
 
     override fun transform(raw: String): String {
         return EmojiModifier.getPreferredTone(raw, defaultSkinTone)
@@ -72,5 +61,5 @@ class EmojiPickerPolicy : PickerPolicy {
         return KeyDef.Popup.Keyboard.Explicit(items)
     }
 
-    override fun invalidateKey(): Prefs = prefs
+    override fun invalidateKey(): EmojiModifier.SkinTone = defaultSkinTone
 }

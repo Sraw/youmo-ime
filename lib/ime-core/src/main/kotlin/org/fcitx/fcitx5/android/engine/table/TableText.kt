@@ -8,13 +8,10 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.CodeTableReader
 import java.nio.ByteBuffer
 
-/** A code table's text made into what [CodeTable.load] reads. */
 object TableText {
 
     /**
-     * Codes the phrases [reader] found listed without a code by the table's 组词规则, as libime
-     * does, adding them to its entries. Those the rules cannot code (a character the table has no
-     * code for, a length no rule covers) are left out.
+     * Codes the phrases [reader] found listed without a code by the 组词规则, as libime does; those the rules cannot code are left out.
      *
      * @return how many were left out
      */
@@ -33,29 +30,15 @@ object TableText {
         return uncoded
     }
 
-    /** What [addWords] did to a table: the words it added that stayed, [fresh] or not, and those [dropped] as rare. */
     class Added(val fresh: Int, val others: Int, val dropped: Int)
 
     /**
-     * Adds [words] to the table [reader] read (its phrases coded), each coded by its 组词规则 --
-     * so a 五笔 user types 内卷 as the rules spell it -- and arranges each code of the longest
-     * length by use, [score] a text's log10 probability: the commonest first, space committing it,
-     * and a code of one candidate committing that by itself (唯一自动上屏). So:
-     * - an entry the table has stays, only moved by use, a character, punctuation and a saying
-     *   with a comma (—— ……, 吃一堑，长一智) too: 您好, added under 五笔's `wqvb`, comes before the
-     *   table's 你好 there if more used; so a code the table gives two candidates or more never
-     *   commits by itself;
-     * - a word added goes if less than a tenth as common as the commonest of the code's others
-     *   (characters and words not [fresh]) or never seen, unless not all Han, which no count is
-     *   of; one the user picked before stays theirs (SavedPhrases). A [fresh] word (the new-word
-     *   pack's) never goes: new, it is more used than any count of the past says, taken as
-     *   [FRESH_BOOST] more;
-     * - codes shorter than the longest, the table's 简码, stay as they were.
-     * A word goes in only where each shorter code it starts with led somewhere already (else a
-     * key that led nowhere and committed, 顶屏, would lead on), to its own code or one it comes
-     * after (a shorter code's first candidate changes only where it was of this code), and not
-     * under a pinyin entry's spelling (五笔拼音). Not a word the table has; a table without rules
-     * gets none and loses none.
+     * Adds [words] to the table, each coded by its 组词规则 (so 五笔 types 内卷 as the rules spell it), and orders each
+     * longest-length code by use ([score], log10): the commonest first, a lone candidate committing itself. The table's
+     * own entries only move; an added word goes if under a tenth as common as the code's commonest other, unless
+     * [fresh] (the new-word pack, boosted by [FRESH_BOOST]). 简码 stay as they were. A word goes in only where each
+     * shorter code it starts with led somewhere already (else a 顶屏 key would lead on), and not under a pinyin entry's
+     * spelling. A table without rules gets none.
      */
     fun addWords(reader: CodeTableReader, words: Iterable<String>, score: (String) -> Float, fresh: (String) -> Boolean): Added {
         val table = CodeTable.load(ByteBuffer.wrap(reader.builder.build().toByteArray()), verify = false)
@@ -69,7 +52,6 @@ object TableText {
             val shorter = table.prefixRange(code.substring(0, n))
             !shorter.isEmpty() && table.code(shorter.first) <= code
         }
-        // of the longest length: no code leads on from it
         fun fits(code: String) = code.length == dictionary.maxLength &&
             (marker == null || table.prefixRange("$marker$code").isEmpty()) && follows(code)
         val added = HashMap<String, MutableList<String>>()
@@ -82,7 +64,6 @@ object TableText {
         }
         var dropped = 0
         reader.builder.arrange { entries ->
-            // the longest codes, each with the words coded to it; the rest as they were
             val (full, kept) = entries.partition { (code, _) -> code.length == dictionary.maxLength && (marker == null || code[0] != marker) }
             val byCode = LinkedHashMap<String, MutableList<String>>()
             for ((code, text) in full) byCode.getOrPut(code) { ArrayList() } += text
@@ -98,10 +79,7 @@ object TableText {
         return Added(freshAdded, new.count { it in left } - freshAdded, dropped)
     }
 
-    /**
-     * [texts] of one code kept, the commonest first (as listed where as common, never seen last),
-     * and those that go, of those [added] only: see [addWords].
-     */
+    /** [texts] of one code kept, commonest first (unseen last), and those of [added] that go: see [addWords]. */
     internal fun arrange(texts: List<String>, score: (String) -> Float, fresh: (String) -> Boolean, added: (String) -> Boolean): Pair<List<String>, List<String>> {
         val others = texts.filterNot(fresh)
         val top = others.maxOfOrNull(score) ?: Float.NEGATIVE_INFINITY
@@ -112,11 +90,7 @@ object TableText {
         return ranked to texts.filter { it !in keep }
     }
 
-    /**
-     * Words of Han characters, two or more, the model scores; not a character (one outside the
-     * BMP is two chars), nor punctuation or a saying with a comma in it (五笔's —— and ……, 吃一堑，
-     * 长一智), which no model count says anything of.
-     */
+    /** Han words of two or more characters the model scores; not a character (outside the BMP it is two chars), nor punctuation or a saying with a comma. */
     private fun isWord(text: String): Boolean {
         if (text.codePointCount(0, text.length) < 2) return false
         var i = 0
@@ -128,9 +102,7 @@ object TableText {
         return true
     }
 
-    /** log10: a fresh word counts ten times its use. */
     const val FRESH_BOOST = 1f
 
-    /** log10: a word added under a tenth as common as its code's commonest goes. */
     const val KEEP_WITHIN = 1f
 }

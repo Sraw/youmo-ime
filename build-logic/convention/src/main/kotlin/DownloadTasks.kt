@@ -123,10 +123,7 @@ abstract class ExtractTask @Inject constructor(private val exec: ExecOperations)
     }
 }
 
-/**
- * What to do about a [cmake] that is not there: install the SDK's of its version, unless it is the
- * one `cmake.dir` names ([fromCmakeDir]), whose directory is named after no SDK package.
- */
+/** What to do about a missing [cmake]: install the SDK's, unless `cmake.dir` names it ([fromCmakeDir]). */
 internal fun noCmake(cmake: File, fromCmakeDir: Boolean): String =
     if (fromCmakeDir) {
         "no CMake at $cmake, where cmake.dir in local.properties points"

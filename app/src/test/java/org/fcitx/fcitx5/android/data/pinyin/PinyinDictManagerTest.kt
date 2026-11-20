@@ -43,10 +43,9 @@ import kotlin.concurrent.thread
 @Config(application = FcitxApplication::class)
 class PinyinDictManagerTest {
 
-    // the manager's own, made once for the class: each test's application has another external dir
+    // made once for the class: each test's application has another external dir
     private val dir get() = PinyinDictManager.pinyinDicDir
 
-    // the dictionaries, not the dot files kept among them (.libime) nor the file compiled from them
     private fun names() = dir.list()!!.filter { !it.startsWith(".") && !MergedDictionary.isCompiled(File(dir, it)) }.sorted()
 
     @Before
@@ -56,16 +55,12 @@ class PinyinDictManagerTest {
         MergedDictionary.made = {}
         MergedDictionary.base = { null }
         dir.listFiles()?.forEach { it.deleteRecursively() }
-        // made when the manager first ran, under that test's application: it may be gone since
+        // made under the first test's application: it may be gone since
         dir.mkdirs()
     }
 
-    // import-edit-2: a binary dictionary past its kind's cap is refused as it is copied, before anything reads it whole
-    // (an OutOfMemoryError there took the keyboard down with this process), the copy left in no cache; nothing is
-    // read past the cap ([endless] fails the test there). R25r2 F7856: the user dictionary's import (readWords) copies
-    // into the cache as the base's does, and went through an unbounded copyTo; and each kind has the cap of how it is
-    // read (maxImported). Text has no row: it is streamed, capped for the cache alone, and a row would write its
-    // 512 MiB to the test's disk
+    // a binary dictionary past its kind's cap is refused while copying, before anything reads it whole (an OOM took the
+    // keyboard down). Text has no row: it is streamed, and a row would write 512 MiB to disk
     @Test
     @Uat("WD-14z3")
     fun aBinaryDictionaryPastItsCapIsRefusedAsItIsCopied() {
@@ -83,18 +78,15 @@ class PinyinDictManagerTest {
             val cache = importCopies()
             val refused = assertThrows(PinyinDictManager.Refusal::class.java) { row.import(endless(PinyinDictManager.maxImported(row.type)), row.name) }
             assertEquals(DictionaryFormat.Reason.TOO_LARGE, refused.reason)
-            // what the page shows of it (WD-14z3): 格式不支持 and that the file is too large
             if (row.says) assertEquals(appContext.getString(R.string.dict_refused, appContext.getString(R.string.dict_refused_too_large)), refused.message)
             assertEquals(emptySet<String>(), importCopies() - cache)
         }
     }
 
-    // an import's copies in the cache (PinyinDictManager's createTempFile "import…"), not the whole cache: it is the
-    // application's, written meanwhile by others (a temp dir, a theme's unpacking, an earlier test's work landing late),
-    // and compared whole the case failed on what was none of the import's
+    // an import's copies only: others write to the cache meanwhile, which failed the case
     private fun importCopies() = appContext.cacheDir.list().orEmpty().filter { it.startsWith("import") }.toSet()
 
-    // zeroes without end, failing the test if read past [cap]: what is copied stops there
+    // endless zeroes, failing the test if read past [cap]
     private fun endless(cap: Long) = object : InputStream() {
         private var given = 0L
 
@@ -108,7 +100,6 @@ class PinyinDictManagerTest {
         }
     }
 
-    // audit-061 import-edit-7: one rule of what a file names in the base, the settings page's and importFromInputStream's
     @Test
     fun aFileIsNamedInTheBaseAsTheSettingsPageNamesIt() {
         assertEquals("luna_pinyin", PinyinDictManager.dictionaryName("luna_pinyin.dict.yaml"))
@@ -145,7 +136,6 @@ class PinyinDictManagerTest {
         val unread = Provided(null)
         assertThrows(IOException::class.java) { runBlocking { PinyinDictManager.readWords(unread, "words.txt") { it.toList() } } }
         assertTrue(unread.closed)
-        // nor of the copy readWords makes and its text, read or not
         assertEquals(cached, cachedFiles())
         assertEquals(listOf("mine.txt.gz"), names())
     }
@@ -174,7 +164,6 @@ class PinyinDictManagerTest {
             val dots = Provided("搭子 da'zi 0\n".toByteArray())
             assertTrue(PinyinDictManager.importFromInputStream(dots, "..").isFailure)
             assertTrue(dots.closed)
-            // a picked .gz is no dictionary either, though they are kept so (S4)
             val gz = Provided("搭子 da'zi 0\n".toByteArray())
             assertTrue(PinyinDictManager.importFromInputStream(gz, "words.txt.gz").isFailure)
             assertTrue(gz.closed)
@@ -187,18 +176,17 @@ class PinyinDictManagerTest {
 
     @Test
     fun aSogouCellDictionaryBecomesScel2org5sTextAndABrokenOneFails() {
-        // relative to app/, where Gradle runs the tests; an IDE's other working directory would read as a converter failure
+        // relative to app/, where Gradle runs tests; an IDE's working directory would read as a converter failure
         val scel = File("../uat/fixtures/scel")
         check(scel.isDirectory) { "fixtures not found at ${scel.absolutePath}: run with app/ as the working directory" }
         val dest = File(RuntimeEnvironment.getApplication().cacheDir, "extra.txt")
         PinyinDictManager.sougouDictConv(File(scel, "extra.scel"), dest)
         assertEquals(File(scel, "extra.txt").readText(), dest.readText())
         assertThrows(IOException::class.java) { PinyinDictManager.sougouDictConv(File(scel, "truncated.scel"), dest) }
-        // the half written, not the call before's output left in its place (F3793)
+        // the half written, not the previous call's output left in its place
         assertFalse(dest.exists())
     }
 
-    // a word list as other input methods export them, its layout told from the whole file (D6)
     @Test
     fun aTextFileIsReadInTheLayoutItHas() {
         PinyinDictManager.importFromInputStream("you mo 幽默 12\nda zi 搭子 3\n".byteInputStream(), "pinyin-first.txt").getOrThrow()
@@ -209,16 +197,14 @@ class PinyinDictManagerTest {
         val gb = "幽默 you'mo 0\n".toByteArray(charset("GB18030"))
         PinyinDictManager.importFromInputStream(gb.inputStream(), "gb.txt").getOrThrow()
         assertEquals(listOf("幽默 you'mo 0.0"), lines(File(dir, "gb.txt.gz")))
-        // the three compiled into one file, each counted
         assertEquals(mapOf("gb" to 1, "pinyin-first" to 2, "sogou" to 2), MergedDictionary.sourceWords(dir))
     }
 
-    // the cache's files but lock files (*.lck): those another part of the app takes there come and go
-    // on their own while a test runs, nothing an import left
+    // excluding lock files (*.lck), which others take there and drop on their own while a test runs
     private fun cachedFiles(): Set<String> =
         RuntimeEnvironment.getApplication().cacheDir.list()!!.filterNot { it.endsWith(".lck") }.toSet()
 
-    // never imported half right: a file of two layouts, or initials only, is refused and nothing kept
+    // never imported half right: two layouts, or initials only, refused and nothing kept
     @Test
     fun aFileNotSurelyReadIsRefusedWithTheReason() {
         val cache = cachedFiles()
@@ -230,8 +216,7 @@ class PinyinDictManagerTest {
         assertEquals(cache, cachedFiles())
     }
 
-    // one of a name there, on or off, is not imported over (ImportedDictionaries.hasDictionary): its
-    // text and the merged file as they were (review S7)
+    // one of a name there, on or off, is not imported over
     @Test
     fun oneOfANameThereOnOrOffIsNotImportedOver() {
         val mine = PinyinDictManager.importFromInputStream("幽默 you'mo\n".byteInputStream(), "mine.txt").getOrThrow()
@@ -248,7 +233,6 @@ class PinyinDictManagerTest {
         }
     }
 
-    // the page's turning off and on: the merged file made again without it, its count read from the file
     @Test
     fun turningOneOffCompilesTheRestWithoutIt() {
         val mine = PinyinDictManager.importFromInputStream("幽默 you'mo\n搭子 da'zi\n".byteInputStream(), "mine.txt").getOrThrow()
@@ -257,23 +241,19 @@ class PinyinDictManagerTest {
         assertTrue(PinyinDictManager.turn(mine, false))
         MergedDictionary.refreshNow(dir)
         assertEquals(mapOf("theirs" to 1), MergedDictionary.sourceWords(dir))
-        // off: counted from its text, listed again as the page does after a change (turned by name, the row is the page's as listed)
         assertEquals(2, PinyinDictManager.wordCount(PinyinDictManager.listDictionaries().single { it.name == "mine" }))
         assertTrue(PinyinDictManager.turn(mine, true))
         MergedDictionary.refreshNow(dir)
         assertEquals(3, MergedDictionary.current(dir).file!!.size)
     }
 
-    // an import that does not end leaves nothing turned on to be compiled silently later: the
-    // directory as it was. Each row: how it fails, and what it fails with
+    // an import that does not finish leaves nothing turned on to be compiled silently later
     @Test
     fun anImportThatFailsLeavesNothingBehind() {
         PinyinDictManager.importFromInputStream("你好 ni'hao\n".byteInputStream(), "theirs.txt").getOrThrow()
         class Row(val why: String, val cancel: Boolean, val base: MergedDictionary.Base?, val thrown: Class<out Throwable>)
         val rows = listOf(
-            // its compile fails (the disk full) (review M2)
             Row("compile failed", cancel = false, MergedDictionary.Base("full") { throw IOException("no space left") }, IOException::class.java),
-            // cancelled before the compile, while the file is written (review M1)
             Row("cancelled", cancel = true, null, CancellationException::class.java),
         )
         val noBase = MergedDictionary.base
@@ -281,7 +261,7 @@ class PinyinDictManagerTest {
             val before = names()
             MergedDictionary.base = noBase
             val prepared = PinyinDictManager.prepare("幽默 you'mo\n搭子 da'zi\n".byteInputStream(), "mine.txt")
-            // set after prepare, which reads the base's readings too: the failure is the compile's
+            // set after prepare, which reads the base too: the failure is the compile's
             MergedDictionary.base = { row.base }
             val failed = prepared.use { PinyinDictManager.importPrepared(it, "mine", AtomicBoolean(row.cancel)) }
             assertTrue(row.why, row.thrown.isInstance(failed.exceptionOrNull()))
@@ -289,7 +269,6 @@ class PinyinDictManagerTest {
         }
     }
 
-    // 0.6.0 #5: a list of words alone goes into the base with the readings the guess gives, the rest skipped
     @Test
     fun aListOfWordsAloneIsPreparedWithTheReadingsGuessed() {
         val readings = mapOf("幽默" to "you mo", "搭子" to "da zi")
@@ -302,8 +281,7 @@ class PinyinDictManagerTest {
         }
     }
 
-    // one of its name that comes as it is written (another import's, a restore) is told 词库已存在,
-    // not the commit's raw IOException, and is left as it is (F3603, F3654)
+    // one of its name arriving meanwhile is told 词库已存在, not the commit's raw IOException, and left as it is
     @Test
     fun aNameTakenAsItIsWrittenIsToldAlreadyThere() {
         val prepared = PinyinDictManager.prepare("幽默 you'mo\n".byteInputStream(), "mine.txt")
@@ -311,32 +289,27 @@ class PinyinDictManagerTest {
         val failed = prepared.use {
             PinyinDictManager.importPrepared(it, "mine") { if (!theirs.exists()) theirs.writeText("theirs") }
         }
-        // the same message errorArg gives, with app resources or without (F3671)
+        // errorArg's message, with app resources or without
         val expected = runCatching { errorArg(R.string.dict_already_exists) }.exceptionOrNull()?.message
         assertEquals(expected, failed.exceptionOrNull()?.message)
         assertEquals("theirs", theirs.readText())
         theirs.delete()
     }
 
-    // turning one on that would take the merged words past what the compiler takes is refused, left
-    // off (review S5); a limit of 3 here, not the compiler's millions written and compiled. Each row:
-    // how those already on are counted (review F3405)
+    // turning one on past what the compiler takes is refused and left off (a limit of 3 here)
     @Test
     fun turningOnPastTheLimitIsRefused() {
         class Row(val why: String, val compiledFirst: Boolean)
         val rows = listOf(
-            // the merged file's header
             Row("counted from the merged file", compiledFirst = true),
-            // not made yet (0.3.1's upgrade under way, or failed): from their texts, not as none (review NIT, F3386)
+            // not made yet (an upgrade under way, or failed): counted from the texts, not as none
             Row("counted from the texts, the merged file not made", compiledFirst = false),
         )
         assertRows(rows, { it.why }) { row ->
             empty()
             val mine = PinyinDictManager.importFromInputStream("幽默 you'mo\n".byteInputStream(), "mine.txt").getOrThrow()
             assertTrue(row.why, PinyinDictManager.turn(mine, false))
-            // the compile the turn queued, done before an older build's text is put there: one it converted
-            // as it was written (made, not yet written to) was committed empty and deleted under the write,
-            // its words gone. An older build is never running beside this one's compile
+            // the turn's queued compile done first: one converted as written would be committed empty. An older build never runs beside it
             MergedDictionary.refreshNow(dir)
             File(dir, "big.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n你 ni 0.0\n")
             if (row.compiledFirst) MergedDictionary.refreshNow(dir)
@@ -345,13 +318,11 @@ class PinyinDictManagerTest {
             val refused = runCatching { PinyinDictManager.turn(off, true, max = 3) }.exceptionOrNull()
             assertEquals(row.why, DictionaryFormat.Reason.TOO_MANY, (refused as? PinyinDictManager.Refusal)?.reason)
             assertFalse(row.why, PinyinDictManager.listDictionaries().single { it.name == "mine" }.isEnabled)
-            // up to the limit: turned on
             assertTrue(row.why, PinyinDictManager.turn(off, true, max = 4))
         }
     }
 
-    // the user's export put into the base: its learned words (`~`) are words there too, read only
-    // after the export's mark (WordListFiles.baseLines, not baseLine line by line)
+    // the user's export in the base: its learned words (`~`) count too, read only after the export's mark
     @Test
     fun anExportsLearnedWordsAreReadIntoTheBase() {
         val export = "\n# youmo-words 1\n# header\n幽默 you'mo\n~ 这个誓言很难 zhe'ge'shi'yan'hen'nan 3.0\n~搭子 da'zi 2\n!尬 ga\n"
@@ -360,12 +331,11 @@ class PinyinDictManagerTest {
             listOf("幽默 you'mo 0.0", "这个誓言很难 zhe'ge'shi'yan'hen'nan 0.0", "搭子 da'zi 0.0"),
             lines(File(dir, "export.txt.gz")),
         )
-        // in another list a learned word is no line it reads: half of it unread, refused
+        // in another list a learned word is no line it reads: half unread, refused
         val list = PinyinDictManager.importFromInputStream("幽默 you'mo\n~ 搭子 da'zi 2\n".byteInputStream(), "list.txt")
         assertEquals(DictionaryFormat.Reason.UNREADABLE, (list.exceptionOrNull() as PinyinDictManager.Refusal).reason)
     }
 
-    // the list of those an older build merged into the new words goes as the dictionaries are listed
     @Test
     fun aDictionaryIsImportedAndDeleted() {
         val file = File(RuntimeEnvironment.getApplication().cacheDir, "mine.txt").apply { writeText("搭子 da'zi 0\n") }
@@ -380,8 +350,7 @@ class PinyinDictManagerTest {
         assertEquals(1, PinyinDictManager.wordCount(base))
     }
 
-    // 0.3.2's texts: listed as they are, counted toward the limit while not converted (RM1), and
-    // the page's row, listed before the conversion, turned and deleted by its name after it (RS1)
+    // 0.3.2's texts: counted toward the limit while unconverted; the page's row turned and deleted by name after it
     @Test
     fun anOlderBuildsTextIsListedCountedAndActedOnByName() {
         File(dir, "old.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n")
@@ -393,10 +362,10 @@ class PinyinDictManagerTest {
         assertEquals(DictionaryFormat.Reason.TOO_MANY, (refused as? PinyinDictManager.Refusal)?.reason)
         MergedDictionary.refreshNow(dir)
         assertEquals(listOf("off.txt.gz.disable", "old.txt.gz"), names())
-        // counted by its name as it is now, not as none from the text the page listed (F3591)
+        // counted by its current name, not as none from the text the page listed
         val again = runCatching { PinyinDictManager.turn(off, true, max = 2) }.exceptionOrNull()
         assertEquals(DictionaryFormat.Reason.TOO_MANY, (again as? PinyinDictManager.Refusal)?.reason)
-        // a text and its gzip of one name (a kill between the rename and the delete): counted once, 2 + 1 (F3595)
+        // a text and its gzip of one name: counted once, 2 + 1
         File(dir, "old.txt").writeText("搭子 da'zi 0.0\n妮 ni 0.0\n")
         assertTrue(PinyinDictManager.turn(off, true, max = 3))
         assertTrue(PinyinDictManager.delete(listed.last()))
@@ -405,9 +374,7 @@ class PinyinDictManagerTest {
         assertEquals(mapOf("off" to 1), MergedDictionary.sourceWords(dir))
     }
 
-    // an import while a conversion runs: its file committed mid-gzip, the import done after, no deadlock
-    // on the sources lock. Fails if the conversion deflated under the lock (the commit never comes), or
-    // the import waited on the compile inside it (the conversion's commit never comes) (RS2, F3605)
+    // an import while a conversion runs: no deadlock on the sources lock. Fails if the conversion deflated under the lock
     @Test(timeout = 30_000)
     fun anImportWhileAConversionRunsEnds() {
         File(dir, "old.txt").writeText((1..20_000).joinToString("") { "词$it ci 0.0\n" })
@@ -433,7 +400,6 @@ class PinyinDictManagerTest {
 
     private fun lines(file: File) = GZIPInputStream(file.inputStream()).bufferedReader().readLines()
 
-    // a provider's stream: [bytes], or none that can be read
     private class Provided(bytes: ByteArray?) : InputStream() {
         private val input = bytes?.inputStream()
         var closed = false
@@ -445,8 +411,7 @@ class PinyinDictManagerTest {
         }
     }
 
-    // A4: an upgraded install started without its external storage, fcitx's data not moved yet: a
-    // dictionary is neither turned, deleted nor imported, the page told why
+    // data not moved yet (no external storage): no turn, delete or import, the page told why
     @Test
     fun dictionariesNotSettledAreNotWritten() {
         val external = appContext.getExternalFilesDir(null)!!
@@ -456,13 +421,13 @@ class PinyinDictManagerTest {
         ShadowEnvironment.setExternalStorageState(external, Environment.MEDIA_REMOVED)
         HostConfigDir.forget()
         try {
-            // the list as the page holds it: its home not settled is no directory to hold one, so one elsewhere
+            // an unsettled home holds none, so one elsewhere
             val mine = TextDictionary(File(appContext.cacheDir, "mine.txt").apply { writeText("搭子 da'zi 0\n") })
             val notSettled = appContext.getString(R.string.user_data_not_settled)
             assertEquals(notSettled, assertThrows(IllegalArgumentException::class.java) { PinyinDictManager.turn(mine, false) }.message)
             assertEquals(notSettled, assertThrows(IllegalArgumentException::class.java) { PinyinDictManager.delete(mine) }.message)
             assertTrue(PinyinDictManager.importFromInputStream("搭子 da'zi 0\n".byteInputStream(), "mine.txt").isFailure)
-            // the page's retry of a failed compile: nothing compiled where the data is not settled
+            // nothing compiled while data is unsettled
             PinyinDictManager.retryMerged()
             assertFalse(File(dir, "merged.ymd").exists())
             assertFalse(File(dir, "mine.txt").exists())

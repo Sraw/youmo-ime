@@ -50,7 +50,7 @@ jobs:
   key_marks:
     name: Key marks on every keyboard (SDK ${{ matrix.sdk }})
     runs-on: ubuntu-24.04
-    # Android 10 (minSdk 29) as well, like unit_test.yml's app_29: a runner each
+    # Android 10 (minSdk 29) as well, like unit_test.yml's app job: a runner each
     strategy:
       fail-fast: false
       matrix:

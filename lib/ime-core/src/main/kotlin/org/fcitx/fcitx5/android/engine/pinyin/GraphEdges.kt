@@ -7,7 +7,6 @@ package org.fcitx.fcitx5.android.engine.pinyin
 import org.fcitx.fcitx5.android.engine.data.IntList
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 
-/** The edges of a [SyllableGraph] being built, grouped by the node they leave. */
 internal class GraphEdges private constructor(private val input: String) {
     private val firstEdge = IntArray(input.length + 2)
     private val from = IntList()
@@ -17,11 +16,7 @@ internal class GraphEdges private constructor(private val input: String) {
     private val against = ArrayList<FloatArray?>()
     private val slips = ArrayList<Slips?>()
 
-    /**
-     * Adds an edge over the [length] characters at [at], leading past any separators after them;
-     * [taps], a value for each of [m] as [SyllableGraph.against] has them, or null for none;
-     * [slip], for an edge of keys read as the keys next to them ([SyllableGraph.slips]).
-     */
+    /** An edge over [length] characters at [at], past any following separators; [taps] per match as [SyllableGraph.against]; [slip] for keys read as neighbours. */
     fun add(at: Int, length: Int, kind: Kind, m: SyllableMatches, taps: FloatArray? = null, slip: Slips? = null) {
         from += at
         to += skipSeparators(input, at + length)
@@ -32,10 +27,7 @@ internal class GraphEdges private constructor(private val input: String) {
     }
 
     companion object {
-        /**
-         * Builds the graph of [input] from the edges [walk] adds at each node reachable from the
-         * start; where it adds none, one character is kept as typed, so every path goes on.
-         */
+        /** Where [walk] adds no edge, one character is kept as typed, so every path goes on. */
         fun build(input: String, walk: (at: Int, edges: GraphEdges) -> Unit): SyllableGraph {
             val n = input.length
             val edges = GraphEdges(input)

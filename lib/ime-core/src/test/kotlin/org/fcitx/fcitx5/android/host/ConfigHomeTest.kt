@@ -32,7 +32,7 @@ class ConfigHomeTest {
     private val files = MemoryFiles()
     private val external = MemoryFiles()
 
-    // the file at [path], its directories made first where [make]
+    // its directories made first where [make]
     private fun UserFiles.at(path: String, make: Boolean = false): LogFile {
         val dir = path.split('/').dropLast(1).fold(this) { at, name -> at.dir(name) }
         if (make) dir.mkdirs()
@@ -97,8 +97,7 @@ class ConfigHomeTest {
         assertEquals("PageSize=7\n", files.text("config/$engineConf"))
     }
 
-    // a home left with its marker as a kill just after the rename leaves it, settled at the next start:
-    // the old the marker names deleted (or already gone), the marker then; one naming nothing known deletes nothing
+    // a home left with its marker by a kill after the rename, settled next start: the old deleted, then the marker
     private class Marker(val why: String, val text: String, val oldExternal: Boolean, val oldFallback: Boolean, val externalLeft: Boolean, val fallbackLeft: Boolean)
 
     @Test
@@ -223,7 +222,7 @@ class ConfigHomeTest {
         external.put("data/pinyin/customphrase", "dz,1=北京\n")
         external.put("data/punctuation/punc.mb.zh_CN", ", ，\n")
         external.put("theme/mine.json", "{}")
-        // what an older build wrote in the app's files at a start without the external storage: not data's home
+        // what an older build wrote in the app's files without the external storage: not data's home
         files.put("data/pinyin/customphrase", "stale")
         assertEquals(Use.EXTERNAL, ConfigHome.settle(files, external, ConfigHome.DATA).movedFrom)
         assertFalse(files.dir(ConfigHome.CONFIG.name).exists())
@@ -241,7 +240,7 @@ class ConfigHomeTest {
 
     @Test
     fun `a file larger than a chunk, ending mid-chunk, comes along whole and one differing late is caught`() {
-        // a dictionary's size is past what is held at once: streamed, compared a chunk at a time
+        // past what is held at once: streamed, compared a chunk at a time
         val bytes = ByteArray(3 * 65536 + 123) { (it * 31 + it / 7).toByte() }
         val dir = external.dir("data").dir("pinyin").dir("dictionaries")
         dir.mkdirs()
@@ -257,8 +256,7 @@ class ConfigHomeTest {
         assertFalse(torn.dir("host-data").exists())
     }
 
-    // one place a process for everyone: an editor that took the old directory while the move failed
-    // must not write where the engine, settling later, no longer reads
+    // one place a process: an editor that took the old directory while the move failed must not write where the engine no longer reads
     @Test
     fun `a home is settled once a process, a failed move too, and tried again by the next`() {
         external.put("data/pinyin/customphrase", "dz,1=北京\n")
@@ -280,8 +278,7 @@ class ConfigHomeTest {
         assertEquals("dz,1=北京\n", files.dir("host-data").text("pinyin/customphrase"))
     }
 
-    // what [Settled]'s callback changes (the app's punctuation reset) is done before anyone reads the place: a
-    // second reader waits for it, not given the place while it runs
+    // [Settled]'s callback is done before anyone reads the place: a second reader waits for it
     @Test
     fun `a reader gets the place only after the callback has run`() {
         val running = CountDownLatch(1)
@@ -354,8 +351,7 @@ class ConfigHomeTest {
         assertFalse(files.dir(ConfigHome.CONFIG.name).exists())
     }
 
-    // an old config that cannot be moved as it is: no home made, the old kept, and the next start tries again.
-    // Each a bug that bit (review F4610, F4619, F4889, F4912, F4964, F4977: one table)
+    // an old config that cannot be moved: no home made, the old kept, the next start tries again; each a bug that bit
     private class Unmoved(
         val why: String,
         val source: String,
@@ -363,7 +359,7 @@ class ConfigHomeTest {
         val settle: (MemoryFiles, MemoryFiles) -> Place,
         val problem: Problem,
         val use: Use? = null,
-        // false where the home is not settled: the host writing its defaults there was the loss (F4999)
+        // false where the home is not settled: the host writing its defaults there was the loss
         val writable: Boolean? = null,
     )
 
@@ -415,7 +411,7 @@ class ConfigHomeTest {
         assertNotNull(place.error)
     }
 
-    // a bug that bit: the move gave every file a new time, so imported lexicons were compiled again and away meanwhile
+    // a bug that bit: the move gave every file a new time, so imported lexicons were compiled again
     @Test
     fun `a moved file keeps its time`() {
         external.put("config/$engineConf", "EnablePrediction=False\n")
@@ -425,7 +421,7 @@ class ConfigHomeTest {
         assertEquals(1_600_000_000_000, files.dir(ConfigHome.CONFIG.name).at(engineConf).lastModified())
     }
 
-    // review F4889: a listing whose kind is unknown was taken for the old gone, the marker dropped
+    // a listing whose kind is unknown was taken for the old gone, the marker dropped
     @Test
     fun `an old directory of a kind that does not read is not taken for gone, its marker kept`() {
         external.put("config/$engineConf", "EnablePrediction=False\n")

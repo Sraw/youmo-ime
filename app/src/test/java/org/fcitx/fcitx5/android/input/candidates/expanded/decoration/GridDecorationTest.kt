@@ -18,7 +18,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/** The dividers of the expanded candidates' grid stop at the last candidate, wherever it is scrolled to. */
 @RunWith(RobolectricTestRunner::class)
 class GridDecorationTest {
 
@@ -62,7 +61,6 @@ class GridDecorationTest {
         recyclerView.layOut()
         val last = recyclerView.findViewHolderForAdapterPosition(20)!!.itemView
         GridDecoration(divider).onDraw(Canvas(), recyclerView, RecyclerView.State())
-        // the rows above it still have theirs
         assertTrue(drawn.isNotEmpty())
         assertTrue(drawn.toString(), drawn.none { it.top >= last.top && it.bottom <= last.bottom })
     }

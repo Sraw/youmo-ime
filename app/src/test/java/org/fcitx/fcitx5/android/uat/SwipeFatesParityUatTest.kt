@@ -34,11 +34,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * What the settings page says of a way (SwipeFates) is what the keyboard draws of it: each key's ways'
- * fates of the page's scene against the keyboard's own scene, docked, one-handed, floating, split
- * landscape and the nine keys.
- */
+/** What the settings page says of a way (SwipeFates) is what the keyboard draws of it, on every keyboard style. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -50,7 +46,6 @@ class SwipeFatesParityUatTest {
 
     private fun slots() = SwipeSlots.parse(slotsPref.getValue())
 
-    // low keys, the down way at the bottom: j's long text shortened or a sign, not as set
     private fun setWays() {
         val k = AppPrefs.getInstance().keyboard
         prefs.set(k.swipeDownPosition, KeyMarkPosition.Bottom)
@@ -69,7 +64,7 @@ class SwipeFatesParityUatTest {
 
     private fun page(h: KeyboardHarness) = SwipeFates.Page(h.service, listOf(KeyboardHarness.PINYIN), emptyMap())
 
-    // both sides measure a character alike (Robolectric measures no text: every way would fit, as set)
+    // Robolectric measures no text: every way would fit, as set
     @Before
     fun fixedWidths() {
         SceneBoard.measurerFor = { FixedMeasurer }
@@ -90,8 +85,8 @@ class SwipeFatesParityUatTest {
             assertEquals(1, seen.size)
             val said = seen.single().fates!!
             assertTrue("no way set drawn", drawn.values.any { it.isNotEmpty() })
-            // not all as set: the comparison tells a way drawn otherwise (j's long text, upright or turned; the
-            // nine keys' backspace is wide enough for its text's first two, so there both sides' as set is the check)
+            // not all as set: the comparison tells a way drawn otherwise (the nine keys' backspace is wide enough, so there
+            // both sides' as set is the check)
             if (!nine) assertTrue("every way drawn as set: $drawn", drawn.values.flatMap { it.values }.any { it != MarkFate.AsSet })
             assertEquals(drawn, said)
         }
@@ -121,7 +116,6 @@ class SwipeFatesParityUatTest {
     @Test
     fun nineKeysBackspace() = parity(nine = true)
 
-    // a way switched off or placed 无 is drawn nowhere as the user chose: the page says nothing of it
     private fun noNoteOfDown() {
         setSlots()
         KeyboardHarness(TestThemes.PixelLight).start().use { h ->
@@ -144,8 +138,8 @@ class SwipeFatesParityUatTest {
         noNoteOfDown()
     }
 
-    // the page's scenes made on its thread work out the theme's looks in cascades of its own: none of SceneThemes'
-    // kept ones, which the input view and the main thread work out at the same time
+    // the page's scenes work out the theme's looks in cascades of their own: none of SceneThemes' kept ones, which the
+    // input view works out at the same time
     @Test
     fun thePagesThreadWorksOutLooksOfItsOwn() {
         setWays()

@@ -9,10 +9,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/**
- * OpenCC 1.2.0's rules on small dictionaries (the whole data against OpenCC itself is
- * `lib/ime-eval`'s ChineseConverterGoldenTest). Files are 1.2.0's `src/`.
- */
+/** OpenCC 1.2.0's rules on small dictionaries; the whole data is `lib/ime-eval`'s ChineseConverterGoldenTest. */
 class ChineseConverterTest {
 
     @Test

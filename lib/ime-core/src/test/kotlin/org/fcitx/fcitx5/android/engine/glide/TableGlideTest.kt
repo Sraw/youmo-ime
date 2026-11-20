@@ -22,7 +22,6 @@ class TableGlideTest {
         val best = glide.decode(path("wqiy"), GlideLayout.QWERTY, 3).first()
         assertEquals("wqiy", best.keys)
         assertEquals("你", best.word)
-        // where the path lifts decides: vbg's own path, not vbgf's
         assertEquals("好", glide.decode(path("vbg"), GlideLayout.QWERTY, 3).first().word)
         assertEquals("vbgf", glide.decode(path("vbgf"), GlideLayout.QWERTY, 3).first().keys)
     }
@@ -62,7 +61,6 @@ class TableGlideTest {
         val once = HashMap(asked)
         now["妤"] = -7f
         val again = counted.decode(path("vbgf"), GlideLayout.QWERTY, 3).first { it.word == "妤" }
-        // the learned word's score as now, the rest not asked again
         assertEquals(2 * once.getValue("妤"), asked.getValue("妤"))
         assertEquals(once - "妤", asked - "妤")
         assertEquals(-1f, again.score - first.score, 1e-4f)
@@ -73,13 +71,11 @@ class TableGlideTest {
         val blocked = TableGlide(dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vb 奻", "vb 女"), { scores.getValue(it) }, blocked = { _, text -> text == "女" })
         val unblocked = TableGlide(dictionary("wqiy 你", "vbg 好", "vbgf 妤", "vb 奻", "vb 女"), { scores.getValue(it) })
         assertEquals("女", unblocked.decode(path("vb"), GlideLayout.QWERTY, 3).first { it.keys == "vb" }.word)
-        // vb by its next entry, not dropped
         assertEquals("奻", blocked.decode(path("vb"), GlideLayout.QWERTY, 10).first { it.keys == "vb" }.word)
         val none = TableGlide(dictionary("wqiy 你", "vb 女"), { scores.getValue(it) }, blocked = { _, text -> text == "女" })
         assertTrue(none.decode(path("vb"), GlideLayout.QWERTY, 3).none { it.keys == "vb" })
     }
 
-    // a block is under a code (U-28): the same text under another code still reads there
     @Test
     fun aBlockUnderOneCodeLeavesTheTextUnderAnother() {
         val glide = TableGlide(

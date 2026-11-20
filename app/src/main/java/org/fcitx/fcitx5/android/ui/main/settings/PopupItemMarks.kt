@@ -34,10 +34,8 @@ import java.util.Calendar
 import com.google.android.material.R as MaterialR
 
 /**
- * The long press editor's item marks (061-text-variables §2.5: 使用变量; 061-no-cn-punct §2.3: 不转中文标点): the
- * selected item's toggles on the button row, the line over it, and beside [field] the two check boxes of what is
- * added (one or the other or none) with the help of each. [convertible]:
- * the English marks a Chinese punctuation table converts, the ones 不转中文标点 is for; [changed] redraws the editor.
+ * The long press editor's item marks (使用变量, 不转中文标点): toggles on the button row, the line over it, and the
+ * check boxes by [field]. [convertible]: the marks a Chinese punctuation table converts; [changed] redraws the editor.
  */
 class PopupItemMarks(
     private val ctx: Context,
@@ -46,10 +44,7 @@ class PopupItemMarks(
     private val convertible: Set<String>,
     private val changed: () -> Unit,
 ) {
-    /**
-     * The line over the buttons, one line always there so nothing under it moves (061-settings-cards §5.2): with
-     * nothing selected how to start, with an item of variables selected what it types now, else blank.
-     */
+    /** Always one line so nothing under it moves: a hint with nothing selected, what a variable item types now, else blank. */
     val line: TextView = small().apply {
         maxLines = 1
         isSingleLine = true
@@ -92,7 +87,7 @@ class PopupItemMarks(
         }
     }
 
-    /** The mark of what is added now: as the check boxes by the field are. */
+    /** As the check boxes by the field are. */
     val adding: ItemMark?
         get() = when {
             addVariables.isChecked -> ItemMark.Variables
@@ -100,15 +95,13 @@ class PopupItemMarks(
             else -> null
         }
 
-    /** The toggles put on the button row [actions], after its buttons. */
     fun addTo(actions: FlexboxLayout) = toggles.forEach { (button, _, _) ->
         with(actions) { add(button, FlexboxLayout.LayoutParams(wrapContent, wrapContent)) }
     }
 
-    /** What [item]'s cap says of its mark, null for none. */
+    /** Null for none. */
     fun tag(item: String): String? = editor.marks[item]?.let { ctx.getString(tagOf(it)) }
 
-    /** The toggles and the line over them as the selected item is. */
     fun render() {
         toggles.forEach { (button, mark, title) ->
             val on = editor.selectedMark == mark
@@ -125,7 +118,7 @@ class PopupItemMarks(
         }
     }
 
-    /** Under the field, each with its top margin in dp: the check boxes, the as-is hint, the variables' help. */
+    /** Each with its top margin in dp: check boxes, the as-is hint, the variables' help. */
     fun underField(): List<Pair<View, Int>> {
         val row = FlexboxLayout(ctx).apply {
             flexWrap = FlexWrap.WRAP
@@ -141,14 +134,14 @@ class PopupItemMarks(
     }
 
     companion object {
-        /** The editor's compact text button (§5.2): no border, 40 dp high, a disabled one only faded text. */
+        /** Compact: no border, 40 dp high, disabled only fades the text. */
         fun textButton(ctx: Context, @StringRes title: Int) = MaterialButton(ctx, null, androidx.appcompat.R.attr.borderlessButtonStyle).apply {
             setText(title)
             insetTop = 0
             insetBottom = 0
             minHeight = ctx.dp(TEXT_BUTTON_DP)
             minimumHeight = ctx.dp(TEXT_BUTTON_DP)
-            // as wide as its words: the four actions on one line of a phone, not Material's 88 dp each
+            // as wide as its words: four actions on one phone line, not Material's 88 dp each
             minWidth = 0
             minimumWidth = 0
             setPaddingRelative(ctx.dp(TEXT_BUTTON_PAD_DP), paddingTop, ctx.dp(TEXT_BUTTON_PAD_DP), paddingBottom)
@@ -157,7 +150,6 @@ class PopupItemMarks(
         private const val TEXT_BUTTON_DP = 40
         private const val TEXT_BUTTON_PAD_DP = 12
 
-        // the marks an item can have, each its toggle's words
         private val MARKS = listOf(ItemMark.Variables to R.string.text_variables_use, ItemMark.AsIs to R.string.text_as_is)
 
         @StringRes
@@ -166,10 +158,7 @@ class PopupItemMarks(
             ItemMark.AsIs -> R.string.text_mark_as_is
         }
 
-        /**
-         * The keys a Chinese punctuation table converts, the built-in table's and the user's (061-no-cn-punct Q1):
-         * the items 不转中文标点 is for.
-         */
+        /** The built-in table's and the user's: the items 不转中文标点 is for. */
         fun convertible(ctx: Context): Set<String> {
             val app = ctx.applicationContext
             val maps = PunctuationMaps(HostConfigDir.inUse(ConfigHome.DATA).dir) { lang ->

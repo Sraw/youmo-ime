@@ -59,8 +59,7 @@ class NewWordsTest {
 
     @Test
     fun aRunOfFourIsFoundAsTheWordsCommandLooksForThem() {
-        // the length words looks for (NewWords.MAX_LENGTH): 一起吃饭 twice, after 子 and the comma,
-        // before the end and 吧
+        // the length words looks for: 一起吃饭 twice
         val run = find(maxLength = 4).first { it.text == "一起吃饭" }
         assertEquals(2, run.count)
         // its likeliest split 一起吃|饭, 2 and 4 times in 46 characters
@@ -98,10 +97,7 @@ class NewWordsTest {
         // sixteen cells for forty keys: counts over, none under
         keys.forEachIndexed { i, k -> assertTrue("$k", narrow.count(k) >= i + 1) }
         assertTrue(keys.indices.any { narrow.count(keys[it]) > it + 1 })
-        // 1024 cells: 13 × 7919's second is 22 × 7919's first; a count is the lesser of a key's two
-        // cells, so every one comes out exact, where the greater or either row alone would not.
-        // Those cells are Sketch.slot's and MIX's as they are: with another hash, pick keys that
-        // share a cell again, rather than change count
+        // keys chosen so every count is exact with the lesser of two cells; with another hash, pick keys that share a cell again
         assertEquals(keys.indices.map { it + 1 }, keys.map(wide::count))
         assertEquals(0, wide.count(41L * 7919))
     }
@@ -117,8 +113,7 @@ class NewWordsTest {
         }
         val out = ArrayList<NewWords.Candidate>().also { c -> finder.candidates { c += it } }
         val dazi = out.first { it.text == "搭子" }
-        // 饭 before it both times; after it the full stop, which stands for a different char each
-        // time: ln 2 over two, and Miller-Madow's (2 - 1) / 4 on top
+        // the full stop stands for a different char each time: ln 2 over two, plus Miller-Madow's
         assertEquals(0.0, dazi.leftEntropy, 1e-9)
         assertEquals(Math.log(2.0) + 0.25, dazi.rightEntropy, 1e-9)
     }
@@ -148,8 +143,7 @@ class NewWordsTest {
         val finder = NewWords(emptySet(), 2, 2, sketchBits = 12)
         while (!finder.done) {
             finder.add("你好吗", "")
-            // 搭子 50 times on the second line, after a different character each time: its every other
-            // occurrence looked at, where every other line would have skipped the line
+            // 搭子 50 times after a different character each: every other occurrence looked at
             finder.add((0 until 50).joinToString("") { "${'一' + it}搭子。" }, "")
             finder.nextPass()
         }

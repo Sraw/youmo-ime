@@ -59,7 +59,6 @@ class LearningControlUndoTest {
         assertEquals("地址", log.state.pins.values.single().text)
         assertEquals("地址", replayed().pins.values.single().text)
         assertEquals(1, inverse)
-        // once
         assertFalse(control.undo(token))
     }
 
@@ -81,11 +80,9 @@ class LearningControlUndoTest {
         val control = control(log)
         val first = control.undoable { log.forget("你") }
         val second = control.undoable { log.forget("好") }
-        // only the last
         assertFalse(control.undo(first))
         log.guide()
         assertFalse(control.undo(second))
-        // an act of nothing written: its inverse alone
         var undone = false
         assertTrue(control.undo(control.undoable(inverse = { undone = true }) {}))
         assertTrue(undone)
@@ -100,7 +97,6 @@ class LearningControlUndoTest {
         assertTrue(control.undo(pinned))
         val off = control.undoable { log.noPredict("我", "的", on = true) }
         assertTrue(control.undo(off))
-        // a table's block under its code (U-28), as its long press makes it
         val blocked = control.undoable { log.event { minute, _ -> LearnRecord.TableBlock(minute, "engine-wbx", "wqiy", "你", on = true) } }
         assertEquals(setOf("你"), log.state.tableBlocks[("engine-wbx" to "wqiy")])
         assertTrue(control.undo(blocked))
@@ -108,16 +104,12 @@ class LearningControlUndoTest {
         assertTrue(log.state.pins.isEmpty() && log.state.noPredict.isEmpty())
         assertTrue(log.state.tableBlocks.values.all { it.isEmpty() })
         assertTrue(replayed().tableBlocks.values.all { it.isEmpty() })
-        // a forget has none: the log rewritten without it
         log.guide()
         assertTrue(control.undo(control.undoable { log.forget("指导") }))
         assertNotEquals(written, log.rewrites)
         assertEquals(1, replayed().uses("指导"))
     }
 
-    // R25 F8004: the only act of a new record, one with no opposite, is taken back by a rewrite to no record at
-    // all. The store declined that (a header alone) till R25 F8000, and the 撤销 did nothing; now the record is
-    // written as one emptied, and goes on behind that mark
     @Test
     fun theOnlyActOfANewRecordIsTakenBackAndTheRecordGoesOnBehindTheMark() {
         val log = open()

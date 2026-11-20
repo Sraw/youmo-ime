@@ -19,7 +19,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
 
-/** 生僻字屏蔽's file (dev/design/061-rare-char-block.md §4.2): read, changes laid over it as it is, never written over what cannot be read. */
+/** Read, changes laid over it as it is, never written over what cannot be read. */
 class RareCharsManagerTest {
 
     @get:Rule
@@ -37,7 +37,7 @@ class RareCharsManagerTest {
             assertEquals(setOf(Level.EXT), made.groups)
             assertEquals("# youmo-rare-chars 1\non\t1\ngroups\tEXT\nallow\t\nblock\t\n", file.readText())
             assertEquals(made, RareCharsManager.load(file))
-            // the write done through a file beside it: nothing of it left (one row with the write it checks, R26 F8114)
+            // the write done through a file beside it: nothing of it left
             assertEquals(listOf("rarechars.txt"), file.parentFile!!.list()!!.toList())
         },
     )
@@ -46,7 +46,6 @@ class RareCharsManagerTest {
     @Test
     fun twoWritersOneAfterTheOtherBothStay() {
         RareCharsManager.update(listOf(Change.On(true)), levels, file)
-        // the page read the file, then a word's 放行 let 𤝰 through, then the page saves its 龘
         RareCharsManager.update(listOf(Change.One(TestCharLevels.EXT, false)), levels, file)
         val saved = RareCharsManager.update(listOf(Change.One(TestCharLevels.OUT, true)), levels, file)
         assertEquals(setOf(TestCharLevels.EXT), saved.allow)
@@ -65,7 +64,7 @@ class RareCharsManagerTest {
         assertEquals(later, file.readText())
     }
 
-    // DECISIONS A4: what cannot be read is not written over with the default
+    // what cannot be read is not written over with the default
     @Test
     fun aFileThatCannotBeReadIsNotWrittenOver() {
         // a directory where the file is: reading it fails as storage gone would

@@ -19,7 +19,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Under the app, whose preferences say how the touch keyboard follows a hardware one. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class InputDeviceManagerTest {
@@ -34,7 +33,7 @@ class InputDeviceManagerTest {
         every { deviceId } returns 5
     }
 
-    /** As the button's KDoc has it, with the system deciding too: till a hardware key is typed, not the next tap. */
+    /** Till a hardware key is typed, not the next tap. */
     @Test
     fun inTheSystemsModeTheButtonsTouchKeyboardStaysTillAHardwareKey() {
         val mode = AppPrefs.getInstance().candidates.mode
@@ -44,11 +43,9 @@ class InputDeviceManagerTest {
             assertFalse(mgr.evaluateOnStartInputView(field, service))
             mgr.showTouchKeyboard()
             assertTrue(mgr.isVirtualKeyboard)
-            // a tap in the field, the next field
             mgr.evaluateOnViewClicked(service)
             assertTrue(mgr.isVirtualKeyboard)
             assertTrue(mgr.evaluateOnStartInputView(field, service))
-            // a hardware key typed: the system's say again, at the next tap too
             mgr.evaluateOnKeyDown(key, service)
             assertFalse(mgr.isVirtualKeyboard)
             mgr.evaluateOnViewClicked(service)

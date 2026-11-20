@@ -30,7 +30,6 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.math.abs
 
-/** The key style settings (大小与样式) over the theme in use, as the keyboard reads it, and the theme left as it is. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class KeyStyleThemeTest {
@@ -53,9 +52,9 @@ class KeyStyleThemeTest {
 
         prefs.keyRadiusChoice.setValue(KeyRadiusChoice.Square)
         assertEquals(0, ThemeManager.shownLook(theme).keys.radiusDp)
-        // asked again, the same object: what is decoded of a look is kept by it
+        // the same object: a look's decoded parts are kept by it
         assertSame(ThemeManager.shownLook(theme), ThemeManager.shownLook(theme))
-        // up and down alone: across the theme's
+        // vertical only: horizontal stays the theme's
         prefs.keyVSpacingChoice.setValue(KeyVSpacingChoice.Loose)
         ThemeManager.shownLook(theme).keys.gap.let {
             assertEquals(KeyStyleChoice.V_LOOSE, KeyStyleChoice.Spacing(it.v, it.vLand))
@@ -67,13 +66,13 @@ class KeyStyleThemeTest {
             assertEquals(Gap(2, 9, 2, 6), it.gap)
             assertEquals(false, it.blocks)
         }
-        // the theme's own (exported, saved) is not changed: a built-in one's are the defaults
+        // the theme's own (exported, saved) is unchanged
         ThemeManager.activeTheme.look.keys.let {
             assertEquals(LookDefaults.KEYS.radiusDp, it.radiusDp)
             assertEquals(LookDefaults.KEYS.gap, it.gap)
             assertTrue(it.blocks)
         }
-        // another theme is its own look under the settings, not the one cached
+        // another theme gets its own look, not the cached one
         val other = ThemeManager.BuiltinThemes.first { it.name != theme.name }
         assertNotSame(ThemeManager.shownLook(theme), ThemeManager.shownLook(other))
         assertEquals(other.look.palette, ThemeManager.shownLook(other).palette)
@@ -98,8 +97,7 @@ class KeyStyleThemeTest {
         }
     }
 
-    // what the keyboard draws follows the choice: Square, every key's corners square on the canvas, Round
-    // rounded (a canvas reading a look that ignores the choice, cached or the theme's own, draws them as before)
+    // the canvas draws the chosen corners (one reading a cached or the theme's own look would not)
     @Uat("ST-58")
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -117,8 +115,7 @@ class KeyStyleThemeTest {
         assertTrue("round", radii(KeyRadiusChoice.Round).any { it > 0.0 })
     }
 
-    // 纵向 很紧凑 drawn: each letter's face 2 dp in from its cell above and below, as across at 横向 紧凑; at
-    // the keyboard height 紧凑 1 dp (40% of 2, a gap kept)
+    // 纵向 很紧凑: each face 2 dp in from its cell vertically; at keyboard height 紧凑 1 dp
     @Uat("ST-160")
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -134,7 +131,7 @@ class KeyStyleThemeTest {
         prefs.keyHSpacingChoice.setValue(KeyHSpacingChoice.Compact)
         prefs.keyVSpacingChoice.setValue(KeyVSpacingChoice.VeryCompact)
         insets().let { assertTrue("$it", it.all { d -> abs(d - 2.0) < 0.6 }) }
-        // 紧凑 as the level list sets it: both numbers (KeyboardHeightLevels.isCompact)
+        // 紧凑 sets both numbers (KeyboardHeightLevels.isCompact)
         val height = listOf(keyboard.keyboardHeightPercent, keyboard.keyboardHeightPercentLandscape)
         val was = keyboard.keyboardHeightFollowTheme.getValue() to height.map { it.getValue() }
         try {
@@ -150,15 +147,14 @@ class KeyStyleThemeTest {
         }
     }
 
-    // a reader of the theme's own look in the keyboard would draw over what is chosen: none there (specs/app.md)
-    // only `.look` as written is caught: `with(theme) { look }` or `Theme::look` would pass it (none of them now)
+    // no keyboard code reads the theme's own look, which would bypass the settings; only a literal `.look` is caught
     @Test
     fun theKeyboardReadsNoThemesOwnLook() {
         val root = File("src/main/java/org/fcitx/fcitx5/android")
         val files = File(root, "input").walk().filter { it.extension == "kt" } +
             File(root, "ui/main/settings/theme/KeyboardPreviewUi.kt")
         val readers = files.flatMap { f ->
-            // an import is no reader: keyboard-scene's package `scene.look` (060-render-p3 T2) has the word
+            // keyboard-scene's package `scene.look` has the word
             f.readLines().withIndex().filter { !it.value.startsWith("import ") && Regex("""\.look\b""").containsMatchIn(it.value) }
                 .map { "${f.name}:${it.index + 1}" }
         }.toList()

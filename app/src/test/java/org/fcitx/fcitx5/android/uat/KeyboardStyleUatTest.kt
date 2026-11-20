@@ -38,9 +38,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 竖屏键盘样式 and 横屏键盘样式 on the keyboard (061-wide-keyboard-style; uat/16): each shape its own, the
- * keyboard's toggles writing the shape it is on, the views made anew only floating or split into or out of,
- * and then what is typed kept. Turned, at redroid's screen: 851 × 393 dp.
+ * 竖屏键盘样式 and 横屏键盘样式: each shape its own, the views made anew only floating or split into or out of.
+ * Turned, at redroid's screen: 851 × 393 dp.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -67,12 +66,10 @@ class KeyboardStyleUatTest {
 
     private fun board(): Rect = h.box(h.board)
 
-    // the whole keyboard at a side, about 420 dp of the 851
     private fun atASide(b: Rect) = b.width() < width * 0.6 && (b.left <= 2 || b.right >= width - 2)
 
     private fun has(description: Int) = KeyboardHarness.all(h.inputView).any { h.shown(it) && it.contentDescription == s(description) }
 
-    // the ⋯ panel's entry [text], tapped
     private fun panel(text: Int) {
         if (!has(R.string.hide_toolbar)) {
             h.tap(h.described(s(R.string.expand_toolbar)))
@@ -87,7 +84,6 @@ class KeyboardStyleUatTest {
         h.relayout()
     }
 
-    // pinyin being typed, as the engine shows it
     private fun typing() {
         h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf("ni"), intArrayOf(0), 2), FormattedText.Empty, FormattedText.Empty)
         h.emit(h.api.inputPanelCached)
@@ -147,7 +143,6 @@ class KeyboardStyleUatTest {
         h.start()
         assertFalse(split())
         assertTrue("${board()} of $width", atASide(board()) && board().left <= 2)
-        // the slanted arrow: both hands again, split as it was, the views made anew
         val made = h.inputView
         h.tap(KeyboardHarness.all(h.inputView).first { h.shown(it) && it.contentDescription?.toString() == s(R.string.one_handed_exit) })
         h.idle()
@@ -188,14 +183,12 @@ class KeyboardStyleUatTest {
         assertNull(stored(landscape = false))
         assertFalse(split())
         assertEquals("what is typed kept", emptyList<String>(), ended())
-        // dragged back down (FloatingController): what was under it, split
         KeyboardStyles.floatingOff(KeyboardArea.screen(h.service))
         h.idle()
         h.relayout()
         assertTrue(split())
     }
 
-    // the other shape's style changes nothing shown: no view made anew
     @Test
     @Uat("LS-40")
     fun theOtherShapesStyleMakesNothingAnew() {
@@ -209,7 +202,6 @@ class KeyboardStyleUatTest {
         assertTrue(split())
     }
 
-    // 普通 and 单手 slide the board in the view there is (InputView), not made anew
     @Test
     @Uat("TB-20")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
@@ -226,7 +218,6 @@ class KeyboardStyleUatTest {
         assertEquals(emptyList<String>(), ended())
     }
 
-    // the screen turned: the service makes the view anew on the turned screen (onConfigurationChanged)
     private fun turn(to: String) {
         RuntimeEnvironment.setQualifiers(to)
         h.service.onConfigurationChanged(Configuration(h.service.resources.configuration))
@@ -234,8 +225,7 @@ class KeyboardStyleUatTest {
         h.relayout()
     }
 
-    // after a turn the toggles write the shape the new view was made on, and the service tells a change from it:
-    // floating from ⋯ makes it anew once
+    // after a turn the toggles write the shape the new view was made on
     @Test
     @Uat("LS-42")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
@@ -260,8 +250,7 @@ class KeyboardStyleUatTest {
         }
     }
 
-    // the screen turned but the view not made anew yet (its configuration change to come): ⋯'s floating and
-    // one-handed write the shape the view there is was made on, not the screen there is now
+    // turned but the view not made anew yet: the toggles write the shape the view was made on, not the screen's
     @Test
     @Uat("LS-42")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
@@ -286,8 +275,7 @@ class KeyboardStyleUatTest {
         }
     }
 
-    // dragged down to dock and the screen turned while it slides: the view taken out docks the shape it was made
-    // on (FloatingController.detached), the turned one floats on
+    // dragged down to dock and turned while it slides: the view taken out docks the shape it was made on
     @Test
     @Uat("LS-45")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi")
@@ -307,7 +295,7 @@ class KeyboardStyleUatTest {
         }
     }
 
-    // §3.6: split to one-handed from the bar makes the view anew; TalkBack's focus goes back to its button there
+    // split to one-handed makes the view anew; TalkBack's focus goes back to its button there
     @Test
     @Uat("TB-65")
     fun fromTheBarTheFocusIsOnTheNewViewsOneHandedButton() {
@@ -324,7 +312,6 @@ class KeyboardStyleUatTest {
         assertNotSame("made anew", before, after)
         assertTrue(after.createAccessibilityNodeInfo().isChecked)
         assertSame(after, bar.talkBackFocused)
-        // back to split the same way
         h.tap(after)
         h.idle()
         h.relayout()

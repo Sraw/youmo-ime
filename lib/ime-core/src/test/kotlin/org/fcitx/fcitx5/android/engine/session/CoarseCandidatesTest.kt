@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Kinds
@@ -29,7 +30,6 @@ class CoarseCandidatesTest {
         ByteBuffer.wrap(
             PinyinDataBuilder()
                 .unigram("<unk>", -7f, 0f)
-                // the model's likeliest of the reading, as the web taught it
                 .unigram("小穴", -1f, 0f)
                 .unigram("小学", -3f, 0f)
                 .unigram("小雪", -3.5f, 0f)
@@ -77,22 +77,12 @@ class CoarseCandidatesTest {
     @Test
     fun wordsInTurnTheUserTypedAreTheirsToo() {
         // 小 and 穴 each far likelier than the word: read as the two, whatever the user typed
-        val split = PinyinData.load(
-            ByteBuffer.wrap(
-                PinyinDataBuilder()
-                    .unigram("<unk>", -7f, 0f)
-                    .unigram("小穴", -9f, 0f)
-                    .unigram("小学", -3f, 0f)
-                    .unigram("小雪", -3.5f, 0f)
-                    .unigram("小", -0.1f, 0f)
-                    .unigram("穴", -0.1f, 0f)
-                    .entry("小穴", syl("xiao", "xue"))
-                    .entry("小学", syl("xiao", "xue"))
-                    .entry("小雪", syl("xiao", "xue"))
-                    .entry("小", syl("xiao"))
-                    .entry("穴", syl("xue"))
-                    .build().toByteArray(),
-            ),
+        val split = pinyinDataOf(
+            Triple("小穴", "xiao xue", -9f),
+            Triple("小学", "xiao xue", -3f),
+            Triple("小雪", "xiao xue", -3.5f),
+            Triple("小", "xiao", -0.1f),
+            Triple("穴", "xue", -0.1f),
         )
         fun first(user: UserModel?) = PinyinSession(split, PinyinSegmenter(), pageSize = 2, user = user, prediction = false)
             .type("xiaoxue").candidates.take(2)
@@ -116,11 +106,7 @@ class CoarseCandidatesTest {
         assertTrue("小穴" in s.type("xiaoxue").candidates)
     }
 
-    /**
-     * Only the first page waits: one found among the words read as the list was shown further put
-     * itself at the second page's start, every candidate listed since one place on, so a tap on
-     * one the keyboard had fetched picked its neighbour; one lower down moved up to there too.
-     */
+    /** Only the first page waits: a coarse word further on once shifted the list, so a tap picked its neighbour. */
     @Test
     fun aCoarseWordPastTheFirstPageKeepsItsPlaceAndMovesNothing() {
         // 小穴 41st of the words read at first, 骚穴 last, read only as the list is shown that far
@@ -144,7 +130,7 @@ class CoarseCandidatesTest {
         assertTrue(all.indexOf("骚穴") >= PinyinDecoder.DEFAULT_WORDS)
     }
 
-    // design-1b S7: a coarse word pinned is the user's choice, never held
+    // a coarse word pinned is the user's choice, never held
     @Test
     fun aCoarseWordPinnedIsFirst() {
         val learner = Learner(data)
@@ -153,7 +139,7 @@ class CoarseCandidatesTest {
         assertEquals("小穴", s.type("xiaoxue").candidates.first())
     }
 
-    // review-1b N2: one of the user's own, unused for 30 typing days, is theirs still: not held
+    // one of the user's own, unused for 30 typing days, is theirs still: not held
     @Test
     fun aCoarseWordOfTheirOwnUnusedIsNotHeld() {
         val learner = Learner(data)

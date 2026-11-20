@@ -7,10 +7,7 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 
-/**
- * The [SwipeSlots] the setting holds now, parsed again only when it changed. Read on the main
- * thread alone: the keys' swipes and marks, and the settings page.
- */
+/** Main thread alone. */
 object SwipeSlotsCache {
 
     private var parsedText: String? = null

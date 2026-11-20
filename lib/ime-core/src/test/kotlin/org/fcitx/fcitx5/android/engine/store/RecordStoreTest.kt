@@ -85,7 +85,6 @@ class RecordStoreTest {
         val errors = ArrayList<IOException>()
         val kept = HashMap<String, Int>()
         store(kept, errors).use { s ->
-            // fields as long as a reader takes, then one byte longer
             s.append(padding(RecordFormat.MAX_RECORD))
             s.append(padding(RecordFormat.MAX_RECORD + 1))
             s.learn(kept, "a")
@@ -111,8 +110,7 @@ class RecordStoreTest {
         assertEquals(mapOf("a" to 1), read())
     }
 
-    // an import's words in one write: the same bytes as one at a time, one that does not fit left out,
-    // and so not all of them written (what LearnLog tells as learned not kept)
+    // one record that does not fit is left out, so not all are written
     @Test
     fun recordsAppendedAllAtOnceAreTheLogOneAtATimeWouldBe() {
         val errors = ArrayList<IOException>()
@@ -153,18 +151,13 @@ class RecordStoreTest {
         assertArrayEquals(format.header() + good, file.readBytes())
     }
 
-    /**
-     * User's decision B2 (0.6.1 audit engine-07): a record garbled mid-log, its length sound, is
-     * dropped and what follows read on; a run of them too. The log is kept aside whole first, and
-     * rewritten without them, so the next open neither drops nor keeps aside again.
-     */
     @Uat("WD-47")
     @Test
     fun recordsGarbledMidLogAreDroppedAndTheRestReadOn() = assertRows(
         listOf(
             GarbledRow("one garbled record, whole to the end after it", added("a") + garbled("b") + added("d"), listOf("a", "d"), stops = false),
             GarbledRow("a run of garbled records", added("a") + garbled("b") + garbled("c") + added("d"), listOf("a", "d"), stops = false),
-            // R25 F7832: the log ends past the last whole record, so it is rewritten up to there, not cut
+            // the log ends past the last whole record, so it is rewritten up to there, not cut
             GarbledRow(
                 "a torn append after: cut with the rewrite, and no damage of its own to tell",
                 added("a") + garbled("b") + added("c") + added("d").let { it.copyOf(it.size - 1) },
@@ -198,8 +191,6 @@ class RecordStoreTest {
     /** A log's [records] after its header with garbled ones among them, the words that [read] of it, and whether it [stops] reading before its end other than in a torn append. */
     private class GarbledRow(val why: String, val records: ByteArray, val read: List<String>, val stops: Boolean)
 
-    // R25 F7832 (audit-061 engine-07): B2 is the log's alone: a backup is written whole and never merged in part,
-    // so its reader (no `garbled`) stops at the first record whose CRC fails, where the log's reads past it
     @Test
     fun aReaderNotToldOfGarbledRecordsStopsAtTheFirst() {
         val bytes = format.header() + added("a") + garbled("b") + added("d")
@@ -237,10 +228,7 @@ class RecordStoreTest {
     // a record whose CRC fails, its length sound
     private fun garbled(word: String) = added(word).also { it[it.size - 1] = (it[it.size - 1] + 1).toByte() }
 
-    /**
-     * A torn append leaves a last record whose length, or the bytes that length says, run past
-     * the end; a length no record has is garbage even when the bytes run out.
-     */
+    /** A torn append's last record runs past the end; a length no record has is garbage even then. */
     @Test
     fun aTornAppendIsCutWithoutAWordButALengthPastWhatAppendWritesIsDamage() {
         val good = added("a")
@@ -261,11 +249,7 @@ class RecordStoreTest {
         assertTrue(aside.exists())
     }
 
-    /**
-     * Runs what it is given only when told to, on the thread that tells it. So no task is still
-     * being written by another thread when the store waits for it (at close, or an explicit
-     * compaction): that wait is not exercised here, as the store has no seam to hold a write.
-     */
+    /** Runs what it is given only when told to, on the telling thread; the store's wait for a task is not exercised here. */
     private class Later : Executor {
         val tasks = ArrayList<Runnable>()
 
@@ -288,7 +272,6 @@ class RecordStoreTest {
             later.run()
             assertEquals(8L + 4 * added("a").size, file.length())
             s.learn(kept, "a")
-            // what was appended meanwhile follows the counts
             assertArrayEquals(format.header() + count("a", 3) + added("a") + added("a"), file.readBytes())
             assertFalse(File(file.path + ".compacting").exists())
         }
@@ -308,7 +291,6 @@ class RecordStoreTest {
         val later = Later()
         val errors = ArrayList<IOException>()
         val kept = LinkedHashMap<String, Int>()
-        // where the counts would be written, something that cannot be
         File(file.path + ".compacting").mkdirs()
         store(kept, errors, compactAt = 40, background = later).use { s ->
             repeat(3) { s.learn(kept, "a") }
@@ -316,7 +298,6 @@ class RecordStoreTest {
             assertEquals("heard of by the store, at its next append", 0, errors.size)
             s.learn(kept, "a")
             assertEquals(1, errors.size)
-            // not tried again before the log has doubled
             s.learn(kept, "a")
             assertEquals(1, later.tasks.size)
         }
@@ -324,7 +305,6 @@ class RecordStoreTest {
         assertEquals(mapOf("a" to 5), read())
     }
 
-    // a seed that seeded nothing (its source did not read) leaves a header alone, seeded again at the next open
     @Test
     fun aSeedThatSeededNothingIsTriedAgainAtTheNextOpen() {
         val kept = LinkedHashMap<String, Int>()
@@ -361,8 +341,7 @@ class RecordStoreTest {
         assertEquals(mapOf("a" to 5), read())
     }
 
-    // R25 F8000: declined, as it was, a clear of all the log held (清掉最近 on a log of that time alone, no
-    // snapshot yet) left it all in the file while the user was told it was cleared
+    // must not leave the log in the file while the user is told it was cleared
     @Test
     fun aRewriteToAHeaderAloneIsWrittenAsALogEmptied() {
         val errors = ArrayList<IOException>()
@@ -376,7 +355,6 @@ class RecordStoreTest {
         }
         assertEquals(emptyList<IOException>(), errors)
         assertEquals(emptyMap<String, Int>(), read())
-        // emptied, not new: a start does not seed it again
         var seeds = 0
         RecordStore(JvmFile(file), format, RecordStore.DEFAULT_COMPACT_AT, {}).use {
             it.open(replay = { _, _ -> }, counts = { }, seed = { seeds++; true })
@@ -397,7 +375,6 @@ class RecordStoreTest {
             assertEquals(null, s.rewrite { _, _ -> true })
             assertEquals(1, errors.size)
             assertArrayEquals(before, file.readBytes())
-            // still open: what is learned next is appended
             s.learn(kept, "b")
         }
         assertEquals(mapOf("a" to 1, "b" to 1), read())
@@ -434,10 +411,6 @@ class RecordStoreTest {
         assertEquals(mapOf("b" to 2), read())
     }
 
-    /**
-     * Killed once the counts were synced to `.compacting` but before they were put in place: the
-     * log is still whole, and the next open compacts it again in the background, over that file.
-     */
     @Test
     fun aCompactionKilledBeforeItWasPutInPlaceIsDoneAgainInTheBackgroundAtTheNextOpen() {
         val first = Later()
@@ -457,7 +430,6 @@ class RecordStoreTest {
         val reopened = LinkedHashMap<String, Int>()
         store(reopened, compactAt = 40, background = later).use { s ->
             assertEquals(mapOf("a" to 3, "b" to 1), reopened)
-            // due, but not written by the thread that opens
             assertArrayEquals(log, file.readBytes())
             assertEquals(1, later.tasks.size)
             later.run()
@@ -486,13 +458,7 @@ class RecordStoreTest {
         assertEquals(mapOf("a" to 4), read())
     }
 
-    /**
-     * A copy aside, or counts compacted in the background, whose write fails once the file is
-     * made (the disk full, as /dev/full is) leaves no file cut short behind. Only the background
-     * write is made to fail here: aside() never picks a name that exists, so cut()'s copy aside,
-     * which goes through the same writeSynced, cannot be pointed at /dev/full. Skipped where there
-     * is no /dev/full to link to (macOS, Windows).
-     */
+    /** A copy aside or compaction whose write fails (as on /dev/full) leaves no file cut short. Skipped where there is no /dev/full. */
     @Test
     fun aFileWhoseWriteFailsIsNotLeftBehind() {
         val next = File(file.path + ".compacting")
@@ -535,11 +501,7 @@ class RecordStoreTest {
         assertArrayEquals(format.header(), file.readBytes())
     }
 
-    /**
-     * R25 F7819: a full disk lets the file be cut back and opened again after a write it refused, and
-     * refuses the next write as well: not writing for as long as that lasts, whatever the open said, and
-     * writing again, with no restart, once an append (one record or many) is written.
-     */
+    /** A full disk refuses writes after a reopen too: not writing while it lasts, writing again once an append goes through. */
     @Uat("WD-46")
     @Test
     fun aStoreWhoseWritesKeepFailingIsNotWritingUntilOneIsWritten() = assertRows(
@@ -585,11 +547,6 @@ class RecordStoreTest {
         assertArrayEquals(format.header() + added("a") + added("c"), file.readBytes())
     }
 
-    /**
-     * R25 F7953: the log written whole after a write the disk refused (清空学到的, a 清掉最近 that took records out of the file, a compaction) and
-     * opened again is writing again, as after an append: 「没在保存」 otherwise stayed till a word was next
-     * learned, and for good where nothing is (habits off, a field that learns nothing).
-     */
     @Uat("WD-46")
     @Test
     fun aStoreAWriteWasRefusedIsWritingAgainOnceTheLogIsWrittenWhole() = assertRows(
@@ -626,17 +583,13 @@ class RecordStoreTest {
             full = false
             whole(s)
             assertTrue(why, s.writing)
-            // and the appends go on behind what was written
             assertTrue(why, s.append(added("c")))
         }
         assertEquals(why, listOf("disk full"), errors.map { e -> e.message })
         assertEquals(why, mapOf("a" to 1, "c" to 1), read())
     }
 
-    /**
-     * [real], but a file written whole beside it runs [atSync] before it is synced: the seam to stop a compaction
-     * between its last byte and its task's end.
-     */
+    /** [real], but [atSync] runs before a whole-file write is synced: the seam to stop a compaction there. */
     private class SyncHeld(private val real: JvmFile, private val atSync: () -> Unit) : LogFile by real {
         override fun beside(suffix: String): LogFile = SyncHeld(real.beside(suffix), atSync)
 
@@ -669,13 +622,6 @@ class RecordStoreTest {
 
     private class RefusalRow(val why: String, val writing: Boolean, val since: List<String> = emptyList(), val steps: Refusal.() -> Unit)
 
-    /**
-     * R25 F7967, F7982: a compaction being written by the executor when the disk refused an append is put in
-     * place and the log opened again; it is writing again only if the disk took bytes of it after the refusal.
-     * Put in place here by a rewrite that writes nothing, which waits for it first. Each row for the counts
-     * written from memory and for the log folded from its own bytes, which is what the learning record's
-     * compactions all are (LearnLog passes a fold: R25 F8023).
-     */
     @Uat("WD-46")
     @Test
     fun aCompactionPutInPlaceAfterAWriteRefusedIsWritingOnlyIfWrittenSince() {
@@ -684,8 +630,7 @@ class RecordStoreTest {
                 later.run()
                 refuse()
             },
-            // R25 F8008: asked whether its task was done, the store took a compaction all written but not yet synced
-            // for written after the refusal, and was writing again with no byte written since
+            // a compaction written but not yet synced is not written after the refusal
             RefusalRow("every byte of it written at the refusal, its sync to come and its task not ended: as the row above", writing = false) {
                 var writtenAtRefusal = -1L
                 atSync = {
@@ -731,7 +676,6 @@ class RecordStoreTest {
             var atSync: () -> Unit = {}
             RecordStore(SyncHeld(JvmFile(file)) { atSync() }, format, 40, { errors += it }, disk, later, kind.second).use { s ->
                 s.open(replay = { type, input -> replay(type, input, kept) }, counts = { write -> kept.forEach { (word, n) -> write(count(word, n)) } })
-                // past 40 bytes: a compaction is due, the executor's to write
                 repeat(3) { s.learn(kept, "a") }
                 assertEquals(why, 1, later.tasks.size)
                 val refusal = Refusal(s, later, kind.third) {
@@ -749,7 +693,6 @@ class RecordStoreTest {
                 assertFalse(why, File(file.path + ".compacting").exists())
                 assertArrayEquals(why, row.since.fold(kind.third) { bytes, word -> bytes + added(word) }, file.readBytes())
                 assertEquals(why, row.writing, s.writing)
-                // an append written is writing again either way
                 assertTrue(why, s.append(added("c")))
                 assertTrue(why, s.writing)
             }
@@ -757,11 +700,7 @@ class RecordStoreTest {
         }
     }
 
-    /**
-     * R25 F8018, F8024: a rewrite of a log that takes no writes throws, and so does one whose log stops taking them
-     * as the compaction being written is put in place before it (renamed over, then not opened again): returning
-     * "nothing written" there, a clear was told done with what it cleared still in the file.
-     */
+    /** A rewrite of a log that takes no writes throws, else a clear was told done with what it cleared still in the file. */
     @Uat("WD-46")
     @Test
     fun aRewriteOfALogNotOpenedAgainBehindItsCompactionThrowsAndWritesNothing() {
@@ -781,10 +720,9 @@ class RecordStoreTest {
             assertThrows(IOException::class.java) { rewrite() }
             assertFalse("the log was not read to be rewritten", asked)
             assertFalse(s.writing)
-            // as the compaction left it
             assertFalse(File(file.path + ".compacting").exists())
             assertArrayEquals(format.header() + count("a", 3), file.readBytes())
-            // and so from then on, what [checkRewrites] tells a caller before it deletes anything (R25 F8021)
+            // and so from then on, what [checkRewrites] tells a caller before it deletes anything
             assertThrows(IOException::class.java) { rewrite() }
             assertThrows(IOException::class.java) { s.checkRewrites() }
             assertFalse(asked)

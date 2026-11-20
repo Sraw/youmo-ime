@@ -21,12 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * Where the toolbar's 手写 writes (061-handwriting-toolbar §3.2, §9): the letters' keys' hit areas, the gaps
- * between them shared out as a tap's are, Shift with them on the 26 keys and 1 on the nine keys; ⌫ and the
- * nine keys' side columns not. A point is in the area exactly where the key a tap there would press is one of
- * the area's, whatever the gap or edge.
- */
+/** Where the toolbar's 手写 writes: a point is in the area exactly where the key a tap there presses is one of the area's. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -43,7 +38,6 @@ class LetterAreaTest {
     }
 
     private class Board(val keyboard: BaseKeyboard, val canvas: KeyboardCanvasView, val area: LetterArea) {
-        // in the area at ([x], [y]) of the canvas, as the keyboard asks it (its own pixels)
         fun at(x: Double, y: Double) = area.at(canvas, (x + canvas.left).toFloat(), (y + canvas.top).toFloat())
         fun key(id: String): KeyNode = canvas.keyAt(id) ?: error("no key $id")
         fun pressed(x: Double, y: Double) = canvas.keyAt(x.toFloat(), y.toFloat())
@@ -57,7 +51,6 @@ class LetterAreaTest {
         return Board(k, canvas, k.letterAreaForTest ?: error("not written on"))
     }
 
-    // every point of the keyboard a few pixels apart: in the area just where the key pressed there is [inArea]
     private fun everywhere(b: Board, inArea: (KeyNode) -> Boolean) {
         val wrong = ArrayList<String>()
         var y = 0.5
@@ -112,10 +105,7 @@ class LetterAreaTest {
         val one = b.key("1").bounds
         val three = b.key("3").bounds
         val backspace = b.key("backspace").bounds
-        // the gap between the letters and the side column, each side's half going as a tap there does: [everywhere]'s. The
-        // area at a point is the key a tap there presses asked (LetterArea.at), so an edge pixel adds no answer that key's
-        // other pixels in [everywhere] do not give; the press's own answer as its row's expectation, the edges' rows were the
-        // same check again (R26 F8361, F8485)
+        // the gap by the side column, each half going as a tap there does; an edge pixel adds no answer [everywhere] does not give
         assertRows(
             listOf(
                 Point("the gap between 2 and 3", (b.key("2").bounds.right + three.left) / 2, one.centerY, true),

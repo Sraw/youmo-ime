@@ -4,33 +4,6 @@
 from uat import case, check, choose, gear, grouped_keys, keys_at, script
 
 
-case("SP-01", needs="jvm:OtherInputMethodsUatTest.shuangpinZiranma")(lambda d: None)
-
-
-case("SP-02", needs="jvm:ShuangpinUatTest.xiaohe")(lambda d: None)
-
-
-case("SP-03", needs="jvm:GroupedKeyboardUatTest.microsoftsSemicolonKeyBesideL、HostCasesUatTest.microsoftsSemicolonIsAFinal")(lambda d: None)
-
-
-case("SP-04", needs="jvm:ShuangpinUatTest.aSyllableWithNoInitial")(lambda d: None)
-
-
-case("SP-05", needs="jvm:ShuangpinUatTest.twoKeysNoSyllableAreInitials")(lambda d: None)
-
-
-case("SP-07", needs="jvm:ShuangpinUatTest.aWordMadeInFullPinyinTypesInShuangpinItsOrderItsOwn")(lambda d: None)
-
-
-case("SP-09", needs="jvm:ShuangpinUatTest.everyKeyboardGlides、GlideUatTest.shuangpinWubiAndTheNineKeysGlidesAreDrawn")(lambda d: None)
-
-
-case("SP-13b", needs="jvm:ShuangpinUatTest.aWordTypedTwiceInFullGoesThirdUnderAPartWithinItsKeyboard")(lambda d: None)
-
-
-case("SP-13c", needs="jvm:ShuangpinUatTest.aWordTypedTwiceInFullGoesThirdUnderAPartWithinItsKeyboard")(lambda d: None)
-
-
 @case("SP-30", base="B0-双拼", mutates="learn")
 def sp30(d):
     # only the words typed before are read by a key alone: each in whole syllables once first
@@ -55,138 +28,11 @@ def sp30(d):
     return f"框里是「{t}」；yivz 候选 {c2[:8]}"
 
 
-case("SP-31", needs="jvm:ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllableFirst、ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviations、ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviationsInASessionThatLearns")(lambda d: None)
-
-
-case("SP-32", needs="jvm:ShuangpinUatTest.aWordTypedByItsInitialsOnly")(lambda d: None)
-
-
-case("SP-33", needs="jvm:ShuangpinUatTest.aWordTypedPartlyByInitialsIsLearnedUnderThoseKeys、PinyinSessionAbbrevTest.aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack")(lambda d: None)
-
-
-case("SP-34", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
-
-
-case("SP-35", needs="jvm:ShuangpinUatTest.aWordAddedByHandGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordAddedByHandGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
-
-
-case("SP-36", needs="jvm:ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere")(lambda d: None)
-
-
-case("SP-43", needs="jvm:ShuangpinUatTest.aWordAddedByHandIsReadByAKeyAloneAtOnce、PinyinSessionAbbrevTest.aWordAddedByHandIsReadByAKeyAlone")(lambda d: None)
-
-
-case("SP-44", needs="jvm:PinyinSessionAbbrevTest.aWordNotTypedForThirtyTypingDaysIsReadByWholeSyllablesOnlyAgain、PinyinSessionAbbrevTest.aWordPinnedIsReadByAKeyAloneThoughNotTypedForThirtyTypingDays、PinyinSessionAbbrevTest.aWordPickedUnderAKeyReadAloneIsTypedThatDay、HabitCountsTest.theNodesToAWordTypedAreThoseOfEachReadingItWasTypedAt")(lambda d: None)
-
-
-case("SP-45", needs="jvm:PinyinDecoderTypedTest.aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped、PinyinDecoderTypedTest.aKeyReadAloneReadsOnlyTheWordsTypedOrChosen")(lambda d: None)
-
-
-case("SP-46", needs="jvm:ShuangpinUatTest.withTheHabitsOffNoKeyIsReadAlone、ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、PinyinSessionAbbrevTest.withNoHabitsAKeyIsNotReadAlone、PinyinSessionAbbrevGroupedTest.withNoHabitsAKeyIsNotReadAlone")(lambda d: None)
-
-
-case("SP-55", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、ShuangpinUatTest.whatIsPinnedOrPickedUnderACodeReadWholeIsRankedThere、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell、HabitRankerTest.wordsTypedReadAloneGoBeforeOrAfterTheFirstByHowTheCodeReads")(lambda d: None)
-
-
-case("SP-56", needs="jvm:ShuangpinUatTest.aWordTypedByInitialsGoesSecondOnTheWayToAWordTypedInFull、PinyinSessionAbbrevTest.wordsTypedAllByInitialsGoSecondOnTheWayToAWordTypedInFull、PinyinSessionAbbrevTest.theGateIsOpenedByAWordTypedPastTheFirstWordsRead")(lambda d: None)
-
-
-case("SP-58", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、ShuangpinUatTest.microsoftsSemicolonAfterAKeyAloneReadsAsBefore、PinyinSessionAbbrevGroupedTest.theNineKeysOneKeyReadsAsTheSeparator")(lambda d: None)
-
-
-case("SP-59", needs="jvm:ShuangpinUatTest.aWordUsedInFullGoesSecondUnderAPairItsInitialsSpell、PinyinSessionAbbrevTest.aWordPickedInFullGoesSecondUnderAPairItsInitialsSpell")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 18 键 and 九键双拼 (B0-18键, B0-九键双拼)
-
-
-case("SP-52", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard、PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone")(lambda d: None)
-
-
-case("SP-53", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard、PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone")(lambda d: None)
-
-
-case("SP-54", needs="jvm:ShuangpinUatTest.theGroupedKeyboardsReadAWordTypedByItsInitials、ShuangpinUatTest.theNineKeysPutAWordTypedSecondUnderACodeTheyReadWhole、PinyinSessionAbbrevGroupedTest.aWordTypedIsReadByItsInitialsOnEveryKeyboard、PinyinDecoderTypedTest.theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone")(lambda d: None)
-
-
-case("SP-14", needs="jvm:ShuangpinUatTest.theEighteenKeysInXiaoheTypeASentenceAndOfferTheSyllables、ShuangpinKeysUatTest.theEighteenKeysAreThreeRowsOfCapitalsAndTheCodeRowOffersTheSyllables")(lambda d: None)
-
-
-case("SP-15", needs="jvm:ShuangpinUatTest.theNineKeysInZiranmaTypeASentenceAndOfferTheSyllables、ShuangpinKeysUatTest.theNineKeysHaveThePhonesLettersAndTheColumnOffersTheSyllables")(lambda d: None)
-
-
-case("SP-16", needs="jvm:ShuangpinUatTest.microsoftsIngIsTheLSemicolonKey、ShuangpinKeysUatTest.theEighteenKeysHaveLAndSemicolonOnOneKeyAndNoSemicolonKey")(lambda d: None)
-
-
-case("SP-17", needs="jvm:ShuangpinUatTest.theEighteenKeysLearnApartFromTheFullKeyboard")(lambda d: None)
-
-
-case("SP-18", needs="jvm:ShuangpinUatTest.enterOrASwitchCommitsTheReadingShownInLetters")(lambda d: None)
-
-
-case("SP-19", needs="jvm:SettingsPagesUatTest.aPinOnTheEighteenKeysSaysSoWithItsSchemeAndLetters、WordsUatTest.pinsOnTheEighteenKeysAndTheFullListedUnderTheirKinds、LearnedItemsFragmentTest.eachKeyboardsKindIsNamed、LearnedItemsFragmentTest.aGroupedKeyboardsKeysAreShownAsTheirLetters")(lambda d: None)
-
-
-case("SP-20", needs="jvm:GroupedKeyboardUatTest.theGlobeGoesToTheEnglishKeyboardAndBack、GroupedKeyboardTest.theBottomRowHasNoChineseEnglishKeyAndTheLanguageSwitchFollowsItsSetting")(lambda d: None)
-
-
-case("SP-21", needs="jvm:GroupedKeyboard18Test.theSpaceIsAtLeast15PercentOfTheRowInEveryField、GroupedKeyboardUatTest.theEighteenAndNineKeysInAnAddressField、KeyboardHalvesUatTest.inAnAddressFieldShuangpinsGroupedKeysGoInAsLettersOrTheWordTyped")(lambda d: None)
-
-
-case("SP-22", needs="jvm:ShuangpinUatTest.onTheNineKeysOneSeparatesTheSyllablesWhileTyping、ShuangpinKeysUatTest.theNineKeysOneIsPunctuationWithNothingTypedTheSeparatorWhileTyping")(lambda d: None)
-
-
-case("SP-24", needs="jvm:GroupedKeyboardUatTest.aNineKeyAtTheRightReachesItsLastLetterOnScreen、GroupedKeyboardUatTest.nineKeyShuangpinsLongPressesCodeRowAndTheNumbersStrip、KeyboardHalvesUatTest.aSyllableTakenOnTheNumbersPageGoesIntoTheCode")(lambda d: None)
-
-
-case("SP-23", needs="jvm:ShuangpinUatTest.microsoftsScreenSemicolonIsAMarkAndAnInitialTakenKeepsItsSyllables")(lambda d: None)
-
-
-case("SP-25", needs="jvm:StrokeFilterUatTest.shuangpinXiThenADownStroke、StrokeFilterUatTest.shuangpinXiOnTheGroupedKeysThenADownStroke")(lambda d: None)
-case("SP-37", needs="jvm:StrokeFilterUatTest.keyiThenAHengPutsTwoCharactersAloneRightAfterTheFirst")(lambda d: None)
-
-
-case("SP-26", needs="jvm:ImKeyboardsUatTest.shuangpinsFourteenKeysSendTheirOwnCodesAndAreNoneUnderMicrosoft、InputMethodSettingsScreenTest.theFourteenKeysUnderMicrosoftShowAsTheEighteen")(lambda d: None)
-
-
-case("SP-27", needs="jvm:KotlinHostSchemeTest.aNewInstallsShuangpinIsXiaohe")(lambda d: None)
-
-
-case("SP-28", needs="jvm:ShuangpinKeysUatTest.theEighteenKeysUnderASchemeWithoutTheSemicolonShowLAlone、ShuangpinKeysUatTest.theNineKeysUnderASchemeWithoutTheSemicolonShowJklAlone、KeyboardWindowTest、GroupedKeyboard18Test.pinyinsEighteenKeysShowLWithoutTheSemicolon")(lambda d: None)
-case("SP-29", needs="jvm:EnginesWordCardTest")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 按偏的键按落点读 (061-neighbour-correction)
-
-
-case("SP-38", needs="jvm:NeighbourSlipTest.shuangpinReadsTwoKeysWithOneSlippedWhereTapped、NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards、NeighbourSlipTest.aSlipCostsByHowFarTheTapIsFromTheKeyMeant")(lambda d: None)
-
-
-case("SP-39", needs="jvm:NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards、NeighbourSlipTest.aSlipCostsByHowFarTheTapIsFromTheKeyMeant")(lambda d: None)
-
-
-case("SP-40", needs="jvm:NeighbourSlipTest.eachShuangpinSchemeReadsTheKeyTappedTowards、NeighbourSlipTest.aSlipCostsByHowFarTheTapIsFromTheKeyMeant")(lambda d: None)
-
-
-case("SP-41", needs="jvm:ShuangpinUatTest.initialsInTheMiddleReadTheWordsTypedWhereverTapped、PinyinSessionAbbrevSlipTest.aWordTypedIsReadByItsInitialsBeforeASlipOfThem、NeighbourSlipTest.consonantsAloneReadAsTypedWhereTappedInTheMiddle")(lambda d: None)
-
-
-case("SP-42", needs="jvm:PinyinSessionSlipTest.shuangpinsCodeShowsTheSyllableAsMeant")(lambda d: None)
-
-
-case("SP-48", needs="jvm:NeighbourSlipTest.shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt、EnginesTest.shuangpinsEighteenKeysAndDachenReadASlipUnlessSlipsAreOff、PinyinSessionSlipTest.onShuangpinsEighteenKeysTheKeyMeantIsLearnedAsItsCode、GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem、NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem")(lambda d: None)
-
-
-case("SP-49", needs="jvm:NeighbourSlipTest.shuangpinsEighteenAndFourteenKeysReadAGroupAsTheOneNextToIt、GroupedKeyboardTapTest.everyGroupedKeyboardsTapCarriesTheKeysAroundItAsTheEngineReadsThem、NeighbourTouchTest.aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem")(lambda d: None)
-
-
-case("SP-50", needs="jvm:NeighbourSlipTest.shuangpinsNineKeysReadADigitAsTheOneItWasTappedTowards、T9ShuangpinKeyboardTest.aDigitKeysTapGoesWithWhereItFellAndTheKeysAroundItByTheirCodes、NeighbourTouchTest.shuangpinsNineKeysDigitsGoWithTheirCodesAround")(lambda d: None)
 
 
 @case("SP-47", base="B0-双拼", mutates=True)
 def sp47(d):
-    # 小鹤 (q is iu, tiu no syllable): q tapped at its bottom right corner, toward a (whose middle is under q's right
-    # edge), is ta, its code row so; in the middle t q (the two initials)
+    # 小鹤: q tapped at its bottom right corner, toward a, is ta; in the middle t q
     gear(d, "双拼")
     choose(d, "双拼方案", "小鹤")
     d.open_page("text")
@@ -206,13 +52,12 @@ def sp47(d):
 
 @case("SP-57", base="B0-双拼", mutates="learn")
 def sp57(d):
-    # 自然码 ky (kuai), 可以 typed: y tapped by its right edge (toward u, ky read as ku too) and in its middle; the word
-    # typed among the first 10 by the edge with ku's 苦 there too (uat/07-shuangpin.md), right after the first in the middle
+    # 自然码 ky: y tapped by its right edge reads ku too, so 可以 comes among the first 10, not right after the first
     d.type("keyi")
     d.pick("可以")
     d.clear()
     keys_at(d, "ky", [None, (0.95, 0.5)])
-    # two pages: the slip's own reading, ku, is ranked by its score, maybe past the first (R27 F8572)
+    # two pages: the slip's own reading, ku, is ranked by its score, maybe past the first
     edge = d.all_cands(pages=2)
     d.shot("kb", "自然码 k、y 靠 u 点（打过「可以」）：第一页有「可以」")
     d.clear()
@@ -228,7 +73,7 @@ def sp57(d):
 
 @case("SP-51", base="B0-18键", mutates=True, visual=True)
 def sp51(d):
-    # 061-custom-layout L4: the 18 keys with Q and WE swapped are the 18 keys, 双拼's too, drawn as the layout has them
+    # the 18 keys with Q and WE swapped are the 18 keys, 双拼's too, drawn as the layout has them
     script("06-pinyin").import_grouped(d, "uat-k18-swapped-1.0", "UAT 换位 18 键")
     check(d.wait_text("现在就用在", timeout=6, where="all", contains=True), f"没问用在哪：{d.screen().texts('all')[:10]}")
     for im in ("拼音", "双拼"):

@@ -4,22 +4,16 @@
  */
 package org.fcitx.fcitx5.android.input.picker
 
-/**
- * The pinyin typed in the emoji panel's search, and where its keys go: the letters build it; a
- * backspace takes its last letter, or with none typed deletes in the field as elsewhere, but not
- * one held on from the query's letters, which would go on into the user's text. ⌫'s slots' 清空 and 恢复
- * are the query's too ([clearAll], [restore]; 060-keys-unify J1): it is what the user is editing.
- */
+/** The emoji search's pinyin: letters build it; backspace takes a letter, or with none deletes in the field, but not as a repeat of the query's held key. 清空 and 恢复 act on the query. */
 class EmojiSearchQuery {
 
     enum class Outcome {
-        /** the query changed: search again */
+        /** Search again. */
         CHANGED,
 
-        /** nothing to do */
         SWALLOWED,
 
-        /** the key is the field's, as with the keyboard */
+        /** As with the keyboard. */
         PASSED,
     }
 
@@ -30,13 +24,13 @@ class EmojiSearchQuery {
     // what the last clearAll took, for one restore
     private var cleared: String? = null
 
-    /** The search opened or closed: nothing typed, nothing to restore. */
+    /** Nothing typed, nothing to restore. */
     fun clear() {
         typed.clear()
         cleared = null
     }
 
-    /** 清空: the query emptied, kept for [restore]; with nothing typed, nothing (the field is not the query). */
+    /** With nothing typed, nothing (the field is not the query). */
     fun clearAll(): Outcome {
         if (typed.isEmpty()) return Outcome.SWALLOWED
         cleared = typed.toString()
@@ -44,7 +38,7 @@ class EmojiSearchQuery {
         return Outcome.CHANGED
     }
 
-    /** 恢复: the query the last [clearAll] took, once, in place of what is typed now; none, nothing. */
+    /** Once, in place of what is typed now. */
     fun restore(): Outcome {
         val back = cleared ?: return Outcome.SWALLOWED
         cleared = null
@@ -58,7 +52,7 @@ class EmojiSearchQuery {
         return Outcome.CHANGED
     }
 
-    /** A backspace, [repeat] one of a held key's. */
+    /** [repeat]: one of a held key's. */
     fun backspace(repeat: Boolean): Outcome = when {
         typed.isNotEmpty() -> {
             typed.deleteCharAt(typed.length - 1)

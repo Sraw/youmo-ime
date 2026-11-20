@@ -15,7 +15,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The steps carried out on an editor as BaseInputConnection's, its context menu as a TextView's. */
+/** The editor as BaseInputConnection's, its context menu as a TextView's. */
 class EditPlanTest {
 
     private val clipboard = StringBuilder()
@@ -160,7 +160,7 @@ class EditPlanTest {
         assertEquals(0, editor.selectionStart)
     }
 
-    // import-edit-5: an app that reads nothing before the cursor, the cursor reported past the start
+    // an app that reads nothing before the cursor, the cursor reported past the start
     @Uat("KB-62")
     @Test
     fun nothingReadBeforeAReportedCursorPutsWhatIsAfterBackAtThatCursor() {
@@ -178,9 +178,7 @@ class EditPlanTest {
         assertEquals(3, editor.selectionEnd)
     }
 
-    // KB-88 review: nothing before the cursor given and the read after it cut short at the limit. A select-all
-    // would take what is before the cursor too, never read and not kept; only what was read after it goes.
-    // The same where "" was read before a cursor reported past the start
+    // nothing before the cursor given, the read after it cut at the limit: only what was read after goes
     @Uat("KB-88")
     @Test
     fun aLongFieldAfterACursorWithTextBeforeItNotReadKeepsThatText() = assertRows(
@@ -208,9 +206,7 @@ class EditPlanTest {
         assertEquals("", editor.text)
     }
 
-    // KB-88 review: a clear in a field one side of which the app does not give cannot tell text typed on that
-    // side since, so it is not put back once anything was typed (as a short read's is not), whatever the cursor
-    // reported: at the start (the after side's clear), with a selection, or the other side's
+    // a field one side of which the app does not give: not put back once anything was typed
     @Uat("KB-88")
     @Test
     fun aClearWithASideNotGivenIsNotPutBackOnceSomethingIsTyped() = assertRows(
@@ -229,10 +225,7 @@ class EditPlanTest {
         assertNull(kept.take(f, cleared.left, typing = false))
     }
 
-    // R25 F7834: the cursor just put at the field's start, the report still where it was as 清除 is pressed.
-    // The field reads as the app above's does (nothing before a reported cursor past the start), so the
-    // clear cannot tell them apart; the report as the clear is taken back does: settled by then, at the
-    // start here and where it was there
+    // the cursor just put at the start, the report stale as 清除 is pressed: the report at undo time tells them apart
     @Test
     fun whatIsAfterACursorWhoseReportLaggedIsPutBackWithTheCursorWhereTheEditorHasIt() = assertRows(
         listOf(
@@ -252,8 +245,7 @@ class EditPlanTest {
         assertEquals(cursor, editor.selectionEnd)
     }
 
-    // only a cursor left before the text put back goes by the later report: a selection's ends, and a
-    // report not known, stay as planned
+    // only a cursor left before the text put back goes by the later report
     @Test
     fun theReportAsAClearIsTakenBackMovesOnlyACursorLeftBeforeTheText() {
         val after = EditPlan.clear(EditPlan.Field("", "", "def"), 3, 3, 1000, password = false).cleared!!
@@ -309,8 +301,7 @@ class EditPlanTest {
         assertNull("a clear not kept", kept.take(f, field, typing = false))
     }
 
-    // review S1: typing never reaches the field (pinyin's shows above it), so the field read alone
-    // cannot tell it: something typed now, or typed and cleared since, and nothing is put back
+    // typing never reaches the field (pinyin's shows above it): typed and cleared since, nothing is put back
     @Test
     fun nothingIsPutBackWhileSomethingIsTypedNorPastWhatWasTypedSince() {
         val kept = ClearedText()
@@ -332,8 +323,7 @@ class EditPlanTest {
         assertEquals("", text.text)
     }
 
-    // review M1: another field that reads the same (another chat's empty box, the same view) is
-    // another input started: nothing put back there; input started anew or finished forgets all
+    // another field that reads the same is another input: nothing put back there
     @Test
     fun aClearIsPutBackInTheInputItWasClearedInAlone() {
         val kept = ClearedText()
@@ -357,8 +347,7 @@ class EditPlanTest {
         assertEquals(ClearedText.MAX, taken)
     }
 
-    // review S2: the app gives no text of the selection (none, or too much to): the selection is
-    // still what goes, never the side before it, and nothing is kept
+    // the app gives no text of the selection: the selection still goes, never the side before it, nothing kept
     @Test
     fun aSelectionWhoseTextIsNotGivenIsDeletedNotKept() {
         val kept = ClearedText()
@@ -374,9 +363,7 @@ class EditPlanTest {
         assertEquals("ah", long.text)
     }
 
-    // a reported cursor past the text read (a stale report running ahead of the editor, or an app
-    // giving less than asked): only what was read goes, from the editor's own cursor, never the text
-    // after the cursor, and it can be put back
+    // a reported cursor past the text read: only what was read goes, from the editor's cursor, and it can be put back
     @Test
     fun aCursorReportedPastTheTextReadClearsOnlyWhatWasReadAndKeepsIt() {
         val kept = ClearedText()
@@ -390,8 +377,7 @@ class EditPlanTest {
         assertEquals("abc def", editor.text)
     }
 
-    // an app giving less text before the cursor than asked: only what it gave goes, and 撤销 puts back
-    // exactly that, at the cursor, the text it never gave staying before it (matched by what is after)
+    // an app giving less text before the cursor than asked: only that goes, and 撤销 puts back exactly that
     @Test
     @Uat("KB-62")
     fun aShortReadClearsWhatWasGivenAndPutsBackJustThatAtTheCursor() {
@@ -415,8 +401,7 @@ class EditPlanTest {
         assertFalse(editor.restore(kept))
     }
 
-    // a short read's clear never read all before the cursor, so text typed there since cannot be told
-    // by the field: the typing itself ends it, else 撤销 would put the cleared text after what was typed
+    // a short read's clear cannot see typing before the cursor: the typing itself ends it
     @Test
     @Uat("KB-62")
     fun aShortReadClearIsNotPutBackOnceSomethingWasTypedBeforeTheCursor() {
@@ -439,8 +424,7 @@ class EditPlanTest {
         }
     }
 
-    // what a clear matches the field by: all of it where it read all before the cursor, else the
-    // selection and what is after alone, a change before the cursor then not seen
+    // a clear matches the field by all of it where it read all before the cursor, else the selection and after
     @Test
     fun aClearMatchesTheFieldWholeOnlyWhereItReadAllBeforeTheCursor() {
         val left = EditPlan.Field("", "", " gh")
@@ -459,8 +443,7 @@ class EditPlanTest {
         }
     }
 
-    // a read cut short at the limit with a reported cursor past the editor's: all before the editor's
-    // own cursor goes, never the text after it (a Select from the reported cursor would take that too)
+    // a read cut at the limit, a reported cursor past the editor's: all before the editor's cursor goes, never after
     @Test
     @Uat("KB-62")
     fun aClearAtTheLimitWithTheCursorReportedAheadKeepsWhatIsAfterTheCursor() {
@@ -474,8 +457,7 @@ class EditPlanTest {
         assertFalse(editor.restore(kept))
     }
 
-    // review S2: the reported cursor behind the editor's (a report not in yet): what was read
-    // before or after it is what goes, measured from where the editor has the cursor
+    // the reported cursor behind the editor's: measured from where the editor has the cursor
     @Test
     fun aSideReadWholeGoesByItsLengthFromTheEditorsCursor() {
         val kept = ClearedText()
@@ -491,8 +473,7 @@ class EditPlanTest {
         assertEquals("", after.text)
     }
 
-    // review2: a selection the report has not caught up with (collapsed yet, the app giving its text):
-    // the selection goes, never all before it; not kept, where it starts not known from the report
+    // a selection the report has not caught up with: the selection goes, not kept
     @Test
     fun aSelectionTheReportLagsIsWhatGoesNotKept() {
         val kept = ClearedText()
@@ -519,8 +500,7 @@ class EditPlanTest {
         assertEquals(false, EditMenuLayout.disabled(KeyCommand.Copy, password = false))
     }
 
-    // the row up where a notice goes: across as rowLeft has it above or below the keyboard, the
-    // notice's own left beside a floating one; over the bar where the notice's place would not show
+    // the row up where a notice goes; over the bar where the notice's place would not show
     @Test
     fun theEditMenuGoesWhereTheNoticesGo() {
         val above = UndoChipPlacement.Place(left = 340, top = 900, slide = UndoChipPlacement.Slide.Up)
@@ -530,7 +510,7 @@ class EditPlanTest {
         val beside = UndoChipPlacement.Place(left = 700, top = 1200, slide = UndoChipPlacement.Slide.Right)
         assertEquals(EditMenuLayout.Spot(700, 1200), EditMenuLayout.place(beside, 300, 100, 0, 1080, roomTop = 0, barMiddle = 1050))
         assertEquals("no room above", EditMenuLayout.Spot(150, 1000), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 950, barMiddle = 1050))
-        // review L7: a bar's middle less than half a cell below the view's top: not off it
+        // a bar's middle less than half a cell below the view's top: not off it
         assertEquals("over the bar, inside the view", EditMenuLayout.Spot(150, 1000), EditMenuLayout.place(above, 500, 100, 0, 1080, roomTop = 1000, barMiddle = 1020))
     }
 }

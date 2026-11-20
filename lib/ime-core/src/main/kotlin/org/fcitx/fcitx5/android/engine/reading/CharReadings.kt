@@ -10,22 +10,19 @@ import org.fcitx.fcitx5.android.engine.data.ensureFormat
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.nio.ByteBuffer
 
-/** A reading of a character: a [syllable] (an id of [Syllables]) in a [tone] (1–4, [ToneMark.NEUTRAL]). */
+/** [tone] is 1–4 or [ToneMark.NEUTRAL]. */
 data class Reading(val syllable: Int, val tone: Int) {
-    /** In pinyin, its tone marked: háng. */
+    /** háng */
     val pinyin: String get() = ToneMark.pinyin(Syllables.spelling(syllable), tone)
 
-    /** In zhuyin, its tone after: ㄏㄤˊ; empty for a syllable zhuyin does not write. */
+    /** ㄏㄤˊ; empty for a syllable zhuyin does not write. */
     val zhuyin: String get() = Zhuyin.of(syllable)?.let { ToneMark.zhuyin(it, tone) }.orEmpty()
 }
 
 /**
- * A character's readings, as its card and handwriting's candidates list them (the order and which
- * ones: the compile's, `CharReadingsBuilder`), and the commonest words reading it each way (行 xíng
- * 行走 进行, háng 银行): pinyin data's sections, mapped where they lie.
- *
- * Unlike [ReadingTable], which tells the tone a character has read a way, this says which ways there are.
- * One table, the mainland's, as there; another would go by a name as [ReadingTable.name] does.
+ * A character's readings as its card and handwriting candidates list them (order and selection from the
+ * compile, `CharReadingsBuilder`), with the commonest words per reading (行 xíng 行走 进行, háng 银行). Unlike
+ * [ReadingTable] (which tone a reading has), this says which readings exist.
  */
 class CharReadings internal constructor(
     private val chars: BitPacked,
@@ -55,10 +52,7 @@ class CharReadings internal constructor(
         return if (i < chars.size && chars[i] == codePoint) i else -1
     }
 
-    /**
-     * [codePoint]'s readings, the first the commonest; [card], the card's, the dictionaries' neutral tones
-     * the candidates leave out (子 zi) after them; none for a code point with none (no Han character, or one no source reads).
-     */
+    /** Commonest first; with [card], the dictionaries' neutral tones the candidates omit (子 zi) come after. None for no reading. */
     fun of(codePoint: Int, card: Boolean = false): List<Reading> {
         val i = at(codePoint)
         if (i < 0) return emptyList()
@@ -68,7 +62,7 @@ class CharReadings internal constructor(
         }
     }
 
-    /** The commonest words reading [codePoint] as its [reading]th reading of the card's ([of]), at most two; none for a character of one reading. */
+    /** At most two; none for a character of one reading. */
     fun examples(codePoint: Int, reading: Int): List<String> {
         val i = at(codePoint)
         if (i < 0 || reading !in 0 until start[i + 1] - start[i]) return emptyList()
@@ -76,14 +70,13 @@ class CharReadings internal constructor(
         return (exampleStart[r] until exampleStart[r + 1]).map { vocabulary.word(examples[it]) }
     }
 
-    /** The [index]th character it has readings for, by code point: for a walk of them all. */
+    /** For a walk of them all, by code point. */
     fun codePointAt(index: Int): Int = chars[index]
 
-    /** How many characters it has readings for: what the compile reports. */
     val characters: Int get() = chars.size
 
     companion object {
-        /** Set in a reading's tone byte: one only the card lists. */
+        /** In a reading's tone byte: only the card lists it. */
         const val CARD_ONLY = 0x10
     }
 }

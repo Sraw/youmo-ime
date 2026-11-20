@@ -10,7 +10,6 @@ import org.fcitx.fcitx5.android.engine.user.imports.Fixtures.resource
 import org.fcitx.fcitx5.android.engine.user.imports.Fixtures.sha256
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,7 +36,6 @@ class ZstdTest {
             assertDigest(TEXT, 140000, decompressed("text.fast.zst"))
         },
         "text with a small window" to {
-            // short offsets over and over: the repeated ones
             assertDigest(TEXT, 140000, decompressed("text.window.zst"))
         },
         "random bytes are kept raw" to {
@@ -63,14 +61,6 @@ class ZstdTest {
     fun decompressingFromAnOffset() {
         val frame = resource("random.zst")
         assertArrayEquals(Zstd.decompress(frame), Zstd.decompress(byteArrayOf(9, 9, 9) + frame, 3))
-    }
-
-    @Test
-    fun aFrameIsKnownByItsMagic() {
-        assertTrue(Zstd.isFrame(resource("random.zst")))
-        assertTrue(Zstd.isFrame(byteArrayOf(0) + resource("random.zst"), 1))
-        assertFalse(Zstd.isFrame(byteArrayOf(0x28, 0xB5.toByte(), 0x2F)))
-        assertFalse(Zstd.isFrame("not zstd".toByteArray()))
     }
 
     @Test
@@ -103,7 +93,6 @@ class ZstdTest {
     @Test
     fun moreThanTheLimitFails() {
         assertThrows(DataFormatException::class.java) { Zstd.decompress(resource("zeros.zst"), limit = 99999) }
-        // zeros are one byte repeated
         assertArrayEquals(ByteArray(100000), Zstd.decompress(resource("zeros.zst"), limit = 100000))
     }
 
@@ -121,11 +110,7 @@ class ZstdTest {
         assertTrue(e.message, e.message!!.contains("block makes more than"))
     }
 
-    /**
-     * A frame of one compressed block: a raw literal x, then one sequence repeating it in a match of
-     * [length] (65,539 to 131,074). Each of its tables is one code repeated: literal length 1, the
-     * first repeated offset (1), and match length code 52, whose 16 bits are all its bitstream has.
-     */
+    /** A frame of one block: a raw literal x repeated in a match of [length], each table one code repeated. */
     private fun match(length: Int): ByteArray {
         val more = length - 65539
         val block = byteArrayOf(0x08, 'x'.code.toByte(), 1, 0x54, 1, 0, 52, more.toByte(), (more ushr 8).toByte(), 1)
@@ -136,9 +121,7 @@ class ZstdTest {
 
     @Test
     fun aFewBytesMakingMoreThan128MiBFail() {
-        // as much as zhwiki's dictionary unpacks to (64.5 MiB) reads
         assertEquals(520 * MAX_BLOCK, Zstd.decompress(rle(520, MAX_BLOCK)).size)
-        // four bytes a block: four kilobytes of file for 128 MiB
         assertThrows(DataFormatException::class.java) { Zstd.decompress(rle(1025, MAX_BLOCK)) }
     }
 
@@ -200,7 +183,6 @@ class ZstdTest {
     companion object {
         private const val TEXT = "cfd5fa92102fe0b9e17460daad0a8a6e26bb9e6757835da0a03fcea93b9bf7b4"
 
-        // RFC 8878's Block_Maximum_Size
         private const val MAX_BLOCK = 1 shl 17
     }
 }

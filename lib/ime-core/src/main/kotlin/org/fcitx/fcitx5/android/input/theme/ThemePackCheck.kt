@@ -10,17 +10,10 @@ import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.Value
 
-/**
- * What an import asks of a theme 4.0 pack the engine has read (060-render-p3 T8a), beside what the
- * engine checks itself: the files it names, keys it would leave blank, and keys hard to read.
- */
+/** What an import asks of a theme 4.0 pack beyond the engine's own checks: named files, blank keys, hard-to-read keys. */
 object ThemePackCheck {
 
-    /**
-     * The files [theme] names, each by what it is: read as that before it is taken. [images] the
-     * nine-slice key images of its styles, [pictures] its picture's source photo apart, [preview] its
-     * `<meta preview>`, [effects] the images its keys' press effects play (060-render-p3 A3).
-     */
+    /** Each read as what it is before taken: [pictures] the picture's source photo, [effects] the press effects' images. */
     data class Files(
         val pictures: Set<String>,
         val source: String?,
@@ -29,7 +22,7 @@ object ThemePackCheck {
         val icons: Set<String>,
         val preview: String?,
         val effects: Set<String> = emptySet(),
-        /** Every `<sound>`'s file, of a class this version does not know too: kept, checked, exported all the same. */
+        /** Of a class this version does not know too: kept, checked, exported all the same. */
         val sounds: Set<String> = emptySet(),
     ) {
         val all: Set<String> get() = pictures + images + fonts + icons + effects + sounds + listOfNotNull(source, preview)
@@ -46,22 +39,15 @@ object ThemePackCheck {
         sounds = theme.soundFiles.map { it.second }.toSet(),
     )
 
-    /** The keys a theme must not hide the labels of: [BlankKeys.REQUIRED_ROLES]. */
     val REQUIRED_ROLES = BlankKeys.REQUIRED_ROLES
 
-    /**
-     * Where [theme] would leave those keys blank on [boards] (the app's and the pack's own), the first found:
-     * [BlankKeys.find], the engine's own drawing asked, the theme maker's rule too.
-     */
+    /** The first found, on the app's and the pack's boards; [BlankKeys.find] asks the engine's own drawing. */
     fun hidesRequired(theme: Theme, boards: List<BlankKeys.Board>): List<BlankKeys.Blank> = BlankKeys.find(theme, boards)
 
-    /** The least contrast between a key's words and its face a theme is let in without a warning (WCAG's for large text). */
+    /** WCAG's for large text: under it, a warning. */
     const val MIN_CONTRAST = 3.0
 
-    /**
-     * The versions of [theme] (false light, true dark) whose `keyText` on `key` is under [MIN_CONTRAST]:
-     * warned of, not refused (§16).
-     */
+    /** Light (false) and dark (true) versions under [MIN_CONTRAST]: warned of, not refused. */
     fun lowContrast(theme: Theme): List<Boolean> = theme.variants.sorted().filter { dark ->
         val colors = theme.variant(dark).colors
         val text = colors["keyText"] ?: return@filter false

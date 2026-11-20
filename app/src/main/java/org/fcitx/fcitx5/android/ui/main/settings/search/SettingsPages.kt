@@ -32,56 +32,46 @@ import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeFragment
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeSettingsFragment
 import org.fcitx.fcitx5.android.ui.search.SettingsSearch.Entry
 
-/**
- * Every page of the settings ([SettingsRoute]) and how the search finds what is on it, in the home page's order
- * (dev/design/061-settings-search.md §4.2): a page added without a line here fails SettingsPagesTest.
- */
+/** Every [SettingsRoute] page and how search finds its contents, in home-page order: a page missing here fails SettingsPagesTest. */
 object SettingsPages {
 
-    /** More found with a page, read by the index itself: the commands of a key's swipe, fcitx's own options. */
+    /** Found with a page by the index itself: a key swipe's commands, fcitx's own options. */
     fun interface More {
         fun add(context: Context, path: List<String>, into: MutableList<Entry<SettingsIndex.Target>>)
     }
 
     sealed interface Source {
-        /** The home page: its language row, which opens no page. */
+        /** Its language row, which opens no page. */
         data object Index : Source
 
         /**
-         * Built as its fragment builds it ([build]), never shown, and read for its preferences; [also], what is on
-         * it beside them drawn by hand (外观's built-in themes). Not opened by SettingsPagesTest's T3: [also]'s
-         * entries are held by its own test (everyBuiltInThemeIsRevealed); the rest of what is drawn there (新增主题,
-         * 布局's cards and ＋) imports or opens the user's own, not searched (Q5).
+         * Built as its fragment builds it, never shown, read for its preferences; [also]: hand-drawn extras (外观's built-in
+         * themes), held by their own test. The rest drawn there imports or opens the user's own, not searched.
          */
         class Managed(
             val open: SettingsRoute, @StringRes val title: Int, val build: (PreferenceScreen) -> Unit,
             val also: SearchablePage? = null, val more: More? = null,
         ) : Source
 
-        /**
-         * Drawn by hand: what its page says it has ([SearchablePage]), under [under]; [listed] false, a page whose
-         * own row is a setting's on another (网址和邮箱, a row of 通用输入). [demoted]: a step lower, all of it (开发者).
-         */
+        /** [listed] false: its row is a setting on another page (网址和邮箱 on 通用输入). [demoted]: all a step lower (开发者). */
         class Hand(
             val open: SettingsRoute, @StringRes val title: Int, val page: SearchablePage,
             val under: List<Int> = emptyList(), @StringRes val summary: Int = 0,
             val listed: Boolean = true, val demoted: Boolean = false, val more: More? = null,
         ) : Source
 
-        /** Read by the index from what the page is built of: the input methods', InputMethodSettings. */
+        /** Read from what the page is built of: InputMethodSettings. */
         class Listed(val more: More) : Source
 
-        /** Found with another page's: [why]. */
         class Elsewhere(val why: String) : Source
 
-        /** Not searched at all: [why]. */
         class NotSearched(val why: String) : Source
     }
 
     val PAGES: List<Pair<Class<out SettingsRoute>, Source>> = listOf(
         SettingsRoute.InputMethodList::class.java to Source.Listed { ctx, _, into -> SettingsIndex.inputMethods(ctx, into) },
         SettingsRoute.InputMethodConfig::class.java to Source.Elsewhere("each built-in input method's, with the input method list"),
-        // its own row is a setting's on each input method's page (InputMethodSettings.NINE_KEYS), found there
+        // its row is a setting on each input method's page (InputMethodSettings.NINE_KEYS), found there
         SettingsRoute.T9Letters::class.java to Source.Hand(
             SettingsRoute.T9Letters, R.string.t9_letters, NineKeyLettersFragment, under = listOf(R.string.input_methods), listed = false,
         ),
@@ -115,7 +105,7 @@ object SettingsPages {
         ),
         SettingsRoute.SoundAndVibration::class.java to Source.Managed(SettingsRoute.SoundAndVibration, R.string.section_sound_and_vibration, { SoundSettingsFragment.build(it) }),
         SettingsRoute.Clipboard::class.java to Source.Managed(SettingsRoute.Clipboard, R.string.clipboard_and_emoji, { ClipboardSettingsFragment.build(it) }),
-        // and fcitx's own, added to that page once fcitx answers
+        // and fcitx's own, added once fcitx answers
         SettingsRoute.HardwareKeyboard::class.java to Source.Managed(
             SettingsRoute.HardwareKeyboard, R.string.hardware_keyboard, { HardwareKeyboardFragment.build(it) },
             more = { ctx, path, into -> SettingsIndex.hardwareItems(ctx, path, into) },

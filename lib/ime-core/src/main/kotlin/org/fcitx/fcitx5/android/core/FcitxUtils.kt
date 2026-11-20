@@ -7,8 +7,7 @@ package org.fcitx.fcitx5.android.core
 
 object FcitxUtils {
 
-    // https://github.com/fcitx/fcitx5/blob/5.1.21/src/lib/fcitx-utils/stringutils.cpp#L100
-    // https://en.cppreference.com/cpp/language/escape
+    // fcitx-utils/stringutils.cpp
     private val unescapeMap = mapOf(
         '\\' to '\\',
         '"' to '"',
@@ -19,20 +18,15 @@ object FcitxUtils {
         'v' to '\u000b',
     )
 
-    // https://github.com/fcitx/fcitx5/blob/5.1.21/src/lib/fcitx-utils/stringutils.cpp#L390
-    // null where a quote closes before the end, as fcitx's std::nullopt
+    // fcitx-utils/stringutils.cpp unescapeForValue; null where a quote closes before the end, as fcitx's std::nullopt
     fun unescapeForValue(str: String): String? {
         if (str.length < 2 || !str.startsWith('"') || !str.endsWith('"')) return str
         val value = StringBuilder(str.length)
         return if (consumeMaybeEscapedValue(str, 0, "", value) == str.length) value.toString() else null
     }
 
-    // https://github.com/fcitx/fcitx5/blob/5.1.21/src/lib/fcitx-utils/stringutils.cpp#L435
-    /**
-     * The value in [input] from [from] on, past any of [skip]: one starting with a quote
-     * unescaped up to the quote closing it, else (or if that quote never closes) as it is, up to
-     * the next of [skip]. Put in [out]; returns where it ends, or -1 if only [skip] is left.
-     */
+    // fcitx-utils/stringutils.cpp
+    /** Past [skip]: a quoted value unescaped to its closing quote, else (or unclosed) up to the next [skip]; returns its end, or -1 if only [skip] is left. */
     fun consumeMaybeEscapedValue(input: String, from: Int, skip: String, out: StringBuilder): Int {
         out.setLength(0)
         var start = from
@@ -60,7 +54,7 @@ object FcitxUtils {
         return end
     }
 
-    // https://github.com/fcitx/fcitx5/blob/5.1.21/src/lib/fcitx-utils/stringutils.cpp#L86
+    // fcitx-utils/stringutils.cpp
     private val escapeMap = mapOf(
         '\\' to '\\',
         '"' to '"',
@@ -74,7 +68,7 @@ object FcitxUtils {
     // "\f\r\t\v \"\\\n"
     private val EscapeChars = charArrayOf('\u000c', '\r', '\t', '\u000b', ' ', '"', '\\', '\n')
 
-    // https://github.com/fcitx/fcitx5/blob/5.1.21/src/lib/fcitx-utils/stringutils.cpp#L404
+    // fcitx-utils/stringutils.cpp
     fun escapeForValue(str: String): String {
         if (str.lastIndexOfAny(EscapeChars) < 0) return str
         return buildString {

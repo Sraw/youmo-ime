@@ -29,7 +29,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
-/** The punctuation map in the Kotlin host's hands: a table put where a user's own is read (nothing in the app writes one since 0.6.1), then the keyboard's ， typed through it. */
+/** A table put where a user's own is read, then the keyboard's ， typed through it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -47,17 +47,15 @@ class PunctuationMapUatTest {
         if (::h.isInitialized) h.close()
         if (::fcitx.isInitialized) fcitx.stop()
         home.deleteRecursively()
-        // the map a test saved, cached for the process
+        // cached for the process
         PunctuationManager.forget()
-        // and the start keys it wrote, kept for the process too: else a later InputView reads this test's comma
+        // kept for the process too: else a later InputView reads this test's comma
         PunctuationStartKeys.forget(appContext)
     }
 
     private fun until(what: String, done: () -> Boolean) = waitUntil(what, step = { if (::h.isInitialized) h.idle() }, done = done)
 
-    // what the main thread posted to the host done, and what it told back shown
     private fun synced() {
-        // set on the fcitx thread, read on this one
         val done = java.util.concurrent.atomic.AtomicBoolean()
         h.service.postFcitxJob { done.set(true) }
         until("the host's queue done") { done.get() }
@@ -68,7 +66,7 @@ class PunctuationMapUatTest {
     fun theCommaMappedToAnotherMarkTypesIt() {
         fcitx = startedHost(ScriptedEngine(home))
         runBlocking {
-            // a table of the user's (the built-in one is not among the test's assets)
+            // the built-in one is not among the test's assets
             fcitx.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", "")))
             assertEquals(listOf(PunctuationMapEntry(",", "、", "")), fcitx.punctuationMap("zh_CN"))
         }
@@ -80,8 +78,8 @@ class PunctuationMapUatTest {
         assertEquals("、", h.field.text.toString())
     }
 
-    // 060-render-p2 S7 #7: "half width after a letter or number" on, after a letter the ， key shows and
-    // bubbles the , it types; after a Chinese word it is ， again; off, ， throughout.
+    // "half width after a letter or number" on: after a letter the ， key shows and bubbles the , it types; after a
+    // Chinese word ， again
     @Test
     fun afterALetterTheCommaShowsTheHalfWidthItTypes() {
         for (on in listOf(true, false)) {
@@ -99,21 +97,18 @@ class PunctuationMapUatTest {
             val comma = { h.keyWithId(R.id.button_comma)!! }
             val shown = { faceAndBubble(comma) }
             val twice = { c: String -> listOf(c, c) }
-            // the first press at once, the start's statuses not waited for: its mark shown and typed
             assertEquals(what, twice("，"), shown())
             until("the mark typed") { h.field.text.toString() == "，" }
-            // a letter the engine leaves (the scripted one composes only a to z): typed as itself, the A of shift's
+            // the scripted engine composes only a to z: the A of shift's typed as itself
             h.tap(h.keyNamed("shift"))
             h.tap(h.key("A"))
             until("A typed") { h.field.text.toString() == "，A" }
             val half = if (on) "," else "，"
-            // the A typed back to the field before the host told the keys what the comma now types: that told first
             synced()
-            // the host tells the map after the A's selection reached it: its face drawn anew first, then both checked
+            // the host tells the map after the A's selection reached it: its face drawn anew first
             until("the comma's face told") { comma().label == half }
             assertEquals(what, twice(half), shown())
             until("the mark typed") { h.field.text.toString() == "，A$half" }
-            // a Chinese word after it: the comma back to its mark
             h.tap(h.key("a"))
             runBlocking { fcitx.select(0) }
             until("the word typed") { h.field.text.endsWith("你好") }
@@ -125,8 +120,8 @@ class PunctuationMapUatTest {
         }
     }
 
-    // the first press as soon as the keyboard is up, nothing waited for: face, bubble and what it types one mark
-    // (the status a view made anew replayed before the host had sent one drew , where the engine typed 、, S7a)
+    // the first press as soon as the keyboard is up: face, bubble and what it types one mark (a replayed status once
+    // drew , where the engine typed 、)
     @Test
     fun theFirstPressAtOnceShowsWhatItTypes() {
         fcitx = startedHost(ScriptedEngine(home))
@@ -143,15 +138,13 @@ class PunctuationMapUatTest {
         assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
     }
 
-    // a host that ran before read a user's table, and stopped; a new one made, not started, and the keyboard up before it,
-    // with what the last run kept ([kept]) or none
+    // a host that ran before read a user's table, and stopped; a new one made, not started, the keyboard up before it
     private fun keyboardBeforeTheHost(kept: Boolean): KotlinHost {
         PunctuationStartKeys.forget(appContext)
         startedHost(ScriptedEngine(home)).let { first ->
             runBlocking { first.putPunctuationTable(home, listOf(PunctuationMapEntry(",", "、", ""))) }
             first.stop()
         }
-        // the next process: what the last one kept, read from the file; or a first install's none
         if (kept) PunctuationStartKeys.loadNow(appContext) else PunctuationStartKeys.forget(appContext)
         val next = KotlinHost(appContext, ScriptedEngine(home))
         h = KeyboardHarness(host = next)
@@ -161,8 +154,7 @@ class PunctuationMapUatTest {
         return next
     }
 
-    // the comma pressed before the host is up, its keys as the last run started with them (PunctuationStartKeys, read
-    // from its file): face and bubble the mark typed once the host is up (S7a: , shown, 、 typed)
+    // the comma pressed before the host is up, its keys as the last run started with them (PunctuationStartKeys)
     @Test
     fun beforeTheHostIsUpTheKeysAreTheLastRunsStart() {
         val next = keyboardBeforeTheHost(kept = true)
@@ -177,8 +169,7 @@ class PunctuationMapUatTest {
         assertEquals(listOf("、", "、", "、"), listOf(face, bubble, h.field.text.toString()))
     }
 
-    // the service's read done after the keyboard was made (its thread slower): a press then takes the keys read,
-    // not held back till the host is up (S7a round 4)
+    // the service's read done after the keyboard was made: a press then takes the keys read, not held back
     @Test
     fun theLastRunsKeysReadAfterTheKeyboardStillCount() {
         fcitx = keyboardBeforeTheHost(kept = false)
@@ -196,8 +187,7 @@ class PunctuationMapUatTest {
         assertEquals("、", h.keyWithId(R.id.button_comma)!!.label)
     }
 
-    // none kept (a first install): the comma pressed before the host is up neither types nor bubbles, as no face
-    // could show what it would type; once the host is up it types its mark
+    // none kept: the comma pressed before the host is up neither types nor bubbles, as no face could show what it would type
     @Test
     fun beforeTheHostIsUpWithNoneKeptTheKeysAreHeldBack() {
         fcitx = keyboardBeforeTheHost(kept = false)
@@ -207,8 +197,7 @@ class PunctuationMapUatTest {
         h.release()
         fcitx.start()
         until("the host up") { fcitx.isReady }
-        // whatever was queued for it done, and its events handed over
-        // (a key queued for the host goes through the service's jobs and the main thread: a few turns, time run on)
+        // a key queued for the host goes through the service's jobs and the main thread: a few turns, time run on
         repeat(5) { runBlocking { fcitx.isEmpty() }; h.after(200) }
         assertEquals("", h.field.text.toString())
         h.after(BUBBLE_GONE_MS)
@@ -218,8 +207,6 @@ class PunctuationMapUatTest {
         assertEquals("the held one never typed", "、", h.field.text.toString())
     }
 
-    // punctuation turned off, then on again (the toggle's action): each press of the comma before, between and
-    // after shows on its face and bubble the mark it types, the switch made in the status's own event
     @Test
     fun offThenOnTheCommaShowsWhatItTypesEachPress() {
         fcitx = startedHost(ScriptedEngine(home))
@@ -250,9 +237,8 @@ class PunctuationMapUatTest {
         press("、")
     }
 
-    // the key's face and the bubble it shows pressed, both read while it is held, before the release types (a key's
-    // label is looked up in the scene each time; the mark typed on release may already have made the host tell the
-    // next one, after a half-width , the full-width ， again: face ，, bubble , on SDK 29 and 35, CI 43202860764)
+    // both read while it is held, before the release types: the mark typed may already have made the host tell the
+    // next one (after a half-width , the full-width ， again)
     private fun faceAndBubble(key: () -> org.fcitx.fcitx5.android.input.ShownKey): List<String> {
         h.after(BUBBLE_GONE_MS)
         val k = key()

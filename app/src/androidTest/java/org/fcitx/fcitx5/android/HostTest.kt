@@ -31,10 +31,7 @@ import java.io.File
 
 class HostTest {
 
-    /**
-     * Without this a broken engine interaction hangs the whole run instead of failing it --
-     * which is exactly what happened before `activate`/`focus` were added to [TestHost.start].
-     */
+    // without it a broken engine interaction hangs the whole run instead of failing it
     @get:Rule
     val timeout: Timeout = Timeout.seconds(30)
 
@@ -45,13 +42,12 @@ class HostTest {
         val latestInputPanel get() = harness.latestInputPanel
         val latestPaged get() = harness.latestPaged
 
-        /** Pinyin's prediction as the app's data had it, put back by [cleanup]. */
         var predictionBefore: String? = null
 
         @BeforeClass
         @JvmStatic
         fun setup() = harness.start {
-            // prediction on, whatever the app's data says: a commit then followed by none says learning is off
+            // prediction on: a commit then followed by none says learning is off
             predictionBefore = imOptions(InputMethodCatalog.PINYIN)?.get(EngineSettings.PREDICTION).orEmpty()
             setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.PREDICTION to "True"))
         }
@@ -62,7 +58,6 @@ class HostTest {
             predictionBefore?.let { setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.PREDICTION to it)) }
         }
 
-        /** 五笔, the engine's own table (a key of [InputMethodCatalog.TABLES]). */
         const val WUBI = "engine-wubi"
 
         private suspend fun sendString(str: String) {
@@ -72,7 +67,7 @@ class HostTest {
             }
         }
 
-        /** [digits] as pinyin's nine keys send them: each its own code (Keyboard.pinyinNineKey). */
+        /** Each digit its own code (Keyboard.pinyinNineKey). */
         private suspend fun sendNineKeys(digits: String) {
             digits.forEach { d ->
                 fcitx.sendKey(0x01000000 + Keyboard.pinyinNineKey(d))
@@ -87,13 +82,7 @@ class HostTest {
 
         private suspend fun receiveFirstPreedit() = receiveFirst<HostEvent.ClientPreedit>()
 
-        /**
-         * Waits for the input panel to show [expected] as its preedit. The panel is updated
-         * when fcitx flushes its UI, which is not necessarily done by the time `sendKey`
-         * returns, so asserting straight after typing races it.
-         *
-         * @return the preedit last seen: [expected], unless it did not arrive in time
-         */
+        /** The panel updates when fcitx flushes its UI, not necessarily before `sendKey` returns; returns the last preedit seen. */
         private suspend fun awaitPanelPreedit(expected: String, timeoutMs: Long = 5_000): String {
             val deadline = SystemClock.uptimeMillis() + timeoutMs
             while (true) {
@@ -107,24 +96,16 @@ class HostTest {
 
         private suspend fun eventsTillQuiet() = harness.eventsTillQuiet()
 
-        /** Where fcitx's data is (ConfigHome.DATA, moved into the app's own files): its punctuation tables. */
         private fun fcitxData(): File = HostConfigDir.inUse(ConfigHome.DATA).dir
     }
 
-    /** A clean engine and event queue for each test: see [TestHost.beforeTest]. */
     @Before
     fun resetEngineAndDrainEvents() = harness.beforeTest()
 
     @After
     fun restoreEnabledIME() = harness.afterTest()
 
-    /**
-     * `wqvb` is the table's 你好 and 您好, in the order of their use (TableText.addWords): the
-     * model's, or on a device whose user picked one, theirs. So each is picked by content, and with
-     * two candidates neither commits itself on the last key ([aFullCodeOfOneCandidateCommitsItself]
-     * has a code of one). 你好 is typed by its characters too, 你 picked from `wq`'s candidates: what
-     * this test is for is the code -> candidates -> select -> commit path.
-     */
+    /** `wqvb` gives 你好 and 您好 in usage order, so picks go by content; with two candidates neither commits itself. */
     @Test
     fun testWbx(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(WUBI))
@@ -151,13 +132,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * Picks the candidate by content rather than by index.
-     *
-     * Asserting `select(0)` would pin the engine's ranking: "nihaoshijie" reads as 你好世界 or
-     * 你好时节, and either is a legitimate reading. What this test is for is
-     * the sendKey -> candidates -> select -> commit path, not the engine's scoring.
-     */
+    // by content, not index: 你好世界 and 你好时节 are both fair readings, and the ranking is not under test
     @Test
     fun testPinyin(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -177,14 +152,10 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * A letter chosen from a nine-key's long press: the keyboard sends it as a character past the
-     * BMP (Keyboard.letterKey), which fcitx must hand the engine whole. m then 4 is mi alone,
-     * never ni.
-     */
+    /** The long press sends the letter past the BMP (Keyboard.letterKey), which fcitx must pass whole: m then 4 is mi, never ni. */
     @Test
     fun aLetterTypedAsItselfOnTheNineKeysReachesTheEngine(): Unit = runBlocking {
-        // pinyin's nine keys (I1): their digits are codes of their own, Keyboard.pinyinNineKey
+        // nine-key digits are codes of their own (Keyboard.pinyinNineKey)
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
         fcitx.sendKey(0x01000000 + Keyboard.letterKey('m', again = false))
         sendNineKeys("4")
@@ -194,8 +165,7 @@ class HostTest {
         Assert.assertTrue("米 among $candidates", "米" in candidates)
         Assert.assertFalse("no 你 among $candidates", "你" in candidates)
         fcitx.reset()
-        // 连按 (strict): 2 four times fast, each repeat a character past the BMP, is the letter it
-        // came round to, a, typed as itself: 啊, never the keys 2222 (爸爸)
+        // 连按: 2 four times fast is a, typed as itself (啊), never 2222 (爸爸)
         sendNineKeys("2")
         "bca".forEach { fcitx.sendKey(0x01000000 + Keyboard.letterKey(it, again = true)) }
         awaitQuiet()
@@ -205,8 +175,6 @@ class HostTest {
         Assert.assertFalse("no 爸爸 among $a", "爸爸" in a)
         fcitx.reset()
     }
-
-    // region input method management
 
     @Test
     fun switchingInputMethodChangesTheCurrentOne(): Unit = runBlocking {
@@ -227,12 +195,7 @@ class HostTest {
         Assert.assertEquals("cycles back round", InputMethodCatalog.PINYIN, fcitx.currentIme().uniqueName)
     }
 
-    /**
-     * The list set anew with the input method kept is told as one HostEvent.InputMethodChanged, the app reading the
-     * list again on it (HardwareKeyboard's Ctrl+Space). The harness's context is focused, where the
-     * re-activation tells it; unfocused (split screen, settings in front) androidfrontend's
-     * InputMethodGroupChanged watcher does. Both paths, each told once.
-     */
+    /** Told as one HostEvent.InputMethodChanged, both focused (re-activation) and unfocused (InputMethodGroupChanged). */
     @Test
     fun aListSetAnewWithTheInputMethodKeptIsToldOnce(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -262,18 +225,9 @@ class HostTest {
         Assert.assertTrue("$WUBI missing from $available", WUBI in available)
     }
 
-    // endregion
-
-    // region pinyin decoding
-
     /**
-     * Waits for the finished composition rather than taking the first preedit event:
-     * `sendString` produces one per keystroke, so the first would be "n".
-     *
-     * Uses the input panel's preedit, not [HostApi.clientPreeditCached]. This test drives a
-     * bare engine whose capability flags (see [TestHost.start]) leave out `Preedit`, so fcitx has
-     * no reason to believe the client can render a preedit and keeps it in the input panel. The
-     * real service sets the capability flags in `onStartInput`, which is what moves it client-side.
+     * Waits for the whole composition: `sendString` gives one preedit per keystroke. Reads the panel's preedit,
+     * since [TestHost.start]'s flags leave out `Preedit` and fcitx keeps it in the panel.
      */
     @Test
     fun pinyinSegmentsSyllablesInThePreedit(): Unit = runBlocking {
@@ -285,7 +239,6 @@ class HostTest {
         fcitx.reset()
     }
 
-    /** The preedit in the input panel has its cursor at its end, as one in the app has. */
     @Test
     fun theInputPanelsPreeditHasItsCursorAtItsEnd(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -305,12 +258,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * A file written through the documents provider, or the punctuation edited, has fcitx read its
-     * config again, and nothing more: the bar has its candidates after it, in pinyin and on the nine
-     * keys, for which a reload once left them unshown till fcitx restarted (15fb15963b; not seen
-     * since on redroid, 2026-10-13).
-     */
+    /** A reload once left the bar empty till fcitx restarted. */
     @Test
     fun theBarGetsCandidatesAfterFcitxReadsItsConfigAgain(): Unit = runBlocking {
         for ((nine, keys) in listOf(false to "ni", true to "64")) {
@@ -344,7 +292,7 @@ class HostTest {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
         sendString("nihao")
         Assert.assertFalse("engine should hold a composition", fcitx.isEmpty())
-        // seen first, so that an empty preedit below is the reset's doing and not a leftover
+        // so an empty preedit below is the reset's doing, not a leftover
         Assert.assertEquals("ni hao", awaitPanelPreedit("ni hao"))
         fcitx.reset()
         Assert.assertTrue("reset should clear it", fcitx.isEmpty())
@@ -352,12 +300,7 @@ class HostTest {
         Assert.assertEquals("", awaitPanelPreedit(""))
     }
 
-    /**
-     * The preedit is cleared, and the whole panel with it: where it learns the engine follows a
-     * commit with predictions for the word just typed (`isEmpty()` false), prediction being on as
-     * [setup] sets it, and the Sensitive flag [TestHost.start] sets, which keeps the tests' words out of the
-     * app's data, turns learning off.
-     */
+    /** The whole panel clears: the Sensitive flag turns learning off, so no predictions follow the commit. */
     @Test
     fun selectingACandidateCommitsItAndClearsThePreedit(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -372,10 +315,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * A tap carries the text it showed. A refine slice can reorder the list between the tap and
-     * its pick, and the index then names another word: that pick is dropped, not committed.
-     */
+    /** A refine can reorder the list between tap and pick; the pick names its text, so a stale index is dropped. */
     @Test
     fun aPickOfTextTheCandidateNoLongerShowsIsDropped(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -391,10 +331,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * The same past U+FFFF (CJK Ext-B, in the tables): JNI's modified UTF-8 spells such a
-     * character as two surrogates, which no candidate's text equals.
-     */
+    /** JNI's modified UTF-8 spells such a character as two surrogates, which no candidate's text equals. */
     @Test
     fun aPickOfACharacterPastTheBmpIsCheckedByItsText(): Unit = runBlocking {
         // 五笔's fae is 霰 and U+2298F
@@ -411,10 +348,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * A page at a time, as the floating window of a physical keyboard has them: arrows only where
-     * there is a page, what space commits highlighted, and a pick of a page turned from dropped.
-     */
+    /** As a physical keyboard's floating window pages: arrows only where there is a page, and a pick from a page turned from is dropped. */
     @Test
     fun pagedCandidatesTurnAndDropAPickOfAnotherPage(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -449,11 +383,7 @@ class HostTest {
         }
     }
 
-    /**
-     * A page turned to: the bar still shows the list from the first of all, those before the page
-     * fetched as it asks for them, and a pick on the page commits that page's word, sent as its
-     * index among all.
-     */
+    /** The bar keeps the whole list from the first; a pick on the page is sent as its index among all. */
     @Test
     fun aPageTurnedToKeepsTheBarWholeAndCommitsItsOwnWord(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -479,10 +409,7 @@ class HostTest {
         }
     }
 
-    /**
-     * A hardware keyboard's = and - turn the page while something is typed, as PageDown and PageUp
-     * do, nothing of them going to the app; with nothing typed - is the key it is.
-     */
+    /** As PageDown/PageUp, nothing reaching the app; with nothing typed - is itself. */
     @Test
     fun equalsAndMinusTurnThePageWhileSomethingIsTyped(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -514,17 +441,12 @@ class HostTest {
         }
     }
 
-    /**
-     * A tap on the code above the candidates puts the cursor there, a key missed typed in its place;
-     * one no session takes (on marks offered) leaves the panel as it was, nothing put in: fcitx's
-     * own would put in the app's composing text, here none, and drop the marks.
-     */
+    /** A key missed is retyped in place; with marks offered no session takes the tap, and fcitx's own would drop the marks. */
     @Test
     fun aTapOnTheCodeMovesItsCursorAndOneNotTakenChangesNothing(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
         sendString("nhao")
         awaitQuiet()
-        // after the n
         fcitx.moveCursor(1)
         sendString("i")
         Assert.assertEquals("ni hao", awaitPanelPreedit("ni hao"))
@@ -547,10 +469,6 @@ class HostTest {
         fcitx.reset()
     }
 
-    // endregion
-
-    // region code table input
-
     @Test
     fun wubiOffersCandidatesForAPartialCode(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(WUBI))
@@ -561,10 +479,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * A full code with one candidate commits it on its last key (唯一自动上屏): the code -> commit
-     * path. 五笔's aaog is 工业 alone.
-     */
+    // 五笔's aaog is 工业 alone
     @Test
     fun aFullCodeOfOneCandidateCommitsItself(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(WUBI))
@@ -573,10 +488,6 @@ class HostTest {
         Assert.assertEquals("", awaitPanelPreedit(""))
         fcitx.reset()
     }
-
-    // endregion
-
-    // region punctuation
 
     // fcitx's zh_CN map: . has 。 alone, [ has 【 「 『 ❲ ［ [
 
@@ -590,10 +501,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * A key with several marks offers them all, its first as typed: the next key puts that in
-     * and goes on, a tap puts in another, Backspace none.
-     */
+    /** The next key puts the first in and goes on, a tap puts in another, Backspace none. */
     @Test
     fun aPunctuationKeyWithSeveralMarksOffersThemItsFirstGoingIn(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -615,13 +523,12 @@ class HostTest {
         Assert.assertEquals("", awaitPanelPreedit(""))
         Assert.assertTrue("the key taken back", fcitx.isEmpty())
 
-        // Space and Return pick the first and type nothing more: no space after it, no message sent
+        // Space and Return pick the first and type nothing more
         for (key in listOf("space", "Return")) {
             sendString("[")
             awaitQuiet()
             fcitx.sendKey(key)
             Assert.assertEquals(key, "【", receiveFirstCommitString()?.text)
-            // the key itself not passed on to the app (a space typed, a message sent), nor anything more committed
             val after = eventsTillQuiet()
             Assert.assertTrue("$key: $after", after.none { it is HostEvent.Key || it is HostEvent.Commit })
             Assert.assertTrue(key, fcitx.isEmpty())
@@ -629,10 +536,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /**
-     * [entries] as zh_CN's table where a user's own is read, and read again as a reload reads it; null, none there
-     * (the built-in table). No app path saves one since 0.6.1: an edited table is what a test puts in so.
-     */
+    /** [entries] as the user's zh_CN table and reloaded; null removes it (built-in table). No app path saves one any more. */
     private suspend fun putTable(entries: List<PunctuationMapEntry>?) {
         val file = File(fcitxData(), "punctuation/punc.mb.zh_CN")
         if (entries == null) {
@@ -645,17 +549,13 @@ class HostTest {
         PunctuationManager.forget()
     }
 
-    /**
-     * A pair as a key's first card is one choice, the half the key types: its other half is not
-     * offered beside it. The halves come in turn, fcitx's default (TypePairedPunctuationsTogether=False).
-     */
+    /** The halves come in turn, fcitx's default (TypePairedPunctuationsTogether=False). */
     @Test
     fun aPairAsAKeysFirstCardIsOneChoice(): Unit = runBlocking {
         val shipped = PunctuationManager.load(fcitx, "zh_CN")
         val saved = File(fcitxData(), "punctuation/punc.mb.zh_CN")
         val hadSaved = saved.exists()
         try {
-            // " with a card after its pair, as the editor page lets one add
             putTable(shipped.filter { it.key != "\"" } + PunctuationMapEntry("\"", "“", "”") + PunctuationMapEntry("\"", "＂", ""))
             fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
             sendString("\"")
@@ -673,15 +573,11 @@ class HostTest {
             Assert.assertEquals("＂", receiveFirstCommitString()?.text)
         } finally {
             fcitx.reset()
-            // the table above put where there was none, or the user's put back
             if (hadSaved) putTable(shipped) else putTable(null)
         }
     }
 
-    /**
-     * A pair's half on offer opens or closes the pair only as it goes in: after another card is
-     * picked, or the key is taken back with Backspace, the key opens the pair again.
-     */
+    /** After another card is picked or Backspace, the key opens the pair again. */
     @Test
     fun aPairsHalfNotPutInLeavesThePairAsItWas(): Unit = runBlocking {
         val shipped = PunctuationManager.load(fcitx, "zh_CN")
@@ -695,7 +591,7 @@ class HostTest {
             awaitQuiet()
             Assert.assertTrue(fcitx.select(1, "＂"))
             Assert.assertEquals("＂", receiveFirstCommitString()?.text)
-            // gone first, so that the “ below is the next press's and not a leftover
+            // so the “ below is the next press's, not a leftover
             Assert.assertEquals("", awaitPanelPreedit(""))
 
             sendString("\"")
@@ -707,7 +603,6 @@ class HostTest {
             sendString("\"")
             Assert.assertEquals("taken back", "“", awaitPanelPreedit("“"))
             awaitQuiet()
-            // the next key puts in the half on offer, and this press then closes the pair
             sendString("\"")
             Assert.assertEquals("“", receiveFirstCommitString()?.text)
             Assert.assertEquals("”", awaitPanelPreedit("”"))
@@ -717,10 +612,7 @@ class HostTest {
         }
     }
 
-    /**
-     * The same for the half that closes it: with “ in, the key offers ” after another card is
-     * picked or Backspace, till ” goes in.
-     */
+    /** With “ in, the key offers ” after another card is picked or Backspace, till ” goes in. */
     @Test
     fun aClosingHalfNotPutInLeavesThePairOpen(): Unit = runBlocking {
         val shipped = PunctuationManager.load(fcitx, "zh_CN")
@@ -740,7 +632,7 @@ class HostTest {
             awaitQuiet()
             Assert.assertTrue(fcitx.select(1, "＂"))
             Assert.assertEquals("＂", receiveFirstCommitString()?.text)
-            // gone first, so that the ” below is the next press's and not a leftover
+            // so the ” below is the next press's, not a leftover
             Assert.assertEquals("", awaitPanelPreedit(""))
 
             sendString("\"")
@@ -752,7 +644,6 @@ class HostTest {
             sendString("\"")
             Assert.assertEquals("taken back", "”", awaitPanelPreedit("”"))
             awaitQuiet()
-            // the next key puts in ”, which closes the pair, and this press then opens it again
             sendString("\"")
             Assert.assertEquals("”", receiveFirstCommitString()?.text)
             Assert.assertEquals("“", awaitPanelPreedit("“"))
@@ -762,7 +653,6 @@ class HostTest {
         }
     }
 
-    /** Switching input method puts in the first of the marks on offer, as it keeps what was typed. */
     @Test
     fun switchingInputMethodPutsInTheMarkOnOffer(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.SHUANGPIN))
@@ -776,7 +666,6 @@ class HostTest {
         fcitx.reset()
     }
 
-    /** A shortcut puts in the first of the marks on offer before it goes to the app, as any other key does. */
     @Test
     fun aShortcutPutsInTheMarkOnOfferBeforeTheAppGetsIt(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
@@ -793,8 +682,6 @@ class HostTest {
         fcitx.reset()
     }
 
-    // endregion
-
     @Test
     fun testInputPanelStatus(): Unit = runBlocking {
         fcitx.reset()
@@ -809,7 +696,6 @@ class HostTest {
         Assert.assertEquals(true, fcitx.isEmpty())
     }
 
-    /** A character key reaches fcitx as that character: one the engine does not take comes back to the app as it. */
     @Test
     fun aCharacterKeyPastLatin1ReachesFcitxAsItself(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))

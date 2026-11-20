@@ -20,7 +20,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// 060-render-v2 §6 step 2: includes, `when=`, bindings, defaults
+// includes, `when=`, bindings, defaults
 class ExpandTest {
     private val env = Fixtures.portrait
 

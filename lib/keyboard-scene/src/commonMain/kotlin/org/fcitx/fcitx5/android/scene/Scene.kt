@@ -9,17 +9,7 @@ import org.fcitx.fcitx5.android.scene.layout.MenuItem
 import org.fcitx.fcitx5.android.scene.layout.Popup
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
-/**
- * What the engine makes of a layout, a theme and an environment (060-render-v2 §3): every key's
- * shape, touch area and drawing, in px; plain data, the same on the JVM and in JS ([SceneText]).
- * [base] is drawn first (the keyboard's own fill), then the slots' faces, then each key's face for
- * its states. [board] is where the keys are: the whole of it, or one-handed or split at a side
- * (rules D §2), the rest a `side-buttons` slot. [preview] and [popups]: whether its keys pop up a
- * preview, a long press's keyboard (the layout's; the number pad's do not); a menu written on a key
- * pops up all the same (the number pad's Return's, rules C 疑问 8). [warnings]: what
- * the layout asked that this environment could not give and was done another way (a split row of
- * other than nine or ten keys, scaled).
- */
+/** What the engine makes of a layout, a theme and an environment, in px: plain data, the same on the JVM and in JS. */
 class Scene(
     val width: Double,
     val height: Double,
@@ -31,12 +21,7 @@ class Scene(
     val popups: Boolean = true,
     val warnings: List<Problem> = emptyList(),
 ) {
-    /**
-     * The key a finger at ([x], [y]) presses: the one whose [KeyNode.hit] holds it; none in a gap.
-     * A touch on the scene's right or bottom edge, or past any of its four edges (a finger's centre the
-     * system reports a pixel out), counts as just inside: the edge keys' hits stop short of their right
-     * and bottom, and a touch left of or above the scene goes to the left or top edge's key.
-     */
+    /** A touch on or past the scene's edges counts as just inside (the system may report a finger's centre a pixel out). */
     fun keyAt(x: Double, y: Double): KeyNode? {
         val cx = x.coerceIn(0.0, maxOf(0.0, width - EDGE))
         val cy = y.coerceIn(0.0, maxOf(0.0, height - EDGE))
@@ -48,11 +33,6 @@ class Scene(
     }
 }
 
-/**
- * The states a key is drawn in (theme-4.xsd's `:pressed` and the rest). A key is in a set of them:
- * [Pressed] while a finger is on it, the others as the input is ([KeyNode.states]: Shift on or
- * locked, the handwriting's 注 on, a panel's lock locked, a key not usable, a popup's focused cell).
- */
 enum class KeyState(val xml: String) {
     Pressed("pressed"), Shifted("shifted"), Locked("locked"), On("on"), Disabled("disabled"), Selected("selected");
 
@@ -61,18 +41,7 @@ enum class KeyState(val xml: String) {
     }
 }
 
-/**
- * A key (§3, §3.1): [id] is the name themes, overrides, UAT and accessibility know it by
- * (`qwerty/q`); [copy] tells apart the two of a key a split row draws on both halves (G, V).
- * [shape] is its face's; [bounds] its cell (where a popup is placed, a screen reader's box); [hit]
- * where a finger counts as on it, gaps between keys and a row's blank ends included; [anchor] its
- * middle for glide typing and popups; [up] the way a swipe up goes (a unit vector, the screen's up).
- *
- * What the app needs to work it, so it never goes back to the layout: [label] and [alt] as shown (the
- * bindings read; null where there is none), [altRaw] the alt as written (`{punct:~}`; snapshots and tests only), its long
- * press's [popup] as written (null: its character's built-in list, KeyDefaults, a named key's the user's over it;
- * [Scene.popups] off: none at all) and [menu], the [sound] it clicks with, the [shortcut] its swipes' symbols are kept under.
- */
+/** It carries everything the app needs to work it, so the app never goes back to the layout. [copy] tells apart a split row's two copies. */
 class KeyNode(
     val id: String,
     val copy: Int,
@@ -83,9 +52,8 @@ class KeyNode(
     val hit: Shape,
     val anchor: Point,
     val up: Point,
-    /** The states it is in now, but [KeyState.Pressed]: a change of these is a new scene for the key (§3). */
+    /** A change of these is a new scene for the key. */
     val states: Set<KeyState>,
-    /** Its drawing in [states], and pressed ([states] and [KeyState.Pressed]). */
     val faces: Map<Set<KeyState>, List<Op>>,
     val a11y: String,
     val actions: Map<String, String>,
@@ -96,41 +64,25 @@ class KeyNode(
     val menu: List<MenuItem> = emptyList(),
     val sound: String = "standard",
     val shortcut: String? = null,
-    /** The letters it types as a group, row by row as they sit on it (the layout's `letters=`), null for a key of no group. */
     val letters: Letters? = null,
-    /** A tap on it leans to the letter it fell nearest ([Key.leans][org.fcitx.fcitx5.android.scene.layout.Key.leans]). */
     val lean: Boolean = false,
-    /** Its layout's say over its face (`face=`) and its gap (`margin=`): what an exporter of the layout (the theme maker's) passes on. */
     val face: org.fcitx.fcitx5.android.scene.layout.Face = org.fcitx.fcitx5.android.scene.layout.Face.Default,
     val margin: Boolean = true,
-    /** How it moves between its faces (060-render-p3 A1); null: it does not, each shown at once (every theme without motion). */
     val motion: Motion? = null,
-    /**
-     * Each way the user set that it places a mark of (true: 上滑), how it is drawn: what the settings tell of it.
-     * A way set that places none (set to 空, no first, its mark hidden by the theme, roots shown) has no entry: no
-     * claim; [MarkFate.Dropped] only for a mark placed and then left out for room.
-     */
+    /** [MarkFate.Dropped] only for a mark placed then left out for room. */
     val fates: Map<Boolean, MarkFate> = emptyMap(),
-    /** The part of [bounds] in its first row: [bounds] but for a key across rows (`rows=`), whose bubble goes over its top row. */
+    /** Differs only for a key across rows, whose bubble goes over its top row. */
     val head: Box = bounds,
 ) {
-    /** What a backend draws for it: [faces] in its [states], pressed or not. */
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)
 }
 
-/**
- * A key's motion (060-render-p3 §4, A1), plain data: [transition] how its pressed face fades out when
- * let go and its state's face fades in when the state changes (Shift, locked), its look's `transition`
- * in [KeyNode.states]; [press] how long its pressed face takes to scale to [pressScale] and sink
- * [pressSink] px, the pressed look's `transition` no longer than [MAX_PRESS_MS] (none: at once). The
- * pressed face itself is shown whole at once, never faded in.
- */
+/** The pressed face itself is shown whole at once, never faded in. */
 data class Motion(
     val transition: org.fcitx.fcitx5.android.scene.theme.Transition?,
     val press: org.fcitx.fcitx5.android.scene.theme.Transition?,
     val pressScale: Double = 1.0,
     val pressSink: Double = 0.0,
-    /** What plays over it each press (A3), px; null: nothing. */
     val effect: KeyEffect? = null,
 ) {
     companion object {
@@ -138,23 +90,14 @@ data class Motion(
     }
 }
 
-/**
- * A key's press effect as drawn (060-render-p3 A3): the theme's `effect` ([org.fcitx.fcitx5.android.scene.theme.Effect])
- * in px, its image [file] played [ms] long from where the finger is.
- */
 sealed interface KeyEffect {
     val file: String
     val ms: Int
 
-    /** The image grown to [radius] px across its middle, fading, clipped to the key's face. */
     data class Ripple(override val file: String, val radius: Double, override val ms: Int) : KeyEffect
 
-    /** [count] copies of the image flying out up to [spread] px each ([ends]), fading. */
     data class Particles(override val file: String, val count: Int, val spread: Double, override val ms: Int) : KeyEffect {
-        /**
-         * Where each of them ends, (dx, dy) px from where it starts, for press [seed]: the same seed the same
-         * flight on every platform (kotlin.random's generator is common code), spread round evenly, each a little off.
-         */
+        /** The same seed gives the same flight on every platform (kotlin.random's generator is common code). */
         fun ends(seed: Int): DoubleArray {
             val r = kotlin.random.Random(seed)
             val out = DoubleArray(count * 2)
@@ -168,68 +111,37 @@ sealed interface KeyEffect {
         }
 
         private companion object {
-            // how far round from its even place a particle may go (of its share), and the shortest flight (of the spread)
             const val JITTER = 0.6
             const val NEAREST = 0.5
         }
     }
 }
 
-/**
- * A native widget's place (the handwriting pad, the nine keys' column, a one-handed board's side
- * buttons): the app puts its view there, over [ops], a key's face drawn under it where the layout
- * gives it a look (never pressed). The handwriting pad's [ink] is what its strokes are drawn in
- * (060-render-p3 T7b: [org.fcitx.fcitx5.android.scene.engine.Pads]); its grid, where the theme shows
- * one, is in [ops], over the face.
- */
 class SlotNode(val kind: String, val id: String?, val bounds: Box, val ops: List<Op> = emptyList(), val ink: Ink? = null)
 
-/** The handwriting pad's strokes: their colour and width, px. */
 data class Ink(val color: Argb, val width: Double)
 
-/**
- * One drawing step, px, the engine's arithmetic done (§3, its geometry by [Shape] as §3.1 has it).
- * A backend draws them in order and computes nothing.
- */
+/** One drawing step, px, the engine's arithmetic done: a backend draws them in order and computes nothing. */
 sealed interface Op {
-    /**
-     * A solid colour over [shape], less what is inside [less] where given (a key cap's band under a face
-     * that may be translucent: only what shows below the face).
-     */
     data class Fill(val shape: Shape, val color: Argb, val less: Shape? = null) : Op
 
-    /** A linear gradient over [shape], [angle] degrees, its stops (colour, 0–1). */
     data class Gradient(val shape: Shape, val angle: Double, val stops: List<Pair<Argb, Double>>) : Op
 
-    /** A nine-slice image over [shape], its [insets] source pixels at [pxPerDp]; [fallback] filled where the image is not there (theme 3.0's key colour). */
     data class NineSlice(val shape: Shape, val file: String, val insets: List<Int>, val pxPerDp: Int, val fallback: Argb? = null) : Op
 
-    /** The keyboard's picture under [shape], as the theme's `<picture>` unless given; [over] laid on it (theme 3.0's key colour). */
     data class Picture(val shape: Shape, val blurDp: Double?, val brightness: Double?, val over: Argb? = null) : Op
 
-    /** A shadow: [shape] drawn in [color], blurred [blur] px (none: a solid edge, theme 3.0's). */
     data class Shadow(val shape: Shape, val blur: Double, val color: Argb) : Op
 
-    /**
-     * A shadow inside [shape] (a theme's `inner-shadow`, CSS's inset box-shadow): [ring] less [hole] (the
-     * shape moved by the shadow's offset, filled by the same rule as [shape]) in [color], blurred [blur] px (none:
-     * sharp), and only what falls inside [shape] drawn. [ring] is far enough past [shape] that its blur is
-     * whole at [shape]'s edge.
-     */
+    /** [ring] reaches far enough past [shape] that its blur is whole at the edge. */
     data class InnerShadow(val shape: Shape, val hole: Shape, val ring: Box, val blur: Double, val color: Argb) : Op
 
-    /** A line [width] px wide along [shape]'s edge, centred on it (the engine has inset it by half the width, so the line keeps inside the face). */
+    /** The engine inset [shape] by half the width, so the line stays inside the face. */
     data class Stroke(val shape: Shape, val width: Double, val color: Argb) : Op
 
-    /** A pressed key's ripple, from its touch, over [shape]. */
     data class Ripple(val shape: Shape, val color: Argb) : Op
 
-    /**
-     * [text] from ([x], [baseline]) in [font] [weight] at [size] px, squeezed to [scaleX] of its
-     * width, turned [rotation] degrees about ([x], [baseline]) (§3.1; 0 for now); its characters
-     * [letterSpacing] em apart (Paint.letterSpacing's), outlined by [stroke] under its fill and
-     * shadowed by [shadow] (a theme's `stroke`, `text-shadow`: drawn, never measured, as CSS's).
-     */
+    /** [stroke] and [shadow] are drawn, never measured, as in CSS. */
     data class Text(
         val text: String,
         val x: Double,
@@ -243,25 +155,17 @@ sealed interface Op {
         val letterSpacing: Double = 0.0,
         val stroke: TextStroke? = null,
         val shadow: TextShadow? = null,
-        /** The part of its key it is (`label`, `mark`, `shortcut`, `badge`…, a theme's part names; null: none), for what reads a scene: not drawn. */
+        /** For readers of a scene: not drawn. */
         val part: String? = null,
     ) : Op
 
-    /** The icon [name] in [box], tinted [tint], turned [rotation] degrees about its middle. */
     data class Icon(val name: String, val box: Box, val tint: Argb, val rotation: Double = 0.0) : Op
 }
 
-/** An outline [width] px outside a text's glyphs, in [color]: drawn first, its fill over it. */
 data class TextStroke(val width: Double, val color: Argb)
 
-/** A text's shadow: its glyphs moved ([dx], [dy]) px, blurred [blur] px (0: sharp), in [color]. */
 data class TextShadow(val dx: Double, val dy: Double, val blur: Double, val color: Argb)
 
-/**
- * How a way the user set is drawn on its key ([KeyNode.fates]): as it is set ([AsSet], a
- * long text as the app gives it, two characters and 「…」), a step down where it has no room ([Shortened] to its
- * first character and 「…」, the two-line [Sign]), or not at all ([Dropped]): what the settings say of it.
- */
 sealed interface MarkFate {
     data object AsSet : MarkFate
     data class Shortened(val text: String) : MarkFate

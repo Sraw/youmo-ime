@@ -4,31 +4,22 @@
  */
 package org.fcitx.fcitx5.android.input.editing
 
-/**
- * What to do with a key fcitx hands back -- a hardware key it did not consume, or one an input
- * method forwarded -- when there is no original Android `KeyEvent` to replay.
- */
+/** A key fcitx hands back with no original Android `KeyEvent` to replay. */
 object ForwardedKeys {
 
     sealed interface Action {
-        /** Send a synthetic key event with this Android key code. */
         data class SendKey(val keyCode: Int, val up: Boolean) : Action
 
-        /** No Android key code exists for it: type the character instead, once, on key down. */
+        /** No key code for it: type the character once, on key down. */
         data class CommitChar(val text: String) : Action
 
-        /** Nothing sensible to do (a key up with no key code, or no character). */
+        /** A key up with no key code, or no character. */
         data object Ignore : Action
     }
 
-    /** `KeyEvent.KEYCODE_UNKNOWN`. */
     const val KEYCODE_UNKNOWN = 0
 
-    /**
-     * `KeyCharacterMap.PICKER_DIALOG_INPUT`: the character that makes the default
-     * `QwertyKeyListener` pop up a Gingerbread-era character picker. A key carrying it is
-     * replayed without its character, so the key still reaches the editor but no dialog opens.
-     */
+    /** `KeyCharacterMap.PICKER_DIALOG_INPUT` pops the default listener's character picker: replayed without its character. */
     const val PICKER_DIALOG_INPUT = 0xEF01
 
     fun decide(keyCode: Int, up: Boolean, unicode: Int): Action = when {
@@ -40,12 +31,7 @@ object ForwardedKeys {
     fun opensCharacterPicker(unicodeChar: Int) = unicodeChar == PICKER_DIALOG_INPUT
 }
 
-/**
- * Tracks the meta state of a hardware keyboard with sticky modifiers, so that releasing a
- * modifier clears exactly the meta bits that release dropped -- and not those of a modifier
- * still held or still latched.
- * See `InputConnection.clearMetaKeyStates`.
- */
+/** Releasing a sticky modifier clears exactly its meta bits, not those still held or latched (`clearMetaKeyStates`). */
 class StickyMetaState {
 
     private var last = 0
@@ -54,7 +40,7 @@ class StickyMetaState {
         last = metaState
     }
 
-    /** @return the meta bits to clear in the editor */
+    /** The meta bits to clear in the editor. */
     fun onModifierUp(metaState: Int): Int {
         val released = last and metaState.inv()
         last = metaState

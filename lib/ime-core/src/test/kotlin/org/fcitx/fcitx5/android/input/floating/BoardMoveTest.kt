@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.input.floating
 
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.floating.BoardMove.Kind
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard.Dock
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard.Dock
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

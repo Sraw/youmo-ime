@@ -35,11 +35,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.zip.ZipInputStream
 
-/**
- * FB12 (dev/design/061-theme-separator-migration.md §3): the packs installed before 0.6.1 given the app's 分词 in their
- * qwerty's Shift's place, once an install; those of a backup of before 0.6.1 at the start after its restore; never one
- * imported after, and never a start lost to it.
- */
+/** Old packs get the app's 分词 once per install or restore; never one imported later, and never a start lost to it. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeSeparatorMigrationTest : ThemePackFixture() {
@@ -70,7 +66,6 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         ThemeSeparators.tryingFile = realTrying
     }
 
-    // a pack of [name] with 0.6.0's qwerty, as one imported then (or [qwerty]'s bytes)
     private fun old(name: String, qwerty: String = v060): File {
         placed(sample(sampleXml.replace("name=\"mine\"", "name=\"$name\""), "layouts/qwerty.xml" to qwerty))
         return File(packs, "$name/layouts/qwerty.xml")
@@ -89,23 +84,21 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         run()
         assertTrue(file.separated())
         assertTrue("when=\"!table !composing\"" in file.readText())
-        // the pack's time kept: its place in the list, and its layouts' cache key
+        // the pack's time kept: its list place and its layouts' cache key
         assertEquals(at, themeXml.lastModified())
         assertTrue(marker.isFile)
-        // as the app takes it: a layout of the user's since 0.6.1 (ThemeLayoutsToList), 分词 in it; listed after the
-        // blank-key check of its new stamp
+        // listed after the blank-key check of its new stamp
         val made = ThemeLayoutsToList.convert(file.parentFile!!, "mine", null).single()
         assertEquals("qwerty", made.first)
         assertTrue("when=\"!table !composing\"" in (made.second as PackLayouts.Converted.Done).text)
         File(packs, "mine/.checked").delete()
         assertEquals(listOf("mine#light", "mine#dark"), ThemeFilesManager.listPacks().map { it.name })
-        // an import after: as it is written, though the start runs it again
+        // an import after: as written, though the start runs again
         val later = old("later")
         val bytes = later.readBytes()
         run()
         assertArrayEquals(bytes, later.readBytes())
         assertFalse(later.separated())
-        // exported, the file as it is now
         val pack = ThemeFilesManager.listPacks().first { it.file == "mine" }
         val out = ByteArrayOutputStream()
         ThemeFilesManager.exportTheme(pack, out).getOrThrow()
@@ -124,8 +117,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertFalse(later.separated())
     }
 
-    // A4: not before the themes can be written (the phone not unlocked yet, the storage away): nothing, no marker, the next
-    // start that can does it
+    // not before themes can be written: nothing, no marker; the next able start does it
     @Test
     fun notWhileTheThemesCannotBeWritten() {
         val file = old("mine")
@@ -144,7 +136,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertTrue(file.separated())
     }
 
-    // a pack that fails is left as it was and the start goes on: the rest given it, the marker written, no retry
+    // a failing pack is left and the start goes on: the rest done, the marker written, no retry
     @Test
     fun aPackThatFailsIsLeftAndTheStartGoesOn() {
         val a = old("a")
@@ -162,7 +154,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
 
     private class Killed : Error()
 
-    // killed in the middle: no marker, the next start gives the rest it, the one done not again, what was left cleared
+    // killed midway: no marker; the next start does the rest and clears leftovers
     @Test
     fun aKillInTheMiddleIsFinishedAtTheNextStart() {
         val a = old("a")
@@ -183,7 +175,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertTrue(marker.isFile)
     }
 
-    // what is not UTF-8 is not written back (its other bytes would change); a byte-order mark kept
+    // non-UTF-8 is not written back (other bytes would change); a BOM is kept
     @Test
     fun notUtf8IsLeftAndAByteOrderMarkKept() {
         val gbk = old("gbk")
@@ -199,7 +191,6 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertTrue(bom.separated())
     }
 
-    // a file the app does not draw: as it is
     @Test
     fun aFileTheAppDoesNotUseIsLeft() {
         placed(sample())
@@ -209,7 +200,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertTrue(marker.isFile)
     }
 
-    // PR-63: the packs a backup of before 0.6.1 restored given it at the next start, the phone's others not
+    // packs a pre-0.6.1 backup restored get it at the next start, the phone's others not
     @Test
     @Uat("PR-63")
     fun thePacksRestoredFromABackupOfBeforeAreGivenItAtTheNextStart() {
@@ -221,14 +212,12 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertTrue(restoredPack.separated())
         assertFalse(phones.separated())
         assertFalse(restored.exists())
-        // the next start: nothing more
         val bytes = phones.readBytes()
         run()
         assertArrayEquals(bytes, phones.readBytes())
     }
 
-    // PR-63: a backup of before 0.6.1 (its code below 0.6.1's lowest, 5130) records its packs for the next start, added to
-    // what an earlier restore without a start between recorded; one of 0.6.1, any ABI, or after does not
+    // a pre-0.6.1 backup records its packs for the next start, added to an earlier restore's
     @Test
     @Uat("PR-63")
     fun aRestoreOfABackupOfBefore061RecordsItsPacks() {
@@ -243,13 +232,13 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
             UserDataManager.import(backupZip(*packs("p"), versionCode = code), install("v$code")).getOrThrow()
             assertFalse("$code", restored.exists())
         }
-        // upstream's (fcitx5-android's, its own codes; it has no packs of these): not looked at
+        // upstream's (its own codes, no packs): not looked at
         val upstream = LEGACY_APPLICATION_ID_ROOT + BuildConfig.APPLICATION_ID.removePrefix(BuildConfig.APPLICATION_ID_ROOT)
         UserDataManager.import(backupZip(*packs("p"), versionCode = 300L, packageName = upstream), install("upstream")).getOrThrow()
         assertFalse(restored.exists())
     }
 
-    // restored from a backup of 0.6.0, then a pack of the same name imported before the next start: as it is written
+    // restored, then a same-named pack imported before the next start: as written
     @Test
     fun aPackImportedOverOneAnOldBackupRestoredIsNotGivenIt() {
         run()
@@ -261,8 +250,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertFalse(file.separated())
     }
 
-    // an Error out of a start (a StackOverflowError, an OOM, not caught): the next does it once more, marker and list
-    // first, and the one after that nothing; never a start lost to it each time
+    // an Error out of a start: the next does it once more, marker and list first, the one after nothing
     @Test
     fun anErrorThatEndsTheStartCostsOneStartMoreNotEvery() {
         old("a")
@@ -279,7 +267,6 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         run()
         assertEquals(2, calls)
         assertFalse(trying.exists())
-        // the list path as well: once more, not again
         ThemeSeparators.restoredBeforeSeparator(listOf("a"))
         assertThrows(Killed::class.java) { run() }
         assertThrows(Killed::class.java) { run() }
@@ -288,8 +275,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertFalse(trying.exists() || restored.exists())
     }
 
-    // an Exception caught (the marker not written: a full disk, say) is not a start that died: the next tries in full,
-    // not as the one more after a crash
+    // a caught Exception (marker not written) is no dead start: the next tries in full
     @Test
     fun anExceptionCaughtIsNotTakenForAStartThatDied() {
         val a = old("a")
@@ -306,8 +292,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertFalse(trying.exists())
     }
 
-    // a byte-order mark counted as the app reads it (ThemePackLayouts.read: the file's length): a file the rewrite puts a
-    // few bytes over with it is left, as it would no longer be drawn
+    // the BOM counted as the app reads it: a rewrite pushing it over the limit is left undone
     @Test
     fun overTheLimitWithItsByteOrderMarkIsLeft() {
         val probe = old("probe")
@@ -327,7 +312,6 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertArrayEquals(bytes, big.readBytes())
     }
 
-    // a pack of a name on the list imported before the next start (the restored one deleted, or replaced): as written
     @Test
     fun aPackImportedOverOneRestoredIsNotGivenIt() {
         run()
@@ -341,7 +325,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
         assertFalse(restored.exists())
     }
 
-    // an upgrade's first start gives every pack it, those of a restore before it too: the list gone with it
+    // an upgrade's first start gives every pack it, a prior restore's too
     @Test
     fun theFirstStartClearsTheList() {
         val file = old("mine")
@@ -353,7 +337,7 @@ class ThemeSeparatorMigrationTest : ThemePackFixture() {
     }
 
     private companion object {
-        // Versions.calculateVersionCode: 0.6.0 for arm64, 0.6.1 for each ABI
+        // 0.6.0 for arm64, 0.6.1 for each ABI
         const val V060 = 5122L
         val V061 = listOf(5130L, 5132L, 5134L)
     }

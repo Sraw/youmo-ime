@@ -19,7 +19,7 @@ class PickerDataTest {
         assertEquals(EmojiData.GROUPS.toSet(), PickerData.EmojiCategories.keys)
     }
 
-    // the symbol panel's pick kept by the category's id (PAN-29): each its own, found again by it; one no longer listed, none
+    // kept by the category's id; one no longer listed, none
     @Test
     @Uat("PAN-29")
     fun everySymbolCategoryIsFoundAgainByItsId() {
@@ -35,7 +35,7 @@ class PickerDataTest {
         assertEquals("ids are never empty nor shared", categories.size, categories.map { it.id }.filter { it.isNotEmpty() }.toSet().size)
     }
 
-    // user 2026-11-13: 英文 without the digits (no use there), with the English comma and full stop it lacked
+    // 英文 without the digits, with the English comma and full stop
     @Test
     @Uat("PAN-29")
     fun theEnglishTabHasNoDigitsButTheEnglishCommaAndFullStop() {

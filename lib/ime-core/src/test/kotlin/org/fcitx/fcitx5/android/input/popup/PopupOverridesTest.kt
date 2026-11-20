@@ -143,8 +143,7 @@ class PopupOverridesTest {
         },
     )
 
-    // the keyboards' own codes (design §1.1): never kept, and one an older build or a backup wrote is
-    // kept as written but never offered
+    // the keyboards' own codes: never kept; one an older build or a backup wrote is kept as written but never offered
     @Test
     fun aKeyboardsCodeIsNeverKeptNorReadBack() {
         val qw = g14("qw")

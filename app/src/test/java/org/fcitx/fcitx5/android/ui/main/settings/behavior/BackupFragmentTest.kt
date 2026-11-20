@@ -17,7 +17,7 @@ import timber.log.Timber
 @OptIn(ExperimentalCoroutinesApi::class)
 class BackupFragmentTest {
 
-    // a reopen that still throws, its count failing on the full disk say (SQLiteFullException, a stub off the device)
+    // a reopen that still throws (SQLiteFullException, a stub off the device)
     @Test
     fun fcitxStartsAgainThoughTheClipboardCannotReopen() = runTest {
         val done = mutableListOf<String>()
@@ -34,7 +34,7 @@ class BackupFragmentTest {
         val thrown = runCatching { restartAfterFailedImport({ throw AssertionError("a bug") }) { done += "fcitx" } }.exceptionOrNull()
         // rethrown, not made a log line
         assertTrue(thrown.toString(), thrown is Error)
-        // a page gone, no one may await the Error: the keyboard is not left without fcitx for it
+        // no one may await the Error: the keyboard is not left without fcitx for it
         assertEquals(listOf("fcitx"), done)
     }
 
@@ -55,12 +55,10 @@ class BackupFragmentTest {
             }
             runCurrent()
             job.cancel()
-            // its catch over before done is read
             job.join()
         } finally {
             Timber.uproot(tree)
         }
-        // rethrown, so nothing after it runs; no failure logged
         assertEquals(listOf("fcitx"), done)
         assertEquals(emptyList<String>(), logged)
     }

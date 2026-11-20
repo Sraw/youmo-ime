@@ -11,10 +11,7 @@ import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import splitties.dimensions.dp
 
-/**
- * Room for a divider on the item's trailing side, as the layout direction has it, and [gap] px more (a
- * theme's room between two candidates, T6a), the divider in its middle.
- */
+/** [gap]: a theme's room between two candidates, the divider in its middle. */
 internal fun Rect.setTrailingDivider(parent: RecyclerView, drawable: Drawable, gap: Int = 0) {
     when (parent.layoutDirection) {
         View.LAYOUT_DIRECTION_LTR -> right = drawable.intrinsicWidth + gap
@@ -24,7 +21,6 @@ internal fun Rect.setTrailingDivider(parent: RecyclerView, drawable: Drawable, g
     }
 }
 
-/** Draws [drawable] on [view]'s trailing side, shorter than the item, in the middle of the room [setTrailingDivider] keeps. */
 internal fun drawTrailingDivider(c: Canvas, parent: RecyclerView, view: View, drawable: Drawable, gap: Int = 0) {
     val lp = view.layoutParams as RecyclerView.LayoutParams
     val left: Int
@@ -46,7 +42,6 @@ internal fun drawTrailingDivider(c: Canvas, parent: RecyclerView, view: View, dr
     }
     val top = view.top - lp.topMargin
     val bottom = view.bottom + lp.bottomMargin
-    // make the divider shorter
     val vInset = parent.dp(8)
     drawable.setBounds(left, top + vInset, right, bottom - vInset)
     drawable.draw(c)

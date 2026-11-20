@@ -12,28 +12,14 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import java.util.BitSet
 
-/**
- * Words as text, read as the dictionary reads them: a word's reading spelled (`ni'hao`), a line of
- * a dictionary in libime's text format (`text pin'yin cost`, what a `.dict` reads as and an import
- * or a word list writes), and the likeliest readings of texts given none. Libime's names, as the
- * format is its, but nothing of libime's learning: every word list, import and dictionary reads so.
- */
+/** Words as text, as the dictionary reads them: `ni'hao` readings, libime text dictionary lines (`text pin'yin cost`), and likeliest readings of bare texts. */
 object WordText {
 
     /**
-     * The syllables of each of [texts] the dictionary has, as its likeliest reading of it: the
-     * one of highest weight, the first found of equals. One walk of the trie, as deep as the
-     * longest of [texts], at each depth by only the syllables their characters there have as
-     * words of their own (as Predictor reads a word), or by any where one has none, and by any at
-     * one depth of a path: a character may take inside a word a syllable it never has alone (儿 is
-     * r in 这儿, er alone). Not at the first depth unless [strayFirst] (an import, a settings action,
-     * a block from a table's candidate, each run once, which may also walk again with it for what a
-     * walk without did not find): a stray there is any child of the root's, which makes a text or two
-     * some hundred times the walk, and what a table reads as it is typed in (a phrase it saves, what
-     * a long press offers) is read without, on the input thread; a phrase so read piece by piece may
-     * be read again with [strayFirst]. A text or two walk a small part of the
-     * trie, an import of thousands most of it.
-     * A word is made a string only if its length and first char could match.
+     * The dictionary's likeliest reading of each of [texts] (highest weight, first of equals), in one trie walk as deep
+     * as the longest text, by the syllables each character has alone, plus one stray syllable a path (儿 is r in 这儿).
+     * A stray at the first depth costs some hundred times the walk, so it is only taken with [strayFirst] (imports and
+     * one-off actions), never on the input thread.
      */
     internal fun readings(
         dictionary: PinyinDictionary,
@@ -54,7 +40,6 @@ object WordText {
         val best = HashMap<String, IntArray>()
         val weights = HashMap<String, Float>()
         val path = IntArray(deepest)
-        // [strayed]: the path took a syllable its character there has not alone, which it may do once
         fun visit(node: Int, depth: Int, strayed: Boolean) {
             if (depths[depth]) {
                 for (i in 0 until dictionary.wordCount(node)) {
@@ -83,14 +68,11 @@ object WordText {
         return best
     }
 
-    // whether a path of [readings] at [depth] may take a stray syllable: once a path, at the first depth only if [strayFirst]
     private fun canStray(strayed: Boolean, depth: Int, strayFirst: Boolean) = !strayed && (depth > 0 || strayFirst)
 
-    // at each depth below [deepest], the syllables [readings] walks without straying: those of the characters of [texts] there
     private fun syllablesAt(dictionary: PinyinDictionary, vocabulary: Vocabulary, texts: Set<String>, deepest: Int): Array<BitSet> {
         val chars = HashSet<Int>().apply { texts.forEach { text -> forEachCodePoint(text) { add(it) } } }.toIntArray()
         chars.sort()
-        // each character's syllables as a word of its own, from the root's children
         val alone = Array(chars.size) { BitSet() }
         val first = dictionary.firstChild(dictionary.root)
         for (node in first until first + dictionary.childCount(dictionary.root)) {
@@ -112,7 +94,6 @@ object WordText {
         return walked
     }
 
-    // the one code point word [id] is, or -1 if it is more or none
     private fun codePointOf(vocabulary: Vocabulary, id: Int): Int = when (vocabulary.length(id)) {
         1 -> vocabulary.char(id, 0).code
         2 -> {
@@ -132,11 +113,7 @@ object WordText {
         }
     }
 
-    /**
-     * The word of a line of a dictionary in libime's text format, as libime reads one: `text
-     * pin'yin`, a cost after it or not, apart by any whitespace, a value in quotes if fcitx
-     * escaped it. Null for a blank or unreadable line, which libime skips too.
-     */
+    /** The word of a libime text dictionary line as libime reads it (cost optional, any whitespace, quoted values unescaped); null for a blank or unreadable line. */
     fun dictionaryEntry(line: String): Entry? = dictionaryEntry(splitValues(line))
 
     private fun dictionaryEntry(fields: List<String>): Entry? {
@@ -145,16 +122,12 @@ object WordText {
         return entry(fields[0], fields[1])
     }
 
-    /**
-     * The words of [lines], a dictionary in libime's text format, a line each as this engine keeps
-     * them (`text pin'yin cost`), those [dictionaryEntry] cannot read left out.
-     */
+    /** [lines] of a libime text dictionary as `text pin'yin cost`, unreadable ones left out. */
     fun dictionaryText(lines: Sequence<String>): Sequence<String> = lines.mapNotNull { line ->
         val fields = splitValues(line)
         dictionaryEntry(fields)?.let { "${escapeValue(fields[0])} ${fields[1]} ${fields.getOrNull(2)?.toFloat() ?: 0f}" }
     }
 
-    /** [text] read as [code] (`ni'hao`); null unless each character has a syllable spelled so. */
     internal fun entry(text: String, code: String): Entry? {
         if (text.isEmpty()) return null
         val syllables = code.split('\'').map { Syllables.id(spelling(it)) }
@@ -162,7 +135,7 @@ object WordText {
         return Entry(text, syllables.toIntArray())
     }
 
-    // libime writes lü and nüe with the ü, and reads lue as lüe; WordLists reads a user's pinyin so too
+    // libime writes lü and nüe with the ü, and reads lue as lüe
     internal fun spelling(s: String): String = when (s) {
         "lue" -> "lve"
         "nue" -> "nve"

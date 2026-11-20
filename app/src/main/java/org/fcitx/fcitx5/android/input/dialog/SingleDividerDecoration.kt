@@ -16,7 +16,7 @@ class SingleDividerDecoration(val drawable: Drawable, val index: Int) : Recycler
 
     private val dividerHeight = max(drawable.intrinsicHeight, 1)
 
-    /** The list's start and end item padding, looked up on the first draw, not on every frame. */
+    /** Looked up on the first draw, not on every frame. */
     private var insets: Pair<Int, Int>? = null
 
     override fun getItemOffsets(

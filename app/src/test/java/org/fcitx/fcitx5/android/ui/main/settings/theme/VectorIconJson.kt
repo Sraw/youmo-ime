@@ -12,12 +12,9 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
- * A vector drawable of the app's as the theme maker's page draws it (`youmo-icons`, `youmo-engine-icons`):
- * its viewport and paths, `{vw, vh, paths: [{d, rule?, stroke?, alpha?, transform?}]}`, each filled in the
- * tint unless stroked, a group's transform written as SVG's. What the page would draw otherwise than the app is
- * refused, so a drawable that has it fails the test that writes the icons: a clip-path, a path of no colour or
- * of both a fill and a stroke, a stroke's alpha, cap, join or miter limit other than VectorDrawable's defaults
- * (the page's painter sets those: butt, miter, 4).
+ * A drawable as the web maker draws it: `{vw, vh, paths: [{d, rule?, stroke?, alpha?, transform?}]}`. Anything the
+ * page would draw differently fails the test: a clip-path, a path of no colour or both fill and stroke, non-default
+ * stroke attributes.
  */
 object VectorIconJson {
     fun of(name: String): String = of(
@@ -25,7 +22,6 @@ object VectorIconJson {
         File("src/main/res/drawable/$name.xml").takeIf { it.exists() } ?: File("app/src/main/res/drawable/$name.xml"),
     )
 
-    /** [file] (the drawable [name]) as the page draws it. */
     fun of(name: String, file: File): String {
         val doc = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
             .newDocumentBuilder().parse(file)
@@ -68,7 +64,7 @@ object VectorIconJson {
         }.toString()
     }
 
-    // a group's transform as SVG's: about its pivot, scaled and rotated, then translated
+    // about its pivot, scaled and rotated, then translated
     private fun groupTransform(e: Element, attr: (Element, String) -> String?): String? {
         val px = attr(e, "pivotX")?.toDouble() ?: 0.0
         val py = attr(e, "pivotY")?.toDouble() ?: 0.0
@@ -81,12 +77,12 @@ object VectorIconJson {
         return "translate(${tx + px} ${ty + py}) rotate($r) scale($sx $sy) translate(${-px} ${-py})"
     }
 
-    // "1.0" is the default "1" (aapt keeps a float as written)
+    // aapt keeps a float as written: "1.0" is the default "1"
     private fun isDefault(value: String, default: String) =
         value == default || value.toDoubleOrNull()?.let { it == default.toDoubleOrNull() } == true
 
     private const val NS = "http://schemas.android.com/apk/res/android"
 
-    // a stroke's attributes the page's painter takes as these (CanvasPainter's icon)
+    // CanvasPainter's icon assumes these
     private val STROKE_DEFAULTS = listOf("strokeAlpha" to "1", "strokeLineCap" to "butt", "strokeLineJoin" to "miter", "strokeMiterLimit" to "4")
 }

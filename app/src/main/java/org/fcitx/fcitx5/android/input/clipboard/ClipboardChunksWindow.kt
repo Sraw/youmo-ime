@@ -47,11 +47,7 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.dsl.recyclerview.recyclerView
 import splitties.views.setPaddingDp
 
-/**
- * 「切词」 on a clipboard entry: its pieces ([ClipboardChunks]) as a grid, a tap picking one (again, dropping
- * it), 「上屏」 committing those picked in the order tapped or swept (a sweep's appended in text order, [ClipboardChunks.join]), 「重选」 dropping them
- * all; ← back to the clipboard list it came from (user 2026-11-01).
- */
+/** 「上屏」 commits those picked in the order tapped or swept (a sweep's appended in text order). */
 class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInputWindow<ClipboardChunksWindow>() {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
@@ -62,7 +58,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
 
     private val returnAfterPaste by AppPrefs.getInstance().clipboard.clipboardReturnAfterPaste
 
-    // the start of a very long entry, between clusters: the model's split runs on the engine's thread, which typing waits on
+    // the model's split runs on the engine's thread, which typing waits on
     private val shown = ClipboardChunks.cut(text, MAX_CHARS)
 
     private val ui by lazy {
@@ -77,7 +73,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     override fun onCreateView(): View = ui.root
 
     override fun onAttached() {
-        // pieces at once, cluster by cluster where Chinese; the model's words when it answers
+        // cluster by cluster at once; the model's words when it answers
         ui.show(ClipboardChunks.chunks(shown))
         splitJob = imeScope.launch {
             modelChunks(shown) { fcitx.runOnReady { wordBoundaries(it) } }?.let(ui::show)
@@ -107,14 +103,11 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
         const val MAX_CHARS = 5000
         private const val WORDS_MS = 1000L
 
-        /** Each of [picked] as the one of [pieces] now holding it, in order, once (北 → 北京; 北 and 京 → 北京). */
+        /** 北 → 北京; 北 and 京 → 北京. */
         internal fun remap(picked: List<Chunk>, pieces: List<Chunk>): List<Chunk> =
             picked.mapNotNull { p -> pieces.firstOrNull { it.from <= p.from && p.to <= it.to } }.distinct()
 
-        /**
-         * [text]'s pieces with the model's words from [boundaries]; null with no Chinese, or when it takes
-         * over [WORDS_MS] (the engine busy or not ready): the pieces shown, cluster by cluster, stay.
-         */
+        /** Null with no Chinese, or past [WORDS_MS] (the engine busy or not ready): the clusters shown stay. */
         internal suspend fun modelChunks(text: String, boundaries: suspend (List<String>) -> Map<String, IntArray>): List<Chunk>? {
             val runs = ClipboardChunks.hanRuns(text)
             if (runs.isEmpty()) return null
@@ -124,11 +117,7 @@ class ClipboardChunksWindow(private val text: String) : InputWindow.ExtendedInpu
     }
 }
 
-/**
- * The pieces of [text] as cells wrapped in rows. A tap picks one or drops it, a sideways sweep a run of them
- * ([SwipePick]), each picked showing its place in the order; [commitButton] gives [onCommit] them joined, [resetButton] drops them. [cut]: [text] is the
- * entry's start only, said at the end.
- */
+/** [cut]: [text] is the entry's start only, said at the end. */
 class ClipboardChunksUi(
     override val ctx: Context,
     private val theme: Theme,
@@ -140,7 +129,6 @@ class ClipboardChunksUi(
 
     private var pieces: List<Chunk> = emptyList()
 
-    /** The pieces picked, in the order tapped or swept (a sweep's appended in text order). */
     val picked = ArrayList<Chunk>()
 
     private val radius = ScenePanels.clipboardRadius(ctx, look)
@@ -154,7 +142,6 @@ class ClipboardChunksUi(
         setOnClickListener { onClick() }
     }
 
-    /** Off till something is picked. */
     val commitButton = barButton(R.string.clipboard_split_commit) {
         if (picked.isEmpty()) return@barButton
         val joined = ClipboardChunks.join(text, pieces, picked)
@@ -221,7 +208,7 @@ class ClipboardChunksUi(
             holder.badge.isVisible = order >= 0
             holder.badge.text = (order + 1).toString()
             holder.cell.background = background(if (order >= 0) theme.genericActiveBackgroundColor else look.fill.value)
-            // picked: the colour made for the active background it sits on, as the bar's selected candidate
+            // the colour made for the active background it sits on
             holder.label.setTextColor(if (order >= 0) theme.genericActiveForegroundColor else look.color.value)
             holder.cell.setOnClickListener { pick(if (order >= 0) picked - piece else picked + piece) }
         }
@@ -230,26 +217,25 @@ class ClipboardChunksUi(
     private val sweep = object : RecyclerView.OnItemTouchListener {
         private val slop = ViewConfiguration.get(ctx).scaledTouchSlop.toFloat()
         private val edge = ctx.dp(32)
-        // the cells' margin: a finger clamped into the grid lands on the edge row's cells, not the gap around them
+        // a finger clamped into the grid lands on the edge row's cells, not the gap around them
         private val margin = ctx.dp(MARGIN_DP)
         private val step = ctx.dp(8)
         private var anchor = -1
         private var downX = 0f
         private var downY = 0f
-        // the highest and lowest the finger went since it came down: toward an edge is measured from the far side
+        // toward an edge is measured from the far side
         private var minY = 0f
         private var maxY = 0f
         private var x = 0f
         private var y = 0f
         private var swipe: SwipePick<Chunk>? = null
 
-        // held after dragging toward the top or bottom edge: the grid scrolls on and the range follows the piece under it
         private val scroll = object : Runnable {
             override fun run() {
                 if (swipe == null) return
                 val by = step * SwipePick.scrollDirection(y, minY, maxY, root.height, edge, slop)
                 if (by == 0) return
-                // at the end already: no frames spent (and a grid shorter than two bands never spins)
+                // no frames spent (and a grid shorter than two bands never spins)
                 if (!root.canScrollVertically(by)) return
                 root.scrollBy(0, by)
                 follow()
@@ -266,9 +252,7 @@ class ClipboardChunksUi(
         private fun position(rv: RecyclerView, e: MotionEvent): Int? =
             rv.findChildViewUnder(e.x, e.y)?.let(rv::getChildAdapterPosition)?.takeIf { it != RecyclerView.NO_POSITION }
 
-        // over a gap the range stays; over the cut note, as the last piece; a finger past the grid's
-        // edge as over the row at that edge, so the range follows the auto-scroll (a grid too small for the
-        // insets: its top-left inset corner)
+        // a finger past the grid's edge as over the row at that edge, so the range follows the auto-scroll
         private fun follow() {
             val s = swipe ?: return
             val left = (root.paddingLeft + margin).toFloat()
@@ -293,7 +277,7 @@ class ClipboardChunksUi(
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (anchor < 0) return false
-                    // the farthest the finger went either way counts from the down, before the sweep is taken too
+                    // before the sweep is taken too
                     minY = minOf(minY, e.y)
                     maxY = maxOf(maxY, e.y)
                     when (SwipePick.startsSwipe(e.x - downX, e.y - downY, slop)) {
@@ -308,7 +292,7 @@ class ClipboardChunksUi(
                         }
                     }
                 }
-                // a second finger: the sweep ends where it is, the picks kept, and no other finger moves it
+                // a second finger: the sweep ends where it is, the picks kept
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> end()
             }
             return false
@@ -354,7 +338,6 @@ class ClipboardChunksUi(
         adapter.notifyDataSetChanged()
     }
 
-    /** The pieces to show; the model's split replacing the first keeps each pick as the piece now holding it (北 → 北京). */
     fun show(pieces: List<Chunk>) {
         // a sweep's anchor and range index the pieces replaced: it ends, its picks remapped like any
         sweep.end()

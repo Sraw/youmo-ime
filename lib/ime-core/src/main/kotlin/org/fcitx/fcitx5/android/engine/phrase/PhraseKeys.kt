@@ -8,35 +8,26 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 
 /**
- * Input typed on keys of letter groups (the nine keys, the 14 keys, 双拼's 18 and nine keys, English's
- * nine keys), as the custom phrases' keys of letters it may be (A1): its input is the keys' codes,
- * never a phrase's key as the user wrote it. Each code is any letter of its key, so one input reads
- * as several keys, every one of them offered, as the nine keys offer each syllable their digits type.
- *
- * What the user fixed must agree: a letter typed as itself (upper case in the input, any case on
- * English's nine keys) is that letter, and a syllable or initial taken off the bar (its letters
- * then a separator) is what [of]'s `taken` spells it as in a key: its own letters on full pinyin's
- * keyboards, 双拼's keys for it on 双拼's. A separator splits syllables, which a key has none of:
- * skipped.
+ * Input typed on grouped keys, as the custom-phrase keys it may be: each code is any letter of its key, so
+ * one input reads as several keys, all offered. A letter typed as itself is that letter; a syllable taken off
+ * the bar is what [of]'s `taken` spells; separators are skipped.
  */
 class PhraseKeys private constructor(
-    // a place of the input each: the letters, or the runs of them, a key may have there
+    // per input place: the letters (or runs) a key may have there
     private val slots: List<List<String>>,
 ) {
-    // the lengths a key read may have: each place one of its ways
     private val shortest = slots.sumOf { slot -> slot.minOf { it.length } }
     private val longest = slots.sumOf { slot -> slot.maxOf { it.length } }
 
-    /** The lengths a key read may have: the phrases' keys of these alone are worth trying. */
+    /** Only phrase keys of these lengths are worth trying. */
     val lengths: IntRange get() = shortest..longest
 
-    /** Whether a key [length] long may be read, as [lengths] has it. */
     fun fits(length: Int): Boolean = length in lengths
 
-    /** Whether the input reads as [key]: each place of it, in turn, one of its ways in the key, and nothing of the key left. */
+    /** Each place in turn is one of its ways in [key], with nothing of [key] left. */
     fun reads(key: String): Boolean {
         if (slots.isEmpty()) return false
-        // two arrays for every place, swapped: one key's read allocates no more as the input grows
+        // two arrays swapped per place: no allocation as the input grows
         var at = BooleanArray(key.length + 1).also { it[0] = true }
         var next = BooleanArray(key.length + 1)
         for (slot in slots) {
@@ -58,13 +49,7 @@ class PhraseKeys private constructor(
     }
 
     companion object {
-        /**
-         * [typed] on keys of [letters], as a phrase's key may be; null where it can be none (a
-         * character no key types, nothing but separators). [taken] spells a syllable taken off the
-         * bar, the lower-case letters before a separator, in a key's letters: each way it may be.
-         * [ways], where not null, are the letters a character of [typed] may be in a key, before
-         * anything else: a zhuyin key's in pinyin (ㄧ i, y or yi), an empty list skipped (a tone).
-         */
+        /** [typed] on keys of [letters] as a phrase key may be; null if it can be none. [taken] spells a bar syllable each way; [ways], if given, overrides a character's letters (zhuyin in pinyin; empty skips a tone). */
         fun of(
             typed: CharSequence,
             letters: NineKeyLetters,

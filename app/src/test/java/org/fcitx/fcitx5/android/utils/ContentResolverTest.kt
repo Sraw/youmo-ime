@@ -25,7 +25,6 @@ import org.robolectric.annotation.Config
 @Config(sdk = [29, 35])
 class ContentResolverTest {
 
-    /** A provider that names each document by the uri's `name` parameter: NULL without one. */
     class Names : ContentProvider() {
         override fun onCreate() = true
 
@@ -55,7 +54,6 @@ class ContentResolverTest {
         Robolectric.setupContentProvider(Names::class.java, AUTHORITY)
     }
 
-    /** The name [Names] gives a document whose path ends in doc.scel. */
     private fun named(name: String?): String? {
         val builder = Uri.parse("content://$AUTHORITY/document/doc.scel").buildUpon()
         name?.let { builder.appendQueryParameter("name", it) }

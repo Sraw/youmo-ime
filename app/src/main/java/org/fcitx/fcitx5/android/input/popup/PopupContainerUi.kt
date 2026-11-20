@@ -37,11 +37,9 @@ abstract class PopupContainerUi(
     abstract val offsetY: Int
 
     /**
-     * The column of the key in focus at first, the one centred over the trigger: the one nearest the
-     * middle that leaves every column inside [outerBounds], else the one past them least. Keys wider
-     * than the trigger may leave none that fits (nine keys' 9, a long word over Q):
-     * [PopupKeyboardUi] moves itself in by the rest. Bounds not laid out yet, empty, have nothing
-     * to fit in: the middle one.
+     * The one nearest the middle that leaves every column inside [outerBounds], else the one past them least:
+     * keys wider than the trigger may leave none that fits, and [PopupKeyboardUi] moves itself in. Bounds not
+     * laid out yet: the middle one.
      */
     fun calcInitialFocusedColumn(
         columnCount: Int,
@@ -52,7 +50,6 @@ abstract class PopupContainerUi(
         val middle = (columnCount - 1) / 2
         // every column is past empty bounds, and the search took one at the right: the popup opened left of the key
         if (outerBounds.isEmpty) return middle
-        // the key in focus as offsetX centres it: wider than the trigger, it overhangs it both sides
         val keyLeft = triggerBounds.left + (triggerBounds.width() - columnWidth) / 2
         val leftSpace = keyLeft - outerBounds.left
         val rightSpace = outerBounds.right - (keyLeft + columnWidth)
@@ -91,13 +88,24 @@ abstract class PopupContainerUi(
     }
 
     /**
-     * Handle focus change of this [PopupKeyboardUi].
      * [x], [y] axis are relative to container itself.
      *
      * @return Whether the gesture should be consumed, ie. no more gesture events should
      * be dispatched to the trigger view.
      */
     abstract fun onChangeFocus(x: Float, y: Float): Boolean
+
+    protected inline fun moveFocus(
+        focus: PopupFocus, x: Float, y: Float, from: Int, draw: (Int) -> Boolean, moved: (Int) -> Unit
+    ): Boolean {
+        val newFocus = focus.moveTo(x, y)
+        if (newFocus == PopupFocus.CANCELLED) {
+            onDismissSelf(this)
+            return true
+        }
+        if (newFocus != from && draw(newFocus)) moved(newFocus)
+        return false
+    }
 
     abstract fun onTrigger(): KeyAction?
 }

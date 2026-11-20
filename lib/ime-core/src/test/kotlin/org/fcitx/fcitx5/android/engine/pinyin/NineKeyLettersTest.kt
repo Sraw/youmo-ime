@@ -42,7 +42,6 @@ class NineKeyLettersTest {
         assertTrue(keys.sameKey('5', 'a'))
         assertTrue(keys.sameKey('A', 'j'))
         assertFalse(keys.sameKey('B', 'j'))
-        // l is on no key: nothing with it is typed
         assertEquals("l", keys.missing)
         assertEquals(emptyList<String>(), keys.typings("lai"))
     }
@@ -52,7 +51,6 @@ class NineKeyLettersTest {
         assertEquals("abcde", NineKeyLetters.normalize("aAbB1cdefg"))
         val keys = NineKeyLetters.of(listOf("abcdefg"))
         assertEquals("abcde", keys.letters('2'))
-        // the keys not given as on a phone
         assertEquals("def", keys.letters('3'))
     }
 
@@ -169,8 +167,7 @@ class NineKeyLettersTest {
     @Test
     fun theGroupedCodesAreThreeBlocksOfThePrivateUseAreaPastTheSyllables() {
         val blocks = listOf(NineKeyLetters.G18_BLOCK, NineKeyLetters.G14_BLOCK, NineKeyLetters.NINE_SP_BLOCK)
-        // one after the other, none overlapping, from past the syllables' and zhuyin's to no further than the BMP's area
-        // a layout's own keyboard's codes between the syllables' and zhuyin's
+        // the blocks run one after the other, within the BMP's private use
         assertEquals(Keyboard.SYLLABLES.last.code + 1, NineKeyLetters.CUSTOM_BLOCK.first)
         assertTrue(NineKeyLetters.CUSTOM_BLOCK.last < ZhuyinKeys.BLOCK.first.code)
         assertTrue(ZhuyinKeys.BLOCK.last.code < blocks.first().first)
@@ -185,13 +182,11 @@ class NineKeyLettersTest {
 
     @Test
     fun semicolonIsTypedOnTheKeysHoldingIt() {
-        // 微软's ing, on L: never normalized away
         assertEquals('\uF8CB', NineKeyLetters.G18.key(';'))
         assertEquals('\uF8FC', NineKeyLetters.NINE_SP.key(';'))
         assertEquals("l;", NineKeyLetters.G18.letters('\uF8CB'))
         assertEquals("jkl", NineKeyLetters.NINE_SP.letters(nineSpCode('5')))
         assertEquals(";", NineKeyLetters.NINE_SP.letters('\uF8FC'))
-        // no key holds it: itself, as before
         assertEquals(';', NineKeyLetters.G14.key(';'))
         assertEquals(';', NineKeyLetters.STANDARD.key(';'))
     }

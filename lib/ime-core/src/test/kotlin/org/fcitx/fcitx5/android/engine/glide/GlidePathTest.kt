@@ -29,10 +29,8 @@ class GlidePathTest {
     @Test
     fun aTurnNoKeyOfTheWordIsAtCostsByHowFarItTurns() {
         val none = GlidePath.Weights(corner = 0f)
-        // n-i-h-a-o turns at h, which niao has not
         assertEquals(0f, cost("nihao", "nihao")!! - cost("nihao", "nihao", weights = none)!!, 1e-4f)
         assertTrue(cost("nihao", "niao")!! > cost("nihao", "niao", weights = none)!! + 0.1f)
-        // a straight line turns nowhere
         val straight = FloatArray(20) { if (it % 2 == 0) it * 0.125f else 0f }
         assertEquals(0, GlidePath.Corners(straight, 10, 0.8f).at.size)
         // a right angle: one turn, by 1 (a cosine of 0), at the corner
@@ -55,7 +53,6 @@ class GlidePathTest {
         assertTrue(own < 0.01f)
         assertTrue(own < cost("thre", "the")!!)
         assertNull(cost("the", "they"))
-        // a letter doubled passed once, and no dearer for it
         assertEquals(cost("helo", "helo")!!, cost("helo", "hello")!!, 1e-4f)
     }
 
@@ -65,10 +62,8 @@ class GlidePathTest {
         assertTrue(nine.sameKey('t', 'u'))
         assertFalse(nine.sameKey('t', 'o'))
         assertFalse(GlideLayout.QWERTY.sameKey('a', 's'))
-        // t and u both on 8: tuo is the path from 8 to 6, as to is
         val to = path("to", nine)
         assertEquals(cost("to", "to", nine, to)!!, cost("to", "tuo", nine, to)!!, 1e-4f)
-        // all on one key: a tap
         assertNull(cost("ta", "ta", nine, path = path("ta", nine) + path("u", nine)))
     }
 
@@ -85,9 +80,7 @@ class GlidePathTest {
         val g = GlidePath(floatArrayOf(1f, 1f), GlideLayout.QWERTY, GlidePath.Weights(), 30)
         assertEquals(0, g.points)
         assertEquals(false, g.step(0, 'q'))
-        // a capital, which the layout finds, is no key a path passes
         assertNull(cost("the", "The"))
-        // a letter the layout lacks
         assertNull(cost("the", "the", GlideLayout(mapOf('t' to (4.5f to 0.7f), 'e' to (2.5f to 0.7f)))))
     }
 

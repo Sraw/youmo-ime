@@ -4,38 +4,37 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.descriptors.PolymorphicKind
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.SerialKind
-import kotlinx.serialization.descriptors.StructureKind
-import kotlinx.serialization.descriptors.elementDescriptors
-import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.input.theme.KeyImageBudget
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
+import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.Gap
 import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.fcitx.fcitx5.android.scene.look.Picture
+import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.look.Text
+import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,66 +46,123 @@ import java.nio.ByteBuffer
 import java.util.zip.ZipInputStream
 
 /**
- * contract: the theme file format and the page's generated blocks, which mutation cannot see.
- * The theme maker page and the app read and write the same theme files: the page's generated blocks
- * in web/theme-maker/generated/ (`youmo-format`: the file's version, fields and limits; `youmo-presets`:
- * the built-in themes) are what this app has, and what the page exports (testdata/from-web.theme, which
- * its own test holds byte for byte) imports as testdata/theme.json. Changed here, the page's test
- * (`node --test web/theme-maker/test/format.test.mjs`) fails till it follows.
+ * contract: the web theme maker and the app share the theme format. Its generated block (web/theme-maker/generated/)
+ * is what this app has, and a page-written 3.0 theme (testdata/from-web.theme) imports as testdata/theme.json.
+ * Change it here and `node --test web/theme-maker/test/format.test.mjs` fails till the page follows.
  */
 @RunWith(RobolectricTestRunner::class)
-// the real application: the import goes through appContext (where the themes are)
+// the real application: the import goes through appContext
 @Config(application = FcitxApplication::class)
 class ThemeMakerFormatTest {
 
     private val pretty = Json { prettyPrint = true }
 
-    // the theme json's type of a descriptor: ThemeFileJson → ThemeFile, the page's name for it
-    private fun typeName(d: SerialDescriptor) = d.serialName.removeSuffix("?").substringAfterLast('.').removeSuffix("Json")
-
-    /** Every type of the theme file, by the page's names: a class's fields in the order written, a sealed one's types, an enum's values. */
-    @OptIn(ExperimentalSerializationApi::class)
-    private fun types(): JsonObject {
-        val out = LinkedHashMap<String, JsonElement>()
-        fun ref(d: SerialDescriptor): String {
-            val base = when (val kind: SerialKind = d.kind) {
-                PrimitiveKind.INT -> "int"
-                PrimitiveKind.STRING -> "string"
-                PrimitiveKind.BOOLEAN -> "boolean"
-                StructureKind.LIST -> "[" + ref(d.getElementDescriptor(0)) + "]"
-                StructureKind.MAP -> "{" + ref(d.getElementDescriptor(1)) + "}"
-                StructureKind.CLASS, StructureKind.OBJECT, PolymorphicKind.SEALED, SerialKind.ENUM -> {
-                    val name = typeName(d)
-                    if (name !in out) {
-                        out[name] = JsonPrimitive("") // taken before its fields: no type twice
-                        out[name] = when (kind) {
-                            SerialKind.ENUM -> buildJsonObject { put("@enum", JsonArray(d.elementNames.map(::JsonPrimitive))) }
-                            PolymorphicKind.SEALED -> {
-                                val subs = d.getElementDescriptor(1)
-                                buildJsonObject {
-                                    put("@sealed", JsonObject(subs.elementNames.zip(subs.elementDescriptors).associate { (n, s) -> n to fields(s, ::ref) }))
-                                }
-                            }
-                            else -> fields(d, ::ref)
-                        }
-                    }
-                    name
-                }
-                else -> error("${d.serialName}: $kind is not in a theme file")
-            }
-            return if (d.isNullable) "$base?" else base
+    /** Every theme file type by the page's names, as keyboard-scene's ThemeLookReader/Writer handle them. */
+    private val types = Json.parseToJsonElement(
+        """
+        {
+        "ThemeFile":{"name":"string","isDark":"boolean","palette":"Palette","picture":"Picture?","base":"Base","bar":"Bar","keys":"Keys","text":"Text"},
+        "Palette":{"backgroundColor":"int","barColor":"int","keyboardColor":"int","keyBackgroundColor":"int","keyTextColor":"int","candidateTextColor":"int","candidateLabelColor":"int","candidateCommentColor":"int","altKeyBackgroundColor":"int","altKeyTextColor":"int","accentKeyBackgroundColor":"int","accentKeyTextColor":"int","keyPressHighlightColor":"int","keyShadowColor":"int","popupBackgroundColor":"int","popupTextColor":"int","spaceBarColor":"int","dividerColor":"int","clipboardEntryColor":"int","genericActiveBackgroundColor":"int","genericActiveForegroundColor":"int","keyBorderColor":"int","keyHintColor":"int","toolbarIconColor":"int"},
+        "Picture":{"src":"string","portrait":"Crop","landscape":"Crop?","brightness":"int","blurDp":"int"},
+        "Crop":{"file":"string","cropRect":"Box?","rotation":"int"},
+        "Box":{"bottom":"int","left":"int","right":"int","top":"int"},
+        "Base":{"@sealed":{"color":{},"picture":{}}},
+        "Bar":{"@sealed":{"color":{},"picture":{"blurDp":"int","brightness":"int"},"transparent":{}}},
+        "Keys":{"blocks":"boolean","radiusDp":"int","borderDp":"int","shadowDp":"int","gap":"Gap","press":"Press","letter":"Kind","function":"Kind","space":"Kind","enter":"Kind","overrides":"{Override}"},
+        "Gap":{"h":"int","v":"int","hLand":"int","vLand":"int"},
+        "Press":{"@enum":["tint","ripple"]},
+        "Kind":{"fill":"Fill","pressed":"Pressed"},
+        "Fill":{"@sealed":{"color":{},"image":{"file":"string","insets":"[int]","pxPerDp":"int"},"picture":{"blurDp":"int","brightness":"int"}}},
+        "Pressed":{"@sealed":{"color":{"argb":"int"},"darken":{},"image":{"file":"string","insets":"[int]","pxPerDp":"int"}}},
+        "Override":{"fill":"Fill?","pressed":"Pressed?","label":"Label"},
+        "Label":{"@enum":["show","hide"]},
+        "Text":{"keyFont":"string?","candidateFont":"string?","keyWeight":"int","candidateWeight":"int","keyScale":"int"}
         }
-        ref(ThemeFileJson.serializer().descriptor)
-        return JsonObject(out)
+        """,
+    ).jsonObject
+
+    private val defaultsTheme get() = Theme.Custom("defaults", false, LookDefaults.look(TestThemes.PixelDark.look.palette))
+
+    // looks covering every sealed kind and enum value: theme.json's, the defaults', a bar of each other kind with the ripple
+    private fun looks(): List<Theme.Custom> {
+        val defaults = defaultsTheme
+        return listOf(themeJson, defaults) + listOf(BarBase.Transparent, BarBase.Color).map { bar ->
+            defaults.copy(look = defaults.look.copy(bar = bar, keys = defaults.look.keys.copy(press = PressEffect.Ripple)))
+        }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    private fun fields(d: SerialDescriptor, ref: (SerialDescriptor) -> String) =
-        JsonObject(d.elementNames.zip(d.elementDescriptors).associate { (n, e) -> n to JsonPrimitive(ref(e)) })
+    private fun read(file: JsonObject) = ThemeLookReader.read(file.toString())
 
-    // the largest value [make] takes: a limit ime-core keeps to itself (its require is the rule). Only
-    // its require's IllegalArgumentException means "too large"; anything else fails the test, and so
-    // does a limit past the scan's end
+    // fields exactly those of its type, in order; each sealed kind and enum value met put in [seen]
+    private fun walk(value: JsonElement, type: String, at: String, seen: MutableSet<String>) {
+        if (type.endsWith("?")) {
+            if (value !is JsonNull) walk(value, type.dropLast(1), at, seen)
+            return
+        }
+        when {
+            type == "int" -> assertTrue(at, value is JsonPrimitive && !value.isString && value.content.toIntOrNull() != null)
+            type == "string" -> assertTrue(at, value is JsonPrimitive && value.isString)
+            type == "boolean" -> assertTrue(at, value is JsonPrimitive && !value.isString && value.content in setOf("true", "false"))
+            type.startsWith("[") -> value.jsonArray.forEachIndexed { i, v -> walk(v, type.drop(1).dropLast(1), "$at[$i]", seen) }
+            type.startsWith("{") -> value.jsonObject.forEach { (k, v) -> walk(v, type.drop(1).dropLast(1), "$at.$k", seen) }
+            else -> walkType(value, type, at, seen)
+        }
+    }
+
+    private fun walkType(value: JsonElement, type: String, at: String, seen: MutableSet<String>) {
+        val t = types.getValue(type).jsonObject
+        t["@enum"]?.let { values ->
+            val v = value.jsonPrimitive
+            assertTrue(at, v.isString && JsonPrimitive(v.content) in values.jsonArray)
+            seen += "$type.${v.content}"
+            return
+        }
+        val o = value.jsonObject
+        val sealed = t["@sealed"]?.jsonObject
+        val fields = if (sealed == null) t else {
+            val kind = o.getValue("type").jsonPrimitive.content
+            assertTrue("$at: no $type of type $kind", kind in sealed)
+            seen += "$type.$kind"
+            JsonObject(mapOf("type" to JsonPrimitive("string")) + sealed.getValue(kind).jsonObject)
+        }
+        assertEquals(at, fields.keys.toList(), o.keys.toList())
+        for ((k, v) in o) walk(v, fields.getValue(k).jsonPrimitive.content, "$at.$k", seen)
+    }
+
+    private fun JsonObject.at(path: List<String>, change: (JsonObject) -> JsonObject): JsonObject =
+        if (path.isEmpty()) change(this) else JsonObject(this + (path[0] to getValue(path[0]).jsonObject.at(path.drop(1), change)))
+
+    // its own first
+    private fun JsonObject.objects(path: List<String> = emptyList()): List<List<String>> =
+        listOf(path) + flatMap { (k, v) -> if (v is JsonObject) v.objects(path + k) else emptyList() }
+
+    @Test
+    fun theTypesAreWhatTheAppReadsAndWrites() {
+        val seen = HashSet<String>()
+        for (theme in looks()) {
+            val file = Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, theme)).jsonObject
+            assertEquals("version", file.keys.first())
+            walk(JsonObject(file - "version"), "ThemeFile", theme.name, seen)
+            assertTrue(read(file) is Parsed.Ok)
+            // each field as the reader takes it: none left out (nullable ones neither), none more (single keys a map)
+            for (path in file.objects()) {
+                val fields = path.fold(file) { o, k -> o.getValue(k).jsonObject }.keys.takeUnless { path.lastOrNull() == "overrides" }
+                for (k in fields.orEmpty()) {
+                    assertTrue("$path: $k left out", read(file.at(path) { JsonObject(it - k) }) is Parsed.Failed)
+                }
+                assertTrue("$path: a field more", read(file.at(path) { JsonObject(it + ("extra" to JsonPrimitive(1))) }) is Parsed.Failed)
+            }
+        }
+        val all = types.flatMap { (name, t) ->
+            val o = t.jsonObject
+            val values = o["@sealed"]?.jsonObject?.keys ?: o["@enum"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty()
+            values.map { "$name.$it" }
+        }
+        assertEquals(all.toSet(), seen)
+    }
+
+    // a limit ime-core keeps to itself: only its require's IllegalArgumentException means too large; anything else, or a
+    // limit past the scan's end, fails
     private fun largest(make: (Int) -> Unit): Int {
         fun takes(v: Int) = try {
             make(v)
@@ -152,43 +208,26 @@ class ThemeMakerFormatTest {
         val current = CustomThemeSerializer.CURRENT_VERSION
         val format = buildJsonObject {
             put("version", current)
-            // what the page brings to the current version itself (CustomThemeSerializer's 2.1 → 3.0);
-            // older ones it sends to the app first
+            // what the page migrates itself (CustomThemeSerializer's 2.1 → 3.0); older ones it sends to the app
             put("migrates", JsonArray(listOf(JsonPrimitive("2.1"))))
             put("older", JsonArray(CustomThemeSerializer.knownVersions.filter { it != current && it != "2.1" }.map(::JsonPrimitive)))
-            put("types", types())
+            put("types", types)
             put("limits", limits())
-            // the names a pack may not take, both of ThemeFilesManager.packClash's rules: ThemePackFiles.builtinClash's
-            // (each built-in version's 0.5 name, ref and file; every name a setting is moved from) and the built-in
-            // packs' (ThemeManager.BuiltinPackNames); the page checks the pack's name and, for two versions, name#light/#dark
+            // names a pack may not take, both ThemeFilesManager.packClash rules: ThemePackFiles.builtinClash's and the built-in
+            // packs' (ThemeManager.BuiltinPackNames)
             val clash = TestThemes.builtins.flatMap { (old, t) -> listOf(old, t.name, t.file) } +
                 BuiltinThemeFiles.LEGACY.keys + BuiltinThemeFiles.RETIRED.keys + ThemeManager.BuiltinPackNames.sorted()
             put("builtinNames", JsonArray(clash.distinct().map(::JsonPrimitive)))
             put("defaults", buildJsonObject {
-                put("keys", pretty.encodeToJsonElement(KeysJson.of(LookDefaults.KEYS)))
-                put("text", pretty.encodeToJsonElement(TextJson.of(LookDefaults.TEXT)))
+                val defaults = Json.parseToJsonElement(Json.encodeToString(CustomThemeSerializer, defaultsTheme)).jsonObject
+                put("keys", defaults.getValue("keys"))
+                put("text", defaults.getValue("text"))
             })
         }
         ThemeMakerTestdata.block("youmo-format", pretty.encodeToString(JsonElement.serializer(), format))
     }
 
-    @Test
-    fun thePagesBuiltInThemesAreTheApps() {
-        // read from their files (src/commonMain/themes) as the app lists them, by the names the page has for
-        // them (0.5's); not Monet's, the wallpaper's colours. Then the two a picture's theme starts from
-        val themes = TestThemes.builtins.filterNot { it.second.followsSystem } +
-            listOf("TransparentDark" to TestThemes.TransparentDark, "TransparentLight" to TestThemes.TransparentLight)
-        val presets = buildJsonArray {
-            for ((name, t) in themes) add(buildJsonObject {
-                put("name", name)
-                put("isDark", t.isDark)
-                put("palette", Json.encodeToJsonElement(PaletteJson.of(t.look.palette)))
-            })
-        }
-        ThemeMakerTestdata.block("youmo-presets", pretty.encodeToString(JsonElement.serializer(), presets))
-    }
-
-    // an image is a PNG (its header's size), a font a TrueType or OpenType file: what an import reads, off Android
+    // off Android: an image is a PNG (its header's size), a font a TrueType or OpenType file
     private object Probe : ThemeFilesManager.AssetProbe {
         private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
 
@@ -234,12 +273,11 @@ class ThemeMakerFormatTest {
     fun whatThePageExportsImportsAsTheThemeItMade() {
         val (_, theme, migrated) = ThemeFilesManager.importTheme(fromWeb.inputStream()).getOrThrow()
         assertFalse(migrated)
-        // the colours, the picture's cuts, the keys, the single keys, the fonts: all of theme.json
+        // all of theme.json
         assertEquals(themeJson, theme.copy(look = theme.look.mapFiles { File(it).name }))
         val zip = entries(fromWeb)
         // the page writes the file as the app does, to the byte
         assertEquals(Json.encodeToString(CustomThemeSerializer, themeJson), zip.getValue("full.json").decodeToString())
-        // each file in the theme's dir as the zip had it
         for (path in theme.look.files()) assertArrayEquals(path, zip.getValue(File(path).name), File(path).readBytes())
         assertEquals(theme.look.files().map { File(it).name }.toSet() + "full.json", zip.keys)
     }
@@ -253,10 +291,9 @@ class ThemeMakerFormatTest {
         val (_, again, migrated) = ThemeFilesManager.importTheme(exported.inputStream()).getOrThrow()
         assertFalse(migrated)
         assertEquals(theme, again)
-        // the page's zip and the app's: the same entries, the same bytes (the app's compressed, the page's not)
+        // same entries and bytes (the app's compressed, the page's not)
         assertEquals(entries(fromWeb).mapValues { it.value.toList() }, entries(exported).mapValues { it.value.toList() })
     }
 }
 
-// how far [ThemeMakerFormatTest] looks for a limit ime-core keeps to itself
 private const val SCAN_END = 1000

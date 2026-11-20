@@ -17,12 +17,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/** The letters in two halves on a phone held sideways, G and V on both. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class TextKeyboardSplitTest {
 
-    // the scene's letters in its order, row by row
     private fun letters() = TextKeyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark).laidOut()
         .shownKeys().filter { it.id!!.length == 1 && it.id!![0] in 'a'..'z' }.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
         .joinToString("") { it.label }.lowercase()

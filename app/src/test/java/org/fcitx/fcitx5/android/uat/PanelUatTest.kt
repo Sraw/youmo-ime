@@ -38,7 +38,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** UAT cases of the symbol and emoji panels (uat/04). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -53,7 +52,7 @@ class PanelUatTest {
     fun close() {
         h.close()
         AppPrefs.getInstance().internal.symbolPanelLocked.setValue(false)
-        // kept in the preferences, which outlive the test: the next panel opens without them
+        // kept in the preferences, which outlive the test
         FcitxApplication.getInstance().directBootAwareContext
             .getSharedPreferences(RecentlyUsed.PREFERENCE_NAME, android.content.Context.MODE_PRIVATE).edit().clear().commit()
     }
@@ -72,7 +71,6 @@ class PanelUatTest {
         error("no $label in the grid")
     }
 
-    // a symbol's cell held: its bubble the engine's (S8a: the grids' popups drawn as every key's), the symbol typed
     @Test
     @Uat("PAN-21")
     fun aSymbolHeldShowsItsBubble() {
@@ -99,11 +97,8 @@ class PanelUatTest {
         h.captureBoard("PanelUatTest/symbols")
         h.tap(KeyboardHarness.all(h.inputView).filterIsInstance<TextView>().first { h.shown(it) && it.text == "Chinese" })
         h.tap(scrolledTo("《"))
-        // in a pair, as typed (PAN-30)
         assertEquals("《》", h.field.text.toString())
-        // back on the letters
         assertTrue(h.texts().toString(), "q" in h.texts())
-        // used once, 最近 heads the list
         h.tap(h.key("符"))
         assertEquals(listOf("Recent") + all, categories())
     }
@@ -114,22 +109,18 @@ class PanelUatTest {
         h.start()
         h.tap(h.described(h.service.getString(R.string.a11y_key_emoji)))
         val tabs = KeyboardHarness.find<PickerLayout>(h.inputView)!!.tabsUi.root
-        // 最近使用 first, then Unicode's groups in order
         val groups = PickerData.Emoji.map { h.service.getString(it.first.name) }
         assertEquals(9, groups.size)
         assertEquals(1 + groups.size, tabs.childCount)
         h.capture("PanelUatTest/emoji")
-        // 动物与自然: the recent tab, smileys, people, nature
         h.tap(tabs.getChildAt(3))
         h.tap(scrolledTo("🐱"))
         assertEquals("🐱", h.field.text.toString())
         h.capture("PanelUatTest/emoji_nature")
     }
 
-    // the field with | at the cursor
     private fun shown() = h.field.text.toString().let { t -> t.substring(0, h.field.selectionStart) + "|" + t.substring(h.field.selectionStart) }
 
-    // the symbol panel opened on 中文, [symbol] tapped: the panel closes after it
     private fun picked(symbol: String) {
         h.tap(h.key("符"))
         h.tap(textView("Chinese"))
@@ -142,7 +133,6 @@ class PanelUatTest {
         h.emit(HostEvent.Key(FcitxKeyMapping.FcitxKey_BackSpace, KeyStates.Virtual.states.toInt(), 0, false, 0))
     }
 
-    // FB9: a bracket from the symbol panel goes in paired, as typed; Backspace in the empty pair takes both
     @Test
     @Uat("PAN-30")
     fun aBracketFromThePanelGoesInPairedAndBackspaceTakesBoth() {
@@ -153,7 +143,6 @@ class PanelUatTest {
         assertEquals("|", shown())
     }
 
-    // the closing one from the panel steps over the one put in, as typed
     @Test
     @Uat("PAN-31")
     fun theClosingOneFromThePanelStepsOverTheOnePutIn() {
@@ -164,7 +153,6 @@ class PanelUatTest {
         assertEquals("「」|", shown())
     }
 
-    // the number keyboard's ( and ) (a dialler's pad) alone, as typed: a dialler formats the number
     @Test
     @Uat("PAN-32")
     fun inAPhoneNumbersFieldThePadsBracketsAreAlone() {
@@ -176,12 +164,9 @@ class PanelUatTest {
         assertEquals("()|", shown())
     }
 
-    // a URL's `)` typed on the keyboard goes in as it is, over the engine: it still steps over the one the panel's
-    // `(` put in, not `())`
     @Test
     @Uat("PAN-34")
     fun inAnAddressTheKeysClosingOneStepsOverThePanels() {
-        // an address field has no comma key: p's long press is `)` here
         prefs.setList("full/p", listOf(")"))
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         h.tap(h.key("符"))
@@ -195,7 +180,6 @@ class PanelUatTest {
         assertEquals("()|", shown())
     }
 
-    // where brackets are not paired (括号成对 off, a password) the panel's goes in alone
     @Test
     @Uat("PAN-33")
     fun offOrInAPasswordThePanelsBracketIsAlone() {
@@ -204,7 +188,6 @@ class PanelUatTest {
         h.start()
         picked("《")
         assertEquals("《|", shown())
-        // on again: the password alone keeps it single
         prefs.set(keyboard.autoPairs, true)
         h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         picked("《")
@@ -216,10 +199,8 @@ class PanelUatTest {
 
     private fun letters() = "q" in h.texts() && "m" in h.texts()
 
-    // the way back of the number pads and the panels: 返回 (Back here), no longer ABC (0.6.1, 061-layout-survey Q2)
     private fun back() = h.service.getString(R.string.picker_back)
 
-    // KB-92: every way back says 返回, the pad a number or phone field opens with and the emoticons' too, as the symbol panel's
     @Test
     @Uat("KB-92")
     fun everyWayBackSaysBack() = assertRows(
@@ -257,12 +238,10 @@ class PanelUatTest {
         assertTrue(categories().toString(), "Common" in categories())
     }
 
-    // the category shown in bold on the side: the one the panel shows
     private fun shownCategory(of: KeyboardHarness = h): String = KeyboardHarness.all(KeyboardHarness.find<PickerSideUi>(of.inputView)!!)
         .filterIsInstance<TextView>().single { of.shown(it) && it.typeface?.isBold == true }.text.toString()
 
-    // user 2026-11-13: till a category is picked the panel opens on 最近 once a symbol was used, else on 常用;
-    // once one is, on the one shown last
+    // till a category is picked the panel opens on 最近 once a symbol was used, else on 常用; once one is, on the last
     @Test
     @Uat("PAN-29")
     fun thePanelOpensOnTheRecentlyUsedTillACategoryIsPicked() {
@@ -278,8 +257,7 @@ class PanelUatTest {
         assertEquals("picked, then reopened", "Arrows", shownCategory())
     }
 
-    // user 2026-11-14: the pick kept across a restart (a keyboard made anew reads it), a reopen being none; one
-    // kept that is no longer a category (renamed, gone) as none picked
+    // the pick kept across a restart; one kept that is no longer a category as none picked
     @Test
     @Uat("PAN-29")
     fun theCategoryPickedIsKeptForTheNextStart() {
@@ -315,7 +293,6 @@ class PanelUatTest {
         h.tap(textView("Arrows"))
         for (s in listOf("→", "←", "↑")) h.tap(scrolledTo(s))
         assertEquals("→←↑", h.field.text.toString())
-        // still the panel
         assertTrue(categories().toString(), "Arrows" in categories())
     }
 
@@ -389,9 +366,7 @@ class PanelUatTest {
         assertTrue(row().toString(), "👍" in row())
         h.tap(KeyboardHarness.all(search).filterIsInstance<TextView>().first { it.text.toString() == "👍" && it.hasOnClickListeners() })
         assertEquals("👍", h.field.text.toString())
-        // the search's own 返回: the panel's, under the search, says 返回 too now (0.6.1)
         h.tap(h.keys(search).first { it.label == back() })
-        // the list again, 👍 first among the recent
         val tabs = KeyboardHarness.find<PickerLayout>(h.inputView)!!.tabsUi.root
         h.tap(tabs.getChildAt(0))
         val grid = KeyboardHarness.find<PickerGridView>(h.inputView)!!
@@ -410,7 +385,6 @@ class PanelUatTest {
         val space = h.describedKey("Space")
         h.api.calls.clear()
         h.swipe(space, -space.width * 0.8f, 0f)
-        // ← keys for the cursor (the engine passes them on), no space typed
         val keys = h.api.calls.filter { it.startsWith("sendKey") && "up=false" in it }
         assertTrue(keys.toString(), keys.isNotEmpty() && keys.all { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it })
         assertEquals("一段长长的文字在这里", h.field.text.toString())
@@ -431,7 +405,6 @@ class PanelUatTest {
         }
         open(); nature(); h.tap(scrolledTo("🐱"))
         h.tap(h.key(back()))
-        // another app's field
         h.start()
         open()
         assertFalse(recent().toString(), "🐱" in recent())

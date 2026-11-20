@@ -2,7 +2,7 @@
 """Makes uat/fixtures/upgrade/<version>/ from a released arm64 text APK on a throwaway redroid:
 installs it on a fresh device, sets what README.md lists through the app's UI (the uat.py
 helpers), then saves the app's files (internal, external and device-protected, as root) and a 备份全部 zip.
-Each step is timed into timings.tsv.
+Each step's time is printed.
 
   UAT_BUILD=release python3 uat/fixtures/upgrade/make.py <version> <apk> <container> <port>
 
@@ -179,7 +179,4 @@ try:
 finally:
     server.terminate()
 
-with open(os.path.join(out, "timings.tsv"), "w") as f:
-    f.write("step\tseconds\n")
-    f.writelines(f"{n}\t{t:.1f}\n" for n, t in times)
 print("total", round(sum(t for _, t in times)), "s")

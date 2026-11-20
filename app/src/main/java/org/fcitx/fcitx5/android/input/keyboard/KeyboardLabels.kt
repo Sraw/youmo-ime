@@ -13,16 +13,12 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 
-/**
- * The keyboards' names as the input method pages and ⋯'s 键盘 list them, with the theme's layout a keyboard is drawn
- * with (060-render-p3 T8b): `18 键（主题：17 键）`.
- */
+/** With the theme's layout a keyboard is drawn with: `18 键（主题：17 键）`. */
 object KeyboardLabels {
 
-    /** The longest of a theme's layout's name shown: a pack's is unbounded. */
+    /** A pack's is unbounded. */
     private const val NAME_MAX = 24
 
-    /** The layout a keyboard of the input method pages is drawn with ([ImKeyboard]'s board). */
     fun boardOf(keyboard: ImKeyboard): String = when (keyboard) {
         ImKeyboard.FULL -> "qwerty"
         ImKeyboard.KEYS18 -> "k18"
@@ -34,42 +30,33 @@ object KeyboardLabels {
         ImKeyboard.CUSTOM -> "qwerty"
     }
 
-    /**
-     * The name of the theme's layout [im]'s [keyboard] is drawn with now (`17 键`), null where it is the app's:
-     * none in the pack, one refused, or (14 and 18 keys) groups [im] cannot type, the app's drawn instead (T9b).
-     */
+    /** Null where it is the app's: none in the pack, one refused, or (14 and 18 keys) groups [im] cannot type. */
     fun themedName(context: Context, im: String, keyboard: ImKeyboard): String? {
         if (keyboard == ImKeyboard.CUSTOM) return null
         val id = boardOf(keyboard)
         val shown = SceneLayouts.of(context, id) ?: return null
         if (shown === SceneLayouts.builtIn(context, id)) return null
-        // the grouped keyboards' letters, by the layout they are drawn with
         val letters = listOf(NineKeyLetters.G14, NineKeyLetters.G18).firstOrNull { GroupedKeyboard.layoutOf(it) == id }
         if (letters != null && GroupedKeyboard.grouping(context, letters, own = im == InputMethodCatalog.PINYIN, log = false).layout !== shown) return null
         return shortName(shown.layout.name)
     }
 
-    /** A layout's [name] as shown: past [NAME_MAX] characters cut, with `…`; by characters, not UTF-16 units, so an emoji or an extension-B character is never cut in half. */
+    /** Cut by characters, not UTF-16 units, so an emoji or an extension-B character is never cut in half. */
     internal fun shortName(name: String): String {
         if (name.codePointCount(0, name.length) <= NAME_MAX) return name
         return name.substring(0, name.offsetByCodePoints(0, NAME_MAX)) + "…"
     }
 
-    /** [label] (a keyboard's own name) with the theme's layout's it is drawn with ([themedName]). */
     fun label(context: Context, im: String, keyboard: ImKeyboard, label: String): String =
         themedName(context, im, keyboard)?.let { context.getString(R.string.keyboard_themed, label, it) } ?: label
 
-    /**
-     * A layout of the user's as the keyboards are listed (061-custom-layout §5.4): 「17 键（自定义）」; one not drawn
-     * ([CustomChoice.drawn]: its file refused as it was read), 「17 键（读不出，暂用 18 键）」 with [base] (what is drawn
-     * in its place) given.
-     */
+    /** 「17 键（自定义）」; one whose file was refused, 「17 键（读不出，暂用 18 键）」 with [base] given. */
     fun custom(context: Context, layout: CustomChoice, base: String? = null): String {
         val name = shortName(layout.name)
         return if (layout.drawn || base == null) context.getString(R.string.keyboard_custom_named, name) else context.getString(R.string.keyboard_custom_unread, name, base)
     }
 
-    /** The name of [keyboard], one of the app's, in [im]'s list: its own preference's (PinyinKeyboard…), the full keyboard's for a table. */
+    /** Its own preference's (PinyinKeyboard…), the full keyboard's for a table. */
     fun builtInName(context: Context, im: String, keyboard: ImKeyboard): String = context.getString(
         when (im) {
             InputMethodCatalog.PINYIN -> PinyinKeyboard.of(keyboard).stringRes

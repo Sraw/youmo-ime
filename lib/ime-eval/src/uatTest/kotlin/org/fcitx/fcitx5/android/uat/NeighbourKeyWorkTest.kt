@@ -26,13 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
-/**
- * What reading a key by where it was tapped (061-neighbour-correction §7.2) takes of the decoder on
- * the app's data, counted ([PinyinDecoder.Work]): clean taps, no key slipped, as most are. Each kind
- * of input with the slips read takes at most a tenth more than without (on a phone 1.5 ms of a 双拼
- * key's 14), full pinyin against its 0.6.0 rule (a tap with no place), which it read before. And a
- * key's reading kept from the key before is what a decoder made afresh reads, the slips' costs in it.
- */
+/** What reading a key by where it was tapped takes of the decoder (clean taps): at most a tenth more than without, and the same as afresh. */
 class NeighbourKeyWorkTest {
 
     private val chat by lazy {
@@ -53,8 +47,7 @@ class NeighbourKeyWorkTest {
 
     private fun decoder(user: UserModel? = null) = UatEngines.pinyinData.let { PinyinDecoder(it.dictionary, it.vocabulary, WordScorer.of(it.model), user = user, extensions = { extensions }) }
 
-    // a user who typed the [HISTORY] likeliest words: 双拼 reads a key alone only for the words typed, and
-    // with none typed a key takes so little that the slips' few arcs are more than a tenth of it
+    // a user who typed the [HISTORY] likeliest words: with none, a key takes so little the slips' arcs exceed a tenth
     private val typed by lazy {
         UatEngines.pinyinData.let { data -> UserModel(data.dictionary, data.vocabulary, index = data.wordIndex).also { TypedHistory.count(it, data, TypedHistory.likeliest(data, HISTORY)) } }
     }
@@ -107,8 +100,7 @@ class NeighbourKeyWorkTest {
         }
     }
 
-    // with nothing typed a 小鹤 key takes little (no key read alone finds a word), and a tenth of that
-    // would not hold the slips: held by how many arcs they add (193 when measured)
+    // with nothing typed a 小鹤 key takes little, so the slips are held by how many arcs they add
     @Test
     fun xiaoheWithNothingTypedTakesFewArcsMore() {
         val on = ShuangpinSegmenter(ShuangpinScheme.XIAOHE, neighbours = true)
@@ -131,8 +123,7 @@ class NeighbourKeyWorkTest {
         }
     }
 
-    // 双拼's grouped keyboards (061-neighbour-groups): 小鹤 typed whole and the first syllable whole with initials after,
-    // on the 18, 14 and nine keys (the nine keys' digits read no slip under -3)
+    // 双拼's grouped keyboards, whole and by initials (the nine keys' digits read no slip under -3)
     @Test
     fun shuangpinsGroupedKeyboardsTakeAtMostATenthMore() {
         for (initials in listOf(false, true)) {
@@ -149,9 +140,7 @@ class NeighbourKeyWorkTest {
         }
     }
 
-    // 大千 (061-neighbour-groups), the chat's lines typed in zhuyin with no tones (the tones' tables are the engine's
-    // download's, not the repository's: with them the slips took no more, 061-neighbour-scope-research); its slips over
-    // -3 alone, as T9Segmenter has them (over -4 they took a quarter more)
+    // 大千 with no tones; its slips over -3 alone, as T9Segmenter has them
     @Test
     fun dachenTakesAtMostATenthMore() {
         val samples = File("data/pinyin-chat.tsv").readLines().filter { it.isNotBlank() && !it.startsWith("#") }
@@ -169,7 +158,7 @@ class NeighbourKeyWorkTest {
         const val LINES = 8
         const val HISTORY = 3000
         const val EMPTY_ARCS_MORE = 250.0
-        // 1.5 ms of a 双拼 key's 14.1 on the 6T (061-neighbour-correction §7.1)
+        // 1.5 ms of a 双拼 key's 14.1 on the 6T
         const val AT_MOST = 1.10
 
         val extensions: Array<IntArray?> by lazy { arrayOfNulls<IntArray>(UatEngines.pinyinData.dictionary.nodeCount) }

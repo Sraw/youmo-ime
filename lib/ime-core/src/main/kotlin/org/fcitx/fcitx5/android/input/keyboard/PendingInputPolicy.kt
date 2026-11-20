@@ -6,38 +6,23 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 
-/**
- * What happens to half-typed input when a key does something other than typing -- commits a
- * symbol, starts quick phrase or unicode input. fcitx is reset afterwards either way; this
- * decides what the user keeps first.
- */
+/** Half-typed input when a key does something other than typing (a symbol, quick phrase, unicode); fcitx is reset after either way. */
 object PendingInputPolicy {
 
     enum class Resolution {
-        /** Take the first candidate, as Space would. */
+        /** As Space would. */
         SelectFirstCandidate,
 
-        /** Keep the preedit in the editor exactly as typed. */
+        /** Exactly as typed. */
         FinishComposing,
 
-        /** The input method commits what was typed, its letters (Enter's), not a candidate. */
+        /** Its letters (Enter's), not a candidate. */
         CommitAsTyped,
 
-        /** Nothing to keep. */
         None,
     }
 
-    /**
-     * Chinese input methods turn their preedit (pinyin, say) into the first candidate: the raw
-     * preedit is rarely what anyone wants in the text. With no preedit the candidates on offer
-     * are predictions, which are not taken. Other languages type the text itself as the
-     * preedit, so it is kept as is.
-     *
-     * In an [address] field (a URL's, an email's) what is typed is what is meant: `xiaoming` then
-     * `@` is xiaoming@, not 小明@. A candidate is still there to pick before the key.
-     *
-     * @param hasPreedit whether there is a preedit, in the editor or on fcitx's input panel
-     */
+    /** Chinese takes the first candidate (no preedit: predictions, not taken); others keep the preedit. In an [address] field what is typed is meant (`xiaoming@`, not 小明@). */
     fun resolve(languageCode: String, hasPreedit: Boolean, address: Boolean = false): Resolution = when {
         !languageCode.startsWith("zh") -> Resolution.FinishComposing
         hasPreedit && address -> Resolution.CommitAsTyped
@@ -45,15 +30,7 @@ object PendingInputPolicy {
         else -> Resolution.None
     }
 
-    /**
-     * Whether [key], the character a key sends the engine, is put in as it is in an [address] field,
-     * as the address keys' are, what is typed before it committed as typed ([resolve]): through the
-     * engine a digit picks a candidate and `_` is ——, and xiaoming2026@ came out 小明026@. A letter
-     * is typed as ever, a space too, and so is a character the input method [reads] as a key of its
-     * own (`InputMethodCatalog.readsAsKey`: the nine keys' digits, 微软双拼's `;`, the pinyins' `'` and a table's
-     * keys, 二笔's `;`, while something is typed), and those the nine keys send for a syllable or a
-     * letter.
-     */
+    /** In an [address] field, as the address keys are (a digit would pick, `_` be ——); letters, space and keys the input method reads as its own go through. */
     fun typesAsIs(key: String, address: Boolean, reads: (Int) -> Boolean = { false }): Boolean {
         if (!address || key.codePointCount(0, key.length) != 1) return false
         val c = key.codePointAt(0)

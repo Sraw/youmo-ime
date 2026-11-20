@@ -52,7 +52,7 @@ class ShuangpinSetTest {
         assertEquals(2, runCli(arrayOf("shuangpin", "nope", set.path, converted.path), out, StringBuilder()))
     }
 
-    // design §1.4: on the 18 keys and the nine keys each key its group's code; no Latin letters there
+    // on the 18 keys and the nine keys each key its group's code; no Latin letters there
     @Test
     fun onAGroupedKeyboardEachKeyIsItsGroupsCode() {
         val samples = listOf(Sample("nihao", "你好", "daily"), Sample("AGgu", "AG股", "daily"))
@@ -103,7 +103,7 @@ class ShuangpinSetTest {
             assertEquals(0, runCli(arrayOf("pinyin", data.path, set.path, result.path, "--scheme", scheme), StringBuilder(), StringBuilder()))
             assertEquals(scheme, "你好", result.useLines { RunResultFormat.parse(it) }.single().candidates.first())
         }
-        // T9Set's names alone are its own (review N7)
+        // T9Set's names alone are its own
         assertThrows(IllegalArgumentException::class.java) { T9Set.lettersOf("xiaohe-18") }
         assertEquals(NineKeyLetters.G14, T9Set.lettersOf("g14-strict"))
     }

@@ -27,7 +27,7 @@ import org.robolectric.annotation.Config
 @Config(application = FcitxApplication::class, qualifiers = "w800dp-h360dp-land")
 class ThemePackDialogsTest {
 
-    // R26 F8162: a phone turned, a long confirmation: 一起导入 under it scrolled to and shown whole, not given no room
+    // a phone turned, a long confirmation: 一起导入 under it scrolled to and shown whole, not given no room
     @Test
     @Uat("ST-72")
     fun whatIsUnderALongTextIsReachedOnALowScreen() {

@@ -34,7 +34,7 @@ class GlideTouchTest {
         assertEquals(Route.KEYS, t.move(50f, 120f, 40))
     }
 
-    // 061-handwriting-toolbar §3.2: handwriting on, a touch on the letter area is a stroke from its down, never a key
+    // handwriting on: a touch on the letter area is a stroke from its down, never a key
     @Test
     fun handwritingOnATouchOnTheLettersIsAStrokeFromItsDown() {
         val t = GlideTouch()
@@ -163,8 +163,7 @@ class GlideTouchTest {
         val cancelled = stroke()
         cancelled.move(50f, 100f, 30)
         assertEquals(Route.GLIDE, cancelled.up(50f, 100f, cancelled = true))
-        // another finger down once it started, short of the lift: the first's tap there and then, the other the keys'
-        // (two thumbs typing fast); nothing swallowed, the first's lift nothing more
+        // another finger down short of the lift: the first's tap at once, the other the keys' (two thumbs typing fast)
         val two = stroke()
         two.move(50f, 100f, 30)
         assertEquals(Route.TAP_KEY, two.otherDown())
@@ -204,7 +203,6 @@ class GlideTouchTest {
         t.up(250f, 140f, cancelled = false)
         val unitY = 140f / GlideLayout.ROW_HEIGHT
         assertArrayEquals(floatArrayOf(0.5f, 70f / unitY, 1.5f, 70f / unitY, 2.5f, 140f / unitY), t.takeGlided(), 1e-5f)
-        // given once
         assertNull(t.takeGlided())
     }
 
@@ -258,7 +256,6 @@ class GlideTouchTest {
         assertEquals(Route.KEYS, t.otherDown())
         assertEquals(Route.KEYS, t.move(250f, 70f, 40))
         assertEquals(Route.KEYS, t.pointerUp(1, 0f, 0f))
-        // and it stops keeping places
         assertEquals(0, t.count)
     }
 
@@ -271,8 +268,7 @@ class GlideTouchTest {
         assertEquals(0, t.count)
     }
 
-    // a thumb resting while another finger writes (0.6.0's pad's): each lift of the writing finger a stroke, its next
-    // down on the letters the next one, off them nothing; the thumb's lift ends it all, and a glide never writes again
+    // a thumb resting while another finger writes: each lift a stroke, the next down on the letters the next; the thumb's lift ends it
     @Test
     @Uat("HW-53")
     fun handwritingWithAThumbRestingEachDownOnTheLettersWritesAgain() {

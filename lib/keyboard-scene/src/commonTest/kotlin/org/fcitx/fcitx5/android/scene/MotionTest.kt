@@ -5,12 +5,13 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.theme
+import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.engine.PopupMotion
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.theme.Appear
 import org.fcitx.fcitx5.android.scene.theme.Effect
-import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.theme.Transition
@@ -23,19 +24,9 @@ import kotlin.test.assertTrue
 
 // 060-render-p3 A1: `transition`, `press-scale`, `press-sink` read, cascaded and put in the scene as a key's Motion
 class MotionTest {
-    private val source = testData("material-light.xml")
+    private fun warnings(vararg style: String) = Fixtures.warnings(withStyle(*style))
 
-    private fun withStyle(vararg style: String) = source.replace("</theme>", style.joinToString("\n", postfix = "\n</theme>"))
-
-    private fun theme(vararg style: String): Theme = ThemeReader.theme(withStyle(*style)).ok()
-
-    private fun warnings(vararg style: String): List<String> {
-        val t = ThemeReader.theme(withStyle(*style))
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
-
-    private fun problems(vararg style: String) = ThemeReader.theme(withStyle(*style)).problems().map { it.message }
+    private fun problems(vararg style: String) = Fixtures.problems(withStyle(*style))
 
     @Test
     fun valuesReadInRangeAndRefusedOut() {
@@ -95,7 +86,7 @@ class MotionTest {
         assertNull(Fixtures.scene(Fixtures.portrait, theme = theme("<style select=\"key:pressed\" transition=\"60ms ease\"/>")).keys.first { it.id == "q" }.motion)
     }
 
-    // A3: `effect=`'s two forms and none, in range, read; out of range or of another form, refused
+    // `effect=`'s two forms and none, in range, read; out of range or of another form, refused
     @Test
     fun effectsReadInRangeAndRefusedOut() {
         assertEquals(Value.OfEffect(Effect.Ripple("ring.png", 80.0, 300)), Values.read("effect", "ripple-image(ring.png, 80%, 300ms)"))
@@ -167,7 +158,7 @@ class MotionTest {
     @Test
     fun motionWhereItDoesNothingWarned() {
         assertEquals(emptyList(), warnings("<style select=\"key\" transition=\"150ms ease\"/>", "<style select=\"key:pressed\" press-scale=\"95%\" press-sink=\"1dp\"/>"))
-        // A2: a popup's and a bubble's going, their and a menu's coming up
+        // a popup's and a bubble's going, their and a menu's coming up
         assertEquals(emptyList(), warnings("<style select=\"popup\" transition=\"150ms ease\" appear=\"scale 150ms\"/>", "<style select=\"preview\" transition=\"100ms linear\" appear=\"rise 80ms\"/>", "<style select=\"menu\" appear=\"fade 100ms\"/>"))
         assertEquals(listOf("transition= on menu does nothing: a menu goes at once"), warnings("<style select=\"menu\" transition=\"150ms ease\"/>"))
         assertEquals(listOf("appear= on popup in a state or a part does nothing: a popup moves as a whole"), warnings("<style select=\"popup:selected\" appear=\"scale 150ms\"/>"))

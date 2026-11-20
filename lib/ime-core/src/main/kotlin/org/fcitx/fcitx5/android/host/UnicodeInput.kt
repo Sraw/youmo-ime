@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.host
 import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.TextFormatFlag
 
-/** The Unicode mode's texts (`unicodetempmode.cpp:404-408`), translated by the app. */
+/** The Unicode mode's texts, translated by the app. */
 data class UnicodeStrings(
     val aux: String = "Unicode: ",
     val hint: String = "(Type to search unicode by code or description)",
@@ -15,29 +15,16 @@ data class UnicodeStrings(
 )
 
 /**
- * Unicode input, fcitx's unicode temp mode (`modules/unicode/unicodetempmode.cpp`, `unicode.cpp`):
- * Ctrl+Alt+Shift+U searches characters by name, alias or code ([CharSelectData]); Ctrl+Shift+U types
- * a code in hex (`unicode.h:26-34`, no setting, design Q6). [trigger] is the keyboard's button
- * (`native-lib.cpp:298-303`).
- *
- * Opened with nothing typed, the search lists the characters of the clipboard's latest text
- * (`:342-395`). fcitx also lists the editor's selection, but only when the context reports
- * surrounding text, which this frontend never does, and the X primary selection, which Android does
- * not have; [clipboard] gives the latest clipboard text ("" for none). No compose sequences (see
- * [QuickPhrase]).
- *
- * [loadData] reads `charselectdata` once, at the first trigger; when it gives null the mode never
- * starts (`CharSelectData::load`, `charselectdata.cpp:76-101`, remembers the failure too).
+ * fcitx's unicode temp mode: Ctrl+Alt+Shift+U searches characters by name, alias or code; Ctrl+Shift+U types a hex
+ * code. Opened with nothing typed, the search lists the latest clipboard text's characters (fcitx's editor selection
+ * and X primary selection have no source here). When [loadData] gives null the mode never starts.
  */
 class UnicodeInput(
     private val host: TempModeHost,
     private val loadData: () -> ByteArray?,
     private val clipboard: () -> String = { "" },
     private val strings: UnicodeStrings = UnicodeStrings(),
-    // where the search's index is built after the first trigger: off the host thread, which the
-    // trigger's own panel (the clipboard's characters, names only) does not wait for. Priority 4 is
-    // Android's nice 10 (THREAD_PRIORITY_BACKGROUND), not MIN's 19: a key typed meanwhile waits on
-    // this build, which at 19 gets next to no CPU while the app and keyboard draw
+    // the index is built off the host thread; priority 4 (nice 10), not MIN's 19, as a key typed meanwhile waits on it
     private val background: (() -> Unit) -> Unit = { Thread(it, "host-unicode").apply { priority = Thread.NORM_PRIORITY - 1 }.start() },
 ) : TempMode {
 
@@ -52,13 +39,12 @@ class UnicodeInput(
 
     private val state = IcProperty { State() }
 
-    // read at the first trigger, as fcitx does (CharSelectData::load, charselectdata.cpp:76-101):
-    // nothing held till Unicode is used; the index then built in the background
+    // read at the first trigger, as fcitx does: nothing held till Unicode is used
     private val data: CharSelectData? by lazy { loadData()?.let { CharSelectData(it, strings.names).also { d -> background(d::prepare) } } }
 
     override fun isActive(ic: InputContext) = ic.propertyFor(state).active
 
-    /** `triggerTempMode` (`:107-122`). */
+    /** `triggerTempMode`. */
     override fun trigger(ic: InputContext, e: KeyEvent): Boolean {
         if (e.release) return false
         val mode = when {
@@ -69,10 +55,9 @@ class UnicodeInput(
         return trigger(ic, mode)
     }
 
-    /** The keyboard's button: search (`:103-105`). */
+    /** The keyboard's button: search. */
     fun trigger(ic: InputContext): Boolean = trigger(ic, Mode.Search)
 
-    /** `:143-152`. */
     private fun trigger(ic: InputContext, mode: Mode): Boolean {
         if (data == null) return false
         val s = ic.propertyFor(state)
@@ -87,7 +72,7 @@ class UnicodeInput(
         return if (ic.propertyFor(state).mode == Mode.Search) handleSearch(ic, e.key) else handleDirect(ic, e.key)
     }
 
-    /** `handleSearch` (`:154-248`). */
+    /** `handleSearch`. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount")
     private fun handleSearch(ic: InputContext, key: Key): Boolean {
         val s = ic.propertyFor(state)
@@ -136,7 +121,7 @@ class UnicodeInput(
         return true
     }
 
-    /** `handleDirect` (`:250-296`): every key is used. */
+    /** `handleDirect`: every key is used. */
     @Suppress("ReturnCount")
     private fun handleDirect(ic: InputContext, key: Key): Boolean {
         val s = ic.propertyFor(state)
@@ -165,7 +150,7 @@ class UnicodeInput(
         return true
     }
 
-    /** Leaves the mode (`:134-139`, `UnicodeState::reset`, `:92-100`). */
+    /** `UnicodeState::reset`. */
     override fun reset(ic: InputContext) {
         val s = ic.propertyFor(state)
         s.active = false
@@ -175,10 +160,10 @@ class UnicodeInput(
         host.showPanel(ic, TempPanel.EMPTY)
     }
 
-    /** No invoke action of its own: fcitx's default takes it and does nothing (`fcitx/tempmode.cpp:26-29`). */
+    /** fcitx's default takes it and does nothing. */
     override fun invokeAction(ic: InputContext, e: InvokeActionEvent) = true
 
-    /** `updateUI` (`:298-417`): rebuilds the list. */
+    /** `updateUI`: rebuilds the list. */
     private fun updateUI(ic: InputContext, trigger: Boolean = false) {
         val s = ic.propertyFor(state)
         if (s.mode == Mode.Search) {
@@ -213,14 +198,13 @@ class UnicodeInput(
             if (it.totalSize > 0) it.setGlobalCursorIndex(0)
         }
 
-    /** Up to 21 distinct characters of the clipboard text, each with its code and name (`:365-395`). */
+    /** Up to 21 distinct characters, each with its code and name. */
     private fun clipboardChars(): List<TempCandidate> {
         val text = clipboard()
         val d = data!!
         val out = ArrayList<TempCandidate>()
         var counter = 0
-        // a lone surrogate is no character (fcitx skips text that is not valid UTF-8); a nameless
-        // one shows its code alone (`:368-386`)
+        // a lone surrogate is no character (fcitx skips invalid UTF-8); a nameless one shows its code alone
         val chars = text.codePoints().distinct().filter { it !in Character.MIN_SURROGATE.code..Character.MAX_SURROGATE.code }
         for (chr in chars) {
             val name = d.name(chr)
@@ -235,7 +219,7 @@ class UnicodeInput(
         val s = ic.propertyFor(state)
         val panel = when (s.mode) {
             Mode.Direct -> {
-                // capabilityFlags(), masked as setEnablePreedit left it (inputcontext.cpp:69-75)
+                // capabilityFlags(), masked as setEnablePreedit left it
                 val client = ic.has(Capability.PREEDIT)
                 val format = TextFormatFlag.DontCommit.flag or if (client) TextFormatFlag.Underline.flag else 0
                 val segments = listOf("U+", s.buffer.userInput).filter { it.isNotEmpty() }
@@ -264,23 +248,19 @@ class UnicodeInput(
         private const val CLIPBOARD_LIMIT = 20
         private val COMMIT_KEYS = setOf(KeySyms.SPACE, KeySyms.KP_SPACE, KeySyms.RETURN, KeySyms.KP_ENTER)
 
-        /** `TriggerKey` and `DirectUnicodeMode` defaults (`unicode.h:26-34`). */
+        /** `TriggerKey` and `DirectUnicodeMode` defaults. */
         val SEARCH_KEY = Key('U'.code, KeyStates.CTRL_ALT_SHIFT)
         val DIRECT_KEY = Key('U'.code, KeyStates.CTRL or KeyStates.SHIFT)
 
-        /** Alt+1 … Alt+0 (`unicode.cpp:19-26`). */
+        /** Alt+1 … Alt+0. */
         private val SEARCH_LABELS =
             (1..10).map { TempCandidateList.keyToLabel(Key(KeySyms.DIGIT_0 + it % 10, KeyStates.ALT)) }
 
-        /** `utf8::UCS4IsValid` (`fcitx-utils/utf8.cpp:17-19`), on fcitx's unsigned value. */
+        /** `utf8::UCS4IsValid`, on fcitx's unsigned value. */
         @Suppress("MagicNumber")
         internal fun isValid(code: Int) = Integer.compareUnsigned(code, 0x110000) < 0 && code and 0xFFFFF800.toInt() != 0xD800
 
-        /**
-         * A search that is a code without its `U+`: 2–6 ASCII hex digits, one at least a digit (so "face"
-         * and "bead" stay words); the character, or null. No control character: "1b" would commit an
-         * escape into the field.
-         */
+        /** 2–6 hex digits, at least one a digit (so "face" stays a word); no control character ("1b" would commit an escape). */
         @Suppress("MagicNumber")
         internal fun bareCodeOf(text: String): Int? {
             if (text.length !in 2..6 || text.none { it in '0'..'9' }) return null
@@ -288,14 +268,11 @@ class UnicodeInput(
             return codeOf(text)?.takeIf { Character.getType(it) != Character.CONTROL.toInt() }
         }
 
-        /** `isHexKey` (`:39-47`). */
+        /** `isHexKey`. */
         private fun isHexKey(key: Key) = key.isDigit ||
             (key.isUAZ || key.isLAZ) && Character.digit(key.sym, 16) >= 0
 
-        /**
-         * `bufferIsValid` (`:49-64`): the hex digits as `std::stoi` reads them (past `int`, invalid)
-         * and a character; null when not.
-         */
+        /** `bufferIsValid`: as `std::stoi` reads it (past `int`, invalid), and a character; null when not. */
         @Suppress("MagicNumber")
         internal fun codeOf(hex: String): Int? {
             val v = hex.toBigIntegerOrNull(16) ?: return null

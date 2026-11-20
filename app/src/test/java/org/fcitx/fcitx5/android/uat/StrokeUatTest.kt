@@ -47,12 +47,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowLog
 
-/**
- * The keyboard's half of 笔画筛选 (uat/02 KB-42, KB-43): a stroke drawn over the keys while pinyin
- * is typed is sent as the engine's stroke key, the keys cancelled; with nothing typed, with glide
- * typing chosen instead, or in English, none is. What the engine does with it is StrokeFilterUatTest
- * (:lib:ime-eval), the shape read StrokeShapeTest.
- */
+/** A stroke over the keys while pinyin is typed is sent as the engine's stroke key; nothing typed, glide, English: none. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -70,15 +65,13 @@ class StrokeUatTest {
         open?.close()
     }
 
-    // 笔画筛选 on, or 滑行输入 instead where [glide]
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
 
     private fun harness(im: InputMethodEntry, glide: Boolean = false, keyboards: ImKeyboards.Chosen? = null): KeyboardHarness {
         prefs.set(keyDrawing, if (glide) KeyDrawing.Glide else KeyDrawing.StrokeFilter)
         return KeyboardHarness(TestThemes.PixelLight, im, keyboards = keyboards).also { open = it }.start()
     }
 
-    // pinyin typed (the code row shows it) or nothing; in a temporary mode, with its line [aux] above
     private fun typed(pinyin: String, aux: String = "") {
         val above = if (aux.isEmpty()) FormattedText.Empty else FormattedText(arrayOf(aux), intArrayOf(0), -1)
         h.api.inputPanelCached = HostEvent.InputPanel(FormattedText(arrayOf(pinyin), intArrayOf(0), pinyin.length), above, FormattedText.Empty)
@@ -91,19 +84,16 @@ class StrokeUatTest {
 
     private fun stroke(c: Char) = "sym=${UNICODE + Keyboard.strokeKey(c)},"
 
-    // a finger down on [v], moved [across] and [down] of its width and height, then lifted
     private fun draw(v: ShownKey, across: Float, down: Float) {
         val b = h.box(v)
         h.drag(v, b.exactCenterX() + across * b.width(), b.exactCenterY() + down * b.height(), steps = 12)
     }
 
-    // a finger down in [k]'s middle, moved in steps of 16ms to [dx], [dy] dp from it, then lifted
     private fun drawDp(k: ShownKey, dx: Float, dy: Float, steps: Int = 6, ms: Long = 16) {
         val path = (0..steps).map { i -> h.at(k, dx * i / steps, dy * i / steps, if (i == 0) 0 else ms) }
         h.touch(k, *path.toTypedArray())
     }
 
-    // what a plain tap on [k] sends, while pinyin is typed
     private fun tapped(k: () -> ShownKey): List<String> {
         typed("hao")
         h.api.calls.clear()
@@ -111,8 +101,7 @@ class StrokeUatTest {
         return downs().also { assertTrue(it.toString(), it.isNotEmpty() && strokesSent().isEmpty()) }
     }
 
-    // 笔画筛选灵敏度: a stroke started (12dp) but lifted never its distance from its down is the key's tap,
-    // the same as a tap there sends; past it a stroke. Its trail is drawn only past it
+    // a stroke started but lifted never its distance from its down is the key's tap; its trail drawn only past it
     @Test
     @Uat("KB-101")
     fun aFingerThatSlidesShortOfTheLiftDistanceIsTheKeysTap() {
@@ -124,14 +113,12 @@ class StrokeUatTest {
             drawDp(h.key("q"), dx, dy)
             assertEquals("$dx,$dy", q, downs())
         }
-        // 30dp and back to 5dp: a stroke, by the farthest it went
         typed("hao")
         h.api.calls.clear()
         val k = h.key("q")
         h.touch(k, h.at(k), h.at(k, 15f, 0f, 16), h.at(k, 30f, 0f, 16), h.at(k, 5f, 0f, 16))
         assertEquals(downs().toString(), 1, strokesSent().size)
         assertEquals(downs().toString(), 1, downs().size)
-        // the trail: none short of it, drawn past it
         typed("hao")
         val f = h.finger(k, h.at(k))
         h.after(16)
@@ -141,7 +128,6 @@ class StrokeUatTest {
         f.move(h.at(k, 25f, 0f))
         assertTrue(board().glideForTest!!.trailShown)
         f.up(h.at(k, 25f, 0f))
-        // the nine keys: the digit's group, as its tap
         close()
         harness(KeyboardHarness.PINYIN, keyboards = KeyboardHarness.NINE_KEYS)
         val two = tapped { h.nineKey("2") }
@@ -150,7 +136,7 @@ class StrokeUatTest {
         drawDp(h.nineKey("2"), 16f, 8f)
         assertEquals(two, downs())
         close()
-        // the 14 keys, whose tap is sent with where across the key it landed: the tap's place is its down's
+        // the 14 keys' tap is sent with where across the key it landed: the tap's place is its down's
         prefs.set(AppPrefs.getInstance().keyboard.pinyinKeyboard, PinyinKeyboard.Keys14)
         harness(KeyboardHarness.PINYIN)
         val tapAt = { dx: Float ->
@@ -169,15 +155,13 @@ class StrokeUatTest {
         assertEquals(left, downs())
     }
 
-    // the tap a short stroke is (GlideTouch.Route.TAP_KEY) goes to the engine with where the finger came down,
-    // as a plain tap's does: a key tapped off-centre read as the one next to it (061-neighbour-correction)
+    // a short stroke's tap goes to the engine with where the finger came down, as a plain tap's does
     @Test
     fun aShortStrokesTapCarriesWhereTheFingerCameDown() {
         harness(KeyboardHarness.PINYIN)
         typed("hao")
         h.api.touches.clear()
         val s = h.key("s")
-        // down 10dp left of the middle, toward a; a stroke started (12dp) but lifted 15dp off, short of the lift distance (24dp)
         h.touch(s, h.at(s, -10f, 0f), h.at(s, -4f, 0f, 16), h.at(s, 2f, 0f, 16), h.at(s, 5f, 0f, 16))
         assertTrue(strokesSent().toString(), strokesSent().isEmpty())
         val (key, touch) = h.api.touches.single()
@@ -186,8 +170,7 @@ class StrokeUatTest {
         assertTrue(touch.near.toString(), touch.near('a') != null)
     }
 
-    // two thumbs overlapping: q drifting 14dp down as a lands, q lifted, then a: both typed, q first, no stroke
-    // (0.6.0 started a stroke at about 19dp down, and typed both)
+    // two thumbs overlapping: q drifting down as a lands: both typed, q first, no stroke
     @Test
     @Uat("KB-101")
     fun aShortStrokeAsAnotherFingerLandsIsItsTapAndTheOtherKeyTypedToo() {
@@ -203,7 +186,6 @@ class StrokeUatTest {
         h.secondFingerThenLift(ab.exactCenterX(), ab.exactCenterY(), firstLifts = true)
         assertEquals(q + a, downs())
         assertEquals(emptyList<String>(), strokesSent())
-        // a lifted first, then q: the same
         typed("hao")
         h.api.calls.clear()
         h.drag(qb, qb.exactCenterX(), qb.exactCenterY() + 14f * dp, steps = 4, lift = false)
@@ -212,8 +194,7 @@ class StrokeUatTest {
         assertEquals(emptyList<String>(), strokesSent())
     }
 
-    // the debug trace (YoumoStrokeTap) has a line for a stroke whose other finger lifts last, swallowed: that
-    // touch's line, not lost
+    // the debug trace (YoumoStrokeTap) has a line for a stroke whose other finger lifts last, swallowed
     @Test
     fun theStrokeTraceHasALineForAStrokeWhoseOtherFingerLiftsLast() {
         harness(KeyboardHarness.PINYIN)
@@ -229,7 +210,6 @@ class StrokeUatTest {
         assertTrue(lines.single(), "multi=1" in lines.single())
     }
 
-    // a finger down near a key's edge sliding out past it (touch slop and all), short of the lift: the key it came down on
     @Test
     @Uat("KB-102")
     fun aTapNearTheEdgeSlidingOffTheKeyIsStillItsTap() {
@@ -243,7 +223,6 @@ class StrokeUatTest {
         assertEquals(a, downs())
     }
 
-    // the sensitivity read at each touch: a 22dp 横 a stroke on 高 (20dp), the key's tap on 低 (28dp); the nine keys alike
     @Test
     @Uat("ST-134")
     fun theSensitivityIsReadAtEachTouch() {
@@ -267,7 +246,6 @@ class StrokeUatTest {
         }
     }
 
-    // a slow stroke: started (12dp) before the long press, a stroke read and no long press, at each long press delay
     @Test
     @Uat("KB-103")
     fun aSlowStrokeIsReadBeforeAnyLongPress() {
@@ -276,14 +254,12 @@ class StrokeUatTest {
             harness(KeyboardHarness.PINYIN)
             typed("hao")
             h.api.calls.clear()
-            // 40dp down in 480ms, about 13mm a second
             drawDp(h.key("e"), 0f, 40f, steps = 12, ms = 40)
             assertEquals("$delay ${downs()}", listOf(true), downs().map { stroke('s') in it })
             close()
         }
     }
 
-    // a stroke drawn while pinyin is typed is sent as one, the keys under it none: from any row, short or long
     @Test
     @Uat("KB-42")
     fun aStrokeDrawnWhilePinyinIsTypedIsSentAsOneTheKeysNone() {
@@ -291,7 +267,6 @@ class StrokeUatTest {
         class Row(val why: String, val strokes: String, val drawn: () -> Unit)
         assertRows(
             listOf(
-                // past the lift distance (中, 24dp): short of it a tap (KB-101)
                 Row("short, from any row: 竖 from the bottom row 26dp down, a short 点, a 横 26dp across", "snh") {
                     drawDp(h.key("x"), 0f, 26f)
                     drawDp(h.key("e"), 19f, 19f)
@@ -306,7 +281,6 @@ class StrokeUatTest {
                     h.drag(h.key("e"), e.exactCenterX() + 2.5f * e.width(), e.exactCenterY(), steps = 6, lift = false)
                     h.move(e.exactCenterX() + 2.5f * e.width(), e.exactCenterY() + 2f * e.height(), steps = 6, lift = true)
                 },
-                // up is no stroke: nothing sent, nothing typed
                 Row("up", "") { draw(h.key("x"), across = 0f, down = -2f) },
             ),
             { it.why },
@@ -319,7 +293,6 @@ class StrokeUatTest {
             assertEquals(downs().toString(), strokes, downs().map { call -> strokes.first { it in call } })
             assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("offerGlide") })
         }
-        // a tap is still a tap
         typed("hao")
         h.api.calls.clear()
         h.tap(h.key("q"))
@@ -342,7 +315,6 @@ class StrokeUatTest {
         draw(h.key("GH"), across = 0f, down = 2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
         close()
-        // pinyin's 18 keys
         harness(KeyboardHarness.PINYIN, keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS18))
         typed("hao")
         h.api.calls.clear()
@@ -350,7 +322,7 @@ class StrokeUatTest {
         draw(h.keys().first { it.label in faces18 }, across = 0f, down = 2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
         close()
-        // 双拼's nine keys, whose keys glide no letters (T9Keyboard's other path): a stroke all the same
+        // 双拼's nine keys glide no letters (T9Keyboard's other path): a stroke all the same
         harness(shuangpin, keyboards = ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS))
         typed("hk")
         h.api.calls.clear()
@@ -358,8 +330,7 @@ class StrokeUatTest {
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('n') in it })
     }
 
-    // the bug: a stroke started on 九键's 1 (top left: a 横 along the top row) was no stroke, the letters' keys alone
-    // taken as where one starts; 1 is in the 3×3 drawn over as the toolbar's 手写 writes there. A tap on it is the separator still
+    // a stroke started on 九键's 1 was once no stroke; 1 is in the 3×3 drawn over. A tap on it is the separator still
     @Test
     @Uat("T9-69")
     fun theNineKeysOneStartsAStrokeAsTheLettersDoATapIsStillTheSeparator() {
@@ -371,7 +342,6 @@ class StrokeUatTest {
         h.api.calls.clear()
         draw(h.nineKey("1"), across = 0.8f, down = 1.2f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('n') in it })
-        // the engine's word that nine keys are typed: 1's tap its code (PINYIN_NINE's 1), the engine's separator
         EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("wang"), id = 1)
         try {
             h.idle()
@@ -382,13 +352,11 @@ class StrokeUatTest {
             EngineState.syllablesState.value = EngineState.SyllableState()
         }
         close()
-        // 双拼's nine keys the same
         harness(shuangpin, keyboards = ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS))
         typed("hk")
         h.api.calls.clear()
         draw(h.nineKey("1"), across = 2f, down = 0f)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('h') in it })
-        // and a tap on its 1 while typing the separator ' still (SP-22), no stroke
         EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("hk"), id = 1)
         try {
             h.idle()
@@ -400,7 +368,6 @@ class StrokeUatTest {
         }
     }
 
-    // the split keyboard's gap: a stroke may start there (no key to tap); a tap there, or a glide, still does nothing
     @Test
     @Uat("KB-42")
     @Config(qualifiers = LANDSCAPE)
@@ -408,19 +375,16 @@ class StrokeUatTest {
         harness(KeyboardHarness.PINYIN)
         val gap = gap()
         val t = h.box(h.key("t"))
-        // what GlideInput is told there, and not on the letters beside it
         assertTrue(gapAt(gap.exactCenterX(), gap.exactCenterY()))
         assertFalse(gapAt(t.exactCenterX(), t.exactCenterY()))
         typed("hao")
         h.api.calls.clear()
         h.drag(gap, gap.exactCenterX(), gap.exactCenterY() + 2f * t.height())
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
-        // a tap there: nothing
         h.api.calls.clear()
         h.drag(gap, gap.exactCenterX(), gap.exactCenterY(), steps = 1)
         assertEquals(emptyList<String>(), downs())
         close()
-        // glide typing chosen: no glide from the gap, nothing typed
         harness(KeyboardHarness.PINYIN, glide = true)
         typed("hao")
         h.api.calls.clear()
@@ -428,7 +392,6 @@ class StrokeUatTest {
         assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("offerGlide") } && downs().isEmpty())
     }
 
-    // a finger resting in the gap, another tapping a letter: the letter typed as ever, no stroke
     @Test
     @Uat("KB-42")
     @Config(qualifiers = LANDSCAPE)
@@ -437,7 +400,6 @@ class StrokeUatTest {
         val gap = gap()
         val k = h.box(h.key("k"))
         typed("hao")
-        // what k typed alone sends
         h.api.calls.clear()
         h.drag(k, k.exactCenterX(), k.exactCenterY(), steps = 1)
         val alone = downs()
@@ -450,7 +412,6 @@ class StrokeUatTest {
         assertEquals(emptyList<String>(), strokesSent())
     }
 
-    // a stroke from the gap cancelled midway (the system took the touch): nothing sent, its trail gone
     @Test
     @Uat("KB-42")
     @Config(qualifiers = LANDSCAPE)
@@ -473,14 +434,12 @@ class StrokeUatTest {
         h.relayout()
         assertFalse(glide().trailShown)
         assertEquals(emptyList<String>(), downs())
-        // the next touch as ever: a stroke from the gap again
         typed("hao")
         h.api.calls.clear()
         h.drag(gap, gap.exactCenterX(), gap.exactCenterY() + 2f * keyHeight)
         assertEquals(downs().toString(), listOf(true), downs().map { stroke('s') in it })
     }
 
-    // only the split 26 keys have a gap: no point of any other layout's keyboard is one, as GlideInput asks
     @Test
     @Uat("KB-42")
     fun noOtherLayoutHasAGap() {
@@ -501,7 +460,6 @@ class StrokeUatTest {
             harness(KeyboardHarness.PINYIN)
             val kb = board()
             assertTrue("${b.name}: ${kb.javaClass}", b.kind.isInstance(kb))
-            // one-handed: the keyboard narrower than the screen, its letters as one block at a side
             if (b.oneHanded) assertTrue("${kb.width} of ${kb.rootView.width}", kb.width < kb.rootView.width * 0.9)
             val found = grid(kb).filter { (x, y) -> kb.glideForTest?.inGap(x, y) == true }
             assertEquals(b.name, emptyList<Pair<Float, Float>>(), found)
@@ -509,7 +467,6 @@ class StrokeUatTest {
         }
     }
 
-    // the same grid finds the split keyboard's gap: the sweep above would see one
     @Test
     @Uat("KB-42")
     @Config(qualifiers = LANDSCAPE)
@@ -519,15 +476,12 @@ class StrokeUatTest {
         assertTrue(grid(kb).any { (x, y) -> kb.glideForTest?.inGap(x, y) == true })
     }
 
-    // the letters shown now
     private fun board(): BaseKeyboard = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
 
     private fun glide(): GlideInput = board().glideForTest!!
 
-    // points every 1/40 across and 1/20 down the keyboard, in its pixels
     private fun grid(kb: BaseKeyboard) = (0..40).flatMap { i -> (0..20).map { j -> kb.width * i / 40f to kb.height * j / 20f } }
 
-    // between T and Y, the top row's halves of the split letters, the screen's
     private fun gap(): Rect {
         assertEquals(h.texts().toString(), 2, h.keys().count { it.label.equals("g", ignoreCase = true) })
         val t = h.box(h.key("t"))
@@ -536,7 +490,6 @@ class StrokeUatTest {
         return Rect(t.right, t.top, y.left, t.bottom)
     }
 
-    // whether GlideInput has [x], [y] (the screen's) in the gap
     private fun gapAt(x: Float, y: Float): Boolean {
         val kb = board()
         val at = IntArray(2).also(kb::getLocationInWindow)
@@ -546,33 +499,28 @@ class StrokeUatTest {
     @Test
     @Uat("KB-43")
     fun withNothingTypedGlideChosenOrEnglishNoStrokeIsSent() {
-        // nothing typed: the drag is the keys' as ever, no stroke
         harness(KeyboardHarness.PINYIN)
         draw(h.key("w"), across = 3f, down = 0f)
         assertEquals(emptyList<String>(), strokesSent())
         close()
-        // glide typing chosen: the same drag glides, no stroke
         harness(KeyboardHarness.PINYIN, glide = true)
         typed("hao")
         draw(h.key("w"), across = 3f, down = 0f)
         assertEquals(emptyList<String>(), strokesSent())
         assertEquals(h.api.calls.toString(), 1, h.api.calls.count { it.startsWith("offerGlide") })
         close()
-        // 笔画筛选 chosen: English neither glides nor filters
         harness(KeyboardHarness.ENGLISH)
         typed("hel")
         draw(h.key("w"), across = 3f, down = 0f)
         assertEquals(emptyList<String>(), strokesSent())
         assertTrue(h.api.calls.toString(), h.api.calls.none { it.startsWith("offerGlide") })
         close()
-        // a temporary mode (快速输入): what is typed is not pinyin's, no stroke
         harness(KeyboardHarness.PINYIN)
         typed("ab", aux = "快速输入：")
         draw(h.key("w"), across = 3f, down = 0f)
         assertEquals(emptyList<String>(), strokesSent())
         close()
-        // nor does a table (五笔): it glides only when glide typing is chosen
-        harness(InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false))
+        harness(InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN"))
         typed("wq")
         draw(h.key("w"), across = 3f, down = 0f)
         assertEquals(emptyList<String>(), strokesSent())

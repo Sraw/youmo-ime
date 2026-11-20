@@ -34,7 +34,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A table's commit deleted at once is taken back; the same keys again are a pick there, and nothing more (U-03, F2655). */
+/** A table's commit deleted at once is taken back; the same keys again are a pick there, and nothing more. */
 class TableSessionUndoTest {
 
     // 人 first by the word model (调频 on) and the table (off)
@@ -78,7 +78,7 @@ class TableSessionUndoTest {
 
     private fun uses(keys: String, text: String) = learner.habits.uses(Code(kind, keys), Words.of(text))
 
-    // 原 TBL-37: 山 picked, 人 put in by mistake and deleted, 山 again: still two running, 山 first
+    // 山 picked, 人 put in by mistake and deleted, 山 again: still two running, 山 first
     @Test
     fun aDeletedPickIsTakenBackAndTheRunGoesOn() {
         val t = session()
@@ -92,7 +92,6 @@ class TableSessionUndoTest {
         assertEquals("山", t.type("kkkk").second.candidates.first())
     }
 
-    // 原 TBL-38: 调频 off, the table's order never moves; what was deleted is no use
     @Test
     fun withOrderByUseOffADeletedPickIsNoUse() {
         val t = session(orderByUse = false)
@@ -105,7 +104,6 @@ class TableSessionUndoTest {
         assertEquals(before, t.type("kkkk").second.candidates)
     }
 
-    // the same keys again: its own pick row is the correction, nothing else (形码看键)
     @Test
     fun theSameKeysAgainAddNoRow() {
         val t = session()
@@ -118,7 +116,6 @@ class TableSessionUndoTest {
         assertEquals(1, learner.habits.corrections(Code(kind, "kkkk"), Words.of("山")))
     }
 
-    // review F2655 MUST: a 联想 pick deleted is taken back, the commit before it stands
     @Test
     fun aDeletedPredictionIsTakenBackAlone() {
         val t = session()
@@ -132,7 +129,6 @@ class TableSessionUndoTest {
         assertEquals(1, uses("g", "高"))
     }
 
-    // review F2655 S: a wildcard's commit has its use and pair too: taken back alike
     @Test
     fun aDeletedWildcardCommitIsTakenBack() {
         val t = session()
@@ -166,7 +162,7 @@ class TableSessionUndoTest {
         assertEquals(1, uses("kkkk", "人"))
     }
 
-    // review F2655 S: a traditional table's commit, read back by the host as written
+    // a traditional table's commit, read back by the host as written
     @Test
     fun aTraditionalTablesCommitFitsTheField() {
         val t = session(language = language(simplify = { it.replace('說', '说') }))
@@ -176,7 +172,7 @@ class TableSessionUndoTest {
         assertEquals(0, uses("llll", "說"))
     }
 
-    // review F2655 S (U-28): a word looked up by pinyin is taken back as full pinyin's
+    // a word looked up by pinyin is taken back as full pinyin's
     @Test
     fun aDeletedLookupIsTakenBack() {
         val pinyin = Lookup(learner.habits)
@@ -188,7 +184,6 @@ class TableSessionUndoTest {
         assertFalse("人" in learner.used())
     }
 
-    // review F3087: a key handed on is in the field; a Backspace deletes it, not the pick before
     @Test
     fun aKeyHandedOnAfterAPickIsWhatABackspaceDeletes() {
         val t = session()
@@ -198,7 +193,7 @@ class TableSessionUndoTest {
         assertEquals(1, uses("kkkk", "山"))
     }
 
-    // review F3232: a glide's key no code takes is dropped (GlideSession hands nothing on): a Backspace still takes the pick back
+    // a glide's key no code takes is dropped (GlideSession hands nothing on): a Backspace still takes the pick back
     @Test
     fun aGlidedKeyHandedOnAfterAPickLeavesItToTakeBack() {
         val t = session()
@@ -208,7 +203,7 @@ class TableSessionUndoTest {
         assertEquals(0, uses("kkkk", "山"))
     }
 
-    // review F3087: a code committed by a key not of the codes, the key then the app's
+    // a code committed by a key not of the codes, the key then the app's
     @Test
     fun aKeyEndingACodeAndHandedOnIsWhatABackspaceDeletes() {
         val t = session()
@@ -221,7 +216,6 @@ class TableSessionUndoTest {
         assertEquals(1, uses("kkkk", word))
     }
 
-    // review F3105: a look-up after a message sent learns no pair with the message
     @Test
     fun aLookUpAfterAClearedFieldSaysSo() {
         val pinyin = Lookup(learner.habits)
@@ -231,7 +225,6 @@ class TableSessionUndoTest {
         assertTrue(pinyin.context!!.cleared)
     }
 
-    // review F3166: a look-up a key ends is written, then the key: a Backspace deletes the key
     @Test
     fun aLookUpEndedByAKeyIsNotTakenBackByOneBackspace() {
         val pinyin = Lookup(learner.habits)
@@ -243,7 +236,6 @@ class TableSessionUndoTest {
         assertTrue("人" in learner.used())
     }
 
-    // review F2655 S: a glided code is taken back as a typed one
     @Test
     fun aGlidedCodeIsTakenBack() {
         val table = session()
@@ -254,7 +246,6 @@ class TableSessionUndoTest {
         assertEquals(0, uses("kkkk", "人"))
     }
 
-    // review F2655 S: a word the glide held back is written, no record of it; the field still known
     @Test
     fun aHeldBackWordTakesNothingBackAndKeepsTheFieldKnown() {
         val table = session()

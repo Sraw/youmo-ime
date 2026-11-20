@@ -31,11 +31,7 @@ import java.io.File
 import java.util.zip.ZipFile
 import kotlin.math.abs
 
-/**
- * The key style settings over every built-in 4.0 pack, as the keyboard draws it (KeyStyleChoice.overPack on the
- * scene's Env): the owner, 0.6.0-beta2, 国风·天青's keys spaced as the pack wrote whatever was set. Each kind of key,
- * upright, on its side, 紧凑 and both.
- */
+/** The key style settings over every built-in 4.0 pack (KeyStyleChoice.overPack): each kind of key, upright, on its side, 紧凑 and both. */
 class PackKeyStyleTest {
 
     private val packs: Map<String, Theme> by lazy {
@@ -44,7 +40,7 @@ class PackKeyStyleTest {
                 val text = ZipFile(f).use { z -> z.getInputStream(z.getEntry("theme.xml")).bufferedReader().readText() }
                 f.name.removePrefix("builtin_theme_").removeSuffix(".theme") to (ThemeReader.theme(text) as Parsed.Ok).value
             }
-            // the tests below go over every pack: none found (the path moved) would pass them all
+            // none found (the path moved) would pass them all
             .also { assertTrue("no built-in packs under src/main/res/raw", it.isNotEmpty()) }
     }
 
@@ -68,7 +64,6 @@ class PackKeyStyleTest {
 
     private fun Scene.key(role: String) = keys.first { it.role == role || it.id == role }
 
-    // the face's inset, dp: top, right, bottom, left
     private fun inset(n: KeyNode): List<Double> = (n.shape as Shape.Rect).box.let { b ->
         listOf(b.top - n.bounds.top, n.bounds.right - b.right, n.bounds.bottom - b.bottom, b.left - n.bounds.left).map { it / density }
     }
@@ -78,7 +73,6 @@ class PackKeyStyleTest {
     @Test
     fun everyPacksKeysTakeTheSpacingsInEveryForm() {
         val choice = KeyStyleChoice(null, KeyStyleChoice.H_STANDARD, KeyStyleChoice.V_LOOSE, null)
-        // "own" below is the pack as it drew itself: following it lays nothing over it
         assertNull(KeyStyleChoice.FOLLOW.overPack)
         packs.forEach { (name, theme) ->
             forms.forEach { (form, env) ->
@@ -90,21 +84,18 @@ class PackKeyStyleTest {
                     val i = inset(set.key(k))
                     val o = inset(own.key(k))
                     assertTrue("$what left/right $i", near(i[1], 3.0) && near(i[3], 3.0))
-                    // the pack's own top and bottom for this key (the face measured has its cap, depth, under it)
+                    // the face measured has its cap (depth) under it
                     val n = own.key(k)
                     val raw = KeyLook(Cascades(theme).of(env.scenes).of(Selector.Target("key", qwerty.id, n.id, n.role, setOf(n.kind))), theme).inset
                     val half = (raw.bottom - raw.top) / 2
                     val top = (level - half).coerceAtLeast(0.0)
                     assertTrue("$what top $i (own $o, $raw)", near(i[0], top))
-                    // the bottom moved as the top did: the pack's difference (and its cap) kept
                     assertTrue("$what bottom-minus-top kept $i (own $o, $raw)", near(i[2] - o[2], i[0] - o[0]) || top == 0.0)
                 }
             }
         }
     }
 
-    // 无边框 on every pack, every form: every key alike (the space and Return too), no fill, border, shadow,
-    // inner shadow or cap (机械键帽's depth) unpressed
     @Test
     fun withoutBordersEveryPacksKeysAreFlat() {
         val flat = KeyStyleChoice(false, null, null, null)
@@ -127,14 +118,13 @@ class PackKeyStyleTest {
     fun theRadiusIsEveryKeysInEveryFormPressedToo() {
         val choice = KeyStyleChoice(null, null, null, KeyStyleChoice.RADIUS_SQUARE)
         packs.forEach { (name, theme) ->
-            // a pack drawing its own shape= (none of the built-in ones now) is not a rounded rect to square
+            // a pack drawing its own shape= (none built in now) is not a rounded rect to square
             if (theme.styles.any { st -> "shape" in st.values }) return@forEach
             forms.forEach { (form, env) ->
                 val s = scene(theme, choice, env)
                 listOf("a", "shift", "space", "enter").forEach { k ->
                     val n = s.key(k)
                     assertEquals("$name $form $k", List(4) { 0.0 }, (n.shape as Shape.Rect).radii)
-                    // the pressed face's fills square too
                     n.faces.filterKeys { KeyState.Pressed in it }.values.flatten().filterIsInstance<Op.Fill>().forEach {
                         assertEquals("$name $form $k pressed", List(4) { 0.0 }, (it.shape as? Shape.Rect)?.radii ?: List(4) { 0.0 })
                     }

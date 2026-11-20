@@ -25,9 +25,7 @@ class ToolFingerprintTest {
 
     private val warnings = ArrayList<String>()
 
-    // a class file as far as ToolFingerprint reads one: its header and constant pool, [code] a
-    // string constant standing for its code, [classes] Class constants, [strings] other text; with
-    // [line], a method too, of the one instruction [op], that its line number table puts on that line
+    // a class file as far as ToolFingerprint reads one; with [line], one method whose line number table puts [op] there
     private fun classFile(
         code: String,
         classes: List<String> = listOf(),
@@ -81,10 +79,7 @@ class ToolFingerprintTest {
         return bytes.toByteArray()
     }
 
-    // a coroutine's class as kotlinc writes it, less its members: its line in @DebugMetadata's
-    // [element], an Integer constant, beside another, [version]; with [shared], the line array names
-    // the constant of the version instead; with [alsoIn], an attribute of that name names the line's
-    // constant too (see naming5), a field's for a ConstantValue, else the class's
+    // a coroutine's class as kotlinc writes it, less its members: its line an Integer constant in @DebugMetadata's [element]
     private fun coroutine(line: Int, element: String = "l", version: Int = 2, shared: Boolean = false, alsoIn: String? = null): ByteArray {
         val bytes = ByteArrayOutputStream()
         DataOutputStream(bytes).run {
@@ -144,8 +139,7 @@ class ToolFingerprintTest {
         return bytes.toByteArray()
     }
 
-    // the value of the attribute [name] as it names constant 5, a coroutine's line; a Signature
-    // naming another, and one of a name ToolFingerprint does not know, the constant as it might
+    // the attribute [name]'s value naming constant 5, a coroutine's line
     private fun naming5(name: String): ByteArray {
         val bytes = ByteArrayOutputStream()
         DataOutputStream(bytes).run {
@@ -294,9 +288,7 @@ class ToolFingerprintTest {
         assertEquals(fingerprint(dir("a", withLib(coroutine(10, alsoIn = "Signature")))), fingerprint(dir("b", withLib(coroutine(20, alsoIn = "Signature")))))
     }
 
-    // kotlinc's own output, with what the classes built above lack (InnerClasses, Signature,
-    // BootstrapMethods, StackMapTable, @Metadata, a coroutine's @DebugMetadata): if it did not read to
-    // the end, its whole bytes would be hashed, lines and all
+    // kotlinc's own output, with the attributes the classes above lack: if it did not read to the end, lines and all would be hashed
     @Test
     fun realClassesLoseTheirDebugInfo() {
         // its one suspension point is on the next line, which its @DebugMetadata's l holds

@@ -41,7 +41,7 @@ class KeyboardHeightLevelsTest {
 
     @Test
     fun turnedALevelIsARowOfTheTable() {
-        // 061-landscape-height §5.1: a phone's rows are a common phone's today, a large screen's from Gboard's 56
+        // a phone's rows are a common phone's today, a large screen's from Gboard's 56
         val phone = KeyboardHeightLevels.ALL.map { KeyboardHeightLevels.landscapeRowDp(it.landscapeLevel.toDouble(), large = false) }
         val large = KeyboardHeightLevels.ALL.map { KeyboardHeightLevels.landscapeRowDp(it.landscapeLevel.toDouble(), large = true) }
         assertEquals(listOf(34.0, 41.0, 48.0, 54.0, 59.0), phone)
@@ -50,7 +50,7 @@ class KeyboardHeightLevelsTest {
 
     @Test
     fun turnedAValueBetweenLevelsIsStraightBetweenTheirRows() {
-        // a theme's 45, 0.4's dragged 52: between 矮 (42, 41 dp) and 标准 (49, 48 dp), and between 标准 and 高
+        // a theme's 45, an old dragged 52: between 矮 (42, 41 dp) and 标准 (49, 48 dp), and between 标准 and 高
         assertEquals(44.0, KeyboardHeightLevels.landscapeRowDp(45.0, large = false), 1e-9)
         assertEquals(51.0, KeyboardHeightLevels.landscapeRowDp(52.0, large = false), 1e-9)
         assertEquals(54.0, KeyboardHeightLevels.landscapeRowDp(45.5, large = true), 1e-9)

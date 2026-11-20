@@ -13,10 +13,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.utils.Const
 import org.fcitx.fcitx5.android.utils.openUrl
 
-/**
- * 新增主题's menu (060-render-p3 M5): import a theme file, or make one on the web theme maker in a
- * browser (the app has no network permission, so no WebView) and come back to import it.
- */
+/** Made on the web theme maker in a browser (the app has no network permission, so no WebView). */
 object ThemeAddMenu {
 
     fun show(ctx: Context, import: () -> Unit): AlertDialog {

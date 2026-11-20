@@ -7,27 +7,19 @@ package org.fcitx.fcitx5.android.engine.runtime
 import java.util.concurrent.Executor
 
 /**
- * A value made on [executor], off the input thread, for the [get]s that ask for it by a key: null
- * till it is made. Asked for under another key (what it is made of changed), the one made for an
- * older key is dropped, however late it comes, and so is one being made. A make that throws is
- * reported to [onError] and stays unmade for its key (null, not retried at every [get]): it runs
- * on a bare thread, where an uncaught exception would kill the input method. An Error too: an
- * OutOfMemoryError coding a merged dictionary for a table (0.3.1) killed it so, crash-looping.
+ * A value made on [executor] per key, null till made; asking under a new key drops the old key's value even
+ * if it arrives late. A throwing make (Errors too) goes to [onError] and stays unmade for its key: on a bare
+ * thread it would kill the input method (an OOM coding a merged dictionary once crash-looped it).
  */
 internal class InBackground<V : Any>(private val executor: Executor, private val onError: (Throwable) -> Unit) {
     private val lock = Any()
     private var asked: Any? = null
     private var made: V? = null
 
-    // one per ask: a key asked for again later is a new ask, which a make of the earlier one (perhaps stopped early) must not fill
+    // one per ask: a key asked again later is a new ask, which an earlier make must not fill
     private var asks = 0L
 
-    /**
-     * The value for [key], or null while it is being made. [snapshot] runs here, on the caller's
-     * thread, once per key: it reads what the value is made of and returns the work, which runs on
-     * [executor] and reads nothing the caller's thread changes. The work may stop early once its
-     * argument says the key is no longer asked for; what it returns then is dropped.
-     */
+    /** Null while being made. [snapshot] runs once per key on the caller's thread and returns the work, which runs on [executor] reading nothing the caller changes; it may stop early once no longer asked, and its result is then dropped. */
     fun get(key: Any, snapshot: () -> (stillAsked: () -> Boolean) -> V): V? {
         val ask = synchronized(lock) {
             if (asked == key) return made
@@ -42,7 +34,7 @@ internal class InBackground<V : Any>(private val executor: Executor, private val
             val value = try {
                 work(stillAsked)
             } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
-                // whatever it throws: on a bare thread, uncaught, it would kill the input method
+                // whatever it throws: uncaught on a bare thread it would kill the input method
                 onError(e)
                 return@execute
             }

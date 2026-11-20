@@ -12,18 +12,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
 
-/**
- * [UserFiles] in memory, for a test: what the engine writes kept as it would be on a disk, under
- * this root, till the test drops it. A file is written through as it goes (an append not yet
- * closed is read with what it wrote so far), a write needs its directory made first, and a rename
- * replaces what was at its destination, as on the phone. Safe across threads, as a compaction
- * reads the log on its own. Another [MemoryFiles] made over the same [root] (an engines made anew)
- * sees the same files. Held to [JvmFiles][org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles]
- * on a disk by UserFilesContractTest; a directory's own length is ext4's (and f2fs's), [DIR_LENGTH].
- * Not modelled: a [LogFile.create] stream keeps its offset on a disk when another handle cuts the
- * file (its next write leaves a hole of zeros); here every stream writes on at the end, as an
- * append does, which is all [UserFiles] promises.
- */
+/** [UserFiles] in memory, held to [JvmFiles] by UserFilesContractTest; unlike a disk, every stream writes at the end. */
 class MemoryFiles private constructor(private val root: Root, private val path: String) : UserFiles {
     constructor() : this(Root(), "")
 
@@ -100,7 +89,6 @@ class MemoryFiles private constructor(private val root: Root, private val path: 
         val to = (dest as MemoryFiles).path
         // onto a directory only if it is empty, as rename(2) replaces one
         val free = to !in root.files && (to !in root.dirs || MemoryFiles(root, to).let { it.files().isEmpty() && it.dirs().isEmpty() })
-        // nor into itself
         val place = parent(to) in root.dirs && !to.startsWith("$path/")
         if (path !in root.dirs || !free || !place) return false
         root.dirs -= to
@@ -147,7 +135,6 @@ class MemoryFiles private constructor(private val root: Root, private val path: 
             (path in root.files).also { if (it) root.modified[path] = time }
         }
 
-        // the directory it is in: one not made is no place to write
         private fun open(fresh: Boolean): ByteArrayOutputStream = synchronized(root) {
             if (parent(path) !in root.dirs || path in root.dirs) throw FileNotFoundException(toString())
             // written anew, it is the same file emptied: an append open on it writes on after what is written now
@@ -159,8 +146,7 @@ class MemoryFiles private constructor(private val root: Root, private val path: 
 
         override fun append(): LogOutput = Output(open(fresh = false))
 
-        // writes to the bytes the file had as it was opened: a file renamed over meanwhile is
-        // written no more, as an unlinked one is not on the disk
+        // a file renamed over meanwhile is written no more, as an unlinked one on a disk
         private inner class Output(private val to: ByteArrayOutputStream) : LogOutput() {
             private var closed = false
 
@@ -181,7 +167,6 @@ class MemoryFiles private constructor(private val root: Root, private val path: 
             }
         }
 
-        // one not there is made, as RandomAccessFile's "rw" makes it
         override fun truncate(length: Long) = synchronized(root) {
             val was = open(fresh = false)
             val kept = was.toByteArray().copyOf(length.toInt())
@@ -191,7 +176,6 @@ class MemoryFiles private constructor(private val root: Root, private val path: 
 
         override fun renameTo(dest: LogFile): Boolean = synchronized(root) {
             val to = (dest as MemoryFile).path
-            // a directory at the path moves as a directory does
             if (path in root.dirs) return MemoryFiles(root, path).renameTo(MemoryFiles(root, to))
             val moved = root.files[path] ?: return false
             if (parent(to) !in root.dirs || to in root.dirs) return false
@@ -222,7 +206,6 @@ class MemoryFiles private constructor(private val root: Root, private val path: 
     private companion object {
         fun parent(path: String) = path.substringBeforeLast('/', "")
 
-        // what ext4 and f2fs give as a directory's own length
         const val DIR_LENGTH = 4096L
     }
 }

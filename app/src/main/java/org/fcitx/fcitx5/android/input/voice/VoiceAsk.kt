@@ -5,37 +5,29 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * 语音先问再记, the service's side (061-voice-learn-from-edits.md): a talk's text gathered as it goes
- * into the field, handed over whole once the talk is over and the last of it in ([ended], [landed]),
- * for the engine to follow ([org.fcitx.fcitx5.android.core.HostApi.voiceSaid]); then what else goes
- * in reported ([putIn]) while the engine follows it. On the main thread.
+ * A talk's text handed over whole once the talk is over and the last of it in, for the engine to follow;
+ * then what else goes in reported while the engine follows it. Main thread.
  */
 class VoiceAsk {
     private val said = StringBuilder()
     private var talking = false
 
-    // voice's commits posted through fcitx ([posting]), not in yet: the talk's now, [talk]
     private var posted = 0
 
-    // the talk now, numbered: a commit another posted (fcitx busy as the next began, a field left) lands uncounted,
-    // ungathered (R26 F8367: it took one off the next's count, its text handed over before the last of it was in)
+    // a commit another talk posted (fcitx busy as the next began, a field left) lands uncounted: it took one off the
+    // next's count, its text handed over before the last of it was in
     private var talk = 0
 
-    // one of them did not go in (the field changed): the talk's text not all there
+    // the field changed: the talk's text not all there
     private var dropped = false
 
-    // voice's text going in now ([voice]), and whether it is the talk's now, to gather
     private var voicePutting = false
     private var gathering = false
 
-    // a window the engine may have open, by the talk that made it: what goes in is reported
     private var window = 0
     private var open = false
 
-    /**
-     * A talk began: what was gathered of another, gone. The window of the last is left open: a talk that puts
-     * nothing in (not heard, no permission, a failure) leaves it as it was.
-     */
+    /** The last talk's window is left open: a talk that puts nothing in leaves it as it was. */
     fun began() {
         said.setLength(0)
         talking = true
@@ -44,19 +36,16 @@ class VoiceAsk {
         dropped = false
     }
 
-    /** The talk is over: its text, if all of it is in. */
     fun ended(): String? {
         talking = false
         return whole()
     }
 
-    /** Voice's commit posted through fcitx (CommitAction's), to come in later: the talk it is of, for [landed] and [voice]. */
     fun posting(): Int {
         posted++
         return talk
     }
 
-    /** That commit of [talk] ([posting]'s) in ([inField]) or dropped: the talk's text, if it is over and all of it in. */
     fun landed(talk: Int, inField: Boolean): String? {
         if (talk != this.talk) return null
         if (posted > 0) posted--
@@ -64,7 +53,7 @@ class VoiceAsk {
         return whole()
     }
 
-    /** [block] puts voice's text of [talk] ([posting]'s) in: gathered if that talk is the one now, never reported. */
+    /** Gathered if that talk is the one now, never reported. */
     inline fun <T> voice(talk: Int, block: () -> T): T {
         voicing(true, talk)
         try {
@@ -74,7 +63,6 @@ class VoiceAsk {
         }
     }
 
-    /** The talk now: its text put in at once, not posted ([voice]). */
     val talkNow: Int get() = talk
 
     @PublishedApi
@@ -83,19 +71,15 @@ class VoiceAsk {
         gathering = on && talk == this.talk
     }
 
-    /** What to do with text that went in ([putIn]). */
     enum class Put {
-        /** nothing: voice's, gathered, or no window open */
         NONE,
 
-        /** reported to the engine ([org.fcitx.fcitx5.android.core.HostApi.voicePutIn]) */
         REPORT,
 
-        /** the window ended ([org.fcitx.fcitx5.android.core.HostApi.voiceEditsEnd]): typed while a talk lasts (VO-47) */
+        /** typed while a talk lasts */
         END,
     }
 
-    /** [text] into the field: voice's gathered; else reported while a window is open, the window shut if a talk goes on. */
     fun putIn(text: String): Put {
         if (voicePutting) {
             if (gathering) said.append(text)
@@ -108,21 +92,17 @@ class VoiceAsk {
         return Put.END
     }
 
-    /** The talk's text handed to the engine, [asks] or not: the window it may open, numbered. */
     fun told(asks: Boolean): Int {
         open = asks
         return ++window
     }
 
-    /** The engine said [window] is shut (its report's answer): nothing reported till another opens. */
     fun shut(window: Int) {
         if (window == this.window) open = false
     }
 
-    /** The window's number now, for [shut]. */
     val current: Int get() = window
 
-    /** The field left, input finished: nothing gathered nor followed. */
     fun reset() {
         said.setLength(0)
         talking = false

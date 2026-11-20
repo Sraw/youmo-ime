@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.core.CoreLog
 
 class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<State, B>, B : EventStateMachine.BooleanStateKey>(
     private val initialState: State,
-    private val externalBooleanStates: MutableMap<B, Boolean>
+    internal val externalBooleanStates: MutableMap<B, Boolean>
 ) {
 
     interface BooleanStateKey {
@@ -16,10 +16,7 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
     }
 
     interface TransitionEvent<State : Any, B : BooleanStateKey> {
-        /**
-         * INVARIANT: No side effects
-         * @return the next state
-         */
+        /** No side effects. */
         fun accept(initialState: State, currentState: State, useBoolean: (B) -> Boolean?): State
 
     }
@@ -27,11 +24,8 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
     var onNewStateListener: ((State) -> Unit)? = null
 
     var currentState = initialState
-        private set
+        internal set
 
-    /**
-     * Push an event that may trigger a transition of state
-     */
     fun push(event: Event) {
         val newState = event.accept(initialState, currentState) { externalBooleanStates[it] }
         if (newState == currentState) {
@@ -43,9 +37,6 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
         onNewStateListener?.invoke(newState)
     }
 
-    /**
-     * Update boolean states and push an event
-     */
     fun push(event: Event, vararg booleanStates: Pair<B, Boolean>) {
         booleanStates.forEach {
             setBooleanState(it.first, it.second)
@@ -56,17 +47,8 @@ class EventStateMachine<State : Any, Event : EventStateMachine.TransitionEvent<S
     fun setBooleanState(key: B, value: Boolean) {
         externalBooleanStates[key] = value
     }
-
-    fun getBooleanState(key: B) =
-        externalBooleanStates[key]
-
-    fun unsafeJump(state: State) {
-        currentState = state
-        onNewStateListener?.invoke(state)
-    }
 }
 
-// DSL
 class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey> {
 
     private var raw: ((State, State, (B) -> Boolean?) -> State)? = null
@@ -75,7 +57,7 @@ class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey>
         lateinit var target: State
         var pred: ((B) -> Boolean?) -> Boolean = { _ -> true }
 
-        // what the verbose log shows of a rule; a rule without a target must not make it throw
+        // a rule without a target must not make the verbose log throw
         override fun toString() = "$source -> ${if (::target.isInitialized) target else "?"}"
     }
 
@@ -95,9 +77,7 @@ class TransitionEventBuilder<State : Any, B : EventStateMachine.BooleanStateKey>
 
     fun from(state: State) = Builder(state).also { builders += it }
 
-    /**
-     * Use either [from] or [accept] to build the transition event
-     */
+    /** Either [from] or [accept] builds the transition. */
     fun accept(block: ((State, State, (B) -> Boolean?) -> State)) = apply {
         raw = block
     }

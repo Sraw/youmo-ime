@@ -7,13 +7,12 @@ package org.fcitx.fcitx5.android.engine.learn
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 
 /**
- * How a code spells a word of its keyboard (U-20, D32 B; docs/pinyin.md 完整拼音和简拼): told by
- * the number of keys alone, so a slip or a fuzzy reading of the same length counts as typed. Only
- * a word of two syllables or more is any of them: a syllable alone's initial is half of it, too
- * many words to lift. Within one keyboard only: full pinyin's uses never reach 双拼 or the nine keys.
+ * How a code spells a word of its keyboard (完整拼音和简拼), told by key count alone, so a slip or fuzzy
+ * reading of the same length counts as typed. Only words of two+ syllables: a lone syllable's initial is
+ * half of it, too many words to lift. Within one keyboard only: full pinyin's uses never reach 双拼 or the nine keys.
  */
 enum class SpelledForm {
-    /** Every letter (fenghua, the nine keys' 3364482) or, 双拼, two keys a syllable. */
+    /** Every letter (fenghua, nine-key 3364482) or, for 双拼, two keys per syllable. */
     FULL,
     /** A key a syllable (fh, 34). */
     INITIALS,
@@ -22,23 +21,22 @@ enum class SpelledForm {
     ;
 
     companion object {
-        /** How [keys] under [kind] spell [reading] (syllables apart by spaces); null where none is: a word of one syllable, a kind of no readings, fewer keys than syllables (no spelling of it). */
+        /** How [keys] under [kind] spell [reading] (space-separated syllables); null for none: one syllable, a kind without readings, fewer keys than syllables. */
         fun of(kind: String, keys: String, reading: String): SpelledForm? {
-            // zhuyin's keys spell no pinyin letters: its keyboards link no spellings (design 051, a trade-off kept simple)
+            // zhuyin keys spell no pinyin letters: its keyboards link no spellings (kept simple on purpose)
             if (Kinds.byText(kind) || Kinds.isZhuyin(kind) || reading.isEmpty()) return null
             val syllables = reading.split(' ')
             return of(Kinds.isShuangpin(kind), keys.count { it != '\'' }, syllables.size, syllables.sumOf { it.length })
         }
 
         /**
-         * [of] by counts, under a kind of readings ([Kinds.byText] false): [n] keys (no separator)
-         * spelling a reading of [syllables] syllables, [letters] letters in all; [shuangpin], two
-         * keys a syllable. What a level asks of each word under its first key, no reading split
-         * there (S15 B5.1).
+         * [of] by counts, for a kind with readings ([Kinds.byText] false): [n] keys (no separator) spelling a
+         * reading of [syllables] syllables and [letters] letters; [shuangpin], two keys a syllable. Each level asks
+         * this of every word under its first key, so no reading is split there.
          */
         fun of(shuangpin: Boolean, n: Int, syllables: Int, letters: Int): SpelledForm? {
             if (syllables < 2) return null
-            // "f" never reads feng hua: no spelling, nor a reason to read the level (R14 F3741)
+            // "f" never reads feng hua: no spelling, and no reason to read the level
             if (n < syllables) return null
             val full = if (shuangpin) 2 * syllables else letters
             return when (n) {
@@ -49,10 +47,9 @@ enum class SpelledForm {
         }
 
         /**
-         * Whether [keys] on [keyboard] ([Kinds.keyboard]) can be the start of each syllable of
-         * [reading] in turn (fengh, feng'h, 33644 for feng hua): a cheap look before a word is
-         * walked into a level (R14 F3733), the walk still the judge. 双拼 is not looked at. A
-         * fuzzy reading or a slip is not walked in so; the decoder's own lists still have them.
+         * Whether [keys] on [keyboard] ([Kinds.keyboard]) can start each syllable of [reading] in turn (fengh,
+         * feng'h, 33644 for feng hua): a cheap check before walking a word into a level; the walk still decides.
+         * 双拼 is not checked. Fuzzy readings and slips are not walked in this way; the decoder's own lists have them.
          */
         fun spells(keyboard: String, keys: String, reading: String): Boolean {
             if (Kinds.isShuangpin(keyboard)) return true
@@ -60,14 +57,9 @@ enum class SpelledForm {
             return spells(typed, Array(typed.length) { nineKeyLetters(keyboard, typed[it]) }, reading.split(' '))
         }
 
-        /**
-         * [spells] off 双拼, its parts worked out once for the many words under a key: [typed] the
-         * keys with no separator, [letters] each one's letters on the nine keys ([nineKeyLetters],
-         * empty off them), [syllables] the reading's.
-         */
+        /** [spells] off 双拼, parts precomputed for the many words under a key: [typed] keys without separator, [letters] each one's nine-key letters ([nineKeyLetters], empty off them), [syllables] the reading's. */
         fun spells(typed: String, letters: Array<String>, syllables: List<String>): Boolean {
             fun same(i: Int, c: Char) = typed[i] == c || c in letters[i]
-            // from key i on, syllable j on: each syllable at least its first letter
             fun from(i: Int, j: Int): Boolean {
                 if (j == syllables.size) return i == typed.length
                 val syl = syllables[j]
@@ -81,22 +73,11 @@ enum class SpelledForm {
             return from(0, 0)
         }
 
-        /**
-         * The first key a code of [reading] on [keyboard] ([Kinds.keyboard]) is filed under, to be
-         * found at a key: the nine keys' (digits, or 连按's letters) by the reading's first letter,
-         * so that 连按 and digits find each other (R14 F3731), and a grouped keyboard's so, its key
-         * found by its letters as a digit is ([nineKeyLetters]); others by the code's first key.
-         */
+        /** The first key a code of [reading] is filed under: on nine-key and grouped keyboards the reading's first letter's key, so 连按 and digits find each other; else the code's first key. */
         fun filedUnder(keyboard: String, keys: String, reading: String): Char? =
             if (keyboard.startsWith(NINE_KEYS) || keyboard.startsWith(GROUPED)) reading.firstOrNull() else keys.firstOrNull { it != '\'' }
 
-        /**
-         * The letters [code] types on the nine keys of [keyboard], whose layout's tag ([Kinds.nineKeys]) has
-         * each key's letters apart by commas; or a grouped keyboard's code ([Kinds.keys], BN's: bn) as the
-         * keyboard its tag files ([NineKeyLetters.filedAs]: the 14 or 18 keys, or a layout's own; never
-         * 双拼's) has it, whose codes the tag does not say. Not grouped 双拼's: its rows
-         * are filed by the code itself ([filedUnder]), so its letters would look where none is.
-         */
+        /** The letters [code] types on [keyboard]'s nine keys or grouped keys ([NineKeyLetters.filedAs]); not grouped 双拼, whose rows are filed by the code itself. */
         fun nineKeyLetters(keyboard: String, code: Char): String = when {
             keyboard.startsWith(GROUPED) -> Kinds.keysTag(keyboard)?.let { NineKeyLetters.filedAs(it) }?.letters(code).orEmpty()
             !keyboard.startsWith(NINE_KEYS) || code !in '2'..'9' -> ""
@@ -104,7 +85,7 @@ enum class SpelledForm {
         }
 
         private val NINE_KEYS = Kinds.nineKeys("")
-        // the 14 keys' alone: a grouped 双拼 key is filed by its code, its initial's key being the scheme's (E2)
+        // the 14 keys' alone: a grouped 双拼 key is filed by its code
         private val GROUPED = Kinds.keys("")
     }
 }

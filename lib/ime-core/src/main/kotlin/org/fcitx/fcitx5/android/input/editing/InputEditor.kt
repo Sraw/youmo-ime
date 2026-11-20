@@ -6,33 +6,16 @@ package org.fcitx.fcitx5.android.input.editing
 
 import org.fcitx.fcitx5.android.input.cursor.CursorRange
 
-/**
- * The slice of `android.view.inputmethod.InputConnection` that editing logic actually needs.
- *
- * Having it as an interface is what lets the cursor and composing arithmetic be tested against
- * a plain `StringBuilder` instead of a live editor on a device.
- *
- * Positions and the meaning of `newCursorPosition` follow `InputConnection` exactly, so the
- * real implementation is a straight delegation.
- */
+/** The slice of `InputConnection` editing needs, so the logic tests against a `StringBuilder`; positions follow `InputConnection` exactly. */
 interface InputEditor {
 
-    /**
-     * Whether there is an editor to talk to right now. `InputMethodService` has no input
-     * connection between sessions; operations that would otherwise update the IME's cursor
-     * prediction check this first, so a dropped call does not leave a stale prediction behind.
-     * (All of `EditingSession`'s do, except `onCursorUpdate`, which only runs on the editor's own
-     * report.)
-     */
+    /** No connection between sessions; calls that update the cursor prediction check this first so none goes stale. */
     val isAvailable: Boolean
 
-    /**
-     * @return false when the editor did not take [text]: no connection, or the binder call failed
-     * (one too large for the editor's buffer, [CommitPieces]). Nothing of it went in then.
-     */
+    /** False when the editor did not take [text] (no connection, or too large for the binder: [CommitPieces]); nothing went in. */
     fun commitText(text: String, newCursorPosition: Int): Boolean
 
-    /** Replaces the composing region (or else the selection) with [text], which stays composing. */
+    /** Replaces the composing region (or else the selection); [text] stays composing. */
     fun setComposingText(text: CharSequence, newCursorPosition: Int)
 
     fun setSelection(start: Int, end: Int)
@@ -41,34 +24,18 @@ interface InputEditor {
 
     fun setComposingRegion(start: Int, end: Int)
 
-    /**
-     * Up to [length] UTF-16 units immediately before the cursor (before the selection start,
-     * when there is a selection), or null when the editor will not say. May be shorter than
-     * asked near the start of the text, or when the editor chooses to reveal less.
-     */
+    /** Before the selection start; null when the editor will not say; may be shorter than asked. */
     fun textBeforeCursor(length: Int): CharSequence?
 
-    /**
-     * Up to [length] UTF-16 units immediately after the cursor (after the selection end, when
-     * there is a selection), or null when the editor will not say.
-     */
+    /** After the selection end; null when the editor will not say. */
     fun textAfterCursor(length: Int): CharSequence?
 
-    /**
-     * Deletes around the selection -- widened to include the composing region, as editors do.
-     *
-     * @param inCodePoints delete whole code points rather than UTF-16 units, so one press
-     * removes a complete emoji instead of half a surrogate pair.
-     */
+    /** Around the selection widened to the composing region; [inCodePoints] so one press removes a whole emoji. */
     fun deleteSurroundingText(before: Int, after: Int, inCodePoints: Boolean)
 
-    /** Groups the calls in [block] so the editor sees one atomic change. */
+    /** One atomic change for the editor. */
     fun batchEdit(block: () -> Unit)
 
-    /**
-     * The composing region as the editor has it now, read at once (Android 13's `takeSnapshot`), not as its
-     * last report said: start and end -1 when there is none; null when the editor cannot tell (before
-     * Android 13, or no snapshot given).
-     */
+    /** Read at once (Android 13's `takeSnapshot`), not the last report; -1 ends for none; null when it cannot tell. */
     fun composingRegion(): CursorRange? = null
 }

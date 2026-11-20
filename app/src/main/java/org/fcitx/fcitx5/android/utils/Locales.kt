@@ -15,11 +15,7 @@ import java.util.Locale
 
 object Locales {
 
-    /**
-     * The languages the user picked for the app (in its settings or, from Android 13 on, the
-     * phone's), empty for the phone's own. Below 13 appcompat keeps them, but knows them only
-     * once an activity of the app has started: the keyboard, started first, reads the app's copy.
-     */
+    /** Empty for the phone's. Below 13 appcompat knows them only after an activity starts, so the keyboard reads the app's copy. */
     fun picked(context: Context): LocaleListCompat =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             LocaleListCompat.wrap(context.getSystemService(LocaleManager::class.java).applicationLocales)
@@ -52,11 +48,7 @@ object Locales {
         update(app + system)
     }
 
-    /**
-     * [onLocaleChange] once the user picked the app's languages. From Android 13 on, the app's
-     * configuration gets them only when the system sends it, after this: here the phone's own
-     * languages are read from the system instead, behind the picked ones.
-     */
+    /** From Android 13 the configuration gets them only later, so the phone's languages are read from the system here. */
     fun onLocalesPicked(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val app = picked(context).let { list -> (0..<list.size()).mapNotNull { list[it] } }
@@ -74,7 +66,7 @@ object Locales {
         fcitxLocale = locales.joinToString(":")
     }
 
-    /** The `language_COUNTRY` and `language` names fcitx looks for, most preferred first. */
+    /** Most preferred first. */
     fun fcitxLocales(preferred: List<Locale>): List<String> {
         val locales = LinkedHashSet<String>()
         for (i in preferred.indices) {

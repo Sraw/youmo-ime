@@ -25,19 +25,14 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 
-/**
- * A key's swipe shortcut carried out on the main thread, what was typed already put in: the field
- * edited through [EditPlan], the clears kept ([ClearedText]) and said with 撤销, the panels opened as
- * the bar's buttons open them ([tradSimp] and [chooseKeyboard] the bar's own).
- */
+/** On the main thread, what was typed already put in; clears kept ([ClearedText]) and said with 撤销. */
 class KeyShortcutRunner(
     private val service: FcitxInputMethodService,
     private val windowManager: InputWindowManager,
     private val tradSimp: () -> Unit,
     private val chooseKeyboard: () -> Unit,
-    /** tap to talk started, or stopped, as by the bar's microphone */
     private val voice: () -> Unit,
-    /** Whether something is typed (the engine's preedit shown): no clear is put back over it. */
+    /** No clear is put back over it. */
     private val typing: () -> Boolean,
 ) {
     private val cleared: ClearedText get() = service.clearedText
@@ -46,7 +41,7 @@ class KeyShortcutRunner(
 
     fun run(shortcut: KeyShortcut) {
         when (shortcut) {
-            // one of variables filled in as it is run (061-text-variables §2.4); filling in nothing, nothing typed
+            // filling in nothing, nothing typed
             is KeyShortcut.Text -> shortcut.typed(KeyClock.calendar()).takeIf { it.isNotEmpty() }?.let { service.commitOverEngine(it) }
             is KeyShortcut.Command -> run(shortcut.command)
             KeyShortcut.None -> {}
@@ -62,7 +57,7 @@ class KeyShortcutRunner(
             KeyCommand.Copy -> if (nothingToTake(range.start, range.end)) {
                 service.say(R.string.nothing_to_copy)
             } else {
-                // the field as it was, the cursor back: a run of Backspaces goes on after it, as after the panel's copy (review L3)
+                // the field as it was: a run of Backspaces goes on after it, as after the panel's copy
                 service.quietly { apply(EditPlan.copy(range.start, range.end)) }
                 if (copyIsSaid(service.currentInputEditorInfo)) service.say(R.string.text_copied)
             }
@@ -74,7 +69,7 @@ class KeyShortcutRunner(
             KeyCommand.Paste -> service.performContextMenuAction(android.R.id.paste)
             KeyCommand.Undo -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
             KeyCommand.Redo -> service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
-            // the listener's: 清除 drops what is typed first, 恢复 must not commit it
+            // 清除 drops what is typed first, 恢复 must not commit it
             KeyCommand.Clear -> clear(null)
             KeyCommand.Restore -> restore()
             KeyCommand.FieldStart -> fieldEdge(KeyEvent.KEYCODE_MOVE_HOME)
@@ -84,9 +79,8 @@ class KeyShortcutRunner(
             // selects as a swipe that reached it moves on (KeySwipes); run any other way, nothing to select by
             KeyCommand.SwipeSelect -> {}
             KeyCommand.Clipboard -> windowManager.attachWindow(ClipboardWindow())
-            // a key's swipe opens it in CommonKeyActionListener, as 符's long press; from here (a menu's) the same
-            // what is typed put in first, as 符's long press does: else its pinyin is the keyword's start, and the
-            // full keyboard's Shift still 分词 over it
+            // what is typed put in first, as 符's long press does: else its pinyin is the keyword's start, and the full
+            // keyboard's Shift still 分词 over it
             KeyCommand.QuickInput -> {
                 val address = service.inAddressField
                 service.postFcitxJob {
@@ -99,26 +93,21 @@ class KeyShortcutRunner(
             KeyCommand.TradSimp -> tradSimp()
             KeyCommand.ChooseKeyboard -> chooseKeyboard()
             KeyCommand.HideKeyboard -> service.requestHideSelf(0)
-            // the engine's keys, sent by the listener as a stroke drawn is (CommonKeyActionListener): nothing here
+            // sent by the listener as a stroke drawn is: nothing here
             KeyCommand.StrokeHeng, KeyCommand.StrokeShu, KeyCommand.StrokePie, KeyCommand.StrokeDian, KeyCommand.StrokeZhe -> {}
         }
     }
 
-    /**
-     * 清除 in [field] (the input started then): [typing] what the engine dropped of what was typed
-     * (nothing committed), kept to type again; with nothing typed, the field cleared as [EditPlan.clear]
-     * says. Nothing done once input has moved on to another field.
-     */
+    /** [typing] kept to type again; nothing done once input has moved on to another field. */
     fun clear(typing: HostCore.Retyping?, field: Any? = service.startedField) {
         if (field == null || field !== service.startedField) return
         val kept = if (typing != null) {
-            // a field not read is said cleared, those before it broken off as for one not kept.
-            // A sensitive field's keys the host kept back itself (HostCore.clearTyped): nothing of it here
-            // with a side not given, text committed there since cannot be told by the field: not whole, as a clear of text is
+            // a field not read is said cleared. A sensitive field's keys the host kept back itself. With a side not
+            // given, text committed there since cannot be told: not whole
             typing.keys?.let { read()?.let { now -> EditPlan.Cleared(now.field, emptyList(), typing, whole = now.beforeGiven && now.afterGiven) } }
         } else {
             val now = read() ?: return
-            // a field kept from learning is kept from this too: nothing of it remembered
+            // kept from learning is kept from this too
             val sensitive = service.inSensitiveField
             val range = service.currentInputSelection
             val clearing = EditPlan.clear(now.field, range.start, range.end, READ_LIMIT, sensitive, now.beforeGiven, now.afterGiven)
@@ -136,23 +125,19 @@ class KeyShortcutRunner(
 
     fun restore() {
         val field = service.startedField
-        // a side not given reads as nothing on it: where that does not match what a clear left, take forgets the clears kept
+        // a side not given reads as nothing on it: where that does not match what a clear left, the clears kept are forgotten
         val back = field?.let { read()?.let { now -> cleared.take(field, now.field, typing()) } } ?: return service.say(R.string.nothing_to_restore)
         val typed = back.typed as? HostCore.Retyping
         if (typed == null) return apply(back.restoreAt(service.currentInputSelection.let { minOf(it.start, it.end) }))
-        // the input method changed since, its keyboard, or the field: said, the clear gone all
-        // the same (review S4)
+        // the input method changed since, its keyboard, or the field: said, the clear gone all the same
         val keyboard = keyboardOf(typed.im)
         service.postFcitxJob {
             if (!retype(typed, keyboard)) ContextCompat.getMainExecutor(service).execute { service.say(R.string.nothing_to_restore) }
         }
     }
 
-    // the field around its selection as a clear reads it; null without one, or where the app gives
-    // neither side (no text read is no empty field: review S2). A side the app gives none of is read as
-    // nothing on it, as [EditPlan.clear] takes it: what the other side gave is cleared and put back (an
-    // app with no text before its cursor returned null here for all it had after it: KB-88). [bothSides]:
-    // null where either is not given, for what asks whether the field is empty
+    // no text read is no empty field. A side the app gives none of is read as nothing on it: an app with no text
+    // before its cursor returned null here for all it had after it. [bothSides]: null where either is not given
     private fun read(limit: Int = READ_LIMIT, bothSides: Boolean = false): Read? {
         val ic = service.currentInputConnection ?: return null
         val before = ic.getTextBeforeCursor(limit, 0)?.toString()
@@ -161,11 +146,10 @@ class KeyShortcutRunner(
         return Read(EditPlan.Field(before.orEmpty(), ic.getSelectedText(0)?.toString() ?: "", after.orEmpty()), before != null, after != null)
     }
 
-    // [field] with which sides the app gave: one not given is "" in it, which [EditPlan.clear] is told
+    // one not given is "" in it
     private class Read(val field: EditPlan.Field, val beforeGiven: Boolean, val afterGiven: Boolean)
 
-    // a character each side tells an empty field: the field read only with nothing selected. A side not
-    // read is no empty one: the field is then taken whole, as one not read at all
+    // a character each side tells an empty field. A side not read is no empty one: the field is then taken whole
     private fun nothingToTake(start: Int, end: Int) = start == end &&
         EditPlan.nothingToTake(start, end, read(1, bothSides = true)?.field, service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true)
 
@@ -174,7 +158,7 @@ class KeyShortcutRunner(
         ctrl = fieldEdgeCtrl(service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true),
     )
 
-    // done past the session: a commit waiting can no longer be read back (CommitCheck.moved)
+    // past the session: a commit waiting can no longer be read back (CommitCheck.moved)
     private fun apply(steps: List<EditPlan.Step>) {
         if (steps.isNotEmpty()) service.changedPastSession()
         EditPlan.apply(steps, editor, ::menu)
@@ -189,10 +173,10 @@ class KeyShortcutRunner(
     )
 
     companion object {
-        // what a clear reads of each side to keep it: a field longer is cleared with nothing kept
+        // a field longer is cleared with nothing kept
         private const val READ_LIMIT = 10_000
 
-        /** What [im] is typed with now, its layout and 双拼's scheme: what was typed is typed again on the same alone ([HostCore.retype]). */
+        /** What was typed is typed again on the same alone ([HostCore.retype]). */
         fun keyboardOf(im: String): ImKeyboards.TypedWith =
             ImKeyboards.typedWith(im, AppPrefs.getInstance().keyboard.imKeyboards(), EngineState.shuangpinScheme)
     }

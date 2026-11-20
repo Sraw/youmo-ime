@@ -11,12 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * The input type flags the EditorInfo inspector lists. Text and number flags share bits
- * (`TYPE_TEXT_FLAG_CAP_CHARACTERS` and `TYPE_NUMBER_FLAG_SIGNED` are both 0x1000), so a field
- * shows only the flags of its own class. Under Robolectric: the parser reads the framework's
- * constants by reflection.
- */
+/** Text and number flags share bits (CAP_CHARACTERS and NUMBER_FLAG_SIGNED are both 0x1000): a field lists only its own class's. */
 @RunWith(RobolectricTestRunner::class)
 class EditorInfoParserTest {
 

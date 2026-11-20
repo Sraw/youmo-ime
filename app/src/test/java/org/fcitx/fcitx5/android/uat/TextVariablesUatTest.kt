@@ -35,10 +35,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.Calendar
 import java.util.SimpleTimeZone
 
-/**
- * A key's long press items and swipe texts that fill in the date and time (061-text-variables, uat KB-93–97): what the
- * keys show is the value now, what they type the value as they are picked.
- */
+/** Long press items and swipe texts that fill in the date and time: shown the value now, typed as picked. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -56,7 +53,7 @@ class TextVariablesUatTest {
         KeyClock.clock = JvmClock
     }
 
-    // the keys' clock set by the test: [at] what it says, in UTC+8
+    // in UTC+8
     private class SetClock(var at: Long) : LearnClock {
         override fun now() = at
         override fun offset(at: Long) = OFFSET
@@ -65,11 +62,10 @@ class TextVariablesUatTest {
     private fun time(day: Int, hour: Int, minute: Int, second: Int = 0) =
         Calendar.getInstance(SimpleTimeZone(OFFSET, "t")).apply { clear(); set(2026, Calendar.NOVEMBER, day, hour, minute, second) }.timeInMillis
 
-    // every test here runs on a set clock but the one of the real clock's wiring (anItemOfVariablesShowsAndTypesToday):
-    // its values are known, none turns while the test runs
+    // every test here but anItemOfVariablesShowsAndTypesToday runs on a set clock: its values known, none turns mid-test
     private fun setClock(at: Long) = SetClock(at).also { KeyClock.clock = it }
 
-    // [template] filled in now; [typed] one of its values about now (a minute may turn while the test runs)
+    // [typed] one of its values about now (a minute may turn while the test runs)
     private fun now(template: String) = TextVariables.expand(template, Calendar.getInstance())
     private fun assertTypedNow(template: String, before: String, typed: String) =
         assertTrue("$typed of $template", typed == before || typed == now(template))
@@ -89,7 +85,6 @@ class TextVariablesUatTest {
         prefs.setWays(up = true, down = true)
         h.start()
         val value = now(date)
-        // the corner its first two characters and 「…」, as a long one is shortened
         val q = h.key("q") as SceneShownKey
         assertTrue(q.drawnTexts.toString(), value.take(2) + "…" in q.drawnTexts)
         val shown = h.longPress(h.key("q"), pick = value)
@@ -97,7 +92,6 @@ class TextVariablesUatTest {
         assertTypedNow(date, value, h.field.text.toString())
     }
 
-    // the minute it is swiped, not the one the keyboard came up in
     @Test
     @Uat("KB-94")
     fun aSwipesTextOfVariablesTypesTheTimeItIsSwiped() {
@@ -110,7 +104,7 @@ class TextVariablesUatTest {
         assertEquals("09:05", h.field.text.toString())
     }
 
-    // KB-95: not marked, typed as written; marked, never in capitals nor turned into Chinese punctuation
+    // not marked, typed as written; marked, never in capitals nor turned into Chinese punctuation
     @Test
     @Uat("KB-95")
     fun withoutTheMarkAsWrittenWithItAsFilledIn() {
@@ -124,14 +118,12 @@ class TextVariablesUatTest {
         h.longPress(h.key("q"), pick = "\$year").let { assertTrue(it.toString(), it.containsAll(listOf("\$year", value))) }
         assertEquals("\$year", h.field.text.toString())
         h.field.setText("")
-        // Shift: the plain one in capitals, the one filled in as it is
         h.tap(h.describedKey("Shift"))
         val shifted = h.longPress(h.key("Q"), pick = value)
         assertTrue(shifted.toString(), "\$YEAR" in shifted && value in shifted)
         assertEquals(value, h.field.text.toString())
     }
 
-    // the day it is swiped, not the one the keyboard came up on
     @Test
     @Uat("KB-97")
     fun anItemOfVariablesFirstIsTypedBySwipingUp() {
@@ -144,7 +136,7 @@ class TextVariablesUatTest {
         assertEquals("11月15日", h.field.text.toString())
     }
 
-    // 061-text-variables §2.3: a long value in the long press shrunk to the least size, then cut with 「…」, said whole
+    // a long value in the long press shrunk to the least size, then cut with 「…」, said whole
     @Test
     @Uat("KB-93")
     fun aLongValueIsCutInItsCellAndSaidWhole() {
@@ -165,8 +157,7 @@ class TextVariablesUatTest {
         assertTrue(drawn, drawn.endsWith("…") && value.startsWith(drawn.removeSuffix("…")))
     }
 
-    // one clock for what is shown and what is typed: a long press opened before midnight and picked after it types the
-    // new day (the moment it is picked, 061-text-variables §2.4), whatever it showed
+    // a long press opened before midnight and picked after it types the new day, whatever it showed
     @Test
     @Uat("KB-93")
     fun anItemPickedAfterMidnightTypesTheNewDay() {
@@ -178,7 +169,6 @@ class TextVariablesUatTest {
         assertEquals("11月15日", h.field.text.toString())
     }
 
-    // put away one day and shown the next: the corner the day it is shown, not the one it was last drawn
     @Test
     @Uat("KB-93")
     fun shownAgainTheCornerIsOfTheMinuteNow() {
@@ -195,9 +185,8 @@ class TextVariablesUatTest {
         assertTrue(q.drawnTexts.toString(), "15…" in q.drawnTexts)
     }
 
-    // the catch-up alone (what a keyboard shown again calls, KeyboardWindow.onStartInput): keys drawn in a minute gone
-    // made anew with this one's values, though a long press asked for this minute meanwhile (it draws no corner); in
-    // the minute drawn, the scene left as it is
+    // the catch-up alone (KeyboardWindow.onStartInput): keys drawn in a minute gone made anew, though a long press asked
+    // for this minute meanwhile; in the minute drawn, the scene left as it is
     @Test
     @Uat("KB-93")
     fun theCatchUpRedrawsOnlyForANewMinute() {
@@ -213,15 +202,13 @@ class TextVariablesUatTest {
         h.longPress(h.key("q"))
         board.catchUpMinute()
         assertTrue(q.drawnTexts.toString(), "15…" in q.drawnTexts)
-        // again in the minute drawn: nothing made again
         val drawn = q.canvas.scene
         clock.at = time(15, 0, 0, 50)
         board.catchUpMinute()
         assertSame(drawn, q.canvas.scene)
     }
 
-    // the keyboard's rows counted (KeyboardWindow.rowUnits, each InputView.updateKeyboardSize) draw nothing: keys drawn
-    // with variables' values of a minute gone are still made anew by the catch-up after it (review R26 F8366)
+    // the keyboard's rows counted draw nothing: keys of a minute gone are still made anew by the catch-up after it
     @Test
     fun rowsCountedInANewMinuteLeaveTheCatchUpToDrawIt() {
         val day = "\$day日"

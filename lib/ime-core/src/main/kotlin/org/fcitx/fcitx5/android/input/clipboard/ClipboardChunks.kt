@@ -7,19 +7,15 @@ package org.fcitx.fcitx5.android.input.clipboard
 import java.text.BreakIterator
 
 /**
- * A clipboard entry cut into the pieces 「切词」 offers, picked by taps and committed joined ([join]): an email as
- * name, `@`, domain; a URL as its scheme, host, each `/` part, the query and the fragment; Chinese
- * as the pinyin model splits it ([hanRuns] are what to ask it for, `Engines.wordBoundaries`);
- * other letters as words, a number as one piece, any other mark as its own. Spaces are no piece.
- * Nothing is cut inside a grapheme cluster: 👨‍👩‍👧, 👍🏽, 🇨🇳, ❤️, 1️⃣, 𬭚 are each whole.
+ * A clipboard entry cut into 「切词」's pieces: an email as name, `@`, domain; a URL by scheme, host, `/` parts, query,
+ * fragment; Chinese as the pinyin model splits it; other words, numbers and marks each a piece; spaces none. Nothing
+ * is cut inside a grapheme cluster (👨‍👩‍👧, 🇨🇳, 𬭚 whole).
  */
 object ClipboardChunks {
 
-    /** A piece: its text, at [from] until [to] of the text split. */
     data class Chunk(val text: String, val from: Int, val to: Int)
 
-    // ASCII only after the scheme (a URL pasted into Chinese text ends where the Chinese begins); the
-    // schemes people copy, none glued to a word before it (Visithttps://, awww.)
+    // ASCII only after the scheme (a URL pasted into Chinese ends where the Chinese begins); none glued to a word before
     private val URL = Regex("""(?i)(?<![a-z0-9])(?:(?:https?|ftps?|sftp|wss?|file|ssh|git|smb|rtsp|ed2k|thunder)://|www\.)[!-~]+""")
     // from the name's first char only: else each char of a long token without @ starts a match (O(n²))
     private val EMAIL = Regex("""(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+""")
@@ -27,20 +23,16 @@ object ClipboardChunks {
     // what a sentence puts after a URL or an email, not part of it; a ) only when the link opened none
     private const val TRAILING = ".,;:!?]}'\">"
 
-    /** The Chinese runs of [text], each to be split by the model and passed back to [split]. */
+    /** Each to be split by the model and passed back to [split]. */
     fun hanRuns(text: String): List<String> =
         plain(text).flatMap { (from, to) -> runs(text, from, to) }
             .filter { it.kind == Kind.Han }
             .map { text.substring(it.from, it.to) }
             .distinct()
 
-    /** [chunks]' texts. */
     fun split(text: String, words: Map<String, IntArray> = emptyMap()): List<String> = chunks(text, words).map { it.text }
 
-    /**
-     * [text]'s pieces in order. [words] holds the model's boundaries of each of [hanRuns] (0 and
-     * the length included); a run it lacks, the engine not ready, goes cluster by cluster.
-     */
+    /** [words]: the model's boundaries per run, 0 and length included; a run missing goes cluster by cluster. */
     fun chunks(text: String, words: Map<String, IntArray> = emptyMap()): List<Chunk> {
         val out = ArrayList<Chunk>()
         var at = 0
@@ -53,18 +45,14 @@ object ClipboardChunks {
         return out
     }
 
-    /** At most [max] chars of [text]'s start, ending between grapheme clusters. */
+    /** Ending between grapheme clusters. */
     fun cut(text: String, max: Int): String {
         if (text.length <= max) return text
         val it = BreakIterator.getCharacterInstance().apply { setText(text) }
         return text.substring(0, if (it.isBoundary(max)) max else it.preceding(max).coerceAtLeast(0))
     }
 
-    /**
-     * What the pieces picked, in [picked]'s order (the order they were tapped), commit as: one
-     * right after the one before it in [all] with the text between them (a space kept), else one
-     * space between two that would run a Latin word or number together, else nothing between.
-     */
+    /** In tap order: adjacent pieces with their text between, else a space where a Latin word or number would run together. */
     fun join(text: String, all: List<Chunk>, picked: List<Chunk>): String = buildString {
         var last: Chunk? = null
         for (chunk in picked) {
@@ -86,7 +74,7 @@ object ClipboardChunks {
     private fun isLatinWord(cp: Int) =
         Character.isDigit(cp) || (Character.isLetter(cp) && Character.UnicodeScript.of(cp) == Character.UnicodeScript.LATIN)
 
-    // the last letter of [s] its marks put aside: a café spelled e and U+0301 ends in e
+    // a café spelled e and U+0301 ends in e
     private fun lastBase(s: String): Int {
         var i = s.length
         while (i > 0) {
@@ -97,7 +85,7 @@ object ClipboardChunks {
         return s.codePointAt(0)
     }
 
-    // the URLs and emails of text, in order, not overlapping, trailing punctuation left out
+    // not overlapping, trailing punctuation left out
     private fun links(text: String): List<IntRange> {
         val found = (URL.findAll(text) + EMAIL.findAll(text)).map { trimmed(text, it.range) }
             .sortedWith(compareBy<IntRange> { it.first }.thenByDescending { it.last })
@@ -108,8 +96,7 @@ object ClipboardChunks {
 
     private fun trimmed(text: String, range: IntRange): IntRange {
         var last = range.last
-        // the ( and ) before [last], counted once and kept so as it moves back: a link followed by
-        // thousands of dots is not counted again at each
+        // counted once as [last] moves back: a link followed by thousands of dots is not counted again at each
         var opened = 0
         var closed = 0
         for (i in range.first until last) {
@@ -158,7 +145,7 @@ object ClipboardChunks {
 
     private fun isFormat(c: Char) = Character.getType(c) == Character.FORMAT.toInt()
 
-    // a piece without the format chars a cluster took in at its ends (b\u200D): nothing invisible is committed
+    // without the format chars a cluster took in at its ends (b‍): nothing invisible is committed
     private fun MutableList<Chunk>.piece(text: String, from: Int, to: Int) {
         var a = from
         var b = to
@@ -195,7 +182,6 @@ object ClipboardChunks {
         }
     }
 
-    // the ends of [from, to)'s grapheme clusters, ascending, to last
     private fun clusterEnds(text: String, from: Int, to: Int): List<Int> {
         val it = BreakIterator.getCharacterInstance().apply { setText(text.substring(from, to)) }
         val out = ArrayList<Int>()
@@ -222,7 +208,7 @@ object ClipboardChunks {
 
     private data class Run(val kind: Kind, val from: Int, val to: Int)
 
-    // a cluster by its first code point; one of format chars only (a lone ZWJ, a zero-width space) is no piece
+    // one of format chars only (a lone ZWJ, a zero-width space) is no piece
     private fun kindOf(text: String, from: Int, to: Int): Kind {
         val cp = text.codePointAt(from)
         val invisible = (from until to).all { isFormat(text[it]) }
@@ -235,8 +221,7 @@ object ClipboardChunks {
         }
     }
 
-    // [from, to) cut where the kind changes, cluster by cluster; a mark keeps a word or number whole
-    // between two of its own kind: don't, 3.14, 1,000
+    // a mark keeps a word or number whole between two of its kind: don't, 3.14, 1,000
     private fun runs(text: String, from: Int, to: Int): List<Run> {
         if (from >= to) return emptyList()
         val ends = clusterEnds(text, from, to)
@@ -249,13 +234,11 @@ object ClipboardChunks {
             var j = i + 1
             if (kind == Kind.Letter || kind == Kind.Digit || kind == Kind.Han) {
                 val joiner = if (kind == Kind.Letter) "'’-" else if (kind == Kind.Digit) ".,:" else ""
-                // one joiner between two of the kind
                 fun joins(at: Int) = at + 1 < starts.size && ends[at] - starts[at] == 1 && text[starts[at]] in joiner && kinds[at + 1] == kind
                 while (j < starts.size) {
                     if (kinds[j] == kind) {
                         j++
                     } else if (joins(j)) {
-                        // the joiner and the cluster after it
                         j += 2
                     } else {
                         break

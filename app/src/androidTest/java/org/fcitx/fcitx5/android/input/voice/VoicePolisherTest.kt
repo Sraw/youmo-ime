@@ -10,10 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The polish tagger as packaged (the voice pack, imported on the device first), through the app's onnxruntime (OrtModel.runLongs: int64 in, three
- * outputs: op, after, num): what it does to spoken text is the evaluation's; here, that it runs and does something.
- */
+/** The packaged tagger through OrtModel.runLongs (int64 in, three outputs); only that it runs and does something. */
 class VoicePolisherTest {
 
     @Test
@@ -36,7 +33,7 @@ class VoicePolisherTest {
             val said = "那个我觉得这个方案还是可以的就是时间上有点紧我们下周再讨论一下吧"
             var shown = VoicePolishStream.Shown("", "")
             for (n in 4..said.length step 4) shown = stream.update(said.take(n))
-            // what is 16 characters behind is frozen, the rest still the tagger's to change
+            // 16 characters back is frozen, the rest still the tagger's to change
             assertTrue(shown.toString(), shown.polished.isNotEmpty())
             assertTrue(stream.finish(said), stream.finish(said).isNotEmpty())
         }

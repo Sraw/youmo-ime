@@ -20,8 +20,7 @@ class LatinSyncTest : EnginesFixture() {
 
     private fun sync() = latin.sync(true, englishUser, { log.state }, lexicon)
 
-    // review R11 F3023: English's words are its last 30 typing days': the window moving with no
-    // English typed lists the words anew, one gone from it no more spelled
+    // the window moving with no English typed lists the words anew
     @Test
     fun aWordOutOfEnglishsWindowIsNoMoreListedOnTheDayItLeaves() {
         englishUser.commit(null, "github")

@@ -28,10 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * A keyboard setting makes the keyboards anew in the input view there is (060-render-perf-2 #1):
- * what shows is what a view made with the setting shows, keys, code row and bar alike.
- */
+/** A keyboard setting remakes the keyboards in the existing input view: what shows must match a fresh view's. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -40,11 +37,10 @@ class RemakeKeyboardsTest {
     @After
     fun close() = KeyboardHarness.setKeyboards(ImKeyboards.Chosen())
 
-    // what the user sees: each key's label where it is, the code row's box, the bar's buttons shown
     private fun KeyboardHarness.seen(): List<Any> {
         relayout()
         val bar = KeyboardHarness.all(inputView).filter { shown(it) && it.contentDescription != null }.map { it.contentDescription.toString() to box(it) }.toList()
-        // each key's face, its marks where they are drawn included: a mark left as the old setting had it shows here
+        // a mark left as the old setting had it shows here
         val keys = keys().map { k -> listOf(k.label, k.bounds, k.alt, k.drawnIcons, k.drawnTexts.map { it to k.drawn(it) }) }
         return listOf(keys, box(inputView.findViewById<View>(R.id.code_row_text)), bar)
     }
@@ -68,7 +64,6 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /** The toolbar opened before the pick folds as a new view's would. */
     @Test
     fun theToolbarFoldsAsANewViewsWould() {
         KeyboardHarness(keyboards = ImKeyboards.Chosen()).use { h ->
@@ -83,7 +78,6 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /** The marks' places and the letters' case remake the keys and the password field's number row as a new view's. */
     @Test
     fun theMarksAndCaseRemakeTheKeysAndTheNumberRow() {
         val prefs = AppPrefs.getInstance().keyboard
@@ -117,7 +111,7 @@ class RemakeKeyboardsTest {
     private fun rowOf(h: KeyboardHarness): View? =
         KeyboardHarness.all(h.inputView).firstOrNull { it is org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow }
 
-    /** Changed with the keyboard hidden: shown next in a number field, then a password one, as a view made with it. */
+    /** Changed while hidden: next a number field, then a password one. */
     @Test
     fun changedWhileHiddenShowsAsANewViewInTheNextField() {
         val nine = ImKeyboards.Chosen(pinyin = ImKeyboard.NINE_KEYS)
@@ -135,7 +129,6 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /** Changed with a panel open (the clipboard): back on the keys, as a new view starts. */
     @Test
     fun changedWithAPanelOpenGoesBackToTheKeys() {
         val expected = fresh(ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS14))
@@ -151,10 +144,7 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /**
-     * 九键's letters and a key's long press edited: the nine keys as a view made with them. The letters remake the
-     * keyboard; key_lists only redraw it (BaseKeyboard.onKeyListsChanged) and a long press reads the list as it is held.
-     */
+    /** The letters remake the keyboard; key_lists only redraw it (BaseKeyboard.onKeyListsChanged), a long press reading the list as held. */
     @Test
     fun theNineKeysLettersAndLongPressesShowAsAFreshOne() {
         val prefs = AppPrefs.getInstance().keyboard
@@ -177,7 +167,7 @@ class RemakeKeyboardsTest {
         }
     }
 
-    /** A notice with its undo (忘记's 撤销) goes with the keyboards it was over, as with the view it was in. */
+    /** 忘记's 撤销 chip goes with the keyboards it was over. */
     @Test
     fun theUndoChipGoesWithTheKeyboards() {
         KeyboardHarness(keyboards = ImKeyboards.Chosen()).use { h ->

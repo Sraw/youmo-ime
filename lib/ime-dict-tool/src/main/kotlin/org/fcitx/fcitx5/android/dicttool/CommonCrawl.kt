@@ -23,14 +23,7 @@ import java.util.concurrent.Future
 import java.util.zip.GZIPInputStream
 import kotlin.random.Random
 
-/**
- * The Chinese pages of a CommonCrawl crawl (commoncrawl.org, under its terms of use), out of its
- * WET files: the text CommonCrawl took out of each page it fetched. Newer than FineWeb-2, whose
- * dumps end in 2024: a crawl of the last months has the words of the last months
- * (dev/TRAINING-PLAN.md 11.7d). A page is taken when CommonCrawl's own language detection has
- * Chinese first and it holds [MIN_HAN] Han characters or more; its boilerplate and spam are
- * [PageCleaner]'s to take out.
- */
+/** The Chinese pages of a CommonCrawl crawl's WET files (under its terms of use): Chinese first by its detection, [MIN_HAN] Han characters or more. */
 object CommonCrawl {
 
     const val BASE = "https://data.commoncrawl.org/"
@@ -38,15 +31,7 @@ object CommonCrawl {
     /** WET files a shard: 100 hold some 150 million Han characters, 230 MB of parquet. */
     const val FILES_PER_SHARD = 100
 
-    /**
-     * Writes the Chinese pages of WET files [from] until [from] + [files] of [crawl], in the order
-     * of its `wet.paths.gz`, to [outDir]: a shard of [FILES_PER_SHARD] files each,
-     * `<crawl>-<first file>-<last file + 1>.parquet`, its pages in the files' order. A shard already
-     * there is kept, so a run stopped halfway goes on where it was; named by both ends, a shorter
-     * last shard of an earlier run is not taken for a whole one. [base] is CommonCrawl's, or for a test
-     * a directory laid out as it.
-     * @throws IOException if a file cannot be fetched after some tries, or is not WARC
-     */
+    /** Writes the Chinese pages of [files] WET files to [outDir] in shards; a whole shard already there is kept, so a stopped run goes on. */
     fun extract(crawl: String, from: Int, files: Int, outDir: File, base: String = BASE, log: (String) -> Unit) {
         // the pool's threads tell of their retries too
         val say: (String) -> Unit = { line -> synchronized(log) { log(line) } }
@@ -56,10 +41,7 @@ object CommonCrawl {
         if (!outDir.isDirectory && !outDir.mkdirs()) throw IOException("cannot make $outDir")
         val pool = Executors.newFixedThreadPool(THREADS)
         try {
-            // a shard's files are fetched while the one before is written: its write, or one file of
-            // it waiting out CommonCrawl's 503s, would leave the other threads and the network idle.
-            // Two shards' pages are held then, some 0.5 GB each by estimate (150 million Han characters,
-            // two bytes each in a String, and the rest of the text): well under the tool's -Xmx6g
+            // a shard's files are fetched while the one before is written, so neither the threads nor the network idle
             var pending: Pair<File, List<Future<ArrayList<WebText.Page>>>>? = null
             for (first in from until from + files step FILES_PER_SHARD) {
                 val until = minOf(first + FILES_PER_SHARD, from + files)
@@ -93,12 +75,7 @@ object CommonCrawl {
         log("${shard.name}: ${fetched.size} files, ${pages.size} pages, ${pages.sumOf { p -> p.text.count { TextChars.isHan(it) } }} Han characters")
     }
 
-    /**
-     * The Chinese pages of a WET file, [wet]: gzip members of a WARC record each, a `conversion`
-     * record a page. [wet] must tell its [InputStream.available] bytes truly (a file read into
-     * memory does): GZIPInputStream reads on past a member only while there are some.
-     * @throws IOException if it is not WARC
-     */
+    /** The Chinese pages of a WET file; [wet]'s `available()` must be true, as GZIPInputStream reads past a member only then. */
     fun pages(wet: InputStream, page: (WebText.Page) -> Unit) {
         val input = BufferedInputStream(GZIPInputStream(wet, BUFFER), BUFFER)
         while (true) {
@@ -137,16 +114,12 @@ object CommonCrawl {
     }
 
     private val client: HttpClient by lazy {
-        // HTTP/1.1: over HTTP/2 the client puts every request to one host on one connection, and
-        // the threads would share its bandwidth
+        // HTTP/1.1: over HTTP/2 all requests to one host share one connection's bandwidth
         HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).connectTimeout(Duration.ofSeconds(CONNECT_SECONDS))
             .followRedirects(HttpClient.Redirect.NORMAL).build()
     }
 
-    /**
-     * A whole file: one is 60 MB, and the gzip members are read from memory past the network's pauses.
-     * Each pause before another try is told to [log], and spent in [sleep].
-     */
+    /** A whole file, so the gzip members are read from memory; each pause before another try is told to [log]. */
     internal fun fetch(base: String, path: String, log: (String) -> Unit, sleep: (Long) -> Unit = Thread::sleep): ByteArray {
         if (!base.startsWith("http")) return File(base, path).readBytes()
         val request = HttpRequest.newBuilder(URI(base + path)).timeout(Duration.ofMinutes(FETCH_MINUTES)).build()
@@ -160,14 +133,12 @@ object CommonCrawl {
                 failure = e
                 0
             }
-            // CommonCrawl answers 503 (and now and then 429) to slow a client down: some 1 in 100
-            // files of a run, as measured; a 404 and the like will not mend
+            // 503 and 429 slow a client down and are retried; a 404 and the like will not mend
             if (status != 0) {
                 failure = IOException("$path: HTTP $status")
                 if (!passing(status)) throw failure
             }
-            // twice as long each time, up to minutes, and at random within half of it: the threads
-            // slowed down together must not come back together
+            // doubling, at random within half of it: threads slowed together must not come back together
             if (attempt < TRIES) {
                 val least = minOf(PAUSE_MILLIS shl (attempt - 1), MAX_PAUSE_MILLIS)
                 val pause = least + Random.nextLong(least / 2)

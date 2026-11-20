@@ -8,10 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/**
- * Undoing the undo of a batch added put its items back one by one, each drawn, told and given a
- * Snackbar of its own: thousands of them held the main thread again.
- */
+/** Redoing an added batch put items back one by one, each with its own Snackbar: thousands held the main thread. */
 class BaseDynamicListUiTest {
 
     @Test

@@ -7,11 +7,7 @@ package org.fcitx.fcitx5.android.dicttool
 /** 2^64 / φ, the multiplier of a Fibonacci hash: for [LongIndex]'s slots and [NewWords.Sketch]'s cells. */
 internal const val GOLDEN = -0x61c8864680b583ebL
 
-/**
- * Non-negative longs to dense indices 0, 1, 2 ... in the order they were added, for keeping
- * what belongs to each in plain arrays: tens of millions of n-grams in boxed maps would not fit
- * in the heap. An open-addressing table, at most [LOAD] full.
- */
+/** Non-negative longs to dense indices in the order added, for plain arrays where boxed maps would not fit; open addressing. */
 class LongIndex(expected: Int = 16) {
 
     private var slots = IntArray(capacityFor(expected)) { EMPTY }
@@ -20,7 +16,6 @@ class LongIndex(expected: Int = 16) {
     var size = 0
         private set
 
-    /** The index of [key], or -1. */
     fun indexOf(key: Long): Int {
         var slot = slot(key, slots.size)
         while (true) {

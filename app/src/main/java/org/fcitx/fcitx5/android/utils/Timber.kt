@@ -30,12 +30,9 @@ fun Timber.Forest.setupForest(verbose: Boolean) {
     }
     val debugLogging = BuildConfig.DEBUG || verbose
     plant(if (debugLogging) VerboseTree() else ConciseTree())
-    // :lib:ime-core is a plain JVM module and cannot depend on Timber. Attaching the sink here
-    // keeps it in step with the tree, and leaving it null when debug logging is off preserves
-    // the old behaviour of not formatting messages that would be dropped anyway.
+    // :lib:ime-core is a plain JVM module and cannot depend on Timber; null when off skips formatting dropped messages
     CoreLog.sink = if (debugLogging) ({ Timber.tag("ime-core").d(it) }) else null
     // errors always: a release build's exported log must still carry them
     CoreLog.errorSink = { Timber.tag("ime-core").e(it) }
-    // state machine tracing follows the setting alone, as it did before it moved to ime-core
     CoreLog.verbose = verbose
 }

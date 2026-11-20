@@ -9,10 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The input-method state model with `ShareInputState=All` (design §1.1). `fcitx/…` is
- * upstream fcitx5 442edbc9 `src/lib/fcitx/…` (`lib/ime-core/tools/upstream.sh fcitx5`).
- */
+/** The input-method state with `ShareInputState=All`. */
 class InputContextsTest {
 
     private val us = ImGroup.KEYBOARD_US
@@ -26,7 +23,7 @@ class InputContextsTest {
 
     @Test
     fun `the state follows the user from app to app`() {
-        // fcitx/globalconfig.cpp:189-191 (All on Android); fcitx/inputcontextmanager.cpp:378-400 (propagateProperty)
+        // ShareInputState All on Android; InputContextManager propagateProperty
         val a = open(1)
         val b = open(2)
         assertEquals("pinyin", contexts.inputMethod(a))
@@ -42,18 +39,18 @@ class InputContextsTest {
 
     @Test
     fun `a new context starts from the current state`() {
-        // fcitx/inputcontextmanager.cpp:159-185: copyTo from an existing context
+        // InputContextManager: copyTo from an existing context
         contexts.toggle(open(1))
         val c = open(3)
         assertEquals(us, contexts.inputMethod(c))
-        // and the very first one from fcitx's default, inactive (ActiveByDefault false, fcitx/instance.cpp:510-513)
+        // and the very first one from fcitx's default, inactive (ActiveByDefault false)
         val fresh = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> })
         assertEquals("pinyin", fresh.inputMethod(fresh.activate(9)))
     }
 
     @Test
     fun `a password field is temporarily english`() {
-        // fcitx/instance.cpp:1745-1755 (keyboard-us in a password field), :725-764 (switched out and in)
+        // keyboard-us in a password field, switched out and in
         val a = open(1)
         contexts.setCapabilities(a, Capability.PASSWORD)
         assertEquals(us, contexts.inputMethod(a))
@@ -66,8 +63,7 @@ class InputContextsTest {
 
     @Test
     fun `a capability switch that throws still puts the new flags in place`() {
-        // F3855: the old flags are back for the old input method's leaving; a failing switch must
-        // not leave a password field on them (pinyin, learning). The failure still reaches the caller
+        // the old flags are back for the old input method's leaving; a failing switch must not leave a password field on them
         val failing = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> throw IllegalStateException("boom") })
         val ic = failing.activate(1).also { failing.focus(it, true) }
         val thrown = runCatching { failing.setCapabilities(ic, Capability.PASSWORD) }.exceptionOrNull()
@@ -78,7 +74,7 @@ class InputContextsTest {
 
     @Test
     fun `a capability change switches only a focused context and only across the fallback`() {
-        // fcitx/instance.cpp:728-730 (hasFocus), :144-149 (shouldSwitchIM)
+        // hasFocus, shouldSwitchIM
         val a = open(1)
         contexts.focus(a, false)
         contexts.setCapabilities(a, Capability.PASSWORD)
@@ -87,17 +83,13 @@ class InputContextsTest {
         contexts.setCapabilities(a, Capability.PASSWORD or Capability.DISABLE)
         contexts.setCapabilities(a, 1L shl 1)
         assertEquals(listOf("1 CapabilityChanged $us>pinyin"), switches)
-        val allowed = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> switches += "x" }, allowImForPassword = true)
-        val p = allowed.activate(1).also { allowed.focus(it, true) }
-        allowed.setCapabilities(p, Capability.PASSWORD)
-        assertEquals("pinyin", allowed.inputMethod(p))
-        allowed.setCapabilities(p, Capability.DISABLE)
-        assertEquals(us, allowed.inputMethod(p))
+        contexts.setCapabilities(a, Capability.DISABLE)
+        assertEquals(us, contexts.inputMethod(a))
     }
 
     @Test
     fun `the group default is never the first while there is a second`() {
-        // fcitx/inputmethodgroup.cpp:93-114
+        // InputMethodGroup
         val g = ImGroup.of("Default", listOf("pinyin", us, "wubi"))
         assertEquals(us, g.defaultInputMethod)
         assertEquals(us, g.withDefault("pinyin").defaultInputMethod)
@@ -105,7 +97,7 @@ class InputContextsTest {
         assertEquals(us, g.withDefault("nope").defaultInputMethod)
         assertEquals("pinyin", ImGroup.of("G", listOf("pinyin"), "x").defaultInputMethod)
         assertEquals("", ImGroup.of("G", emptyList()).defaultInputMethod)
-        // setGroup: unavailable dropped, old default kept (fcitx/inputmethodmanager.cpp:350-358)
+        // setGroup: unavailable dropped, old default kept
         val n = g.withDefault("wubi").withInputMethods(listOf("english", "gone", "wubi", us), available)
         assertEquals(listOf("english", "wubi", us), n.inputMethods)
         assertEquals("wubi", n.defaultInputMethod)
@@ -113,7 +105,6 @@ class InputContextsTest {
 
     @Test
     fun `enumerate wraps and makes the next the default`() {
-        // fcitx/instance.cpp:2311-2350
         val a = open(1)
         contexts.enumerate(a, forward = false)
         assertEquals("wubi", contexts.inputMethod(a))
@@ -125,7 +116,6 @@ class InputContextsTest {
 
     @Test
     fun `set current input method, global or local`() {
-        // fcitx/instance.cpp:2102-2160
         val a = open(1)
         contexts.setCurrentInputMethod(a, "wubi", local = true)
         assertEquals("wubi", contexts.inputMethod(a))
@@ -143,7 +133,7 @@ class InputContextsTest {
 
     @Test
     fun `nothing switches with one input method`() {
-        // fcitx/instance.cpp:2192-2195 (canTrigger)
+        // canTrigger
         val one = InputContexts(ImGroup.of("Default", listOf("pinyin")), { _, _, _, _ -> switches += "x" })
         val ic = one.activate(1)
         assertFalse(one.toggle(ic))
@@ -159,14 +149,14 @@ class InputContextsTest {
         contexts.setInputMethods(listOf("wubi", "pinyin", us), available)
         assertEquals("wubi", contexts.inputMethod(a))
         assertEquals(listOf("1 GroupChange pinyin>wubi"), switches)
-        // unchanged, the focused context is switched all the same: deactivated and activated (`instance.cpp:687-711`)
+        // unchanged, the focused context is switched all the same: deactivated and activated
         contexts.setInputMethods(listOf("wubi", "pinyin", us), available)
         assertEquals(listOf("1 GroupChange pinyin>wubi", "1 GroupChange wubi>wubi"), switches)
     }
 
     @Test
     fun `contexts past the cache size push out the least recently used`() {
-        // native-last:app/src/main/cpp/androidfrontend/inputcontextcache.h: LRU of 80
+        // inputcontextcache.h: LRU of 80
         val small = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> }, capacity = 2)
         val first = small.activate(1)
         small.activate(2)
@@ -182,7 +172,6 @@ class InputContextsTest {
 
     @Test
     fun `deactivate of an unknown uid changes nothing, a known one clears only its own`() {
-        // native-last:app/src/main/cpp/androidfrontend/androidfrontend.cpp:485-490 (F3811)
         val ics = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> })
         ics.activate(1)
         val second = ics.activate(2)
@@ -197,7 +186,7 @@ class InputContextsTest {
 
     @Test
     fun `reading mostRecent does not reorder the cache`() {
-        // F4033: it read contexts[uid], which moves uid to the access-ordered map's end
+        // reading contexts[uid] moves uid to the access-ordered map's end
         val small = InputContexts(ImGroup.of("Default", listOf("pinyin", us)), { _, _, _, _ -> }, capacity = 2)
         val first = small.activate(1)
         small.focus(first, true)

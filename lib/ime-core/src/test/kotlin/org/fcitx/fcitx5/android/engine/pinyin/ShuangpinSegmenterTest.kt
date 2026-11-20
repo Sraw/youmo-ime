@@ -43,10 +43,7 @@ class ShuangpinSegmenterTest {
         return out
     }
 
-    /**
-     * Syllables of the edges from [typed]'s start but 简拼 in the middle, spelt, with `~` for
-     * fuzzy, `!` for a typo and `…` for a completion.
-     */
+    /** Syllables of the edges from [typed]'s start: `~` fuzzy, `!` typo, `…` completion. */
     private fun ShuangpinSegmenter.read(typed: String): Set<String> {
         val g = segment(typed)
         return g.edges(g.start).filterNot { g.abbrev(it) }.flatMap { e ->
@@ -75,7 +72,6 @@ class ShuangpinSegmenterTest {
                 val i = g.matches(e).indexOf(id)
                 assertTrue("$code for ${Syllables.spelling(id)}", i >= 0 && g.matches(e).flags(i) == 0)
             }
-            // all but m, n, ng, r and the 26 Latin letters
             assertEquals(Syllables.count - 4 - 26, typed)
         }
     }
@@ -85,11 +81,9 @@ class ShuangpinSegmenterTest {
         assertEquals(setOf("xiao"), xiaohe.read("xn"))
         assertEquals(setOf("zhong"), xiaohe.read("vs"))
         assertEquals(setOf("shu"), xiaohe.read("uu"))
-        // one key for two finals: the initial tells which
         assertEquals(setOf("jiong"), microsoft.read("js"))
         assertEquals(setOf("dong"), microsoft.read("ds"))
         assertEquals(setOf("bing"), microsoft.read("b;"))
-        // ü has its own key in 微软, and lüe is lve or lue
         assertEquals(setOf("lv"), microsoft.read("ly"))
         assertEquals(setOf("lve"), microsoft.read("lv"))
         assertEquals(setOf("lve"), microsoft.read("lt"))
@@ -104,15 +98,12 @@ class ShuangpinSegmenterTest {
         assertEquals(setOf("ai"), xiaohe.read("ai"))
         assertEquals(setOf("ai"), xiaohe.read("ad"))
         assertEquals(setOf("ou"), xiaohe.read("oz"))
-        // 小鹤 has no key for er
         assertEquals(setOf("er"), xiaohe.read("er"))
-        // 微软: o, and spelt where the keys mean nothing else
         assertEquals(setOf("a"), microsoft.read("oa"))
         assertEquals(setOf("an"), microsoft.read("oj"))
         assertEquals(setOf("er"), microsoft.read("or"))
         assertEquals(setOf("ou"), microsoft.read("ou"))
         assertEquals(setOf("ai"), microsoft.read("ai"))
-        // 国标: a; ao is taken by o, so ao is ac only
         val gb = ShuangpinSegmenter(GB)
         assertEquals(setOf("o"), gb.read("ao"))
         assertEquals(setOf("ao"), gb.read("ac"))
@@ -137,7 +128,6 @@ class ShuangpinSegmenterTest {
     fun keysArePairedFromTheStart() {
         assertEquals(listOf("ni:SYLLABLE", "hc:SYLLABLE"), xiaohe.segment("nihc").path())
         assertEquals(setOf("hao"), xiaohe.read("hc"))
-        // a separator ends the pair, and leading ones are skipped
         assertEquals(listOf("n:INITIAL", "ih:SYLLABLE", "c:PARTIAL"), xiaohe.segment("n'ihc").path())
         assertEquals(1, xiaohe.segment("'ni").start)
         assertEquals(listOf("A:SYLLABLE", "gu:SYLLABLE"), xiaohe.segment("Agu").path())
@@ -158,7 +148,6 @@ class ShuangpinSegmenterTest {
         // biu is no syllable: b stands alone, then q is still being typed
         assertEquals(listOf("b:INITIAL", "q:PARTIAL"), xiaohe.segment("bq").path())
         assertTrue("zhong…" in xiaohe.read("v"))
-        // 微软's o starts every syllable with no initial
         assertTrue(microsoft.read("o").containsAll(listOf("a…", "an…", "er…", "ou…")))
     }
 
@@ -179,7 +168,6 @@ class ShuangpinSegmenterTest {
     fun üTypedWithItsOwnKeyIsASlip() {
         assertEquals(setOf("ju!"), xiaohe.read("jv"))
         assertEquals(setOf("ju"), xiaohe.read("ju"))
-        // 微软 types ü with y and ve with v
         assertEquals(setOf("qu!"), microsoft.read("qy"))
         assertEquals(setOf("jue!"), microsoft.read("jv"))
         assertEquals(listOf("j:INITIAL", "v:PARTIAL"), ShuangpinSegmenter(XIAOHE, typos = false).segment("jv").path())
@@ -195,7 +183,6 @@ class ShuangpinSegmenterTest {
         // ou's partner u has no syllable of its own: uu stays shu, not 欧
         val ou = ShuangpinSegmenter(XIAOHE, setOf(Fuzzy.U_OU))
         assertEquals(setOf("shu", "shou~"), ou.read("uu"))
-        // 微软's fuzzy ou (o, then u) leaves ou spelt exactly
         assertEquals(setOf("ou"), ShuangpinSegmenter(MICROSOFT, setOf(Fuzzy.U_OU)).read("ou"))
     }
 
@@ -206,7 +193,6 @@ class ShuangpinSegmenterTest {
         assertEquals(setOf("bing"), segmenter.read("b;"))
         assertEquals(setOf("bing"), segmenter.read("by"))
         assertEquals("b;", scheme.encode(Syllables.id("bing")))
-        // z still types z as well as zh standing for it
         assertEquals(setOf("zhi"), segmenter.read("vi"))
         assertEquals(setOf("zi"), segmenter.read("zi"))
     }
@@ -219,12 +205,10 @@ class ShuangpinSegmenterTest {
         val g = ziranma.segment("xm")
         val x = g.edges(0).single { g.kind(it) == Kind.INITIAL }
         assertTrue(g.abbrev(x))
-        // shown flagged (`^`) beside its completion
         assertTrue(g.matches(x).toString(), g.matches(x).toString().split(' ').all { it.endsWith("…^") })
         // the same syllables as x alone at the end, flagged ABBREV on top
         val end = ziranma.segment("x").let { it.matches(it.edges(0).single()) }
         assertEquals((0 until end.size).map { end.syllable(it) to (end.flags(it) or ABBREV) }, g.matches(x).let { m -> (0 until m.size).map { m.syllable(it) to m.flags(it) } })
-        // off: the pair only, as before
         assertEquals(setOf("0-2:SYLLABLE"), ShuangpinSegmenter(ZIRANMA, abbreviations = false).segment("xm").edgeSet())
         // where the pair is no syllable the key alone is the plain initial, read either way
         assertEquals(ShuangpinSegmenter(ZIRANMA, abbreviations = false).segment("fx").edgeSet(), ziranma.segment("fx").edgeSet())
@@ -266,8 +250,7 @@ class ShuangpinSegmenterTest {
 
     @Test
     fun wholeSyllablesKeepTheirEdgesUnflagged() {
-        // the pairs of input typed in whole syllables are as before, abbreviations only added beside
-        // them; what the decoder makes of it is UAT's (ShuangpinUatTest: whole syllables read as before)
+        // abbreviations only added beside the whole syllables (the decoder's part: ShuangpinUatTest)
         val sentence = listOf("wo", "men", "zhong", "guo", "ren", "chi", "shen", "me", "an", "ai", "er", "xue")
         for (scheme in listOf(ZIRANMA, MICROSOFT, XIAOHE, ZIGUANG, ABC, GB)) {
             val typed = sentence.joinToString("") { scheme.encode(Syllables.id(it))!! }
@@ -285,7 +268,7 @@ class ShuangpinSegmenterTest {
 
     @Test
     fun aSemicolonAfterAWholeSyllableIsNoFinalThoughAKeyAloneWouldReadIt() {
-        // 微软 lj is lan: l alone (简拼 in the middle) then j; (jing) would read ; as ing (review M1)
+        // 微软 lj is lan: l alone (简拼 in the middle) then j; (jing) would read ; as ing
         assertFalse(microsoft.readsAfter("lj", ';'))
         assertFalse(microsoft.readsAfter("woxm", ';'))
         assertTrue(microsoft.readsAfter("x", ';'))
@@ -301,7 +284,6 @@ class ShuangpinSegmenterTest {
         }
         assertTrue(ziranma.segment("xm").hasAbbreviations)
         assertFalse(ziranma.segment("xm").withoutOtherReadings().hasAbbreviations)
-        // none to take off: the graph itself
         val full = PinyinSegmenter().segment("xian")
         assertFalse(full.hasAbbreviations)
         assertSame(full, full.withoutOtherReadings())
@@ -317,7 +299,6 @@ class ShuangpinSegmenterTest {
         assertFalse(whole("umuh")) // u alone: um is no syllable
         assertFalse(whole("x"))
         assertFalse(whole("x'm"))
-        // a stretch of it: xian of xmx
         val xmx = ziranma.segment("xmx")
         assertTrue(xmx.readsWhole(0, 2))
         assertFalse(xmx.readsWhole(0, 3))
@@ -351,7 +332,6 @@ class ShuangpinSegmenterTest {
             val segmenter = ShuangpinSegmenter(scheme)
             for ((initial, whole) in listOf("zh" to "zhong", "ch" to "chi", "sh" to "shuo")) {
                 val code = scheme.encode(Syllables.id(whole))!!
-                // the key alone before the guo pair, in the middle
                 val g = segmenter.segment(code + scheme.encode(Syllables.id("guo"))!!)
                 val alone = g.edges(0).single { g.abbrev(it) }
                 val m = g.matches(alone)
@@ -373,8 +353,7 @@ class ShuangpinSegmenterTest {
     }
 
     private companion object {
-        // three of the schemes 0.5 dropped (SchemeMigration), libime's tables kept here: a no-initial
-        // key that types an initial too (紫光's and 智能ABC's a), and 国标's zero key a
+        // schemes no longer offered (SchemeMigration): a no-initial key that types an initial too, and 国标's zero key a
         val ZIGUANG = ShuangpinScheme(
             "zh=u ch=a sh=i ai=p an=r ang=s ao=q ei=k en=w eng=t er=j ia=x ian=f iang=g iao=b ie=d in=y ing=; " +
                 "iong=h iu=j ong=h ou=z ua=x uai=y uan=l uang=g ue=n ui=n un=m uo=o ve=n v=v",

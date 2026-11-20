@@ -243,7 +243,7 @@ class FaceTest {
         val space = Fixtures.scene(Fixtures.portrait, theme = t).keys.first { it.id == "space" }
         val fills = space.ops(true).filterIsInstance<Op.Fill>()
         assertEquals(listOf(Argb(0xFFFF0000.toInt())), fills.map { it.color }, "the pressed face, no overlay on it")
-        // L5: a key too narrow for its inset has a face of nothing, and nothing pressed
+        // a key too narrow for its inset has a face of nothing, and nothing pressed
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\" columns=\"10\">" +
                 "<row><key id=\"a\" label=\"a\" width=\"0.01\"/><key id=\"b\" label=\"b\" width=\"fill\"/></row></keyboard>",
@@ -260,7 +260,7 @@ class FaceTest {
         ).ok()
         val lang = Fixtures.scene(e, theme = t).keys.first { it.id == "lang" }
         assertEquals(setOf(KeyState.On, KeyState.Disabled), lang.states)
-        // its fill the style's, faded as it takes no press (S6)
+        // its fill the style's, faded as it takes no press
         val green = { op: Op -> op is Op.Fill && op.color.value and 0xFFFFFF == 0x00FF00 && (op.color.value ushr 24) < 0xFF }
         assertTrue(lang.ops(false).any(green), "${lang.ops(false)}")
         assertTrue(lang.ops(true).any(green), "pressed keeps the others")

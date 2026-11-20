@@ -23,7 +23,6 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class KeyEventRelayTest {
 
-    /** A real connection that records the keys and meta-state clears reaching the editor. */
     private class RecordingConnection : BaseInputConnection(View(RuntimeEnvironment.getApplication()), false) {
         val sent = mutableListOf<KeyEvent>()
         val cleared = mutableListOf<Int>()
@@ -72,7 +71,7 @@ class KeyEventRelayTest {
 
     @Test
     fun theSameEventTwiceGetsTwoIds() {
-        // a key's down and up can share a timestamp, which is why ids are a counter
+        // down and up can share a timestamp, which is why ids are a counter
         val event = key(KeyEvent.KEYCODE_A)
         assertNotEquals(relay.remember(event), relay.remember(event))
     }
@@ -94,7 +93,7 @@ class KeyEventRelayTest {
 
     @Test
     fun aKeyThatWouldOpenTheCharacterPickerIsReplayedWithoutItsCharacter() {
-        // mocked: no real KeyEvent maps to PICKER_DIALOG_INPUT in Robolectric's key character map
+        // no real KeyEvent maps to PICKER_DIALOG_INPUT in Robolectric's key character map
         val event = mockk<KeyEvent>(relaxed = true) {
             every { unicodeChar } returns ForwardedKeys.PICKER_DIALOG_INPUT
             every { keyCode } returns KeyEvent.KEYCODE_A
@@ -110,7 +109,7 @@ class KeyEventRelayTest {
         assertEquals(KeyEvent.KEYCODE_A, sent.keyCode)
         assertEquals("rebuilt as a virtual-keyboard key", -1, sent.deviceId)
         assertEquals(30, sent.scanCode)
-        // read through the virtual keyboard's character map, which deviceId -1 picks and which has no picker key
+        // deviceId -1 picks the virtual keyboard's character map, which has no picker key
         assertNotEquals(ForwardedKeys.PICKER_DIALOG_INPUT, sent.unicodeChar)
         assertTrue(ic.cleared.isEmpty())
     }

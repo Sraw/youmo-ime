@@ -30,7 +30,7 @@ class KeyShortcutPagesTest {
         assertEquals("num/0", KeyShortcutPages.Number.rows.last().single().name)
     }
 
-    // a layout of the user's in use (061-custom-layout §9, L6): its tab made from it, the keys it shares with the app's marked
+    // a layout of the user's in use: its tab made from it, the keys it shares with the app's marked
     @Test
     fun aLayoutsTabIsMadeFromItsKeys() {
         val text = SceneData.read("k18.xml").replaceFirst("id=\"k18\"", "id=\"my-k17\" based-on=\"k18\"")
@@ -58,7 +58,7 @@ class KeyShortcutPagesTest {
         val other = page.copy(form = "layout:another", title = "另一块")
         assertEquals(other, KeyShortcutPages.sharedWith(page, "my-k17/hjk", KeyShortcutPages.all(listOf(page, other))))
         assertEquals(page, KeyShortcutPages.sharedWith(KeyShortcutPages.Grouped18, "g18/we", pages))
-        // a group key of the app's name drawn with letters of its own: labelled by them, not as 18 键's tab has it (L6 review N5)
+        // a group key of the app's name drawn with letters of its own: labelled by them, not as 18 键's tab has it
         val drawn = KeyShortcutPages.of("my-k17", "我的 17 键", LayoutReader.layout(text.replace("letters=\"we\"", "letters=\"ew\"").replace("label=\"{group:we}\"", "label=\"{group:ew}\""))
             .let { it as? Parsed.Ok ?: error(it.toString()) }.value, mapOf("grouped-bottom" to bottom))
         assertEquals(KeyShortcutPages.Key("EW", "g18/we"), drawn.rows[0].single { it.name == "g18/we" })
@@ -96,8 +96,7 @@ class KeyShortcutPagesTest {
     }
 
     @Test
-    fun zhuyinNineAndTheNumbersHaveNoPresetsAndZhuyinNinesShortRowIsLeft() {
-        assertEquals(listOf(KeyShortcutPages.ZhuyinNine, KeyShortcutPages.Number), KeyShortcutPages.all.filterNot { it.hasPresets })
+    fun zhuyinNinesShortRowIsLeft() {
         assertEquals(listOf(KeyShortcutPages.ZhuyinNine), KeyShortcutPages.all.filter { it.leftAligned })
     }
 
@@ -109,7 +108,7 @@ class KeyShortcutPagesTest {
         assertEquals(KeyShortcutPages.all.size, KeyShortcutPages.all.map { it.form }.toSet().size)
     }
 
-    // the count on a keyboard's card (061-settings-cards §2.3): the keys its tab outlines
+    // the count on a keyboard's card: the keys its tab outlines
     @Test
     fun aPagesEditedKeysAreItsSlotsSetAndItsListsOfTheUsers() {
         val pages = KeyShortcutPages

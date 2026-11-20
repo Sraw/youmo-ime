@@ -13,9 +13,6 @@ def sym_comma(d):
     d.press(",")
 
 
-case("EN-01", needs="jvm:OtherInputMethodsUatTest.englishTheWordTypedIsFirst")(lambda d: None)
-
-
 @case("EN-02", base="B0-英文", mutates="learn")
 def en02(d):
     d.type("teh")
@@ -25,42 +22,6 @@ def en02(d):
     check(c[:2] == ["the", "teh"], f"候选 {c[:4]}")
     check(t == "the ", f"框里「{t}」")
     return f"候选 {c[:3]}，框里「{t}」"
-
-
-case("EN-03", needs="jvm:EnglishUatTest.theApostropheAdded")(lambda d: None)
-
-
-case("EN-04", needs="jvm:OtherInputMethodsUatTest.englishBackspaceRightAfterACorrectionUndoesItForGoodUntilRestored、SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap")(lambda d: None)
-
-
-case("EN-06", needs="jvm:EnglishUatTest.aMarkTakesTheSpaceAfterIt")(lambda d: None)
-
-
-case("EN-07", needs="jvm:EnglishUatTest.twoSpacesAFullStop")(lambda d: None)
-
-
-case("EN-08", needs="jvm:EnglishUatTest.theNextWordPredicted")(lambda d: None)
-
-
-case("EN-09", needs="jvm:EnglishCapsUatTest.aSentencesFirstLetterIsACapital")(lambda d: None)
-
-
-case("EN-10", needs="jvm:EnglishCapsUatTest.anAddressFieldGetsNoCapitals")(lambda d: None)
-
-
-case("EN-11", needs="jvm:EnglishUatTest.aCorrectionTappedBackIntoAndUndoneIsNotMadeAgain")(lambda d: None)
-
-
-case("EN-12", needs="jvm:EnglishUatTest.aWordAddedIsNotCorrected")(lambda d: None)
-
-
-case("EN-13", needs="jvm:EnglishUatTest.anEmailFieldNeitherSuggestsNorCorrects")(lambda d: None)
-
-
-case("EN-14", needs="jvm:EnglishUatTest.aFieldAskingNoSuggestionsGetsNone")(lambda d: None)
-
-
-case("EN-15", needs="jvm:EnglishUatTest.suggestionsTurnedOff")(lambda d: None)
 
 
 @case("EN-19", base="B0-设置", mutates=True)
@@ -92,12 +53,6 @@ def en19(d):
     return f"「{t1}」「{t2}」「{t3}」「{t4}」「{t5}」"
 
 
-case("EN-21", needs="jvm:EnglishCapsUatTest.aGlideTakesShiftWhereTheFieldAsksACapitalOrItIsPressed、EnglishUatTest.aGlideTakesShiftAWordsOwnCapitalAndI")(lambda d: None)
-
-
-case("EN-26", needs="jvm:EnglishUatTest.theWordAsTypedPickedCountsAsACorrectionTakenBack、SettingsPagesUatTest.anEnglishWordNoLongerCorrectedIsMarkedAndCorrectedAgainOnATap")(lambda d: None)
-
-
 @case("EN-27", base="B0-英文", mutates=True)
 def en27(d):
     d.type("th")
@@ -117,13 +72,9 @@ def en27(d):
     return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}，thw 空格「{t}」（设置里恢复由 JVM 管）"
 
 
-case("EN-28", needs="jvm:EnglishBlockOffersTest")(lambda d: None)
-case("EN-29", needs="jvm:EnginesWordCardTest、CandidateMenuUatTest.noReadingLineWhereTheEngineHasNoCard")(lambda d: None)
 @case("EN-30", base="B0-英文", mutates="learn")
 def en30(d):
-    # a word typed with a capital of its own (a name, not a sentence's start) is corrected only for a key beside: b
-    # tapped near its left edge, toward v, reads as v (Stebe → Steve); all in the middle it is kept as typed. A place
-    # lost (read as no place) corrects both, a wrong reach (b and n, say) neither (review R26 F8418)
+    # a capitalised word is corrected only for a key beside: b tapped toward v reads Steve, in the middle as typed
     def typed(at):
         keys_at(d, "hi", [None, None])
         d.space()
@@ -149,8 +100,7 @@ def en31(d):
     d.open_page("text")
     d.switch_im("英文")
     d.clear()
-    # when (9436) with its 4 slipped onto 5, tapped 3% of 5's width in from its left edge, by 4: when; all in the
-    # middle, each key's first letter (9536 spells nothing)
+    # when (9436) with 4 slipped onto 5's edge by 4: when; in the middle each key's first letter
     keys_at(d, "9536", [None, (0.03, 0.5), None, None])
     # English's nine keys compose in the field (no code row)
     edge = d.field_text()

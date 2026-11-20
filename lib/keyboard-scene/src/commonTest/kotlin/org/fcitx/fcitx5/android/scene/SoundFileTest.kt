@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** 060-theme-sounds-icons §1.2: a theme's key sound, Ogg Vorbis, WAV (8/16-bit PCM) or MP3, checked from its bytes. */
+/** A theme's key sound, Ogg Vorbis, WAV (8/16-bit PCM) or MP3, checked from its bytes. */
 class SoundFileTest {
 
     private fun ok(name: String, bytes: ByteArray): Info = SoundFile.read(name, bytes).getOr { error("$name: $it") }

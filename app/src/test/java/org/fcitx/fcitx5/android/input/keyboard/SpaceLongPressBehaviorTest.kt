@@ -8,10 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Holding the space talks only where the user chose it and the voice pack is imported, and never
- * in a password field: what is said there would be heard by whoever is near.
- */
+/** Never in a password field: what is said there would be heard by whoever is near. */
 class SpaceLongPressBehaviorTest {
 
     @Test

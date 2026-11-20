@@ -21,12 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
 
-/**
- * uat/15-privacy-backup.md, the engine's half: a field that asks not to learn, 不用我的输入习惯
- * with an imported base dictionary, 清掉最近, and the learning backups (restore merged, 退回恢复前,
- * this install's automatic ones, blocks first). The pages' buttons are HostApi's `learning(op)`;
- * here they are those ops.
- */
+/** uat/15-privacy-backup.md, the engine's half, through HostApi's `learning(op)` as the pages' buttons. */
 class PrivacyUatTest {
 
     private fun EngineReplay.backups(op: BackupOp) = engines.learning(null, op) as BackupResult

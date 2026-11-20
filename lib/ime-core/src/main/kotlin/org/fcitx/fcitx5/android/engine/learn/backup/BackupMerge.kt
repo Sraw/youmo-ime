@@ -34,43 +34,24 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 
 /**
- * A backup merged into the phone's learning (U-100, PLAN §2.9): each count the larger of the
- * two, day by day; what the user set (a first, a pin) the phone's where both have one; the user's
- * words, 不再联想 and anything else both sides list, together. Merging the same backup again
- * changes nothing, on any later day too.
+ * Merges a backup into the phone's learning: counts take the per-day max, user settings (a first, a pin)
+ * prefer the phone's, lists are unioned, so merging the same backup again changes nothing.
  *
- * Another install's typing days are not the phone's: its days are moved by an offset ([offset]),
- * first so its last typing day is the phone's, else a backup of an older install would all be
- * past the window, and one restored on a new phone would take months to fade. The offset is kept
- * in the phone's log ([ORIGIN], one per install), so the same backup restored again, days later,
- * lands on the same days and the per-day max takes nothing twice. The same install's days are as
- * they are.
- *
- * Seqs are not moved: seq fields stay ≥ 0 (a MINE word's sinceSeq ≥ 0 is what marks it), and the
- * merged [LearnState.nextSeq] is past both, so every commit after has a seq above every one kept.
- *
- * Done on the two states' snapshot rows, the backup's applied first so the phone's win where a
- * row of a type not merged here (a later build's, kept) has the same key.
+ * Another install's typing days are shifted so its last is the phone's ([offset]), stored per install
+ * ([ORIGIN]) so a later restore of the same backup lands on the same days. Seqs are not shifted: the merged
+ * [LearnState.nextSeq] is past both. The backup's rows are applied first, so the phone's win on a shared key.
  */
 object BackupMerge {
 
-    /**
-     * Snapshot row (stream D's 70–79): the offset [merge] moved the days of install `i64 id` by,
-     * `i32 offset`; kept by the reducer as an unknown row, so folds keep it.
-     */
+    /** Snapshot row: the day offset for install `i64 id`, `i32 offset`; kept as an unknown row so folds keep it. */
     const val ORIGIN: Byte = 73
 
-    /**
-     * [phone] and [backup] (made by the install [from], [sameInstall] if it is the phone's) as one
-     * state, restored at [minute]; a pin of a text in [blocked], the backup's or the phone's, is left out (the block wins, C9).
-     * The backup's import batches made new are numbered past [lastBatch] too: the live record's
-     * last, which knows batches undone that a fold forgot.
-     */
+    /** [phone] and [backup] as one state restored at [minute]; pins of [blocked] texts are dropped, and new import batches are numbered past [lastBatch]. */
     fun merge(phone: LearnState, backup: LearnState, from: Long, sameInstall: Boolean, minute: Int, blocked: Set<String> = emptySet(), lastBatch: Int = 0): LearnState {
         val origins = origins(phone)
         val shift = if (sameInstall) 0 else offset(phone, backup, origins[from])
         val today = maxOf(phone.day, backup.day + shift)
-        // each side swept to the day first, the corrections aged out in its own older: a day the phone swept is not counted again
+        // each side swept to its day first, so a day the phone swept is not counted again
         val pinBlocked = { r: LearnRecord -> r is PinRow && r.text in blocked }
         val ours = swept(phone.snapshot(phone.cut), today).filterNot { isOrigin(it) || pinBlocked(it) }
         val theirs = swept(
@@ -79,7 +60,7 @@ object BackupMerge {
             today,
         )
         val merged = LearnState()
-        // all of it a snapshot as of the restore (U-88 cuts no earlier); the sequence past both: no commit to come shares one of theirs
+        // a snapshot as of the restore; seq past both
         merged.apply(
             Head(
                 cut = minute,
@@ -99,7 +80,6 @@ object BackupMerge {
         return merged
     }
 
-    // [rows] as the reducer's sweep leaves them on typing day [today]
     private fun swept(rows: List<LearnRecord>, today: Int): List<LearnRecord> {
         val s = LearnState()
         for (r in rows) LearnLog.applyOrKeep(s, if (r is Head) r.copy(day = today) else r)
@@ -107,22 +87,17 @@ object BackupMerge {
         return s.snapshot(s.cut)
     }
 
-    /**
-     * By how many days [backup]'s are moved to be the phone's: as [stored] for its install, unless
-     * its last day would then be past the phone's (a newer backup of it); else its last typing day
-     * made the phone's last.
-     */
+    /** The day shift for [backup]: [stored] for its install unless that puts it past the phone's last day, else its last day made the phone's. */
     fun offset(phone: LearnState, backup: LearnState, stored: Int?): Int =
         stored?.takeIf { backup.day + it <= phone.day } ?: (phone.day - backup.day)
 
-    /** The offsets [state] keeps ([ORIGIN]), by install. */
     fun origins(state: LearnState): Map<Long, Int> = state.kept.filter(::isOrigin).associate { r ->
         DataInputStream(ByteArrayInputStream((r as Unknown).fields)).run { readLong() to readInt() }
     }
 
     private fun isOrigin(r: LearnRecord) = r is Unknown && r.type == ORIGIN
 
-    /** An install whose days are the log's own (an offset of none): written by the install that opens it ([BackupControl.claim]). */
+    /** An install whose days are the log's own (offset 0): written by the install that opens it. */
     fun lineage(install: Long): LearnRecord = origin(install, 0)
 
     private fun origin(id: Long, offset: Int) = Unknown(
@@ -130,9 +105,8 @@ object BackupMerge {
         ByteArrayOutputStream().also { DataOutputStream(it).run { writeLong(id); writeInt(offset) } }.toByteArray(),
     )
 
-    // the backup's import batches as the phone's: one of the same file, day and size is the phone's, another a new id, its words with it
-    // ids past [last] as well: one the phone undid may be put back by 撤销, and a batch of the backup's
-    // under its id would take its words (review-int-records S3)
+    // the backup's batches as the phone's (same file, day and size match); others get new ids past [last],
+    // so a phone batch undone and later restored does not lose its words
     private fun renumbered(ours: List<LearnRecord>, theirs: List<LearnRecord>, last: Int): List<LearnRecord> {
         val batches = ours.filterIsInstance<BatchRow>()
         if (theirs.none { it is BatchRow }) return theirs
@@ -149,9 +123,8 @@ object BackupMerge {
         }
     }
 
-    // the rows of both: merged by key where both have one, the backup's first otherwise. The import
-    // batches first, the phone's of an id before the backup's, then the phone's words, then the
-    // backup's: no word before its batch, and one in both the phone's batch keeps (review-G S10)
+    // batches first, then the phone's words, then the backup's: no word before its batch, and a shared
+    // word keeps the phone's batch
     private fun rows(ours: List<LearnRecord>, theirs: List<LearnRecord>): List<LearnRecord> {
         val out = ArrayList<LearnRecord>()
         (ours + theirs).filterIsInstance<BatchRow>().distinctBy { it.id }.forEach(out::add)
@@ -163,7 +136,7 @@ object BackupMerge {
         for (r in theirs.filterNot(::imports)) {
             val k = key(r)
             if (k == null) {
-                // a row merged by no key (kept, a later build's): both sides', the same one once
+                // unkeyed rows (kept, a later build's): both sides', duplicates once
                 if (r !in phoneUnkeyed) out += r
                 continue
             }
@@ -177,8 +150,7 @@ object BackupMerge {
 
     private fun imports(r: LearnRecord) = r is BatchRow || r is ImportedRow
 
-    // what a row is merged by: rows of one key are the same thing, on either side. Every type
-    // named, no else: a new row is decided here, not left unmerged by default (review R11)
+    // every type named, no else: a new row type must decide how it merges
     private fun key(r: LearnRecord): Any? = when (r) {
         is StatRow -> listOf("stat", r.code, r.words.text, r.words.reading)
         is WordUseRow -> "use" to (r.text to r.reading)
@@ -192,9 +164,8 @@ object BackupMerge {
         is EnPairRow -> "enPair" to (r.prev to r.word)
         is TableWordRow -> listOf("table", r.im, r.code, r.text)
         is PinRow -> "pin" to r.code
-        // a typing day's calendar day: the phone's where both have the day (review-E-engine S11)
         is DateRow -> "date" to r.day
-        // the same one on both sides kept once (rows: equal rows), the rest both sides'
+        // equal rows kept once, others from both sides
         is NoPredictRow, is TableBlockRow, is Unknown, is BatchRow, is ImportedRow, is Head, Cut -> null
         // events: never in a snapshot
         is LearnRecord.Commit, is LearnRecord.Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
@@ -204,7 +175,6 @@ object BackupMerge {
         -> null
     }
 
-    // the phone's row [ours] and the backup's [theirs] of one key
     private fun both(ours: LearnRecord, theirs: LearnRecord): LearnRecord = when (ours) {
         is StatRow -> (theirs as StatRow).let {
             StatRow(ours.code, ours.words, max(ours.uses, it.uses), max(ours.corrections, it.corrections), maxOf(ours.older, it.older), ours.firstSeq)
@@ -226,11 +196,9 @@ object BackupMerge {
         is EnWordRow -> (theirs as EnWordRow).let { EnWordRow(ours.word, ours.flags or it.flags, max(ours.uses, it.uses)) }
         is EnPairRow -> (theirs as EnPairRow).let { EnPairRow(ours.prev, ours.word, maxOf(ours.count, it.count), maxOf(ours.lastDay, it.lastDay)) }
         is TableWordRow -> TableWordRow(ours.im, ours.code, ours.text, minOf(ours.since, (theirs as TableWordRow).since))
-        // a first and the words corrected to since, a pin, a pending text: what the phone has
         else -> ours
     }
 
-    // each day's count, the larger of the two
     private fun max(a: DayCounts, b: DayCounts): DayCounts {
         val out = a.copy()
         for (i in 0 until b.size) {
@@ -243,8 +211,7 @@ object BackupMerge {
 
     private fun DayCounts.shifted(by: Int) = if (by == 0) copy() else DayCounts().also { c -> for (i in 0 until size) c.add(day(i) + by, count(i)) }
 
-    // [r], a backup's row, its typing days moved [by] days. Every type named, no else: a new row
-    // with a typing day is not left on the other install's days by default (review R11)
+    // every type named, no else: a new row with a typing day must not keep the other install's days
     private fun shifted(r: LearnRecord, by: Int): LearnRecord = if (by == 0) r else when (r) {
         is StatRow -> StatRow(r.code, r.words, r.uses.shifted(by), r.corrections.shifted(by), r.older, r.firstSeq)
         is WordUseRow -> WordUseRow(r.text, r.reading, r.uses.shifted(by))
@@ -257,9 +224,8 @@ object BackupMerge {
         is EnWordRow -> EnWordRow(r.word, r.flags, r.uses.shifted(by))
         is EnPairRow -> EnPairRow(r.prev, r.word, r.count, r.lastDay + by)
         is TableWordRow -> TableWordRow(r.im, r.code, r.text, r.since + by)
-        // the typing day moved, the calendar day it was is what it was
         is DateRow -> DateRow(r.day + by, r.localDay)
-        // no typing day: a batch's day is a calendar one; a later build's row unread
+        // no typing day (a batch's day is a calendar one), or unread
         is Head, Cut, is PinRow, is NoPredictRow, is TableBlockRow, is BatchRow, is ImportedRow, is Unknown -> r
         is LearnRecord.Commit, is LearnRecord.Undo, is LearnRecord.Pin, is LearnRecord.Forget, is LearnRecord.PhraseForget, is LearnRecord.NoPredict,
         is LearnRecord.TableOrderReset, is LearnRecord.TableBlock, is LearnRecord.EnCommit, is LearnRecord.EnForget,
@@ -268,11 +234,7 @@ object BackupMerge {
         -> r
     }
 
-    /**
-     * The words to add and to block so the phone's lists take the backup's in (U-100): those the
-     * phone lacks; one the phone has on the other list stays as the phone has it, and one on both
-     * of the backup's is blocked (the block wins, C9).
-     */
+    /** Words to add and block so the phone's lists take in the backup's; a word on both of the backup's lists is blocked. */
     fun lists(phoneAdded: Collection<ListedWord>, phoneBlocked: Collection<ListedWord>, added: Collection<ListedWord>, blocked: Collection<ListedWord>): Pair<List<ListedWord>, List<ListedWord>> {
         val ours = (phoneAdded + phoneBlocked).mapTo(HashSet()) { it.text to it.code }
         val block = blocked.filter { (it.text to it.code) !in ours }.distinct()

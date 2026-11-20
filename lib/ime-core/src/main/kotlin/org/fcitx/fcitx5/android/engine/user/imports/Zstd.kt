@@ -8,15 +8,9 @@ import org.fcitx.fcitx5.android.engine.data.DataFormatException
 import java.util.Arrays
 
 /**
- * A Zstandard decoder (RFC 8878), for the files libime compresses: frames as zstd's library
- * writes them, one after another, skippable frames skipped. A frame that needs a dictionary is
- * refused; one whose content is not the size its header says, or not what its checksum says
- * (libime writes one), is corrupt, as zstd's library takes it.
- *
- * The whole output is kept, so a match may reach back as far as the frame goes; libime's files
- * are tens of megabytes at most. It is decoded twice: counted, then written into an array of just
- * that size. Grown as it was written, by doubling, then cut to size, it took up to three times
- * its size at once.
+ * A Zstandard decoder (RFC 8878) for libime's files: frames in sequence, skippable ones skipped, dictionary frames
+ * refused, size and checksum mismatches corrupt. The whole output is kept, so a match may reach back the whole
+ * frame. Decoded twice, counted then written into an exact array: grown by doubling it took up to three times its size.
  */
 object Zstd {
 
@@ -24,20 +18,16 @@ object Zstd {
     private const val SKIPPABLE_MAGIC = 0x184D2A50
     private const val SKIPPABLE_MASK = 0xFFFFFFF0.toInt()
 
-    // fcitx5-pinyin-zhwiki's dictionary is 64.5 MiB unpacked (its 20260416 release), moegirl's
-    // 5 MiB: about twice the larger, for it to grow
+    // zhwiki's dictionary is 64.5 MiB unpacked: about twice that, for it to grow
     private const val MAX_OUTPUT = 1 shl 27
 
-    // RFC 8878's Block_Maximum_Size: what a block holds, or makes, at most
+    // RFC 8878's Block_Maximum_Size
     private const val MAX_BLOCK = 1 shl 17
 
     private val NO_LITERALS = ByteArray(0)
 
-    /** Whether [data] starts as a zstd frame does. */
-    fun isFrame(data: ByteArray, from: Int = 0): Boolean = data.size - from >= 4 && le32(data, from) == FRAME_MAGIC
-
     /**
-     * The frames in [data] from [from] to its end, decompressed.
+     * The frames in [data] from [from] on, decompressed.
      *
      * @throws DataFormatException past [limit] bytes too: a few bytes of zstd can claim gigabytes
      */
@@ -47,7 +37,6 @@ object Zstd {
         return bytes
     }
 
-    /** The frames in [data] from [from] to its end, into [out]; how many bytes they make. */
     private fun frames(data: ByteArray, from: Int, out: Output): Int {
         var pos = from
         try {
@@ -75,18 +64,15 @@ object Zstd {
         var size = 0
             private set
 
-        // where the block being read began
         private var blockStart = 0
 
-        /** A block begins: from here it may make [MAX_BLOCK] bytes. */
         fun startBlock() {
             blockStart = size
         }
 
-        /** An array for [count] literals to write; none when only counting, as nothing reads them. */
+        /** An array for [count] literals; none when only counting, as nothing reads them. */
         fun literals(count: Int): ByteArray = if (bytes == null) NO_LITERALS else ByteArray(count)
 
-        /** Room for [extra] bytes to come, as a frame's header claims. */
         fun reserve(extra: Long) {
             if (extra > limit - size) corrupt("zstd output past $limit bytes")
         }
@@ -126,7 +112,6 @@ object Zstd {
         }
     }
 
-    /** One frame: its blocks and what they carry from one to the next. */
     private class Frame(private val src: ByteArray, private val out: Output) {
         private val frameStart = out.size
         private val repeats = intArrayOf(1, 4, 8)
@@ -157,7 +142,6 @@ object Zstd {
             val produced = out.size - frameStart
             if (contentSize >= 0 && produced.toLong() != contentSize) corrupt("zstd frame is $produced bytes, not $contentSize")
             if (descriptor and 0x04 != 0) {
-                // counted only: no bytes yet to check
                 val bytes = out.bytes
                 if (bytes != null && le32(src, p) != xxh64(bytes, frameStart, produced).toInt()) corrupt("zstd checksum does not match")
                 p += 4
@@ -165,7 +149,6 @@ object Zstd {
             return p
         }
 
-        /** The size the frame says it is, in [bytes] bytes at [p]; -1 if it does not say. */
         private fun contentSize(p: Int, bytes: Int): Long {
             if (bytes == 0) return -1
             val size = leN(src, p, bytes) + if (bytes == 2) 256 else 0
@@ -173,7 +156,6 @@ object Zstd {
             return if (size < 0) Long.MAX_VALUE else size
         }
 
-        /** The blocks from [start] to the last; where it ends. */
         private fun blocks(start: Int): Int {
             var p = start
             do {
@@ -208,7 +190,6 @@ object Zstd {
             val literalsSize: Int
             when (b0 and 3) {
                 0, 1 -> {
-                    // 0 and 2 a byte, 1 two, 3 three
                     val headerSize = if (sizeFormat and 1 == 0) 1 else sizeFormat / 2 + 2
                     literalsSize = when (headerSize) {
                         1 -> b0 ushr 3
@@ -249,7 +230,6 @@ object Zstd {
                     val table = huffman ?: corrupt("zstd literals repeat no table")
                     literals = out.literals(literalsSize)
                     literalsFrom = 0
-                    // decoded only when written: a count needs only how many there are
                     if (out.bytes != null) {
                         if (sizeFormat == 0) {
                             table.decode(src, q, streamsEnd, literals, 0, literalsSize)
@@ -312,7 +292,7 @@ object Zstd {
             out.write(literals, literal, literalsEnd - literal)
         }
 
-        /** The offset [value] stands for, the repeated ones kept as the RFC says. */
+        /** The offset [value] stands for, repeat offsets kept as the RFC says. */
         private fun offset(value: Long, noLiterals: Boolean): Int {
             if (value > 3) {
                 val offset = value - 3
@@ -332,7 +312,6 @@ object Zstd {
         }
     }
 
-    /** A Huffman decoding table for literals: indexed by the next [maxBits] bits. */
     private class Huffman(val maxBits: Int, val symbols: ByteArray, val lengths: ByteArray) {
 
         fun decode(src: ByteArray, start: Int, end: Int, out: ByteArray, from: Int, to: Int) {
@@ -365,7 +344,6 @@ object Zstd {
         companion object {
             private const val MAX_BITS = 11
 
-            /** The table described at [start], and where its description ends. */
             fun read(src: ByteArray, start: Int, end: Int): Pair<Huffman, Int> {
                 var p = start
                 val header = u8(src, p++)
@@ -411,7 +389,6 @@ object Zstd {
                 return Huffman(maxBits, symbols, lengths) to p
             }
 
-            /** Weights FSE-compressed, two states taking turns; how many there are. */
             private fun fseWeights(src: ByteArray, start: Int, end: Int, weights: IntArray): Int {
                 val (table, from) = Fse.read(src, start, end, 255, 6)
                 val bits = BackwardBits(src, from, end)
@@ -432,13 +409,11 @@ object Zstd {
         }
     }
 
-    /** An FSE decoding table of 2^[log] states. */
     private class Fse(val log: Int, val symbol: IntArray, val bits: IntArray, val base: IntArray) {
 
         fun next(state: Int, stream: BackwardBits): Int = base[state] + stream.read(bits[state])
 
         companion object {
-            /** The table [mode] says, and where its description ends. */
             fun table(mode: Int, previous: Fse?, src: ByteArray, start: Int, end: Int, default: Fse, maxSymbol: Int, maxLog: Int): Pair<Fse, Int> = when (mode) {
                 0 -> default to start
                 1 -> {
@@ -450,7 +425,6 @@ object Zstd {
                 else -> (previous ?: corrupt("zstd repeats no table")) to start
             }
 
-            /** A table as zstd describes one (its normalized counts), and where that ends. */
             fun read(src: ByteArray, start: Int, end: Int, maxSymbol: Int, maxLog: Int): Pair<Fse, Int> {
                 val bits = ForwardBits(src, start, end)
                 val log = bits.read(4) + 5
@@ -549,10 +523,8 @@ object Zstd {
             pos = (end - 1 - start) * 8 + highBit(last)
         }
 
-        /** All read, none past. */
         val finished get() = pos == 0
 
-        /** Read past the start: what was read there counted as 0s. */
         val overflowed get() = pos < 0
 
         fun peek(n: Int): Int = bits(pos - n, n)
@@ -567,7 +539,6 @@ object Zstd {
             return bits(pos, n)
         }
 
-        // bits [low, low + n) of the stream taken as one little-endian number, 0 below its start
         private fun bits(low: Int, n: Int): Int {
             val high = low + n
             if (high <= 0) return 0
@@ -580,7 +551,6 @@ object Zstd {
         }
     }
 
-    /** Bits read from the start of a stream on, lowest first. */
     private class ForwardBits(private val src: ByteArray, private val start: Int, private val end: Int) {
         private var pos = 0
 
@@ -608,7 +578,6 @@ object Zstd {
     }
     private val ML_BITS = IntArray(53) { if (it < 32) 0 else intArrayOf(1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)[it - 32] }
 
-    // the predefined distributions, as normalized counts
     private val LL_DEFAULT = defaultTable(
         6, 4, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 2, 1, 1, 1, 1, 1, -1, -1, -1, -1,
     )

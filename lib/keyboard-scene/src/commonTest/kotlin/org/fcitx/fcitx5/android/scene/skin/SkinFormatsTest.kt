@@ -20,14 +20,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Sogou as real skins write it, Trime's and FlorisBoard's themes, and the readers under them (synthetic files only). */
 class SkinFormatsTest {
     private fun SkinConversion.image(name: String) =
         assertNotNull(files.firstOrNull { it.name == name } as? SkinOutput.Image, "$name in ${files.map { it.name }}").pixels
 
     private fun hexOf(c: SkinConversion, name: String) = read(c).colors[name]?.let { SkinTheme.hex(it.value) }
 
-    // --- Sogou as the downloaded skins write it
 
     private fun sogouKeyboardPicture(): MutableMap<String, ByteArray> {
         val files = sogou(periods = 1)
@@ -54,7 +52,6 @@ class SkinFormatsTest {
     fun sogouKeyboardPictureUnderTheBar() {
         val c = convert(sogouKeyboardPicture())
         val board = c.image(SkinTheme.BOARD)
-        // the bar's picture (126 px at 1080) over the keyboard's (600), its six-number band read as the four
         assertEquals(1080 to 726, board.width to board.height)
         assertEquals(0xFFCC3333.toInt(), board[540, 60])
         assertEquals(0xFF3366CC.toInt(), board[540, 700])
@@ -63,11 +60,9 @@ class SkinFormatsTest {
     @Test
     fun sogouTransparentFacesBakedIconsAndSuffixedLetters() {
         val c = convert(sogouKeyboardPicture())
-        // the letters' face transparent.png, an all-transparent picture the function keys': no face, the pressed one drawn
         assertContains(c.themeXml, """<style select="key" fill="#00000000"""")
         assertContains(c.themeXml, """select="key.function" fill="#00000000"""")
         assertContains(c.themeXml, """select="key:pressed" fill="image(l-key-p.png""")
-        // space's symbol in its face (ICON transparent.png): no label or icon of the app's on it
         assertContains(c.themeXml, """select="key.space" fill="#00000000" color="transparent" icon-color="transparent"""")
         // the letters' colour from Key_G_L's picture
         assertEquals("#00ff00", hexOf(c, "keyText"))
@@ -181,22 +176,19 @@ class SkinFormatsTest {
     fun trimeInARepositoryFolder() {
         val zipped = trime().mapKeys { "ink-main/" + it.key } + ("ink-main/README.md" to text("x"))
         assertEquals("Ink", convert(zipped).name)
-        // the biggest theme file is the theme; the others (a patch) beside it
         val two = trime() + ("ink.custom.trime.yaml" to text("patch: {}"))
         assertEquals("Ink", convert(two).name)
     }
 
     @Test
     fun aFolderZippedByMacOsFinderIsUnwrapped() {
-        // Finder's __MACOSX/ and ._ files beside the theme's folder: not a second folder
         val zipped = trime().mapKeys { "ink/" + it.key } + ("__MACOSX/ink/._ink.trime.yaml" to text("x")) + ("ink/._k.ttf" to text("x"))
         assertEquals("Ink", convert(zipped).name)
     }
 
     @Test
     fun aKeyboardFontPastTheLimitIsLeftOut() {
-        // each reader keeps a font of its own within SkinLimits.MAX_FONT_BYTES; one past it is left out and the text
-        // note said (Sogou's and Trime's skins set a text size of their own, so theirs is said whatever the font)
+        // one font past SkinLimits.MAX_FONT_BYTES is left out and the text note said
         val rows = listOf(
             Triple("FlorisBoard's @font", { floris() }, "fonts/moss.ttf"),
             Triple("Sogou's TYPEFACE", { sogou() }, "default/font.ttf"),
@@ -219,7 +211,6 @@ class SkinFormatsTest {
         assertFailsWith<SkinError> { convert(mapOf("x.yaml" to text("- just\n- a list\n"))) }
     }
 
-    // --- FlorisBoard
 
     private fun floris(): MutableMap<String, ByteArray> = linkedMapOf(
         "extension.json" to text(
@@ -253,7 +244,6 @@ class SkinFormatsTest {
         val t = read(c)
         assertEquals("Moss Day", t.name)
         assertEquals("Di", t.meta?.author)
-        // the night one has no isNight: dark by its background
         assertEquals(setOf(false, true), t.variants)
         assertEquals("#203020", hexOf(c, "keyText"))
         assertEquals("#102010", hexOf(c, "candidateText"))

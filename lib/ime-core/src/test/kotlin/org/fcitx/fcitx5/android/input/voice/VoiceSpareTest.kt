@@ -74,8 +74,7 @@ class VoiceSpareTest {
         assertNull(spare.take())
     }
 
-    // a clear while a build is under way releases what the build made, rather than keep it as the
-    // spare: kept, a VAD's native memory stayed held with voice not in use
+    // a clear during a build releases what it made rather than keep it as the spare (a VAD's native memory stayed held)
     @Test
     fun aClearDuringABuildReleasesWhatItMade() {
         val released = mutableListOf<String>()
@@ -85,8 +84,7 @@ class VoiceSpareTest {
         assertEquals(listOf("a"), released)
     }
 
-    // a clear landing after the build's keep but before its undo lets go of what was made itself: the
-    // undo then finds it gone and does not release it again (a VAD released twice is a native double free)
+    // a clear after the build's keep but before its undo releases it itself; the undo then does not (a native double free)
     @Test
     fun aClearBetweenTheKeepAndItsUndoReleasesOnce() {
         val released = mutableListOf<String>()
@@ -97,7 +95,7 @@ class VoiceSpareTest {
         assertEquals(listOf("a"), released)
     }
 
-    // review F6461: a clear between reading clears and the offer undoes the keep, released once; with none between, it is kept
+    // a clear between reading clears and the offer undoes the keep, released once; with none between, it is kept
     @Test
     fun anOfferAfterAClearItDidNotSeeIsUndone() {
         val released = mutableListOf<String>()

@@ -9,7 +9,7 @@ import java.io.IOException
 
 class CausesTest {
 
-    // audit-061 app-rest-13: the chain was cut at a count (MAX_CAUSES: 8 in PackStore, 16 in EngineBridge), and a cause
+    // the chain was cut at a count (MAX_CAUSES: 8 in PackStore, 16 in EngineBridge), and a cause
     // deeper than that (a PackUnavailableException under the engine's wrappers) was not found, the pack not read
     // through. 21 deep on purpose: past both of the old counts; a shorter chain would pass with a cut again
     @Test

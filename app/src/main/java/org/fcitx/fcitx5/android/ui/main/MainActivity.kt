@@ -67,17 +67,17 @@ class MainActivity : AppCompatActivity() {
         }
         navController.addOnDestinationChangedListener { _, dest, _ ->
             dest.label?.let { viewModel.setToolbarTitle(it.toString()) }
-            // the home page is the top level: no up arrow there (system back still leaves)
+            // no up arrow at the top level (system back still leaves)
             supportActionBar?.setDisplayHomeAsUpEnabled(!dest.hasRoute<SettingsRoute.Index>())
         }
-        // made again (a rotation, a new app language): the pages are restored, the intent was acted on
+        // recreated: the pages are restored and the intent was acted on
         if (savedInstanceState == null) processIntent(intent)
     }
 
     override fun onResume() {
         super.onResume()
-        // each time it comes back, not only made: the system's own settings open this activity
-        // (singleTask) over the setup, which went, and the launcher then only brings the task back
+        // on each return: the system's settings open this singleTask activity over the gone setup, and the launcher only
+        // brings the task back
         if (intent?.action != Intent.ACTION_VIEW && SetupActivity.shouldShowUp()) {
             startActivity<SetupActivity>()
         }
@@ -128,9 +128,9 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 if (route is SettingsRoute.QuickPhrase) {
-                    // the keyboard's own refuses a longer one before it sends it; another app's is refused here
+                    // the keyboard refuses a longer one before sending; another app's is refused here
                     if (route.content.length > QuickPhraseBook.MAX_CONTENT) return
-                    // quick input's page up with its editor changed: it asks before that is dropped
+                    // quick input's page with its editor changed: it asks before that is dropped
                     val page = supportFragmentManager.findFragmentById(R.id.nav_host_fragment)?.childFragmentManager?.primaryNavigationFragment
                     if ((page as? QuickPhraseFragment)?.takeRequest(route) == true) return
                 }
@@ -151,10 +151,8 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_SETTINGS_ROUTE = "${BuildConfig.APPLICATION_ID}.EXTRA_SETTINGS_ROUTE"
 
         /**
-         * Whether a file another app asks us to open ([Intent.ACTION_VIEW]) may be read: a `content://` one (its
-         * provider gives what the sender may share), or a `file://` one (old file managers still send them) outside
-         * this app's own directories. Read with the app's rights, a path into them would take its private files,
-         * the learning backup kept before a restore say, for a dictionary to import.
+         * `content://`, or `file://` outside this app's own directories: read with the app's rights, such a path would import
+         * its private files (say, the pre-restore learning backup).
          */
         internal fun importable(ctx: Context, uri: Uri): Boolean = when (uri.scheme) {
             ContentResolver.SCHEME_CONTENT -> true
@@ -172,12 +170,8 @@ class MainActivity : AppCompatActivity() {
 
 }
 
-/**
- * Takes out of this intent the deep links Navigation opens on the first graph: MainActivity is
- * exported, and the app sends none, so they could only be another app's way to any page.
- */
-// the keys are Navigation's own (restricted to its library group), and the only way to take its
-// deep links out before the NavController reads them
+/** Drops the deep links Navigation would open: this activity is exported and the app sends none. */
+// the keys are Navigation's own (restricted), the only way to drop them before the NavController reads them
 @SuppressLint("RestrictedApi")
 internal fun Intent.dropDeepLinks() {
     try {

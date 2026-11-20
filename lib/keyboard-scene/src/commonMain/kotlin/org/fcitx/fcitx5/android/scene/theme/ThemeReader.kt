@@ -11,14 +11,10 @@ import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
 import org.fcitx.fcitx5.android.scene.xml.XmlElement
 
-/**
- * A theme file read and checked: theme-4.xsd's words, and what an import checks beyond them (the 24
- * colours of 3.0 all there, every `@name` naming a colour and none itself, at most 1000 styles, 4
- * fonts and 200 icons, a selector's grammar exactly).
- */
+/** A theme file read and checked: theme-4.xsd's rules plus what an import checks beyond them. */
 object ThemeReader {
     const val NAMESPACE = "https://youmo-ime/theme/4"
-    /** A theme file's styles at most; one the app writes itself may say more (`maxStyles`). */
+    /** A theme file's styles at most; one the app writes itself may allow more (`maxStyles`). */
     const val MAX_STYLES = 1000
     private const val MAX_FONTS = 4
     private const val MAX_ICONS = 200
@@ -27,13 +23,10 @@ object ThemeReader {
     private val VERSION = Regex("4\\.[0-9]+")
     private val VAR_NAME = Regex("[a-zA-Z][a-zA-Z0-9_-]{0,31}")
     // ASCII white space spelt out: `\s` is more on JS than on the JVM, and a file must read the same on both
-    // no control character, nor a name all dots
     internal val FILE = Regex("(?!\\.+$)[^/\\\\:*?\"<>| \\x00-\\x1F\\u00A0][^/\\\\:*?\"<>|\\x00-\\x1F]{0,127}")
     private val ICON = Regex("[a-z0-9]+(-[a-z0-9]+)*")
-    // a sound's class: a known one (SoundKey) or a later version's, worded alike
     private val SOUND_KEY = Regex("[a-z][a-z0-9-]{0,31}")
 
-    /** The colours the app's own widgets take by name (theme 3.0's, less their Color suffix). */
     val REQUIRED_COLORS = listOf(
         "background", "bar", "keyboard", "key", "keyText", "candidateText", "candidateLabel", "candidateComment", "altKey",
         "altKeyText", "accentKey", "accentKeyText", "keyPressHighlight", "keyShadow", "popupBackground", "popupText",
@@ -41,29 +34,16 @@ object ThemeReader {
         "toolbarIcon",
     )
 
-    /**
-     * Elements of a later version, read and ignored with a warning, whatever they hold; a version that
-     * makes one work moves it out. None now: `<sounds>` (060-theme-sounds-icons) is read.
-     */
     val RESERVED_ELEMENTS: Set<String> = emptySet()
 
-    /**
-     * [source] read, `system()` colours from [systemColors] (none: each its fallback; the light
-     * `<colors>` take its light ones, `<colors variant="dark">` and a dark-only theme its dark ones),
-     * refused where its `<meta min-app>` is newer than [appVersion]. [appVersion] null: not checked;
-     * the app (T8a) passes its release's base version (`Versions.baseVersionName`, `0.6.0`), not a
-     * development build's `0.6.0-12-gabcdef`, whose suffix [newer] would drop anyway.
-     */
+    /** [appVersion] null: not checked; the app passes its release's base version, not a dev build's `0.6.0-12-gabcdef`. */
     fun theme(source: String, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null, maxStyles: Int = MAX_STYLES): Parsed<Theme> =
         when (val xml = Xml.parse(source)) {
             is Parsed.Failed -> xml
             is Parsed.Ok -> theme(xml.value, systemColors, appVersion, maxStyles)
         }
 
-    /**
-     * [root] read. A theme comes from anywhere: whatever goes wrong reading it (a bug of ours it
-     * finds, a stack it overflows) is a problem of the file, never a crash of the keyboard.
-     */
+    /** A theme comes from anywhere: whatever goes wrong reading it (a bug of ours, a stack overflow) is a problem, never a crash. */
     @Suppress("TooGenericExceptionCaught")
     fun theme(root: XmlElement, systemColors: SystemColors = SystemColors.NONE, appVersion: String? = null, maxStyles: Int = MAX_STYLES): Parsed<Theme> = try {
         read(root, systemColors, appVersion, maxStyles)
@@ -98,7 +78,7 @@ object ThemeReader {
         val icons = named(atMost(root.all("icon"), MAX_ICONS, p, "icons"), p, "icon")
         val styleEls = root.all("style")
         if (styleEls.size > maxStyles) p.add(styleEls[maxStyles].line, "over $maxStyles styles")
-        // the rest not read: the file is refused already, and a million styles would each be a problem
+        // the file is refused already, and a million styles would each be a problem
         val styles = styleEls.take(maxStyles).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys, icons.keys) }
         undrawnIcons(root.all("icon"), icons.keys, styles, p)
         val soundsEls = root.all("sounds")
@@ -111,7 +91,6 @@ object ThemeReader {
         }
     }
 
-    // <colors>, and <colors variant="dark"> where given: the dark one the light one but what it gives
     private fun colorTables(root: XmlElement, variants: Set<Boolean>, p: Problems, system: SystemColors): Pair<Map<String, Argb>, Map<String, Argb>?> {
         val (darkEls, baseEls) = root.all("colors").partition { it["variant"] == "dark" }
         if (baseEls.size != 1) p.add(root.line, "<theme> needs one <colors>")
@@ -120,7 +99,7 @@ object ThemeReader {
         val baseRaw = baseEls.firstOrNull()?.let { rawColors(it, p, required = true) }.orEmpty()
         val reported = HashSet<Triple<Boolean, String, String>>()
         val colors = resolved(baseRaw, p, system.of(variants == setOf(true)), reported, null)
-        // the dark version's whenever there is one: its system() colours are the dark roles, a <colors variant="dark"> or not
+        // whenever there is a dark version its system() colours are the dark roles, with or without <colors variant="dark">
         val darkColors = if (true !in variants) null else {
             val over = darkEls.firstOrNull()?.let { rawColors(it, p, required = false) }.orEmpty()
             over.filterKeys { it !in baseRaw }.forEach { (k, v) -> p.add(v.second, "the colour $k is not in the light <colors>") }
@@ -129,7 +108,6 @@ object ThemeReader {
         return colors to darkColors
     }
 
-    // variants="light|dark|light dark", or 3.0's way dark="true|false": one of the two
     private fun variants(a: Attributes): Set<Boolean> {
         val given = a.string("variants") != null || a.string("dark") != null
         val dark = a.boolean("dark")
@@ -168,11 +146,7 @@ object ThemeReader {
         return meta
     }
 
-    /**
-     * Whether [source] is a later build's theme, whether or not it reads here: its root's `version=` a later
-     * format's than 4.x (`5.0`), or its `<meta min-app>` newer than [app]. A file that is no XML, or says
-     * neither, is not ([newer]: what cannot tell is not). [app] null (a dev build): only the format is checked.
-     */
+    /** Whether [source] is a later build's theme: `version=` past 4.x, or `<meta min-app>` newer than [app]. */
     fun laterBuilds(source: String, app: String?): Boolean {
         val root = (Xml.parse(source) as? Parsed.Ok)?.value?.takeIf { it.name == "theme" } ?: return false
         val format = root["version"]?.let(FORMAT::matchEntire)?.groupValues?.get(1)?.toIntOrNull()
@@ -181,13 +155,9 @@ object ThemeReader {
     }
 
     private const val FORMAT_MAJOR = 4
-    // `5.0`, or `5` alone: either a later format
     private val FORMAT = Regex("([0-9]{1,4})(?:\\.[0-9]{1,4})?")
 
-    /**
-     * Whether [version] (`0.6.0`) is newer than [app] (`0.5.2`; a leading `v` and what follows a `-`
-     * dropped: `v0.6.0-beta1` is `0.6.0`). Either not three numbers after that: false, it cannot tell.
-     */
+    /** Either not three numbers: false, it cannot tell. */
     fun newer(version: String, app: String): Boolean {
         fun numbers(v: String) = v.removePrefix("v").substringBefore('-').takeIf(APP_VERSION::matches)?.split('.')?.map { it.toInt() }
         val x = numbers(version) ?: return false
@@ -195,10 +165,8 @@ object ThemeReader {
         return (0 until THREE).firstOrNull { x[it] != y[it] }?.let { x[it] > y[it] } ?: false
     }
 
-    /** A theme's `name=` at its longest, characters. */
     const val MAX_NAME = 64
 
-    // a <colors>' variables as written, each with its line; the 24 all there where [required]
     private fun rawColors(el: XmlElement, p: Problems, required: Boolean): Map<String, Pair<ColorExpr, Int>> {
         Attributes(el, p).apply { oneOf("variant", listOf("dark")) }.done()
         val raw = LinkedHashMap<String, Pair<ColorExpr, Int>>()
@@ -212,7 +180,6 @@ object ThemeReader {
         return raw
     }
 
-    // a <color>'s name and value, null where it is not one
     private fun color(c: XmlElement, p: Problems): Pair<String, ColorExpr>? {
         if (c.name != "color") return null.also { p.add(c.line, "<${c.name}> is not allowed in <colors>") }
         val a = Attributes(c, p)
@@ -222,9 +189,7 @@ object ThemeReader {
         return if (name == null || value == null) null else name to value
     }
 
-    // every colour variable resolved, those that name what is not there or themselves left out (and a
-    // problem; each once in [reported] by its table, colour and message: the dark colours resolve the
-    // light ones they do not give again, [dark] those they give, said to be the dark colours')
+    // those naming something missing or themselves are left out and reported once per table, colour and message
     private fun resolved(
         raw: Map<String, Pair<ColorExpr, Int>>,
         p: Problems,
@@ -237,7 +202,7 @@ object ThemeReader {
         fun problem(colour: String, line: Int, message: String) {
             if (reported.add(Triple(dark?.contains(colour) == true, colour, message))) p.add(line, message + where)
         }
-        // the names being resolved, one set for the whole walk (not a copy at each step: a long chain stays cheap)
+        // one set for the whole walk, not a copy per step: a long chain stays cheap
         val seen = HashSet<String>()
         fun resolve(name: String): Argb? {
             done[name]?.let { return it }
@@ -252,8 +217,7 @@ object ThemeReader {
         return raw.keys.mapNotNull { k -> done[k]?.let { k to it } }.toMap()
     }
 
-    // over an animated picture a view showing it is see-through, darkened only (A4): a blur is not drawn, and
-    // it is never lighter than the board, so text meant over a lighter picture may not read
+    // over an animated picture a view is only darkened, never lighter than the board, so text meant for a lighter one may not read
     private fun seeThroughWarnings(styles: List<Style>, board: Double, p: Problems) = styles.forEach { s ->
         s.values.forEach { (name, v) ->
             val fill = (v as? Value.OfFill)?.fill as? Fill.Picture ?: return@forEach
@@ -271,7 +235,7 @@ object ThemeReader {
         val blur = a.value("blur", "0dp–25dp") { Values.dp(it, MAX_BLUR) } ?: 0.0
         val animated = a.oneOf("animated", listOf("true", "false")) == "true"
         a.done()
-        // played frame by frame, not blurred: a blur a frame costs too much battery (060-render-p3 §8)
+        // a per-frame blur costs too much battery
         if (animated && blur > 0) p.warn(el.line, "blur= on an animated <picture> is not drawn: its frames are not blurred")
         val cuts = el.children.mapNotNull { cut ->
             if (cut.name != "cut") return@mapNotNull null.also { p.add(cut.line, "<${cut.name}> is not allowed in <picture>") }
@@ -289,13 +253,11 @@ object ThemeReader {
 
     private const val MAX_BLUR = 25.0
 
-    // the first [max] of [els], one more a problem ("over [max] [what]")
     private fun atMost(els: List<XmlElement>, max: Int, p: Problems, what: String): List<XmlElement> {
         if (els.size > max) p.add(els[max].line, "over $max $what")
         return els.take(max)
     }
 
-    // [els]' names and files, a name given twice a problem as a colour's is ([what]: font, icon)
     private fun named(els: List<XmlElement>, p: Problems, what: String): Map<String, String> {
         val out = LinkedHashMap<String, String>()
         for (el in els) {
@@ -316,7 +278,6 @@ object ThemeReader {
         return if (name != null && src != null) name to src else null
     }
 
-    // <sounds>: its <sound key src>s as written; a key or an attribute of a later version warned of, its file kept
     private fun sounds(el: XmlElement, p: Problems): List<Pair<String, String>> {
         el.attributes.keys.filter { !namespace(it) }
             .forEach { p.warn(el.line, ignored("<sounds $it=>")) }
@@ -340,10 +301,9 @@ object ThemeReader {
         return if (key != null && src != null) key to src else null
     }
 
-    // an XML namespace's attribute, never a later version's
     private fun namespace(name: String): Boolean = name == "xmlns" || name.startsWith("xmlns:") || name.startsWith("xsi:")
 
-    // an <icon> whose name is no app's icon and no icon() names: drawn nowhere (a layout of the theme's own may)
+    // drawn nowhere, though a theme's own layout may use it
     private fun undrawnIcons(els: List<XmlElement>, icons: Set<String>, styles: List<Style>, p: Problems) {
         val used = styles.flatMap { it.values.values }.mapNotNull { ((it as? Value.OfShown)?.shown as? Shown.Icon)?.name }.toSet()
         for (name in icons) {
@@ -357,7 +317,6 @@ object ThemeReader {
         val a = Attributes(el, p)
         val select = a.required("select")
         val selectors = select?.let { Selector.parseList(it) ?: null.also { a.problem("select=\"$select\" is no selector") } }
-        // the properties it sets, in PROPERTIES' order: a theme's styles are many, each sets a few
         val values = LinkedHashMap<String, Value>()
         var reserved = 0
         for ((prop, what) in PROPERTY_VALUES) {
@@ -382,8 +341,7 @@ object ThemeReader {
         return selectors?.let { Style(it, values, order, el.line) }
     }
 
-    // a keyboard's size: on a keyboard alone, or (under a scene, in a state, a list) read, warned of, ignored; the same
-    // names of another widget a later stage's, of one in a list with a keyboard too; how many ignored
+    // a keyboard's size only on a bare keyboard style; elsewhere read but warned of and ignored
     private fun sizesAndReserved(
         el: XmlElement, a: Attributes, p: Problems, colors: Set<String>, selectors: List<Selector>, values: MutableMap<String, Value>,
     ): Int {
@@ -392,7 +350,6 @@ object ThemeReader {
         val keyboards = keyboard && selectors.all { it.widget == "keyboard" }
         val handles = selectors.isNotEmpty() && selectors.all { it.widget == HANDLE }
         if (handles) grip(el, a, values)
-        // the bar's height (T6b), on a style of bars alone: under a scene too (a bar lower turned)
         val bars = selectors.isNotEmpty() && selectors.all { it.widget == "bar" }
         if (bars && el["height"] != null) {
             val what = "${Values.MIN_BAR_HEIGHT.toInt()}%–${Values.MAX_BAR_HEIGHT.toInt()}%"
@@ -407,7 +364,6 @@ object ThemeReader {
         return sized + reserved(el, a, p, colors, skip)
     }
 
-    // the handle's grip ([Values.HANDLE_SIZES]), on a style of handles alone (in a list with others, a later stage's)
     private fun grip(el: XmlElement, a: Attributes, values: MutableMap<String, Value>) {
         for (prop in Values.HANDLE_SIZES.filter { el[it] != null }) {
             val max = if (prop == "width") Values.MAX_GRIP_WIDTH_DP else Values.MAX_GRIP_HEIGHT_DP
@@ -415,10 +371,9 @@ object ThemeReader {
         }
     }
 
-    // `color="follow"` ([Values.FOLLOW]): the navigation bar's (a style of others warned of and ignoring it)
     private fun follow(prop: String, raw: String): Value? = FOLLOW.takeIf { prop == "color" && raw == Values.FOLLOW }
 
-    // the frame is the system's outline, of one radius and an elevation's shadow (straight down, no offset of its own)
+    // the frame is the system's outline: one radius and an elevation's shadow (no offset of its own)
     private fun frame(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
         if (selectors.none { it.widget == "frame" }) return
         val shadow = (values["shadow"] as? Value.OfShadow)?.shadow
@@ -429,19 +384,16 @@ object ThemeReader {
         if (radius != null && radius.corners.distinct().size > 1) p.warn(line, "radius= of the frame is one radius: its first is taken")
     }
 
-    // what of the selectors selects nothing: a later stage's, an input method this app has none of (a misspelt
-    // one, a table it lacks)
+    // a later version's, or an input method the app lacks (misspelt, a missing table)
     private fun selectorWarnings(el: XmlElement, p: Problems, selectors: List<Selector>) {
         selectors.mapNotNull { it.reserved }.distinct().forEach { p.warn(el.line, ignored(it)) }
         selectors.flatMap { it.scenes }.filter { it.startsWith("im=") && it.removePrefix("im=") !in Selector.IMS }.distinct()
             .forEach {
-                // 0.6.0's handwriting input method, written over the keys of the one in use now (061-handwriting-toolbar §7)
                 if (it == "im=$PAD_BOARD") p.warn(el.line, "@$it selects nothing: handwriting is no input method now, it is written over the letters of the one in use")
                 else p.warn(el.line, "@$it is no input method of this app: it selects nothing")
             }
     }
 
-    // what a style's [values] name is there: its colours in <colors>, its fonts a <font>, its icons the app's or an <icon>
     private fun named(values: Map<String, Value>, a: Attributes, colors: Set<String>, fonts: Set<String>, icons: Set<String>) {
         for (v in values.values) {
             colorsOf(v).flatMap { it.refs() }.filter { it !in colors }.forEach { a.problem("@$it is no colour") }
@@ -455,11 +407,9 @@ object ThemeReader {
         }
     }
 
-    // the properties naming a font: a <font>'s, or system
     private val FONT_PROPERTIES = listOf("font", "font-han", "font-latin")
 
-    // a key's properties read from one part of it (`align` and `space-content` from its label, `return-icon-*`
-    // from its icon, inherited from the key): set on another part they do nothing, which a warning says
+    // a key's properties read from one part only: set on another part they do nothing, which a warning says
     private fun readElsewhere(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         for (prop in props) {
             val from = if (prop.startsWith(Values.RETURN_ICON)) "icon" else if (prop in LABEL_READ) "label" else continue
@@ -470,8 +420,7 @@ object ThemeReader {
 
     private val LABEL_READ = setOf("align", "space-content")
 
-    // a window widget's property it has no use for (`navbar fill=`, `frame fill=`): warned of, as one may think it does
-    // something; in a list, where another widget may read it, too (of that widget)
+    // warned of, as one may think it does something
     private fun unreadByWindow(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         for ((w, states) in selectors.filter { it.widget in WINDOW_READS }.map { it.widget to it.states }.distinct()) {
             val on = w + states.sorted().joinToString("") { ":$it" }
@@ -481,25 +430,21 @@ object ThemeReader {
         }
     }
 
-    // a window widget's properties read in [states]: in none all of WINDOW_READS; pressed, a side button's
-    // overlay (WindowLooks.sideButton's ripple); no other state of the window is ever asked for
     private fun windowReads(widget: String, states: Set<String>): List<String> = when {
         states.isEmpty() -> WINDOW_READS.getValue(widget)
         widget == "side-button" && states == setOf("pressed") -> listOf("overlay")
         else -> emptyList()
     }
 
-    // whether [widget] is warned of by what it reads, a table's (the window's, a panel, the bar's: unreadByWindow,
-    // unreadByPanel, unreadByBar); every other check leaves it to them, so a widget is told of once
+    // each told once, by its own table's check
     private fun readByTable(widget: String) = widget in WINDOW_READS || widget in Selector.PANEL_WIDGETS || widget in Selector.BAR_WIDGETS
 
-    // what the window's widgets, the panels and the candidates have no use for (T7a, T7b, T6a)
     private fun unread(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
         unreadByWindow(selectors, values.keys, line, p)
         unreadByPanel(selectors, values.keys, line, p)
         unreadByBar(selectors, values, line, p)
         val fill = (values["fill"] as? Value.OfFill)?.fill
-        // a panel's native view takes a colour; a picture's or an image's fill is the scene's alone (PanelLooks.fill)
+        // a panel's native view takes a colour; a picture or image fill is the scene's alone (PanelLooks.fill)
         if (fill != null && fill !is Fill.Solid) {
             selectors.map { it.widget }.filter { it in Selector.PANEL_WIDGETS }.distinct()
                 .forEach { p.warn(line, "fill= on $it is no colour: a panel's fill is a colour alone, ignored") }
@@ -508,9 +453,6 @@ object ThemeReader {
         unreadMotion(selectors, values.keys, line, p)
     }
 
-    // A1's motion a key's alone, not a part's; a pressed face's scale and sink in a pressed state alone. A2's: a
-    // popup's and a bubble's transition (how it goes), their and a menu's appear. The window's, the panels' and
-    // the bar's widgets warned of by what they read (above)
     private fun unreadMotion(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         val moving = MOTION.filter { it in props }
         if (moving.isEmpty()) return
@@ -527,21 +469,18 @@ object ThemeReader {
         for (part in others.filter { it.widget == "key" }.mapNotNull { it.part }.distinct()) {
             moving.filter { it != "appear" }.forEach { p.warn(line, "$it= on a key's $part does nothing: the key moves as a whole") }
         }
-        // a popup comes and goes as a whole: its look in a state (the one in focus) or a part's not asked
+        // a popup comes and goes as a whole: its look in a state or a part's is not asked
         for (s in others.filter { it.widget in POPUP_MOTION && (it.states.isNotEmpty() || it.part != null) }) {
             moving.filter { it in POPUP_MOTION.getValue(s.widget) }.forEach { p.warn(line, "$it= on ${s.widget} in a state or a part does nothing: a ${s.widget} moves as a whole") }
         }
         if ("appear" in moving && others.any { it.widget == "key" }) p.warn(line, "appear= on key does nothing: only a popup, a preview or a menu comes up")
-        // press-scale and press-sink on a key in any state are read: a style selects a pressed key too (`key`, `key:shifted`)
+        // a style selects a pressed key too (`key`, `key:shifted`)
     }
 
-    /** What of the motion each window that comes up moves by: a menu comes up, never fades going (PopupBuilder.motion reads it too). */
     internal val POPUP_MOTION = mapOf("popup" to setOf("transition", "appear"), "preview" to setOf("transition", "appear"), "menu" to setOf("appear"))
 
     private val MOTION = listOf("transition", "press-scale", "press-sink", "effect", "appear")
 
-    // a panel's property it has no use for (`clipboard shadow=`), as the window's; the voice mask's blur and the
-    // handwriting pad's ink and grid set on what does not read them, too
     private fun unreadByPanel(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         for (s in selectors.filter { it.widget in Selector.PANEL_WIDGETS }.map { Selector.Target(it.widget, states = it.states, part = it.part) }.distinct()) {
             val reads = panelReads(s)
@@ -555,15 +494,12 @@ object ThemeReader {
                 in PAD_PROPERTIES -> "key" to "the handwriting ink's (handwriting/pad)"
                 else -> continue
             }
-            // the window's widgets and the candidates' warned of already, by what they read (unreadByWindow, unreadByBar)
             selectors.map { it.widget }.filter { it != widget && !readByTable(it) }.distinct()
                 .forEach { p.warn(line, "$prop= on $it does nothing: it is $whose") }
         }
     }
 
-    // the handwriting board's rules (`handwriting/*`, `@keyboard=handwriting`): its keyboard gone, handwriting written over the
-    // letters (061-handwriting-toolbar §7), they select nothing but its pad's ink (PanelLooks.pad); its grid is not drawn.
-    // The pad's ink on a key named that is not the pad (`qwerty/q`, `*/enter`): it reads them alone; a class or a kind may be the pad's
+    // the handwriting keyboard is gone, so its rules select nothing but the pad's ink; its grid is not drawn
     private fun unreadPad(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         for (s in selectors.filter { it.board == PAD_BOARD || "keyboard=$PAD_BOARD" in it.scenes }) {
             val ink = s.board == PAD_BOARD && s.key == PAD_KEY && s.widget == "key" && s.scenes.none { it == "keyboard=$PAD_BOARD" }
@@ -577,19 +513,15 @@ object ThemeReader {
         for (at in named) pad.forEach { p.warn(line, "$it= on $at does nothing: it is the handwriting ink's (handwriting/pad)") }
     }
 
-    // what [s] (a panel, its states and part) reads: in a state, only the picker's one shown
     private fun panelReads(s: Selector.Target): List<String> {
         val selected = s.widget == "picker" && s.states == setOf("selected")
         return when {
-            // the one shown: its categories' fill and colour, and the colour they inherit; no fill of the picker's own
             selected && s.part == null -> listOf("color")
             s.states.isEmpty() || selected -> PANEL_READS.getValue(s.part?.let { "${s.widget} $it" } ?: s.widget)
             else -> emptyList()
         }
     }
 
-    // what each panel reads, and each part of one (060-render-p3 T7b, engine/PanelLooks): `color` and `icon-color`
-    // on the picker and the voice mask are their parts', inherited
     private val PANEL_READS = mapOf(
         "clipboard" to listOf("fill", "radius", "color"),
         "picker" to listOf("fill", "color"),
@@ -604,7 +536,6 @@ object ThemeReader {
     private const val PAD_BOARD = "handwriting"
     private const val PAD_KEY = "pad"
 
-    // what each widget of the window round the keys reads (060-render-p3 T7a, engine/WindowLooks, SceneBuilder's split gap)
     private val WINDOW_READS = mapOf(
         "frame" to listOf("radius", "border", "shadow"),
         HANDLE to listOf("fill", "color", "icon-color", "width", "height"),
@@ -613,11 +544,8 @@ object ThemeReader {
         NAVBAR to listOf("color"),
     )
 
-    // a property the bar or a candidate has no use for (`candidate size=`, `candidates-divider radius=`), or none in
-    // that state or part: warned of, as the window's are; the bar's base of a gradient or an image, which the
-    // bar's view does not draw (only a colour or the picture)
+    // also a gradient or image bar base, which the bar's view does not draw (only a colour or the picture)
     private fun unreadByBar(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
-        // the window's and the panels' warned of by what they read (unreadByWindow, unreadByPanel)
         val others = selectors.map { it.widget }.distinct()
             .filter { !readByTable(it) && it !in Selector.RESERVED_WIDGETS }
         for (w in others) CANDIDATE_ONLY.filter { it in values }.forEach { p.warn(line, "$it= on $w does nothing: only a candidate has it") }
@@ -638,17 +566,14 @@ object ThemeReader {
         }
     }
 
-    // what each of the bar's widgets reads (060-render-p3 T6a, engine/BarLook) in [states], of [part]: a
-    // candidate's layout and pressed colour in no state, its colours and font when first or selected too; a
-    // part's colour alone (a candidate is one line of text: its number, words and comment in one font)
+    // a candidate is one line: number, words and comment in one font
     private fun barReads(widget: String, states: Set<String>, part: String?): List<String> = when {
-        // a toolbar button pressed its overlay; on (a toggle's, `:selected`) its fill and its icon's colour
         widget == "toolbar" && states == setOf("pressed") -> listOf("overlay")
         widget == "toolbar" && states == setOf("selected") -> listOf("fill", "icon-color")
         widget != "candidate" -> if (states.isEmpty()) BAR_READS.getValue(widget) else emptyList()
         part != null -> if ("pressed" in states) emptyList() else listOf("color")
         states.isEmpty() -> BAR_READS.getValue(widget)
-        // the first pressed has an overlay of its own; nothing presses a selected candidate (the window's, by keys)
+        // nothing presses a selected candidate (the window's, by keys)
         "pressed" in states && (states - "pressed" - "first").isEmpty() -> listOf("overlay")
         "pressed" !in states -> CANDIDATE_STATE_READS
         else -> emptyList()
@@ -659,32 +584,24 @@ object ThemeReader {
         "candidate" to listOf("fill", "radius", "inset", "padding", "gap", "color", "font", "weight", "label-style"),
         "candidates-divider" to listOf("fill"),
         "candidates-panel" to listOf("fill"),
-        // T6b's: the code being typed (its text, the underline fcitx asks for, the cursor), a toolbar button
         "preedit" to listOf("color", "underline", "cursor-color"),
         "toolbar" to listOf("fill", "radius", "icon-color"),
     )
 
     private val CANDIDATE_STATE_READS = listOf("fill", "color", "font", "weight")
 
-    // T6a's properties no widget but a candidate has
     private val CANDIDATE_ONLY = listOf("gap", "label-style")
 
-    // T6b's properties no widget but the code being typed has
     private val PREEDIT_ONLY = listOf("underline", "cursor-color")
 
-    // the window forms the bar is not placed by (060-render-p3 T6b review): it is drawn the same over each
     private val UNPLACED = setOf("floating", "split", "one-handed")
 
-    // the bar is one over every window form (SceneWindow.scenes: never floating, split or one-handed): such a selector never matches
+    // the bar is one over every window form (never floating, split or one-handed): such a selector never matches
     private fun unplacedBar(selectors: List<Selector>, line: Int, p: Problems) =
         selectors.filter { it.widget in Selector.BAR_WIDGETS }.flatMap { s -> s.scenes.filter { it in UNPLACED }.map { "@$it ${s.widget}" } }.distinct()
             .forEach { p.warn(line, "$it never matches: the bar is the same over a floating, split or one-handed keyboard") }
 
-    // T4b's that do nothing where they are set, which a warning says: the bubble's shape, tail, size and
-    // offset on anything but the bubble, a cap's depth on anything but a key, a path or an inner shadow on
-    // what has no face drawn of it (the keyboard's base a plain fill, the bar's and the rest the app's), a radius
-    // beside a path, a tail beside a shape that is no bubble. A size in % not on the bubble alone is ignored
-    // too: kept, it would stand in for the sp size the widget would inherit. How many ignored.
+    // a % size kept off the bubble would stand in for the sp size the widget would inherit
     private fun shapes(selectors: List<Selector>, values: MutableMap<String, Value>, line: Int, p: Problems): Int {
         val bubbly = listOfNotNull(
             "shape=\"bubble\"".takeIf { (values["shape"] as? Value.Word)?.word == Values.BUBBLE },
@@ -702,7 +619,6 @@ object ThemeReader {
         if ("tail" in values && shape != null && (shape as? Value.Word)?.word != Values.BUBBLE) {
             p.warn(line, "tail= does nothing beside a shape that is no bubble: only a bubble has a tail")
         }
-        // a later stage's widgets aside (warned of, selecting nothing), as the warnings above
         val live = selectors.filter { it.widget !in Selector.RESERVED_WIDGETS }
         if (values["size"] !is Value.Percent || live.all { it.widget == "preview" && it.part == null }) return 0
         values.remove("size")
@@ -710,17 +626,13 @@ object ThemeReader {
         return 1
     }
 
-    // the widgets a face is drawn of, a path's or an inner shadow's
     private val FACED = setOf("key", "popup", "preview", "menu")
 
-    // the navigation bar's colour as the keyboard's under it ([org.fcitx.fcitx5.android.scene.engine.WindowLooks.navbar])
     private val FOLLOW = Value.Word(Values.FOLLOW)
     private const val NAVBAR = "navbar"
     private const val HANDLE = "handle"
 
-    // the keyboard's size, set where every selector is a `keyboard` under no scene or state ([Values.KEYBOARD_SIZES]);
-    // else of its form, and ignored with a warning saying why (how many: a style of them alone sets something): a
-    // theme's keyboard has one size, its scenes and states cannot change it, and a list's other widgets have none
+    // a theme's keyboard has one size: its scenes and states cannot change it
     private fun sizes(el: XmlElement, a: Attributes, p: Problems, selectors: List<Selector>, values: MutableMap<String, Value>): Int {
         var ignored = 0
         val keyboards = selectors.filter { it.widget == "keyboard" }
@@ -747,7 +659,6 @@ object ThemeReader {
         return ignored
     }
 
-    // a later stage's properties ([Values.RESERVED], but [skip]) each a warning where of their form and naming colours there; how many
     private fun reserved(el: XmlElement, a: Attributes, p: Problems, colors: Set<String>, skip: List<String>): Int {
         val given = Values.RESERVED.filterKeys { el[it] != null && it !in skip }
         for ((prop, form) in given) {
@@ -758,7 +669,6 @@ object ThemeReader {
         return given.size
     }
 
-    // each property and how a problem names its value
     private val PROPERTY_VALUES = Values.PROPERTIES.map { it to "a value of $it" }
 
     private fun colorsOf(v: Value): List<ColorExpr> = when (v) {

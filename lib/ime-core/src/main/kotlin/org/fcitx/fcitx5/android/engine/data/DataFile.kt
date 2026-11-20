@@ -15,30 +15,18 @@ import java.nio.ByteOrder
 import java.util.zip.CRC32
 
 /**
- * The container every compiled engine data file uses: a header, then numbered sections, each a
- * self-contained array. Everything is little-endian and 8-byte aligned so that a memory-mapped
- * file can be read in place, without copying anything onto the Java heap.
+ * Every compiled engine data file: little-endian, 8-byte aligned, so a mapped file is read in place.
  *
  * ```
  * "FCITXIME"  u32 containerVersion  u32 kind  u32 sectionCount  u32 kindVersion
  * sectionCount x (u32 id, u32 crc32, u64 offset, u64 length)
- * sections, each starting on an 8-byte boundary
  * ```
  *
- * [VERSION] covers only this container; what the sections hold is versioned per kind, so that
- * changing the pinyin layout does not invalidate code tables a user compiled.
- *
- * A file whose versions or kind are not what the reader expects is rejected outright: an engine
- * quietly reading a file laid out differently would produce plausible-looking garbage. So is one
- * whose sections fail their checksums, when opened with `verify`: a file cut short fails the
- * bounds checks, but blocks zeroed by a crash or bits flipped by bad storage would pass them and
- * just rank words wrongly. A damaged section table either misplaces a section, which its checksum
- * then catches, or loses one, which the reader asking for it catches: so a reader asks for every
- * section the file should have, as [has] cannot tell a lost section from one never written.
+ * [VERSION] covers only the container; kinds version their sections. `verify` checks CRCs (flipped bits pass
+ * bounds checks). Readers ask for every section they need: [has] cannot tell lost from never written.
  */
 class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expectedKindVersion: Int, verify: Boolean) {
 
-    // slice: offsets count from the caller's position, whatever buffer the file sits in
     private val buffer: ByteBuffer = buffer.slice().order(ByteOrder.LITTLE_ENDIAN)
     private val sections = HashMap<Int, LongRange>()
 
@@ -56,8 +44,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
             throw DataFormatException("kind $kind format version $kindVersion, this build reads $expectedKindVersion")
         }
         val count = b.getInt(16)
-        // capped, not just bounded by the file size: each entry costs heap, and a crafted table
-        // file could otherwise declare millions of empty sections
+        // capped, not just bounded by file size: each entry costs heap, and a crafted file could declare millions
         if (count !in 0..MAX_SECTIONS || HEADER_BYTES + count.toLong() * ENTRY_BYTES > b.capacity()) {
             throw DataFormatException("bad section count $count")
         }
@@ -78,21 +65,18 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         }
     }
 
-    // compared this way round so that garbage lengths cannot overflow
+    // this way round so garbage lengths cannot overflow
     private fun fits(offset: Long, length: Long, capacity: Int) =
         offset in 0..capacity && length in 0..capacity - offset
 
     fun has(id: Int): Boolean = id in sections
 
-    /** The ids of the sections the file lists, in no order: for this module's tests. */
     internal val ids: Set<Int> get() = sections.keys
 
-    /** A little-endian view of section [id], indexed from 0. */
     fun section(id: Int): ByteBuffer {
         val range = sections[id] ?: throw DataFormatException("missing section $id")
         val view = buffer.duplicate()
-        // through Buffer: ByteBuffer's covariant overrides of these only exist from Java 9, and
-        // Android before API 34 does not have them
+        // through Buffer: ByteBuffer's covariant overrides exist only from Java 9, missing on Android < API 34
         (view as Buffer).limit(range.last.toInt() + 1)
         (view as Buffer).position(range.first.toInt())
         return view.slice().order(ByteOrder.LITTLE_ENDIAN)
@@ -110,10 +94,9 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         throw DataFormatException("section $id: ${e.message}", e)
     }
 
-    /** `key=value` lines, UTF-8. */
     fun meta(id: Int): Map<String, String> {
         val s = section(id)
-        // copied onto the heap three times over (bytes, string, lines), so keep it small
+        // copied onto the heap three times (bytes, string, lines), so keep it small
         ensureFormat(s.capacity() <= MAX_META_BYTES) { "meta section of ${s.capacity()} bytes" }
         val bytes = ByteArray(s.capacity()) { s.get(it) }
         return String(bytes, Charsets.UTF_8).split('\n').filter { it.isNotEmpty() }.associate {
@@ -133,12 +116,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         fun addMeta(id: Int, meta: Map<String, String>) = add(id, metaBytes(meta))
 
         fun writeTo(out: OutputStream) {
-            val header = LittleEndianOutput(HEADER_BYTES + sections.size * ENTRY_BYTES)
-            header.write(MAGIC)
-            header.writeInt(VERSION)
-            header.writeInt(kind)
-            header.writeInt(sections.size)
-            header.writeInt(kindVersion)
+            val header = header(kind, kindVersion, sections.size)
             var offset = align(HEADER_BYTES.toLong() + sections.size * ENTRY_BYTES)
             val offsets = sections.map { (id, bytes) ->
                 header.writeInt(id)
@@ -179,20 +157,13 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
         private const val CRC_CHUNK = 64 * 1024
 
         /**
-         * The file starts at [buffer]'s position and ends at its limit. [verify] reads every byte
-         * to check the sections' checksums: on the host, 50 ms for the 49 MB pinyin data in a
-         * fresh JVM, against 9 ms to open it unchecked, and on a phone it reads a mapped file
-         * into memory whole. A caller that already checked this file (when it copied it into
-         * place), or can trust where it sits (inside the signed APK), can skip it.
+         * [verify] reads every byte for the CRCs; skip it for a file checked when copied, or inside the signed APK.
          * @throws DataFormatException if it is not a well-formed file of [kind] at [kindVersion]
          */
         fun open(buffer: ByteBuffer, kind: Int, kindVersion: Int, verify: Boolean = true): DataFile =
             DataFile(buffer, kind, kindVersion, verify)
 
-        /**
-         * The kind's format version in [file]'s header, read without mapping the file: null unless
-         * it is an engine data file of this container [VERSION] and at least a header long.
-         */
+        /** Read without mapping; null unless an engine data file of container [VERSION] at least a header long. */
         fun peekKindVersion(file: File): Int? = try {
             RandomAccessFile(file, "r").use { f ->
                 val header = ByteArray(HEADER_BYTES)
@@ -209,22 +180,20 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
             null
         }
 
-        /**
-         * The file [Writer] makes, written to [file] a section at a time, as [write] streams each
-         * of [ids] (in that order), the header last: for one too large to hold in the heap (a
-         * dictionary the user merged, DictionaryCompiler).
-         */
+        private fun header(kind: Int, kindVersion: Int, sections: Int) = LittleEndianOutput(HEADER_BYTES + sections * ENTRY_BYTES).apply {
+            write(MAGIC)
+            writeInt(VERSION)
+            writeInt(kind)
+            writeInt(sections)
+            writeInt(kindVersion)
+        }
+
         fun stream(file: RandomAccessFile, kind: Int, kindVersion: Int, ids: List<Int>, write: (Int, OutputStream) -> Unit) {
             require(ids.toSet().size == ids.size && ids.size <= MAX_SECTIONS) { "sections $ids" }
             val headerBytes = HEADER_BYTES + ids.size * ENTRY_BYTES
             val out = SectionOutput(file)
             out.pad((headerBytes + 7L) and 7L.inv())
-            val header = LittleEndianOutput(headerBytes)
-            header.write(MAGIC)
-            header.writeInt(VERSION)
-            header.writeInt(kind)
-            header.writeInt(ids.size)
-            header.writeInt(kindVersion)
+            val header = header(kind, kindVersion, ids.size)
             for (id in ids) {
                 out.pad((out.at + 7L) and 7L.inv())
                 val from = out.at
@@ -241,11 +210,7 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
             file.write(header.toByteArray())
         }
 
-        /**
-         * [meta] as a meta section's bytes, for [Writer.addMeta] and a [stream]ed file alike: the
-         * reader's limit checked, so a file it would refuse fails where it is made.
-         * @throws IllegalArgumentException for a key with `=` or a line break, a value with a line break, or too many bytes
-         */
+        /** [meta] as a meta section, checked against the reader's limits; throws IllegalArgumentException for a key with `=`, a line break, or too many bytes. */
         fun metaBytes(meta: Map<String, String>): ByteArray {
             meta.forEach { (k, v) -> require('=' !in k && '\n' !in k && '\n' !in v && '\r' !in k && '\r' !in v) { "bad meta entry $k=$v" } }
             val bytes = meta.entries.joinToString("") { "${it.key}=${it.value}\n" }.toByteArray(Charsets.UTF_8)
@@ -299,12 +264,10 @@ class DataFile private constructor(buffer: ByteBuffer, expectedKind: Int, expect
 
 class DataFormatException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
-/** [require] for file contents: a bad file is a [DataFormatException], not a caller's bug. */
 internal inline fun ensureFormat(ok: Boolean, message: () -> String) {
     if (!ok) throw DataFormatException(message())
 }
 
-/** Grows a little-endian byte array; the write side of the formats here. */
 internal class LittleEndianOutput(initialCapacity: Int = 64) {
     private var bytes = ByteArray(maxOf(initialCapacity, 8))
     var size = 0

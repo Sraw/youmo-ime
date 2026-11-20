@@ -30,10 +30,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * What a field took and dropped is kept on the keyboard (LC-24, LC-36; CommitCheck): a WebView whose
- * view lost the focus as the screen turned with the keyboard up takes every write, does nothing with
- * it and reports nothing. The code row says 「没写进去：…，点一下输入框」, a tap on that line writes it,
- * and no field that is only slow gets the line. Run at SDK 29 too (testDebugUnitTestAt29).
+ * A field that takes every write and does nothing with it (a WebView that lost focus as the screen turned): the
+ * code row says 「没写进去：…，点一下输入框」, a tap writes it, and no field that is only slow gets the line.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -72,13 +70,12 @@ class CommitKeptUatTest {
         h.emit(panel)
     }
 
-    /** [text] chosen: the engine commits it, its code gone; then the wait for the field's report runs out. */
+    /** Then the wait for the field's report runs out. */
     private fun chosen(text: String) {
         committed(text)
         h.advance(CommitCheck.WAIT_MS + 50)
     }
 
-    /** [text] chosen, the wait for the field's report not run yet. */
     private fun committed(text: String) {
         h.emit(HostEvent.Commit(text, -1))
         h.api.inputPanelCached = HostEvent.InputPanel.EMPTY
@@ -92,7 +89,7 @@ class CommitKeptUatTest {
     private fun rowText(): TextView? =
         h.inputView.findViewById<HorizontalScrollView>(R.id.code_row_text)?.let { KeyboardHarness.all(it).filterIsInstance<TextView>().firstOrNull() }
 
-    /** What the code row says ("" while it shows nothing), without the gap the row puts before its line below. */
+    /** "" while it shows nothing, without the gap the row puts before its line. */
     private fun row(): String = rowText()?.takeIf { it.isShown }?.text?.toString().orEmpty().trim()
 
     private fun line(kept: String) = h.service.getString(R.string.commit_kept, kept)
@@ -104,16 +101,13 @@ class CommitKeptUatTest {
         typed("n", "ni", "ni h", "ni hao")
         h.turn()
         val turned = text
-        // the web view lost its focus as the screen turned
         h.writesDropped = true
         typed("h", "ha", "hao")
         chosen("好")
         val dropped = text to row()
-        // tapped while the field still drops: said again
         h.tap(rowText()!!)
         h.advance(CommitCheck.WAIT_MS + 50)
         val tappedTooSoon = text to row()
-        // the field tapped: its view has the focus again
         h.writesDropped = false
         h.tap(rowText()!!)
         h.advance(CommitCheck.WAIT_MS + 50)
@@ -162,7 +156,7 @@ class CommitKeptUatTest {
         val late = text to row()
         h.selectionLags = false
         h.idle()
-        // read before open() below puts another harness in its place (review R26 F8115)
+        // read before open() below puts another harness in its place
         val afterReports = row()
         open(CodeRowStyle.InField)
         h.selectionLags = true
@@ -205,7 +199,6 @@ class CommitKeptUatTest {
             chosen("a")
             row()
         }
-        // what a field that drops [text] is left keeping, as the code row says it (null: nothing), the field [opened]
         fun keptIn(text: String, opened: () -> KeyboardHarness): String? = opened().let {
             it.writesDropped = true
             typed("h")
@@ -213,15 +206,13 @@ class CommitKeptUatTest {
             it.service.keptLine
         }
         val unlearned = keptIn("好") { open(CodeRowStyle.Floating, imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) }
-        // a field of no type (TYPE_NULL and IME_NULL, isTypeNull): the harness's terminal tells TYPE_NULL with its
-        // EditText's options, as Termux tells IME_FLAG_NO_FULLSCREEN, so the input is started again with none. A
-        // terminal with options is judged (R26 F8168: read right after the write, used not dropped)
+        // a field of no type: the harness's terminal tells TYPE_NULL with its EditText's options, as Termux does, so the
+        // input is started again with none
         val terminal = keptIn("好") {
             open(CodeRowStyle.Floating, terminal = true).also { it.info.imeOptions = EditorInfo.IME_NULL; it.service.onStartInput(it.info, true) }
         }
-        // 30 characters: the last 24 shown
         val long = keptIn("一二三四五六七八九十".repeat(3)) { open(CodeRowStyle.Floating) }
-        // cut where the last 24 begin with the second half of 𠀀 (U+20000, two chars): the whole character left out
+        // cut where the last 24 begin with the second half of 𠀀 (two chars): the whole character left out
         val split = keptIn("甲乙丙丁戊𠀀" + "己".repeat(23)) { open(CodeRowStyle.Floating) }
         assertRows(
             "the screen turned: the same field, still kept" to { assertEquals(line("好"), turned) },
@@ -240,8 +231,8 @@ class CommitKeptUatTest {
     @Test
     @Uat("LC-36")
     fun aCommitMadeJustBeforeTheWaitForAnEarlierOneIsUpWaitsItsOwnTime() {
-        // the first commit reported at once, the next made just before the timer set for the first runs:
-        // an editor whose reads lag a frame (Compose's old text field) has not shown it yet
+        // the next commit made just before the timer set for the first runs: an editor whose reads lag a frame
+        // (Compose's old text field) has not shown it yet
         open(CodeRowStyle.Floating)
         committed("你")
         h.advance(CommitCheck.WAIT_MS - 50)
@@ -251,7 +242,6 @@ class CommitKeptUatTest {
         val atTheFirstTimer = row()
         h.advance(CommitCheck.WAIT_MS)
         val atItsOwn = row()
-        // the same with another field started between them: the first field's timer
         open(CodeRowStyle.Floating)
         h.writesDropped = true
         committed("你")
@@ -274,13 +264,12 @@ class CommitKeptUatTest {
     @Test
     @Uat("LC-36")
     fun aCommitFollowedByADeletionASendOrInputStartedAnewIsNotSaidToBeLostInAFieldThatReportsLate() {
-        // the field takes the text, its reports held back past the wait; before the wait is up the text
-        // is gone again or the field is another, and a read finds what was there before the commit
+        // its reports held back past the wait; before it is up the text is gone again or the field is another, and a read
+        // finds what was there before the commit
         val restarted = open(CodeRowStyle.Floating).let {
             it.selectionLags = true
             typed("h", "hao")
             committed("好")
-            // a chat's field emptied by the app and input started anew in it
             it.field.setText("")
             it.restart()
             it.advance(CommitCheck.WAIT_MS + 50)
@@ -319,7 +308,6 @@ class CommitKeptUatTest {
         chosen("你")
         typed("h", "hao")
         committed("好")
-        // tapped before the wait for 好 is up; the field answers again by then
         h.tap(rowText()!!)
         h.writesDropped = false
         h.advance(CommitCheck.WAIT_MS + 50)
@@ -336,7 +324,6 @@ class CommitKeptUatTest {
         h.writesDropped = true
         typed("n", "ni")
         chosen("你")
-        // the field answers again; 好's report is held back past the tap
         h.writesDropped = false
         h.selectionLags = true
         typed("h", "hao")
@@ -364,7 +351,7 @@ class CommitKeptUatTest {
         h.tap(rowText()!!)
     }
 
-    // the report of 吗 (cursor 0 to 1) told straight to the service, nothing posted run yet
+    // told straight to the service, nothing posted run yet
     private fun reportedMa() = h.service.onUpdateSelection(0, 0, 1, 1, -1, -1)
 
     private fun settled() {
@@ -376,7 +363,6 @@ class CommitKeptUatTest {
     @Test
     @Uat("LC-36")
     fun theKeptLineAskedForIsWrittenWhenTheWaitEndsHoweverItEnds() {
-        // read back in when the wait is up, its report never come in time
         val readBack = tappedWhileMaWaits().let {
             h.advance(CommitCheck.WAIT_MS + 50)
             val written = text
@@ -389,16 +375,15 @@ class CommitKeptUatTest {
             settled()
             text to row()
         }
-        // 吗 reported, and 好 committed before the posted write runs (a key queued ahead of it): 你 first
+        // 好 committed before the posted write runs (a key queued ahead of it): 你 first
         val typedBeforeThePost = tappedWhileMaWaits().let {
             reportedMa()
             h.service.commitText("好")
             settled()
             text to row()
         }
-        // 吗 reported, and input finished before the posted write runs: not written into the finished
-        // connection, nor ahead of a late commit (the engine's, after the finish); written once input starts
-        // again in the same field
+        // input finished before the posted write runs: not written into the finished connection, nor ahead of a late
+        // commit; written once input starts again in the same field
         val finished = tappedWhileMaWaits().let {
             reportedMa()
             h.service.onFinishInput()

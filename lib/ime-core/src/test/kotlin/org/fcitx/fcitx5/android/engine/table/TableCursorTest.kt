@@ -24,7 +24,6 @@ class TableCursorTest {
         val (_, typed) = t.type("wqy")
         assertEquals("wqy", typed.preedit)
         assertEquals(-1, typed.cursor)
-        // after the q
         val tapped = t.apply(Action.Cursor(2))
         assertTrue(tapped.handled)
         assertEquals(2, tapped.cursor)
@@ -65,7 +64,6 @@ class TableCursorTest {
         val wubiPinyin = dictionary("a 工", "aa 式", "@zhong 中", "@zhongguo 中国", header = mapOf("拼音" to "@", "键码" to "a"))
         val t = TableSession(wubiPinyin, TableOptions.WUBI_PINYIN)
         t.type("zhongguo")
-        // the second g taken out before the cursor, then put back
         t.apply(Action.Cursor(5))
         val out = t.apply(Backspace)
         assertEquals("zhonguo", out.preedit)

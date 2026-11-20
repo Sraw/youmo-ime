@@ -27,11 +27,11 @@ class EvalSetTest {
         assertEquals(listOf(Sample("jingli", "经理", "pair", "公司新来的")), set)
     }
 
-    // review F8206: a sample of no context and no touches was written with an empty last field, which parse refuses
+    // a sample of no context and no touches was written with an empty last field, which parse refuses
     @Test
     fun aSampleWrittenIsReadBack() {
         val touch = Touch(0.1f, 0f, 36f, 50f, listOf(Near('h', 1f, 0f)))
-        // each row with what it holds (R26 F8475)
+        // each row with what it holds
         val why = mapOf(
             Sample("nihao", "你好", "daily") to "no context, no touches (the F8206 bug: an empty last field)",
             Sample("jingli", "经理", "pair", "公司新来的") to "a context: its fourth field",

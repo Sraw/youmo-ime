@@ -40,16 +40,14 @@ class TextEditingButton(
     private val bordered: Boolean,
     private val radius: Float,
     private val altStyle: Boolean = false,
-    // the theme's fill (ScenePanels.editing): a block of it whatever the keys; null, the keys' colours, a block as [bordered]
+    // null: the keys' colours, a block as [bordered]
     private val fill: Int? = null,
 ) : CustomGestureView(ctx) {
 
-    // bordered
     private val shadowWidth = dp(1)
     private val hInset = dp(4)
     private val vInset = dp(4)
 
-    // !bordered
     private val lineWidth = max(1, dp(1) / 2)
 
     init {
@@ -105,13 +103,10 @@ class TextEditingButton(
         showImage()
     }
 
-    // the icon of a name shown ([setIcon]): a read finished for one shown before is not drawn over this one
+    // a read finished for one shown before is not drawn over this one
     private var shown: BarIcons.Icon? = null
 
-    /**
-     * [icon], a button doing a command's job (061-toolbar-icons §2.8): a theme's of its name in the icon's colour
-     * where it has one (nothing till it is read), else the app's.
-     */
+    /** A theme's of its name where it has one (nothing till it is read), else the app's. */
     fun setIcon(icon: BarIcons.Icon) {
         val icons = PackIcons.of(theme)
         if (!BarIconDrawables.themed(icons, icon)) return setIcon(ToolbarButtonLooks.drawable(icon.fallback))
@@ -184,7 +179,6 @@ class TextEditingButton(
     }
 
     private companion object {
-        // the app's vectors' side
         const val ICON_DP = 24
     }
 }

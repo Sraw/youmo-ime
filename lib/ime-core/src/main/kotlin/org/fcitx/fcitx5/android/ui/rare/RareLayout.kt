@@ -8,18 +8,13 @@ import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
 import org.fcitx.fcitx5.android.engine.user.RareChoice
 
 /**
- * The rows of 生僻字屏蔽's grid (dev/design/061-rare-char-block.md §6.2–§6.4): each group's head, then,
- * if open, a row for each first letter and its cells. A group opened from its card (061-settings-cards.md
- * §3.2) is alone and has no head: the page's title and its fixed strip say which it is. Plain arrays, ~35,000 cells: a position's row
- * kind, span index and row are found by a binary search over the blocks (a head or a letter and the
- * cells after it), not by counting from the top as GridLayoutManager's default lookup does.
+ * 生僻字屏蔽's grid rows: each group's head, then if open a row per first letter and its cells (a group opened from
+ * its card alone, headless). ~35,000 cells: a position is found by binary search over blocks, not by counting from
+ * the top as GridLayoutManager's default lookup does.
  */
 class RareLayout(groups: List<Group>) {
 
-    /**
-     * A group as the page has it: its [cells] (grid indexes, in the grid's order), each one's first
-     * [letter], [open] or shut, with a [head] row or not.
-     */
+    /** [cells]: grid indexes in grid order. */
     class Group(val level: Level, val cells: IntArray, val letter: (Int) -> Char, val open: Boolean, val head: Boolean = true)
 
     enum class Kind { HEAD, LETTER, CELL }
@@ -35,7 +30,6 @@ class RareLayout(groups: List<Group>) {
     private val cellIndex: IntArray
     private val blockFirstCell: IntArray
 
-    /** How many rows the list has. */
     val size: Int
 
     init {
@@ -79,7 +73,6 @@ class RareLayout(groups: List<Group>) {
         size = at
     }
 
-    // the block [position] is in
     private fun blockOf(position: Int): Int {
         require(position in 0 until size) { "row $position of $size" }
         var lo = 0
@@ -96,13 +89,10 @@ class RareLayout(groups: List<Group>) {
         return if (position == blockStart[b]) blockKind[b] else Kind.CELL
     }
 
-    /** The group [position] is in. */
     fun level(position: Int): Level = blockLevel[blockOf(position)]
 
-    /** A letter row's letter. */
     fun letter(position: Int): Char = blockLetter[blockOf(position)]
 
-    /** A cell's grid index. */
     fun cell(position: Int): Int {
         val b = blockOf(position)
         check(position != blockStart[b]) { "row $position is no cell" }
@@ -112,7 +102,6 @@ class RareLayout(groups: List<Group>) {
     /** A head or a letter takes a row; a cell one of [columns]. */
     fun spanSize(position: Int, columns: Int): Int = if (kind(position) == Kind.CELL) 1 else columns
 
-    /** A cell's column. */
     fun spanIndex(position: Int, columns: Int): Int {
         val b = blockOf(position)
         return if (position == blockStart[b]) 0 else (position - blockStart[b] - 1) % columns
@@ -122,7 +111,6 @@ class RareLayout(groups: List<Group>) {
     private var rowsFor = -1
     private var rowsBefore = IntArray(0)
 
-    /** The screen row [position] is on. */
     fun spanGroupIndex(position: Int, columns: Int): Int {
         if (rowsFor != columns) {
             rowsBefore = IntArray(blockStart.size)
@@ -137,15 +125,10 @@ class RareLayout(groups: List<Group>) {
         return rowsBefore[b] + if (position == blockStart[b]) 0 else 1 + (position - blockStart[b] - 1) / columns
     }
 
-    /** The letters the fast scroller offers: those of the open groups, a–z. */
+    /** Those of the open groups, a–z. */
     val letters: List<Char> get() = blockLetter.indices.filter { blockKind[it] == Kind.LETTER }.map { blockLetter[it] }.distinct().sorted()
 
-    /**
-     * Where the fast scroller at [letter] goes, the list's first row shown being [top]: the row of it in
-     * the group [top] is in (a drag in 其它表外字 stays there, review S2), else in the first open group
-     * after it (a shut group's head at the top), else in the first open; of the nearest letter before it
-     * there where the group has not [letter] (the group's first, before its first); -1 with no group open.
-     */
+    /** In [top]'s group (a drag in 其它表外字 stays there), else the first open after it, else the first; the nearest letter before where missing; -1 none open. */
     fun positionOf(letter: Char, top: Int = 0): Int {
         val rows = blockStart.indices.filter { blockKind[it] == Kind.LETTER }
         if (rows.isEmpty()) return -1
@@ -160,10 +143,7 @@ class RareLayout(groups: List<Group>) {
     }
 
     companion object {
-        /**
-         * The groups in the page's order: those held by default first (扩展区), so the page turned on shows a
-         * group with characters held at its top; the rest in [Level.GRID]'s order. The file and the grid keep GRID's.
-         */
+        /** Held by default first (扩展区), so the page turned on shows held characters at its top; the file and grid keep GRID's. */
         val ORDER: List<Level> = Level.GRID.sortedBy { it !in RareChoice.DEFAULT }
     }
 }

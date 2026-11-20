@@ -43,39 +43,14 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * The resource packs (dev/design/060-asset-packs.md, specs/data-and-build.md): the big data no
- * longer in the APK, made into two signed `.youmopack` files the user imports, and a release's two
- * bundles (the APK and the packs, zipped).
- *
- * - `packTextPack`, `packVoicePack` (`packs` both): `build/packs/youmo-<id>-v<version>.youmopack`,
- *   a zip of stored entries: `manifest.json` (the pack, its version and format from
- *   `app/packs.properties`, each file's size and SHA-256), `manifest.sig` (Ed25519 over the
- *   manifest's bytes), then the files at the asset paths the app reads them by. Beside it
- *   `<same name>.json`: what the release listing reads. The same inputs make the same bytes.
- * - Signed with the key at local.properties' `youmo.packKey` (or `YOUMO_PACK_KEY`), the release's;
- *   without one, with the test key `app/pack-keys/test-ed25519.pem`, which only debug builds trust.
- * - What each build trusts goes into `BuildConfig.PACK_KEYS`: the keys of `app/pack-keys/release.pub`,
- *   and the test key's only in [TEST_KEY_BUILDS] (debug, benchmark); any other build type fails to
- *   build with no release key.
- *   What each pack must be (format, oldest version) goes in as `PACK_<ID>_FORMAT`, `PACK_<ID>_MIN_VERSION`.
- * - `releaseBundles`: the release APK with the text pack (文字版), and with both (语音版), and
- *   `release-packs.json`, saying of each pack whether its content changed since the last
- *   release's listing (by its format and its files' SHA-256s): an unchanged pack is not uploaded
- *   again. That listing is `app/packs-released.json` (the last release's `release-packs.json`,
- *   committed after it), or `-PpreviousPacks=<file>`; with neither the task fails, unless
- *   `-PfirstPackRelease` (the first release with packs). Only with the release key.
- *
- * Which asset paths each pack owns is the app's `PackKind`'s; [OWNED] repeats it, and a pack task
- * fails on a file it does not list.
- */
+/** The resource packs: signed reproducible `.youmopack` zips and the release's APK bundles; without `youmo.packKey` only [TEST_KEY_BUILDS] build. */
 class AssetPacksPlugin : Plugin<Project> {
 
     companion object {
         const val PROPERTY_KEY = "youmo.packKey"
         const val ENV_KEY = "YOUMO_PACK_KEY"
 
-        /** The asset paths each pack owns: PackKind's lists, repeated. */
+        /** PackKind's lists, repeated. */
         val OWNED = mapOf(
             "text" to listOf(
                 "engine/pinyin.data", "engine/english.data", "engine/sentence-model", "engine/stroke.data",
@@ -84,10 +59,7 @@ class AssetPacksPlugin : Plugin<Project> {
             "voice" to listOf("voice/"),
         )
 
-        /**
-         * The tasks whose outputs (each a directory of asset paths) make each pack. An engine data task added to the
-         * text pack goes into EngineDataPlugin's DATA_CONFIGURATION too, which :lib:ime-eval's replay reads.
-         */
+        /** The tasks whose outputs make each pack. A data task added to the text pack goes into EngineDataPlugin's DATA_CONFIGURATION too. */
         private val SOURCES = mapOf(
             "text" to listOf(
                 EngineDataPlugin.COMPILE_TASK, EngineDataPlugin.ENGLISH_TASK, EngineDataPlugin.MODEL_TASK,
@@ -99,11 +71,7 @@ class AssetPacksPlugin : Plugin<Project> {
         // a raw Ed25519 key as X.509's SubjectPublicKeyInfo: this prefix, then the 32 bytes
         private val X509_PREFIX = byteArrayOf(0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00)
 
-        // entries' time: the same inputs, the same bytes. A local time, as a zip keeps it: an
-        // instant (1980-01-01 UTC) was the build machine's time zone's local time, other bytes in
-        // another zone, and before 1980 west of UTC. Not 1980-01-01 00:00 itself: ZipEntry takes
-        // that DOS time for "before 1980" and adds an extended-time field of the zone's instant
-        // (Gradle's reproducible archives use 1980-02-01 for the same reason)
+        // entries' time: a LocalDateTime, as an instant differs by zone; not 1980-01-01, which ZipEntry reads as "before 1980"
         private val ZIP_TIME: LocalDateTime = LocalDateTime.of(1980, 2, 1, 0, 0)
 
         fun publicKey(raw: ByteArray) = KeyFactory.getInstance("Ed25519").generatePublic(X509EncodedKeySpec(X509_PREFIX + raw))
@@ -158,7 +126,6 @@ class AssetPacksPlugin : Plugin<Project> {
         fun storedFile(zip: ZipOutputStream, name: String, file: File, crc: Long) =
             stored(zip, name, file.length(), crc) { out -> file.inputStream().use { it.copyTo(out, 1 shl 16) } }
 
-        /** A file's CRC-32 and SHA-256, one read. */
         fun sums(file: File): Pair<Long, String> {
             val crc = CRC32()
             val sha = MessageDigest.getInstance("SHA-256")
@@ -174,11 +141,7 @@ class AssetPacksPlugin : Plugin<Project> {
             return crc.value to hex(sha.digest())
         }
 
-        /**
-         * Whether [now] changed since [old] (the last release's listing of it; none: new): its files'
-         * content or its version. Content changed under the same version fails: the app could not tell
-         * the two packs apart (`PackManifest.sameAs` goes by both).
-         */
+        /** Whether [now] changed since [old]; content changed under the same version fails, as the app could not tell them apart. */
         fun changed(old: Listing?, now: Listing): Boolean {
             if (old == null) return true
             if (now.version < old.version) {
@@ -190,17 +153,14 @@ class AssetPacksPlugin : Plugin<Project> {
             return old.contentSha256 != now.contentSha256 || old.version != now.version
         }
 
-        /**
-         * The app's `PackManifest.contentSha256`, repeated (build-logic does not see ime-core): `format<TAB>n\n`,
-         * then `path<TAB>size<TAB>sha256\n` a file, by path. The two tests hold one digest to the same hex.
-         */
+        /** The app's `PackManifest.contentSha256`, repeated (build-logic does not see ime-core); two tests hold both to the same hex. */
         fun contentSha256(format: Int, files: List<Triple<String, Long, String>>): String = MessageDigest.getInstance("SHA-256").run {
             update("format\t$format\n".toByteArray())
             files.sortedBy { it.first }.forEach { (path, size, sha) -> update("$path\t$size\t$sha\n".toByteArray()) }
             hex(digest())
         }
 
-        /** The listing [ReleaseBundlesTask] compares with: [previous]'s, or none for the first release with packs, said so. */
+        /** The listing [ReleaseBundlesTask] compares with: [previous]'s, or none for the first release with packs. */
         fun previousListing(previous: File?, firstRelease: Boolean): Map<String, Listing> = when {
             previous != null && firstRelease ->
                 throw GradleException("-PfirstPackRelease, but there is a previous pack listing ($previous): a release after the first compares with it")
@@ -212,23 +172,14 @@ class AssetPacksPlugin : Plugin<Project> {
             )
         }
 
-        /** The last release's `release-packs.json`, committed: what [ReleaseBundlesTask] compares with by default. */
         const val RELEASED = "packs-released.json"
 
-        /**
-         * The build types that take packs signed with the test key, too: debug, and benchmark (the
-         * instrumented performance tests' build: debug-signed, its own id, never shipped; its device
-         * runs import what `:app:packs` made, the test key's without a release key, as on CI). A
-         * list of those that may, not of those that may not: a build type added later trusts the
-         * release key only.
-         */
+        /** The build types that also trust the test key: an allow list, so a build type added later trusts the release key only. */
         val TEST_KEY_BUILDS = setOf("debug", "benchmark")
 
-        /** `BuildConfig.PACK_KEYS` of a [buildType]: the keys it trusts, base64, comma-separated. */
         fun packKeys(buildType: String?, release: List<ByteArray>, test: List<ByteArray>): String =
             (if (buildType in TEST_KEY_BUILDS) release + test else release).joinToString(",") { Base64.getEncoder().encodeToString(it) }
 
-        /** [s] as a JSON string: `"`, `\` and the control characters escaped. */
         fun jsonString(s: String) = buildString {
             append('"')
             for (c in s) {
@@ -241,7 +192,7 @@ class AssetPacksPlugin : Plugin<Project> {
             append('"')
         }
 
-        /** The signing key's path as set: `~/` is [home], a relative path [root]'s (not the Gradle daemon's directory); empty stays empty */
+        /** The signing key's path: `~/` is [home], a relative path [root]'s (not the daemon's directory); empty stays empty */
         fun resolveKeyPath(value: String, root: File, home: String): String {
             val path = homed(value, home)
             return if (path.isEmpty() || File(path).isAbsolute) path else root.resolve(path).path
@@ -253,14 +204,7 @@ class AssetPacksPlugin : Plugin<Project> {
             return minVersion
         }
 
-        /**
-         * The release's files in [out] (emptied first): the APK as `youmo-<version>.apk`, the text
-         * bundle (APK + text pack) and the voice bundle (APK + both), each pack, and
-         * `release-packs.json` (read back by [Listing.readAll] as the next release's [before]).
-         * Every check before anything is written: a failed run leaves nothing that looks releasable.
-         * The APK: signed (AGP names one without a key `*-unsigned.apk`), not [profileable] (a test build's),
-         * built at a release's or pre-release's tag ([version] not `0.6.0-5-gabc1234` nor `0.6.0-untagged`).
-         */
+        /** The release's files in [out]: every check runs before anything is written, so a failed run leaves nothing releasable. */
         fun writeBundles(apk: File, text: Listing, voice: Listing, version: String, before: Map<String, Listing>, out: File, profileable: Boolean = false) {
             if (apk.name.endsWith("-unsigned.apk")) throw GradleException("${apk.name} is not signed: set the release key (SIGN_KEY_FILE or SIGN_KEY_BASE64, BUILDING.md)")
             if (profileable) throw GradleException("buildProfileable is set: a release APK is never profileable (unset BUILD_PROFILEABLE / -PbuildProfileable)")
@@ -300,7 +244,6 @@ class AssetPacksPlugin : Plugin<Project> {
         val local = target.providers.fileContents(root.file("local.properties")).asText.map { text ->
             Properties().apply { load(text.reader()) }.getProperty(PROPERTY_KEY).orEmpty()
         }.orElse("")
-        // `~/` is home, and a relative path the root project's, not the Gradle daemon's directory
         val keyPath = target.providers.environmentVariable(ENV_KEY)
             .orElse(target.providers.gradleProperty(PROPERTY_KEY))
             .orElse(local)
@@ -319,8 +262,7 @@ class AssetPacksPlugin : Plugin<Project> {
                 key.set(keyPath)
                 this.testKey.set(testKey)
                 releaseKeys.set(keysDir.file("release.pub"))
-                // both packs share build/packs (uat.py and emulator_test read build/packs/*.youmopack):
-                // each task deletes only its own `youmo-<id>-` files
+                // both packs share build/packs (uat.py and emulator_test read it): each task deletes only its own files
                 outputDir.set(target.layout.buildDirectory.dir("packs"))
             }
         }
@@ -376,7 +318,6 @@ class AssetPacksPlugin : Plugin<Project> {
         }
     }
 
-    /** One pack, signed (see the plugin). */
     @DisableCachingByDefault(because = "hundreds of MB, quicker made than fetched")
     abstract class PackTask : DefaultTask() {
         @get:Input
@@ -391,12 +332,11 @@ class AssetPacksPlugin : Plugin<Project> {
         @get:Input
         abstract val owned: ListProperty<String>
 
-        /** The producing tasks' output directories, each of asset paths. */
         @get:InputFiles
         @get:PathSensitive(PathSensitivity.RELATIVE)
         abstract val sources: ConfigurableFileCollection
 
-        /** The release key's path, or empty: [testKey] then. Its path, not its content, is an input: never copied into the build's caches. */
+        /** The release key's path, or empty for [testKey]. The path, not the content, is the input: never copied into caches. */
         @get:Input
         abstract val key: Property<String>
 
@@ -477,7 +417,6 @@ class AssetPacksPlugin : Plugin<Project> {
         }
     }
 
-    /** The release's two bundles and its pack listing (see the plugin). */
     @DisableCachingByDefault(because = "copies")
     abstract class ReleaseBundlesTask : DefaultTask() {
         @get:InputDirectory
@@ -539,7 +478,6 @@ class AssetPacksPlugin : Plugin<Project> {
         }
     }
 
-    /** A pack's listing, the `.json` beside it, or a line of a release's `release-packs.json`. */
     class Listing(val id: String, val version: Int, val format: Int, val file: File, val sha256: String, val contentSha256: String, val releaseKey: Boolean) {
         companion object {
             private fun parse(text: String) = groovy.json.JsonSlurper().parseText(text)
@@ -551,7 +489,6 @@ class AssetPacksPlugin : Plugin<Project> {
 
             fun read(file: File) = of(parse(file.readText()) as Map<*, *>, file.parentFile)
 
-            /** A release's listing, by pack. */
             fun readAll(file: File): Map<String, Listing> =
                 ((parse(file.readText()) as Map<*, *>)["packs"] as List<*>).map { of(it as Map<*, *>, file.parentFile) }.associateBy { it.id }
         }

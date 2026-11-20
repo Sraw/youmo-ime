@@ -5,40 +5,29 @@
 package org.fcitx.fcitx5.android.input.shortcut
 
 /**
- * The shortcuts the user set, over [KeyShortcutPreset]'s.
- *
- * A key is named by its keyboard's form and the key ([charKey]: `full/a`, `t9/2`, `g14/cv`,
- * `num/5`, `zyfull/a`), a function key by its name and the way it is swiped ([functionKey]:
- * `fn/space.up`). Stored as text, a line per key: the name, a tab, then the value: a command's
- * key, `text:` and the text (tab, line break and backslash escaped), or `none`, set to nothing
- * over a preset. A key with no line has its preset, so a preset changed later reaches everyone
- * who did not change that key, and an upgrade needs no migration of this text.
+ * The user's shortcuts over [KeyShortcutPreset]'s. Keys are `full/a`, `t9/2`, `fn/space.up`...; stored a line per key:
+ * name, tab, then a command's key, `text:` and the escaped text, or `none`. A key with no line has its preset, so a
+ * changed preset reaches everyone and upgrades need no migration.
  */
 class KeyShortcuts private constructor(private val table: Map<String, KeyShortcut>) {
 
     val isEmpty: Boolean get() = table.isEmpty()
 
-    /** The names the user set, in the order stored. */
+    /** In the order stored. */
     val names: Set<String> get() = table.keys
 
-    /** What [name] does: the user's, else its preset's. */
     fun resolve(name: String): KeyShortcut = table[name] ?: KeyShortcutPreset.of(name)
 
-    /** Whether the user set [name] themselves: drawn outlined on the settings page. */
+    /** Drawn outlined on the settings page. */
     fun isSet(name: String): Boolean = name in table
 
     fun with(name: String, shortcut: KeyShortcut): KeyShortcuts =
         KeyShortcuts(LinkedHashMap(table).also { it[name] = shortcut })
 
-    /** [name] back to its preset. */
     fun without(name: String): KeyShortcuts =
         if (name in table) KeyShortcuts(LinkedHashMap(table).also { it.remove(name) }) else this
 
-    /** Every key of [form] (`full`, `fn`, …) that has a preset back to it, the others left as they are (套用编辑快捷键). */
-    fun withPresets(form: String): KeyShortcuts =
-        KeyShortcuts(table.filterKeys { formOf(it) != form || KeyShortcutPreset.of(it) == KeyShortcut.None })
-
-    /** Every one of [names] set to nothing, its preset too (清除这一页的快捷键). */
+    /** Their presets too (清除这一页的快捷键). */
     fun cleared(names: Collection<String>): KeyShortcuts =
         KeyShortcuts(LinkedHashMap(table).also { t -> names.forEach { t[it] = KeyShortcut.None } })
 
@@ -76,7 +65,7 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
                     '\\' -> append("\\\\")
                     '\t' -> append("\\t")
                     '\n' -> append("\\n")
-                    // a stored \r once ended the line it was in, the rest of the text lost (review S3)
+                    // a stored \r once ended the line it was in, the rest of the text lost
                     '\r' -> append("\\r")
                     else -> append(it)
                 }
@@ -113,10 +102,10 @@ class KeyShortcuts private constructor(private val table: Map<String, KeyShortcu
             else -> KeyCommand.ofKey(value)?.let(KeyShortcut::Command)
         }
 
-        /** Never throws: a line that does not parse is skipped; a later line for the same key wins. */
+        /** Never throws: a bad line is skipped; a later line for the same key wins. */
         fun parse(text: String): KeyShortcuts {
             val table = LinkedHashMap<String, KeyShortcut>()
-            // lines end at \n alone: lineSequence() would end one at a \r too, a text cut there (review S3)
+            // lines end at \n alone: lineSequence() would cut a text at a \r too
             text.splitToSequence('\n').mapNotNull(::parseLine).forEach { (name, shortcut) -> table[name] = shortcut }
             return if (table.isEmpty()) Empty else KeyShortcuts(table)
         }

@@ -21,11 +21,7 @@ import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.verticalLayout
 import java.util.Calendar
 
-/**
- * Under a field whose text fills in variables while [on] (061-text-variables §2.5): 插入变量 (each name, what it
- * is and its value now; picked, `${name}` at the cursor), what the text types now, and what of it is not filled in.
- * [shape] makes the field's text what is stored (an item of a long press: one line, trimmed, 64 at most).
- */
+/** 插入变量, the preview and what is not filled in, while [on]; [shape] makes the text what is stored. */
 class TextVariableHelp(
     private val ctx: Context,
     private val field: EditText,
@@ -48,7 +44,6 @@ class TextVariableHelp(
         isVisible = false
     }
 
-    /** Whether the text fills in variables: the help shown. */
     var on: Boolean = false
         set(value) {
             field = value
@@ -56,10 +51,10 @@ class TextVariableHelp(
             update()
         }
 
-    /** What the preview says now: a test's. */
+    /** For tests. */
     val previewed: String get() = preview.text.toString()
 
-    /** What the problems line says now, empty for none: a test's. */
+    /** Empty for none; for tests. */
     val told: String get() = problems.text.toString().takeIf { problems.isVisible }.orEmpty()
 
     init {
@@ -98,11 +93,10 @@ class TextVariableHelp(
     }
 
     companion object {
-        /** 「现在打出：…」 of [template] at [now]: what it types, or that it types nothing. */
         fun typedNow(ctx: Context, template: String, now: Calendar): String =
             TextVariables.expand(template, now).let { if (it.isEmpty()) ctx.getString(R.string.text_variables_nothing) else ctx.getString(R.string.text_variables_now, it) }
 
-        /** What of [template] is not filled in, a line each ([TextVariables.problems]); empty for none. */
+        /** A line each ([TextVariables.problems]); empty for none. */
         fun problemsOf(ctx: Context, template: String): String = TextVariables.problems(template).joinToString("\n") {
             ctx.getString(if (it.dropped) R.string.text_variables_dropped else R.string.text_variables_kept, it.written)
         }

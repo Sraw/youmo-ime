@@ -17,11 +17,7 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 
-/**
- * What the engine asks of [UserFiles] and [LogFile], the same of the disk ([JvmFiles]) and of
- * [MemoryFiles]: the tests that keep the user's files in memory see what the phone would. Where a
- * file is wanted and a directory stands, as the engine's tests of a record that does not open put one.
- */
+/** What the engine asks of [UserFiles] and [LogFile], held alike on [JvmFiles] and [MemoryFiles]. */
 abstract class UserFilesContractTest {
     /** An empty directory of the files under test. */
     abstract fun root(): UserFiles
@@ -43,7 +39,6 @@ abstract class UserFilesContractTest {
         assertTrue(root.file("f").taken())
         assertFalse(root.dir("f").exists())
         assertFalse(root.dir("f").mkdirs())
-        // nor deeper: a file on the way makes no directory below it
         assertFalse(root.dir("f").dir("g").mkdirs())
         assertFalse(root.dir("f").dir("g").exists())
         assertThrows(IOException::class.java) { root.dir("f").dir("g").file("x").create() }
@@ -101,7 +96,6 @@ abstract class UserFilesContractTest {
         assertEquals(2L, f.length())
     }
 
-    // what a fold leans on: an append open on a file renamed over writes to the file that was, not the new one
     @Test
     fun anAppendOpenOnAFileRenamedOverWritesNoMoreToThatPath() {
         val a = root.file("a").apply { write("a".toByteArray()) }
@@ -145,7 +139,6 @@ abstract class UserFilesContractTest {
         f.createNew()
         assertTrue(f.delete())
         assertFalse(f.taken())
-        // an empty directory at a file's path goes, a full one stays
         root.dir("e").mkdirs()
         assertTrue(root.file("e").delete())
         assertFalse(root.dir("e").exists())
@@ -190,11 +183,9 @@ abstract class UserFilesContractTest {
         assertTrue(a.renameTo(root.dir("b")))
         assertFalse(a.exists())
         assertEquals("x", root.dir("b").dir("sub").file("x").text())
-        // onto an empty directory: replaced
         root.dir("c").mkdirs()
         assertTrue(root.dir("b").renameTo(root.dir("c")))
         assertEquals(listOf("sub"), root.dir("c").dirs())
-        // not onto a full one, nor a file
         root.dir("full").apply { mkdirs() }.file("y").createNew()
         assertFalse(root.dir("c").renameTo(root.dir("full")))
         root.file("f").createNew()
@@ -203,8 +194,7 @@ abstract class UserFilesContractTest {
         assertFalse(root.dir("none").renameTo(root.dir("other")))
     }
 
-    // a directory's own length is the file system's (ext4's and f2fs's, the phone's, 4096 is what
-    // MemoryFiles gives), read off each directory so that a tmpfs or overlayfs runs the test too
+    // read off each directory, so tmpfs and overlayfs pass too (MemoryFiles gives the phone's 4096)
     @Test
     fun aSizeCountsTheFilesAndTheDirectoriesOwnLengths() {
         val d = root.dir("d").apply { mkdirs() }
@@ -249,8 +239,7 @@ class JvmFilesContractTest : UserFilesContractTest() {
 
     override fun root(): UserFiles = JvmFiles(tmp.newFolder())
 
-    // a stat that fails reads as neither file nor directory (a dangling link here, EIO on a FUSE on the
-    // phone): listed as unknown, not dropped, else ConfigHome takes an old config for none (review F4889, F4983)
+    // listed as unknown, not dropped, else ConfigHome takes an old config for none
     @Test
     fun anEntryOfAKindThatDoesNotReadIsListedAsUnknown() {
         val dir = tmp.newFolder()
@@ -264,8 +253,6 @@ class JvmFilesContractTest : UserFilesContractTest() {
 class MemoryFilesContractTest : UserFilesContractTest() {
     override fun root(): UserFiles = MemoryFiles()
 
-    // the contract reads each directory's length off the files under test; the phone's (ext4,
-    // f2fs) is what MemoryFiles must give, so a size there is as the phone's
     @Test
     fun aDirectoryIsAsLongAsOnThePhone() {
         val root = root()

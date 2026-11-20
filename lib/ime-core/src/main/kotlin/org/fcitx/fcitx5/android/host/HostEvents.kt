@@ -10,17 +10,13 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 
-/** A candidate as the frontend sends it (`CandidateEntity`): its text and comment through the output filters. */
+/** `CandidateEntity`: text and comment through the output filters. */
 typealias CandidateEntry = CandidateWord
 
-/** fcitx's `CandidateLayoutHint`, as the paged list carries it. */
+/** fcitx's `CandidateLayoutHint`. */
 enum class LayoutHint { NotSet, Vertical, Horizontal }
 
-/**
- * What the host tells the app, one for each of the frontend's callbacks (`androidfrontend.cpp`,
- * `native-lib.cpp`), with the values those built for the app (`object-conversion.h`). The app
- * takes these as they are: there is no second event type.
- */
+/** One per frontend callback, with the values those built for the app; the app takes these as they are. */
 sealed class HostEvent {
     data class Commit(val text: String, val cursor: Int) : HostEvent()
     data class ClientPreedit(val text: FormattedText) : HostEvent()
@@ -28,12 +24,8 @@ sealed class HostEvent {
         val preedit: FormattedText,
         val auxUp: FormattedText,
         val auxDown: FormattedText,
-        /** Quick input's panel ([TempPanel.quickPhrase]). */
         val quickPhrase: Boolean = false,
-        /**
-         * [preedit] is the session's code as the code row shows it ([Panel.code]): what 编码行 输入框里
-         * may write into the field. Not a temp mode's nor a punctuation key's marks on offer.
-         */
+        /** [preedit] is the session's code ([Panel.code]): what 编码行 输入框里 may write into the field. */
         val code: Boolean = false,
     ) : HostEvent() {
         companion object {
@@ -41,17 +33,14 @@ sealed class HostEvent {
         }
     }
 
-    /**
-     * The bulk list's first 16 (`updateCandidatesBulk`, `androidfrontend.cpp:94-123`); [predicting], 联想's words
-     * with nothing typed ([CandidateList.predicting]): the bar shows its × for them.
-     */
+    /** `updateCandidatesBulk`'s first 16; [predicting]: 联想's with nothing typed, the bar shows its ×. */
     data class Candidates(val total: Int, val candidates: List<CandidateEntry>, val predicting: Boolean = false) : HostEvent() {
         companion object {
             val EMPTY = Candidates(0, emptyList())
         }
     }
 
-    /** The page, for the hardware keyboard's window (`updateCandidatesPaged`, `:125-148`), with the list's layout hint. */
+    /** `updateCandidatesPaged`, for the hardware keyboard's window. */
     data class Paged(
         val candidates: List<CandidateEntry>,
         val cursorIndex: Int,
@@ -64,7 +53,7 @@ sealed class HostEvent {
         }
     }
 
-    /** A key for the app: not taken, or forwarded (timestamp -1) (`AndroidFrontend::keyEvent`/`forwardKey`, `:385-398`). */
+    /** Not taken, or forwarded (timestamp -1). */
     data class Key(val sym: Int, val states: Int, val unicode: Int, val up: Boolean, val timestamp: Int) : HostEvent() {
         val keySym: KeySym get() = KeySym(sym)
         val keyStates: KeyStates get() = KeyStates.of(states)
@@ -72,23 +61,17 @@ sealed class HostEvent {
 
     data class DeleteSurrounding(val before: Int, val after: Int) : HostEvent()
 
-    /** The active context's input method activated, or the group changed under an unfocused one (`:327-348`). */
+    /** Or the group changed under an unfocused one. */
     data class InputMethodChanged(val entry: InputMethodEntry) : HostEvent() {
         constructor(im: String) : this(InputMethodEntries.of(im))
 
         val im: String get() = entry.uniqueName
     }
 
-    /** `InputContextSwitchInputMethod` on the active context (`:349-359`). */
+    /** `InputContextSwitchInputMethod` on the active context. */
     data class SwitchInputMethod(val reason: SwitchReason, val oldInputMethod: String) : HostEvent()
 
-    /**
-     * The active context's status area anew, with its input method (`statusAreaUpdateCallback`, `androidfrontend.cpp:376-379`),
-     * and [punctuation]: what each punctuation key types now (`,` to `，`; empty, punctuation off), worked out on the host's
-     * thread with the status, so the keyboard switches in this event, before any key after it. Null: not told (a status
-     * replayed before the host sent one): the keyboard keeps what it has. [fullWidth]: full width on for it, every
-     * mark and key's own character then typed full width ([FullWidth.convert]), the keys typing themselves too.
-     */
+    /** [punctuation] computed with the status so the keyboard switches before the next key; null: not told, keep it. [fullWidth]: keys type full width too. */
     data class StatusArea(
         val entries: List<StatusEntry>,
         val entry: InputMethodEntry,
@@ -101,25 +84,17 @@ sealed class HostEvent {
         val im: String get() = entry.uniqueName
     }
 
-    /**
-     * The punctuation keys (`,` `.`) that now type their own character, not their mark: after a letter
-     * or digit with "half width after a letter or number" on ([Punctuation.typesAsItself]); empty, none.
-     */
+    /** After a letter or digit with "half width after a letter or number" on; empty, none. */
     data class PunctuationAsTyped(val marks: Set<String>) : HostEvent()
 
-    /** A tip (`showTip`): the app shows it on the keyboard, not through its event flow (`Fcitx.showToast`). */
+    /** Shown on the keyboard, not through the event flow. */
     data class Tip(val text: String) : HostEvent()
 
-    /** The app's host is up (`KotlinHost` sends it once, after its start); the core never sends it. */
+    /** `KotlinHost` sends it once, after its start; the core never sends it. */
     data object Ready : HostEvent()
 }
 
-/**
- * Who hears the host's events, on the host thread, in the order the host makes them: commits,
- * deletes and keys at once, the panel once per event. `HostCore.events` runs each listener in
- * turn, as `fcitxEventHandlers` ran (`Fcitx.kt:428-434`); the app's `KotlinHost` is one, and
- * makes its event flow of what it hears.
- */
+/** On the host thread, in order: commits, deletes and keys at once, the panel once per event. */
 fun interface HostEvents {
     fun onEvent(event: HostEvent)
 }

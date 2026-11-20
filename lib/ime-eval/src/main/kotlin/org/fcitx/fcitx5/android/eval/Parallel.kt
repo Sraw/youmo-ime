@@ -8,12 +8,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.Executors
 
-/**
- * [work] over [items] on up to [threads] threads, one result per item in the items' order. Each
- * thread makes its own worker, as an engine keeps state between calls; the items are dealt out a
- * card at a time, so that the long ones spread over the threads. A run with the sentence models
- * takes minutes on one thread, and the samples do not depend on one another.
- */
+/** [work] over [items] on up to [threads] threads, each with its own worker, results in order; dealt a card at a time. */
 internal fun <T, W, R> dealt(items: List<T>, threads: Int, worker: () -> W, work: W.(List<T>) -> List<R>): List<R> {
     val n = threads.coerceIn(1, maxOf(1, items.size))
     val hands = List(n) { hand -> items.filterIndexed { i, _ -> i % n == hand } }
@@ -21,8 +16,7 @@ internal fun <T, W, R> dealt(items: List<T>, threads: Int, worker: () -> W, work
     val results = if (n == 1) {
         listOf(play(hands[0]))
     } else {
-        // daemons, as the engine's loops do not stop when interrupted: a failure ends the run
-        // without waiting for the other hands
+        // daemons, as the engine's loops do not stop when interrupted: a failure ends the run without waiting
         val pool = Executors.newFixedThreadPool(n) { task -> Thread(task).apply { isDaemon = true } }
         try {
             val done = ExecutorCompletionService<Pair<Int, List<R>>>(pool)

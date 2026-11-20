@@ -10,7 +10,6 @@ import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parceler
 import kotlinx.parcelize.Parcelize
 import kotlinx.parcelize.TypeParceler
-import kotlinx.serialization.json.Json
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
@@ -22,7 +21,6 @@ sealed class Theme : Parcelable {
     abstract val name: String
     abstract val isDark: Boolean
 
-    /** Its colours: a custom theme's [look]'s, a built-in one's version's colour table, a pack's what its file says. */
     abstract val palette: Palette
 
     val backgroundColor: Int get() = palette.backgroundColor
@@ -47,26 +45,17 @@ sealed class Theme : Parcelable {
     val genericActiveBackgroundColor: Int get() = palette.genericActiveBackgroundColor
     val genericActiveForegroundColor: Int get() = palette.genericActiveForegroundColor
 
-    /**
-     * All the theme draws with: a custom theme's own, a built-in one's its colours with [LookDefaults]; a pack's
-     * what of it the views round the keys take (its keys are drawn as its file says: [Pack.scene]).
-     */
+    /** A pack's covers only what the views round the keys take; its keys are drawn from its file ([Pack.scene]). */
     abstract val look: ThemeLook
 
-    /**
-     * A theme of a theme 4.0 file, one of whose versions it is ([BuiltinThemeFiles.ref]: `pixel#dark`, or the
-     * file's name alone where it has one): the versions of one [file] are one card in the list.
-     */
+    /** The versions of one [file] ([BuiltinThemeFiles.ref]: `pixel#dark`) are one card in the list. */
     interface Versioned {
         val name: String
         val isDark: Boolean
         val file: String
     }
 
-    /**
-     * The user's own, saved as a file: all of it is its [look] (theme file 3.0), the colours too;
-     * its files by absolute path in memory, by name in the file ([ThemeFilesManager]).
-     */
+    /** All of it is its [look] (theme file 3.0); its files by absolute path in memory, by name on disk ([ThemeFilesManager]). */
     @Parcelize
     @TypeParceler<ThemeLook, ThemeLookParceler>
     data class Custom(
@@ -78,18 +67,15 @@ sealed class Theme : Parcelable {
     }
 
     /**
-     * A built-in theme's version: one of the files of keyboard-scene's src/commonMain/themes ([BuiltinThemeFiles]),
-     * its colours that version's colour table (the 24 of ThemeReader.REQUIRED_COLORS), drawn as LookDefaults with
-     * them, which is what the file's styles say (BuiltinThemeEquivalenceTest). [name] is how the settings refer to
-     * it: the file's name, and its version where it has two (`pixel#dark`). Monet's ([followsSystem]) colours are
-     * the system's, read again when they change; its keys may keep the key style of before 3.0 (ThemeLookMigration).
+     * A version of a keyboard-scene built-in theme file, drawn as LookDefaults with its 24 colours, which is what the file's
+     * styles say (BuiltinThemeEquivalenceTest). [name] is the settings' reference (`pixel#dark`). Monet's colours
+     * ([followsSystem]) are the system's; its keys may keep the pre-3.0 key style (ThemeLookMigration).
      */
     @Parcelize
     @TypeParceler<Palette, PaletteParceler>
     data class Builtin(
         override val name: String,
         override val isDark: Boolean,
-        /** Its file's theme: the versions of one file are one card in the list. */
         override val file: String,
         val followsSystem: Boolean,
         override val palette: Palette,
@@ -100,17 +86,16 @@ sealed class Theme : Parcelable {
             LookDefaults.look(palette).let { if (followsSystem) ThemeLookMigration.monetLook?.applyTo(it) ?: it else it }
         }
 
-        /** Monet's look as it is now, fixed, as a theme of the user's: exported, it no longer follows the wallpaper. */
+        /** Monet's look fixed as a user theme: exported, it no longer follows the wallpaper. */
         @OptIn(ExperimentalStdlibApi::class)
         fun toCustom() = Custom(
-            // its primary colour tells two apart; named as 0.5 named it (MonetLight#ff415f91)
+            // its primary colour tells two apart; named as 0.5 did (MonetLight#ff415f91)
             name = (BuiltinThemeFiles.legacyName(name) ?: name) + "#" + accentKeyBackgroundColor.toHexString(),
             isDark = isDark,
             look = look,
         )
 
         companion object {
-            /** [theme], a built-in file read and picked as one of its versions, referred to as [name]. */
             fun of(theme: SceneTheme, name: String, followsSystem: Boolean): Builtin {
                 fun c(n: String) = theme.colors.getValue(n).value
                 return Builtin(
@@ -127,10 +112,8 @@ sealed class Theme : Parcelable {
     }
 
     /**
-     * A theme 4.0 pack of the user's (060-render-p3 T8a), as one of its versions: [file] its name and its folder's
-     * (`v4/<file>/` in the themes', [dir]), [stamp] its `theme.xml`'s time (a pack imported again another theme).
-     * Its keys, bar and popups are drawn as the file says ([scene], read from it when first drawn: no pack's text is
-     * kept); the views round them take its colours and what [look] makes of its picture and fonts.
+     * A theme 4.0 pack version in `v4/<file>/` ([dir]); [stamp] its `theme.xml` time (a reimport is another theme). Keys,
+     * bar and popups are drawn from the file ([scene], read when first drawn; no text kept); views round them take [look].
      */
     @Parcelize
     data class Pack(
@@ -139,18 +122,15 @@ sealed class Theme : Parcelable {
         override val file: String,
         val dir: String,
         val stamp: Long,
-        /** One of the app's ([BuiltinPacks]): listed with the built-in themes, never deleted. */
+        /** One of the app's ([BuiltinPacks]): listed with the built-ins, never deleted. */
         val builtin: Boolean = false,
     ) : Theme(), Versioned {
 
-        /**
-         * Its theme as the engine reads it, this version ([ThemePackFiles.scene]: with the system's colours as they
-         * are; the built-in theme's where its file no longer reads).
-         */
+        /** This version as the engine reads it, with current system colours; the built-in theme's where the file no longer reads. */
         @IgnoredOnParcel
         val scene: SceneTheme by lazy { ThemePackFiles.scene(dir, isDark) }
 
-        /** [scene] as drawn: its files by their paths ([ThemePackFiles.drawn]). */
+        /** Files by their paths ([ThemePackFiles.drawn]). */
         @IgnoredOnParcel
         val drawn: SceneTheme by lazy { ThemePackFiles.drawn(scene, dir) }
 
@@ -160,14 +140,13 @@ sealed class Theme : Parcelable {
         @IgnoredOnParcel
         override val look: ThemeLook by lazy { ThemePackFiles.look(scene, palette, dir) }
 
-        /** The file of it a theme 4 names [name] (by its name in the pack's folder). */
         fun path(name: String): String = File(dir, name).path
     }
 }
 
-/** A built-in theme's [Palette] in a parcel, by name ([PaletteJson]) as a theme file holds it. */
+/** By name as a theme file holds it ([ThemeLookParceler]). */
 internal object PaletteParceler : Parceler<Palette> {
-    override fun create(parcel: Parcel): Palette = Json.decodeFromString(PaletteJson.serializer(), parcel.readString()!!).toPalette()
+    override fun create(parcel: Parcel): Palette = with(ThemeLookParceler) { create(parcel).palette }
 
-    override fun Palette.write(parcel: Parcel, flags: Int) = parcel.writeString(Json.encodeToString(PaletteJson.serializer(), PaletteJson.of(this)))
+    override fun Palette.write(parcel: Parcel, flags: Int) = with(ThemeLookParceler) { LookDefaults.look(this@write).write(parcel, flags) }
 }

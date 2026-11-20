@@ -24,25 +24,13 @@ import org.fcitx.fcitx5.android.engine.user.LearningUse
 import java.io.File
 import java.nio.file.Files
 
-/**
- * What the user sees after doing something: scripted behaviour (type, pick, a context, a day
- * passing) run through the pinyin sessions as the app has them, one user per scenario ([EvalUser]:
- * its learning record and user model, a `day` its clock a calendar day on), and
- * the order of the candidates then checked against what the spec of learning
- * (`dev/design/learning-ux/final/draft-simple.md`) says. The scripts are in `data/learn-ux`; the
- * format is [LearnUxScript]'s.
- *
- * An expectation is [Status.PENDING] where the engine cannot do yet what comes before it: in a
- * scenario marked `pending`, after a `todo` (an action
- * not driven yet: a table, handwriting, an import) or a keyboard this runner does not make.
- */
+/** Scripted behaviour ([LearnUxScript], `data/learn-ux`) run through the pinyin sessions, the candidates' order checked against the learning spec. */
 class LearnUx(
     private val data: PinyinData,
-    /** Makes a session's reranker, as the app gives each session its own. */
     private val reranker: (() -> SentencePicker)? = null,
     private val refiner: (() -> SentenceRefiner)? = null,
     private val use: LearningUse = LearningUse.DEFAULT,
-    /** Committed (picked as expected) before each scenario, into its learning record: a user's history. */
+    /** Committed before each scenario into its learning record: a user's history. */
     private val seed: List<Sample> = emptyList(),
 ) {
     enum class Status { PASS, FAIL, PENDING, NOTE }
@@ -51,7 +39,7 @@ class LearnUx(
     data class Result(val scenario: Scenario, val line: Int, val text: String, val status: Status, val detail: String = "")
 
     fun run(scenarios: List<Scenario>): List<Result> {
-        // the seed's learning record, typed once a run and copied for each scenario: none without a seed or scenarios
+        // the seed's record, typed once a run and copied for each scenario
         val seeded = if (seed.isEmpty() || scenarios.isEmpty()) null else seedLog()
         return try {
             scenarios.flatMap { scenario -> runSeeded(scenario, seeded) }
@@ -74,9 +62,7 @@ class LearnUx(
         }
     }
 
-    // without the sentence models: the text committed is the sample's either way, and thousands are typed.
-    // Typed with today's use whatever is measured: the seed is the user's past, the same for every
-    // setting compared; what it learned changes with the ranking. All on one day, the scenario's first
+    // without the sentence models (the text committed is the sample's either way), all on the scenario's first day
     private fun seedLog(): File {
         val dir = Files.createTempDirectory("learn-ux-seed").toFile()
         val user = EvalUser(data, File(dir, LearnLog.FILE))
@@ -92,7 +78,6 @@ class LearnUx(
         refiner = refiner?.invoke(), reranker = reranker?.invoke(),
     )
 
-    /** One scenario run: its own [user], and the sessions made as its keyboards are used. */
     private inner class Run(private val scenario: Scenario, private val user: EvalUser) {
         private val sessions = HashMap<String, PinyinSession>()
         private var active: PinyinSession? = null
@@ -110,10 +95,9 @@ class LearnUx(
             try {
                 scenario.steps.forEach(::step)
             } catch (e: Stop) {
-                // what a pending scenario cannot do yet is no failure either
                 val status = if (pending == null) Status.FAIL else Status.PENDING
                 val why = listOfNotNull(pending?.let { "($it)" }, e.message).joinToString(" ")
-                // each expectation not come to is one too: the count is the script's, however far a run gets
+                // each expectation not come to counts too: the count is the script's, however far a run gets
                 val left = expects(scenario.steps).drop(reached)
                 // an expectation that stopped the run is come to: its own row, with why
                 if (e.onExpect || left.isEmpty()) out += Result(scenario, e.line, e.text, status, why)
@@ -123,7 +107,6 @@ class LearnUx(
         }
 
         private fun step(s: Step) {
-            // what is done with keys typed on a keyboard not driven
             if (s is Step.Expect) reached++
             if (undriven && s.onInput) {
                 if (s is Step.Expect) out += Result(scenario, s.line, s.source, Status.PENDING, "($pending)")
@@ -147,7 +130,6 @@ class LearnUx(
             }
         }
 
-        // the first reason given stands
         private fun pend(why: String) {
             if (pending == null) pending = why
         }
@@ -159,7 +141,6 @@ class LearnUx(
             after(session, session.apply(Action.Pick(index)))
         }
 
-        // a context taken, or none: what was typed and not committed is dropped
         private fun settle(text: String, cleared: Boolean) {
             if (typing || predicting) active?.apply(Action.Reset)
             typing = false
@@ -180,7 +161,7 @@ class LearnUx(
             predicting = false
             val given = context
             when {
-                // as the host tells it: with the field's learn flags (null is the engine's own context)
+                // as the host tells it (null is the engine's own context)
                 given != null -> session.apply(if (given.isEmpty()) Action.Reset else Action.Context(given, cleared, learnFlags = 0))
                 // another keyboard: what this one committed is no context of that one
                 session !== active -> session.apply(Action.Reset)
@@ -192,7 +173,7 @@ class LearnUx(
             shot?.let { after(session, it) }
         }
 
-        // the user pauses, as KeystrokeRun's: the refiner's pick is what they see
+        // the user pauses, as in KeystrokeRun: the refiner's pick is what they see
         private fun after(session: PinyinSession, snapshot: Snapshot) {
             var shot = snapshot
             while (shot.refines) shot = session.apply(Action.Refine)
@@ -201,7 +182,7 @@ class LearnUx(
             predicting = shot.predicting
         }
 
-        // the app's space selects only while composing (Keyboard.kt): with only 联想 shown it types a space, not driven here
+        // the app's space selects only while composing: with only 联想 shown it types a space, not driven here
         private fun space(s: Step.Space) {
             val session = active(s)
             if (!typing) throw Stop(s, if (predicting) "space with only 联想 shown: the app's space types a space then" else "space with nothing typed: the app's space types a space then")
@@ -216,8 +197,7 @@ class LearnUx(
             if (!user.unimport()) throw Stop(s, "nothing imported")
         }
 
-        // the last [Step.Del.commits] commits taken back by Backspace, a code point a press, as the app's Backspace sends them;
-        // the last press's snapshot is what is shown then (Backspace drops the 联想)
+        // the last commits taken back by Backspace, a code point a press (Backspace drops the 联想)
         private fun del(s: Step.Del) {
             val session = active(s)
             if (typing) throw Stop(s, "del with ${shown(session)} not committed")
@@ -246,13 +226,12 @@ class LearnUx(
             out += Result(scenario, s.line, s.source, status, detail)
         }
 
-        // what was typed, or the 联想 after a commit: a pick, a space or an expectation then is of those
+        // what was typed, or the 联想 after a commit
         private fun active(s: Step): PinyinSession {
             if (!typing && !predicting && s !is Step.Del) throw Stop(s, "nothing typed")
             return active ?: throw Stop(s, "nothing typed")
         }
 
-        // in the order a run comes to them, a repeat's as often as it repeats
         private fun expects(steps: List<Step>): List<Step.Expect> = steps.flatMap { s ->
             when (s) {
                 is Step.Expect -> listOf(s)
@@ -265,12 +244,11 @@ class LearnUx(
 
         private fun shown(session: PinyinSession) = list(session).take(SHOWN).joinToString(" ")
 
-        /** The session of keyboard [kb], made on first use; null for one this runner does not make. */
+        /** Null for a keyboard this runner does not make. */
         private fun sessionFor(kb: String): PinyinSession? {
             sessions[kb]?.let { return it }
             val made = when {
                 kb == QP -> session(PinyinSegmenter(neighbours = true, latin = LatinWords.of(data.dictionary)), false, user, Kinds.FULL)
-                // the nine keys' kind is the recorder's, from the keys pressed
                 kb == T9 -> session(T9Segmenter(abbreviations = false), true, user, Kinds.FULL)
                 kb.startsWith(SP) -> {
                     val name = kb.removePrefix(SP)
@@ -296,12 +274,11 @@ class LearnUx(
         const val T9 = "t9"
         const val SP = "sp:"
 
-        // read for an expectation, and looked through for a pick (dl's 点了 is past the 50th), shown when one fails
+        // read for an expectation and searched for a pick (dl's 点了 is past the 50th)
         private const val LISTED = 200
         private const val PICKED = 5000
         const val SHOWN = 5
 
-        /** The results, each a line, then the tally per scenario and in all. */
         fun report(results: List<Result>): String = buildString {
             var at: Scenario? = null
             for (r in results) {
@@ -323,67 +300,56 @@ class LearnUx(
     }
 }
 
-/** A scenario of [LearnUxScript]: run on a user model of its own. [pending] says why its expectations are all pending, if they are. */
+/** A [LearnUxScript] scenario, run on a user model of its own; [pending] says why its expectations are all pending. */
 class Scenario(val name: String, val file: String, val pending: String?, val steps: List<Step>)
 
-/** A line of a script, at [line] of its file. */
 sealed class Step {
     abstract val line: Int
 
-    /** Whether it acts on what was typed: skipped after keys a keyboard not driven yet typed. */
+    /** Whether it acts on what was typed: skipped after keys typed on a keyboard not driven. */
     open val onInput: Boolean get() = false
 
-    /** The app's text before the cursor ([Action.Context]) for what is typed next. */
     data class Ctx(override val line: Int, val text: String, val cleared: Boolean = false) : Step()
 
-    /** No text before the cursor: [Action.Reset]. */
     data class Clear(override val line: Int) : Step()
 
-    /** [keys] typed on keyboard [kb] (`qp`, `sp:<scheme>`, `t9`; another is not driven yet), then a pause. */
+    /** [keys] typed on keyboard [kb] (`qp`, `sp:<scheme>`, `t9`), then a pause. */
     data class Type(override val line: Int, val keys: String, val kb: String) : Step()
 
-    /** The candidate [text] picked, wherever it is in the list. */
     data class Pick(override val line: Int, val text: String) : Step() {
         override val onInput get() = true
     }
 
-    /** Space: the first candidate. */
     data class Space(override val line: Int) : Step() {
         override val onInput get() = true
     }
 
-    /** The last [commits] commits taken back by Backspace. */
     data class Del(override val line: Int, val commits: Int) : Step() {
         override val onInput get() = true
     }
 
-    /** A typing day passes. */
     data class Day(override val line: Int) : Step()
 
-    /** [text] read [reading] imported as a list of its own (U-101), as another input method's list is. */
+    /** [text] read [reading] imported as a list of its own, as another input method's list is. */
     data class Import(override val line: Int, val text: String, val reading: String) : Step()
 
-    /** The last list imported undone (U-102). */
     data class Unimport(override val line: Int) : Step()
 
-    /** [text], read [reading], added by hand to the word list. */
     data class Add(override val line: Int, val text: String, val reading: String) : Step()
 
-    /** Something this runner cannot do yet ([what]): what follows is pending. */
     data class Todo(override val line: Int, val what: String) : Step()
 
-    /** The candidates shown, noted in the report. */
     data class Show(override val line: Int) : Step() {
         override val onInput get() = true
     }
 
     data class Repeat(override val line: Int, val times: Int, val steps: List<Step>) : Step()
 
-    /** `expect <kind> <words>` as written ([source]), checked on the candidates shown (the 联想 after a commit). */
+    /** `expect <kind> <words>` as written ([source]), checked on the candidates shown (or the 联想 after a commit). */
     data class Expect(override val line: Int, val source: String, val kind: Kind, val words: List<String>, val within: Int = 0) : Step() {
         override val onInput get() = true
 
-        /** As written, but [TOP]: `top<n>`, n the words given. */
+        /** As written, but [TOP] takes its count from the words given. */
         enum class Kind(val words: Int) { FIRST(1), NOTFIRST(1), BEFORE(2), HAS(1), LACKS(1), TOP(0), WITHIN(1), LACKSN(1) }
 
         fun holds(list: List<String>): Boolean = when (kind) {
@@ -392,7 +358,6 @@ sealed class Step {
             Kind.HAS -> words[0] in list
             Kind.LACKS -> words[0] !in list
             Kind.BEFORE -> list.indexOf(words[0]).let { a -> a >= 0 && list.indexOf(words[1]).let { b -> b < 0 || a < b } }
-            // the first n, in this order
             Kind.TOP -> list.take(words.size) == words
             Kind.WITHIN -> words[0] in list.take(within)
             Kind.LACKSN -> words[0] !in list.take(within)
@@ -417,9 +382,9 @@ sealed class Step {
  *                          (the app's space types a space then, not driven here)
  * del <n>                  the last n commits deleted by Backspace
  * day                      a typing day passes: the clock a calendar day on, the next commit on the next
- * import <text> <pinyin>   the word imported as a list of its own (U-101): pinyin with ' between syllables
- * unimport                 the last list imported undone (U-102)
- * add <text> <reading>     a word added by hand to the word list, its syllables apart by spaces (U-65)
+ * import <text> <pinyin>   the word imported as a list of its own: pinyin with ' between syllables
+ * unimport                 the last list imported undone
+ * add <text> <reading>     a word added by hand to the word list, its syllables apart by spaces
  * todo <what>              an action not driven yet: expectations after it are pending
  * show                     the candidates shown, noted
  * expect top<n> a,b,...    the first n are these, in this order
@@ -445,7 +410,6 @@ object LearnUxScript {
         private var pending: String? = null
         private var steps = ArrayList<Step>()
 
-        // the repeats open, innermost last: the line each starts at, its count and its steps
         private val open = ArrayList<Triple<Int, Int, ArrayList<Step>>>()
 
         fun done(): List<Scenario> {
@@ -510,7 +474,6 @@ object LearnUxScript {
             return Step.Type(n, parts[0], kb)
         }
 
-        // in quotes to keep spaces at its ends, the line being trimmed
         private fun ctx(n: Int, rest: String, cleared: Boolean, bad: (String) -> Nothing): Step {
             val text = if (rest.length >= 2 && rest.startsWith('"') && rest.endsWith('"')) rest.substring(1, rest.length - 1) else rest
             return Step.Ctx(n, text.ifEmpty { bad("no text") }, cleared)

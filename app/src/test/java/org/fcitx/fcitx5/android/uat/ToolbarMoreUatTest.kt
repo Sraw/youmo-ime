@@ -30,10 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * ⋯ and its panel for the toolbar: the menu key as ⋯ where the toolbar has nothing to show (uat/05 TB-69), 手写 in the
- * panel as on the bar (TB-67), the narrowest bar's middle (TB-68).
- */
+/** The menu key as ⋯ where the toolbar has nothing to show, 手写 in the panel as on the bar, the narrowest bar's middle. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
@@ -74,13 +71,11 @@ class ToolbarMoreUatTest {
         h.relayout()
     }
 
-    // FB11 (the user's call, 2026-11-15): none of the toolbar's to show, the menu key is ⋯ itself, a tap opening its
-    // panel, over a clipboard suggestion too; never opened, 默认展开工具栏 or not; a greyed 手写 counts as one to show
+    // none of the toolbar's to show: the menu key is ⋯ itself, over a clipboard suggestion too; a greyed 手写 counts
     @Test
     @Uat("TB-69")
     fun aToolbarWithNothingToShowHasMoreForTheMenuKey() {
         prefs.set(internal.toolbarButtons, "-undo,-redo,-cursor_move,-clipboard,|,emoji,handwriting,voice,hide")
-        prefs.set(AppPrefs.getInstance().keyboard.expandToolbarByDefault, true)
         h.start()
         val cells = ToolbarSpacingUatTest.barCells(h)
         assertEquals(cells.toString(), s(R.string.toolbar_more), cells.first().first)
@@ -89,14 +84,12 @@ class ToolbarMoreUatTest {
         h.tap(h.described(s(R.string.toolbar_more)))
         h.waitFor("⋯'s panel") { h.relayout(); panelOpen() }
         backToKeyboard()
-        // a clip offered: the tap still the panel's
         h.copied("a clip to paste")
         h.waitFor("the clip offered") { h.relayout(); KeyboardHarness.all(h.bar).any { h.shown(it) && it is TextView && it.text.toString() == "a clip to paste" } }
         h.tap(h.described(s(R.string.toolbar_more)))
         h.waitFor("⋯'s panel over the clip") { h.relayout(); panelOpen() }
         backToKeyboard()
         assertFalse(has(R.string.hide_toolbar))
-        // 手写 ticked on the toolbar: in English greyed but there, so the menu key again (the clip still offered: shut)
         prefs.set(internal.toolbarButtons, "handwriting,|,emoji,voice,hide")
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
         h.relayout()
@@ -108,11 +101,9 @@ class ToolbarMoreUatTest {
         assertEquals(0.38f, greyed.alpha, 0.01f)
     }
 
-    // 手写 with no slot on the bar, in ⋯'s panel: lit while on, greyed and said so where it does not write, as on the bar
     @Test
     @Uat("TB-67")
     fun handwritingInMoresPanelIsGreyedAndLitAsOnTheBar() {
-        // ten slots: the menu key, three at the right, ⋯, five of the toolbar's; 手写 the sixth, in the panel
         prefs.set(internal.toolbarButtons, "undo,redo,cursor_move,clipboard,quick_input,handwriting,|,emoji,voice,hide")
         prefs.set(internal.handwritingOpen, true)
         h.start()
@@ -131,18 +122,15 @@ class ToolbarMoreUatTest {
         assertEquals(ThemeManager.activeTheme.keyBackgroundColor, background(greyed))
     }
 
-    // the panel's cell named [label]
     private fun entry(label: String): View {
         val text = KeyboardHarness.all(h.inputView).first { h.shown(it) && it is TextView && it.text.toString() == label }
         return generateSequence(text) { it.parent as? View }.first { it.hasOnClickListeners() }
     }
 
-    // the circle behind a panel cell's icon
     private fun background(cell: View): Int =
         KeyboardHarness.all(cell).firstNotNullOf { (it.background as? ShapeDrawable)?.paint?.color }
 
-    // the floating keyboard at its narrowest (260 dp): about 74 dp between the menu key and the right's, a clipboard
-    // suggestion and a sum's result each shortened there, over none of the buttons
+    // the floating keyboard at its narrowest (260 dp): a clipboard suggestion and a sum's result each shortened there
     @Test
     @Uat("TB-68")
     fun theSmallestBarsMiddleHoldsAClipAndASum() {
@@ -160,13 +148,11 @@ class ToolbarMoreUatTest {
             }
             assertTrue("$what shortened", (view.layout?.getEllipsisCount(0) ?: 0) > 0)
         }
-        // the strip's text cut at its length, the rest of it shortened to the room
         val clip = "a clip far longer than the narrowest bar's"
         h.copied("$clip middle")
         h.waitFor("the clip offered") { h.relayout(); KeyboardHarness.all(h.bar).any { h.shown(it) && it is TextView && it.text.startsWith(clip) } }
         assertInMiddle("the clip", clip)
         assertEquals(cells, ToolbarSpacingUatTest.barCells(h))
-        // a sum's long result, the clip let go (its strip goes as the sum's comes)
         h.field.setText("123456789*987654321")
         h.field.setSelection(19)
         h.idle()

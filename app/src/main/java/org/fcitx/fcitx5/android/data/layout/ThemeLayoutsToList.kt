@@ -38,53 +38,33 @@ import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 
 /**
- * A theme pack's boards the user picks among their own layouts (`qwerty`, `k14`, `k18`, `nine`, `number`, `symbols`:
- * [KeyData.LISTED]) put in 外观 → 布局 as layouts of the user's (061-custom-layout §11, L7): since 0.6.1 they stand for
- * the app's no more. The same for each of the three ways a pack comes: the packs installed before, at the first start of
- * 0.6.1 (each chosen board switched to its layout, [ThemeLayoutSwitch]); the packs a backup brings, at the start after its
- * restore (switched where the backup is of before 0.6.1); a pack imported with 「一起导入」 ticked (only listed; one
- * unticked recorded, not listed: [notListed]). Once a pack's `file@stamp` ([CustomLayoutFiles.CONVERTED]): the same pack
- * again does nothing, one imported again (its stamp new) updates the layouts it made where they are as it wrote them
- * ([CustomLayoutFiles.target]: one the user changed, or not this pack's, kept, the pack's under a free id). The pack's
- * files are left as they are.
+ * Lists a theme pack's boards in 外观 → 布局 as user layouts (packs no longer replace the app's boards): old packs at
+ * the first start, a backup's after a restore, an import with 「一起导入」. Recorded by `file@stamp`, so the same pack
+ * again does nothing; a reimport updates layouts it wrote, keeping user-changed ones.
  */
 object ThemeLayoutsToList {
 
-    /** A pack's board [board] (`k18`) put in the list as [done], [put] so. */
     class Listed(val board: String, val done: PackLayouts.Converted.Done, val put: CustomLayoutFiles.Put = CustomLayoutFiles.Put.NEW)
 
-    /**
-     * Where it is kept that this install's packs were put in the list ([atStart]): this phone's, not backed up, as a
-     * restore's packs are its own matter ([restored]).
-     */
+    /** Device-local: a restore's packs are handled by [restored]. */
     @VisibleForTesting
     internal var listedFile: () -> File = { File(appContext.noBackupFilesDir, "theme-layouts-listed") }
 
-    /** The packs a backup restored, to be put in the list at the next start: its first line `switch` or `list`, a name a line after. */
     @VisibleForTesting
     internal var restoredFile: () -> File = { File(appContext.noBackupFilesDir, "theme-layouts-restored") }
 
-    /**
-     * There while a start puts packs in the list, its count of starts that tried: one that finds it there ended in the
-     * middle (killed: common, the app's process ends as the settings close), and tries again, [MAX_TRIES] at most.
-     */
+    /** A start finding it ended midway (killed, common as settings close) and retries, at most [MAX_TRIES]. */
     @VisibleForTesting
     internal var tryingFile: () -> File = { File(appContext.noBackupFilesDir, "theme-layouts-trying") }
 
     private const val SWITCH = "switch"
     private const val LIST = "list"
 
-    /** The most starts that try to put the packs in the list ([atStart]): one more ended in the middle, given up (logged). */
     const val MAX_TRIES = 3
 
-    /** The app the layouts made are held to: its `min-app=`s (a dev build: any). */
     fun appVersion(): String = LayoutImport.appVersion(ThemePackFiles.minAppVersion(BuildConfig.VERSION_NAME))
 
-    /**
-     * The pack's boards in [layouts] (its `layouts/`) made layouts of the user's, nothing saved: each listed board it
-     * has a file of, by board, in [KeyData.LISTED]'s order; [theme] the pack's name, [meta] its theme's, [ids] the id
-     * each is made ([targets]'); [boards] those looked at. What throws making one is one not made (a pack is untrusted).
-     */
+    /** What throws making one is one not made: a pack is untrusted. */
     fun convert(
         layouts: File,
         theme: String,
@@ -103,10 +83,7 @@ object ThemeLayoutsToList {
         }
     }
 
-    /**
-     * Where pack [file]'s boards go in [dir]'s list ([CustomLayoutFiles.target]), by board; [same], the import of it
-     * recorded already is listed again; [made] what a board makes under an id, its digest (null where not made).
-     */
+    /** [same]: the recorded import is listed again; [made]: a board's digest under an id, null where not made. */
     fun targets(
         file: String,
         same: Boolean = false,
@@ -119,12 +96,11 @@ object ThemeLayoutsToList {
         }
     }
 
-    // what [layouts]' [board] makes under [id] (as [convert]), its digest; null where it is not made
     private fun madeDigest(layouts: File, theme: String, meta: Meta?, appVersion: String, board: String, id: String): String? =
         (convert(layouts, theme, meta, appVersion, listOf(board)) { id }.singleOrNull()?.second as? PackLayouts.Converted.Done)
             ?.let { CustomLayoutFiles.digest(it.text.encodeToByteArray()) }
 
-    // the digest of layout [id]'s file in [dir]; null where there is none, empty where it cannot be read (not free)
+    // empty where unreadable (so not free)
     private fun digestOf(dir: File, id: String): String? {
         val file = File(dir, CustomLayoutFiles.fileName(id))
         if (!file.exists()) return null
@@ -132,15 +108,9 @@ object ThemeLayoutsToList {
             ?.let { runCatching { CustomLayoutFiles.digest(it.readBytes()) }.getOrNull() }.orEmpty()
     }
 
-    /** What an import of a pack would put in the list ([staged]): [listed] as [convert], [replaced] the names of the layouts it writes over, [notFitting] those of new ids the list has no room for. */
     class Staged(val listed: List<Pair<String, PackLayouts.Converted>>, val replaced: List<String>, val notFitting: Int)
 
-    /**
-     * Pack [theme]'s boards in [layouts] as its import with 「一起导入」 would list them in [dir]'s ([targets]): what its
-     * confirmation says (§4.2 第 4 步: 「替换已有的『…』」; the list full). Read as the pack is opened, outside the lock:
-     * for the confirmation's words alone. What the import does is decided again on OK ([run]), and a list changed
-     * meanwhile told then, by fewer listed than said (R26 F8196).
-     */
+    /** For the confirmation's words only; [run] decides again on OK. */
     fun staged(layouts: File, theme: String, meta: Meta?, appVersion: String, dir: File = CustomKeyboards.dir()): Staged {
         val targets = targets(theme, dir = dir) { board, id -> madeDigest(layouts, theme, meta, appVersion, board, id) }
         val listed = convert(layouts, theme, meta, appVersion) { targets.getValue(it).id }
@@ -151,13 +121,7 @@ object ThemeLayoutsToList {
         return Staged(listed, replaced, (new - room.coerceAtLeast(0)).coerceAtLeast(0))
     }
 
-    /**
-     * [pack]'s boards put in [dir]'s list ([convert]): each saved where [targets] says (over the one it made before, an
-     * update; under a free id; one the user changed of the same import listed [again] left as it is); the pack and each
-     * layout written recorded. The settings under a name it renamed are the caller's to copy, on the main thread
-     * ([copySettings]). Null where the record has it already and not [again] (nothing done); the boards listed else,
-     * none where it has none. One of a new id is not saved where [dir] holds [CustomLayoutFiles.MAX_LAYOUTS] (logged).
-     */
+    /** An update over its own, else a free id; null when already recorded and not [again]. A full list saves no new id. */
     @Synchronized
     @Throws(IOException::class)
     fun run(pack: Theme.Pack, dir: File = CustomKeyboards.dir(), again: Boolean = false): List<Listed>? {
@@ -190,26 +154,19 @@ object ThemeLayoutsToList {
         return listed
     }
 
-    // why [made] is not saved in [dir]: a new id where the list is full (CustomLayoutFiles.MAX_LAYOUTS); null it is
     private fun full(made: PackLayouts.Converted.Done, dir: File): String? {
         val ids = dir.list().orEmpty().mapNotNull(CustomLayoutFiles::idOf)
         return if (made.id !in ids && ids.size >= CustomLayoutFiles.MAX_LAYOUTS) "${ids.size} layouts already" else null
     }
 
-    /**
-     * [pack], just imported with 「一起导入」 unticked, recorded as if listed: a restore of a backup holding it does not put
-     * its boards in the list either (L7 review NIT1; UserDataManager leaves out the packs the backup's record has).
-     */
+    /** So restoring a backup holding it does not list its boards either. */
     @Synchronized
     @Throws(IOException::class)
     fun notListed(pack: Theme.Pack, dir: File = CustomKeyboards.dir()) {
         CustomLayouts.recordConverted(listOf("${pack.file}@${pack.stamp}"), dir)
     }
 
-    /**
-     * The settings of the names [renames] a layout listed renamed ([Listed.done]'s), copied under the new ones (§2.3: the
-     * old kept, one set kept): on the main thread, where the settings pages change them too (not a write over one made there).
-     */
+    /** On the main thread, where the settings pages change them too, so no write races. */
     fun copySettings(renames: Map<String, String>) {
         if (renames.isEmpty()) return
         val prefs = AppPrefs.getInstance()
@@ -217,11 +174,7 @@ object ThemeLayoutsToList {
         RenamedKeys.keySwipes(prefs.internal.keySwipes.getValue(), renames)?.let { prefs.internal.keySwipes.setValue(it) }
     }
 
-    /**
-     * The packs [names] a backup restored (UserDataManager), each replacing the phone's of its name: put in the list at the
-     * next start ([atStart]), its settings then the backup's; [switch] where the backup is of before 0.6.1 (what it chose
-     * is a board its packs stood for). Added to: two backups restored without a start between, switched where either is.
-     */
+    /** Listed at the next start; two restores without a start between are switched where either is. */
     @Synchronized
     fun restored(names: Collection<String>, switch: Boolean) {
         if (names.isEmpty()) return
@@ -235,13 +188,12 @@ object ThemeLayoutsToList {
         if (!temp.renameTo(file)) throw IOException("cannot record the packs restored")
     }
 
-    // whether to switch, and the names; null none
     private fun readRestored(file: File = restoredFile()): Pair<Boolean, List<String>>? {
         val lines = file.takeIf { it.isFile }?.readLines()?.filter { it.isNotEmpty() } ?: return null
         return (lines.firstOrNull() == SWITCH) to lines.drop(1)
     }
 
-    // [names] taken off [file] (the packs a start listed), those a restore recorded since kept (L7 review B4)
+    // those a restore recorded since are kept
     private fun unrestored(file: File, names: List<String>) {
         val (switch, all) = readRestored(file) ?: return
         val left = all.filter { it !in names }
@@ -254,13 +206,9 @@ object ThemeLayoutsToList {
         if (!temp.renameTo(file)) throw IOException("cannot record the packs restored")
     }
 
-    /** The themes in use as a start switches ([atStart]): [shown] drawn, [other] the other slot's of 跟随系统深色模式 (null off), [dark] the phone. */
+    /** [other]: the other dark-mode slot's (null off). */
     class InUse(val shown: Theme?, val other: Theme?, val dark: Boolean)
 
-    /**
-     * What a start listed off the main thread ([listAtStart]), for [chooseAtStart] to switch on it: [all], the install's
-     * packs; [restored], the names of a restore's it took.
-     */
     @VisibleForTesting
     internal class Started(
         val all: Boolean,
@@ -269,21 +217,16 @@ object ThemeLayoutsToList {
         val restored: List<String> = emptyList(),
     )
 
-    /** How long the notice of the boards chosen stays ([tellUnseen]): a line a pack, more than a line said's 1 s reads. */
+    /** Longer than a one-line message's 1 s. */
     const val NOTICE_MS = 4000L
 
-    /** Where a start lists: a thread of its own, as converting a pack's boards takes seconds (2.7 s a 26 keys' measured). */
+    /** Converting a pack's boards takes seconds. */
     @VisibleForTesting
     internal var background: Executor = Executor { Thread(it, "theme-layouts").apply { isDaemon = true }.start() }
 
-    /** Where it switches: the main thread, where the settings are changed and the keyboards read them. */
     @VisibleForTesting
     internal var mainThread: Executor = Executor { ContextCompat.getMainExecutor(appContext).execute(it) }
 
-    /**
-     * A start's: its files as they were as it began (not another's set after, a test's), its listing ended, it ended
-     * (its switch made, or none to make), its switch dropped (a restore came first: [dropStart]).
-     */
     @VisibleForTesting
     internal class Start(val listed: File, val restored: File, val trying: File) {
         val listing = CountDownLatch(1)
@@ -292,25 +235,18 @@ object ThemeLayoutsToList {
         // under ThemeLayoutsToList's lock
         var dropped = false
 
-        // its switch begun ([chooseAtStart]): no more to drop, waited for instead (under the lock too)
+        // begun: no longer droppable, waited for instead
         var switching = false
     }
 
-    // the last start begun: what [awaitStart] waits for
     @Volatile
     private var current: Start? = null
 
     private const val START_WAIT_S = 60L
 
     /**
-     * At the app's start (ThemeManager, the packs listed; [inUse] the themes in use, read as it switches): the packs
-     * of before 0.6.1 put in the list once an install, each chosen board switched to its layout; the packs a backup
-     * restored ([restored]) too. Listed on [background], switched on [mainThread] after: till then the keyboards draw
-     * the app's boards, then (their settings changed) the pack's, once an upgrade or a restore. Not while the files
-     * cannot be written (A4: the next start after the unlock). It never throws (a pack that fails is left as it is,
-     * logged); one that ended in the middle (killed, an Error, its switch thrown) is tried again by the next start,
-     * [MAX_TRIES] starts at most. Called once ThemeManager's packs are listed, so after ThemeSeparators.addSeparatorsOnce:
-     * the boards made have their 分词 (ST-143).
+     * Lists on [background], switches on [mainThread]: till then keyboards draw the app's boards. Never throws; retried
+     * by the next start. Runs after ThemeSeparators.addSeparatorsOnce, so the boards have their 分词.
      */
     fun atStart(packs: List<Theme.Pack>, inUse: () -> InUse) {
         val start = Start(listedFile(), restoredFile(), tryingFile())
@@ -334,13 +270,7 @@ object ThemeLayoutsToList {
         }
     }
 
-    /**
-     * Waits for the start ([atStart]) to end, its switch made: what writes the packs or the layouts (a pack imported)
-     * does not do so under it, nor reads the list or the choices before they are made (外观 → 布局 opened at once). Not
-     * on the main thread, where the switch is made. [restoring] (a backup restored): its listing alone waited for; its
-     * switch dropped only once the restore is past its checks ([dropStart]), as a refused one copies no settings in.
-     * One that does not end in a minute is not waited for longer.
-     */
+    /** Not on the main thread, where the switch is made. [restoring]: only the listing is waited for. Gives up after a minute. */
     fun awaitStart(restoring: Boolean = false) {
         val start = current ?: return
         if (!(if (restoring) start.listing else start.ended).await(START_WAIT_S, TimeUnit.SECONDS)) {
@@ -348,13 +278,7 @@ object ThemeLayoutsToList {
         }
     }
 
-    /**
-     * The start's switch, not yet made, dropped: a restore past its checks, about to copy the backup's settings in, which
-     * the switch would write the phone's over (its marker of trying cleared all the same, the next start finds the packs
-     * it listed recorded). A restore refused before this leaves the switch to be made (R26 F8134: else an upgrade's
-     * packs were never switched in, its end written). One begun already is waited for, its settings' writes on disk, so
-     * that the backup's are copied over them, not they over the backup's (R26 F8423). Not on the main thread.
-     */
+    /** The switch would write the phone's settings over a restored backup's, so it is dropped; one begun is waited for. */
     fun dropStart() {
         val start = current ?: return
         val begun = synchronized(this) {
@@ -366,14 +290,7 @@ object ThemeLayoutsToList {
         AppPrefs.getInstance().awaitWritten()
     }
 
-    /**
-     * The packs [start] puts in the list, saved, its count of tries written ([tryingFile]); null where none had a board to
-     * list, it then ended here ([ended]), or where it failed (logged: the count left for the next start). Each of the
-     * packs it takes is listed again ([run] again: one a start that ended in the middle listed is switched on by its
-     * record's id, L7 review S5), its `.converted` written [CustomLayoutFiles.CURRENT] (NIT1). The packs a restore
-     * recorded are taken here, under the lock: one that records after is the next start's. Each layout read here too,
-     * for the switch, not on the main thread; the switch planned there, on the settings then (B3).
-     */
+    /** Null when no pack had a board, or on failure (the count left for the next start). Layouts read off the main thread. */
     @Synchronized
     @VisibleForTesting
     @Suppress("TooGenericExceptionCaught")
@@ -403,7 +320,6 @@ object ThemeLayoutsToList {
             }
             Timber.i("theme packs' layouts listed: %d in %d ms (try %d)", made.size, (System.nanoTime() - began) / NANOS_A_MS, tries + 1)
             if (made.isEmpty()) {
-                // nothing for the main thread to do (no pack had one): ended here
                 ended(start, all, names)
                 return null
             }
@@ -414,12 +330,7 @@ object ThemeLayoutsToList {
         }
     }
 
-    /**
-     * On the main thread, what [listAtStart] listed: the settings of the keys they renamed copied, the boards chosen
-     * switched ([switchIn], planned on the settings now, told once; [inUse] read now), then its end written ([ended]:
-     * not before, or a start killed between would never switch, L7 review B1). Dropped ([dropStart]: a restore's
-     * settings are the backup's): its end alone. One that throws is tried again by the next start (logged).
-     */
+    /** The end is written after the switch, or a start killed between would never switch. */
     @VisibleForTesting
     @Suppress("TooGenericExceptionCaught")
     internal fun chooseAtStart(start: Start, started: Started, inUse: () -> InUse) {
@@ -441,14 +352,13 @@ object ThemeLayoutsToList {
         }
     }
 
-    // [start] done: the install's marker written where [all], the restore's [names] taken off its record, the count of tries cleared
     private fun ended(start: Start, all: Boolean, names: List<String>) {
         if (all) written(start.listed)
         if (names.isNotEmpty()) unrestored(start.restored, names)
         start.trying.delete()
     }
 
-    // the starts that tried, as [file] counts them (0: none; one of before the count, empty: one)
+    // an empty file (from before the count): one
     private fun tries(file: File): Int {
         if (!file.exists()) return 0
         return file.takeIf { it.length() <= MAX_TRIES_BYTES }?.readText()?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
@@ -463,21 +373,18 @@ object ThemeLayoutsToList {
 
     private const val NANOS_A_MS = 1_000_000
 
-    // whether the user's layout [id] has a file (one that does not read still listed, PanelLayouts.listedUnder)
+    // one that does not read is still listed (PanelLayouts.listedUnder)
     private fun listedFile(id: String) = CustomLayoutFiles.validId(id) && File(CustomKeyboards.dir(), CustomLayoutFiles.fileName(id)).isFile
 
-    // [read] chosen where its board was (ThemeLayoutSwitch), and told once ([tellUnseen])
     private fun switchIn(read: List<Pair<ThemeLayoutSwitch.Made, Listed>>, shown: Theme.Pack?, other: Theme.Pack?, dark: Boolean) {
         val keyboard = AppPrefs.getInstance().keyboard
-        // a setting of a layout gone or of another family now is none, as the app's card says (PanelLayouts.missing: L5's
-        // restore leaves it as it was); one whose file does not read is kept (读不出，暂用内置的)
+        // a gone or other-family layout's setting is none; an unreadable file's is kept
         val chosen = keyboard.panelLayouts()
         val listed = chosen.values.filter { it.isNotEmpty() && listedFile(it) }.associateWith { id ->
             PanelLayouts.listedUnder(CustomKeyboards.choice(id)?.family, id, chosen)
         }
         val panels = chosen.entries.associate { (panel, id) -> panel.family to id.takeUnless { PanelLayouts.missing(panel, chosen, listed) }.orEmpty() }
-        // planned here, on the settings and the engine's 双拼 scheme as they are now (L7 review B3, NIT7): the scheme read
-        // as the engine started, seconds before; its default where it has not yet (as for any choice made then)
+        // the 双拼 scheme was read seconds before as the engine started
         val plan = ThemeLayoutSwitch.plan(keyboard.imKeyboards(), EngineState.shuangpinScheme, panels, shown?.file, other?.file, read.map { it.first })
         plan.slots.forEach { (slot, id) -> keyboard.setImKeyboard(ImKeyboards.imOf(slot), ImKeyboard.CUSTOM, id) }
         plan.panels[ThemeLayoutSwitch.NUMBER]?.let { keyboard.numberKeyboardLayout.setValue(it) }
@@ -486,24 +393,20 @@ object ThemeLayoutsToList {
         val told = notice(appContext, plan, own, other?.file, !dark)
         if (told.isNotEmpty()) {
             AppPrefs.getInstance().internal.themeLayoutsUnseen.setValue(told)
-            // the engine told what was unseen as it started, before this was
+            // the engine told what was unseen before this was
             tellUnseen()
         }
         Timber.i("theme packs' layouts chosen: %s %s", plan.slots, plan.panels)
     }
 
-    /** The boards a start chose told till seen (EngineNotices.toldUntilSeen, [NOTICE_MS]), then forgotten: as the engine starts, and as they are chosen. */
+    /** Told till seen, then forgotten. */
     fun tellUnseen() {
         val unseen = AppPrefs.getInstance().internal.themeLayoutsUnseen
         val told = unseen.getValue()
         if (told.isNotEmpty()) EngineNotices.toldUntilSeen(R.string.theme_layouts_told, told, ms = NOTICE_MS) { unseen.setValue("") }
     }
 
-    /**
-     * What a switch ([plan]) tells, a line a pack: 「主题「薄荷」带的17 键已放进 外观 → 布局，拼音正在用」, and of the
-     * other slot's pack ([other], dark where [otherDark]) its boards set aside (Q15); empty where none is switched.
-     * [own]: each layout's own name.
-     */
+    /** E.g. 「主题「薄荷」带的17 键已放进 外观 → 布局，拼音正在用」; empty where none is switched. */
     @VisibleForTesting
     internal fun notice(ctx: Context, plan: ThemeLayoutSwitch.Plan, own: Map<ThemeLayoutSwitch.Made, String>, other: String?, otherDark: Boolean): String {
         val separator = ctx.getString(R.string.layout_list_separator)
@@ -520,7 +423,6 @@ object ThemeLayoutsToList {
         return lines.joinToString("\n")
     }
 
-    // a slot's or a panel's name as 外观 → 布局 says it
     private fun userName(ctx: Context, user: String): String = ctx.getString(
         when (user) {
             InputMethodCatalog.PINYIN -> R.string.layout_im_pinyin
@@ -532,7 +434,6 @@ object ThemeLayoutsToList {
         },
     )
 
-    // [file] there, empty, on the disk
     private fun written(file: File) {
         file.parentFile?.mkdirs()
         FileOutputStream(file).use { it.fd.sync() }

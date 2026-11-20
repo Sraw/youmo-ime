@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.dicttool
 
-/**
- * The strings of a JSON array of strings, as LCCC has a conversation a line
- * (`["你 好", "好 久 不见"]`); anything else in the line is an error.
- */
+/** The strings of a JSON array of strings, as LCCC has a conversation a line; anything else is an error. */
 object JsonStrings {
 
     /** [strings] as such an array, what [parse] reads back. */

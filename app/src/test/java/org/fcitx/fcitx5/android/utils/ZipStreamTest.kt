@@ -18,7 +18,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
-/** Themes, tables and backups are zips the user picked: none may write outside the directory they are extracted to. */
+/** User-picked zips: none may write outside the directory they are extracted to. */
 class ZipStreamTest {
 
     @get:Rule
@@ -91,7 +91,7 @@ class ZipStreamTest {
     fun theCheckSeesEachEntrysCountItsSizeAndTheTotalBefore() {
         val seen = mutableListOf<Triple<Int, Long, Long>>()
         zip("a" to "12345", "d/" to null, "b" to "").use { it.extract(dest) { c, s, t -> seen += Triple(c, s, t) } }
-        // before each entry (size 0) and after each chunk; a directory is an entry of the count too
+        // before each entry and after each chunk; a directory counts as an entry
         assertEquals(listOf(Triple(1, 0L, 0L), Triple(1, 5L, 0L), Triple(2, 0L, 5L), Triple(3, 0L, 5L)), seen)
     }
 
@@ -112,14 +112,14 @@ class ZipStreamTest {
         }
         assertEquals(setOf("a", "b"), top.map { it.name }.toSet())
         assertEquals(setOf("a", "b"), dest.list()!!.toSet())
-        // the folder's file read through the check (a zip bomb in one is stopped as at the top), not kept
+        // a nested file is read through the check (a zip bomb there is stopped), not kept
         assertEquals(
             listOf(Triple(1, 0L, 0L), Triple(1, 2L, 0L), Triple(2, 0L, 2L), Triple(3, 0L, 2L), Triple(3, 3L, 2L), Triple(4, 0L, 5L), Triple(4, 1L, 5L)),
             seen,
         )
     }
 
-    // a theme 4.0 pack's: its top and layouts/ unpacked, the rest counted and metered, every name told
+    // a 4.0 pack's top and layouts/ unpacked, the rest counted and metered, every name told
     @Test
     fun keepPicksWhatIsUnpackedAndEveryNameIsTold() {
         val names = mutableListOf<String>()
@@ -140,7 +140,7 @@ class ZipStreamTest {
         assertThrows(IllegalStateException::class.java) {
             zip("big" to big).use { z -> z.extract(dest) { _, size, _ -> check(size <= DEFAULT_BUFFER_SIZE) } }
         }
-        // the zip's reader hands out chunks of up to a buffer: none past the limit reaches the disk
+        // the reader hands out chunks of up to a buffer: none past the limit reaches the disk
         assertTrue(File(dest, "big").length() <= DEFAULT_BUFFER_SIZE)
     }
 }

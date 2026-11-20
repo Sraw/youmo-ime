@@ -81,7 +81,7 @@ class DefaultMarksTest {
     }
 
     // a user's layout's key of the app's name is the app's key: its long press and corner the app's board's node's,
-    // whatever letters it writes; a name of its own, what it writes (L6 review S2)
+    // whatever letters it writes; a name of its own, what it writes
     @Test
     fun aUsersKeyOfTheAppsNameIsTheAppsKey() {
         val mine = testData("k18.xml").replaceFirst("id=\"k18\"", "id=\"my-k18\" based-on=\"k18\"")

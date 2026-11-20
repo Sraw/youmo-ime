@@ -27,11 +27,7 @@ import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
 import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
 import org.fcitx.fcitx5.android.ui.main.settings.search.SearchablePage
 
-/**
- * The bar's buttons ([ToolbarConfig]) in one list: dragged to order, checked to show; the
- * divider, dragged too, parts the toolbar's from those always at the bar's right. Saved as
- * each changes. The menu key and ⋯ are fixed, not listed.
- */
+/** Dragged to order, checked to show; the divider parts the toolbar's from those always at the bar's right. */
 class ToolbarButtonsFragment : Fragment(), OnItemChangedListener<Item> {
 
     private val pref get() = AppPrefs.getInstance().internal.toolbarButtons
@@ -78,7 +74,6 @@ class ToolbarButtonsFragment : Fragment(), OnItemChangedListener<Item> {
         return ui.root
     }
 
-    /** The bar as it always was ([ToolbarConfig.DEFAULT]), the list with it. */
     @VisibleForTesting
     internal fun reset() {
         pref.setValue("")
@@ -86,7 +81,7 @@ class ToolbarButtonsFragment : Fragment(), OnItemChangedListener<Item> {
         ui.addItems(ToolbarConfig.DEFAULT.items)
     }
 
-    // shown before the first unlock too: copied there as the page is left, as the other pages do
+    // shown before the first unlock too: copied there as the page is left
     override fun onStop() {
         AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()

@@ -7,13 +7,8 @@ package org.fcitx.fcitx5.android.scene.look
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 
 /**
- * All a theme draws the keyboard with (theme file 3.0): its colours, its picture, what is under the
- * keyboard and the bar, the keys' shape and faces, single keys' own faces, and the fonts. The app
- * reads and writes it as json, the theme maker on the web the same; files are named, not held: a
- * name is a file in the theme's directory (the app keeps absolute paths in memory, [mapFiles]).
- *
- * Every range is checked as it is made, so a file out of range does not read, as a field it does not
- * know does not: the import fails with the reason, not a keyboard drawn wrong.
+ * All a theme 3.0 draws the keyboard with. Every range is checked as it is made, so a file out of range does not read:
+ * the import fails with the reason instead of drawing a keyboard wrong.
  */
 data class ThemeLook(
     val palette: Palette,
@@ -24,13 +19,11 @@ data class ThemeLook(
     val text: Text,
 ) {
     init {
-        // what shows the picture needs one
         require(picture != null || (base !is BoardBase.Picture && bar !is BarBase.Picture && !keys.showsPicture())) {
             "the picture is shown but there is none"
         }
     }
 
-    /** The files the look names, each once, in the order the json has them. */
     fun files(): List<String> {
         val out = LinkedHashSet<String>()
         picture?.let {
@@ -51,10 +44,7 @@ data class ThemeLook(
         return out.toList()
     }
 
-    /**
-     * The blurs the picture is shown at, dp: under the keyboard, under the bar, in the keys (the kinds' and
-     * single keys'); none without a picture. What is decoded ahead when the theme is picked.
-     */
+    /** Decoded ahead when the theme is picked. */
     fun pictureBlurs(): Set<Int> {
         val p = picture ?: return emptySet()
         val out = LinkedHashSet<Int>()
@@ -65,7 +55,7 @@ data class ThemeLook(
         return out
     }
 
-    /** The same look with every file name put through [f]: names to paths as read, paths to names as written. */
+    /** Names to paths as read, paths to names as written. */
     fun mapFiles(f: (String) -> String): ThemeLook = copy(
         picture = picture?.let {
             it.copy(
@@ -87,11 +77,7 @@ data class ThemeLook(
     )
 }
 
-/**
- * A theme's colours, 0xAARRGGBB. The first 21 are those of theme file 2.1; the three after them came
- * with 3.0, each what was drawn in its place before: the border in the shadow's colour, a key's
- * corner text and the toolbar's icons in the function keys' text colour.
- */
+/** The three after theme 2.1's 21 came with 3.0, each what was drawn in its place before. */
 data class Palette(
     val backgroundColor: Int,
     val barColor: Int,
@@ -119,22 +105,15 @@ data class Palette(
     val toolbarIconColor: Int = altKeyTextColor,
 )
 
-/** A rectangle of an image, in its pixels. */
 data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
-/** One orientation's cut of the picture: [file] the cut, [cropRect] where in the source it is (null: the whole), turned by [rotation]. */
 data class Crop(val file: String, val cropRect: Box?, val rotation: Int) {
     init {
         require(rotation % 90 == 0 && rotation in 0..270) { "rotation $rotation is not a quarter turn" }
     }
 }
 
-/**
- * The theme's picture: [src] as picked, cut once for portrait and once for landscape ([landscape]
- * null: the portrait cut, centre cropped, as before 3.0), at [brightness] percent, blurred [blurDp].
- * [animated]: a theme 4.0's animated `<picture>` (060-render-p3 A4), [src] the animated WebP the keyboard
- * plays, centre cropped, [blurDp] not drawn while it plays; the cuts its still picture. No 3.0 file has one.
- */
+/** [animated]: theme 4.0's animated `<picture>`, [blurDp] not drawn while it plays; the cuts are its still picture. */
 data class Picture(
     val src: String,
     val portrait: Crop,
@@ -149,14 +128,12 @@ data class Picture(
     }
 }
 
-/** Under the whole keyboard, the bar and the keys: the palette's colour, or the picture. */
 sealed interface BoardBase {
     data object Color : BoardBase
 
     data object Picture : BoardBase
 }
 
-/** Under the candidates and the toolbar: the keyboard's base seen through, the palette's bar colour, or the picture's part there. */
 sealed interface BarBase {
     data object Transparent : BarBase
 
@@ -170,11 +147,6 @@ sealed interface BarBase {
     }
 }
 
-/**
- * An image stretched to any size: its [insets] (source pixels, left top right bottom) are corners
- * and edges kept as they are, the middle stretched; all four 0, the whole image stretched. [pxPerDp]
- * is how many of its pixels make a dp, the scale its corners are drawn at.
- */
 data class NineSlice(val file: String, val insets: Insets, val pxPerDp: Int) {
     init {
         require(pxPerDp in 1..MAX_PX_PER_DP) { "pxPerDp $pxPerDp out of 1..$MAX_PX_PER_DP" }
@@ -183,7 +155,6 @@ data class NineSlice(val file: String, val insets: Insets, val pxPerDp: Int) {
     companion object {
         const val MAX_PX_PER_DP = 8
 
-        /** A key image's longest side, px, as the app takes one in (ThemeAssetLimits): no inset is past it. */
         const val MAX_SIDE = 1024
     }
 }
@@ -193,11 +164,9 @@ data class Insets(val left: Int, val top: Int, val right: Int, val bottom: Int) 
         require(left >= 0 && top >= 0 && right >= 0 && bottom >= 0) { "negative insets" }
     }
 
-    /** No corners: the image stretched whole. */
     val isZero get() = left == 0 && top == 0 && right == 0 && bottom == 0
 }
 
-/** A key's face: its kind's colour from the palette, an image, or the picture's part where the key is. */
 sealed interface KeyFill {
     data object Color : KeyFill
 
@@ -211,7 +180,6 @@ sealed interface KeyFill {
     }
 }
 
-/** A key's face while pressed: its own face darkened (the palette's press highlight over it), a colour, an image. */
 sealed interface KeyPressed {
     data object Darken : KeyPressed
 
@@ -220,7 +188,6 @@ sealed interface KeyPressed {
     data class Image(val slice: NineSlice) : KeyPressed
 }
 
-/** The four kinds of keys a theme styles apart. */
 enum class KeyKind { Letter, Function, Space, Enter }
 
 data class KindStyle(val fill: KeyFill, val pressed: KeyPressed) {
@@ -231,48 +198,31 @@ enum class PressEffect { Tint, Ripple }
 
 enum class KeyLabel { Show, Hide }
 
-/** One key's own face over its kind's: what is null is its kind's; [label] Hide when the image has the text already. */
 data class KeyOverride(val fill: KeyFill?, val pressed: KeyPressed?, val label: KeyLabel)
 
-/**
- * The room round each key, dp, portrait and landscape: inside the key's cell, so a key is pressed where its gap is too.
- * At the keyboard height 紧凑 the room above and below is [vCompact] and [vLandCompact] (the user, 2026-11-06: the
- * rows closer, the keys taller in the same height); across, the keyboard is as wide as ever, so it is the same.
- */
+/** Inside the key's cell, so a press on the gap is the key's. */
 data class Gap(val h: Int, val v: Int, val hLand: Int, val vLand: Int) {
     init {
         require(listOf(h, v, hLand, vLand).all { it in 0..MAX_GAP_DP }) { "gap out of 0..$MAX_GAP_DP" }
     }
 
-    /** [v] at 紧凑: [compact]. */
     val vCompact: Int get() = compact(v)
 
-    /** [vLand] at 紧凑: [compact]. */
     val vLandCompact: Int get() = compact(vLand)
 
     companion object {
         const val MAX_GAP_DP = 24
 
-        /**
-         * What of the room above and below a key is left at 紧凑, percent. One share for any gap, the theme's or
-         * the setting's, so a looser theme or level stays looser there too. 40 makes the default 7 dp 3 (as
-         * wide as the 3 dp across), keys some 8 dp taller on a phone upright; chosen from emulator shots of
-         * 70, 55, 40 and 25 (design 060-key-spacing).
-         */
+        /** One share for any gap, so a looser theme stays looser at 紧凑 too. */
         const val COMPACT_V_PERCENT = 40
 
         private const val PERCENT = 100
 
-        /** [dp] at 紧凑: [COMPACT_V_PERCENT] of it, to the nearest dp (a half up); a gap there stays one, 1 dp at least. */
         fun compact(dp: Int): Int = if (dp <= 0) 0 else maxOf(1, (dp * COMPACT_V_PERCENT + PERCENT / 2) / PERCENT)
     }
 }
 
-/**
- * The keys: [blocks] drawn as blocks, or flat (no face; the space a bar, Return a circle); the
- * shape; [press] how a press shows; each kind's style; [overrides] single keys' by name ([KeyNames.split]:
- * `qwerty/q`, `*`/backspace). A name of a board or key this build does not know is kept, not used.
- */
+/** An unknown board or key name is kept, not used. */
 data class Keys(
     val blocks: Boolean,
     val radiusDp: Int,
@@ -310,15 +260,10 @@ data class Keys(
         const val MAX_BORDER_DP = 3
         const val MAX_SHADOW_DP = 3
 
-        /** The single keys a theme may style at most (an import refuses more: the app's ThemeAssetLimits). */
         const val MAX_OVERRIDES = 400
     }
 }
 
-/**
- * The fonts (file names; null the system's), their weights (300, 400, 700) and the keys' text size,
- * percent of each key's own.
- */
 data class Text(
     val keyFont: String?,
     val candidateFont: String?,

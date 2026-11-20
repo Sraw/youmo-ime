@@ -51,7 +51,7 @@ class ClipboardEditActivity : Activity() {
     private fun finishEditing(copy: Boolean = false) {
         val str = editText.str
         val id = entryId
-        // the app's scope, not this one: onDestroy cancels it right after finish(), losing the edit and the copy
+        // the app's scope: onDestroy cancels this one right after finish(), losing the edit
         launchOutlivingPage("clipboard edit") {
             ClipboardManager.updateText(id, str)
             if (copy) {
@@ -105,12 +105,7 @@ class ClipboardEditActivity : Activity() {
     }
 }
 
-/**
- * Runs [copy], handing [onRefused] what the clipboard service throws for a clip it does not take:
- * one too big for a binder transaction comes as a RuntimeException around a
- * TransactionTooLargeException. That is the user's text, not a bug, so it is shown, not left to
- * the crash handler past [launchOutlivingPage], which would take the keyboard down with the app.
- */
+/** A clip too big for a binder transaction is the user's text, not a bug: shown, not crashed on (which takes the keyboard too). */
 internal fun copyingClip(onRefused: (RuntimeException) -> Unit, copy: () -> Unit) {
     try {
         copy()

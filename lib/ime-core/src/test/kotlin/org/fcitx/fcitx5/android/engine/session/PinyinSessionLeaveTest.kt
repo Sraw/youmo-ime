@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.junit.Assert.assertEquals
@@ -17,25 +18,16 @@ import java.nio.ByteBuffer
 class PinyinSessionLeaveTest {
 
     // 你 and 好 alone: nihao reads only as 你好, whole
-    private val data = PinyinData.load(
-        ByteBuffer.wrap(
-            PinyinDataBuilder()
-                .unigram("<unk>", -7f, 0f)
-                .unigram("你", -2f, 0f)
-                .unigram("好", -2.5f, 0f)
-                .entry("你", syl("ni"))
-                .entry("好", syl("hao"))
-                .build().toByteArray(),
-        ),
+    private val data = pinyinDataOf(
+        Triple("你", "ni", -2f),
+        Triple("好", "hao", -2.5f),
     )
 
     private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.last()
 
     @Test
     fun aKeyNotReadKeepsWhatTheFirstCandidateLeavesAsTyped() {
-        // every reading of it all coarse, held past the first page: the first, 啊, reads only a
-        // (a phrase no longer moves the decoder's of its text: impl/PLAN.md §2.7). The five are words of
-        // lattice/coarse.txt (CoarseWords.LIST): one taken off that list puts its reading first here
+        // held past the first page; the five are lattice/coarse.txt's words
         val held = listOf("屄", "骚屄", "嫩屄", "肉棒", "鸡巴").mapIndexed { i, w -> Triple(w, -0.1f * (i + 1), "bi") }
         val coarse = PinyinData.load(
             ByteBuffer.wrap(

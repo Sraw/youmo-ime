@@ -9,7 +9,7 @@ compiled is not done.
 | Layer | Where | Run | For |
 |---|---|---|---|
 | ime-core unit tests | `lib/ime-core/src/test` | `./gradlew :lib:ime-core:check` (tests + animal-sniffer + Kover floors) | every decision and the whole engine; milliseconds each |
-| Drawing engine tests | `lib/keyboard-scene/src/commonTest` | `./gradlew :lib:keyboard-scene:check` (the same tests on the JVM and in node, animal-sniffer, Kover floors 90/60) | parsing, cascade, placement, hit, marks; scene snapshots in `src/commonTest/data/snapshots` (and the texts `ThemeWriter` and `LookTheme` write, in `data/writer` and `data/look-theme`), written by `jvmTest -Psnapshots.record=true` and compared on both targets, so JVM and JS must agree |
+| Drawing engine tests | `lib/keyboard-scene/src/commonTest` | `./gradlew :lib:keyboard-scene:check` (the same tests on the JVM and in node, animal-sniffer, Kover floors 90/60) | parsing, cascade, placement, hit, marks; scene snapshots in `src/commonTest/data/snapshots` (qwerty in every form, the other boards in block, split and landscape; `SnapshotTest.noBoardWarnsInAnyForm` draws every board in every form; the layout maker's examples in block only) (and the texts `ThemeWriter` and `LookTheme` write, in `data/writer` and `data/look-theme`), written by `jvmTest -Psnapshots.record=true` and compared on both targets, so JVM and JS must agree |
 | App JVM tests | `app/src/test` | `./gradlew :app:testDebugUnitTest` | glue that needs Android types: Robolectric where the framework is reached; the scene's wiring key by key against `app/src/test/resources/wiring/`, recorded from the old keys by `WIRING_RECORD=1 ./gradlew :app:testDebugUnitTest --tests '*SceneWiringTest' --tests '*NineSceneGesturesTest'` |
 | App JVM tests at minSdk | `app/src/test` | `./gradlew :app:testDebugUnitTestAt29` | the same tests at SDK 29, Android 10, which must keep working (below) |
 | Engine UAT replay | `lib/ime-eval/src/uatTest` | `./gradlew :lib:ime-eval:uatTest` (not in `check`) | the uat/ cases whose 预期 is what the engine types, through `Engines` with the app's own data: needs `:app`'s data tasks (minutes the first time), and a 2 GB heap; no network (its named keys are held to the host's `KeySyms`, which `KeySymsGoldenTest` holds to fcitx) |
@@ -223,15 +223,7 @@ hangs on words typed; a history from the tree is `ime-eval history <pinyin.data>
 
 Roborazzi goldens (`app/src/test/screenshots/`) show the bar with its microphone and the space's
 voice hint: since 0.6.0 there is one build, and voice is everyone's default (the voice pack's absence
-is a notice, not a hidden button). `app/src/test/baseline-060` is the old drawing's record (the key
-views, drawn as the text build did), kept for 060's P3; S8a deleted the views and the test that drew it.
-`ThemeBaselineCompareTest` draws its 432 pictures again with the scene engine (about 40 s) and compares each where
-it lies in the input view: a pixel differs when a channel is off by more than 24, and a picture's share of
-different pixels may not exceed its line in `baseline-060/limits.tsv` by more than 0.2 points (a ratchet).
-A line over 1.5% (注音大千 2%) says why: `5.3: …` for what P2 accepted, or what else it is (a test
-theme's own font, a rounding). `-PthemeBaseline.tighten=true` lowers the lines to what is drawn now (never raises one: that
-is an edit with its reason) and prints the rows drawn worse than their lines, for that edit. Each picture that differs is written to `app/build/theme-baseline-diff/`, the
-different pixels in red over the record in grey, with what is drawn now beside it (`.now.png`).
+is a notice, not a hidden button).
 
 The resource packs in JVM tests: `TestShelves` (app test sources) makes tiny packs signed with the
 committed test key (`TestPacks`, ime-core testFixtures) and installs them through `PackStore.useShelf`;
@@ -331,7 +323,8 @@ AVD's snapshot), `run [--areas] [--ids] [--devices]` (`UAT_BUILD=release`: on th
 release APK, the debug package uninstalled first and installed back only for the cases that type into
 its `TypingHostActivity`; the canvas is the app's default, so no switch is written), `mark` (a visual case after its sheet is seen). One
 script per case file (`uat/scripts/<file>.py`; handwriting's strokes in `hw_strokes.py`); a case in a
-.md with no script is reported blocked (没有脚本), never left out; a case whose `needs=` names another
+.md with no script is reported blocked (没有脚本), never left out, unless it has a **JVM** line: then it is a
+`jvm:` case, its tests the ones carrying its `@Uat`; a case whose `needs=` names another
 place (a run without the voice pack, a release by hand, a real phone, the JVM) is listed as 在别处跑, not counted
 as skipped. The UI is read back by a resident `Dumper.java`, which waits for the screen to settle, so
 the runner polls for what it waits on rather than sleeping; visual cases go on contact sheets, reviewed
@@ -347,13 +340,14 @@ Details in `uat/README.md`.
 
 Release gates 2 and 3 of the host replacement (0.4.0) (in-place upgrade from the `uat/fixtures/upgrade`
 releases, backups both ways with them) are one command each, `uat/gates/gates.py upgrade|backups`, run
-before every release from 0.6.1 (DECISIONS.md B14), each on uat.py's emulator of its own (`--port`,
+before every release from 0.6.1 (DECISIONS.md B14; gate 2 is paused, see below), each on uat.py's emulator of its own (`--port`,
 default 5560, up from the clean snapshot and down after); the new build gets the text pack after the
 fixture's files are in place. Results in `uat/runs/` (`uat/gates/README.md`). A `.debug` build is
 upgraded by putting the fixture's files into its own directories and gets backups retargeted to its id;
 the release APK is upgraded with `install -r`. Gate 5 (start, latency, memory side by side) is gone:
 `uat/tools/perf.py` measures that. `uat/fixtures/upgrade/make.py` still exits (made for redroid): the
-fixtures are the ones it made on 0.3.x/0.4.0.
+fixtures are the ones it made on 0.3.x/0.4.0, an in-place upgrade this build no longer supports, so gate 2
+is paused till there are 0.5.x fixtures.
 
 ## The testbed app (`:testbed`)
 
@@ -375,61 +369,40 @@ In 0.5.x the app and the user docs did not link the page; from 0.6.0 they do (�
 Its tests below run either way: the app reads the same format.
 UAT cases that need a theme file take `from-app.theme` from this directory and rewrite it in python (as `push_theme` does), as each says.
 
-The theme maker page draws its preview by the app's rules and reads and writes its theme files, so
-the app makes the files its tests read: `rules.json` (`ThemeMakerRulesTest`: `KeyFaceGeometry`,
-`NineSliceLayout`, `PictureWindow`, `BoxBlur`, `KeyStyleResolver`, `KeyImageBudget` and the 2.1 →
-3.0 migration over fixed cases), `theme.json` (a 3.0 theme with everything), `from-app.theme` and
-`from-app-2.1.theme` (an export of this app's and of one before 3.0), `youmo-layout.json` and
-`youmo-icons.json` (`ThemeMakerLayoutTest`: the real keyboard measured under Robolectric on the
-page's four phones, both orientations, every board, normal / one-handed / floating, and the 26 keys
-typing, long-pressed and showing the clipboard; each key's cell, kind and theme name, each text,
-icon and fill with the palette field it is drawn in, read off a probe theme whose 24 colours all
-differ; the format's key names; the icons' vector paths). The layout test also writes the two into
-the page's `<script type="application/json" id="youmo-layout">` / `id="youmo-icons"` blocks, so
-the page needs no build. Each test compares its file with
-the repo's and fails on a difference;
-`./gradlew :app:testDebugUnitTest --tests '*ThemeMakerRulesTest' --tests '*ThemeMakerLayoutTest' -PupdateThemeMaker`
-writes them again, and the page's own test then shows what it must follow.
-
-The four phones, their short names (`label`, the select's) and the phones named as examples
-(`examples`, a line under the select; long, inside the select they widened the preview on a phone)
-are `ThemeMakerLayoutTest.phones`'s, the user's choice. Every phone has the full set of views: the
-page falls back to none of another phone's, and the node test holds each phone's views to the
-default's. So the page is about 1.5 MB, the layout block most of it (4 phones × 43 views); a fifth
-phone adds about 0.3 MB. The page's layout rule, also the user's: one scroll, the page's (no column
-scrolls in itself, no `overflow`/`max-height` on one), and the preview stays in view only while it
-fits (`fitPreview` in classic/ui.js: the window's height wide, 55% of it narrow).
+The theme maker page reads the app's theme files (a 3.0 one it opens and makes 4.0), so the app makes
+the files its tests read (`ThemeMakerRulesTest`): `migration.json` (a 2.1 theme, a whole one and one
+missing what an older 2.1 left out, and each brought to 3.0 as the app brings it), `theme.json` (a 3.0
+theme with everything), `from-app.theme` and `from-app-2.1.theme` (an export of this app's and of one
+before 3.0). Each test compares its file with the repo's and fails on a difference;
+`./gradlew :app:testDebugUnitTest --tests '*ThemeMakerRulesTest' -PupdateThemeMaker` writes them again,
+and the page's own test then shows what it must follow.
 
 The page's side: `node --test web/theme-maker/test/format.test.mjs` (Node 24; CI's unit test job and
-the Pages workflow run it) loads the page's `youmo-lib` block as the page runs it and holds it to
-each `rules.json` case (Float maths with `Math.fround`, the blur to the pixel), reads `theme.json`
-and both `from-app` theme files, and builds `from-web.theme` from `theme.json` (the app's PNGs of
-`from-app.theme` under its names, and `tiny.ttf`, a 1 KB font of square glyphs made by
-`make-tiny-font.py`), comparing it byte for byte; `UPDATE=1 node --test …` writes it again.
+the Pages workflow run it) loads `src/lib.js` as the page runs it and holds it to `migration.json`
+(2.1 → 3.0 as the app does it), reads `theme.json` and writes it again as the app writes it, opens both
+`from-app` theme files and refuses what the app's import refuses (the zip's limits, names, image sizes).
+`from-web.theme` is the 3.0 file of `theme.json` the maker before 0.6.0 exported (that page is gone since
+0.6.3; the file stays as it was).
 `ThemeMakerFormatTest` (app JVM) closes the loop: `from-web.theme` imports as `theme.json`, and an app
-export of it imports the same; and the pages' generated blocks (`youmo-format`: the
-file's version, every type's fields from `ThemeFileJson`'s descriptors, the limits, the defaults;
-`youmo-presets`: the eleven built-in palettes) are what the app has, through
-`ThemeMakerTestdata.block`, which `-PupdateThemeMaker` lets write them, each to
-`web/theme-maker/generated/<id>.json` (in git; the pages read them from there). `youmo-layout` and
-`youmo-icons` are `ThemeMakerLayoutTest`'s the same way, and the page's test holds them to what the
-preview reads (format 1: views of items, every key name one `KeyNames` knows, every colour a palette
-field, every icon there). The test task takes `web/theme-maker` as an
+export of it imports the same; and the maker's generated block `youmo-format` (the file's version, every
+type's fields in the order written, held to what keyboard-scene's `ThemeLookReader` reads and its
+`ThemeLookWriter` writes: each field there, none left out, none more, every kind of each sealed type and
+every value met; the limits; the defaults) is what the app has, through `ThemeMakerTestdata.block`, which
+`-PupdateThemeMaker` lets write it, to `web/theme-maker/generated/<id>.json` (in git; the pages read
+them from there). The test task takes `web/theme-maker` as an
 input, so a change to the page reruns it. Nothing in those blocks is edited by hand.
 
-Two pages (060-render-p3 M1): `index.html`, the maker (`src/`: `page.html` with slots for the rest,
+Two pages: `index.html`, the maker (060-render-p3 M1) (`src/`: `page.html` with slots for the rest,
 `style.css`, `maker.js`: the document, held to the engine by `test/maker.test.mjs`, `form.js` and
 `panels/*.js`: the editing's forms (M2: one file a tab, put in as one script in their names' order),
-held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `classic/index.html`, the maker before 0.6.0, kept till 0.6.x ends (`src/classic/`: its
-`page.html`, `style.css`, `ui.js`), and `examples/` (`examples.json` and a folder of each example, put in the
-maker's `youmo-examples` block); and `layout/index.html`, the layout maker (061-custom-layout §12; `src/layout/`: its `page.html`, `style.css`, `layout-maker.js`, `layout-edit.js`, `ui.js`, with the maker's engine, `lib.js`, the theme file's format, `form.js` and `maker.js`: a `.theme` opened is read as the maker reads it), its examples `examples/layouts/` (`layouts.json` and a `.layout` each, put in its `youmo-layout-examples` block as they are, with `name=` as the label; `ExampleLayoutsTest` in keyboard-scene checks each clean and holds its scenes, upright, turned, compact and split, the number one in each of its pads, to `src/commonTest/data/example-layouts/` on the JVM and in node). The maker, classic and the layout maker run `src/lib.js` (everything the tests hold to the app's
-3.0 rules and zip). None of the three pages is in git (R25 B12): `node web/theme-maker/tools/assemble.mjs` makes
+held to the engine by `test/form.test.mjs`, `ui.js`: the page), and `examples/` (`examples.json` and a folder of each example, put in the
+maker's `youmo-examples` block); and `layout/index.html`, the layout maker (061-custom-layout §12; `src/layout/`: its `page.html`, `style.css`, `layout-maker.js`, `layout-edit.js`, `ui.js`, with the maker's engine, `lib.js`, the theme file's format, `form.js` and `maker.js`: a `.theme` opened is read as the maker reads it), its examples `examples/layouts/` (`layouts.json` and a `.layout` each, put in its `youmo-layout-examples` block as they are, with `name=` as the label; `ExampleLayoutsTest` in keyboard-scene checks each clean and holds its scenes, upright, turned, compact and split, the number one in each of its pads, to `src/commonTest/data/example-layouts/` on the JVM and in node). The maker and the layout maker run `src/lib.js` (everything the tests hold to the app's
+3.0 file and zip). Neither page is in git (R25 B12): `node web/theme-maker/tools/assemble.mjs` makes
 them from their sources (`web/theme-maker/.gitignore` keeps them out): the sources put in, each page's
 generated blocks read from `generated/<id>.json` (each carries only the ones its `page.html` has a slot
-for: the maker `youmo-format`, `youmo-engine-icons` and `youmo-examples` (from `examples/`), classic
-`youmo-format`, `youmo-presets`, `youmo-layout`, `youmo-icons` and no engine, the layout maker `youmo-layout-examples`, `youmo-format`,
+for: the maker `youmo-format`, `youmo-engine-icons`, `youmo-bar-icons` and `youmo-examples` (from `examples/`), the layout maker `youmo-layout-examples`, `youmo-format`,
 `youmo-engine-icons` and the engine), and the
-Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker, two on classic, seven on the layout maker;
+Content-Security-Policy's `script-src` set to each script's SHA-256 (six on the maker, seven on the layout maker;
 nothing else runs, a script not hashed is refused). The pages' tests (`maker.test.mjs`, `layout-maker.test.mjs` for the layout page) assemble them in memory and fails
 when a generated block is missing or the CSP's hashes are not its scripts'. Commit `src/` and
 `generated/`; CI, the tests and `dev/serve.mjs` assemble the pages.
@@ -447,7 +420,7 @@ not know, comments and spacing kept), the engine reads every result, and the cas
 (`YoumoEngine.sources`, `Cascade.sources`) names the style each value comes from; the forms write numbers within the engine's bounds (`YoumoEngine.limits`), and an icon the app would refuse (a PNG, an SVG past `SvgSubset`, which the engine's `readIcon` runs) is named and blocks the save. `from-maker.theme` and `from-maker-picture.theme` (the panels' save: a real PNG cut for each orientation, see-through keys, a gradient, an SVG icon) are
 its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
-`fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `classic/index.html` and `layout/index.html` beside it) with `assemble.mjs --engine <file>`; the workflow fails where the layout page lacks its script, its examples or its engine.
+`fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `layout/index.html` beside it) with `assemble.mjs --engine <file>`; the workflow fails where the layout page lacks its script, its examples or its engine.
 `test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine, a `.theme`'s boards offered as the app's import makes them (`themeBoards`), and its size to 2,100,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser in a 1400 px wide window (`cdp.mjs`) and at 360 px: new from a base and from each example, editing, save, help, a `.theme` opened (its theme the preview's, a board of it started from).
 
 ### The engine in the page (060-render-p3 W1)
@@ -482,7 +455,7 @@ What holds the library to the app:
   with format.test.mjs) builds every snapshot through the facade from shots.json and compares
   `scene.text()` with it, converts look-3.0.json, writes a theme, reads layouts with and without
   their fragments, and paints each scene of `testdata/paint.txt` on a recording 2D context.
-- `paint.txt` and `engine-icons.json` are the app's `EnginePaintTest` (Robolectric, NATIVE graphics):
+- `paint.txt` is the app's `EnginePaintTest` (Robolectric, NATIVE graphics):
   ScenePainter's calls on a recording Canvas for 20 shots, normalized to device pixels to a tenth
   (fills, fills less a shape, blurs as their sigma, strokes, text with its weight, size, squeeze,
   spacing, stroke and shadow, icons by name, clips); the node test compares them line for line, a
@@ -552,9 +525,9 @@ the number pad, the symbol picker, emoji, kaomoji, emoji search and the expanded
   (when a line is dropped; the `@3` marks), `DowngradeTo060Test` (0.6.0's own reading of `key_lists` and `key_swipes`,
   frozen: a marked list its defaults never written over, a `vtext:` slot its default, the rest kept), `KeyResolverMarksTest`
   (an item of variables filled in and filled in again as picked, an item as it is only where punctuation converts it),
-  `KeyListsMigrationTest` (0.5.2, beta1, beta2 prefs in
-  `lib/ime-core/src/test/resources/keys-migration/` to `@1`, twice the same; `upgrade`'s `@1` → `@2` cases), app `KeyListsUpgradeTest` (0.5.2, beta2 and
-  beta3 `@1` backups built in memory, `v052()`, `beta2()`, imported through `UserDataManager.import`, restarted, reset, and
+  `KeyListsMigrationTest` (0.5.2 and beta1 prefs in
+  `lib/ime-core/src/test/resources/keys-migration/` to `@1`, twice the same; `upgrade`'s `@1` → `@2` cases), app `KeyListsUpgradeTest` (0.5.2
+  backups built in memory, `v052()`, imported through `UserDataManager.import`, restarted, reset, and
   before the first unlock; `uat/fixtures/upgrade/` holds only v0.3.x and v0.4.0 backups).
 - The web page and the app agree: keyboard-scene `DefaultMarksTest` compares `DefaultMarks.of` for every built-in
   layout with `src/commonTest/data/default-marks/<layout>.json` on the JVM and in node (recorded with
@@ -576,7 +549,7 @@ regenerate without a checkout of fcitx:
 - Key symbols: `lib/ime-core/tools/keysyms-gen.py` downloads fcitx5's `keydata.h`, `keynametable.h`,
   `keynametable-compat.h` and `keysymgen.h` at 442edbc9 (SHA-256 pinned) and
   writes the committed `host/KeySymUnicodeTable.kt`, `host/KeySymNameTable.kt` and `src/test/resources/keysyms/*.tsv` (what
-  `Key::keySymFromString`/`keySymToString`/`keySymFromUnicode`/`keySymToUnicode` return);
+  `Key::keySymFromString`/`keySymFromUnicode`/`keySymToUnicode` return);
   `KeySymsGoldenTest` runs `KeySyms` over every name, every keysym to 0xffff and every code point against them.
   Not part of the build; rerun by hand.
 - Quick input, Unicode and the INI rules: `lib/ime-core/tools/host-golden` and `tools/fcitx-ini` compile
@@ -590,7 +563,7 @@ regenerate without a checkout of fcitx:
   `lib/ime-eval/src/test/resources/opencc/golden.tsv.gz` (82,800 cases, 1.6 MB).
 - scel2org5: `uat/fixtures/scel/` holds `.scel` inputs and what the 0.3.2 release's `libscel2org5.so`
   writes for each, made on redroid by its `make.sh` (README there). The import now reads `.scel` in Kotlin
-  (`ImportFiles.Scel.textDictionary`); `ScelGoldenTest` holds it to these byte for byte, the two broken files
+  (`ImportFiles.Scel.writeTextDictionary`); `ImportFilesTest` holds it to these byte for byte, the two broken files
   failing as `IOException`.
 
 ## Parity of the two hosts (history)

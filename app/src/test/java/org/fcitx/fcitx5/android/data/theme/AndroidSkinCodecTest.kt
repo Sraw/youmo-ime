@@ -18,7 +18,6 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.zip.CRC32
 
-/** A skin's images through Android's codec: written and read back as they were, one too large not decoded. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -37,7 +36,7 @@ class AndroidSkinCodecTest {
 
     @Test
     fun aHugeImageIsNotDecoded() {
-        // a header of 5000×5000 (25 M pixels): refused from its size alone
+        // refused from its size alone
         assertNull(AndroidSkinCodec.image(header(5000, 5000)))
         assertNull(AndroidSkinCodec.image("not an image".toByteArray()))
     }

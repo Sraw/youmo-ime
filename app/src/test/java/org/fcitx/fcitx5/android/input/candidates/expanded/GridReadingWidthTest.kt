@@ -32,11 +32,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
 
-/**
- * The expanded grid's width of a word with readings, which places it in its spans: measured as
- * CandidateItemUi draws it (a copy of its hint's baseline and the readings' floor), so a change to
- * one that the other misses, puts words in too few spans.
- */
+/** Measured as CandidateItemUi draws it (a copy of its hint's baseline and the readings' floor): a change missed by one puts words in too few spans. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class)
@@ -49,7 +45,6 @@ class GridReadingWidthTest {
 
     private val word = CandidateWord("", "银行", "", readings = listOf("yín", "háng"))
 
-    // what CandidateItemUi's text needs, in the grid's unit (a word's width over its text size, scaled by 候选字号)
     private fun drawn(bar: BarLook = SceneBar.of(ctx, TestThemes.PixelLight)): Float {
         val ui = CandidateItemUi(ctx, TestThemes.PixelLight, bar)
         ui.updateCandidate(word)
@@ -60,8 +55,6 @@ class GridReadingWidthTest {
 
     private val ctx get() = RuntimeEnvironment.getApplication()
 
-    // a hint's baseline in the bar's own height, the theme's `bar height=` in it (060-render-p3 T6b): the
-    // view's and the grid's alike, and the rows a bar's height each
     @Test
     fun theHintStandsInTheThemesBarHeight() {
         val grid = object : GridPagingCandidateViewAdapter(TestThemes.PixelLight) {}

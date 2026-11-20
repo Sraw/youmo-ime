@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.reading
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.phrase.CharInfoTest
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -14,13 +15,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** A held word's card (061-word-card.md §3.4): its reading as 候选词注音 writes it, a row for each Han character. */
+/** A held word's card: its reading as 候选词注音 writes it, a row for each Han character. */
 class WordCardTest {
 
     private val data = ReadingData.data
     private val readings = CandidateReadings(data, data.tones) { Predictor.charReadingsOf(data.dictionary, data.vocabulary) }
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     // [text] read as its session read it ([typed], else by its text), as Engines.card reads it
     private fun card(text: String, vararg typed: String): WordCard {

@@ -55,10 +55,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.Calendar
 import java.util.SimpleTimeZone
 
-/**
- * A function key's way as the settings page tells it: the scenes name it `fn/backspace`, the function tab by its
- * bare `backspace`; both read as the one name, a real keyboard's scene made. A table's roots fill its letters alone.
- */
+/** The scenes name a function key `fn/backspace`, the function tab bare `backspace`: both read as one name. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -81,7 +78,7 @@ class SwipeFatesTest {
         SceneBoard.measurerFor = null
     }
 
-    // ⌫'s 下滑 a long text, the keyboard low, the way at the bottom: far more than its corner holds
+    // a long text on ⌫'s 下滑 with the keyboard low: far more than its corner holds
     private fun setBackspace(): SwipeSlots {
         val k = AppPrefs.getInstance().keyboard
         prefs.set(k.swipeDownPosition, KeyMarkPosition.Bottom)
@@ -105,7 +102,7 @@ class SwipeFatesTest {
         }
     }
 
-    // a way set to 空 draws nothing: no fate, no note (never 画不下)
+    // 空 draws nothing: no fate, no note
     @Test
     fun aWaySetEmptyIsNotNoted() {
         setBackspace()
@@ -120,10 +117,10 @@ class SwipeFatesTest {
     @Test
     fun aTablesRootsFillItsLettersAloneNotTheFunctionKeys() {
         val slots = setBackspace()
-        // the roots fill a full keyboard alone: one not 紧凑 (setBackspace's 20% is)
+        // a table's roots fill only a full keyboard, not 紧凑
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 30)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 49)
-        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
         KeyboardHarness(TestThemes.PixelLight).start().use { h ->
             val page = SwipeFates.Page(h.service, listOf(wubi), mapOf(InputMethodCatalog.WUBI to KeyLabels.ROOTS.key))
             val seen = page.jobs(slots).map(SwipeFates::made)
@@ -133,7 +130,7 @@ class SwipeFatesTest {
         }
     }
 
-    // a layout of the user's an input method draws: its keyboard named by the layout's name (061-custom-layout §9, L6)
+    // a user layout's keyboard is named by the layout's name
     @Test
     @Uat("ST-187")
     fun aLayoutOfTheUsersIsNamedByItsName() {
@@ -150,9 +147,8 @@ class SwipeFatesTest {
             prefs.set(k.pinyinKeyboardLayout, "")
             k.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "my-qwerty")
             KeyboardHarness(TestThemes.PixelLight).start().use { h ->
-                val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
+                val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "En", "en")
                 val seen = SwipeFates.Page(h.service, listOf(KeyboardHarness.PINYIN, english), emptyMap()).jobs(slots).map(SwipeFates::made)
-                // pinyin's the layout's name, English's (the app's 26 keys) the app's: two keyboards, no input method's name after either
                 assertEquals(setOf("我的 26 键", h.service.getString(R.string.shortcut_page_full)), seen.map { it.label }.toSet())
             }
         } finally {
@@ -161,11 +157,10 @@ class SwipeFatesTest {
         }
     }
 
-    // R26 F8250: a cap of a key on no board the app reads (the user's layout it was on gone) fills its marks' variables in
-    // on the keys' clock (KeyClock), as the keyboard's corners, long press and swipes do: one minute for them all
+    // a cap of a key on no board the app reads fills its variables on the keys' clock (KeyClock), as the keyboard does
     @Test
     fun aCapOnNoBoardFillsItsVariablesInOnTheKeysClock() {
-        // the keys' clock half an hour off the device's: their minutes never the same while the test runs
+        // half an hour off the device's clock: their minutes never match during the test
         val minute = (Calendar.getInstance().get(Calendar.MINUTE) + HALF_HOUR) % HOUR
         val at = Calendar.getInstance(SimpleTimeZone(UTC8, "t")).apply { clear(); set(2001, Calendar.MARCH, 4, 9, minute) }.timeInMillis
         KeyClock.clock = object : LearnClock {
@@ -184,8 +179,7 @@ class SwipeFatesTest {
         }
     }
 
-    // R26 F8117: a cap of grouped keys based on the full keyboard (let in) is of the keys the keyboard draws them as, its own
-    // family's (KeyboardWindow: split as the letters only where it is of them), not of the board it takes its styles of
+    // grouped keys based on the full keyboard are sized as the keyboard draws them, not as the board they take styles of
     @Test
     fun aCapOfGroupedKeysBasedOnTheFullKeyboardIsOfItsOwnFamilysSize() {
         prefs.setStyle(KeyboardStyle.SPLIT)
@@ -198,7 +192,6 @@ class SwipeFatesTest {
             java.io.File(dir, "cross.xml").writeText(k18.replaceFirst("id=\"k18\"", "id=\"cross\" based-on=\"qwerty\""))
             CustomKeyboards.forget("cross")
             fun size(layout: String) = KeyCaps.board(ctx, "full/q", layout).let { listOf(it.width, it.split) }
-            // split as it is here, the letters and grouped keys apart
             assertNotEquals(size("qwerty"), size("k18"))
             assertEquals(size("k18"), size("cross"))
         } finally {
@@ -209,8 +202,7 @@ class SwipeFatesTest {
     @Test
     @Config(qualifiers = "w780dp-h380dp-land-440dpi")
     fun turnedZhuyinsNotesAreOfItsFiveRows() {
-        // a small phone turned at 很高: the letters' four rows give way to the app's 120 dp, 注音's five keep 36 dp each,
-        // as the keyboard has them (ImeRoomViewTest): the page's notes are of the keys as tall as there
+        // a small phone turned at 很高: the letters' rows give way to 120 dp, 注音's five keep 36 dp each (ImeRoomViewTest)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 60)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         val turned = KeyboardArea.screens(RuntimeEnvironment.getApplication()).second
@@ -218,7 +210,6 @@ class SwipeFatesTest {
         val five = SwipeFates.size(turned, "zhuyin", ImKeyboards.Layout.TEXT, 5.0).height
         assertEquals(turned.dp(5.0 * KeyboardHeightCap.MIN_ROW_DP), five)
         assertTrue("$four < $five", four < five)
-        // the rows the page asks the board of (SwipeFates.jobs), the keyboard's own
         KeyboardHarness(keyboards = ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)).start().use { h ->
             val board = KeyboardHarness.all(h.inputView).filterIsInstance<BaseKeyboard>().first { it.isShown }
             assertEquals(5.0, KeyboardWindow.rowUnits(board, ThemeManager.shownLook(ThemeManager.activeTheme)), 0.0)

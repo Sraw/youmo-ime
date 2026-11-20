@@ -7,18 +7,29 @@ package org.fcitx.fcitx5.android.core
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMaps
+import org.fcitx.fcitx5.android.engine.platform.Blobs
+import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.EnginesHost
+import org.fcitx.fcitx5.android.host.EngineHost
 import org.fcitx.fcitx5.android.host.PunctuationTable
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
+import java.util.concurrent.Executor
 
-/**
- * The Kotlin host on [side] (a [ScriptedEngine] for most), started and ready; as on a new install's
- * first run unless [firstRun] is false (a restart): AppPrefs outlives a test's sandbox, with the last
- * one's first run done. [beforeStart] is for what must see the first event (a collector of eventFlow,
- * which keeps no replay).
- */
+/** A real engine on small data (no user dictionary, warmed up on the caller's thread). */
+fun tinyEngineSide(home: File, blobs: Blobs, wrap: (Engines, EngineHost) -> EngineHost = { _, host -> host }) =
+    object : KotlinHost.EngineSide {
+        val engines = Engines(blobs = blobs, userDir = null, warmUps = Executor(Runnable::run))
+        override val host: EngineHost = wrap(engines, EnginesHost(engines))
+        override fun data() = HostConfig(File(home, "data"), writable = true)
+        override fun config() = HostConfig(File(home, "config"), writable = true)
+        override fun start() = Unit
+        override fun close() = Unit
+    }
+
+/** Started and ready; [firstRun] since AppPrefs outlives the sandbox. [beforeStart] for what must see the first event (eventFlow keeps no replay). */
 fun startedHost(side: KotlinHost.EngineSide, firstRun: Boolean = true, beforeStart: (KotlinHost) -> Unit = {}): KotlinHost {
     if (firstRun) AppPrefs.getInstance().internal.firstRun.setValue(true)
     return KotlinHost(appContext, side).apply {
@@ -28,32 +39,20 @@ fun startedHost(side: KotlinHost.EngineSide, firstRun: Boolean = true, beforeSta
     }
 }
 
-/**
- * [entries] as zh_CN's punctuation table of this host, started on a [ScriptedEngine] of [home]: the built-in table is
- * an app asset, not on the JVM's classpath, and no app path saves one since 0.6.1 (HostApi has no setter), so it is
- * put where a user's own table is read, under [home]'s data, and read again as fcitx's reload reads it.
- */
+/** The built-in table is an app asset, not on the JVM classpath, and no app path saves one: put where a user's is read, then reloaded. */
 suspend fun KotlinHost.putPunctuationTable(home: File, entries: List<PunctuationMapEntry>) {
     File(home, "data/${PunctuationMaps.DIR}/punc.mb.zh_CN").apply { parentFile!!.mkdirs() }
         .writeBytes(PunctuationTable.write(entries.map { PunctuationTable.Entry(it.key, it.mapping, it.altMapping) }))
     reloadConfig()
 }
 
-/**
- * A keyboard on [host] with the input context onBindInput activates made first: the harness starts
- * input without a binding, and focus needs one. Not started: the caller sets what it reads first.
- * [api]: what the keyboard calls, [host] or a wrapper of it; jobs wait for [host] to be up either way.
- */
+/** Activates onBindInput's context first: the harness starts input without a binding, and focus needs one. Not started. */
 fun keyboardOn(host: KotlinHost, api: HostApi = host) = KeyboardHarness(host = api, ready = host).also { h ->
     h.service.postFcitxJob { activate(1, "org.example.app") }
 }
 
-/**
- * What a [KotlinHost] told a case (its events, its notices), for the case to read. They come on the host's thread,
- * and not only within a case's own calls: its timers send too (on a first run the input method's name shown 30 ms
- * after the group is set, its panel and list sent again), so they are read as a copy taken under the lock. Iterated
- * as the host added to it, a synchronized list threw ConcurrentModificationException.
- */
+// events arrive on the host's thread, timers included, outside a case's own calls: read as a copy taken under the lock
+// (iterating a synchronized list while the host added to it threw ConcurrentModificationException)
 class HostLog<T> {
     private val items = ArrayList<T>()
 
@@ -63,6 +62,5 @@ class HostLog<T> {
 
     fun clear() = synchronized(items) { items.clear() }
 
-    /** What was told till now, a copy. */
     fun list(): List<T> = synchronized(items) { items.toList() }
 }

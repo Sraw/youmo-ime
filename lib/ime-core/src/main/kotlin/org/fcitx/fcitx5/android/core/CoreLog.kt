@@ -4,20 +4,7 @@
  */
 package org.fcitx.fcitx5.android.core
 
-/**
- * Debug logging for `:lib:ime-core`.
- *
- * This module is a plain JVM library, so it cannot depend on Timber (an AAR). The app wires
- * [sink] to Timber at startup; in a unit test it stays null and logging is a no-op.
- *
- * Two levels, matching what the app logged before this module existed:
- * - [d]: plain debug logging, emitted whenever a sink is attached (debug builds, or release
- *   builds with verbose logging on).
- * - [v]: chatty tracing such as every state machine transition, emitted only when [verbose]
- *   is also set -- the "verbose log" developer setting, in any build.
- *
- * The message is a lambda so nothing is formatted when it would be dropped.
- */
+/** A plain JVM library cannot use Timber (an AAR): the app wires [sink]; null in tests. [d] whenever a sink is set, [v] only with [verbose]; messages are lambdas so dropped ones are never formatted. */
 object CoreLog {
 
     @Volatile
@@ -26,7 +13,7 @@ object CoreLog {
     @Volatile
     var verbose: Boolean = false
 
-    /** Release-level: always passed on (the exported log keeps it), whatever [verbose] and debug logging say. */
+    /** Always passed on (the exported log keeps it), whatever [verbose] and debug logging say. */
     @Volatile
     var errorSink: ((String) -> Unit)? = null
 

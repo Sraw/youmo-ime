@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
@@ -19,14 +20,9 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * [HostCore] and [KeyRouter] against a fake engine host. Lines: `ae` is
- * `app/src/main/cpp/androidengine/androidengine.cpp`, `af` `androidfrontend/androidfrontend.cpp`
- * (both at the tag `native-last`), `fcitx/…` upstream fcitx5 442edbc9 `src/lib/fcitx/…` (`lib/ime-core/tools/upstream.sh fcitx5`).
- */
+/** [HostCore] and [KeyRouter] against a fake engine host, case by case against the native addons at `native-last`. */
 class HostCoreContractTest {
 
-    /** Records every call; answers with [answer]. */
     private inner class FakeHost : EngineHost {
         val calls = mutableListOf<String>()
         var answer: (im: String, event: Int, arg: Int) -> Snapshot? = { _, _, _ -> snap() }
@@ -72,28 +68,24 @@ class HostCoreContractTest {
     private val persisted = mutableListOf<Persist>()
 
     private fun core(
-        profile: Profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"),
+        profile: Profile = testProfile(),
         firstRun: Boolean = true,
         modules: (HostServices) -> HostModules = { HostModules() },
     ) = HostCore(fake, clock, profile, firstRun = firstRun, persist = { persisted += it }, modules = modules)
 
-    private fun HostCore.log(): MutableList<HostEvent> = mutableListOf<HostEvent>().also { l -> events += HostEvents { l += it } }
 
     private fun HostCore.open(uid: Int = 1, caps: Long = Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT or Capability.COMMIT_STRING_WITH_CURSOR) {
         activate(uid)
         setCapabilities(caps)
         focus(true)
-        // the first run's new list shows the name 30 ms on (fcitx/instance.cpp:1213-1229): past it, and hidden
+        // the first run's new list shows the name 30 ms on: past it, and hidden
         clock.advance(2 * HostCore.INFO_MILLIS)
     }
 
     private fun HostCore.press(c: Char, virtual: Boolean = true) = sendKey(Key(c.code), virtual = virtual)
 
-    // ---- first run and profile
-
     @Test
     fun `first run is the Default group, pinyin first, keyboard-us default, and saved`() {
-        // fcitx/inputmethodmanager.cpp:147-162 + native-last:app/src/main/java/org/fcitx/fcitx5/android/core/Fcitx.kt:437-447
         val listed = InputMethodCatalog.LISTED.map { it.name }.toSet()
         fun firstRun(available: Set<String>, expected: List<String>) {
             fake = FakeHost()
@@ -108,7 +100,7 @@ class HostCoreContractTest {
         }
         assertRows(
             "the engines list pinyin" to { firstRun(listed, listOf(InputMethodCatalog.PINYIN, ImGroup.KEYBOARD_US)) },
-            // F4199: HostCore's init puts pinyin first only when the engines list it
+            // HostCore's init puts pinyin first only when the engines list it
             "no pinyin listed keeps the keyboard alone (F4199)" to { firstRun(listed - InputMethodCatalog.PINYIN, listOf(ImGroup.KEYBOARD_US)) },
         )
     }
@@ -121,11 +113,8 @@ class HostCoreContractTest {
         assertTrue(persisted.isEmpty())
     }
 
-    // ---- activation, events order
-
     @Test
     fun `focus activates the input method, resetting the session, and tells the app`() {
-        // fcitx/instance.cpp:1069-1091,2454-2494; ae:492-513; af:327-335
         val core = core()
         val log = core.log()
         core.open()
@@ -135,7 +124,6 @@ class HostCoreContractTest {
 
     @Test
     fun `a commit goes out before the panel that clears its preedit, the panel once`() {
-        // fcitx/inputcontext.cpp:433-466 (commit at once), ae:723-739 (show)
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(commit = "你", preedit = "", handled = true) else snap() }
@@ -148,7 +136,6 @@ class HostCoreContractTest {
 
     @Test
     fun `a pinyin code shows above the candidates, English's word in the app underlined`() {
-        // ae:241-258 showPreedit, ae:375-383 composesText, inputcontext.cpp:69-75 masks Preedit
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni", candidates = listOf("你")) else snap() }
@@ -167,8 +154,7 @@ class HostCoreContractTest {
 
     @Test
     fun `the session's code is flagged as the code the app may write into the field, nothing else is`() {
-        // 061-code-in-field §4.2: only KeyRouter.show's preedit; a temp mode's and the punctuation marks' are
-        // covered where those are (ChineseModulesHostTest, KeyRouterPunctuationTest)
+        // only KeyRouter.show's preedit; temp modes' and punctuation marks' are in ChineseModulesHostTest, KeyRouterPunctuationTest
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni hao", candidates = listOf("你好")) else snap() }
@@ -193,7 +179,6 @@ class HostCoreContractTest {
 
     @Test
     fun `an untaken key is handed back, release too`() {
-        // af:385-393
         val core = core()
         core.open()
         fake.answer = { _, _, _ -> snap(handled = false) }
@@ -205,7 +190,7 @@ class HostCoreContractTest {
 
     @Test
     fun `an unfocused context hands every key back`() {
-        // inputcontext.cpp:333-335 RETURN_IF_HAS_NO_FOCUS
+        // RETURN_IF_HAS_NO_FOCUS
         val core = core()
         core.activate(1)
         val log = core.log()
@@ -214,11 +199,9 @@ class HostCoreContractTest {
         assertTrue(fake.calls.isEmpty())
     }
 
-    // ---- KeyRouter branches
-
     @Test
     fun `shortcuts are the app's`() {
-        // ae:557-566; the mark on offer going in first: KeyRouterPunctuationTest
+        // the mark on offer going in first: KeyRouterPunctuationTest
         val core = core()
         core.open()
         val n = fake.calls.size
@@ -228,7 +211,6 @@ class HostCoreContractTest {
 
     @Test
     fun `keys map to their events, keypad apart, controls as Other`() {
-        // ae:650-673
         val core = core()
         core.open()
         fake.answer = { _, _, _ -> snap(handled = false) }
@@ -244,7 +226,6 @@ class HostCoreContractTest {
 
     @Test
     fun `hardware minus and equal turn pages only while typing`() {
-        // ae:639-649
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "ni", candidates = listOf("你")) else snap() }
@@ -258,7 +239,6 @@ class HostCoreContractTest {
 
     @Test
     fun `English that suggests nothing tells the session what the screen key typed, none in a password`() {
-        // ae:583-638 asIs, ae:681-687 suggestsEnglish
         val core = core()
         core.open(caps = Capability.PREEDIT or Capability.NO_SPELL_CHECK)
         core.setCurrentInputMethod(ImGroup.KEYBOARD_US)
@@ -267,35 +247,31 @@ class HostCoreContractTest {
         core.press('a', virtual = false)
         assertEquals("keyboard-us ${EngineEvent.ENTER} 0", fake.calls.last())
         // a glide is swallowed, and the key after it is the session's
-        assertTrue(core.sendKey(Key(KeySyms.UNICODE_OFFSET or KeyRouter.GLIDE_CHAR)))
+        assertTrue(core.sendKey(Key(UNICODE or KeyRouter.GLIDE_CHAR)))
         core.press('.')
         assertEquals("keyboard-us ${EngineEvent.CHAR} ${'.'.code}", fake.calls.last())
     }
 
     @Test
     fun `a nine-keys letter commits itself in its case`() {
-        // ae:596-606
         val core = core()
         core.open(caps = Capability.NO_SPELL_CHECK)
         core.setCurrentInputMethod(ImGroup.KEYBOARD_US)
         val log = core.log()
-        assertTrue(core.sendKey(Key(KeySyms.UNICODE_OFFSET or (0xF0060 + 26 + 1))))
+        assertTrue(core.sendKey(Key(UNICODE or (0xF0060 + 26 + 1))))
         assertEquals(HostEvent.Commit("B", -1), log.filterIsInstance<HostEvent.Commit>().single())
     }
 
     @Test
     fun `learning is off in a sensitive field`() {
-        // ae:696
         val core = core()
         core.open(caps = Capability.SENSITIVE)
         assertTrue(fake.calls.last().endsWith("nolearn"))
     }
 
-    // ---- failure fallback
-
     @Test
     fun `a failing session clears the panel, is reset, and one failing reset is not reset again`() {
-        // native-last:app/src/main/cpp/native-lib.cpp:722-745
+        // native-lib's engineEventCallback
         fun fails(throwable: () -> Throwable) {
             fake = FakeHost()
             clock = VirtualHostClock()
@@ -316,7 +292,7 @@ class HostCoreContractTest {
         }
         assertRows(
             "an exception" to { fails { IllegalStateException("boom") } },
-            // F4195: native's engineFailed took any pending throwable (native-last:app/src/main/cpp/native-lib.cpp:510-528)
+            // native's engineFailed took any pending throwable
             "an engine out of memory (F4195)" to { fails { OutOfMemoryError() } },
         )
     }
@@ -346,8 +322,6 @@ class HostCoreContractTest {
         assertFalse(core.press('a'))
     }
 
-    // ---- candidates
-
     private fun HostCore.typed(all: List<String>, shown: Int = 5, total: Int = all.size, first: Int = 0) {
         fake.all = all.map { Choice(it) }
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR || e == EngineEvent.PAGE_DOWN) snap(preedit = "a", candidates = all.drop(first).take(shown), total = total, first = first, actionable = true) else snap() }
@@ -356,7 +330,6 @@ class HostCoreContractTest {
 
     @Test
     fun `the bulk list sends the first 16, fetched a chunk at a time`() {
-        // af:94-123, ae:125-152 (Chunk 32)
         val core = core()
         core.open()
         val log = core.log()
@@ -370,7 +343,6 @@ class HostCoreContractTest {
 
     @Test
     fun `an uncounted list asks till a chunk runs short`() {
-        // ae:126-150, af:103-113
         val core = core()
         core.open()
         val log = core.log()
@@ -380,7 +352,6 @@ class HostCoreContractTest {
 
     @Test
     fun `those before the page are fetched once from the first`() {
-        // ae:128-139
         val core = core()
         core.open()
         core.typed((1..20).map { "c$it" }, first = 5)
@@ -391,7 +362,6 @@ class HostCoreContractTest {
 
     @Test
     fun `select checks the text after the output filters`() {
-        // af:150-168,302-307
         val core = core(modules = { HostModules(outputFilters = listOf(OutputFilter { _, t -> t.copy(strings = t.strings.map { it.replace("门", "門") }.toTypedArray()) })) })
         core.open()
         core.typed(listOf("门", "们"))
@@ -420,8 +390,7 @@ class HostCoreContractTest {
         core.open()
         val ic = checkNotNull(core.contexts.active)
         asked.clear()
-        // a fresh instance, not the literal: assertSame then holds only if a text no filter changes
-        // comes back as given, not rebuilt (a string a candidate a key on the typing path)
+        // a fresh instance: assertSame holds only if an unchanged text comes back as given, not rebuilt
         val text = String(charArrayOf('们'))
         assertSame(text, core.filterOutput(ic, text))
         assertEquals("門", core.filterOutput(ic, "门"))
@@ -431,7 +400,6 @@ class HostCoreContractTest {
 
     @Test
     fun `the paged window shows the page, labels by number, and turns while composing`() {
-        // af:125-148,270-289; ae:94-121,156-172
         val core = core()
         core.open()
         core.setCandidatePagingMode(1)
@@ -449,7 +417,6 @@ class HostCoreContractTest {
 
     @Test
     fun `the long-press menu asks the session, and acts only on the candidate it was asked for`() {
-        // ae:176-211, af:233-256
         val core = core()
         core.open()
         core.typed(listOf("你", "拟"))
@@ -469,11 +436,8 @@ class HostCoreContractTest {
         assertEquals("engine-pinyin ${EngineEvent.FORGET} 0", fake.calls.last())
     }
 
-    // ---- refine
-
     @Test
     fun `a snapshot that refines is refined after a 30 ms pause, any key first cancels it`() {
-        // ae:26-28,689-721
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "n", candidates = listOf("你"), refines = true) else snap(handled = false) }
@@ -488,7 +452,6 @@ class HostCoreContractTest {
 
     @Test
     fun `a refining slice that changes nothing leaves the panel, the next slice at once`() {
-        // ae:699-702
         val core = core()
         core.open()
         var slices = 0
@@ -508,7 +471,6 @@ class HostCoreContractTest {
 
     @Test
     fun `a menu shown stops refining`() {
-        // ae:194-195
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "n", candidates = listOf("你"), refines = true, actionable = true) else snap() }
@@ -519,11 +481,8 @@ class HostCoreContractTest {
         assertFalse(fake.calls.any { it.contains(" ${EngineEvent.REFINE} ") })
     }
 
-    // ---- switching and the overlay
-
     @Test
     fun `a switch commits what was typed, activates the new one, tells the app, shows its name a second`() {
-        // fcitx/instance.cpp:1178-1212,414-452,521-531; ae:764-772; af:349-359
         val core = core()
         core.open()
         val log = core.log()
@@ -538,7 +497,6 @@ class HostCoreContractTest {
 
     @Test
     fun `a key press hides the name, a release does not`() {
-        // fcitx/instance.cpp:970-976
         val core = core()
         core.open()
         fake.answer = { _, _, _ -> snap(handled = false) }
@@ -552,7 +510,7 @@ class HostCoreContractTest {
 
     @Test
     fun `a tap no one takes in English's composing text commits it, then resets`() {
-        // fcitx/inputmethodengine.cpp:46-54 (defaultInvokeActionBehavior), F3788
+        // defaultInvokeActionBehavior
         val core = core()
         core.open()
         core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH, ImGroup.KEYBOARD_US))
@@ -567,8 +525,7 @@ class HostCoreContractTest {
 
     @Test
     fun `a password field's switch ends the old input method under the old flags, starts the new under the new`() {
-        // fcitx's CapabilityAboutToChange then CapabilityChanged (F3855): the old engine's ENTER learns
-        // as its field did, the new engine's activation as its own field does (a throwing switch: InputContextsTest)
+        // the old engine's ENTER learns as its field did, the new one activates as its own field does
         fun of(calls: List<String>, im: String) = calls.filter { it.startsWith("$im ") }
         // each row its own core: the way out starts from a password field set up here, not by the row before
         fun calls(from: Long, to: Long): List<String> {
@@ -588,8 +545,7 @@ class HostCoreContractTest {
                 assertEquals(c.toString(), listOf("${InputMethodCatalog.PINYIN} ${EngineEvent.ENTER} 0"), c.filter { it.split(' ')[1] == "${EngineEvent.ENTER}" })
                 assertTrue(c.toString(), of(c, InputMethodCatalog.PINYIN).none { it.endsWith(" nolearn") })
             },
-            // the privacy half: what was typed in the password field is never learnt; pinyin comes
-            // back learning, its activation not under the password's flags
+            // what was typed in the password field is never learnt; pinyin comes back learning
             "out of a password field" to {
                 val c = calls(Capability.PASSWORD, 0)
                 assertTrue(c.toString(), of(c, ImGroup.KEYBOARD_US).all { it.endsWith(" nolearn") })
@@ -601,7 +557,7 @@ class HostCoreContractTest {
 
     @Test
     fun `a password field switches without the name or a switch event`() {
-        // fcitx/instance.cpp:725-764,1203-1211 (CapabilityChanged not listed); S1 deviation 4
+        // CapabilityChanged posts no switch event
         val core = core()
         core.open()
         val log = core.log()
@@ -614,7 +570,6 @@ class HostCoreContractTest {
 
     @Test
     fun `a new list switches the focused context without a switch event, its name after 30 ms, saved`() {
-        // fcitx/instance.cpp:687-711,1213-1229; native-last:app/src/main/cpp/native-lib.cpp:196-206
         val core = core()
         core.open()
         val log = core.log()
@@ -629,8 +584,8 @@ class HostCoreContractTest {
 
     @Test
     fun `the name overlay can be turned off`() {
-        // the instrumented TestHost sets KotlinHost.showInputMethodInformation = false; here a constructor switch
-        val core = HostCore(fake, clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true, showInputMethodInformation = false)
+        // the instrumented TestHost turns it off through KotlinHost; here a constructor switch
+        val core = HostCore(fake, clock, testProfile(), firstRun = true, showInputMethodInformation = false)
         core.open()
         core.toggle()
         assertTrue(core.isEmpty())
@@ -639,7 +594,6 @@ class HostCoreContractTest {
 
     @Test
     fun `focus out resets the engine without committing, temp modes leave`() {
-        // fcitx/instance.cpp:1125-1153, ae:764-772, tempmodemanager.cpp:44-46
         var reset = 0
         val mode = object : TempMode {
             override fun isActive(ic: InputContext) = true
@@ -697,8 +651,7 @@ class HostCoreContractTest {
 
     @Test
     fun `an unbind arriving after the next app's bind leaves that app focused, its keys typed`() {
-        // the bug: the old app's late unbind ended the context that was current, the new app's, so
-        // its keys went to the app raw instead of being typed (InputContexts.deactivate)
+        // the old app's late unbind must not end the new app's context, or its keys go to the app raw
         val core = core()
         core.open()
         core.activate(2)
@@ -713,7 +666,6 @@ class HostCoreContractTest {
 
     @Test
     fun `without ClientUnfocusCommit the client preedit is committed on focus out`() {
-        // fcitx/instance.cpp:1131-1139
         val core = core()
         core.open(caps = Capability.PREEDIT)
         core.setCurrentInputMethod(ImGroup.KEYBOARD_US)
@@ -726,13 +678,12 @@ class HostCoreContractTest {
 
     @Test
     fun `a tap in the code row moves the session's cursor, one it does not take leaves the panel as it is`() {
-        // ae:741-756, af:454-458
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> snap(handled = e == EngineEvent.CURSOR) }
         core.moveCursor(1)
         assertEquals("engine-pinyin ${EngineEvent.CURSOR} 1", fake.calls.last())
-        // refused, its empty snapshot is not shown: the code typed stays on the panel (F3815)
+        // refused, its empty snapshot is not shown: the code typed stays on the panel
         fake.answer = { _, e, _ -> if (e == EngineEvent.CURSOR) snap(handled = false) else snap(preedit = "ab") }
         core.press('a')
         val log = core.log()
@@ -743,7 +694,6 @@ class HostCoreContractTest {
 
     @Test
     fun `deleteBefore deletes ahead of the commit`() {
-        // ae:730-732, af:51-60
         val core = core()
         core.open()
         fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(commit = ". ", deleteBefore = 1) else snap() }

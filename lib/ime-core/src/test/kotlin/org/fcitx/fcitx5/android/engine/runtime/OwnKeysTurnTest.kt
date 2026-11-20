@@ -12,7 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Other groups of a layout's own take over at their first code, what was typed committed then (061-custom-layout §6, L4). */
+/** Other groups of a layout's own take over at their first code, what was typed committed then. */
 class OwnKeysTurnTest {
     private val a = listOf("qw", "er", "ty", "ui", "op", "as", "df", "gh", "jk", "l", "zx", "cv", "bn", "m", "pq rs", "abc", "xyz")
     private val b = a.reversed()
@@ -28,7 +28,6 @@ class OwnKeysTurnTest {
             assertEquals(Step.TURN, OwnKeysTurn.at(a, a, key))
             assertEquals(Step.TURN, OwnKeysTurn.at(null, null, key))
         }
-        // the same groups told anew (another list, equal): no change
         assertEquals(Step.TURN, OwnKeysTurn.at(a, a.toList(), backspace))
     }
 
@@ -43,8 +42,7 @@ class OwnKeysTurnTest {
         assertEquals(Step.COMMIT_AND_TURN, OwnKeysTurn.at(a, b, place))
     }
 
-    // review L4 N1: none told after some (a fallback took them back) waits as other groups do: a Backspace edits what
-    // was typed; the built-in codes the keyboard shown sends turn as KeyboardPair turns
+    // a Backspace edits what was typed; built-in codes turn as KeyboardPair turns
     @Test
     fun noneToldAfterSomeWaitsAsOtherGroupsDo() {
         for (key in listOf(backspace, space, 'a'.code, NineKeyLetters.G14.codes[0].code)) {

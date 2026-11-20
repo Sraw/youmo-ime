@@ -10,7 +10,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** How an imported dictionary file is classified from its name alone. */
 class PinyinDictionaryTypeTest {
 
     @Test
@@ -22,7 +21,6 @@ class PinyinDictionaryTypeTest {
         assertNull(Type.fromFileName("new.words"))
     }
 
-    /** A dictionary the user imported is kept as text; `.disable` marks it off. */
     @Test
     fun aDisabledDictionaryIsStillText() {
         assertEquals(Type.Text, Type.fromFileName("words.txt.disable"))
@@ -35,14 +33,14 @@ class PinyinDictionaryTypeTest {
         assertNull(Type.fromFileName(""))
     }
 
-    /** Only text has a disabled form: libime's are turned into text, not kept (see ImportedDictionaries). */
+    /** Only text has a disabled form: libime's are turned into text, not kept. */
     @Test
     fun theDisableSuffixIsNotRecognisedForOtherTypes() {
         assertNull(Type.fromFileName("words.scel.disable"))
         assertNull(Type.fromFileName("words.dict.disable"))
     }
 
-    /** A dictionary exported as `WORDS.SCEL` (common on Windows) is one to import. */
+    /** `WORDS.SCEL` (common on Windows) is one to import. */
     @Test
     fun theExtensionMatchesInAnyCase() {
         assertEquals(Type.LibIME, Type.fromFileName(withLowercaseExtension("words.DICT")))
@@ -50,7 +48,7 @@ class PinyinDictionaryTypeTest {
         assertEquals(Type.Text, Type.fromFileName(withLowercaseExtension("words.TXT")))
     }
 
-    /** The files kept are named in lowercase, as the engine reads them: no other is one of them. */
+    /** The files kept are named in lowercase, as the engine reads them. */
     @Test
     fun aKeptFileMatchesOnlyAsItIsNamed() {
         assertNull(Type.fromFileName("words.TXT"))

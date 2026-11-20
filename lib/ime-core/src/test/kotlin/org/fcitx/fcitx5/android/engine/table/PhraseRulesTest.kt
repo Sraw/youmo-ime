@@ -22,7 +22,6 @@ class PhraseRulesTest {
     fun wubiPhrasesTakeTheirKeysFromEachCharacterByLength() {
         assertEquals("wqwu", encode(wubi, "你们"))
         assertEquals("wtrq", encode(wubi, "你我的"))
-        // four or more: the first three characters and the last
         assertEquals("wnat", encode(wubi, "人民共和"))
         assertEquals("wnal", encode(wubi, "人民共和国"))
     }
@@ -42,10 +41,8 @@ class PhraseRulesTest {
 
     @Test
     fun keysMayCountFromTheCodesEndAndATakenKeyIsNotTakenTwice() {
-        // z is the last key of a code, y the one before
         val rules = PhraseRules(mapOf("e2" to "p1z+p1y+p2z+p00"))
         assertEquals("yin", encode(rules, "你们"))
-        // 人 is one key: p11 and p1z are the same key
         assertEquals("w", PhraseRules(mapOf("e1" to "p11+p1z")).encode("人", codes::get))
     }
 

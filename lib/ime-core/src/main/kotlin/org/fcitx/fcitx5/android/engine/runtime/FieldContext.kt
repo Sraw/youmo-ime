@@ -14,22 +14,12 @@ import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.session.Session
 import java.util.concurrent.Executor
 
-/**
- * What the field's last context said learning leaves out ([Action.Context.learnFlags][org.fcitx.fcitx5.android.engine.session.Action.Context.learnFlags]),
- * for the engines' sessions made after it. One for the host: given to each [Engines] it makes, so
- * one made anew in the same field (after a close) has them (review-int N1), with no second copy to
- * fall out of step (review B 3.8).
- */
+/** What the field's last context said learning leaves out ([Action.Context.learnFlags][org.fcitx.fcitx5.android.engine.session.Action.Context.learnFlags]): one per host, shared with every [Engines] it makes so remade engines keep it without a second copy. */
 class FieldFlags {
     var value = 0
 }
 
-/**
- * The field the user types in, as [Engines] hears of it: its text before the cursor told to the
- * keyboards made ([context]), its [flags] kept for those made after, and what the input method it
- * starts in will want read ahead of its first key, on [warmUps]. Once for each [Engines]: one made
- * anew reads them again. On the engines' thread.
- */
+/** The field as [Engines] hears of it: the text before the cursor told to keyboards, [flags] kept for later ones, and the starting input method's data warmed ahead on [warmUps]. Once per [Engines]; on its thread. */
 internal class FieldContext(
     private val assets: EngineAssets,
     private val warmUps: Executor,
@@ -42,14 +32,13 @@ internal class FieldContext(
     private val pairs: () -> Map<String, KeyboardPair>,
     val flags: FieldFlags,
 ) {
-    // English's data is read once and kept: warmed up once, however often its session is made
+    // English's data is read once and kept: warmed up once
     private var englishWarmedUp = false
 
-    // pinyin's data and word index, which the sessions of READS_PINYIN_DATA and the tables read as they
-    // are made: read once, in the background
+    // pinyin's data and word index, read once in the background
     private var pinyinWarmedUp = false
 
-    // of what is placed beside the candidates (EMOJI_DATA, CHAIZI_DATA, READINGS_ASIDE), what was warmed up
+    // aside sources (EMOJI_DATA, CHAIZI_DATA, READINGS_ASIDE) already warmed
     private val asideWarmedUp = HashSet<String>()
 
     /** See [Engines.context]. */
@@ -64,21 +53,20 @@ internal class FieldContext(
         selected: Boolean,
         said: Boolean,
     ): Boolean {
-        // first, as the host kept its own copy before it told the engines: engines made after a close
-        // start with this field's flags even if what follows throws
+        // first, so engines remade after a close keep this field's flags even if what follows throws
         flags.value = learnFlags
-        // the counts a new typing day changed, made anew here rather than on a key (HabitCounts.settle)
+        // a new typing day's counts are made here, not on a key (HabitCounts.settle)
         learner.settle()
         if (im in READS_PINYIN_DATA || im in TABLES) warmUpPinyin(im)
-        // 中英混输 asks English's words of each English word learned at the first key (LatinSync): indexed before it
+        // 中英混输 looks up English words at the first key (LatinSync): index them before it
         if (im == PINYIN && !englishWarmedUp && latinAsksEnglish()) warmUpEnglish()
-        // the user's words coded for the table before its first key, which would otherwise start it
+        // code the user's words before the first key, which would otherwise start it
         if (im in TABLES) tables.prepare(im)
         var offers = false
         val pairs = pairs()
         // pinyin's and 双拼's through their pairs, below
         for ((name, keyboard) in keyboards.asSequence().filter { (n, _) -> pairs.values.none { it.holds(n) } }) {
-            // only [im]'s: another's candidates would stay on show where nothing resets them, its contexts ignored
+            // only [im]'s: another's candidates would stay shown where nothing resets them
             val shows = keyboard.context(before, learning, cleared, learnFlags, started, after, selected, offers = name == im, said = said)
             if (name == im && shows && sessions[name] is EnglishSession) offers = true
         }
@@ -86,8 +74,7 @@ internal class FieldContext(
         return offers
     }
 
-    // English's data, its keys and word index (some hundreds of milliseconds on a phone) built off
-    // this thread before the first key wants them; a key that comes sooner waits for them, as it would anyway
+    // English's keys and word index take hundreds of ms on a phone: built off-thread before the first key needs them
     private fun latinAsksEnglish() = settings().latinWords && learner.useHabits && english.user().words.isNotEmpty()
 
     /** English's data, its warm-up started the first time. */
@@ -98,14 +85,10 @@ internal class FieldContext(
         }
     }
 
-    // told as a field starts in an input method that reads pinyin's data (READS_PINYIN_DATA, a table,
-    // which ranks and learns by them: TableLanguage), before its first key: the data read and its 270
-    // thousand words indexed meanwhile, off the fcitx thread; one who types only English neither waits
-    // for them nor holds them. A key that comes sooner waits for them, and a switch from English to one
-    // of those reads them on the fcitx thread as it makes the session (activate's Reset). Whatever
-    // reading them throws is dropped, the lazies left unset (WarmUp, quiet): the session reads them again
-    // as it is made, on the fcitx thread, which hands it to the addon (EngineBridge.Unloadable).
-    // Beside it only what [im] shows as the settings have it, held from then on: characters by their parts and their readings (笔画查字's) only in full pinyin
+    // for input methods reading pinyin data (incl. tables via TableLanguage): read and index its 270k words off
+    // the fcitx thread before the first key, so English-only users neither wait nor hold them. Failures are
+    // dropped quietly (lazies unset): the session rereads on the fcitx thread, which reports to the addon.
+    // Plus the aside sources [im] shows; parts and readings only in full pinyin
     private fun warmUpPinyin(im: String) {
         val settings = settings()
         val aside = HashSet<String>()
@@ -126,8 +109,7 @@ internal class FieldContext(
     }
 
     private companion object {
-        // what charReading reads off pinyin's dictionary, warmed up as the data files are: a key of
-        // [asideWarmedUp] beside the data files' names, not the step's name (WarmUp.CHAR_READINGS)
+        // an [asideWarmedUp] key beside the data file names, not the step's name (WarmUp.CHAR_READINGS)
         const val READINGS_ASIDE = "char readings"
     }
 }

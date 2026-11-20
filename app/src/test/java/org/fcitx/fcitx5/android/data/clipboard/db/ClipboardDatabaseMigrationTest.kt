@@ -21,20 +21,16 @@ import org.robolectric.RuntimeEnvironment
 import java.io.File
 
 /**
- * Every schema Room exported to app/schemas upgrades to the current one, its clips kept, with the migrations the app
- * opens the clipboard with: a version left without one fails here, not at the users' next start, which would keep
- * their clips in memory until a build that has it. Built as Room's MigrationTestHelper would, but from the source
- * tree: the helper reads the schemas from the test's assets, which :app's unit tests run without
- * (isIncludeAndroidResources is off).
+ * Every exported schema upgrades to the current one with its clips. Built as MigrationTestHelper would, but from the
+ * source tree: the helper reads schemas from test assets, which :app's unit tests run without.
  */
 @RunWith(RobolectricTestRunner::class)
 class ClipboardDatabaseMigrationTest {
 
     private val context: Context = RuntimeEnvironment.getApplication()
 
-    // each version's identity as it shipped, one line each, a new version's added as it ships: an entity changed
-    // without a new version rewrites the current one's schema, which the upgrade below then passes, while every user's
-    // file fails Room's identity check and keeps their clips in memory
+    // identities as shipped: an entity changed without a new version rewrites the current schema and would pass below,
+    // while users' files fail Room's identity check
     private val shipped = mapOf(
         1 to "6703837121d954933d8376d61e4d8291",
         2 to "fc902cf5d26aca7d0ac10be1fc3728f0",
@@ -47,8 +43,7 @@ class ClipboardDatabaseMigrationTest {
         assertEquals(shipped, schemas().mapValues { (_, schema) -> databaseIn(schema).getValue("identityHash").jsonPrimitive.content })
     }
 
-    // what Room checks a user's file against as it opens it, made from the entities as this build compiled them: an
-    // entity changed without a new version fails here too, with the schemas' export off
+    // as this build compiled the entities: catches a changed entity even with the schemas' export off
     @Test
     fun aFreshDatabaseIsTheNewestVersionAsItShipped() {
         val name = "fresh"
@@ -69,7 +64,7 @@ class ClipboardDatabaseMigrationTest {
     @Test
     fun everyExportedSchemaUpgradesToTheCurrentOneWithItsClips() = runTest {
         val schemas = schemas()
-        // none left out between the first and the current, whose version would go untested
+        // none left out between the first and the current
         assertEquals((1..schemas.size).toList(), schemas.keys.sorted())
         schemas.forEach { (version, schema) ->
             val name = "migrated-v$version"
@@ -86,7 +81,7 @@ class ClipboardDatabaseMigrationTest {
         }
     }
 
-    // from the module dir, where Gradle runs the tests, or the repo root, where an IDE run may start
+    // the module dir (Gradle) or the repo root (an IDE run)
     private fun schemas(): Map<Int, File> =
         listOf("schemas", "app/schemas")
             .map { File(it, ClipboardDatabase::class.java.name) }
@@ -94,10 +89,9 @@ class ClipboardDatabaseMigrationTest {
             .listFiles { file -> file.extension == "json" }!!
             .associateBy { it.nameWithoutExtension.toInt() }
 
-    // the database a schema file describes
     private fun databaseIn(schema: File) = Json.parseToJsonElement(schema.readText()).jsonObject.getValue("database").jsonObject
 
-    // the database as a build of [schema]'s version left it, a pinned clip in it
+    // as a build of [schema]'s version left it, a pinned clip in it
     private fun createAt(name: String, schema: File) {
         val database = databaseIn(schema)
         context.deleteDatabase(name)

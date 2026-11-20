@@ -1,7 +1,7 @@
 # Release gates 2, 3
 
 `dev/design/fcitx-replacement.md` §8: run on the release tree before the draft release; also
-runnable on any debug build to find problems early; run both before every release (DECISIONS.md B14).
+runnable on any debug build to find problems early; run before every release (DECISIONS.md B14); gate 2 is paused, see below.
 Each brings up uat.py's emulator (the AVD `youmo` from its read-only snapshot: a clean device every
 time; `uat/tools/avd.sh` makes it) on `--port` (default 5560, clear of a UAT run's 5554/5556, but `uat.py --devices auto` can reach it) and
 kills it after (`--keep` leaves it up to look at; the next run kills a gate's emulator found on the port and starts
@@ -14,8 +14,12 @@ first start moves them); a released build in gate 3 before 0.6.0 has no pack to 
 
 | Gate | Command | What |
 |---|---|---|
-| 2 | `python3 uat/gates/gates.py upgrade <new.apk> [--old <dir>]` | each `uat/fixtures/upgrade/v0.3.x` upgraded to the new build, then 14 checks (15 with a `de.tar`) |
+| 2 | `python3 uat/gates/gates.py upgrade <new.apk> [--old <dir>]` | paused: not run at a release (below) |
 | 3 | `python3 uat/gates/gates.py backups <new.apk> --old <dir>` | the new build's 备份全部 restored into v0.3.0/0.3.1/0.3.2; each fixture's `backup.zip` restored into the new build |
+
+Gate 2 upgrades each `uat/fixtures/upgrade` fixture (v0.3.0–v0.4.0) in place, a path this build no longer
+supports (0.4 and before upgrade through 0.6.2 first), so it is paused till there are 0.5.x fixtures
+(`make.py` still runs on redroid only). Gate 3 still puts the v0.3.2 fixture's files in as its starting point.
 
 `<dir>`: the released text APKs, `gh release download v0.3.x -p '*text-arm64*'` for each (0.3.x and
 0.4.0 shipped a text and a voice APK; 0.6.0 on ships one). Gate 5 (start, latency, memory) is gone: `uat/tools/perf.py`.
@@ -26,11 +30,9 @@ and order, 繁体 on (`guojia` gives 國家), the punctuation (the fixtures' edi
 (`dz`), the learned word (`jingmiaoyu` gives 鲸喵屿 first), each read from the files as fcitx reads
 them and typed on the test page (from `host-config/` and `host-data/` in the app's own storage; for a
 v0.3.x build installed in gate 3, from `config/` and `data/` on the external storage, where it keeps
-them). Gate 2 also checks that the external storage's old `config/`, `data/` and `theme/` are deleted
-once the first start has moved them (in gate 3 the restore is what is under test). A fixture with a `de.tar` (device-protected storage, made by
-`make.py` since R15; the three v0.3.x fixtures predate it, so remake them to cover this) also has it
-restored, and the check adds that the old native host's synced data there (`descriptor.json`,
-`usr/`) is gone after the new build's first start (gate 2 only: in gate 3 an installed 0.3.x build keeps its own synced data there); without one, that migration is not exercised.
+them). A fixture's `de.tar` (device-protected storage: the direct-boot prefs; made by `make.py` since R15, the
+three v0.3.x fixtures have none) is put back with the rest; 0.3.x's native host data there (`descriptor.json`,
+`usr/`) is left in place, no longer deleted or checked.
 
 A release APK (`io.github.sraw.youmo`) is installed over the old release (`install -r`), as users
 get it. A `.debug` APK cannot be (other id and key): gate 2 installs it and puts the fixture's files

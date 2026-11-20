@@ -67,7 +67,6 @@ class BackupControlTest {
             added -= a.toSet()
             blocked -= b.toSet()
         },
-        // as the user dictionary's import: each word line added
         importLines = { lines ->
             if (importFails) throw IOException("the import failed")
             for (line in lines) {
@@ -108,14 +107,13 @@ class BackupControlTest {
         return LearnBackup.bytes(BackupHead(0, other.state.day, install, BackupHead.SAVED), other.state, emptyList(), emptyList())
     }
 
-    // C25, review-DE-design DE-M1: invalidated, cleared, a fresh one made: nothing cleared comes back from this install's
+    // invalidated, cleared, a fresh one made: nothing cleared comes back from this install's
     @Test
     fun aClearedLearningComesNotBackFromThisInstallsBackups() {
         val control = control()
         learn("拟")
         control.afterCommit()
         assertEquals(1, control.backups.list().size)
-        // U-86's 全部清空, as stream E does it: invalidate, rewrite, a new one
         control.invalidate(LearningResult.ALL)
         assertTrue(control.backups.list().isEmpty())
         assertTrue(log.rewrite { _, out -> LearnBackup.writeLog(out, LearnState().apply { day = 1 }); true })
@@ -134,7 +132,6 @@ class BackupControlTest {
         val bytes = LearnBackup.bytes(BackupHead(0, 0, 2L, BackupHead.SAVED), LearnState(), listOf(ListedWord("巴波", "ba'bo")), listOf(ListedWord("幽默", "you'mo")))
         val before = now()
         control.run(BackupOp.Restore(bytes))
-        // blocked in the backup, added on the phone: added still
         assertEquals(setOf(ListedWord("幽默", "you'mo"), ListedWord("巴波", "ba'bo")), added)
         assertTrue(blocked.isEmpty())
         assertTrue(control.run(BackupOp.Revert).ok)
@@ -142,12 +139,11 @@ class BackupControlTest {
         assertEquals(before, now())
         assertEquals(now(), onDisk())
         assertFalse(control.run(BackupOp.Revert).ok)
-        // learning goes on after it
         learn("拟")
         assertEquals(2, log.state.stats.size)
     }
 
-    // review-DE-design D-M1: the same backup restored again on a later typing day changes nothing
+    // the same backup restored again on a later typing day changes nothing
     @Test
     fun restoringTwiceDaysApartIsRestoringOnce() {
         val control = control()
@@ -164,7 +160,7 @@ class BackupControlTest {
         assertEquals(once, onDisk())
     }
 
-    // review-int-records M1: taken back, the phone keeps the offsets it had stored, so a backup restored again is not moved anew
+    // taken back, the phone keeps the offsets it had stored, so a backup restored again is not moved anew
     @Test
     fun aRevertKeepsTheOffsetsStored() {
         val control = control()
@@ -178,8 +174,7 @@ class BackupControlTest {
         assertEquals(stored, BackupMerge.origins(LearnLog.replay(root.file(LearnLog.FILE).read())))
     }
 
-    // review of 051-predict (2): 退回恢复前's copy is the phone's own file, never handed around: a whole
-    // phrase used once (C54 keeps it out of a backup) comes back with the revert, as it was
+    // 退回恢复前's copy is the phone's own file: a phrase kept out of backups comes back with the revert
     @Test
     fun aRevertKeepsAPhraseUsedOnce() {
         val control = control()
@@ -189,12 +184,11 @@ class BackupControlTest {
         assertTrue(control.run(BackupOp.Revert).ok)
         assertEquals(1, log.state.phrases["你好呀亲爱的"]?.count)
         assertEquals(1, LearnLog.replay(root.file(LearnLog.FILE).read()).phrases["你好呀亲爱的"]?.count)
-        // a copy the user saves leaves it out still
         val saved = LearnBackup.read(control.run(BackupOp.Copy).bytes!!)
         assertNull(saved.state.phrases["你好呀亲爱的"])
     }
 
-    // review-int-records S3: a backup's batch is numbered past one the phone undid (F2811: whose 撤销 the restore ends)
+    // a backup's batch is numbered past one the phone undid (whose 撤销 the restore ends)
     @Test
     fun aBackupsBatchTakesNotTheIdOfOneUndone() {
         val control = control()
@@ -207,11 +201,11 @@ class BackupControlTest {
         val bytes = LearnBackup.bytes(BackupHead(0, other.state.day, 2L, BackupHead.SAVED), other.state, emptyList(), emptyList())
         assertTrue(control.run(BackupOp.Restore(bytes)).ok)
         assertEquals(listOf(2), log.state.imports.batches.map { it.id })
-        // the restore is a rewrite: it ends the 撤销 of the batch undone before it (F2811)
+        // the restore is a rewrite: it ends the 撤销 of the batch undone before it
         assertEquals(emptyList<LearnRecord>(), log.state.imports.restore(1))
     }
 
-    // review-int-records S5: a log carried to another install (D2D) restores a backup made where it was on its own day line
+    // a log carried to another install (D2D) restores a backup made where it was on its own day line
     @Test
     fun aLogCarriedToAnotherInstallRestoresItsOldBackupsUnmoved() {
         val old = control()
@@ -229,12 +223,11 @@ class BackupControlTest {
         phone.claim(log)
         val stats = statLines()
         assertTrue(phone.run(BackupOp.Restore(backup)).ok)
-        // the same uses on the same days: none counted twice
         assertEquals(stats, statLines())
         assertEquals(mapOf(1L to 0, 6L to 0), BackupMerge.origins(log.state))
     }
 
-    // D-S4: taken back, the typing day stays where the phone has it, so the backups made since are not in its future
+    // taken back, the typing day stays where the phone has it, so the backups made since are not in its future
     @Test
     fun aRevertKeepsTheTypingDay() {
         val control = control()
@@ -247,7 +240,7 @@ class BackupControlTest {
         assertEquals(day, log.state.day)
     }
 
-    // D-S6: the user dictionary's export is a restore too: imported, the phone's kept first
+    // the user dictionary's export is a restore too: imported, the phone's kept first
     @Test
     fun anExportIsRestoredByItsImportAndTakenBack() {
         val control = control()
@@ -261,7 +254,6 @@ class BackupControlTest {
         assertEquals(listOf(ListedWord("幽默", "you'mo")), added.toList())
         val learned = now()
         assertTrue(control.run(BackupOp.Kept).canRevert)
-        // U-100: taken back, the lists and the learning as before
         assertTrue(control.run(BackupOp.Revert).ok)
         assertTrue(added.isEmpty())
         assertEquals(learned, now())
@@ -280,7 +272,6 @@ class BackupControlTest {
         assertTrue(copy.contentEquals(control.backups.beforeRestore()))
     }
 
-    // F3146: none before it, the copy the failed import made is dropped, not a 退回恢复前 that reverts nothing
     @Test
     fun aFailedExportRestoreWithNoCopyBeforeLeavesNone() {
         val control = control()
@@ -290,7 +281,7 @@ class BackupControlTest {
         assertFalse(control.run(BackupOp.Kept).canRevert)
     }
 
-    // F3139: an import that failed after adding its words keeps the copy made before it, so they can be taken back
+    // an import that failed after adding its words keeps the copy made before it, so they can be taken back
     @Test
     fun anExportRestoreFailedPartWayCanBeTakenBack() {
         val control = control()
@@ -305,7 +296,7 @@ class BackupControlTest {
         assertFalse(ListedWord("幽默", "you'mo") in added)
     }
 
-    // F3202: an import that failed after learning, its lists unchanged, keeps the copy too
+    // an import that failed after learning, its lists unchanged, keeps the copy too
     @Test
     fun anExportRestoreFailedAfterLearningCanBeTakenBack() {
         val control = control()
@@ -317,7 +308,6 @@ class BackupControlTest {
         assertFalse("拟" in now())
     }
 
-    // F3059, F3103: a backup's block of a word the phone added and pinned: added and pinned still once restored
     @Test
     fun aRestoredBlockOfAWordThePhoneAddedLeavesItsPin() {
         val control = control()
@@ -342,17 +332,12 @@ class BackupControlTest {
         clock.minutes(5)
         assertFalse(control.run(BackupOp.Restore(backupOf(3L, "泥"))).ok)
         assertTrue(copy.contentEquals(control.backups.beforeRestore()))
-        // none before: none after
         control.backups.dropBeforeRestore()
         assertFalse(control.run(BackupOp.Restore(backupOf(3L, "泥"))).ok)
         assertNull(control.backups.beforeRestore())
     }
 
-    /**
-     * A record with a restore written (a copy for 退回恢复前 to go back to) and a word learned after it; [stopped],
-     * that word's write was refused and the file not opened again, so the record takes no more writes this run.
-     * Each row of the test below has its own.
-     */
+    /** A record with a restore written and a word learned after it; [stopped]: that write refused, so no more writes this run. */
     private class Restored(stopped: Boolean, restored: ByteArray) : AutoCloseable {
         val root = MemoryFiles()
         val clock = FakeClock()
@@ -389,7 +374,6 @@ class BackupControlTest {
                 disk.refuseNextWrite()
             }
             log.record(listOf(corrected("ni", "尼", "ni")))
-            // the condition itself, not the words the store logs of it (R25 F8044)
             assertEquals(!stopped, log.saving)
             assertEquals(!stopped, log.takesRewrites)
             file = root.file(LearnLog.FILE).read()
@@ -416,11 +400,7 @@ class BackupControlTest {
         override fun close() = log.close()
     }
 
-    // R25 F8027: a record that stopped taking writes (one failed, the file not opened again) is not rewritten, and
-    // since R25 F8018 its rewrite throws where it said "not written". A restore and 退回恢复前 fail as they did (the
-    // result not ok; what the app then says is LearningRestore's failedMessage, the restart text there:
-    // LearningClearedTest), the copy before kept, and a settings zip's stash is left for the next start, told once.
-    // Each row does the same on a record that takes writes first, where it is done: the record stopped is what refuses it
+    // the record that stopped refuses a restore and 退回恢复前, keeps the copy, and leaves a zip's stash for the next start
     @Uat("WD-46")
     @Test
     fun aRecordThatStoppedTakingWritesIsNeitherRestoredToNorRevertedAndAStashWaits() {
@@ -430,7 +410,7 @@ class BackupControlTest {
             listOf<Pair<String, (Restored) -> Boolean>>(
                 "a backup restored" to { it.control.run(BackupOp.Restore(backup)).ok },
                 "退回恢复前" to { it.control.run(BackupOp.Revert).ok },
-                // told is the stash intake's alone to fill: asked of this row only (R25 F8060)
+                // told is the stash intake's alone to fill: asked of this row only
                 "a settings zip's stash: told once, left where it is" to { r ->
                     r.stashTaken(backup).also { taken -> if (!taken) assertEquals("told once", 1, r.told.size) }
                 },
@@ -471,7 +451,6 @@ class BackupControlTest {
         assertFalse(control.run(BackupOp.Kept).canRevert)
     }
 
-    // WD-10d: a backup cut short is not peeked as one, and its restore merges nothing
     @Test
     fun aBackupCutShortIsSaidSoAndChangesNothing() {
         val control = control()
@@ -499,7 +478,6 @@ class BackupControlTest {
         assertFalse(control.run(BackupOp.Kept).canRevert)
     }
 
-    // 退回恢复前's copy cut at its end: the revert fails, nothing half put back
     @Test
     fun aCopyBeforeCutAtItsEndDoesNotRevert() {
         val backups = Backups(root.dir(Backups.DIR), 1L)
@@ -537,7 +515,6 @@ class BackupControlTest {
         val control = control()
         assertTrue(control.run(BackupOp.Restore(backupOf(2L, "拟"))).ok)
         check(checkNotNull(control.backups.beforeRestore()))
-        // the settings' zip carries Copy's bytes as they are
         val stash = MemoryFiles()
         stash.file(RestoreStash.BACKUP).write(copy)
         assertEquals(listOf(ListedWord("幽默", "you'mo")), RestoreStash.read(stash, {}).added)
@@ -563,7 +540,6 @@ class BackupControlTest {
         assertTrue(control.backups.list().isEmpty())
     }
 
-    // F2991, F3091: a clock set back after a commit times the backup no earlier than that commit's minute, so a clear from it drops it
     @Test
     fun aBackupAfterTheClockSetBackIsTimedAtItsLastCommit() {
         val control = control()
@@ -578,7 +554,6 @@ class BackupControlTest {
         assertTrue(control.backups.list().isEmpty())
     }
 
-    // DE-S2: made of the log as on disk, off the keyboard's thread
     @Test
     fun anAutomaticBackupIsMadeOfTheLogOnDisk() {
         val control = control(logBytes = { root.file(LearnLog.FILE).read() })
@@ -589,7 +564,6 @@ class BackupControlTest {
         assertEquals(now(), state.dump().substringAfter('\n'))
     }
 
-    // an install of no id (its file unwritable) makes none, and takes no backup for its own
     @Test
     fun anInstallOfNoIdMakesNone() {
         val control = control(Backups(root.dir(Backups.DIR), 0L))
@@ -622,10 +596,8 @@ class BackupControlTest {
     fun aBackupMadeBeforeAddressesWentWithItLeavesThemAsTheyAre() {
         val control = control()
         book = AddressData("1\t@qq.com", "1\ta@qq.com")
-        // v0.4.0's: none in it
         control.run(BackupOp.Restore(backupOf(2L, "你")))
         assertEquals(emptyList<Pair<AddressData, Boolean>>(), puts)
-        // a copy before made by v0.4.0, taken back: as they are
         control.backups.saveBeforeRestore(backupOf(1L, "拟"))
         assertTrue(control.run(BackupOp.Revert).ok)
         assertEquals(emptyList<Pair<AddressData, Boolean>>(), puts)

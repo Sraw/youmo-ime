@@ -24,7 +24,7 @@ class KeyboardVariantsTest {
     fun aKeyboardIsTheSameForEveryInputMethodBut双拼s() {
         val ms = ShuangpinScheme.MICROSOFT
         assertEquals(KeyboardVariant(Form.Full), KeyboardVariants.of(Form.Full, InputMethodCatalog.PINYIN, ms))
-        // English and a table's no case of their own (用户 2026-11-11: 以拼音为准)
+        // English and a table have no case of their own: pinyin's rules
         assertEquals(KeyboardVariant(Form.Full), KeyboardVariants.of(Form.Full, InputMethodCatalog.ENGLISH, ms))
         assertEquals(KeyboardVariant(Form.Nine), KeyboardVariants.of(Form.Nine, InputMethodCatalog.ENGLISH, ms))
         assertEquals(KeyboardVariant(Form.Full), KeyboardVariants.of(Form.Full, InputMethodCatalog.WUBI, ms))
@@ -33,7 +33,6 @@ class KeyboardVariantsTest {
         assertTrue(sp.semicolon)
         assertFalse(KeyboardVariants.of(Form.Grouped18, InputMethodCatalog.SHUANGPIN_KEYS18, ShuangpinScheme.XIAOHE).semicolon)
         assertEquals(KeyboardVariants.SHUANGPIN_NINE, KeyboardVariants.of(Form.Nine, InputMethodCatalog.SHUANGPIN_NINE, ms).nineLetters)
-        // 注音's keyboards are theirs whatever types on them
         assertEquals(KeyboardVariant(Form.ZhuyinNine), KeyboardVariants.of(Form.ZhuyinNine, InputMethodCatalog.ZHUYIN_NINE, ms))
     }
 

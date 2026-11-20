@@ -8,9 +8,8 @@ import java.io.File
 import java.io.IOException
 
 /**
- * [org.fcitx.fcitx5.android.engine.store.replaceFile] of files of the platform's file system, for
- * the app's own files (a custom phrases file, the host's config): [dest] replaced with what
- * [write] puts in [temp], whole or not at all, no [temp] left behind.
+ * [org.fcitx.fcitx5.android.engine.store.replaceFile] for plain files: [dest] replaced whole or not at all
+ * with what [write] puts in [temp], no [temp] left behind.
  *
  * @throws IOException if [dest] could not be replaced
  */

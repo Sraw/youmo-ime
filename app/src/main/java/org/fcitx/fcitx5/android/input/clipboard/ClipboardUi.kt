@@ -66,7 +66,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     fun switchUiByState(state: ClipboardStateMachine.State) {
         Timber.d("Switch clipboard to $state")
-        // a panel's change, as Motion says: Medium, and none with animation off
         val motion = motionSettings()
         if (motion.animates)
             TransitionManager.beginDelayedTransition(root, Fade().apply { duration = Motion.Medium.enter(motion) })

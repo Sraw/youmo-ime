@@ -44,11 +44,7 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/**
- * The picker's cells as one-key scenes (060-render-p2 S6, its review): every 颜文字 whole in its cell at
- * 360 and 393 dp (rules B §8a), an emoji centred in its own, a reused cell's words and what a screen
- * reader reads both the new item's, and a long press's popup over the face drawn.
- */
+/** Every 颜文字 whole in its cell at 360 and 393 dp, an emoji centred, a reused cell's words and reading the new item's. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
@@ -59,13 +55,12 @@ class PickerSceneCellTest {
 
     @Before
     fun canvasOn() {
-        // the 颜文字 these tests open is remembered as the panel last shown: put back after, so a later test's 表情 opens the emoji
+        // 颜文字 is remembered as the panel last shown: put back after, so a later test's 表情 opens the emoji
         prefs.set(AppPrefs.getInstance().internal.lastPickerType, AppPrefs.getInstance().internal.lastPickerType.getValue())
     }
 
     private val measurer by lazy { AndroidTextMeasurer(SceneFonts(ThemeManager.shownLook(ThemeManager.activeTheme))) }
 
-    // the bar's 表情 button opens the panel last shown: the 颜文字's own switch key (表情 too) back to the emoji
     private fun KeyboardHarness.emojiPanel() {
         tap(described(service.getString(R.string.a11y_key_emoji)))
         relayout()
@@ -95,15 +90,13 @@ class PickerSceneCellTest {
         error("no $label in the grid")
     }
 
-    // the label's ink across, measured as the scene measures it
     private fun ink(cell: SceneKeyCell): Pair<Double, Double> {
         val t = cell.keyNode!!.ops(false).filterIsInstance<Op.Text>().single()
         val m = measurer.measure(t.text, t.font, t.weight, t.size)
         return (t.x + m.ink.left * t.scaleX) to (t.x + m.ink.right * t.scaleX)
     }
 
-    // outside the engine's room is out of rule B §8a (and outside the cell cut off): the room its content box (a
-    // grid cell's face is a rectangle: the face) less 2 dp a side; half a px of rounding allowed
+    // outside the engine's room (the face less 2 dp a side) is cut off; half a px of rounding allowed
     private fun outside(cell: SceneKeyCell): String? {
         val (l, r) = ink(cell)
         val face = cell.keyNode!!.shape.bounds
@@ -115,7 +108,7 @@ class PickerSceneCellTest {
 
     private fun everyEmoticonWhole(width: String) {
         RuntimeEnvironment.setQualifiers(width)
-        // the width put back after: a later test in this sandbox starts at the class's
+        // put back: a later test in this sandbox starts at the class's
         try {
             everyEmoticonWholeAt()
         } finally {
@@ -138,8 +131,7 @@ class PickerSceneCellTest {
         }
     }
 
-    // a theme whose letters are a nine-slice image: the grid's cells have no images to draw it with, and
-    // show the letters' colour there, as theme 3.0's cells did (not the panel through an empty face)
+    // a nine-slice theme: the grid's cells have no images, so they show the letters' colour as theme 3.0's did
     @Test
     fun aNineSliceThemesCellShowsTheKeyColour() {
         val light = TestThemes.PixelLight.look
@@ -220,7 +212,6 @@ class PickerSceneCellTest {
             grid, KeyActionListener { _, _ -> }, PopupActionListener { actions += it },
             listOf(PickerData.Category("a") to arrayOf("x")), "PickerSceneCellTest", bordered = true, policy = policy,
         ).apply { rebuild() }
-        // nothing used yet: the header, then "x"
         val holder = adapter.onCreateViewHolder(grid, adapter.getItemViewType(1))
         adapter.onBindViewHolder(holder, 1)
         val cell = holder.itemView as SceneKeyCell
@@ -229,7 +220,6 @@ class PickerSceneCellTest {
         cell.measure(View.MeasureSpec.makeMeasureSpec(W, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(H, View.MeasureSpec.EXACTLY))
         cell.layout(0, 0, W, H)
         cell.performLongClick()
-        // the face as drawn: its fill, a margin in from the cell's sides (bordered)
         val face = cell.keyNode!!.ops(false).filterIsInstance<Op.Fill>().first().shape.bounds
         assertTrue("$face", face.left > 0 && face.right < W)
         val shown = actions.filterIsInstance<PopupAction.ShowKeyboardAction>().single()

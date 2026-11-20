@@ -1,44 +1,36 @@
-// youmo-maker: the theme maker's document (060-render-p3 §5.1, M1), apart from the page so node tests it:
-// a theme 4.0 pack (theme.xml, its files, its layouts/) opened, saved, kept as a draft, undone and redone;
-// the preview's environment. The engine (youmo-engine) reads and draws; youmo-lib has the zip and the 3.0
-// and 2.1 files, which the engine's convert30 makes 4.0.
+// youmo-maker: the theme maker's document (a 4.0 pack), apart from the page so node tests it.
 (function (root) {
   'use strict';
 
-  // the XML text helpers are youmo-form's, one set for both (R25 web-8): the page and the tests load it first
   const F = root.YoumoForm;
   if (!F) throw new Error('youmo-maker needs youmo-form loaded first');
   const { uncommented, unescape, escape } = F;
-  // a file named by an attribute: either quote, spaces around '=' (as XML has it and the app reads it)
+  // either quote, spaces around '=' (as XML allows and the app reads)
   const srcOf = (tag, attr) => new RegExp('<(' + tag + ')\\b[^>]*?\\b(' + attr + ')\\s*=\\s*(?:"([^"]+)"|\'([^\']+)\')', 'g');
   const fileOf = (m) => unescape(m[3] ?? m[4]);
-  // the image a style's function names: a key's image(…), an effect's ripple-image(…) or particles(…)
   const IMAGE_FN = /(?<![\w-])(image|ripple-image|particles)\(\s*([^,)\s]+)/g;
 
   const THEME_XML = 'theme.xml';
   const LAYOUTS = 'layouts/';
   const UNDO_LIMIT = 100;
 
-  /** A document: the theme's text, its files by name, its layouts by their path under layouts/ (kept as they are). */
   function doc(xml, files = {}, layouts = {}) {
     // own keys copied one by one: a file named __proto__ stays a file
     const copy = (o) => { const out = Object.create(null); for (const k of Object.keys(o)) out[k] = o[k]; return out; };
     return { xml, files: copy(files), layouts: copy(layouts) };
   }
 
-  /** The <theme>'s name= of [xml], null for none. */
   function themeName(xml) {
     const t = F.elements(xml, 'theme')[0];
     const a = t && t.attrs.find((x) => x[0] === 'name');
     return a ? a[1] : null;
   }
 
-  /** [xml] with its <theme>'s name= [name] (one put in where it has none). */
   function withName(xml, name) {
     const t = F.elements(xml, 'theme')[0];
     if (!t) return xml;
     const tag = t.tag;
-    // its attributes one by one, so a ' name=' inside another's quoted value is never the one changed
+    // attribute by attribute, so a ' name=' inside another's quoted value is never the one changed
     let at = null;
     for (const a of tag.matchAll(/(\s)([^\s=/>]+)\s*=\s*("[^"]*"|'[^']*')/g)) if (a[2] === 'name') { at = a; break; }
     const named = at
@@ -113,19 +105,17 @@
         else if (Math.max(s[0], s[1]) > side) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，最多 ' + side);
         else if (role === 'image' && bytes.length > lim.keyImageBytes) bad(file + ' 超过 ' + lim.keyImageBytes + ' 字节');
       } else if (role === 'effect') {
-        // the app's ThemeAssetLimits.checkEffectImage: PNG or WebP by its name, its sides and bytes
         const s = L.imageSize(bytes);
         if (!/\.(png|webp)$/i.test(file)) bad(file + '：特效图片只能是 .png 或 .webp');
         else if (!s) bad(file + ' 不是 App 认得的图片');
         else if (lim.effectImageSide != null && Math.max(s[0], s[1]) > lim.effectImageSide) bad(file + ' 太大：' + s[0] + '×' + s[1] + '，特效图片最多 ' + lim.effectImageSide);
         else if (lim.effectImageBytes != null && bytes.length > lim.effectImageBytes) bad(file + ' 超过 ' + lim.effectImageBytes + ' 字节（特效图片）');
       } else if (role === 'preview') {
-        // the app's ThemeAssetLimits.preview
         const s = L.imageSize(bytes);
         if (!s || !['png', 'webp'].includes(L.imageType(bytes))) bad(file + ' 不是 PNG 或 WebP');
         else if (Math.max(s[0], s[1]) > 2048 || bytes.length > 512 * 1024) bad(file + ' 太大：预览图最大 2048×2048、512 KB');
       } else if (role === 'icon') {
-        // the app keeps an icon only as an SVG of filled paths (SvgSubset, the engine's readIcon)
+        // the app keeps an icon only as an SVG of filled paths (SvgSubset)
         let text = null;
         try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch (e) { /* not text: no SVG */ }
         const r = text == null ? null : E.readIcon(text);
@@ -133,20 +123,16 @@
         else if (!r) bad(file + ' 不是 SVG（App 只收 SVG 图标）');
         else if (!r.ok) bad(file + '：' + r.problems[0].message);
       } else if (role === 'sound') {
-        // the app's ThemeAssetLimits.sound: the engine's SoundFile, the one rule (its limits, its formats)
         const r = E.readSound(file, bytes);
         if (!r.ok) bad(r.problems[0].message);
       }
     }
-    // an animated <picture> (060-render-p3 A4): past the app's limits it is drawn still, with a warning on import
-    // the engine's reading of it (info().picture.animated), each version's
     const animSrcs = new Set([false, true].map((dark) => read.theme.info(dark).picture).filter((p) => p && p.animated).map((p) => p.src));
     for (const animSrc of animSrcs) {
       if (!d.files[animSrc]) continue;
       const why = animatedStill(lim, d.files[animSrc]);
       if (why) out.push({ level: 'warning', line: 0, message: animSrc + ' 在 App 里会显示成静态图：' + why });
     }
-    // the app's own check (BlankKeys): on its boards and the theme's own layouts, in every scene the styles name
     const layouts = Object.create(null);
     for (const [n, t] of Object.entries(d.layouts)) layouts[n] = t;
     for (const where of E.blankKeys(read.theme, layouts)) {
@@ -154,10 +140,7 @@
       else bad(where + '：字藏了，键面又不是图片——Shift、退格、空格或回车会是空白键');
     }
     const enc = new TextEncoder();
-    // the pack's layouts as the app takes them (ThemePackFiles.checkLayouts, ThemeAssetLimits.layouts; ThemePackLayouts.report)
     const names = Object.keys(d.layouts);
-    // the app's boards (BuiltInKeyData.BOARDS): one of those it does not read from a pack (PackLayouts.replaces) is one
-    // the user picks among their own layouts, made one of those once imported (061-custom-layout §11; one rule, not two)
     const boards = new Set(E.layouts());
     for (const n of names) if (!n.endsWith('.xml') || !L.isPlainFileName(n)) bad('layouts/' + n + ' 不是 App 认得的布局文件名（<键盘>.xml）');
     if (names.length > lim.layouts) bad('自带的键盘布局 ' + names.length + ' 个，App 最多收 ' + lim.layouts + ' 个');
@@ -167,7 +150,6 @@
       if (boards.has(id) && !E.replaces(id)) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：范围内的布局在 0.6.1 起要在布局列表里选（导入主题时放进 外观 → 布局，不再顶替这个键盘）' });
       else if (!E.replaces(id)) out.push({ level: 'warning', line: 0, message: 'layouts/' + n + '：App 没有这个键盘，不会用它' });
     }
-    // the app's ThemeAssetLimits.MAX_THEME_XML_BYTES
     const xmlBytes = enc.encode(d.xml).length;
     if (lim.themeXmlBytes != null && xmlBytes > lim.themeXmlBytes) bad('theme.xml 有 ' + xmlBytes + ' 字节，App 最多收 ' + lim.themeXmlBytes + ' 字节');
     let total = 0;
@@ -180,22 +162,15 @@
     return out;
   }
 
-  // the pixels the page decodes of a theme at most, all its images together (64 MP, ~256 MB of bitmaps)
   const DECODE_BUDGET = 64 * 1000 * 1000;
 
-  /**
-   * Which of [d]'s files the page may decode: only images the theme names, each within its role's sides (the
-   * picture's source, its cuts, a key's image: youmo-lib's decodeCaps), and all of them within DECODE_BUDGET, the
-   * first named first. A pack's bytes are not trusted: a decode past the browser's memory takes the tab down.
-   * [only]: those roles alone (the layout page draws no picture: its keys' images only, the budget theirs).
-   */
+  /** Which files the page may decode: pack bytes are untrusted, and a decode past the browser's memory takes the tab down. */
   function decodableImages(L, format, d, only = null) {
     const xml = uncommented(d.xml);
     const roles = new Map();
     const name = (n, role) => { if (!roles.has(n)) roles.set(n, role); };
     for (const m of xml.matchAll(srcOf('picture', 'src'))) name(fileOf(m), 'source');
     for (const m of xml.matchAll(srcOf('cut', 'file'))) name(fileOf(m), 'picture');
-    // an effect's image is not drawn by the preview: not decoded
     for (const m of xml.matchAll(IMAGE_FN)) if (m[1] === 'image') name(m[2].replace(/^["']|["']$/g, ''), 'key');
     let spent = 0;
     const out = [];
@@ -227,15 +202,8 @@
   const decode = (bytes) => new TextDecoder().decode(bytes);
   const isZip = (bytes) => bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b;
 
-  /**
-   * [bytes] (a file the user opened) as a document: a 4.0 pack (a zip with theme.xml at its top), a 3.0 or 2.1
-   * theme file (youmo-lib reads it as the app does, the engine makes it 4.0), or a bare theme.xml.
-   * `{doc, notes}`: notes say what was done to it (`converted`), what it carries (`layouts`: their ids) and what
-   * the app would not take from it (`dropped`). Throws youmo-lib's ThemeError (or an Error) where it is none of them.
-   */
   async function open(E, L, format, bytes) {
     if (!isZip(bytes)) {
-      // a theme.xml: text that starts as XML, no bigger than a file the app takes
       if (bytes.length > format.limits.fileBytes) throw new L.ThemeError('limit', 'fileBytes');
       const text = decode(bytes).replace(/^﻿/, '');
       if (!/^\s*</.test(text)) throw new L.ThemeError('not-theme', 'not a theme file');
@@ -275,7 +243,6 @@
     return { doc: doc(r.xml, files), notes: [{ kind: 'converted', from: opened.migrated ? '2.1' : '3.0' }] };
   }
 
-  /** [d] as the file the app imports: `{name: "<theme's name>.theme", bytes}`, theme.xml first, then its files, then layouts/. */
   function save(L, d) {
     const enc = new TextEncoder();
     const entries = [[THEME_XML, enc.encode(d.xml)]];
@@ -284,7 +251,6 @@
     return { name: (themeName(d.xml) || 'theme') + '.theme', bytes: L.writeZip(entries) };
   }
 
-  /** Two documents the same: their text, files and layouts. */
   function same(a, b) {
     if (a.xml !== b.xml) return false;
     const eq = (x, y, byte) => {
@@ -296,7 +262,6 @@
     return eq(a.files, b.files, true) && eq(a.layouts, b.layouts, false);
   }
 
-  /** Undo and redo: the documents as they were, at most [limit] back (each a whole document: files are shared, not copied). */
   class History {
     constructor(first, limit = UNDO_LIMIT) {
       this.limit = limit;
@@ -307,7 +272,6 @@
     get current() { return this.now; }
     get canUndo() { return this.past.length > 0; }
     get canRedo() { return this.future.length > 0; }
-    /** [next] the document now; nothing kept where it is the same as now. */
     push(next) {
       if (same(next, this.now)) return false;
       this.past.push(this.now);
@@ -330,35 +294,19 @@
     }
   }
 
-  /**
-   * The draft: the document as it is now, kept in [store] (`get(key)`, `put(key, value)`, `remove(key)`, `keys()`,
-   * each a promise; `lock(act)` where the tabs' writes can be made one at a time) so a page opened again offers it
-   * back. A store that fails (a private window, no IndexedDB) is a page without drafts, never one that stops.
-   */
+  /** A failing store (private window) means no drafts, never a broken page. */
   const DRAFT = 'draft';
-  // the files apart from the text: written again only when they changed (an edit of theme.xml shares its files
-  // object with the document before it), not megabytes of pictures each time a value is typed
-  // the text names its files record by id (each set of files kept under its own key): the files are written
-  // first, then the text naming them, then this page's records before it are let go. A text read with files
-  // not its own is no draft, never a mix; two tabs each write their own files again when the other wrote last
+  // files are written apart from the text, only when changed; a text read with files not its own is no draft, never a mix
   const DRAFT_FILES = 'draft-files'; // the one files record of the pages before (drafts 2 and 3)
   const filesKey = (id) => DRAFT_FILES + '-' + id;
-  // the store → { files, id, own }: the files last written to it, and the ids of the files records this page
-  // wrote and has not let go yet (a record of a write cut before its text, or the one an earlier text named)
   const keptFiles = new WeakMap();
   const wrote = new WeakSet(); // the pages whose text has gone in
-  // the tabs' writes one at a time where the store can (store.lock: the browser's Web Locks): a page's first write
-  // lets go of the record of a page closed before, which, without the lock, may be the record an open tab has read
-  // the text naming and is about to name again (its draft lost); without a lock that record is left
-  // (a lock refused, as browsers may for a file:// page, is a write without it; the write on hiding the page waits
-  // for another tab's write, a few IndexedDB transactions: a page closed while another tab writes may lose its
-  // last change)
+  // a page's first write lets go of a closed page's record, which without the lock may be one an open tab is about to name
   async function locked(store, act) {
     if (store.lock) {
       try {
         return await store.lock(() => act(true));
       } catch (e) {
-        // no lock to be had: written as without one (act itself never throws)
       }
     }
     return act(false);
@@ -372,7 +320,6 @@
       const prev = before && before.v === 4 ? before.files : null;
       const first = !wrote.has(store);
       let kept = keptFiles.get(store);
-      // files changed, or another tab's text is there now (its files may have replaced ours): written anew
       if (!kept || kept.files !== d.files || prev !== kept.id) {
         const id = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
         kept = { files: d.files, id, own: (kept ? kept.own : []).concat(id) };
@@ -381,13 +328,8 @@
       }
       await store.put(DRAFT, { v: 4, doc: { xml: d.xml, layouts: d.layouts }, files: kept.id, env, at: Date.now() });
       wrote.add(store);
-      // only this page's own records are let go: another open tab may have read its text before we wrote and
-      // write it after, naming its record (removing that record lost its draft). The record of a page closed
-      // before is let go by the first write of the next page, only with the tabs' writes one at a time
       const gone = kept.own.filter((x) => x !== kept.id);
       if (first && serial) {
-        // under the lock any files record the text does not name is no open tab's to lose (an open tab writes its
-        // files again when the text names another's): the records of pages closed before, all of them
         for (const k of await store.keys()) {
           if (typeof k !== 'string' || !k.startsWith(DRAFT_FILES + '-')) continue;
           const id = k.slice(DRAFT_FILES.length + 1);
@@ -410,7 +352,6 @@
     try {
       const v = await store.get(DRAFT);
       if (!v || ![1, 2, 3, 4].includes(v.v) || !v.doc || typeof v.doc.xml !== 'string') return null;
-      // 1: the files kept with the text; 2: kept apart, with no id; 3: one record with an id; 4: a record per id
       let files = v.doc.files;
       if (v.v !== 1) {
         const kept = await store.get(v.v === 4 ? filesKey(v.files) : DRAFT_FILES);
@@ -439,14 +380,10 @@
       keptFiles.delete(store);
       wrote.delete(store);
     } catch (e) {
-      // nothing kept: nothing to drop
     }
   }
 
-  /**
-   * IndexedDB as a draft store (pictures are too big for localStorage); null where the browser has none. [name]: the
-   * page's own database (the layout maker keeps its draft apart from the theme maker's), its tabs' lock named after it.
-   */
+  /** IndexedDB as a draft store (pictures are too big for localStorage); null where the browser has none. */
   function idbStore(idb, name = 'youmo-theme-maker') {
     if (!idb) return null;
     let db = null;
@@ -473,9 +410,7 @@
     };
   }
 
-  // ---- the preview's environment ----
 
-  /** Phones to preview on: the screen's short and long side in px and its density (the keyboard as tall as the app makes it by default). */
   const DEVICES = [
     { id: 'oneplus-6t', label: 'OnePlus 6T', w: 1080, h: 2340, density: 2.625 },
     { id: 'pixel-8', label: 'Pixel 8', w: 1080, h: 2400, density: 2.625 },
@@ -484,20 +419,9 @@
     { id: 'small', label: '小屏 720p', w: 720, h: 1280, density: 2 },
     { id: 'tablet', label: '平板 10"', w: 1600, h: 2560, density: 2 },
   ];
-  /**
-   * The keyboard's height in dp, the app's default: upright 30% of a common phone; turned 标准's four rows, 48 dp on a
-   * phone, 56 dp on a large screen (a short side of 600 dp or more: a tablet, a foldable's inner screen;
-   * 061-landscape-height §5.1).
-   */
   const KEYBOARD_DP = { portrait: 267, landscape: 192, landscapeLarge: 224 };
   const LARGE_SHORT_SIDE_DP = 600;
 
-  /**
-   * The window [e] is drawn in as the app lays it out: its width in px across the device as held ([e].landscape: turned),
-   * 横屏 or not by the engine's answer (ScreenShape: turned, or 600 dp wide; a tablet upright is 横屏 throughout, its
-   * `@landscape` styles, sizes' second values and landscape cut as well as its height), the keyboard's height in px
-   * ([KEYBOARD_DP]).
-   */
   function shape(E, e) {
     const width = e.landscape ? Math.max(e.w, e.h) : Math.min(e.w, e.h);
     const landscape = !!E.screenLandscape(!!e.landscape, Math.round(width / e.density));
@@ -507,21 +431,11 @@
   const FORMS = ['normal', 'compact', 'floating', 'left', 'right', 'split', 'flat'];
   const BOARDS = ['qwerty', 'nine', 'k14', 'k18', 'zhuyin', 'zhuyin-nine', 'number', 'symbols'];
 
-  /**
-   * The preview's environment (060-render-p3 §5.1 预览环境): the device, the board and its form; the field and the
-   * input method typed in (the theme's `@field=`, `@im=`); what is shown besides the keys: a popup (`show`: preview,
-   * keys, menu), the bar (`bar`: idle, typing) and a panel over the keys (`panel`: clipboard, picker, editing, voice).
-   */
   const ENV = {
     device: 'oneplus-6t', w: 1080, h: 2340, density: 2.625, landscape: false, board: 'qwerty', form: 'normal', dark: false, shift: 'none',
     field: 'text', ime: 'pinyin', show: '', bar: 'idle', panel: '',
   };
-  /**
-   * A draft's kept environment [kept] (keepDraft's) as the page can show it now: a choice its form does not offer
-   * ([offered]: a key of ENV to its select's values) the default's, as 0.6.0's 手写 board, gone since (a board the engine
-   * does not have draws nothing and leaves the form's select empty); a device it does not list `custom` (its size kept);
-   * a size not a positive number, or a value of another type, the default's.
-   */
+  /** A choice the form no longer offers falls back to the default (else the select empties). */
   function restoreEnv(kept, offered) {
     const k = kept && typeof kept === 'object' ? kept : {};
     const e = Object.assign({}, ENV);
@@ -537,25 +451,16 @@
     }
     return e;
   }
-  /** The fields and input methods the environment offers: the engine's (Selector.FIELDS, Selector.IMS). */
   const FIELDS = ['text', 'password', 'url', 'number', 'email'];
   const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie'];
 
-  /**
-   * Chinese punctuation as the app ships it (`punc.mb.zh_CN`), each key to its first, the one typed: what a new install
-   * has on for a Chinese input method, so the preview shows marks as the app does (，。？！ on nine's 1). The test
-   * holds it to the app's file.
-   */
+  /** As the app ships it (`punc.mb.zh_CN`): the test holds it to the app's file. */
   const ZH_PUNCTUATION = {
     '.': '。', ',': '，', '?': '？', '"': '“', ':': '：', ';': '；', "'": '‘', '<': '《', '>': '》', '\\': '、', '!': '！',
     '#': '#', '$': '$', '%': '%', '^': '……', '_': '——', '(': '（', ')': '）', '[': '【', ']': '】', '{': '{', '}': '}',
     '~': '～', '`': '`',
   };
 
-  /**
-   * [e] (the page's choices) as the engine's EnvJson: the window's [shape], the form's flags, and
-   * Chinese punctuation (ZH_PUNCTUATION) for any input method but English, as on a new install.
-   */
   function envJson(E, e) {
     const s = shape(E, e);
     const out = { width: s.width, height: s.height, density: e.density };
@@ -572,12 +477,6 @@
     return out;
   }
 
-  /**
-   * A `.layout` file's [bytes] as its text, the one opener of the theme maker's 打开 .layout… and the layout maker's
-   * (LM.openText): UTF-8 (its byte-order mark gone, its line ends \n), within the app's [max] bytes (§2.6); throws with
-   * what the page says otherwise, a zip (a .theme) said to be one. [size]: the file's, where [bytes] is only its start
-   * (a file far past the limit is not read whole to be refused).
-   */
   function layoutText(bytes, max, size = bytes.length) {
     if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b) throw new Error('这是主题包（.theme），不是 .layout 布局文件');
     if (size > max) throw new Error('文件 ' + size + ' 字节，布局最大 ' + Math.round(max / 1024) + ' KB');
@@ -587,26 +486,17 @@
     } catch (e) {
       throw new Error('不是 UTF-8 文本');
     }
-    // Windows' line ends as the page's: the lines the layout maker adds (a <meta>) are \n, a textarea gives \n back
     return text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
   }
 
-  /**
-   * [text] (a layout's) with each key's face a layout maker before L8 wrote of three letters or more (`{group:hjk}`,
-   * W2's merge: LayoutReader refuses it, its GROUP_ARG is one or two) written as that page writes it now, the letters'
-   * capitals (LE.groupLabel): `{xml, keys}`, how many changed. Only where the key's letters= are those letters: another
-   * face is the user's own. Both pages' openers run it (review R26 D8; F8459: 打开 .layout here showed a line error for
-   * a file of then, nothing said why).
-   */
   function oldGroupFaces(text) {
     let out = text;
     let keys = 0;
-    // from the last, so each key found is still where it was found
     for (const k of F.elements(text, 'key').reverse()) {
       const a = Object.fromEntries(k.attrs);
       const m = /^\{group:([a-z;]{3,})\}$/.exec(a.label || '');
       if (!m || (a.letters || '').replace(/ /g, '') !== m[1]) continue;
-      // the label= attribute itself, the tag's attributes gone through whole (a "label=…" inside another's value is that value)
+      // whole attributes, so a "label=…" inside another's value is that value
       const at = [...k.tag.matchAll(/(\s+)([\w:.-]+)\s*=\s*("[^"]*"|'[^']*')/g)].find((x) => x[2] === 'label');
       if (!at) continue;
       const tag = k.tag.slice(0, at.index) + at[1] + 'label="' + m[1].toUpperCase() + '"' + k.tag.slice(at.index + at[0].length);

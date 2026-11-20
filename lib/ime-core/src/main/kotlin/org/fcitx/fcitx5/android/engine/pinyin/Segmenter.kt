@@ -4,53 +4,31 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/** Turns what was typed into the syllables it may stand for, the same for every way of typing pinyin. */
+/** Turns typed input into the syllables it may stand for, for every pinyin input style. */
 fun interface Segmenter {
     fun segment(input: String): SyllableGraph
 
-    /**
-     * [input] as [segment] has it, [taps] where across its key each place was tapped (NaN for no
-     * place; null for none at all): weighed where a key types two letters, the grouped keyboards'
-     * ([T9Segmenter]). Any other way of typing has no such keys.
-     */
+    /** [taps]: where across its key each place was tapped (NaN none; null for all), weighed on two-letter grouped keys. */
     fun segment(input: String, taps: FloatArray?): SyllableGraph = segment(input)
 
-    /**
-     * [input] as [segment] has it with [taps], and [touches] where each place's key was tapped and
-     * the keys around it (null for a place with none; null for none at all): a key read as the
-     * key next to it, as likely as where it was tapped says (061-neighbour-correction). Where a
-     * way of typing reads no slips, as without them.
-     */
+    /** Plus [touches] (each place's tapped key and neighbours), for reading slips; without slips as [segment]. */
     fun segment(input: String, taps: FloatArray?, touches: Array<Touch?>?): SyllableGraph = segment(input, taps)
 
-    /** Whether [c] is a key of this way of typing: what a keyboard hands to the engine. */
+    /** What a keyboard hands to the engine for this style. */
     fun reads(c: Char): Boolean = c in 'a'..'z'
 
-    /**
-     * Whether [c], a key this [reads], is read after [before] (the input not yet taken, up to the
-     * cursor): false where it can only be punctuation there (双拼's `;`, a final, with no initial
-     * before it).
-     */
+    /** False where [c] can only be punctuation after [before] (双拼's `;` final with no initial). */
     fun readsAfter(before: String, c: Char): Boolean = true
 
-    /**
-     * Whether the keys are the letters of the pinyin, as typed; false for the nine keys, whose
-     * input is digits, the syllables shown spelt and taken one by one ([T9Segmenter]).
-     */
+    /** False for grouped keys, whose input is codes with syllables taken off a bar ([T9Segmenter]). */
     val typesLetters: Boolean get() = true
 
-    /**
-     * Whether the keys spell full pinyin, so the built-in phrases' keys (`rq`, `sj`, `xq`) are no
-     * syllable's: false in 双拼, where `sj` and `xq` spell syllables (san, xiu in 自然码) whose words they would push down.
-     */
+    /** False in 双拼, where built-in phrase keys (`sj`, `xq`) spell syllables whose words they would push down. */
     val spellsFullPinyin: Boolean get() = true
 
-    /**
-     * How [syllable] is typed in letters, as a common word's key has it (CommonWords): its pinyin;
-     * 双拼's two keys, as the scheme teaches them. Null where it cannot be typed so.
-     */
+    /** How [syllable] is typed in letters, for common-word keys: pinyin, or 双拼's taught keys; null if it cannot be. */
     fun typedAs(syllable: Int): String? = Syllables.spelling(syllable)
 
-    /** What [typedAs] differs by among segmenters: two alike type alike (an index of the keys kept for it). */
+    /** Equal values type alike (keys a common-word index). */
     val typing: Any get() = Syllables
 }

@@ -24,10 +24,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * The keyboard chosen on 拼音's and 双拼's pages (uat/14 ST-40, ST-42), shown at the next focus with
- * no restart; the pages' own half is in [SettingsUatTest].
- */
+/** The keyboard chosen on 拼音's and 双拼's pages, shown at the next focus with no restart. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -63,7 +60,7 @@ class KeyboardChoiceUatTest {
     @Test
     @Uat("ST-42")
     fun shuangpinsEighteenThenNineKeysChosenAreThereAtTheNextFocus() {
-        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
         KeyboardHarness(im = shuangpin).use { h ->
             h.start()
             assertTrue("q" in h.texts())

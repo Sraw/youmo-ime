@@ -7,16 +7,9 @@ package org.fcitx.fcitx5.android.input.editing
 import org.fcitx.fcitx5.android.engine.session.Action
 
 /**
- * The end of what was written in each field, for the engine's context where the field has none: a
- * chat clears its box once a message is sent, and the reply typed next follows it more than it
- * follows nothing. Kept as long as it is [fresh], for the last [apps] fields, in memory only; the
- * service tells it nothing of a password or other sensitive field, and names a field as [field]
- * does: fields that say no more of themselves than their app and view share one, as a browser's
- * sites or a chat app's conversations may.
- *
- * The text is what the editor showed before the cursor, the last time it was read, with what was
- * committed since and less what Backspace took: not read back each time, which would cost a round
- * trip a key.
+ * The end of what was written in each field, the engine's context where the field has none (a chat's box cleared
+ * after sending): kept while [fresh], for the last [apps] fields, in memory only, never of a sensitive field. Kept as
+ * read before the cursor plus commits less Backspace, not read back each key (a round trip each).
  */
 class ContextMemory(
     private val keep: Int = KEEP,
@@ -25,27 +18,21 @@ class ContextMemory(
 ) {
     private class Written(val text: StringBuilder, var at: Long)
 
-    // in order of use, the field last written in, read or asked about last; past `apps`, the first goes
+    // in order of use; past `apps`, the first goes
     private val written = object : LinkedHashMap<String, Written>(apps, LOAD, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Written>?) = size > apps
     }
     private var app: String? = null
 
-    /** The field [app] focused; null: one whose text is not to be kept. */
+    /** Null: one whose text is not to be kept. */
     fun focus(app: String?) {
         this.app = app
     }
 
-    /** Whether there is anything fresh at [now] for the field focused: else no need to ask if it is empty. */
+    /** Else no need to ask if it is empty. */
     fun remembers(now: Long): Boolean = written[app ?: return false]?.let { now - it.at <= fresh } == true
 
-    /**
-     * The context for the engine where the editor shows [before] before the cursor at [now]:
-     * itself, or, when the field is empty, what was written in it last, still fresh. Whether it is
-     * empty [after] tells, what follows the cursor: asked only where nothing is before it and
-     * something fresh is kept, as each ask is a round trip. Null: the editor would not say, so what
-     * is kept stays for the next time.
-     */
+    /** [before] itself, or when empty what was written last, still fresh; [after] asked only then (a round trip). Null: kept for next time. */
     fun context(before: String, now: Long, after: () -> CharSequence?): String {
         val app = app ?: return before
         if (before.isNotEmpty()) {
@@ -60,7 +47,7 @@ class ContextMemory(
         return before
     }
 
-    /** [text] committed at [now], the cursor left after its first [cursor] units ([text]'s end for -1). */
+    /** The cursor after its first [cursor] units ([text]'s end for -1). */
     fun committed(text: String, cursor: Int = -1, now: Long) {
         val app = app ?: return
         val typed = if (cursor in 0 until text.length) text.substring(0, cursor) else text
@@ -70,19 +57,18 @@ class ContextMemory(
         if (last.length > keep) last.delete(0, last.length - keep)
     }
 
-    /** A selection was deleted, of what length is not known: what was kept no longer ends the text. */
+    /** Of unknown length: what was kept no longer ends the text. */
     fun cut() {
         written.remove(app ?: return)
     }
 
-    /** Backspace took the code point before the cursor. */
     fun deleted() {
         val last = written[app ?: return]?.text ?: return
         if (last.isEmpty()) return
         last.setLength(last.length - Character.charCount(Character.codePointBefore(last, last.length)))
     }
 
-    /** A Backspace about to go where [start] to [end] is selected: the selection, or the code point before the cursor. */
+    /** The selection, or the code point before the cursor. */
     fun backspace(start: Int, end: Int) {
         if (start != end) cut() else if (start > 0) deleted()
     }
@@ -94,10 +80,7 @@ class ContextMemory(
     }
 
     companion object {
-        /**
-         * As much as the service reads before the cursor: kept full, the context is as long as
-         * the field's own read whole, and English takes it as the end of more, no field's start.
-         */
+        /** As much as the service reads: the context is as long as a field read whole, so English takes it as no field's start. */
         const val KEEP = Action.Context.HOST_CHARS
 
         /** A message answered within half an hour is still the conversation. */
@@ -106,11 +89,7 @@ class ContextMemory(
         const val APPS = 8
         private const val LOAD = 0.75f
 
-        /**
-         * The name [focus] is given for a field: its [app], its view's [id], and what it says of
-         * itself ([type], [name], [hint]), which tells apart the fields one view holds (a Compose
-         * screen's, a browser's) where they differ.
-         */
+        /** What it says of itself tells apart the fields one view holds (Compose, a browser). */
         fun field(app: String?, id: Int, type: Int, name: String?, hint: CharSequence?): String =
             "$app#$id#$type#${name.orEmpty()}#${hint ?: ""}"
     }

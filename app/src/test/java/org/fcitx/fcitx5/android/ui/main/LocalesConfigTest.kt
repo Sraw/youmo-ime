@@ -10,10 +10,7 @@ import org.w3c.dom.Element
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-/**
- * Android 13's per-app languages are the ones the app's own picker offers ([AppLanguage]), not
- * every values-* directory: those hold partial translations too, mostly English once picked.
- */
+/** The app's own picker's languages, not every values-* directory: those hold partial translations too. */
 class LocalesConfigTest {
 
     @Test

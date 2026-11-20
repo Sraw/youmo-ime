@@ -10,20 +10,10 @@ import java.io.OutputStream
 import java.util.zip.ZipInputStream
 
 /**
- * [check], when given, is asked as each entry is unpacked, a chunk at a time, with the entry's count,
- * what it has of it so far and what the entries before it had: it throws to stop, on the chunk that
- * is past a limit, not after a zip bomb is all on the disk. Every entry is counted, a directory's
- * too (size 0): else a zip of empty directories would pass any count.
- *
- * [flat]: only the files at the zip's top are unpacked; a directory, or a file in one, is counted and
- * its bytes read through [check] all the same, and nothing of it written (a Mac's archive of loose
- * files has a `__MACOSX/` of their attributes beside them).
- *
- * [keep], when given, is what is unpacked instead of [flat]'s rule: the entries whose names it keeps
- * (a theme 4.0 pack's top and its `layouts/`), the rest counted and read the same, not written. Every
- * entry's name goes to [names], kept or not.
- *
- * @return top-level files in zip file
+ * [check] is asked per chunk with the entry count and bytes so far, and throws to stop before a zip bomb fills the disk;
+ * directories count too, else a zip of empty ones passes. [flat] writes only top-level files (a Mac archive has a
+ * `__MACOSX/` beside them); [keep] instead writes the names it keeps. Unwritten entries are still read through [check];
+ * every name goes to [names].
  */
 fun ZipInputStream.extract(
     destDir: File,
@@ -65,8 +55,7 @@ fun ZipInputStream.extract(
     return destDir.listFiles()?.toList() ?: emptyList()
 }
 
-// the entry's bytes into [out], [check] asked with what it has so far before a chunk is written:
-// one that throws leaves the chunk past the limit unwritten
+// [check] before each chunk is written: one that throws leaves the chunk past the limit unwritten
 private fun ZipInputStream.copyChecked(out: OutputStream, check: ((size: Long) -> Unit)?): Long {
     if (check == null) return copyTo(out)
     var size = 0L
@@ -81,7 +70,7 @@ private fun ZipInputStream.copyChecked(out: OutputStream, check: ((size: Long) -
     }
 }
 
-// what a flat unpacking reads of an entry it does not keep (OutputStream.nullOutputStream is API 33)
+// OutputStream.nullOutputStream is API 33
 private object Discard : OutputStream() {
     override fun write(b: Int) = Unit
 

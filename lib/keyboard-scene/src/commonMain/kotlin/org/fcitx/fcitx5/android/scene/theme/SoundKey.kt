@@ -5,7 +5,7 @@
 package org.fcitx.fcitx5.android.scene.theme
 
 /**
- * The classes of key a theme's `<sound key=…>` gives a sound to (060-theme-sounds-icons §1.1), by the
+ * The classes of key a theme's `<sound key=…>` gives a sound to, by the
  * selectors' words: what an author styles a key as is what they give a sound to.
  */
 enum class SoundKey(val word: String) {

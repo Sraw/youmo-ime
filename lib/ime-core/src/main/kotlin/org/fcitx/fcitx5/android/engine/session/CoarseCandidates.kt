@@ -10,18 +10,10 @@ import org.fcitx.fcitx5.android.engine.lattice.Candidate
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.user.UserModel
 
-/**
- * Where a list of [data]'s candidates puts those with a word of [coarse] the [user] never typed:
- * past its first page (see [CoarseWords]). [PinyinSession] lists by it, and so does ime-eval, whose
- * ranks are to be those of the list the app shows: a copy of the rule there drifted from this one.
- */
+/** Puts candidates with a [coarse] word the [user] never typed past the first page ([CoarseWords]); shared by [PinyinSession] and ime-eval so their ranks cannot drift. */
 class CoarseCandidates(private val coarse: CoarseWords, private val data: PinyinData, private val user: UserModel?) {
 
-    /**
-     * The candidates of [listed] with a coarse word the user never typed that a first page of
-     * [pageSize] would show, but those [kept] (the user's habit put them there): they wait past it,
-     * those further down keep their place, so what more words read goes after all that was listed.
-     */
+    /** Candidates a first page of [pageSize] would show with an untyped coarse word, except [kept] (placed by habit): they wait past it, later ones keep their place. */
     fun held(listed: List<Candidate>, pageSize: Int, kept: (Candidate) -> Boolean = { false }): List<Candidate> {
         val typedOnce = HashMap<String, Boolean>()
         val held = ArrayList<Candidate>()
@@ -33,15 +25,14 @@ class CoarseCandidates(private val coarse: CoarseWords, private val data: Pinyin
         return held
     }
 
-    /** [listed] as pages of [pageSize] show it: those [held] right after the first page of the others. */
+    /** [listed] paged: [held] right after the first page of the others. */
     fun order(listed: List<Candidate>, pageSize: Int, held: List<Candidate> = this.held(listed, pageSize)): List<Candidate> {
         if (held.isEmpty()) return listed
         val kept = listed.filter { it !in held }
         return kept.take(pageSize) + held + kept.drop(pageSize)
     }
 
-    // one of its words coarse, or words in turn spelling one the user never typed: 射 then 精 is
-    // 射精 as well, and once typed it is read as 射, 精 still
+    // one word coarse, or consecutive words spelling one the user never typed (射 then 精); once typed it reads as 射, 精
     private fun isCoarse(c: Candidate, typedOnce: MutableMap<String, Boolean>): Boolean {
         val words = c.words
         for (i in words.indices) {
@@ -69,6 +60,6 @@ class CoarseCandidates(private val coarse: CoarseWords, private val data: Pinyin
     }
 }
 
-/** The text of [word]: the model's, else the [user]'s own. */
+/** The model's text, else the [user]'s own. */
 internal fun wordText(data: PinyinData, user: UserModel?, word: Int): String =
     if (word < data.vocabulary.size || user == null) data.vocabulary.word(word) else user.text(word)

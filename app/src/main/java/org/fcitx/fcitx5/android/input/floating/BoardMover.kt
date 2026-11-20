@@ -10,11 +10,7 @@ import org.fcitx.fcitx5.android.input.motion.Motion
 import org.fcitx.fcitx5.android.utils.interpolator
 import org.fcitx.fcitx5.android.utils.motionSettings
 
-/**
- * The docked board and the bars over it ([views], in the [keyboard]) moved across by their setting
- * ([BoardMove]): from where they are drawn now, a move under way too, to where they are laid out
- * next. Hidden (the setting changed from the settings page), or animation off, they are just there.
- */
+/** From where they are drawn now, a move under way too. Hidden, or animation off, they are just there. */
 class BoardMover(private val keyboard: View, private val views: List<View>) {
 
     /** Called before the views are laid out anew for the board's new place. */

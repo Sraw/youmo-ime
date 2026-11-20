@@ -33,19 +33,14 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import timber.log.Timber
 import org.fcitx.fcitx5.android.data.theme.Theme as AppTheme
 
-/**
- * A scene's text in [look]'s fonts: `system` the system's, [LookTheme.KEY_FONT] the theme's key font,
- * [LookTheme.CANDIDATE_FONT] its candidates' (060-render-p3 T6a), a pack's ([files]: its fonts by name, each its
- * file's path, T8a) any of its own, at the weight asked (ThemeAssets); null the default one.
- */
+/** `system` the system's font, a pack's ([files]) by name, at the weight asked; null the default one. */
 class SceneFonts(private val look: ThemeLook, private val files: Map<String, String> = emptyMap()) {
     fun typeface(font: String, weight: Int): Typeface? = ThemeAssets.typeface(look, files[font] ?: path(look, font), weight)
 
     companion object {
-        /** [theme]'s fonts, [look] the one it is drawn in (ThemeManager.shownLook). */
         fun of(theme: AppTheme, look: ThemeLook) = SceneFonts(look, (theme as? AppTheme.Pack)?.drawn?.fonts.orEmpty())
 
-        /** The file of [font] in [look]; null, the system's. */
+        /** Null: the system's. */
         fun path(look: ThemeLook, font: String): String? = when (font) {
             LookTheme.KEY_FONT -> look.text.keyFont
             LookTheme.CANDIDATE_FONT -> look.text.candidateFont
@@ -55,12 +50,8 @@ class SceneFonts(private val look: ThemeLook, private val files: Map<String, Str
 }
 
 /**
- * The engine's text measured as Android draws it ([ScenePainter]): the same Paint settings, so what is
- * placed is what is drawn. Kept, the last [KEPT] texts by text, font, weight and size: a scene made
- * again (Shift, Return's label) measures only what it had not before. Measuring is a small part of a
- * scene (youmo29: some 60 texts, 0.1 ms, specs/app.md), so this saves little, but nothing twice.
- *
- * The main thread's only, as the keyboard draws: its Paint and its map are one caller's at a time.
+ * Measured with the same Paint settings [ScenePainter] draws with, so what is placed is what is drawn.
+ * Main thread only: its Paint and its map are one caller's at a time.
  */
 class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -69,11 +60,10 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
 
     private data class Asked(val text: String, val font: String, val weight: Int, val size: Double, val spacing: Double)
 
-    // the least recently asked let go first (access order), so a table's roots or another font for a
-    // while do not keep growing it
+    // access order, so a table's roots or another font for a while do not keep growing it
     private val kept = lruMap<Asked, TextMetrics>(KEPT)
 
-    /** The texts measured with Paint, not found kept: for tests. */
+    /** For tests. */
     @VisibleForTesting
     var measured = 0
         private set
@@ -111,16 +101,14 @@ class AndroidTextMeasurer(val fonts: SceneFonts) : TextMeasurer {
     }
 }
 
-/** The engine's phases ([org.fcitx.fcitx5.android.scene.engine.SceneBuilder]) as Trace sections: a system trace shows where a scene's time goes. */
 object SceneTrace : Phases {
     override fun begin(name: String) = Trace.beginSection(name)
 
     override fun end() = Trace.endSection()
 }
 
-/** The icons a scene names ([org.fcitx.fcitx5.android.scene.Op.Icon]) as the app's drawables. */
 object SceneIcons {
-    // Return's, by ReturnKeyAppearance's icon: the name the scene is given for it (Texts.returnIcon)
+    // by ReturnKeyAppearance's icon (Texts.returnIcon)
     private val returns = mapOf(
         "enter" to R.drawable.ic_baseline_keyboard_return_24,
         "go" to R.drawable.ic_baseline_arrow_forward_24,
@@ -147,20 +135,16 @@ object SceneIcons {
         "arrow-downward" to R.drawable.ic_baseline_arrow_downward_24,
         "short-text" to R.drawable.ic_baseline_short_text_24,
     ) + KeyCommand.entries.associate { SceneMarks.icon(it) to KeyShortcutLooks.of(it).icon } +
-        // the bar's and the panels' own (a key may name them too), their images there; a name shared with a key's
-        // or a command's is drawn on a key as the key's (hide-keyboard's ⌄ keyboard, not the bar's ▾)
+        // a name shared with a key's or a command's is drawn on a key as the key's (hide-keyboard's ⌄, not the bar's ▾)
         (BarIcons.BAR + BarIcons.PANELS).filter { it.name !in Icons.KEYS && it.name !in Icons.COMMANDS }
             .associate { it.name to ToolbarButtonLooks.drawable(it.fallback) }
 
-    // the drawables named by id ([nameOf]): only these read back, so a name no menu gave (a theme's
-    // icon="drawable:123") is no resource looked up that may not exist
+    // only these read back, so a name no menu gave (a theme's icon="drawable:123") looks up no resource that may not exist
     private val named = mutableSetOf<Int>()
 
-    /** The names it draws: the scene's own [org.fcitx.fcitx5.android.scene.Icons.ALL] (a test holds them alike), and none of the menus' ([nameOf]). */
     val names: Set<String> get() = all.keys
 
-    // the names asked for that it has no drawable of: each logged once a process (a layout's or theme's
-    // name the app does not have draws nothing, every frame)
+    // each logged once a process: a name the app does not have draws nothing, every frame
     private val unknown = mutableSetOf<String>()
 
     @DrawableRes
@@ -171,20 +155,15 @@ object SceneIcons {
         return id
     }
 
-    /**
-     * [icon]'s name for a scene (a menu's item, KeyDef's drawable): its own where it has one, else
-     * the drawable's id as a name ([of] reads it back), as the menus' icons are any drawable.
-     */
+    /** Its own where it has one, else the drawable's id as a name ([of] reads it back): the menus' icons are any drawable. */
     fun nameOf(@DrawableRes icon: Int): String =
         all.entries.firstOrNull { it.value == icon }?.key ?: "$DRAWABLE$icon".also { synchronized(named) { named += icon } }
 
     private const val DRAWABLE = "drawable:"
 
-    /** Return's icon's name for the scene: the one the keyboard shows it with now. */
     fun returnName(@DrawableRes icon: Int): String = returns.entries.firstOrNull { it.value == icon }?.key ?: "enter"
 }
 
-/** A map of the last [max] entries asked for (or put), the least recently used dropped as one more is put. */
 internal fun <K, V> lruMap(max: Int): LinkedHashMap<K, V> = object : LinkedHashMap<K, V>(max, LRU_LOAD, true) {
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > max
 }
@@ -192,30 +171,22 @@ internal fun <K, V> lruMap(max: Int): LinkedHashMap<K, V> = object : LinkedHashM
 private const val LRU_LOAD = 0.75f
 
 /**
- * A theme 3.0 look as the engine's theme ([LookTheme]), and its [Cascades], kept for the last
- * [KEPT] looks (main thread). A theme switched back to (day and night, the settings' preview and
- * back) is not read and matched again: each switch rebuilds the input view, and the 700 KiB a theme
- * read and its first scene's matching allocate were what made the canvas's switch wait for a GC.
+ * Kept for the last [KEPT] looks (main thread): each theme switch rebuilds the input view, and a theme's
+ * read and first matching allocate enough to make the switch wait for a GC.
  */
 object SceneThemes {
     private const val KEPT = 4
 
-    // [pack]: the pack instance whose drawn this is (a pack's alone)
     private class Made(val theme: Theme, val pack: AppTheme.Pack? = null) {
         val cascades = Cascades(theme)
     }
 
-    // in the order last asked for, the oldest first
     private val made = lruMap<Triple<ThemeLook, String, Boolean>, Made>(KEPT)
 
-    // the looks that made no theme: not read again, nor logged again, each scene asked of them (every
-    // key that changes what shows, Shift, Return); a look edited is another look, read
+    // not read nor logged again at every scene; a look edited is another look, read
     private val refused = lruMap<Triple<ThemeLook, String, Boolean>, Unit>(KEPT)
 
-    /**
-     * A look's theme file ([LookTheme]); a test's own, one setting more than a look can (060-render-p3
-     * T7a: the window round the keys), the themes kept forgotten as it is set.
-     */
+    /** A test's own, one setting more than a look can; the themes kept forgotten as it is set. */
     @VisibleForTesting
     internal var source: (ThemeLook, String, Boolean) -> String = LookTheme::xml
         set(value) {
@@ -225,18 +196,13 @@ object SceneThemes {
             packs.clear()
         }
 
-    // the packs' (060-render-p3 T8a), read as they were listed, by the system's colours their system() took
+    // by the system's colours their system() took
     private val packs = lruMap<Pair<AppTheme.Pack, SystemColors>, Made>(KEPT)
 
-    /**
-     * [theme]'s engine theme, drawn in [look] (ThemeManager.shownLook): a pack's its own file ([AppTheme.Pack.drawn]),
-     * any other's its look's ([of]).
-     */
     fun of(theme: AppTheme, look: ThemeLook): Theme? {
         if (theme !is AppTheme.Pack) return of(look, theme.name, theme.isDark)
         val key = theme to ThemePackFiles.systemColors
-        // this instance's drawn alone: a copy() equal to an older one (the system's colours set anew) has
-        // its own, an old instance asked after the colours changed not kept as the new one's
+        // this instance's alone: a copy() equal to an older one (system colours set anew) has its own
         packs[key]?.takeIf { it.pack === theme }?.let { return it.theme }
         return theme.drawn.also { packs[key] = Made(it, theme) }
     }
@@ -245,8 +211,7 @@ object SceneThemes {
         val key = Triple(look, name, dark)
         made[key]?.let { return it.theme }
         if (refused.containsKey(key)) return null
-        // writing the look's theme file can throw (a broken 3.0 theme); that look is refused as an
-        // unreadable one is, not a crash in onDraw or layout
+        // writing it can throw (a broken 3.0 theme): refused as an unreadable look, not a crash in onDraw or layout
         val xml = runCatching { source(look, name, dark) }
             .onFailure { Timber.e(it, "scene theme $name: not written") }
             .getOrNull()
@@ -260,10 +225,7 @@ object SceneThemes {
         return null
     }
 
-    /**
-     * Everything kept by a look let go: the themes, the measurers (their fonts), the icons and the
-     * scenes. A look names its files by path, so a theme's file written over in place changes no look.
-     */
+    /** A look names its files by path, so a theme's file written over in place changes no look. */
     fun forgetAll() {
         made.clear()
         refused.clear()
@@ -272,7 +234,7 @@ object SceneThemes {
         SceneBoard.forgetLooks()
     }
 
-    /** [theme]'s cascades, [of]'s theme kept; a theme not kept (none [of] made), new ones. */
+    /** A theme not kept, new ones. */
     fun cascades(theme: Theme): Cascades =
         (made.values.firstOrNull { it.theme === theme } ?: packs.values.firstOrNull { it.theme === theme })?.cascades ?: Cascades(theme)
 }

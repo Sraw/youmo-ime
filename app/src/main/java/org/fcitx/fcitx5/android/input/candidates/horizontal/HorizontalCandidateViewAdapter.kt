@@ -20,7 +20,6 @@ import splitties.dimensions.dp
 import splitties.views.dsl.core.matchParent
 import splitties.views.dsl.core.wrapContent
 
-/** [bar]: the theme's candidates (T6a), worked out once for every holder and the bar's lines alike. */
 open class HorizontalCandidateViewAdapter(val theme: Theme, val bar: BarLook) :
     RecyclerView.Adapter<CandidateViewHolder>() {
 

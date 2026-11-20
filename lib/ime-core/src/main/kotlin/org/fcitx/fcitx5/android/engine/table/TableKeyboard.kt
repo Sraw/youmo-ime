@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.table
 
-/**
- * What table [im]'s letters keyboard shows of it, the engine's to say (Engines.tableKeyboard): the
- * [keys] of its codes that are no letter (二笔's `;',./`, a wildcard `*`), whether its 拼 key is on
- * ([lookingUp], [org.fcitx.fcitx5.android.engine.session.Action.LookUp]), and its [roots] on the
- * letters as [labels] says.
- */
+/** What table [im]'s keyboard shows: its non-letter code [keys] (二笔's `;',./`, a wildcard), whether 拼 is on, and its [roots] per [labels]. */
 data class TableKeyboard(
     val im: String,
     val keys: Set<Char>,
@@ -17,13 +12,9 @@ data class TableKeyboard(
     val labels: KeyLabels,
     val roots: TableRoots?,
 ) {
-    /** Whether the letters show roots ([label]): their corner then shows the letter, not its swipe. */
     val labelled: Boolean get() = labels != KeyLabels.NONE && roots != null
 
-    /**
-     * What [letter]'s key shows over it, null for the letter itself: its name, or all its roots, more
-     * than [ROOTS_A_LINE] in two lines (one, 8 of them were too small to read on a phone's key).
-     */
+    /** What [letter]'s key shows over it, null for the letter: its name, or its roots in two lines past [ROOTS_A_LINE] (8 on one line were unreadable). */
     fun label(letter: Char): String? {
         val roots = roots ?: return null
         return when (labels) {
@@ -35,21 +26,12 @@ data class TableKeyboard(
         }
     }
 
-    /**
-     * As the keys show it at 键盘高度 紧凑 when [compact]: all the roots in two lines too small to read
-     * on a key that short, their names instead (the setting kept, all of them again out of 紧凑), and
-     * the letters' shortcuts marked as with the names.
-     */
+    /** At 紧凑 height two lines of roots are unreadable: names instead, the setting kept. */
     fun atHeight(compact: Boolean): TableKeyboard = if (compact && labels == KeyLabels.ROOTS) copy(labels = KeyLabels.NAMES) else this
 
-    /** What [letter]'s long press shows instead of its symbols, large: all its roots, while the keys show them. */
     fun rootsOf(letter: Char): List<String>? = if (labels == KeyLabels.ROOTS) roots?.all?.get(letter) else null
 
-    /**
-     * Which of the keyboard's [slots] (the keys it may show beside the letters, first wanted first)
-     * to show: one of [keys] the face has nowhere else ([onFace]: the bottom row's, and the letters'
-     * corners where they show their swipes, a swipe typing it), or none.
-     */
+    /** Which of [slots] to show beside the letters: one of [keys] the face has nowhere else ([onFace]), or none. */
     fun extraKey(slots: List<Char>, onFace: Set<Char>): Char? = slots.firstOrNull { it in keys && it !in onFace }
 
     private companion object {

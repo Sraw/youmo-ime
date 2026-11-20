@@ -17,17 +17,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
-/**
- * Levels and Choice, stored nowhere of their own, read what they show as their page opens: that is never
- * written back, even when what is stored changes between the read and the write (the settings search makes
- * them off the main thread while the keyboard may change a level or a style). The user's pick still is.
- */
+/** What Levels and Choice read on open is never written back, even if storage changed meanwhile; the user's pick is. */
 @RunWith(RobolectricTestRunner::class)
 class OpeningWritesNothingTest {
 
     private val context: Context = RuntimeEnvironment.getApplication()
 
-    // added to a screen as a page's or the index's are: its initial value read then
+    // its initial value read as it is added to a screen
     private fun open(pref: ListPreference) =
         PreferenceManager(context).createPreferenceScreen(context).addPreference(pref)
 
@@ -36,7 +32,7 @@ class OpeningWritesNothingTest {
         val real = context.getSharedPreferences("opening", Context.MODE_PRIVATE)
         var reads = 0
         var edits = 0
-        // each read of the two keys (one current()) other than the last: the keyboard set the next level between
+        // the keyboard sets the next level between reads
         val moving = object : SharedPreferences by real {
             override fun getInt(key: String?, defValue: Int) = real.getInt(key, defValue) + if (reads++ / 2 % 2 == 1) 8 else 0
 

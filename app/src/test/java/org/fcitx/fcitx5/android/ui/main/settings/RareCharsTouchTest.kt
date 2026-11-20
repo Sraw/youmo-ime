@@ -29,11 +29,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.Duration
 
-/**
- * 生僻字屏蔽's page where the finger, the keyboard and the letters are not where the page thinks (review R26 F8161,
- * F8184, F8325, F8376): a drag only while a finger is down and only over the rows it began on, the search's keyboard put
- * away with the search, the letters at the top of the ones set, a save after the last one's.
- */
+/** Drags only while a finger is down and over their own rows; the search keyboard goes with the search; saves never lost. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -47,8 +43,7 @@ class RareCharsTouchTest : RarePageUat() {
 
     private fun middle(c: String): Pair<Float, Float> = cell(c).let { (it.left + it.width / 2f) to (it.top + it.height / 2f) }
 
-    // F8161 (a): a long press with no finger (a screen reader's) changes its cell and is over; the next touch, a tap
-    // moved a little on another cell, is that tap, not the end of a drag from the first (炟 to 鎉, 畣 between held)
+    // a long press with no finger (a screen reader's) is over at once: the next touch is a tap, not a drag's end
     @Test
     @Uat("AX-17")
     fun aLongPressWithNoFingerIsNoDrag() {
@@ -66,8 +61,7 @@ class RareCharsTouchTest : RarePageUat() {
         assertFalse("no drag from 炟 over 畣", cell("畣").held)
     }
 
-    // F8161 (b): a drag under way when the search finds fewer rows: lifted, nothing changed, and no crash on the old
-    // rows' positions (龘 the eighth row of DA's results, 扩展区's two first; 炟's results two rows)
+    // a drag under way when the search finds fewer rows: lifted, nothing changed, no crash on old positions
     @Test
     fun aDragOverRowsTheSearchChangedEndsWithThem() {
         RareCharsManager.update(listOf(Change.On(true)), TestCharLevels.levels)
@@ -86,9 +80,7 @@ class RareCharsTouchTest : RarePageUat() {
         assertFalse("the drag's start not changed on the lift", cell("龘").held)
     }
 
-    // F8376: the page left while the last leave's save still writes (the file's lock held here), a change made, left
-    // again and a change made after: each written once, the last not dropped by the second save's bookkeeping
-    // (炟 the first save's, 鎉 the second's, 畣 made while both wait)
+    // left again while the previous save still writes: each change written once, the last not dropped
     @Test
     fun aSaveWhileTheLastStillWritesLosesNothing() {
         RareCharsManager.update(listOf(Change.On(true)), TestCharLevels.levels)
@@ -106,13 +98,11 @@ class RareCharsTouchTest : RarePageUat() {
             idle()
             sent
         }
-        // both saves done, whichever writes first
         until("saved") { first?.isCompleted == true && RareCharsViewModel.saving?.isCompleted == true }
         listOf("炟", "鎉", "畣").forEach { assertTrue("$it held", cell(it).held) }
     }
 
-    // F8325: the letters down the edge set anew (another group, a search): read out and stepped from at their top,
-    // not at the letter the last ones were gone to (B, not in X Y Z)
+    // letters set anew are read from their top, not the letter last gone to
     @Test
     @Uat("AX-17")
     fun newLettersAreAtTheirTop() {
@@ -129,8 +119,7 @@ class RareCharsTouchTest : RarePageUat() {
         assertEquals(listOf('b', 'y'), gone)
     }
 
-    // F8184: a group opened while the search has the keyboard: the keyboard put away and the search let go of, or
-    // what is typed next searches unseen and back from the grid is the search's results, not the cards
+    // a group opened while the search has the keyboard: the keyboard put away and the search let go
     @Test
     @Uat("WD-57")
     fun aGroupOpenedPutsTheSearchsKeyboardAway() {

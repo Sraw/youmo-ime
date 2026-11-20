@@ -4,7 +4,11 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.Fixtures.icons
+import org.fcitx.fcitx5.android.scene.Fixtures.near
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.ops
+import org.fcitx.fcitx5.android.scene.Fixtures.texts
 import org.fcitx.fcitx5.android.scene.engine.Content
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
@@ -27,14 +31,6 @@ import kotlin.test.assertTrue
 class ContentLooksTest {
     private val env = Fixtures.portrait
     private val d = Fixtures.DENSITY
-
-    private fun near(e: Double, a: Double, what: String = "") = assertTrue(abs(e - a) < 0.01, "$what: expected $e, was $a")
-
-    private fun ops(s: Scene, id: String) = s.keys.first { it.id == id }.ops(false)
-
-    private fun texts(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Text>()
-
-    private fun icons(s: Scene, id: String) = ops(s, id).filterIsInstance<Op.Icon>()
 
     private fun face(s: Scene, id: String) = (s.keys.first { it.id == id }.shape as Shape.Rect).box
 

@@ -3,27 +3,17 @@
  * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
  */
 
-// A plain JVM library, deliberately NOT an android-library: the compiler then enforces that
-// nothing here can reach for the Android framework. Logic that lands in this module is
-// testable in milliseconds, with no emulator, no Robolectric and no Android SDK.
+// A plain JVM library, not an android-library, so nothing here can reach the Android framework and tests run in milliseconds.
 plugins {
     `java-library`
-    // FakeEditor lives in testFixtures so :app's contract test can hold it against the real
-    // BaseInputConnection; the handwriting test data so :lib:ime-eval's tests read the same words
+    // FakeEditor in testFixtures so :app's contract test can hold it against the real BaseInputConnection
     `java-test-fixtures`
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.animalsniffer)
     alias(libs.plugins.kover)
 }
 
-// The bytecode target alone does not stop code from calling APIs newer than Android has: this
-// module compiles against the build's JDK, so e.g. Kotlin's `list.removeFirst()` would bind to
-// JDK 21's `List.removeFirst`, pass every JVM test, then throw NoSuchMethodError on Android
-// before 15. Two guards:
-//  - compile against the JDK 11 API rather than the host JDK's (`release`);
-//  - check the result against Android's actual API at minSdk (animal-sniffer, below). Android
-//    lint does not look inside a plain JVM module, so nothing else would catch it.
-// The Android modules target Java 21 (Versions.java); this one stays at the JDK 11 API on purpose.
+// Compile against JDK 11's API and check Android's at minSdk (animal-sniffer), as lint skips plain JVM modules.
 java {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
@@ -33,8 +23,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.release.set(11)
 }
 
-// fcitx's built-in data (charselectdata, quick phrase and punctuation tables) as the app ships it:
-// the tests read that one copy, on the classpath as /pkgdata/...
+// fcitx's built-in data as the app ships it, on the tests' classpath as /pkgdata/...
 sourceSets.test {
     resources.srcDir("../../app/src/main/host-assets")
 }
@@ -52,10 +41,9 @@ animalsniffer {
 }
 
 dependencies {
-    // minSdk 29; keep in step with minSdk. gummy-bears publishes no coreLib2 (desugared java.*)
-    // variant for API 29, so APIs only desugaring would supply are rejected here too
+    // minSdk 29, in step with minSdk; no coreLib2 variant for API 29, so desugared APIs are rejected too
     signature(variantOf(libs.gummyBears.api29) { artifactType("signature") })
-    // the drawing engine (060): a theme 3.0 look and the keyboards' state said in its words (input/scene)
+    // the drawing engine: a theme's look and the keyboards' state in its words (input/scene)
     api(project(":lib:keyboard-scene"))
     testImplementation(libs.junit)
 }
@@ -71,10 +59,7 @@ tasks.withType<Test>().configureEach {
     inputs.dir(rootProject.file("lib/keyboard-scene/src/commonMain/layouts")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sceneLayouts")
     // MisreadingsTest checks the list the app build compiles: an edit to it alone runs it again
     inputs.file(rootProject.file("lexicon/misreadings.tsv")).withPathSensitivity(PathSensitivity.RELATIVE)
-    // the other files tests read from disk by a path of their own, not the classpath: each an input, so an edit to it
-    // alone runs them again rather than leaving them up to date. The built-in themes (ThemePackCheckTest), the import
-    // fixtures (LayoutImportTest, ScelGoldenTest), the learning fixtures (LearnFixtures), the words page's variables
-    // (TextVariablesTest); the 0.6.0 example pack's layouts (KeyResolverGoldenTest, KeyIdRoundTripTest) are sceneData's
+    // the other files tests read by path, as inputs so an edit reruns them
     inputs.dir(rootProject.file("lib/keyboard-scene/src/commonMain/themes")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("sceneThemes")
     inputs.files(rootProject.file("uat/fixtures/layouts"), rootProject.file("uat/fixtures/scel")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("uatFixtures")
     inputs.dir(rootProject.file("app/src/main/assets/learn")).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("learnAssets")
@@ -84,12 +69,7 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Coverage floors. This module holds the logic that is hard to get right and easy to break
-// quietly -- cursor prediction, editing, gestures -- and most of it is fully tested; the floors
-// keep it that way. `./gradlew :lib:ime-core:koverLog` prints the current numbers (at the time
-// of writing: 92% of lines overall; input/* 97-100%, core 64%, being mostly key tables --
-// adding untested tables there will need its floor looked at).
-// Part of `check`.
+// Coverage floors (part of `check`); `./gradlew :lib:ime-core:koverLog` prints the numbers
 kover {
     currentProject {
         sources {
@@ -97,7 +77,7 @@ kover {
             excludedSourceSets.add("testFixtures")
         }
         instrumentation {
-            // the bounded-heap tests time their keys; the coverage agent would slow them and add to the 48 MB heap
+            // the bounded-heap tests time their keys; the coverage agent would slow them and add to the small heap
             disabledForTestTasks.add("boundedHeapTest")
         }
     }
@@ -114,8 +94,7 @@ kover {
     }
 }
 
-// A merged dictionary's words must compile and open in a small heap (DictionaryFileBoundedHeapTest):
-// 0.3.1 ran a phone's 256 MB out with them. Alone in a 48 MB JVM, so the bound is the heap's own
+// A merged dictionary must compile and open in a small heap (DictionaryFileBoundedHeapTest): alone in a 48 MB JVM
 tasks.named<Test>("test") {
     exclude("**/*BoundedHeapTest*")
 }

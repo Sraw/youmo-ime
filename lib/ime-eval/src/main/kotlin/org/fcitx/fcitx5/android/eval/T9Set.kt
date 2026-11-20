@@ -7,12 +7,7 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 
-/**
- * Types the full-pinyin samples of an evaluation set on the nine keys (九键), as [ShuangpinSet]
- * does in 双拼: the [ExactReading] spelt in digits, no separators, as a phone's user types it.
- * Samples with a Latin letter are left out: the nine keys type it in another mode. How a key is
- * pressed is [Presses]': once a letter (连按 off, the default), or each letter spelt by 连按.
- */
+/** Types an evaluation set's full-pinyin samples on the nine keys, the [ExactReading] spelt in digits; Latin samples left out. */
 object T9Set {
 
     /** The scheme whose segmenter reads 简拼: [T9Segmenter]'s `abbreviations`. */
@@ -24,11 +19,7 @@ object T9Set {
     /** The 18 keys' (NineKeyLetters.G18) that reads 简拼 as [ABBREVIATING] does. */
     const val G18_ABBREVIATING = "g18"
 
-    /**
-     * The segmenters measured: `t9` reads 简拼 where no longer syllable starts, `t9-strict` only where
-     * nothing else is read; `g14` and `g14-strict` the same on the 14 keys, a set typed `--keys 14`,
-     * `g18` and `g18-strict` on pinyin's 18 keys (G18, the 双拼 18 keys' grouping), one typed `--keys 18`.
-     */
+    /** The segmenters measured: `t9`, `g14`, `g18` read 简拼 where no longer syllable starts, their `-strict` only where nothing else is read. */
     val SCHEMES: Set<String> get() = LETTERS.keys
 
     // the keys each of SCHEMES reads
@@ -55,12 +46,7 @@ object T9Set {
         /** Once, 连按 off or a pause before each press: 744 for shi. */
         ONCE("once"),
 
-        /**
-         * As 连按 spells a letter, its key as many times as its place on it, quickly: as the session
-         * has it, the key's digit for its first letter, else the letter typed as itself (s is `S`,
-         * shi `SHI`, hao `H2O`). A fast same-key pair with 连按 on is a letter, so typing once a
-         * letter quickly models nobody: it is no option.
-         */
+        /** As 连按 spells a letter: its key as many times as its place on it, quickly. */
         LETTERS("letters");
 
         companion object {
@@ -68,10 +54,7 @@ object T9Set {
         }
     }
 
-    /**
-     * [samples] typed on [keys]: the nine keys' by default, or a grouped keyboard's (the 14 keys'),
-     * which has no 连按: [presses] [Presses.ONCE] alone.
-     */
+    /** [samples] typed on [keys]: the nine keys' by default, or a grouped keyboard's, which has no 连按. */
     fun convert(samples: List<Sample>, presses: Presses = Presses.ONCE, keys: NineKeyLetters = NineKeyLetters.STANDARD): List<Sample> {
         require(presses == Presses.ONCE || keys == NineKeyLetters.STANDARD) { "连按 is the nine keys' alone" }
         return samples.mapNotNull { sample ->

@@ -6,30 +6,21 @@ package org.fcitx.fcitx5.android.engine.reading
 
 import java.text.Normalizer
 
-/**
- * A syllable with its tone, written out: pinyin with a tone mark (hǎo, lǜ) or zhuyin with its tone
- * sign (ㄏㄠˇ). Tones are numbered 1–4, [NEUTRAL] for the neutral tone (轻声); [NONE] means not known,
- * written as the syllable alone: callers write it toneless or leave it out rather than guess a tone
- * (CandidateReadings: pinyin toneless, zhuyin left out, as there it would read as the first tone).
- */
+/** A syllable written with its tone: pinyin marked (hǎo, lǜ) or zhuyin signed (ㄏㄠˇ). Tones 1–4, [NEUTRAL] 轻声; [NONE] is unknown, written bare. */
 object ToneMark {
 
     const val NONE = 0
     const val NEUTRAL = 5
 
-    // Combining marks of tones 1–4, as NFD splits them off (ǎ = a + U+030C).
+    // combining marks of tones 1–4, as NFD splits them off (ǎ = a + U+030C)
     private const val MARKS = "̄́̌̀"
     private const val DIAERESIS = '̈'
 
-    // Tones 2–4 follow the syllable; the neutral tone's ˙ goes before it; tone 1 is left bare
-    // (the usual way in Taiwan's dictionaries and textbooks).
+    // tones 2–4 follow the syllable, the neutral ˙ precedes it, tone 1 bare (as Taiwan's textbooks)
     private const val ZHUYIN_SIGNS = "ˊˇˋ"
     private const val ZHUYIN_NEUTRAL = '˙'
 
-    /**
-     * [spelling] (a pinyin syllable, `v` for ü) in [tone]: the mark on a or e, else on the o of ou,
-     * else on the last vowel (so iu → iū, ui → uí); m, n, ng, hm carry it on their m or n (ń, hm̀).
-     */
+    /** The mark on a or e, else the o of ou, else the last vowel (iu → iū, ui → uí); m, n, ng, hm on the m or n (ń, hm̀). */
     fun pinyin(spelling: String, tone: Int): String {
         val s = spelling.replace('v', 'ü')
         if (tone !in 1..4) return s
@@ -42,18 +33,14 @@ object ToneMark {
         return Normalizer.normalize(s.substring(0, at + 1) + MARKS[tone - 1] + s.substring(at + 1), Normalizer.Form.NFC)
     }
 
-    /** [zhuyin] (a syllable's symbols) in [tone]: ㄏㄠˇ, ˙ㄗ, ㄊㄧㄢ for tone 1. */
+    /** ㄏㄠˇ, ˙ㄗ, ㄊㄧㄢ for tone 1. */
     fun zhuyin(zhuyin: String, tone: Int): String = when (tone) {
         in 2..4 -> zhuyin + ZHUYIN_SIGNS[tone - 2]
         NEUTRAL -> ZHUYIN_NEUTRAL + zhuyin
         else -> zhuyin
     }
 
-    /**
-     * A marked pinyin syllable as the reading lists write it (`hǎo`, `lüè`, `ḿ`, `zi` for the neutral
-     * tone) back to its spelling and tone: `hao` 3, `lve` 4, `m` 2, `zi` [NEUTRAL]. A trailing digit
-     * (`hao3`, `zi5`) is read too. Null if it has letters pinyin does not use.
-     */
+    /** A marked syllable (`hǎo`, `lüè`, `ḿ`, `zi` neutral) or digit-toned one (`hao3`) as spelling and tone; null for non-pinyin letters. */
     fun parse(marked: String): Pair<String, Int>? {
         val d = Normalizer.normalize(marked.lowercase(), Normalizer.Form.NFD)
         var tone = NEUTRAL

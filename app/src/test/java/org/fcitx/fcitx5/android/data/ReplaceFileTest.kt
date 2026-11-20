@@ -12,7 +12,6 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
 
-/** A directory replaced whole or not at all, with nothing left beside it. */
 class ReplaceFileTest {
 
     @get:Rule
@@ -70,7 +69,6 @@ class ReplaceFileTest {
         restoreDirectory(dest)
         assertEquals("learned", File(dest, "log").readText())
         assertEquals(listOf("engine", "engine.import"), names())
-        // the next import starts from it rather than deleting it
         dest.renameTo(File(folder.root, "engine.old"))
         replaceDirectory(dest, staged) { s ->
             if (dest.isDirectory) dest.copyRecursively(s)

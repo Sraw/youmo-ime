@@ -15,11 +15,7 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
 
-/**
- * UAT cases of voice and the user's words (uat/12), as the deterministic chain: what a stream is
- * told to listen for and never type ([VoiceHotwords.ofUser]). Whether the model then hears the
- * word is acoustics: the voice-eval benchmark and VO-14's device smoke.
- */
+/** Voice and the user's words as the deterministic chain: what a stream listens for and never types; whether it is heard is acoustics. */
 class VoiceUatTest {
 
     private val lan = UserWord("澜境花园", "lan jing hua yuan", Kind.ADDED)
@@ -44,9 +40,7 @@ class VoiceUatTest {
     @Test
     @Uat("VO-18")
     fun anImportedWordIsNotListenedForTillAddedByHand() {
-        // an imported word is the import layer's, no user word: that Engines.userWords leaves it out is
-        // EnginesImportTest's (its import of 汪晓明); here only what follows, no user word listened for
-        // added by hand: listened for at the bonus that hears it
+        // an imported word is no user word (EnginesImportTest's); a word added by hand is listened for at the bonus that hears it
         assertEquals(listOf("澜 境 花 园 :${VoiceHotwords.ADDED_SCORE}"), listened(lan))
     }
 

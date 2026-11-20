@@ -12,11 +12,7 @@ import org.fcitx.fcitx5.android.scene.skin.SkinImage
 import org.fcitx.fcitx5.android.scene.skin.SkinLimits
 import java.io.ByteArrayOutputStream
 
-/**
- * A skin's images decoded and a converted one's written by Android ([ThemeFilesManager.openSkin]): an image's size
- * read from its header first, one past [SkinLimits.MAX_IMAGE_PIXELS] not decoded; decoded not premultiplied, as
- * [Pixels] is, its pixels read a part at a time ([SkinImage.pixels]: a key's tile of an atlas, not the atlas whole).
- */
+/** An image past [SkinLimits.MAX_IMAGE_PIXELS] (by its header) is not decoded; decoded unpremultiplied, read a tile at a time. */
 internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
     override fun image(bytes: ByteArray): SkinImage? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -33,7 +29,7 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
             override val width = bitmap.width
             override val height = bitmap.height
 
-            // held to the bitmap, as PixelsImage's crop is: getPixels throws past it
+            // held to the bitmap: getPixels throws past it
             override fun pixels(x: Int, y: Int, w: Int, h: Int): Pixels {
                 val l = x.coerceIn(0, width)
                 val t = y.coerceIn(0, height)

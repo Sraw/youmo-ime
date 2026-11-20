@@ -21,17 +21,11 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import java.util.Locale
 
-/**
- * [NodeReading]'s pieces ([TextSegments]) at the edges, against the framework's own: a view's
- * description (a key's frame, View.getIterableTextForAccessibility) and a TextView's text (a popup's
- * cell), read a character, a word and a paragraph at a time, forward then back and back then
- * forward. Each move's answer and the events it sends (the piece traversed, the cursor) the same.
- */
+/** [TextSegments] against the framework's own (View.getIterableTextForAccessibility, a TextView's text): each move's answer and events the same. */
 @RunWith(RobolectricTestRunner::class)
 class TextSegmentsTest {
 
-    // the empty, one character, a surrogate pair, a ZWJ emoji (a family: one character of five code
-    // points), paragraphs ending in a line break
+    // a ZWJ emoji is one character of five code points
     private val edges = listOf("", "a", "a\uD83D\uDE00b", "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67 ok", "one two\nthree\n")
 
     private val granularities = listOf(
@@ -40,7 +34,6 @@ class TextSegmentsTest {
         AccessibilityNodeInfoCompat.MOVEMENT_GRANULARITY_PARAGRAPH,
     )
 
-    // what a view's parent is asked to send: what the view told
     private class Told(context: android.content.Context) : FrameLayout(context) {
         val events = mutableListOf<String>()
 
@@ -55,7 +48,6 @@ class TextSegmentsTest {
         val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
         val told = Told(activity)
         activity.setContentView(told)
-        // events sent: TalkBack on
         shadowOf(activity.getSystemService(AccessibilityManager::class.java)).setEnabled(true)
         for (words in edges) {
             for (granularity in granularities) {
@@ -92,7 +84,6 @@ class TextSegmentsTest {
     private companion object {
         const val NODE = 0
 
-        // more than any of the words has pieces: past the last, the answer is no
         const val MOVES = 12
 
         fun said(e: AccessibilityEvent): String = when (e.eventType) {

@@ -39,7 +39,7 @@ class FloatingSwitchTest {
             assertFalse(sw.drop())
             assertEquals(Layout.Placed(Grab(500f, 1900f, docked, underFinger = true, ended = true)), sw.laidOut())
         },
-        // F3467: TalkBack's detach, no finger down and so no drop to come
+        // TalkBack's detach, no finger down and so no drop to come
         "TalkBack's detach, no finger down" to {
             val sw = FloatingSwitch()
             sw.grab(500f, 1900f, docked, ended = true)

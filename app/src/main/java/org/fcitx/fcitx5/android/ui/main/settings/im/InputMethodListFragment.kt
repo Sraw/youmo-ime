@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.ui.main.settings.im
 
 import android.os.Build
 import android.view.View
-import androidx.lifecycle.Lifecycle
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.SubtypeManager
@@ -15,8 +14,8 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.common.DynamicListUi
 import org.fcitx.fcitx5.android.ui.common.OnItemChangedListener
-import org.fcitx.fcitx5.android.ui.main.EditDeleteMenuProvider
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
+import org.fcitx.fcitx5.android.ui.main.addEditDeleteMenu
 import org.fcitx.fcitx5.android.ui.main.settings.ProgressFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
@@ -58,17 +57,7 @@ class InputMethodListFragment : ProgressFragment(), OnItemChangedListener<InputM
         ui.setViewModel(viewModel)
         viewModel.toolbarButton.value =
             if (ui.entries.isNotEmpty()) ButtonMode.EDIT else ButtonMode.NONE
-        requireActivity().addMenuProvider(
-            EditDeleteMenuProvider(
-                buttonMode = viewModel.toolbarButton,
-                editButtonAction = { ui.enterMultiSelect(requireActivity().onBackPressedDispatcher) },
-                deleteButtonAction = { ui.deleteSelected(); ui.exitMultiSelect() },
-                menuHost = requireActivity(),
-                lifecycleOwner = viewLifecycleOwner,
-            ),
-            viewLifecycleOwner,
-            Lifecycle.State.STARTED
-        )
+        addEditDeleteMenu(viewModel.toolbarButton, ui)
         return ui.root
     }
 

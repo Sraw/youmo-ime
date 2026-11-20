@@ -12,7 +12,6 @@ LISTEN, HEARD_NOTHING, PREPARING, SILENT = "正在听…", "没有听清", "准�
 EV = "voice:语音要导入语音包和 debug 包的片段麦克风（uat.py run 默认导入；--no-voice 时不跑）"
 
 
-
 def anywhere(s, text):
     return next((n for n in s.nodes if text in (n.text or "") or text in (n.desc or "")), None)
 
@@ -33,10 +32,7 @@ def quiet(d, timeout=6):
         time.sleep(0.2)
 
 
-# the emulator's touchscreen, written to with sendevent (adb shell is root there): a native binary
-# starts in milliseconds where `input` starts an app_process, ±300 ms on a loaded host
-# The device, its axes' top and the screen's size are read from the emulator once (another AVD or
-# skin has others), not assumed
+# the emulator's touchscreen written with sendevent (root there): a native binary starts far faster than `input`
 _touch = {}
 
 
@@ -124,8 +120,7 @@ def dictate(d, clip):
             time.sleep(0.2)
     finally:
         p.kill()   # done or not, nothing left streaming into the next case
-    # the last segment's silence (1.2 s: the recognizer's endpoint closes it), then up to 4 s for its text to show: on
-    # a loaded host the recognizer takes longer than the silence, and VO-02 then saw only 正在听…
+    # the last segment's silence, then up to 4 s for its text: on a loaded host recognition outlasts the silence
     heard = len(shown)
     end = time.time() + 4
     settled = time.time() + 1.2
@@ -135,10 +130,7 @@ def dictate(d, clip):
         shown += [n.text for n in s.nodes if n.text and n.pkg == PKG and n.text not in shown]
         if time.time() >= settled and len(shown) > heard:
             break
-        # the final text the same as a live one already in shown: nothing new would ever come, and
-        # the status line says 正在听… while the finger is down, so the screen unchanged for 1 s is the
-        # cue, but only with a recognized text on it: with none yet the recognizer may still be on the
-        # last stretch, and lifting then is the early lift the 4 s are for
+        # the screen unchanged for 1 s with recognized text on it is the cue; with none yet the recognizer may still be working
         now = [n.text for n in s.nodes if n.text and n.pkg == PKG]
         recognized = any(t not in before and not any(k in t for k in (LISTEN, PREPARING, SILENT, HEARD_NOTHING)) for t in now)
         if now != texts:
@@ -191,8 +183,7 @@ def capture_log(d):
     return {k: num(k) for k in ("liftFrame", "stopAt", "read", "speechStart", "segments", "envPeak", "peakGainDb")}
 
 
-# also on the JVM (VoiceHoldUatTest.theFirstHoldAsksForTheMicrophone); the system dialog and the way back
-# to the field after 允许 are the framework's, which Robolectric does not run
+# also on the JVM; the system dialog and the way back to the field are the framework's, which Robolectric does not run
 @case("VO-01", base="B0", mutates=True, needs=EV)
 def vo01(d):
     d.sh(f"pm revoke {PKG} android.permission.RECORD_AUDIO")
@@ -222,9 +213,6 @@ def vo02(d):
     return f"听的时候显示 {live[:2]}；框里「{t}」"
 
 
-case("VO-03", needs="jvm:VoiceHoldUatTest.slidingUpDropsIt、VoiceHoldUatTest.onAScaledKeyboardTheCancelDistanceIsTheKeyboardAsSeen")(lambda d: None)
-
-
 def tap_mic(d):
     """the toolbar's microphone tapped: the mask over the keys; returns its hint (the mask has no
     button: tapping it, or the microphone, ends the talk)"""
@@ -249,8 +237,7 @@ def mask_gone(d, timeout=15):
     return d.field_text() or ""
 
 
-# also on the JVM (VoiceTapUatTest); on the device the real recognizer and InputConnection: stopped by
-# the microphone, then by the mask (its hint: the mask has no button)
+# also on the JVM; here the real recognizer and InputConnection, stopped by the microphone and then by the mask
 @case("VO-04", base="B0-语音", mutates="learn", needs=EV)
 def vo04(d):
     tap_mic(d)
@@ -273,25 +260,11 @@ def vo04(d):
     return f"点麦克风结束「{t1}」；点盖层结束「{t2}」"
 
 
-case("VO-05", needs="jvm:VoiceGlassTest、VoiceTapUatTest.theMaskHasNoEnterStoppedTheKeyboardsSendsIt")(lambda d: None)
-
-
-case("VO-06", needs="jvm:VoiceHoldUatTest.numbersAreWrittenInDigits、ChineseNumbersTest.whatDoesNotReadAsItsKindStaysAsSaid、ChineseNumbersTest.digitsAreDigitByDigit")(lambda d: None)
-
-
-case("VO-07", needs="jvm:VoiceHoldUatTest.wordsWithNumeralsAreLeftAlone")(lambda d: None)
-
-
-case("VO-08", needs="jvm:VoiceHoldUatTest.englishInChineseIsTypedAsWritten")(lambda d: None)
-
-
-# also on the JVM (VoiceHoldUatTest.aCoughTypesNothing); this one, the room's own noise through the gain:
-# digital silence shows no gain, so real noise is played
+# also on the JVM; here the room's own noise through the gain, as digital silence shows no gain
 @case("VO-09", base="B0-语音", mutates="learn", needs=EV)
 def vo09(d):
     d.sh("logcat -c")   # this try's line only, not one an earlier case left
-    # the room all through the hold, lifted at 6 s while it plays: no floor after it for the
-    # recognizer to end on, the room itself judged (dictate's 3 s clip then silence passed without VoiceQuiet)
+    # the room all through the hold, lifted at 6 s while it plays: no floor after it for the recognizer to end on
     x, y = hold_space(d)
     p = None
     shown = []
@@ -316,8 +289,7 @@ def vo09(d):
     return f"底噪贯穿按住 6 s：不上屏，显示「{HEARD_NOTHING}」{gain}"
 
 
-# also on the JVM (VoiceUatTest.aBlockedWordIsNotTypedFromVoice), which checks the string handed to the
-# recognizer; this one, that the stream with searchBlocked changes what is heard
+# also on the JVM, which checks the string handed over; here, that searchBlocked changes what is heard
 @case("VO-10", base="B0-设置", mutates=True, needs=EV)
 def vo10(d):
     script("13-words").block_word(d, "天气")
@@ -328,17 +300,7 @@ def vo10(d):
     return f"框里「{t}」"
 
 
-case("VO-11", needs="jvm:VoiceKeyboardUatTest.aPasswordFieldHasNoVoice")(lambda d: None)
-
-
-case("VO-12", needs="jvm:VoiceHoldUatTest.onlyTheFieldItWasSaidForGetsIt、VoiceHoldUatTest.whatWasHeardBeforeAnotherFieldGoesIntoTheFirst、VoiceHoldUatTest.anotherFieldWhileInTheCancelZoneTypesNothing、VoiceHoldUatTest.inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid、VoiceHoldUatTest.theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce、VoiceHoldUatTest.theScreenTurnedWhileHoldingTypesWhatWasHeardOnce、VoiceHoldUatTest.theKeyboardHiddenWhileHoldingTypesWhatWasHeardOnce、VoiceHoldUatTest.theKeyboardHiddenAfterTheLiftStillTypesTheTail")(lambda d: None)
-
-
-case("VO-13", needs="jvm:VoiceHoldUatTest.holdingTheSpaceForThePickerDoesNotTalk")(lambda d: None)
-
-
-# also on the JVM (VoiceUatTest.aWordAddedByHandIsListenedForHardest); this one, that the stream's hotwords
-# change what is heard
+# also on the JVM; here, that the stream's hotwords change what is heard
 @case("VO-14", base="B0-设置", mutates=True, needs=EV)
 def vo14(d):
     script("13-words").add_word(d, "澜境花园")
@@ -348,8 +310,7 @@ def vo14(d):
     return f"框里「{t}」"
 
 
-# 20bbb03e0: a hotword begun (酒店式公寓) but not finished at a segment's end adds nothing; no JVM test, the native
-# recognizer's
+# a hotword begun (酒店式公寓) but not finished at a segment's end adds nothing; no JVM test, the native recognizer's
 @case("VO-56", base="B0-设置", mutates=True, needs=EV)
 def vo56(d):
     script("13-words").add_word(d, "酒店式公寓")
@@ -377,8 +338,7 @@ def vo38(d):
     return "框里 " + " / ".join(f"「{t}」" for t in out)
 
 
-# 徐静 of a talk of xujing deleted to the end (the sentence's mark with it) and 徐婧 typed again in pinyin: asked
-# 「让语音记住『徐婧』？」; the talk's text
+# 徐静 of a talk deleted to the end and 徐婧 typed again in pinyin: asked 「让语音记住『徐婧』？」
 def retyped_asks(d, between=None):
     d.clear()
     _, t = dictate(d, "xujing")
@@ -397,9 +357,7 @@ def retyped_asks(d, between=None):
     return t
 
 
-# also on the JVM (VoiceAskUatTest, EnginesVoiceEditsTest); this one, the glue: a real talk's text told to the
-# engine, a real pinyin commit reported, the notice's 记住 adding the word, the bar's 联想 of the session it
-# drops cleared (review item 16)
+# also on the JVM; here the glue: a real talk told to the engine, a real pinyin commit, the notice's 记住 adding the word
 @case("VO-41", base="B0-语音", mutates=True, needs=EV)
 def vo41(d):
     d.open_page("text")
@@ -416,8 +374,7 @@ def vo41(d):
 CHROME = "com.android.chrome"
 
 
-# VO-50's web field in Chrome where the emulator has it (its first-run pages skipped by its command line, a debug
-# app's), else the test page's WebView browser as VO-41 runs it; WeChat and 备忘录 are the phone's
+# in Chrome where the emulator has it, else the test page's WebView browser
 @case("VO-50", base="B0-语音", mutates=True, needs=EV)
 def vo50(d):
     # the test page first: served and reversed to the device (ensure_fixtures), the keyboard up
@@ -471,9 +428,6 @@ case("VO-44", needs="jvm:EnginesVoiceEditsTest.asked again at the place, the fir
      "VoiceEditsTest.asked again at the same place, the word it adds takes the first's place (review M4)")(lambda d: None)
 
 
-case("VO-45", needs="jvm:EnginesVoiceEditsTest.a word written again on the pad is asked about, read as the characters are")(lambda d: None)
-
-
 case("VO-46", needs="jvm:VoiceAskUatTest.aFieldThatLearnsNothingIsNotFollowed、"
      "EnginesVoiceEditsTest.nothing is followed where nothing would be learned")(lambda d: None)
 
@@ -488,16 +442,12 @@ def nothing_said(d):
     check(t == before, f"按住空格什么都没说，框里从「{before}」变成「{t}」")
 
 
-# also on the JVM (VoiceAskUatTest: typing while a talk lasts, a talk that puts nothing in); this one, a real
-# talk that hears nothing between voice's text and its edit
+# also on the JVM; here a real talk that hears nothing between voice's text and its edit
 @case("VO-47", base="B0-语音", mutates=True, needs=EV)
 def vo47(d):
     d.open_page("text")
     t = retyped_asks(d, between=nothing_said)
     return f"说出「{t}」，再按住空格什么都没说（没上屏），之后删到句末重打「徐婧」照样问"
-
-
-case("VO-48", needs="jvm:VoiceEditsTest.what is not asked about")(lambda d: None)
 
 
 case("VO-49", needs="jvm:VoiceEditsTest.edits made other ways than Backspace at the end、"
@@ -561,44 +511,9 @@ def vo55(d):
 
         out.append(verdict(clip, counted_tries(d, clip, attempt, most=10)))
         median = sorted(took)[len(took) // 2]
-        # a loose bar: the same emulator's medians differed twice over (1029 and 509 ms); the phone's is the gate
+        # a loose bar: the same emulator's medians vary twice over; the phone's is the gate
         check(median <= 1500, f"{clip}：松开到出字的中位数 {median} ms，超过 1500 ms（字对只是慢：只开一台模拟器重跑）：{took}")
     return "；".join(out)
-
-case("VO-15", needs="jvm:LicensePageUatTest.theVoiceModelsDataIsCredited")(lambda d: None)
-
-
-case("VO-16", needs="jvm:VoiceHoldUatTest.holdingAgainWhileDidntCatchThatShowsListens")(lambda d: None)
-
-
-case("VO-17", needs="jvm:VoiceUatTest.onlyTheWordAddedIsListenedFor")(lambda d: None)
-
-
-case("VO-18", needs="jvm:VoiceUatTest.anImportedWordIsNotListenedForTillAddedByHand")(lambda d: None)
-
-
-case("VO-19", needs="jvm:VoiceHoldUatTest.whatIsSaidIsContextNotLearned")(lambda d: None)
-
-
-case("VO-20", needs="jvm:VoiceUatTest.aNameTypedTwiceIsListenedFor")(lambda d: None)
-
-
-case("VO-21", needs="jvm:VoiceUatTest.aWordDeletedOrBlockedIsNotListenedFor")(lambda d: None)
-
-
-case("VO-22", needs="jvm:VoiceUatTest.habitsOffListensForNoneOfTheirs")(lambda d: None)
-
-
-case("VO-29", needs="jvm:VoiceTapUatTest.whatIsSettledIsTypedAsItIsSaid、VoiceTapUatTest.theCursorMovedWhileTalkingTheTailComposesWhereItWent、VoiceTapUatTest.whatTheAppSentIsNotTypedAgain、VoiceTapUatTest.theViewsMadeAnewWhileTalkingTheTailIsTypedOnce、VoiceTalkTest.thePolishFailingAfterANumberWrittenInDigitsTypesWhatFollowsItOnce")(lambda d: None)
-
-
-case("VO-30", needs="jvm:VoiceTapFieldUatTest.anotherFieldGetsNothingTheFirstGetsWhatWasSaid、VoiceTapFieldUatTest.theKeyboardHiddenStopsItAndTypesTheRestOnceRecognized、VoiceTapFieldUatTest.inputRestartedInTheSameFieldTalksOn")(lambda d: None)
-
-
-case("VO-31", needs="jvm:VoiceTapFieldUatTest.aMinuteWithNothingSaidStopsIt、VoiceHoldUatTest.aHoldCutShortTypesWhatWasHeard")(lambda d: None)
-
-
-case("VO-27", needs="jvm:VoiceHoldUatTest.aSilentMicrophoneIsSaidAndListeningComesWithTheFirstSound、VoiceOnsetTest.twoSecondsOfZeroesIsASilentMicrophoneToldOnce、VoiceTapUatTest.aSilentMicrophoneIsSaid")(lambda d: None)
 
 
 def input_lag(d):
@@ -632,10 +547,7 @@ def lift_early(d, clip, before_s):
     d.sh("logcat -c")
     hold_space(d, raw=True)
     time.sleep(0.3)
-    # the wait on the device begun in the same shell as the queueing, before it: begun after, logcat
-    # -m 1 could miss the line or match it already out, and the lift be timed from the host after
-    # all (adb's and the queueing's own time moved it by 300 ms from one try to the next). Returns
-    # once the finger is up; no line in end + 5 s (nothing played): lifted all the same
+    # the logcat wait begun in the same shell before the queueing, or it could miss the line; no line in end + 5 s: lifted all the same
     cmd = (f"timeout {end + 5:.0f} logcat -m 1 -e 'voice clip started: {clip}.wav' >/dev/null; "
            f"sleep {max(0.0, end - before_s):.3f}; {raw_up(d)}")
     p = d.say(clip, wait=False, alongside=cmd)
@@ -648,19 +560,15 @@ def lift_early(d, clip, before_s):
     check(log and log["stopAt"] is not None, f"没有调试日志的 voice capture 一行：{log}")
     if log["speechStart"] is None:   # no speech heard: the offset cannot be measured
         return t, NOTHING_HEARD
-    # split in two at an endpoint: a pause in the clip, the speech's end then not the clip's
-    # (a build without the count: None, taken as one)
+    # split at an endpoint: a pause in the clip, the speech's end then not the clip's
     if (log["segments"] or 1) > 1:
         return t, NOTHING_HEARD
     if not plain(t):
         keep_log(d, clip, "empty")
-    # the clip microphone gives no timestamp (VoiceListener): the frames read when the capture
-    # thread saw the lift, which adds the capture path's latency to the offset
+    # the clip microphone gives no timestamp: the frames read when the capture thread saw the lift
     check(log["liftFrame"] is None, f"片段麦克风下不该有时间戳：liftFrame={log['liftFrame']}")
     lift = log["stopAt"] - 0.3 * RATE
-    # the speech's end where the clip microphone put it: the clip's start frame (its log line) plus
-    # where the speech ends in the clip. Not from speechStart: the recognizer's first token moved by
-    # up to 800 ms from one try to the next
+    # the speech's end from the clip's start frame, not from speechStart, as the first token varies between tries
     at = re.search(rf"voice clip started: {clip}\.wav frame=(\d+)", d.sh("logcat -d | grep 'voice clip started'"))
     check(at, "没有片段麦克风的 voice clip started 一行")
     speech_end = int(at.group(1)) + end * RATE
@@ -723,8 +631,7 @@ def vo24(d):
     return soft_speech(d, (("zouba-q44", "我们走吧"), ("nihao-q44", "你好")))
 
 
-# the same in the room's noise, which goes on all through the clip: VoiceQuiet must not take soft
-# speech for the room (077374d11 dropped it: 没有听清)
+# the same in the room's noise, all through the clip: VoiceQuiet must not take soft speech for the room
 @case("VO-32", base="B0-语音", mutates="learn", needs=EV)
 def vo32(d):
     return soft_speech(d, (("zouba-q44-room", "我们走吧"), ("nihao-q44-room", "你好")))
@@ -751,9 +658,7 @@ def soft_speech(d, clips):
             check(log and log["envPeak"] is not None, f"没有调试日志的 voice capture 一行：{log}")
             env, gain = log["envPeak"], log["peakGainDb"]
             note = f"env {env} dBFS、{gain:+.1f} dB「{got}」"
-            # the level in the app off: not counted. The clip's own peak lands at -55 ± 1 dBFS
-            # (measured -55.3 to -54.3), so the top of the window has 5 dB of room; the gain is
-            # what says it was quiet speech
+            # the level in the app off: not counted; the gain is what says it was quiet speech
             if -65 <= env <= -50 and gain >= 15:
                 return ok, note, True, t
             return ok, note + "（电平不对，不算）", False, t
@@ -762,8 +667,7 @@ def soft_speech(d, clips):
     return "；".join(out)
 
 
-# the rule itself on the JVM (VoiceHoldUatTest.pressingAgainEndsTheTailAndCountsForNothing); on the
-# device a smoke: the first sentence typed, and where the press fell written down
+# the rule itself on the JVM; on the device a smoke: the first sentence typed, and where the press fell written down
 @case("VO-25", base="B0-语音", mutates="learn", needs=EV)
 def vo25(d):
     d.sh("logcat -c")
@@ -784,8 +688,7 @@ def vo25(d):
     return f"之前框里「{before}」，上屏「{got}」；再按落在{when}（read={read}, stopAt={stop}）"
 
 
-# the rule on the JVM (VoiceHoldUatTest, VoiceOnsetTest); on the device, that 正在听 waits for the
-# microphone's first sample not zero, and how long that took (the debug log's fromStartMs)
+# the rule on the JVM; on the device, that 正在听 waits for the microphone's first nonzero sample, and how long that took
 @case("VO-26", base="B0-语音", mutates="learn", needs=EV)
 def vo26(d):
     """one hold: 准备中… till the microphone's first sound, then 正在听…, and the text. The clip
@@ -812,8 +715,7 @@ def vo26(d):
     t = settle(d)
     got = t[len(before):] if t.startswith(before) else t
     ready = d.sh("logcat -d | grep -o 'voice ready: fromStartMs=[0-9]*' | tail -1").strip()
-    # the rule: 正在听 never before the first sample not zero: either order of the two is fine,
-    # 正在听 without the log is not
+    # 正在听 never before the first nonzero sample: either order of the two is fine, 正在听 without the log is not
     check(first == PREPARING or early, f"按下后第一眼「{first}」，却没有 voice ready 日志：正在听亮得比麦克风早")
     check(seen and ready, f"播「你好」时{'' if seen else '没'}出现「{LISTEN}」，{ready or '没有 voice ready 日志'}")
     check(plain(got) == "你好", f"说「你好」，框里「{got}」")
@@ -821,8 +723,7 @@ def vo26(d):
     return f"{how}（{ready.split(': ')[1]}，从开麦算）；框里「{got}」"
 
 
-# the rule on the JVM (VoiceTapUatTest); on the device a smoke: in the chat box, the mask (no Enter of
-# its own) tapped to stop after the clip, then the keyboard's Enter once it has gone sends the sentence
+# the rule on the JVM; on the device a smoke: the mask tapped to stop after the clip, then Enter sends the sentence
 @case("VO-28", base="B0-语音", mutates="learn", needs=EV, page="chat")
 def vo28(d):
     """one sentence said, stopped on the mask, then the keyboard's Enter"""
@@ -850,12 +751,10 @@ def vo28(d):
     ex, ey = enter.c
     d.touch(("down", ex, ey), ("sleep", 0.05), ("up", ex, ey))
     time.sleep(2)
-    # the page's log skips an empty send, so an empty ↵ before the sentence shows as the sentence
-    # left in the box, not as a line of its own
+    # the page's log skips an empty send, so an empty ↵ before the sentence shows as the sentence left in the box
     def sent_in(s):
         return sum((n.text or "").count("我们走吧") for n in s.app() if n.cls != "EditText")
-    # a long-running Dumper's UiAutomation keeps the WebView's old node for the log (2026-11-10: still
-    # empty 8 s after the send, while a fresh connection reads the line at once): read again anew
+    # a long-running Dumper's UiAutomation keeps the WebView's old node for the log: read again anew
     s = d.screen()
     if not sent_in(s) and d.start_dumper():
         s = d.screen()
@@ -865,9 +764,6 @@ def vo28(d):
     return "发出「我们走吧」一次，聊天框已清空"
 
 
-case("VO-34", needs="jvm:PacksUatTest.withoutTheVoicePackTheMicrophoneAsksForItAndTheSpaceDoesNothing、PacksUatTest.aVoicePackOlderThanTheAppTakesAsksForTheNewOneAndVoiceStaysOff")(lambda d: None)
-case("VO-35", needs="jvm:VoiceEndTest.aChatLosesItsClosingMarkAQuestionKeepsItsOwn、VoiceEndTest.aLineLosesEveryEndMark、VoiceEndTest.elsewhereTheTextEndsAsSaidUnlessDropped、VoiceEndTest.aSearchAnAddressOrOneLineIsALine、VoicePolishTest.appliesAsPython")(lambda d: None)
-case("VO-36", needs="jvm:VoicePolishTest.aMarkKeepsTheWidthTheRecognizerWroteItIn、VoicePolishTest.nothingIsWrittenAfterAFullStop")(lambda d: None)
 case("VO-39", needs="jvm:VoiceFailureUatTest.eachFailureSaysItsOwnMessageAndWhatWasHeardIsTyped、"
      "VoiceListenerMicrophoneTest.aReadThrowingIsTheMicrophonesFailure、"
      "VoiceListenerMicrophoneTest.aReadThrowingOnceLiftedIsNoFailure")(lambda d: None)

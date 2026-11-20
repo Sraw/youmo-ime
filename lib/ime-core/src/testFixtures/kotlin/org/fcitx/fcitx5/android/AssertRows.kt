@@ -4,11 +4,7 @@
  */
 package org.fcitx.fcitx5.android
 
-/**
- * A table test: each row is why it is there and its check. The rows-of-data form
- * ([org.fcitx.fcitx5.android.engine.assertRows]) does the checking, so both fail the same way:
- * every row checked, one failure naming each failed row, the first failure as its cause.
- */
+/** A table test of rows each with its why and its check, failing as [org.fcitx.fcitx5.android.engine.assertRows] does. */
 fun assertRows(vararg rows: Pair<String, () -> Unit>) {
     require(rows.isNotEmpty()) { "a table of no rows checks nothing" }
     org.fcitx.fcitx5.android.engine.assertRows(rows.asList(), { it.first }) { it.second() }

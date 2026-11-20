@@ -8,28 +8,17 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.E
 import kotlin.math.log10
 
-/**
- * Where a key was tapped, as the keyboard saw it (061-neighbour-correction §2.2): [dx] and [dy]
- * from the key's centre in its width and height (±0.5 its edges; past them where the key's touch
- * area is wider than it is drawn), the key [widthDp] by [heightDp], and the keys around it [near].
- * The keyboard's geometry stays the keyboard's: each key carries its own neighbours, so a layout
- * of the user's, a split or one-handed keyboard read alike.
- */
+/** Where a key was tapped: [dx], [dy] from its centre in key widths/heights (±0.5 its edges), its size in dp, and its neighbours [near]; each key carries its own, so any layout reads alike. */
 data class Touch(val dx: Float, val dy: Float, val widthDp: Float, val heightDp: Float, val near: List<Near> = emptyList()) {
-    /** The key around this one that types [c]; null where none does. */
     fun near(c: Char): Near? = near.firstOrNull { it.char == c }
 
-    /**
-     * As text, for an evaluation set's column (ime-eval writes it, the device's runner reads it):
-     * `dx,dy,w,h`, then `|` and each key around it, its character and `,nx,ny,nw,nh`.
-     */
+    /** For an evaluation set's column: `dx,dy,w,h`, then `|` and per neighbour its character and `,nx,ny,nw,nh`. */
     fun text(): String = buildString {
         append(dx).append(',').append(dy).append(',').append(widthDp).append(',').append(heightDp)
         for (n in near) append('|').append(n.char).append(',').append(n.nx).append(',').append(n.ny).append(',').append(n.nw).append(',').append(n.nh)
     }
 
     companion object {
-        /** [text]'s touch; null where it is none. */
         fun parse(text: String): Touch? = runCatching {
             val parts = text.split('|')
             val t = fours(parts[0])
@@ -45,24 +34,13 @@ data class Touch(val dx: Float, val dy: Float, val widthDp: Float, val heightDp:
     }
 }
 
-/**
- * A key around a tapped one: what it types ([char], a grouped keyboard's code), its centre [nx],
- * [ny] from the tapped key's, and its size [nw] by [nh], all in the tapped key's width and height.
- * [stacked]: a built-in group's letters a layout of the user's puts one over the other (W over E),
- * so a place along them is down the key, not across (T9Segmenter.placeOn; GroupedKeyboard.tapped
- * sends a tap on such a key so, review L4). Not in [Touch.text]: the evaluation sets type the
- * app's keyboards, whose keys have their letters across.
- */
+/** A neighbouring key: what it types, its centre and size in the tapped key's units. [stacked]: a layout puts its letters one over another, so places along them run down (not in [Touch.text]). */
 data class Near(val char: Char, val nx: Float, val ny: Float, val nw: Float = 1f, val nh: Float = 1f, val stacked: Boolean = false)
 
 /**
- * What reading a tapped key as a key around it costs (log10, as the model's scores; §3): the log
- * of how much likelier the tap is under a finger aimed at that key than at the one hit, each a
- * round Gaussian of [sigmaDp] (a finger misses by the same whatever the key's size), never above
- * 0 (a slip is never likelier than the key hit, a wide key next to a narrow one or a tap past the
- * key's edge as well), [legal] more where the keys as typed read too, and none below [floor].
- * [fixed]: a key with no place (a hardware keyboard's): the 0.6.0 rule, a slip read only where
- * the keys spell nothing.
+ * The log10 cost of reading a tap as a neighbour: how much likelier the tap is aimed at the neighbour than at
+ * the key hit, under a round Gaussian of [sigmaDp]; never above 0, [legal] more where the keys as typed read
+ * too, none below [floor]. [fixed]: for a key without a place (hardware), slips read only where keys spell nothing.
  */
 data class SlipCost(
     val sigmaDp: Float = 10f,
@@ -71,11 +49,11 @@ data class SlipCost(
     val fixed: Float = -2f,
 ) {
     init {
-        // T9Segmenter.passing drops a key around a tap that fails the floor as an illegal slip, for the legal one too
+        // T9Segmenter.passing drops a neighbour that fails the floor as illegal, for the legal case too
         require(legal <= 0f) { "a legal slip never costs less than an illegal one" }
     }
 
-    /** What reading [touch] as [near] costs, [legal] or not; NaN where it is below [floor]. */
+    /** NaN where below [floor]. */
     fun of(touch: Touch, near: Near, legal: Boolean): Float {
         val sx = sigmaDp / touch.widthDp
         val sy = sigmaDp / touch.heightDp
@@ -86,7 +64,7 @@ data class SlipCost(
         return if (cost >= floor) cost else Float.NaN
     }
 
-    /** [of] a legal slip, [illegal] what the same tap costs read so as an illegal one (NaN: below [floor] already). */
+    /** A legal slip's cost from its [illegal] cost (NaN already below [floor]). */
     fun legal(illegal: Float): Float = (illegal + legal).let { if (it >= floor) it else Float.NaN }
 
     private companion object {
@@ -94,16 +72,9 @@ data class SlipCost(
     }
 }
 
-/**
- * A keyboard's typing keys, each [Box] (in dp, the keyboard's own coordinates) under what it types:
- * the [Touch] of a tap in one, with the keys around it (the next ones in its row either side, and
- * those of the rows above and below that overlap it across; 061-neighbour-correction §2.2). By
- * where the keys are, not a layout's name: a layout of the user's, a split or one-handed keyboard
- * read alike; a gap between keys is no gap between neighbours.
- */
+/** A keyboard's keys as dp boxes by what they type, giving a tap's [Touch] with neighbours by geometry (row either side, overlapping keys above and below), so any layout reads alike. */
 class KeyBoxes(private val keys: Map<Char, Box>) {
 
-    /** A key's rectangle. */
     data class Box(val left: Float, val top: Float, val right: Float, val bottom: Float) {
         val cx get() = (left + right) / 2
         val cy get() = (top + bottom) / 2
@@ -113,15 +84,14 @@ class KeyBoxes(private val keys: Map<Char, Box>) {
 
     private val rows by lazy { rowsOf(keys) }
 
-    // a key's neighbours, worked out when first asked: a tap asks for its key's alone
-    // (TouchBoxes' boards are shared, their taps made on any thread)
+    // neighbours computed on first ask; boards are shared and taps come from any thread
     private val around = ConcurrentHashMap<Char, List<Near>>()
 
     private fun aroundOf(c: Char): List<Near> = if (c !in keys) emptyList() else around.computeIfAbsent(c) { aroundFresh(it) }
 
     private fun aroundFresh(c: Char): List<Near> {
         val k = keys.getValue(c)
-        // the rows the key is in: more than one for a key over two rows (a layout's rows="2")
+        // a key spanning two rows (rows="2") is in both
         val inRows = rows.indices.filter { c in rows[it] }
         val out = LinkedHashMap<Char, Near>()
         for (r in inRows) {
@@ -143,21 +113,16 @@ class KeyBoxes(private val keys: Map<Char, Box>) {
         return Near(d, (o.cx - k.cx) / k.w, (o.cy - k.cy) / k.h, o.w / k.w, o.h / k.h)
     }
 
-    /** What a tap at ([x], [y]) on the key typing [hit] is: null where no key types it. */
+    /** Null if no key types [hit]. */
     fun touch(hit: Char, x: Float, y: Float): Touch? {
         val k = keys[hit] ?: return null
         return Touch((x - k.cx) / k.w, (y - k.cy) / k.h, k.w, k.h, aroundOf(hit))
     }
 
-    /** The keys around the one typing [c], as [touch] has them. */
     fun around(c: Char): List<Near> = aroundOf(c)
 
     companion object {
-        /**
-         * The [Touch] of a tap at ([x], [y]) on the [hit]th of [keys], each what it types and where: a
-         * character typed by more than one key (a split keyboard's G on both halves, a layout's two
-         * keys of one letter) is the copy nearest the key hit, the key hit its own.
-         */
+        /** The [Touch] of a tap on the [hit]th of [keys]; a character on several keys (split keyboard) uses the copy nearest the key hit. */
         fun touch(keys: List<Pair<Char, Box>>, hit: Int, x: Float, y: Float): Touch? {
             val (c, at) = keys.getOrNull(hit) ?: return null
             val nearest = HashMap<Char, Box>()
@@ -171,19 +136,13 @@ class KeyBoxes(private val keys: Map<Char, Box>) {
 
         private fun apart(a: Box, b: Box) = (a.cx - b.cx).let { it * it } + (a.cy - b.cy).let { it * it }
 
-        // keys of rows above and below overlapping by less than this much of the key's width are no neighbours (a corner)
+        // keys above/below overlapping by less than this share of width are no neighbours (a corner)
         private const val OVERLAP = 0.01f
 
-        // a key is in a row whose line goes through it at least this much of the line's key's height inside its edges
+        // a key belongs to a row whose line passes at least this share of the line key's height inside it
         private const val SAME_ROW = 0.25f
 
-        /**
-         * The keys in rows, top to bottom, each row left to right; a key over more than one row in each of them.
-         * A row is a line across the keyboard through the middle of the key that drew it and the keys it goes
-         * through: drawn by the lowest keys first, a key two rows high (a layout's rows="2") meets the lines of
-         * both its rows. By centres alone it was a row of its own between them, which left it no key beside it
-         * and the two rows none above or below each other (review F8167).
-         */
+        /** Keys in rows, top to bottom, left to right. A row is a line through the middle of the key that drew it, drawn lowest keys first, so a two-row-high key meets both rows' lines. */
         private fun rowsOf(keys: Map<Char, Box>): List<List<Char>> {
             val lines = ArrayList<Pair<Float, Float>>() // where, and the height of the key that drew it
             val rows = ArrayList<MutableList<Char>>()

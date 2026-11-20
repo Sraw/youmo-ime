@@ -24,12 +24,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * 快捷键图标位置's six places and 标点位置's on the full keyboard, standard and 紧凑, and on 九键 and 大千
- * (uat/02 KB-66): the goldens under src/test/screenshots/KeyMarksScreenshotTest,
- * named <board>_<标点位置>_<快捷键图标位置>, looked at one by one for a mark on another or on a letter
- * (KeyMarksEverywhereUatTest measures it everywhere).
- */
+/** 快捷键图标位置's six places and 标点位置's on several boards: goldens named <board>_<标点位置>_<快捷键图标位置>, looked at by eye. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -44,8 +39,7 @@ class KeyMarksScreenshotTest {
         "zhuyin_full" to (KeyboardHarness.PINYIN to ImKeyboards.Chosen(pinyin = ImKeyboard.ZHUYIN_FULL)),
     )
 
-    // each shortcut place with the symbols top right (bottom right where the shortcuts are), each symbol
-    // place with the shortcuts top left (bottom right where the symbols are): pairs the settings allow
+    // the pairs the settings allow: each place with the other mark in a corner it does not take
     private val pairs = KeyMarkPosition.entries.map { (if (it == KeyMarkPosition.TopRight) KeyMarkPosition.BottomRight else KeyMarkPosition.TopRight) to it } +
         KeyMarkPosition.entries.filter { it != KeyMarkPosition.TopRight }
             .map { it to (if (it == KeyMarkPosition.TopLeft) KeyMarkPosition.BottomRight else KeyMarkPosition.TopLeft) }
@@ -77,28 +71,26 @@ class KeyMarksScreenshotTest {
     @Test
     @Uat("KB-66")
     fun everyPlaceCompact() {
-        // 紧凑 is both heights at its level (KeyboardHeightLevels.isCompact): the portrait one alone is
-        // just a low keyboard, its keys made as standard ones
+        // 紧凑 is both heights at its level (KeyboardHeightLevels.isCompact): the portrait one alone is just a low keyboard
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
-        // 底部 has no room there: the symbol top right (bottom right where the shortcuts are), the
-        // shortcut the first corner of top left, top right, … the symbol does not take
+        // 底部 has no room there: the symbol top right, the shortcut the first free corner
         for ((symbolAt, shortcutAt) in (pairs + (KeyMarkPosition.Bottom to KeyMarkPosition.TopRight) + (KeyMarkPosition.TopLeft to KeyMarkPosition.Bottom)).distinct()) {
             shoot("full_compact", symbolAt, shortcutAt, boards[0].second)
         }
     }
 
-    // where a key has no room for its shortcut in the chosen place, another free corner of that key: 紧凑单手's narrow low keys at 右下 and 左下, floating 大千's backspace at 底部
+    // no room in the chosen place: another free corner of that key
     @Test
     @Uat("KB-67")
     fun noRoomAnotherCornerOfTheKey() {
-        // 大千's 简繁 hint: not said, its "told" put back after (PrefsRule) for KeyboardPickerUatTest
+        // 大千's 简繁 hint not said, its "told" put back after (PrefsRule)
         prefs.set(AppPrefs.getInstance().internal.zhuyinTraditionalTold, true)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercent, 20)
         prefs.set(AppPrefs.getInstance().keyboard.keyboardHeightPercentLandscape, 34)
         prefs.setStyle(KeyboardStyle.ONE_HANDED, side = OneHanded.Right)
         shoot("full_compact_one_handed", KeyMarkPosition.TopRight, KeyMarkPosition.BottomRight, boards[0].second)
-        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "", "五", "zh_CN", "androidengine", false)
+        val wubi = InputMethodEntry(InputMethodCatalog.WUBI, "五笔", "", "五", "zh_CN")
         try {
             val names = TableKeyboard(InputMethodCatalog.WUBI, emptySet(), false, KeyLabels.NAMES, TableRoots.WUBI86)
             shoot("wubi_compact_one_handed", KeyMarkPosition.TopRight, KeyMarkPosition.BottomLeft, wubi to null, names)

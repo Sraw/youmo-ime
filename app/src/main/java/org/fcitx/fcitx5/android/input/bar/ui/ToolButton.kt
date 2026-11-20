@@ -56,23 +56,22 @@ class ToolButton(context: Context) : CustomGestureView(context) {
             image.rotation = value
         }
 
-    /** The theme's toolbar button (060-render-p3 T6b): its fill and shape, its icon's colour, pressed and on. */
     private var toolbar: ToolbarLook? = null
 
-    // the theme's icons ([setIcon] of a name) and the one shown by its name, null: an image of the app's alone
+    // null: an image of the app's alone
     private var icons = PackIcons.EMPTY
     private var shown: BarIcons.Icon? = null
 
-    // the icon's side ([fixIconSize]), 0: a vector's own, 24 dp
+    // 0: a vector's own, 24 dp
     private var iconPx = 0
 
-    /** A button of the bar's or a panel's whose [icon] a theme may replace (061-toolbar-icons). */
+    /** One whose [icon] a theme may replace. */
     constructor(context: Context, icon: BarIcons.Icon, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
         dress(theme, look)
         setIcon(icon)
     }
 
-    /** A button whose icon is the app's whatever the theme (the title bar's back, the editor info's). */
+    /** The app's whatever the theme (the title bar's back, the editor info's). */
     constructor(context: Context, @DrawableRes icon: Int, theme: Theme, look: ToolbarLook = SceneBar.of(context, theme).toolbar) : this(context) {
         dress(theme, look)
         setIcon(icon)
@@ -86,17 +85,15 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         add(image, lParams(wrapContent, wrapContent, gravityCenter))
     }
 
-    // a toggle's state, said by TalkBack as checked or not; null: no toggle
+    // said by TalkBack as checked or not; null: no toggle
     private var on: Boolean? = null
 
-    // [on] said as checked or not: false where the button's name already says its state (setOn)
+    // false where the button's name already says its state
     private var checkable = true
 
     /**
-     * A toggle's button drawn on ([ToolbarLook.onIcon], [ToolbarLook.onFill]) or off, as the theme has it, and
-     * said so: a checkable node, checked while on (061-handwriting-toolbar §3.8; stateDescription is API 30's).
-     * [checkable] false: drawn so only, its name the state's or the tap's (简繁, 我的输入习惯), which a checked
-     * state would contradict (R26 F8269: 已选中，恢复我的输入习惯).
+     * Said as a checkable node (stateDescription is API 30's). [checkable] false where its name is the state's
+     * or the tap's (简繁, 我的输入习惯), which a checked state would contradict.
      */
     fun setOn(on: Boolean, checkable: Boolean = true) {
         this.on = on
@@ -106,11 +103,11 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         if (look.fill != look.onFill) background = background(look, on)
     }
 
-    /** [setOn] with the icon of that state ([icon]): drawn once, in the state's colour. */
+    /** Drawn once, in the state's colour. */
     fun setOn(on: Boolean, icon: BarIcons.Icon, checkable: Boolean = true) {
         shown = icon
         setOn(on, checkable)
-        // the app's: set by its resource, the tint list already the state's
+        // the app's: the tint list already the state's
         if (!themed) drawIcon()
     }
 
@@ -122,8 +119,8 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
     }
 
-    // no fill nor radius in this state: the press highlight's circle (a ripple) as ever, so a theme's
-    // `toolbar:selected fill` alone leaves every button off as it was; else the fill of its shape, the pressed colour over it
+    // no fill nor radius in this state: the ripple as ever, so a theme's `toolbar:selected fill` alone leaves
+    // every button off as it was
     private fun background(look: ToolbarLook, on: Boolean): Drawable {
         val fill = if (on) look.onFill else look.fill
         if (look.radius == null && fill == null) return pressHighlight(look.pressed.value)
@@ -134,7 +131,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         }
     }
 
-    // no radius: a circle, as wide as the button's shorter side and in its middle (an oval in a wide button is not)
+    // a circle in the middle (an oval in a wide button is not)
     @VisibleForTesting
     internal class Circle(@ColorInt color: Int) : GradientDrawable() {
         init {
@@ -156,10 +153,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
             image.alpha = value
         }
 
-    /**
-     * False: of no use here (手写 in English), drawn greyed, the theme's icon or the app's alike, and still in its place
-     * so that nothing moves (the user's call, 2026-11-15); its tap says why (KawaiiBarComponent).
-     */
+    /** Drawn greyed and still in its place, so nothing moves; its tap says why (KawaiiBarComponent). */
     var available = true
         set(value) {
             if (value == field) return
@@ -169,7 +163,7 @@ class ToolButton(context: Context) : CustomGestureView(context) {
 
     fun iconAnimate(): ViewPropertyAnimator = image.animate()
 
-    /** The icon [px] square whatever the button's size: a button made narrower keeps it as it was. */
+    /** A button made narrower keeps it. */
     fun fixIconSize(px: Int) {
         if (px == iconPx) return
         image.padding = 0
@@ -181,13 +175,12 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         if (themed) drawIcon()
     }
 
-    /** The icon's colour: lit (a toggle on) or not */
     @get:ColorInt
     val iconTint: Int get() = image.imageTintList?.defaultColor ?: 0
 
     fun setIconTint(@ColorInt color: Int) {
         image.imageTintList = ColorStateList.valueOf(color)
-        // a theme's icon is drawn in its colour (a tint list is nothing to it): drawn again in this one
+        // a tint list is nothing to a theme's icon: drawn again in this one
         if (themed) drawIcon()
     }
 
@@ -197,12 +190,9 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         showOwn(icon)
     }
 
-    // the image read anew, not the resource's shared one: a vector's raster only ever grows, and a copy (mutate) starts
-    // at the size its source grew to. Drawn at its own size elsewhere first (another bar, a panel), the shared one made
-    // this button's smaller icon sharper than drawn alone, its pixels hanging on what was drawn before
-    // (a toolbar image is a vector's XML, read as XML: lint takes getXml's id for an xml resource's alone. One that
-    // isn't (a bitmap) has no raster to grow, and is read the usual way, a copy of its own.) The same icon shown again
-    // (each arrangement, status and input method update sets it) keeps the image it has.
+    // read anew, not the shared one: a vector's raster only ever grows, and a copy (mutate) starts at the size its
+    // source grew to, so drawn bigger elsewhere first, it was sharper than alone. lint takes getXml's id for an
+    // xml resource's alone; a bitmap has no raster to grow and is read the usual way
     @SuppressLint("ResourceType")
     private fun showOwn(@DrawableRes icon: Int) {
         if (iconRes == icon && image.drawable != null) return
@@ -215,32 +205,31 @@ class ToolButton(context: Context) : CustomGestureView(context) {
         iconRes = icon
     }
 
-    /** The app's image shown, by its resource; 0 for a theme's. The ImageView, given the drawable, has none. */
+    /** 0 for a theme's. The ImageView, given the drawable, has none. */
     @get:VisibleForTesting
     @DrawableRes
     internal var iconRes = 0
         private set
 
-    /** [icon]: the theme's of its name where it has one (nothing till it is read), else the app's ([BarIconDrawables]). */
+    /** Nothing till the theme's is read. */
     fun setIcon(icon: BarIcons.Icon) {
         shown = icon
         drawIcon()
     }
 
-    /** Whether the icon shown is the theme's (or will be, once read): not where its file failed and the app's is drawn. */
+    /** Not where its file failed and the app's is drawn. */
     val themed: Boolean get() = shown?.let { BarIconDrawables.drawsOwn(icons, it) } == true
 
-    /** The icon as drawn now; null where the theme's is not read yet. */
+    /** Null where the theme's is not read yet. */
     @get:VisibleForTesting
     internal val iconDrawable: Drawable? get() = image.drawable
 
-    // what the theme's icon drawn now was drawn of (name, colour, side): the same again is not rastered anew
+    // the same again is not rastered anew
     private var drawn: Triple<BarIcons.Icon, Int, Int>? = null
 
     private fun drawIcon() {
         val icon = shown ?: return
         if (!BarIconDrawables.themed(icons, icon)) {
-            // the app's, in the tint list as ever
             drawn = null
             showOwn(ToolbarButtonLooks.drawable(icon.fallback))
             return
@@ -262,10 +251,9 @@ class ToolButton(context: Context) : CustomGestureView(context) {
     }
 
     companion object {
-        // the app's vectors' side
         private const val DEFAULT_ICON_DP = 24
 
-        /** Material's disabled content: a button of no use here (⋯'s panel's cell for it too) */
+        /** Material's disabled content */
         const val UNAVAILABLE_ALPHA = 0.38f
     }
 }

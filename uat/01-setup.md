@@ -53,20 +53,14 @@
 - **预期**：可添加的列表里有五笔、二笔、仓颉、自然码、双拼、五笔拼音六个（0.6.1 起没有手写：手写是工具栏的开关），五笔排在最前，没有"九键拼音"（九键是拼音的键盘，在 **输入法 → 拼音 → 键盘** 里选，见 T9-01）；点了之后回到输入法列表，最下面多了"五笔"。
 - **JVM**：`SettingsPagesUatTest.addingAnInputMethodOffersNoNineKeysAndWubiFirst`（可添加的六个、五笔在前、没有九键；点了加到最下面并告诉引擎）；设备上不跑。
 
-### SET-13 [P0] 从 0.4 升级：九键拼音并入拼音，只提示一次
-- **前提**：装着 0.4.x，在 **输入法** 里加了九键拼音并拖到最上面（列表：九键拼音、拼音、英文），当前输入法是九键拼音。然后直接装要测的这一版（覆盖安装，不重置）。
-- **操作**：打开测试页点「普通文本」框；看键盘和键盘上方的提示；看 **输入法** 列表和 **输入法 → 拼音 → 键盘**；收起键盘再点一次框；重启手机后再点框。另：再覆盖安装一次（同样从 0.4.x 起），这回先打开设置，把 **界面语言** 改成 English 再改回简体中文（换界面语言会重启主机，主机启动时会再告知一次；普通开关不会），再点框。
-- **预期**：第一次弹出时键盘是九键（空格上写着"拼音"），上方提示「九键拼音已并入拼音，在 ⋯ → 键盘里切换」（普通提示的样子，不是出错的样子）；输入法列表只有拼音、英文，拼音的 **键盘** 是「九键」。之后再弹出、重启后都不再提示，键盘仍是九键。先换了界面语言再点框的那次，提示也只出现一次（不叠成两行）。只加了九键拼音、没有拼音的，升级后同样是拼音（九键）；两个都在的，拼音的键盘按列表里靠前的那个定（九键拼音在前是九键，拼音在前键盘不变），不看默认输入法。
-- **JVM**：`KotlinHostTest.zeroFoursNineKeysPinyinBecomesPinyinsKeyboardAndTheUserIsToldOnce`（0.4 的 profile 读进来后列表是拼音、英文，键盘是九键，提示一次、普通样子，保存后 profile 里没有 engine-t9，重启后不再提示）、`KotlinHostTest.aMergeNotWrittenBackIsNotDoneOverTheUsersKeyboard`（profile 写不回去时，之后改的键盘不被盖掉、不再提示）、`NineKeysMergeTest`（ime-core：哪个赢、只有九键时、都不在时）、`EngineNoticesTest.newsToldTwiceBeforeItIsSeenIsSaidOnce`（键盘弹出前因主机重启又告知一次，只说一次）、`EngineNoticesTest.aFailureWithNewsWaitingToastsTheFailureAlone`（没有键盘时出错的 toast 不带这条提示）；设备上不跑。
-
-### SET-14 [P0] 从 0.4 升级：双拼方案不变
-- **前提**：装着 0.4.x，加了双拼。分三次：方案没动过（0.4 默认的自然码）；方案选了微软；方案选了小鹤。每次都直接装要测的这一版（覆盖安装，不重置）。
+### SET-14 [P0] 0.4 留下的双拼配置：方案不变
+- **前提**：双拼的配置还是 0.4 留下的样子（0.4 用过双拼、经 0.5.x 升级上来的安装；0.4 及更早不能直接升到这一版）。分三次：方案没动过（0.4 默认的自然码）；方案选了微软；方案选了小鹤。
 - **操作**：打开 **输入法 → 双拼** 看 **方案**；回测试页点「普通文本」框，换到双拼，看键盘上方。
 - **预期**：方案和升级前一样（没动过的是自然码，不会变成新装默认的小鹤），键盘上方没有提示。
 - **JVM**：`KotlinHostSchemeTest.anUpgradeKeepsItsScheme`（配置里没有方案、没有配置文件、注释掉的自然码：定成自然码并明写进配置，不提示；写着自然码、微软、小鹤的不变、不写）、`SchemeMigrationTest.anUpgradeWithAnEmptyOrUnknownSchemeIsPinnedToZiranmaAsWithNone`（ime-core：写着空值或不认识的名字也和没有方案一样，定成自然码，不提示）、`KotlinHostSchemeTest.directBootSettlesNothing`、`KotlinHostSchemeTest.aPinNotOnDiskIsMadeAgainAtTheNextStart`（配置不可写、读不到、写不进：本次定成自然码但不算定下，下次启动再写）；设备上不跑。
 
-### SET-15 [P0] 从 0.4 升级：不再提供的双拼方案改成小鹤，提示一次
-- **前提**：装着 0.4.x，加了双拼，方案选了紫光（再分别试智能ABC、中文之星、拼音加加、国标）。然后直接装要测的这一版（覆盖安装，不重置）。
+### SET-15 [P0] 0.4 留下的双拼配置：不再提供的方案改成小鹤，提示一次
+- **前提**：双拼的配置还是 0.4 留下的样子（同 SET-14），方案是紫光（再分别试智能ABC、中文之星、拼音加加、国标）。
 - **操作**：打开测试页点「普通文本」框，换到双拼；看键盘上方的提示；看 **输入法 → 双拼 → 方案**；收起键盘再点一次框；重启手机后再点框。另：在 0.5 新装上恢复一个方案是紫光的 0.4 备份，再恢复一个没改过方案的 0.4 备份。
 - **预期**：第一次弹出时上方提示「你用的紫光双拼已不再提供，已改成小鹤双拼，可在双拼设置里换。」（普通提示的样子，不是出错的样子），方案是小鹤；之后再弹出、重启后都不再提示。之前在紫光下学到的、固定的词还在 **已学条目** 里，标着紫光，能忘掉。恢复紫光的备份后同样改成小鹤并提示一次；恢复没改过方案的备份后是自然码（0.4 的默认），不提示。
 - **JVM**：`KotlinHostSchemeTest.aDroppedSchemeIsXiaoheAndTheUserIsToldOnce`（五个方案各一遍：小鹤，写回配置，提示一次、普通样子，重启后不再提示）、`KotlinHostSchemeTest.aZeroFourBackupRestoredHasItsSchemeRead`（新装上恢复备份：0.4 的紫光改成小鹤并提示，0.4 的没有方案是自然码，0.5 的没有方案是小鹤）、`SchemeMigrationTest`（ime-core）、`EnginesLearningTest.aPinUnderADroppedSchemeIsListedAndTakenOff`（紫光下固定的词照样列出、能去掉）、`LearnedItemsFragmentTest`（已学条目里标着旧方案的名字）；设备上不跑。

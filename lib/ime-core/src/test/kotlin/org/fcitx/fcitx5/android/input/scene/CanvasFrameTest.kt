@@ -58,7 +58,7 @@ class CanvasFrameTest {
         // a shadow blurred 12 px, moved 5 down: 7 past the bounds at the sides, 12 below
         val shadow = Op.Shadow(Shape.Rect(Box(105.0, 60.0, 195.0, 150.0), listOf(0.0, 0.0, 0.0, 0.0)), 12.0, black)
         assertEquals(Box(93.0, 48.0, 207.0, 162.0), CanvasFrame.extent(bounds, listOf(shadow), 0.0))
-        // an inner shadow: clipped to its face, its ring however far out (T4b)
+        // an inner shadow: clipped to its face, its ring however far out
         val inner = Op.InnerShadow(face, face.moved(0.0, 8.0), Box(0.0, 0.0, 400.0, 400.0), 12.0, black)
         assertEquals(bounds, CanvasFrame.extent(bounds, listOf(inner), 0.0))
         // a text: a guess wider than its ink, never less than the bounds
@@ -73,7 +73,7 @@ class CanvasFrameTest {
         assertTrue("$turned", turned.bottom >= 110.0 + 30.0 && turned.left <= 140.0 - 40.0)
         assertTrue(CanvasFrame.showsPicture(listOf(Op.Fill(face, black), Op.Picture(face, null, null))))
         assertFalse(CanvasFrame.showsPicture(listOf(Op.Fill(face, black))))
-        // a text's letter spacing, stroke and shadow reach past its plain ink (R20 F5990)
+        // a text's letter spacing, stroke and shadow reach past its plain ink
         val at = Box(140.0, 110.0, 140.0, 110.0)
         val plain = CanvasFrame.extent(at, listOf(text), 0.0)
         val spaced = CanvasFrame.extent(at, listOf(text.copy(letterSpacing = 0.5)), 0.0)

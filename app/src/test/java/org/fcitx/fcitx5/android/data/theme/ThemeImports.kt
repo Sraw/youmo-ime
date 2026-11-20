@@ -13,10 +13,7 @@ import java.io.OutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * The 3.0 theme zip [src] imported the way the theme page imports it ([ThemeFilesManager.openTheme]): the tests of
- * 3.0 imports go through the path a user's import takes, not a second one of its own. A 4.0 pack there fails.
- */
+/** Through the theme page's path ([ThemeFilesManager.openTheme]), not a second one; a 4.0 pack fails. */
 fun ThemeFilesManager.importTheme(
     src: InputStream,
     themes: List<Theme> = ThemeManager.getAllThemes(),
@@ -31,10 +28,7 @@ fun ThemeFilesManager.importTheme(
         }
     }
 
-/**
- * [theme] as a theme 3.0 zip (its files by name, then its json), as the app exported before 0.6.0 and the theme
- * maker's page still makes and reads: test data only (the zips the page's tests read, ThemeMakerRulesTest).
- */
+/** A 3.0 zip as the app exported before 0.6.0 and the web maker still uses: test data only. */
 fun ThemeFilesManager.exportJson(theme: Theme.Custom, dest: OutputStream): Result<Unit> =
     runCatching {
         ZipOutputStream(dest.buffered()).use { zip ->
@@ -49,11 +43,7 @@ fun ThemeFilesManager.exportJson(theme: Theme.Custom, dest: OutputStream): Resul
         }
     }
 
-/**
- * A user's pack (what no built-in theme is, as motion, effects or a style of a layout's): the built-in material's file
- * named [name], [styles] put last, [files] (name to bytes) beside it, imported as the theme page imports it and placed;
- * its light version.
- */
+/** The built-in material file as user pack [name] with [styles] last and [files] beside, imported and placed; light version. */
 fun materialPack(name: String, vararg styles: String, files: Map<String, ByteArray> = emptyMap()): Theme {
     val text = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_material)
         .replace("name=\"material\"", "name=\"$name\"")

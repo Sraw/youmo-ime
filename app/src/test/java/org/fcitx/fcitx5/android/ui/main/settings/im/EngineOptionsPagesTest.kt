@@ -11,11 +11,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings.Toggle
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 
-/**
- * The Kotlin host's pages ([EngineOptions.page]) have every option the app's pages read, at the
- * path they read it: the pages stay as they are when the host changes.
- * contract: pages generated from fcitx's option table, which mutation cannot see.
- */
+/** contract: pages generated from fcitx's option table have every option at the path the app's pages read it. */
 class EngineOptionsPagesTest {
 
     private fun paths(items: List<InputMethodSettings.Item>): List<String> = items.flat().flatMap {

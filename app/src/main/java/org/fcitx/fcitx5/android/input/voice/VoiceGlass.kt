@@ -19,24 +19,17 @@ import timber.log.Timber
 import kotlin.math.roundToInt
 
 /**
- * The mask's frosted glass (the user's decision 2026-11-07): the keys under it blurred, only their
- * shapes and colours seen, [color] over them, so what the mask says reads clearly. RenderEffect is
- * API 31's and minSdk is 29, so the keyboard's view is drawn once, [SCALE] times smaller, into a
- * bitmap, box-blurred and drawn back as large: the keys do not change while talking. Drawn in the
- * card's own parent's coordinates, it lines up with the keys however the keyboard is moved,
- * scaled or rounded (floating, one-handed, sideways, a picture theme): those are the parent's.
- *
- * How much: [blur], the theme's (`voice { blur }`, 060-render-p3 T7b: [Blur.of]) or the app's of before
- * ([Blur.DEFAULT]); null, none: nothing taken, the keys plain under [color]. The same on every API
- * (RenderEffect blurs a view's own drawing, not what is under it, and is API 31's): one picture taken
- * once, nothing more each frame.
+ * The keys under the mask blurred. RenderEffect is API 31's (minSdk 29) and blurs a view's own drawing,
+ * not what is under it, so the keyboard's view is drawn once, [SCALE] times smaller, into a bitmap,
+ * box-blurred and drawn back: the keys do not change while talking. Drawn in the card's parent's
+ * coordinates, it lines up however the keyboard is moved or scaled.
  */
 class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = Blur.DEFAULT) : Drawable() {
     private var shot: Bitmap? = null
     private val paint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val fill = Paint()
 
-    // nothing taken (it could not be drawn): the mask opaque, the keys not seen through it plain
+    // nothing taken: the mask opaque, the keys not seen through it plain
     private var failed = false
 
     var color: Int = color
@@ -45,7 +38,6 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
             invalidateSelf()
         }
 
-    /** Once [card], a child of [board], is laid out: what is under it taken; freed as it goes. */
     fun under(card: View, board: ViewGroup) {
         if (blur == null) return
         card.doOnPreDraw { take(board, card) }
@@ -93,18 +85,12 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
     @Deprecated("Deprecated in Java")
     override fun getOpacity() = PixelFormat.TRANSLUCENT
 
-    /** The keys taken [scale] times smaller and box-blurred [radius] of those pixels, [PASSES] times. */
     data class Blur(val scale: Int, val radius: Int) {
         companion object {
-            /** The app's of before: 8 times smaller, 2 px (16 px of the screen's, whatever its density). */
+            /** 8 times smaller, 2 px (16 px of the screen's, whatever its density). */
             val DEFAULT = Blur(SCALE, RADIUS)
 
-            /**
-             * A theme's blur of [px] (its dp on this screen): three box blurs of that radius, as the keyboard's
-             * picture's (BoxBlur), on the keys taken as much smaller as leaves [MIN_RADIUS] small pixels of
-             * it, no more than [SCALE] nor less than [MIN_SCALE] times: a small blur is a little more than asked
-             * (under 4 px, one or two small pixels: 2 or 4 px), never the keys taken whole; under half a pixel, none.
-             */
+            /** A small blur is a little more than asked, never the keys taken whole; under half a pixel, none. */
             fun of(px: Double): Blur? {
                 if (px < HALF) return null
                 val scale = (px / MIN_RADIUS).toInt().coerceIn(MIN_SCALE, SCALE)
@@ -118,24 +104,20 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
     }
 
     companion object {
-        /** how much smaller the keys are taken at most: blurred anyway, and a few ms on the UI thread */
+        /** blurred anyway, and a few ms on the UI thread */
         const val SCALE = 8
 
-        /** the blur's radius in the small picture's pixels of before, and how many times it runs (3: near a Gaussian) */
+        /** 3 passes: near a Gaussian */
         private const val RADIUS = 2
         private const val PASSES = 3
 
-        /** [size] pixels taken [scale] times smaller: the last part-cell counted whole, so it covers it all */
+        /** the last part-cell counted whole, so it covers it all */
         @VisibleForTesting
         internal fun small(size: Int, scale: Int = SCALE) = (size + scale - 1) / scale
 
         private const val OPAQUE = 0xFF shl 24
 
-        /**
-         * [board] under [card], small and blurred; null where it cannot be drawn. Drawn as the board
-         * draws itself, its children's alpha, clips and transforms with it: the card is taken before
-         * its first frame, at alpha 0, so left out; a mask still fading out is taken as seen.
-         */
+        /** The card is taken before its first frame, at alpha 0, so left out; a mask still fading out is taken as seen. */
         @VisibleForTesting
         internal fun capture(board: ViewGroup, card: View, blur: Blur = Blur.DEFAULT): Bitmap? {
             val w = small(card.width, blur.scale)
@@ -160,7 +142,6 @@ class VoiceGlass(color: Int, @get:VisibleForTesting internal val blur: Blur? = B
             return bitmap
         }
 
-        /** [pixels] ([w] × [h], ARGB) box-blurred in place, across then down, the edges held. */
         @VisibleForTesting
         internal fun boxBlur(pixels: IntArray, w: Int, h: Int, radius: Int) {
             val line = IntArray(maxOf(w, h))

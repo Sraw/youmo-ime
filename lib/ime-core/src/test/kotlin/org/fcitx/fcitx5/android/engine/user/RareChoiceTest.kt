@@ -19,7 +19,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** 生僻字屏蔽's file (dev/design/061-rare-char-block.md §4.2): read, decided, changed, written. */
+/** 生僻字屏蔽's file: read, decided, changed, written. */
 class RareChoiceTest {
 
     private val levels = TestCharLevels.levels
@@ -159,7 +159,7 @@ class RareChoiceTest {
     @Test
     fun aCharacterBeyondTheBasicPlaneIsOne() = assertEquals(cps(str(ext)), RareChoice.parse(file("on\t1", "allow\t${str(ext)}")).allow)
 
-    // §5.4: a user word's row names the characters held back in it
+    // a user word's row names the characters held back in it
     @Test
     @Uat("WD-56")
     fun theCharactersHeldInAWord() {

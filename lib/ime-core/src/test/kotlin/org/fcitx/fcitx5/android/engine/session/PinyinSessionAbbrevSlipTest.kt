@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -20,11 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 双拼's two other readings of the keys together: a key read alone where it and the next make a
- * syllable, which reads only the words the user typed, and a key read as the one next to it by
- * where it was tapped, which reads the whole dictionary as a key hit does.
- */
+/** 双拼's keys read alone (typed words only) and read as a neighbour (the whole dictionary) together. */
 class PinyinSessionAbbrevSlipTest {
 
     // 自然码: ni k w l is 你, kei (kw) and l, or 你看完了 by its initials; w tapped by e is ke
@@ -44,13 +41,10 @@ class PinyinSessionAbbrevSlipTest {
 
     private fun Session.tap(keys: String, touches: List<Touch?>): List<String> = keys.indices.map { apply(Key(keys[it], touch = touches[it])) }.last().candidates.also { apply(Reset) }
 
-    // a slip is no key read alone: with nothing typed it still reads the dictionary's words
     @Test
     fun withNothingTypedAKeyReadAsItsNeighbourReadsTheDictionary() {
         val s = session(Learner(data))
-        // tq is tiu, which spells nothing: q tapped by a is ta
         assertEquals("他", s.tap("tq", at("tq", slipped = 1, dx = 0.3f, dy = 0.45f)).first())
-        // and past a slip the words go on: w tapped by e, ni ke l
         val shown = s.tap("nikwl", at("nikwl", slipped = 3, dx = 0.42f))
         assertTrue("$shown", shown.any { it.startsWith("你课") })
     }
@@ -60,10 +54,8 @@ class PinyinSessionAbbrevSlipTest {
     fun aWordTypedIsReadByItsInitialsBeforeASlipOfThem() {
         val learner = Learner(data)
         val s = session(learner)
-        // never typed: no 你看完了 by n i, k, w, l, tapped where they may
         assertTrue("你看完了" !in s.tap("nikwl", at("nikwl")))
         assertTrue("你看完了" !in s.tap("nikwl", at("nikwl", slipped = 3, dx = 0.42f)))
-        // typed in whole syllables once
         val whole = "nikjwjle"
         val typed = whole.indices.map { s.apply(Key(whole[it], touch = at(whole)[it])) }.last().candidates
         s.apply(Select(typed.indexOf("你看完了")))
@@ -72,14 +64,12 @@ class PinyinSessionAbbrevSlipTest {
         val middle = s.tap("nikwl", at("nikwl"))
         assertEquals("$middle", "你看完了", middle.first())
         assertTrue("$middle", middle.none { it.startsWith("你课") })
-        // w tapped by e: the slip is read, after the word typed
         val edge = s.tap("nikwl", at("nikwl", slipped = 3, dx = 0.42f))
         assertEquals("$edge", "你看完了", edge.first())
         assertTrue("$edge", edge.any { it.startsWith("你课") })
     }
 
-    // a slip in a code read whole holds back only what the slip reads (061-sp-abbrev §3.6, review r2 M1): the words
-    // typed and added by hand read by the keys alone are raised there all the same. ky is kuai; y tapped by u, ku
+    // the words typed and added by hand are still raised by the keys alone; y tapped by u reads ku
     @Test
     @Uat("SP-57")
     fun wordsTypedOrAddedAreRaisedByTheirInitialsBesideASlip() {
@@ -87,7 +77,6 @@ class PinyinSessionAbbrevSlipTest {
         val learner = Learner(data)
         val fresh = session(learner).tap("ky", touches)
         assertTrue("$fresh", "可以" !in fresh && "苦" in fresh)
-        // added by hand
         learner.model.listByHand(UserModel.Entry("可以", intArrayOf(Syllables.id("ke"), Syllables.id("yi"))))
         val added = PinyinSession(
             data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, neighbours = true), pageSize = 20, prediction = false, user = learner.model,
@@ -97,7 +86,6 @@ class PinyinSessionAbbrevSlipTest {
         val shown = added.tap("ky", touches)
         assertEquals("$shown", listOf("快", "苦", "可以"), shown.take(3))
         assertEquals(listOf("快", "可以"), added.tap("ky", at("ky")).take(2))
-        // typed: the same
         val typing = Learner(data)
         val s = session(typing)
         val whole = "keyi"

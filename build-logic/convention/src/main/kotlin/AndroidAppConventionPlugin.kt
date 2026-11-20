@@ -89,8 +89,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             }
         }
 
-        // remove META-INF/com/android/build/gradle/app-metadata.properties: through Gradle's internals, so a
-        // Gradle or AGP that changed them fails the build here instead of shipping the file unnoticed
+        // through Gradle's internals, so a Gradle or AGP that changed them fails here instead of shipping the file
         target.tasks.withType<PackageApplication> {
             val valueField = checkNotNull(AbstractProperty::class.java.declaredFields.find { it.name == "value" }) {
                 "AbstractProperty has no field `value` (a Gradle upgrade?): app-metadata.properties would go into the APK"
@@ -102,9 +101,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             }
         }
 
-        // remove assets/dexopt/baseline.prof{,m} (baseline profile)
-        // not kept for an APK installed from a file: profileinstaller would only hand it to ART's
-        // next background dexopt, which compiles the methods the JIT found hot anyway
+        // remove assets/dexopt/baseline.prof{,m}: for an APK installed from a file ART's dexopt finds the hot methods anyway
         target.tasks.withType<MergeArtProfileTask> { enabled = false }
         target.tasks.withType<ExpandArtProfileWildcardsTask> { enabled = false }
         target.tasks.withType<CompileArtProfileTask> { enabled = false }
@@ -149,12 +146,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
         target.dependencies.add("coreLibraryDesugaring", target.libs.android.desugarJDKLibs)
     }
 
-    /**
-     * Fails the build if the merged manifest asks for a permission not in [allowed], and otherwise
-     * passes it on unchanged. The app asks for what it needs and no more, no network above all
-     * (README, PRIVACY.md), and a dependency's manifest would merge one in without a line of this
-     * repository changing.
-     */
+    /** Fails the build if the merged manifest asks for a permission not in [allowed]: a dependency could merge one in unseen. */
     abstract class PermissionCheckTask : DefaultTask() {
         @get:InputFile
         @get:PathSensitive(PathSensitivity.NONE)
@@ -188,10 +180,7 @@ class AndroidAppConventionPlugin : AndroidBaseConventionPlugin() {
             private const val ANDROID_NS = "http://schemas.android.com/apk/res/android"
             private val PERMISSION_TAGS = listOf("uses-permission", "uses-permission-sdk-23")
 
-            /**
-             * Key feedback; the microphone for voice input, asked for at its first use only (and
-             * only with the voice pack imported, VoiceFeature). Nothing else, the network above all (PRIVACY.md).
-             */
+            /** Key feedback and the microphone (asked for at voice's first use); nothing else, the network above all. */
             val ALLOWED = setOf("android.permission.VIBRATE", "android.permission.RECORD_AUDIO")
         }
     }

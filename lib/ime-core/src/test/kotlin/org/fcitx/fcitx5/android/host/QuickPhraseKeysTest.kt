@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** What each keyboard's key is in a quick phrase's key (design 051-quickphrase §1.4). */
+/** What each keyboard's key is in a quick phrase's key. */
 class QuickPhraseKeysTest {
 
     private fun of(codePoint: Int, nine: NineKeyLetters = NineKeyLetters.STANDARD) = QuickPhraseKeys.of(codePoint, nine)!!

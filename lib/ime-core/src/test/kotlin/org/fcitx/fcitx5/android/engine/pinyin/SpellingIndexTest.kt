@@ -28,12 +28,9 @@ class SpellingIndexTest {
         // with no initial the final is the syllable, and u is none, as in 双拼
         assertEquals(emptySet<String>(), index.spells("u"))
         assertEquals(setOf("ou"), index.spells("ou"))
-        // after an initial the pair holds
         assertEquals(setOf("du", "dou"), index.spells("du"))
-        // so xiu is no xi then 欧
         val g = PinyinSegmenter(setOf(Fuzzy.U_OU)).segment("xiu")
         assertTrue(g.edges(2).none { g.kind(it) == Kind.SYLLABLE })
-        // the one rule every segmenter reads its finals through
         assertEquals(listOf("ou" to 0), SpellingIndex.finalsAfter("", "ou", listOf(Fuzzy.U_OU)))
         assertEquals(listOf("ou" to 0, "u" to SyllableMatches.FUZZY), SpellingIndex.finalsAfter("d", "ou", listOf(Fuzzy.U_OU)))
     }

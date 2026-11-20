@@ -9,9 +9,8 @@ import org.fcitx.fcitx5.android.engine.data.CharLevels.Level
 import java.util.BitSet
 
 /**
- * What the user chose of 生僻字屏蔽 (dev/design/061-rare-char-block.md §4.2): [on] or off, the
- * [groups] held back whole, and the characters let through ([allow]) or held back ([block]) apart
- * from their group. A file of its own beside the common words (RareCharsManager):
+ * The user's 生僻字屏蔽 choice: [on], the [groups] held whole, and per-character [allow]/[block] exceptions. A file
+ * of its own (RareCharsManager):
  *
  * ```
  * # youmo-rare-chars 1
@@ -21,13 +20,9 @@ import java.util.BitSet
  * block	犇
  * ```
  *
- * No file, or one with no `on 1` line, is off. No `groups` line is the default, [Level.EXT] alone
- * (what turning it on the first time writes). A group name or a line this build does not know is
- * kept as it is and written back ([otherGroups], [otherLines]): adding either needs no new version.
- * A file of a later version ([newer]) is off and not written over ([with] refuses).
- *
- * [L1][Level.L1] and [L2][Level.L2] characters are never held back, whatever the file says, nor
- * one [CharLevels] puts in no group.
+ * No `on 1` line is off; no `groups` line is [Level.EXT] alone. Unknown groups and lines are kept and written
+ * back, so adding either needs no new version; a [newer] file is off and never overwritten. L1, L2 and
+ * ungrouped characters are never held back.
  */
 class RareChoice private constructor(
     val on: Boolean,
@@ -38,13 +33,9 @@ class RareChoice private constructor(
     val otherLines: List<String> = emptyList(),
     val newer: Boolean = false,
 ) {
-    /** Whether [level]'s group is held back whole: never [L1][Level.L1] nor [L2][Level.L2]. */
     fun holdsGroup(level: Level): Boolean = level in Level.GRID && level in groups
 
-    /**
-     * Whether [codePoint], in [level], is held back: never a character of the table's first two
-     * levels or of no group; else held in [block], let through in [allow] (held if in both), else as its group.
-     */
+    /** Whether [codePoint] in [level] is held back: never L1, L2 or ungrouped; else [block] holds, [allow] lets through (both: held), else its group. */
     fun holds(codePoint: Int, level: Level?): Boolean = when {
         level == null || level !in Level.GRID -> false
         codePoint in block -> true
@@ -52,7 +43,7 @@ class RareChoice private constructor(
         else -> level in groups
     }
 
-    /** The gate of this choice over [levels]: none while off, of a later version's file, or without [levels]. */
+    /** The gate of this choice: none while off, for a newer file, or without [levels]. */
     fun gate(levels: CharLevels?): CharGate {
         if (!on || newer || levels == null) return CharGate.NONE
         val plane0 = BitSet(PLANE)
@@ -67,25 +58,20 @@ class RareChoice private constructor(
         return CharGate.of(plane0) { cp -> holds(cp, levels.of(cp)) }
     }
 
-    /** A change the settings make, laid over the file as it is when saved ([with]). */
     sealed class Change {
-        /** The switch. */
         data class On(val on: Boolean) : Change()
 
-        /** [level]'s group held back whole or let through whole: its characters' exceptions cleared. */
         data class Group(val level: Level, val held: Boolean) : Change()
 
-        /** [codePoint] held back or let through, apart from its group where that differs. */
         data class One(val codePoint: Int, val held: Boolean) : Change()
 
-        /** 恢复默认: [Level.EXT] alone, no exceptions, nor a group or line this build does not know; the switch as it is. */
+        /** 恢复默认: [Level.EXT] alone, no exceptions, no unknown groups or lines; the switch as it is. */
         data object Reset : Change()
     }
 
     /**
-     * This choice with [changes] laid over it in turn, [levels] telling each character's group;
-     * the exceptions that say what their group says dropped (a group a character moved to since).
-     * @throws IllegalStateException for a later version's file, which this build does not write
+     * This choice with [changes] applied in turn; exceptions that now agree with their group are dropped.
+     * @throws IllegalStateException for a newer file, which this build does not write
      */
     fun with(changes: List<Change>, levels: CharLevels): RareChoice {
         check(!newer) { "rare characters: a later version's file, not written over" }
@@ -95,7 +81,6 @@ class RareChoice private constructor(
         val block = block.toMutableSet()
         var otherGroups = otherGroups
         var otherLines = otherLines
-        // a level or a character not the grid's: nothing
         val grids = changes.filter {
             when (it) {
                 is Change.Group -> it.level in Level.GRID
@@ -111,7 +96,6 @@ class RareChoice private constructor(
                     allow.removeAll { levels.of(it) == change.level }
                     block.removeAll { levels.of(it) == change.level }
                 }
-                // one its group agrees with is dropped below, the groups as they end
                 is Change.One -> {
                     allow -= change.codePoint
                     block -= change.codePoint
@@ -127,13 +111,11 @@ class RareChoice private constructor(
                 }
             }
         }
-        // an exception its group now agrees with, or of a character in no group of the grid's, says nothing
         allow.removeAll { cp -> levels.of(cp).let { it !in Level.GRID || it !in groups } }
         block.removeAll { cp -> levels.of(cp).let { it !in Level.GRID || it in groups } }
         return RareChoice(on, groups, allow, block, otherGroups, otherLines)
     }
 
-    /** The file's text: [otherGroups] after the known ones, [otherLines] after the known lines, as read. */
     fun format(): String = buildString {
         appendLine(HEADER_PREFIX + VERSION)
         appendLine("$ON\t${if (on) "1" else "0"}")
@@ -153,7 +135,7 @@ class RareChoice private constructor(
     override fun toString() = if (newer) "RareChoice(newer)" else format()
 
     companion object {
-        /** The file's version; bumped only when a line already there changes meaning. */
+        /** Bumped only when a line already there changes meaning. */
         const val VERSION = 1
         private const val HEADER_PREFIX = "# youmo-rare-chars "
         private const val ON = "on"
@@ -162,13 +144,11 @@ class RareChoice private constructor(
         private const val BLOCK = "block"
         private const val PLANE = 0x10000
 
-        /** What is held back once turned on the first time, and after 恢复默认: 扩展 B on alone (DECISIONS 2026-11-14). */
+        /** What is held back once turned on the first time, and after 恢复默认: 扩展 B on alone. */
         val DEFAULT: Set<Level> = setOf(Level.EXT)
 
-        /** No file: off, [DEFAULT] the groups once on. */
         val NONE = RareChoice(false, DEFAULT, emptySet(), emptySet())
 
-        /** The file's [text]; empty for none. */
         fun parse(text: String): RareChoice {
             if (text.isBlank()) return NONE
             val lines = text.lines()

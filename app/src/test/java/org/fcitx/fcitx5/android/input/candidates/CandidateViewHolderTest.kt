@@ -16,11 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-/**
- * A tapped candidate is picked by what it showed on the tap, not by what its holder is bound to
- * when the pick runs: a list refined in between shows another word there. Under the app, whose
- * preferences CandidateItemUi's gesture view reads.
- */
+/** A tap picks what the candidate showed on the tap, not what its holder is bound to when the pick runs. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class CandidateViewHolderTest {

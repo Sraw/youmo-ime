@@ -18,10 +18,8 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.address.AddressLists
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
-import org.fcitx.fcitx5.android.input.candidates.expanded.ExpandedCandidateStyle
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesMode
 import org.fcitx.fcitx5.android.input.candidates.floating.FloatingCandidatesOrientation
-import org.fcitx.fcitx5.android.input.candidates.horizontal.HorizontalCandidateMode
 import org.fcitx.fcitx5.android.input.floating.FloatingKeyboard
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
@@ -33,8 +31,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
-import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightPercentBase
-import org.fcitx.fcitx5.android.input.keyboard.LangSwitchBehavior
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
@@ -101,9 +97,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         /** Whether [offerHandwriting] ran: its first look at [toolbarButtons], once. */
         val toolbarHandwritingLooked = bool("toolbar_handwriting_looked", false)
 
-        /** Whether [resetHiddenSettings] ran: on the first start of a version with it, and so once. */
-        val hiddenSettingsReset = bool("hidden_settings_reset", false)
-
         /** Whether the punctuation table the user edited before 0.6.1 was deleted (HostConfigDir.resetPunctuationOnce). */
         val punctuationReset061 = bool("punctuation_reset_061", false)
 
@@ -136,19 +129,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** Whether a zhuyin keyboard has said once that 繁体 is in ⋯ (KeyboardWindow). */
         val zhuyinTraditionalTold = bool("zhuyin_traditional_told", false)
-
-        /**
-         * Whether 0.4's 九键拼音 was merged into pinyin (KotlinHost.mergeNineKeys): pinyin's keyboard set
-         * once, though the profile could not be written back without the old name. Not a 0.4 backup's,
-         * so one restored is merged again.
-         */
-        val nineKeysMerged = bool("nine_keys_merged", false)
-
-        /**
-         * Whether the merge's notice ([nineKeysMerged], both pinyins were on) is still to be seen: kept till
-         * it is said on the keyboard, so a process ended before any keyboard showed says it at the next start.
-         */
-        val nineKeysUnseen = bool("nine_keys_merged_unseen", false)
 
         /**
          * What the theme packs' boards made layouts of the user's at an upgrade or a restore tell (ThemeLayoutsToList,
@@ -219,19 +199,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     inner class Advanced : ManagedPreferenceCategory(R.string.advanced, sharedPreferences) {
-        val ignoreSystemCursor = hidden { switch(R.string.ignore_sys_cursor, "ignore_system_cursor", false) }
-        val hideKeyConfig = hidden { switch(R.string.hide_key_config, "hide_key_config", true) }
         val disableAnimation = switch(R.string.disable_animation, "disable_animation", false)
 
         /** 键盘动效 (060-render-p3 A1): a theme's keys move as it says (KeyMotionSwitch); off, they are drawn as a theme without motion. */
         val keyboardMotion = switch(R.string.keyboard_motion, "keyboard_motion", true, R.string.keyboard_motion_summary)
-        val keyboardHeightPercentBase = hidden {
-            enumList(
-                R.string.keyboard_height_percent_base,
-                "keyboard_height_percent_base",
-                KeyboardHeightPercentBase.DisplayMetrics
-            )
-        }
     }
 
     inner class Keyboard : ManagedPreferenceCategory(R.string.virtual_keyboard, sharedPreferences) {
@@ -240,13 +211,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         }
 
         val popupOnKeyPress = switch(R.string.popup_on_key_press, "popup_on_key_press", true)
-        val keepLettersUppercase = hidden {
-            switch(
-                R.string.keep_keyboard_letters_uppercase,
-                "keep_keyboard_letters_uppercase",
-                false
-            )
-        }
         /** 拼音键字母大小写: a Chinese input method's letter keys' faces ([LetterCaseChoice]); English's follow Shift whatever it is. */
         val letterCase = enumList(R.string.letter_case, "letter_case", LetterCaseChoice.Shift)
         /** 上滑 on every key (060-swipe-slots): off, a swipe up is a character key's tap, a function key as it was. */
@@ -278,7 +242,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 note = R.string.mark_at_taken_by_up,
             )
         )
-        val longPressDelay = hidden(setByLevels = true) {
+        val longPressDelay = hidden {
             int(
                 R.string.keyboard_long_press_delay,
                 "keyboard_long_press_delay",
@@ -308,7 +272,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val voiceEndMark = enumList(R.string.voice_end_mark, "voice_end_mark", VoiceEndMark.Auto)
         val spaceSwipeMoveCursor =
             switch(R.string.space_swipe_move_cursor, "space_swipe_move_cursor", true)
-        // set on an input method's page or the shared one, with no UI here: not hidden { }, which would put them back to their defaults
+        // set on an input method's page or the shared one, with no UI here
         private fun bool(key: String, defaultValue: Boolean) =
             ManagedPreference.PBool(sharedPreferences, key, defaultValue).apply { register() }
 
@@ -332,7 +296,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /**
          * Shown on the pinyin page and in ⋯'s 键盘: the on-screen keyboard pinyin is typed on, the
-         * nine keys 0.4's 九键拼音 (NineKeysMerge). A hardware keyboard types 全拼 still.
+         * nine keys 0.4's 九键拼音. A hardware keyboard types 全拼 still.
          */
         val pinyinKeyboard = stringLike(PINYIN_KEYBOARD, ManagedPreference.enumCodec<PinyinKeyboard>(), PinyinKeyboard.Full)
 
@@ -450,65 +414,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val handwritingPause = stringLike(HANDWRITING_PAUSE, ManagedPreference.enumCodec<HandwritingPause>(), HandwritingPause.Medium)
         val showLangSwitchKey =
             switch(R.string.show_lang_switch_key, "show_lang_switch_key", true)
-        val langSwitchKeyBehavior = hidden {
-            enumList(
-                R.string.lang_switch_key_behavior,
-                "lang_switch_key_behavior",
-                LangSwitchBehavior.Enumerate
-            ) { showLangSwitchKey.getValue() }
-        }
-
-        val focusChangeResetKeyboard =
-            hidden { switch(R.string.reset_keyboard_on_focus_change, "reset_keyboard_on_focus_change", true) }
-
-        val expandToolbarByDefault =
-            hidden { switch(R.string.expand_toolbar_by_default, "expand_toolbar_by_default", false) }
-        val inlineSuggestions = hidden { switch(R.string.inline_suggestions, "inline_suggestions", true) }
-        val toolbarNumRowOnPassword =
-            hidden { switch(R.string.toolbar_num_row_on_password, "toolbar_num_row_on_password", true) }
-
-        val horizontalCandidateStyle = hidden {
-            enumList(
-                R.string.horizontal_candidate_style,
-                "horizontal_candidate_style",
-                HorizontalCandidateMode.AutoFillWidth
-            )
-        }
-        val expandedCandidateStyle = hidden {
-            enumList(
-                R.string.expanded_candidate_style,
-                "expanded_candidate_style",
-                ExpandedCandidateStyle.Grid
-            )
-        }
-
-        val expandedCandidateGridSpanCount: ManagedPreference.PInt
-        val expandedCandidateGridSpanCountLandscape: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = hidden {
-                twinInt(
-                    R.string.expanded_candidate_grid_span_count,
-                    R.string.portrait,
-                    "expanded_candidate_grid_span_count_portrait",
-                    6,
-                    R.string.landscape,
-                    "expanded_candidate_grid_span_count_landscape",
-                    8,
-                    4,
-                    12,
-                )
-            }
-            expandedCandidateGridSpanCount = primary
-            expandedCandidateGridSpanCountLandscape = secondary
-        }
-
 
         val keyboardHeightPercent: ManagedPreference.PInt
         val keyboardHeightPercentLandscape: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden(setByLevels = true) {
+            val (primary, secondary) = hidden {
                 twinInt(
                     R.string.keyboard_height,
                     R.string.portrait,
@@ -530,7 +441,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val keyboardSidePaddingLandscape: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden(setByLevels = true) {
+            val (primary, secondary) = hidden {
                 twinInt(
                     R.string.keyboard_side_padding,
                     R.string.portrait,
@@ -552,7 +463,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val keyboardBottomPaddingLandscape: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden(setByLevels = true) {
+            val (primary, secondary) = hidden {
                 twinInt(
                     R.string.keyboard_bottom_padding,
                     R.string.portrait,
@@ -572,7 +483,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 1: docked, no room is left for the navigation bar (键盘底部边距 贴底), for ROMs that hide
         // the gesture line yet still report its insets, leaving a blank strip under the keys
-        val keyboardBottomFlush = hidden(setByLevels = true) {
+        val keyboardBottomFlush = hidden {
             int(R.string.keyboard_bottom_padding, "keyboard_bottom_flush", 0, 0, 1)
         }
 
@@ -582,13 +493,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         // 跟随主题 of each of the three (060-render-p3 T5): the theme's size where it gives one, else
         // the numbers above, which 跟随主题 puts back to their defaults. The default, for 0.6.0's own;
         // an upgrade's are ThemePrefs.migrateSizeFollow's (a size set kept, not following)
-        val keyboardHeightFollowTheme = hidden(setByLevels = true) {
+        val keyboardHeightFollowTheme = hidden {
             switch(R.string.follow_theme, "keyboard_height_follow_theme", true)
         }
-        val keyboardSidePaddingFollowTheme = hidden(setByLevels = true) {
+        val keyboardSidePaddingFollowTheme = hidden {
             switch(R.string.follow_theme, "keyboard_side_padding_follow_theme", true)
         }
-        val keyboardBottomPaddingFollowTheme = hidden(setByLevels = true) {
+        val keyboardBottomPaddingFollowTheme = hidden {
             switch(R.string.follow_theme, "keyboard_bottom_padding_follow_theme", true)
         }
 
@@ -602,20 +513,12 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 "haptic_on_keypress",
                 InputFeedbackMode.FollowingSystem
             )
-        val hapticOnKeyUp = hidden {
-            switch(
-                R.string.button_up_haptic_feedback,
-                "haptic_on_keyup",
-                false
-            ) { hapticOnKeyPress.getValue() != InputFeedbackMode.Disabled }
-        }
-        val hapticOnRepeat = hidden { switch(R.string.haptic_on_repeat, "haptic_on_repeat", false) }
 
         val buttonPressVibrationMilliseconds: ManagedPreference.PInt
         val buttonLongPressVibrationMilliseconds: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden(setByLevels = true) {
+            val (primary, secondary) = hidden {
                 twinInt(
                     R.string.button_vibration_milliseconds,
                     R.string.button_press,
@@ -638,7 +541,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val buttonLongPressVibrationAmplitude: ManagedPreference.PInt
 
         init {
-            val (primary, secondary) = hidden(setByLevels = true) {
+            val (primary, secondary) = hidden {
                 twinInt(
                     R.string.button_vibration_amplitude,
                     R.string.button_press,
@@ -723,48 +626,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             FloatingCandidatesOrientation.Automatic
         )
 
-        val windowMinWidth = hidden {
-            int(
-                R.string.candidates_window_min_width,
-                "candidates_window_min_width",
-                0,
-                0,
-                640,
-                "dp",
-                10
-            )
-        }
-
-        val windowPadding =
-            hidden { int(R.string.candidates_window_padding, "candidates_window_padding", 4, 0, 32, "dp") }
-
         val fontSize =
             int(R.string.candidates_font_size, "candidates_window_font_size", 20, 4, 64, "sp")
-
-        val windowRadius =
-            hidden { int(R.string.candidates_window_radius, "candidates_window_radius", 0, 0, 48, "dp") }
-
-        val itemPaddingVertical: ManagedPreference.PInt
-        val itemPaddingHorizontal: ManagedPreference.PInt
-
-        init {
-            val (primary, secondary) = hidden {
-                twinInt(
-                    R.string.candidates_padding,
-                    R.string.vertical,
-                    "candidates_item_padding_vertical",
-                    2,
-                    R.string.horizontal,
-                    "candidates_item_padding_horizontal",
-                    4,
-                    0,
-                    64,
-                    "dp"
-                )
-            }
-            itemPaddingVertical = primary
-            itemPaddingHorizontal = secondary
-        }
     }
 
     inner class Clipboard : ManagedPreferenceCategory(R.string.clipboard, sharedPreferences) {
@@ -781,16 +644,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val clipboardSuggestion = switch(
             R.string.clipboard_suggestion, "clipboard_suggestion", true
         ) { clipboardListening.getValue() }
-        val clipboardItemTimeout = hidden {
-            int(
-                R.string.clipboard_suggestion_timeout,
-                "clipboard_item_timeout",
-                30,
-                -1,
-                Int.MAX_VALUE,
-                "s"
-            ) { clipboardListening.getValue() && clipboardSuggestion.getValue() }
-        }
         val clipboardReturnAfterPaste = switch(
             R.string.clipboard_return_after_paste, "clipboard_return_after_paste", true
         ) { clipboardListening.getValue() }
@@ -806,14 +659,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     inner class Symbols : ManagedPreferenceCategory(R.string.emoji_and_symbols, sharedPreferences) {
-        val hideUnsupportedEmojis = hidden {
-            switch(
-                R.string.hide_unsupported_emojis,
-                "hide_unsupported_emojis",
-                true
-            )
-        }
-
         val defaultEmojiSkinTone = enumList(
             R.string.default_emoji_skin_tone,
             "default_emoji_skin_tone",
@@ -822,9 +667,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     private val providers = mutableListOf<ManagedPreferenceProvider>()
-
-    // resetHiddenSettings ran in this process: a category registered after it is reset as it registers
-    private var hiddenResetInProcess = false
 
     /**
      * Waits for the settings written so far to be on disk: a setting's write (apply) is written later on another thread,
@@ -840,9 +682,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     ): T {
         val provider = providerF(sharedPreferences)
         providers.add(provider)
-        if (hiddenResetInProcess && provider is ManagedPreferenceCategory) {
-            sharedPreferences.edit(commit = true) { provider.resetHidden(this) }
-        }
         return provider
     }
 
@@ -877,7 +716,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.keySwipes,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
-                advanced.ignoreSystemCursor,
                 advanced.disableAnimation,
                 advanced.keyboardMotion,
             ).forEach {
@@ -915,7 +753,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     /**
      * The settings no version reads any more removed, as a 0.4 install or a backup of one has them,
      * and 标点位置 stored where 快捷键图标位置 is moved ([settleMarkPositions]): at every start, a
-     * backup restored (an import, after [resetHiddenSettings] again) being read at the next.
+     * backup restored (an import) being read at the next.
      */
     fun dropRetired() {
         // gone with the old drawing (060-render-p2 S8): 0.6's betas' switch of the redraw, vivo's touch routing to
@@ -944,25 +782,19 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     fun storedOldLongPress(key: String): String? = runCatching { sharedPreferences.getString(key, null) }.getOrNull()
 
     /**
-     * 0.5's and 0.6's betas' long presses ([POPUP_OVERRIDES], [KEY_POPUPS], [T9_SYMBOLS]) as [Internal.keyLists]
-     * (KeyListsMigration, 060-keys-unify §4.3), and beta3's `@1` upgraded to `@2` (060-row-unlock §5, its rows by the
-     * user's 按键字母): run while it is neither (never stored, a 0.5, beta or `@1` backup restored), once; the old ones
-     * migrated to `@1` first. A later version's (`@4`) left as it is. The old ones kept as they are, for a downgrade (§4.4).
+     * 0.5's long presses ([POPUP_OVERRIDES], [T9_SYMBOLS]; beta2's [KEY_POPUPS] no longer read) as [Internal.keyLists]
+     * (KeyListsMigration, 060-keys-unify §4.3), to `@1` then `@2` (060-row-unlock §5, its rows by the user's 按键字母):
+     * run while it is neither (never stored, a 0.5, beta or `@1` backup restored), once. A later version's (`@4`) left
+     * as it is. The old ones kept as they are, for a downgrade (§4.4).
      */
     private fun migrateKeyLists() {
         val sp = sharedPreferences
         // stored as another type (a bad backup): read as unset, never a crash at every start
         fun storedString(key: String) = runCatching { sp.getString(key, null) }.getOrNull()
-        val stored = storedKeyLists()
-        if (!KeyLists.needsMigration(stored)) return
-        val v1 = if (KeyLists.isVersion1(stored)) {
-            stored.orEmpty()
-        } else {
-            val moved = KeyListsMigration.migrate(storedString(POPUP_OVERRIDES), storedString(KEY_POPUPS), storedString(T9_SYMBOLS))
-            moved.lost.forEach { Timber.i("long press not kept: %s", it) }
-            moved.text
-        }
-        sp.edit { putString(KEY_LISTS, KeyListsMigration.upgrade(v1, KeyListsCache.nineLettersOf(storedString(T9_LETTERS)))) }
+        if (!KeyLists.needsMigration(storedKeyLists())) return
+        val moved = KeyListsMigration.migrate(storedString(POPUP_OVERRIDES), storedString(T9_SYMBOLS))
+        moved.lost.forEach { Timber.i("long press not kept: %s", it) }
+        sp.edit { putString(KEY_LISTS, KeyListsMigration.upgrade(moved.text, KeyListsCache.nineLettersOf(storedString(T9_LETTERS)))) }
     }
 
     /**
@@ -1092,23 +924,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
     }
 
     /**
-     * Puts the settings that have no UI back to their defaults ([ManagedPreferenceCategory.hidden]):
-     * once, and [again] after an import of the user's data, for what an older version or a backup
-     * set there could not be changed back. Every category registered here is reset, ThemePrefs too:
-     * ThemeManager registers it after this has run at the start, and [registerProvider] resets it then.
+     * At the start after an import of the user's data: the punctuation mark it brings is the backup's, saying nothing of
+     * this phone's data; cleared, the table a restore could not delete is tried again (HostConfigDir.resetPunctuationOnce).
      */
-    fun resetHiddenSettings(again: Boolean = false) {
-        if (!again && internal.hiddenSettingsReset.getValue()) return
-        // on disk before an import's marker goes
-        sharedPreferences.edit(commit = true) {
-            providers.filterIsInstance<ManagedPreferenceCategory>().forEach { it.resetHidden(this@edit) }
-            putBoolean(internal.hiddenSettingsReset.key, true)
-            // the punctuation mark an import brings is the backup's, saying nothing of this phone's data: cleared, the
-            // table a restore could not delete is tried again at this start (HostConfigDir.resetPunctuationOnce)
-            if (again) putBoolean(internal.punctuationReset061.key, false)
-        }
-        hiddenResetInProcess = true
-        Timber.i("settings without a UI reset to their defaults%s", if (again) " after an import" else "")
+    fun afterImport() {
+        // on disk before the import's marker goes
+        sharedPreferences.edit(commit = true) { putBoolean(internal.punctuationReset061.key, false) }
+        Timber.i("punctuation mark cleared after an import")
     }
 
     companion object {

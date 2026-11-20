@@ -37,7 +37,6 @@ class CustomPhrasesTest {
             dh,2=电话
             """.trimIndent(),
         )
-        // turned off and repeated ones left out, the rest in order
         assertEquals(listOf(0 to "邮箱", 2 to "a@b.c"), phrases.lookup("yx", now))
         assertEquals(listOf(1 to "电话"), phrases.lookup("dh", now))
         assertEquals(emptyList<Pair<Int, String>>(), phrases.lookup("y", now))
@@ -67,7 +66,6 @@ class CustomPhrasesTest {
         assertEquals("a\r\nb\tc\u000c\u000b", value("\"a\\r\\nb\\tc\\f\\v\""))
         // another character after a backslash is itself, as fcitx reads it
         assertEquals("ax", value("\"a\\x\""))
-        // not quoted, or not escaped right: as it is
         for (raw in listOf("abc", "\"", "\"a\"b\"", "\"a\\\"")) assertEquals(raw, value(raw))
         assertEquals(listOf(0 to "two\nlines"), CustomPhrases.parse("q,1=\"two\\nlines\"").lookup("q", now))
     }
@@ -91,16 +89,13 @@ class CustomPhrasesTest {
     @Test
     fun phrasesGoWhereTheirOrderSaysEachACandidateOfItsOwn() {
         val phrases = CustomPhrases.parse("ab,1=甲\nab,3=乙\nab,9=丙\nab,2=丁\nab,1=戊\nab,2=己")
-        // of one order, in the file's order; a candidate of a phrase's text that reads all stays
-        // where it is (PLAN §2.7), one that reads less is left out
+        // a phrase's text that reads all stays put; one that reads less is left out
         assertEquals(listOf("+甲", "+戊", "+丁", "+己", "+乙", "x", "y", "+丙"), phrases.place("ab", listOf("x", "乙", "y", "甲…")))
         // the candidate ranked before its phrase: the text listed once, there
         assertEquals(listOf("乙", "x"), CustomPhrases.parse("ab,3=乙").place("ab", listOf("乙", "x")))
-        // and the phrases after it keep their places (F3000)
         assertEquals(listOf("x", "a", "+y"), CustomPhrases.parse("ab,2=x\nab,3=y").place("ab", listOf("x", "a")))
         assertEquals(listOf("a", "+x", "b", "+y"), CustomPhrases.parse("ab,2=x\nab,4=y").place("ab", listOf("a", "x", "b")))
         assertEquals(listOf("x"), phrases.place("abc", listOf("x")))
-        // the time is asked only for a key with phrases
         assertEquals(listOf("x"), phrases.place("abc", { error("asked") }, listOf("x"), { it }, { true }, { it }))
         assertEquals(listOf("x"), CustomPhrases.parse("ab,-1=甲").place("ab", listOf("x")))
     }
@@ -109,15 +104,12 @@ class CustomPhrasesTest {
     fun theSettingsListEveryPhraseAndSaveThemAsFcitxDoes() {
         val phrases = CustomPhrases.parse("zz,2=乙\nab,-1=off\nzz,1=甲\nsig,1=\nline one\nline two\nq,1=\"\"\nD,1=大")
         val all = phrases.all
-        // a key in capitals kept in lower case, as it is matched (A1)
         assertEquals(listOf("ab", "d", "q", "sig", "zz", "zz"), all.map { it.key })
         assertEquals(listOf(-1, 1, 1, 1, 1, 2), all.map { it.order })
         val text = CustomPhrases.format(all)
         assertEquals("ab,-1=off\nd,1=大\nq,1=\"\"\nsig,1=\"line one\\nline two\"\nzz,1=甲\nzz,2=乙\n", text)
-        // what is saved reads back the same
         assertEquals(text, CustomPhrases.format(CustomPhrases.parse(text).all))
         assertEquals(listOf(0 to "line one\nline two"), CustomPhrases.parse(text).lookup("sig", now))
-        // saved in the order given, a key's phrases together
         val given = listOf(CustomPhrases.Phrase("b", 2, "x y"), CustomPhrases.Phrase("a", 1, "\"q\""), CustomPhrases.Phrase("b", 1, "z"))
         assertEquals("a,1=\"\\\"q\\\"\"\nb,2=\"x y\"\nb,1=z\n", CustomPhrases.format(given))
         assertEquals(listOf(0 to "\"q\""), CustomPhrases.parse(CustomPhrases.format(given)).lookup("a", now))
@@ -129,11 +121,9 @@ class CustomPhrasesTest {
         val phrases = CustomPhrases.parse("yx,1=邮箱\nyx,1=信箱\nyx,3=a@b.c\nyx,-2=信箱\ndh,1=电话")
         val pinned = phrases.pinned("yx", "a@b.c")
         assertEquals(listOf(0 to "a@b.c", 0 to "邮箱", 0 to "信箱"), pinned.lookup("yx", now))
-        // one of the value, turned off or not: it is turned on
         assertEquals(listOf(0 to "信箱", 0 to "邮箱", 2 to "a@b.c"), phrases.pinned("yx", "信箱").lookup("yx", now))
         assertEquals("yx,1=信箱 yx,1=邮箱 yx,3=a@b.c", phrases.pinned("yx", "信箱").all.filter { it.key == "yx" }.joinToString(" "))
         assertEquals(listOf(0 to "新"), phrases.pinned("xin", "新").lookup("xin", now))
-        // what it was is kept
         assertEquals(listOf(0 to "邮箱", 0 to "信箱", 2 to "a@b.c"), phrases.lookup("yx", now))
         val without = phrases.without("yx", "信箱")
         assertEquals(listOf(0 to "邮箱", 2 to "a@b.c"), without.lookup("yx", now))

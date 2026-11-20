@@ -47,22 +47,22 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.setPaddingDp
 import timber.log.Timber
 
-/** Finds a setting by its name, or by what it says, on any page; a result opens its page at it. */
+/** Finds a setting by name or by what it says, on any page; a result opens its page at it. */
 class SettingsSearchFragment : Fragment() {
 
-    // null until the index lands (SettingsIndexModel, off the main thread): what is typed meanwhile is searched then
+    // null until the index lands off the main thread: what is typed meanwhile is searched then
     private var search: SettingsSearch<SettingsIndex.Target>? = null
 
     private val index: SettingsIndexModel by viewModels()
 
     private val viewModel: MainViewModel by activityViewModels()
 
-    // the input methods added, to say so under the options of one not: none said until fcitx answers
+    // to note an input method not added; none noted until fcitx answers
     private var added: Set<String>? = null
 
     private var results: List<SettingsSearch.Found<SettingsIndex.Target>> = emptyList()
 
-    // kept while the fragment is on the back stack: coming back shows the same results
+    // kept on the back stack: coming back shows the same results
     private var query = ""
 
     private var none: TextView? = null
@@ -103,7 +103,7 @@ class SettingsSearchFragment : Fragment() {
             val entry = found.entry
             holder.title.text = entry.title
             holder.detail.apply {
-                // where it is and what it is, then what it says
+                // where and what it is, then what it says
                 val where = (listOf(entry.path.joinToString(" › ")) + notes(found)).filter { it.isNotEmpty() }.joinToString(" · ")
                 text = listOf(where, entry.summary).filter { it.isNotEmpty() }.joinToString("\n")
                 isVisible = text.isNotEmpty()
@@ -133,7 +133,7 @@ class SettingsSearchFragment : Fragment() {
             adapter = this@SettingsSearchFragment.adapter
             addItemDecoration(DividerItemDecoration(ctx, DividerItemDecoration.VERTICAL))
         }
-        // the keyboard at once only the first time: back from a result, the list is what is wanted
+        // the keyboard only the first time: back from a result, the list is wanted
         if (query.isEmpty()) field.post {
             field.requestFocus()
             ctx.getSystemService<InputMethodManager>()?.showSoftInput(field, 0)
@@ -147,7 +147,7 @@ class SettingsSearchFragment : Fragment() {
         }
     }
 
-    // the adapter and these fields outlive the view on the back stack: let go of the old views, or they keep it
+    // the adapter and fields outlive the view on the back stack: drop the old views or they leak it
     override fun onDestroyView() {
         list?.adapter = null
         list = null
@@ -157,16 +157,15 @@ class SettingsSearchFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // started with the view, built on Dispatchers.Default while the page slides in; waited for only while the
-        // view lives, the build itself kept over a rotation and cancelled with the page (SettingsIndexModel). A build
-        // that throws throws here, at await(), on the main thread, as it did when it was built there
+        // built on Dispatchers.Default while the page slides in, kept over a rotation (SettingsIndexModel); a throwing build
+        // throws here at await() on the main thread
         if (search == null) viewLifecycleOwner.lifecycleScope.launch {
             search = index.index(requireContext()).await()
             show(query)
         }
     }
 
-    // each time the page is back: an input method may have been added or removed on a result's page
+    // an input method may have been added or removed on a result's page
     override fun onResume() {
         super.onResume()
         viewLifecycleOwner.lifecycleScope.launch {
@@ -195,20 +194,19 @@ class SettingsSearchFragment : Fragment() {
         val target = entry.target
         view?.let { requireContext().getSystemService<InputMethodManager>()?.hideSoftInputFromWindow(it.windowToken, 0) }
         val nav = findNavController()
-        // the home page's own row: back to the home page under every page, not one more of it
+        // the home page's own row: back to it, not one more of it
         if (target.route == SettingsRoute.Index) nav.popBackStack(SettingsRoute.Index, false) else navigateWithAnim(target.route)
-        // the result's entry, on the back stack before its fragment is made: its page reads the id there
+        // before its fragment is made: its page reads the id there
         nav.currentBackStackEntry?.let { SearchHighlight.point(it, target.highlight, target.highlightVia) }
         if (entry.kind == SettingsSearch.Kind.COMMAND) {
-            // where a command is set is a key's swipe, which no row points at: said how instead
+            // a command is set on a key's swipe, which no row points at: said how instead
             val name = if (entry.id == SettingsIndex.STROKES) getString(R.string.search_strokes_one) else entry.title
-            // stays until let go, it says what to do on the page it opened; but on android.R.id.content it would
-            // outlive that page: gone at the first page change too
+            // stays until dismissed, but on android.R.id.content it would outlive the page: gone at the first page change too
             val shownOn = nav.currentBackStackEntry
             val bar = Snackbar.make(requireActivity().findViewById(android.R.id.content), getString(R.string.search_command_hint, name), Snackbar.LENGTH_INDEFINITE)
             val leave = object : NavController.OnDestinationChangedListener {
                 override fun onDestinationChanged(controller: NavController, destination: NavDestination, arguments: Bundle?) {
-                    // called at once when added, on the page it is shown on
+                    // called at once when added, on its own page
                     if (controller.currentBackStackEntry === shownOn) return
                     controller.removeOnDestinationChangedListener(this)
                     bar.dismiss()
@@ -224,10 +222,7 @@ class SettingsSearchFragment : Fragment() {
     }
 
     companion object {
-        /**
-         * Said after where a result is: a choice, a command, an input method not in [added] (none said while it is
-         * not known), the other name it was found by.
-         */
+        /** A choice, a command, an input method not in [added] (unsaid while unknown), the other name it was found by. */
         fun notes(context: Context, found: SettingsSearch.Found<SettingsIndex.Target>, added: Set<String>?): List<String> {
             val entry = found.entry
             val im = (entry.target.route as? SettingsRoute.InputMethodConfig)?.uniqueName
@@ -237,7 +232,7 @@ class SettingsSearchFragment : Fragment() {
                     SettingsSearch.Kind.COMMAND -> context.getString(R.string.search_is_command)
                     else -> null
                 },
-                // a page's own action with no row or button to flash (↶, ⋮'s): where it is
+                // a page action with no row to flash (↶, ⋮'s): where it is
                 entry.target.where.takeIf { it != 0 }?.let(context::getString),
                 context.getString(R.string.search_not_added).takeIf { im != null && added?.contains(im) == false },
                 found.alias?.let { context.getString(R.string.search_also_called, it) },

@@ -16,13 +16,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.WordListFiles
 import org.fcitx.fcitx5.android.engine.user.WordLists
 
-/**
- * A list of words imported in the settings, for [UserLexicon], split out of it (S11): the user's
- * own export added to the [lists] ([addWords], [blockAll]) and made theirs again ([owned]), another
- * input method's list blocked where marked so and the rest written to the learning record as a
- * batch of imported words ([imports], U-101), those [user] knows already left out. A change the
- * sessions must see drops them ([dropSessions]).
- */
+/** Imports a settings word list for [UserLexicon]: the user's own export re-added ([addWords], [blockAll]) and owned again ([owned]); another input method's list blocked where marked, the rest an imported batch in the record ([imports]), skipping words [user] knows. Changes drop sessions. */
 internal class WordImport(
     private val assets: EngineAssets,
     private val lists: WordLists,
@@ -32,15 +26,11 @@ internal class WordImport(
     private val dropSessions: () -> Unit,
     private val owned: (Map<Entry, Float>) -> Int,
     private val imports: (String, List<ImportedWords.Incoming>, (String, String) -> Boolean) -> Int,
-    /** English's words blocked ([WordListFiles.ENGLISH_BLOCK_MARK]): how many newly. */
+    /** English's blocked words ([WordListFiles.ENGLISH_BLOCK_MARK]): how many new. */
     private val blockEnglish: (List<String>) -> Int = { 0 },
 ) {
 
-    /**
-     * The words of [lines], a list named [file]: the user's own export ([WordListFiles.EXPORT_MARK],
-     * or an older one's header) added, blocked and learned as it was; another input method's list
-     * blocked where marked so and imported as a batch (U-101), in the record, not on the hand list.
-     */
+    /** The user's own export ([WordListFiles.EXPORT_MARK] or an older header) returns as it was; another list is blocked where marked and imported as a batch into the record, not the hand list. */
     fun importWords(lines: Sequence<String>, file: String = ""): Imported {
         val list = readList(lines)
         val add = LinkedHashSet<Entry>()
@@ -50,13 +40,13 @@ internal class WordImport(
         val incoming = ArrayList<Pair<Entry, Double?>>()
         for ((i, line) in list.read.withIndex()) {
             val pinyin = line.pinyin ?: guessed[line.text]
-            // a blocked emoji's syllables are not one a code point (WordLists.blockedEntry)
+            // a blocked emoji's syllables are not one per code point (WordLists.blockedEntry)
             val entry = pinyin?.let { if (line.blocked) WordLists.blockedEntry(line.text, it) else WordLists.entry(line.text, it) }
             when {
                 entry == null -> unread++
                 line.blocked -> block += entry
                 list.own -> add += entry
-                // another list's line of no Chinese (a Latin word given a guessed pinyin) is no word to import
+                // another list's line without Chinese (a Latin word with guessed pinyin) is not imported
                 !Han.any(line.text) -> unread++
                 else -> incoming += entry to list.counts[i]
             }
@@ -79,15 +69,14 @@ internal class WordImport(
         return Imported(added, blocked, unread, learnAll(list.learn), imported)
     }
 
-    // a list's lines as read: the words ([read], each with its line's count), the learned of an export, whether it is the user's own
+    // lines as read: words with counts, an export's learned words, whether it is the user's own
     private class ListRead(val read: List<WordLists.Line>, val counts: List<Double?>, val learn: Map<Entry, Float>, val unread: Int, val own: Boolean, val english: List<String>)
 
     private fun readList(lines: Sequence<String>): ListRead {
         val learn = LinkedHashMap<Entry, Float>()
         var unread = 0
-        // `~`, a learned word, only in the user's own export (its first line the mark): another
-        // list's line never becomes a learned word unseen, it is not read (counted unread). One
-        // pass, no line kept but as read
+        // `~` learned lines only in the user's own export (marked on its first line); elsewhere counted unread, never
+        // silently learned. One pass, no line kept but as read
         var export: Boolean? = null
         var own = false
         val read = ArrayList<WordLists.Line>()
@@ -119,8 +108,8 @@ internal class WordImport(
         return ListRead(read, counts, learn, unread, own, english)
     }
 
-    // the words an import leaves as they are (U-101): the dictionary's (in any reading: a list's misreading of
-    // one is no new word, review-G S4) or a user dictionary's, added, imported or blocked already
+    // words an import leaves alone: the dictionary's in any reading (a misreading is no new word), or a user
+    // dictionary's, added, imported or blocked already
     private fun kept(): (String, String) -> Boolean {
         val model = user()
         val blocked = lists.blockedWords.toHashSet()
@@ -129,10 +118,7 @@ internal class WordImport(
         }
     }
 
-    /**
-     * Makes each of [words] the user's own, as a phone move brings them back: not one added, blocked
-     * or theirs already; an export's count of each comes back as its uses today ([owned]). How many.
-     */
+    /** Makes [words] the user's own, as a phone move restores them (skipping added, blocked or owned ones), an export's count as today's uses: how many. */
     private fun learnAll(words: Map<Entry, Float>): Int {
         if (words.isEmpty()) return 0
         val added = lists.addedWords.toHashSet()

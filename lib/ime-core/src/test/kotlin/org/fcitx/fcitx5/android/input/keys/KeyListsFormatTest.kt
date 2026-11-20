@@ -24,7 +24,7 @@ class KeyListsFormatTest {
         assertEquals(UserList(false, listOf("1", "!", "Q"), First.Default), l[KeyId("full/q")])
         assertEquals(UserList(false, listOf("…", "."), First.Literal(".")), l[KeyId("t9/1")])
         assertEquals(UserList.Off, l[KeyId("fn/comma")])
-        // a set of no items is off, as KeyLists.with stores it (FB4 of R24)
+        // a set of no items is off, as KeyLists.with stores it
         assertEquals(UserList.Off, l[KeyId("full/w")])
     }
 
@@ -91,7 +91,7 @@ class KeyListsFormatTest {
         for (kept in listOf("@2", "\uFEFF@2\n", "@3\nfull/q\toff", "@4\nfull/q\toff")) assertFalse(kept, KeyLists.needsMigration(kept))
     }
 
-    // 061-text-variables §4.1 (M1–M3): items marked, `@3`, each item `<marks>|<escaped>`
+    // items marked, `@3`, each item `<marks>|<escaped>`
 
     private fun marked(vararg items: Pair<String, ItemMark?>, first: First = First.Default) =
         UserList(false, items.map { it.first }, first, items.mapNotNull { (t, m) -> m?.let { t to it } }.toMap())

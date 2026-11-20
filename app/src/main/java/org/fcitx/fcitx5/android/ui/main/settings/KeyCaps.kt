@@ -53,37 +53,24 @@ import com.google.android.material.R as MaterialR
 import org.fcitx.fcitx5.android.input.keys.KeyState as KeysState
 import org.fcitx.fcitx5.android.scene.layout.Text as SceneText
 
-/**
- * Keys drawn as keys in the settings that edit what a key does (long press, Chinese punctuation),
- * so a page reads as the keyboard it changes rather than as a list of strings.
- */
+/** Settings that edit a key draw it as a key, so the page reads as the keyboard it changes. */
 object KeyCaps {
 
-    // a dimmed cap's label, as the views' (0.4)
     private const val DIMMED = 0.4
 
-    /** A key's face: [marked] outlined in the accent colour, [selected] filled with it */
     fun background(ctx: Context, marked: Boolean = false, radius: Int = 8, selected: Boolean = false) = GradientDrawable().apply {
         cornerRadius = ctx.dp(radius).toFloat()
         setColor(ctx.styledColor(if (selected) MaterialR.attr.colorPrimaryContainer else MaterialR.attr.colorSurfaceContainerHighest))
         if (marked) setStroke(ctx.dp(2), ctx.styledColor(android.R.attr.colorPrimary))
     }
 
-    /**
-     * A key's swipes, for the engine to draw its marks: a character key's [name] (`full/a`) or a function
-     * key's (`space`, its up and down), as [slots] (the page's, being edited) has them; [layout] the board it is
-     * drawn on, its form's ([board]) where null.
-     */
+    /** [name]: `full/a`, or a function key's (`space`); [layout] null means its form's ([board]). */
     class Shortcut(val name: String, val slots: SwipeSlots, val charShortcuts: Boolean = true, val layout: String? = null)
 
-    // the edited key outlined along the engine's face, in the keyboard theme's accent (as light or dark as the
-    // face it is on, whatever the settings' own theme); dimmed (its long press off), its words faded alone, the
-    // face and marks as they are, as the key views fade theirs (060-render-p2 S6 review)
+    // outlined in the keyboard theme's accent, whatever the settings theme; dimmed fades only its words, as the key views do
     private fun sceneKey(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
         SceneKeyCell(ctx, ThemeManager.activeTheme).apply {
-            // the item a move or delete acts on (selected) outlined in the settings' own colour: the keyboard's
-            // styles draw no selected key of their own outside a popup, and it read as any other item; over the
-            // marked outline where it is both (the first item), the one acted on being what the user looks for
+            // the item acted on is outlined in the settings' own colour: keyboard styles draw no selected key outside a popup
             outline = when {
                 selected -> Argb(ctx.styledColor(android.R.attr.colorPrimary))
                 marked -> Argb(ThemeManager.activeTheme.accentKeyBackgroundColor)
@@ -93,10 +80,8 @@ object KeyCaps {
             isClickable = false
             isFocusable = false
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            // the key's one name, as the layouts' (a function key's `fn/comma`)
             val id = shortcut?.name?.let(KeyId::of)
-            // a cap of no key's name with a hint (九键's letters' digits): the hint its first's mark, as a key's first is
-            // drawn (no layout's corner drawn any more, 060-keys-unify S6)
+            // a non-key cap with a hint (九键's letters' digits): the hint drawn as a key's first mark
             val cap = HINT_CAP.takeIf { id == null && hint.isNotEmpty() }
             attrs = KeyAttrs(
                 label = SceneText.Literal(text),
@@ -105,34 +90,26 @@ object KeyCaps {
                 shortcut = id?.name ?: cap,
             )
             states = setOfNotNull(KeyState.Selected.takeIf { selected })
-            // the label the keyboard's, shrunk as the cap is to its key, its marks where they are there (060-pending-decisions);
-            // a shortcut's key the keyboard's very key, made on its board at the keys' size, every key of the board
-            // with its marks, as a mark class is sized over them all (060-render-p2 S7a)
+            // made on its board at key size with every key's marks, as a mark class is sized over them all
             onBoard(ctx, shortcut, shortcut?.let { if (it.layout != null) board(ctx, it.name, it.layout) else board(ctx, it.name) })
             if (cap != null) marks = marks.copy(shortcuts = marks.shortcuts + ("$cap:${if (marks.firstUp) "up" else "down"}" to MarkContent.Symbol(hint)))
         }
 
-    // the name a hinted cap's first is drawn by: no key's (KeyId's forms), a character key's
+    // no key's name (KeyId's forms), drawn as a character key's
     private const val HINT_CAP = "cap/hint"
 
-    /**
-     * [shortcut]'s key made on [board] (none: the key alone) at the keyboard's key height, its marks as the
-     * keyboard's: the settings' caps, and what the page tells of a way drawn otherwise than set (SwipeFates).
-     */
+    /** Also what the page tells of a way drawn otherwise (SwipeFates). */
     internal fun SceneKeyCell.onBoard(ctx: Context, shortcut: Shortcut?, board: SceneKeyCell.Board?) {
         keyboardKeyHeight = keyboardKeyHeight(ctx, board?.layout)
         this.board = board
         val layout = board?.let { SceneLayouts.board(ctx, it.layout) }
         val slots = shortcut?.slots ?: SwipeSlotsCache.current
         val charShortcuts = shortcut?.charShortcuts ?: true
-        // the marks as the keyboard's resolver has them (060-keys-unify §1.3): each key's first from key_lists, its
-        // slots the page's being edited
         marks = if (layout != null) {
             SceneBoard.resolver(layout, NO_IM, nineLetters(), slots).marks(keysState()).let { if (it.charShortcuts == charShortcuts) it else it.copy(charShortcuts = charShortcuts) }
         } else {
-            // a key alone (no board): its slots' marks, no first
             val spots = swipeSpots()
-            // the keyboard's clock (KeyClock), not the system's: a variable's value as the keyboard would show it (R26 F8250)
+            // the keyboard's clock (KeyClock), not the system's: a variable shows as the keyboard would
             SceneMarks.settings(
                 slots, swipeWays(), spots.symbol, spots.shortcut, charShortcuts, listOfNotNull(shortcut?.name?.let { KeyId.of(it).name }), emptyMap(),
                 now = KeyClock::calendar,
@@ -140,51 +117,38 @@ object KeyCaps {
         }
     }
 
-    // the keys' state on a keyboard of no Shift and no punctuation: the swipe settings alone
     private fun keysState() = KeysState(ways = swipeWays(), spots = swipeSpots())
 
-    /**
-     * [layout]'s resolver as the editor reads a key's list of it ([KeyResolver.edit]): its keys' defaults and the user's
-     * lists, one list a key for every input method (060-row-unlock), shown with the user's 按键字母 and 18 键's L with
-     * its `:` (a scheme typing `;`'s: the item every keyboard but that one skips, §2).
-     */
+    /** With the user's 按键字母 and 18 键's L with its `:` (the item every other keyboard skips). */
     fun resolver(ctx: Context, layout: String): KeyResolver? = SceneLayouts.board(ctx, layout)?.let {
         SceneBoard.resolver(it, KeyboardVariant(DefaultMarks.variantOf(it.layout, it.fallback).form, nineLetters(), semicolon = true))
     }
 
-    /** The nine keys' letters as the user set them (t9_letters), as 九键's keyboard has them: the editor's rows of 2 to 9. */
     fun nineLetters(): Map<Char, String> = KeyListsCache.nineLettersOf(AppPrefs.getInstance().keyboard.t9Letters.getValue())
 
-    /**
-     * A key's height on the keyboard as the height settings make it now, px (InputView's keys' area, [KeyboardArea]):
-     * the keys' over [layout]'s rows (注音's five, a qwerty's four; none given: qwerty's).
-     */
+    /** In px as InputView's keys' area makes it, over [layout]'s rows. */
     fun keyboardKeyHeight(ctx: Context, layout: String? = null): Int {
         val rows = layout?.let { rowsOf(ctx, it) } ?: KeyboardHeightCap.DEFAULT_ROWS
         return (SwipeFates.size(upright(ctx), layout ?: KeyNames.QWERTY, ImKeyboards.Layout.TEXT, rows).height / rows).toInt()
     }
 
-    // [layout]'s rows as the keyboard counts them (KeyboardWindow.rowUnits); upright, at no size: the built-in boards'
-    // rows do not depend on it. Once a turn, as [thisTurn] promises, not twice a cap (R26 F8324)
+    // built-in boards' row counts do not depend on size; once a turn, not per cap
     private fun rowsOf(ctx: Context, layout: String): Double = thisTurn(listOf(ROWS, layout)) {
         SceneLayouts.board(ctx, layout)?.let {
             KeyboardHeightCap.rowUnits(it.layout, it.fragments, Env(1.0, 1.0, ctx.resources.displayMetrics.density.toDouble()))
         } ?: KeyboardHeightCap.DEFAULT_ROWS
     }
 
-    // the keyboard upright on this display, as the page's notes have it (SwipeFates), whatever way the page is turned
+    // upright whatever way the page is turned, as the page's notes have it
     private fun upright(ctx: Context) = thisTurn(UPRIGHT to Configuration(ctx.resources.configuration)) { KeyboardArea.screens(ctx).first }
 
-    /** The input method a settings cap's resolver is of: none, its layout's own defaults (KeyboardVariants' "" ). */
     const val NO_IM = ""
 
     private const val UPRIGHT = "upright"
 
     private const val ROWS = "rows"
 
-    // what one main-looper turn (a page rebuilt, a dialog's list drawn) works out once for all its caps, not per cap:
-    // the upright screen (KeyboardArea.screens asks the window manager, a binder call, and a secure setting) and each
-    // board's readings for the settings as they are; let go at the turn's end, before any setting can change
+    // once per main-looper turn for all caps (the upright screen is a binder call); dropped before any setting can change
     private var turn: HashMap<Any, Any?>? = null
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
@@ -195,20 +159,14 @@ object KeyCaps {
         return if (key in cache) cache[key] as T else make().also { cache[key] = it }
     }
 
-    /**
-     * The keyboard the key of [shortcut] (a shortcut page's name: `full/a`, `zyfull/1`, a function key's `space`) is on,
-     * at its keys' size as InputView makes it upright (SwipeFates.size: the height settings, the bar, the board's code row, the
-     * paddings, the cap, one-handed, floating, split): [layout] the board, a function key's qwerty's unless given; a layout
-     * of the user's at its base's size (its code row, split as the letters where it is of them: KeyboardWindow's).
-     */
+    /** At key size as InputView makes it upright; a user layout at its base's size. */
     fun board(ctx: Context, shortcut: String, layout: String = defaultBoard(shortcut)): SceneKeyCell.Board {
         val screen = upright(ctx)
         val base = SceneLayouts.board(ctx, layout)?.fallback ?: layout
         val size = SwipeFates.size(screen, base, CODE_ROWS[base] ?: ImKeyboards.Layout.TEXT, rowsOf(ctx, layout))
-        // the corners as the keyboard says them (BaseKeyboard.keyReadings: the long presses' firsts, the user's; none where the
-        // first's way draws nothing); the marks drawn are the resolver's (onBoard)
+        // corners as BaseKeyboard.keyReadings says them; marks are the resolver's
         val alts = if (firstShown()) {
-            // keyed by all they are of: a setting changed within the turn (a test's) is no stale reading
+            // keyed by all they depend on: a setting changed within the turn is no stale reading
             val state = keysState()
             thisTurn(listOf(layout, state, KeyListsCache.user.current, SwipeSlotsCache.current, nineLetters())) {
                 resolver(ctx, layout)?.readings(state).orEmpty()
@@ -220,30 +178,21 @@ object KeyCaps {
             AppPrefs.getInstance().keyboard.letterCase.getValue().case, size.floating, size.split, screen.landscape, size.resize)
     }
 
-    /**
-     * The board the page's key of [shortcut] is on: a character key's its form's, a function key's (`space`, `fn/retype`)
-     * the board it is on, qwerty where that has it (九键's 重输 and 0 are the nine keys', 分词 the 14 keys').
-     */
+    /** Qwerty's where qwerty has it (九键's 重输 and 0 are the nine keys', 分词 the 14 keys'). */
     fun defaultBoard(shortcut: String): String = KeyId.of(shortcut).let { id ->
         if (id.isFunction) FUNCTION_BOARDS[id.key] ?: KeyNames.QWERTY else BOARDS[id.form]?.first ?: KeyNames.QWERTY
     }
 
-    /**
-     * Every key's width on [layout] as the keyboard lays it out (its `fill` keys sharing what the row's others leave,
-     * its conditions weighed), by its shortcut's name, px at the keyboard's size: a settings page's cells weighted by
-     * these are shaped as the keys, so every cap, aspect-fitted into its cell (SceneKeyCell), comes out the
-     * keyboard's height (注音九键 mixes 14 and 24). Empty where the board could not be made.
-     */
+    /** Cells weighted by these make every aspect-fitted cap the keyboard's height (注音九键 mixes 14 and 24). */
     fun widths(ctx: Context, layout: String, shortcut: String): Map<String, Double> =
         SceneKeyCell(ctx, ThemeManager.activeTheme).run {
             this.board = board(ctx, shortcut, layout)
-            // a scene is made for a cell of some size only; the board's own size is what lays the keys out
+            // any size will do: the board's own size lays the keys out
             layout(0, 0, 1, 1)
-            // the first of a name, as a cap draws (SceneKeyCell.keyNode): 注音九键 has ， twice
+            // the first of a name, as a cap draws: 注音九键 has ， twice
             scene?.keys.orEmpty().filter { it.copy == 0 && it.shortcut != null }.distinctBy { it.shortcut }.associate { it.shortcut!! to it.bounds.width }
         }
 
-    // a shortcut page's form: its board and the code row that board has
     private val BOARDS = mapOf(
         KeyShortcutPreset.FULL to (KeyNames.QWERTY to ImKeyboards.Layout.TEXT),
         KeyShortcutPreset.NINE to (KeyNames.NINE to ImKeyboards.Layout.PINYIN_NINE),
@@ -254,10 +203,8 @@ object KeyCaps {
         KeyShortcutPreset.NUMBER to (KeyNames.NUMBER to ImKeyboards.Layout.TEXT),
     )
 
-    // the function keys qwerty has not: the board each is on (九键's 重输 and 0, 14/18 键's 分词)
     private val FUNCTION_BOARDS = mapOf("retype" to KeyNames.NINE, "zero" to KeyNames.NINE, "separator" to KeyNames.K14)
 
-    // each board's code row
     private val CODE_ROWS = BOARDS.values.toMap()
 
     fun label(ctx: Context, text: String, size: Float = 18f) = TextView(ctx).apply {
@@ -268,14 +215,7 @@ object KeyCaps {
         setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurface))
     }
 
-    /**
-     * A key with [text] on it and [hint], the first long-press character, where the keyboard puts its
-     * symbol, and [shortcut]'s marks, the engine placing both as on the keyboard (按键's 标点位置 and
-     * 快捷键图标位置); [dimmed] for a key whose long press is turned off. [state] is what a screen
-     * reader says of what the outline and the fading show, which only the caller knows; [said], what
-     * a screen reader says of the shortcut. With a [shortcut] the cap is the keyboard's very key, drawn as
-     * the board has it: [text] and [hint] are then what a screen reader says alone.
-     */
+    /** With a [shortcut] the cap is the keyboard's very key, and [text] and [hint] are only spoken. */
     fun key(
         ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean = false,
         state: String? = null,
@@ -291,11 +231,8 @@ object KeyCaps {
         contentDescription = listOfNotNull(text, hint, said, tag).filter { it.isNotEmpty() }.joinToString(", ")
         ViewCompat.setStateDescription(this, state)
         isSelected = selected
-        // drawn by the engine as the keyboard draws the key (060-render-p2 S6): its face in the keyboard's
-        // theme, its symbol and shortcut's marks placed by the engine; edited, outlined along its face
         foreground = ripple
         add(sceneKey(ctx, text, hint, marked, dimmed, selected, shortcut), lParams(matchParent, matchParent))
-        // an item's mark (「变量」, 「原样」: 061-text-variables §2.5) in small words along the cap's foot
         if (tag != null) {
             add(TextView(ctx).apply {
                 this.text = tag
@@ -306,11 +243,9 @@ object KeyCaps {
         }
     }
 
-    // the mark's words under an item's label
     private const val TAG_SP = 9f
 
-    // the engine's cell is a gesture view and takes every touch it gets, so a tap never reached this frame's
-    // click on a device (Robolectric's performClick went straight to the frame): the frame keeps them all
+    // the engine's cell takes every touch, so a tap never reached this frame on a device (Robolectric's performClick bypassed it)
     private class KeyFrame(ctx: Context) : FrameLayout(ctx) {
         override fun onInterceptTouchEvent(ev: MotionEvent) = true
     }

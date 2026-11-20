@@ -28,10 +28,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * A held candidate's card as [Engines.card] works it out (061-word-card.md §3.4, §8.1): its reading the bar's
- * own ([Snapshot.readings] while 候选词注音 is on), whatever was typed with; a character looked up its card at once.
- */
+/** A held candidate's card as [Engines.card] works it out: its reading the bar's own, whatever was typed. */
 class EnginesWordCardTest : EnginesFixture() {
 
     // the fixture's own: 角色 under its misreading too
@@ -84,7 +81,6 @@ class EnginesWordCardTest : EnginesFixture() {
         assertEquals(listOf("yín", "háng"), card.card.rows.map { it.pinyin })
         assertEquals(CardReading(Syllables.id("hang"), 2), card.card.rows[1].reading)
         assertTheBars(PINYIN, "银行") { it.type(PINYIN, "yinhang") }
-        // 候选词注音 in zhuyin: the line in zhuyin
         assertEquals("ㄧㄣˊ ㄏㄤˊ", (cardOf(PINYIN, "yinhang", "银行", ReadingStyle.ZHUYIN) as CandidateCard.Word).line)
     }
 
@@ -131,9 +127,7 @@ class EnginesWordCardTest : EnginesFixture() {
         assertEquals("行", card.card.text)
         assertEquals("xíng" to true, card.card.readings.first().let { it.pinyin to it.inWord })
         assertTheBars(PINYIN, "行") { it.type(PINYIN, "xing") }
-        // typed hang: háng first
         assertEquals("háng / xíng…", (cardOf(PINYIN, "hang", "行") as CandidateCard.Char).line)
-        // zhuyin's keyboard, 候选词注音 off: the line in zhuyin (Q6)
         assertEquals("ㄏㄤˊ / ㄒㄧㄥˊ…", (cardOf(ZHUYIN, "ㄏㄤ".map(ZhuyinKeys::symbolCode).joinToString(""), "行") as CandidateCard.Char).line)
     }
 
@@ -179,14 +173,11 @@ class EnginesWordCardTest : EnginesFixture() {
     fun noHanCharacterNoCard() {
         val e = engines()
         e.type(PINYIN, "yinhang")
-        // not what is there now
         assertNull(e.card(PINYIN, e.at(PINYIN, "银行"), "江"))
         assertNull(e.card(PINYIN, 99, "银行"))
-        // English's
         val en = engines()
         en.type(ENGLISH, "the")
         assertNull(en.card(ENGLISH, 0, en.candidates(ENGLISH, 0, 1).single().text))
-        // no session yet
         assertNull(engines().card(PINYIN, 0, "银行"))
     }
 
@@ -204,11 +195,9 @@ class EnginesWordCardTest : EnginesFixture() {
         val eight = engines()
         eight.type(PINYIN, "eight")
         assertTrue(eight.card(PINYIN, eight.at(PINYIN, "银行银行银行银行"), "银行银行银行银行") is CandidateCard.Word)
-        // counted by Han characters: OK not among them
         val mix = engines()
         mix.type(PINYIN, "mix")
         assertTrue(mix.card(PINYIN, mix.at(PINYIN, "银行OK银行银行银行"), "银行OK银行银行银行") is CandidateCard.Word)
-        // a paragraph's: its first LINE_CHARS read, then …
         phrases = "para,1=" + "银行".repeat(100) + "\n"
         val para = engines(ReadingStyle.PINYIN)
         para.type(PINYIN, "para")
@@ -217,8 +206,7 @@ class EnginesWordCardTest : EnginesFixture() {
         assertEquals(List(WordCard.LINE_CHARS / 2) { "yín háng" }.joinToString(" ") + " …", long.line)
     }
 
-    // a sentence typed of more than LINE_CHARS: its first whole words as the bar reads them (角色 typed jiaose
-    // is jiǎo sè there, not its true jué sè: the bar's, not the word's)
+    // the bar's reading (jiǎo sè as typed), not the word's true jué sè
     @Test
     @Uat("PY-133")
     fun aLongTypedSentencesLineIsTheBarsAsFarAsItGoes() {
@@ -234,7 +222,6 @@ class EnginesWordCardTest : EnginesFixture() {
         }
     }
 
-    // 生僻字屏蔽 filters no phrase of the user's (061-rare-char-block.md §5.1): its card has a row of the held character too
     @Test
     @Uat("PY-128")
     fun aPhrasesCharacterHeldBackStillHasItsRow() {
@@ -267,7 +254,6 @@ class EnginesWordCardTest : EnginesFixture() {
 
     @Test
     fun theZhuyinNineKeysLineIsInZhuyin() {
-        // 候选词注音 off: zhuyin on either zhuyin keyboard (Q6)
         val e = engines()
         "ㄏㄤ".forEach { c -> e.onEvent(PINYIN, EngineEvent.CHAR, Keyboard.zhuyinNineKey(ZhuyinKeys.GROUP_SYMBOLS.indexOfFirst { c in it })) }
         val card = e.card(PINYIN, e.at(PINYIN, "行"), "行") as CandidateCard.Char
@@ -288,7 +274,6 @@ class EnginesWordCardTest : EnginesFixture() {
     @Test
     fun aCharactersCardOfTheDataAlone() {
         val e = engines()
-        // no session, nothing typed: the same
         val card = e.charCardOf("行", CardReading(Syllables.id("hang"), 2))!!
         assertEquals(listOf("háng", "xíng", "héng", "hàng"), card.readings.map { it.pinyin })
         assertEquals("行", card.radical)

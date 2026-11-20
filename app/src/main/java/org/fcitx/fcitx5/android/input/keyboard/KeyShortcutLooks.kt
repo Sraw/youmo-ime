@@ -9,10 +9,9 @@ import androidx.annotation.StringRes
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 
-/** How a [KeyCommand] looks: its name, and the icon drawn in a key's corner and the edit menu (the bar's where it has one). */
 class KeyShortcutLooks private constructor(@StringRes val label: Int, @DrawableRes val icon: Int) {
     companion object {
-        // a flat table, a branch per command (as KeyShortcutRunner.run's), kept a `when` so a command added is a compile error here
+        // a flat table, a branch per command, kept a `when` so a command added is a compile error here
         @Suppress("CyclomaticComplexMethod")
         fun of(command: KeyCommand): KeyShortcutLooks = when (command) {
             KeyCommand.SelectAll -> KeyShortcutLooks(R.string.shortcut_select_all, R.drawable.ic_baseline_select_all_24)
@@ -34,8 +33,7 @@ class KeyShortcutLooks private constructor(@StringRes val label: Int, @DrawableR
             KeyCommand.TradSimp -> KeyShortcutLooks(R.string.shortcut_trad_simp, R.drawable.ic_fcitx_status_chttrans_trad)
             KeyCommand.ChooseKeyboard -> KeyShortcutLooks(R.string.shortcut_choose_keyboard, R.drawable.ic_baseline_keyboard_24)
             KeyCommand.HideKeyboard -> KeyShortcutLooks(R.string.shortcut_hide_keyboard, R.drawable.ic_baseline_keyboard_hide_24)
-            // the stroke's own shape, as the code row shows it (一丨丿丶乛): an icon as every command's, drawn in
-            // the theme's colour and size with no font to lack 丿 or 乛, and the same rule for room on the key
+            // an icon, not the character: no font to lack 丿 or 乛
             KeyCommand.StrokeHeng -> KeyShortcutLooks(R.string.shortcut_stroke_h, R.drawable.ic_stroke_h)
             KeyCommand.StrokeShu -> KeyShortcutLooks(R.string.shortcut_stroke_s, R.drawable.ic_stroke_s)
             KeyCommand.StrokePie -> KeyShortcutLooks(R.string.shortcut_stroke_p, R.drawable.ic_stroke_p)

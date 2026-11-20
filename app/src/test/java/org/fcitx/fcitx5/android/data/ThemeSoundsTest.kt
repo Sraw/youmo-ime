@@ -24,7 +24,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** 060-theme-sounds-icons §1.4: the theme's key sounds on their own thread, a pool for each theme wanted. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemeSoundsTest {
@@ -42,7 +41,7 @@ class ThemeSoundsTest {
 
     private fun idle() = shadowOf(thread.looper).idle()
 
-    // a 100 ms 8-bit PCM WAV of [data] zero-byte samples (full negative; 8-bit PCM silence is 0x80) at 8 kHz, mono
+    // a 100 ms 8-bit mono 8 kHz WAV of [data] zero samples (8-bit silence is 0x80)
     private fun wav(name: String, data: Int = 800): File {
         fun le(v: Int, n: Int) = ByteArray(n) { (v ushr (8 * it)).toByte() }
         val fmt = "fmt ".toByteArray() + le(16, 4) + le(1, 2) + le(1, 2) + le(8000, 4) + le(8000, 4) + le(1, 2) + le(8, 2)
@@ -81,7 +80,7 @@ class ThemeSoundsTest {
         sounds.use("a") { mapOf(SoundKey.LETTER to letter.path) }
         idle()
         val old = sounds.currentPool!!
-        // the same theme imported again (another stamp): a pool anew, files read again
+        // reimported (another stamp): a new pool, files read again
         var read = 0
         sounds.use("a2") { read++; mapOf(SoundKey.LETTER to letter.path) }
         idle()
@@ -90,7 +89,7 @@ class ThemeSoundsTest {
         shadowOf(old).notifyPathLoaded(letter.path, true)
         idle()
         assertTrue(sounds.loaded.isEmpty())
-        // the same again: nothing anew
+        // the same again: nothing new
         val now = sounds.currentPool
         sounds.use("a2") { read++; emptyMap() }
         idle()
@@ -136,7 +135,7 @@ class ThemeSoundsTest {
         }
         idle()
         loaded(good)
-        // only the good one loaded: the others' classes play the system's click
+        // only the good one loaded: the others play the system's click
         assertEquals(setOf(SoundKey.BACKSPACE), sounds.loaded)
         for (key in listOf(SoundKey.LETTER, SoundKey.SPACE, SoundKey.ENTER)) assertFalse(sounds.play(key, 1f))
     }
@@ -148,12 +147,12 @@ class ThemeSoundsTest {
         idle()
         loaded(letter)
         val old = sounds.currentPool!!
-        // the sound thread held, so the play stays posted until the new ask (it runs freely otherwise)
+        // the sound thread held, so the play stays posted until the new ask
         shadowOf(thread.looper).pause()
         assertTrue(sounds.play(SoundKey.LETTER, 1f))
-        // another theme asked for before the play ran: its sample is not the new pool's
+        // another theme asked for before the play ran
         sounds.use("b") { mapOf(SoundKey.LETTER to letter.path) }
-        // until the new pool is built nothing is loaded: the caller plays the system's click
+        // nothing loaded till the new pool is built
         assertTrue(sounds.loaded.isEmpty())
         assertFalse(sounds.play(SoundKey.LETTER, 1f))
         shadowOf(thread.looper).unPause()
@@ -168,7 +167,7 @@ class ThemeSoundsTest {
         sounds.use("a") { mapOf(SoundKey.LETTER to letter.path) }
         idle()
         val old = sounds.currentPool!!
-        // the theme changed on the main thread; the old pool's load lands before the rebuild runs
+        // the old pool's load lands before the rebuild runs
         sounds.use("b") { mapOf(SoundKey.LETTER to letter.path) }
         shadowOf(old).notifyPathLoaded(letter.path, true)
         assertTrue(sounds.loaded.isEmpty())

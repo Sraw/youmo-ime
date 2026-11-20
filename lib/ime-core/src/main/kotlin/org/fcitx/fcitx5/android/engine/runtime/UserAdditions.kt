@@ -14,19 +14,14 @@ import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.RareChoice
 import java.io.IOException
 
-/**
- * What the user added to pinyin, as [read] gives it ([Additions]): their dictionaries merged in one
- * file, opened once ([dictionary]), the tables' indexes of it ([indexes]) and their custom phrases
- * ([phrases]). Read at first need and again after [drop]; a failure is told [onError] once, typing
- * going on without them. Split out of [UserLexicon], which makes its models over [dictionary] (S11).
- */
+/** What the user added to pinyin ([Additions]): their dictionaries merged in one file ([dictionary]), the tables' indexes ([indexes]) and custom phrases ([phrases]). Read at need and after [drop]; failures told [onError] once, typing going on without them. */
 internal class UserAdditions(
     private val read: () -> Additions?,
     private val onError: (IOException) -> Unit,
 ) {
     private var additions: Additions? = null
     private var addedRead = false
-    // read() threw as last read: which dictionaries the user has is not known
+    // read() threw last time: which dictionaries the user has is unknown
     private var addedFailed = false
 
     private fun added(): Additions? {
@@ -43,19 +38,17 @@ internal class UserAdditions(
         return additions
     }
 
-    // the merged dictionaries of the additions last read, opened once for them: a failure told once,
-    // typing going on without them, not tried again on every focus as 0.3.1's OOM was
+    // the merged dictionaries opened once per additions: a failure told once, not retried on every focus
     private var mergedOf: Additions? = null
     private var mergedFile: DictionaryFile? = null
     private var mergedFailed = false
 
-    /** The user's dictionaries merged, opened: null for none, or none that opened. */
+    /** Null for none, or none that opened. */
     fun dictionary(): DictionaryFile? {
         val now = added()
         if (now === mergedOf) return mergedFile
         mergedOf = now
-        // failed until the open returns: an unchecked throw is not remembered as "no dictionaries" (F3403),
-        // nor is the last additions' file kept under these
+        // failed until the open returns: an unchecked throw is not remembered as "no dictionaries", nor the old file kept
         mergedFailed = true
         mergedFile = null
         mergedFile = try {
@@ -67,16 +60,14 @@ internal class UserAdditions(
         return mergedFile
     }
 
-    /** Whether the words of the user's dictionaries are not known: they failed to read or open, or are being made (0.3.1's minute of upgrade). */
+    /** Whether the user's dictionary words are unknown: failed to read or open, or still being made. */
     fun unknown(): Boolean = mergedFailed || addedFailed || added()?.dictionaryPending?.invoke() == true
 
-    /** Whether [dictionary] was compiled against another base dictionary than this one's (review S7). */
+    /** Whether [dictionary] was compiled against another base dictionary. */
     fun stale(): Boolean = added()?.dictionaryStale == true
 
-    /** Which dictionaries the user has, as read now: [Additions.dictionaries]. */
     fun dictionaries(): String = added()?.dictionaries.orEmpty()
 
-    /** Where the tables keep their indexes of the merged dictionaries: [Additions.indexes]. */
     fun indexes(): UserFiles? = added()?.indexes
 
     private var phrases: PhraseBook? = null
@@ -85,8 +76,7 @@ internal class UserAdditions(
         try {
             additions?.savePhrases?.invoke(it)
         } catch (e: IOException) {
-            // refused (not read, or the data not settled): told, and thrown on so the book takes no
-            // change, as a refused punctuation save does not
+            // refused (unread, or the data not settled): told, and rethrown so the book takes no change
             onError(e)
             throw e
         }
@@ -94,7 +84,7 @@ internal class UserAdditions(
 
     private var commonWords: CommonWordBook? = null
 
-    /** The common words, read once as the phrases are; a line not read (no reading) left out. */
+    /** Read once, as the phrases are; unreadable lines left out. */
     fun commonWords(): CommonWordBook = commonWords ?: CommonWordBook(CommonWords.parse(added()?.commonWords.orEmpty()).words) {
         try {
             additions?.saveCommonWords?.invoke(it)
@@ -106,13 +96,13 @@ internal class UserAdditions(
 
     private var rareChoice: RareChoice? = null
 
-    /** 生僻字屏蔽 as the user chose it ([RareChoice]), read once as the phrases are: the same object till [drop]. */
+    /** 生僻字屏蔽 as chosen ([RareChoice]), read once: the same object till [drop]. */
     fun rareChoice(): RareChoice = rareChoice ?: RareChoice.parse(added()?.rareChars.orEmpty()).also { rareChoice = it }
 
-    /** As a fresh install has them: the built-in phrases alone, the user's left out (U-93). */
+    /** As a fresh install has them: built-ins alone. */
     fun freshPhrases(): PhraseBook = PhraseBook(CustomPhrases.parse(""), CustomPhrases.BUILT_IN) {}
 
-    /** Forgets what was read, read again at next need: which dictionaries there were, to tell them from [dictionaries] then. */
+    /** Forgets what was read, reread at next need; returns the old [dictionaries] for comparison. */
     fun drop(): String {
         val before = additions?.dictionaries.orEmpty()
         addedRead = false

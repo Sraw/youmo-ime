@@ -21,11 +21,7 @@ import org.fcitx.fcitx5.android.utils.pressHighlightDrawable
 import org.fcitx.fcitx5.android.utils.rippleDrawable
 import splitties.dimensions.dp
 
-/**
- * The symbol panel's categories, named in words down its side as Sogou lists them: icons in a
- * row above said less, and left no room for more of them. Their colours the theme's (`picker
- * categories`, the one shown `picker:selected categories`; 060-render-p3 T7b).
- */
+/** Named in words down its side as Sogou lists them: icons in a row above said less, and left no room for more. */
 class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(context) {
 
     private val keyRipple = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
@@ -73,7 +69,6 @@ class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(cont
         items.getOrNull(selected)?.let { style(it, false) }
         items.getOrNull(category)?.let {
             style(it, true)
-            // scrolled into sight, once laid out
             post { it.requestRectangleOnScreen(Rect(0, 0, it.width, it.height), false) }
         }
         selected = category
@@ -82,7 +77,7 @@ class PickerSideUi(context: Context, private val theme: Theme) : ScrollView(cont
     private fun style(item: TextView, active: Boolean) {
         item.typeface = if (active) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
         item.setTextColor((if (active) look.selected else look.categories).color.value)
-        // the one shown the colour of the list beside it, as if a tab of it (not set: PanelLooks' default)
+        // the one shown the colour of the list beside it, as if a tab of it
         val shown = look.selected.fill.takeIf { active }
         item.background = when {
             shown != null -> ColorDrawable(shown.value)

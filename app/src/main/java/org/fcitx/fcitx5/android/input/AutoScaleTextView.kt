@@ -58,8 +58,7 @@ class AutoScaleTextView @JvmOverloads constructor(
     private var textScaleX = 1.0f
     private var textScaleY = 1.0f
 
-    // a text with spans (one part smaller or fainter than the rest) laid out by the platform, which
-    // draws them; drawn as a plain string they were lost
+    // laid out by the platform, which draws the spans; drawn as a plain string they were lost
     private var styled: Layout? = null
 
     override fun setText(charSequence: CharSequence?, bufferType: BufferType) {
@@ -138,7 +137,6 @@ class AutoScaleTextView @JvmOverloads constructor(
         measureTextBounds()
         val textLeft: Float = textBounds.left.toFloat()
         val textWidth: Float = textBounds.width().toFloat()
-        // lines drawn from their top, the first's baseline nowhere in particular
         val textTop: Float = if (lines() != null) 0.0f else fontMetrics.top
         val textHeight: Float = textHeight()
         val taller = lines() != null && textHeight > contentHeight
@@ -216,7 +214,6 @@ class AutoScaleTextView @JvmOverloads constructor(
             scale(textScaleX, textScaleY)
             val layout = styled
             if (layout != null) {
-                // its first line's baseline where the plain text's is; lines from their top
                 if (layout.lineCount == 1) translate(0.0f, -layout.getLineBaseline(0).toFloat())
                 layout.draw(this)
             } else {
@@ -227,14 +224,10 @@ class AutoScaleTextView @JvmOverloads constructor(
 
     private val inkBounds = Rect()
 
-    /**
-     * Where its glyphs are drawn, in its own coordinates, into [out]: their ink, not the line's
-     * height and advance the view is sized by (a key's label giving way to its corner's mark,
-     * the scene's rules.KeyMarkYield). False for none: nothing to draw, or a styled text, its lines' ink unmeasured.
-     */
+    /** Their ink, not the line's height and advance. False for none, or a styled text, its lines' ink unmeasured. */
     fun inkBounds(out: RectF): Boolean {
         if (text.isEmpty()) return false
-        // what it is styled with known only once its transform is (laid out, nothing drawn yet)
+        // known only once its transform is (laid out, nothing drawn yet)
         if (needsCalculateTransform) {
             calculateTransform(width, height)
             needsCalculateTransform = false
@@ -249,7 +242,6 @@ class AutoScaleTextView @JvmOverloads constructor(
         return true
     }
 
-    // a styled text of more than one line (a table's roots on a key, TextKeyboard): sized and centred whole
     private fun lines(): Layout? = styled?.takeIf { it.lineCount > 1 }
 
     private fun textHeight(): Float {

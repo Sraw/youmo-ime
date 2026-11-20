@@ -8,21 +8,13 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData.Section
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
 
-/**
- * Compiles a dictionary and an ARPA-style backoff model into the layout [PinyinData] reads.
- * Runs on the build host (lib/ime-dict-tool) and in tests; nothing on the device writes this.
- *
- * Every word of a bigram or trigram must have been added as a unigram first, and every trigram
- * needs its leading bigram, as in any well-formed ARPA file. [UNKNOWN] must be among the
- * unigrams: dictionary words the model lacks score as it.
- */
+/** Compiles a dictionary and an ARPA backoff model into [PinyinData] (build host and tests). [UNKNOWN] must be a unigram: missing words score as it. */
 class PinyinDataBuilder {
 
     private val model = NgramWords()
     private val entries = ArrayList<Entry>()
     private var layerNames = listOf(WordLayers.BASE)
 
-    /** Names the dictionary's layers, [names] indexed as [entry]'s layer; the first is the base. */
     fun layers(names: List<String>) = apply {
         require(names.isNotEmpty() && names.all { it.isNotEmpty() && ',' !in it }) { "layer names $names" }
         require(names.toSet().size == names.size) { "a layer named twice in $names" }
@@ -32,18 +24,13 @@ class PinyinDataBuilder {
 
     fun unigram(word: String, prob: Float, backoff: Float) = apply { model.unigram(word, prob, backoff) }
 
-    /** [word]'s unigram probability, or null if it was not added as one. */
     fun unigramOf(word: String): Float? = model[word]?.let { model.tables.unigramProb(it) }
 
     fun bigram(prev: String, word: String, prob: Float, backoff: Float) = apply { model.bigram(prev, word, prob, backoff) }
 
     fun trigram(prev2: String, prev: String, word: String, prob: Float) = apply { model.trigram(prev2, prev, word, prob) }
 
-    /**
-     * [word] is spelt [syllables] (ids from [Syllables]). [weight] is a log10 adjustment for
-     * this reading: 0 for most words, below 0 for a polyphone's rarer reading (呆 as ai rather
-     * than dai). libime's data also has a few small positive ones, so it is not a probability.
-     */
+    /** [weight]: log10 adjustment for this reading (libime has a few positive ones, so not a probability). */
     fun entry(word: String, syllables: IntArray, weight: Float = 0f, layer: Int = 0) = apply {
         require(syllables.isNotEmpty()) { "\"$word\" has no syllables" }
         syllables.forEach { require(it in 0 until Syllables.count) { "\"$word\": bad syllable id $it" } }
@@ -52,20 +39,14 @@ class PinyinDataBuilder {
         entries += Entry(syllables, word, weight, layer)
     }
 
-    // code point × KEY_SPAN + syllable to its usual tone and the tones it may have, as ToneTable reads them
     private val charTones = HashMap<Int, Int>()
 
-    // word to its readings' tones, a reading as its syllables; those a curated source gave, which no rule changes
     private val wordTones = HashMap<String, HashMap<List<Int>, ByteArray>>()
     private val curated = HashSet<Pair<String, List<Int>>>()
 
-    // each character's readings in order, and their words (CharReadings)
     private val charReadings = CharReadingsBuilder()
 
-    /**
-     * [codePoint] read as [syllable] may have [tone] (1–4, [ToneMark.NEUTRAL]). Called in order of
-     * likelihood: the first tone given for a character and syllable is its usual one.
-     */
+    /** Call in order of likelihood: the first tone given for a character and syllable is its usual one. */
     fun charTone(codePoint: Int, syllable: Int, tone: Int) = apply {
         require(codePoint in 0 until ToneTable.MAX_CODE_POINT && syllable in 0 until Syllables.count && tone in 1..ToneMark.NEUTRAL) {
             "tone $tone of U+${codePoint.toString(16)} as syllable $syllable"
@@ -75,10 +56,6 @@ class PinyinDataBuilder {
         charTones[key] = old or (1 shl (tone - 1 + ToneTable.MASK_SHIFT))
     }
 
-    /**
-     * [codePoint] has the reading [syllable] in [tone], as [source] lists it: called in the order the
-     * source lists them. Which a character's card shows, and in what order: [CharReadingsBuilder].
-     */
     fun charReading(source: ReadingSource, codePoint: Int, syllable: Int, tone: Int) = apply {
         require(codePoint in 0 until ToneTable.MAX_CODE_POINT && syllable in 0 until Syllables.count && tone in 1..ToneMark.NEUTRAL) {
             "reading $syllable $tone of U+${codePoint.toString(16)}"
@@ -86,12 +63,7 @@ class PinyinDataBuilder {
         charReadings.add(source, codePoint, syllable, tone)
     }
 
-    /**
-     * [word] read as [syllables] has [tones], one a code point; a later call for the same reading
-     * replaces it, so the sources go in from the least trusted. 一 and 不 keep their own tones (yī,
-     * bù), whatever the source writes: the dictionaries' way, and a rule simpler than the sandhi.
-     * A [curated] reading (`lexicon/tones.tsv`, a misreading's) is taken as it is; others go through [ToneRules].
-     */
+    /** A later call for the same reading replaces it, so feed least trusted first; [curated] tones skip [ToneRules]. */
     fun wordTones(word: String, syllables: IntArray, tones: ByteArray, curated: Boolean = false) = apply {
         val cps = word.codePoints().toArray()
         require(cps.size == syllables.size && tones.size == syllables.size) { "\"$word\": ${syllables.size} syllables, ${tones.size} tones" }
@@ -103,13 +75,11 @@ class PinyinDataBuilder {
 
     private var built = false
 
-    /** Once only: building appends the dictionary's own words to the vocabulary. */
     fun build(meta: Map<String, String> = emptyMap()): DataFile.Writer {
         check(!built) { "already built" }
         val lmSize = model.words.size
         val unknown = requireNotNull(model[UNKNOWN]) { "the model has no $UNKNOWN" }
         built = true
-        // dictionary words the model lacks get ids after the model's own
         entries.forEach { e -> model.add(e.word) }
         val out = DataFile.Writer(DataFile.KIND_PINYIN, PinyinData.VERSION)
         out.addMeta(
@@ -139,7 +109,6 @@ class PinyinDataBuilder {
 
     private class Entry(val syllables: IntArray, val word: String, val weight: Float, val layer: Int)
 
-    /** A word's layer is the first it has an entry in; a model word with no entry is of the base. */
     private fun writeLayers(out: DataFile.Writer) {
         if (layerNames.size == 1) return
         val size = model.words.size
@@ -151,20 +120,11 @@ class PinyinDataBuilder {
         out.add(Section.WORD_LAYER, BitPacked.encode(size) { maxOf(layer[it], 0) })
     }
 
-    // each word's reading of the highest weight: the first listed, of two alike
     private fun likeliest(): Map<String, Entry> = HashMap<String, Entry>().also { m ->
         entries.forEach { e -> m.merge(e.word, e) { old, new -> if (new.weight > old.weight) new else old } }
     }
 
-    /**
-     * The characters' tones, those the words' readings use among them, and the words whose tones are
-     * not their characters' usual ones. Words of one character are read first: the usual tone they set
-     * is what the longer words are compared with, and what a longer word's neutral tone becomes
-     * ([ToneRules.full]); the rest in order of their text, so the same sources compile to the same file.
-     * A neutral tone listed still marks its character as typed with ˙ ([ToneTable.allows]): shown in its
-     * own tone (桌子 zhuō zǐ), 子 typed zi˙ as Taiwan's users type it is no worse (the user, 2026-11-02).
-     * Each word's likeliest reading (its highest weight) is handed to [read] with its tones.
-     */
+    /** Character tones first (what words compare with and neutral tones become), then words whose tones differ, by text so builds are reproducible. */
     private fun writeTones(out: DataFile.Writer, read: (Entry, ByteArray) -> Unit) {
         val chars = charToneBits()
         val keys = chars.keys.sorted()
@@ -173,11 +133,9 @@ class PinyinDataBuilder {
         writeToneWords(out, chars, read)
     }
 
-    // the usual tones of [cps] read [reading], as [chars] has them; 0 for a character with none
     private fun usual(chars: Map<Int, Int>, cps: IntArray, reading: List<Int>) =
         ByteArray(cps.size) { i -> ((chars[cps[i] * ToneTable.KEY_SPAN + reading[i]] ?: 0) and ToneTable.USUAL_MASK).toByte() }
 
-    // each character and syllable's byte of [ToneTable]: its usual tone and the tones it is typed with
     private fun charToneBits(): HashMap<Int, Int> {
         val chars = HashMap(charTones)
         for ((word, readings) in wordTones.entries.sortedWith(compareBy({ it.key.codePointCount(0, it.key.length) > 1 }, { it.key }))) {
@@ -196,16 +154,14 @@ class PinyinDataBuilder {
         return chars
     }
 
-    // the words whose tones are not their characters' usual ones, each likeliest reading handed to [read]
     private fun writeToneWords(out: DataFile.Writer, chars: Map<Int, Int>, read: (Entry, ByteArray) -> Unit) {
-        // only a reading in the dictionary, whose tones its characters' usual ones would not give
         val exceptions = sortedMapOf<Int, MutableList<Pair<List<Int>, ByteArray>>>()
         val likeliest = likeliest()
         entries.distinctBy { it.word to it.syllables.toList() }.forEach { e ->
             val reading = e.syllables.toList()
             val own = wordTones[e.word]?.get(reading)
             val cps = e.word.codePoints().toArray()
-            // a Latin word's letters (iPhone) are no syllable each
+            // a Latin word's letters (iPhone) are not a syllable each
             if (cps.size != reading.size) return@forEach
             val usual = usual(chars, cps, reading)
             if (own == null && usual.any { it.toInt() == 0 }) return@forEach
@@ -226,7 +182,6 @@ class PinyinDataBuilder {
     private class Node(val syllable: Int) {
         val children = sortedMapOf<Int, Node>()
 
-        /** word id to reading weight */
         val words = HashMap<Int, Float>()
     }
 
@@ -234,11 +189,10 @@ class PinyinDataBuilder {
         val root = Node(0)
         entries.forEach { e ->
             val node = e.syllables.fold(root) { node, s -> node.children.getOrPut(s) { Node(s) } }
-            // the same reading listed twice (say, in two source files) keeps its likelier weight
+            // the same reading listed twice (two source files) keeps its likelier weight
             val id = model.id(e.word)
             node.words[id] = maxOf(e.weight, node.words[id] ?: e.weight)
         }
-        // breadth-first, so that each node's children get consecutive ids
         val order = ArrayList<Node>().apply { add(root) }
         var i = 0
         while (i < order.size) order += order[i++].children.values
@@ -268,7 +222,7 @@ class PinyinDataBuilder {
     companion object {
         const val UNKNOWN = "<unk>"
 
-        // 一 and 不 as the dictionaries list them, not as said before another syllable (yí bù)
+        // 一 and 不 as dictionaries list them, not as sandhi says them (yí bù)
         internal val OWN_TONES = mapOf(
             '一'.code to Syllables.id("yi") to 1,
             '不'.code to Syllables.id("bu") to 4,
@@ -286,7 +240,6 @@ internal class IntList {
         a[size++] = v
     }
 
-    /** Adds [other]'s values from [from] up to [until], in one copy. */
     fun addAll(other: IntList, from: Int, until: Int) {
         val count = until - from
         if (size + count > a.size) a = a.copyOf(maxOf(a.size * 2, size + count))
@@ -300,7 +253,6 @@ internal class IntList {
         a[i] = v
     }
 
-    /** Empties the list, keeping its storage for reuse. */
     fun clear() {
         size = 0
     }
@@ -318,7 +270,6 @@ internal class FloatList {
         a[size++] = v
     }
 
-    /** Adds [other]'s values from [from] up to [until], in one copy. */
     fun addAll(other: FloatList, from: Int, until: Int) {
         val count = until - from
         if (size + count > a.size) a = a.copyOf(maxOf(a.size * 2, size + count))
@@ -332,7 +283,6 @@ internal class FloatList {
         a[i] = v
     }
 
-    /** Empties the list, keeping its storage for reuse. */
     fun clear() {
         size = 0
     }

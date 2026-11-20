@@ -10,8 +10,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
 
 /**
- * A pack of words to type that the dictionary built in does not have yet, or has as unknown:
- * the new words of a season, got to the phone sooner than a release. Text, UTF-8:
+ * New words shipped sooner than a release, UTF-8 text:
  *
  * ```
  * # youmo words 1
@@ -19,14 +18,9 @@ import org.fcitx.fcitx5.android.engine.user.imports.WordText
  * 搭子	da'zi	-5.6
  * ```
  *
- * The first line is [HEADER]. `layer` names the layer the words are of, for [LayerPrior]
- * ([org.fcitx.fcitx5.android.engine.lattice.LayerPrior]) to weigh against the user's picks;
- * [DEFAULT_LAYER] without it. Then a word a line: its text, how it reads (libime's `pin'yin`),
- * and its log10 probability on the model's unigram scale (the unknown word is -6.5). Lines
- * starting `#` are comments.
- *
- * A word of the pack that the model knows is listed but scored as the model says; one the model
- * lacks is scored as the pack says, in place of the unknown word ([UserScorer]).
+ * [HEADER] first; `layer` names the words' layer for [org.fcitx.fcitx5.android.engine.lattice.LayerPrior]
+ * ([DEFAULT_LAYER] without it). A line: text, `pin'yin`, log10 probability on the unigram scale (unknown is -6.5).
+ * Words the model knows keep its score.
  */
 class WordPack(val layer: String, val words: List<Word>) {
 
@@ -39,17 +33,11 @@ class WordPack(val layer: String, val words: List<Word>) {
 
         private const val KIND = "# youmo words"
 
-        /**
-         * Whether [firstLine] starts a pack of some version: how one is told from a dictionary in
-         * libime's format. [parse] says whether this version reads it.
-         */
+        /** Whether [firstLine] starts a pack of any version (as against a libime dictionary); [parse] says whether this one reads it. */
         fun isPack(firstLine: String) = clean(firstLine).startsWith(KIND)
 
         private fun clean(line: String) = line.removePrefix("\uFEFF").trimEnd()
 
-        /**
-         * @throws SourceException at the first line that is not as above, naming [source]
-         */
         fun parse(lines: Sequence<String>, source: String = "pack"): WordPack {
             val rest = lines.iterator()
             val first = if (rest.hasNext()) rest.next() else fail(source, 1, "not a word pack: empty")
@@ -76,10 +64,7 @@ class WordPack(val layer: String, val words: List<Word>) {
 
         private const val MAX_NAME = 64
 
-        /**
-         * A name that fits a `name=value,...` list, a header line and the user log's `writeUTF`
-         * (64 KB at most, thrown from inside a pick past that): no comma, no space, 1 to 64 chars.
-         */
+        /** A layer name fitting `name=value,...` lists and the log's `writeUTF`: no comma, `=` or space, 1 to 64 chars. */
         fun validLayer(name: String) = name.length in 1..MAX_NAME && name.none { it == ',' || it == '=' || it.isWhitespace() }
 
         private fun word(line: String): Word? {

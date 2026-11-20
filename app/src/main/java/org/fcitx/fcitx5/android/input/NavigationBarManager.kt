@@ -12,7 +12,6 @@ import androidx.annotation.ColorInt
 import androidx.core.view.WindowCompat
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
-import org.fcitx.fcitx5.android.data.theme.ThemePrefs.NavbarBackground
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneWindow
 import org.fcitx.fcitx5.android.input.theme.ThemeColors
@@ -21,13 +20,10 @@ import org.fcitx.fcitx5.android.utils.DeviceUtil
 
 class NavigationBarManager {
 
-    private val navbarBackground by ThemeManager.prefs.navbarBackground
-
     private var shouldUpdateNavbarForeground = false
     private var shouldUpdateNavbarBackground = false
 
-    // the touch keyboard is up (not the hardware keyboard's candidates alone), and where its board is
-    // ([SceneWindow.placement]): the theme's `@one-handed`, `@split` navigation bar
+    // the theme's `@one-handed`, `@split` navigation bar
     private var virtual = true
     private var placement: Set<String> = emptySet()
 
@@ -54,31 +50,21 @@ class NavigationBarManager {
     }
 
     private fun evaluateWithVirtualKeyboard(window: Window) {
-        // floating, the app is under the bar, not the keyboard: the system's, as with None
-        val background = if (KeyboardStyles.floating(window.context)) NavbarBackground.None else navbarBackground
-        when (background) {
-            NavbarBackground.None -> {
-                shouldUpdateNavbarForeground = false
-                shouldUpdateNavbarBackground = false
-                window.useSystemNavbarBackground(true)
-                window.enforceNavbarContrast(true)
-            }
-            NavbarBackground.ColorOnly -> {
-                shouldUpdateNavbarForeground = true
+        if (KeyboardStyles.floating(window.context)) {
+            // floating, the app is under the bar, not the keyboard: the system's
+            shouldUpdateNavbarForeground = false
+            shouldUpdateNavbarBackground = false
+            window.useSystemNavbarBackground(true)
+            window.enforceNavbarContrast(true)
+        } else {
+            shouldUpdateNavbarForeground = true
+            shouldUpdateNavbarBackground = false
+            window.useSystemNavbarBackground(false)
+            window.setNavbarBackgroundColor(Color.TRANSPARENT)
+            window.enforceNavbarContrast(false)
+            // it seems One UI 7.0 (Android 15) does not allow drawing behind navbar
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && DeviceUtil.isSamsungOneUI) {
                 shouldUpdateNavbarBackground = true
-                window.useSystemNavbarBackground(true)
-                window.enforceNavbarContrast(false)
-            }
-            NavbarBackground.Full -> {
-                shouldUpdateNavbarForeground = true
-                shouldUpdateNavbarBackground = false
-                window.useSystemNavbarBackground(false)
-                window.setNavbarBackgroundColor(Color.TRANSPARENT)
-                window.enforceNavbarContrast(false)
-                // it seems One UI 7.0 (Android 15) does not allow drawing behind navbar
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && DeviceUtil.isSamsungOneUI) {
-                    shouldUpdateNavbarBackground = true
-                }
             }
         }
     }
@@ -97,7 +83,6 @@ class NavigationBarManager {
         update(window)
     }
 
-    /** The touch keyboard's board placed anew: the bar's colour of its [placement] ([SceneWindow.placement]). */
     fun place(window: Window, placement: Set<String>) {
         if (placement == this.placement) return
         this.placement = placement
@@ -106,8 +91,7 @@ class NavigationBarManager {
 
     private fun update(window: Window) {
         val theme = ThemeManager.activeTheme
-        // the theme's (`navbar { color }`, 060-render-p3 T7a); null, follow: the colour under the keys. The
-        // floating keyboard's is the app's under it; the hardware keyboard's (its candidates alone) the theme's
+        // null, follow: the colour under the keys. Floating, the app's under it; the hardware keyboard's the theme's
         val floating = virtual && KeyboardStyles.floating(window.context)
         val set = if (floating) null else SceneWindow.navbar(theme, SceneWindow.scenes(window.context, theme, placement = if (virtual) placement else emptySet()))
         if (shouldUpdateNavbarForeground) {
@@ -116,7 +100,7 @@ class NavigationBarManager {
         }
         if (shouldUpdateNavbarBackground) {
             window.setNavbarBackgroundColor(
-                // the colour under the keys, as the theme has it; under a picture the theme's dark of it
+                // under a picture the theme's dark of it
                 set ?: if (ThemeManager.shownLook(theme).base == BoardBase.Picture) theme.backgroundColor else ThemeColors.board(ThemeManager.shownLook(theme).palette, ThemeManager.shownLook(theme).keys)
             )
         }

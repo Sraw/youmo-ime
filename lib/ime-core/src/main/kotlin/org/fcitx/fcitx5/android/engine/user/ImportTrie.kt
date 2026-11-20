@@ -7,14 +7,9 @@ package org.fcitx.fcitx5.android.engine.user
 import org.fcitx.fcitx5.android.engine.lattice.StartWords
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 
-/**
- * [imports]' words but those [skip] says, by their syllables, packed for 100 000 of them: a run
- * of their places sorted by syllables (each node's words a part of it), and the nodes in arrays,
- * each node's children together. Made whole again as the words change: they change by batches.
- * Each word is [base] plus its place ([UserModel]'s ids of them).
- */
+/** [imports]' words (but [skip]'s) by syllables, packed for 100 000: places sorted by syllables, nodes in arrays; rebuilt whole as words change, since they change in batches. */
 internal class ImportTrie(private val imports: ImportedWords, private val base: Int, skip: (Int) -> Boolean) : StartWords {
-    // the places, sorted by syllables, a shorter reading before the longer ones it starts
+    // a shorter reading before the longer ones it starts
     private val sorted: IntArray
     private var firstChildOf = IntArray(0)
     private var childCounts = IntArray(0)
@@ -38,7 +33,6 @@ internal class ImportTrie(private val imports: ImportedWords, private val base: 
         syllableOf = IntArray(syllables)
         wordFrom = IntArray(syllables)
         wordCounts = IntArray(syllables)
-        // each node's run of sorted, and its depth: only while building
         val lo = IntArray(syllables)
         val hi = IntArray(syllables)
         val depthOf = IntArray(syllables)
@@ -66,7 +60,6 @@ internal class ImportTrie(private val imports: ImportedWords, private val base: 
             childCounts[node] = nodes - firstChildOf[node]
             node++
         }
-        // as many nodes as made: fewer than syllables where readings share their starts
         firstChildOf = firstChildOf.copyOf(nodes)
         childCounts = childCounts.copyOf(nodes)
         syllableOf = syllableOf.copyOf(nodes)
@@ -83,7 +76,6 @@ internal class ImportTrie(private val imports: ImportedWords, private val base: 
         return imports.length(a).compareTo(imports.length(b))
     }
 
-    /** How many words it has. */
     val size: Int get() = sorted.size
 
     override fun child(node: Int, syllable: Int): Int {

@@ -68,15 +68,13 @@ class PinyinSessionLatinTest {
     fun aLatinWordTypedInLowerCaseIsOfferedAsWritten() {
         val s = session().type("wodeiphone")
         assertEquals("我的iPhone", s.candidates.first())
-        // shown as typed, not a letter at a time
         assertEquals("wo de iphone", s.preedit)
         assertEquals("我的iPhone", session().also { it.type("wodeiphone") }.apply(Select(0)).commit)
         assertEquals("iPhone", session().type("iphone").candidates.first())
-        // without the Latin words: what it was
         assertNotEquals("iPhone", session(latin = null).type("iphone").candidates.first())
     }
 
-    // a word's letters cost nothing, 简拼 an initial each: a word the user corrected to twice is first there (U-02 rule 2)
+    // a word's letters cost nothing, 简拼 an initial each: a word the user corrected to twice is first there
     @Test
     fun aWordPickedOverALatinWordTwiceIsFirstThereafter() {
         val learner = Learner(data)

@@ -13,7 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Where 编码行 输入框里 sends the code (dev/design/061-code-in-field.md §4.4, §6). */
+/** Where 编码行 输入框里 sends the code. */
 class CodeInFieldTest {
 
     private fun started(traits: EditorTraits = EditorTraits()) = CodeInField().apply { startInput(traits, restarting = false) }

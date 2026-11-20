@@ -16,12 +16,7 @@ import org.json.JSONArray
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-/**
- * Debug builds only: the native fields' text, selection, composing span and batch depth, for uat.py
- * (`adb shell content query --uri content://org.fcitx.fcitx5.android.testbed.state`), one row
- * with one column `json`. Exported, as `content` runs as the shell, but anyone other than the
- * shell (of any user) or root is refused: no other app reads what is typed here.
- */
+/** Debug builds only: the native fields' state for uat.py via `content query`; anyone but the shell or root is refused. */
 class StateProvider : ContentProvider() {
     override fun onCreate() = true
 

@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreferenceEnum
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers.Layer
 
-/** The 滑动 setting's seven choices ([SwipeLayers.entries]), stored by name. */
 enum class SwipeLayersChoice(override val stringRes: Int, val layers: SwipeLayers) : ManagedPreferenceEnum {
     ShortcutUpSymbolDown(R.string.swipe_shortcut_up_symbol_down, SwipeLayers(Layer.Shortcut, Layer.Symbol)),
     SymbolUpShortcutDown(R.string.swipe_symbol_up_shortcut_down, SwipeLayers(Layer.Symbol, Layer.Shortcut)),
@@ -19,10 +18,7 @@ enum class SwipeLayersChoice(override val stringRes: Int, val layers: SwipeLayer
     Off(R.string.swipe_off, SwipeLayers(Layer.Off, Layer.Off));
 
     companion object {
-        /**
-         * The choice of [layers]: every one of the seven has one. Anything else (never made today) reads as
-         * the default: the migration that calls this runs at every start and must never crash there.
-         */
+        /** Anything else reads as the default: the migration that calls this runs at every start and must never crash there. */
         fun of(layers: SwipeLayers): SwipeLayersChoice =
             entries.firstOrNull { it.layers == layers } ?: entries.first { it.layers == SwipeLayers.Default }
     }

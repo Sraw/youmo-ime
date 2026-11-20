@@ -10,11 +10,8 @@ import java.io.FileOutputStream
 import java.io.IOException
 
 /**
- * Replaces directory [dest] with what [fill] puts in [staged], in one rename, and leaves no
- * [staged] behind: if it fails, [dest] and the files of it held open are as they were. A [dest]
- * left aside by one killed between its renames is put back first ([restoreDirectory]).
- *
- * @throws IOException if [dest] could not be replaced
+ * One rename, no [staged] left behind; on failure [dest] and its open files are as they were. A [dest] left aside by a
+ * kill between renames is restored first ([restoreDirectory]).
  */
 fun replaceDirectory(dest: File, staged: File, fill: (File) -> Unit) {
     val aside = asideOf(dest)
@@ -23,7 +20,7 @@ fun replaceDirectory(dest: File, staged: File, fill: (File) -> Unit) {
     aside.deleteRecursively()
     try {
         fill(staged)
-        // on disk before the renames, as in replaceFile: the old copy is deleted right after
+        // on disk before the renames: the old copy is deleted right after
         staged.walkTopDown().filter { it.isFile }.forEach { file -> FileOutputStream(file, true).use { it.fd.sync() } }
         val moved = dest.exists()
         if (moved) dest.renameOrThrow(aside, "cannot move ${dest.name} aside")
@@ -38,13 +35,7 @@ fun replaceDirectory(dest: File, staged: File, fill: (File) -> Unit) {
     aside.deleteRecursively()
 }
 
-/**
- * Puts [dest] back where a [replaceDirectory] killed between its renames left it aside, the only
- * copy of what it held; nothing to do while [dest] is there. For its owner to call before [dest]
- * is opened, as anything that makes [dest] anew then hides that copy.
- *
- * @throws IOException if it could not be put back
- */
+/** Call before opening [dest]: anything that recreates it would hide the aside copy, the only one. */
 fun restoreDirectory(dest: File) {
     val aside = asideOf(dest)
     if (dest.exists() || !aside.exists()) return

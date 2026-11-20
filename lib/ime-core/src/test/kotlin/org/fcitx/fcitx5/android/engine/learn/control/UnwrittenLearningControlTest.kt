@@ -19,18 +19,15 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.io.IOException
 
-/** An act taken back where the disk refused records: what counts as unwritten (LearningControl.takeBack, R25 F8066). */
+/** An act taken back where the disk refused records: what counts as unwritten (LearningControl.takeBack). */
 class UnwrittenLearningControlTest {
 
-    // R25 F8080, F8081, F8085: what [LearnLog.unwritten] counts, which the rows of LearningControlTest do not tell apart: each
-    // record refused, from when the state was last made the file's (a rewrite, an act taken back in memory),
-    // and held against the act's own records only where the file refused some of them
+    // records refused since the state was last made the file's, held against the act's own
     @Uat("WD-46")
     @Test
     fun whatIsUnwrittenIsCountedARecordAndAnewOnceTheStateIsTheFiles() {
         assertRows(
-            // the half `written.size < records.size`: with all of the act in the file the rewrite takes it out as
-            // ever, the state then the file's; and the count starts anew with it
+            // with all of the act in the file the rewrite takes it out and the count starts anew
             "something learned in memory, the delete after it written: taken back by the rewrite; a forget refused next, in memory" to {
                 with(RefusedScene()) {
                     there()
@@ -70,9 +67,7 @@ class UnwrittenLearningControlTest {
                     assertEquals(emptyList<IOException>(), told)
                 }
             },
-            // LearningControlTest's row of this ("something else learned in memory after the delete") ends at the act no
-            // longer being the last. Here the control is not told of what came after, as nothing in the app
-            // does: the count alone holds it back
+            // the control is not told of what came after, as nothing in the app does: the count alone holds it back
             "something else learned in memory after the delete, the act still the last: no longer taken back, it is kept" to {
                 with(RefusedScene()) {
                     there()
@@ -89,8 +84,6 @@ class UnwrittenLearningControlTest {
         )
     }
 
-    // R25 F8088: a pin, a 不再联想 and a table block are taken back by their opposite record, not a rewrite: done whatever else is
-    // unwritten (WD-46, docs/faq.md), the state as before the act
     @Uat("WD-46")
     @Test
     fun aPinOrANoPredictIsTakenBackByItsOppositeWhateverIsUnwritten() {
@@ -113,9 +106,6 @@ class UnwrittenLearningControlTest {
         )
     }
 
-    // R25 F8078: a record whose file did not open this run learns in memory, where a rewrite would not last
-    // (LearnLog.rewrite): a forget there is no longer to be taken back, the word still deleted. Not a failure of
-    // the disk to say, and not taken back in memory as an act an open file refused is
     @Uat("WD-46")
     @Test
     fun aForgetOnARecordThatDidNotOpenIsNoLongerTakenBack() {
@@ -130,7 +120,6 @@ class UnwrittenLearningControlTest {
         val token = control.undoable { log.forget("指导") }
         val forgotten = log.state.dump()
         assertNotEquals(learned, forgotten)
-        // what the file not opening said is not the undo's
         told.clear()
         assertEquals(LearningControl.TakenBack.GONE, control.takeBack(token))
         assertEquals("still deleted", forgotten, log.state.dump())

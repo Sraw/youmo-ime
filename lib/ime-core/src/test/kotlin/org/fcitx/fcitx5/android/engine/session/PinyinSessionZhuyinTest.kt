@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.SpelledForm
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
@@ -21,7 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Pinyin typed in zhuyin (design 051 §3.3): 大千's and 注音九键's sessions on the session's test data. */
+/** Pinyin typed in zhuyin: 大千's and 注音九键's sessions on the session's test data. */
 class PinyinSessionZhuyinTest {
 
     private val data = sessionTestData()
@@ -58,8 +59,7 @@ class PinyinSessionZhuyinTest {
         assertEquals("ㄋㄧ ㄏㄠ", out.preedit)
     }
 
-    // the bar's syllables in zhuyin as the code row is (design 051 §3.2), never pinyin's letters; one
-    // tapped still settles its syllable
+    // the bar's syllables in zhuyin as the code row is, never pinyin's letters; one tapped still settles its syllable
     @Test
     fun theNineKeysOfferTheSyllablesInZhuyin() {
         val keyboard = Keyboard(session(nine = true), nineKeys = true)
@@ -73,7 +73,6 @@ class PinyinSessionZhuyinTest {
         assertTrue(taken.preedit, taken.preedit.startsWith("ㄇㄧ") && taken.preedit.endsWith("ㄏㄠ") && taken.preedit.none { it in 'a'..'z' })
     }
 
-    // design 051 Q3 A: a space gives a syllable with no tone its first, then picks the first candidate
     @Test
     fun dachensSpaceIsTheFirstToneThenThePick() {
         val keyboard = Keyboard(session(), nineKeys = true)
@@ -85,8 +84,7 @@ class PinyinSessionZhuyinTest {
         assertEquals("中", picked.commit)
     }
 
-    // a tone ends a syllable: with nothing typed it ends nothing, typed nothing, and the next
-    // syllable starts clean (it was kept unseen, then shown as its code before ㄋㄧ)
+    // with nothing typed a tone types nothing, and the next syllable starts clean
     @Test
     fun aToneWithNothingTypedIsNotTyped() {
         for (nine in listOf(false, true)) {
@@ -110,13 +108,10 @@ class PinyinSessionZhuyinTest {
         assertTrue(out.commit.none { it in ZhuyinKeys.BLOCK })
     }
 
-    // design 051 Q4 A: a tone the reading has not puts the word after, never out. The Ext-B rows: a
-    // character outside the BMP (two chars, one syllable), alone and in a word with one inside it,
-    // its tone read as one code point a syllable, not passed over as a length that does not match
+    // a tone the reading has not puts the word after, never out; a non-BMP character's tone is read as one code point
     @Test
     fun aToneTheReadingHasNotPutsTheWordAfter() {
         val ni = Syllables.id("ni")
-        // 你 is ni3 alone here; 拟 any
         val niThird = { cp: Int, syllable: Int, tone: Int -> !(cp == '你'.code && syllable == ni && tone != 3) }
         val extB = "\uD840\uDC00" // U+20000
         val extBData = pinyinDataOf(
@@ -158,7 +153,7 @@ class PinyinSessionZhuyinTest {
         }
     }
 
-    // zhuyin's keys spell no pinyin letters: its kinds link no spellings (U-20), their keys filed by the code
+    // zhuyin's keys spell no pinyin letters: its kinds link no spellings, their keys filed by the code
     @Test
     fun theZhuyinKindsLinkNoSpellings() {
         assertTrue(Kinds.isZhuyin(Kinds.ZHUYIN_NINE) && Kinds.isZhuyin(Kinds.ZHUYIN_DACHEN))
@@ -169,8 +164,6 @@ class PinyinSessionZhuyinTest {
     private fun Keyboard.take(syllables: List<String>, id: Int, shown: String) =
         onEvent(EngineEvent.CHAR, Keyboard.syllableKey(syllables.indexOf(shown).also { assertTrue(syllables.toString(), it >= 0) }, id).code)
 
-    // ㄓ is zhi whole and zh's initial alike: the bar has it once, as the initial (taken, the symbol
-    // typed as itself), not twice where none could tell them apart
     @Test
     fun aWholeSyllableShownAsItsInitialIsOnTheBarOnceAsTheInitial() {
         for (symbol in "ㄓㄔㄕㄖㄗㄘㄙ") {
@@ -187,7 +180,6 @@ class PinyinSessionZhuyinTest {
         }
     }
 
-    // the initial taken goes on into a final typed next (ㄓ ㄨㄥ, 中); none after, its whole syllable (ㄖ, ri)
     @Test
     fun anInitialTakenGoesOnIntoTheFinalOrIsItsWholeSyllable() {
         val zhong = Keyboard(session(nine = true), nineKeys = true)
@@ -200,9 +192,7 @@ class PinyinSessionZhuyinTest {
         val r = riqi.type(nine("ㄖ"))
         riqi.take(r.syllables, r.syllablesId, "ㄖ")
         assertEquals("日期", riqi.type(nine("ㄑㄧ")).candidates[0])
-        // every initial is taken so, not only the seven a whole syllable shares: ㄋ (of ㄇㄋㄜ) taken is ㄋ picked
-        // off its key, as a long press picks it, and the keys after go on from it (ㄋ ㄧ ㄏㄠ, 你好). The zhuyin
-        // keyboards have no 简拼 (abbreviations off), so an initial alone is not a word's first syllable
+        // every initial is taken so; the zhuyin keyboards have no 简拼, so an initial alone is no word's first syllable
         val nh = Keyboard(session(nine = true), nineKeys = true)
         val n = nh.type(nine("ㄋ"))
         assertEquals("ㄋ", nh.take(n.syllables, n.syllablesId, "ㄋ").preedit)
@@ -212,7 +202,6 @@ class PinyinSessionZhuyinTest {
             k.take(m.syllables, m.syllablesId, "ㄋ")
             k.type(nine("ㄏ")).candidates[0]
         })
-        // given back by ⌫ right after: the key as it was
         val s = session(nine = true)
         val back = Keyboard(s, nineKeys = true)
         val typed = back.type(nine("ㄓ"))

@@ -14,12 +14,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.zip.GZIPInputStream
 
-/**
- * contract: the Kotlin s2tw against OpenCC 1.2.0 itself: golden.tsv.gz is `opencc -c s2tw.json` of the host
- * build (tools/opencc/build.sh, golden.py) over every dictionary key of the release, every Chinese
- * sentence of data/ and edge cases. Every case must match. The converter reads the data as the app
- * does: the dictionaries of lib/ime-dict-tool/opencc compiled by [OpenCCData.write], then mapped.
- */
+/** contract: the Kotlin s2tw against OpenCC itself (golden.tsv.gz, `opencc -c s2tw.json` over every dictionary key and data/ sentence). */
 class ChineseConverterGoldenTest {
 
     private val converter = ChineseConverter.s2tw(
@@ -59,12 +54,7 @@ class ChineseConverterGoldenTest {
         return out
     }
 
-    /**
-     * UTF-8, but a lone surrogate written as CESU-8 (as JNI's modified UTF-8 hands one over) is that
-     * surrogate: what the Kotlin side sees for such a string. Through [DataInputStream.readUTF], so
-     * only for what the golden set has: a line under 64 KiB, and no 4-byte UTF-8 (a supplementary
-     * character) in a line that also has a lone surrogate; anything else throws, never compares wrong.
-     */
+    /** UTF-8 with a lone surrogate read as CESU-8 (as JNI hands it over); anything [DataInputStream.readUTF] cannot take throws. */
     private fun decode(bytes: ByteArray): String {
         val s = String(bytes, Charsets.UTF_8)
         if ('�' !in s) return s

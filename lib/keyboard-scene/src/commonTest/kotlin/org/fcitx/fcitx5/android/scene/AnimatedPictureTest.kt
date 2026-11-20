@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.Fixtures.warnings
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import kotlin.test.Test
@@ -20,12 +21,6 @@ class AnimatedPictureTest {
 
     private fun with(attrs: String) =
         source.replace("</colors>", "</colors>\n<picture src=\"bg.webp\" $attrs><cut orientation=\"portrait\" file=\"p.png\"/></picture>")
-
-    private fun warnings(s: String): List<String> {
-        val t = ThemeReader.theme(s)
-        assertTrue(t is Parsed.Ok, "${t.problems()}")
-        return t.warnings().map { it.message }
-    }
 
     @Test
     fun anAnimatedPictureReads() {

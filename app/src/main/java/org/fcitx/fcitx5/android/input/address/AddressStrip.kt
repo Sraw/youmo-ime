@@ -29,13 +29,10 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.horizontalPadding
 
 /**
- * The bar's suggestions in an email or a URL field while it is empty else ([AddressSuggestions]):
- * one tap puts one in. A field left for another, what it was left with is learned
- * ([AddressLearning], [AddressBook.left]), but where the field asks not to be learned from (无痕),
- * is a password's, or the habits are not used (「不用我的输入习惯」), and before the first unlock,
- * when the settings are the device-protected copy's; and only if it changed while the keyboard was
- * up: an address the app filled in is not the user's. Where nothing is learned the text is read
- * for the suggestions alone, at most [READ] units either side of the cursor, and kept nowhere.
+ * A field left, what it was left with is learned, but not where the field asks not to be learned from,
+ * is a password's, the habits are off, or before the first unlock (the settings are the device-protected
+ * copy's); and only if it changed while the keyboard was up: an address the app filled in is not the
+ * user's. Where nothing is learned, the text is read for the suggestions alone and kept nowhere.
  */
 class AddressStrip(private val ctx: Context, private val theme: Theme, private val service: FcitxInputMethodService) {
 
@@ -56,9 +53,8 @@ class AddressStrip(private val ctx: Context, private val theme: Theme, private v
     private var field: AddressField? = null
     private var learns = false
 
-    /** A field started, [capFlags] its, as the service tells fcitx: the last one's suggestions gone. */
     fun start(info: EditorInfo, capFlags: CapabilityFlags) {
-        // whatever the field, a restart's too: nothing of the one before offered in it
+        // a restart's too: nothing of the one before offered in it
         show(emptyList())
         val traits = info.toEditorTraits()
         field = when {
@@ -75,41 +71,35 @@ class AddressStrip(private val ctx: Context, private val theme: Theme, private v
         refresh(info.initialSelStart, info.initialSelEnd, read)
     }
 
-    /** The keyboard hidden, the bar made anew, or the field left: nothing offered till the next start. */
     fun finish() {
         field = null
         show(emptyList())
     }
 
-    /** The cursor at [start]..[end], the text maybe changed: offered anew. */
     fun refresh(start: Int, end: Int) = refresh(start, end, null)
 
-    // [read], what start read already
     private fun refresh(start: Int, end: Int, read: Around?) {
         val f = field ?: return
-        // the code in the field (编码行 输入框里) is not an address: nothing read, offered nor seen while it
-        // is there; the candidates have the bar meanwhile (061-code-in-field §6.5)
+        // the code in the field is not an address: nothing read, offered nor seen while it is there
         if (service.codeInFieldNow) return show(emptyList())
         val around = read ?: Around.read(service.currentInputConnection, start == end && start >= 0)
         if (learns) service.addressLearning.seen(around?.whole, read = around != null)
         // a selection: nothing to put beside it. One the app gave no position of (-1, -1) shows as the text selected
         if (around == null || start != end || around.selected.isNotEmpty()) return show(emptyList())
         val habits = prefs.internal.useHabits.getValue()
-        // the remembered addresses not offered while they are not remembered, kept for when they are again
+        // not offered while not remembered, kept for when they are again
         val book = AddressStore.book().takeIf { habits }
             ?.let { if (prefs.keyboard.rememberAddresses.getValue()) it else AddressBook(it.counts) }
         show(AddressSuggestions.suggest(f, around.before, around.after, AddressStore.lists(), book, read = READ))
     }
 
-    /** The text around the cursor as read once: [READ] units either side, and the selection. */
     private class Around(val before: String, val selected: String, val after: String) {
-        // the field's text, the selection's too: null where more than was read
+        // null where more than was read
         val whole: String? get() = (before + selected + after).takeIf { before.length < READ && selected.length < READ && after.length < READ }
 
         companion object {
-            // null: the connection gave nothing (none, a WebView's timeout), not an empty field. Each a
-            // round trip to the app on the main thread at every cursor move: the selection not asked for
-            // where there is none ([collapsed])
+            // null: the connection gave nothing (a WebView's timeout), not an empty field. A round trip to the app on the
+            // main thread at every cursor move: the selection not asked for where there is none
             fun read(ic: InputConnection?, collapsed: Boolean): Around? {
                 ic ?: return null
                 val before = ic.getTextBeforeCursor(READ, 0) ?: return null

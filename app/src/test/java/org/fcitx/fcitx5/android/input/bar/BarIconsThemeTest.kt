@@ -68,10 +68,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * 061-toolbar-icons in the app: a theme's `<icon>` of a bar's or a panel's name drawn there, in the place's colour;
- * a name it does not write the place's own image; the menu key's states; read ahead, never the app's first.
- */
+/** A theme's `<icon>` for a bar or panel name, in the place's colour; unnamed ones keep the app's image; read ahead, never the app's first. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -110,11 +107,9 @@ class BarIconsThemeTest {
         ThemeManager.refreshThemes()
     }
 
-    // a square filling its box: the icon's pixels its tint (or its own colour)
     private val square = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24h-24z"/></svg>"""
 
-    // a pack `mine<n>` (the built-in Nord's file under that name) with an icon of each of [names], imported and listed:
-    // its dark version, the one the tests show
+    // `mine<n>` (Nord's file renamed) with an icon for each of [names], imported; its dark version is shown
     private var packs = 0
 
     private fun pack(vararg names: String, styles: String = "", picture: Boolean = false): Theme.Pack {
@@ -161,7 +156,6 @@ class BarIconsThemeTest {
 
     private val Drawable?.themed get() = this is PackIconDrawable
 
-    // [d]'s middle pixel drawn 24 px square
     private fun middle(d: Drawable): Int {
         val b = Bitmap.createBitmap(SIDE, SIDE, Bitmap.Config.ARGB_8888)
         d.setBounds(0, 0, SIDE, SIDE)
@@ -179,12 +173,10 @@ class BarIconsThemeTest {
         assertTrue(h.button(R.string.hide_toolbar).iconDrawable.themed)
         assertTrue(h.button(R.string.undo).iconDrawable.themed)
         assertTrue(h.button(R.string.status_area).iconDrawable.themed)
-        // none of its own: the app's, as ever
         val redo = h.button(R.string.redo)
         assertFalse(redo.themed)
         assertNotNull(redo.iconDrawable)
         assertFalse(redo.iconDrawable.themed)
-        // the strip of the clipboard's last copy: its `clipboard`, here none
         assertFalse(ClipboardSuggestionUi(ctx, mine).iconDrawable.themed)
         assertTrue(ClipboardSuggestionUi(ctx, pack("clipboard")).iconDrawable.themed)
     }
@@ -200,7 +192,7 @@ class BarIconsThemeTest {
         assertNotNull(h.button(R.string.undo).iconDrawable)
     }
 
-    // one name, one meaning: a 0.6.0 theme's `undo` (written for the keys) is the toolbar's too
+    // one name, one meaning: a theme's `undo` written for the keys is the toolbar's too
     @Test
     @Uat("ST-129")
     fun aThemesUndoIsTheToolbarsAndTheShortcutsAlike() {
@@ -208,7 +200,6 @@ class BarIconsThemeTest {
         val h = shown(mine)
         h.expand()
         assertTrue(h.button(R.string.undo).iconDrawable.themed)
-        // the key's shortcut drawn by the same name, which the theme's icons hold
         assertEquals("undo", SceneIcons.nameOf(KeyShortcutLooks.of(KeyCommand.Undo).icon))
         assertNotNull(PackIcons.of(mine).file("undo"))
     }
@@ -222,7 +213,7 @@ class BarIconsThemeTest {
         assertEquals(0f, menu.iconRotation)
         h.expand()
         assertFalse(menu.iconDrawable.themed)
-        // the app's ⌄ turned as the open toolbar's ever was, faded in, not turned to it
+        // the app's ⌄ turned as the open toolbar's ever was, faded in
         assertEquals(90f, menu.iconRotation)
         assertEquals(1f, menu.iconAlpha)
         h.tap(menu)
@@ -231,8 +222,7 @@ class BarIconsThemeTest {
         assertEquals(0f, menu.iconRotation)
     }
 
-    // the app's ⌄ drawn for the menu key, turned as ever (-90 folded, +90 open), however the theme has none drawn; each
-    // row its own pack and bar
+    // the app's ⌄ for the menu key, turned as ever, whatever the theme draws
     @Test
     @Uat("ST-130")
     fun menuIconsNoneDrawnTurnTheAppsAsEver() {
@@ -245,7 +235,7 @@ class BarIconsThemeTest {
             assertFalse(menu.iconDrawable.themed)
         }
 
-        // the two by name, their files broken (a restored backup's pack, no import's checks)
+        // broken files by name (a restored backup's pack skips import's checks)
         fun broken(): Theme.Pack {
             val mine = pack("toolbar-expand", "toolbar-collapse")
             val icons = PackIcons.of(mine)
@@ -265,8 +255,7 @@ class BarIconsThemeTest {
         assertRows(
             "no menu icon of the theme's" to row { shown(pack("undo")) },
             "the two that fail, the two states told apart (R26 F8310)" to row { shown(broken()) },
-            // made while they were being read (counted the theme's then, upright), failed once read: turned at once,
-            // not upright till the toolbar is first opened (R26 F8451)
+            // failed once read: turned at once, not upright till the toolbar first opens
             "the two that fail read after the bar is made" to row {
                 val mine = broken()
                 val queued = ArrayList<Runnable>()
@@ -284,7 +273,7 @@ class BarIconsThemeTest {
         )
     }
 
-    // hide-keyboard's own images differ (▾ on the bar, the keyboard with ⌄ on a key): each its own till a theme writes it
+    // hide-keyboard's two images differ (▾ on the bar, ⌄ on a key): each its own till a theme writes it
     @Test
     @Uat("ST-130")
     fun hideKeyboardsImagesAreEachPlacesOwnTillAThemeWritesIt() {
@@ -298,9 +287,8 @@ class BarIconsThemeTest {
         assertNotNull(PackIcons.of(mine).file("hide-keyboard"))
     }
 
-    // the app's image drawn at its own size elsewhere first (another bar, a panel, an earlier case): a vector's raster
-    // only ever grows, shared by every drawable of the resource, so the button's smaller icon came out sharper than
-    // drawn alone (the low landscape bar's emoji, at random in a full run; fixed in 332983c57)
+    // a vector's raster only grows and is shared by every drawable of the resource: drawn larger elsewhere first, the
+    // button's smaller icon came out sharper than alone
     @Test
     fun aButtonsIconIsDrawnAlikeWhateverDrewTheSameImageBefore() {
         val image = ctx.getDrawable(ToolbarButtonLooks.drawable(BarIcons.EMOJI.fallback))!!
@@ -350,7 +338,7 @@ class BarIconsThemeTest {
         assertFalse(h.button(R.string.status_traditional).iconDrawable.themed)
     }
 
-    // T4: a name the theme writes is never the app's image first, then the theme's; one it does not write is there at once
+    // never the app's image first, then the theme's
     @Test
     @Uat("TB-64")
     fun aThemesIconNotReadYetIsNothingTillItIsNeverTheAppsFirst() {
@@ -365,7 +353,7 @@ class BarIconsThemeTest {
         assertEquals(1, queued.size)
         queued.single().run()
         assertTrue(undo.iconDrawable.themed)
-        // read ahead (ThemeManager, the theme picked): a bar made after is drawn the theme's at once
+        // read ahead when the theme is picked: a bar made after draws the theme's at once
         ScenePainter.forgetIcons()
         queued.clear()
         BarIconDrawables.readAhead(PackIcons.of(mine))
@@ -384,7 +372,7 @@ class BarIconsThemeTest {
         assertFalse(undo.iconDrawable.themed)
     }
 
-    // the status panel's cells, two states of an engine's toggle two names; unikey's and the fallback never the theme's
+    // an engine toggle's two states are two names; unikey's and the fallback never the theme's
     @Test
     @Uat("ST-132")
     fun theStatusPanelsCellsAndGearAreTheThemes() {
@@ -408,16 +396,14 @@ class BarIconsThemeTest {
         assertTrue(cell(s(R.string.virtual_keyboard)).themed)
         assertTrue(cell(s(R.string.status_simplified)).themed)
         assertTrue(cell(s(R.string.status_punctuation_chinese)).themed)
-        // not written: the app's
         assertFalse(cell(s(R.string.input_method_options)).themed)
         assertFalse(cell(s(R.string.status_half_width)).themed)
         assertTrue(h.button(R.string.open_input_method_settings).iconDrawable.themed)
-        // unikey's no name of ours, though the theme has an icon so named
+        // unikey's is no name of ours, though the theme has an icon so named
         val unikey = StatusAreaEntryUi(ctx, mine).apply { setEntry(StatusAreaEntry.fromEntry(ctx, StatusEntry(4, "unikey", "document-edit", "U", false))) }
         assertFalse(unikey.icon.drawable.themed)
     }
 
-    // every cell of the app's own and every engine icon the app has an image of: a name a theme may write
     @Test
     fun everyCellHasAName() {
         for (t in StatusAreaEntry.Android.Type.entries) assertTrue(t.name, StatusAreaEntry.iconOf(t).name in Icons.ALL)
@@ -441,20 +427,17 @@ class BarIconsThemeTest {
         val clipboards = KeyboardHarness.all(h.inputView).filterIsInstance<ToolButton>().filter { h.shown(it) && it.contentDescription == s(R.string.clipboard) }.toList()
         assertTrue(clipboards.isNotEmpty())
         assertTrue(clipboards.all { it.iconDrawable.themed })
-        // the arrows not a command's job: the app's
         val up = KeyboardHarness.all(h.inputView).filterIsInstance<TextEditingButton>().single { h.shown(it) && it.contentDescription == s(R.string.move_cursor_up) }
         assertFalse(up.imageView.drawable.themed)
-        // the symbol panel's 123 and the emoticons' emoji are keys of the scene's, by the keys' names
+        // the symbol panel's 123 and the emoticons' emoji are scene keys, by the keys' names
         assertEquals("number-pad", SceneIcons.nameOf(R.drawable.ic_number_pad))
         assertEquals("emoji", SceneIcons.nameOf(R.drawable.ic_baseline_tag_faces_24))
-        // the floating keyboard's strip
         val handle = FloatingHandle(ctx, mine, FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize))
         assertTrue(handle.dockDrawable.themed)
         assertTrue((handle.resizeButton as ImageView).drawable.themed)
-        // growing up and left, the theme's own drawn mirrored as the app's is (⤢ as ⤡)
+        // growing up and left: the theme's own drawn mirrored as the app's (⤢ as ⤡)
         handle.showGrowth(down = false)
         assertTrue(handle.resizeButton!!.mirrored && handle.resizeButton!!.drawable.themed)
-        // drawn mirrored: the left half of its picture is the right half's turned over
         val b = android.graphics.Bitmap.createBitmap(56, 24, android.graphics.Bitmap.Config.ARGB_8888)
         handle.resizeButton!!.apply { layout(0, 0, 56, 24); background = null; draw(android.graphics.Canvas(b)) }
         val straight = android.graphics.Bitmap.createBitmap(56, 24, android.graphics.Bitmap.Config.ARGB_8888)
@@ -466,7 +449,7 @@ class BarIconsThemeTest {
         assertFalse(FloatingHandle(ctx, pack("undo"), FloatingHandleSide.Top, FloatingHandle.Mode.Floating({ _, _ -> }, {}, {}, NoResize)).dockDrawable.themed)
     }
 
-    // beside the keys: one-handed's way back to the whole width, the floating candidate window's page arrows
+    // one-handed's way back to full width, the floating candidate window's page arrows
     @Test
     @Uat("ST-132")
     fun theButtonsBesideTheKeysAreTheThemes() {
@@ -480,12 +463,10 @@ class BarIconsThemeTest {
         val paging = PaginationUi(ctx, ThemeManager.activeTheme)
         assertTrue(paging.prevIcon.drawable.themed)
         assertFalse(paging.nextIcon.drawable.themed)
-        // the app's as ever: its resource in the window's colour
         assertNotNull(paging.nextIcon.colorFilter)
         assertFalse(PaginationUi(ctx, pack("undo")).prevIcon.drawable.themed)
     }
 
-    // a hardware keyboard's floating candidate window: its way to the touch keyboard
     @Test
     @Uat("ST-132")
     @Config(qualifiers = "w393dp-h851dp-port-440dpi-keysexposed-qwerty")
@@ -497,14 +478,14 @@ class BarIconsThemeTest {
         assertTrue(button.drawable.themed)
     }
 
-    // the hide button's ▾ turned the way a swipe goes (the number row's way) is the app's arrow; a theme's is no arrow
+    // the ▾ turned the way a swipe goes is the app's arrow; a theme's is no arrow
     @Test
     fun aThemesHideKeyboardIsNotTurnedBySwipes() {
         fun turnedBy(theme: Theme): Float {
             harness?.close()
             val h = shown(theme)
             h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-            // the number row a password's bar is, put away by a swipe to the right: the toolbar's ▾ then turns to bring it back
+            // a password's bar is the number row, put away by a swipe right: the ▾ then turns to bring it back
             val row = KeyboardHarness.find<NumberRow>(h.bar)!!
             h.swipe(row, h.box(row).height() * 2f, 0f)
             h.relayout()
@@ -517,7 +498,6 @@ class BarIconsThemeTest {
         assertEquals(0f, turnedBy(pack("hide-keyboard")))
     }
 
-    // a button drawn again in the same name, colour and size keeps the bitmap it has; a new colour is drawn anew
     @Test
     fun theSameIconIsNotDrawnAnew() {
         val b = ToolButton(ctx, BarIcons.ONE_HANDED, pack("one-handed", styles = """<style select="toolbar:selected" icon-color="#ffff0000"/>"""))
@@ -533,7 +513,6 @@ class BarIconsThemeTest {
         assertTrue(on === b.iconDrawable)
     }
 
-    // a read finished for an icon no longer shown is not drawn over the one shown now
     @Test
     fun anEditingButtonsIconReadLateIsNotDrawnOverAnother() {
         val mine = pack("backspace")
@@ -550,7 +529,7 @@ class BarIconsThemeTest {
         assertTrue(app === b.imageView.drawable)
     }
 
-    // a theme picked: its bar's icons queued for the decode thread before its picture and the picture's blurs
+    // before its picture and the picture's blurs on the decode thread
     @Test
     fun aPickedThemesBarIconsAreReadBeforeItsPicture() {
         val mine = pack("undo", picture = true)
@@ -558,9 +537,7 @@ class BarIconsThemeTest {
         val queued = ArrayList<Runnable>()
         ThemeAssets.runner = { queued += it }
         ThemeManager.setNormalModeTheme(mine)
-        // the icon's read and the picture's decode (its blurs with it)
         assertEquals(2, queued.size)
-        // the first queued is the icon's read: run alone, the bar's undo is the theme's
         queued.first().run()
         assertTrue(ToolButton(ctx, BarIcons.UNDO, mine).iconDrawable.themed)
     }

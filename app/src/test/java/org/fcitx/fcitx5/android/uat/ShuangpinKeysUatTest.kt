@@ -21,9 +21,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.preedit.SyllableStrip
-import org.fcitx.fcitx5.android.input.keyboard.T9Keyboard
-import org.fcitx.fcitx5.android.input.keyboard.KeyDef
-import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -34,16 +31,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/**
- * uat/07-shuangpin.md's 18 keys and nine keys, the keyboard's half (the engine's is ShuangpinUatTest
- * in :lib:ime-eval): what the keyboard looks like, and where it offers the syllables the engine tells it.
- */
+/** The 18 and nine keys' keyboard half: how it looks, and where it offers the syllables the engine tells it. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
 class ShuangpinKeysUatTest {
 
-    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+    private val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
     private val setting = AppPrefs.getInstance().keyboard.shuangpinKeyboard
     private var h: KeyboardHarness? = null
 
@@ -60,7 +54,6 @@ class ShuangpinKeysUatTest {
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
-    // what the engine tells of wo typed: the code row's preedit, and the syllables to take
     private fun KeyboardHarness.typedWo() {
         emit(HostEvent.InputPanel(FormattedText(arrayOf("wo"), intArrayOf(0), 2), FormattedText.Empty, FormattedText.Empty))
         EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("wo", "w"), id = 1)
@@ -94,7 +87,6 @@ class ShuangpinKeysUatTest {
         for (l in listOf("ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ")) assertTrue("$l in $labels", l in labels)
         assertFalse("no 中/英: $labels", "中/英" in labels)
         h.typedWo()
-        // the column has them, the code row none
         assertFalse(h.strip().isVisible)
         val column = KeyboardHarness.all(h.keyboard).filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
         val shown = (0 until column.childCount).map { column.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
@@ -129,17 +121,12 @@ class ShuangpinKeysUatTest {
         assertTrue(h.texts().toString(), "JKL" in h.texts() && "JKL;" !in h.texts())
         val five = h.longPress(h.nineKey("5"))
         assertFalse("$five", five.any { it == ";" || it == "；" || it == ":" || it == "：" })
-        // 1's corner its first (Keypad 1) under every scheme: not under 小鹤 nor 自然码, drawn (the scene) or as the views had it
         for (scheme in listOf(ShuangpinScheme.XIAOHE, ShuangpinScheme.ZIRANMA)) {
             EngineState.shuangpinScheme = scheme
             h.start()
             assertEquals("$scheme", "1", h.nineKey("1").alt)
         }
-        val oldOne = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = false).flatten()
-            .firstNotNullOf { it.appearance as? KeyDef.Appearance.AltText }
-        assertEquals("1", oldOne.altText)
-        // 微软's, where 1 types ; while typing: its corner its first's still (060-keys-unify S6: a key's corner is its long
-        // press's first, by its name), the ; on its face while typing, what the tap types then (060-s6-review L3)
+        // 微软's, where 1 types ; while typing: its corner its first's still, the ; on its face while typing
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
         h.start()
         assertEquals("1", h.nineKey("1").alt)
@@ -154,9 +141,7 @@ class ShuangpinKeysUatTest {
     fun theNineKeysOneIsPunctuationWithNothingTypedTheSeparatorWhileTyping() {
         val h = harness(ShuangpinKeyboard.NineKeys)
         h.tap(h.nineKey("1"))
-        // as the punctuation maps it: none here (KeysEverywhereUatTest has Chinese's ，)
         assertEquals(",", h.field.text.toString())
-        // while typing it is the separator, sent to the engine (ShuangpinUatTest has what it does there)
         h.typedWo()
         h.tap(h.nineKey("1"))
         assertEquals(",", h.field.text.toString())

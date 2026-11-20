@@ -1,12 +1,5 @@
-// The layout maker in a real browser (061-custom-layout §12): 新建 from a board, the preview and its environment bar
-// (横屏 derived, the number pads), the source read again on typing, a problem's click to its line, undo, 保存 (min-app
-// written, the file named; Ctrl+S in the source), a text past the size limit, and the draft offered back (its
-// environment too; one that does not open offered to be dropped); the editing (W2): a key selected and outlined, moved
-// by the buttons and dragged (a finger only after 300 ms), its width by its right edge, a character key added, its
-// actions (a shared name's read-only), keys merged into a group, the app's bottom row made the layout's own, rows,
-// 整块, 信息, the page at a phone's 360 px; by the keyboard (Delete, the arrows, Ctrl+Z in a field the field's), a field
-// kept focused over its commit, the selection following its key over an undo, a finger's tap and swipe; 新建 from an
-// example (W3) and at 360 px, the help; a .theme opened (L8): the preview's theme, a board of it to start from. CI runs it with the runner's Chrome, as panels-smoke.mjs.
+// The layout maker in a real browser: making, the preview, the source, saving, the draft, and the editing by mouse,
+// keyboard and finger. CI runs it with the runner's Chrome, as panels-smoke.mjs.
 // Run: node web/theme-maker/test/layout-smoke.mjs [chromium]   (SHOT=<file.png>: the page's picture saved there)
 // Exit 0 all kept, 1 not, 2 not run (no Chromium).
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -67,14 +60,13 @@ async function main() {
     await b.send('Page.navigate', { url });
     await until(`!!document.getElementById('new-panel')?.open`, 'the page did not start (新建 not opened)');
 
-    // 新建: an id the app has refused in the dialog, a good one made
     await make('k18', 'k18');
     const refused = await js(`[document.getElementById('new-panel').open, document.getElementById('new-problem').textContent]`);
     check(refused[0] && /App 自带的键盘或片段叫 k18/.test(refused[1]), '新建 refuses an id of the app\'s: ' + refused[1]);
     await make('k18', 'grouped-bottom');
     const fragment = await js(`[document.getElementById('new-panel').open, document.getElementById('new-problem').textContent]`);
     check(fragment[0] && /grouped-bottom/.test(fragment[1]), '新建 refuses a fragment\'s id: ' + fragment[1]);
-    // Enter in the id: 新建 (the form's default button), held to the same checks; not 取消 (review R26 F8128)
+    // Enter in the id: 新建 (the form's default button), not 取消
     const enter = async (id) => {
       await js(`(() => { const i = document.getElementById('new-id'); i.value = ${JSON.stringify(id)}; i.focus(); })()`);
       await b.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
@@ -93,7 +85,6 @@ async function main() {
     const upright = await canvas();
     check(upright[0] === 1080 && upright[1] > 600, 'drawn the phone\'s width: ' + upright);
 
-    // 横屏 is the device's turn, shown, not a toggle
     check(/411 dp 宽，按竖屏排/.test(await js(`document.getElementById('env-shape').textContent`)), 'upright: 按竖屏排');
     await choose('env-turned', 'turned');
     check(/按横屏排/.test(await js(`document.getElementById('env-shape').textContent`)) && (await canvas())[0] === 2340, 'turned: 按横屏排, drawn 2340 wide');
@@ -102,7 +93,6 @@ async function main() {
     check(/800 dp 宽，按横屏排/.test(await js(`document.getElementById('env-shape').textContent`)), 'a tablet upright: 800 dp, 按横屏排 (as the app)');
     await choose('env-device', 'oneplus-6t');
 
-    // the source read again on typing: an error listed with its line, a click there selects it; undo takes it back
     await type(`(t) => t.replace('<row>', '<row>\\n    <nope/>')`);
     const listed = await js(`[...document.querySelectorAll('#problems li.error')].map((li) => li.textContent)`);
     check(listed.length > 0 && listed.some((t) => /第 \d+ 行/.test(t)), 'an error typed in is listed with its line: ' + listed[0]);
@@ -115,7 +105,6 @@ async function main() {
     check(/<nope\/>/.test(await source()), 'redo');
     await js(`document.getElementById('undo').click()`);
 
-    // a number board: its pads, not the fields
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);
     await make('number', 'my-number');
     await wait(300);
@@ -125,7 +114,6 @@ async function main() {
     await choose('env-pad', 'phone');
     check((await js(`document.getElementById('preview').toDataURL()`)) !== full, 'the phone pad drawn apart from the full one');
 
-    // 保存: min-app written, the file named by the layout's name
     await js(`window.__saved = []; HTMLAnchorElement.prototype.click = function () { window.__saved.push(this.download); }`);
     await js(`document.querySelector('#file-menu [data-act=save]').click()`);
     await wait(500);
@@ -137,7 +125,6 @@ async function main() {
     await wait(500);
     const typedSave = await js(`window.__saved`);
     check(typedSave.length === 2 && typedSave[1] === '键盘 2.layout', 'Ctrl+S in the source saves what is typed: ' + JSON.stringify(typedSave));
-    // an error: nothing saved, the error listed by 保存 itself (the list emptied first, nothing typed since)
     await type(`(t) => t.replace('id="my-number"', 'id="number"')`);
     await js(`document.getElementById('problems').textContent = ''`);
     await js(`document.querySelector('#file-menu [data-act=save]').click()`);
@@ -145,7 +132,6 @@ async function main() {
     check((await js(`window.__saved.length`)) === 2 && /重名/.test(await js(`document.getElementById('problems').textContent`)) && /App 导入不了/.test(await js(`document.getElementById('toast').textContent`)),
       '保存 with an error: nothing saved, the error listed by 保存');
 
-    // past the size limit: that one error, nothing drawn, not kept as the draft
     await type(`(t) => t.replace('id="number"', 'id="my-number"')`);
     await wait(800);
     const keptBefore = await js(`window.YoumoMaker.draft(window.YoumoMaker.idbStore(indexedDB, 'youmo-layout-maker')).then((d) => d && d.doc.xml)`);
@@ -158,7 +144,6 @@ async function main() {
     check(keptAfter !== null && keptAfter === keptBefore && keptAfter.length < 65536, 'past 64 KB: the draft not replaced');
     await js(`document.getElementById('undo').click()`);
 
-    // the draft: offered back on the next visit, the environment it was drawn in too (the phone pad chosen above)
     await wait(800);
     const before = await source();
     await b.send('Page.navigate', { url });
@@ -168,7 +153,6 @@ async function main() {
     check((await source()) === before, 'the draft restored as it was');
     check((await js(`document.getElementById('env-pad').value`)) === 'phone', 'its environment restored: the phone pad');
 
-    // a draft that does not open: offered to be dropped, and dropped, the page starting anew
     await js(`window.YoumoMaker.keepDraft(window.YoumoMaker.idbStore(indexedDB, 'youmo-layout-maker'), window.YoumoMaker.doc('<x/>'), {})`);
     await b.send('Page.enable');
     await b.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.confirm = (m) => { window.__asked = m; return true; };' });
@@ -179,12 +163,11 @@ async function main() {
     check(/^草稿打不开/.test(await js(`window.__asked || ''`)), 'a draft that does not open: asked to drop it: ' + (await js(`window.__asked || ''`)));
     check((await js(`window.YoumoMaker.draft(window.YoumoMaker.idbStore(indexedDB, 'youmo-layout-maker'))`)) === null, 'and dropped');
 
-    // ---- the editing (W2, §12.3, §12.5) ----
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);
     await make('qwerty', 'my-qwerty');
     await wait(300);
     const fresh = await source();
-    // a key's middle in the page's pixels, by the scene the page draws (the bounds do not hang on the fonts)
+    // by the scene the page draws, so the bounds do not hang on the fonts
     const at = (id, dx = 0.5) => js(`(() => {
       const E = window['youmo-engine'].YoumoEngine, LM = window.YoumoLayoutMaker;
       const t = document.getElementById('source').value;
@@ -207,8 +190,7 @@ async function main() {
 
     await click('q');
     check(/键 q/.test(await keyTab()), 'a click on Q selects it: its panel');
-    // the outline's middle line (3 px in from the key's edge) on each of its four sides, near the accent (#3b6fd8): not
-    // one exact pixel, which a stroke's width or anti-aliasing moves
+    // near the accent, not one exact pixel, which a stroke's width or anti-aliasing moves
     const { b: qb } = await at('q');
     const [mx, my] = [(qb[0] + qb[2]) / 2, (qb[1] + qb[3]) / 2];
     const sides = await js(`[[${qb[0] + 3}, ${my}], [${qb[2] - 3}, ${my}], [${mx}, ${qb[1] + 3}], [${mx}, ${qb[3] - 3}]].map(([x, y]) =>
@@ -225,7 +207,6 @@ async function main() {
     await js(`document.getElementById('undo').click(); document.getElementById('undo').click(); document.getElementById('undo').click()`);
     check((await source()) === fresh, 'undone three times: as it was');
 
-    // its width by its right edge, snapped to half a unit
     await click('w');
     const w0 = await at('w', 0.98);
     const unit = (await at('e')).x - (await at('w')).x;
@@ -233,12 +214,10 @@ async function main() {
     check(/<key id="w"[^>]* width="1\.5"/.test(await source()), 'W\'s right edge dragged half a key: width="1.5": ' + /<key id="w"[^>]*>/.exec(await source())[0]);
     await js(`document.getElementById('undo').click()`);
 
-    // a shared name: its actions but the tap read-only, said why
     await click('e');
     const shared = await js(`[document.getElementById('tab-key').textContent, document.querySelector('#tab-key select[aria-label=长按]').disabled, document.querySelector('#tab-key select[aria-label=点按]').disabled]`);
     check(/跟内置的26 键 E，在 App 的按键字符和快捷键里改/.test(shared[0]) && shared[1] && !shared[2], 'E (full/e): its long press read-only, said why; its tap not');
 
-    // 加键: a character key left of E, its own name; its long press its layout's
     await js(`(() => { const i = document.querySelector('#tab-key input[aria-label=字符键打出的文字]'); i.value = '你好'; })()`);
     await js(`[...document.querySelectorAll('#tab-key button')].filter((x) => x.textContent === '加')[1].click()`);
     await wait(300);
@@ -255,7 +234,6 @@ async function main() {
     await wait(300);
     check(!/id="c1"/.test(await source()), '删除 takes it out');
 
-    // 合并: Q and W one group key, the board grouped, said what it means
     await js(`document.getElementById('source').value = ${JSON.stringify(fresh)}`);
     await js(`document.getElementById('source').dispatchEvent(new Event('change'))`);
     await wait(500);
@@ -268,8 +246,6 @@ async function main() {
       '合并 Q W: one group key, the board grouped, the note shown');
     check(/^0 个错误/.test(await count()) || (await count()) === '没有', 'merged: no errors: ' + (await count()));
 
-    // the keyboard: several keys selected and taken out by 删除这些, one by Delete on the preview, none by Backspace in a
-    // field; the arrows move the selection; Ctrl+Z in a field is the field's
     const keyPress = async (k, code, vk, modifiers = 0) => {
       for (const type of ['keyDown', 'keyUp']) await b.send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk, modifiers });
       await wait(250);
@@ -285,7 +261,6 @@ async function main() {
     await press('删除这些');
     await wait(300);
     check((await rowIds(0)).startsWith('e r t'), '删除这些: Q and W taken out: ' + await rowIds(0));
-    // (a letter board without them is refused, nothing drawn: back first)
     await js(`document.getElementById('undo').click()`);
     await wait(300);
     await click('e');
@@ -304,7 +279,6 @@ async function main() {
     check(/键 w/.test(await keyTab()), '→ on the preview: W selected');
     await keyPress('ArrowDown', 'ArrowDown', 40);
     check(/键 [as]\b/.test(await keyTab()), '↓: a key of the row below: ' + /键 \S+/.exec(await keyTab()));
-    // the selection follows its key over an undo (its place another key's now)
     await click('e');
     await press('右移');
     await wait(300);
@@ -319,14 +293,12 @@ async function main() {
     await js(`document.querySelector('#tab-key input[aria-label=读屏念什么]').focus()`);
     await keyPress('z', 'KeyZ', 90, 2);
     check((await source()) === unUndone, 'Ctrl+Z in a field: the layout not undone');
-    // a select has no undo of its own: Ctrl+Z there is the layout's
     await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=种类]'); s.focus(); s.value = 'function'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await wait(300);
     const kinded = /<key id="e"[^>]* kind="function"/.test(await source());
     await js(`document.querySelector('#tab-key select[aria-label=种类]').focus()`);
     await keyPress('z', 'KeyZ', 90, 2);
     check(kinded && (await source()) === unUndone, '种类 changed, Ctrl+Z on its select: undone');
-    // a label with braces refused, said why
     await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=显示的字是]'); s.value = 'text'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await wait(300);
     const plain = await source();
@@ -336,7 +308,6 @@ async function main() {
     await js(`(() => { const s = document.querySelector('#tab-key select[aria-label=显示的字是]'); s.value = 'none'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await wait(300);
     check(await js(`document.querySelector('#tab-key input[aria-label=显示的字]').disabled`), '不显示字: the label field off');
-    // a long press from elsewhere said, not an empty list over it
     await type(`(t) => t.replace('</keyboard>', '  <row>\\n    <key id="z9" label="z" send="z"><popup from="preset" preset="q" in-row="2"/></key>\\n  </row>\\n</keyboard>')`);
     await click('z9');
     check(/这个键的长按来自键 q/.test(await keyTab()), 'a preset long press: where it comes from said');
@@ -344,14 +315,12 @@ async function main() {
     await wait(300);
     check(/<popup from="list" in-row="2"><item text="甲"\/><\/popup>/.test(await source()), 'a list written over it: its in-row kept');
 
-    // an icon key: its icon chosen from the app's, shown
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);
     await make('k18', 'my-k18');
     await wait(300);
     await click('backspace');
     const icon = await js(`(() => { const c = document.querySelector('#tab-key canvas.icon'); return [document.querySelector('#tab-key select[aria-label=图标]').value, Array.from(c.getContext('2d').getImageData(0, 0, c.width, c.height).data).some((v, i) => i % 4 === 3 && v > 0)]; })()`);
     check(icon[0] === 'backspace' && icon[1], '⌫: its icon chosen and drawn beside the list: ' + icon);
-    // a function key the app's bottom row has too, in a row of its own: an id of its own, saved clean
     await js(`document.querySelector('#tabs [data-tab=row]').click()`);
     await press('加一行');
     await wait(300);
@@ -362,7 +331,6 @@ async function main() {
     await js(`document.getElementById('undo').click(); document.getElementById('undo').click()`);
     await wait(300);
 
-    // the app's bottom row made the layout's own, asked first
     await click('space');
     check(/在 App 的底行里/.test(await keyTab()), 'space: in the app\'s bottom row');
     await press('改成这块键盘自己的底行…');
@@ -370,7 +338,6 @@ async function main() {
     await wait(500);
     check(!/<include/.test(await source()) && /<key id="space"/.test(await source()) && /键 space/.test(await keyTab()), 'yes: its rows copied in, space selected');
 
-    // 行: a row added and moved up; 整块 and 信息 written
     await js(`document.querySelector('#tabs [data-tab=row]').click()`);
     const rows = async () => js(`window.YoumoLayoutEdit.parse(document.getElementById('source').value).rows.length`);
     const n = await rows();
@@ -380,7 +347,6 @@ async function main() {
     await js(`[...document.querySelectorAll('#tab-row button[aria-label=上移]')].pop().click()`);
     await wait(300);
     check(/<row>\s*<gap\/>\s*<\/row>\s*<row>/.test(await source()), '↑: moved up a row');
-    // its ☰ dragged below the next row
     const order = async () => js(`window.YoumoLayoutEdit.parse(document.getElementById('source').value).rows.map((r) => r.cells.length).join(' ')`);
     const was = await order();
     await js(`(() => {
@@ -404,7 +370,6 @@ async function main() {
     await wait(300);
     check(/<keyboard[^>]* on-split="none"/.test(await source()), '整块: on-split="none"');
 
-    // a phone's width (§12.5): nothing wider than the screen, the buttons doing what a drag does
     await b.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 760, deviceScaleFactor: 2, mobile: true });
     await wait(500);
     await js(`document.querySelector('#tabs [data-tab=key]').click()`);
@@ -414,7 +379,6 @@ async function main() {
     await press('左移');
     await wait(300);
     check((await rowIds(0)).startsWith('r1c2 r1c1 r1c3'), '← on a phone: ' + await rowIds(0));
-    // a finger: a quick move scrolls, a 300 ms press then a move drags
     const finger = async (from, to, hold) => {
       await b.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
       await wait(hold);
@@ -427,7 +391,6 @@ async function main() {
     check((await rowIds(0)) === unmoved, 'a finger moved at once: nothing dragged');
     await finger(await at('r1c7'), await at('r1c2', 0.1), 450);
     check((await rowIds(0)).startsWith('r1c7 r1c2 r1c1'), 'held 300 ms, then moved: dragged: ' + await rowIds(0));
-    // a tap selects on lifting; a swipe over the preview leaves the tab as it was
     const tap = async (p) => {
       await b.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
       await wait(50);
@@ -439,7 +402,6 @@ async function main() {
     await js(`document.querySelector('#tabs [data-tab=row]').click()`);
     await finger(await at('r1c5'), { ...(await at('r1c5')), y: (await at('r1c5')).y + 120 }, 0);
     check((await js(`document.getElementById('tab-row').hidden`)) === false, 'a swipe over the preview: the 行 tab still shown');
-    // W3: 新建 at a phone's width (the examples' cards too) and from an example; help
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);
     await wait(300);
     const dialogWide = await js(`[document.documentElement.scrollWidth, document.getElementById('new-panel').getBoundingClientRect().right, document.querySelectorAll('#layout-examples button').length]`);
@@ -467,9 +429,7 @@ async function main() {
     check(/docs\/layout-maker\.md/.test(help) && /docs\/layout-format\.md/.test(help), 'help: open with its links: ' + help);
     await js(`document.querySelector('#help-panel button[value=close]').click()`);
 
-    // a .theme opened (L8, §12.4): 0.6.0's 薄荷 17 键 pack, zipped in the page; its theme the preview's, its k18.xml offered
-    // made a layout as the app makes it, a start from it checked clean; named .zip as a download may save it, a pack by its
-    // bytes still (review S3)
+    // named .zip as a download may save it, a pack by its bytes still
     const mint = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data', 'mint-k17');
     const pack = { theme: readFileSync(join(mint, 'theme.xml'), 'utf8'), k18: readFileSync(join(mint, 'layouts', 'k18.xml'), 'utf8') };
     await js(`(() => {
@@ -491,7 +451,6 @@ async function main() {
     check(/based-on="k18"/.test(fromPack) && /letters="hjk"/.test(fromPack) && (/^0 个错误/.test(packCount) || packCount === '没有'), 'from the pack\'s 17 keys: based on k18, no errors: ' + packCount);
     await choose('env-theme', 'material');
 
-    // the picture: a new 18 keys upright
     await js(`document.querySelector('#file-menu [data-act=new]').click()`);
     await make('k18', 'my-k18');
     await choose('env-pad', 'full');

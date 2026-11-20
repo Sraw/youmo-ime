@@ -25,17 +25,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-// contract: the theme file format (every version this app reads, and 3.0 as it writes it)
 class ThemeSerializationTest {
 
     private fun Theme.Custom.toJson() = Json.encodeToString(CustomThemeSerializer, this)
     private fun String.toCustomTheme() =
         Json.decodeFromString(CustomThemeSerializer.WithMigrationStatus, this)
 
-    /**
-     * A theme document at each known schema version. Everything below is derived from these,
-     * so adding a new version means adding one entry plus one test.
-     */
+    /** A theme document at each known schema version: adding a version means one entry plus one test. */
     private object Fixtures {
 
         val v1 = """
@@ -65,7 +61,6 @@ class ThemeSerializationTest {
             }
         """.trimIndent()
 
-        /** v1 without a background image: exercises the other branch of the 2.0 migration. */
         val v1NoBackgroundImage = """
             {
                 "name": "",
@@ -89,7 +84,6 @@ class ThemeSerializationTest {
             }
         """.trimIndent()
 
-        /** Adds popup/generic-active colors over v1. Still missing the candidate colors. */
         val v2 = """
             {
                "name":"",
@@ -121,7 +115,6 @@ class ThemeSerializationTest {
             }
         """.trimIndent()
 
-        /** The current schema: adds candidateTextColor/candidateLabelColor/candidateCommentColor. */
         val v21 = """
             {
                "name":"",
@@ -174,7 +167,6 @@ class ThemeSerializationTest {
     fun version1() {
         val (decoded, migrated) = Fixtures.v1.toCustomTheme()
         Assert.assertEquals("Migration should happen", true, migrated)
-        // over a background image, the popup gets the preset matching the theme's darkness
         Assert.assertEquals(
             "popupBackgroundColor from preset",
             TestThemes.PixelDark.popupBackgroundColor,
@@ -187,16 +179,13 @@ class ThemeSerializationTest {
     fun version1WithoutBackgroundImage() {
         val (decoded, migrated) = Fixtures.v1NoBackgroundImage.toCustomTheme()
         Assert.assertEquals("Migration should happen", true, migrated)
-        // With no background image to clash with, the popup takes the theme's own bar color.
-        // A JSON null decodes to JsonNull rather than a Kotlin null, which the migration used
-        // to mistake for "has a background image", handing out a preset color instead.
+        // a JSON null decodes to JsonNull rather than a Kotlin null, which the migration once mistook for "has a background image"
         Assert.assertEquals("popupBackgroundColor from barColor", decoded.barColor, decoded.popupBackgroundColor)
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
     }
 
     @Test
     fun version2() {
-        // 2.0 predates the current schema, so decoding it must report a migration
         val (decoded, migrated) = Fixtures.v2.toCustomTheme()
         Assert.assertEquals("Migration should happen", true, migrated)
         Assert.assertEquals("Round trip", decoded, decoded.toJson().toCustomTheme().first)
@@ -204,7 +193,6 @@ class ThemeSerializationTest {
 
     @Test
     fun version2MigratesCandidateColors() {
-        // the 2.1 migration seeds candidate colors from the key colors
         val (decoded, _) = Fixtures.v2.toCustomTheme()
         Assert.assertEquals("candidateTextColor from keyTextColor", decoded.keyTextColor, decoded.candidateTextColor)
         Assert.assertEquals("candidateLabelColor from keyTextColor", decoded.keyTextColor, decoded.candidateLabelColor)
@@ -217,7 +205,6 @@ class ThemeSerializationTest {
 
     @Test
     fun version21() {
-        // the last before the look: migrated, its colours and picture kept, the default keys
         val (decoded, migrated) = Fixtures.v21.toCustomTheme()
         Assert.assertEquals("Migration should happen", true, migrated)
         Assert.assertEquals(-10577930, decoded.genericActiveBackgroundColor)
@@ -227,21 +214,18 @@ class ThemeSerializationTest {
 
     @Test
     fun version3() {
-        // the current schema: decoding must not report a migration
         val theme = Fixtures.v21.toCustomTheme().first
         val (decoded, migrated) = theme.toJson().toCustomTheme()
         Assert.assertEquals("Migration shouldn't happen", false, migrated)
         Assert.assertEquals(theme, decoded)
     }
 
-    // this with the object at [path] changed by [change]
     private fun JsonObject.at(vararg path: String, change: (JsonObject) -> JsonObject): JsonObject =
         if (path.isEmpty()) change(this)
         else JsonObject(this + (path[0] to getValue(path[0]).jsonObject.at(*path.drop(1).toTypedArray(), change = change)))
 
     @Test
     fun version3IsReadOnlyAsItIsWritten() {
-        // a picture with no landscape cut, no font, an override with no fill: every nullable field written as null
         val theme = Fixtures.v21.toCustomTheme().first.let { t ->
             val q = KeyOverride(null, KeyPressed.Color(1), KeyLabel.Hide)
             t.copy(look = t.look.copy(keys = t.look.keys.copy(overrides = mapOf("qwerty/q" to q))))
@@ -266,7 +250,6 @@ class ThemeSerializationTest {
 
     @Test
     fun version1AndVersion2AgreeAfterMigration() {
-        // v1 and v2 describe the same theme; migrating either must land on the same result
         val fromV1 = Fixtures.v1.toCustomTheme().first
         val fromV2 = Fixtures.v2.toCustomTheme().first
         Assert.assertEquals("Migration chain is consistent", fromV2, fromV1)
@@ -294,10 +277,7 @@ class ThemeSerializationTest {
         Assert.assertTrue("Serialized form carries a version", theme.toJson().startsWith("{\"version\":\"${CustomThemeSerializer.CURRENT_VERSION}\""))
     }
 
-    /**
-     * A background image's crop rectangle, which needs a real `android.graphics.Rect`: off
-     * Robolectric, `Rect` is an android.jar stub that cannot even be constructed.
-     */
+    /** Needs a real `android.graphics.Rect`: off Robolectric it is an android.jar stub that cannot be constructed. */
     @RunWith(RobolectricTestRunner::class)
     class WithCropRect {
 
@@ -324,7 +304,6 @@ class ThemeSerializationTest {
             Assert.assertEquals(Rect(10, 20, 300, 400), again.crop)
         }
 
-        /** Missing edges decode as -1 rather than failing the whole theme. */
         @Test
         fun missingEdgesAreMinusOne() {
             val partial = Fixtures.v21.replace("\"cropRect\": null", "\"cropRect\": {\"left\": 10}")

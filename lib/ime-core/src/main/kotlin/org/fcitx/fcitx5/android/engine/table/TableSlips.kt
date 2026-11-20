@@ -9,19 +9,11 @@ import org.fcitx.fcitx5.android.engine.pinyin.SlipCost
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 
 /**
- * A table's key tapped off-centre (061-neighbour-table): read as a key around it where the key typed
- * would lead nowhere: an empty code (空码: no candidate's code starts so), or a commit of the first
- * candidate shown with the key starting the next code (顶字, [TableOptions.noMatchAutoSelectLength], or
- * a code read so whose one candidate waits for a key that cannot go on); and that key, as near to the tap as [Costs.cost]
- * allows, leads on: the nearest, then the one whose first candidate the word model weighs more. A code
- * with a key so read never commits itself as it is typed ([marks]). The key itself where it leads on (a
- * code with entries is never touched), on a code empty already, and for the wildcard, the pinyin key and
- * a selection key, nor is a key read as one of them. Where the key would commit something, a typist's
- * code (简码, or a part of one that shows the character first) then the next code's first key most often,
- * only a tap nearer the edge ([Costs.toppingFloor]) is read, as a key whose code's first is another text
- * the word model weighs as much as the one the key would commit: typed on target (TouchSim's taps, whole
- * codes and the shortest part that shows the character first, a tap in the key's middle), no word changes.
- * [TableSession] asks at the code's end only.
+ * A table key tapped off-centre is read as a neighbour only where the typed key would lead nowhere (空码, or 顶字
+ * committing the first shown) and the neighbour leads on: the nearest, then the one whose first candidate the word
+ * model weighs more. A code with a key so read never commits itself as typed ([marks]). Never for the wildcard, the
+ * pinyin key or a selection key. Where the key would commit something only a tap nearer the edge
+ * ([Costs.toppingFloor]) is read, so on-target typing changes no word. [TableSession] asks at the code's end only.
  */
 class TableSlips internal constructor(
     private val costs: Costs,
@@ -30,19 +22,15 @@ class TableSlips internal constructor(
     private val language: TableLanguage?,
     private val isCode: (Char) -> Boolean,
     private val leadsAnywhere: (String) -> Boolean,
-    // what a key leading nowhere would commit (the first candidate shown: 顶字, or a code read so waiting), else null
     private val topped: () -> String?,
 ) {
 
-    /** What reading a tap as another key costs: [cost] (its floor) where the key would lead nowhere, [toppingFloor] where it would commit something. */
+    /** What reading a tap as another key costs: [cost] where the key leads nowhere, [toppingFloor] where it would commit something. */
     data class Costs(val cost: SlipCost, val toppingFloor: Float)
 
-    // the places in the code of the keys read as the one beside them, a bit each: such a code never commits
-    // itself. A key is read short of the table's longest code only, so the first bits; one moved past the
-    // last by keys put in before it is dropped, as a code of 64 keys has nothing to commit
+    // a bit per code place read as a neighbour; reads happen short of the longest code, and a bit pushed past 64 is dropped
     private var at = 0L
 
-    /** [c] tapped at [touch] after [code]: the key read. */
     fun read(c: Char, touch: Touch, code: CharSequence): Char {
         val cost = costs.cost
         // a tap near no other key, most of them: nothing to look up (the lookups are what costs a key on target)
@@ -51,7 +39,6 @@ class TableSlips internal constructor(
         if (leadsAnywhere(typed + c) || !leadsAnywhere(typed)) return c
         val whole = topped()
         val floor = if (whole != null) costs.toppingFloor else cost.floor
-        // weighed once a neighbour is near enough: most taps on a topping key are not
         var least: Float? = null
         var meant = c
         var best = Float.NEGATIVE_INFINITY
@@ -72,62 +59,45 @@ class TableSlips internal constructor(
         return meant
     }
 
-    /** Whether the code has a key read as another: it then never commits itself as it is typed. */
     fun marks() = at != 0L
 
-    /** A key put in at [cursor] of the code, [length] keys before it: those read after it move on (at the end, the key just read stays). */
+    /** A key put in at [cursor]: those read after it move on (at the end, the key just read stays). */
     fun inserted(cursor: Int, length: Int) {
         if (cursor >= length || cursor >= Long.SIZE_BITS) return
         val before = (1L shl cursor) - 1
         at = (at and before) or ((at and before.inv()) shl 1)
     }
 
-    /** The key at [cursor] deleted: if it was one read as another, that is gone; those after it move back. */
     fun deleted(cursor: Int) {
         if (cursor >= Long.SIZE_BITS) return
         val before = (1L shl cursor) - 1
         at = (at and before) or ((at ushr 1) and before.inv())
     }
 
-    /** The code gone. */
     fun clear() {
         at = 0L
     }
 
-    // what reading [c]'s tap at [touch] as [near] costs: NaN where that is no key to read it as
     private fun costOf(c: Char, touch: Touch, near: Near): Float =
         if (near.char == c || !readable(near.char) || near.char in options.endKeys) Float.NaN else costs.cost.of(touch, near, legal = false)
 
-    // the table's first text of [code], read: none where it leads nowhere, to pinyin alone, or to the very text
-    // the key would commit ([whole]: the key is the next code's, nothing gained). The table's first, not the
-    // order the session would show: that is weighed for the code typed only, and its lookups are what a key on
-    // target would pay for. Nor does it pass over what the session hides (blocked under the code, held by 生僻字屏蔽):
-    // a slip whose code's first is one of those is read, and the code then shows the next text or none (review F8393;
-    // rare, the session's hiding is by the code and not to be had here)
+    // the table's first text of [code] (not the session's order, which costs lookups a key on target would pay for);
+    // none where it leads nowhere, to pinyin alone, or to [whole]. The session's hiding is not seen here (rare)
     private fun firstOf(code: String, whole: String?): String? {
         if (!leadsAnywhere(code)) return null
         val first = table.firstOf(code)
         return if (first < 0) null else table.text(first).takeUnless { it == whole }
     }
 
-    // a key a slip is read from and as: one of the codes, not the wildcard, the pinyin key nor a selection key
     private fun readable(c: Char) = isCode(c) && c != options.matchingKey && c != options.pinyinKey && c !in options.selectionKeys
 
-    // how the word model weighs [text]: alike for all where there is no language (the table's order then)
     private fun score(text: String): Float = language?.words?.logProb(text) ?: 0f
 
     companion object {
         /**
-         * A table's slips: read only where the key leads nowhere, never against a reading that has entries,
-         * so with no legal cost. Floor −1.5 (061-neighbour-table-impl-report): a tap in a key's middle reads
-         * as typed (a QWERTY neighbour across costs it −2.8 or less), and of the empty codes a slip made,
-         * those read into a wrong character are 1% (仓颉) and 2.5% (二笔), against 8% and 20% at −4, for a few
-         * more right ones below it. Where the key would commit what is shown (顶字, or a code that waits),
-         * −1 with the word model's check: the loosest that changes no word typed on target, a tap in the key's
-         * middle (σ 0.15: whole codes and the shortest part that shows the word, then the next word's first key;
-         * five tables, seeds 1–3, both halves; the user's rule of 2026-11-16), where −1.5 changed one; a looser
-         * hand changes a few (覅 → 要饭: a rare word the model weighs below the phrase a neighbour leads to).
-         * −0.1 read a third of what −1 reads (061-neighbour-18key-impl-report).
+         * Floor −1.5: a tap in a key's middle reads as typed (a QWERTY neighbour across costs −2.8 or less), and wrong
+         * characters from 空码 slips stay at 1–2.5% (8–20% at −4). Where the key would commit, −1 is the loosest that
+         * changes no word typed on target in simulation.
          */
         val SLIPS = Costs(SlipCost(floor = -1.5f), toppingFloor = -1f)
     }

@@ -47,29 +47,26 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 
 /**
- * `learn.log`'s records (impl/design-1a.md §1): events as they happen, and a snapshot's rows
- * once compacted, between a HEAD and a CUT.
+ * `learn.log`'s records: events as they happen, and a snapshot's rows once compacted, between HEAD and CUT.
  *
- * The format stays version 1 for good: [RecordFormat.hasHeader] wants the exact version, and a
- * build that reads another moves the file aside. A change is a new type, or fields appended to a
- * type's end, read only while some are left ([intOr], [utfOr]): an older reader stops before
- * them, as [RecordFormat.read] does not ask that a record be read to its end. A field appended
- * may be left out where it says nothing only while it is the type's last: [Commit.continued] is
- * written only where there is one, so the next field appended to a commit needs it written
- * always first, "" too (an older reader still stops before both). Types are never
- * reused. Allocated: events 1–16 (16 [PHRASE_FORGET]) and 28 ([EN_CORRECT]); events 17–27, 29–31 free (31 the
- * last event type); rows 32–49 (49 [PHRASE_ROW]), 65 ([TABLE_BLOCK_ROW]) and 80 ([DATE_ROW]); 70–79 the backup
- * file's ([backup.LearnBackup]; 73 [backup.BackupMerge.ORIGIN] the one a log may also hold, 74 its
- * END, 75–79 kept for the file), never a log's. Free rows: 50–64, 66–69, 81 on. Only snapshot
- * rows name a kind by its id ([KIND], scoped to the snapshot); events, and the rows an [Undo] puts
- * back, name it in full. A fold keeps the ids the snapshot it read had ([SnapshotWriter]), so a row
- * of a later build's that names a kind by id still names the same one.
+ * The format stays version 1 for good: [RecordFormat.hasHeader] wants the exact version, and a build
+ * reading another moves the file aside. A change is a new type, or fields appended to a type's end, read
+ * only while bytes remain ([intOr], [utfOr]): an older reader stops before them, as [RecordFormat.read]
+ * does not require reading a record to its end. An appended field may be omitted when empty only while
+ * it is the type's last: [Commit.continued] is written only when present, so the next field appended to
+ * a commit needs it always written first, "" too. Types are never reused. Allocated: events 1–16 (16
+ * [PHRASE_FORGET]) and 28 ([EN_CORRECT]); events 17–27, 29–31 free (31 the last event type); rows 32–49
+ * (49 [PHRASE_ROW]), 65 ([TABLE_BLOCK_ROW]) and 80 ([DATE_ROW]); 70–79 the backup file's
+ * ([backup.LearnBackup]; 73 [backup.BackupMerge.ORIGIN] the one a log may also hold, 74 its END, 75–79
+ * reserved for the file), never a log's. Free rows: 50–64, 66–69, 81 on. Only snapshot rows name a kind
+ * by id ([KIND], scoped to the snapshot); events, and rows an [Undo] restores, name it in full. A fold
+ * keeps the ids of the snapshot it read ([SnapshotWriter]), so a later build's row naming a kind by id
+ * still names the same one.
  *
- * A record this build cannot read (a later build's type, or one of its types with what this one
- * does not know inside: an [Undo] putting back a row of a new type) is kept as it is ([Unknown])
- * and written again so: an older build neither loses nor misreads it. A fold writes a kept event
- * after the snapshot, so a later build that reads it applies it after what the snapshot holds,
- * the commits after it among them (an [Undo] of a later build's putting back rows over them).
+ * A record this build cannot read (a later type, or a known type holding something unknown: an [Undo]
+ * restoring a row of a new type) is kept as it is ([Unknown]) and written back so: an older build neither
+ * loses nor misreads it. A fold writes a kept event after the snapshot, so a later build applies it after
+ * what the snapshot holds, including the commits after it (a later build's [Undo] restoring rows over them).
  */
 object LearnRecords {
     val FORMAT = RecordFormat("FXLR", 1)
@@ -89,11 +86,11 @@ object LearnRecords {
     const val IMPORT_UNDO: Byte = 13
     const val ABSORBED: Byte = 14
 
-    /** An [ABSORBED] record's rows at most: so many short rows stay well within a record's 64 KB (LearnLog halves longer ones). */
+    /** The most rows per [ABSORBED] record: that many short rows stay well within a record's 64 KB (LearnLog halves longer ones). */
     const val ABSORBED_ROWS = 200
     const val TABLE_BLOCK: Byte = 15
 
-    /** A whole phrase's count deleted (U-73, [PhraseForget]). */
+    /** [PhraseForget]. */
     const val PHRASE_FORGET: Byte = 16
 
     // 17–27 free (see the class's allocation)
@@ -117,13 +114,13 @@ object LearnRecords {
     const val BATCH_ROW: Byte = 46
     const val IMPORTED_ROW: Byte = 47
     const val WORD_USE_ROW: Byte = 48
-    /** A whole phrase's count (U-73, [PhraseRow]). */
+    /** [PhraseRow]. */
     const val PHRASE_ROW: Byte = 49
-    /** Step 2's (tables): a table word the user blocked, put in and taken out by TableBlock (15) as they block it and let it show again, and kept by a snapshot. */
+    /** A table word the user blocked: added and removed by TableBlock (15) as they block and unblock it, kept by a snapshot. */
     const val TABLE_BLOCK_ROW: Byte = 65
     const val DATE_ROW: Byte = 80
 
-    /** [record] as one record of the log; an event, or a row that names no kind (see [SnapshotWriter]). */
+    /** [record] as one log record; an event, or a row that names no kind (see [SnapshotWriter]). */
     fun encode(record: LearnRecord): ByteArray = encode(record) { error("a snapshot row needs its kinds: $record") }
 
     private fun encode(record: LearnRecord, kind: (String) -> Int): ByteArray = when (record) {
@@ -172,7 +169,7 @@ object LearnRecords {
         else -> laterRowType(record)
     }
 
-    // the rows the later streams added (impl/design-1a.md, "Added by later streams"), and a later build's
+    // rows added after the first format, and a later build's
     private fun laterRowType(record: LearnRecord): Byte = when (record) {
         is DateRow -> DATE_ROW
         is TableBlockRow -> TABLE_BLOCK_ROW
@@ -190,15 +187,14 @@ object LearnRecords {
                 r.rows.forEach { row(it) }
                 writeByte(r.takes.size)
                 r.takes.forEach { take(it) }
-                // appended (U-73), only where there is one: an older reader stops before it. The last
-                // field a commit may leave out: a field appended after it needs it written always
-                // ("" too), or a reader could not tell one from the other (see the class)
+                // appended later, only when present: an older reader stops before it. The last field a commit may omit:
+                // one appended after it needs it always written ("" too), or a reader could not tell them apart
                 if (r.continued.isNotEmpty()) writeUTF(r.continued)
             }
             is Undo -> {
                 stamp(r.undoneSeq, r.minute, r.day, r.localDay)
                 val undone = encode(r.undone)
-                // the record whole, length, CRC and all: a reader that does not know its type still knows its end
+                // the record whole, length, CRC and all: a reader not knowing its type still knows its end
                 writeInt(undone.size)
                 write(undone)
                 writeShort(r.befores.size)
@@ -263,7 +259,7 @@ object LearnRecords {
         }
     }
 
-    // the events of what comes in at once: an import, an older build's files taken in
+    // events of what comes in at once: an import, an older build's files taken in
     private fun DataOutputStream.bulk(r: LearnRecord) {
         when (r) {
             is ImportBatch -> batch(r.id, r.file, r.localDay, r.count)
@@ -501,13 +497,10 @@ object LearnRecords {
 
         private val named = HashMap<Int, String>()
 
-        /** The kinds the snapshot read last named, by id: for the next snapshot to keep them (see [SnapshotWriter]). */
+        /** The kinds the last snapshot read named, by id, for the next snapshot to keep (see [SnapshotWriter]). */
         val kinds: Map<Int, String> get() = named
 
-        /**
-         * The record of [type] [input] holds; null for a [KIND] row, which only names a kind for
-         * those after it. One that does not read is [Unknown], its fields as they are.
-         */
+        /** Null for a [KIND] row, which only names a kind for those after it. One that does not read is [Unknown], its fields as they are. */
         fun decode(type: Byte, input: DataInputStream): LearnRecord? {
             val fields = ByteArray(input.available()).also { input.readFully(it) }
             return try {
@@ -551,7 +544,7 @@ object LearnRecords {
             }
         }
 
-        // the events the later streams added (impl/design-1a.md, "Added by later streams"), and a later build's
+        // events added after the first format, and a later build's
         private fun laterEvent(type: Byte, input: DataInputStream): LearnRecord = with(input) {
             when (type) {
                 TABLE_BLOCK -> TableBlock(readInt(), readUTF(), readUTF(), readUTF(), readBoolean())
@@ -574,7 +567,7 @@ object LearnRecords {
                     named[readUnsignedShort()] = readUTF()
                     null
                 }
-                // firstSeq appended in 1b: a row of 1a's has none
+                // firstSeq appended later: an older row has none
                 STAT_ROW -> StatRow(Code(kind(), readUTF()), words(), days(), days(), readInt(), longOr(0))
                 FIRST_OF -> FirstRow(Code(kind(), readUTF()), readUTF(), first())
                 PENDING_ROW -> PendingRow(readUTF(), pending())
@@ -587,7 +580,7 @@ object LearnRecords {
             }
         }
 
-        // the rows of English, the tables, imports and the words' uses
+        // the rows of English, the tables, imports and word uses
         private fun otherRow(type: Byte, input: DataInputStream): LearnRecord = with(input) {
             when (type) {
                 EN_WORD_ROW -> EnWordRow(readUTF(), readUnsignedByte(), days())
@@ -610,17 +603,14 @@ object LearnRecords {
         }
     }
 
-    /**
-     * The record [bytes] holds whole (length, type, fields, CRC); one that does not read is kept
-     * as its type and fields, to be written again as it was.
-     */
+    /** The record [bytes] holds whole (length, type, fields, CRC); one that does not read is kept as type and fields, to be written back as it was. */
     private fun nested(bytes: ByteArray): LearnRecord {
         decode(bytes)?.let { return it }
         if (bytes.size < NESTED_OVERHEAD) throw java.io.IOException("an undone record of ${bytes.size} bytes")
         return Unknown(bytes[4], bytes.copyOfRange(5, bytes.size - 4))
     }
 
-    // a record's length before it and CRC after it, and its type
+    // a record's length before it, CRC after it, and its type
     private const val NESTED_OVERHEAD = 4 + 1 + 4
 
     private fun DataInputStream.intOr(default: Int) = if (available() > 0) readInt() else default
@@ -671,17 +661,14 @@ object LearnRecords {
         }
     }
 
-    /**
-     * Writes a snapshot's rows to [write], each kind named by a [KIND] row before the first row
-     * that has it.
-     */
+    /** Writes a snapshot's rows to [write], each kind named by a [KIND] row before the first row using it. */
     class SnapshotWriter(private val write: (ByteArray) -> Unit, private val kept: Map<Int, String> = emptyMap()) {
         private val kinds = HashMap<String, Int>()
         private var next = kept.keys.maxOrNull()?.plus(1) ?: 0
 
         fun write(record: LearnRecord) {
             write(encode(record) { tag -> kinds[tag] ?: next++.also { id -> kinds[tag] = id; write(kindRow(id, tag)) } })
-            // the ids the snapshot folded had, named after its HEAD (which starts the kinds anew), each the kind it was
+            // the ids the folded snapshot had, named after its HEAD (which starts kinds anew), each its old kind
             if (record is Head) {
                 for ((id, tag) in kept.entries.sortedBy { it.key }) {
                     if (tag in kinds) continue
@@ -697,7 +684,7 @@ object LearnRecords {
         }
     }
 
-    /** Decodes the record of [bytes] (a log's whole record, as [encode] gives it): for tests and the fold. */
+    /** Decodes a whole log record, as [encode] gives it: for tests and the fold. */
     fun decode(bytes: ByteArray, reader: Reader = Reader()): LearnRecord? {
         var record: LearnRecord? = null
         FORMAT.read(FORMAT.header() + bytes) { type, input -> record = reader.decode(type, input) }

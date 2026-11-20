@@ -32,7 +32,6 @@ import splitties.views.dsl.core.wrapContent
 import splitties.views.imageDrawable
 import splitties.views.setPaddingDp
 
-/** An entry's card, [look] the theme's (060-render-p3 T7b: its fill, corners, [radius] px of them, and text colour). */
 class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, look: PanelLooks.Clipboard, radius: Float) : Ui {
 
     val textView = textView {

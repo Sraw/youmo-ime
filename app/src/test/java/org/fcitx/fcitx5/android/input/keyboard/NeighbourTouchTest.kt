@@ -41,11 +41,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import org.fcitx.fcitx5.android.until as waitUntil
 
-/**
- * A typing key's tap goes to the engine with where it fell and the keys around it (061-neighbour-correction
- * §2): the letters of the full keyboard, 九键's digit keys with letters; a click no touch made (TalkBack)
- * and the keys around them (九键's 1 and 0) with none.
- */
+/** A typing key's tap carries where it fell and the keys around it; a click no touch made (TalkBack) carries none. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -66,7 +62,6 @@ class NeighbourTouchTest {
         home?.deleteRecursively()
     }
 
-    // [k] tapped [dx], [dy] of its size from its middle
     private fun KeyboardHarness.tapOff(k: ShownKey, dx: Float, dy: Float = 0f) {
         val dp = service.resources.displayMetrics.density
         touch(k, at(k, dx = dx * k.width / dp, dy = dy * k.height / dp))
@@ -84,14 +79,12 @@ class NeighbourTouchTest {
         assertEquals(0.2f, touch.dy, 0.03f)
         assertEquals(setOf('f', 'h', 't', 'y', 'v'), near(touch))
         assertTrue(touch.near('f')!!.nx < 0f && touch.near('t')!!.ny < 0f)
-        // a click no touch made: no place
         h.tap(h.keyNamed("g"))
         assertEquals(1, h.api.touches.size)
     }
 
-    // a layout of one's own may make a letter wider than its neighbours (061-custom-layout): the keys around it are
-    // where that layout drew them, in the wide key's size, and a tap at its edge reads the narrow key beside it no
-    // likelier than the key hit (the cost kept at most 0, 061-neighbour-correction §3)
+    // an own layout's wide letter: the keys around it where that layout drew them, and an edge tap reads the narrow
+    // neighbour no likelier than the key hit (cost at most 0)
     @Test
     fun aWideLetterOfAnOwnLayoutHasItsNeighboursWhereTheyAreDrawn() {
         val builtIn = SceneLayouts.source
@@ -121,11 +114,11 @@ class NeighbourTouchTest {
         }
     }
 
-    // 微软 双拼 types ing on `;`, the middle row's tenth key: l's neighbour, and a tap on it goes with its place
+    // 微软 双拼 types ing on `;`: l's neighbour, its tap with its place
     @Test
     fun microsoftsSemicolonIsATypingKey() {
         EngineState.shuangpinScheme = ShuangpinScheme.MICROSOFT
-        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
         val h = KeyboardHarness(im = shuangpin).also { h = it }.start()
         h.idle()
         h.relayout()
@@ -151,8 +144,6 @@ class NeighbourTouchTest {
         assertEquals(1, h.api.touches.size)
     }
 
-    // English on the nine keys spelling a word: each digit with its place too, as the sym English reads it
-    // (061-neighbour-english)
     @Test
     @Uat("EN-31")
     fun englishsNineKeysDigitsGoWithTheirPlace() {
@@ -165,12 +156,11 @@ class NeighbourTouchTest {
         assertEquals(setOf('2', '4', '6', '8'), near(touch))
     }
 
-    // 061-neighbour-groups: on the grouped keyboards the keys around a tap are the codes the engine reads (its input's
-    // Keyboard.keyedChar), whatever a key is sent as: pinyin's 18 keys' were cut to another character before
+    // the keys around are the codes the engine reads (Keyboard.keyedChar): pinyin's 18 keys' were once cut to another character
     @Test
     @Uat("PY-142", "SP-48", "SP-49")
     fun aGroupKeysTapGoesWithTheGroupsAroundItAsTheEngineReadsThem() {
-        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
         val made = listOf(
             Triple("拼音 18", KeyboardHarness.PINYIN, ImKeyboards.Chosen(pinyin = ImKeyboard.KEYS18)) to NineKeyLetters.G18,
             Triple("双拼 18", shuangpin, ImKeyboards.Chosen(shuangpin = ImKeyboard.KEYS18)) to NineKeyLetters.G18,
@@ -190,11 +180,10 @@ class NeighbourTouchTest {
         }
     }
 
-    // 双拼's nine keys: a digit's tap goes with the digits around it as their NINE_SP codes, as the engine reads them
     @Test
     @Uat("SP-50")
     fun shuangpinsNineKeysDigitsGoWithTheirCodesAround() {
-        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "", "双", "zh_CN", "androidengine", false)
+        val shuangpin = InputMethodEntry(InputMethodCatalog.SHUANGPIN, "双拼", "", "双", "zh_CN")
         val h = KeyboardHarness(im = shuangpin, keyboards = ImKeyboards.Chosen(shuangpin = ImKeyboard.NINE_KEYS)).also { h = it }.start()
         h.idle()
         h.relayout()
@@ -205,8 +194,7 @@ class NeighbourTouchTest {
         assertEquals(1, h.api.touches.size)
     }
 
-    // 大千: a symbol key's tap goes with the symbol keys around it by their codes; a tone key's none, nor is a tone key
-    // among the keys around (ㄉ has ㄅ to its left, ˇ to its right no neighbour)
+    // 大千: a tone key's tap has none, nor is a tone key among the keys around
     @Test
     @Uat("PY-150")
     fun dachensSymbolKeysGoWithTheSymbolKeysAround() {
@@ -222,8 +210,6 @@ class NeighbourTouchTest {
         assertEquals(1, dachen.api.touches.size)
     }
 
-    // 注音九键 since the user's 11-16: a group key's tap goes with the group keys around it by their group codes
-    // (ㄆㄊㄛ has ㄎㄑㄟ to its right); the tone key ˉ's none
     @Test
     @Uat("PY-151")
     fun zhuyinsNineGroupKeysGoWithTheGroupKeysAround() {
@@ -241,7 +227,6 @@ class NeighbourTouchTest {
         assertTrue(nine.api.calls.toString(), nine.api.calls.count { it.startsWith("sendKey(") } >= 2)
     }
 
-    // through the host to the engine: the key's payload, the engine's Keyboard reads its touch
     @Test
     @Uat("PY-137")
     fun theHostHandsTheTouchToTheEngineWithTheKey() {

@@ -8,29 +8,19 @@ import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.IntBuffer
 
-/**
- * One OpenCC dictionary: sorted keys (by UTF-16 unit, `String.compareTo`), each with its default
- * value (`DictEntry::GetDefault`, the first of a line's values) — all a conversion reads.
- */
+/** Keys sorted by UTF-16 unit, each with its default value (`DictEntry::GetDefault`): all a conversion reads. */
 class OpenCCDict internal constructor(
     private val keyOffsets: IntBuffer,
     private val keyChars: CharBuffer,
     private val valueOffsets: IntBuffer,
     private val valueChars: CharBuffer,
-    /** The longest key, in UTF-16 units. */
     val maxKeyLength: Int,
 ) {
     val size: Int get() = keyOffsets.limit() - 1
 
-    /**
-     * The longest key that [text] has at [start] (not past [end]), its index, or -1: what
-     * `MarisaDict::MatchPrefix` gives (`common_prefix_search`'s last match, OpenCC 1.2.0
-     * `src/MarisaDict.cpp:63-77`). One pass along [text]: the keys sharing its first units narrowed
-     * a unit at a time, stopping where none is left, rather than a search per length.
-     */
+    /** `MarisaDict::MatchPrefix`'s longest key at [start], or -1, in one pass narrowing a unit at a time. */
     fun matchPrefix(text: String, start: Int, end: Int): Int {
-        // keys sorted as [compare] orders them: those sharing a prefix are a run, the one that is
-        // just the prefix first, then by the next unit
+        // a prefix's keys are a run, the bare prefix first, then by the next unit
         var low = 0
         var high = size
         var best = -1
@@ -44,8 +34,7 @@ class OpenCCDict internal constructor(
         return best
     }
 
-    // the first key in [low, high) longer than [at] whose unit at [at] passes [past]; shorter ones
-    // (no unit there) come first in the run
+    // shorter keys (no unit at [at]) come first in the run
     private inline fun bound(low: Int, high: Int, at: Int, past: (Char) -> Boolean): Int {
         var lo = low
         var hi = high
@@ -71,27 +60,17 @@ class OpenCCDict internal constructor(
 }
 
 /**
- * OpenCC 1.2.0's `s2tw.json` in Kotlin, the conversion chttrans runs (`ca/chttrans/chttrans-opencc.cpp:29-36`
- * prefers s2tw). As 1.2.0's `Converter::Convert` (`src/Converter.cpp`):
- *
- * 1. `MaxMatchSegmentation` on STPhrases (`src/MaxMatchSegmentation.cpp`): at each place the
- *    longest key is a segment of its own; characters no key starts at gather into one segment
- *    between them. The text ends at the first NUL, as the C string it is there.
- * 2. Each step of the chain converts **each segment on its own** (`src/Conversion.cpp`), so no
- *    match crosses a segment's end: at each place the longest key's default value, else the
- *    character as it is. Step one is the group STPhrases, STCharacters: the **first** dictionary
- *    with any match, its longest (`src/DictGroup.cpp` `MatchPrefix`), not the longest of the two.
- *    Step two is TWVariants.
- *
- * A character is a code point; a lone surrogate is one character, as its CESU-8 form is to OpenCC.
- * The data is frozen at 1.2.0 (Q8); [OpenCCData] is its compiled form.
+ * OpenCC 1.2.0's `s2tw.json` (chttrans prefers s2tw), as `Converter::Convert`: `MaxMatchSegmentation` on STPhrases
+ * (text ends at the first NUL), then each chain step converts **each segment on its own**, so no match crosses a
+ * segment; STPhrases/STCharacters is a group: the **first** dictionary with a match, not the longest of the two.
+ * A lone surrogate is one character, as its CESU-8 form is to OpenCC. Data frozen at 1.2.0.
  */
 class ChineseConverter(
     private val phrases: OpenCCDict,
     private val characters: OpenCCDict,
     private val variants: OpenCCDict,
 ) {
-    // the chain's two steps, made once: this runs on every candidate, preedit and aux shown
+    // made once: this runs on every candidate, preedit and aux shown
     private val group = listOf(phrases, characters)
     private val chain2 = listOf(variants)
 
@@ -152,7 +131,7 @@ class ChineseConverter(
         if (Character.isHighSurrogate(text[i]) && i + 1 < end && Character.isLowSurrogate(text[i + 1])) 2 else 1
 
     companion object {
-        /** The dictionaries of s2tw, in [OpenCCData]'s order. */
+        /** In [OpenCCData]'s order. */
         val S2TW = listOf("STPhrases", "STCharacters", "TWVariants")
 
         fun s2tw(dicts: List<OpenCCDict>): ChineseConverter {
@@ -163,17 +142,14 @@ class ChineseConverter(
 }
 
 /**
- * `engine/opencc-s2tw.data`, what ime-dict-tool's `opencc` compiles from OpenCC 1.2.0's dictionary
- * text: read straight out of a mapped buffer, nothing copied to the heap but the values converted.
- *
- * Big-endian: the magic `OCS2TW01`, the number of dictionaries, then each: its key count n, its
- * longest key, its key and value lengths in chars, n+1 key offsets, n+1 value offsets, the keys'
- * chars, the values' chars (UTF-16).
+ * `engine/opencc-s2tw.data` (ime-dict-tool's `opencc`), read from a mapped buffer. Big-endian: `OCS2TW01`, the
+ * dictionary count, then each: key count n, longest key, key and value char lengths, n+1 key offsets, n+1 value
+ * offsets, key chars, value chars (UTF-16).
  */
 object OpenCCData {
     private val MAGIC = "OCS2TW01".toByteArray(Charsets.US_ASCII)
 
-    /** One dictionary's text (`key\tvalue[ value...]`, `#` lines and lines with no tab skipped, as 1.2.0's `Lexicon`). */
+    /** `key\tvalue[ value...]`, `#` lines and lines with no tab skipped, as 1.2.0's `Lexicon`. */
     fun parse(text: String): List<Pair<String, String>> = text.lineSequence()
         .filter { it.isNotEmpty() && !it.startsWith("#") && '\t' in it }
         .map { line -> line.substringBefore('\t') to line.substringAfter('\t').trim().substringBefore(' ') }

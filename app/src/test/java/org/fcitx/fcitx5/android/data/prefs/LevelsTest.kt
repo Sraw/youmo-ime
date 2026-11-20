@@ -57,7 +57,7 @@ class LevelsTest {
 
     @Test
     fun keysOfOtherUnitsWeighAlike() {
-        // as the vibration's: ms, and amplitudes of 0..255 where 0 is the device's own
+        // amplitudes of 0..255 where 0 is the device's own
         val vibration = ManagedPreferenceUi.Levels(
             R.string.vibration_strength, "vibration_level", store,
             listOf("press" to 0, "long_press" to 0, "press_amplitude" to 0, "long_press_amplitude" to 0),

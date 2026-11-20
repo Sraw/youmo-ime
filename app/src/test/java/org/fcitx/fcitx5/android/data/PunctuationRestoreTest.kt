@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.core.backupZip
 import org.fcitx.fcitx5.android.core.dirsUnder
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -15,16 +16,9 @@ import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
-/**
- * 0.6.1 has no 中文标点 page (DECISIONS FB9): a punctuation table a backup brings, this app's or upstream Fcitx5's,
- * is not used, and the phone's goes too; anything else in its directory stays, as the other followed files'
- * dot-entries do. (UserDataManagerTest has the rest of a restore.)
- */
+/** A punctuation table a backup brings is not used, and the phone's goes too; anything else in its directory stays. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class PunctuationRestoreTest {
@@ -32,17 +26,7 @@ class PunctuationRestoreTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private fun zip(packageName: String, vararg entries: Pair<String, String>) = ByteArrayOutputStream().also { bytes ->
-        ZipOutputStream(bytes).use { zip ->
-            zip.putNextEntry(ZipEntry("metadata.json"))
-            val metadata = """{"packageName":"$packageName","versionCode":${BuildConfig.VERSION_CODE},"versionName":"1","exportTime":0}"""
-            zip.write(metadata.encodeToByteArray())
-            for ((name, text) in entries) {
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(text.encodeToByteArray())
-            }
-        }
-    }.toByteArray().inputStream()
+    private fun zip(packageName: String, vararg entries: Pair<String, String>) = backupZip(*entries, packageName = packageName)
 
     @Test
     @Uat("PR-62")

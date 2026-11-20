@@ -9,20 +9,10 @@ import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import java.util.Locale
 
-/**
- * Keys pressed per character of text (KSC), through an engine's [Session]: a user types the whole
- * input, pauses (the session [refines][Snapshot.refines] what it shows), then picks the expected
- * text, or failing that the longest piece it starts with, turning pages until one shows; a page
- * turn and a pick are a key each. What top1 misses, this counts at
- * its cost: 你好吗 typed as `nihaoma` is 8 keys if it comes first, 9 if 你好 must be picked
- * before 吗.
- */
+/** Keys pressed per character (KSC): typed, then the expected text picked, a page turn and a pick a key each. */
 class KeystrokeRun(private val session: Session, private val maxPages: Int = MAX_PAGES) {
 
-    /**
-     * [keys] pressed for [sample]; [reached] false if its text could not be picked, [first] true
-     * if it was the first candidate once typed.
-     */
+    /** [keys] pressed for [sample]; [reached] false if its text could not be picked, [first] if it came first. */
     data class Outcome(val sample: Sample, val keys: Int, val reached: Boolean, val first: Boolean = false)
 
     fun type(sample: Sample): Outcome {

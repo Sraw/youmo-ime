@@ -19,10 +19,7 @@ import org.robolectric.annotation.Config
 import org.fcitx.fcitx5.android.Uat
 import org.robolectric.shadows.ShadowDialog
 
-/**
- * audit-061 app-input-8: the space's long press set to the next input method, with one input method enabled,
- * shows the prompt to add more as the language key does; it did nothing.
- */
+/** Set to the next input method with one enabled, the long press shows the language key's prompt to add more; it did nothing. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SpaceLongPressNextImTest {
@@ -51,7 +48,6 @@ class SpaceLongPressNextImTest {
         h.idle()
         val shown = ShadowDialog.getLatestDialog()
         assertTrue("a dialog shown", shown != null && shown !== before && shown.isShowing)
-        // the prompt to add input methods, the language key's, not any dialog
         assertEquals(h.service.getString(R.string.add_more_input_methods), shown.findViewById<TextView>(android.R.id.message)?.text?.toString())
         assertEquals(h.api.calls.toString(), 0, h.api.calls.count { it.startsWith("enumerateIme") })
     }

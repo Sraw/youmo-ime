@@ -21,10 +21,9 @@ class LastWordTest {
         assertEquals("你好", last.of("你好 "))
     }
 
-    // as the model reads the run (uat-triage-pinyin T9-54): its last word, or one of the user's ending it at a word's start
+    // as the model reads the run: its last word, or one of the user's ending it at a word's start
     @Test
     fun withASplitTheLastWordAsReadOrTheUsersEndingIt() {
-        // each character a word but 小明 and 了他, read 了｜他
         fun split(run: String): IntArray {
             val ends = arrayListOf(0)
             var i = 0
@@ -38,7 +37,6 @@ class LastWordTest {
         assertEquals("他", read.of("他点了他"))
         assertEquals("汪小明", read.of("我叫汪小明"))
         assertEquals("小明", read.of("是小明"))
-        // the user's, but starting inside a word read: not the 前文
         assertEquals("好", read.of("小明天好"))
     }
 

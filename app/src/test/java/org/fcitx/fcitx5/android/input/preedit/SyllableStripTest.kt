@@ -36,11 +36,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 
-/**
- * The code row's two parts: the code, and the 14 keys' syllables at its right end, never over 60%
- * of the row, gone with nothing to take. A tap takes the syllable with its list's id, as 九键's
- * column; one released on a list since replaced is dropped.
- */
+/** The 14 keys' syllables never over 60% of the row; one released on a list since replaced is dropped. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class SyllableStripTest {
@@ -66,7 +62,6 @@ class SyllableStripTest {
         val row = CodeRowUi(context, TestThemes.PixelDark) {}
         assertTrue(row.root.findViewById<View>(R.id.code_row_text) != null)
         assertTrue(row.root.findViewById<View>(R.id.code_row_syllables) === row.syllables)
-        // the code first, the syllables at the right end
         assertEquals(R.id.code_row_text, (row.root as ViewGroup).getChildAt(0).id)
         assertEquals(R.id.code_row_syllables, (row.root as ViewGroup).getChildAt(1).id)
     }
@@ -80,10 +75,8 @@ class SyllableStripTest {
         assertEquals("ni", strip.item(0).text.toString())
         strip.show(EngineState.SyllableState(InputMethodCatalog.PINYIN))
         assertEquals(View.GONE, strip.visibility)
-        // typing, all keys taken
         strip.show(typing())
         assertEquals(View.GONE, strip.visibility)
-        // another input method's
         strip.show(typing("ni", im = InputMethodCatalog.ENGLISH))
         assertEquals(View.GONE, strip.visibility)
     }
@@ -96,7 +89,6 @@ class SyllableStripTest {
         row.root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY))
         assertEquals((width * SyllableStrip.MAX_SHARE).toInt(), row.syllables.measuredWidth)
         assertEquals(width - row.syllables.measuredWidth, row.root.findViewById<View>(R.id.code_row_text).measuredWidth)
-        // none: the code takes the whole row
         row.syllables.show(EngineState.SyllableState())
         row.root.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY))
         assertEquals(width, row.root.findViewById<View>(R.id.code_row_text).measuredWidth)
@@ -164,7 +156,6 @@ class SyllableStripTest {
         val looper = shadowOf(Looper.getMainLooper())
         strip.show(typing("ni", "mi", id = 1))
         looper.idleFor(1, TimeUnit.SECONDS)
-        // through the strip, as a finger: the item is the touch target the cancel reaches
         fun send(action: Int) = MotionEvent.obtain(0L, 0L, action, 5f, 5f, 0).also {
             strip.dispatchTouchEvent(it)
             it.recycle()
@@ -188,7 +179,6 @@ class SyllableStripTest {
         row.syllables.show(typing("ni", "mi"))
         looper.idleFor(1, TimeUnit.SECONDS)
         assertEquals(View.VISIBLE, row.syllables.visibility)
-        // through the new root, as a finger: the code's part on the left takes it
         fun tapAt(x: Float) {
             for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
                 MotionEvent.obtain(0L, 0L, action, x, 5f, 0).also {
@@ -199,7 +189,6 @@ class SyllableStripTest {
         }
         tapAt(1f)
         assertEquals(listOf(0), taps)
-        // the syllables' part beside it is not the code's
         tapAt(row.syllables.left + 5f)
         assertEquals(listOf(0), taps)
     }
@@ -207,18 +196,15 @@ class SyllableStripTest {
     @Test
     fun shuangpinsSyllablesShowUnlessTheKeyboardOffersThemItself() {
         val strip = SyllableStrip(context, TestThemes.PixelDark)
-        // the 18 keys: 双拼's grouped session answers as 双拼
         strip.show(typing("ni", "mi", im = InputMethodCatalog.SHUANGPIN))
         assertEquals(View.VISIBLE, strip.visibility)
         assertEquals("mi", strip.item(1).text.toString())
-        // 九键双拼's column has them: shown again as the keyboard changes
         strip.owned = true
         assertEquals(View.GONE, strip.visibility)
         strip.show(typing("ni", im = InputMethodCatalog.SHUANGPIN))
         assertEquals(View.GONE, strip.visibility)
         strip.owned = false
         assertEquals(View.VISIBLE, strip.visibility)
-        // other input methods still none
         strip.show(typing("ni", im = InputMethodCatalog.WUBI))
         assertEquals(View.GONE, strip.visibility)
     }

@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.host
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
@@ -28,7 +29,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** [HostCore] on a real [Engines] (the fixture's tiny pinyin data), through [EnginesHost]. */
+/** On a real [Engines] (the fixture's tiny pinyin data), through [EnginesHost]. */
 class HostCoreEnginesTest : EnginesFixture() {
 
     private val clock = VirtualHostClock(epochMillis = 1_800_000_000_000)
@@ -36,7 +37,7 @@ class HostCoreEnginesTest : EnginesFixture() {
     private fun engines() = Engines(::load, null, warmUps = inPlace, clock = clock)
 
     private fun core(engines: Engines) =
-        HostCore(EnginesHost(engines), clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true)
+        HostCore(EnginesHost(engines), clock, testProfile(), firstRun = true)
 
     @Test
     fun `typing ni and picking commits 你 on pinyin`() {
@@ -81,8 +82,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         "nihao".forEach { core.sendKey(Key(it.code), virtual = true) }
         val shown = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
         assertTrue(core.select(shown.indexOf("你"), "你"))
-        // pinyin holds a part chosen till the rest is: nothing committed; a pick sent again by its
-        // index could choose another word, so what is typed then is dropped for good (review M2)
+        // pinyin holds a part chosen till the rest is: a pick sent again by index could choose another word, so dropped
         val commits = log.filterIsInstance<HostEvent.Commit>()
         val picked = core.clearTyped()!!
         assertNull("a pick is not typed again", picked.keys)
@@ -94,9 +94,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals(2, core.clearTyped()!!.keys!!.size)
     }
 
-    // review2: the keyboard is the app's to tell (its layout and 双拼's scheme: ImKeyboards.typedWith),
-    // the keys' codes each going to a session of their own (KeyboardPair): the nine keys' typed again
-    // on the full keyboard would type a session shown on none
+    // the keys' codes go to a session per keyboard: the nine keys' typed again on the full keyboard would show nowhere
     @Test
     fun `what is typed is typed again on the keyboard it was typed with alone`() {
         val core = core(engines())
@@ -117,8 +115,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertTrue(log.none { it is HostEvent.Commit })
     }
 
-    // review2 M2: a digit or the keypad's digit picks while something is typed, a part of it
-    // chosen as a pick's is: never typed again, the list reordered since could give another word
+    // a digit picking a part while typing is never typed again: the list reordered since could give another word
     @Test
     fun `what is typed after a key picks a part of it is never typed again`() {
         val core = core(engines())
@@ -128,8 +125,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
         core.focus(true)
         fun candidates() = log.filterIsInstance<HostEvent.Candidates>().last().candidates.map { it.text }
-        // nihao's third is 你, a part, held till the rest is chosen. Space picks the same way (Keyboard's
-        // select) but takes the first, the whole sentence here: no part of it to hold
+        // nihao's third is 你, a part, held; Space takes the first, the whole sentence: no part to hold
         val picks = listOf(
             Triple("3", "nihao", Key('3'.code)),
             Triple("the keypad's 3", "nihao", Key(KeySyms.KP_0 + 3)),
@@ -147,8 +143,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         }
     }
 
-    // review M2: a candidate's long-press action (forget, pin, block) sent again by its index could
-    // land on another word, the list reordered by it: none is typed again, nor what follows it
+    // a candidate's long-press action could land on another word if sent again: none typed again, nor what follows
     @Test
     fun `what is typed after a candidate's action is never typed again`() {
         val core = core(engines())
@@ -211,13 +206,12 @@ class HostCoreEnginesTest : EnginesFixture() {
         heard.chunked(2).forEach { (a, b) -> assertEquals(listOf(1, 2), listOf(a.first, b.first)) }
     }
 
-    // review B 3.9: the date, time and weekday phrases are the replay's clock's (LearnClock.calendar),
-    // the same on every run, never the system's: 2026-10-17 09:05 UTC, a Saturday
+    // the date phrases use the replay's clock (LearnClock.calendar), never the system's: 2026-10-17 09:05 UTC, a Saturday
     @Test
     fun `the date and time phrases are the virtual clock's`() {
         val at = VirtualHostClock(epochMillis = 1_792_227_900_000)
         val engines = Engines(::load, null, warmUps = inPlace, clock = at)
-        val core = HostCore(EnginesHost(engines), at, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true)
+        val core = HostCore(EnginesHost(engines), at, testProfile(), firstRun = true)
         val log = mutableListOf<HostEvent>()
         core.events += HostEvents { log += it }
         core.activate(1)
@@ -237,9 +231,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         engines.close()
     }
 
-    // review M5: through the core and its chttrans, the user's own entry goes out as it is
-    // (HostCore.commitAsIs, past the commit filters) and the built-in one converted, both shown as they go out; neither reaches
-    // the engine, so nothing is learnt of them and nothing is predicted after them
+    // the user's entry goes out as is, the built-in one converted; neither reaches the engine, so nothing learnt or predicted
     @Test
     @Uat("QU-23")
     fun `quick input's own entry goes out as it is under traditional, a built-in one converted, neither learnt nor predicted from`() {
@@ -270,7 +262,7 @@ class HostCoreEnginesTest : EnginesFixture() {
                 quickPhrases = { book },
             ),
         )
-        val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+        val profile = testProfile()
         val core = HostCore(host, clock, profile, firstRun = true, modules = modules::build)
         val log = mutableListOf<HostEvent>()
         core.events += HostEvents { log += it }
@@ -299,9 +291,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         engines.close()
     }
 
-    // review R2: a long press under 繁體 as the app's host makes it (KotlinHost.learning: the engines
-    // told the core's shownText): the menu named by the text shown, converted, answers with the
-    // engine's; the acts name that, the converted one nothing
+    // a long press under 繁體: the menu named by the converted text answers with the engine's; acts name that
     @Test
     fun `a long press under traditional names the candidate as shown and acts on the engine's text`() {
         val engines = engines()
@@ -309,7 +299,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         val modules = ChineseModules(
             ModuleInputs(PunctuationProfile.parse(""), chttransEnabled = setOf(InputMethodCatalog.PINYIN), converter = { converter }),
         )
-        val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+        val profile = testProfile()
         val core = HostCore(EnginesHost(engines), clock, profile, firstRun = true, modules = modules::build)
         val log = mutableListOf<HostEvent>()
         core.events += HostEvents { log += it }
@@ -334,14 +324,13 @@ class HostCoreEnginesTest : EnginesFixture() {
         engines.close()
     }
 
-    // review L-6: the keyboard's way after a card's 删除 (KotlinHost.readModuleFiles): the book read
-    // again, then the open list shown again from it; the entry gone at once, what was typed kept
+    // after a card's 删除: the book read again, the open list shown from it; the entry gone, what was typed kept
     @Test
     fun `an entry deleted while quick input is open leaves its list at the reload`() {
         val engines = engines()
         var built: HostModules? = null
         val modules = ChineseModules(ModuleInputs(PunctuationProfile.parse(""), quickPhrases = { QuickPhraseBook(QuickPhraseTable.EMPTY, listOf(QuickPhraseEntry("tf", "头发"), QuickPhraseEntry("tg", "头盖"))) }))
-        val core = HostCore(EnginesHost(engines), clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true) {
+        val core = HostCore(EnginesHost(engines), clock, testProfile(), firstRun = true) {
             modules.build(it).also { m -> built = m }
         }
         val log = mutableListOf<HostEvent>()
@@ -361,13 +350,12 @@ class HostCoreEnginesTest : EnginesFixture() {
         engines.close()
     }
 
-    // review LOW (S13): an Ink key quick input had, never reaching handwriting, holds its reading
-    // for the next, as before the key carried it; dropped, the stroke's ink stayed on the pad
+    // an Ink key quick input had holds its reading for the next; dropped, the stroke's ink stayed on the pad
     @Test
     fun `ink written under quick input is shown with the next stroke after it`() {
         val engines = engines()
         val modules = ChineseModules(ModuleInputs(PunctuationProfile.parse("")))
-        val profile = Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default")
+        val profile = testProfile()
         val core = HostCore(EnginesHost(engines), clock, profile, firstRun = true, modules = modules::build)
         val log = mutableListOf<HostEvent>()
         core.events += HostEvents { log += it }
@@ -379,7 +367,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         fun write(piece: Int, vararg chars: String) {
             val ink = Action.Ink(piece, InkReading(chars.toList(), DoubleArray(chars.size)))
             engines.ink(ink, shown = true, im = InputMethodCatalog.PINYIN)
-            core.sendKey(Key(KeySyms.UNICODE_OFFSET + Keyboard.INK, KeyStates.VIRTUAL), virtual = true, payload = ink)
+            core.sendKey(Key(UNICODE + Keyboard.INK, KeyStates.VIRTUAL), virtual = true, payload = ink)
             engines.inkSent(ink, im = InputMethodCatalog.PINYIN)
         }
         core.triggerQuickPhrase()
@@ -390,8 +378,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals("你好", log.filterIsInstance<HostEvent.InputPanel>().last().preedit.toString())
     }
 
-    // 清除 and the backspace swipe drop what handwriting wrote, nothing committed; the input ended
-    // otherwise (the cursor moved away, the keyboard hidden) puts it in (061-handwriting-toolbar LC-35)
+    // 清除 and the backspace swipe drop what handwriting wrote; the input ended otherwise puts it in
     @Test
     fun `clearing handwriting commits nothing, the input ended commits it`() {
         val engines = engines()
@@ -404,7 +391,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         fun write(piece: Int, text: String) {
             val ink = Action.Ink(piece, InkReading(listOf(text), DoubleArray(1)))
             engines.ink(ink, shown = true, im = InputMethodCatalog.PINYIN)
-            core.sendKey(Key(KeySyms.UNICODE_OFFSET + Keyboard.INK, KeyStates.VIRTUAL), virtual = true, payload = ink)
+            core.sendKey(Key(UNICODE + Keyboard.INK, KeyStates.VIRTUAL), virtual = true, payload = ink)
             engines.inkSent(ink, im = InputMethodCatalog.PINYIN)
         }
         fun commits() = log.filterIsInstance<HostEvent.Commit>().map { it.text }
@@ -423,8 +410,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertEquals(listOf("天"), commits())
     }
 
-    // 编码行 输入框里 writes the panel's code into the field (dev/design/061-code-in-field.md §4.2): each
-    // keyboard's own codes (private use, past the BMP) are keys, never the code's text
+    // 编码行 输入框里: each keyboard's own codes (private use, past the BMP) are keys, never the code's text
     @Test
     fun `the code each keyboard types is text, no private-use character in it`() {
         val keyboards = listOf(
@@ -434,7 +420,7 @@ class HostCoreEnginesTest : EnginesFixture() {
             "nine keys" to "64".map(Keyboard::pinyinNineKey),
             "注音九键" to listOf(Keyboard.zhuyinNineKey(6), Keyboard.zhuyinNineKey(5)),
         )
-        // each row's keys sent inside its own check: one keyboard that throws is that row's failure (review F8301)
+        // each row's keys sent inside its own check: one keyboard that throws is that row's failure
         val rows = keyboards.map { (name, keys) ->
             "$name: a code, its characters no private use's" to {
                 val core = core(engines())
@@ -452,8 +438,7 @@ class HostCoreEnginesTest : EnginesFixture() {
         assertRows(*rows.toTypedArray())
     }
 
-    // a syllable taken off the nine keys' bar is a pick: the list it was taken from is one the
-    // session has moved past, so what is typed is never typed again from there
+    // a syllable taken off the nine keys' bar is a pick: never typed again from a list the session moved past
     @Test
     @Uat("KB-62")
     fun `what is typed after a syllable taken off the nine keys' bar is never typed again`() {
@@ -463,7 +448,7 @@ class HostCoreEnginesTest : EnginesFixture() {
             override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot? =
                 real.event(im, event, arg, learning, payload).also { last = it }
         }
-        val core = HostCore(host, clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true)
+        val core = HostCore(host, clock, testProfile(), firstRun = true)
         core.activate(1)
         core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)
         core.focus(true)

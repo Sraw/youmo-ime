@@ -1,7 +1,6 @@
 #!/bin/bash
 # Golden outputs of the native scel2org5 (the libscel2org5.so of an installed 幽默输入法) for every
-# *.scel here: <name>.txt (what it writes with -o, the file PinyinDictManager.kt imports),
-# <name>.out (its stdout and stderr) and <name>.rc (its exit status). It is called as the app calls
+# *.scel here: <name>.txt (what it writes with -o, the file PinyinDictManager.kt imports). It is called as the app calls
 # it (PinyinDictManager.kt:370: scel2org5 -o <dest> <src>, no -a).
 #   uat/fixtures/scel/make.sh <redroid container> <adb serial>
 # Root in the container: on redroid (x86_64) the arm64 build runs under ndk_translation, whose
@@ -23,13 +22,11 @@ docker exec "$C" sh -c "
   for f in *.scel; do
     b=\${f%.scel}
     rm -f \$b.txt
-    env -i $T-lib/libscel2org5.so -o \$b.txt \$f > \$b.out 2>&1; echo \$? > \$b.rc
+    env -i $T-lib/libscel2org5.so -o \$b.txt \$f > /dev/null 2>&1 || true
   done"
 for f in "$HERE"/*.scel; do
   b=$(basename "$f" .scel)
   rm -f "$HERE/$b.txt"
   adb shell "[ -f $T/$b.txt ]" && adb pull -q $T/$b.txt "$HERE/"
-  adb pull -q $T/$b.out $T/$b.rc "$HERE/"
-  sed -i -E 's/^([EWI])[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:.]+ /\1 /; s/ \(0x[0-9a-f]+\)$//' "$HERE/$b.out"   # log time, addresses
 done
 adb shell dumpsys package $PKG | grep -m1 versionName | tr -d ' ' > "$HERE/VERSION"

@@ -12,7 +12,7 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** uat/10-tables.md: a table's key tapped off-centre (061-neighbour-table), with the app's 仓颉. */
+/** uat/10-tables.md: a table's key tapped off-centre, with the app's 仓颉. */
 class TableSlipUatTest {
 
     // e tapped at its right edge, toward r (QWERTY: w left, r right)
@@ -60,8 +60,7 @@ class TableSlipUatTest {
             expectText("乃")
             assertEquals("j", preedit)
         }
-        // at the very edge toward h: etnh, whose first 用 is commoner than 乃; nothing committed, and the
-        // full code waits to be seen: a space commits it
+        // at the very edge toward h: etnh waits to be seen, a space commits it
         with(EngineReplay(im = InputMethodCatalog.WUBI)) {
             type("etn")
             tapJ(-0.49f)

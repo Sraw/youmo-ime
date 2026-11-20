@@ -23,11 +23,7 @@ import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.verticalMargin
 import splitties.views.textAppearance
 
-/**
- * A long job's dialog: what it is doing and how far ([set]), with a cancel that calls [cancel]
- * once (the job stops at its next step and the dialog goes when it has). A work of a minute
- * (a 1.9-million-word dictionary) is not a spinner to wait on blind.
- */
+/** [cancel] is called once; the dialog goes when the job has stopped. */
 class ProgressBarDialog(private val context: Context, @StringRes title: Int, cancel: () -> Unit) {
     private val label: TextView
     private val bar: ProgressBar
@@ -56,7 +52,6 @@ class ProgressBarDialog(private val context: Context, @StringRes title: Int, can
         }
     }
 
-    /** [text] said over the bar, at [percent]. */
     fun set(text: String, percent: Int) {
         label.text = text
         bar.progress = percent

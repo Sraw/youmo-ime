@@ -44,19 +44,17 @@ class PinyinSessionPhraseTest {
         val s = session.type("nizai")
         val text = s.candidates[2]
         val pinned = session.apply(Pin(2))
-        // in front, the rest as they were (impl/design-1b.md M4), the pin the learning record's
+        // in front, the rest as they were, the pin the learning record's
         assertEquals(listOf(text) + s.candidates.filter { it != text }, pinned.candidates)
         assertEquals(s.preedit, pinned.preedit)
         assertEquals("", pinned.commit)
         assertTrue(saved.isEmpty())
         assertTrue(Offer.UNPIN in session.offers(0))
-        // a phrase is the settings': neither pinned nor unpinned here
         val phrase = pinned.candidates.indexOf("你在哪儿")
         assertFalse(Offer.PIN in session.offers(phrase) || Offer.UNPIN in session.offers(phrase))
         assertTrue(Offer.PIN in session.offers(pinned.candidates.indexOf(s.candidates[0])))
         val unpinned = session.apply(Unpin(0))
         assertEquals(s.candidates, unpinned.candidates)
-        // not pinned, or past the candidates: nothing to do
         assertEquals(unpinned, session.apply(Unpin(0)))
         assertEquals(unpinned, session.apply(Pin(99)))
         assertTrue(saved.isEmpty())
@@ -79,7 +77,6 @@ class PinyinSessionPhraseTest {
         val saved = ArrayList<String>()
         val session = phrased("", saved = saved)
         val s = session.type("nihao")
-        // 你 reads ni: pinned to nihao, it would drop hao each time
         val short = s.candidates.indexOf("你")
         assertTrue(short > 0)
         assertEquals(emptySet<Offer>(), session.offers(short))
@@ -145,20 +142,17 @@ class PinyinSessionPhraseTest {
         val session = phrased("nizai,1=你在哪儿\nni,1=拟", learner = learner)
         assertEquals("你在哪儿", session.type("nizai").candidates.first())
         session.apply(Select(0))
-        // 拟 put first by a phrase is the phrase's pick, no word picked (PLAN §2.7): the record has neither
+        // 拟 put first by a phrase is the phrase's pick, no word picked: the record has neither
         assertEquals("拟", session.type("ni").candidates.first())
         session.apply(Select(0))
         assertEquals(emptySet<String>(), learner.used())
         session.type("zai")
         val after = session.apply(Select(0)).commit
-        // the word after learned, the phrase's 拟 no word of it
         assertTrue(learner.used().toString(), after in learner.used())
         assertFalse("拟" in learner.used())
     }
 
-    // U-66, impl/PLAN.md §2.7: the phrase a candidate of its own, not learned, where its order says; the
-    // decoder's of the same text not moved there: ranked after it, the phrase stands for it; ranked
-    // before (learned elsewhere), it stays a word there, picked and learned, the phrase not listed again
+    // ranked after the decoder's of the same text, the phrase stands for it; ranked before, it stays a word
     @Test
     fun aPhraseIsItsOwnCandidateAndNoTextIsListedTwice() {
         val learner = Learner(data)
@@ -178,7 +172,6 @@ class PinyinSessionPhraseTest {
         val learned = session.type("ni").candidates
         assertEquals("拟", learned[0])
         assertEquals(1, learned.count { it == "拟" })
-        // the word, not the phrase: pinned like any word
         assertTrue(Offer.PIN in session.offers(0))
     }
 
@@ -187,10 +180,8 @@ class PinyinSessionPhraseTest {
         val book = { PhraseBook(builtIn = CustomPhrases.BUILT_IN) }
         val now = { GregorianCalendar(2026, Calendar.OCTOBER, 17, 9, 5) }
         assertTrue("09:05" in PinyinSession(data, PinyinSegmenter(), pageSize = 20, phraseBook = book(), now = now).type("sj").candidates)
-        // sj is san in 自然码
         val shuangpin = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), spell = true, pageSize = 20, phraseBook = book(), now = now)
         assertFalse("09:05" in shuangpin.type("sj").candidates)
-        // the user's own are offered there still
         val own = PhraseBook(CustomPhrases.parse("sj,1=三家"), CustomPhrases.BUILT_IN)
         val mine = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), spell = true, pageSize = 20, phraseBook = own, now = now)
         assertEquals("三家", mine.type("sj").candidates[0])
@@ -205,7 +196,6 @@ class PinyinSessionPhraseTest {
         assertFalse("09:05" in session(false).type("sj").candidates)
         assertTrue("星期六" in session(true).type("xq").candidates)
         assertFalse("星期六" in session(false).type("xq").candidates)
-        // the user's own stays
         assertEquals("日前", session(false).type("rq").candidates[0])
     }
 
@@ -226,9 +216,7 @@ class PinyinSessionPhraseTest {
         assertEquals("日期", full[0])
         assertEquals(dates, full.filter { it in dates })
         assertEquals(minOf(2, full.size - dates.size), full.indexOf(dates[0]))
-        // rq in full pinyin: its own, not twice
         assertEquals(1, session(spell = false).type("rq").candidates.count { it == "2026-10-17" })
-        // the switch off, or the one deleted: none
         assertFalse("2026-10-17" in session(spell = true, on = false).type("riqi").candidates)
         val book = PhraseBook(builtIn = CustomPhrases.BUILT_IN)
         book.remove("rq", "#\$year-\$month_mm-\$day_dd")
@@ -237,7 +225,6 @@ class PinyinSessionPhraseTest {
         assertTrue("2026年10月17日" in left)
     }
 
-    // UAT PY-49: v0.3.0's 从自定义词组中删除 on a built-in date, lost with the learning menu
     @Test
     fun aBuiltInDateIsDeletedFromTheCustomPhrasesByItsLongPress() {
         val saved = ArrayList<String>()

@@ -13,11 +13,7 @@ import org.junit.Test
 import java.util.zip.GZIPInputStream
 import kotlin.math.abs
 
-/**
- * Held to the training code's features: `ink-golden.json.gz` is `gen_golden.py` (in the recognizers'
- * training sources) run on made-up strokes, through `portable.py`, which the training pipeline's own
- * features equal (thinning bit for bit, the planes to 4e-7).
- */
+/** Held to `ink-golden.json.gz`, made by the training sources' `gen_golden.py` through `portable.py`. */
 class InkFeaturesTest {
 
     @Suppress("UNCHECKED_CAST")

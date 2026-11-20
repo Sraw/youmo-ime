@@ -16,7 +16,7 @@ class UserWordSourceTest {
 
     private val words = listOf(UserWord("你好", "ni hao", UserWord.Kind.ADDED))
 
-    // U-80: the list page's delete is the learning's RemoveWords, its token the 撤销 offered
+    // the list page's delete is the learning's RemoveWords, its token the 撤销 offered
     @Test
     fun aPinyinListsDeleteIsTheLearningsAndGivesItsUndo() = runTest {
         val fcitx = FakeHostApi()

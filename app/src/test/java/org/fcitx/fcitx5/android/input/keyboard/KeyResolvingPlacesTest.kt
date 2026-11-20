@@ -9,10 +9,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyResolving.Places
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/**
- * Where a long press's items go once those it cannot type are dropped ([KeyResolving.placesOf]): the
- * row's place under the finger and the focus moved to the items kept.
- */
 class KeyResolvingPlacesTest {
 
     // Q W 1 q w, then ! ?: the row the first five, 1 the focus and its own middle

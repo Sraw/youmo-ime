@@ -23,10 +23,7 @@ import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-/**
- * 060-render-p3 T10a: a pack's import replacing a 3.0 theme of its name when the disk does not do as asked (a record
- * not written again, a json not deleted), and the first sweep of `.saving` while an import writes there.
- */
+/** A pack import replacing a 3.0 theme when the disk misbehaves, and the first `.saving` sweep while an import writes. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class ThemePackReplacementTest {
@@ -53,7 +50,7 @@ class ThemePackReplacementTest {
         ThemeManager.refreshThemes()
     }
 
-    // the built-in nord, of two versions, as a pack of the user's named "mine"
+    // the built-in two-version nord, as a user pack named "mine"
     private fun opened(): ThemeFilesManager.Opened.Pack {
         val xml = BuiltinThemeFiles.text(appContext.resources, R.raw.scene_theme_nord)
             .replace("name=\"nord\"", "name=\"mine\"")
@@ -68,8 +65,7 @@ class ThemePackReplacementTest {
         ThemeManager.refreshThemes()
     }
 
-    // the record not written again (a full disk) as one replacement finishes and another is left: not thrown (at the
-    // app's start that crashed every start), the record kept for the next listing
+    // the record not rewritten (full disk): not thrown (it crashed every start), kept for the next listing
     @Test
     fun aRecordNotWrittenAgainIsLeftForTheNextListing() {
         mine()
@@ -83,14 +79,13 @@ class ThemePackReplacementTest {
         }
     }
 
-    // the replaced theme's json not deleted: its record kept and tried again, not dropped with the theme left beside
-    // the pack for good
+    // the replaced json not deleted: its record kept and retried, not dropped with the theme left for good
     @Test
     fun aReplacedThemeNotDeletedIsTriedAgain() {
         mine()
         opened().commit().getOrThrow()
         try {
-            // root deletes anyway: a skip there (F4987), not a failure
+            // root deletes anyway: a skip there, not a failure
             assumeTrue("a directory not writable (not as root)", dir.setWritable(false) && !dir.canWrite())
             ThemeManager.refreshThemes()
             assertTrue(File(dir, "mine.json").exists())
@@ -103,7 +98,7 @@ class ThemePackReplacementTest {
         assertEquals(emptySet<String>(), ThemeFilesManager.replacing())
     }
 
-    // the user's delete whose json is not deleted: told as not done, still listed (not gone till the next start)
+    // a delete whose json stays: told as not done, still listed
     @Test
     fun aDeleteThatDidNotDeleteKeepsTheThemeListed() {
         mine()
@@ -116,14 +111,13 @@ class ThemePackReplacementTest {
         }
     }
 
-    // a record that does not read: not read by an import replacing nothing; set aside (not written over, not taken as
-    // empty) by one replacing a theme, which then goes ahead: no import blocked for good
+    // an unreadable record: ignored when replacing nothing, set aside when replacing a theme: no import blocked for good
     @Test
     fun aRecordThatDoesNotReadIsSetAsideNotWrittenOver() {
         val record = ThemeFilesManager.replacingFile().apply { writeText("old\n") }
         val bad = File(record.path + ".bad").apply { delete() }
         try {
-            // root reads anyway: a skip there (F4987), not a failure
+            // root reads anyway: a skip there, not a failure
             assumeTrue("a file not readable (not as root)", record.setReadable(false) && !record.canRead())
             assertTrue(opened().commit().isSuccess)
             assertFalse(bad.exists())
@@ -139,8 +133,7 @@ class ThemePackReplacementTest {
         }
     }
 
-    // Q1: a process's first sweep while an import writes its pack in .saving (a start not settled, then a listing):
-    // not swept under it, swept at a listing once it is done
+    // a first sweep during an import into .saving does not sweep it; a listing does once it is done
     @Test
     fun aFirstSweepWhileAPackIsWrittenLeavesItBe() {
         val pack = opened()

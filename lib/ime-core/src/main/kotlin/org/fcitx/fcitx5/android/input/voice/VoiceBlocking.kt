@@ -5,30 +5,20 @@
 package org.fcitx.fcitx5.android.input.voice
 
 /**
- * Blocked words in what was heard, as typing blocks them: a word, not a run of characters. The
- * recognizer writes characters and knows no words, so 开饭 blocked in its search would take 开饭店
- * and 打开饭盒 with it. Instead its hypotheses (best first) are split into words as the pinyin
- * engine's model finds likeliest (TextWords.boundaries), and the first in which no blocked word
- * stands as words of its own is written: starting and ending where words do. If each has one, the
- * user said it, and the search is run again with the words blocked in it (VoiceChoice).
+ * Blocked words as typing blocks them: a word, not a run of characters (开饭 blocked in the recognizer's search took
+ * 开饭店 and 打开饭盒). Hypotheses are split by the pinyin model's likeliest words; the first with no blocked word
+ * standing as words is written. If each has one, the search runs again with them blocked (VoiceChoice).
  */
 object VoiceBlocking {
 
-    /**
-     * Of [nbest], each as typed (without the recognizer's spaces, as VoiceText types it), those
-     * with a blocked word in them at all: the only ones to split.
-     */
+    /** Typed without the recognizer's spaces; those with a blocked word in them at all, the only ones to split. */
     fun suspects(nbest: List<String>, blocked: List<String>): List<String> =
         nbest.map { typed(it) }.filter { text -> blocked.any { it in text } }.distinct()
 
     /**
-     * The first of [nbest] in which none of [blocked] stands as words, given [boundaries] of the
-     * [suspects] (offsets between words, as TextWords.boundaries); null if none is. A suspect
-     * with no boundaries (the engine could not split it) is taken to have one. Below the first,
-     * only one without them at all: 今天气很好 for 今天天气很好 with 天气 blocked (今天 气) is a
-     * worse hearing that still shows it (VO-10); the search again with it blocked does better.
-     * That search, with nothing after it, takes any [last]: one below its first without them
-     * standing beats its first with them standing.
+     * The first in which none of [blocked] stands as words; null if none. A suspect with no boundaries counts as having
+     * one. Below the first, only one without them at all (今天气很好 for 今天天气很好 with 天气 is a worse hearing);
+     * the [last] search takes one standing-free below its first.
      */
     fun pick(nbest: List<String>, blocked: List<String>, boundaries: Map<String, IntArray>, last: Boolean = false): Int? =
         nbest.indices.firstOrNull { i ->
@@ -36,8 +26,7 @@ object VoiceBlocking {
             blocked.none { word -> word in text && ((i > 0 && !last) || stands(text, word, boundaries[text])) }
         }
 
-    // as far as a blocked word goes, what is typed: VoiceText takes out the spaces X-ASR puts by
-    // Chinese (开 饭 typed 开饭), and a blocked word is all Chinese (VoiceHotwords.spelled)
+    // VoiceText takes out the spaces X-ASR puts by Chinese, and a blocked word is all Chinese
     private fun typed(text: String) = text.filterNot { it.isWhitespace() }
 
     // some occurrence of word starts and ends between words

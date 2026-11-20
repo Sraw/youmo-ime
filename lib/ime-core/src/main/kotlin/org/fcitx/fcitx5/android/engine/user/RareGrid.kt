@@ -10,14 +10,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.reading.CharReadings
 import org.fcitx.fcitx5.android.engine.reading.Reading
 
-/**
- * The characters 生僻字屏蔽's grid shows (dev/design/061-rare-char-block.md §2.3, §6): those of the
- * grid's groups the readings know, each with its readings, copied out of the pinyin data as plain
- * arrays on the fcitx thread ([copy], a few hundred KB, no object a character), so the page holds
- * no mapped table the engine may let go of; sorted for the page off it ([sorted]). [unread], by
- * group ([Level.GRID]'s order), how many characters the dictionary or the strokes have that no
- * reading is known of: no cell, held back or let through with their group.
- */
+/** The characters 生僻字屏蔽's grid shows, with readings, copied from the pinyin data into plain arrays on the fcitx thread ([copy], a few hundred KB), so the page holds no mapped table the engine may drop. [unread]: per group, characters with no known reading (no cell). */
 class RareGrid private constructor(
     val chars: IntArray,
     private val levels: ByteArray,
@@ -30,19 +23,13 @@ class RareGrid private constructor(
 
     fun level(i: Int): Level = Level.entries[levels[i].toInt()]
 
-    /** The [i]th character's readings, the commonest first. */
     fun readings(i: Int): List<Reading> = (readingStart[i] until readingStart[i + 1]).map { Reading(syllables[it], tones[it].toInt()) }
 
-    /** The [i]th character's first reading, toneless, as it is searched by ([find]). */
     fun spelling(i: Int): String = Syllables.spelling(syllables[readingStart[i]])
 
-    /** How many of [level]'s characters have a cell. */
     fun count(level: Level): Int = levels.count { it.toInt() == level.ordinal }
 
-    /**
-     * The grid's groups, each its characters' indexes in the grid's order: by the first reading's
-     * spelling (a–z), then its tone, then the code point (§6.3). Run off the fcitx thread.
-     */
+    /** Each group's indexes by first reading's spelling, tone, then code point; run off the fcitx thread. */
     fun sorted(): Map<Level, IntArray> {
         val spellings = Array(size) { spelling(it) }
         val order = (0 until size).sortedWith(
@@ -51,7 +38,7 @@ class RareGrid private constructor(
         return Level.GRID.associateWith { level -> order.filter { levels[it].toInt() == level.ordinal }.toIntArray() }
     }
 
-    /** The cells read [spelling] in any reading (toneless, `ü` as `v`), each group's in [sorted]'s order. */
+    /** The cells read [spelling] in any reading (toneless, `ü` as `v`). */
     fun find(spelling: String, sorted: Map<Level, IntArray>): List<Int> {
         val wanted = spelling.lowercase().replace('ü', 'v')
         return Level.GRID.flatMap { level ->
@@ -59,18 +46,12 @@ class RareGrid private constructor(
         }
     }
 
-    /** The cell of [codePoint]; -1 for none. */
     fun indexOf(codePoint: Int): Int = chars.indexOf(codePoint)
 
     companion object {
         val EMPTY = RareGrid(IntArray(0), ByteArray(0), IntArray(1), IntArray(0), ByteArray(0), IntArray(Level.GRID.size))
 
-        /**
-         * The grid of [levels] over what [readings] knows, of [Level.EXT] only what something [typed]
-         * (DECISIONS N2: the readings know ~2,600 of it nothing offers, a cell to hold for nothing);
-         * [others], the code points the dictionary and the strokes have (repeats allowed), counted by
-         * group where no reading is known ([unread]).
-         */
+        /** The grid of [levels] over [readings]; of [Level.EXT] only what something [typed] (~2,600 others would be cells for nothing). [others] counts per group what no reading knows. */
         fun copy(levels: CharLevels, readings: CharReadings, others: Sequence<Int>, typed: (Int) -> Boolean = { true }): RareGrid {
             val chars = ArrayList<Int>()
             val lv = ArrayList<Byte>()

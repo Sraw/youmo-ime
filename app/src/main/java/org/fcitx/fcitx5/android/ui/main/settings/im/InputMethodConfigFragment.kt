@@ -39,15 +39,14 @@ class InputMethodConfigFragment : HostPreferenceFragment() {
             // options the app has no page for: none shown (HostPreferenceFragment says so)
             ?: preferenceManager.createPreferenceScreen(requireContext())
 
-    // 0.6.0's 手写 page, its route restored (a back stack saved before): 通用输入 in its place, its options neither read nor written
+    // a retired page's route restored: 通用输入 in its place, its options neither read nor written
     private val retired get() = SettingsRoute.now(args) != args
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         if (retired) {
             view.post {
-                // the page left before this runs (popped in the same frame, the state saved): no NavController to ask
-                // (R26 F8404), as SearchHighlight.showIn's post
+                // the page left before this runs (popped in the same frame): no NavController to ask
                 if (!isAdded) return@post
                 findNavController().popBackStack()
                 findNavController().navigateWithAnim(SettingsRoute.now(args))
@@ -64,7 +63,7 @@ class InputMethodConfigFragment : HostPreferenceFragment() {
     }
 
     override fun onStop() {
-        // 连按 and English's auto-caps are the keyboard's: before the first unlock it reads them from device-protected storage
+        // before the first unlock the keyboard reads them from device-protected storage
         AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
     }

@@ -23,7 +23,6 @@ import java.util.concurrent.Executor
 
 class EngineBackedHostApiTest {
 
-    // 你 好 and 你好, all an engine needs to read and to take words
     private val pinyin = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)
         .unigram("你", -2f, 0f)
@@ -56,7 +55,6 @@ class EngineBackedHostApiTest {
         val api = EngineBackedHostApi(engines())
         api.engineContext("你", started = true)
         assertEquals(listOf("engineContext(你, true, started)"), api.fake.calls)
-        // the engine typed after it, and the rest of the API still the fake's
         val shot = api.engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.CHAR, 'n'.code)
         assertTrue(shot.handled)
         api.reloadEngine()

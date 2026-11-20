@@ -720,19 +720,13 @@
 - **前提**：0.5.2 导出的备份（`popup_overrides` 是 `q ! 1 Q` 和 `, 。 ？` 两行，`t9_symbols` 是 `1 . ,`）。和 JVM 测试用的是同一份数据；uat/fixtures 里没有 0.5.2 的备份，设备上跑要先在 0.5.2 上照这些设好再导出。
 - **操作**：**备份与恢复** 导入这份备份，重启 App；长按全键盘 q、各键盘的 ，、九键 1；打开 **按键字符和快捷键 → 功能键**。
 - **预期**：q 弹出 `! 1 Q`；所有键盘的 ， 弹出 `。？`；九键 1 的符号是 `. ,`（按中英文标点转换显示）；功能键里 ， 有"改过"的描边。0.5 给符号面板格子设的长按不再生效（ime-core `KeyListsMigrationTest` 管）。
-- **JVM**：app `KeyListsUpgradeTest.v052sLongPressesMoveOverAndTheOldOnesStay`、`.beta2sNamedListsMoveOverToo`、`.aBackupImportedIsMigratedAtTheStartAfterOr0_6sKept`。
+- **JVM**：app `KeyListsUpgradeTest.v052sLongPressesMoveOverAndTheOldOnesStay`、`.aBackupImportedIsMigratedAtTheStartAfterOr0_6sKept`。
 
 ### ST-109 [P1] 数字键盘的键能在编辑器里改
 - **前提**：B0。
 - **操作**：**按键字符和快捷键** 选 **数字键盘**，给 `5` 添加 `½`；回到数字键盘长按 5。
 - **预期**：有数字键盘卡片；长按 5 弹出 `½`。
 - **JVM**：app `PopupOverridesFragmentTest$Dialog.numberPage`。
-
-### ST-110 [P1] beta3 存的长按升级后照旧
-- **前提**：一台装着 0.6.0-beta3 的机器（或模拟器），在 beta3 的 **按键字符和快捷键** 里给九键 2 加 `#`、14 键 QW 加 `①` 并把 `①` 设为首选，**输入法 → 拼音** 的 **键盘** 选「14 键」，然后覆盖安装这一版。
-- **操作**：长按九键 2（拼音的键盘换成九键）、上滑 2；换回 14 键，长按 QW、上滑 QW；再打开编辑器看这两个键。
-- **预期**：九键 2 弹出 `A B C 2 a b c` 一行、`#` 在符号里，键角和上滑是 `2`；QW 弹出 `Q W 1 q w` 一行、`①` 在上面，键角和上滑是 `①`；编辑器里两个键的列表就是弹出的那些，都显示改过。
-- **JVM**：ime-core `KeyListsMigrationTest.upgradeAsTheEditorShowsIt`（九键 2 一行、符号在后、数字首选那一行）、app `KeyListsUpgradeTest.aBeta3ListIsUpgradedAtTheStart`；设备上要 beta3 的包，发版时手动。
 
 ### ST-111 [P2] 按键音音量是滑块：最左系统默认，松手响一声，按键音禁用时变灰
 - **前提**：B0-设置，按键音 **启用**，模拟器或手机开着媒体声音。

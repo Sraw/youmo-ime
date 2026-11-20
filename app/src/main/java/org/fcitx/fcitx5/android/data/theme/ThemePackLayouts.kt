@@ -22,15 +22,7 @@ import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.layout.Row
 import java.io.File
 
-/**
- * A theme 4.0 pack's `layouts/<id>.xml` (060-render-p3 T8b, 060-render-v2 §15): what [SceneLayouts] reads first
- * while the pack is the theme in use, the app's own under it, keyboard by keyboard. A pack replaces only a keyboard
- * the app has that the user does not pick among their own layouts ([PackLayouts.replaces]: `zhuyin`, `emoji`…; since
- * 0.6.1 its `qwerty`, `k18`… are put in 外观 → 布局 instead, ThemeLayoutsToList), never adds one; a fragment of its own
- * (`grouped-bottom.xml`) is read only by the pack's own keyboards that include it, the app's keep the app's. A
- * keyboard is taken only where it is as typable as the app's of its id ([judge]), else the app's is drawn (logged
- * once). Kept under the pack's file and its `theme.xml`'s time: a pack imported again is read again.
- */
+/** Only replaces keyboards the user does not pick among their own; one less typable than the app's is not taken. */
 class ThemePackLayouts(private val context: Context, private val pack: Theme.Pack) : LayoutSource {
 
     override val key: String get() = "$PREFIX${pack.file}@${pack.stamp}"
@@ -40,20 +32,10 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
     override fun refuses(id: String, layout: Layout, fragments: Map<String, Fragment>): String? =
         judge(id, layout, fragments, SceneLayouts.builtIn(context, id))
 
-    // 主题只管外观: what its keys do held or swiped the app's keys' of their names
+    // 主题只管外观: held and swiped actions are the app keys'
     override val keyData: KeyData.Mode get() = KeyData.Mode.Pack
 
-    /**
-     * What an import tells of a pack's layouts: the keyboards it replaces, the files it never uses with why, the `commit:`
-     * actions of those used (as they are taken: a long press's or a swipe's written in it is not), and how many of what
-     * they write a key does held or swiped is not taken ([ignored], KeyData: 061-custom-layout §19.4); [listed], the names
-     * of the layouts of the user's its boards of those the user picks would be (ThemeLayoutsToList, §11).
-     */
-    /**
-     * [used] boards drawn from the pack, [unused] with why, [commits] the `commit:` texts in those; [listed] the names of
-     * the layouts 「一起导入」 would make, [listedCommits] the `commit:` texts their keys type that their bases' do not
-     * (§13), [replaced] the names of the layouts they write over (§4.2 第 4 步), [notFitting] how many the list has no room for.
-     */
+    /** [ignored]: held/swiped actions not taken; [listed]: the layouts 「一起导入」 would make. */
     class Report(
         val used: List<String>,
         val unused: List<Pair<String, String>>,
@@ -64,7 +46,6 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         val replaced: List<String> = emptyList(),
         val notFitting: Int = 0,
     ) {
-        /** This with what listing it does to the list ([ThemeLayoutsToList.staged]). */
         fun listing(replaced: List<String>, notFitting: Int) = Report(used, unused, commits, ignored, listed, listedCommits, replaced, notFitting)
     }
 
@@ -73,11 +54,10 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         private const val BOM = "\uFEFF"
 
 
-        /** Where the keyboards' layouts are read from first: the pack in use's, else the app's ([SceneLayouts.source]). */
         fun current(context: Context): LayoutSource =
             (ThemeManager.activeOrNull as? Theme.Pack)?.let { ThemePackLayouts(context, it) } ?: BuiltInLayouts(context)
 
-        /** The layout file [id] of the folder [dir], an id a pack's file is read by only ([PackLayouts.replaces]), within the limit, its byte-order mark gone. */
+        /** Only ids a pack replaces, within the limit, BOM stripped. */
         fun read(dir: File, id: String): String? {
             if (!PackLayouts.replaces(id)) return null
             val file = File(dir, "$id.xml")
@@ -85,11 +65,10 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             return file.readText().removePrefix(BOM)
         }
 
-        /** Why the pack's [layout] may not stand for the app's keyboard [id] ([app]), null where it may: [PackLayouts.judge], which the theme maker's page shares. */
+        /** Shared with the theme maker page. */
         fun judge(id: String, layout: Layout, fragments: Map<String, Fragment>, app: SceneLayout?): String? =
             PackLayouts.judge(id, layout, fragments, app?.layout, app?.fragments.orEmpty())
 
-        /** How many actions of [layout] and its [fragments] type text of their own (`commit:`): keys', their variants', popups', menus'. */
         fun commits(layout: Layout, fragments: Map<String, Fragment>): Int = commits(
             listOf(layout.defaults) + fragments.values.map { it.defaults },
             layout.parts.filterIsInstance<Row>() + fragments.values.flatMap { it.rows },
@@ -108,11 +87,10 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         private sealed interface Taken {
             class Yes(val layout: Layout, val fragments: Map<String, Fragment>, val ignored: List<KeyData.Ignored>) : Taken
 
-            /** Not a keyboard used: [why], null for a fragment (told unless a keyboard used includes it). */
+            /** [why] null for a fragment (told unless a used keyboard includes it). */
             class Not(val why: String?) : Taken
         }
 
-        // the pack's file [id] as it would be drawn ([report])
         private fun taken(dir: File, id: String, app: (String) -> SceneLayout?, appText: (String) -> String?): Taken {
             val text = read(dir, id) ?: return Taken.Not(if (PackLayouts.replaces(id)) "does not read" else "not a keyboard of the app")
             val layout = (LayoutReader.layout(text) as? Parsed.Ok)?.value
@@ -124,18 +102,10 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
                 fragments[src] = f
             }
             judge(id, layout, fragments, app(id))?.let { return Taken.Not(it) }
-            // as it is drawn: what its keys do held or swiped the app's (SceneLayouts.load)
-            // a pack's board is of its own id, whatever based-on= it writes (PackLayouts.judge holds it to that one)
+            // a pack's board is of its own id whatever based-on= says
             return KeyData.of(id, layout, fragments, KeyData.Mode.Pack, basedOn = null).let { Taken.Yes(it.layout, it.fragments, it.ignored) }
         }
 
-        /**
-         * The pack's layout files [files] (`k18.xml`) in [dir], as they would be drawn: each keyboard the app has that
-         * reads and is [judge]d typable used, its fragments the pack's where it has them; the rest with why not (a
-         * fragment none of those includes is no keyboard). [app]: the app's layout of an id. [listed]: its boards the user
-         * picks among their own layouts as they would be made ones (ThemeLayoutsToList.convert): listed by name, or
-         * unused with why; a fragment of the pack one of those includes is one used.
-         */
         fun report(
             dir: File,
             files: List<String>,
@@ -145,9 +115,8 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         ): Report {
             val used = ArrayList<String>()
             val unused = ArrayList<Pair<String, String>>()
-            // the fragments of the keyboards used, each counted once (k14 and k18 share the bottom row)
+            // each counted once (k14 and k18 share the bottom row)
             val included = HashMap<String, Fragment>()
-            // each thing not taken once, a fragment's though two keyboards include it
             val ignored = HashSet<KeyData.Ignored>()
             var commits = 0
             var listedCommits = 0
@@ -156,7 +125,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             val inList = HashSet<String>()
             for (id in ids) {
                 val c = made[id]
-                // the pack's bottom row one listed took in: no fragment unused
+                // a listed one took the bottom row in: no fragment unused
                 if (c is PackLayouts.Converted.Done) {
                     inList += includes(File(dir, "$id.xml"))
                     listedCommits += c.commits.size
@@ -176,12 +145,11 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             commits += included.values.sumOf { f -> commits(listOf(f.defaults), f.rows) }
             ids.filter { it !in used && it !in included && it !in inList && it !in made && unused.none { u -> u.first == it } }
                 .forEach { unused += it to "a fragment no keyboard of the pack includes" }
-            // in the order they are made in, not the files'
+            // in the order made, not the files'
             val names = listed.filter { it.first in ids }.mapNotNull { (it.second as? PackLayouts.Converted.Done)?.name }
             return Report(used, unused, commits, ignored.size, names, listedCommits)
         }
 
-        // the fragments the layout [file] includes; none where it does not read
         private fun includes(file: File): List<String> {
             val text = file.takeIf { it.isFile && it.length() <= ThemeAssetLimits.MAX_LAYOUT_BYTES }?.readText()?.removePrefix(BOM) ?: return emptyList()
             return (LayoutReader.layout(text) as? Parsed.Ok)?.value?.parts?.filterIsInstance<Include>()?.map { it.src }.orEmpty()

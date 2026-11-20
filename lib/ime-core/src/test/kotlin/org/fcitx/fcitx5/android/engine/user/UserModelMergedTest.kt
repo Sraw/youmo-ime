@@ -26,11 +26,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import kotlin.math.log10
 
-/**
- * The dictionaries the user merged, in the model: read from their compiled file in place
- * (DictionaryFile), walked in its own trie ([UserModel.mergedWords]), listed all; a word the base
- * has too keeps the base's id and is offered only from there (design D2, D3).
- */
+/** The user's merged dictionaries in the model, read in place (DictionaryFile); a word the base has keeps the base's id. */
 class UserModelMergedTest {
     @get:Rule
     val folder = TemporaryFolder()
@@ -68,7 +64,6 @@ class UserModelMergedTest {
         // against its dictionary's best, 你 0.5, though the base has that one
         assertEquals(log10(0.02f), m.mergedScore(id), 1e-5f)
         assertEquals(emptyList<Pair<UserModel.Entry, Float>>(), m.madeWords())
-        // listed for the tables from the file, not as a list
         assertFalse("妮好" in m.listedTexts())
     }
 
@@ -77,7 +72,6 @@ class UserModelMergedTest {
         val m = model(merged("你 ni 0.5", "泥 ni 0.1"))
         val ni = m.known(entry("你", "ni"))
         assertTrue(ni < data.vocabulary.size)
-        // the file's trie has 泥 at ni, not 你 a second time
         assertEquals(listOf("泥"), m.mergedWords!!.at("ni").map(m::text))
         // blocked in the base, it stays blocked: no arc of the file's brings it back
         assertTrue(m.block(entry("你", "ni")))
@@ -93,7 +87,7 @@ class UserModelMergedTest {
         assertTrue(m.blocked(id, -1))
         m.unblock(niHao)
         assertFalse(m.blocked(id, -1))
-        // the decoder's per-key questions, kept as owning, adding and counting change (review F3293, F3277, F3286)
+        // the decoder's per-key questions, kept as owning, adding and counting change
         assertFalse(m.anyMergedChosen())
         assertFalse(m.anyMergedCounted())
         assertEquals(id, m.own(niHao))
@@ -111,17 +105,14 @@ class UserModelMergedTest {
         assertTrue(m.addedByHand(id))
         assertTrue(m.chosen(id))
         assertTrue(m.anyMergedChosen())
-        // deleted by hand, the dictionary's word stays its word
         m.unlist(niHao)
         assertFalse(m.addedByHand(id))
         assertFalse(m.chosen(id))
         assertFalse(m.anyMergedChosen())
-        // typed: counted; forgotten: not
         m.learn(null, listOf(niHao))
         assertTrue(m.anyMergedCounted())
         m.forget(listOf(niHao))
         assertFalse(m.anyMergedCounted())
-        // the app's way: counts cleared and set again from the habits (review F3410)
         m.clearCounts()
         m.setCount(id, 2f)
         assertTrue(m.anyMergedCounted())
@@ -149,7 +140,6 @@ class UserModelMergedTest {
         assertTrue(m.isMerged(id))
         assertFalse(m.startOnly(id))
         assertFalse(m.isImported(niHao))
-        // left out of the start trie: offered once, from the file's
         assertEquals(listOf("拟浩"), m.startWords!!.at("ni", "hao").map(m::text))
     }
 
@@ -159,16 +149,14 @@ class UserModelMergedTest {
         val ids = ArrayList<Int>()
         m.forEachMergedOfText("妮") { ids += it }
         assertEquals(listOf("妮"), ids.map(m::text))
-        // 你 the base has: kept past the file's trie, no merged word (review F3342)
         m.forEachMergedOfText("你") { ids += it }
         assertEquals(listOf("妮"), ids.map(m::text))
-        // the file's left to the tables' index of it (CodedIndex)
         assertEquals(emptyList<String>(), m.listedTexts())
         assertTrue(m.listByHand(entry("拟好", "ni", "hao")) >= 0)
         assertEquals(listOf("拟好"), m.listedTexts())
     }
 
-    // review S3: asked before any id was made for it, the import a merged file has is the file's still
+    // asked before any id was made for it, the import a merged file has is the file's still
     @Test
     fun anImportTheFileHasIsNotOnlyImportedThoughNeverLookedUpBefore() {
         val m = model(merged("妮好 ni'hao 0.01"))
@@ -177,7 +165,6 @@ class UserModelMergedTest {
         assertEquals(Row.DICTIONARY, m.origin(niHao))
     }
 
-    // review S2: a merged word never typed in pinyin, committed in a table or handwriting, is found by its text
     @Test
     fun aMergedWordNeverTypedIsFoundByItsTextForLearningAndPairs() {
         val m = model(merged("妮好 ni'hao 0.5", "妮好 ni'hao 0.01", "你 ni 0.5"))
@@ -189,14 +176,13 @@ class UserModelMergedTest {
         assertNull(m.newEntryOf("没有"))
     }
 
-    // of a text's readings in the file, its best ranked (review F3380)
+    // of a text's readings in the file, its best ranked
     @Test
     fun aMergedTextsEntryIsItsBestRankedReading() {
         val m = model(merged("鬲 ni 0.01", "鬲 hao 0.1"))
         assertEquals(entry("鬲", "hao"), m.newEntryOf("鬲"))
     }
 
-    // review S5: the walkers look past a node's limit only when the user chose a merged word
     @Test
     fun aChosenMergedWordIsToldSoTheWalkersLookPastTheLimitForIt() {
         val m = model(merged("妮好 ni'hao 0.5", "拟浩 ni'hao 0.01"))
@@ -208,12 +194,10 @@ class UserModelMergedTest {
         assertFalse(m.anyMergedChosen())
     }
 
-    // review S7: a file compiled against an older base, while its recompile is owed: a word the base
-    // gained since is the base's alone, its block not undone by the file's copy
+    // a word the base gained since is the base's alone
     @Test
     fun aStaleFilesWordTheBaseHasNowIsLeftToTheBase() {
         val file = File(folder.root, "stale.ymd")
-        // compiled as if the base lacked 你
         DictionaryCompiler.compile(listOf(sequenceOf("你 ni 0.5", "妮 ni 0.1")), file)
         val m = UserModel(data.dictionary, data.vocabulary, data.wordIndex, DictionaryFile.open(JvmFile(file)), mergedStale = true)
         val copy = m.mergedWords!!.at("ni").single { m.text(it) == "你" }

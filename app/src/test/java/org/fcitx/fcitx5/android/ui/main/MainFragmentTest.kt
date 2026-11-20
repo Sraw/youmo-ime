@@ -13,10 +13,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The home page is one flat list in the order decided (2026-10-18; 资源包 last, 0.6.0), each row opening its page.
- * The data is as old as the day its release was made: an old tree built today is warned of too.
- */
+/** The data's age is its release day: an old tree built today is warned of too. */
 class MainFragmentTest {
 
     @Test
@@ -37,7 +34,6 @@ class MainFragmentTest {
             ),
             MainFragment.HOME.map { it.route },
         )
-        // each says what is behind it
         MainFragment.HOME.forEach { assertTrue(it.summary != 0) }
     }
 
@@ -56,7 +52,7 @@ class MainFragmentTest {
 
     @Test
     fun theReleaseBuiltInHasADay() {
-        // a tag renamed out of the pattern would have the warning fall back to the build time unnoticed
+        // a tag renamed out of the pattern would silently fall back to the build time
         assertNotNull(BuildConfig.ENGINE_DATA, dataDay(BuildConfig.ENGINE_DATA))
     }
 

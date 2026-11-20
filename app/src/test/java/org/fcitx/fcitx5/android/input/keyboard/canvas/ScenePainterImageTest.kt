@@ -22,7 +22,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.GraphicsMode
 
-// a key's image not decoded yet: its kind's colour shown meanwhile, and the painter told to draw again once in
+// an image not decoded yet: its kind's colour meanwhile, the painter told to draw again once in
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ScenePainterImageTest {
@@ -43,7 +43,6 @@ class ScenePainterImageTest {
         assertTrue(painter.missed)
     }
 
-    // one that will never come (no images on this keyboard): its colour, not drawn again for nothing
     @Test
     fun anImageThatIsNotThereShowsItsColourOnly() {
         val (painter, b) = drawn(BoardImages.NONE)

@@ -16,12 +16,6 @@ def words13():
 DOWNLOAD = "/sdcard/Download"
 
 
-case("PR-01", needs="jvm:BackupUatTest.noNetwork")(lambda d: None)
-
-
-case("PR-02", needs="jvm:BackupUatTest.noStorageContactsOrOtherPermissions")(lambda d: None)
-
-
 def password(d):
     open_url(d, "password")
     time.sleep(0.6)
@@ -48,18 +42,6 @@ def pr03(d):
     return f"空格「{lab}」，框里「{t}」"
 
 
-case("PR-04", needs="jvm:HostCasesUatTest.leavingAPasswordFieldGoesBackToTheInputMethodBefore")(lambda d: None)
-
-
-case("PR-05", needs="jvm:ToolbarUatTest.aPasswordsBarIsTheDigitsRow")(lambda d: None)
-
-
-case("PR-07", needs="jvm:PrivacyUatTest.aFieldThatAsksNotToLearnLearnsNothing")(lambda d: None)
-
-
-case("PR-08", needs="jvm:ImeSwitchUatTest.aSensitiveClipIsShownAsDots")(lambda d: None)
-
-
 def backup(d):
     """备份全部 → 保存 in 下载; returns (the new file, any message seen)"""
     d.hide_keyboard()
@@ -72,9 +54,7 @@ def backup(d):
     s = d.screen()
     name = next((n.text for n in s.app() if n.cls == "EditText"), "")
     d.tap_text("保存", where="all", scroll=False, after=0.3)
-    # a toast's window is not in uiautomator's dump: 备份成功 is read off the picture. Frames grabbed
-    # at once, not through shot()'s settle(): waiting for a still screen outlasted the 1 s toast;
-    # at 0.2, 0.5 and 0.8 s after 保存 (or as soon after as the last screencap allows)
+    # a toast is not in the dump: 备份成功 read off frames grabbed at once, as settle() outlasted the 1 s toast
     t0 = time.time()
     for i, at in enumerate((0.2, 0.5, 0.8)):
         time.sleep(max(0.0, t0 + at - time.time()))
@@ -91,7 +71,7 @@ def backup(d):
 
 def restore(d, fname, refused=None, took=None):
     """从备份恢复 → fname; returns (the confirmation's text, restarted), after the app came back.
-    The caller checks restarted (F3725): a case may check the warning first (F3714).
+    The caller checks restarted: a case may check the warning first.
     refused: text the import's error dialog must show (a backup this build refuses); returns (that
     dialog's text, False) once it shows over our page, with our process still the same one.
     took: a list the seconds from the file's tap to the refusal shown are added to"""
@@ -107,8 +87,7 @@ def restore(d, fname, refused=None, took=None):
     d.tap(b.c, 2.5)
     if "documentsui" not in d.top_activity():
         raise Blocked(f"没出文件选择：{d.top_activity()}")
-    # a file pushed over adb (PR-52b's) is in 下载 but not in 近期的文件, where the picker may open: as
-    # import_packs_ui goes there
+    # a file pushed over adb is in 下载 but not in 近期的文件, where the picker may open
     s = d.screen()
     # 近期的文件 (Android 14+) or 最近 (Android 10's)
     if not s.find(text=fname) and any(s.find(text=t, where="all") for t in ("近期的文件", "最近")):
@@ -159,8 +138,7 @@ def restore(d, fname, refused=None, took=None):
     ensure_ime(d)
     if not restarted:
         return warn, restarted
-    # the restarted settings home itself: the new process can be up (the keyboard's service)
-    # before its page is, and a tap made meanwhile is lost when the page comes over it
+    # the new process can be up before its page is, and a tap made meanwhile is lost
     try:
         d.wait(lambda s: "MainActivity" in d.top_activity() and d.at_home(s), timeout=15, what="恢复后重启的设置首页")
     except Blocked:
@@ -196,7 +174,7 @@ def pr10(d):
     d.step("重置后恢复")
     reset(d, "B0-设置", "设置")
     warn, restarted = restore(d, new[0])
-    # checked before anything else: the rest means nothing without a restart (F3725)
+    # checked before anything else: the rest means nothing without a restart
     check("覆盖" in warn and "标点用自带的" in warn and "剪贴板" in warn, f"确认前的提示「{warn[:60]}」")
     check(restarted, "应用没有重启")
     c1 = words13().page_cands(d, "dz")
@@ -228,7 +206,7 @@ def pr10(d):
     d.hide_keyboard()
     home(d, "实体键盘")
     choose(d, "每页候选数", "5")
-    # copied after the backup: the restore replaces the clipboard, it does not merge (F4273)
+    # copied after the backup: the restore replaces the clipboard, it does not merge
     tb = script("05-toolbar")
     tb.copy_word(d, "公园")
     tb.clip_panel(d)
@@ -297,44 +275,14 @@ def pr34(d):
     return f"{new[0]}；恢复后 {c[:3]}"
 
 
-case("PR-12", needs="jvm:BackupUatTest.aSensitiveClipboardEntryIsNotBackedUp")(lambda d: None)
-
-
 case("PR-13", needs="release:要同一版本的正式包覆盖安装，再导入语音包")(lambda d: None)
-
-
-case("PR-10a", needs="jvm:BackupUatTest.a032BackupOverAnImportOfTheNameOff")(lambda d: None)
-
-
-case("PR-10b", needs="jvm:BackupUatTest.thisBuildsBackupOverItsDictionaryTurnedOff")(lambda d: None)
 
 
 case("PR-14", needs="release:上一版正式版装上再覆盖安装这一版正式版，签名要一致")(lambda d: None)
 
 
-case("PR-30", needs="release:要 v0.3.0 正式版装上再覆盖安装这一版正式版")(lambda d: None)
 
 
-case("PR-15", needs="jvm:OwnFieldUatTest.thisAppsOwnFieldLearnsNothing、OwnFieldUatTest.thisAppsOwnFieldKeepsNoRecentSymbolAndReadsNoSum")(lambda d: None)
-
-
-case("PR-16", needs="jvm:OwnFieldEngineUatTest.whatWasDeletedInTheAppsOwnFieldIsNotTheTextBefore")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 不用我的输入习惯、清掉最近
-
-
-case("PR-17", needs="jvm:WordsUatTest.notUsingMyHabitsAsFreshlyInstalledButForWhatIsBlocked、HabitsUatTest.offTheEntrySaysToRestoreAndTheRecentEmojiAreGoneTillOn、HabitsUatTest.theSwitchOnTopOfTheUserWordsIsTheSameAsInTheStatusArea、MotionNoticeUatTest.habitsOffAndOnEachSaidTheNewInTheOldsPlace")(lambda d: None)
-
-
-case("PR-17a", needs="jvm:PrivacyUatTest.notUsingHabitsTheBaseDictionaryStillTypes")(lambda d: None)
-case("PR-17b", needs="jvm:EnginesBorrowedPhrasesTest.aSwitchOfTheHabitsOrThePhrasesReadAnewChangesTheBookThatDecides")(lambda d: None)
-
-
-case("PR-21", needs="jvm:PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins、LearningControlTest.aClearOfAllTheRecordHoldsEmptiesIt")(lambda d: None)
-
-
-# ---------------------------------------------------------------- 自动备份
 
 def backups(d):
     """用户词库 → 学习备份: the rows under 备份"""
@@ -343,18 +291,6 @@ def backups(d):
     return t[t.index("备份") + 1:] if "备份" in t else t
 
 
-case("PR-26", needs="jvm:PrivacyUatTest.clearedThenRestoredFromThisInstallsBackupBringsNothingBack")(lambda d: None)
-
-
-case("PR-27", needs="jvm:PrivacyUatTest.anAutomaticBackupOnTheFirstTypingDayDeleted")(lambda d: None)
-
-
-case("PR-32", needs="jvm:PrivacyUatTest.aBlockInTheBackupWinsOverThePhonesPin")(lambda d: None)
-
-
-# ---------------------------------------------------------------- R11: restore merges, 退回恢复前
-
-case("PR-25", needs="jvm:PrivacyUatTest.aRestoreMergesAndIsTakenBack")(lambda d: None)
 
 
 case("PR-35", needs="release:gate 3（gates.py backups，只支持 redroid；模拟器上手工做）恢复 fixtures/upgrade/v0.3.0 的备份")(lambda d: None)
@@ -369,44 +305,20 @@ case("PR-37", needs="release:gate 3（gates.py backups，只支持 redroid；模
 case("PR-38", needs="release:这一版正式版的备份装回 v0.3.2 正式版恢复")(lambda d: None)
 
 
-case("PR-39", needs="jvm:BackupUatTest.noDocumentsProviderForTheFilesApp")(lambda d: None)
-
-
-case("PR-40", needs="jvm:BackupUatTest.aBackupBringsPinyinsAndShuangpinsKeyboards")(lambda d: None)
-
-
-case("PR-41", needs="release:要 v0.4.0 正式版升级后以 root 删 Android/data；发版时手动跑")(lambda d: None)
 case("PR-42", needs="jvm:KotlinHostTest.anUnreadableFileIsNeverWrittenOverAndTheUserIsTold、"
      "KotlinHostTest.filesNotSettledAreReadButNotWrittenAndTheUserIsTold、"
      "UserDataManagerTest.aBackupAndARestoreAreRefusedWhileNotSettled、"
      "EngineBridgeTest.theKeyboardsPinIsRefusedWhereTheFileWouldBeLost、EngineBridgeTest.theKeyboardsPinIsRefusedWhereDataIsNotSettled、PhraseBookTest.aRefusedSaveTakesNoEffect、"
      "ThemeFilesManagerTest.themesNotSettledAreNotWritten")(lambda d: None)
-case("PR-43", needs="release:要 v0.4.0 正式版里并入雾凇拼音，再覆盖安装这一版正式版；发版时手动跑")(lambda d: None)
 
 
-case("PR-44", needs="jvm:BackupUatTest.aBackupBringsTheAddressListsAndWhatTheyLearned")(lambda d: None)
-
-
-case("PR-45", needs="jvm:BackupUatTest.aLearningBackupBringsWhatTheAddressBarLearned")(lambda d: None)
-
-
-case("PR-46", needs="jvm:BackupUatTest.aSettingsBackupsAddressesMergeWithThePhones")(lambda d: None)
-
-
-case("PR-47", needs="jvm:KotlinHostTest.aZeroFourBackupRestoredMergesItsNineKeysPinyinAgain")(lambda d: None)
-
-
-case("PR-49", needs="jvm:PrivacyUatTest.aBackupTakesAWholeSentenceUsedTwiceNotOnce")(lambda d: None)
-
-
-case("PR-50", needs="jvm:UserDataManagerTest.aBackupBiggerThanTheRoomLeftStopsAsItIsUnpacked")(lambda d: None)
 case("PR-51", needs="manual:要恢复备份造出同名的 3.0 主题和主题包两张卡，再分别删除")(lambda d: None)
 case("PR-52", needs="jvm:BackupEntriesTest.aFileIsCopiedOnlyIfAZipOfSizeAndRoomAndReadByItsEndRecord、BackupEntriesTest.aFullFieldIsReadFromZip64OnlyWhereItsRecordIsThereAndHolds、BackupEntriesTest.aBackupOfTooManyEntriesIsRefusedBeforeAnyIsUnpacked、UserDataManagerTest.aBackupOfTooManyEntriesStopsAsItIsUnpacked、"
      "UserDataManagerTest.aFileWithoutTheMetadataIsRefusedAndNothingChanges")(lambda d: None)
 @case("PR-52b", base="B0-设置", mutates=True)
 def pr52b(d):
     """a zip of 100 001 empty folders refused at once, by its central directory: not after each was
-    unpacked (R25: half a minute of 加载中 first)"""
+    unpacked"""
     d.step("把 many.zip 放进下载")
     with tempfile.TemporaryDirectory() as tmp:
         local = os.path.join(tmp, "many.zip")
@@ -426,23 +338,15 @@ def pr52b(d):
 
 
 case("PR-52a", needs="manual:系统文件选择器里选改过名的备份、不是备份的 zip、图片和条目太多的 zip；在真机或模拟器上手工跑")(lambda d: None)
-case("PR-53", needs="jvm:AppPrefsTest.theOneHandedSideRememberedIsNotResetByTheResetsOfHiddenSettings")(lambda d: None)
-case("PR-54", needs="jvm:CandidateMenuUatTest.aFieldThatLearnsNothingHasTheCardAndNoLines")(lambda d: None)
 
-case("PR-55", needs="jvm:KotlinHostHandwritingTest.zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce、HandwritingRetireTest.eachGroupWithoutHandwriting")(lambda d: None)
 case("PR-56", needs="jvm:AppPrefsTest.zeroSixsKeyHandwritingIsOffWithTheToolbarsHandwritingPinned、"
                "KotlinHostHandwritingTest.zeroSixsHandwritingInputMethodMovesOntoTheToolbarAndTheUserIsToldOnce、HandwritingRetireTest.eachGroupWithoutHandwriting")(lambda d: None)
 case("PR-57", needs="manual:要 0.6.0 做的「备份全部」（列表里有手写、学过「澜」），恢复后看列表、手写开关和「澜」的排序")(lambda d: None)
 case("PR-58", needs="jvm:KotlinHostHandwritingTest.zeroSixsTraditionalHandwritingIsPinyinsWhereItTookItsPlace、"
                "HandwritingRetireTest.traditionalHandwritingGoesToPinyinWhereItTookHandwritingsPlace")(lambda d: None)
-case("PR-59", needs="jvm:KeyboardStyleTest.from060EachShapeAsItShowed、KeyboardStyleTest.from060FloatingOverWhatShowedDocked、KeyboardStyleMigrationAppTest.onTheWideScreenTheLandscapeOneIsNotWritten、KeyboardStyleMigrationAppTest.alwaysSplitFloatingIsFloatingOverSplitBothWays、KeyboardStyleMigrationAppTest.onlyOnceAndAStyleStoredIsKept")(lambda d: None)
 case("PR-60", needs="manual:要 0.6.0 的包：0.6.1 的备份恢复到 0.6.0 不崩、照升级前的设置；在 0.6.0 改了再升回来用降级前 0.6.1 的样式")(lambda d: None)
-case("PR-61", needs="jvm:KeyboardSizesTest.floatingKeepsThePercentOf060、KeyboardAreaTest.aPhoneTurnedAsksForFourRowsOf48")(lambda d: None)
-case("PR-62", needs="jvm:PunctuationRestoreTest.aRestoredPunctuationTableIsDropped、BackupUatTest.aBackupRestoredReplacesSettingsAndPhrasesItsPunctuationTableDropped")(lambda d: None)
 case("PR-63", needs="manual:要 0.6.0 的正式包：升级后已装主题包的 ⇧ 变分词，恢复 0.6.0 的备份带进来的包也变、0.6.1 的备份的不变；记录和改写由 ThemeSeparatorMigrationTest.aRestoreOfABackupOfBefore061RecordsItsPacks、ThemeSeparatorMigrationTest 查")(lambda d: None)
 
-
-case("PR-64", needs="jvm:BackupLayoutsTest.theLayoutsGoWithABackupAndAreLaidOverThePhones、BackupLayoutsTest.aBackupWithoutLayoutsLeavesThePhonesAndOneForgedIsNotTakenAsItSays")(lambda d: None)
 
 case("PR-68", needs="jvm:ThemeLayoutsToListTest.aBackupOf060sPacksIsListedAtTheStartAfterItsRestoreItsChoicesSwitched、"
                      "ThemeLayoutsToListTest.aRestoreOf061sPacksListsThemAndChoosesNone、"

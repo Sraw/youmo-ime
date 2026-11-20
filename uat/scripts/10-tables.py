@@ -32,69 +32,6 @@ def tbl01(d):
     return f"「{t}」"
 
 
-case("TBL-02", needs="jvm:OtherInputMethodsUatTest.wubiFourCodesWithOneCharacterCommitIt")(lambda d: None)
-
-
-case("TBL-03", needs="jvm:TablesUatTest.fullCodeThenAnotherKeyCommitsTheFirst")(lambda d: None)
-
-
-case("TBL-04", needs="jvm:TablesUatTest.autoCommitOff")(lambda d: None)
-
-
-case("TBL-05", needs="jvm:TablesUatTest.anEmptyCodeIsDroppedByTheNextKey")(lambda d: None)
-
-
-case("TBL-06", needs="jvm:TablesUatTest.codeHintsByDefault")(lambda d: None)
-
-
-case("TBL-07", needs="jvm:TablesUatTest.codeHintsOff")(lambda d: None)
-
-
-case("TBL-08", needs="jvm:TablesUatTest.wubiZLooksUpByPinyin")(lambda d: None)
-
-
-case("TBL-09", needs="jvm:TablesUatTest.wubiZIsAWildcard")(lambda d: None)
-
-
-case("TBL-10", needs="jvm:OtherInputMethodsUatTest.wubiAWord")(lambda d: None)
-
-
-case("TBL-11", needs="jvm:TablesUatTest.aCharacterAtATimeMakesNoWord")(lambda d: None)
-
-
-case("TBL-12", needs="jvm:TablesSettingsUatTest.aPinyinWordOnATablesOnlyCodeSaysWhichWord、TablesUatTest.aPinyinWordTakesNoTablesOnlyCode")(lambda d: None)
-
-
-case("TBL-14", needs="jvm:TablesUatTest.noOrderByUseOnANewInstall")(lambda d: None)
-
-
-case("TBL-15", needs="jvm:TablesUatTest.orderByUseOnPinyinUntouchedThenTheTablesOrderBack")(lambda d: None)
-
-
-case("TBL-16", needs="jvm:TablesUatTest.aTablesCommitPredicts")(lambda d: None)
-
-
-case("TBL-18", needs="jvm:TablesUatTest.erbiBracketLooksUpByPinyin")(lambda d: None)
-
-
-case("TBL-19", needs="jvm:OtherInputMethodsUatTest.cangjie")(lambda d: None)
-
-
-case("TBL-45", needs="jvm:TablesUatTest.cangjieAndErbiStarIsAWildcard")(lambda d: None)
-
-
-case("TBL-21", needs="jvm:TablesUatTest.ziranmaTable")(lambda d: None)
-
-
-case("TBL-22", needs="jvm:OtherInputMethodsUatTest.wubiAndPinyinMixed")(lambda d: None)
-
-
-case("TBL-24", needs="jvm:HostCasesUatTest.aCodeMistypedInTheMiddleIsFixedWhereTheRowIsTapped")(lambda d: None)
-
-
-case("TBL-12b", needs="jvm:TablesUatTest.importedWordsAfterTheTablesOwnNotOnItsOnlyCode")(lambda d: None)
-
-
 @case("TBL-12c", base="B0-设置", mutates=True, heavy=True,
       needs="release,scripted:发版时用发布包跑（UAT_BUILD=release），平时不跑：要雾凇拼音，一条三四分钟（用户 2026-10-30 定）")
 def tbl12c(d):
@@ -121,9 +58,7 @@ def tbl12c(d):
         time.sleep(0.4)
         more.append(words(d.candidates())[:3])
         d.clear()
-    # coding frost for 五笔 runs on past the 30 s above and holds ~100 MB live while it does (read
-    # after a GC); the case is about what stays, so wait for it to finish before the readings
-    # two low readings in a row: one alone can fall between two batches of the coding
+    # coding frost for 五笔 runs past the wait above: wait for two low readings in a row before the readings
     peak, low = 0, 0
     for _ in range(30):
         h = words13.java_heap(d)
@@ -143,43 +78,7 @@ def tbl12c(d):
     return f"jbys：{c[:5]}；gg、wq {more}；Java 堆 {base} → {heap} KB（编码时最高 {peak} KB）"
 
 
-case("TBL-27", needs="jvm:TablesUatTest.wubiEmoji")(lambda d: None)
-
-
-case("TBL-28", needs="jvm:TablesUatTest.everyTableHasEmojiAfterASwitchAndARestart")(lambda d: None)
-
-
-case("TBL-33", needs="release:要从 v0.3.0 升级（装旧版、学过词，不卸载装这一版）；发版时手动跑")(lambda d: None)
-
-
 case("TBL-43", needs="release:要 v0.4.0 装好学过词后导出的 .zip，再重置装这一版恢复；发版时手动跑")(lambda d: None)
-
-
-case("TBL-12d", needs="release:v0.3.2 正式版里并入雾凇拼音、加五笔，再覆盖安装这一版正式版，签名要一致")(lambda d: None)
-
-
-case("TBL-36", needs="jvm:TablesUatTest.aBlockInATableIsForThatCodeListedAndRestored")(lambda d: None)
-
-
-case("TBL-46", needs="jvm:TablesUatTest.cangjiesCodeIsShownInItsRoots")(lambda d: None)
-
-
-case("TBL-47", needs="jvm:TablesUatTest.theLookUpKeyLooksUpByPinyinTillPressedAgain")(lambda d: None)
-
-
-case("TBL-48", needs="jvm:TablesKeysUatTest.returnSaysConfirmWhileATableHasACode")(lambda d: None)
-
-
-case("TBL-49", needs="jvm:TablesKeysUatTest.wubiKeysShowNamesOrAllRoots")(lambda d: None)
-
-
-case("TBL-50", needs="jvm:TablesKeysUatTest.erbisSemicolonHasAKey")(lambda d: None)
-
-
-case("TBL-51", needs="jvm:TablesKeysUatTest.wubisAllRootsAreItsNamesAtCompact、TableRootsTest.atCompactAllTheRootsAreShownAsTheirNames")(lambda d: None)
-case("TBL-54", needs="jvm:TableSlipUatTest.cangjiesEmptyCodeIsReadAsTheKeyTheTapLeansTo、TableSlipUatTest.cangjiesLoneCodeReadFromASlipWaitsForTheNextKey、TableSlipTest.aKeyThatMakesAnEmptyCodeIsReadAsTheOneItsTapLeansTo、TableSlipTest.theNearestKeyThatLeadsOnIsTaken、TableSlipTest.aCodeReadFromASlipWithOneCandidateIsCommittedByAKeyThatCannotGoOn、TableSlipTest.aCodeReadFromASlipWaitsOnlyWhereItWouldHaveCommittedItself、TableSlipTest.theKeyAfterAWaitingCodeIsReadAsAToppingKeyIs、TableSlipTest.aWaitingCodeIsCommittedByPunctuationASpaceOrASelectionKeyAsAnyCode、TableSlipTest.everyKeyReadKeepsItsMarkWhenAnotherGoes、TableSlipTest.aKeyPutInMidCodeIsNeverReadAndMovesTheMarks、TableSlipTest.noKeyIsReadAsASelectionKeyNorAnEndKey、TableSlipTest.erbiNeverTopsAndItsPinyinKeyIsNeverRead、EnginesTableSlipTest.aCodeReadFromASlipWaitsThenTheNextKeyThatCannotGoOnCommitsIt")(lambda d: None)
-case("TBL-55", needs="jvm:TableSlipUatTest.wubisToppingKeyIsReadOnlyAtTheEdge、TableSlipTest.aKeyAfterAWholeCodeIsReadOnlyAtTheEdge、TableSlipTest.aKeyIsNeverReadAsOneLeadingToTheTextItWouldCommit、TableSlipTest.aWaitingCodeIsCommittedOnceWhereTheTableTops、TableSlipTest.ziranmaTopsAsWubiDoes、TableSlipTest.wubiPinyinReadsNoKeyAsOneLeadingToPinyinAlone、TableSlipTest.aKeyAfterAWholeCodeIsReadOnlyForACodeTheWordModelWeighsAsMuch、TableSlipTest.aCodeWithAKeyReadAsItsNeighbourNeverCommitsItself、TableSlipTest.aCodeWithEntriesIsNeverChanged、TableSlipTest.aCodesFirstKeyIsNeverRead、TableSlipTest.aFullCodesNextKeyStartsTheNextCode、TableSlipTest.theWildcardIsNeverReadAsAnotherKey")(lambda d: None)
-case("TBL-56", needs="jvm:TableSlipUatTest.slipsOffLeaveTheEmptyCodeToBeDropped、EnginesTableSlipTest.aSlipIntoAnEmptyCodeIsReadAsTheKeyMeantUnlessSlipsAreOff")(lambda d: None)
 
 
 @case("TBL-52", base="B0-五笔", mutates=True)   # 你 blocked stays blocked
@@ -198,4 +97,3 @@ def tbl52(d):
     d.clear()
     check("你" not in again, f"屏蔽后 z n i 还有「你」：{again[:6]}")
     return f"屏蔽前 {c[:4]}，屏蔽后 {again[:4]}（设置里恢复由 JVM 管）"
-case("TBL-53", needs="jvm:EnginesWordCardTest、WordCardUatTest.theExamplesReadAsTheDesignHasThem")(lambda d: None)

@@ -42,8 +42,7 @@ class ReadingsRunTest {
 
     @Test
     fun countsTheWordsReadRightAndListsTheRest() {
-        // 东西's xi, neutral as listed, read in 西's own tone; 银行's hàng is wrong on purpose (it is
-        // háng), the one miss counted
+        // 东西's neutral xi read in 西's own tone; 银行's hàng is wrong on purpose, the one miss
         val set = ReadingsRun.parse(sequenceOf("# comment", "银行\tyín hàng", "东西\tdōng xī", ""))
         val r = ReadingsRun(data).measure(set)
         assertEquals(2, r.words)

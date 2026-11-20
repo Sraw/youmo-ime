@@ -14,15 +14,13 @@ import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEve
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesAttached
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesDetached
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesUpdated
+import org.fcitx.fcitx5.android.utils.getBooleanState
+import org.fcitx.fcitx5.android.utils.unsafeJump
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The chevron at the right of the candidate strip. It is [Hidden] when there is nothing to
- * expand, points down when the expanded candidate window can be opened, and up when it can
- * be closed again.
- */
+/** The chevron: [Hidden] with nothing to expand, down to open, up to close. */
 class ExpandButtonStateMachineTest {
 
     private val seen = mutableListOf<State>()
@@ -63,8 +61,7 @@ class ExpandButtonStateMachineTest {
         "the button stays hidden without expanded candidates" to { assertTransition(Hidden, ExpandedCandidatesUpdated, expandedEmpty = true, expected = Hidden) },
         "the button disappears when expanded candidates run out" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesUpdated, expandedEmpty = true, expected = Hidden) },
         "the button stays visible while expanded candidates remain" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesUpdated, expandedEmpty = false, expected = ClickToAttachWindow) },
-        // no rule from ClickToDetachWindow for this event: while the window is open the button
-        // keeps meaning "close me", even if the candidate list changes underneath
+        // no rule from ClickToDetachWindow for this event: while open the button keeps meaning "close me"
         "updating candidates while the window is open does not change the button (none left)" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesUpdated, expandedEmpty = true, expected = ClickToDetachWindow) },
         "updating candidates while the window is open does not change the button (some left)" to { assertTransition(ClickToDetachWindow, ExpandedCandidatesUpdated, expandedEmpty = false, expected = ClickToDetachWindow) },
         "attaching flips the button to detach (candidates left)" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesAttached, expandedEmpty = false, expected = ClickToDetachWindow) },
@@ -76,8 +73,6 @@ class ExpandButtonStateMachineTest {
         "detaching while hidden is a no-op" to { assertTransition(Hidden, ExpandedCandidatesDetached, expandedEmpty = false, expected = Hidden) },
         "detaching while detached is a no-op" to { assertTransition(ClickToAttachWindow, ExpandedCandidatesDetached, expandedEmpty = false, expected = ClickToAttachWindow) },
     )
-
-    // region realistic sequences
 
     @Test
     fun openAndCloseTheExpandedWindowWithCandidatesStillPresent() {
@@ -109,5 +104,4 @@ class ExpandButtonStateMachineTest {
         assertEquals(Hidden, m.currentState)
     }
 
-    // endregion
 }

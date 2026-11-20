@@ -105,9 +105,7 @@ class SetupActivity : AppCompatActivity() {
     }
 
     companion object {
-        // skipped in this process: not shown again till it restarts. Shown once was not enough to keep
-        // it away: a user leaving it for the system's settings (a tap on the keyboard's name opens the
-        // app's) came back to the app with nothing to select the keyboard
+        // skipped in this process: shown once was not enough, a user back from the system's settings had nothing to select it
         @VisibleForTesting
         internal var skipped = false
         fun shouldShowUp() = !skipped && SetupPage.hasUndonePage()

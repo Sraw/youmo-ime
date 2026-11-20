@@ -14,37 +14,25 @@ import java.io.FileFilter
 import java.io.FileOutputStream
 import java.io.IOException
 
-/** FB12: the packs installed before 0.6.1, and those an older backup restores, given the app's 分词 ([addSeparatorsOnce]). */
+/** Pre-0.6.1 packs, and those an older backup restores, get the app's 分词 ([addSeparatorsOnce]). */
 object ThemeSeparators {
 
-    /**
-     * Where it is kept that this install's packs were given 分词 ([addSeparatorsOnce]): this phone's, not backed up, nor in
-     * the prefs, which a restore writes over (a backup of 0.6.0 restored would have every pack given it again, one of
-     * 0.6.1 its packs too, which were imported after).
-     */
+    /** This phone's, not backed up nor in the prefs: a restore would overwrite them and redo every pack. */
     @VisibleForTesting
     internal var separatorsFile: () -> File = { File(appContext.noBackupFilesDir, "theme-separator-added") }
 
-    /** The packs a backup of before 0.6.1 restored, to be given 分词 at the next start ([restoredBeforeSeparator]). */
+    /** Given 分词 at the next start ([restoredBeforeSeparator]). */
     @VisibleForTesting
     internal var restoredFile: () -> File = { File(appContext.noBackupFilesDir, "theme-separator-restored") }
 
-    /**
-     * There while a start gives packs 分词: one that finds it there ended in the middle (killed, or an Error such as
-     * StackOverflowError out of Application.onCreate), and does it once more with the marker written and the list
-     * dropped first, so a pack that kills the app costs one start more, never every start.
-     */
+    /** Present while a start works: found, the last ended midway (killed, or an Error), so it runs once more with marker and list cleared first. */
     @VisibleForTesting
     internal var tryingFile: () -> File = { File(appContext.noBackupFilesDir, "theme-separator-trying") }
 
     /**
-     * FB12 (dev/design/061-theme-separator-migration.md): the packs installed before 0.6.1 given the app's 分词 in their
-     * qwerty's Shift's place while pinyin is typed, as the app's own qwerty has it since ([ThemePackFiles.addSeparator]),
-     * once an install, at the first start the themes can be written (A4: none before the phone is unlocked); and the
-     * packs a backup of before 0.6.1 brought ([restoredBeforeSeparator]) at the start after its restore. The packs imported
-     * after are as they are written. Run by ThemeManager before the packs are listed, on the main thread of
-     * Application.onCreate: it never throws (a pack that fails is left as it was, logged, and not tried again).
-     * Under the lock [restoredBeforeSeparator] takes: a restore's list is not added to between its read and its deletion.
+     * Puts 分词 in qwerty Shift's place while pinyin is typed ([ThemePackFiles.addSeparator]), once per install at the
+     * first start themes can be written, and for a pre-0.6.1 backup's packs at the start after its restore. Runs on
+     * Application.onCreate's main thread and never throws (a failing pack is logged and left). Under the restore's lock.
      */
     @Synchronized
     @Suppress("TooGenericExceptionCaught")
@@ -61,16 +49,16 @@ object ThemeSeparators {
                 return
             }
             if (trying.exists()) {
-                // the last start ended in the middle: once more, not again
+                // the last start ended midway: once more, not again
                 written(marker)
                 restored.delete()
             } else {
                 written(trying)
             }
-            // a kill in the middle of an import put right first: the pack it replaced back, what it left cleared
+            // an import killed midway put right first
             ThemeFilesManager.sweepPacksOnce()
             val dirs = ThemePackFiles.folder(ThemeFilesManager.dir).listFiles(FileFilter { it.isDirectory && !it.name.startsWith(".") && (names == null || it.name in names) })
-            // once an install, on the start's main thread: how long, for the packs a phone may have (impl report)
+            // once an install on the main thread: logged how long
             val start = System.nanoTime()
             if (!dirs.isNullOrEmpty()) addSeparators(dirs.toList())
             Timber.i("Theme packs given 分词: ${dirs?.size ?: 0} looked at in ${(System.nanoTime() - start) / NANOS_A_MS} ms")
@@ -86,7 +74,7 @@ object ThemeSeparators {
 
     private const val NANOS_A_MS = 1_000_000
 
-    // [file] there, empty, on the disk
+    // there, empty, on the disk
     private fun written(file: File) {
         file.parentFile?.mkdirs()
         FileOutputStream(file).use { it.fd.sync() }
@@ -109,18 +97,14 @@ object ThemeSeparators {
         }
     }
 
-    /**
-     * The packs [names] a backup made before 0.6.1 restored (UserDataManager), each replacing the phone's of its name: to
-     * be given 分词 at the next start, as the ones installed then were. One of 0.6.1 or later brings its packs as they
-     * were (given it already, or imported after).
-     */
+    /** Each replacing the phone's of its name; a 0.6.1+ backup brings its packs as they were. */
     @Synchronized
     fun restoredBeforeSeparator(names: Collection<String>) {
         // added to: two old backups restored without a start between
         if (names.isNotEmpty()) writeRestored(readRestored() + names)
     }
 
-    /** The pack [name] imported (placed): not one an old backup restored any more, as it is written. */
+    /** Imported (placed): no longer an old backup's, as written. */
     @Synchronized
     internal fun importedOverRestored(name: String) {
         val names = readRestored()

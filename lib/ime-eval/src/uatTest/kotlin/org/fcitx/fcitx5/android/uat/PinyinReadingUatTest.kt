@@ -14,9 +14,7 @@ import org.junit.Test
 /** uat/06-pinyin.md: the readings above candidates, on the shipped data (PinyinUatTest is at detekt's size). */
 class PinyinReadingUatTest {
 
-    // the shipped data's 䏝: the dictionary lists it under chun, the tone table has no tone of it there (only zhuān),
-    // so pinyin shows the typed syllable toneless beside its neighbours' toned ones; zhuyin shows none, a toneless
-    // zhuyin reading as tone 1 (DECISIONS.md 候选注音缺读音与对齐)
+    // 䏝 has no tone under chun in the tone table: pinyin shows it toneless, zhuyin as tone 1
     @Test
     @Uat("PY-121")
     fun aCharacterOfNoKnownToneReadsToneless() {

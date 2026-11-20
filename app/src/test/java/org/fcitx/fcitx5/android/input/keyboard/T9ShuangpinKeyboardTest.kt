@@ -34,10 +34,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/**
- * 九键双拼 (design §3.4): the nine keys' layout, its digit keys sending [NineKeyLetters.NINE_SP]'s
- * codes, 1 the separator `'` while typing; no 中/英, no 连按.
- */
+/** 九键双拼: digit keys send [NineKeyLetters.NINE_SP]'s codes, 1 the separator `'` while typing; no 中/英, no 连按. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class T9ShuangpinKeyboardTest {
@@ -48,13 +45,12 @@ class T9ShuangpinKeyboardTest {
     private fun code(c: Char) = KeyAction.SymAction(KeySym(UNICODE + c.code), KeyStates.Virtual)
 
     @Test
-    fun theDigitKeysShowTheStandardLettersAndOneMicrosoftsSemicolon() {
-        fun alts(semicolon: Boolean) = T9Keyboard.layout(NineKeyLetters.STANDARD, shuangpin = true, semicolon = semicolon).flatten()
-            .mapNotNull { it.appearance as? KeyDef.Appearance.AltText }
-        assertEquals(listOf(",.?!", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"), alts(true).map { it.displayText })
-        // 1's ; beside its digit under 微软's alone
-        assertEquals("1;", alts(true).first().altText)
-        assertEquals("1", alts(false).first().altText)
+    fun theDigitKeysShowTheStandardLetters() {
+        fun keys(semicolon: Boolean) = T9Keyboard(context, TestThemes.PixelDark, shuangpin = true, semicolon = semicolon).laidOut().shownKeys()
+        val digits = keys(true).filter { it.alt != null }
+        assertEquals(listOf(",.?!", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"), digits.map { it.label })
+        assertEquals("1", digits.first().alt)
+        assertEquals("1", keys(false).first { it.alt != null }.alt)
     }
 
     @Test
@@ -63,13 +59,11 @@ class T9ShuangpinKeyboardTest {
         for (d in '2'..'9') {
             assertEquals(code(NineKeyLetters.NINE_SP.codes[d - '2']), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("$d"), keys, tap, 0L, composing = false, semicolon = false))
         }
-        // pressed again soon: no 连按, the same code again
         assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 10L, composing = true, semicolon = false))
         assertEquals(code(nineSpCode('2')), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("2"), keys, tap, 20L, composing = true, semicolon = false))
     }
 
-    // 061-neighbour-groups: a digit key's tap goes with where it fell and the digit keys around it, as the engine reads
-    // them (their NINE_SP codes, not the digits); 1 (its separator, 微软's ;) none
+    // a digit's tap goes with the digits around as their NINE_SP codes; 1 none
     @Test
     @Uat("SP-50")
     fun aDigitKeysTapGoesWithWhereItFellAndTheKeysAroundItByTheirCodes() {
@@ -78,11 +72,9 @@ class T9ShuangpinKeyboardTest {
         assertEquals(code(nineSpCode('9')).copy(touch = touch), sent)
         val keyboard = T9Keyboard(context, TestThemes.PixelDark, shuangpin = true, semicolon = true)
         assertEquals(('2'..'9').map { nineSpCode(it) to KeyRef(it.toString()) }, keyboard.typingKeys())
-        // 九键 pinyin's, its digits
         assertEquals(('2'..'9').toList(), T9Keyboard(context, TestThemes.PixelDark, semicolon = false).typingKeys().map { it.first })
     }
 
-    // Chinese punctuation on: 1's , as it maps it
     private val zh = mapOf("," to "，")
 
     @Test
@@ -92,7 +84,7 @@ class T9ShuangpinKeyboardTest {
         assertEquals(KeyAction.CommitAction("，", punctuation = true), T9Keyboard.resolveShuangpin(KeyAction.HostKeyAction("1"), keys, tap, 0L, composing = false, semicolon = false, marks = zh))
     }
 
-    // 微软's: 1 while typing is ;'s code, the engine reading it as ing or the separator; else punctuation as ever
+    // 微软's: 1 while typing is ;'s code (ing or the separator); else punctuation as ever
     @Test
     fun oneIsTheSemicolonsCodeWhileTypingOnMicrosofts() {
         val tap = MultiTap(0)
@@ -121,11 +113,9 @@ class T9ShuangpinKeyboardTest {
         activity.setContentView(keyboard)
         val looper = shadowOf(Looper.getMainLooper())
         try {
-            // the column: 双拼's syllables while typing, as 九键's
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("ni", "mi"), id = 1)
             looper.idle()
             assertEquals(listOf("ni", "mi"), column())
-            // pinyin's answer is another input method's here: not taken
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("bu", "nu"), id = 2)
             looper.idle()
             assertEquals(T9Keyboard.labels(T9State()), column())

@@ -4,14 +4,10 @@
  */
 package org.fcitx.fcitx5.android.data
 
-/** This fork was built as upstream's org.fcitx.fcitx5.android until 2026-10-02, when it became 幽默输入法. */
+/** This fork's package before it became 幽默输入法. */
 const val LEGACY_APPLICATION_ID_ROOT = "org.fcitx.fcitx5.android"
 
-/**
- * Where user data exported by [exporter] comes from, for the app [applicationId] whose id without the
- * build type's suffix is [root]: [Own] when it is this app's, [Legacy] when it is the same build type's
- * from before the renaming, so that a backup outlives it, and null for any other app's.
- */
+/** [Own] for this app's data, [Legacy] for the same build type's from before the rename (so backups outlive it), else null. */
 sealed interface UserDataOrigin {
     data object Own : UserDataOrigin
 
@@ -27,7 +23,6 @@ sealed interface UserDataOrigin {
             else -> null
         }
 
-        /** PreferenceManager.getDefaultSharedPreferences's file in shared_prefs. */
         fun preferencesFile(packageName: String) = "${packageName}_preferences.xml"
     }
 }

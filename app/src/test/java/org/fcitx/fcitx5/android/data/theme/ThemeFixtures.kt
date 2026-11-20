@@ -10,13 +10,12 @@ import org.fcitx.fcitx5.android.scene.look.Crop
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.Picture
 
-// the tests' custom themes as the app made them before 3.0 (no editing in the app now): a built-in
-// theme's colours, with or without a picture under the keyboard
+// the tests' custom themes as the app made them before 3.0 (no editing in the app now)
 
 /** [this] built-in theme as a custom one named [name], no picture. */
 fun Theme.Builtin.deriveCustomNoBackground(name: String) = Theme.Custom(name, isDark, look)
 
-/** [this] built-in theme as a custom one named [name], [cropped] (cut from [src]) under the keyboard. */
+/** [cropped] (cut from [src]) under the keyboard. */
 fun Theme.Builtin.deriveCustomBackground(
     name: String,
     cropped: String,
@@ -33,7 +32,6 @@ fun Theme.Builtin.deriveCustomBackground(
     ),
 )
 
-/** The picture's portrait cut as file 2.x had it ("backgroundImage"). */
 data class BackgroundImage(
     val croppedFilePath: String,
     val srcFilePath: String,

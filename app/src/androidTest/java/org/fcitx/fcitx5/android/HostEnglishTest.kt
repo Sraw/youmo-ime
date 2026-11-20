@@ -23,10 +23,10 @@ import org.junit.Test
 import org.junit.rules.Timeout
 import timber.log.Timber
 
-/** [HostTest]'s English cases, in a class of their own for its size: the engine set up as there ([TestHost]). */
+/** [HostTest]'s English cases, split out for size. */
 class HostEnglishTest {
 
-    // as HostTest's: a broken engine interaction fails the run instead of hanging it
+    // a broken engine interaction fails the run instead of hanging it
     @get:Rule
     val timeout: Timeout = Timeout.seconds(30)
 
@@ -49,19 +49,13 @@ class HostEnglishTest {
         private suspend fun eventsTillQuiet() = harness.eventsTillQuiet()
     }
 
-    /** A clean engine and event queue for each test: see [TestHost.beforeTest]. */
     @Before
     fun resetEngineAndDrainEvents() = harness.beforeTest()
 
     @After
     fun restoreEnabledIME() = harness.afterTest()
 
-    /**
-     * English through the engine as the keyboard types it (virtual keys): the word typed offered
-     * with what it starts, space committing it with a space, and a full stop typed next put in
-     * that space's place, `hel. `; a slip corrected by space, and, nothing learned here, no words
-     * offered after it; a hardware key types itself.
-     */
+    /** `hel. `: a full stop replaces the committed word's space; a slip is corrected by space. */
     @Test
     fun englishCompletesCorrectsAndSpacesWordsAndLeavesAHardwareKeyToTheApp(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodNames.KEYBOARD))
@@ -86,9 +80,9 @@ class HostEnglishTest {
         Timber.i("teh typed in ${(System.nanoTime() - started) / 1_000_000} ms, the first key building the word index")
         fcitx.sendKey(' ', KeyState.Virtual.state)
         val corrected = eventsTillQuiet()
-        // the capital at a sentence's start is the keyboard's (AutoCaps), which these keys are not
+        // the capital at a sentence start is AutoCaps', which these keys do not go through
         Assert.assertEquals("the ", corrected.filterIsInstance<HostEvent.Commit>().joinToString("") { it.text })
-        // the engine is Sensitive here (TestHost.start): nothing of the text kept, so nothing offered after it
+        // Sensitive (TestHost.start): nothing kept, so nothing predicted
         Assert.assertEquals("$corrected", 0, corrected.filterIsInstance<HostEvent.Candidates>().lastOrNull()?.total)
         val warm = System.nanoTime()
         "becuase".forEach { fcitx.sendKey(it, KeyState.Virtual.state) }
@@ -96,18 +90,13 @@ class HostEnglishTest {
         Timber.i("becuase typed in ${(System.nanoTime() - warm) / 1_000_000} ms: ${fcitx.getCandidates(0, 4).map { it.text }}")
         fcitx.sendKey(' ', KeyState.Virtual.state)
         Assert.assertEquals("because ", eventsTillQuiet().filterIsInstance<HostEvent.Commit>().joinToString("") { it.text })
-        // a hardware keyboard's key is the app's to type
         fcitx.sendKey('a')
         Assert.assertTrue(eventsTillQuiet().any { it is HostEvent.Key })
         Assert.assertEquals("", latestInputPanel.preedit.toString())
         fcitx.reset()
     }
 
-    /**
-     * Where English suggests nothing the keys type themselves, nothing composed or corrected: `teh`
-     * stays as typed and no space is put after it, in a password, in an address, and with the
-     * English page's switch off.
-     */
+    /** `teh` stays as typed, with no space added: in a password, an address, and with English's switch off. */
     @Test
     fun englishTypesTheKeysThemselvesWhereItSuggestsNothing(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodNames.KEYBOARD))
@@ -131,7 +120,6 @@ class HostEnglishTest {
         }
     }
 
-    /** `teh ` typed as the keyboard types it (virtual keys) comes back to the app as those keys, nothing composed or committed. */
     private suspend fun assertTypedAsKeys(where: String) {
         "teh ".forEach { fcitx.sendKey(it, KeyState.Virtual.state) }
         val events = eventsTillQuiet()
@@ -140,10 +128,7 @@ class HostEnglishTest {
         Assert.assertEquals(where, "", latestInputPanel.preedit.toString())
     }
 
-    /**
-     * English has none of Chinese's toggles (简繁, 中文标点, 全角) in its status area: a 全角 turned on
-     * in pinyin, which every input method showing it shares, leaves English's keys as they are.
-     */
+    /** English shows none of Chinese's status toggles, and pinyin's shared 全角 does not change its keys. */
     @Test
     fun aFullWidthTurnedOnInPinyinLeavesEnglishsKeysAsTheyAre(): Unit = runBlocking {
         val toggles = listOf("chttrans", "punctuation", "fullwidth")
@@ -160,7 +145,6 @@ class HostEnglishTest {
             awaitQuiet()
             val english = fcitx.statusArea().map { it.name }
             Assert.assertTrue("$english", english.none { it in toggles })
-            // a hardware keyboard's key, which English passes on
             fcitx.sendKey('a')
             val typed = eventsTillQuiet()
             Assert.assertEquals("$typed", listOf('a'.code), typed.filterIsInstance<HostEvent.Key>().map { it.unicode })

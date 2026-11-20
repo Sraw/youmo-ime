@@ -10,9 +10,12 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import androidx.core.view.MenuHost
 import androidx.core.view.MenuProvider
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.ui.common.BaseDynamicListUi
 import org.fcitx.fcitx5.android.ui.main.MainViewModel.ButtonMode
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.styledColor
@@ -52,4 +55,35 @@ class EditDeleteMenuProvider<T>(
     }
 
     override fun onMenuItemSelected(menuItem: MenuItem): Boolean = false
+}
+
+/** [ui]'s 编辑 and 删除 on the bar, as [buttonMode] says, while this fragment's view is started. */
+fun Fragment.addEditDeleteMenu(buttonMode: LiveData<ButtonMode>, ui: BaseDynamicListUi<*>) {
+    requireActivity().addMenuProvider(
+        EditDeleteMenuProvider(
+            buttonMode = buttonMode,
+            editButtonAction = { ui.enterMultiSelect(requireActivity().onBackPressedDispatcher) },
+            deleteButtonAction = { ui.deleteSelected(); ui.exitMultiSelect() },
+            menuHost = requireActivity(),
+            lifecycleOwner = viewLifecycleOwner,
+        ),
+        viewLifecycleOwner,
+        Lifecycle.State.STARTED,
+    )
+}
+
+/** [items] (a title and its action) in the bar's overflow while this fragment's view is started, enabled as [enabled] says. */
+fun Fragment.addOverflowMenu(vararg items: Pair<Int, () -> Unit>, enabled: () -> Boolean = { true }) {
+    requireActivity().addMenuProvider(object : MenuProvider {
+        override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+            for ((title, action) in items) {
+                menu.add(title).setEnabled(enabled()).setOnMenuItemClickListener {
+                    action()
+                    true
+                }
+            }
+        }
+
+        override fun onMenuItemSelected(menuItem: MenuItem) = false
+    }, viewLifecycleOwner, Lifecycle.State.STARTED)
 }

@@ -11,12 +11,7 @@ import org.fcitx.fcitx5.android.eval.parity.Step
 import org.fcitx.fcitx5.android.host.HostStrings
 import org.fcitx.fcitx5.android.host.KeySyms
 
-/**
- * A parity sequence run on the Kotlin host and the real engines ([HostReplay]), as the device tool
- * once ran it with its test editor (fcitx-replacement §7.2; the device side and the file comparison were
- * deleted in 0.6.1, the owner's choice of 2026-11-13: specs/testing.md "Parity of the two hosts"): from a
- * fresh install, [run]'s input methods enabled in their order, what the user sees after each step. HostReplayUatTest holds the host to what the devices showed this way.
- */
+/** A parity sequence run on the Kotlin host from a fresh install: what the user sees after each step. */
 object ParityReplay {
     /** The test editors' uids (two apps, as the device tool had them). */
     private const val APP_A = 1
@@ -41,21 +36,17 @@ object ParityReplay {
             // a pick HostReplay refuses: the rest left out, the sequence stopped
             stopped(sequence, states, e)
         } catch (@Suppress("TooGenericExceptionCaught") e: RuntimeException) {
-            // a malformed step too (pick 0, a hw key not named): this sequence stopped, not the shard's
-            // hours of output, written only at the end
+            // a malformed step too: this sequence stopped, not the shard's output, written only at the end
             stopped(sequence, states, e)
         }
     }
 
     /** What the device's screen shows around the host's panel, and what the driver does to get at it. */
     private class Screen(private val replay: HostReplay) {
-        // another app brought up keeps showing the bar and code row the last one had, until the host
-        // next updates them or the input method changes (the app's views, on either host: native
-        // shows it): what the bar showed then
+        // another app brought up keeps showing the last one's bar and code row until the host next updates them
         private var stale: State? = null
 
-        // what the bar shows, under a hardware key's floating window too (updated there as ever); the
-        // screen's keyboard used again (any step but a hardware key) brings the bar back
+        // what the bar shows, under a hardware key's floating window too; any screen step brings the bar back
         private var bar: State? = null
         private var floating = false
         private var updates = 0
@@ -76,8 +67,7 @@ object ParityReplay {
                 hidden = false
             }
             if (step.op == "app" || step.op == "field") hidden = false
-            // the screen's keyboard wanted back from under the floating window: the driver's need_keyboard
-            // taps the field, at its end (a tall field's bottom right, a short one's middle past its text)
+            // the screen's keyboard wanted back from under the floating window: the driver taps the field at its end
             if (floating && step.op in SCREEN_KEYS) replay.tappedAtEnd()
             if (step.op != "hw") floating = false
             if (step.op == "app") stale = bar
@@ -85,7 +75,6 @@ object ParityReplay {
             floated = replay.floatingShown
         }
 
-        /** What the device shows after [step]. */
         fun after(step: Step): State {
             if (step.op == "app") updates = replay.panelUpdates + replay.switches
             if (replay.panelUpdates + replay.switches != updates) stale = null
@@ -102,7 +91,6 @@ object ParityReplay {
         }
     }
 
-    // a step on the replay; the app in front after it
     private fun apply(replay: HostReplay, step: Step, front: Int): Int {
         var app = front
         when (step.op) {
@@ -122,8 +110,7 @@ object ParityReplay {
             }
             "pause" -> replay.pause()
             "toggle" -> {
-                // the driver's way to the toolbar (uat.py expand_toolbar): next-word suggestions holding
-                // the bar, the keyboard put away and the field tapped to bring it back without them
+                // the driver's way to the toolbar (expand_toolbar): keyboard put away and the field tapped
                 if (replay.preedit.isEmpty() && replay.page.isNotEmpty()) replay.keyboardHiddenAndShown()
                 replay.toggle(step.arg!!)
             }
@@ -137,8 +124,7 @@ object ParityReplay {
     // the steps the driver taps the screen's keyboard for (uat.py's keys(), its need_keyboard)
     private val SCREEN_KEYS = setOf("type", "space", "enter", "bksp", "ime", "toggle", "quick", "unicode")
 
-    // a field as the service tells one from another (ContextMemory.field): the editor app's package and
-    // the kind of field, each kind one EditText the editor makes again on each start
+    // a field as ContextMemory tells one from another: the editor app's package and the kind of field
     private fun fieldName(app: Int, kind: String) = "editor$app/$kind"
 
     private fun stopped(sequence: Sequence, states: List<State>, e: Throwable) =

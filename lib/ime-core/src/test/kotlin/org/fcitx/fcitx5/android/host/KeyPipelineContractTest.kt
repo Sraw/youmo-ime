@@ -10,11 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The key pipeline's contract (design §1.0). Lines: `fcitx/…` is
- * upstream fcitx5 442edbc9 `src/lib/fcitx/…`, `ca/…` is upstream fcitx5-chinese-addons 0d3fd040 `modules/…`
- * (`lib/ime-core/tools/upstream.sh fcitx5|chinese-addons`).
- */
+/** The key pipeline's contract against upstream fcitx5 442edbc9 and fcitx5-chinese-addons 0d3fd040 (`lib/ime-core/tools/upstream.sh`). */
 class KeyPipelineContractTest {
 
     private val log = mutableListOf<String>()
@@ -40,7 +36,6 @@ class KeyPipelineContractTest {
     private val contexts = InputContexts(ImGroup.of("Default", listOf("pinyin", ImGroup.KEYBOARD_US)), { _, _, _, _ -> })
     private val ic = contexts.activate(1).also { contexts.focus(it, true) }
 
-    /** An engine that takes the letters it is told to, filtering and accepting them as androidengine does. */
     private open inner class Engine(val takes: (KeyEvent) -> Boolean = { false }) : KeyEngine {
         override fun keyEvent(ic: InputContext, e: KeyEvent) {
             log += "engine ${e.key.sym.toString(16)}"
@@ -52,10 +47,7 @@ class KeyPipelineContractTest {
         }
     }
 
-    /**
-     * Punctuation's "last was a letter or digit" (`ca/punctuation/punctuation.cpp:217-302`), built on
-     * the pipeline's hooks as the S2 module will be: commit filter, key result, forwarded key, reset.
-     */
+    /** Punctuation's "last was a letter or digit", on the pipeline's hooks: commit filter, key result, forwarded key, reset. */
     private class LastChar : CommitFilter, KeyResultListener, ForwardKeyListener, ContextListener {
         var last = 0
 
@@ -81,7 +73,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `reset clears the punctuation state`() {
-        // ca/punctuation/punctuation.cpp:287-302: InputContextReset at PostInputMethod clears lastIsEngOrDigit_
+        // punctuation: InputContextReset at PostInputMethod clears lastIsEngOrDigit_
         val punc = LastChar()
         val p = KeyPipeline(Engine(), output, resultListeners = listOf(punc), contextListeners = listOf(punc))
         p.dispatch(ic, press('a'.code))
@@ -92,7 +84,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `a forwarded key updates the last character and goes to the application`() {
-        // ca/punctuation/punctuation.cpp:249-254 (ForwardKey at PostInputMethod); native-last:app/src/main/cpp/androidfrontend/androidfrontend.cpp:394-398 (-1)
+        // punctuation's ForwardKey at PostInputMethod; androidfrontend's forwardKey (-1)
         val punc = LastChar()
         val p = KeyPipeline(Engine(), output, forwardListeners = listOf(punc))
         punc.last = 'a'.code
@@ -109,7 +101,7 @@ class KeyPipelineContractTest {
         override fun isActive(ic: InputContext) = active
 
         override fun trigger(ic: InputContext, e: KeyEvent): Boolean {
-            // quickphrase.h:35-39: Super+grave
+            // quickphrase: Super+grave
             if (e.release || e.key != Key('`'.code, KeyStates.SUPER)) return false
             active = true
             return true
@@ -130,7 +122,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `an active temp mode gets every key and the engine none`() {
-        // fcitx/tempmodemanager.cpp:63-72: filter, accept only what the mode used
+        // tempmodemanager: filter, accept only what the mode used
         val mode = Mode().apply { active = true }
         val results = mutableListOf<KeyEvent>()
         val p = KeyPipeline(Engine { true }, output, TempModeManager(listOf(mode)), resultListeners = listOf(KeyResultListener { _, e -> results += e }))
@@ -139,13 +131,12 @@ class KeyPipelineContractTest {
         // Return was filtered but not used: back to the application; no ReservedLast for either
         assertEquals(listOf("mode 61", "mode ff0d", "back ff0d 0 down -1"), log)
         assertTrue(results.isEmpty())
-        // invoke actions too (:74-82)
         assertTrue(p.invokeAction(ic, InvokeActionEvent(InvokeActionEvent.Action.LeftClick, 0)).accepted)
     }
 
     @Test
     fun `a temp mode starts at PostInputMethod and leaves on focus out, reset and switch`() {
-        // fcitx/tempmodemanager.cpp:23-25,54-61 (trigger, Default phase); :28-52 (reset)
+        // tempmodemanager: trigger at the Default phase, and reset
         val mode = Mode()
         val p = KeyPipeline(Engine(), output, TempModeManager(listOf(mode)))
         val e = p.dispatch(ic, press('`'.code, KeyStates.SUPER))
@@ -164,8 +155,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `fullwidth commits a fullwidth space for a key the engine did not take`() {
-        // ca/fullwidth/fullwidth.cpp:37-53: accept (not filter) and commit sCornerTrans[key - 32]; space is U+3000
-        // the hook commits through the pipeline it is part of
+        // fullwidth: accept (not filter) and commit sCornerTrans[key - 32]; space is U+3000, committed through the pipeline
         lateinit var p: KeyPipeline
         val fullwidth = PostKeyHook { ic, e ->
             if (e.release || e.key.states != 0) return@PostKeyHook
@@ -187,8 +177,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `ctrl period toggles punctuation only on a chinese input method`() {
-        // ca/punctuation/punctuation.cpp:255-276: only inWhiteList contexts (the status area has the
-        // action, i.e. a Chinese input method); filterAndAccept ends the key
+        // punctuation's hotkey: only inWhiteList contexts (a Chinese input method); filterAndAccept ends the key
         var enabled = true
         val chinese = { c: InputContext -> contexts.inputMethod(c) != ImGroup.KEYBOARD_US }
         val hotkey = PostKeyHook { c, e ->
@@ -210,7 +199,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `a release goes back as it came, with its timestamp`() {
-        // native-last:app/src/main/cpp/androidfrontend/androidfrontend.cpp:385-392: an unaccepted key, release included, goes back with the raw key
+        // androidfrontend: an unaccepted key, release included, goes back with the raw key
         val p = KeyPipeline(Engine { !it.release }, output)
         p.dispatch(ic, press('a'.code, KeyStates.SHIFT, timestamp = 41))
         p.dispatch(ic, KeyEvent(Key('a'.code, KeyStates.SHIFT or KeyStates.CAPS_LOCK), release = true, timestamp = 42))
@@ -220,7 +209,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `commit filters run punctuation, fullwidth, chttrans in that order`() {
-        // registration order: ca/punctuation/punctuation.cpp:217-228, ca/fullwidth/fullwidth.cpp:84-103, ca/chttrans/chttrans.cpp:185-194
+        // registration order: punctuation, fullwidth, chttrans
         val punc = LastChar()
         val fullwidth = CommitFilter { _, s -> s.map { if (it.code in 0x21..0x7e) (it.code + 0xfee0).toChar() else it }.joinToString("") }
         val chttrans = CommitFilter { _, s -> s.replace("发", "發") }
@@ -229,14 +218,13 @@ class KeyPipelineContractTest {
         // punctuation saw the string before fullwidth changed its last letter
         assertEquals('a'.code, punc.last)
         assertEquals(listOf("commit 發ａ"), log)
-        // fullwidth leaves the space alone (wc > 32, fullwidth.cpp:95)
+        // fullwidth leaves the space alone (wc > 32)
         p.commit(ic, "a b")
         assertEquals("commit ａ ｂ", log.last())
     }
 
     @Test
     fun `output filter converts the whole text and cuts it back into its segments`() {
-        // ca/chttrans/chttrans.cpp:133-183
         val f = WholeTextFilter({ true }) { it.replace("后来", "後來").replace("里", "裡") }
         val p = KeyPipeline(Engine(), output, outputFilters = listOf(f))
         // a phrase across two segments converts as one, each keeps its flags
@@ -266,7 +254,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `key event result fires only for keys nobody filtered`() {
-        // fcitx/instance.cpp:1013-1024 (ReservedLast) and :1665-1673 (stop at the first filter)
+        // Instance: ReservedLast, and stop at the first filter
         val seen = mutableListOf<Int>()
         val p = KeyPipeline(Engine { it.key.sym == 'a'.code }, output, resultListeners = listOf(KeyResultListener { _, e -> seen += e.key.sym }))
         p.dispatch(ic, press('a'.code))
@@ -277,7 +265,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `a post hook that filters stops the hooks after it`() {
-        // fcitx/instance.cpp:1665-1670: within a phase too, the first filter ends the key
+        // within a phase too, the first filter ends the key
         val p = KeyPipeline(
             Engine(), output,
             postHooks = listOf(PostKeyHook { _, e -> log += "hook1"; e.filter() }, PostKeyHook { _, _ -> log += "hook2" }),
@@ -289,7 +277,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `reserved first sees presses and releases before anything`() {
-        // fcitx/instance.cpp:970-976: the name overlay hides on a press
+        // the name overlay hides on a press
         var hidden = 0
         val overlay = PreKeyHook { _, e -> if (!e.release) hidden++ }
         val p = KeyPipeline(Engine(), output, preHooks = listOf(overlay, PreKeyHook { _, e -> e.filterAndAccept() }, PreKeyHook { _, _ -> log += "never" }))
@@ -301,7 +289,7 @@ class KeyPipelineContractTest {
 
     @Test
     fun `commits go out at once, the panel once at the end of the event`() {
-        // fcitx/inputcontext.cpp:433-466, fcitx/instance.cpp:1231-1244: commit immediately, panel coalesced
+        // commit immediately, panel coalesced
         lateinit var pipe: KeyPipeline
         val engine = object : KeyEngine {
             override fun keyEvent(ic: InputContext, e: KeyEvent) {

@@ -76,8 +76,7 @@ class SkinZipTest {
 
     @Test
     fun aFinderZipOfOneFlexIsUnpackedLikeAnyOther() {
-        // the bug: Finder adds __MACOSX/._ink.flex beside ink.flex; it was counted as a second .flex, so the
-        // inner one was never unpacked and the import failed with a file-name error
+        // Finder's __MACOSX/._ink.flex was counted as a second .flex, so the inner one was never unpacked
         val flex = zip("extension.json" to "{}".toByteArray(), "stylesheets/a.json" to "{}".toByteArray())
         val finder = zip("ink.flex" to flex, "__MACOSX/._ink.flex" to byteArrayOf(0, 5, 22, 7))
         assertEquals(setOf("extension.json", "stylesheets/a.json"), SkinZip.readSkin(finder.inputStream(), "ink.zip").keys)
@@ -118,8 +117,7 @@ class SkinZipTest {
 
     @Test
     fun aZippedExtensionIsUnpackedWithinTheZipsBudget() {
-        // a budget of 300 KB (the rule, at a test's size): 200 KB unpacked in the .flex (within it alone), 100 KB more
-        // in the ZIP's own files: past it together
+        // 300 KB: 200 KB unpacked in the .flex, 100 KB more in the ZIP's own files: past it together
         val budget = 300L * 1024
         val rnd = Random(3)
         fun noise(n: Int) = ByteArray(n) { rnd.nextInt(4).toByte() }
@@ -235,7 +233,7 @@ class SkinZipTest {
             try {
                 SkinZip.read(x)
             } catch (_: SkinError) {
-                // refused with a reason: as it should be
+                // refused with a reason
             }
         }
     }

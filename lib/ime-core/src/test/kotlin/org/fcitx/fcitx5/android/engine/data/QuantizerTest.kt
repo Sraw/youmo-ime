@@ -23,7 +23,6 @@ class QuantizerTest {
         val q = Quantizer.build(values, exactZero = false)
         val table = decode(q)
         val worst = values.maxOf { abs(table[q.encode(it)] - it) }
-        // 256 equal-count bins over a spread of 8: each is ~0.03 wide
         assertTrue("worst error $worst", worst < 0.05f)
     }
 
@@ -42,8 +41,7 @@ class QuantizerTest {
 
     @Test
     fun aRunOfEqualValuesIsNeverSplitAcrossBins() {
-        // half of all values are -0.5: with bins by position they would fill ~128 bins, and the
-        // first of those would also hold smaller values and decode -0.5 to something else
+        // half the values equal: bins by position would decode -0.5 as something else
         val random = Random(5)
         val values = FloatArray(100_000) { if (it % 2 == 0) -0.5f else -8f * random.nextFloat() }
         val q = Quantizer.build(values, exactZero = false)
@@ -57,7 +55,6 @@ class QuantizerTest {
         val q = Quantizer.build(values, exactZero = true)
         assertEquals(0, q.encode(0f))
         assertEquals(0f, decode(q)[0], 0f)
-        // a value close to zero must not collapse onto it
         assertTrue(q.encode(-0.01f) != 0)
     }
 

@@ -68,8 +68,7 @@ class TextBoardSceneTest {
         assertNull(TextBoardState(tableExtra = 'x').input().tableExtra)
     }
 
-    // KB-106: pinyin or 双拼 typed, 分词 in Shift's place (as wide, the separator's reading); Return kept, a table's keys
-    // not shown; 分词 never on a table, which has its lookup key there
+    // pinyin or 双拼 typed: 分词 in Shift's place, Return kept, a table's keys not shown; never on a table
     @Test
     fun separatingShowsTheSeparatorInShiftsPlace() {
         val typing = keys(TextBoardState(composing = true, separating = true))
@@ -89,9 +88,7 @@ class TextBoardSceneTest {
         assertEquals("a11y_key_separator", separator.a11y)
     }
 
-    // why input() may drop composing without a table or pinyin's typing: qwerty.xml asks it of nothing else. Every
-    // when= in it but Shift's and 分词's (ShiftSeparator's own), every other term either way, holds alike composing or
-    // not once there is no table
+    // input() may drop composing without a table or pinyin's typing: no other when= in qwerty.xml depends on it
     @Test
     fun qwertyAsksComposingOnlyOfATableAndShift() {
         val layout = SceneData.qwerty

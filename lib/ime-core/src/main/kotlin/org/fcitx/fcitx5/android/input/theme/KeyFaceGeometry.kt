@@ -10,25 +10,18 @@ import org.fcitx.fcitx5.android.scene.look.NineSlice
 import kotlin.math.min
 import kotlin.math.round
 
-/** A rectangle, pixels. */
+/** Pixels. */
 data class Area(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
     val height get() = bottom - top
     val hasSize get() = width > 0 && height > 0
 }
 
-/**
- * [radius] as a rounded rect [width]×[height] can take: half its shorter side at most, 0 for a rect
- * with no size (a key squeezed to nothing in split screen, its gap and border wider than it).
- */
+/** Half the shorter side at most; 0 for no size (a key squeezed to nothing in split screen). */
 fun cornerRadius(radius: Float, width: Float, height: Float): Float =
     radius.coerceIn(0f, maxOf(0f, min(width, height) / 2))
 
-/**
- * Where a key's layers go in its cell: the face, the shadow under it, the border's width, the
- * pressed layer. [face] null: no face (flat keys but the space and Return); [oval] the face and the
- * pressed layer are circles (flat Return). [radius] for the face, the shadow and the pressed layer.
- */
+/** [face] null: no face (flat keys but space and Return); [oval]: face and pressed layer are circles (flat Return). */
 data class KeyFace(
     val face: Area?,
     val shadow: Area?,
@@ -38,23 +31,12 @@ data class KeyFace(
     val oval: Boolean,
 )
 
-/**
- * A key's layers from its cell ([width]×[height] px, at [density] px a dp) and the theme's [keys]:
- * what KeyView drew by hand before 3.0 (its shadowed and bordered faces, a flat space's bar and
- * Return's circle), in one place the theme maker computes the same. The gap is inside the cell, so
- * the whole cell is pressed; [margin] false, a key drawn to its cell's edges.
- */
+/** A key's layers from its cell, computed alike by the theme maker; the gap is inside the cell, so the whole cell is pressed. */
 object KeyFaceGeometry {
 
-    /**
-     * A key's own say over its face, which the keyboard's style ([Keys.blocks]) gives way to: [On] a
-     * face though the keys are flat (确定); [Off] none though they are blocks (the nine keys' column
-     * cells, drawn by the column); [Special] the space's bar or Return's circle when flat; [Default] a
-     * face when blocks, none when flat (Return's colour on a lit 查词 key is no circle).
-     */
+    /** A key's say over the style's: [On] a face on flat keys (确定), [Off] none on blocks (nine keys' column), [Special] space bar or Return circle. */
     enum class Border { Default, On, Off, Special }
 
-    /** [of] for a key whose own say is [border]. */
     fun of(width: Float, height: Float, kind: KeyKind, keys: Keys, landscape: Boolean, density: Float, margin: Boolean, border: Border): KeyFace =
         when {
             border == Border.On -> of(width, height, kind, keys.copy(blocks = true), landscape, density, margin)
@@ -100,11 +82,7 @@ object KeyFaceGeometry {
     private const val ENTER_MAX_DP = 35
 }
 
-/**
- * A nine-slice image ([NineSlice]) laid in [target]: the pieces of the source ([srcWidth]×[srcHeight])
- * and where each is drawn. Corners keep their size (insets / pxPerDp dp); a target smaller than two
- * corners together has them shrunk alike, so they meet. Pieces of no size are left out.
- */
+/** Corners keep their size; a target smaller than two corners shrinks them alike. Pieces of no size are left out. */
 object NineSliceLayout {
 
     data class Piece(val src: Area, val dst: Area)
@@ -139,23 +117,16 @@ object NineSliceLayout {
         return a * k to b * k
     }
 
-    // the edges between pieces on whole pixels: two anti-aliased pieces meeting mid-pixel each cover half of it,
-    // and half over half lets a quarter of what is under the key show through, a line across the face.
-    // A side with no inset has no piece there: its edge is the target's own and stays where it is.
+    // edges on whole pixels: two anti-aliased pieces meeting mid-pixel show a line across the face
     private fun inner(near: Float, far: Float, lo: Float, hi: Float): List<Float> {
         val x1 = if (near == 0f) lo else round(lo + near).coerceIn(lo, hi)
         return listOf(x1, if (far == 0f) hi else round(hi - far).coerceIn(x1, hi))
     }
 }
 
-/**
- * The theme's picture under the keyboard as an ImageView's CENTER_CROP lays it ([picWidth]×[picHeight]
- * over a [boardWidth]×[boardHeight] keyboard), and which part of the picture a key or the bar at an
- * [Area] of the keyboard shows: a key showing the picture shows what is under it, wherever it is.
- */
+/** The picture laid as CENTER_CROP; a key showing it shows what is under it, wherever it is. */
 object PictureWindow {
 
-    /** The scale and the offset the picture is drawn at. */
     data class Placement(val scale: Float, val dx: Float, val dy: Float)
 
     fun centerCrop(picWidth: Int, picHeight: Int, boardWidth: Float, boardHeight: Float): Placement {
@@ -163,17 +134,12 @@ object PictureWindow {
         return Placement(scale, (boardWidth - picWidth * scale) / 2, (boardHeight - picHeight * scale) / 2)
     }
 
-    /**
-     * Over an animated picture (060-render-p3 A4) a key or the bar showing it is see-through, the picture
-     * under the keyboard showing at [board] percent brightness: how dark (percent of black over it) to make
-     * it show at [brightness] instead. None brighter than the board's: it is darkened only.
-     */
+    /** Over an animated picture keys are see-through: how dark to make it to show at [brightness]; darkened only. */
     fun seeThroughDarken(board: Int, brightness: Int): Int =
         if (board <= 0 || brightness >= board) 0 else PERCENT - brightness * PERCENT / board
 
     private const val PERCENT = 100
 
-    /** The picture's pixels under [area] of the keyboard. */
     fun under(p: Placement, area: Area) = Area(
         (area.left - p.dx) / p.scale,
         (area.top - p.dy) / p.scale,

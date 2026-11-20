@@ -14,7 +14,6 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 
 class LogRewritesTest {
-    // F3161: RecordStore's emptied mark after the header is no record: the last act after it is still the last, taken back, the mark gone
     @Test
     fun anActAfterAnEmptiedMarkIsTakenBack() {
         val header = LearnRecords.FORMAT.header()
@@ -23,7 +22,6 @@ class LogRewritesTest {
         val out = ByteArrayOutputStream()
         assertTrue(LogRewrites.dropLast(log, listOf(act), out))
         assertArrayEquals(header, out.toByteArray())
-        // the mark is not taken for an act either
         assertFalse(LogRewrites.dropLast(log, listOf(act, act), ByteArrayOutputStream()))
     }
 }

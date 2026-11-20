@@ -18,7 +18,7 @@ class EditTextIntPreference(context: Context) : EditTextPreference(context) {
     var max: Int = Int.MAX_VALUE
     var unit: String = ""
 
-    /** A value shown as [specialLabel], set by the dialog's own button: ManagedPreferenceUi.EditTextInt.Special. */
+    /** Set by the dialog's own button: ManagedPreferenceUi.EditTextInt.Special. */
     var specialValue: Int? = null
     var specialLabel: String = ""
 

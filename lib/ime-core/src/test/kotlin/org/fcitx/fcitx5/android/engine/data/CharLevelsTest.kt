@@ -17,7 +17,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/** 生僻字屏蔽's groups (dev/design/061-rare-char-block.md §3.1): listed first, then the ranges; the rest none. */
+/** 生僻字屏蔽's groups: listed first, then the ranges; the rest none. */
 class CharLevelsTest {
 
     private val levels = TestCharLevels.levels
@@ -72,7 +72,6 @@ class CharLevelsTest {
             "a rank missing" to {
                 assertThrows(IllegalStateException::class.java) { CharLevelsBuilder().tgh(tgh.dropLast(1).asSequence(), "kTGH").build() }
             },
-            // told by its code point as the file writes it (R26 F8202, F8470: once U+U+4E00)
             "a character twice" to {
                 val e = assertThrows(SourceException::class.java) { CharLevelsBuilder().tgh((tgh + tgh.first()).asSequence(), "kTGH").build() }
                 assertEquals("kTGH:${tgh.size + 1}: ${tgh.first().substringBefore('\t')} twice", e.message)

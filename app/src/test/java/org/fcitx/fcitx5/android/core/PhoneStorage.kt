@@ -19,20 +19,16 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * The app's external storage there, as on a phone, and the homes settled again with it. Robolectric's
- * has no state, so it reads as away; whether the home is then made anyway (`fresh`) hangs on the first-run
- * flag other tests leave in the prefs; and an app made with FcitxApplication settled the themes before the
- * test began. A test that writes what the user added calls it first, or it is refused by the order it ran in.
+ * Makes the external storage present and settles the homes again. Robolectric's has no state (reads as away),
+ * `fresh` hangs on other tests' first-run flag, and FcitxApplication settled the themes first: a test that writes
+ * user data calls this, or it is refused depending on run order.
  */
 fun phoneStorage() {
     ShadowEnvironment.setExternalStorageState(appContext.getExternalFilesDir(null)!!, Environment.MEDIA_MOUNTED)
     HostConfigDir.forget()
 }
 
-/**
- * An install's directories under [root], named as on a phone, made as they are needed: by name, so a
- * field Dirs gains is added here once and two of them are never swapped unseen.
- */
+/** By name, so a field Dirs gains is added once and two are never swapped unseen. */
 internal fun dirsUnder(
     root: File,
     external: File = File(root, "external"),
@@ -51,32 +47,34 @@ internal fun dirsUnder(
     data = data,
     theme = theme,
     settled = settled,
-    // beside host-config in the app's files, as CustomLayouts.dir is on a phone
+    // as CustomLayouts.dir is on a phone
     layouts = File(root, "files/layouts"),
 )
 
-// a backup as the app writes one ([versionCode]: this build's, or the release's that wrote it; [packageName] the app's,
-// or upstream's of a backup of it): its metadata, then entries (a path in the zip to its text)
+// an entry ending in `/` is a directory
+internal fun zipOf(vararg entries: Pair<String, String>): ByteArray = ByteArrayOutputStream().also { bytes ->
+    ZipOutputStream(bytes).use { zip ->
+        for ((name, text) in entries) {
+            zip.putNextEntry(ZipEntry(name))
+            if (!name.endsWith("/")) zip.write(text.encodeToByteArray())
+        }
+    }
+}.toByteArray()
+
 internal fun backupZip(
     vararg entries: Pair<String, String>,
     versionCode: Long = BuildConfig.VERSION_CODE.toLong(),
     packageName: String = BuildConfig.APPLICATION_ID,
-) = ByteArrayOutputStream().also { bytes ->
-    ZipOutputStream(bytes).use { zip ->
-        zip.putNextEntry(ZipEntry("metadata.json"))
-        zip.write("""{"packageName":"$packageName","versionCode":$versionCode,"versionName":"1","exportTime":0}""".encodeToByteArray())
-        for ((name, text) in entries) {
-            zip.putNextEntry(ZipEntry(name))
-            zip.write(text.encodeToByteArray())
-        }
-    }
-}.toByteArray().inputStream()
+) = zipOf(
+    "metadata.json" to """{"packageName":"$packageName","versionCode":$versionCode,"versionName":"1","exportTime":0}""",
+    *entries,
+).inputStream()
 
-/** The app as before the first unlock ([on]) or after it: FcitxApplication's flag, which has no setter. */
+/** FcitxApplication's flag has no setter. */
 internal fun directBoot(on: Boolean) {
     FcitxApplication::class.java.getDeclaredField("isDirectBootMode").apply { isAccessible = true }.setBoolean(FcitxApplication.getInstance(), on)
 }
 
-/** AppPrefs' own store: the instance outlives each test's application, so not this one's default prefs. */
+/** AppPrefs outlives each test's application, so not this one's default prefs. */
 internal fun rawPrefs(): SharedPreferences =
     AppPrefs::class.java.getDeclaredField("sharedPreferences").apply { isAccessible = true }.get(AppPrefs.getInstance()) as SharedPreferences

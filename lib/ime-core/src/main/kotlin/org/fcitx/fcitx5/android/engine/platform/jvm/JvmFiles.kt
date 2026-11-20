@@ -15,7 +15,6 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 
-/** [UserFiles] in the directory [dir] of the platform's file system: the phone's, the JVM's. */
 class JvmFiles(val dir: File) : UserFiles {
     override fun file(name: String) = JvmFile(File(dir, name))
 
@@ -25,13 +24,12 @@ class JvmFiles(val dir: File) : UserFiles {
 
     override fun mkdirs() = dir.mkdirs() || dir.isDirectory
 
-    // by name: the disk's own order is none
+    // sorted: the disk's order is arbitrary
     override fun files(): List<String> = dir.listFiles { f -> f.isFile }.orEmpty().map { it.name }.sorted()
 
     override fun dirs(): List<String> = dir.listFiles { f -> f.isDirectory }.orEmpty().map { it.name }.sorted()
 
-    // one listFiles, its null (which files and dirs take for none) kept
-    // each kind asked once: a stat that fails reads as neither, and is listed as unknown rather than dropped
+    // one listFiles, keeping its null; a stat that fails reads as neither and is listed as unknown, not dropped
     override fun listing() = dir.listFiles()?.let { all ->
         val files = ArrayList<String>()
         val dirs = ArrayList<String>()
@@ -46,7 +44,7 @@ class JvmFiles(val dir: File) : UserFiles {
         UserFiles.Listing(files.sorted(), dirs.sorted(), unknown.sorted())
     }
 
-    // the directories' own lengths too, as the stash's limit has always counted them
+    // directory lengths too, as the stash's limit has always counted them
     override fun size() = dir.walk().sumOf { it.length() }
 
     override fun delete() = dir.delete()
@@ -62,7 +60,6 @@ class JvmFiles(val dir: File) : UserFiles {
     override fun hashCode() = dir.hashCode()
 }
 
-/** A [LogFile] at [file] of the platform's file system. */
 class JvmFile(val file: File) : LogFile {
     override val name: String get() = file.name
 

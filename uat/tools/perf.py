@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keyboard performance, two builds compared on one device (design 060-render-p3 §4.3).
+"""Keyboard performance, two builds compared on one device.
 
   perf.py A [B] [--pairs 3] [--runs 20] [--only press,anim] [--trace] [--out DIR]
 
@@ -103,8 +103,7 @@ def apks(path):
     return app[0], test[0], pack
 
 
-# every family but the motion ones (the call without --only skips the memory and lower-face rows); the idle
-# rows run once, with the second call's anim
+# every family but the motion ones; the idle rows run once, with the second call's anim
 FULL_ONLY = 'theme,shift,build,press,popup,rebuild'
 FAILED = re.compile(r'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|shortMsg|INSTRUMENTATION_CODE: 0')
 

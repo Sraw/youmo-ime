@@ -11,10 +11,7 @@ import java.util.Random
 import kotlin.math.exp
 import kotlin.math.sqrt
 
-/**
- * A chinese-ime-lm model small enough to write out in a test, with random weights, and the same
- * forward pass written plainly over the dense weights to check [SentenceModel] against.
- */
+/** A tiny chinese-ime-lm with random weights and a plain forward pass to check [SentenceModel] against. */
 class TinyModel(
     val vocab: List<String> = listOf("<pad>", "<unk>", "<bos>", "我", "你", "好", "的", "天", "ab"),
     val layers: Int = 2,

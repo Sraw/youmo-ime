@@ -43,11 +43,9 @@ class EnginesModelTest {
             InputMethodCatalog.PINYIN_DATA -> pinyin
             InputMethodCatalog.SENTENCE_MODEL -> model
             InputMethodCatalog.REFINING_MODEL -> refining
-            // none of a word
             InputMethodCatalog.EMOJI_DATA -> ByteArray(0)
             else -> null
         }
-        // as the app's assets do of a file it has not got
         return ByteBuffer.wrap(bytes ?: throw FileNotFoundException(path))
     }
 
@@ -85,7 +83,6 @@ class EnginesModelTest {
         off.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         assertEquals(listOf("你", "拟"), off.type(InputMethodCatalog.PINYIN, "ni").candidates)
         assertTrue(loaded.none { it in models })
-        // dropped when turned off, and read again when turned back on
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         engines.settings = EngineSettings()
         engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "ni"))
@@ -96,7 +93,6 @@ class EnginesModelTest {
     @Test
     fun eachLevelRunsItsModelsAndDropsThoseItNoLongerRuns() {
         val engines = Engines(::load, null)
-        // what 高档 refines (two sentences, ending on a syllable)
         val high = Engines(::load, null)
         for ((im, typed) in listOf(InputMethodCatalog.PINYIN to "ni", InputMethodCatalog.SHUANGPIN to "ni", InputMethodCatalog.T9 to "64")) assertTrue(im, high.type(im, typed).refines)
         loaded.clear()
@@ -118,7 +114,6 @@ class EnginesModelTest {
         engines.settings = EngineSettings()
         engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "ni"))
         assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-        // down to 中档: the large one dropped, the small one kept
         loaded.clear()
         engines.settings = EngineSettings(modelLevel = ModelLevel.MEDIUM)
         engines.settings = EngineSettings()
@@ -147,7 +142,6 @@ class EnginesModelTest {
         val slices = engines.pause(InputMethodCatalog.PINYIN, typed)
         assertTrue(slices.isNotEmpty())
         assertTrue(slices.all { it.commit.isEmpty() })
-        // shown only if it changed the order, and then once
         assertTrue(slices.count { it.handled } <= 1)
         assertEquals(typed.candidates.toSet(), slices.last().candidates.toSet())
         assertFalse(engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.REFINE, 0).handled)

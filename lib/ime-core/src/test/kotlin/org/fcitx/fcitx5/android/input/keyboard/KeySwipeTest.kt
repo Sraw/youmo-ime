@@ -55,8 +55,7 @@ class KeySwipeTest {
         assertEquals(Outcome.Shortcut(KeyShortcut.Text("你好")), up(q, -1))
     }
 
-    // a stroke (issue #4) runs as a command, never the key's tap whatever is typed (the engine does nothing
-    // with it then), in a password too: it reads nothing of the field
+    // a stroke runs as a command, never the key's tap, in a password too: it reads nothing of the field
     @Test
     fun aStrokeSlotIsRunAsItsCommand() {
         val pie = KeyShortcut.Command(KeyCommand.StrokePie)
@@ -118,8 +117,7 @@ class KeySwipeTest {
         assertEquals(Outcome.None, up(Key(false, first, SwipeSlot.Empty, hasFirst = false), -1))
     }
 
-    // a key no layout names (注音九键's ˉ, a panel's): its built-in swipe the way the orientation puts every
-    // key's long press's first, its tap the other; flipped with them (翻转全部 flips the orientation)
+    // a key no layout names: its swipe the way every key's long press's first goes, its tap the other; flipped with them
     @Test
     fun anUnnamedKeyFollowsTheOrientation() {
         val firstUp = Key.unnamed(SwipeOrientation.FirstUp, hasFirst = true)
@@ -134,8 +132,7 @@ class KeySwipeTest {
         assertEquals(Outcome.None, KeySwipe.decide(firstDown, Ways(up = false, down = false), 1, swiped = true, consumed = false, cancelled = false, password = false, now = anyTime))
     }
 
-    // the key's own preview where the lift does nothing as well: swiped back, or a password's copy
-    // (lifted it cancels, as swiped and back does; the preview shows no shortcut that would not run)
+    // the key's own preview where the lift does nothing (swiped back, a password's copy): no shortcut shown that won't run
     @Test
     fun thePreviewIsWhatTheLiftWouldDoTheKeysOwnWhereItDoesNothing() {
         assertEquals(Preview.Shortcut(selectAll), KeySwipe.preview(a, Ways.Both, 1, password = false, now = anyTime))

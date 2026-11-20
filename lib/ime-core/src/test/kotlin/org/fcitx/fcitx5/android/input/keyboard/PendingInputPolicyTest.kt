@@ -35,10 +35,7 @@ class PendingInputPolicyTest {
         },
     )
 
-    /**
-     * Characterises, not specifies: the upstream check is a plain prefix test on fcitx's
-     * language code, case and all, so "zhuang" counts as Chinese.
-     */
+    /** Characterises: the check is a plain prefix test on the language code, so "zhuang" counts as Chinese. */
     @Test
     fun currentlyTheLanguageIsMatchedByAPlainPrefix() {
         assertEquals(Resolution.FinishComposing, PendingInputPolicy.resolve("", hasPreedit = true))
@@ -96,7 +93,7 @@ class PendingInputPolicyTest {
         assertTrue(PendingInputPolicy.typesAsIs("2", address = true, reads = reads(InputMethodCatalog.SHUANGPIN, ShuangpinScheme.MICROSOFT)))
     }
 
-    /** On the 14 keys a code is a key: never typed as it is in an address field (design §1.2). */
+    /** On the 14 keys a code is a key: never typed as it is in an address field. */
     @Test
     fun onTheFourteenKeysTheirCodesStayKeys() {
         val pinyin = { c: Int -> InputMethodCatalog.readsAsKey(InputMethodCatalog.PINYIN, ShuangpinScheme.ZIRANMA, c) }

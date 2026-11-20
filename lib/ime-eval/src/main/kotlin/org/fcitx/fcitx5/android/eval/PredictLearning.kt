@@ -14,17 +14,7 @@ import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.PredictionOrder
 import org.fcitx.fcitx5.android.engine.user.Continuations
 
-/**
- * What learning gains 联想: the sentences of a set split into words, and after each word but the
- * last, whether what follows starts with what is offered, as [PredictRun] scores it, ranked by the
- * user's habits as a session ranks them ([PredictionOrder]). The [Halves.TUNE] half before anything
- * is learned, after it was typed once and after three times (a user's own phrases, typed again:
- * a pair counts from its third time, U-71), the [Halves.HELD_OUT] half after that (text not typed
- * before, which learning must not make worse), each with the user's pairs at [weight]; the whole
- * phrases typed three times going on after their start ([withPhrases], U-73) or not. After a word
- * the model does not know, the session offers the phrases going on after what was put in last; here
- * that is the context's last word, as a set typed a word at a time puts it in.
- */
+/** What learning gains 联想 on [Halves.TUNE] before and after typing it, then on [Halves.HELD_OUT]. */
 class PredictLearning(private val data: PinyinData, private val weight: Float, private val withPhrases: Boolean = true) {
     private val textWords = TextWords(data.model, data.wordIndex)
 

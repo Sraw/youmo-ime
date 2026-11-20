@@ -5,6 +5,8 @@
 package org.fcitx.fcitx5.android.engine.lattice
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
@@ -17,7 +19,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
-import org.fcitx.fcitx5.android.engine.session.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -28,14 +29,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/**
- * 双拼's keys read alone where a key and the next make a syllable (简拼 in the middle) read only the
- * words the user typed or chose ([UserWords.typed]; DECISIONS 0.6.1 双拼中间简拼改 U), 自然码, on all four
- * keyboards (061-sp-abbrev §3.1); the arcs so read told apart from slips, and kept past the words' cap (§3.5).
- */
+/** 双拼's keys read alone read only the words the user typed or chose ([UserWords.typed]), on all four keyboards. */
 class PinyinDecoderTypedTest {
-
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
     private val data = pinyinDataOf(
         Triple("你", "ni", -2f), Triple("拟", "ni", -5f), Triple("好", "hao", -2.5f), Triple("你好", "ni hao", -3f),
@@ -59,8 +54,7 @@ class PinyinDecoderTypedTest {
         return d.arcsBetween(graph, 0, keys.length).map { it.text }
     }
 
-    // DECISIONS 0.6.1 双拼中间简拼改 U: over a key read alone where it and the next make a syllable, only
-    // the words the user typed or chose. nhk is n and hao (and nang, k): 你好 by n alone
+    // nhk is n and hao (and nang, k): 你好 by n alone
     @Test
     @Uat("SP-45")
     fun aKeyReadAloneReadsOnlyTheWordsTypedOrChosen() {
@@ -69,7 +63,6 @@ class PinyinDecoderTypedTest {
         assertEquals(emptyList<String>(), over(null, "nhk"))
         val user = UserModel(data.dictionary, data.vocabulary, data.wordIndex)
         assertEquals(emptyList<String>(), over(user, "nhk"))
-        // counted: typed
         user.setCount(user.id(nihao), 1f, nihao)
         assertEquals(listOf("你好"), over(user, "nhk"))
         // and no other word: 中华 by zh alone and hua is none (vh is zhang)
@@ -78,7 +71,6 @@ class PinyinDecoderTypedTest {
         assertEquals(listOf("人民"), over(user, "rmn"))
         user.setCount(user.id(nihao), 0f, nihao)
         assertEquals(emptyList<String>(), over(user, "nhk"))
-        // the user's own: chosen, with no count
         user.own(nihao)
         assertEquals(listOf("你好"), over(user, "nhk"))
         user.disown(nihao)
@@ -89,16 +81,12 @@ class PinyinDecoderTypedTest {
         assertEquals(listOf("你好"), over(user, "nhk"))
         user.unlistByHand(nihao)
         assertEquals(emptyList<String>(), over(user, "nhk"))
-        // one the dictionary lacks, made by the user
         val nizhong = UserModel.Entry("你中", syl("ni", "zhong"))
         user.own(nizhong)
         assertEquals(listOf("你中"), over(user, "nvs"))
-        // in whole syllables every word is read, typed or not
         assertEquals(listOf("人民"), over(user, "rfmn"))
     }
 
-    // the same of the dictionaries the user merged and of the words only imported: none over a key
-    // read alone till typed or chosen, all of them in whole syllables
     @Test
     @Uat("SP-45")
     fun aKeyReadAloneReadsNoMergedOrImportedWordNeverTyped() {
@@ -117,15 +105,12 @@ class PinyinDecoderTypedTest {
         val ni = UserModel.Entry("泥", syl("ni"))
         user.setCount(user.id(ni), 2f, ni)
         assertEquals(listOf("泥"), alone())
-        // added by hand from the merged dictionary: chosen
         user.listByHand(UserModel.Entry("倪", syl("ni")))
         assertEquals(setOf("泥", "倪"), alone().toSet())
-        // the imported one, made the user's own
         user.own(UserModel.Entry("妮好", syl("ni", "hao")))
         assertEquals(setOf("泥", "倪", "妮好"), alone().toSet())
     }
 
-    // the 18, 14 and nine keys read keys alone as 26 keys do: the words typed only
     @Test
     @Uat("SP-52", "SP-53", "SP-54")
     fun theGroupedKeyboardsReadOnlyTheWordsTypedByAKeyAlone() {
@@ -144,7 +129,6 @@ class PinyinDecoderTypedTest {
             assertTrue("$letters", "你好" !in over(user, "nhk"))
             user.setCount(user.id(nihao), 1f, nihao)
             assertTrue("$letters", "你好" in over(user, "nhk"))
-            // n and h each alone too
             assertTrue("$letters", "你好" in over(user, "nh"))
         }
     }
@@ -167,19 +151,16 @@ class PinyinDecoderTypedTest {
 
     private val neighbours = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, neighbours = true)
 
-    // an arc over a key alone is told from one over a slip (review r2 M1): held back where slips are, only the slipped
     @Test
     fun arcsOverAKeyAloneAreHeldBackOnlyWhereTheyAreSlippedToo() {
         val user = typed("可以" to "ke yi", "苦" to "ku", "你快" to "ni kuai", "你苦" to "ni ku")
         val d = PinyinDecoder(many.dictionary, many.vocabulary, UserScorer(many.model, user), user = user)
         fun between(graph: SyllableGraph, to: Int, holdsSlips: Boolean) = d.arcsBetween(graph, 0, to, holdsSlips).map { it.text }.toSet()
-        // ky, y by u: 可以 alone, 苦 slipped
         val ky = neighbours.segment("ky", null, slipped("ky", 1))
         d.decode(ky)
         assertTrue(between(ky, 2, false).containsAll(listOf("可以", "苦")))
         assertTrue("可以" in between(ky, 2, true))
         assertFalse("苦" in between(ky, 2, true))
-        // nky: n alone, then ky; 你快 alone, 你苦 alone and slipped
         val nky = neighbours.segment("nky", null, slipped("nky", 2))
         d.decode(nky)
         assertTrue(between(nky, 3, false).containsAll(listOf("你快", "你苦")))
@@ -187,7 +168,6 @@ class PinyinDecoderTypedTest {
         assertFalse("你苦" in between(nky, 3, true))
     }
 
-    // past the words' cap the typed words read alone to the end still come (§3.5), not one read over a slip
     @Test
     @Uat("SP-57")
     fun wordsTypedReadAloneAreKeptPastTheCapButNotOnesSlipped() {
@@ -206,9 +186,6 @@ class PinyinDecoderTypedTest {
         listOf("可以" to "ke yi", "开眼" to "kai yan", "考研" to "kao yan", "苦于" to "ku yu", "恐有" to "kong you", "看样" to "kan yang", "可用" to "ke yong", "快要" to "kuai yao", "跨越" to "kua yue")
             .mapIndexed { i, (text, reading) -> Triple(text, reading, -9f - i * 0.1f) } + Triple("可", "ke", -5f)
 
-    // the slots right after the first 64 words, as many as there are (R27 F8561), whatever the words asked: a list read on
-    // with more is the shorter one and more past it (R27 F8537). The grouped keyboards (not wholeFirst) look past a word
-    // that does not read all the keys (review NIT-1, R27 F8557): 可 ranks above the typed words there
     @Test
     fun theTypedWordsSlotsStayRightAfterTheFirstWordsWhateverIsAsked() {
         val d = pinyinDataOf(*slotted.toTypedArray())
@@ -244,8 +221,6 @@ class PinyinDecoderTypedTest {
         }
     }
 
-    // §3.9: over keys alone only the children with a typed word below are walked; they read what looking each
-    // match up reads (collectMatches, the decoder's way before; code review SHOULD-3: not the walk against itself)
     @Test
     fun walkingOnlyTheChildrenWithATypedWordBelowReadsTheSame() {
         val pieces = listOf("ni", "hk", "vs", "hw", "rf", "mn", "n", "h", "v", "r", "m", "k")

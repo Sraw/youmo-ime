@@ -20,17 +20,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 联想's × on real sessions (review 061-small M1): the predictions put away, nothing else. Escape, as it
- * was, reset the session: English lost its own space and a correction's undo, pinyin what was committed.
- */
+/** 联想's × on real sessions: the predictions put away, nothing else (Escape reset the session: English lost its space and undo, pinyin what was committed). */
 class DropPredictionsEnginesTest : EnginesFixture() {
 
     private val clock = VirtualHostClock(epochMillis = 1_800_000_000_000)
     private val log = mutableListOf<HostEvent>()
 
     private fun core(im: String): HostCore {
-        // each row's own events: a row before that failed leaves its own behind (review F8120)
+        // each row's own events: a row before that failed leaves its own behind
         log.clear()
         // what follows the and hello: predictions, which a model offers by its pairs alone
         english = EnglishDataBuilder()
@@ -44,7 +41,7 @@ class DropPredictionsEnginesTest : EnginesFixture() {
             .bigram("hello", "you", -0.5f, 0f)
             .build().toByteArray()
         val engines = Engines(::load, null, warmUps = inPlace, clock = clock)
-        val core = HostCore(EnginesHost(engines), clock, Profile.load(null, InputMethodCatalog.LISTED.map { it.name }.toSet(), "Default"), firstRun = true)
+        val core = HostCore(EnginesHost(engines), clock, testProfile(), firstRun = true)
         core.events += HostEvents { log += it }
         core.activate(1)
         core.setCapabilities(Capability.PREEDIT or Capability.CLIENT_UNFOCUS_COMMIT)

@@ -34,7 +34,6 @@ import splitties.views.dsl.core.view
 import splitties.views.gravityCenter
 import splitties.views.imageDrawable
 
-/** The emoji's categories as tabs in the bar, their colours the theme's (`picker categories`, the one shown `picker:selected categories`; 060-render-p3 T7b). */
 class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
 
     private val keyRipple = ThemeManager.shownLook(theme).keys.press == PressEffect.Ripple
@@ -54,7 +53,6 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
 
         val icon = imageView()
 
-        // its background not shown: the ripple, if any
         private val plain: Drawable? = if (keyRipple) rippleDrawable(theme.keyPressHighlightColor) else null
 
         override val root = view(::CustomGestureView) {
@@ -92,7 +90,7 @@ class PickerTabsUi(override val ctx: Context, val theme: Theme) : Ui {
             val color = (if (active) look.selected else look.categories).color.value
             label.setTextColor(color)
             icon.imageDrawable?.setTint(color)
-            // the one shown on a fill of its own where the theme gives it one (none by default: the bar's)
+            // none by default: the bar's
             look.selected.fill?.let { root.background = if (active) ColorDrawable(it.value) else plain }
         }
     }

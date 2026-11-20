@@ -23,12 +23,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Appends on the thread that learns while a compaction runs on a thread of its own (review B 1.5):
- * the counts written there are put in place with every record appended meanwhile behind them, in
- * their order, and the compaction reads only the log as it was when it was due. On the disk and
- * in memory alike.
- */
+/** Appends during a background compaction land behind its counts, in order; the compaction reads the log as it was when due. */
 class RecordStoreConcurrencyTest {
 
     @get:Rule
@@ -104,7 +99,6 @@ class RecordStoreConcurrencyTest {
         val kept = LinkedHashMap<String, Int>()
         val store = RecordStore(file, format, 40, { synchronized(errors) { errors += it } }, background = threads, fold = fold)
         store.open(replay = { type, input -> replay(type, input, kept) }, counts = { write -> kept.forEach { (w, n) -> write(count(w, n)) } })
-        // past 40 bytes: the fold is due, and runs on its own thread
         repeat(3) { store.append(added("a")) }
         assertTrue(folding.await(10, TimeUnit.SECONDS))
         val since = ByteArrayOutputStream()
@@ -146,7 +140,6 @@ class RecordStoreConcurrencyTest {
             store.append(added(word))
         }
         repeat(3) { learn("a") }
-        // appended as the thread writes, however far it has got
         for (i in 0 until APPENDED) learn("w${i % 7}")
         threads.join()
         learn("last")

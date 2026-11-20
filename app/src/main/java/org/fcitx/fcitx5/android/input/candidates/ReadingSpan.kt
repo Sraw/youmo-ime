@@ -23,20 +23,10 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * One character of a candidate with its 候选词注音 ([org.fcitx.fcitx5.android.core.CandidateWord.readings]),
- * the reading's text half the character's ([CandidateBarHeight.READING_SCALE]), in [color]: pinyin
- * centred above it, the character widened where the pinyin is wider; zhuyin upright to its right, the
- * symbols shrunk to fit the character's height, ˊˇˋ beside the last and ˙ over the first, as
- * Taiwan's textbooks print it.
- *
- * A handwritten character's several readings come joined ([SEPARATOR], [MORE] after them where it has
- * more: CandidateReadings.allOf): pinyin in one line, its size made smaller to fit the character down to
- * [floor] ([CandidateBarHeight.readingsSize]), the character widened past that; zhuyin a column each, side
- * by side, a gap between, ⋮ after the last for more.
- *
- * A hint's reading (候选词注音 off: a misreading's, a part's, a stroke lookup's; [hintSize] above 0) is
- * pinyin too, but in the line's height: [hintSize] its text size ([CandidateBarHeight.hintSize]), [hintRoom]
- * what the view has above the baseline, so the candidate stays where its neighbours are.
+ * Pinyin centred above the character, widened where the pinyin is wider; zhuyin upright to its right,
+ * ˊˇˋ beside the last and ˙ over the first, as Taiwan's textbooks print it. A handwritten character's
+ * several readings come joined: pinyin made smaller down to [floor], zhuyin a column each. A hint's
+ * reading ([hintSize] above 0) is in the line's height, so the candidate stays where its neighbours are.
  */
 class ReadingSpan(
     private val reading: String,
@@ -49,7 +39,6 @@ class ReadingSpan(
     private val hint = hintSize > 0f
     private val zhuyin = !hint && isZhuyin(reading)
 
-    // zhuyin's columns, and whether the character has more readings than shown
     private val more = !hint && reading.endsWith(MORE) && SEPARATOR in reading
     private val columns = (if (more) reading.dropLast(1) else reading).split(SEPARATOR)
     private val small = TextPaint(Paint.ANTI_ALIAS_FLAG)
@@ -57,7 +46,6 @@ class ReadingSpan(
     // read at every draw: one kept, not two made each time
     private val faceMetrics = Paint.FontMetrics()
 
-    // pinyin's size: several readings smaller to fit over the character
     private fun pinyinSize(paint: Paint, w: Float): Float {
         if (hint) return hintSize
         val half = paint.textSize * CandidateBarHeight.READING_SCALE
@@ -73,15 +61,14 @@ class ReadingSpan(
 
     override fun getSize(paint: Paint, text: CharSequence, start: Int, end: Int, fm: Paint.FontMetricsInt?): Int {
         if (fm != null) {
-            // the text's own fonts (a Han character's fallback is taller than the paint's): a line of it plain
-            // and one of it read are then the same height
-            // (that overload is API 33; below it, NoSuchMethodError: a Han character's line as laid out, hanLine)
+            // a Han character's fallback is taller than the paint's: a line of it plain and one read are then the same
+            // height (that overload is API 33; below it, NoSuchMethodError: hanLine)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 paint.getFontMetricsInt(text, start, end - start, start, end - start, false, fm)
             } else {
                 hanLine(paint, fm)
             }
-            // room above for the pinyin where the view lays out by lines (the floating window's)
+            // where the view lays out by lines (the floating window's)
             if (!zhuyin && !hint) {
                 val line = ceil(paint.textSize * CandidateBarHeight.READING_LINE).toInt()
                 fm.ascent -= line
@@ -108,14 +95,12 @@ class ReadingSpan(
             val size = width(paint, text, start, end)
             canvas.drawText(text, start, end, x + (size - w) / 2, y.toFloat(), paint)
             val p = small(paint, pinyinSize(paint, w))
-            // a hint's: on the characters' tops, or lower where the view's top is nearer
             val baseline = if (hint) max(y - paint.textSize * CandidateBarHeight.HAN_TOP - p.descent() - HINT_GAP, y - hintRoom - p.ascent()) else y + paint.ascent() - p.descent()
             canvas.drawText(reading, x + (size - p.measureText(reading)) / 2, baseline, p)
             return
         }
         canvas.drawText(text, start, end, x, y.toFloat(), paint)
-        // the columns as tall as the character's line, each symbol no larger than half the character, all
-        // of one size: that of the longest
+        // each symbol no larger than half the character, all of one size: that of the longest
         paint.getFontMetrics(faceMetrics)
         val faceTop = y + faceMetrics.top
         val faceHeight = faceMetrics.bottom - faceMetrics.top
@@ -158,27 +143,21 @@ class ReadingSpan(
         private const val NEUTRAL = '˙'
         private const val COLUMN_SAMPLE = "ㄅ"
 
-        // zhuyin's: more readings than shown, after the last column
         private const val VERTICAL_MORE = "⋮"
 
-        // the gap between two columns, of a column's width
         private const val COLUMN_GAP = 0.25f
 
-        // a zhuyin column's width, of a symbol's: the symbol and its tone mark beside it, narrower
+        // the symbol and its tone mark beside it, narrower
         private const val COLUMN_ROOM = 1.5f
 
-        // a tone mark beside the last symbol, raised a little off its middle
         private const val TONE_RAISE = 0.75f
 
         fun isZhuyin(reading: String): Boolean = reading.any { it in 'ㄅ'..'ㄯ' }
 
-        // R25r4 F7990, below API 33: the paint's own metrics are its font's, shorter than the Han fallback a plain line
-        // of the floating window is laid out by (a TextView's fallback line spacing), so a candidate read and one not
-        // stood on two baselines there. A Han character's line as a layout makes it instead: one a typeface and size,
-        // kept (a layout each character asked would cost each candidate drawn a layout). A character read is Han.
-        // Accepted, below API 33 alone (R25r5 F8016): the paint's locale list, which picks the CJK fallback, is not in
-        // the key, and a character in another fallback (Ext B …) is not measured, its
-        // line maybe a little off 中's
+        // below API 33 the paint's metrics are its font's, shorter than the Han fallback a floating window's line
+        // is laid out by, so a candidate read and one not stood on two baselines. A layout made instead, kept one
+        // per typeface and size. The paint's locale list is not in the key, and a character in another fallback
+        // (Ext B …) is not measured: accepted
         private const val HAN_SAMPLE = "中"
         private const val KEPT_LINES = 4
         private val hanLines = lruMap<Pair<Typeface?, Float>, Paint.FontMetricsInt>(KEPT_LINES)
@@ -203,11 +182,7 @@ class ReadingSpan(
             fm.leading = 0
         }
 
-        /**
-         * [text] with a [ReadingSpan] on each code point [readings] has one for (one per code point; empty for none);
-         * hints' readings with [hintSize] above 0, [hintRoom] as the span has them; [floor] the smallest several
-         * readings in pinyin are made to fit over their character (0: never smaller, the candidate widened).
-         */
+        /** One reading per code point, empty for none; [floor] 0: never smaller, the candidate widened. */
         fun annotate(builder: SpannableStringBuilder, text: String, readings: List<String>, color: Int, hintSize: Float = 0f, hintRoom: Float = 0f, floor: Float = 0f) {
             val start = builder.length
             builder.append(text)
@@ -224,10 +199,9 @@ class ReadingSpan(
             }
         }
 
-        // a pixel between a hint and its characters, out of the hint's size, so the bar keeps its height
+        // out of the hint's size, so the bar keeps its height
         private const val HINT_GAP = 1f
 
-        /** A hint's reading size ([CandidateBarHeight.hintSize]) for text in [paint], [baseline] below the view's top. */
         fun hintSize(paint: Paint, baseline: Float, floor: Float): Float {
             val fm = paint.fontMetrics
             val room = baseline - paint.textSize * CandidateBarHeight.HAN_TOP - HINT_GAP

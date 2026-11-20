@@ -11,25 +11,12 @@ import org.fcitx.fcitx5.android.input.cursor.CursorTracker
 import kotlin.math.max
 
 /**
- * Where the IME's idea of the cursor, the selection and the composing region lives.
- *
- * The IME runs ahead of the editor: it decides where the cursor *will* be, tells the editor,
- * and later reconciles that prediction against what the editor reports
- * (see [CursorTracker]). Getting that wrong shows up as the cursor jumping, text landing in
- * the wrong place, or a composition that will not clear -- all of which are miserable to
- * reproduce by hand.
- *
- * Everything here is arithmetic over an [InputEditor], with no Android types involved.
- *
- * **Confined to one thread** (the main thread, in the service): the state is plain mutable
- * fields, and the editor's cursor reports arrive on that thread too. [checkThread] is called on
- * every mutating entry point, [pairs]' too, so a debug build can flag a caller on the wrong thread.
+ * The IME's prediction of the editor's cursor, selection and composing region, reconciled against
+ * the editor's reports ([CursorTracker]). Main thread only: [checkThread] guards every mutating entry.
  */
 class EditingSession(
     private val editor: InputEditor,
-    // units a commit goes to the editor in at most ([CommitPieces]); smaller in tests
     private val commitPiece: Int = CommitPieces.MAX,
-    // the main thread held between pieces ([CommitPieces]); recorded in tests
     private val pause: (Long) -> Unit = { Thread.sleep(it) },
     private val checkThread: () -> Unit = {},
 ) {
@@ -40,10 +27,8 @@ class EditingSession(
     /** The range currently held as composing text, in editor coordinates. */
     val composing = CursorRange()
 
-    /** Brackets and quotes typed in pairs, in this editor. */
     val pairs = AutoPairs(this, editor, checkThread)
 
-    /** The content of that range, as fcitx formatted it. */
     var composingText: FormattedText = FormattedText.Empty
         private set
 
@@ -56,47 +41,31 @@ class EditingSession(
         PROVISIONAL,
 
         /**
-         * The session's code as the code row shows it (`ni hao`, 编码行 输入框里, [writeCode]): taken away
-         * when proven still ours, else let go as text; never kept for the engine to commit
-         * (dev/design/061-code-in-field.md §4.3).
+         * The session's code as the code row shows it (编码行 输入框里, [writeCode]): taken away when
+         * proven still ours, else let go as text; never kept for the engine to commit.
          */
         CODE,
     }
 
-    /** The composing text's [Kind]; [Kind.TEXT] with nothing composed. */
     var kind = Kind.TEXT
         private set
 
-    /**
-     * The composing text is not the engine's but stands in for text still to come (voice's, as it
-     * is heard): replaced by the commit, never finished in place first, and taken away, not kept,
-     * when the cursor leaves it. Finished in place, it stayed as text and the commit typed it again.
-     */
+    /** Text standing in for text still to come (voice's): replaced by the commit, taken away when the cursor leaves. */
     val provisional: Boolean get() = kind == Kind.PROVISIONAL
 
-    /** Whether the session's code is in the field now ([Kind.CODE]). */
     val codeInField: Boolean get() = kind == Kind.CODE && composing.isNotEmpty()
 
-    // the code's checks, reads and leaving (FieldCode)
     private val code = FieldCode(this, editor)
 
-    /**
-     * Whether each commit went into the field, and what did not ([CommitCheck]): told of every
-     * [commitText], every cursor report, and every other change made here to the field or its cursor
-     * (a deletion, a selection set: [CommitCheck.moved]); the service times the wait and calls [judgeCommit].
-     */
+    /** Whether each commit went in ([CommitCheck]): told of every commit, report and other change made here. */
     val commits = CommitCheck(editor)
 
-    /**
-     * The wait for a commit's report is up ([CommitCheck.judge]): where nothing went in, the cursor
-     * predicted past it never came, and is the one the editor reported last.
-     */
+    /** The wait for a commit's report is up: where nothing went in, trust the editor's last cursor. */
     fun judgeCommit() {
         checkThread()
         if (commits.judge()) selection.resetTo(selection.current.start, selection.current.end)
     }
 
-    /** [FieldCode.fellBack]: told when the code can no longer be in this field, and floats. */
     var codeFellBack by code::fellBack
 
     /** [FieldCode.inlineCompletion]: a URL's or an email's field, its completion after the code the app's. */
@@ -104,98 +73,66 @@ class EditingSession(
 
     /** How a [provisional] composition left the field ([provisionalTaken]). */
     enum class Taken {
-        /** the cursor left it, or input restarted over it: taken away here, its owner composes it anew */
+        /** the cursor left it or input restarted over it: taken away here, its owner composes it anew */
         AWAY,
 
-        /** no longer in the field at all: the app took it (sent it, cleared the field) */
+        /** the app took it (sent, cleared the field) */
         GONE,
 
-        /** left in the field as text (input restarted where the field could not say where, or in another field) */
+        /** left in the field as text */
         LEFT,
     }
 
-    /**
-     * Told when a [provisional] composition is taken from the field by anything but its owner, and
-     * how ([Taken]). Voice's session listens: text the app took is not typed again and what is said
-     * next starts afresh, text taken away composes anew where the cursor went, text left stays typed.
-     */
+    /** Told when a [provisional] composition is taken from the field by anything but its owner, and how. */
     var provisionalTaken: ((how: Taken) -> Unit)? = null
 
-    /**
-     * Records [text] as the composing text without touching the editor -- for putting a session
-     * into a known state. [updateComposingText] is what shows a new preedit in the editor.
-     */
+    /** Records [text] as the composing text without touching the editor; [updateComposingText] shows it. */
     fun setComposingText(text: FormattedText) {
         checkThread()
         composingText = text
     }
 
     /**
-     * Counts the editor's cursor reports. A fcitx job queued in response to one report checks it
-     * against this before acting, so a burst of reports (a held Backspace, fast typing) only
-     * acts on the last. Read from the fcitx thread, hence volatile. Never reset: a stale job
-     * from before a reset could otherwise match a fresh report's index.
+     * Counts cursor reports so a fcitx job queued for one acts only if still the last (fcitx thread reads it).
+     * Never reset: a stale job from before a reset could match a fresh index.
      */
     @Volatile
     var cursorUpdateIndex: Int = 0
         private set
 
-    /** What the service has to ask fcitx to do after a cursor report; see [onCursorUpdate]. */
     sealed interface CursorUpdate {
-        /** Nothing: the report was expected, or is a selection the IME does not act on. */
         data object None : CursorUpdate
 
-        /**
-         * The cursor moved with nothing composed here. If fcitx still has something on its input
-         * panel (candidates, say), it belongs to where the cursor was, so reset it.
-         */
+        /** The cursor moved with nothing composed: fcitx's panel belongs to where it was, so reset it. */
         data object ResetIfNotEmpty : CursorUpdate
 
-        /**
-         * The cursor moved within the composition; move fcitx's preedit cursor to match.
-         * [codePointPosition] counts code points, as fcitx does. Skip it when [updateIndex] is
-         * no longer [cursorUpdateIndex]: a newer report superseded it.
-         */
+        /** Move fcitx's preedit cursor ([codePointPosition] in code points) unless [updateIndex] is stale. */
         data class MovePreeditCursor(val codePointPosition: Int, val updateIndex: Int) : CursorUpdate
 
         /**
-         * The cursor left the composition, which has been finished in place here: the editor
-         * keeps the text. fcitx has to let go of its preedit too; a reset would commit it at the
-         * new cursor position, so the service focuses out and back in instead. With
-         * `ClientUnfocusCommit` set, fcitx drops the preedit on focus out without committing.
+         * The cursor left the composition, finished in place here. A reset would commit fcitx's preedit at
+         * the new cursor, so focus out and in (`ClientUnfocusCommit` drops it without committing).
          */
         data object FocusOutIn : CursorUpdate
     }
 
-    /**
-     * Whether the last cursor report ([onCursorUpdate]) left a “ that fcitx counts open, with
-     * nothing composed: one put in paired that the cursor left, or one typed to step over a ”.
-     * fcitx's punctuation would make the next quote a lone ”, so the service resets it.
-     */
+    /** A “ fcitx counts open was left by the last report with nothing composed: fcitx would make the next quote ”. */
     var quoteLeftOpen: Boolean = false
         private set
 
     /**
-     * Reconciles a cursor report from the editor (`onUpdateSelection`) with the prediction.
-     *
-     * A report the prediction expected changes nothing -- except that some editors drop the
-     * composing span through an `InputFilter`, which is restored here. Anything else is the user
-     * moving the cursor, and becomes the new truth; what that means for the composition is
-     * returned for the service to pass on to fcitx.
-     *
-     * @param ignoreSystemCursor the user setting that keeps taps inside the preedit from moving
-     * fcitx's cursor
+     * Reconciles a cursor report with the prediction: an expected one only restores a composing span an
+     * `InputFilter` dropped; anything else is the user's move and becomes the truth.
      */
     fun onCursorUpdate(
         selStart: Int,
         selEnd: Int,
         composingStart: Int,
         composingEnd: Int,
-        ignoreSystemCursor: Boolean,
     ): CursorUpdate {
         checkThread()
         val quoteOpen = pairs.quoteOpen
-        return reconcile(selStart, selEnd, composingStart, composingEnd, ignoreSystemCursor).also {
+        return reconcile(selStart, selEnd, composingStart, composingEnd).also {
             quoteLeftOpen = quoteOpen && !pairs.quoteOpen && composing.isEmpty()
         }
     }
@@ -205,53 +142,39 @@ class EditingSession(
         selEnd: Int,
         composingStart: Int,
         composingEnd: Int,
-        ignoreSystemCursor: Boolean,
     ): CursorUpdate {
         val updateIndex = ++cursorUpdateIndex
         pairs.cursorReported()
-        // the cursor where the last write was to leave it: that write is in. Any other report (the field
-        // tapped, the app's own change) says nothing of it, and puts the cursor where no read can tell
+        // only the cursor where the last write left it proves that write went in
         if (!selection.settled && selection.latest.rangeEquals(selStart, selEnd)) commits.reported() else commits.moved()
-        if (codeInField) return code.reconcile(selStart, selEnd, composingStart, composingEnd, ignoreSystemCursor, updateIndex)
+        if (codeInField) return code.reconcile(selStart, selEnd, composingStart, composingEnd, updateIndex)
         if (selection.consume(selStart, selEnd)) {
-            // Only when the prediction matched: an InputFilter can also change the text, and
-            // then the old range may no longer be the composition.
+            // Only when the prediction matched: an InputFilter can change the text too.
             // https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/widget/Editor.java#2083
-            // https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r36/core/java/android/widget/TextView.java#7351
             restoreComposingRegionIfDropped(composingStart, composingEnd)
             return CursorUpdate.None
         }
         selection.resetTo(selStart, selEnd)
         if (provisional && composingStart !in 0..<composingEnd && !provisionalStillThere(selStart, selEnd)) {
-            // the app took it (a chat's text sent, the field cleared): nothing left to take away, and
-            // its owner must not put it in again. The editor's composing region, if it kept one over
-            // what the app put there, is let go: not ours to replace
+            // the app took it: its owner must not put it in again, and the editor's region is not ours to replace
             CoreLog.d { "a provisional composition gone from the field: taken by the app" }
             resetComposingState()
             editor.finishComposingText()
             provisionalTaken?.invoke(Taken.GONE)
             return CursorUpdate.None
         }
-        // the user moved the cursor, or the app changed the text: the pairs are not around it,
-        // unless it moved within what is composed between them (the empty range still holds 0)
+        // the pairs survive only a cursor moved within what is composed between them
         if (selStart != selEnd || composing.isEmpty() || !composing.contains(selStart)) pairs.forget()
-        // nothing composed: the engine is told, as for a cursor (what it committed may not be
-        // before the selection, where the next key goes)
         if (composing.isEmpty()) return CursorUpdate.ResetIfNotEmpty
-        // a selection (rather than a cursor) leaves the composition to the next cursor report
         if (selStart != selEnd) return CursorUpdate.None
         if (composing.contains(selStart)) {
-            // a provisional composition is not fcitx's preedit: nothing of fcitx's to move
-            if (ignoreSystemCursor || provisional) return CursorUpdate.None
-            // fcitx's cursor is relative to the preedit
+            if (provisional) return CursorUpdate.None
             val position = selStart - composing.start
             if (position == composingText.cursor) return CursorUpdate.None
             return CursorUpdate.MovePreeditCursor(composingText.codePointCountUntil(position), updateIndex)
         }
         if (provisional) {
-            // the cursor is outside it: it goes, the cursor kept where the user put it. Where the
-            // editor reports its span, that (the app may have rewritten the text); many report
-            // none at all, so none reported is not taken as gone: the span as composed
+            // many editors report no span at all, so none reported is not taken as gone
             val (start, end) = if (composingStart in 0..<composingEnd) composingStart to composingEnd else composing.start to composing.end
             CoreLog.d { "cursor left a provisional composition: taken away" }
             resetComposingState()
@@ -265,10 +188,7 @@ class EditingSession(
         return CursorUpdate.FocusOutIn
     }
 
-    /**
-     * Where a commit lands now: the cursor, or the start of the code in the field, which it replaces.
-     * Null over voice's or English's composing text, which a commit may or may not replace.
-     */
+    /** Where a commit lands now (cursor, or the code it replaces); null over voice's or English's composing text. */
     val commitStart: Int?
         get() = when {
             composing.isEmpty() -> selection.latest.start
@@ -276,18 +196,12 @@ class EditingSession(
             else -> null
         }
 
-    /**
-     * Writes the session's code [text] into the field as its composing text ([Kind.CODE]), or
-     * empties it. False when it is not written, and the code floats instead: something else
-     * composes here, a selection would be replaced, the field cannot be read, or the code written
-     * before is not as written and was let go of (§6.3; [codeFellBack] is told then).
-     */
+    /** Writes the code into the field ([Kind.CODE]), or false and it floats ([codeFellBack] told if it was let go). */
     fun writeCode(text: FormattedText, render: (FormattedText) -> CharSequence = { it.toString() }): Boolean {
         checkThread()
         if (!editor.isAvailable) return false
         if (text.isEmpty()) {
-            // the code emptied (its last letter deleted, cleared): taken away as leaving takes it,
-            // proven ours, never by an empty write, which replaces whatever the editor holds then
+            // never empty the code by an empty write: that replaces whatever the editor holds then
             if (codeInField) code.leave(fallBack = false)
             return true
         }
@@ -297,12 +211,7 @@ class EditingSession(
         return true
     }
 
-    /**
-     * Ends what is composed as leaving the field ends it, by its [kind]: English's word finished
-     * in place as text ([finishComposition]), voice's taken away (the talk types it), the code taken
-     * away when proven still ours, else let go of as text (§0, §4.3). [fallBack]: the engine keeps
-     * its code, which floats from now on ([codeFellBack]), as before voice's commit.
-     */
+    /** Ends what is composed by its [kind]: text finished, voice's taken away, the code taken away if proven ours. */
     fun leaveComposition(fallBack: Boolean = false) {
         checkThread()
         when (kind) {
@@ -313,36 +222,22 @@ class EditingSession(
     }
 
     /**
-     * Input restarted over the code ([Kind.CODE]; nothing done otherwise). [again], the input
-     * method's own restart (the screen turned, the same EditorInfo): the field is the same, the code
-     * taken away when proven ours. Any other restart may be another field under the same view (a web
-     * page's, Compose's, Flutter's): the code there proves nothing, so it is let go of, never read,
-     * and the field's code floats for the rest of this input (§6.4).
+     * Input restarted over the code. [again] (same EditorInfo): taken away when proven ours. Otherwise
+     * it may be another field under the same view (WebView, Compose): let go unread, and the code floats.
      */
     fun codeRestarted(again: Boolean) {
         checkThread()
         if (kind == Kind.CODE) code.restarted(again)
     }
 
-    /**
-     * What a read of the field's text before the cursor ([before]) would be without the code in it:
-     * the engine's context (前文) is what was there before the code, never the code itself
-     * (§7.9). Unchanged with no code in the field, or with a cursor outside it.
-     */
+    /** A read before the cursor without the code in it: the engine's context never includes the code. */
     fun beforeCode(before: CharSequence?): CharSequence? = code.before(before)
 
-    /** [beforeCode] for a read after the cursor ([after]): the code's part after the cursor dropped. */
     fun afterCode(after: CharSequence?): CharSequence? = code.after(after)
 
     /**
-     * Input restarted over a [provisional] composition, which the restart's focus out would leave as
-     * text. [sameField] with the selection known ([selStart]..[selEnd]: the restarted field's
-     * selection): taken away if still there as composed, for its owner to compose anew
-     * ([Taken.AWAY]); if not there, the app took it ([Taken.GONE]). The selection unknown
-     * ([selStart] -1: nowhere to put the cursor), or another field (a WebView's inputs share one
-     * view): left in place as text, its owner's ([Taken.LEFT]). Whenever not taken away, the
-     * editor's composing region is let go. [provisionalTaken] told in every case; nothing done if
-     * not provisional.
+     * Input restarted over a [provisional] composition, which the restart's focus out would leave as text:
+     * in the same field with a known selection, taken away if still there, else the app took it; otherwise left.
      */
     fun provisionalRestarted(sameField: Boolean, selStart: Int, selEnd: Int) {
         checkThread()
@@ -360,21 +255,13 @@ class EditingSession(
         provisionalTaken?.invoke(
             when {
                 there -> Taken.AWAY
-                // gone from the field it was in: the app took it
                 sameField && selStart >= 0 -> Taken.GONE
-                // the selection unknown: left there as text; or another field's
                 else -> Taken.LEFT
             }
         )
     }
 
-    /**
-     * Removes [start]..[end] (the provisional composition) from the field. The region is set first:
-     * an editor that dropped its composing span would otherwise replace only the empty selection,
-     * leaving the text in place. The cursor kept where it is, the characters gone from before it
-     * (inside the range: at its start); predicted, so the report it brings is not taken as the
-     * user's move.
-     */
+    /** Sets the region first: an editor that dropped its span would otherwise delete only the empty selection. */
     private fun takeAwayProvisional(start: Int, end: Int, selStart: Int) {
         val p = when {
             selStart >= end -> selStart - (end - start)
@@ -389,13 +276,7 @@ class EditingSession(
         }
     }
 
-    /**
-     * Whether the provisional composition is still in the field as composed, the cursor now at
-     * [selStart]..[selEnd]: read around the cursor, the editor reporting no span (it reports one
-     * while the span is there; many report none at all). Text shorter than the range is gone; an
-     * editor that will not say, a selection over it, or a cursor more than [MAX_STILL_THERE_READ]
-     * away (not read across the IPC: maybe the whole document) is taken as still there.
-     */
+    /** Reads around the cursor; an editor that won't say, or one more than [MAX_STILL_THERE_READ] away, counts as there. */
     private fun provisionalStillThere(selStart: Int, selEnd: Int): Boolean {
         val start = composing.start
         val end = composing.end
@@ -423,15 +304,8 @@ class EditingSession(
     }
 
     /**
-     * Shows fcitx's new preedit [text] as the editor's composing text, and predicts where that
-     * leaves the cursor.
-     *
-     * `setComposingText` can only leave the cursor outside the new text (see
-     * `BaseInputConnection.replaceText`), so a preedit cursor anywhere else takes a separate
-     * `setSelection`; the editor may report the intermediate position first, which the
-     * prediction absorbs.
-     *
-     * @param render the text as the editor should show it (the service adds highlight spans)
+     * Shows fcitx's preedit [text] and predicts the cursor. `setComposingText` can only leave the cursor
+     * outside the text, so another position takes a separate `setSelection`.
      */
     fun updateComposingText(
         text: FormattedText,
@@ -443,19 +317,14 @@ class EditingSession(
         write(text, if (provisional) Kind.PROVISIONAL else Kind.TEXT, render)
     }
 
-    // [text] as the composing text of [kind] (TEXT with nothing composed); see updateComposingText
     private fun write(text: FormattedText, kind: Kind, render: (FormattedText) -> CharSequence) {
         this.kind = if (text.length > 0) kind else Kind.TEXT
         val lastSelection = selection.latest
-        // Nothing to change, nothing sent: an empty batch is still two calls on the editor. The
-        // context left behind on an app switch sends its empty preedit as the next app binds, and
-        // whether that lands before or after the bind is the system's timing.
+        // an empty batch is still two calls on the editor; an app switch's empty preedit races the next bind
         val cursorMoves = text.length > 0 && text.cursor >= 0 && text.cursor + composing.start != lastSelection.start
         if (composingText.spanEquals(text) && !cursorMoves) return
         editor.batchEdit {
             if (composingText.spanEquals(text)) {
-                // Same text: only the cursor can have moved, and only a valid one in a
-                // non-empty preedit is followed.
                 if (text.length > 0 && text.cursor >= 0) {
                     val p = text.cursor + composing.start
                     if (p != lastSelection.start) {
@@ -464,8 +333,6 @@ class EditingSession(
                     }
                 }
             } else if (text.isEmpty()) {
-                // With nothing composed before either, composing.start means nothing; the cursor
-                // stays. Otherwise it goes back to where the composition started.
                 selection.predict(if (composing.isEmpty()) lastSelection.start else composing.start)
                 composing.clear()
                 editor.setComposingText("", 1)
@@ -473,7 +340,6 @@ class EditingSession(
                 val start = if (composing.isEmpty()) lastSelection.start else composing.start
                 composing.update(start, start + text.length)
                 if (text.cursor == text.length || text.cursor < 0) {
-                    // at the end (or no cursor): where setComposingText leaves it anyway
                     selection.predict(composing.end)
                     editor.setComposingText(render(text), 1)
                 } else {
@@ -485,7 +351,7 @@ class EditingSession(
             }
             composingText = text
         }
-        // its length only: the debug log can be exported, and the preedit is what the user typed
+        // length only: the exported debug log must not hold what the user typed
         CoreLog.d { "composing ${text.length} chars at $composing, predicted ${selection.latest}" }
     }
 
@@ -496,10 +362,7 @@ class EditingSession(
         kind = Kind.TEXT
     }
 
-    /**
-     * Ends the composition, leaving what was composed in the editor as ordinary text, and
-     * forgets it here. Nothing to do when nothing is being composed, or with no editor.
-     */
+    /** Leaves the composition in the editor as text and forgets it here. */
     fun finishComposition() {
         checkThread()
         if (!editor.isAvailable) return
@@ -508,11 +371,7 @@ class EditingSession(
         editor.finishComposingText()
     }
 
-    /**
-     * [before] and [after] UTF-16 units either side of the cursor replaced by [text], the cursor
-     * [cursor] into it as [commitText] has it: one change, the editor sees no half of it (the
-     * address bar's suggestion, a half-typed suffix finished).
-     */
+    /** Replaces [before]/[after] units around the cursor with [text] in one change the editor sees whole. */
     fun replaceAround(before: Int, after: Int, text: String, cursor: Int = -1) {
         checkThread()
         if (!editor.isAvailable) return
@@ -523,26 +382,14 @@ class EditingSession(
     }
 
     /**
-     * Commits [text], replacing the composing region if there is one, the selection if there
-     * is one, or simply inserting before the cursor. A text too long for one call (a long paste)
-     * goes in pieces in one batch edit ([CommitPieces]).
-     *
-     * @param cursor where to leave the cursor within [text]; `-1` means after its last
-     * character, which is the common case and lets the editor place the cursor itself.
-     * @return what went in: [text], or its start when a long one was cut short. A text of one
-     * call is taken as sent whatever the editor answered (the commit never told before). Nothing
-     * with no editor: the text went nowhere.
+     * Commits [text] over the composing region or selection; a long text goes in pieces in one batch
+     * ([CommitPieces]). Returns what went in ([text], or its start if cut short); "" with no editor.
      */
     fun commitText(text: String, cursor: Int = -1): String {
         checkThread()
         if (!editor.isAvailable) return ""
-        // When the commit is exactly what is already composing, there is nothing to replace:
-        // finish the composition as-is and only move the cursor if it is not already there, or on
-        // its way there: a pending move (the preedit cursor's, say) is where the caret will be.
-        // Re-committing identical text would make the editor redraw and can drop spans.
-        // checked only where the editor has said where its cursor is: one of no text of its own (a
-        // terminal's, a game's) says nothing, and reads back empty whether it took the text or not
-        // not read where the last commit left the text before the cursor known (CommitCheck.before)
+        // committing what is already composed only finishes it: re-committing redraws and can drop spans.
+        // Checked only where the editor has said where its cursor is: one without text of its own reads back empty.
         val plain = composing.isEmpty()
         val before = if (selection.latest.start >= 0) commits.before(text, selection.latest.start, plain) else null
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -581,12 +428,8 @@ class EditingSession(
         return text
     }
 
-    // a long text ([CommitPieces]) in one batch edit, each piece's end predicted once the editor
-    // took it: an editor may report the cursor between pieces, and a report of the last alone
-    // passes the others. A piece the editor did not take is sent again after a pause; when the
-    // pauses are spent or the editor is gone, the rest is not sent (a hole in the middle would be
-    // worse than a paste cut short) nor predicted, and the cursor is left where the editor puts it.
-    // Returns how many units went in.
+    // Each piece's end predicted once taken: the editor may report between pieces. A refused piece is
+    // retried after a pause; once out of pauses the rest is dropped (a hole would be worse than a short paste).
     private fun commitPieces(start: Int, pieces: List<String>, cursor: Int): Int {
         val began = System.nanoTime()
         var end = start
@@ -596,16 +439,13 @@ class EditingSession(
             for ((i, piece) in pieces.withIndex()) {
                 if (i > 0) pause(CommitPieces.GAP_MS)
                 var wait = CommitPieces.FIRST_RETRY_MS
-                // false is a full binder buffer (the editor slow to take a piece: seen, and sent again
-                // fine) or a dead connection, the framework catching either alike. A dead one does not
-                // show in isAvailable while this loop holds the main thread (the unbind waits behind
-                // it), so it waits out the pauses, a second at most; stopping on the first false
-                // would cut short the pastes that only needed a moment
+                // false is a full binder buffer or a dead connection, alike. A dead one hides from isAvailable while
+                // this loop holds the main thread, so wait out the pauses rather than cut short on the first false.
                 while (!editor.commitText(piece, 1)) {
                     if (!editor.isAvailable || paused + wait > CommitPieces.RETRY_BUDGET_MS) {
                         val all = pieces.sumOf { it.length }
                         CoreLog.e("long commit cut short: ${end - start} of $all units, piece ${i + 1} not taken")
-                        // the first piece was to replace the composition: the editor's would linger
+                        // the first piece replaced the composition: the editor's would linger
                         if (i == 0) editor.finishComposingText()
                         return@batchEdit
                     }
@@ -629,23 +469,19 @@ class EditingSession(
         return end - start
     }
 
-    /** Deletes the current selection, if any. A collapsed cursor is left alone. */
     fun deleteSelection() {
         checkThread()
         if (!editor.isAvailable) return
         val lastSelection = selection.latest
         if (lastSelection.isEmpty()) return
         commits.moved()
-        // what the pairs were laid out in is not there to the same length
         pairs.forget()
         selection.predict(lastSelection.start)
         if (composing.isEmpty()) {
             editor.commitText("", 1)
             return
         }
-        // A commit replaces the composing region, not the selection, so the composition is
-        // finished (kept as typed) first. Only the backspace swipe deletes a selection, and it
-        // does not when anything is composed, so this is defence rather than a path in use.
+        // a commit replaces the composing region, not the selection, so finish the composition first
         resetComposingState()
         editor.batchEdit {
             editor.finishComposingText()
@@ -654,13 +490,8 @@ class EditingSession(
     }
 
     /**
-     * Moves each end of the selection by the given offset, clamped at the start of the buffer.
-     * An offset that would invert the range is ignored rather than applied backwards.
-     *
-     * The end is not clamped at the end of the text, whose length the session does not know;
-     * an editor ignores a selection past it, leaving the prediction unconfirmed until the next
-     * report. The backspace swipe moves only the start; [AutoPairs.type] moves both ends by one,
-     * over a closing one it put in.
+     * Moves each end of the selection, clamped at 0; an inverting offset is ignored. The end is not
+     * clamped at the text's end (unknown here): the editor ignores a selection past it.
      */
     fun applySelectionOffset(offsetStart: Int, offsetEnd: Int = 0) {
         checkThread()
@@ -674,11 +505,7 @@ class EditingSession(
         editor.setSelection(start, end)
     }
 
-    /**
-     * Selects [start] to [end] (start ≤ end, clamped at the start of the buffer), as 滑选 moves it:
-     * from where it began, not by offsets from a report that may lag or have been clamped. The end
-     * is not clamped, as in [applySelectionOffset].
-     */
+    /** Selects [start]..[end] as 滑选 moves it: from where it began, not offsets from a report that may lag. */
     fun select(start: Int, end: Int) {
         checkThread()
         if (!editor.isAvailable) return
@@ -689,11 +516,7 @@ class EditingSession(
         editor.setSelection(from, to)
     }
 
-    /**
-     * Selects from [anchor] to [head] in that order, [head] the end the editor moves with shift and an
-     * arrow (its selection's end): 滑选's free end before a line. As the editor reports it, the other
-     * way round where [head] is the left end.
-     */
+    /** Selects with [head] as the end the editor moves with shift+arrow; reported the other way if [head] is left. */
     fun selectFrom(anchor: Int, head: Int) {
         checkThread()
         if (!editor.isAvailable) return
@@ -702,7 +525,6 @@ class EditingSession(
         editor.setSelection(anchor, head)
     }
 
-    /** Collapses a selection to its end, leaving a plain cursor. */
     fun cancelSelection() {
         checkThread()
         if (!editor.isAvailable) return
@@ -715,95 +537,66 @@ class EditingSession(
     }
 
     /**
-     * Deletes text around the cursor at fcitx's request.
-     *
-     * Only [before] shifts the cursor, so only it is predicted -- in UTF-16 units, which is
-     * what the editor will report back, even when the deletion itself counts code points.
-     * Measuring that costs one synchronous `getTextBeforeCursor`; fcitx asks for surrounding
-     * deletions rarely, so this path can afford it (Backspace pays the same round trip, but only
-     * for editors that opted in to direct deletion).
-     *
-     * The service passes `inCodePoints = true`, as fcitx counts characters, but for text it put in
-     * itself, whose units it knows, where the field is not to be read (九键's 1 pressed again in a
-     * password); the unit variant is the editor's own contract too, and the tests hold the fake to it.
+     * Deletes around the cursor at fcitx's request; only [before] moves the cursor, predicted in UTF-16 units
+     * (one synchronous read when counting code points). The service counts units only for text it put in itself
+     * where the field must not be read (a password).
      */
     fun deleteSurrounding(before: Int, after: Int, inCodePoints: Boolean) {
         checkThread()
         if (!editor.isAvailable) return
         commits.moved()
-        // after the cursor, or around what is composed, a closing one put in may go too
         if (after > 0 || composing.isNotEmpty()) pairs.forget()
         val overhangBefore = composingOverhang()
         if (before > 0) {
-            // null: malformed text, which the editor refuses to delete at all
+            // null: malformed text, which the editor refuses to delete
             val units = if (inCodePoints) {
                 unitsBeforeCursor(before, overhangBefore) ?: 0
             } else {
                 before.coerceAtMost(selection.latest.start - overhangBefore)
             }
-            // before the cursor alone: the pairs stay if it is all inside the innermost
             pairs.deletedBefore(selection.latest.start, units)
             if (units > 0) {
                 selection.predictOffset(-units)
-                // the deletion is before the composition too, so it moves along
                 if (composing.isNotEmpty()) composing.offset(-units)
             }
         }
         editor.deleteSurroundingText(before, after, inCodePoints)
     }
 
-    /**
-     * How far the composing region sticks out before the selection, in units.
-     * The editor deletes around the union of the two, never the composing text itself.
-     */
+    /** How far the composing region sticks out before the selection: the editor deletes around the union. */
     private fun composingOverhang(): Int {
         if (composing.isEmpty()) return 0
         return (selection.latest.start - composing.start).coerceAtLeast(0)
     }
 
     /**
-     * Handles Backspace from the virtual keyboard.
-     *
-     * Most editors get a Backspace key event, because that is the only thing every editor
-     * understands. Editors that opted in ([EditorTraits.acceptsDeleteSurrounding]) are edited
-     * directly instead: the selection is deleted, or else one code point before the cursor.
-     *
-     * @return true when handled here; false when the caller must send a Backspace key event
+     * Backspace: a key event for most editors; those with [EditorTraits.acceptsDeleteSurrounding] are edited
+     * directly. False when the caller must send the key event.
      */
     fun backspace(traits: EditorTraits): Boolean {
         checkThread()
-        // Backspace only gets here when fcitx passed it on, which it does not while it has a
-        // preedit; a composing region left in the editor is stale, so it is finished (kept as
-        // typed) and the deletion works on plain text, predictably. The code, if one is there, is
-        // taken away when proven ours, else let go of (§4.3); voice's text is finished as before
+        // fcitx passes Backspace on only without a preedit, so a composing region left here is stale
         if (kind == Kind.CODE) code.leave(fallBack = false) else finishComposition()
-        // a deletion, here or the caller's key event: what a commit waiting did can no longer be read back
+        // a deletion: a pending commit can no longer be read back
         commits.moved()
         val lastSelection = selection.latest
         var direct = editor.isAvailable && traits.acceptsDeleteSurrounding &&
             !traits.isRawKeyInput && (lastSelection.isNotEmpty() || lastSelection.start > 0)
-        // A direct deletion is a known code point, so it is measured -- a round trip per press,
-        // but only for editors that opted in. Malformed text (an unpaired surrogate) would be
-        // refused by a code-point deletion, so that one goes as a key event, which removes it.
+        // malformed text (an unpaired surrogate) is refused by a code-point deletion, so it goes as a key event
         var directUnits = 1
         if (direct && lastSelection.isEmpty()) {
             val measured = unitsBeforeCursor(1, overhang = 0)
             if (measured == null) direct = false else directUnits = measured
         }
-        // a selection goes the one way a selection is deleted (R25 core-input-10)
         if (direct && lastSelection.isNotEmpty()) {
             deleteSelection()
             return true
         }
-        // With no editor the key event the caller falls back to goes nowhere either, so there
-        // is no move to predict.
         if (editor.isAvailable) {
             if (lastSelection.isNotEmpty()) {
                 selection.predict(lastSelection.start)
             } else if (lastSelection.start > 0) {
-                // A key event deletes whatever the editor thinks one character is, which can
-                // only be guessed at; asking the editor would add a round trip to every press,
-                // so the guess stays at one unit.
+                // a key event deletes what the editor thinks one character is; asking would cost a round trip per press
                 selection.predictOffset(-(if (direct) directUnits else 1))
             }
         }
@@ -813,35 +606,22 @@ class EditingSession(
     }
 
     /**
-     * How many UTF-16 units deleting [codePoints] code points before the cursor removes -- and
-     * so how far the cursor moves back.
-     *
-     * The editor deletes before the composing region when it starts before the cursor
-     * ([overhang] units of composing text), not before the cursor, so the text is measured from
-     * there. When the editor will not show enough text to tell, one unit per code point is
-     * assumed.
-     *
-     * @return null for malformed text (an unpaired surrogate in the way), which the editor
-     * refuses to delete, so nothing moves
+     * UTF-16 units [codePoints] code points before the cursor span, measured from the composing region
+     * when it starts earlier (the editor deletes before that). Null for malformed text the editor refuses.
      */
     private fun unitsBeforeCursor(codePoints: Int, overhang: Int): Int? {
         val cursor = selection.latest.start
         val boundary = cursor - overhang
         if (boundary <= 0) return 0
-        // more code points than there are units cannot exist; also keeps the arithmetic small
         val count = codePoints.coerceAtMost(boundary)
         val wanted = count * 2 + overhang // enough for every code point to be a surrogate pair
         val text = editor.textBeforeCursor(wanted) ?: return count
-        // Shorter than the cursor position allows means the editor held text back, not that
-        // the text starts there; counting what came back would under-predict.
+        // shorter than the cursor allows means the editor held text back
         if (text.length < minOf(wanted, cursor)) return count
         return CodePoints.lengthOfLast(text.subSequence(0, text.length - overhang), count)
     }
 
-    /**
-     * Restores the composing region after an editor reported no composing span while this
-     * session still believes there is one -- some editors drop it through an `InputFilter`.
-     */
+    /** Some editors drop the composing span through an `InputFilter`; restore it. */
     private fun restoreComposingRegionIfDropped(reportedStart: Int, reportedEnd: Int) {
         if (reportedStart != -1 || reportedEnd != -1) return
         if (composing.isEmpty()) return
@@ -849,6 +629,5 @@ class EditingSession(
     }
 }
 
-/** How far from the cursor a provisional composition or the code is read back (characters, one IPC read). */
 internal const val MAX_STILL_THERE_READ = 4096
 

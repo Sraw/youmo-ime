@@ -12,8 +12,7 @@ dependencies {
     compileOnly(libs.aboutlibraries.plugin)
     compileOnly(libs.detekt.gradlePlugin)
     implementation(libs.kotlinx.serialization.json)
-    // A workaround to enable version catalog usage in the convention plugin,
-    // see https://github.com/gradle/gradle/issues/15383#issuecomment-779893192
+    // Version catalog in convention plugins: https://github.com/gradle/gradle/issues/15383#issuecomment-779893192
     implementation(files(LibrariesForLibs::class.java.protectionDomain.codeSource.location))
     testImplementation(libs.junit)
 }
@@ -63,10 +62,7 @@ gradlePlugin {
     }
 }
 
-// read from the repository by a path of their own, not the classpath: each an input, or an edit to one alone leaves
-// the tests up to date and what it would fail unseen (R26 F8163; the app's and the libraries' since 2da698df0).
-// VoiceDataPluginTest: the packs' versions, the voice pack's listings; AssetPacksPluginTest: the pack keys;
-// AssetPacksBundleTest: the app's PackKind paths (R26 F8500)
+// files the tests read by path, as inputs so an edit to one alone reruns them
 tasks.named<Test>("test") {
     val repo = rootDir.parentFile
     inputs.files(

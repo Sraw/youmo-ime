@@ -25,10 +25,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
 
-/**
- * 生僻字屏蔽's grid as [Engines] makes it of the pack's data (design §6.2): of 扩展 B on, only what
- * something types, the dictionary's words, a table or the parts (DECISIONS N2); made once (review S7).
- */
+/** 生僻字屏蔽's grid of 扩展 B: only what something types (dictionary, a table, the parts); made once. */
 class RareGridSourcesTest : EnginesFixture() {
 
     private fun s(cp: Int) = String(Character.toChars(cp))
@@ -83,8 +80,7 @@ class RareGridSourcesTest : EnginesFixture() {
         )
     }
 
-    // review F8110: a table this build cannot read (another kind or version) threw the engine's
-    // DataFormatException past a catch of java.util.zip's, and the whole grid failed to be made
+    // the engine's DataFormatException is not java.util.zip's, so the whole grid once failed
     @Test
     fun aTableOfAnotherKindIsPassedOverAndTold() {
         val told = ArrayList<IOException>()
@@ -113,8 +109,6 @@ class RareGridSourcesTest : EnginesFixture() {
         onEvent(PINYIN, EngineEvent.RESET, 0)
     }
 
-    // an import of a rare character's words would leave the user nothing to show it by: theirs type it
-    // too, the grid made again as they change
     @Test
     fun theUsersWordsTypeTheirCharactersTooAsTheyChange() {
         val additions = Engines.Additions("", "d", indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("大${s(merged)} da'a 0.5") })
@@ -132,7 +126,6 @@ class RareGridSourcesTest : EnginesFixture() {
                 "the same grid while they stay" to { assertSame(engines.rareGrid(), engines.rareGrid()) },
             )
             engines.removeWords(engines.userWords(UserWord.Kind.ADDED))
-            // the word picked stays the user's
             assertEquals(1, engines.dropImport(engines.importBatches().single().id))
             assertRows(
                 "the word added taken off: gone" to { assertFalse(has(added)) },
@@ -143,8 +136,6 @@ class RareGridSourcesTest : EnginesFixture() {
         }
     }
 
-    // a merged dictionary may have a million words: walked once a file, not at each grid made again
-    // as the user learns
     @Test
     fun aMergedDictionaryIsWalkedOnceAFileNotAsTheUserLearns() {
         fun of(cp: Int, name: String) = Engines.Additions("", name, indexes = indexDir(), dictionary = compiled(::load) { sequenceOf("大${s(cp)} da'a 0.5") })

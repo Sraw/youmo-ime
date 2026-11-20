@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * What every scene the snapshots hold must be, checked rather than looked at (review M5): on each
+ * What every scene the snapshots hold must be, checked rather than looked at: on each
  * key, the label and the marks kept apart and inside its face; the keys' touch areas apart, and
  * together the whole board but its gaps and a split's middle. A snapshot shows where things are;
  * this says they are right.
@@ -49,7 +49,7 @@ class SceneChecksTest {
     // the exceptions are what theme 3.0 does too, and each still happens somewhere (or it is stale)
     @Test
     fun theFaceExceptionsAreStillMet() {
-        val met = Shots.all.flatMap { shot ->
+        val met = Shots.drawn.flatMap { shot ->
             shot.scene.keys.flatMap { k ->
                 val all = contents(shot, k)
                 all.filter { !inside(it.box, k.shape.bounds) }.mapNotNull { leeway(shot, k, it, all) }
@@ -80,7 +80,7 @@ class SceneChecksTest {
 
     @Test
     fun theKeysTouchAreasKeepApart() {
-        val met = Shots.all.flatMap { shot ->
+        val met = Shots.drawn.flatMap { shot ->
             val keys = shot.scene.keys
             keys.indices.flatMap { i -> (i + 1 until keys.size).map { keys[i] to keys[it] } }
                 .filter { (a, b) -> overlap(a.hit.bounds, b.hit.bounds) > AREA }
@@ -92,7 +92,7 @@ class SceneChecksTest {
     // the keys' hits, the slots, the gaps and a split's middle: the board, all of it, once
     @Test
     fun theTouchAreasCoverTheBoard() {
-        val wrong = Shots.all.mapNotNull { shot ->
+        val wrong = Shots.drawn.mapNotNull { shot ->
             val scene = shot.scene
             val board = scene.board
             val blank = blanks(shot)
@@ -121,7 +121,7 @@ class SceneChecksTest {
         }
 
     private fun expectNone(check: (Shot, KeyNode) -> List<String>) {
-        val found = Shots.all.flatMap { shot -> shot.scene.keys.flatMap { check(shot, it) } }
+        val found = Shots.drawn.flatMap { shot -> shot.scene.keys.flatMap { check(shot, it) } }
         assertTrue(found.isEmpty(), found.joinToString("\n"))
     }
 

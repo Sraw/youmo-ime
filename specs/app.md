@@ -10,7 +10,7 @@ an ime-core class with a test.
 |---|---|
 | `core/` | The host's Android side: `KotlinHost` (the `HostApi` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinhost)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `HostApi` (suspend calls into the host; its `eventFlow`, the host's own `HostEvent`s out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel`; the Android-free DTOs of the same package (`KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
 | `daemon/` | `HostDaemon`: the one fcitx instance, shared by connections (`HostConnection`) |
-| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`KeyDefPreset`, `KeyGesture`, `CommonKeyActionListener`, `canvas/`: the scene drawing), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/` (the history panel; 「切词」, `ClipboardChunksWindow`, shows ime-core's `ClipboardChunks` pieces, picked by tap or by a sideways sweep (ime-core's `SwipePick`), Chinese split by `HostApi.wordBoundaries`; the history at scale measured by `ClipboardScale`, JVM and device: on redroid at 10 000 entries opening ~30 ms, clearing ~0.2 s, a backup ~0.2 s; at 100 000 opening ~0.1 s, a page half way down ~0.35 s, clearing ~1.5 s, a backup ~2 s), `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; its head, `BaseInputView.showCandidateActionMenu`, the engine's `CandidateCard` stepped through by ime-core's `CardNav`: the reading line `CompactLineView`, `WordCardView`, `CharCardView` (`candidates/`), each a view tapped on its own in the list's first row, one column in the floating candidates window; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
+| `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`SceneKeyDef`, `KeyGesture`, `CommonKeyActionListener`, `canvas/`: the scene drawing), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/` (the history panel; 「切词」, `ClipboardChunksWindow`, shows ime-core's `ClipboardChunks` pieces, picked by tap or by a sideways sweep (ime-core's `SwipePick`), Chinese split by `HostApi.wordBoundaries`; the history at scale measured by `ClipboardScale`, JVM and device: on redroid at 10 000 entries opening ~30 ms, clearing ~0.2 s, a backup ~0.2 s; at 100 000 opening ~0.1 s, a page half way down ~0.35 s, clearing ~1.5 s, a backup ~2 s), `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; its head, `BaseInputView.showCandidateActionMenu`, the engine's `CandidateCard` stepped through by ime-core's `CardNav`: the reading line `CompactLineView`, `WordCardView`, `CharCardView` (`candidates/`), each a view tapped on its own in the list's first row, one column in the floating candidates window; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
 | `data/` | File-backed managers: `pack/` (the resource packs: `PackStore` the installed shelf and its state, `PackImports` an import from the picker in the app's scope with its progress and results, `AppData` every data file's door, a pack's file or the APK's asset; data-and-build.md#resource-packs), `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `quickphrase/` (`QuickPhraseManager`: the user's quick input, `mine.mb` (entries with notes, and folders) and `mine.used` read, changed and written whole under one lock, the settings page and the keyboard both writing; files of before read converted and written as version 2 at the next change, host.md `QuickPhraseFiles`; backups take `data/quickphrase.d` as a followed directory, an old backup restored read the same way), `layout/` (`CustomLayouts`: the user's own layouts, `files/layouts/<id>.xml`, written through `<uuid>.saving` and a rename under the lock the list clears a kill's `.saving` under (one over a minute old: a save of another process is younger), listed parsed once a file (path, mtime, size; its text not kept, a throw reading one makes it 读不出), names shown without `LayoutCheck.hidden` characters, the `.converted` record of theme packs' layouts turned into custom ones; the rules, ime-core `input/layout/`: `CustomLayoutFiles` names and limits, `LayoutImport` an import's verdict, `LayoutThumbnail` a card's keys; 061-custom-layout §4), `UserDataManager` (backup/restore; `layouts/` goes in a backup, a restore lays the backup's over the phone's by id, each held to `CustomLayoutFiles.restorable` (the non-strict check, a family of the list, no app id or key-name prefix) and the phone kept within 100, its own first; `.converted` merged; best effort: a failure is logged, the restore goes on) |
 | `ui/` | Settings: `main/` (`MainActivity`, `MainFragment` = the home page, `settings/` pages and `SettingsRoute` (外观 is `theme/ThemeFragment`: the preview over three tabs, 主题, 大小与样式 and 布局, `layout/LayoutListFragment`, whose card tapped shows in the preview till the tab is left), `settings/search/`), `setup/` (the first-run wizard), `common/` |
 | `utils/` | Small helpers (`AppUtil`, `Const`, extensions) |
@@ -171,9 +171,9 @@ Long 150: nothing longer than 150 ms, the owner's rule of 2026-10-23; going is t
 curves' interpolators): no literal durations. Android's 移除动画 or 禁用动画 makes each instant. What
 typing does is never animated: a key's preview, the candidates changing, a layout switched (the
 pickers included), the bar going from idle to candidates. Short: the long-press keys and a
-candidate's menu growing out of what was pressed (`utils/PopIn.kt`), a notice replaced. Medium: a
+candidate's menu growing out of what was pressed (`popIn`, `utils/Views.kt`), a notice replaced. Medium: a
 notice coming, one window for another (`InputWindowManager`, unless the window sets its own), the
-idle bar's views and the ⋯ icon. Long: the candidates expanded (`BaseExpandedCandidateWindow`'s
+idle bar's views and the ⋯ icon. Long: the candidates expanded (`GridExpandedCandidateWindow`'s
 slide from the top) and the whole keyboard moving.
 
 A theme's own key motion (060-render-p3 A1) is apart from these: a key's `Motion` in the scene (its look's
@@ -272,12 +272,12 @@ slots and marks, cached per variant and `KeyLists.version`, the state (Shift, a 
 password, ways, places) mapped on top; an item's commit is the default item's of the same text, else the key's default
 symbols' (the nine key 1's are `AsKey` too, through the punctuation map as the comma's). `KeyOutput.of(item)` → `KeyOutputs.toKeyAction()` (app) is the one commit path
 for `PopupKeyboardUi` and `KeySwipes`. `KeyListsCache` (app) reads `key_lists`; `AppPrefs.dropRetired`'s
-`migrateKeyLists` (`KeyListsMigration`, pure) makes it once from 0.5/beta's `popup_overrides`, `key_popups` and
-`t9_symbols` when it is missing or has no `@n` head, then upgrades it, and beta3's `@1`, to `@2` (`KeyListsMigration.upgrade`:
-a row key's symbols put under its row as the editor shows it, by the user's 按键字母, the first 16 items kept in list order; its first as `@1` resolved it;
+`migrateKeyLists` (`KeyListsMigration`, pure) makes it once from 0.5's `popup_overrides` and
+`t9_symbols` when it is missing or has no `@n` head (or beta3's `@1`, no longer upgraded: migrated over), through `@1` to `@2` (`KeyListsMigration.upgrade`:
+九键's symbols put under its row as the editor shows it, by the user's 按键字母, the first 16 items kept in list order; its first its default's;
 `KeyLists.needsMigration`: a later version's `@4` is kept as it is, read as no lists, never migrated over), leaving the old keys for a downgrade (into `RETIRED` at 0.7); `key_lists` is a
 plain `string` (not `hidden`, or a backup's import would reset it and the old keys come back) and is copied to device
-encrypted storage, where before the first unlock the cache migrates the old keys (or upgrades `@1`) in memory. The settings' editor
+encrypted storage, where before the first unlock the cache migrates the old keys in memory. The settings' editor
 (按键字符和快捷键, eight keyboards' cards over one card of the picked board's keys, the 九键 one replacing 0.5's 按键长按) draws the current theme's layouts,
 starts a key from the resolver (`SceneBoard.resolver` with the variant given: `semicolon = true`, the user's 按键字母,
 so 18 键's L shows its `:`), every item moved, deleted and made the first alike, and saves the whole list through
@@ -310,8 +310,7 @@ tracked one while a selection predicted is not yet reported), and sets the selec
 Right of what is known to be in the field a step is tried alone, the steps after it kept till the
 editor reports it (`reportedSelection`, `selectionSettled`), as one past the end is ignored; one
 given up (the finger back off it) or still unreported at the lift is no longer predicted
-(`forgetSelection`), one reported by then kept for the next touch's anchor. The buzz is the listener's, once a sample, where the selection moved.
-Slid up or down after its first sideways step, the free end moves a screen line a vertical step (the
+(`forgetSelection`), one reported by then kept for the next touch's anchor. Slid up or down after its first sideways step, the free end moves a screen line a vertical step (the
 space's `CrossSteps` and `spaceLineStep`, gated by `SpaceCursor.vertical` as the space's): the editor
 moves it itself, `FcitxInputMethodService.extendLine` sending shift+DPAD (`sendShifted`) through the
 space's `sendLine` (its reads, `SpaceCursor.sendable`/`toEdge`, `LineRush`), the selection first set
@@ -367,9 +366,9 @@ marks on a key are placed by `KeyMarks` in slots of its face (`KeyMarks.Slot`: t
 label), on the keyboard and on 按键字符和快捷键's keys (`KeyCaps`) alike:
 two settings with one list of places (`KeyMarkPosition`, `KeyMarks.At`: 右上 右下 左上 左下 顶部 底部 无; 顶部 added in 0.6.1: the top edge's middle for a symbol and a shortcut alike, the label not moved; on low keys a corner as 底部 is (底部 the first of 右上 右下 左上 左下 the other's is not, 顶部 of 右上 左上 右下 左下: `KeyMarks.lowOrder`), a 顶部 and a 底部 there each its own edge's right corner, a character key's and a function key's alike, `KeyMarks.onKeys`. Stored by name: a build before 0.6.1 reads 「Top」 as unknown, the default), 上滑图标位置 (`AppPrefs.keyboard.swipeUpPosition`, key `swipe_up_position`, top right) and 下滑图标位置 (`swipeDownPosition`, top left), each way's slot drawn at its own (`SceneMarks.settings`, keyboard-scene's `Content.charSlots`: a first as the corner symbol, a command an icon, a text its first two graphemes and 「…」, `KeyMarkText` (a first too: one rule, `SceneMarks.symbol`, the whole typed and said; a 0.5 backup's long presses drew whole over the next keys till R24); a way off draws nothing). A function key's two each at its own way's place too (`Content.functionSlots`, `KeyMarks.placeFunction`; two in one place, an unsettled import only, read as `KeyMarks.settled`: the up one yields). Till beta2 both were at the place of the way that is not the first's, the down one mirrored: a 下滑 右下 drew ⌫'s 恢复 top right and 清除 bottom right. 底部 is a shortcut's bottom edge middle, a symbol's under the letter; on landscape's and 紧凑's low keys (`KeyMarks.onKeys`) a way's 底部 is the first of 右上 右下 左上 左下 (`LowOrder`) the other way's place is not, whatever its mark (till beta2 the symbol's and the shortcut's went by different orders). A mark with no room in its slot is not moved to another corner (S4e): it is drawn smaller, else left out (above). The settings page never lets the two share a place but 无 (`ManagedPreferenceUi.Apart`: the other's place greyed out in `MyListPreferenceDialogFragment`, noted whose); two stored in one place (an import, a backup) are read apart by `KeyMarks.settled`, the up (上滑) way's mark yielding top for bottom on its side, 底部 to top right (`swipeSpots()` is what every key and preview reads), and stored so at the next start (`AppPrefs.dropRetired` → `settleMarkPositions`; `Apart.read` reads them so on the page till then, and a list read again as the other changes: the summary is what the keyboard draws). Both are in the service's `remakeKeyboardsPrefs`: the keyboards (the bar's number row too) are made anew as either changes (`KeyMarksUatTest.eitherChangedTheKeyboardIsMadeAnew`). (0.5.1's testers saw the symbols pushed bottom right, then the shortcuts there after 滑动 changed ways: placement followed the swipe; `KeyMarksUatTest` holds the first open to what any setting change leaves, `KeyMarksTest` every combination.)
 
-拼音键字母大小写 (`AppPrefs.keyboard.letterCase`, key `letter_case`, `LetterCaseChoice`: 总是小写 / 跟随 Shift / 总是大写, default 跟随 Shift) cases a Chinese input method's letter faces and press bubbles only; what is typed and Shift are untouched. The decision is keyboard-scene's pure `LetterCaseRule` (`forIme`: English always follows Shift, its case being what it types; `upper`: the setting, Shift's state, `shiftless` for 九键 and 14/18 键, which show capitals following Shift, and the hidden keep-uppercase). The keyboards pass it as `Texts.letterCase`; `Expand` reads it in `{case:x}`, `{nine-letters:N}` and `{group:qw}` (k14/k18's group faces); a key's screen reader text is the label as 跟随 Shift shows it, so it reads the same whichever is chosen. `TextKeyboard`/`GroupedKeyboard`/`T9Keyboard` case their bubbles by the same rule; `KeyCaps.board` (`SceneKeyCell.Board.letterCase`) and the 九键 letters page show it too. The hidden 键盘字母保持大写 (`keepLettersUppercase`, `keep_keyboard_letters_uppercase`) still holds under 跟随 Shift, 总是小写 over it; with it on, English's press bubble shows the capital its face shows while the letter typed still follows Shift. A table's letter with no root (`{root:x}` empty in `Texts.other`) falls back to `{case:x}`. In `remakeKeyboardsPrefs`. Held by `LetterCaseRuleTest`, `ExpandTest`, `LetterCaseScreenshotTest`.
+拼音键字母大小写 (`AppPrefs.keyboard.letterCase`, key `letter_case`, `LetterCaseChoice`: 总是小写 / 跟随 Shift / 总是大写, default 跟随 Shift) cases a Chinese input method's letter faces and press bubbles only; what is typed and Shift are untouched. The decision is keyboard-scene's pure `LetterCaseRule` (`forIme`: English always follows Shift, its case being what it types; `upper`: the setting, Shift's state, `shiftless` for 九键 and 14/18 键, which show capitals following Shift; `keepUppercase`, which the app always passes false). The keyboards pass it as `Texts.letterCase`; `Expand` reads it in `{case:x}`, `{nine-letters:N}` and `{group:qw}` (k14/k18's group faces); a key's screen reader text is the label as 跟随 Shift shows it, so it reads the same whichever is chosen. `TextKeyboard`/`GroupedKeyboard`/`T9Keyboard` case their bubbles by the same rule; `KeyCaps.board` (`SceneKeyCell.Board.letterCase`) and the 九键 letters page show it too. A table's letter with no root (`{root:x}` empty in `Texts.other`) falls back to `{case:x}`. In `remakeKeyboardsPrefs`. Held by `LetterCaseRuleTest`, `ExpandTest`, `LetterCaseScreenshotTest`.
 五笔's 全部字根 leaves the letters' shortcuts unmarked (`TextKeyboard.charShortcutMarks`: its roots start in the top left corner), shown as 键名 at 紧凑 though (`TableKeyboard.atHeight`, the setting kept); at 键盘高度 紧凑 (`KeyboardHeightLevels.isCompact`, read as the keys
-are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's, times a resized floating keyboard's `resize`; 大千's symbols 0.9 again, `KeyTextScale.dachen`, cut off on a 360 dp phone otherwise). The service
+are made by `keyboardCompact()`) the symbol never under the letter, the shortcuts drawn as anywhere, smaller, and the keys' text 0.9 (`KeyTextScale`, the smaller of it and floating's, times a resized floating keyboard's `resize`; 大千's symbols 0.9 again, its layout's `compact-text-scale`, cut off on a 360 dp phone otherwise). The service
 makes the keys anew only when a height change crosses into or out of 紧凑 (`compactBuilt`; a keyboard style's change
 only where it changes the style built, `screenBuilt`/`styleBuilt`, `keyboardStyleListener`, `ViewRebuild.STYLE`); the theme page's preview does the same in `recalculateSize`. A key's glyph (label, icon) and its marks (shortcut icons and texts, a letter's symbol) keep apart only where their ink meets, worked out by the scene engine as it builds a key's content (`lib/keyboard-scene` `rules/KeyMarkYield`, run from `engine/Content`; 060-render-p2 S4e): one size for each class of glyph across a keyboard, no mark moved to another corner, a text that does not fit as the app gives it (two characters and 「…」) drawn a step down on that key alone, at its class's size (one at an edge's middle stepped down too until it fits between the corner marks on its edge, `Content.MIDDLE_GAP_DP`, 1 dp, from each, the corner marks not moved for it: review 061-small S6), its key then asking nothing of the mark classes (`MarkContent.Text.ladder`: its first character and 「…」, then `Icons.SHORT_TEXT`, a two-line icon drawn as the shortcut icons are, its ink the two lines (`Icons.SHORT_TEXT_INK`), not its square: a text is here; `SceneBuilder.roomless`, `Member.shortened`; 0.6.0-beta2: the owner's 「现在怎么样了」 on j), a mark that cannot fit at its least size left out (a mark wider than its key's face counts as not fitting: a long first the user set, a 0.5 backup's 「5%葡萄糖注射液100ml」, drawn over the next keys till R24; `KeyMarkYield.cornersIn`, `LongMarksStayOnTheirKeyTest`; a built-in one before one the user set, `MarkSettings.user` / `KeyMarkYield.Mark.user`; then the most expendable first: a function key's down shortcut, a shortcut; a symbol last); a mark is kept from the glyph by the gap less half a px (`FIT_SLACK`, L62/L65/L72: as L77's half px, too little to see), everywhere, so none jumps where it stops fitting. `KeyMarksEverywhereUatTest` measures every key of every keyboard (standard, 紧凑, floating, one-handed, landscape; every pair of places the settings allow) for nothing drawn over anything else and prints what was left out; the sweep leaves out no corner symbol (it prints "left out (0)"; 060-pending-decisions S4e recorded 22 corner symbols with 紧凑, one-handed and the symbol at 左下, 右下 or 底部 before `FIT_SLACK` and later changes); at nominal height 大千 with 下滑 at 底部 leaves out preset shortcut icons (`KeyMarksScreenshotTest` zhuyin_full_TopRight_Bottom). The icon 8 dp at 紧凑. `KeyCaps`' caps are scenes and yield as every scene key does (below, S6). 注音 keyboards name their keys `zyfull/<QWERTY letter>` and
 `zy9/1`…`zy9/11`, the groups by their place (`ZhuyinShortcutNames`; the tones and 注音九键's slot none, as 九键's 1). What each punctuation key types (。 or . by the punctuation mode) is the host's (`HostCore.startPunctuationKeys`), kept from the last run in `filesDir/punctuation-start-keys` (`PunctuationStartKeys`, written by the host as it changes, read on a thread of its own at the service's `onCreate`) so the keys show it before the host is up (060-render-p2 S7a); `PunctuationComponent.known` says whether it is known. None kept (a first install, the host not up yet): `KeyboardWindow` holds a punctuation key's tap back (not typed, its bubble not shown) and buzzes once. A long press's keys (`PopupKeyboardUi`, `PopupMenuUi`) are one small size whatever the
@@ -446,12 +445,12 @@ slides; `ThemeManager` makes nothing anew for them, and the theme's preview rema
 the three stored, nothing written); their keys stay, for a backup of 0.6.1 brought back into 0.6.0.
 
 Where the style is 分体 the letters split in two (`TextKeyboard.Split`, sized by
-`SplitKeyboard` in ime-core): Gboard's,
+`SplitKeyboard` in keyboard-scene `scene/rules/`): Gboard's,
 five keys a half, G and V on both (`QWERT|YUIOP`, `ASDFG|GHJKL`, `⇧ZXCV|VBNM⌫`), each half a grid
 from the edge to the room between them; that room what ten letters 48 dp wide leave of the keyboard
 (the screen less its side padding), 12–40% of it; the space spans it, the rest of the bottom row as
-wide in letters as before. `GapKey`
-is the room, a plain view that takes no touch. Decided as the keyboard is made: a turn of the screen
+wide in letters as before. The layout's `<gap>`
+is the room, which takes no touch. Decided as the keyboard is made: a turn of the screen
 makes the input view anew (the theme editor's preview too, `KeyboardPreviewUi`). A first try with
 the halves against the gap and T, G, B on both left the edges ragged and empty (2026-10-14).
 
@@ -467,7 +466,7 @@ the window attached (`InputBroadcastReceiver.onWindowAttached`, its `DockFollowe
 (`KeyboardWindow.onLayoutShown`).
 
 One-handed (the style 单手, read live the same way; the status area's
-单手模式 turns it on at the side last used, `ThemePrefs.oneHandedSide`, right at first, or off; that side is internal state with no UI, not a hidden setting, so neither the first reset nor importing a backup sets it back): every board, the letters
+单手模式 turns it on at the side last used, `ThemePrefs.oneHandedSide`, right at first, or off; that side is internal state with no UI, kept through importing a backup): every board, the letters
 too, goes to that side, 80% of the width, a phone's 420 dp at most (`SplitKeyboard.placement`, which
 decides both). The room beside it has the arrow, which then sets `oneHandedSide` rather than
 `splitDock`, and a button back to both hands (退出单手模式: 普通 or split, as under it). These side buttons, split's and one-handed's, are
@@ -482,12 +481,12 @@ worked out by `FloatingController.handleLook`: the view reads no settings) and t
 board is placed anew or the keyboard's height changes `@compact`.
 
 The navigation bar under a docked keyboard is the theme's `navbar { color }` where it sets a colour
-(T7a; `follow`, the default, and floating: as before, the colour under the keys): where the keyboard
-is drawn behind the bar (导航栏背景 全部; always from Android 15) a strip in the bar's room under the
-keys has it (`InputView.navbarStrip`), and 仅颜色 sets the window's bar colour
-(`NavigationBarManager`, its buttons black or white, whichever stands out more on it:
-`SceneWindow.darkButtonsOn`; a mid grey's luminance is 0.22, yet black on it stands out more). The
-hardware keyboard's bar (its candidates alone) is the theme's whatever the floating setting says.
+(T7a; `follow`, the default: the colour under the keys). The keyboard is always drawn behind the bar (the
+导航栏背景 setting went in 0.6.3, 063-slim RU1: as its 全部), a strip in the bar's room under the keys having it
+(`InputView.navbarStrip`), and `NavigationBarManager` makes the bar's buttons black or white, whichever stands out
+more on it (`SceneWindow.darkButtonsOn`; a mid grey's luminance is 0.22, yet black on it stands out more); floating,
+the bar is the system's over the app. The hardware keyboard's bar (its candidates alone) is the window's bar colour,
+the theme's whatever the floating setting says.
 
 The candidate bar, the expanded candidates and the hardware keyboard's window are drawn by their views
 as the theme's `candidate`, `candidates-divider`, `bar` and `candidates-panel` say (060-render-p3 T6a):
@@ -509,7 +508,7 @@ up to more than it, then scales all down together; so a corner over half the hei
 than in the preview (060-render-p3 T6a review L3, kept: the same where every corner fits, as every built-in theme's do). `gap` widens
 the horizontal bar's room between two (the line in its middle, `FlexboxVerticalDecoration`); the bar's one row is laid out
 by `CandidateRowLayoutManager` (as many as fit, then the leftover shared: FlexboxLayoutManager's first line to the pixel,
-without its lines or caches, the most of a key's layout while typing; 060-perf-cands), the expanded window keeps Flexbox; a
+without its lines or caches, the most of a key's layout while typing; 060-perf-cands), the expanded window is a grid (8 columns in landscape, 6 in portrait); a
 transparent divider draws nothing but keeps its room. `label-style` (number: 1 2 3 of the whole list,
 the expanded grid's numbers going on from the bar's; dot: •; none, the default) stands before the
 words, a space after it; the hardware keyboard's window, whose default is fcitx's own label, shows
@@ -517,7 +516,7 @@ fcitx's label for number; a screen reader reads the candidate without the theme'
 text's content description). `:first` is the list's first in the bar (scrolled, it is still the list's
 first, out of sight), the page's first in the hardware keyboard's window (each page's), and never in the
 expanded grid (its cells go on past the bar's). `gap` is the horizontal bar's alone; `padding` the bar's
-and the flexbox expanded window's (the grid one and the hardware keyboard's window keep their own); the
+alone (the expanded grid and the hardware keyboard's window keep their own); the
 hardware keyboard's window has no pressed colour.
 One BarLook is worked out for a bar and handed to its holders (`HorizontalCandidateViewAdapter.bar`,
 `PagingCandidateViewAdapter.bar`, `PagedCandidatesUi`). `CandidateViewHolder` draws a holder bound at another index again where its
@@ -526,7 +525,7 @@ look or label differs (the first's own look, its number). The candidate's size i
 `BarThemeTest` holds the views to the theme, and to `BarSample.scene` (the engine's sample bar, its
 snapshots `bar-*.txt`): each candidate's box within a pixel, its fill and colours the same, of a theme of
 none of it, pills and a dotted one, a candidate with a comment among them. The sample is the bar at its words'
-own widths (`NeverFillWidth`); filling its width (Auto, Always), the app stretches each candidate, which the
+own widths; with more behind ⌄ (`CandidateSpacing.stretches`), the app stretches each candidate, which the
 web's preview does not show.
 
 T6b adds three to `BarLook`. `bar height=` (80%–140%, on a style of bars alone, a scene allowed) scales the
@@ -683,7 +682,7 @@ a tap there still does nothing, and a glide starts on a letter only. A stroke st
 `writesAlso` adds for 手写 too, Shift's but (`GlideInput.strokeKeys`, by the key's drawn cell, as the letters): `T9Keyboard`'s 1, the 3×3;
 a tap there that key's (the separator while typing), a glide never.
 展开候选's page draws strokes too (0.6.1, dev/design/061-stroke-on-candidate-page.md): its list is a
-`StrokePageRecyclerView`, which at each down asks `BaseExpandedCandidateWindow.drawsStrokes` (ime-core
+`StrokePageRecyclerView`, which at each down asks `GridExpandedCandidateWindow.drawsStrokes` (ime-core
 `PageStrokeTouch.Draws`: `keys`, the rule `BaseKeyboard.drawsStrokes` draws the keys' strokes by, its values read
 from the service, the cached panel and preedit state, and whether the keyboard under the page draws them at all
 from `KeyboardWindow.filtersStrokes` (its `BaseKeyboard.strokesDrawn`, 注音's never); `on`, that and no 手写 writing on the keys, no touch exploration;
@@ -700,7 +699,7 @@ list's as before. With no candidate left past the bar's the page stays while it 
 empty (the offset collector reads `PreeditEmptyStateComponent.isEmpty` and `drawsStrokes`), so its ⌫ takes the stroke
 back; elsewhere it closes as ever. The first three times the page
 opens drawing (`PageStrokeTouch.Hint`, counted in the internal pref `stroke_page_hint_shown`, only once said)
-`BaseExpandedCandidateWindow` says 「这里划笔画，翻页用右边 ↑↓」 in the [notice](#notices) (`BaseInputView.say`, docked above
+`GridExpandedCandidateWindow` says 「这里划笔画，翻页用右边 ↑↓」 in the [notice](#notices) (`BaseInputView.say`, docked above
 the bar, off the list; floating, beside the keyboard) for 2 s (`ms`; a said line's 1 s is too short for it), put away
 by a tap or typing as any line said; never with touch exploration, where the page draws none. Not over a notice
 holding an undo (`BaseInputView.holdsUndo`: a long press's 删除 or 屏蔽), whose act it would lapse: not said nor
@@ -858,8 +857,7 @@ says, the views' against the nodes', is `SceneSpeechTest`: the same, a letter's 
 order (its view had no description, and TalkBack read its texts in the order the view laid them out:
 letter first on a device, as the node; corner first in Robolectric at SDK 30 and up).
 A scene's key's popups are the engine's too (060-render-p2 S2): `PopupComponent` gives a key the canvas
-draws (`KeyRef.isScene`: not a view's, so a picker's key of no id, whose `viewId` is `NO_VIEW` too,
-is drawn by its picker), and a theme that converted (else the built-in theme of its lightness, as a keyboard's), `PopupScenes`, and its bubble
+draws, and a theme that converted (else the built-in theme of its lightness, as a keyboard's), `PopupScenes`, and its bubble
 (`PopupEntryUi.showScene`), long press (`PopupKeyboardUi`) and menus (`PopupMenuUi`, the edit menu
 too) are a `PopupSceneView` drawing a small scene `SceneBuilder.preview`/`popup`/`menu` makes, its
 sizes the engine's (`engine/Popups`: theme 3.0's in dp, its text dp, not sp; its corners the keys'
@@ -974,7 +972,7 @@ custom layouts (`KeyData.LISTED`) keep what they write on a name the app has not
 read of other sources once the source's key changes. The keyboard choices (the input method pages, ⋯'s 键盘) name
 the theme's layout a keyboard is drawn with (`KeyboardLabels`, `keyboard_themed`, `注音（主题：大字注音）`, the name cut
 at 24 characters; since 0.6.1 only 注音's two boards can be a pack's, the others' being layouts of the user's, `PackLayouts.replaces`); ids stay as the theme format names the boards (`k14/r1c1`,
-`ThemeKeyNamesTest.aSceneLayoutsKeysAreItsBoardsNames`). `SceneBoard` makes the canvas view and its scenes
+`ThemeKeyNamesTest.everyKeyHasItsBoardsName`). `SceneBoard` makes the canvas view and its scenes
 (the U8 fallback, the kept scenes, the marks' settings) for any keyboard; the keyboard gives its state as
 `sceneEnv` (its `Input`, texts, marks; `GroupedKeyboard` through `TextBoardState`) and calls
 `invalidateScene()` on every change of what the keys show (punctuation, address keys, the language key,
@@ -1091,7 +1089,7 @@ default) says whether the canvas draws the board's base under the keys (`Keyboar
 three small boards say no and sit on what their panel draws. A picker's bottom row is a layout of
 its own (`PickerLayout`: symbols.xml in a panel, emoji.xml with 搜索, emoticon.xml without), its keys the scene's.
 `ExpandedCandidateLayout.Keyboard.showPages(up, down)` marks a page key `:disabled` where the list cannot turn
-(`BaseExpandedCandidateWindow`). While 笔画筛选 draws on the list (above) these keys are its only paging by touch. `NumberRow`'s collapse swipe (`checkGesture`) is still its own, seen before
+(`GridExpandedCandidateWindow`). While 笔画筛选 draws on the list (above) these keys are its only paging by touch. `NumberRow`'s collapse swipe (`checkGesture`) is still its own, seen before
 the scene's touch; a swipe told as one cancels the keys' press.
 
 `SceneKeyCell` (`input/keyboard/canvas`) is one key drawn by the engine on its own: a scene of a one-key layout
@@ -1368,7 +1366,7 @@ height. Docked the service's touchable insets become a region, the keyboard's ba
 floating, the strip is added to the keyboard's region. The undo chip keeps off it
 (`UndoChipPlacement` `stripTop` / `strip`). The physical keyboard's `CandidatesView` is unaffected.
 
-The row also says what a field took and never wrote (`FcitxInputMethodService.keptLine`, put after the
+The row also says what a field took and never wrote (`FcitxInputMethodService.keptLine`, `KeptCommits` timing and writing it, put after the
 panel's line below by `forStrip`; [pitfalls.md](pitfalls.md#a-field-that-takes-a-commit-and-drops-it)):
 `CodeRowUi.notice` (its length) makes a tap on that part of the line, and a screen reader's click on
 the row, `writeKept`. The physical keyboard's `CandidatesView` shows the line and takes no tap.
@@ -1475,7 +1473,7 @@ Rules for settings, all decided:
   贴底), `KeyboardHeightCap` after it as before, floating still without paddings. A theme 3.0 and the
   built-in ones set no size. `ThemePrefs.migrateSizeFollow` (from `ThemeManager.prefs`) once moves an
   upgrade's sizes: each at its defaults (贴底's flush is not) follows, one set does not; the mark
-  `keyboard_sizes_follow_migrated` is a key of no preference, so the hidden reset keeps it and an older
+  `keyboard_sizes_follow_migrated` is a key of no preference: an older
   version's backup brought back, which has none, is moved again. The mark is copied to device-encrypted
   storage with the theme preferences, and a stored `keyboard_*_follow_theme` counts as done too (only
   0.6.0 writes one), so a start before the first unlock never makes a default level picked follow; a
@@ -1484,8 +1482,8 @@ Rules for settings, all decided:
   changes only its flag; the preview measures itself again on a theme switch. `TextKeyboard.widthDp`
   (floating's width, the split placement) reads the side padding from `KeyboardArea.sizes()` too.
   `ThemePrefsMigrationTest`, `KeyboardAreaTest`, `ThemeSizesUatTest`, ime-core `KeyboardSizesTest`.
-- **`hidden { }`** marks a preference with no UI: it is reset to its default once on upgrade and after
-  a restore (`resetHiddenSettings`), so an old value set where the UI used to be cannot linger.
+- **`hidden { }`** marks a preference a levels row sets (an input method's page or the shared one) and that
+  has no row of its own. The settings that had no UI at all are constants since 0.6.3 (063-slim RU1).
 - **Searchable** (`dev/design/061-settings-search.md`). `SettingsIndex` builds the search from
   `SettingsPages`, one line for each `SettingsRoute` in the home page's order saying how it is read: `Managed`
   (its category's `build`, walked, never shown), `Listed` (the input methods' pages, read from
@@ -1589,9 +1587,12 @@ A custom theme is `files/host-theme/<name>.json` and the files it names beside i
 (a picture's source and its portrait and landscape cuts, key images, fonts). The json is format
 **3.0**: `version` first, then `name`, `isDark`, `palette` (24 colours: the 21 of 2.1 and
 `keyBorderColor`, `keyHintColor`, `toolbarIconColor`), `picture` (or null), `base`, `bar`, `keys`,
-`text`. It is keyboard-scene's `ThemeLook` (`scene/look/`, with `LookDefaults` and `LookTheme`: the web converts 3.0 with the same code, and reads its json with `ThemeLookReader`, held to this one by `ThemeLookReaderParityTest`) one to one, through `ThemeLookJson.kt` (the
-only place the two meet): no field has a default, a field missing or not known is an error, and a
-value out of range is refused as the `ThemeLook` is made. `keys.overrides` maps a key's name
+`text`. It is keyboard-scene's `ThemeLook` (`scene/look/`, with `LookDefaults` and `LookTheme`: the web converts 3.0 with the same code) one to one, read by keyboard-scene's `ThemeLookReader` and written by its
+`ThemeLookWriter` (the web's maker reads with the same reader), through `CustomThemeSerializer`: no field has a default, a field
+missing or not known is an error, and so is a value out of range (`ThemeLook`'s own rules). kotlinx reads the text
+first (a key twice: the last; a byte order mark refused), then the reader its fields (a number in quotes or `8e0` for
+an int refused), through keyboard-scene's `Json` and its limits (1,000,000 characters, a string 4,096, 32 deep),
+which saved themes, imports and a Parcel all pass. `keys.overrides` maps a key's name
 (`KeyNames`: `<board>/<key>`, `*/<role>` for a function key on every board) to its own fill,
 pressed face and label; a name no board here has (a later build's board) is read, kept and drawn
 by none. A key's style is its board's own name, then `*/` (roles only), then its kind's; each field
@@ -1622,8 +1623,7 @@ not saved leaves its slot and every setting for the next start. A Monet theme in
 All the keyboard draws reads `ThemeManager.shownLook(theme)`: the theme's look under the 按键样式 settings (the theme's own when all follow it; one cached look, the same object while the theme's look and the settings stay, as `ThemeAssets` keys on it). Every reader under `input/` and the theme page's preview use it, even those that read colours only, so a guard test (`KeyStyleThemeTest`) can forbid `.look` there. A theme's thumbnail, export, save and the migration read `Theme.look`, the theme's own.
 
 Every key is drawn by `KeyFaceDrawable` (`input/keyboard/`; `View.drawAsKey`): shadow, fill, border, in
-the shape ime-core's `KeyFaceGeometry` gives (blocks or flat, `KeyDef.Appearance.Border` →
-`KeyFaceGeometry.Border`: a flat keyboard's T9 column keeps its face, `On`). The
+the shape ime-core's `KeyFaceGeometry` gives (blocks or flat, `KeyFaceGeometry.Border`: a flat keyboard's T9 column keeps its face, `On`). The
 fill is a colour, a nine-slice image (`NineSliceLayout`, drawn at the sample it was decoded at; the
 colour till the board's images are in, then `invalidateSelf`) or the picture showing through
 (`ThemePictureDrawable`/`PictureHost`: the picture as `PictureWindow.centerCrop` lays it under the
@@ -1715,7 +1715,7 @@ reserved (`ThemeManager.clashesBuiltin`). Picked in the list while following the
 of two versions sets each slot its version, one of one version both slots. `BuiltinThemeFiles` reads them (`ThemeManager.BuiltinThemes`, Monet's first): each
 version a `Theme.Builtin` of that version's 24 colours (ThemeReader.REQUIRED_COLORS; the native code reads
 those as before) drawn as `LookDefaults` with them, which is what the files' styles say
-(keyboard-scene's `BuiltinThemeEquivalenceTest`: every version × board × form × popup, scene text alike;
+(keyboard-scene's `BuiltinThemeEquivalenceTest`: every version × board × the six forms a theme's scenes tell apart × popup, scene text alike;
 the colours were held to the deleted `ThemePreset`/`Theme.Monet` by `BuiltinThemesPresetTest`, commit
 bb317aba3). Monet's colours are `system(role, fallback)`: `ThemeMonet.systemColors` gives the roles from
 Android 14 (the light bar `surface-container-highest`, the dark `surface-container-high`), on 12 and 13
@@ -1918,7 +1918,7 @@ New user data must be added to the export, and must survive a restore made by an
 The learning is merged, not replaced (U-100, `UserDataManager.importEngine`): the phone's
 `learn.log`, its word lists (`words.added`, `words.blocked`, and English's blocked words
 `words.en.blocked`, `EnglishBlocks.FILE`, a word a line, no reading), its old `*.user` logs and its backups stay; what the backup has of
-learning (the zip's learning backup, or its record, or an older build's logs to convert, with its
+learning (the zip's learning backup, or its record (an older build's logs beside it are not read), with its
 lists, `words.en.blocked` with them: `RestoreStash.read` reads it into the blocked words, no reading to
 them, as a backup's bytes carry them) is moved into a directory of its own under `RestoreStash.DIR`, and the engine merges it as it
 next starts (beside any stash not merged yet). An emoji blocked in its word's reading (👍🏻 hao) is a
@@ -1926,7 +1926,7 @@ line of `words.blocked` like any, its syllables not one per code point (`WordLis
 aside) is the phone's own: importing a backup does not overwrite it, an export with the learning leaves it out of the zip, and 全部清空 and clearing a time span both delete it. An export with the learning as a backup leaves out the files it is made of and the old
 logs (`*.user`, `*.user.told`) and `learn.table-logs-read`, the phone's own as the record is; with
 that mark (the old logs read into the record) an export without the learning leaves the old logs out
-too, and the mark goes with the record into the stash, whose logs are then not read again. A zip of this app from before 0.3.1 (its metadata's `versionCode`),
+too, and the mark goes with the record into the stash. A zip of this app from before 0.3.1 (its metadata's `versionCode`),
 or with old logs but neither the record nor a backup, is refused before anything is copied
 (`exception_user_data_too_old`); one from before the renaming is not, having none of the engine's
 learning.
@@ -1982,7 +1982,7 @@ and the field not sensitive (`fieldPolicy.sensitive`: a password, no personalize
 `voiceEditsEnd` alone, voice's text never handed over (review S6). A talk beginning leaves the window of
 the last as it is, so one that puts nothing in (not heard, no permission, a failure) stops nothing; what
 is typed while one lasts is not reported and ends the window (`VoiceAsk.Put.END` → `voiceEditsEnd`), the
-talk's own text handed over once it is over (VO-47). What else goes in (`commitText`,
+talk's own text handed over once it is over (VO-47). The service's side of it is `input/voice/VoiceAsking`. What else goes in (`commitText`,
 `commitTyped`, `putAround`) is reported (`voicePutIn`) while a window is open, the main thread asked only
 where the window shut or an ask came (review N15); an ask is confirmed against the field read again (`voiceConfirm`, review M6) and said as a notice
 with 记住 (`UndoChip.Undo`'s `action`), 3 s, typing puts it away (Q1). 记住 → `voiceRemember`, then

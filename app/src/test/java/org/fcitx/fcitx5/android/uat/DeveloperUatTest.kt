@@ -30,7 +30,6 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowToast
 
-/** 开发者 (uat/14 ST-29, ST-119; uat/18 LC-20): its page, the editor info inspector it turns on in the keyboard's ⋯, 语音先问再记's counts. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -39,8 +38,7 @@ class DeveloperUatTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // read each time, not kept from the class's making (OneDefaultPreferencesShadow now makes the page's
-    // preferences AppPrefs' own; before it the switch saved to another, 2026-10-31's full run)
+    // read each time, not kept from the class's making: the page's preferences must be AppPrefs' own
     private val inspector get() = AppPrefs.getInstance().internal.editorInfoInspector
 
     @Test
@@ -56,7 +54,7 @@ class DeveloperUatTest {
             val switch = st.pref(R.string.editor_info_inspector) as TwoStatePreference
             switch.performClick()
             st.idle()
-            // saved under the inspector's key in the default preferences, which AppPrefs reads
+            // the default preferences, which AppPrefs reads
             val saved = PreferenceManager.getDefaultSharedPreferences(st.activity).getBoolean(inspector.key, false)
             assertTrue("switch ${switch.isChecked}", switch.isChecked && saved)
         }
@@ -71,7 +69,6 @@ class DeveloperUatTest {
         SettingsHarness().use { st ->
             st.activity
             st.open(SettingsRoute.Developer)
-            // a line to read, not a button
             assertTrue(!st.pref(st.activity.getString(R.string.voice_ask_counts, 3, 1)).isSelectable)
         }
     }
@@ -91,7 +88,6 @@ class DeveloperUatTest {
         }
     }
 
-    // 重启 Fcitx 实例, OK: what it says once the restart is done or given up on
     private fun restartSays(): String = SettingsHarness().use { st ->
         st.activity
         st.open(SettingsRoute.Developer)

@@ -7,15 +7,9 @@ package org.fcitx.fcitx5.android.input.floating
 import android.view.View
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.updateLayoutParams
-import org.fcitx.fcitx5.android.input.keyboard.SplitKeyboard
+import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.utils.unset
 
-/**
- * What goes with the docked board at a side (单手模式, 分体时其他面板), under the same thumb: the
- * bars over it (a picker's tabs, the toolbar, the row of the code being typed) and the docked
- * handle (始终显示悬浮条), its grip at the board's middle (the owner, 2026-10-22). Across, the whole
- * width, [padding] in from each side as the board is.
- */
 object BoardFollowers {
 
     fun place(views: List<View>, board: View, side: SplitKeyboard.Dock?, padding: Int) {

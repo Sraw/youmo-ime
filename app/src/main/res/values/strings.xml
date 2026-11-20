@@ -5,11 +5,8 @@
     <string name="app_name_bench">Youmo IME (Bench)</string>
     <string name="input_methods">Input Methods</string>
     <string name="advanced">Advanced</string>
-    <string name="ignore_sys_cursor">Ignore system cursor position</string>
-    <string name="hide_key_config">Hide hotkey configurations</string>
     <string name="_not_available_">(Not Available)</string>
     <string name="button_haptic_feedback">Haptic feedback on keypress</string>
-    <string name="button_up_haptic_feedback">Haptic feedback on keyup</string>
     <string name="button_vibration_milliseconds">Keypress vibration duration</string>
     <string name="button_press">Press</string>
     <string name="button_long_press">Long press</string>
@@ -34,9 +31,6 @@
     <string name="clipboard_listening">Clipboard listening</string>
     <string name="clipboard_limit">Clipboard history limit</string>
     <string name="clipboard_enable">Enable Clipboard</string>
-    <string name="expanded_candidate_style">Expanded candidate style</string>
-    <string name="expanded_candidate_style_grid">Grid</string>
-    <string name="expanded_candidate_style_flexbox">Flexbox</string>
     <string name="no_more_input_methods">No more input methods to switch</string>
     <string name="add_more_input_methods">Would you like to add more input methods?</string>
     <string name="about">About</string>
@@ -51,7 +45,6 @@
     <string name="clipboard">Clipboard</string>
     <string name="keyboard_height">Keyboard height</string>
     <string name="virtual_keyboard">Keys</string>
-    <string name="clipboard_suggestion_timeout">Clipboard suggestion timeout</string>
     <string name="version">Version</string>
     <string name="build_time">Commit time</string>
     <string name="engine_data">Engine data</string>
@@ -64,7 +57,6 @@
     <string name="open_source_licenses">Open source licenses</string>
     <string name="licenses_of_third_party_libraries">Licenses of third-party libraries</string>
     <string name="github_repo">GitHub repository</string>
-    <string name="expanded_candidate_grid_span_count">Number of expanded candidate spans in grid style</string>
     <string name="no_config_options">Currently no configuration options are available</string>
     <string name="select">Select</string>
     <string name="text_editing">Text Editing</string>
@@ -84,11 +76,6 @@
     <string name="reset">Reset</string>
     <string name="input_method_options">Input Method Options</string>
     <string name="theme">Theme</string>
-    <string name="navbar_background">Navigation bar background</string>
-    <string name="navbar_bkg_none">No background</string>
-    <string name="navbar_bkg_color_only">Follow keyboard color</string>
-    <string name="navbar_bkg_full">Keyboard background image</string>
-    <string name="expand_toolbar_by_default">Expand toolbar by default</string>
     <string name="popup_on_key_press">Popup on key press</string>
     <string name="disable_animation">Disable animation</string>
     <string name="keyboard_motion">Keyboard motion</string>
@@ -227,7 +214,6 @@
     <string name="skip">Skip</string>
     <string name="theme_migrated">Theme has been migrated to the current version</string>
     <string name="theme_imported_renamed">“%1$s” is the name of another theme: saved as “%2$s”</string>
-    <string name="keep_keyboard_letters_uppercase">Keep keyboard letters uppercase</string>
     <string name="choose_input_method">Choose input method</string>
     <string name="edit_clipboard">Edit clipboard</string>
     <string name="clipboard_edit_text_hint">Clipboard content</string>
@@ -244,18 +230,12 @@
     <string name="default_">Default</string>
     <string name="saving">Saving</string>
     <string name="delete_all_pinned_items">Delete all pinned items?</string>
-    <string name="toolbar_num_row_on_password">Show number row on toolbar when inputting password</string>
     <string name="space_long_press_behavior">Space key long press behavior</string>
     <string name="space_behavior_none">None</string>
     <string name="space_behavior_enumerate">Enumerate input methods</string>
     <string name="space_behavior_activate">Toggle input method activate state</string>
     <string name="space_behavior_picker">Show input method picker dialog</string>
     <string name="show_lang_switch_key">Show language switch key</string>
-    <string name="horizontal_candidate_style">Horizontal candidate style</string>
-    <string name="horizontal_candidate_never_fill">Never fill width</string>
-    <string name="horizontal_candidate_auto_fill">Fill width on demand</string>
-    <string name="horizontal_candidate_always_fill">Always fill width</string>
-    <string name="inline_suggestions">Show inline autofill suggestions</string>
     <string name="delete_all_except_pinned">Delete all items except pinned ones?</string>
     <string name="num_items_deleted">%1$d item(s) deleted</string>
     <string name="delete_theme">Delete Theme</string>
@@ -274,7 +254,6 @@
     <string name="clipboard_return_after_paste">Back to the keyboard after pasting</string>
     <string name="text_copied">Copied</string>
     <string name="text_cut">Cut</string>
-    <string name="reset_keyboard_on_focus_change">Switch back to keyboard when the focus changes</string>
     <string name="export_user_data">Back up everything</string>
     <string name="import_user_data">Restore a backup</string>
     <string name="exception_user_data_host_starting">The keyboard is still starting and did not finish in time: nothing was restored. Try again in a moment</string>
@@ -290,8 +269,6 @@
     <string name="confirm_import_user_data">Importing user data overrides the settings, custom phrases, common words, quick input and the clipboard, uses the built-in punctuation (what the backup lacks is deleted here too: a backup from before 0.5.1 has no quick input, so your own entries go and the built-in tables you turned off come back on; one from before 0.6.0 has no common words, so this phone\'s go; with no rare characters\' choice in it (one from before 0.6.1, or made before it was ever turned on), they are left off), and merges the words and what was learned with this phone\'s; the app restarts for it to take effect. Proceed?</string>
     <string name="clear_clp_db_confirm">Clipboard database would be completely cleared, including pinned items. Proceed?</string>
     <string name="clear_clp_db_not_all">Some clipboard data could not be cleared. It may still be there or come back at the next start; clearing again, or after a restart, may help.</string>
-    <string name="lang_switch_key_behavior">Language switch key behavior</string>
-    <string name="lang_switch_behavior_next_ime_app">Switch to next input method App</string>
     <string name="_cannot_be_empty">%1$s cannot be empty</string>
     <string name="clipboard_mask_sensitive">Mask sensitive data (such as passwords)</string>
     <string name="clipboard_clear_urls">Remove tracking parameters from links</string>
@@ -302,7 +279,6 @@
     <string name="please_wait">Please wait…</string>
     <string name="candidates_window">Candidate window for a physical keyboard</string>
     <string name="show_candidates_window">Show candidates window</string>
-    <string name="candidates_window_radius">Candidates window radius</string>
     <string name="follow_input_device">Depends on input device</string>
     <string name="candidates_orientation">Candidates list orientation</string>
     <string name="automatic">Automatic</string>
@@ -310,14 +286,10 @@
     <string name="vertical">Vertical</string>
     <string name="candidates_font_size">Floating candidate window text size</string>
     <string name="candidate_text_size">Candidate text size</string>
-    <string name="candidates_padding">Candidate word padding</string>
-    <string name="candidates_window_min_width">Candidate window minimum width</string>
-    <string name="candidates_window_padding">Candidate window padding</string>
     <string name="restart_fcitx_instance">Restart fcitx instance</string>
     <string name="restart_fcitx_instance_confirm">Fcitx instance will be destroyed and reinitialized. Proceed?</string>
     <string name="restart_fcitx_still_starting">The keyboard is still starting and may not have been restarted. Try again in a moment</string>
     <string name="user_data">Backup and restore</string>
-    <string name="haptic_on_repeat">Haptic feedback on key repeat</string>
     <string name="redo">Redo</string>
     <string name="status_area">Status area</string>
     <string name="expand_candidates_list">Expand candidates list</string>
@@ -347,10 +319,6 @@
     <string name="emoji_skin_tone_type_4">🏽 Type-4</string>
     <string name="emoji_skin_tone_type_5">🏾 Type-5</string>
     <string name="emoji_skin_tone_type_6">🏿 Type-6</string>
-    <string name="hide_unsupported_emojis">Hide unsupported Emojis</string>
-    <string name="keyboard_height_percent_base">Keyboard height percent base</string>
-    <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
-    <string name="real_size">Real size (Display.getRealSize)</string>
 
     <!-- Accessibility labels for icon-only controls. These are announced by screen readers,
          and are also what UI automation uses to find a control, so they must stay unique and
@@ -385,7 +353,6 @@
     <string name="a11y_copy">Copy</string>
     <string name="long_press_characters">Key characters and shortcuts</string>
     <string name="section_keys">Keys</string>
-    <string name="section_candidates">Candidate bar</string>
     <string name="section_sound_and_vibration">Sound &amp; vibration</string>
     <string name="long_press_characters_summary">What a long press offers, and what swiping up and down does: the first of the long press, a shortcut (select all, copy, paste, undo), a text</string>
     <string name="toolbar_buttons">Toolbar buttons</string>
@@ -709,7 +676,6 @@
     <string name="handwriting_retired_moved">. Pinyin took its place in your input methods</string>
     <string name="handwriting_retired_traditional">. What you write now follows the simplified/traditional setting of the input method you write in</string>
     <string name="key_handwriting_retired">Handwriting on keys is now the toolbar\'s handwriting button; drawing on keys is set to off</string>
-    <string name="nine_keys_merged">9-key pinyin is now part of Pinyin. Switch keyboards in ⋯ → Keyboard.</string>
     <string name="shuangpin_scheme_retired">The %1$s Shuangpin scheme is no longer offered. Switched to Xiaohe; change it in Shuangpin settings.</string>
     <string name="status_keyboard">Keyboard</string>
     <string name="learning_kind_shuangpin_keys18">Shuangpin, 18 keys</string>

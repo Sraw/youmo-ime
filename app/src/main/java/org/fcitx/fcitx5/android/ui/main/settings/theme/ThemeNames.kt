@@ -18,16 +18,9 @@ import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import kotlin.math.ceil
 
-/** A theme's name as the list shows it under its card (the owner, 0.6.0-beta2). */
 object ThemeNames {
 
-    /**
-     * The built-in 3.0-era themes by their names in the docs (动态取色, Material, Pixel, AMOLED 黑); a 4.0
-     * theme's (a built-in pack, an imported one) its file's, its versions one card; the user's own its name,
-     * one named by a UUID (fcitx5-android's in-app themes, 0.5 and before) 我的主题, a UUID meaning nothing:
-     * of several in [among] (the list), 我的主题, 我的主题 2, 3 … by their UUIDs' order, which moving or adding
-     * cards does not change.
-     */
+    /** UUID-named user themes (pre-0.6 in-app themes) show as 我的主题, numbered by UUID order so moving cards keeps names. */
     fun shown(ctx: Context, theme: Theme, among: List<Theme> = emptyList()): String = when {
         theme is Theme.Builtin -> BUILTIN[theme.file]?.let(ctx::getString) ?: theme.file
         theme is Theme.Versioned -> theme.file
@@ -35,17 +28,15 @@ object ThemeNames {
         else -> theme.name
     }
 
-    /** The built-in file [file]'s name, as its card shows it. */
     fun shown(ctx: Context, file: String): String = BUILTIN[file]?.let(ctx::getString) ?: file
 
-    /** Whether [theme] is named 我的主题 and a number: its name a UUID. */
     fun numbered(theme: Theme): Boolean = theme !is Theme.Builtin && theme !is Theme.Versioned && UUID.matches(theme.name)
 
     // 1 for the first UUID of those in [among], 1 too for one not among them
     private fun number(theme: Theme, among: List<Theme>): Int =
         among.filter(::numbered).map { it.name }.distinct().sorted().indexOf(theme.name) + 1
 
-    /** Each built-in file's name (BuiltinThemeFiles.FILES; a test holds every one to having one). */
+    /** BuiltinThemeFiles.FILES; a test holds every one to having one. */
     @VisibleForTesting
     internal val BUILTIN: Map<String, Int> = mapOf(
         BuiltinThemeFiles.MONET to R.string.theme_name_monet,
@@ -56,7 +47,7 @@ object ThemeNames {
 
     private val UUID = Regex("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 
-    /** The name row's height: a line of 12 sp and room above it, at least 24 dp, more as the font is set larger. */
+    /** At least 24 dp, more as the font is set larger. */
     fun rowHeight(ctx: Context): Int {
         val scale = ctx.resources.configuration.fontScale
         val density = ctx.resources.displayMetrics.density
@@ -66,20 +57,18 @@ object ThemeNames {
         return px
     }
 
-    // the last row worked out, by the font scale and density it was for: every card asks it
+    // every card asks it: cached by font scale and density
     private class Row(val scale: Float, val density: Float, val px: Int)
 
     @Volatile
     private var rows: Row? = null
 
-    // a line of Han characters, its size and the room above and below them
     private const val LINE = 1.4f
 
     private const val MIN_ROW_DP = 24
     private const val ROOM_DP = 8
 }
 
-/** The one-line name under a card. */
 internal fun themeNameView(ctx: Context) = TextView(ctx).apply {
     textSize = 12f
     maxLines = 1
@@ -90,7 +79,6 @@ internal fun themeNameView(ctx: Context) = TextView(ctx).apply {
     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
 }
 
-/** [card] (the list item's size less a name row) with [name] under it, the item. */
 internal fun themeCardWithName(ctx: Context, card: View, name: TextView) = LinearLayout(ctx).apply {
     orientation = LinearLayout.VERTICAL
     clipChildren = false

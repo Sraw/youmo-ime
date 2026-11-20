@@ -4,9 +4,5 @@
  */
 package org.fcitx.fcitx5.android.engine.glide
 
-/**
- * A finger's glide across the letters, as the keyboard hands it to the engine: its [path] over
- * [layout] ([GlidePath]), and whether the shift was on ([shift], an English word's first letter a
- * capital) or locked ([capsLock]).
- */
+/** A glide as the keyboard hands it: [path] over [layout] ([GlidePath]); [shift] capitalises an English word's first letter. */
 class Glide(val path: FloatArray, val layout: GlideLayout, val shift: Boolean = false, val capsLock: Boolean = false)

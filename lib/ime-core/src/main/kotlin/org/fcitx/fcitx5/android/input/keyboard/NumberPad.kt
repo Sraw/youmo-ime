@@ -7,22 +7,14 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.input.editing.NumberKind
 
 /**
- * The number keyboard's keys beside its digits, as the field is: [FULL] by the 123 key in a text
- * field and by a plain number field (one that says no more is often a price's, a Compose or a
- * Flutter field that filters nothing), the others put up by a field that says what it takes ([of]):
- * a PIN's digits alone, a decimal's point, a signed one's minus, a phone's or a date's own.
- * Each pad is a layout of its own, [layout] its name; an empty string is a key left blank, kept so
- * the digits stay where they are on every pad.
- *
- * @param left the column left of the digits, top to bottom
- * @param besideNine the key right of 9, below the space (⌫ right of 3 on every pad, as on the nine keys: 0.6.1;
- *   before, this key was right of 3, the corner)
- * @param bottom the bottom row's: left of the symbols key, right of 0, and left of Return
+ * The number keyboard's keys beside its digits, by field: [FULL] from the 123 key or a plain number field (often a
+ * price, a field that filters nothing); the others for fields that say what they take ([of]). "" is a blank key,
+ * kept so the digits stay put. [left] top to bottom; [besideNine] right of 9 below the space; [bottom] left of the
+ * symbols key, right of 0, left of Return.
  */
 enum class NumberPad(val left: List<String>, val besideNine: String, val bottom: List<String>) {
     FULL(listOf("+", "-", "*"), "/", listOf(",", "=", ".")),
 
-    /** A PIN's: the digits alone. */
     DIGITS(BLANK3, "", BLANK3),
 
     // the sign right of 0, the point in the full pad's place
@@ -30,24 +22,23 @@ enum class NumberPad(val left: List<String>, val besideNine: String, val bottom:
     DECIMAL(BLANK3, "", listOf("", "", ".")),
     SIGNED_DECIMAL(BLANK3, "", listOf("", "-", ".")),
 
-    /** A dialler's: `,` is its pause */
+    /** `,` is a dialler's pause. */
     PHONE(listOf("+", "*", "#"), "-", listOf("(", ")", ",")),
 
-    /** A date's, a time's, both's: `2026-10-31`, `31/10`, `13:45`, `31.10` */
+    /** `2026-10-31`, `31/10`, `13:45`, `31.10` */
     DATETIME(listOf("-", "/", ":"), "", listOf("", "", ".")),
     ;
 
-    /** The name of this pad's layout; [FULL]'s is the number keyboard's. */
     val layout: String get() = if (this == FULL) FULL_LAYOUT else "$FULL_LAYOUT.$name"
 
-    /** This pad as number.xml's `pad=` and a layout's `pads=` name it: `full`, `signed-decimal`… */
+    /** As number.xml's `pad=` and a layout's `pads=` name it. */
     val id: String get() = name.lowercase().replace('_', '-')
 
     companion object {
-        /** The number keyboard's layout name, which every 123 key names. */
+        /** Every 123 key names it. */
         const val FULL_LAYOUT = "Number"
 
-        /** The pad a field of [kind] gets, or null for one that is not a number's, phone's or date's: the letters. */
+        /** Null for the letters. */
         fun of(kind: NumberKind?): NumberPad? = when (kind) {
             null -> null
             NumberKind.INTEGER -> FULL
@@ -59,41 +50,26 @@ enum class NumberPad(val left: List<String>, val besideNine: String, val bottom:
             NumberKind.DATE, NumberKind.TIME, NumberKind.DATETIME -> DATETIME
         }
 
-        /** Every pad's layout name. */
         val layouts: Set<String> = entries.mapTo(LinkedHashSet()) { it.layout }
 
-        /** The pad keyboard [name] shows ([KeyboardNames]: a layout of the user's drawn there too); null for none of them. */
+        /** A user layout drawn there too; null for none of them. */
         fun shownBy(name: String): NumberPad? = KeyboardNames.base(name).let { base -> entries.firstOrNull { it.layout == base } }
     }
 }
 
 private val BLANK3 = listOf("", "", "")
 
-/**
- * Which pad the number keyboard is in a field: [field], the field's own pad while one is focused
- * ([NumberPad.of]), or null. The layout switching ([LettersLayout]) knows the number keyboard as
- * [NumberPad.FULL]'s layout alone, which every 123 key names and the 123 key's memory keeps: this
- * shows the field's pad in its place, and tells the switching the pad shown as that layout, so a
- * pad is never remembered and the 123 key in a phone field, after ABC, brings its pad back.
- */
+/** The switching knows the number keyboard as [NumberPad.FULL] alone: the field's pad is shown in its place, so a pad is never remembered. */
 class FieldPad {
 
     var field: NumberPad? = null
 
-    /**
-     * The user's number board ([PanelLayouts.drawn]; null: the app's): the pads it is for shown by it, each by its name
-     * with the layout's ([KeyboardNames.of]), so a file replaced is a keyboard made anew; the app's pads for the rest.
-     */
+    /** Null: the app's; a file replaced is a keyboard made anew ([KeyboardNames.of]). */
     var numbers: CustomChoice? = null
 
-    /** [current], the layout shown, as the switching knows it. */
     fun known(current: String): String = if (NumberPad.shownBy(current) != null) NumberPad.FULL_LAYOUT else current
 
-    /**
-     * What to show of [target], the switching's choice with [current] shown: the field's pad for
-     * the number keyboard, even where the switching saw it shown already (another pad, the full
-     * one the 123 key brought in a text field, as a number field starts).
-     */
+    /** The field's pad for the number keyboard, even where the switching saw it shown already (another pad, or the full one). */
     fun shown(target: LayoutSwitchPolicy.Target, current: String): LayoutSwitchPolicy.Target {
         val name = when (target) {
             is LayoutSwitchPolicy.Target.Keyboard -> target.name

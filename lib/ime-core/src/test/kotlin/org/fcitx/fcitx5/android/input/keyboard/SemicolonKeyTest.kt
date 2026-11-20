@@ -10,7 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** SP-03: 微软 双拼 types ing on `;`, which the letters had no key for. */
+/** 微软 双拼 types ing on `;`, which the letters had no key for. */
 class SemicolonKeyTest {
 
     @Test

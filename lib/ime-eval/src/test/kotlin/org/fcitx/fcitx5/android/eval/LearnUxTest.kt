@@ -106,7 +106,7 @@ class LearnUxTest {
         for (f in files) assertTrue(f.name, LearnUxScript.parse(f.name, f.readLines()).isNotEmpty())
     }
 
-    // §9: after a commit, nothing typed, a pick, a space and an expectation are of the 联想 offered
+    // after a commit, nothing typed, a pick, a space and an expectation are of the 联想 offered
     @Test
     fun afterACommitThePredictionsAreWhatIsShown() {
         val script = """
@@ -143,7 +143,7 @@ class LearnUxTest {
             expect lacks 拟
             """,
         )
-        // within<n>/lacks<n>: in the first n or not (R14 F3737); a bare lacks, not in the first 200
+        // within<n>/lacks<n>: in the first n or not; a bare lacks, not in the first 200
         assertEquals(
             listOf(Status.PASS, Status.FAIL, Status.PASS, Status.PASS, Status.FAIL, Status.PASS, Status.FAIL, Status.PASS, Status.FAIL, Status.FAIL),
             results.map { it.status },
@@ -217,7 +217,7 @@ class LearnUxTest {
             expect first 你
             """,
         )
-        // a day passes on the learning record's clock: what comes after it is checked (impl/design-1b.md §5)
+        // a day passes on the learning record's clock: what comes after it is checked
         assertEquals(listOf(Status.PENDING, Status.PENDING, Status.PASS, Status.PASS, Status.PENDING, Status.PENDING), results.map { it.status })
     }
 
@@ -331,7 +331,7 @@ class LearnUxTest {
         assertTrue(results[0].detail, "space with only 联想 shown" in results[0].detail)
     }
 
-    // a field that cleared itself (a message sent): no 前文 learned after it (USER-DECISIONS 2026-10-20)
+    // a field that cleared itself (a message sent): no 前文 learned after it
     @Test
     fun aClearedContextAndAQuotedOne() {
         val steps = LearnUxScript.parse("t.txt", listOf("scenario s", "ctx! 我", "ctx \" 我 \"")).single().steps
@@ -355,8 +355,7 @@ class LearnUxTest {
         assertEquals(List(2) { Status.PASS }, ux.run(scenarios).map { it.status })
         // again on the same runner, and with nothing to run
         assertEquals(List(2) { Status.PASS }, ux.run(scenarios).map { it.status })
-        // F2761: nothing to run types no seed. A seed that throws once read for typing: its record is
-        // deleted after a run either way, so only its typing tells (F3213)
+        // a seed that throws once read for typing: its record is deleted either way, so only its typing tells
         val untypable = object : AbstractList<Sample>() {
             override val size = 1
             override fun get(index: Int): Sample = throw AssertionError("the seed was typed")
@@ -364,13 +363,12 @@ class LearnUxTest {
         assertEquals(emptyList<LearnUx.Result>(), LearnUx(data, seed = untypable).run(emptyList()))
     }
 
-    // F2810: a word already imported is not taken again, as ImportLayer.import has it
     @Test
     fun aWordImportedTwiceIsTakenOnce() {
         val results = run("scenario s\nimport 妮 ni\nimport 妮 ni\nexpect first 你")
         assertEquals(listOf(Status.FAIL), results.map { it.status })
         assertTrue(results[0].detail, "not imported: a word already" in results[0].detail)
-        // the second import refused, not the first (F3214)
+        // the second import refused, not the first
         assertTrue(results[0].detail, "stopped at line 3 " in results[0].detail)
     }
 
@@ -388,7 +386,6 @@ class LearnUxTest {
         assertEquals(0, runCli(arrayOf("learn-ux", pinyin.path, File(scripts, "a.txt").path, "--gate", "--seed", "6"), StringBuilder(), StringBuilder()))
     }
 
-    // a gate that checked nothing fails
     @Test
     fun theGateFailsWhereNothingWasChecked() {
         val pinyin = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }

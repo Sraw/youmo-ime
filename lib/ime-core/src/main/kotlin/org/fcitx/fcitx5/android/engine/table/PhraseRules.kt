@@ -5,13 +5,9 @@
 package org.fcitx.fcitx5.android.engine.table
 
 /**
- * A table's 组词规则: how the code of a phrase is put together from the codes of its characters,
- * as libime reads them. `e2=p11+p12+p21+p22` says a phrase of exactly two characters takes the
- * first two code keys of each; `a4=p11+p21+p31+n11` says one of four or more takes the first key
- * of its first three characters and of its last (`n` counts from the end). A key index may be a
- * letter too, counting from the code's end: `z` is its last key, `y` the one before.
- *
- * Rules are tried in the order the table lists them; the first that applies wins.
+ * A table's 组词规则, as libime reads them: `e2=p11+p12+p21+p22` codes a two-character phrase from the first two
+ * keys of each; `a4=p11+p21+p31+n11` one of four or more (`n` counts characters from the end). A key index may be a
+ * letter counting from the code's end (`z` last). The first rule that applies wins.
  */
 class PhraseRules(rules: Map<String, String>) {
 
@@ -23,10 +19,7 @@ class PhraseRules(rules: Map<String, String>) {
 
     val isEmpty: Boolean get() = rules.isEmpty()
 
-    /**
-     * The code of [text], its characters' codes found by [codeOf]; null if no rule applies or a
-     * character it needs has no code.
-     */
+    /** The code of [text] from its characters' [codeOf]; null if no rule applies or a character has no code. */
     fun encode(text: String, codeOf: (String) -> String?): String? {
         val chars = codePoints(text)
         return rules.firstNotNullOfOrNull { rule ->
@@ -37,18 +30,16 @@ class PhraseRules(rules: Map<String, String>) {
 
     private fun apply(rule: Rule, chars: List<String>, codeOf: (String) -> String?): String? {
         val out = StringBuilder()
-        // each key taken: character, key, and whether counted from the code's end
         val taken = HashSet<Triple<Int, Int, Boolean>>()
-        // p00: a placeholder, some tables pad their rules with it
+        // p00: a placeholder some tables pad their rules with
         for (part in rule.parts.filter { it.char != 0 }) {
             if (part.char > chars.size) return null
             val index = if (part.fromEnd) chars.size - part.char else part.char - 1
             val code = codeOf(chars[index]) ?: return null
             val at = if (part.key > 0) part.key - 1 else code.length + part.key
             val keyFromEnd = part.key < 0
-            // a code shorter than the rule reaches is fine: 五笔's 工 is just a; and a key named from
-            // the front and from the end, as p11 and p1z of a one-key code, is taken once (libime
-            // takes it twice; no shipped table's rules name keys from the end)
+            // a code shorter than the rule reaches is fine (五笔's 工 is just a); a key named from both ends is taken once
+            // (libime takes it twice; no shipped table names keys from the end)
             if (at in code.indices && Triple(index, at, !keyFromEnd) !in taken) {
                 out.append(code[at])
                 taken += Triple(index, at, keyFromEnd)

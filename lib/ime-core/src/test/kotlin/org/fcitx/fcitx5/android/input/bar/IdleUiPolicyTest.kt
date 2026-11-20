@@ -19,7 +19,6 @@ class IdleUiPolicyTest {
         isInlineSuggestionPresent = false,
         isPasswordField = false,
         isNumberLayout = false,
-        expandToolbarByDefault = false,
         isToolbarManuallyToggled = false,
         isCalculationPresent = false,
     )
@@ -28,10 +27,8 @@ class IdleUiPolicyTest {
 
     @Test
     fun whatTheIdleBarShows() = assertRows(
-        "with nothing going on the toolbar follows its default (off)" to { assertEquals(Display.Empty, IdleUiPolicy.decide(quiet)) },
-        "with nothing going on the toolbar follows its default (on)" to { assertEquals(Display.Toolbar, decide { copy(expandToolbarByDefault = true) }) },
-        "toggling the toolbar flips the default (off)" to { assertEquals(Display.Toolbar, decide { copy(isToolbarManuallyToggled = true) }) },
-        "toggling the toolbar flips the default (on)" to { assertEquals(Display.Empty, decide { copy(expandToolbarByDefault = true, isToolbarManuallyToggled = true) }) },
+        "with nothing going on the toolbar is closed" to { assertEquals(Display.Empty, IdleUiPolicy.decide(quiet)) },
+        "the toolbar opened shows" to { assertEquals(Display.Toolbar, decide { copy(isToolbarManuallyToggled = true) }) },
         "a forced number row beats everything else" to {
             assertEquals(Display.NumberRow, decide { copy(isClipboardFresh = true, isInlineSuggestionPresent = true, isPasswordField = true, numberRowMode = NumberRowMode.ForceShow) })
         },
@@ -46,7 +43,7 @@ class IdleUiPolicyTest {
         "the number row is skipped when the layout is numeric already" to { assertEquals(Display.Empty, decide { copy(isPasswordField = true, isNumberLayout = true) }) },
         "the number row is skipped when the user hid it" to { assertEquals(Display.Empty, decide { copy(isPasswordField = true, numberRowMode = NumberRowMode.ForceHide) }) },
         "a password field on a numeric layout falls through to the toolbar rule" to {
-            assertEquals(Display.Toolbar, decide { copy(isPasswordField = true, isNumberLayout = true, expandToolbarByDefault = true) })
+            assertEquals(Display.Toolbar, decide { copy(isPasswordField = true, isNumberLayout = true, isToolbarManuallyToggled = true) })
         },
     )
 }

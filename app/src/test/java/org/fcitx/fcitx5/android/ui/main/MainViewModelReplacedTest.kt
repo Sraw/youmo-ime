@@ -14,11 +14,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/**
- * The settings started anew over itself (`am start -f 0x10008000`): the new activity's model is
- * made before the old one's is cleared. The old one clearing must leave the new one connected,
- * or the new activity's onStop (its save) throws "MainViewModel is disconnected".
- */
+/** Started anew over itself (`am start -f 0x10008000`): the old model clearing must leave the new one connected. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class MainViewModelReplacedTest {
@@ -40,7 +36,7 @@ class MainViewModelReplacedTest {
         } finally {
             new.clear()
         }
-        // both names gone: the host free to stop
+        // both gone: the host free to stop
         assertNull(HostDaemon.getFirstConnectionOrNull())
     }
 }

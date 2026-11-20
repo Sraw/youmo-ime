@@ -23,11 +23,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * uat/15-privacy-backup.md, this app's own fields (its settings' search): the real service's field
- * policy tells the engine to learn nothing there and reads none of the field's text, so nothing
- * typed there is learned or kept as the text before (docs/keyboard.md「本应用的输入框」). Another
- * app's field, alike, is told both: what the assertions would catch. What was deleted (PR-16) is
- * the engine's: OwnFieldEngineUatTest, as no context is told after a predicted Backspace here (F4277).
+ * This app's own fields: the field policy tells the engine to learn nothing there and reads none of the field's
+ * text. Another app's field, alike, is told both: what the assertions would catch.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -39,7 +36,7 @@ class OwnFieldUatTest {
     @After
     fun close() = h.close()
 
-    // 我 put in the field and the cursor reported after it, as the editor reports it; the engine's contexts since
+    // 我 put in the field and the cursor reported after it; the engine's contexts since
     private fun contextsAfterTyping(packageName: String): List<String> {
         h.start(packageName = packageName)
         h.api.calls.clear()
@@ -79,7 +76,6 @@ class OwnFieldUatTest {
         error("no $label in the grid")
     }
 
-    // a sum and its = in the field, as the engine commits the = typed
     private fun sum() {
         h.field.setText("1+1")
         h.field.setSelection(3)
@@ -101,7 +97,6 @@ class OwnFieldUatTest {
             h.tap(scrolledTo("★"))
             h.tap(h.key("符"))
             assertTrue(categories().toString(), "Recent" !in categories())
-            // another app's field, alike: its sum read
             h.start()
             sum()
             assertTrue(h.texts(h.inputView).toString(), shown("= 2") != null)

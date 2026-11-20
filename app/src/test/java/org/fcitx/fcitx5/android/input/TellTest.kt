@@ -12,7 +12,7 @@ import org.junit.Test
 
 class TellTest {
 
-    // F3198: each flag defaults to false at engineContext; one dropped on the way is silently off (HW-23's said)
+    // each flag defaults to false at engineContext: one dropped on the way is silently off
     @Test
     fun everyFlagOfTheContextReachesTheEngine() = runTest {
         val fcitx = FakeHostApi()

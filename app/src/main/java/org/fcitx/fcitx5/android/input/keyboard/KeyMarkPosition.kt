@@ -11,10 +11,7 @@ import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 
-/**
- * The choices of 上滑图标位置 and 下滑图标位置 ([KeyMarks.At]), one list in one order and wording for
- * both, stored by name: the older TopRight, Bottom and None read as they were.
- */
+/** Stored by name: the older TopRight, Bottom and None read as they were. */
 enum class KeyMarkPosition(override val stringRes: Int, val at: KeyMarks.At) : ManagedPreferenceEnum {
     TopRight(R.string.mark_at_top_right, KeyMarks.At.TopRight),
     BottomRight(R.string.mark_at_bottom_right, KeyMarks.At.BottomRight),
@@ -29,24 +26,18 @@ enum class KeyMarkPosition(override val stringRes: Int, val at: KeyMarks.At) : M
     }
 }
 
-// the swipe settings as they are now, which the keys' swipes and marks read
-
-/** 上滑 and 下滑 on or off, as the settings are now. */
 internal fun swipeWays(): KeySwipe.Ways {
     val k = AppPrefs.getInstance().keyboard
     return KeySwipe.Ways(k.swipeUp.getValue(), k.swipeDown.getValue())
 }
 
-/** 上滑图标位置 and 下滑图标位置 as read: apart ([KeyMarks.settled], the up one moved off the down one's). */
+/** Apart: the up one moved off the down one's. */
 internal fun swipeSpots(): KeyMarks.Spots {
     val k = AppPrefs.getInstance().keyboard
     return KeyMarks.settled(k.swipeUpPosition.getValue().at, k.swipeDownPosition.getValue().at)
 }
 
-/**
- * Whether a long press's first can be drawn at all (the corners given the scene, told a screen reader): a
- * way on, its place not 无, the first there (the orientation's way, or a key set so).
- */
+/** A way on, its place not 无, the first there. */
 internal fun firstShown(): Boolean {
     val ways = swipeWays()
     val spots = swipeSpots()

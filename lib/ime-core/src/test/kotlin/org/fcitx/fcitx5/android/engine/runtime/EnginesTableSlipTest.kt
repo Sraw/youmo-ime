@@ -9,12 +9,15 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.pinyin.Near
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.pinyin.TouchBoxes
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.nio.ByteBuffer
 
-/** A table's tap with its place, as the host's key carries it (061-neighbour-table): read through the engine, as the setting says. */
+/** A table's tap with its place, as the host's key carries it: read through the engine, as the setting says. */
 class EnginesTableSlipTest : EnginesFixture() {
 
     private val cangjie = CodeTable.Builder()
@@ -57,7 +60,6 @@ class EnginesTableSlipTest : EnginesFixture() {
         val read = engines.onEvent(InputMethodCatalog.CANGJIE, EngineEvent.CHAR, 'e'.code, payload = towardW)
         assertEquals("", read.commit)
         assertEquals(listOf("乙"), read.candidates)
-        // x cannot go on abw: 乙 committed, x the next code's
         val next = engines.onEvent(InputMethodCatalog.CANGJIE, EngineEvent.CHAR, 'x'.code)
         assertEquals("乙", next.commit)
         assertEquals(listOf("难", "难难"), next.candidates)
@@ -67,5 +69,24 @@ class EnginesTableSlipTest : EnginesFixture() {
         engines.type(InputMethodCatalog.CANGJIE, "ab")
         engines.onEvent(InputMethodCatalog.CANGJIE, EngineEvent.CHAR, 'e'.code, payload = towardW)
         assertEquals("", engines.onEvent(InputMethodCatalog.CANGJIE, EngineEvent.CHAR, 'x'.code).commit)
+    }
+
+    // [ㄅㄉㄚ][ㄖㄥㄩ][ㄈㄌㄝ] spells nothing; its very right edge reads ㄐㄩㄝ, 角
+    @Test
+    @Uat("PY-151")
+    fun zhuyinsNineKeysReadASlipUnlessSlipsAreOff() {
+        val engines = Engines(::load, null)
+        val keys = listOf(0, 10, 9).map(ZhuyinKeys::groupCode)
+        fun tapped(dx: Float): List<String> {
+            keys.forEachIndexed { i, c ->
+                val touch = TouchBoxes.tap(TouchBoxes.ZHUYIN_NINE, c, dx = if (i == 0) dx else 0f)
+                engines.onEvent(InputMethodCatalog.ZHUYIN_NINE, EngineEvent.CHAR, c.code, payload = Action.Key(c, touch = touch))
+            }
+            return engines.candidates(InputMethodCatalog.ZHUYIN_NINE, 0, 20).map { it.text }.also { engines.onEvent(InputMethodCatalog.ZHUYIN_NINE, EngineEvent.RESET, 0) }
+        }
+        assertEquals("角", tapped(0.49f).first())
+        assertFalse("角" in tapped(0f))
+        engines.settings = EngineSettings(typos = false)
+        assertFalse("角" in tapped(0.49f))
     }
 }

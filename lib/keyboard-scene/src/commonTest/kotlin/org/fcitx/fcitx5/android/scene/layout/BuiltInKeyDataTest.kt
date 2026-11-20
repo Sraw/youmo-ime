@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 // BuiltInKeyData is the app's layouts' held data, written as source so neither the app (on the main thread) nor the
-// page reads every layout to look a key up (061-custom-layout §19.2): made again of the layouts here, it must be the
+// page reads every layout to look a key up: made again of the layouts here, it must be the
 // file; -Psnapshots.record=true writes it anew
 class BuiltInKeyDataTest {
     private val layoutsDir = "$TEST_DATA/../../commonMain/layouts"
@@ -49,7 +49,7 @@ class BuiltInKeyDataTest {
     fun theTableHasEveryBoardAndTheFragmentsNone() {
         assertEquals(boards.keys, BuiltInKeyData.BOARDS.keys)
         assertEquals(PackLayouts.FRAGMENTS, fragments.keys)
-        // a board the user picks among their own layouts not stood for (061-custom-layout §11, L7): a pack's file of it is one of those
+        // a board the user picks among their own layouts not stood for: a pack's file of it is one of those
         for (id in boards.keys) assertEquals(id !in KeyData.LISTED, PackLayouts.replaces(id), id)
         for (id in fragments.keys) assertTrue(PackLayouts.replaces(id), id)
         assertTrue(!PackLayouts.replaces("mine"))
@@ -68,7 +68,7 @@ class BuiltInKeyDataTest {
         assertEquals(emptyList(), differ)
     }
 
-    // the names KeyData looks up are the names the keys have (061-custom-layout §19.2): the first column of ime-core's
+    // the names KeyData looks up are the names the keys have: the first column of ime-core's
     // keys-golden.tsv, every key of every board as KeyResolver resolves it
     @Test
     fun theNamesAreTheGoldenKeys() {

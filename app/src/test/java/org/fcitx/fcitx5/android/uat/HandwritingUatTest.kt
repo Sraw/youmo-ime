@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.engine.stroke.StrokeShape
 import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.bar.ui.idle.NumberRow
 import org.fcitx.fcitx5.android.input.candidates.CharCardView
 import org.fcitx.fcitx5.android.input.handwriting.AssetRecognizer
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
@@ -71,11 +72,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * UAT cases of handwriting (uat/09) on the whole keyboard over a fake engine: the toolbar's 手写 on, strokes
- * over the letters, their pause. What the strokes are read as is the recognizer's (HandwritingRecognitionTest,
- * the readings recorded on a device), not asserted here.
- */
+/** Handwriting over a fake engine; what the strokes are read as is the recognizer's tests', not asserted here. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -86,8 +83,7 @@ class HandwritingUatTest {
 
     private var h = KeyboardHarness()
 
-    // the app's recognizer is native, not on the JVM: swapped for one that loads and reads nothing (a test of
-    // the readings swaps in its own)
+    // the app's recognizer is native, not on the JVM: swapped for one that loads and reads nothing
     private val reader = HandwritingRecognition.shared.reader.also {
         HandwritingRecognition.shared.reader = object : HandwritingRecognition.Reader {
             override val loadable = true
@@ -103,7 +99,6 @@ class HandwritingUatTest {
         EngineState.candidateReadingState.value = ReadingStyle.OFF
     }
 
-    // pinyin's keyboard with the toolbar's 手写 on
     private fun start(inputType: Int = InputType.TYPE_CLASS_TEXT) {
         prefs.set(AppPrefs.getInstance().internal.handwritingOpen, true)
         h.start(inputType)
@@ -111,10 +106,7 @@ class HandwritingUatTest {
 
     private val pad get() = (KeyboardHarness.find<TextKeyboard>(h.keyboard) ?: error("no keyboard")).keyInkForTest?.pad ?: error("not written on")
 
-    /**
-     * A stroke across the letters (q's top left to m's row, p's right) from ([x0], [y0]) to ([x1], [y1]), fractions
-     * of their size, drawn in [ms].
-     */
+    /** From ([x0], [y0]) to ([x1], [y1]), fractions of the letters' size (q's top left to m's row, p's right). */
     private fun stroke(x0: Float, y0: Float, x1: Float, y1: Float, ms: Long = 200) {
         val q = h.box(h.key("q"))
         val area = Rect(q.left, q.top, h.box(h.key("p")).right, h.box(h.key("m")).bottom)
@@ -143,7 +135,6 @@ class HandwritingUatTest {
     fun theKeyboardWithHandwritingOn() {
         start()
         val keys = h.texts()
-        // the keys as ever, the letters under the ink; the toolbar's button lit
         assertTrue(keys.toString(), "q" in keys && "m" in keys)
         h.describedKey("Backspace")
         assertTrue(keys.toString(), "123" in keys)
@@ -152,7 +143,6 @@ class HandwritingUatTest {
         h.captureBoard("HandwritingUatTest/keyboard")
     }
 
-    // the toolbar's 手写, pinned on a new install (Q2): a tap turns it off, the letters typed and no longer faded; again, on
     @Test
     @Uat("HW-41", "TB-55")
     fun theToolbarsButtonTurnsHandwritingOffAndOn() {
@@ -172,7 +162,6 @@ class HandwritingUatTest {
         assertTrue("letters faded", canvas.faded?.invoke(q) == true)
     }
 
-    // turned off while a stroke is still read: a letter typed right after goes in after what the stroke read, in order
     @Test
     fun aLetterTypedAsHandwritingIsTurnedOffGoesInAfterTheReading() {
         val gate = CountDownLatch(1)
@@ -197,7 +186,6 @@ class HandwritingUatTest {
         assertTrue(h.api.calls.toString(), read in 0 until typed())
     }
 
-    // 061-handwriting-toolbar §3.4: a recognizer given up turns 手写 off, the letters typed on, not drawn over reading nothing
     @Test
     fun aRecognizerGivenUpTurnsHandwritingOff() {
         HandwritingRecognition.shared.reader = object : HandwritingRecognition.Reader {
@@ -210,18 +198,17 @@ class HandwritingUatTest {
         assertFalse(h.toolbarHandwriting()!!.checked())
         val canvas = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyboardCanvasView>().first { it.keyAt("q") != null }
         assertFalse("letters as ever", canvas.faded?.invoke(canvas.keyAt("q")!!) == true)
-        // tapped on again: off again, nothing written
         h.toolbarHandwriting()!!.performClick()
         h.idle()
         assertFalse(AppPrefs.getInstance().internal.handwritingOpen.getValue())
     }
 
-    // a recognizer that cannot load (its files): given up once, the switch off and the user told; turned on again,
-    // off again at once and told again (not a switch that silently does nothing), the recognizer not tried again
+    // turned on again, off again at once and told again (not a switch that silently does nothing), the recognizer not
+    // tried again
     @Test
     fun aRecognizerThatCannotLoadTurnsHandwritingOffAndSaysSoEachTimeItIsTurnedOn() {
         val told = AtomicInteger()
-        // failing once the keyboard is up: told on its notice, not as a toast (EngineNotices.failed with no keyboard)
+        // failing once the keyboard is up: told on its notice, not as a toast
         val shown = CountDownLatch(1)
         HandwritingRecognition.shared.reader = LoadingReader({
             // bounded: a test failed before the count down leaves no recognizer thread blocked for the JVM's rest
@@ -241,7 +228,6 @@ class HandwritingUatTest {
         assertEquals(listOf(unloadable), h.noticeTexts())
         assertNull(ShadowToast.getTextOfLatestToast())
         assertFalse(h.toolbarHandwriting()!!.checked())
-        // tapped on again: off again at once, and told again why
         h.notice()!!.dismiss()
         h.toolbarHandwriting()!!.performClick()
         h.idle()
@@ -253,8 +239,7 @@ class HandwritingUatTest {
         assertEquals(1, told.get())
     }
 
-    // a text pack imported while the keyboard is shown, as ready as before (the keyboard not made anew): what is written
-    // on worked out again, here the recognizer found unloadable on it and 手写 turned off
+    // a text pack imported while shown (the keyboard not made anew): what is written on worked out again
     @Test
     fun aPackImportedWhileShownIsLookedAtAgain() {
         var loadable = true
@@ -275,7 +260,6 @@ class HandwritingUatTest {
         assertSame(board, KeyboardHarness.find<TextKeyboard>(h.keyboard))
     }
 
-    // turned on, the recognizer is loaded then (KeyInk.warmUp), not at the first stroke; off, it is never made
     @Test
     fun turnedOnTheRecognizerIsLoadedBeforeTheFirstStroke() {
         val loads = AtomicInteger()
@@ -297,8 +281,7 @@ class HandwritingUatTest {
         assertTrue(open.getValue())
     }
 
-    // whether the letters are written on is worked out as what it reads changes, not as each frame is drawn: in English,
-    // where nothing is written, the recognizer is not asked whatever is drawn
+    // worked out as what it reads changes, not as each frame is drawn
     @Test
     fun nothingAsksTheRecognizerAsTheKeysAreDrawnInEnglish() {
         // counted on the recognizer's thread too (KeyInk.warmUp's read of loadable)
@@ -318,14 +301,11 @@ class HandwritingUatTest {
         val bitmap = Bitmap.createBitmap(keyboard.width, keyboard.height, Bitmap.Config.ARGB_8888)
         repeat(3) { keyboard.draw(Canvas(bitmap)) }
         assertEquals(0, asked.get())
-        // back in pinyin: written on again
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.PINYIN))
         h.idle()
         assertTrue("letters faded", canvas.faded?.invoke(canvas.keyAt("q")!!) == true)
     }
 
-    // the candidate bar's 手写 left of ⌄ while handwriting is on (Q4), lit and said checked; a tap turns it off: on each
-    // keyboard style, each on a keyboard of its own
     @Test
     @Uat("HW-45", "AX-18")
     fun theCandidateBarsButtonIsLitWhileHandwritingIsOnAndTurnsItOff() {
@@ -344,8 +324,6 @@ class HandwritingUatTest {
         )
     }
 
-    // the candidate bar's 手写 shown lit and said checked while handwriting is on; tapped, off and gone. On a keyboard
-    // made anew in the [style] it sets
     private fun candidateBarsButton(style: () -> Unit) {
         h.close()
         h = KeyboardHarness()
@@ -362,7 +340,6 @@ class HandwritingUatTest {
         h.idle()
         assertFalse(AppPrefs.getInstance().internal.handwritingOpen.getValue())
         assertFalse(h.shown(button))
-        // a button that is no toggle is not said as one
         val other = KeyboardHarness.all(h.inputView).filterIsInstance<ToolButton>().first { it.id != R.id.candidate_handwriting_btn }
         assertFalse(other.createAccessibilityNodeInfo().isCheckable)
     }
@@ -376,15 +353,13 @@ class HandwritingUatTest {
         h.api.calls.clear()
         h.tap(h.describedKey("Backspace"))
         until("taken back") { pad.strokes.isEmpty() }
-        // the stroke, not the field's text: nothing to the engine to delete
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
     }
 
     private fun finishes() = h.api.calls.count { it.startsWith("inkFinished") }
 
-    // the keyboard's half, the recognizer's model (native, not on the JVM) swapped for a reader of
-    // fixed readings: read and offered while writing, the pad wiped at the pause; the composing 人
-    // and its candidates are the engine's (HostCasesUatTest)
+    // the recognizer's model (native) swapped for a reader of fixed readings; the composing 人 and its candidates are
+    // the engine's (HostCasesUatTest)
     @Test
     @Uat("HW-02")
     fun whileWritingTheReadingIsOfferedAndThePauseWipesThePad() {
@@ -426,7 +401,6 @@ class HandwritingUatTest {
             h.advance(1000)
             Thread.sleep(200)
             h.idle()
-            // a second later: still on the pad
             assertEquals(1, finishes())
             assertEquals(1, pad.strokes.size)
             stroke(0.5f, 0.2f, 0.5f, 0.8f)
@@ -437,17 +411,15 @@ class HandwritingUatTest {
         }
     }
 
-    // a password's keyboard has 手写 greyed and is typed on; out of it the letters are written on again
     @Test
     @Uat("HW-16")
     fun aPasswordIsTypedOnAndHandwritingComesBackAfter() {
-        // the toolbar on a password's bar: not the number row it shows in its place by default (工具栏 → 密码框显示数字行)
-        prefs.set(AppPrefs.getInstance().keyboard.toolbarNumRowOnPassword, false)
         start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-        // the password field itself, pinyin still the input method: 手写 greyed on the bar, the letters typed
+        KeyboardHarness.find<NumberRow>(h.bar)!!.onCollapseListener!!.invoke()
+        h.idle()
         h.assertHandwritingGreyed("in the password field")
         assertFalse(KeyboardHarness.find<TextKeyboard>(h.keyboard)!!.keyInkForTest?.writtenOn == true)
-        // androidengine switches a password to English (PR-03)
+        // androidengine switches a password to English
         h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
         h.idle()
         h.assertHandwritingGreyed("in English")
@@ -480,14 +452,12 @@ class HandwritingUatTest {
         val menu = h.inputView.candidateActionMenu!!
         fun lines() = (0 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
         val s = h.service
-        // 忘掉学到的 (learned of it), 屏蔽; no 固定首位 in handwriting
         assertTrue(lines().toString(), s.getString(R.string.learning_forget) in lines() && s.getString(R.string.learning_block) in lines())
         assertFalse(lines().toString(), s.getString(R.string.learning_pin) in lines())
         menu.performItemClick(lines().indexOf(s.getString(R.string.learning_block)))
         h.idle()
         menu.performItemClick(lines().indexOf(s.getString(R.string.learning_block_confirm)))
         h.idle()
-        // the notice over the keyboard, clear of the candidates
         val notice = h.noticeBox()
         assertTrue("$notice over ${h.box(h.bar)}", notice.bottom <= h.box(h.bar).top + 2)
         val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>()
@@ -497,7 +467,6 @@ class HandwritingUatTest {
         assertTrue(h.api.calls.toString(), undone)
     }
 
-    // 银行 written, not yet in: in the field as composing text, as the engine sends it
     private fun written(text: String) {
         h.emit(HostEvent.ClientPreedit(FormattedText(arrayOf(text), intArrayOf(0), text.length)))
         h.api.candidates = arrayOf(CandidateWord("", "行", "", readings = listOf("háng/xíng…")), CandidateWord("", "衍", "", readings = listOf("yǎn")))
@@ -528,10 +497,9 @@ class HandwritingUatTest {
         return h.inputView.candidateActionMenu!!
     }
 
-    // the menu's row [i]; the head's card, not the box it is shown in
+    // the head's card, not the box it is shown in
     private fun ListPopupWindow.row(i: Int): View = listView!!.adapter.getView(i, null, listView!!).let { if (it is FrameLayout) it.getChildAt(0) else it }
 
-    // in Chinese, as the user reviews the image
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
     @Test
     @Uat("HW-29", "HW-40")
@@ -553,14 +521,12 @@ class HandwritingUatTest {
                 "${s.getString(R.string.char_card_order)} 撇、撇、竖、横、横、竖钩",
             card.contentDescription,
         )
-        // 上屏 and 复制 last in it, then the learning menu's lines; the card no line to pick
         assertEquals(listOf(s.getString(R.string.quick_phrase_commit), s.getString(R.string.quick_phrase_copy)), texts.takeLast(2))
         val menuLines = (1 until menu.listView!!.adapter.count).map { menu.listView!!.adapter.getItem(it).toString() }
         assertTrue(menuLines.toString(), h.service.getString(R.string.learning_block) in menuLines)
         assertFalse(menu.listView!!.adapter.isEnabled(0))
         h.relayout()
         h.capture("HandwritingUatTest/char_card_port", menu.listView!!.rootView)
-        // a candidate with no card: the title as before
         h.api.candidateCards.clear()
         menu.dismiss()
         val plain = held("衍")
@@ -584,7 +550,6 @@ class HandwritingUatTest {
         assertEquals("银行", composing())
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("select") || it.startsWith("sendKey") })
         assertEquals(null, h.inputView.candidateActionMenu)
-        // 上屏: as the candidate tapped
         menu = held("行")
         KeyboardHarness.all(menu.row(0)).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.quick_phrase_commit) }.performClick()
         h.idle()
@@ -602,10 +567,8 @@ class HandwritingUatTest {
         val card = held("行").row(0) as CharCardView
         card.measure(View.MeasureSpec.makeMeasureSpec(h.service.dp(567), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
         assertEquals(LinearLayout.HORIZONTAL, card.orientation)
-        // three readings, then scrolled
         assertTrue("${card.readingsScroll.measuredHeight}", card.readingsScroll.measuredHeight < card.readingsScroll.getChildAt(0).measuredHeight)
         h.relayout()
-        // 上屏 and 复制 in the right column, under the radical and the rest
         val copy = KeyboardHarness.all(card).filterIsInstance<TextView>().single { it.text == h.service.getString(R.string.quick_phrase_copy) }
         val at = Rect().also(copy::getDrawingRect).also { card.offsetDescendantRectToMyCoords(copy, it) }
         val readings = Rect().also(card.readingsScroll::getDrawingRect).also { card.offsetDescendantRectToMyCoords(card.readingsScroll, it) }
@@ -613,7 +576,6 @@ class HandwritingUatTest {
         h.capture("HandwritingUatTest/char_card_land", h.inputView.candidateActionMenu!!.listView!!.rootView)
     }
 
-    // floating in landscape: one column, as upright
     @Test
     @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
@@ -633,7 +595,6 @@ class HandwritingUatTest {
         h.capture("HandwritingUatTest/char_card_floating", menu.listView!!.rootView)
     }
 
-    // 乾 not taken apart and no stroke order: those lines left out; 和's six readings scrolled past four
     @Test
     @Uat("HW-29")
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
@@ -644,7 +605,6 @@ class HandwritingUatTest {
             listOf(
                 CharCard.Row("hé", "ㄏㄜˊ", listOf("和平", "和谐")), CharCard.Row("hè", "ㄏㄜˋ", listOf("附和")),
                 CharCard.Row("huó", "ㄏㄨㄛˊ", listOf("和面")), CharCard.Row("huò", "ㄏㄨㄛˋ", listOf("和稀泥")), CharCard.Row("hú", "ㄏㄨˊ", emptyList()),
-                // the dictionaries' neutral tone, the card's alone (暖和)
                 CharCard.Row("huo", "˙ㄏㄨㄛ", emptyList()),
             ),
             "口", 8, listOf(CharCard.Part("禾", "hé"), CharCard.Part("口", "kǒu")), StrokeShape.parse("P H S P D S HZ H"),
@@ -666,7 +626,7 @@ class HandwritingUatTest {
         assertTrue("${he.readingsScroll.measuredHeight}", he.readingsScroll.measuredHeight < he.readingsScroll.getChildAt(0).measuredHeight)
         h.relayout()
         h.capture("HandwritingUatTest/char_card_he", menu.listView!!.rootView)
-        // dragged up in the menu's list: the readings scroll, not the list (review 051-hw-reading M1)
+        // dragged up in the menu's list: the readings scroll, not the list
         val list = menu.listView!!
         val box = Rect().also(he.readingsScroll::getDrawingRect).also { list.offsetDescendantRectToMyCoords(he.readingsScroll, it) }
         val x = box.exactCenterX()

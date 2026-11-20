@@ -31,11 +31,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.Duration
 
-/**
- * 060-render-p3 A1: a theme's keys moving on the canvas. The pressed face shown whole at once, let go
- * fading over the face under it, scaled and sunk by its node's properties alone; a press while it moves
- * jumps to pressed; 键盘动效 off, battery saver: no animator made.
- */
+/** The pressed face shown at once, let go fading over the face under it; a press while it moves jumps to pressed; 键盘动效 off: no animator. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = KeyboardCanvasViewTest.PORTRAIT)
@@ -44,11 +40,11 @@ class KeyMotionTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // it writes a user's pack: the themes settled writable whatever ran before in this JVM (phoneStorage)
+    // it writes a user's pack: the themes settled writable whatever ran before in this JVM
     @Before
     fun phone() = phoneStorage()
 
-    // a user's pack (motion is never a built-in theme's): material's file, named its own, [styles] put last; its light version
+    // motion is never a built-in theme's: a user's pack of material's file, [styles] last
     private fun theme(vararg styles: String): Theme = materialPack("moving", *styles)
 
     private val moving by lazy {
@@ -66,7 +62,6 @@ class KeyMotionTest {
     fun thePressedFaceIsWholeAtTheFirstFrame() = harness().use { h ->
         val c = h.canvas()
         c.press("q")
-        // no time gone: shown pressed (its face, not fading in), scaling from whole, 60 ms
         assertTrue(c.shownPressed("q"))
         assertSame(c.pressedNode("q"), c.shownNode("q"))
         assertEquals(1f, c.pressedNode("q")!!.scaleX, 0f)
@@ -79,7 +74,6 @@ class KeyMotionTest {
         assertEquals(0.9f, n.scaleX, 1e-4f)
         assertEquals(0.9f, n.scaleY, 1e-4f)
         assertEquals(2f * h.service.resources.displayMetrics.density, n.translationY, 1e-3f)
-        // scaled about its key's middle
         val k = c.keyAt("q")!!
         assertEquals(k.bounds.centerX.toFloat(), n.left + n.pivotX, 0.5f)
         c.press("q", down = false)
@@ -105,7 +99,6 @@ class KeyMotionTest {
         assertEquals(0f, pressed.alpha, 1e-3f)
         assertEquals(1f, pressed.scaleX, 1e-4f)
         assertEquals(0f, pressed.translationY, 1e-4f)
-        // ended: two animators made, the press's and the fade's, none since
         assertEquals(2, c.animatorsMade)
         frames(1000)
         assertEquals(2, c.animatorsMade)
@@ -120,7 +113,6 @@ class KeyMotionTest {
         c.press("q", down = false)
         at(c.animator("q")!!, 50)
         c.press("q")
-        // pressed whole, no fading, scaled at once: no animator for this press
         val made = c.animatorsMade
         val n = c.pressedNode("q")!!
         assertEquals(0.9f, n.scaleX, 1e-4f)
@@ -186,7 +178,6 @@ class KeyMotionTest {
         c.press("shift", down = false)
         h.idle()
         c.shownNode("shift")
-        // the face it had over its new one, fading
         val leaving = c.leavingNode("shift")!!
         assertSame(before, leaving)
         assertEquals(1f, leaving.alpha, 1e-3f)
@@ -194,10 +185,8 @@ class KeyMotionTest {
         assertEquals(0.5f, leaving.alpha, 1e-3f)
         frames(300)
         assertNull(c.leavingNode("shift"))
-        // its fade over, the old face's display list freed at once (not at GC)
-        // (Robolectric's RenderNode at 29 keeps a display list discarded: checked from 30 on)
+        // the old face's display list freed at once, not at GC (Robolectric's RenderNode at 29 keeps a discarded one)
         if (android.os.Build.VERSION.SDK_INT > 29) assertTrue(!leaving.hasDisplayList())
-        // the letters relabelled have no transition of theirs: shown at once
         assertNull(c.leavingNode("q"))
     }
 
@@ -210,7 +199,6 @@ class KeyMotionTest {
         c.press("q", down = false)
         at(c.animator("q")!!, 30)
         assertTrue(q.alpha > 0f)
-        // typing on: the next key's frame draws no fade with it
         c.press("w")
         assertNull(c.animator("q"))
         assertEquals(0f, q.alpha, 1e-3f)
@@ -222,16 +210,14 @@ class KeyMotionTest {
     @Test
     fun typedFastTheKeysDoNotMove() = harness().use { h ->
         val c = h.canvas()
-        // the canvas told of each press as a touch tells it, no time let run between: Robolectric's paused looper runs an
-        // animation to its end at the first frame let run, the clock with it, so keys a few ms apart are typed here at once
+        // Robolectric's paused looper runs an animation to its end at the first frame let run, so keys a few ms apart are typed at once
         fun key(k: String, down: Boolean) = c.showPressed(KeyRef(k), down)
-        // the first key after a pause moves: its press and its fade
         key("q", true)
         c.pressedNode("q")
         key("q", false)
         val made = c.animatorsMade
         assertEquals(2, made)
-        // then the keys sooner than the 150 ms fade after the one before: pressed (at its scale at once) and let go still
+        // then keys sooner than the 150 ms fade after the one before
         for (k in listOf("w", "e", "r")) {
             key(k, true)
             assertEquals(0.9f, c.pressedNode(k)!!.scaleX, 1e-4f)
@@ -245,7 +231,7 @@ class KeyMotionTest {
     fun laidOutAnewNothingCrossfades() = harness(theme("<style select=\"key\" transition=\"200ms linear\"/>")).use { h ->
         val c = h.canvas()
         c.shownNode("q")
-        // another size (one-handed, the height setting): every key's faces anew, shown at once, no old keyboard over them
+        // another size: every key's faces anew, shown at once, no old keyboard over them
         c.layout(c.left, c.top, c.right - 40, c.bottom)
         c.scene
         assertTrue(c.shownKeys.none { c.leavingNode(it.id) != null })
@@ -258,7 +244,6 @@ class KeyMotionTest {
         c.press("q")
         frames(200)
         assertEquals(0.9f, c.pressedNode("q")!!.scaleX, 1e-4f)
-        // laid out anew in the same state while held: still at its press scale, not back to whole
         c.layout(c.left, c.top, c.right - 40, c.bottom)
         c.scene
         assertEquals(0.9f, c.pressedNode("q")!!.scaleX, 1e-4f)
@@ -279,17 +264,14 @@ class KeyMotionTest {
         assertNull(c.animator("q"))
     }
 
-    // the clock run on by [ms] and the frames due in it: not the harness's after(), whose paused looper's next task
-    // (an animation's next frame, posted ahead) may run past the end and the animation with it
+    // not the harness's after(): the paused looper's next task (an animation's next frame) may run past the end
     private fun frames(ms: Long) = shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms))
 
-    // [a] at [ms] of its run, its frame's update as a frame there gives it: Robolectric's paused looper runs an
-    // animation to its end at the first frame let run (its clock jumps by the duration), so a frame between is set
+    // the paused looper runs an animation to its end at the first frame (its clock jumps by the duration), so a frame between is set
     private fun at(a: android.animation.ValueAnimator, ms: Long) {
         a.currentPlayTime = ms
     }
 
-    // pressed and let go with nothing moving: no animator, the pressed face as ever
     private fun pressedStill(h: KeyboardHarness) {
         val c = h.canvas()
         c.press("q")

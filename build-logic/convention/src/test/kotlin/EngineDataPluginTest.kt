@@ -66,8 +66,7 @@ class EngineDataPluginTest {
         main.writeBytes(emptyClass)
         task.fingerprint()
         val before = out.readText()
-        // the tool built again after the task was set up, as its jars are: keyed when configured, the
-        // compiles would run the new tool on the old key
+        // the tool rebuilt after the task was set up: keyed at configuration, the new tool would run on the old key
         main.writeBytes(editedClass)
         task.fingerprint()
         assertNotEquals(before, out.readText())

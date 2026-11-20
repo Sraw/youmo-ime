@@ -15,11 +15,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 
-/**
- * Back leaves the setup as skip does, keeping it away: MainActivity looks again each time it resumes
- * (SetupActivityTest), so a back that did not would bring it back at once. Being shown does not keep
- * it away, as it did before. On a device: the activity needs the app's resources.
- */
+/** MainActivity checks on every resume, so a back that did not keep it away would bring it straight back. Needs the app's resources. */
 class SetupActivityDeviceTest {
 
     @Before
@@ -55,10 +51,9 @@ class SetupActivityDeviceTest {
         assertEquals(listOf(true, true), seen)
     }
 
-    /** Shown, it is still due: a flag set as it was shown, as `shown` was in onCreate, kept it away after one look. */
     @Test
     fun shownItIsStillDue() {
-        // on a device whose keyboard is set up none is due, shown or not
+        // a set-up device has none due
         assumeTrue(SetupPage.hasUndonePage())
         val due = mutableListOf<Boolean>()
         launch { due += SetupActivity.shouldShowUp() }

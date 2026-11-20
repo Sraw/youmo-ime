@@ -30,7 +30,7 @@ class EnglishBlocksTest {
         return apply(Action.Key(' ')).commit
     }
 
-    // decode-9: a line not taken for a word is written back as it was, not lost to the next block
+    // a line not taken for a word is written back as it was, not lost to the next block
     @Test
     fun aLineThatDoesNotReadIsKeptThroughABlock() {
         val dir = MemoryFiles()
@@ -41,7 +41,7 @@ class EnglishBlocksTest {
         assertEquals("the\nUS\n!later form\n", dir.file(EnglishBlocks.FILE).read().decodeToString())
     }
 
-    // R25 F7821: 全部清空 takes the lines not taken for a word too; a file of such lines alone as well
+    // 全部清空 takes the lines not taken for a word too; a file of such lines alone as well
     @Test
     fun aClearEmptiesTheWordsAndTheLinesThatDoNotRead() = assertRows(
         listOf("words and a line not read" to "the\n!later form\n", "lines not read alone" to "!later form\n"),
@@ -57,7 +57,6 @@ class EnglishBlocksTest {
         assertEquals("US\n", dir.file(EnglishBlocks.FILE).read().decodeToString())
     }
 
-    // R25 F7961: 全部清空 deletes a list that did not read, as WordLists': skipped, its file was left to come back
     @Test
     fun aClearDeletesAListThatDidNotRead() = assertRows(
         listOf<Triple<String, (MemoryFiles) -> Unit, Boolean>>(
@@ -82,8 +81,7 @@ class EnglishBlocksTest {
         }
     }
 
-    // decode-2 (R25 F7848): a block that cannot be written, or made over a file that did not read, is told as
-    // not kept (Unsaved, what the keyboard says), not as any I/O error (only logged); blocked for the run all the same
+    // told as Unsaved, not as an I/O error; blocked for the run all the same
     @Uat("WD-48")
     @Test
     fun aBlockThatCannotBeKeptIsBlockedInMemoryAndToldAsUnsaved() = assertRows(
@@ -102,7 +100,6 @@ class EnglishBlocksTest {
         assertTrue("$why: ${errors.last()}", errors.last() is Unsaved)
     }
 
-    // review L1: a word blocked in lower case is blocked in any case; one with a capital as written alone
     @Test
     fun aWordInLowerCaseIsBlockedInAnyCaseOneWithACapitalAsWritten() {
         val blocks = EnglishBlocks(null)
@@ -111,7 +108,6 @@ class EnglishBlocksTest {
         assertTrue(blocks.has("US"))
         assertFalse(blocks.has("us"))
         assertFalse(blocks.has("Us"))
-        // kept as written
         val dir = MemoryFiles()
         EnglishBlocks(dir).block(listOf("US", "the"))
         val read = EnglishBlocks(dir)
@@ -120,7 +116,6 @@ class EnglishBlocksTest {
         assertEquals(listOf("US"), read.unblock(listOf("US", "us")))
     }
 
-    // what is shown in the input's case is blocked as written: Hello at a capital, HELLO in capitals, hello's
     @Test
     fun aWordShownInTheInputsCaseIsBlockedAsWritten() {
         for (typed in listOf("Hel", "HEL")) {

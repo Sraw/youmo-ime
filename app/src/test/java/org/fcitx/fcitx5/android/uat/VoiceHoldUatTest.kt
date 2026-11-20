@@ -48,11 +48,8 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 
 /**
- * UAT cases of holding to talk (uat/12), everything after the recognizer: what it hears told
- * straight to the session ([VoiceSession.listening]) as segments closed, the rest the app's own
- * (the finger, VoiceHold, VoiceLive's joining with VoiceText's clean-up and numbers, the polish
- * tagger aside, VoiceEnd, VoiceCommit, the commit into the field). Whether the
- * model hears it right is the voice-eval benchmark's; the microphone end to end is VO-02's device smoke.
+ * Holding to talk, everything after the recognizer: what it hears told straight to the session as segments closed,
+ * the rest the app's own. Whether the model hears it right is the voice-eval benchmark's.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -62,7 +59,6 @@ class VoiceHoldUatTest {
     private val voice = FakeRecognizer()
     private val restore = mutableListOf<() -> Unit>()
 
-    // the 正在听 cues (VoiceStyle.haptics's cue = true)
     private var cues = 0
 
     private val h = KeyboardHarness().also {
@@ -83,11 +79,9 @@ class VoiceHoldUatTest {
 
     private fun allowMicrophone() = app.grantPermissions(Manifest.permission.RECORD_AUDIO)
 
-    // the space as the keyboard shows it (the scene's key on the canvas)
     private val space: ShownKey
         get() = h.keyNamed("space")
 
-    // the long press fired, the finger still down
     private fun holdSpace(): KeyboardHarness.Finger = h.finger(space, h.at(space)).also { h.advance(700) }
 
     private fun KeyboardHarness.Finger.lift(dy: Float = 0f) {
@@ -101,13 +95,11 @@ class VoiceHoldUatTest {
         f.lift()
     }
 
-    // every text shown in the keyboard's window, the hold's card included
     private fun shown(): List<String> = KeyboardHarness.all(h.service.window.window!!.decorView)
         .filterIsInstance<TextView>().filter { h.shown(it) }.map { it.text.toString() }.toList()
 
     private fun text() = h.field.text.toString()
 
-    // the field's composing region, -1 to -1 for none
     private fun composing() = h.field.text.let { BaseInputConnection.getComposingSpanStart(it) to BaseInputConnection.getComposingSpanEnd(it) }
 
     private fun string(id: Int) = h.service.getString(id)
@@ -121,13 +113,11 @@ class VoiceHoldUatTest {
     fun theFirstHoldAsksForTheMicrophone() {
         h.start()
         holdSpace().lift()
-        // no permission: the asking page, the microphone not opened
         val asked = app.nextStartedActivity
         assertEquals(VoicePermissionActivity::class.java.name, asked?.component?.className)
         assertEquals(0, voice.opened)
         val page = Robolectric.buildActivity(VoicePermissionActivity::class.java, asked).setup().get()
         assertTrue(shadowOf(page).lastRequestedPermission?.requestedPermissions.orEmpty().contains(Manifest.permission.RECORD_AUDIO))
-        // allowed: the next hold talks
         allowMicrophone()
         say("你好")
         assertEquals(1, voice.opened)
@@ -138,9 +128,8 @@ class VoiceHoldUatTest {
     fun underEnglishWhatIsSaidIsTypedOnce() {
         allowMicrophone()
         h.start(MULTI_LINE)
-        // not Chinese: what is composing is finished, not picked, before a commit (PendingInputPolicy);
-        // voice's own text was finished so and the commit typed it again
-        val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "", "En", "en", "androidengine", false)
+        // not Chinese: what is composing is finished, not picked, before a commit; voice's own text was once typed again
+        val english = InputMethodEntry(InputMethodCatalog.ENGLISH, "English", "", "En", "en")
         h.api.inputMethodEntryCached = english
         h.emit(HostEvent.InputMethodChanged(english))
         h.advance(100)
@@ -157,11 +146,9 @@ class VoiceHoldUatTest {
     @Test
     fun theEndMarkGoesAsTheFieldHasIt() {
         allowMicrophone()
-        // one line (a search, a name): no end mark at all
         h.start()
         say("你好吗？")
         assertEquals("你好吗", text())
-        // a chat's message box: no full stop, a question keeps its mark
         h.start(MULTI_LINE, imeOptions = EditorInfo.IME_ACTION_SEND)
         say("我到了。")
         assertEquals("我到了", text())
@@ -177,7 +164,6 @@ class VoiceHoldUatTest {
         TestStyles.set(KeyboardStyle.FLOATING)
         restore += { TestStyles.clear() }
         h.start()
-        // dragged and made smaller
         h.keyboard.translationX = 40f
         h.keyboard.translationY = -120f
         h.keyboard.scaleX = 0.8f
@@ -188,7 +174,6 @@ class VoiceHoldUatTest {
             .first { h.shown(it) && it.text.toString() == string(R.string.voice_hold_listening) }
         var card: View = listening
         while (card.parent !== h.keyboard) card = card.parent as View
-        // over the whole keyboard where it is now, not where it would be docked
         val board = Rect().also { h.keyboard.getGlobalVisibleRect(it) }
         val seen = Rect().also { card.getGlobalVisibleRect(it) }
         assertEquals(board, seen)
@@ -208,7 +193,7 @@ class VoiceHoldUatTest {
         h.keyboard.scaleX = 0.8f
         h.keyboard.scaleY = 0.8f
         h.relayout()
-        // the cancel line: a quarter of the keyboard's height as seen (scaled), in dp
+        // a quarter of the keyboard's height as seen (scaled), in dp
         val line = h.keyboard.height * 0.8f * 0.25f / h.service.resources.displayMetrics.density
         val f = holdSpace()
         f.move(h.at(space, dy = -(line - 2f)))
@@ -223,11 +208,9 @@ class VoiceHoldUatTest {
     @Uat("VO-02")
     fun whatIsSaidShowsThenIsTyped() {
         allowMicrophone()
-        // a note's field, many lines: what is said ends as said (VoiceEnd)
         h.start(MULTI_LINE)
         val f = holdSpace()
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
-        // a segment heard at a pause: shown, and composing in the field, not typed yet
         voice.heard("今天天气")
         h.advance(100)
         assertTrue(shown().toString(), "今天天气" in shown())
@@ -240,7 +223,7 @@ class VoiceHoldUatTest {
         assertEquals(-1 to -1, composing())
     }
 
-    /** Sent while holding (the app's button, or Enter with another finger), the field cleared, its input restarted or not: then afresh. */
+    /** Sent while holding, the field cleared, its input restarted or not: then afresh. */
     @Test
     @Uat("VO-29")
     fun afterTheAppSentWhileHoldingWhatIsSaidNextStartsAfresh() {
@@ -261,7 +244,7 @@ class VoiceHoldUatTest {
         }
     }
 
-    /** Input restarted in the same field while the finger is down (a WebView, restartInput): what is said is kept (R20 F5794). */
+    /** Input restarted in the same field while the finger is down (a WebView): what is said is kept. */
     @Test
     @Uat("VO-12")
     fun inputRestartedInTheSameFieldWhileHoldingKeepsWhatIsSaid() {
@@ -277,7 +260,7 @@ class VoiceHoldUatTest {
         assertEquals("今天天气，很好。", text())
     }
 
-    // a hold whose recognizer never answers: what was heard is still typed when it is given up (R20 F5822)
+    // a hold whose recognizer never answers: what was heard is still typed when it is given up
     @Test
     @Uat("VO-31")
     fun aHoldCutShortTypesWhatWasHeard() {
@@ -286,7 +269,6 @@ class VoiceHoldUatTest {
         val f = holdSpace()
         voice.heard("今天天气，")
         h.advance(100)
-        // the tail never recorded, and a cut not answered either: 15 s and given up
         voice.held = true
         voice.stuck = true
         f.lift()
@@ -307,7 +289,6 @@ class VoiceHoldUatTest {
         assertTrue(shown().toString(), string(R.string.voice_hold_cancel) in shown())
         f.lift(dy = -up)
         assertEquals("", text())
-        // dropped at once: no tail recorded after the lift
         assertEquals(0, voice.finishes)
     }
 
@@ -326,7 +307,6 @@ class VoiceHoldUatTest {
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
         assertFalse(shown().toString(), string(R.string.voice_hold_preparing) in shown())
-        // felt once, when it came on
         assertEquals(1, cues)
         voice.said += "你好"
         f.lift()
@@ -363,7 +343,6 @@ class VoiceHoldUatTest {
         val f = holdSpace()
         voice.said += "你"
         f.lift()
-        // lifted while 准备中…: 识别中… shows, and the microphone coming on in the tail is not 正在听 again
         assertTrue(shown().toString(), string(R.string.voice_hold_recognizing) in shown())
         voice.on()
         h.advance(100)
@@ -381,7 +360,6 @@ class VoiceHoldUatTest {
         h.start()
         voice.warm = false
         val f = holdSpace()
-        // slid up and lifted: dropped before the microphone came on
         val up = h.keyboard.height / h.service.resources.displayMetrics.density * 0.4f
         f.move(h.at(space, dy = -up))
         f.lift(dy = -up)
@@ -403,16 +381,13 @@ class VoiceHoldUatTest {
         f.move(h.at(space, dy = -up))
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_cancel) in shown())
-        // the microphone comes on in the cancel zone: 松开手指，取消输入 stays
         voice.on()
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_cancel) in shown())
-        // no 正在听 cue in the cancel zone
         assertEquals(0, cues)
         f.move(h.at(space))
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
-        // its cue put off till now, once
         assertEquals(1, cues)
         f.move(h.at(space, dy = -up))
         f.move(h.at(space))
@@ -432,7 +407,6 @@ class VoiceHoldUatTest {
         f.move(h.at(space, dy = -up))
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_cancel) in shown())
-        // back before the first sample: 准备中 again, no 正在听 cue yet
         f.move(h.at(space))
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_preparing) in shown())
@@ -455,7 +429,6 @@ class VoiceHoldUatTest {
         assertEquals("2002年57%", text().filter { it.isLetterOrDigit() || it == '%' })
     }
 
-    // the tagger failing as the talk ends (VoiceListener's fallback): the raw text, its numbers in characters
     @Test
     @Uat("VO-06")
     fun aTaggerFailingTypesTheRawText() {
@@ -465,13 +438,11 @@ class VoiceHoldUatTest {
         h.start()
         say("二零零二年")
         assertEquals("二零零二年", text())
-        // said on the card, once a cause (060-pending-decisions L112/L170)
         assertTrue(shown().toString(), string(R.string.voice_polish_failed) in shown())
         h.advance(3000)
         say("百分之五十七")
         assertEquals("二零零二年百分之五十七", text())
         assertFalse(shown().toString(), string(R.string.voice_polish_failed) in shown())
-        // the model not read in: another cause, said once too
         voice.finishRaw = false
         voice.polish = null
         voice.polishNotLoaded = true
@@ -480,7 +451,6 @@ class VoiceHoldUatTest {
         assertTrue(shown().toString(), string(R.string.voice_polish_failed) in shown())
     }
 
-    // the tagger's number head as the model has it: 二零零二 a date, 百分之五十七 a percentage
     private val numberTags = VoicePolishTags(listOf("keep", "del"), listOf(""), listOf("none", "value", "digits", "date", "time", "money", "percent"))
     private val numberTagger = VoicePolishStream.Tagger { w ->
         val s = String(w, 0, w.size)
@@ -491,7 +461,6 @@ class VoiceHoldUatTest {
     @Uat("VO-07")
     fun wordsWithNumeralsAreLeftAlone() {
         allowMicrophone()
-        // whether 十分 is a number is the tagger's (measured in voice-eval's cases-N.tsv): this one marks none
         voice.polish = { VoicePolishStream(numberTags, VoicePolishStream.Tagger { w -> VoicePolishStream.Labels(IntArray(w.size), IntArray(w.size)) }) }
         h.start()
         say("这个电影十分有趣")
@@ -513,7 +482,6 @@ class VoiceHoldUatTest {
     fun aCoughTypesNothing() {
         allowMicrophone()
         h.start()
-        // a noise comes back as a filler sound, or nothing
         val f = holdSpace()
         voice.said += "嗯。"
         f.up(h.at(space))
@@ -530,16 +498,13 @@ class VoiceHoldUatTest {
         val first = h.field
         val f = holdSpace()
         voice.said += "你好"
-        // another field before the finger lifts
         h.start()
         f.lift()
         assertEquals("", h.field.text.toString())
         assertEquals("", first.text.toString())
     }
 
-    // heard while the space is held, then another field: what was heard typed into the first, as a tap's
-    // talk does (060-pending-decisions L490, the owner's); the new field gets nothing, nor what the lift brings.
-    // Its own test, not a row beside onlyTheFieldItWasSaidForGetsIt's: rows would share one recognizer and harness
+    // heard while held, then another field: typed into the first; its own test, as rows would share one recognizer and harness
     @Test
     @Uat("VO-12")
     fun whatWasHeardBeforeAnotherFieldGoesIntoTheFirst() {
@@ -559,9 +524,7 @@ class VoiceHoldUatTest {
         assertEquals("", h.field.text.toString())
     }
 
-    // the views made anew under the held finger (a theme's rebuild): what was heard is typed at
-    // once, as on another field, not dropped by the cancel detaching the old view sends; the lift
-    // after it types nothing more
+    // the views made anew under the held finger: what was heard typed at once, not dropped by the old view's cancel
     @Test
     @Uat("VO-12")
     fun theViewsMadeAnewWhileHoldingTypeWhatWasHeardOnce() = heardWhileTheViewsAreMadeAnew {
@@ -569,8 +532,7 @@ class VoiceHoldUatTest {
         restore += { TestStyles.clear() }
     }
 
-    // the screen turned with the finger still down (super makes the views anew): the same, by
-    // another way in (onConfigurationChanged ends the hold itself)
+    // onConfigurationChanged ends the hold itself
     @Test
     @Uat("VO-12")
     fun theScreenTurnedWhileHoldingTypesWhatWasHeardOnce() = heardWhileTheViewsAreMadeAnew {
@@ -580,17 +542,14 @@ class VoiceHoldUatTest {
         h.service.onConfigurationChanged(turned)
     }
 
-    /** "你好" heard under a held space, then [makeAnew] replaces the input view: typed once, at once */
     private fun heardWhileTheViewsAreMadeAnew(makeAnew: () -> Unit) {
         allowMicrophone()
         h.start()
         val f = holdSpace()
         voice.heard("你好，")
         h.advance(100)
-        // as a device's: detaching the old view cancels the touch it held before anything under it
-        // hears of the detach (ViewGroup.removeViewInternal: cancelTouchTarget, then detached). The
-        // harness's finger goes straight to the input view, so its parent has no touch target to
-        // cancel: a first child sends that cancel as it goes, ahead of the card's own detach
+        // as a device's: detaching the old view cancels the touch it held before anything under it hears of the detach;
+        // the harness's finger goes straight to the input view, so a first child sends that cancel ahead of the card's detach
         val old = h.inputView
         old.addView(View(old.context).apply {
             addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
@@ -615,8 +574,6 @@ class VoiceHoldUatTest {
         assertEquals("你好", text())
     }
 
-    // the keyboard hidden with the finger still down: what was heard typed at once, the lift after
-    // it types nothing more
     @Test
     @Uat("VO-12")
     fun theKeyboardHiddenWhileHoldingTypesWhatWasHeardOnce() {
@@ -633,8 +590,7 @@ class VoiceHoldUatTest {
         assertEquals("你好", text())
     }
 
-    // lifted, then the keyboard hidden while the tail is still recorded: as a tap's talk, the
-    // recognizer waited for and all of it typed, not only what was heard before the hide
+    // lifted, then hidden while the tail is still recorded: the recognizer waited for and all of it typed
     @Test
     @Uat("VO-12")
     fun theKeyboardHiddenAfterTheLiftStillTypesTheTail() {
@@ -652,7 +608,6 @@ class VoiceHoldUatTest {
         assertEquals("今天天气很好。", text())
     }
 
-    // slid into the cancel zone, then another field: dropped, as lifting there would
     @Test
     @Uat("VO-12")
     fun anotherFieldWhileInTheCancelZoneTypesNothing() {
@@ -695,7 +650,6 @@ class VoiceHoldUatTest {
         f.up(h.at(space))
         h.advance(300)
         assertTrue(shown().toString(), string(R.string.voice_hold_nothing) in shown())
-        // still shown (it goes after a second or so): the next hold talks at once
         val again = holdSpace()
         assertEquals(2, voice.opened)
         assertTrue(shown().toString(), string(R.string.voice_hold_listening) in shown())
@@ -715,11 +669,9 @@ class VoiceHoldUatTest {
         // the event's own time, before it is handled: not the time the session sees it
         val upAt = SystemClock.uptimeMillis() - 40
         f.up(h.at(space), eventTime = upAt)
-        // the tail counted from this ACTION_UP's own time, "recognizing" shown at once
         assertEquals(upAt, voice.stoppedAt)
         h.advance(100)
         assertTrue(shown().toString(), string(R.string.voice_hold_recognizing) in shown())
-        // the tail still being recorded: nothing typed yet
         h.advance(200)
         assertEquals("", text())
         voice.release()
@@ -737,7 +689,6 @@ class VoiceHoldUatTest {
         voice.said += "你好"
         f.lift()
         assertEquals("", text())
-        // pressed again during the tail: it ends now, what was said is typed, the press is no new hold
         val again = h.finger(space, h.at(space))
         h.advance(100)
         assertEquals(1, voice.cuts)
@@ -747,7 +698,6 @@ class VoiceHoldUatTest {
         h.advance(300)
         assertEquals(1, voice.opened)
         assertEquals("你好", text())
-        // once ended, a long press talks as ever (VO-16)
         voice.held = false
         val next = holdSpace()
         assertEquals(2, voice.opened)
@@ -765,8 +715,7 @@ class VoiceHoldUatTest {
         h.api.calls.clear()
         say("汪小明")
         assertEquals("汪小明", text())
-        // put in the field over the engine (commitOverEngine: its input reset, the text the app's):
-        // no word chosen, added or learned from it; only told the engine to follow (语音先问再记, VO-41)
+        // put in over the engine (commitOverEngine): no word chosen, added or learned from it
         assertEquals(listOf("reset()", "voiceSaid(汪小明, 汪小明, false)"), h.api.calls)
     }
 }

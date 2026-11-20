@@ -13,10 +13,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.util.zip.ZipFile
 
-/**
- * What a release uploads: the two bundles users download, and the listing the next release
- * compares with. A mistake here would show only on the day of a release.
- */
+/** What a release uploads: a mistake here would show only on the day of a release. */
 class AssetPacksBundleTest {
 
     @get:Rule
@@ -61,15 +58,13 @@ class AssetPacksBundleTest {
         assertEquals(mapOf("text" to false, "voice" to true), changed)
     }
 
-    // a refused release leaves nothing that looks releasable: every check before the first file is written
     @Test
     fun aRefusedReleaseWritesNothing() {
         fun write(apkFile: File = apk(), text: AssetPacksPlugin.Listing = listing("text"), voice: AssetPacksPlugin.Listing = listing("voice"), version: String = "0.6.0",
                   before: Map<String, AssetPacksPlugin.Listing> = emptyMap(), profileable: Boolean = false): (File) -> Unit =
             { out -> AssetPacksPlugin.writeBundles(apkFile, text, voice, version, before, out, profileable) }
         val unsigned = folder.root.resolve("app-arm64-v8a-release-unsigned.apk").apply { writeText("apk") }
-        // each row's own refusal (its exception and a word of its message): one refused by an earlier check,
-        // or for a reason of the fixture's (a file missing), would pass a table that took any refusal
+        // each row's own refusal: one refused for another reason would pass a table that took any refusal
         val stateException = IllegalStateException::class.java
         val gradleException = GradleException::class.java
         val rows = listOf(
@@ -114,8 +109,7 @@ class AssetPacksBundleTest {
         assertEquals("\"文字\"", AssetPacksPlugin.jsonString("文字"))
     }
 
-    // contract: the build's list of which pack owns which asset path is the app's PackKind's, repeated: one side
-    // changed alone would show only when a device imports the pack
+    // contract: the build's pack ownership repeats the app's PackKind; one side changed alone shows only on import
     @Test
     fun theOwnedPathsAreTheAppsPackKinds() {
         val source = File(System.getProperty("user.dir"))

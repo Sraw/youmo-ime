@@ -20,7 +20,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** The text editing panel with the editor's selection report lagging behind its selection (uat/05 TB-30). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -44,8 +43,7 @@ class EditingLagUatTest {
         return generateSequence(t) { it.parent as? View }.first { it.hasOnClickListeners() }
     }
 
-    // the tracked selection collapsed, the editor's text selected: 复制 goes by what the editor says is selected
-    // and leaves its selection as it is (剪切 is not shown then) (R20 F6626)
+    // the tracked selection collapsed, the editor's text selected: 复制 goes by what the editor says
     @Test
     @Uat("TB-30")
     fun copyWithTheSelectionReportLagging() {

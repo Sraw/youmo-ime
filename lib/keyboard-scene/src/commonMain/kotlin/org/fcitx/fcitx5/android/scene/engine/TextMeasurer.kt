@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.scene.Box
 
 /**
  * How big text is, which only a platform knows (its fonts): Android's Paint, the web page's canvas,
- * a test's fixed table (060-render-v2 §6 step 5). Everything else about where text goes is the
+ * a test's fixed table. Everything else about where text goes is the
  * engine's, the same everywhere.
  */
 fun interface TextMeasurer {

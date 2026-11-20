@@ -1,9 +1,6 @@
-// The editing's tabs in a real browser (060-render-p3 M2): a field's edit commits on leaving it, and what the user
-// does next is kept: the characters typed into the next field, the box clicked right after. A tab drawn anew under
-// the user (every change did that) took the field just entered away and the click with it. CI runs it on every push
-// and PR (unit_test.yml, with the runner's Chrome; R25 B13); it needs a Chromium (no jsdom here: no npm).
-// Run: node web/theme-maker/test/panels-smoke.mjs [chromium]
-// (default: Playwright's headless shell, as cdp.mjs finds it; CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
+// The editing's tabs in a real browser: a field's edit commits on leaving it, and what the user does next is kept (a
+// tab drawn anew under the user took the next field and the click away). CI runs it with the runner's Chrome.
+// Run: node web/theme-maker/test/panels-smoke.mjs [chromium]   (CHROMIUM=<path> too). Exit 0 all kept, 1 not, 2 not run.
 import { readFileSync } from 'node:fs';
 import { serve } from '../dev/serve.mjs';
 import { browser, chromium } from './cdp.mjs';
@@ -33,7 +30,6 @@ async function main() {
     if (r.exceptionDetails) throw new Error(expr + ': ' + JSON.stringify(r.exceptionDetails.exception && r.exceptionDetails.exception.description));
     return r.result.value;
   };
-  // the field or box in the row labelled [label] of the tab shown: its middle on the page
   const at = (label, tag = 'input') => js(`(() => {
     const row = [...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].find((r) => r.querySelector('.what').textContent === ${JSON.stringify(label)});
     const e = row.querySelector(${JSON.stringify(tag)});
@@ -52,10 +48,7 @@ async function main() {
   const check = (ok, what) => { console.log((ok ? 'ok   ' : 'FAIL ') + what); if (!ok) failed++; };
   try {
     await b.send('Page.navigate', { url: 'http://127.0.0.1:' + server.address().port + '/page.html' });
-    // the page's start is done once it opens 新建 itself (its fonts loaded, no draft found, the first document set):
-    // a theme picked before that (the buttons are there from the first moment) had 新建 opened over it a moment
-    // later on a loaded machine, and the click meant for 大小 landed on the panel
-    // (?.: the navigation may not have put the page in yet)
+    // the start is done once it opens 新建 itself: a theme picked before that had 新建 opened over it on a loaded machine
     const started = () => js(`!!document.getElementById('new-panel')?.open`);
     for (let i = 0; i < 300 && !(await started()); i++) await wait(100);
     if (!(await started())) throw new Error('the page did not start (新建 not opened in 30 s)');
@@ -63,7 +56,6 @@ async function main() {
     await js(`document.querySelector('#tabs [data-tab=text]').click()`);
     await wait(300);
 
-    // 061-toolbar-icons: the icons by where they are drawn, a name in two places noted in each
     const groups = JSON.parse(await js(`JSON.stringify([...document.querySelectorAll('#edit .tab:not([hidden]) h4')].map((e) => e.textContent))`));
     check(['回车键', '键', '快捷键的命令', '栏', '状态面板和编辑面板'].every((g) => groups.includes(g)), 'the icons grouped: ' + groups.join(' '));
     const undo = JSON.parse(await js(`JSON.stringify([...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].filter((r) => r.querySelector('.what').textContent === 'undo').map((r) => r.textContent))`));
@@ -71,7 +63,6 @@ async function main() {
     const hide = await js(`[...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].find((r) => r.querySelector('.what').textContent === 'hide-keyboard').textContent`);
     check(hide.includes('栏上 App 自带的图和键上的不同'), 'hide-keyboard notes its bar image differs: ' + hide);
 
-    // typed into 大小, then into 字距 (clicked): both kept, the second's characters not wiped
     await click('大小');
     await type('120');
     await click('字距');
@@ -84,7 +75,6 @@ async function main() {
     const s = await style();
     check(/scale="120%"/.test(s) && /letter-spacing="0.1em"/.test(s), 'both edits written: ' + s);
 
-    // typed into 大小, then the box clicked: the click acts
     await click('大小');
     await js(`document.activeElement.select()`);
     await type('110');
@@ -124,7 +114,6 @@ async function main() {
     const v = await style();
     check(/scale="105%"/.test(v) && /hidden="true"/.test(v), 'touch: a tap right after an edit acts: ' + v);
 
-    // undo with a field focused: every field shows the document undone, the focused one too
     await tap('大小');
     await js(`document.getElementById('undo').click()`);
     await js(`document.getElementById('undo').click()`);
@@ -138,7 +127,7 @@ async function main() {
     check(/scale="120%"/.test(await style()), 'undo: a step after it goes from the document\'s value: ' + await style());
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
 
-    // Ctrl+Z in a field typed in and not committed is the field's own undo, not the document's (m3 L-a)
+    // Ctrl+Z in a field typed in and not committed is the field's own undo, not the document's
     await click('大小');
     await js(`document.activeElement.select()`);
     await type('133');
@@ -149,7 +138,7 @@ async function main() {
     await js(`document.activeElement.blur()`);
     await wait(300);
 
-    // a colour renamed in the source, then undone on 配色: its row edits the colour it names, not the one it was drawn for
+    // a colour renamed in the source, then undone: its row edits the colour it names, not the one it was drawn for
     await js(`document.querySelector('#tabs [data-tab=colors]').click()`);
     await wait(200);
     await click('加一个');
@@ -170,7 +159,6 @@ async function main() {
     const src = await source();
     check(/name="aaa" value="#123456"/.test(src) && !/name="bbb"/.test(src), 'undo a rename: the row edits the colour it shows');
 
-    // a picture replaced by another of its size: the crop shows the new one
     await js(`document.querySelector('#tabs [data-tab=background]').click()`);
     await wait(200);
     const choose = (color) => js(`(async () => {
@@ -191,14 +179,12 @@ async function main() {
     const blue = await centre();
     check(/^25[45],0,0$/.test(red) && /^0,0,25[45]$/.test(blue), 'a picture replaced: the crop shows the new one (' + red + ' then ' + blue + ')');
 
-    // 用这个裁切 replaces the crop's box whole: the focus goes to the new box's button, not to the page (R8)
     await js(`(() => { const c = document.querySelector('#tab-background canvas.crop-canvas'); c.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, clientY: 10, bubbles: true })); c.dispatchEvent(new PointerEvent('pointermove', { clientX: 30, clientY: 20, bubbles: true })); c.dispatchEvent(new PointerEvent('pointerup', { clientX: 30, clientY: 20, bubbles: true })); })()`);
     await js(`(() => { const x = [...document.querySelectorAll('#tab-background button')].find((y) => y.textContent === '用这个裁切'); x.focus(); x.click(); })()`);
     await wait(1500);
     const focused = await js(`document.activeElement === document.body ? 'body' : document.activeElement.tagName + ' ' + document.activeElement.textContent`);
     check(focused !== 'body' && !!(await js(`document.getElementById('tab-background').contains(document.activeElement)`)), '用这个裁切: the focus stays in the tab (' + focused + ')');
 
-    // M3's tabs: each draws; an edit on one writes its style and keeps the tab (the row synced in place)
     for (const id of ['bar', 'popup', 'window', 'size', 'motion', 'sounds', 'info']) {
       await js(`document.querySelector('#tabs [data-tab=${id}]').click()`);
       await wait(300);
@@ -217,7 +203,6 @@ async function main() {
     await wait(200);
     const played = await js(`(async () => { [...document.querySelectorAll('#tab-motion button')].find((x) => x.textContent === '试一下').click(); await new Promise((ok) => setTimeout(ok, 1200)); return document.getElementById('preview').width; })()`);
     check(played > 0, '动效: 试一下 plays and ends with the keys drawn');
-    // the environment's bar sample: the preview grows by the bar
     const h0 = await js(`document.getElementById('preview').height`);
     await js(`(() => { const s = document.getElementById('env-bar'); s.value = 'typing'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await wait(500);
@@ -226,8 +211,7 @@ async function main() {
     await wait(500);
     check(h1 > h0, '环境: typing: the code strip over the bar (' + h0 + ' → ' + h1 + ')');
 
-    // an edit that adds controls (描边's colour once it has a width) draws the tab anew: the field tapped or clicked
-    // next keeps its focus and what is typed into it (touch and mouse)
+    // an edit that adds controls draws the tab anew: the field tapped or clicked next keeps its focus and what is typed
     await js(`document.querySelector('#tabs [data-tab=popup]').click()`);
     await wait(300);
     const pos = (label, nth) => js(`(() => { const row = [...document.querySelectorAll('#edit .tab:not([hidden]) label.row')].find((r) => r.querySelector('.what').textContent === ${JSON.stringify(label)}); const e = row.querySelectorAll('input')[${nth}]; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
@@ -261,7 +245,6 @@ async function main() {
     }
     await b.send('Emulation.setTouchEmulationEnabled', { enabled: false });
 
-    // 从一张图片开始 twice, with pictures of two colours: each time the colours are the new picture's, in one step
     const fromImage = (colour) => js(`(async () => {
       const panel = document.getElementById('new-panel'); if (!panel.open) panel.showModal();
       document.querySelector('input[name=image-tone][value=dark]').click();
@@ -282,7 +265,6 @@ async function main() {
     await wait(500);
     check(/#e0501[01]/.test((/<color name="accentKey"[^>]*>/.exec(await source()) || [''])[0]), '从一张图片开始: the picture and its colours one step (one undo: the first picture\'s)');
 
-    // 信息 › 从预览截一张 over a photo-like picture (noise: its PNG is past 512 KB): taken smaller or as WebP, within the App's limit
     await js(`(async () => {
       const panel = document.getElementById('new-panel'); if (!panel.open) panel.showModal();
       const oc = new OffscreenCanvas(1600, 1000); const g = oc.getContext('2d'); const im = g.createImageData(1600, 1000);
@@ -301,7 +283,6 @@ async function main() {
     for (let i = 0; i < 50 && !/preview="/.test(await source()); i++) await wait(100);
     check(/<meta [^>]*preview="preview\.(png|webp)"/.test(await source()), '信息: a preview taken over a noisy picture fits the App\'s 512 KB: ' + ((/preview="[^"]*"/.exec(await source()) || ['none'])[0]));
 
-    // M4: an example started from; help; the check before a save (a warning asks, an error stops)
     await js(`(() => { const p = document.getElementById('new-panel'); if (!p.open) p.showModal(); document.querySelectorAll('#examples button')[0].click(); })()`);
     await wait(1500);
     check(/name="晚霞"/.test(await source()) && !(await js(`document.getElementById('new-panel').open`)), '从示例开始: 晚霞 opened');
@@ -310,8 +291,6 @@ async function main() {
     const help = await js(`document.getElementById('help-panel').open ? [...document.querySelectorAll('#help-panel a')].map((a) => a.href).join(' ') : ''`);
     check(/docs\/theme-maker\.md/.test(help) && /docs\/theme-format\.md/.test(help), 'help: open with its links: ' + help);
     await js(`document.getElementById('help-panel').close()`);
-    // 061-custom-layout §10 (W3): 环境 › 键盘 › 打开 .layout: the theme drawn on a layout of the user's, a key of it picked
-    // by its own id, its values' sources found on it
     const k17 = readFileSync(new URL('../examples/layouts/k17.layout', import.meta.url), 'utf8');
     await js(`(() => {
       for (const id of ['env-bar', 'env-show', 'env-sheet']) { const s = document.getElementById(id); s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -332,7 +311,6 @@ async function main() {
     check(/选中的键：hjk（17 键）/.test(pickedOwn), 'a key of it picked: ' + pickedOwn);
     await js(`document.querySelector('#tabs [data-tab=keys]').click()`);
     await wait(300);
-    // 范围 › 选中的键: the changes written for the picked key by the layout's own id
     await js(`(() => {
       const r = [...document.querySelectorAll('#tab-keys select')].find((s) => [...s.options].some((o) => o.value === 'picked'));
       r.value = 'picked'; r.dispatchEvent(new Event('change', { bubbles: true }));
@@ -365,24 +343,20 @@ async function main() {
     await wait(300);
     const stopped = await js(`[!document.getElementById('export-panel').open, window.__saved, document.getElementById('problems').textContent]`);
     check(stopped[0] && stopped[1] === 1 && /nope\.png/.test(stopped[2]), '保存 with an error: nothing saved, the error in 问题: ' + JSON.stringify(stopped.slice(0, 2)));
-    // a phone's width with the top bar's link to the layout maker (W3): on two lines, nothing past the screen, each link one line
     await b.send('Emulation.setDeviceMetricsOverride', { width: 360, height: 760, deviceScaleFactor: 2, mobile: true });
     await wait(500);
     const top = await js(`[document.documentElement.scrollWidth, ...[...document.querySelectorAll('#top a.link')].map((a) => Math.round(a.getBoundingClientRect().height))]`);
     check(top[0] <= 360 && top.slice(1).every((h) => h < 24), '360 px: the top bar within the screen, its links one line each: ' + top);
     await b.send('Emulation.clearDeviceMetricsOverride');
 
-    // a draft restored (review R26 F8152, F8447): its environment through the page's own selects (`form` is
-    // env-form-kind's, `panel` env-sheet's), a board the form does not offer now (0.6.0's 手写) or a layout opened (not
-    // kept: @own, @open) the default's, the rest as kept. A select id wrong threw inside the restore, and the page
-    // offered to drop the draft instead
+    // a draft restored through the page's own selects: a select id wrong threw inside the restore, and the page offered
+    // to drop the draft instead
     await b.send('Page.enable');
     await b.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.confirm = (m) => { window.__asked = m; return false; };' });
     const url = 'http://127.0.0.1:' + server.address().port + '/page.html';
     const offered = (q) => js(`(async () => { for (let i = 0; i < 300 && !document.getElementById('restore-panel')?.open; i++) await new Promise((r) => setTimeout(r, 50)); return ${q}; })()`);
     for (const board of ['handwriting', '@own', '@open']) {
-      // the page's own pending draft written first, so it does not replace the one put in below on leaving; the theme
-      // without the error put in above (a theme with an error draws nothing)
+      // the page's own pending draft written first, so it does not replace the one put in below on leaving
       await wait(800);
       await js(`window.YoumoMaker.keepDraft(window.YoumoMaker.idbStore(indexedDB), window.YoumoMaker.doc(document.getElementById('source').value.replace('<style select="key:pressed" fill="image(nope.png, 0dp)"/>', '')),
         Object.assign({}, window.YoumoMaker.ENV, { board: ${JSON.stringify(board)}, form: 'split', panel: 'voice', bar: 'typing' }))`);

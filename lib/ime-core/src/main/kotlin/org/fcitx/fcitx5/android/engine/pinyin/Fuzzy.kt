@@ -4,11 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
-/**
- * A pair of sounds a user may not tell apart (模糊音), each switched on in the settings. Typing
- * either spelling then also matches syllables spelt with the other. Pairs apply to a whole
- * initial or a whole final, and are not chained: with L_N and L_R, `n` does not reach `r`.
- */
+/** A 模糊音 pair: either spelling also matches the other's syllables. Applies to a whole initial or final, not chained: with L_N and L_R, `n` does not reach `r`. */
 enum class Fuzzy(internal val a: String, internal val b: String, val onInitial: Boolean) {
     Z_ZH("z", "zh", true),
     C_CH("c", "ch", true),
@@ -27,7 +23,6 @@ enum class Fuzzy(internal val a: String, internal val b: String, val onInitial: 
     V_U("v", "u", false),
     ;
 
-    /** Whether this rule applies to a final after [initial]. */
     fun appliesAfter(initial: String): Boolean = when (this) {
         // the u of ju, qu, xu, yu is ü: jou is not a slip for it
         U_OU -> initial !in SpellingIndex.U_IS_V
@@ -36,7 +31,6 @@ enum class Fuzzy(internal val a: String, internal val b: String, val onInitial: 
         else -> true
     }
 
-    /** The other of the pair when [part] is one of them, else null. */
     fun partner(part: String): String? = when (part) {
         a -> b
         b -> a

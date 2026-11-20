@@ -4,10 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.learn
 
-/**
- * Counts by typing day, oldest first: a few days each, for tens of thousands of rows, so two
- * arrays rather than a map of boxed days.
- */
+/** Counts per typing day, oldest first: a few days for each of tens of thousands of rows, so two arrays, not a map of boxed days. */
 class DayCounts {
     private var days = IntArray(2)
     private var counts = IntArray(2)
@@ -20,10 +17,10 @@ class DayCounts {
     fun day(i: Int) = days[i]
     fun count(i: Int) = counts[i]
 
-    /** The last day counted, or [Int.MIN_VALUE] for none. */
+    /** Or [Int.MIN_VALUE] for none. */
     val lastDay get() = if (size == 0) Int.MIN_VALUE else days[size - 1]
 
-    /** Adds [n] (less than none takes back, never below none) to [day]'s count; a day of none is dropped. */
+    /** Negative [n] takes back, never below zero; a day at zero is dropped. */
     fun add(day: Int, n: Int) {
         var i = size - 1
         while (i >= 0 && days[i] > day) i--
@@ -45,7 +42,6 @@ class DayCounts {
         size++
     }
 
-    /** The sum of the counts of the days from [from] on. */
     fun sumFrom(from: Int): Int {
         var sum = 0
         for (i in size - 1 downTo 0) {
@@ -55,7 +51,7 @@ class DayCounts {
         return sum
     }
 
-    /** Drops the days before [from]: what they counted. */
+    /** Returns what the dropped days counted. */
     fun dropBefore(from: Int): Int {
         var n = 0
         while (n < size && days[n] < from) n++

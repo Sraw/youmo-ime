@@ -8,12 +8,7 @@ import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * A safetensors file: an 8-byte little-endian header size, a JSON header naming each tensor's
- * dtype, shape and byte range, then the data. Only F32 and I8 are read, all this project needs.
- * The file is untrusted: every size is checked against the file before anything is allocated,
- * and [IllegalArgumentException] says what did not fit.
- */
+/** A safetensors file (F32 and I8 only). Untrusted: every size is checked against the file before allocating, [IllegalArgumentException] saying what did not fit. */
 internal class Safetensors(buffer: ByteBuffer) {
 
     private val bytes = buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN)
@@ -21,7 +16,7 @@ internal class Safetensors(buffer: ByteBuffer) {
     private val dataStart: Int
     private val dataSize: Int
 
-    /** `__metadata__`: string keys to string values, as the format has it. */
+    /** `__metadata__`: string keys to string values. */
     val metadata: Map<String, String>
 
     init {
@@ -39,7 +34,7 @@ internal class Safetensors(buffer: ByteBuffer) {
         dataSize = bytes.limit() - dataStart
     }
 
-    /** A view of the file from [offset], in its byte order. */
+    /** A view from [offset], in the file's byte order. */
     private fun at(offset: Int): ByteBuffer {
         val view = bytes.duplicate().order(ByteOrder.LITTLE_ENDIAN)
         // through Buffer: ByteBuffer.position(int) returning ByteBuffer is Java 9, not Android's
@@ -63,7 +58,6 @@ internal class Safetensors(buffer: ByteBuffer) {
         return Entry(dtype, shape, offsets[0].toInt(), offsets[1].toInt())
     }
 
-    /** Tensor [name], F32 of [shape]. */
     fun floats(name: String, vararg shape: Int): FloatArray {
         val e = entry(name)
         require(e.dtype == "F32" && e.shape == shape.toList()) { "$name: expected F32 ${shape.toList()}, got ${e.dtype} ${e.shape}" }
@@ -72,17 +66,13 @@ internal class Safetensors(buffer: ByteBuffer) {
         return out
     }
 
-    /**
-     * Tensor [name] of `[rows, columns]`: I8 with an F32 `.scale` per row, read where it lies in the
-     * file (not copied) and multiplied by [kernel], or F32.
-     */
+    /** I8 with an F32 `.scale` per row, read in place and multiplied by [kernel]; or F32. */
     fun matrix(name: String, rows: Int, columns: Int, kernel: MatrixKernel = MatrixKernel.JVM): Matrix {
         val e = entry(name)
         require(e.shape == listOf(rows, columns)) { "$name: expected [$rows, $columns], got ${e.shape}" }
         if (e.dtype == "F32") return Matrix.of(rows, columns, floats(name, rows, columns))
         val q = at(dataStart + e.from)
-        // before slice(): a slice's capacity is what its parent has left, and the app's kernel
-        // takes only a capacity of rows × columns
+        // before slice(): a slice's capacity is its parent's remainder, and the app's kernel needs exactly rows × columns
         (q as Buffer).limit(dataStart + e.to)
         return Matrix.quantized(rows, columns, q.slice(), floats("$name.scale", rows), kernel)
     }

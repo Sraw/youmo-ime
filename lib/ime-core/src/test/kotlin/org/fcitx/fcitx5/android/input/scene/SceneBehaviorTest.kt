@@ -22,7 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// 060-render-p2 U4 B: what a scene key does, all of it its layout's; 060-render-v2 §15: a group's letters
+// what a scene key does, all of it its layout's
 class SceneBehaviorTest {
 
     private val theme = SceneData.theme("material-light.xml")
@@ -67,7 +67,6 @@ class SceneBehaviorTest {
         try {
             for (none in nones) {
                 assertNull(none, SceneAction.of(none))
-                // logged, each
                 assertTrue(none, logged.removeLast().contains("\"$none\""))
                 // the reader takes none of them either: the two agree
                 assertNull(none, LayoutReader.action(none))
@@ -78,8 +77,7 @@ class SceneBehaviorTest {
         assertEquals(SceneAction.Code(0x10FFFF), SceneAction.of("code:U+10FFFF"))
     }
 
-    // every form the reader takes is an action the app reads (one of each of layout-1's patterns, the
-    // edges of each): none it lets through reads as nothing
+    // every form the reader takes is an action the app reads: none it lets through reads as nothing
     @Test
     fun everyWordTheReaderTakesIsAnAction() {
         val forms = listOf(
@@ -95,7 +93,7 @@ class SceneBehaviorTest {
         }
     }
 
-    // a send= written that reads as nothing is nothing (logged), not the group's code its letters= would give
+    // a send= that reads as nothing is nothing (logged), not the group's code its letters= would give
     @Test
     fun aSendWrittenThatReadsAsNothingIsNoGroupsCode() {
         val n = keys("k14").getValue("r1c1")
@@ -111,9 +109,9 @@ class SceneBehaviorTest {
     @Test
     fun aGroupKeyTypesItsLettersAndOffersThemOnALongPress() {
         val qw = SceneBehavior.of(keys("k14").getValue("r1c1"))
-        // no send= written: its letters= are its tap (060-render-v2 §15)
+        // no send= written: its letters= are its tap
         assertEquals(SceneAction.Group("qw"), qw.press)
-        // its swipe by its name (KeyResolver, 060-keys-unify S6): none written, the bubble's corner the app's resolver's
+        // its swipe by its name: none written, the bubble's corner the resolver's
         assertNull(qw.swipe)
         assertEquals(Bubble("QW", ""), qw.bubble)
         assertEquals(LongPopup.Letters("qw"), qw.popup)
@@ -127,12 +125,10 @@ class SceneBehaviorTest {
         assertEquals(LongPopup.Listed(listOf("x"), false), SceneBehavior.of(listed).popup)
         val group = node("<key id=\"g\" label=\"AB\" letters=\"ab\" send=\"x\"><popup from=\"group\"/></key>")
         assertEquals(LongPopup.Letters("ab"), SceneBehavior.of(group).popup)
-        // a send= written is the tap, letters or not
         assertEquals(SceneAction.Key("x"), SceneBehavior.of(group).press)
     }
 
-    // 大千 (060-render-p2 S4c): a symbol's and a tone's tap the keyboard's table's, no long press, the
-    // bubble its face (AltPreview(c, ""), the corner a named key's resolver's): swiped, the shortcut it reaches shows in its place
+    // 大千: a symbol's and a tone's tap from the table, no long press, the bubble its face; swiped, the shortcut shows
     @Test
     fun dachensKeysTypeByTheTableAndTheirBubbleShowsTheShortcutSwipedTo() {
         val k = keys("zhuyin").mapValues { SceneBehavior.of(it.value) }
@@ -144,8 +140,7 @@ class SceneBehaviorTest {
         assertEquals("zyfull/q", q.shortcut)
         assertEquals(mapOf("3" to "tone-3", "4" to "tone-4", "6" to "tone-2", "7" to "tone-5"), listOf("3", "4", "6", "7").associateWith { (k.getValue(it).press as SceneAction.Placeholder).name })
         assertEquals(Bubble("ˇ", ""), k.getValue("3").bubble)
-        // a letter of no shortcut its face alone, or with its swipe-up='s corner; a named key's corner empty
-        // whatever its layout's swipe-up= (its resolver shows its swipe)
+        // a letter of no shortcut its face alone, or with its swipe-up= corner; a named key's corner empty
         assertEquals(Bubble("A", null), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\"/>")).bubble)
         assertEquals(Bubble("A", "!"), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\"/>")).bubble)
         assertEquals(Bubble("A", ""), SceneBehavior.of(node("<key id=\"a\" label=\"A\" send=\"a\" swipe-up=\"!\" shortcut=\"x/a\"/>")).bubble)
@@ -153,10 +148,7 @@ class SceneBehaviorTest {
         assertEquals(Bubble(",", ""), k.getValue("comma").bubble)
     }
 
-    // 注音九键 (060-render-p2 S4d) as its views: a group types by the table, its bubble its face both ways, its
-    // long press the app's (from="group", no letters=); the tones and ? ! ~ show their bubble though function
-    // keys (preview="on"), ? ! ~ offering their presets (SymbolKey's); the slot none though a letter key (preview="off").
-    // Each named (060-keys-unify D2): ˉ's ˙ its long press's first, swiped as the resolver has it; the slot is ，'s (§5.2)
+    // 注音九键: a group types by the table, its long press the app's; tones and ? ! ~ preview="on", the slot off
     @Test
     fun zhuyinNinesKeysBubbleAsTheirViews() {
         val k = keys("zhuyin-nine").mapValues { SceneBehavior.of(it.value) }
@@ -190,8 +182,7 @@ class SceneBehaviorTest {
         assertNull(SceneBehavior.of(node("<key id=\"a\" kind=\"function\" label=\"+\" send=\"+\"/>")).bubble)
     }
 
-    // <defaults preview="off"> a key's preview="on" overrides; what preview says decides the default preset too
-    // (060-render-p2 S4d M1, M2)
+    // <defaults preview="off"> a key's preview="on" overrides; preview decides the default preset too
     @Test
     fun aDefaultsPreviewOffAKeysOnOverrides() {
         val text = "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"grouped\" columns=\"10\">" +
@@ -237,8 +228,7 @@ class SceneBehaviorTest {
         assertEquals(Bubble(".com", null), url.getValue("domain").bubble)
     }
 
-    // 060-keys-unify §5: a function key's action long press by its name alone, on every keyboard that has it (the
-    // number pad's space and !?# too, the layouts writing none)
+    // a function key's long press by its name alone, on every keyboard that has it
     @Test
     fun aFunctionKeysLongPressIsItsNamesOnEveryKeyboard() {
         val want = mapOf(
@@ -258,12 +248,10 @@ class SceneBehaviorTest {
         // Shift's caps lock, on the keyboards that show it
         val shift = keys("qwerty").getValue("shift")
         assertEquals(SceneAction.of("caps:lock"), SceneBehavior.of(shift).longPress)
-        // a key of no such name: none
         assertNull(SceneBehavior.of(keys("qwerty").getValue("backspace")).longPress)
     }
 
-    // contract: a theme's layout that writes long-press= or swipe-up= on a function key changes nothing: it acts by
-    // its name alone, as on every other keyboard (docs/theme-format.md, 060-keys-unify §5); an unnamed key keeps its own
+    // a theme layout writing long-press= or swipe-up= on a function key changes nothing; an unnamed key keeps its own
     @Test
     fun aThemesLongPressAndSwipeOnAFunctionKeyAreIgnored() {
         val space = SceneBehavior.of(node("<key id=\"space\" kind=\"function\" send=\"sym:space\" shortcut=\"space\" long-press=\"ime-picker\" swipe-up=\"!\"/>"))
@@ -284,8 +272,7 @@ class SceneBehaviorTest {
         assertEquals(a, b)
     }
 
-    // 060-render-v2 §15: the built-in 14 and 18 keys' letters= are exactly G14's and G18's groups, in order,
-    // so their codes, wiring and learning record are as they were
+    // the built-in 14 and 18 keys' letters= are exactly G14's and G18's groups, in order
     @Test
     fun theBuiltInLayoutsGroupsAreTheEnginesG14AndG18() {
         val k14 = SceneGroups.of(layout("k14"), mapOf("grouped-bottom" to bottom))
@@ -295,18 +282,16 @@ class SceneBehaviorTest {
         val k18 = SceneGroups.of(layout("k18"), mapOf("grouped-bottom" to bottom))
         assertEquals(NineKeyLetters.G18, SceneGroups.letters(k18))
         assertNull(SceneGroups.mismatch(k18, NineKeyLetters.G18))
-        // the 14 keys' groups on the 18 keys' keyboard, or groups the engine has none of (a 17-key layout's: P3)
+        // the 14 keys' groups on the 18 keys' keyboard, or groups the engine has none of
         assertTrue(SceneGroups.mismatch(k14, NineKeyLetters.G18)!!.contains(NineKeyLetters.G14.tag()))
         val own = listOf("pqrs", "abc")
         assertNull(SceneGroups.letters(own))
         assertTrue(SceneGroups.mismatch(own, NineKeyLetters.G14)!!.contains("pqrs,abc"))
         assertNull(SceneGroups.letters(emptyList()))
-        // none on the full keyboard
         assertEquals(emptyList<String>(), SceneGroups.of(SceneData.qwerty))
     }
 
-    // 060-render-v2 §15 按落点加权: the 14 keys' two-letter groups lean, as they did (GroupedKeyboard.tapped);
-    // the 18 keys' too since 061-neighbour-18key (k18.xml had lean="off"); a group of one letter has nowhere to lean
+    // two-letter groups of the 14 and 18 keys lean; a one-letter group has nowhere to lean
     @Test
     fun theFourteenAndEighteenKeysTwoLetterGroupsLean() {
         val k14 = SceneGroups.leaning(layout("k14"), mapOf("grouped-bottom" to bottom))
@@ -317,14 +302,12 @@ class SceneBehaviorTest {
         val k18 = keys("k18").values.filter { it.letters != null }
         assertEquals(g18.size, k18.count { it.lean })
         assertTrue(k18.filter { !it.lean }.all { it.letters!!.group.length == 1 })
-        // the engine places the 14 keys' codes' taps (Keyboard.TAPS); G18's codes, 双拼's 18 keys', go as codes,
-        // pinyin's 18 keys' taps as codes of their own (Keyboard.pinyin18Tap, TAPS_18)
+        // the engine places the 14 keys' taps (Keyboard.TAPS); 双拼's 18 keys go as codes, pinyin's 18 as codes of their own
         assertTrue(NineKeyLetters.G14.tag().split(',').all { Keyboard.placesTaps(NineKeyLetters.G14.key(it[0])) })
         assertTrue(NineKeyLetters.G18.tag().split(',').none { Keyboard.placesTaps(NineKeyLetters.G18.key(it[0])) })
     }
 
-    // which groups lean on a keyboard: the views' as they always were (G14's two-letter groups, and G18's since
-    // 061-neighbour-18key); the scene's by its layout's lean=, its groups the keyboard's; a layout of other groups gone by, lean= and all
+    // the views' leaning as it always was; the scene's by its layout's lean=; a layout of other groups gone by
     @Test
     fun aKeyboardsLeaningGroupsAreItsLayoutsWhereTheSceneDrawsItAndItsGroupsAreTheKeyboards() {
         val twos = NineKeyLetters.G14.tag().split(',').filter { it.length >= 2 }.toSet()

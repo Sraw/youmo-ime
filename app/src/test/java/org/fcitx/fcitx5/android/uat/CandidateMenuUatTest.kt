@@ -60,11 +60,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import splitties.dimensions.dp
 
-/**
- * UAT cases of a candidate's long-press menu (uat/06): the menu the engine gives, worded and acted
- * on by the keyboard, the chip that says it with 撤销. Which rows the engine offers for a word, and
- * what blocking does to its candidates, are the engine's (its learning tests), not asserted here.
- */
+/** The menu the engine gives, worded and acted on by the keyboard; which rows it offers are the engine's tests'. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
@@ -73,7 +69,7 @@ class CandidateMenuUatTest {
     @get:Rule
     val prefs = PrefsRule()
 
-    // a var for the tables whose rows each want a keyboard of their own (anUndoThatFailedSaysWhatToDo)
+    // a var: some tables want a keyboard per row
     private var h = KeyboardHarness()
 
     @After
@@ -81,7 +77,6 @@ class CandidateMenuUatTest {
 
     private val ops = mutableListOf<LearningOp>()
 
-    // [undone]: what the chip's 撤销 answers; [saving]: what LearningOp.Saving answers
     private fun engine(
         menu: LearningResult.Menu,
         report: String = "",
@@ -111,7 +106,6 @@ class CandidateMenuUatTest {
     private val menu: ListPopupWindow?
         get() = h.inputView.candidateActionMenu
 
-    /** The open menu's lines, its title (the word) first. */
     private fun lines(): List<String> {
         val m = menu ?: error("no menu")
         return (0 until m.listView!!.adapter.count).map { m.listView!!.adapter.getItem(it).toString() }
@@ -131,7 +125,6 @@ class CandidateMenuUatTest {
         h.idle()
     }
 
-    // the chip saying what was done: a popup window over the keyboard
     private fun chip(): List<String>? = shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow
         ?.takeIf { it.isShowing }
         ?.let { w -> KeyboardHarness.all(w.contentView).filterIsInstance<TextView>().map { it.text.toString() }.toList() }
@@ -154,13 +147,12 @@ class CandidateMenuUatTest {
         longPress("是")
         assertEquals(listOf("是", s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
         pick(s(R.string.learning_block))
-        // the reach first: typing, handwriting, voice and predictions alike
         assertEquals(listOf("是", s(R.string.learning_block_everywhere, "是"), s(android.R.string.cancel), s(R.string.learning_block_confirm)), lines())
         pick(s(R.string.learning_block_confirm))
         assertTrue(ops.toString(), ops.any { "Block(index=0, text=是)" in it.toString() })
     }
 
-    // the rows the engine gives, worded: a word never picked has no 忘掉学到的, 删除 or 取消固定 (KeyboardHalvesUatTest's)
+    // a word never picked has no 忘掉学到的, 删除 or 取消固定
     @Test
     @Uat("PY-33")
     fun theMenuShowsTheRowsTheEngineGivesAndForgetOnceLearned() {
@@ -177,15 +169,11 @@ class CandidateMenuUatTest {
         assertEquals(listOf("试", s(R.string.learning_forget), s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
     }
 
-    // F8038: an undo the record could not take is said on the chip, neither "try again" nor a restart: the act is no
-    // longer undoable once its undo failed (R25r7). Whether the record saves is not asked (R25r8 F8057): the one
-    // sentence whatever it answers, so the failed row's record is one that stopped, where the restart would be said
-    // were it asked; an act no longer undoable says so
+    // an undo the record could not take: the act is no longer undoable, said in one sentence whatever the record answers
     @Test
     @Uat("WD-46")
     fun anUndoThatFailedSaysWhatToDo() {
-        // each row on a keyboard of its own: the chip an earlier row left is the latest popup otherwise; the chip's
-        // words and the ops its undo asked
+        // each row on a keyboard of its own: the chip an earlier row left is the latest popup otherwise
         fun saidAfterUndo(undone: LearningResult): Pair<List<String>, List<LearningOp>> {
             h.close()
             h = KeyboardHarness()
@@ -203,7 +191,6 @@ class CandidateMenuUatTest {
             "failed: not undone, neither a retry nor a restart promised, the record not asked whether it saves" to {
                 val (said, asked) = saidAfterUndo(LearningResult.Failed)
                 assertTrue(said.toString(), s(R.string.learning_undo_failed) in said)
-                // the chip says it with no 撤销 of its own: the act is not undone again (R25r9 F8071)
                 assertFalse(said.toString(), s(R.string.learning_undo) in said)
                 assertTrue(asked.toString(), asked.any { it is LearningOp.Undo } && LearningOp.Saving !in asked)
             },
@@ -232,14 +219,12 @@ class CandidateMenuUatTest {
         h.capture("CandidateMenuUatTest/blocked")
         undo()
         assertTrue(ops.toString(), ops.any { it == LearningOp.Undo(TOKEN) })
-        // again, not taken back: typing on puts the chip away at once
         longPress("是")
         pick(s(R.string.learning_block))
         pick(s(R.string.learning_block_confirm))
         val w = shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow!!
         assertTrue(w.isShowing)
         h.tap(h.key("a"))
-        // the engine tells of the a it was sent: typing
         val typed = org.fcitx.fcitx5.android.core.FormattedText(arrayOf("a"), intArrayOf(0), 1)
         val empty = org.fcitx.fcitx5.android.core.FormattedText.Empty
         h.emit(HostEvent.InputPanel(typed, empty, empty))
@@ -266,11 +251,9 @@ class CandidateMenuUatTest {
         pick(s(R.string.learning_why))
         assertEquals(s(R.string.learning_why_dictionary), lines()[1])
         pick(s(R.string.learning_copy_report))
-        // the engine's report, as it gave it, on the clipboard
         assertEquals("dl: 点了 2", h.service.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString())
     }
 
-    // a word's and a character's cards as the engine makes them (EnginesWordCardTest has them from the real data)
     private val hang = CharCard(
         "行",
         listOf(
@@ -288,7 +271,6 @@ class CandidateMenuUatTest {
     )
     private val wordCard = CandidateCard.Word("yín háng", yinhang)
 
-    /** The menu's head, the view in the box it is shown in: null where it has the title alone. */
     private fun head(): View? = (menu!!.listView!!.adapter.getView(0, null, menu!!.listView!!) as? FrameLayout)?.getChildAt(0)
 
     private fun TextView.isLabel(label: String) = text.toString() == label
@@ -307,7 +289,6 @@ class CandidateMenuUatTest {
         measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
     }
 
-    // a prediction's menu: its reading line over 不再联想 and 屏蔽, as they were
     @Test
     @Uat("PY-129")
     fun aPredictionHasItsReadingLineOverItsLines() {
@@ -322,7 +303,7 @@ class CandidateMenuUatTest {
         assertTrue(ops.toString(), ops.any { ((it as? LearningOp.OnPage)?.op ?: it) is LearningOp.NoPredict })
     }
 
-    // a character's card asked for, another candidate held before it came: that menu stays, the first one closed
+    // another candidate held before the card came: that menu stays, the first one closed
     @Test
     @Uat("PY-124")
     fun aCharactersCardThatComesAfterAnotherMenuIsUpIsLeft() {
@@ -349,12 +330,10 @@ class CandidateMenuUatTest {
         assertEquals("因为", lines().first())
     }
 
-    // the head's node as TalkBack has it
     private fun View.node(): AccessibilityNodeInfo = createAccessibilityNodeInfo()
 
     private fun AccessibilityNodeInfo.clickLabel() = actionList.firstOrNull { it.id == AccessibilityNodeInfo.ACTION_CLICK }?.label?.toString()
 
-    // in Chinese, as the user reviews the image
     @Config(qualifiers = "zh-rCN-w393dp-h851dp-port-440dpi")
     @Test
     @Uat("PY-124")
@@ -366,12 +345,10 @@ class CandidateMenuUatTest {
         candidates("银行", "因为")
         longPress("银行")
         val learning = listOf(s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why))
-        // the same lines in the same places, the head over them
         assertEquals(listOf("银行") + learning, lines())
         val line = head() as CompactLineView
         assertEquals("银行　yín háng", line.shown.text.toString())
         assertEquals(null, line.wrapped)
-        // in portrait the platform's scrollbar, fading
         assertTrue(menu!!.listView!!.isScrollbarFadingEnabled)
         h.relayout()
         h.capture("CandidateMenuUatTest/reading_line", menu!!.listView!!.rootView)
@@ -388,7 +365,6 @@ class CandidateMenuUatTest {
         assertTrue(card.rows.all { it.measuredHeight >= minRow() })
         h.relayout()
         h.capture("CandidateMenuUatTest/word_card_port", menu!!.listView!!.rootView)
-        // 行: its card, háng the word's reading first, 复制 it alone and the way back
         check(card.rows[1].performClick())
         h.idle()
         assertEquals(listOf("行" to WordCard.readingOf("háng", "ㄏㄤˊ")), h.api.charCardsAsked)
@@ -400,18 +376,15 @@ class CandidateMenuUatTest {
         assertEquals(listOf("银行") + learning, lines())
         h.relayout()
         h.capture("CandidateMenuUatTest/char_of_word", menu!!.listView!!.rootView)
-        // back: the word's card again
         tapIn(char, "‹ 银行　yín háng")
         assertTrue(head() is WordCardView)
-        // 上屏: as the candidate tapped
         h.api.calls.clear()
         tapIn(head()!!, s(R.string.quick_phrase_commit))
         assertTrue(h.api.calls.toString(), "select(0, 银行)" in h.api.calls)
         assertEquals(null, menu)
     }
 
-    // a word's character and the way back change the card in the same window: not shown anew, not grown again
-    // from the candidate (it went blank for two frames and slid in again on every tap), as wide as before
+    // in the same window, not shown anew: it went blank for two frames and slid in again on every tap
     @Test
     @Uat("PY-144")
     fun aCharacterOfTheWordAndBackStayInTheSameWindow() {
@@ -425,7 +398,6 @@ class CandidateMenuUatTest {
         assertEquals(1, h.inputView.menuGrown)
         check((head() as CompactLineView).performClick())
         h.idle()
-        // the line opened: a wider window, grown from the candidate as the menu first was
         assertEquals(2, h.inputView.menuGrown)
         val decor = m.listView!!.rootView
         val width = m.width
@@ -440,7 +412,7 @@ class CandidateMenuUatTest {
         assertEquals(1f, decor.alpha)
         assertEquals(1f, decor.scaleX)
         assertEquals(1f, decor.scaleY)
-        // its top moved with the card's height: put there, not slid by the system (which showed the new height at the old top)
+        // put there, not slid by the system (which showed the new height at the old top)
         assertTrue(notSlid(decor))
         tapIn(head()!!, "‹ 银行　yín háng")
         assertTrue(head() is WordCardView)
@@ -452,14 +424,13 @@ class CandidateMenuUatTest {
         assertTrue(notSlid(decor))
     }
 
-    // the window's move animation off: API 34's switch, before it the private flag (0x40) it stands for
+    // API 34's switch, before it the private flag (0x40) it stands for
     private fun notSlid(decor: View): Boolean {
         val params = decor.layoutParams as WindowManager.LayoutParams
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return !params.canPlayMoveAnimation()
         return WindowManager.LayoutParams::class.java.getField("privateFlags").getInt(params) and 0x40 != 0
     }
 
-    // 复制 puts the word, or a character of it, on the clipboard, nothing typed
     @Test
     @Uat("PY-124")
     fun copyFromAWordCardAndFromItsCharacter() {
@@ -509,7 +480,6 @@ class CandidateMenuUatTest {
         assertEquals(listOf("行", s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
     }
 
-    // no card from the engine (an emoji, English, a quick input entry: Q8): the title as before
     @Test
     @Uat("PY-128", "EN-29")
     fun noReadingLineWhereTheEngineHasNoCard() {
@@ -521,7 +491,6 @@ class CandidateMenuUatTest {
         assertEquals(listOf("hello", s(R.string.learning_block), s(R.string.learning_pin), s(R.string.learning_why)), lines())
         menu!!.dismiss()
         h.idle()
-        // a quick input entry: its own lines, the card not asked for
         h.api.candidateCards["银行"] = wordCard
         h.api.quickPhrases[0] = QuickPhraseBook.Found("yh", "银行", mine = true)
         candidates("银行")
@@ -543,7 +512,6 @@ class CandidateMenuUatTest {
         assertEquals("wǒ men jīn tiān xià wǔ qù yín háng bàn shì", line.wrapped!!.text.toString())
         assertFalse(line.isClickable)
         assertFalse(line.node().isClickable)
-        // a stop for TalkBack of its own, read whole
         assertTrue(line.node().isFocusable)
         assertEquals("$long，${s(R.string.char_card_readings)} wǒ men jīn tiān xià wǔ qù yín háng bàn shì", line.node().contentDescription.toString())
         assertFalse(KeyboardHarness.all(line).filterIsInstance<TextView>().any { it.text.toString() == "›" })
@@ -577,7 +545,6 @@ class CandidateMenuUatTest {
         h.idle()
         h.relayout()
         val card = head() as WordCardView
-        // the new content's first node
         assertEquals(card.head, h.inputView.cardFocused)
         assertEquals("银行，${s(R.string.char_card_readings)} yín háng", card.head.contentDescription.toString())
         val row = card.rows[1].node()
@@ -593,14 +560,12 @@ class CandidateMenuUatTest {
         assertEquals(s(R.string.card_back, "银行"), back.node().clickLabel())
         back.measured()
         assertTrue(back.measuredHeight >= minRow())
-        // the buttons each a node of their own
         val copy = KeyboardHarness.all(head()!!).filterIsInstance<TextView>().single { it.isLabel(s(R.string.card_copy_char, "行")) }
         assertTrue(copy.node().isClickable && copy.measured().measuredHeight >= minRow())
         check(back.performClick())
         h.idle()
         h.relayout()
         assertEquals((head() as WordCardView).head, h.inputView.cardFocused)
-        // closed, the menu's views are not held on to
         menu!!.dismiss()
         h.idle()
         assertEquals(null, h.inputView.cardFocused)
@@ -616,17 +581,14 @@ class CandidateMenuUatTest {
         h.start()
         candidates("银行", "因为")
         longPress("银行")
-        // a line: as wide as it needs, one column
         check(head()!!.performClick())
         h.idle()
         val card = head() as WordCardView
         assertEquals(LinearLayout.HORIZONTAL, card.orientation)
         h.relayout()
-        // over the docked keyboard the menu has some 190 dp, the card 212 (today's character card 161): the lines
-        // are there, scrolled to (061-word-card-impl-report.md)
+        // over the docked keyboard the menu has some 190 dp, the card 212: the lines are there, scrolled to
         val list = menu!!.listView!!
         assertTrue("${card.height} in ${list.height}", list.canScrollVertically(1))
-        // its scrollbar not fading: the lines are down there (the user, 2026-11-14, A)
         assertFalse(list.isScrollbarFadingEnabled)
         assertEquals(4, list.adapter.count)
         h.capture("CandidateMenuUatTest/word_card_land", list.rootView)
@@ -635,7 +597,6 @@ class CandidateMenuUatTest {
         assertEquals(LinearLayout.HORIZONTAL, (head() as CharCardView).orientation)
     }
 
-    // a menu of no card in landscape: its lines alone, the scrollbar fading as before
     @Test
     @Uat("LS-32")
     @Config(qualifiers = "zh-rCN-w851dp-h393dp-land-440dpi")
@@ -648,7 +609,6 @@ class CandidateMenuUatTest {
         assertTrue(menu!!.listView!!.isScrollbarFadingEnabled)
     }
 
-    // from the expanded grid: the same line and card (the grid's index the list's, as the bar's)
     @Test
     @Uat("PY-124")
     fun theSameFromTheExpandedGrid() {
@@ -657,7 +617,6 @@ class CandidateMenuUatTest {
         h.start()
         candidates(*(listOf("因为") + List(14) { "字$it" } + "银行").toTypedArray())
         h.tap(h.described(s(R.string.expand_candidates_list)))
-        // in the grid, past what the bar showed
         assertTrue(h.texts(h.inputView).toString(), "银行" in h.texts(h.inputView))
         longPress("银行")
         val line = head() as CompactLineView
@@ -667,7 +626,6 @@ class CandidateMenuUatTest {
         assertEquals(yinhang, (head() as WordCardView).card)
     }
 
-    // floating, in landscape: one column, as upright
     @Test
     @Uat("LS-32")
     @Config(qualifiers = "w851dp-h393dp-land-440dpi")
@@ -714,7 +672,6 @@ class CandidateMenuUatTest {
         assertEquals(before, field())
     }
 
-    // a field that learns nothing: the card alone, no lines (Q4)
     @Test
     @Uat("PR-54")
     fun aFieldThatLearnsNothingHasTheCardAndNoLines() {

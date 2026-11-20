@@ -11,12 +11,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * The session's code in the field (编码行 输入框里, [EditingSession.Kind.CODE]; dev/design/061-code-in-field.md
- * §4.3, §6.3, §6.4): what is written, checked, taken away and let go of, against a [FakeEditor] whose app
- * edits, rewrites and selects on its own. The rule over all of it (§0): nothing the keyboard cannot
- * prove it wrote is deleted or replaced.
- */
+/** The code in the field against a [FakeEditor] that edits on its own: nothing the keyboard cannot prove it wrote is deleted or replaced. */
 class EditingSessionCodeTest {
 
     private class Rig(text: String = "", cursor: Int = text.length) {
@@ -30,11 +25,11 @@ class EditingSessionCodeTest {
 
         fun write(text: String, cursor: Int = -1) = s.writeCode(FormattedText(arrayOf(text), intArrayOf(0), cursor))
 
-        /** The editor's report of where it is now, as onUpdateSelection brings it. */
-        fun report(ignoreSystemCursor: Boolean = false) =
-            s.onCursorUpdate(e.selectionStart, e.selectionEnd, e.composingStart, e.composingEnd, ignoreSystemCursor)
+        /** As onUpdateSelection brings it. */
+        fun report() =
+            s.onCursorUpdate(e.selectionStart, e.selectionEnd, e.composingStart, e.composingEnd)
 
-        /** Each code written, the editor reporting it, as keys typed at a pace the editor keeps up with. */
+        /** Each written and reported, as keys at a pace the editor keeps up with. */
         fun type(vararg codes: String) = codes.forEach {
             write(it)
             report()
@@ -131,10 +126,9 @@ class EditingSessionCodeTest {
         val upper = Rig("").apply { e.rewriter = { it.uppercase() } }.also { it.write("n") }.let { it to it.report() }
         val dropped = Rig("AB").also { it.write("n"); it.e.appDropSpan() }.let { it to it.report() }
         val droppedLater = Rig("AB").apply { type("n", "ni") }.also { it.e.appDropSpan() }.let { it to it.report() }
-        // §4.3's first residual assumption: the span dropped between a report and the next write
+        // the span dropped between a report and the next write
         val unreportedDrop = Rig("AB").apply { type("n", "ni") }.also { it.e.appDropSpan(); it.write("ni h") }.let { it to it.report() }
-        // the editor cut it short: its cursor and span as they were, so no report (one that came would be
-        // the last one again, taken for an older write's); the next key's write reads first
+        // the editor cut it short, so no report (one would be the last again); the next key's write reads first
         val cut = Rig("").apply { e.rewriter = { t -> t.take(3) }; type("n", "ni", "ni ") }
             .also { it.write("ni h") }.let { it to it.report() to it.write("ni ha") }
         assertRows(
@@ -161,18 +155,17 @@ class EditingSessionCodeTest {
     fun `a report behind the latest write judges nothing`() {
         // each: written, a report one key behind (the first letter's), then the latest's, then left
         val behind = Rig("AB").apply { write("n"); write("ni") }
-        val behindReport = behind.s.onCursorUpdate(3, 3, 2, 3, false)
+        val behindReport = behind.s.onCursorUpdate(3, 3, 2, 3)
         val behindIn = behind.s.codeInField
         behind.report()
         behind.s.leaveComposition()
-        // 五笔 before the app's own text alike to the code: a report sized by the first letter's span took
-        // the app's g after the cursor for the code's end
+        // 五笔 before app text alike to the code: a report sized by the first letter's span took the app's g for the code's end
         val wubi = Rig("ABgo", cursor = 2).apply { write("g"); write("gg") }
-        wubi.s.onCursorUpdate(3, 3, 2, 3, false)
+        wubi.s.onCursorUpdate(3, 3, 2, 3)
         val wubiIn = wubi.s.codeInField
         wubi.s.leaveComposition()
         val english = Rig("see a book", cursor = 4).apply { write("a"); write("a a") }
-        english.s.onCursorUpdate(5, 5, 4, 5, false)
+        english.s.onCursorUpdate(5, 5, 4, 5)
         val englishIn = english.s.codeInField
         english.s.leaveComposition()
         assertRows(
@@ -193,7 +186,7 @@ class EditingSessionCodeTest {
     fun `a report is the latest write's only by the span that write left`() {
         // the cursor in the code, the code longer after it: two writes, the cursor the same for both
         val longer = Rig("AB").apply { type("n", "ni"); write("ni", cursor = 1); write("nia", cursor = 1) }
-        val older = longer.s.onCursorUpdate(3, 3, 2, 4, false)
+        val older = longer.s.onCursorUpdate(3, 3, 2, 4)
         val olderIn = longer.s.codeInField
         val latest = longer.report()
         // a slow app: each report a key behind, six keys
@@ -202,7 +195,7 @@ class EditingSessionCodeTest {
             write(codes[0])
             codes.zipWithNext { last, next ->
                 write(next)
-                s.onCursorUpdate(2 + last.length, 2 + last.length, 2, 2 + last.length, false)
+                s.onCursorUpdate(2 + last.length, 2 + last.length, 2, 2 + last.length)
             }
             report()
         }
@@ -263,7 +256,7 @@ class EditingSessionCodeTest {
             type("n", "ni")
             e.appSelect(0)
             e.appReplace(0, 0, "X")
-        }.let { it to it.s.onCursorUpdate(0, 0, 2, 4, false) }
+        }.let { it to it.s.onCursorUpdate(0, 0, 2, 4) }
         assertRows(
             "a tap inside it with no span reported: let go of, not moved into (the next write would add a copy)" to {
                 assertEquals("ABni h", insideNoSpan.first.e.text); assertFalse(insideNoSpan.first.s.codeInField)
@@ -406,8 +399,7 @@ class EditingSessionCodeTest {
             "a Backspace the engine passed on with a stale code: taken away, proven, before it deletes" to {
                 val leave = backspace.e.calls.indexOf("deleteSurroundingText(2, 0, inCodePoints=false)")
                 assertTrue(backspace.e.calls.toString(), leave >= 0 && backspace.e.calls[leave - 1] == "finishComposingText()")
-                // R26 F8122: the code alone gone; the deletion is the caller's key event (no direct deletion here), so
-                // the app's B is still there: a session that deleted it as well is the §0 regression
+                // the code alone gone; the deletion is the caller's key event, so the app's B stays
                 assertEquals("AB", backspace.e.text)
                 assertFalse(deletedHere)
             },

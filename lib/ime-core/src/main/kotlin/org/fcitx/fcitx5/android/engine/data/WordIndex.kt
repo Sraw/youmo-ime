@@ -4,12 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.data
 
-/**
- * Text to word id, for the words of [vocabulary] below [size] (the model's): what the file
- * keeps is id to text only, since typing goes by readings. An open-addressing table of ids,
- * made when first asked for (2 MiB and some tens of milliseconds for the model's 270 000 words),
- * hashing the vocabulary's chars where they lie rather than making strings of them.
- */
+/** Text to word id for the model's words: open addressing built on first use, hashing the vocabulary's chars in place. */
 class WordIndex(private val vocabulary: Vocabulary, private val size: Int) {
 
     // id + 1 of the word hashed there, 0 for none; at most two thirds full
@@ -22,7 +17,7 @@ class WordIndex(private val vocabulary: Vocabulary, private val size: Int) {
             val length = vocabulary.length(id)
             var slot = hash(length) { vocabulary.char(id, it) }
             while (slots[slot] != 0) {
-                // a word twice keeps its first id, as the model's lower id is its likelier
+                // a duplicate word keeps its first id, the model's likelier
                 if (same(slots[slot] - 1, length) { vocabulary.char(id, it) }) break
                 slot = (slot + 1) and mask
             }
@@ -30,7 +25,7 @@ class WordIndex(private val vocabulary: Vocabulary, private val size: Int) {
         }
     }
 
-    /** The id of [text]'s chars from [from] to [to], or [NgramModel.NO_WORD]. */
+    /** Or [NgramModel.NO_WORD]. */
     fun find(text: CharSequence, from: Int = 0, to: Int = text.length): Int {
         val length = to - from
         var slot = hash(length) { text[from + it] }
@@ -51,8 +46,7 @@ class WordIndex(private val vocabulary: Vocabulary, private val size: Int) {
     private inline fun hash(length: Int, char: (Int) -> Char): Int {
         var h = length
         for (i in 0 until length) h = h * HASH_MULTIPLIER + char(i).code
-        // the high bits of a Fibonacci hash pick the slot: CJK chars are consecutive code points,
-        // and the low bits of h alone put words in runs that linear probing makes longer
+        // high bits of a Fibonacci hash: CJK code points are consecutive, so low bits alone make runs
         return (h * GOLDEN) ushr shift
     }
 

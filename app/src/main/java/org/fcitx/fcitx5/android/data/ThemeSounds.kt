@@ -19,56 +19,44 @@ import timber.log.Timber
 import java.io.File
 
 /**
- * The selected theme's key sounds (060-theme-sounds-icons §1.4), played by a [SoundPool] on its own
- * thread ([handler]'s): Android 10's `SoundPool.play` runs on its caller and, a channel taking another
- * sample, makes an AudioTrack there (a binder call), where the system's click (`playSoundEffect`) is a
- * oneway call. The pool is made, loaded, called back (its listener runs on the looper it was made on)
- * and played on that thread alone; the main thread reads [loaded] and posts.
- *
- * A pool is made anew for every change of what is wanted ([use]: another theme, the same one imported
- * again, the settings asking for none); a load finished for a pool no longer the current one is dropped.
- * Each file is held to [SoundFile] again before it is loaded: a pack restored from a backup was never
- * imported. One that fails, or has not loaded yet, is not in [loaded]: its class plays the system's click.
+ * Played by a [SoundPool] on [handler]'s thread: Android 10's `SoundPool.play` runs on its caller and may create an
+ * AudioTrack there (a binder call). The pool is made, loaded and played on that thread alone; the main thread reads
+ * [loaded] and posts. A new pool per [use] change; a load for an outdated pool is dropped. Each file is rechecked by
+ * [SoundFile] (a restored pack was never imported); one not loaded plays the system click.
  */
 class ThemeSounds(private val handler: Handler) {
 
-    /** What [use] was last asked for: the theme's identity, its files' paths by class (null: none wanted). */
+    /** The theme's identity and its files by class; null: none wanted. */
     private var wanted: Pair<Any, Map<SoundKey, String>>? = null
 
-    /** The classes the theme wanted gives (main thread). */
+    /** Main thread. */
     var given: Set<SoundKey> = emptySet()
         private set
 
-    // the asks of [use] and [release], one more each (main thread): a pool built for an earlier ask is not
-    // the one wanted now
+    // counted per [use]/[release] (main thread): a pool built for an earlier ask is not the one wanted now
     @Volatile
     private var asked = 0
 
-    /** The samples ready to play in the pool built for the ask [asked]: written whole on the sound thread alone. */
+    /** Written whole on the sound thread alone. */
     private class Ready(val asked: Int, val ids: Map<SoundKey, Int>)
 
-    // read once by each reader: what it reads of the ask and its samples is one pool's
+    // read once by each reader: what it reads is one pool's
     @Volatile
     private var ready = Ready(0, emptyMap())
 
     // the sound thread's alone
     private var pool: SoundPool? = null
 
-    /** The pool now (the tests'). */
     @VisibleForTesting
     internal val currentPool: SoundPool? get() = pool
     private val pending = HashMap<Int, SoundKey>()
 
-    /** The classes ready to play now. */
     val loaded: Set<SoundKey> get() = current()?.ids?.keys.orEmpty()
 
-    // the samples of the pool built for the ask now, null where its rebuild has not run yet
+    // null where the rebuild for the current ask has not run yet
     private fun current(): Ready? = ready.takeIf { it.asked == asked }
 
-    /**
-     * Wants the sounds [files] of the theme [identity] (a theme's file and its stamp: one imported again is
-     * another), null none; the same as before changes nothing.
-     */
+    /** [identity]: a theme's file and stamp, so a reimport differs; null none. The same as before changes nothing. */
     fun use(identity: Any?, files: () -> Map<SoundKey, String>) {
         val now = wanted
         if (identity == null) {
@@ -82,7 +70,7 @@ class ThemeSounds(private val handler: Handler) {
         ask(sounds)
     }
 
-    /** Plays [key]'s sample at [volume] on the sound thread; false where it is not loaded (the caller plays the system's). */
+    /** False where not loaded (the caller plays the system's). */
     fun play(key: SoundKey, volume: Float): Boolean {
         val of = current() ?: return false
         val id = of.ids[key] ?: return false
@@ -99,7 +87,7 @@ class ThemeSounds(private val handler: Handler) {
         return true
     }
 
-    /** No pool held (the service destroyed): the next [use] makes one again. */
+    /** The service destroyed: the next [use] makes one again. */
     fun release() = drop()
 
     private fun drop() {
@@ -108,7 +96,7 @@ class ThemeSounds(private val handler: Handler) {
         ask(emptyMap())
     }
 
-    // a pool anew for [sounds]: until it is built nothing is [loaded]
+    // nothing is [loaded] until it is built
     private fun ask(sounds: Map<SoundKey, String>) {
         val n = ++asked
         handler.post { rebuild(n, sounds) }
@@ -130,7 +118,7 @@ class ThemeSounds(private val handler: Handler) {
             )
             .build()
         pool = p
-        // run on this thread: the pool was made on its looper
+        // runs on this thread: the pool was made on its looper
         p.setOnLoadCompleteListener { from, id, status ->
             if (from !== pool) return@setOnLoadCompleteListener
             val key = pending.remove(id) ?: return@setOnLoadCompleteListener
@@ -143,13 +131,13 @@ class ThemeSounds(private val handler: Handler) {
         }
     }
 
-    // the file there, no longer than a sound may be (compared before it is read), and a sound
+    // present, within a sound's size limit (checked before reading), and a sound
     private fun checked(path: String): Boolean {
         val f = File(path)
         val problem = when {
             !f.isFile -> "missing"
             f.length() > SoundFile.MAX_BYTES -> "over ${SoundFile.MAX_BYTES} bytes"
-            // gone or replaced since it was looked at (the theme deleted or imported again): unreadable, not a crash
+            // gone or replaced since (theme deleted or reimported): unreadable, not a crash
             else -> runCatching { f.readBytes() }.fold(
                 { SoundFile.check(f.name, it).firstOrNull()?.message },
                 { "unreadable: ${it.message}" },
@@ -162,16 +150,13 @@ class ThemeSounds(private val handler: Handler) {
     companion object {
         private const val MAX_STREAMS = 4
 
-        /** The app's: its thread lives as long as the process. */
+        /** Its thread lives as long as the process. */
         val shared: ThemeSounds by lazy {
             val thread = HandlerThread("theme-sounds").apply { start() }
             ThemeSounds(Handler(thread.looper))
         }
 
-        /**
-         * [shared] made to want the selected theme's sounds where 按键音 plays and 按键音音色 follows the
-         * theme ([wanted]), none otherwise. Cheap where nothing changed: called with each press.
-         */
+        /** Wants the selected theme's sounds where 按键音音色 follows the theme; cheap when unchanged, called per press. */
         fun sync(wanted: Boolean) {
             val pack = (ThemeManager.activeTheme as? Theme.Pack)?.takeIf { wanted }
             shared.use(pack?.let { Triple(it.file, it.dir, it.stamp) }) {

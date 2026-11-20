@@ -12,11 +12,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.ui.main.settings.HostPreferenceFragment
 import org.fcitx.fcitx5.android.utils.navigateWithAnim
 
-/**
- * What every input method shares ([InputMethodSettings.SHARED]), over pinyin's config: the addon
- * keeps one value of each, which pinyin's page reads and writes as any other's would, and pinyin's
- * has them all; pinyin need not be among the input methods turned on.
- */
+/** Over pinyin's config: the addon keeps one value of each; pinyin need not be among the input methods turned on. */
 class SharedInputFragment : HostPreferenceFragment() {
 
     override fun getPageTitle(): String = getString(R.string.shared_input)
@@ -32,7 +28,7 @@ class SharedInputFragment : HostPreferenceFragment() {
     }
 
     override fun onStop() {
-        // glide typing and the pairs are the keyboard's: before the first unlock it reads them from device-protected storage
+        // before the first unlock the keyboard reads them from device-protected storage
         AppPrefs.getInstance().syncToDeviceEncryptedStorage()
         super.onStop()
     }

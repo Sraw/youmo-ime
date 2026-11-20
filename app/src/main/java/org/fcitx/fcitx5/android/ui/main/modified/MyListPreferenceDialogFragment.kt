@@ -19,8 +19,7 @@ class MyListPreferenceDialogFragment : ListPreferenceDialogFragmentCompat() {
     override fun onPrepareDialogBuilder(builder: AlertDialog.Builder) {
         val p = preference as ListPreference
         val taken = (p as? ManagedPreferenceUi.TakenEntry)?.takeIf { it.takenIndex >= 0 }
-        // with no default (an input method's own lists have none) the button would only close the dialog;
-        // none either where the default is the place another list holds
+        // with no default the button would only close the dialog; none either where the default is another list's place
         if (p.hasDefault() && (taken == null || p.findIndexOfValue(p.defaultValue()) != taken.takenIndex)) {
             builder.setNeutralButton(R.string.default_) { _, _ ->
                 p.restore()
@@ -30,7 +29,6 @@ class MyListPreferenceDialogFragment : ListPreferenceDialogFragmentCompat() {
         if (taken != null) takenGreyedOut(builder, p, taken)
     }
 
-    // the place another list holds offered greyed out, not picked, and said whose it is
     private fun takenGreyedOut(builder: AlertDialog.Builder, p: ListPreference, taken: ManagedPreferenceUi.TakenEntry) {
         val ctx = builder.context
         val at = taken.takenIndex

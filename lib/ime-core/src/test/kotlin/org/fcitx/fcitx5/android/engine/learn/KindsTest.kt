@@ -47,8 +47,7 @@ class KindsTest {
         assertNull(Kinds.keysTag("spk:Ziranma"))
     }
 
-    // what a learned code's keys are shown by (LearningOps' report, the learned list): a qk: kind filed as its keyboard is, a
-    // layout's own too (060-render-p3 T9b), an spk: kind by the grouped keyboards alone; the built-in two as they were
+    // a qk: kind is shown as its keyboard, an spk: kind by the grouped keyboards alone
     @Test
     fun keysOfIsTheKeyboardEachGroupedKindWasTypedOn() {
         assertEquals(NineKeyLetters.G14, Kinds.keysOf(Kinds.keys(NineKeyLetters.G14.tag())))
@@ -97,7 +96,6 @@ class KindsTest {
         val xiaohe = Kinds.takeLayout(Kinds.shuangpinKeys("Xiaohe", g18.tag()), g18.tag())
         assertEquals("Ziranma:" + g18.tag(), ziranma)
         assertNotEquals(ziranma, xiaohe)
-        // the nine keys' and the 14 keys' as before: their tag
         val standard = NineKeyLetters.STANDARD.tag()
         assertEquals(standard, Kinds.takeLayout(Kinds.nineKeys(standard), standard))
         assertEquals(NineKeyLetters.G14.tag(), Kinds.takeLayout(Kinds.keys(NineKeyLetters.G14.tag()), NineKeyLetters.G14.tag()))

@@ -9,10 +9,7 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeListAdapter
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemeThumbnailUi
 
-/**
- * The theme [name] tapped on the theme page's [list] as a user taps it: its card under the 新增 row, a
- * built-in theme's other version shown first switched to with the card's 浅/深 (060-render-p3 T3).
- */
+/** As a user taps it: a built-in theme's other version shown first switched to with the card's 浅/深. */
 internal fun pickTheme(list: RecyclerView, name: String, idle: () -> Unit) {
     val adapter = list.adapter as ThemeListAdapter
     val file = name.substringBefore('#')

@@ -32,7 +32,6 @@ class FloatingCornersTest {
         val bounds = Rect()
         assertTrue(outline(view).getRect(bounds))
         assertEquals(Rect(0, 0, 600, 400), bounds)
-        // turned, or the corners switched off: read again, square too
         radius = 0f
         view.layout(0, 0, 400, 600)
         assertEquals(0f, outline(view).radius, 0f)

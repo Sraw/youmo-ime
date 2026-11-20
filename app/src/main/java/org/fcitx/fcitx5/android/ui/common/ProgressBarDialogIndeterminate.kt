@@ -71,10 +71,7 @@ fun LifecycleCoroutineScope.withLoadingDialog(
     }
 }
 
-/**
- * Runs [action], showing what [show] makes once it has taken [threshold] ms, and [dismiss]es it
- * however [action] ends: thrown or cancelled too, as a non-cancelable dialog left up blocks the page.
- */
+/** [dismiss]es however [action] ends, as a non-cancelable dialog left up blocks the page. */
 internal suspend fun <D : Any> withLoading(
     threshold: Long,
     show: () -> D,

@@ -20,7 +20,6 @@ class EmojiDataTest {
         assertEquals(groups, data.groups)
         assertEquals(listOf("😃", "😄"), data.of("哈哈"))
         assertEquals(listOf("😴"), data.of("晚安"))
-        // a word with none is not written
         assertEquals(2, data.size)
         assertEquals(emptyList<String>(), data.of("空"))
         assertEquals(emptyList<String>(), data.of("没有"))
@@ -40,7 +39,6 @@ class EmojiDataTest {
     private val searched = EmojiData.read(
         EmojiData.format(
             emptyList(),
-            // in the order of their use, as the tool writes them
             linkedMapOf("笑" to listOf("😄"), "笑脸" to listOf("😃", "😄"), "笑哭" to listOf("😂"), "点赞" to listOf("👍"), "小" to listOf("🤏"), "无读音" to listOf("❓")),
             pinyin = mapOf("笑" to "xiao", "笑脸" to "xiao lian", "笑哭" to "xiao ku", "点赞" to "dian zan", "小" to "xiao", "无读音" to null),
         ),
@@ -50,15 +48,12 @@ class EmojiDataTest {
     fun aSearchFindsWordsTypedInFullThenTheirStartThenEachSyllablesStart() {
         // in full first, fewer syllables first, then as written; then the words xiao starts, each emoji once
         assertEquals(listOf("😄", "🤏", "😃", "😂"), searched.search("xiao"))
-        // the last syllable in part: the start of 笑脸
         assertEquals(listOf("😃", "😄"), searched.search("xiaol"))
         assertEquals(listOf("😃", "😄"), searched.search("XiaoLian"))
-        // each syllable by its start
         assertEquals(listOf("👍"), searched.search("dz"))
         assertEquals(listOf("👍"), searched.search("d'zan"))
         assertEquals(listOf("👍"), searched.search("dianz"))
         assertEquals(listOf("😄", "🤏"), searched.search("xiao", limit = 2))
-        // past a word, or no letter: none
         assertEquals(emptyList<String>(), searched.search("dianzana"))
         assertEquals(emptyList<String>(), searched.search("zan"))
         assertEquals(emptyList<String>(), searched.search("12"))
@@ -77,7 +72,6 @@ class EmojiDataTest {
         )
         // xiao in full and the start of lian, against xia, the start of ou and of li
         assertEquals(listOf("😃", "🌞"), data.search("xiaol"))
-        // half a syllable, then a whole one: each by its start
         assertEquals(listOf("😃"), data.search("xlian"))
     }
 

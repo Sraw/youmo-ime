@@ -12,41 +12,29 @@ import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 
 /**
- * An input method's keyboards in one: the screen's grouped keys, whose codes ([keyedOf]: pinyin's
- * 14, 18 and nine keys; 双拼's 18, 14 and nine keys, a session each) and syllables picked
- * ([Keyboard.SYLLABLES]) go to a session of their own, made at the first of them; and the full
- * keyboard's, [full], which a hardware keyboard always types with. A code of another keyed session
- * than the active one turns to it as to [full]. Told apart by
- * the key itself, not a setting (a tap's code with where it fell, [Keyboard.TAPS], is a code):
- * a code typed while the keyboard shown is not yet made again for a change of it still reaches
- * the grouped session, never full pinyin to be typed as it is.
+ * An input method's keyboards in one: grouped keys' codes and offered syllables go to their own keyed session
+ * (made at first use); letters (and hardware keys) to [full]. Routed by the key itself, not a setting, so a code
+ * typed before the keyboard is remade still reaches its grouped session.
  *
- * - A code or a syllable goes to [keyed]; a letter a to z, upper case too, to [full]; a glide's
- *   [Keyboard.GLIDE] to [glideKeyed] where its layout has letters sharing keys (pinyin's nine keys),
- *   else to [full] (no other grouped keyboard glides).
- * - Any other event to the one that took the last key ([keyedActive]), typing or not: a Backspace,
- *   space or mark after its commit is its own (what it learned of a commit deleted whole, U-03; the
- *   text before the next word). A digit to [keyed] goes as the keypad's, to pick as full pinyin's does.
- * - Escape with nothing shown is the app's, through [full], the 14 keys' Keyboard swallowing it (the
- *   nine keys' rule); with 联想 shown the first closes them (HK-03).
- * - Turning to the other, what the one before typed is kept as typed, an Enter's as a switch of
- *   input method has it, its commit put before what the other then commits. Both are reset then, as
- *   for text another wrote: neither keeps a context or a journal the other made old.
- * - A reset and a [context] go to both; the 14 keys' session, made later, is told the last context
- *   unless something was committed since. A context only the active one's to offer by. The field's
- *   flags each keyboard is made with (Engines). A syllable of a strip gone stale is swallowed.
+ * - Glides go to [glideKeyed] where its layout shares keys (nine keys), else to [full].
+ * - Other events go to whichever took the last key ([keyedActive]), so a Backspace or space after its commit is
+ *   its own; a digit to [keyed] goes as the keypad's.
+ * - Escape with nothing shown is the app's via [full]; with 联想 shown the first closes them.
+ * - Switching commits the previous one's input as typed and resets both, as for text another wrote.
+ * - Resets and [context] go to both; a keyed session made later gets the last context unless something was
+ *   committed since. A stale strip's syllable is swallowed.
  */
 internal class KeyboardPair(
-    /** The input method's name: its sessions' ([sessionOf]) for every keyboard but a keyed one active. */
+    /** The input method's name: [sessionOf] for every keyboard but an active keyed one. */
     private val name: String,
-    /** The keyed session a code point is for (a code, a tap with its place), null for any other. */
+    /** Null for code points no keyed session takes. */
     private val keyedOf: (Int) -> String?,
     private val makeFull: () -> Keyboard,
-    /** The keyed session of that name, made at its first code. */
+    /** Made at its first code. */
     private val makeKeyed: (String) -> Keyboard,
-    /** Whether a hardware keyboard's char no letter ([EngineEvent.HARD_CHAR]) is a key of full's: 双拼's scheme's (微软's ;). */
+    /** Whether a hardware non-letter ([EngineEvent.HARD_CHAR]) is a key of full's: 双拼's scheme's (微软's ;). */
     private val fullTypes: (Int) -> Boolean = { false },
-    /** The keyed session a glide over keys of more than one letter goes to (pinyin's nine keys'), null for none: full's then. */
+    /** Where glides over multi-letter keys go (pinyin's nine keys); null: full's. */
     private val glideKeyed: String? = null,
 ) {
 
@@ -54,19 +42,19 @@ internal class KeyboardPair(
     private val full: Keyboard get() = madeFull ?: makeFull().also { madeFull = it }
     private val made = LinkedHashMap<String, Keyboard>()
 
-    // the keyed session that took the last key, null for full: whose candidates and offers are shown
+    // the keyed session that took the last key, null for full: whose candidates and offers show
     private var active: String? = null
 
-    /** Whether a keyed session was the last to take a key: whose candidates and offers are shown. */
+    /** Whether a keyed session took the last key: its candidates and offers show. */
     val keyedActive: Boolean get() = active != null
 
-    // the last context told, given to a keyed session made after it
+    // the last context told, for a keyed session made after it
     private var lastContext: ((Keyboard) -> Unit)? = null
 
-    /** The session [im]'s candidates are now of: the keyed one's where it took the last key. */
+    /** The keyed one's where it took the last key. */
     fun sessionOf(im: String): String = if (im == name) active ?: im else im
 
-    /** All dropped, as the sessions are: made again at the next key. */
+    /** All dropped, remade at the next key. */
     fun drop() {
         madeFull = null
         made.clear()
@@ -74,23 +62,20 @@ internal class KeyboardPair(
         lastContext = null
     }
 
-    /**
-     * The keyed session [keyed] alone dropped, made again at its next code; the last context kept, told to
-     * it then as to any made later. Its input, if it was the active one, is gone with it: full's is shown.
-     */
+    /** Only [keyed] dropped, remade at its next code with the last context; its input, if active, is gone and full's shows. */
     fun dropKeyed(keyed: String) {
         made.remove(keyed)
         if (active == keyed) active = null
     }
 
-    /** As [Keyboard.onEvent]: [payload] goes with the key to the one that takes it. */
+    /** [payload] goes with the key to whichever takes it. */
     fun onEvent(event: Int, arg: Int, learning: Boolean = true, payload: Action? = null): Snapshot {
         if (event == EngineEvent.RESET) return reset(arg, learning)
-        // with nothing shown Escape is the app's, as full pinyin has it (a keyed Keyboard would swallow it);
-        // with 联想 shown the first closes them, the second is the app's (HK-03). The active one stays
+        // with nothing shown Escape is the app's (a keyed Keyboard would swallow it); with 联想 shown the first closes
+        // them. The active one stays
         if (event == EngineEvent.ESCAPE && !shows(keyedActive)) return full.onEvent(event, arg, learning)
-        // a hardware keyboard's char no letter ([EngineEvent.HARD_CHAR], 微软's ;): full's while a keyed one
-        // types, as a letter is; after its commit the keyed one's mark, as a screen's ; always is (review S1, N9)
+        // a hardware non-letter (微软's ;): full's while a keyed one types, as a letter is; after its commit the keyed
+        // one's mark, as a screen ; always is
         if (event == EngineEvent.HARD_CHAR) {
             val hard = fullTypes(arg) && (active == null || made[active]?.composing == true)
             return route(EngineEvent.CHAR, arg, learning, toFull = hard, payload)
@@ -102,12 +87,10 @@ internal class KeyboardPair(
         val char = event == EngineEvent.CHAR
         val keyed = if (char) keyedOf(arg) else null
         val syllable = char && keyed == null && arg in 0..Char.MAX_VALUE.code && arg.toChar() in Keyboard.SYLLABLES
-        // a syllable picked off a strip gone stale (full took a key since): nothing to take, and nothing committed for it
+        // a syllable from a stale strip (full took a key since): nothing to take or commit
         if (syllable && !keyedActive) return (madeFull?.showing ?: NOTHING).copy(commit = "", deleteBefore = 0, handled = true)
-        // a letter is full's, a glide's key too but the nine keys' (only those and the full keyboard glide:
-        // after the 14 keys' commit it would reach their session, which was offered no glide); the rest the
-        // one's that took the last key, typing or not: a Backspace, space or
-        // mark after its commit is its own to learn by (U-03: a commit deleted whole is unlearned) and the text before
+        // letters and glides are full's except the nine keys' glides (the 14 keys' session was offered none); the rest
+        // go to whichever took the last key, so a Backspace or mark after its commit is its own to learn by
         val glide = char && arg == Keyboard.GLIDE
         val letter = char && !syllable && (isLetter(arg) || glide)
         val target = keyed ?: (if (glide) glidedBy((payload as? Action.Glide)?.glide?.layout) else null) ?: if (toFull || letter) null else active
@@ -124,25 +107,24 @@ internal class KeyboardPair(
         return fromActive ?: fromFull
     }
 
-    // [event] to the keyed session [target] or full's (null), what the one before typed committed before it
+    // [event] to keyed [target] or full (null), committing the previous one's input before it
     private fun to(target: String?, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot {
         val left = if (target != active) leave(learning) else null
         active = target
         val existed = (if (target != null) made[target] else madeFull) != null
         val to = keyboard(target)
-        // what it knew of the field is old: the other wrote there since (one made now knows only the last context)
+        // its knowledge of the field is stale: the other wrote there since
         if (left != null && existed) to.onEvent(EngineEvent.RESET, 0, learning)
         val next = to.onEvent(sent(target != null, event, arg), arg, learning, payload)
         return left?.let { merged(it, next) } ?: next
     }
 
-    /** The session a glide over [layout] is read by: [glideKeyed] where letters share its keys, else the full keyboard's, [name]. */
     fun glidedBy(layout: GlideLayout?): String? = glideKeyed?.takeIf { layout?.sharesKeys == true }
 
-    /** Whether [session] is one of this pair's, made: it hears of the field through [context], not on its own. */
+    /** Whether [session] is this pair's and made: it hears of the field via [context]. */
     fun holds(session: String): Boolean = (session == name && madeFull != null) || session in made
 
-    /** As [Keyboard.context], to both; [offers] for the active one alone. Whether the active one offers candidates now. */
+    /** As [Keyboard.context], to both; [offers] for the active one alone. Whether it offers candidates now. */
     fun context(
         before: String,
         learning: Boolean = true,
@@ -162,7 +144,7 @@ internal class KeyboardPair(
         return (if (keyedActive) keyedOffers else fullOffers) == true
     }
 
-    // a hardware digit while the 14 keys type picks, as full pinyin's does: their Keyboard, a nine keys' one, has digits as no picks
+    // a hardware digit while the 14 keys type picks, as full pinyin's does: their nine-keys-style Keyboard would not
     private fun sent(toKeyed: Boolean, event: Int, arg: Int) =
         if (toKeyed && event == EngineEvent.CHAR && arg in '0'.code..'9'.code) EngineEvent.KEYPAD else event
 
@@ -175,18 +157,17 @@ internal class KeyboardPair(
         }
     }
 
-    /** What the active keyboard shows, as it is (nothing where none is made yet): a key no keyboard takes answered with it, nothing typed or dropped. */
+    /** The active keyboard's snapshot (nothing if none made): the answer for a key no keyboard takes. */
     val showing: Snapshot get() = (active.let { if (it != null) made[it] else madeFull })?.showing ?: NOTHING
 
-    // read off the keyboard, not kept here: its context may show 联想 or drop predictions since its last key
+    // read off the keyboard: its context may show or drop predictions since its last key
     private fun shows(keyedOne: Boolean): Boolean {
         val shown = (if (keyedOne) made[active] else madeFull)?.showing
         return shown != null && (shown.preedit.isNotEmpty() || shown.candidates.isNotEmpty())
     }
 
-    // the active one left for the other: what it typed committed as typed (an Enter), then reset, as for
-    // any text another wrote (PinyinSession's Reset): what it showed, its context and its journal dropped.
-    // An empty snapshot for nothing committed, never null: the other is reset as it comes back too
+    // the active one leaving: its input committed as typed (Enter), then reset as for text another wrote; an empty
+    // snapshot, never null, for nothing committed
     private fun leave(learning: Boolean): Snapshot {
         val was = active.let { if (it != null) made[it] else madeFull }
         val out = if (was?.composing == true) was.onEvent(EngineEvent.ENTER, 0, learning) else NOTHING
@@ -195,21 +176,14 @@ internal class KeyboardPair(
     }
 
     internal companion object {
-        /** The sessions a pair hands grouped keys' codes to: a keyboard of the nine keys' kind (Keyboard's nineKeys). */
+        /** Sessions taking grouped keys' codes: nine-keys-kind keyboards. */
         val KEYED = setOf(
             InputMethodCatalog.PINYIN_KEYS, InputMethodCatalog.PINYIN_KEYS18, InputMethodCatalog.PINYIN_KEYS_OWN, InputMethodCatalog.T9,
             InputMethodCatalog.ZHUYIN_NINE, InputMethodCatalog.ZHUYIN,
             InputMethodCatalog.SHUANGPIN_KEYS18, InputMethodCatalog.SHUANGPIN_KEYS14, InputMethodCatalog.SHUANGPIN_NINE,
         )
 
-        /**
-         * Pinyin's: the 14 keys' codes (a tap's with its place too) to [InputMethodCatalog.PINYIN_KEYS],
-         * the 18 keys' (their codes and taps, [Keyboard.TAPS_18]) to [InputMethodCatalog.PINYIN_KEYS18], a layout's own groups' (their codes and taps,
-         * NineKeyLetters.CUSTOM_BLOCK, [Keyboard.PLACES]) to [InputMethodCatalog.PINYIN_KEYS_OWN], the nine keys' (their digits, a letter 连按
-         * types, [Keyboard.LETTERS], and a glide over them) to [InputMethodCatalog.T9], 注音九键's and 大千's
-         * to [InputMethodCatalog.ZHUYIN_NINE] and [InputMethodCatalog.ZHUYIN]; [keyboard] making
-         * each session's.
-         */
+        /** Pinyin's: 14 keys, 18 keys, a layout's own groups, the nine keys (with 连按 letters and glides), 注音九键 and 大千 each to its keyed session; [keyboard] makes each. */
         fun pinyin(keyboard: (String) -> Keyboard) = KeyboardPair(
             InputMethodCatalog.PINYIN,
             ::pinyinKeyed,
@@ -218,10 +192,7 @@ internal class KeyboardPair(
             glideKeyed = InputMethodCatalog.T9,
         )
 
-        /**
-         * 双拼's: the 18 keys' codes, the 14 keys' and the nine keys' each to a session of their own; a hardware
-         * keyboard's letters and its other keys ([EngineEvent.HARD_CHAR], 微软's ;) full 双拼's.
-         */
+        /** 双拼's: the 18, 14 and nine keys each to their own session; hardware letters and other keys ([EngineEvent.HARD_CHAR]) to full 双拼. */
         fun shuangpin(keyboard: (String) -> Keyboard, scheme: () -> ShuangpinScheme) = KeyboardPair(
             InputMethodCatalog.SHUANGPIN,
             ::shuangpinKeyed,
@@ -230,7 +201,7 @@ internal class KeyboardPair(
             { c -> c in 0..Char.MAX_VALUE.code && scheme().types(c.toChar()) },
         )
 
-        /** Pinyin's keyed session code point [c] is for ([pinyin]), null for none. */
+        /** Null for none. */
         fun pinyinKeyed(c: Int): String? = when {
             c in Keyboard.TAPS -> InputMethodCatalog.PINYIN_KEYS
             c in Keyboard.PINYIN_18 || c in Keyboard.TAPS_18 -> InputMethodCatalog.PINYIN_KEYS18
@@ -242,7 +213,7 @@ internal class KeyboardPair(
             else -> null
         }
 
-        /** 双拼's keyed session code point [c] is for ([shuangpin]), null for none. */
+        /** Null for none. */
         fun shuangpinKeyed(c: Int): String? = when {
             c in Keyboard.SHUANGPIN_14 -> InputMethodCatalog.SHUANGPIN_KEYS14
             else -> when (NineKeyLetters.ofCode(c)) {
@@ -252,23 +223,18 @@ internal class KeyboardPair(
             }
         }
 
-        /** The keys of 双拼's keyed session [name]. */
         fun lettersOf(name: String) = when (name) {
             InputMethodCatalog.SHUANGPIN_KEYS18 -> NineKeyLetters.G18
             InputMethodCatalog.SHUANGPIN_KEYS14 -> NineKeyLetters.G14
             else -> NineKeyLetters.NINE_SP
         }
 
-        /** A letter a to z, upper case too: full's, never a keyed session's (KeyRouter's HARD_CHAR is any other). */
+        /** A to z, either case: full's, never keyed (KeyRouter's HARD_CHAR is any other). */
         fun isLetter(codePoint: Int): Boolean = codePoint in 'a'.code..'z'.code || codePoint in 'A'.code..'Z'.code
 
-        /** Nothing committed or shown, handled. */
         val NOTHING = Snapshot("", "", emptyList(), 0, hasPreviousPage = false, hasNextPage = false, handled = true, predicting = false)
 
-        /**
-         * [left]'s commit and deletion, then [next]'s: as one snapshot, the deletion first. [next]
-         * deleting more than [left] committed deletes on before it.
-         */
+        /** [left]'s commit and deletion then [next]'s, as one snapshot; [next] deleting more than [left] committed deletes on before it. */
         fun merged(left: Snapshot, next: Snapshot): Snapshot {
             val kept = left.commit.length - next.deleteBefore
             return if (kept >= 0) {

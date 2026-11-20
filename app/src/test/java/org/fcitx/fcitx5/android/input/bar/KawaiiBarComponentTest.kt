@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** What the bar's clipboard suggestion shows of a long clip; how tall the code row above it is. */
 class KawaiiBarComponentTest {
 
     @Test
@@ -24,8 +23,7 @@ class KawaiiBarComponentTest {
         assertEquals("复制", clipboardPreview("复制"))
     }
 
-    // the code row is tall enough to tap only where the keyboard shows the syllable strip: pinyin on
-    // the 14 or 18 keys, 双拼 on the 18, 14 or nine keys; thin on every other
+    // tall only where the keyboard shows the syllable strip: pinyin on 14/18 keys, 双拼 on 18, 14 or nine
     @Test
     fun theCodeRowIsTallOnlyOnAKeyboardWithTheStrip() {
         assertEquals(40, KawaiiBarComponent.MIN_TOUCH_DP)

@@ -16,12 +16,7 @@ import org.fcitx.fcitx5.android.utils.alpha
 import splitties.dimensions.dp
 import kotlin.math.max
 
-/**
- * The picker's items in a list scrolled up and down: the emoji a section for each category, the
- * symbol panel the one category picked beside it. It replaced pages swiped sideways, which said
- * nothing of there being more: the list shows a sliver of the row below, fades at its edges and
- * has a scroll bar.
- */
+/** Scrolled up and down, not pages swiped sideways, which said nothing of there being more. */
 @SuppressLint("ViewConstructor")
 class PickerGridView(context: Context, val theme: Theme, val density: Density) : RecyclerView(context) {
 
@@ -29,21 +24,17 @@ class PickerGridView(context: Context, val theme: Theme, val density: Density) :
         val columnCount: Int,
         val rowCount: Int,
         val textSize: Float,
-        val autoScale: Boolean,
-        /** a header over each category's items; the symbol panel names them at its side */
+        /** the symbol panel names them at its side */
         val headers: Boolean = true
     ) {
-        // the symbol panel: four keys a row and three rows, as Sogou's; six by four were crowded,
-        // and four by four too flat
-        Panel(4, 3, 24f, false, headers = false),
+        // as Sogou's; six by four were crowded, and four by four too flat
+        Panel(4, 3, 24f, headers = false),
 
-        // emoji
-        Medium(7, 3, 23.7f, false),
+        Medium(7, 3, 23.7f),
 
-        // emoticon
-        Low(4, 3, 19f, true);
+        Low(4, 3, 19f);
 
-        /** how many recently used ones are kept: their section is one screen of the list */
+        /** their section is one screen of the list */
         val recentLimit get() = columnCount * rowCount
     }
 

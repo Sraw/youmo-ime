@@ -5,32 +5,22 @@
 package org.fcitx.fcitx5.android.engine.table
 
 /**
- * How a table input method behaves beyond what its data says: the options of fcitx's table
- * `.conf` files, meaning what they mean to libime. A length limit of -1 holds at any length and
- * 0 turns its rule off.
+ * A table input method's behaviour beyond its data: fcitx's table `.conf` options, meaning what they mean to
+ * libime. A length limit of -1 holds at any length, 0 turns its rule off.
  *
- * @property autoSelect commit without being asked: a lone candidate, or the first one once the
- *   code is full or the next key leads nowhere
- * @property autoSelectLength a lone candidate whose code is all that was typed is committed once
- *   the code is this long
- * @property noMatchAutoSelectLength a key that leads to no entry commits the first candidate of
- *   what was typed before it, once that is this long, and starts a new code
- * @property noSortInputLength codes this long or shorter (and no longer than what was typed) come
- *   first, in the table's order
+ * @property autoSelect commit unasked: a lone candidate, or the first once the code is full or the next key leads nowhere
+ * @property autoSelectLength a lone candidate whose code is all that was typed commits once the code is this long
+ * @property noMatchAutoSelectLength a key leading nowhere commits the first candidate once the code is this long, and starts a new code
+ * @property noSortInputLength codes this long or shorter (and no longer than typed) come first, in table order
  * @property sortByCodeLength the other codes, shorter first
- * @property orderByUse 调频 (fcitx's OrderPolicy): a code's 重码 by the word and sentence models,
- *   and by what the user picked (U-28); off, the table's order. The presets have fcitx's; the app's
- *   is off on a new install (androidengine's config, D7)
+ * @property orderByUse 调频 (fcitx's OrderPolicy): 重码 by the models and the user's picks; off, table order
  * @property matchingKey stands for any one key (五笔 z, 仓颉 *)
- * @property pinyinKey typed first, looks a character up by its pinyin, showing its code
+ * @property pinyinKey typed first, looks a character up by pinyin, showing its code
  * @property hint show what is left of each candidate's code
- * @property endKeys keys that end a code (a `.conf`'s EndKey, punctuation such as `,./;`): the next
- *   key starts another, the first candidate committed (fcitx's EndKey)
- * @property selectionKeys keys that pick a candidate while something is typed, the first key the
- *   first on the page: for a table whose codes are digits (a `.conf`'s Selection, letters such
- *   as `qwertyuiop`)
- * @property roots the table's roots on its letter keys (仓颉, 五笔 86), none for the others
- * @property keyLabels what of [roots] the keys show; any but none, [TableRoots.inPreedit]'s code is shown as roots too
+ * @property endKeys keys that end a code (EndKey): the next key commits the first candidate
+ * @property selectionKeys keys that pick while something is typed (Selection), for tables whose codes are digits
+ * @property roots the table's roots on its letter keys (仓颉, 五笔 86)
+ * @property keyLabels what of [roots] the keys show; any but none also shows [TableRoots.inPreedit]'s code as roots
  */
 data class TableOptions(
     val autoSelect: Boolean = true,
@@ -52,30 +42,23 @@ data class TableOptions(
         require(pageSize >= 1) { "page size $pageSize" }
     }
 
-    /** [code] as the preedit shows it: in roots where the keys show them ([TableRoots.spell]). */
     fun shown(code: String): String = if (keyLabels == KeyLabels.NONE) code else roots?.spell(code) ?: code
 
     companion object {
-        /** fcitx's wbx.conf: 五笔 86 */
         val WUBI = TableOptions(
             noSortInputLength = 2,
-            // orderByUse as fcitx's .conf has it, in each preset: what an older build ordered by,
-            // which 0.4 kept on for those who typed with it. A new
-            // install's 调频 is off (U-28 D7): the addon's setting, pushed to EngineSettings, says so
-            // over this; where its flattened config has no OrderPolicy, TableSettings.applyTo keeps this true
+            // as fcitx's .conf has it, for older builds' users; a new install's 调频 is off via the addon's setting, which
+            // TableSettings.applyTo leaves true where the config has no OrderPolicy
             orderByUse = true,
             matchingKey = 'z',
             pinyinKey = 'z',
             roots = TableRoots.WUBI86,
         )
 
-        /**
-         * fcitx's wbpy.conf: 五笔 with pinyin, the table's pinyin entries matched as its codes are
-         * (no key to start a lookup).
-         */
+        /** fcitx's wbpy.conf: 五笔 with its pinyin entries matched as codes (no lookup key). */
         val WUBI_PINYIN = WUBI.copy(pinyinKey = null)
 
-        /** fcitx's cangjie.conf; its roots on the keys and in the preedit (日月, not ab), as a new install has them. */
+        /** fcitx's cangjie.conf; roots on the keys and in the preedit (日月, not ab). */
         val CANGJIE = TableOptions(
             noMatchAutoSelectLength = 0,
             matchingKey = '*',
@@ -84,13 +67,9 @@ data class TableOptions(
             keyLabels = KeyLabels.NAMES,
         )
 
-        /** fcitx's zrm.conf: OrderPolicy=Fast, which orders by use as Freq does. */
         val ZIRANMA = TableOptions(orderByUse = true)
 
-        /**
-         * fcitx's erbi.conf. Its AutoSelectRegex is not needed: libime takes it or the length,
-         * and AutoSelectLength=-1 already holds at any length.
-         */
+        /** fcitx's erbi.conf; its AutoSelectRegex is not needed, AutoSelectLength=-1 already holds at any length. */
         val ERBI = TableOptions(
             noMatchAutoSelectLength = 0,
             hint = false,
