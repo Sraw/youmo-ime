@@ -109,7 +109,7 @@ async function main() {
     await make('number', 'my-number');
     await wait(300);
     const pads = await js(`[document.getElementById('env-pad-label').hidden, document.getElementById('env-field-label').hidden, document.getElementById('env-pad').options.length]`);
-    check(!pads[0] && pads[1] && pads[2] === 7, 'a number board: the 7 pads offered, not the fields');
+    check(!pads[0] && pads[1] && pads[2] === 3, 'a number board: the 3 pads offered, not the fields');
     const full = await js(`document.getElementById('preview').toDataURL()`);
     await choose('env-pad', 'phone');
     check((await js(`document.getElementById('preview').toDataURL()`)) !== full, 'the phone pad drawn apart from the full one');
