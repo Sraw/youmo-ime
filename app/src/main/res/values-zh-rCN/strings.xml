@@ -418,6 +418,7 @@
     <string name="same_code_as">%1$s：与 %2$s 同码</string>
     <string name="my_words_no_predict">不再联想的搭配</string>
     <string name="learning_pinned_detail">在 %1$s 下第一 · %2$s</string>
+    <string name="learning_pinned_old_detail">旧记录，已不起作用 · %1$s · %2$s</string>
     <string name="learning_no_predict_detail">不再跟在「%1$s」后面联想</string>
     <string name="learning_no_predict_phrase_detail">整段：哪里都不再联想</string>
     <string name="learning_suggest_again">恢复联想</string>

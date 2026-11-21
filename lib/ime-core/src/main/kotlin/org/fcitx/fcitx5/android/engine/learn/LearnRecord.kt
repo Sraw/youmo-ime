@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 
 /** A word as learned: simplified text and its reading (spelt syllables space-separated; "" for none: a table code, letters). */
 data class Word(val text: String, val reading: String)
@@ -92,6 +93,16 @@ object Kinds {
     fun keysOf(kind: String): NineKeyLetters? = keysTag(kind)?.let { tag ->
         if (kind.startsWith(KEYS)) NineKeyLetters.filedAs(tag) else NineKeyLetters.grouped(tag)
     }
+
+    /** [code]'s keys as the user reads them: a grouped keyboard's as letters ([keysOf]), zhuyin's as symbols and tone marks, else as stored (private-use codes are blank in most fonts). */
+    fun shownKeys(code: Code): String = when (code.kind) {
+        ZHUYIN_NINE -> ZhuyinKeys.shown(code.keys, grouped = true)
+        ZHUYIN_DACHEN -> ZhuyinKeys.shown(code.keys, grouped = false)
+        else -> keysOf(code.kind)?.shown(code.keys) ?: code.keys
+    }
+
+    /** A zhuyin code with a tone, written before 0.6.3 (`PressedKeys.keyOf` files none since): kept, never looked up. */
+    fun readNoMore(code: Code): Boolean = isZhuyin(code.kind) && code.keys.any { ZhuyinKeys.toneOf(it) > 0 }
 
     fun table(im: String) = "$TABLE$im"
 

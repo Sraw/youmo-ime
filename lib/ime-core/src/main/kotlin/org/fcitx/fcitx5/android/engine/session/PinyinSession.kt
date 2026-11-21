@@ -169,7 +169,7 @@ class PinyinSession(
     private val nineKeys = keyed?.let { k ->
         NineKeys(data, k.letters, recorder.pressed, k::isKey, k::initialsOf, k::keyOf, k::shownOffered) { digits -> if (learning && recorder.learns) recorder.habits.bar(recorder.takeLayout, digits) else emptyMap() }
     }
-    private val habitOrder: HabitOrder = HabitOrder(data, user, recorder, decoder, addedWords)
+    private val habitOrder: HabitOrder = HabitOrder(data, user, recorder, decoder, addedWords, (segmenter as? KeyedSegmenter)?.toneAllows)
     private val predictions = Predictions(predictor, textWords, user, habits = recorder.habits, learning = { learning })
     private val pager = Pager(pageSize)
     private var predicting = false
@@ -749,7 +749,7 @@ class PinyinSession(
         val asText = { text: String -> Candidate(text, rest, 0f, intArrayOf(NO_WORD), intArrayOf(rest)) }
         // a sentence blocked whole is left out of what habits put in too
         val sentenceBlocked = { c: Candidate -> c.words.size > 1 && user?.blocksSentence(c.text) { entries(c, decoded.graph) } == true }
-        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere, l.recorded, l.gate) }, pageSize)
+        val ordered = habitOrder.order(decoded.graph, (decoded.sentences + decoded.words).distinctBy { it.text }.filterNot(sentenceBlocked), decoded.sentences, decoded.levels.map { l -> HabitOrder.Level(l.end, l.code, l.prev, l.injected.filterNot(sentenceBlocked), l.habitsHere, l.recorded, l.gate, l.toneOff) }, pageSize)
         val read = ordered.list
         // a phrase of order k a place down where a pin leads: the pin stays first
         val withPhrases = { list: List<Candidate> ->

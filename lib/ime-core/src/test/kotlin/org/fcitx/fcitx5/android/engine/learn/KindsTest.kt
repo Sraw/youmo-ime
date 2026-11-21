@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.learn
 
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -67,6 +68,26 @@ class KindsTest {
         assertEquals("q,q", Kinds.keysOf(Kinds.keys("q,q"))?.tag())
         assertNull(Kinds.keysOf(Kinds.FULL))
         assertNull(Kinds.keysOf(Kinds.nineKeys(NineKeyLetters.STANDARD.tag())))
+    }
+
+    // what a pin's keys and the learning report show: zhuyin's symbols and marks, a grouped keyboard's letters, else as stored
+    @Test
+    fun shownKeysReadZhuyinAndGroupedCodes() {
+        assertEquals("ㄋㄧˇ", Kinds.shownKeys(Code(Kinds.ZHUYIN_DACHEN, "${ZhuyinKeys.symbolCode('ㄋ')}${ZhuyinKeys.symbolCode('ㄧ')}${ZhuyinKeys.toneCode(3)}")))
+        assertEquals("ㄅㄉㄚ ˙", Kinds.shownKeys(Code(Kinds.ZHUYIN_NINE, "${ZhuyinKeys.groupCode(0)}${ZhuyinKeys.toneCode(5)}")))
+        assertEquals("bn ui", Kinds.shownKeys(Code(Kinds.keys(NineKeyLetters.G14.tag()), "${NineKeyLetters.G14.key('b')}${NineKeyLetters.G14.key('u')}")))
+        assertEquals("nihao", Kinds.shownKeys(Code(Kinds.FULL, "nihao")))
+    }
+
+    // a zhuyin code with a tone is one written before 0.6.3: no other kind's keys are tones
+    @Test
+    fun readNoMoreIsAZhuyinCodeWithATone() {
+        val ni = "${ZhuyinKeys.symbolCode('ㄋ')}${ZhuyinKeys.symbolCode('ㄧ')}"
+        assertTrue(Kinds.readNoMore(Code(Kinds.ZHUYIN_DACHEN, ni + ZhuyinKeys.toneCode(3))))
+        assertTrue(Kinds.readNoMore(Code(Kinds.ZHUYIN_NINE, "${ZhuyinKeys.groupCode(0)}${ZhuyinKeys.toneCode(5)}")))
+        assertFalse(Kinds.readNoMore(Code(Kinds.ZHUYIN_DACHEN, ni)))
+        assertFalse(Kinds.readNoMore(Code(Kinds.keys(NineKeyLetters.G14.tag()), "${ZhuyinKeys.toneCode(3)}")))
+        assertFalse(Kinds.readNoMore(Code(Kinds.FULL, "ni")))
     }
 
     @Test

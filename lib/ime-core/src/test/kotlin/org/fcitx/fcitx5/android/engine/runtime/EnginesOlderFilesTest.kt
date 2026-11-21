@@ -4,16 +4,23 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.learn.Code
+import org.fcitx.fcitx5.android.engine.learn.FakeClock
+import org.fcitx.fcitx5.android.engine.learn.Kinds
+import org.fcitx.fcitx5.android.engine.learn.LearnLog
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.fcitx.fcitx5.android.engine.platform.write
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The older builds' learning files, which this build never reads: deleted with what the clears clear. */
+/** The older builds' learning files, which this build never reads: deleted with what the clears clear. Their records it reads no more: listed and taken off. */
 class EnginesOlderFilesTest : EnginesFixture() {
 
     private val root = MemoryFiles()
@@ -47,5 +54,28 @@ class EnginesOlderFilesTest : EnginesFixture() {
             assertTrue(engines.op(LearningOp.ClearRecent(LearningOp.Span.TODAY)) is LearningResult.Cleared)
         }
         assertFalse(log.exists())
+    }
+
+    // a zhuyin pin with a tone, written before 0.6.3, beside the word pinned again: both listed, the old one read no
+    // more and taken off alone
+    @Test
+    @Uat("PY-161")
+    fun anOldTonedZhuyinPinIsListedBesideItsPinAgainAndTakenOff() {
+        val ni = "${ZhuyinKeys.symbolCode('ㄋ')}${ZhuyinKeys.symbolCode('ㄧ')}"
+        val old = Code(Kinds.ZHUYIN_DACHEN, ni + ZhuyinKeys.toneCode(3))
+        val again = Code(Kinds.ZHUYIN_DACHEN, ni)
+        LearnLog(root.file(LearnLog.FILE), FakeClock()).apply {
+            open()
+            pin(old, "拟", "ni", on = true)
+            pin(again, "拟", "ni", on = true)
+            close()
+        }
+        val engines = Engines(::load, root, warmUps = inPlace)
+        val pins = (engines.op(LearningOp.ListItems(LearningOp.Listed.PINS)) as LearningResult.Listed).items
+        assertEquals(setOf(old, again), pins.map { it.code }.toSet())
+        assertEquals(listOf(old), pins.filter { Kinds.readNoMore(it.code!!) }.map { it.code })
+        engines.op(LearningOp.RemoveItems(pins.filter { Kinds.readNoMore(it.code!!) }))
+        assertEquals(setOf(again), LearnLog.replay(root.file(LearnLog.FILE).read()).pins.keys)
+        engines.close()
     }
 }

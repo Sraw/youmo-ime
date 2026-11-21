@@ -426,6 +426,7 @@
     <string name="same_code_as">%1$s: same code as %2$s</string>
     <string name="my_words_no_predict">Suggestions turned off</string>
     <string name="learning_pinned_detail">first under %1$s · %2$s</string>
+    <string name="learning_pinned_old_detail">old record, no longer in effect · %1$s · %2$s</string>
     <string name="learning_no_predict_detail">not suggested after “%1$s”</string>
     <string name="learning_no_predict_phrase_detail">Whole phrase: not suggested anywhere</string>
     <string name="learning_suggest_again">Suggest again</string>

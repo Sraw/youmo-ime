@@ -31,6 +31,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 导入自定义键盘布局只拦读不出、排不下、超出上限、不安全的；缺 ⌫、回车、返回、地球键、某个数字或字母、九键左列这些 App 自带那块有的键，改成在要注意的地方说一句缺了会怎样（「没有 ⌫：删不了字……」「没有数字键 0」），照样导入、照样画出来，从备份恢复也一样；分组键盘缺字母时照样用自己的分组。数字键盘上有键打出字母的也提醒一句。符号面板、九键左列的位置按 `kind=` 找，`id` 随便起；没有那个位置时那一块不显示。网页布局编辑器保存这样的布局时写 `min-app="0.6.3"`。替换正在用的布局、新的这版某个输入法用不了时，确认框里说一句，导入后那个输入法换回 App 自带的键盘。主题包里带的键盘布局照旧：缺键的不转。
 - 语音打出词库里的常见词（「莉莉」），你删掉重打成同音的「丽丽」，现在也问「让语音记住『丽丽』？」；你的词（手动加的、点了 **记住** 的、打字学成的）也可能换掉同音的常见词（见上）。
 - 九键、14 键、18 键双拼每按一个键更快：0.6.1 起这几种键盘把单个键也当声母读（读你打过的词），每键慢了不少，现在编码行和候选的计算少做了大部分重复的工作，候选和以前完全一样。
+- 注音键盘打不打声调学的是同一份：带声调选过两次的词，不带声调打也排第一，反过来也一样；打了声调时，学到的第一和固定的词只在声调对得上时才提前（在 ㄇㄚ 下选惯了「马」，打 ㄇㄚˉ 第一个还是「妈」）。0.6.3 以前带着声调学到的顺序和固定不再起作用，要重新学，已学条目里旧的带声调固定标成「旧记录，已不起作用」。
 
 - 新快捷键 **切输入法** 和 **选输入法**，能设在任意键的上滑或下滑：切输入法和点地球键一样，这样关掉 **显示语言切换键** 也能换输入法；选输入法像编辑菜单那样弹出一排启用的输入法（最后一格 **更多…** 打开输入法选择框），左右挪选、松开就换，滑出直接松开是地球键会换到的那个。
 
@@ -38,6 +39,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 - 手动加了叠字的词（「方方」），语音会把「芳芳」听成「方方方方」：叠字的热词接着自己又算了一次。现在只打一遍。
 - 下滑弹出的编辑菜单难用：手指滑出后再往下多走一点（约 4 dp）菜单就没了，往上滑回键上反而会执行。现在下滑弹出的菜单（编辑菜单、选输入法）和上滑的反过来：接着往下走多远都不取消，往上滑回键上才取消，左右挪法和上滑一样；上滑的照旧。
+- **已学条目** 里注音键盘上固定的词标成了「码表」，按键是空白：现在标「注音九键」「注音全键盘」，按键显示成注音符号（注音九键显示每个键上的那组符号），以前带着声调的显示声调符号。
 
 ### Main changes
 
@@ -69,6 +71,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Importing a custom keyboard layout refuses only what cannot be read or laid out, goes past a limit or is unsafe; a layout lacking a key the app's board has (⌫, Return, back, the globe key, a digit or a letter, the nine keys' left column) is told in the notes, each with what it costs (「没有 ⌫：删不了字……」, 「没有数字键 0」), and imported and drawn as it is, from a backup too; a grouped one lacking letters keeps its own groups. A number layout with a key typing letters is told too. The symbol panel's and the nine keys' places are found by `kind=`, the `id` any; a place the layout has not is not shown. The web layout maker saves such a layout with `min-app="0.6.3"`. Replacing a layout in use with a version an input method cannot use says so in the confirmation, and that input method goes back to the app's own board after the import. A theme pack's layouts are as before: one lacking keys is not converted.
 - A common dictionary word voice wrote (莉莉), deleted and typed again as a homophone (丽丽), is now asked about too (「让语音记住『丽丽』？」), and the user's words (added by hand or **记住**, or learned from typing) may now replace a common homophone in voice too (see above).
 - 双拼 on the nine, 14 and 18 keys is quicker a key: since 0.6.1 those keyboards also read a key alone as an initial (for words you typed), which made each key much slower; the code row and the candidates now skip most of the work repeated from key to key, the candidates exactly as before.
+- The zhuyin keyboards learn a word as one whether its tones are typed or not: picked twice with tones, it is first without them too, and the other way round; with a tone typed, a learned first or pinned word comes forward only where the tone agrees (马 picked under ㄇㄚ, ㄇㄚˉ still gives 妈 first). Orders and pins learned with tones before 0.6.3 no longer apply and are learned anew; in **已学条目** an old toned pin is marked 「旧记录，已不起作用」.
 
 - Two new shortcuts for any key's swipe: **切输入法** does what a tap of the globe key does, so input methods still switch with **显示语言切换键** off; **选输入法** pops a row of the enabled input methods where the edit menu goes (its last cell, **更多…**, opens the input method picker), picked by sliding left or right and switched to on release, the one the globe would go to under the finger.
 
@@ -76,6 +79,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 - With a reduplicated word added (方方), voice wrote 芳芳 as 方方方方: the hotword counted again right after itself. It is written once now.
 - The edit menu a swipe down opened was hard to use: a few more dp down after it opened took it away, and sliding back up onto the key ran the cell instead. A menu a swipe down opens (the edit menu, 选输入法) now mirrors the swipe-up one: going on down never cancels it, back up onto the key does, and left and right pick as on a swipe up; the swipe-up menus are unchanged.
+- In **已学条目**, a word pinned on a zhuyin keyboard was labelled 「码表」 with blank keys: it now says 注音九键 or 注音全键盘 and shows its keys in zhuyin (each 注音九键 key as its group of symbols), an older code's tones as their marks.
 
 ---
 

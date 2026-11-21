@@ -712,6 +712,12 @@
 - **预期**：大千排列，第一行是 ㄅ ㄉ ˇ ˋ ㄓ ˊ ˙ ㄚ ㄞ ㄢ ㄦ；码行 `ㄋㄧˇ ㄏㄠˇ`，首选「你好」；ㄇㄚ 后按空格码行是 `ㄇㄚˉ`、首选「妈」，再按空格上屏「妈」；ㄉㄜ˙ 首选「的」；回车上屏 `ㄅˇ`。框里最后是「你好妈的ㄅˇ」。
 - **JVM**：`ZhuyinSceneGesturesTest`（`everyKeyGestures`、`dachenOnTheKeysAsShown`）、`PinyinSessionZhuyinTest`（`dachenTypesAWordByItsSymbolsShownInZhuyin`、`dachensSpaceIsTheFirstToneThenThePick`、`enterCommitsTheZhuyinShown`）、`PinyinUatTest.aNeutralToneTypedOrNotPutsTheWordFirst`（真数据：ㄓㄨㄛㄗ、ㄉㄨㄥㄒㄧ 打 ˙、打本调、不打声调，「桌子」「东西」都排第一，大千和注音九键都是）；设备上照跑。
 
+### PY-161 [P1] 注音键盘：打不打声调学的是同一份
+- **前提**：B0-注音全键盘，**用我的输入习惯** 开着，没在 ㄋㄧ 下学过。
+- **操作**：点 ㄋ ㄧ，看第一个候选，删光；点 ㄋ ㄧ ˇ，选「拟」；点 ㄋ ㄧ，选「拟」；再点 ㄋ ㄧ、点 ㄋ ㄧ ˇ、点 ㄋ ㄧ ˊ，各看第一个候选。长按「拟」选 **删除**（忘掉），再点 ㄋ ㄧ 看候选。换到注音九键照做一遍（声调用左边的 ˇ、ˊ 键）。
+- **预期**：一开始第一个不是「拟」；带声调和不带声调各选一次以后，ㄋㄧ 和 ㄋㄧˇ 下第一个都是「拟」（声调不算键，两次学在同一串键下）；ㄋㄧˊ 下第一个不是「拟」（「拟」读三声，打了对不上的声调，学到的第一不提前）；忘掉以后 ㄋㄧ 的第一个回到原来的。注音九键一样。0.6.3 以前带着声调学到的顺序和固定不再起作用，也不会出错。
+- **JVM**：`PinyinSessionZhuyinTest`（`aWordTypedWithAToneAndWithoutLearnsAsOne`、`aTonedPickUndoesAndForgetsFromTheOneRecord`、`anOldTonedRecordIsKeptButReadNoMore`、`aWordLearnedFirstGivesWayToATypedToneItHasNot`、`aPinGivesWayToATypedToneItHasNot`：大千和注音九键，带声调和不带声调学成一条、撤销和忘掉、旧的带声调记录留着不读、备份读回一样、学到的第一和固定（单字和句中的词）在声调对不上时不提前）、`PressedKeysTest.zhuyinsTonesAreNoKeysAsTheSeparatorIsNone`；设备上不跑。
+
 ### PY-110 [P1] 候选词注音一律标本调，不标轻声
 - **前提**：B0，**候选词注音** 选「拼音」。
 - **操作**：打 zhuozi，看「桌子」上方；清空，打 dongxi，看「东西」上方；清空，打 women，看「我们」上方。把 **候选词注音** 换成「注音」，再打一遍。

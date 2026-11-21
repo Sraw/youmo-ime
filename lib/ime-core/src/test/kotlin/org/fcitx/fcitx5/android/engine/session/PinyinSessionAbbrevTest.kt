@@ -72,6 +72,22 @@ class PinyinSessionAbbrevTest {
         assertTrue("小米, never typed", "小米" in s.type("x'm").candidates.also { s.apply(Reset) })
     }
 
+    // ' is no key: x'm and xm learn under one code, so a word corrected to twice or pinned apart goes first under the pair too
+    @Test
+    fun xmLearnsWhatXApartMLearns() {
+        val learner = Learner(data)
+        val s = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = learner.model, learnTo = learner.learnTo(kind))
+        assertEquals("先", s.page("xm").first())
+        repeat(2) { s.pick("x'm", "小米") }
+        assertEquals("小米", s.page("xm").first())
+        val pinned = Learner(data)
+        val p = PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.ZIRANMA), pageSize = pageSize, prediction = false, user = pinned.model, learnTo = pinned.learnTo(kind))
+        p.type("x'm")
+        p.apply(Action.Pin(p.candidates(0, pageSize).indexOfFirst { it.text == "下面" }.also { check(it >= 0) }))
+        p.apply(Reset)
+        assertEquals("下面", p.page("xm").first())
+    }
+
     @Test
     @Uat("SP-35")
     fun aWordAddedByHandGoesSecondUnderAPairItsInitialsSpell() {

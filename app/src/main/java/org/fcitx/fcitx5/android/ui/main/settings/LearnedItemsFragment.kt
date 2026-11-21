@@ -81,7 +81,12 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
         // a whole phrase is off everywhere, after no word
         val code = item.code ?: return if (item.prev.isEmpty()) getString(R.string.learning_no_predict_phrase_detail) else getString(R.string.learning_no_predict_detail, item.prev)
         val table = code.kind.takeIf { it.startsWith(TABLE) }?.let { names[it.removePrefix(TABLE)] }
-        return getString(if (item.blocked) R.string.learning_table_blocked_detail else R.string.learning_pinned_detail, keys(code), table ?: label(requireContext(), code))
+        val detail = when {
+            item.blocked -> R.string.learning_table_blocked_detail
+            Kinds.readNoMore(code) -> R.string.learning_pinned_old_detail
+            else -> R.string.learning_pinned_detail
+        }
+        return getString(detail, keys(code), table ?: label(requireContext(), code))
     }
 
     private fun confirmRemove(item: ListedItem) {
@@ -110,10 +115,10 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
 
         /**
          * As the user reads them: a grouped keyboard's private-use codes (blank in most fonts, unread by TalkBack) as letters,
-         * a strokes block's as strokes; anything else as stored.
+         * zhuyin's as symbols and tone marks, a strokes block's as strokes; anything else as stored.
          */
         fun keys(code: Code): String = if (code.kind == STROKES && code.keys.all { it in Strokes.KEYS }) Strokes.shown(code.keys)
-            else Kinds.keysOf(code.kind)?.shown(code.keys) ?: code.keys
+            else Kinds.shownKeys(code)
 
         // a character blocked under strokes typed (笔画查字), filed as a table's block
         private val STROKES = Kinds.table(StrokeLookup.BLOCK_TABLE)
@@ -134,6 +139,8 @@ class LearnedItemsFragment : PaddingPreferenceFragment() {
         fun kind(code: Code) = when {
             code.kind == Kinds.FULL -> R.string.learning_kind_full
             code.kind == Kinds.HANDWRITING -> R.string.learning_kind_handwriting
+            code.kind == Kinds.ZHUYIN_NINE -> R.string.keyboard_zhuyin_nine
+            code.kind == Kinds.ZHUYIN_DACHEN -> R.string.keyboard_zhuyin_full
             code.kind == STROKES -> R.string.learning_kind_strokes
             code.kind.startsWith(Kinds.shuangpin("")) -> R.string.learning_kind_shuangpin
             // the scheme is said by [label]

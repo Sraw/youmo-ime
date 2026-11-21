@@ -45,6 +45,16 @@ object ZhuyinKeys {
     /** Null for any other code. */
     fun symbolOf(c: Char): Char? = if (c in FIRST until FIRST_GROUP) SYMBOLS[c - FIRST] else null
 
+    /** Learned [keys] as the user reads them: a group as its symbols (spaced apart where [grouped]), a symbol as itself, a tone as its mark, anything else as stored. */
+    fun shown(keys: String, grouped: Boolean): String = keys.map { c ->
+        val tone = toneOf(c)
+        when {
+            tone > 0 -> MARKS[tone - 1].toString()
+            c in FIRST_GROUP until FIRST_TONE -> GROUP_SYMBOLS[c - FIRST_GROUP]
+            else -> symbolOf(c)?.toString() ?: c.toString()
+        }
+    }.joinToString(if (grouped) " " else "")
+
     val NINE: NineKeyLetters = NineKeyLetters.zhuyin(GROUP_SYMBOLS, (0 until GROUPS).map { groupCode(it) }.joinToString(""))
 
     val DACHEN: NineKeyLetters = NineKeyLetters.zhuyin(SYMBOLS.map { it.toString() }, SYMBOLS.map { symbolCode(it) }.joinToString(""))

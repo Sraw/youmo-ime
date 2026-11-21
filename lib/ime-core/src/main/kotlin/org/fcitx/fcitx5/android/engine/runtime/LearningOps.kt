@@ -326,8 +326,7 @@ internal class LearningOps(
     }
 
     // grouped codes as their keys' letters (bn ui): pasted elsewhere they would read as nothing
-    private fun reported(code: Code): String =
-        Kinds.keysOf(code.kind)?.shown(code.keys) ?: code.keys
+    private fun reported(code: Code): String = Kinds.shownKeys(code)
 
     private fun overview(): LearningResult.Overview {
         val state = log().state

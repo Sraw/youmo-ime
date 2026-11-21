@@ -833,7 +833,12 @@ setting either: it reads the codes.
 - **Tones.** Optional. `PinyinDecoder`'s `toneAllows` (`PinyinData.tones.allows`) adds `Penalties.tone`
   (−4) for each word whose character cannot take the tone typed: soft, a word is never dropped.
 - **Learning.** Kinds `zy:nine`, `zy:dachen` (`Kinds.isZhuyin`), grouped, no spellings linked (U-20 is
-  pinyin's). Custom phrases match each symbol's pinyin fragments (`ZhuyinKeys.PINYIN_WAYS`).
+  pinyin's). A tone is no key of a code, as `'` is none (`PressedKeys.keyOf`): typed with tones or without, a
+  word is one record. With a tone typed, a pin, first or used word of the code that a typed tone disagrees with
+  (`HabitOrder.toneOff`, the decoder's `toneAllows`) is neither put in nor raised: it falls back with the other
+  characters the tone puts after. `Retype` splits a record's keys without tones, so a word typed again without
+  them counts as a correction. A code with a tone, written before 0.6.3, is never looked up again but kept (shown,
+  marked 「旧记录，已不起作用」 in 已学条目, backed up, forgotten, unpinned as any). Custom phrases match each symbol's pinyin fragments (`ZhuyinKeys.PINYIN_WAYS`).
 - **Top-1** (decoder alone, pinyin.tsv / pinyin-chat.tsv, `ime-eval zhuyin`): 全拼 93.9 / 70.0%, 注音全键盘
   93.2 / 69.4%, with tones 97.4 / 83.4%; 九键拼音 87.6 / 51.5%, 注音九键 86.0 / 48.7%, with tones 95.8 / 70.6% (tones as the app allows them: `PinyinData.tones`; the eval passed none before 0.5.1, so earlier "with tones" numbers were without).
 

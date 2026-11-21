@@ -159,7 +159,7 @@ internal class PressedKeys {
     }
 
     companion object {
-        /** A key as learning files it: separators are none, letters lower case. */
-        fun keyOf(c: Char): String = if (c == SyllableGraph.SEPARATOR) "" else c.lowercaseChar().toString()
+        /** A key as learning files it: separators are none, zhuyin's tones too (typed or not, a word is one record), letters lower case. */
+        fun keyOf(c: Char): String = if (SyllableGraph.isSeparator(c)) "" else c.lowercaseChar().toString()
     }
 }

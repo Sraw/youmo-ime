@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.user.HabitCounts
 import org.fcitx.fcitx5.android.engine.user.UserModel
 
@@ -42,6 +43,8 @@ internal class HabitOrder(
     private val decoder: PinyinDecoder,
     /** Hand-added words in list order, ranked after formed words. */
     private val added: () -> Collection<String>,
+    /** Whether a character read as a syllable may take a typed tone (zhuyin, [PinyinDecoder]'s); null where no tone is typed. */
+    private val toneAllows: ((codePoint: Int, syllable: Int, tone: Int) -> Boolean)? = null,
 ) {
     private val habits get() = recorder.habits
 
@@ -68,8 +71,11 @@ internal class HabitOrder(
         return text in addedOrder
     }
 
-    /** A level: candidates ending at [end], ranked under [code] after [prev]; [injected] those added; [recorded] texts pinned, first or used under the code itself; [gate] (双拼) a typed word reads the code as whole syllables with its last key begun. */
-    class Level(val end: Int, val code: Code, val prev: String, val injected: List<Candidate>, val habitsHere: Boolean, val recorded: Set<String>, val gate: Boolean = false)
+    /** A level: candidates ending at [end], ranked under [code] after [prev]; [injected] those added; [recorded] texts pinned, first or used under the code itself; [gate] (双拼) a typed word reads the code as whole syllables with its last key begun; [toneOff] recorded texts a typed tone disagrees with. */
+    class Level(
+        val end: Int, val code: Code, val prev: String, val injected: List<Candidate>, val habitsHere: Boolean, val recorded: Set<String>, val gate: Boolean,
+        val toneOff: Set<String>,
+    )
 
     /** [ranks]: each ranked one's tier and uses; [pinned]: the pin in front, if any. */
     class Ordered(val list: List<Candidate>, val ranks: Map<Candidate, HabitRanker.Ranked<Candidate>>) {
@@ -125,7 +131,10 @@ internal class HabitOrder(
         val slips = holdsSlips(graph, graph.start, end)
         // what the user did under this very code ranks as read there, slipped or not; other spellings' words and own or
         // added words only over no slip where the code reads whole. Keys read alone (简拼) count as whole
-        val recorded = listOfNotNull(pinned, firstHere) + used
+        // one record serves an input typed with tones and without: a typed tone the word disagrees with keeps it unraised
+        val all = listOfNotNull(pinned, firstHere) + used
+        val toneOff = toneOff(graph, end, all)
+        val recorded = all.filter { it.text !in toneOff }
         walkIn(graph, end, recorded, false, present, ::add)
         walkIn(graph, end, spelled, slips, present, ::add)
         // own and added words the input reads here, under every code; imported ones in their slot
@@ -140,7 +149,21 @@ internal class HabitOrder(
                 .take(IMPORTS_PER_LEVEL).forEach { add(it.first) }
         }
         val gate = gate(graph, code, end)
-        return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere, recorded.mapTo(HashSet()) { it.text }, gate)
+        return Level(end, code, prev, injected.map { Candidate(it.text, it.end, low, it.words, it.ends) }, habitsHere, recorded.mapTo(HashSet()) { it.text }, gate, toneOff)
+    }
+
+    // texts of [words] the input reads to [end] yet not with the tones typed there
+    private fun toneOff(graph: SyllableGraph, end: Int, words: List<Words>): Set<String> {
+        if (toneAllows == null || words.isEmpty() || (graph.start until end).none { ZhuyinKeys.toneOf(graph.input[it]) > 0 }) return emptySet()
+        return words.filter { walk(graph, end, it, slips = false) != null && walk(graph, end, it, slips = false, toned = true) == null }.mapTo(HashSet()) { it.text }
+    }
+
+    // [view] with [off] texts neither pinned, first nor used: ranked as the tone puts them, like any other word
+    private fun toned(off: Set<String>) = object : HabitRanker.View by view {
+        override fun pinned(code: Code) = view.pinned(code)?.takeUnless { it.text in off }
+        override fun first(code: Code, prev: String) = view.first(code, prev)?.takeUnless { it.text in off }
+        override fun uses(code: Code, words: Words) = if (words.text in off) 0 else view.uses(code, words)
+        override fun corrections(code: Code, words: Words) = if (words.text in off) 0 else view.corrections(code, words)
     }
 
     // 双拼's gate, by every word of the start the decoder read to [end], once per decode (by candidates alone it opened
@@ -178,10 +201,11 @@ internal class HabitOrder(
         return here
     }
 
-    /** [words] as the model has them along [graph] to [end]; null if one is none, blocked, or unread there. With [slips] the code reads whole where keys also read slipped, so not along a slip (`ta` near y raises no 呀); a key alone (简拼) is no slip. */
-    private fun walk(graph: SyllableGraph, end: Int, words: Words, start: Int = graph.start, slips: Boolean = holdsSlips(graph, start, end)): Candidate? {
+    /** [words] as the model has them along [graph] to [end]; null if one is none, blocked, or unread there. With [slips] the code reads whole where keys also read slipped, so not along a slip (`ta` near y raises no 呀); a key alone (简拼) is no slip. With [toned], only where each character may take the tone typed after its syllable. */
+    private fun walk(graph: SyllableGraph, end: Int, words: Words, start: Int = graph.start, slips: Boolean = holdsSlips(graph, start, end), toned: Boolean = false): Candidate? {
         // a pinned sentence is one record word, split into model words
-        sentence(words)?.let { return walk(graph, end, it, start, slips) }
+        sentence(words)?.let { return walk(graph, end, it, start, slips, toned) }
+        val allows = toneAllows.takeIf { toned }
         val user = user
         val ids = IntArray(words.list.size)
         val syllables = ArrayList<IntArray>(words.list.size)
@@ -196,6 +220,7 @@ internal class HabitOrder(
             ids[i] = id
             syllables += entry?.syllables ?: return startWord(graph, start, end, id, words, slips)
         }
+        val chars = if (allows == null) null else toneChars(words, syllables)
         val ends = IntArray(ids.size)
         fun go(word: Int, k: Int, at: Int): Boolean {
             if (k == syllables[word].size) {
@@ -205,12 +230,23 @@ internal class HabitOrder(
             for (e in graph.edges(at)) {
                 if (!passes(graph, e, end, slips)) continue
                 val m = graph.matches(e)
-                if ((0 until m.size).any { m.syllable(it) == syllables[word][k] } && go(word, k + 1, graph.to(e))) return true
+                if ((0 until m.size).any { m.syllable(it) == syllables[word][k] } && agrees(graph, e, allows, chars?.get(word), syllables[word], k) && go(word, k + 1, graph.to(e))) return true
             }
             return false
         }
         // its end is the graph's place, as for the decoder's candidates and the levels
         return if (go(0, 0, start)) Candidate(words.text, end, 0f, ids, ends) else null
+    }
+
+    // each word's characters, where one per syllable: else no telling which a tone is of, as for the decoder
+    private fun toneChars(words: Words, syllables: List<IntArray>) =
+        Array(words.list.size) { i -> words.list[i].text.codePoints().toArray().takeIf { it.size == syllables[i].size } }
+
+    // whether character [k] of a word ([chars], [syllables]) may take the tone typed after [e]
+    private fun agrees(graph: SyllableGraph, e: Int, allows: ((Int, Int, Int) -> Boolean)?, chars: IntArray?, syllables: IntArray, k: Int): Boolean {
+        if (allows == null || chars == null) return true
+        val tone = graph.tone(e)
+        return tone == 0 || allows(chars[k], syllables[k], tone)
     }
 
     // whether a word may continue over [e]: no raw input, nothing past [end], no slip where [slips]
@@ -313,7 +349,8 @@ internal class HabitOrder(
             val code = recorder.code(from + a, from + b, emptyList())
             // the same keys end before a separator and past it: only past it is a node, as the walk asks
             under.filter { it.code == code }.forEach { k ->
-                walk(graph, b, k.words, a)?.let { c ->
+                // a pin or first the typed tones disagree with is kept out, as at its level
+                walk(graph, b, k.words, a, toned = true)?.let { c ->
                     items += Enforced.Item(a, b, c.words, c.ends, c.text, k.prev, if (k.prev == null) Enforced.Kind.PIN else Enforced.Kind.FIRST)
                 }
             }
@@ -361,7 +398,7 @@ internal class HabitOrder(
             // exact reading asked only where an imported word needs its slot
             val imports = slots.any { imported(list[it]) }
             val items = slots.map { item(graph, list[it], list[it] in injected, level.habitsHere, imports, readings, alone?.get(it) == true) }
-            val ranked = HabitRanker.rank(items, level.code, level.prev, view, readsWholeAsTyped(graph, graph.start, level.end), level.gate)
+            val ranked = HabitRanker.rank(items, level.code, level.prev, if (level.toneOff.isEmpty()) view else toned(level.toneOff), readsWholeAsTyped(graph, graph.start, level.end), level.gate)
             for ((i, r) in ranked.withIndex()) {
                 list[slots[i]] = r.value
                 ranks[r.value] = r

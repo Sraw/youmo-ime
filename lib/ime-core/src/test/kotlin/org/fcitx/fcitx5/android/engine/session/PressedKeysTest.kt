@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,6 +21,12 @@ class PressedKeysTest {
         assertEquals("64426", keys.keys(0, 5))
         assertEquals("44", keys.keys(1, 3))
         assertEquals(5, keys.length)
+    }
+
+    @Test
+    fun zhuyinsTonesAreNoKeysAsTheSeparatorIsNone() {
+        keys.insert(0, "a${ZhuyinKeys.toneCode(3)}b'c")
+        assertEquals("abc", keys.keys(0, 5))
     }
 
     @Test

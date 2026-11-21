@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.core.ShuangpinNames
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
+import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.nineSp
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
@@ -49,6 +50,8 @@ class LearnedItemsFragmentTest {
         assertEquals(R.string.learning_kind_shuangpin_keys14, kind(Kinds.shuangpinKeys("Ziranma", NineKeyLetters.G14.tag())))
         assertEquals(R.string.learning_kind_strokes, kind(Kinds.table(StrokeLookup.BLOCK_TABLE)))
         assertEquals(R.string.learning_kind_keys_own, kind(Kinds.keys(OWN.tag())))
+        assertEquals(R.string.keyboard_zhuyin_nine, kind(Kinds.ZHUYIN_NINE))
+        assertEquals(R.string.keyboard_zhuyin_full, kind(Kinds.ZHUYIN_DACHEN))
     }
 
     // grouped codes are shown as the letters on each key; the nine keys' digits stay digits
@@ -70,6 +73,15 @@ class LearnedItemsFragmentTest {
         assertEquals("一丨丿丶乛", LearnedItemsFragment.keys(Code(Kinds.table(StrokeLookup.BLOCK_TABLE), "hspnz")))
         // anything else in a strokes block as stored, not the whole list failing
         assertEquals("hx", LearnedItemsFragment.keys(Code(Kinds.table(StrokeLookup.BLOCK_TABLE), "hx")))
+        // zhuyin's codes as symbols: 大千's a symbol a key, 注音九键's groups spaced; a tone of an older code as its mark
+        val ni = "ㄋㄧ".map { ZhuyinKeys.symbolCode(it) }.joinToString("")
+        assertEquals("ㄋㄧ", LearnedItemsFragment.keys(Code(Kinds.ZHUYIN_DACHEN, ni)))
+        assertEquals("ㄋㄧˊ", LearnedItemsFragment.keys(Code(Kinds.ZHUYIN_DACHEN, ni + ZhuyinKeys.toneCode(2))))
+        val niNine = "ㄋㄧ".map { s -> ZhuyinKeys.groupCode(ZhuyinKeys.GROUP_SYMBOLS.indexOfFirst { s in it }) }.joinToString("")
+        assertEquals("ㄇㄋㄜ ㄔㄘㄣㄧ", LearnedItemsFragment.keys(Code(Kinds.ZHUYIN_NINE, niNine)))
+        // an initial taken off the bar is its symbol typed as itself
+        assertEquals("ㄓ ㄕㄙㄤㄨ ㄖㄥㄩ", LearnedItemsFragment.keys(Code(Kinds.ZHUYIN_NINE, "${ZhuyinKeys.symbolCode('ㄓ')}${ZhuyinKeys.groupCode(8)}${ZhuyinKeys.groupCode(10)}")))
+        assertEquals("ㄇㄋㄜ ㄔㄘㄣㄧ ˇ", LearnedItemsFragment.keys(Code(Kinds.ZHUYIN_NINE, niNine + ZhuyinKeys.toneCode(3))))
     }
 
     // Robolectric for the label's strings, this test alone: the rest stay plain JVM
