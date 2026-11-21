@@ -27,8 +27,11 @@ internal class BeamSearch(
     private var statePrev = IntArray(0)
     private var stateBack = IntArray(0) // -1 for the empty sequence at the start
 
-    private val contexts = LongArray(beam) // of the beam being extended, from scorer
-    private val runs = LongArray(beam) // the scorer's trigrams for each of contexts
+    // each state's scorer context and trigrams, made once per beam: a kept beam's are kept with it, and a key
+    // re-extends kept beams wherever arcs from them reach the changed end (most over 双拼 keys read alone)
+    private var contexts = LongArray(0)
+    private var runs = LongArray(0)
+    private var looked = BooleanArray(0)
 
     /** Words scored after a sequence in the last search: [PinyinDecoder.Work.scored]. */
     var scored = 0
@@ -56,9 +59,13 @@ internal class BeamSearch(
             stateWord = stateWord.copyOf((n + 1) * beam)
             statePrev = statePrev.copyOf((n + 1) * beam)
             stateBack = stateBack.copyOf((n + 1) * beam)
+            contexts = contexts.copyOf((n + 1) * beam)
+            runs = runs.copyOf((n + 1) * beam)
+            looked = looked.copyOf(n + 1)
         }
         val from = if (last >= 0) unchangedUntil(arcs, lastArcs, graph, last) else graph.start
         beamSize.fill(0, from, n + 1)
+        looked.fill(false, from, n + 1)
         if (from == graph.start) insert(graph.start, 0f, prev, prev2, -1)
         scored = 0
         for (at in graph.start until n) {
@@ -70,19 +77,18 @@ internal class BeamSearch(
     private fun extend(arcs: Lattice, at: Int, from: Int, wholeEnd: Int) {
         val first = at * beam
         val size = beamSize[at]
-        var looked = false
         var asked = 0
         // those ending before [from] come first, and their beams are kept
         for (a in arcs.firstEndingAt(at, from) until arcs.start[at + 1]) {
             val to = arcs.to[a]
             if (arcs.flags[a] and START_ONLY != 0) continue // a start-only word begins no sentence
-            if (!looked) {
+            if (!looked[at]) {
                 // once per state, not per arc: most of a word's scoring cost. Arcs only go forward, so this beam is stable
-                for (k in 0 until size) {
-                    contexts[k] = scorer.context(statePrev[first + k], stateWord[first + k])
-                    runs[k] = scorer.trigrams(contexts[k]).bits
+                for (s in first until first + size) {
+                    contexts[s] = scorer.context(statePrev[s], stateWord[s])
+                    runs[s] = scorer.trigrams(contexts[s]).bits
                 }
-                looked = true
+                looked[at] = true
             }
             val word = arcs.word[a]
             val scored = arcs.scored[a]
@@ -92,7 +98,7 @@ internal class BeamSearch(
                 val base = stateScore[s] + arcs.cost[a]
                 // scores only fall from here, and the states come best first
                 if (beamSize[to] == beam && base <= stateScore[to * beam + beam - 1]) break
-                val lm = if (word == NO_WORD) 0f else scoring.scoreAfter(contexts[k], Trigrams(runs[k]), scored)
+                val lm = if (word == NO_WORD) 0f else scoring.scoreAfter(contexts[s], Trigrams(runs[s]), scored)
                 insert(to, base + lm, word, stateWord[s], s)
                 asked++
             }

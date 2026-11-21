@@ -452,6 +452,32 @@ class PinyinDecoderTest {
     }
 
     @Test
+    fun aKeyLooksUpNoKeptSequencesContext() {
+        var contexts = 0
+        val model = WordScorer.of(data.model)
+        val counting = object : WordScorer by model {
+            override fun context(prev2: Int, prev: Int): Long = model.context(prev2, prev).also { contexts++ }
+        }
+        // words over 双拼 initials reach back many keys: the sequences there, kept, are extended again
+        val segmenter = ShuangpinSegmenter(ShuangpinScheme.ZIRANMA, abbreviations = true)
+        val input = "nihcmazljmwo".repeat(6)
+        fun count(d: PinyinDecoder, input: String): Int {
+            contexts = 0
+            d.decode(segmenter.segment(input))
+            return contexts
+        }
+        val d = PinyinDecoder(data.dictionary, data.vocabulary, counting)
+        count(d, input)
+        val key = count(d, input + "v")
+        // the new key's beam and the first words' context, not again those of the kept beams arcs reach on from
+        assertTrue("$key", key <= PinyinDecoder.DEFAULT_BEAM + 2)
+        // a key changed mid-input: the beams from it are made again, and their contexts with them
+        val edited = input.replaceRange(30, 31, "x") + "v"
+        val read = describe(d.decode(segmenter.segment(edited)))
+        assertEquals(describe(PinyinDecoder(data.dictionary, data.vocabulary, model).decode(segmenter.segment(edited))), read)
+    }
+
+    @Test
     fun aKeyAtTheEndScoresNoFirstWordAgain() {
         val wo = id("我")
         // after the committed 我 only the words from the start are scored

@@ -336,7 +336,8 @@ internal class LatticeBuilder(
         val first = dictionary.wordsOf(node)
         for (at in first until first + words) {
             val word = dictionary.wordAt(at)
-            if (user?.blocked(word, node) != true && typedOver(word)) arcs.add(to, word, cost + dictionary.weightAt(at) + coarseness(word) + toneCost(word), short = short)
+            // typed first: over a lone key most words are not, and blocked asks more
+            if (typedOver(word) && user?.blocked(word, node) != true) arcs.add(to, word, cost + dictionary.weightAt(at) + coarseness(word) + toneCost(word), short = short)
         }
     }
 

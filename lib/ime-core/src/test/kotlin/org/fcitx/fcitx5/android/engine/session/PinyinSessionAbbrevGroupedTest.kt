@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.session.Action.Reset
 import org.fcitx.fcitx5.android.engine.session.Action.Select
@@ -73,6 +74,35 @@ class PinyinSessionAbbrevGroupedTest {
         for (letters in keyboards) {
             assertTrue("$letters", "什么时候" !in session(letters, null).shown("ufmuh", letters))
             assertEquals("$letters", "什么时候", session(letters, null).shown("ufmeuihb", letters).first())
+        }
+    }
+
+    // a key walks again only the code row's words it changed; one kept reads as a fresh session reads it
+    @Test
+    fun aKeyWalksAgainOnlyTheWordsItChanges() {
+        val polyphone = pinyinDataOf(Triple("可以", "ke yi", -3f), Triple("行", "xing", -2f), Triple("行", "hang", -2f))
+        for (letters in keyboards) {
+            val kept = session(letters, null)
+            val keys = codes("keyixwmmkyufme", letters)
+            var walked = 0
+            for (key in keys) {
+                val before = kept.readingsWalked
+                kept.apply(Key(key))
+                walked = kept.readingsWalked - before
+            }
+            // ke yi xia mian kuai shen me: 什么 alone, not 可以 下面 快 again
+            assertEquals("$letters", 1, walked)
+            // 行 over the same keys after an edit, read anew: hang, not xing
+            fun session() = PinyinSession(polyphone, GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, letters), pageSize = 20, prediction = false)
+            val edited = session().run {
+                codes("keyixy", letters).forEach { apply(Key(it)) }
+                apply(Backspace)
+                apply(Backspace)
+                codes("hh", letters).map { apply(Key(it)) }.last()
+            }
+            val fresh = session().run { codes("keyihh", letters).map { apply(Key(it)) }.last() }
+            assertTrue("$letters ${fresh.preedit}", fresh.preedit.endsWith("hang"))
+            assertEquals("$letters", fresh.preedit, edited.preedit)
         }
     }
 

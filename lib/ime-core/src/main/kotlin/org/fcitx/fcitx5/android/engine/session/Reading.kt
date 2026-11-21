@@ -26,7 +26,6 @@ internal fun reading(
     graph: SyllableGraph, from: Int, to: Int, word: Int, dictionary: PinyinDictionary, own: UserWords?,
     show: (edge: Int, syllable: Int) -> String,
 ): Reading? {
-    val shown = ArrayList<String>()
     val ends = ArrayList<Int>()
     val syllables = ArrayList<Int>()
     val edges = ArrayList<Int>()
@@ -41,22 +40,19 @@ internal fun reading(
         for (e in graph.edges(at)) {
             if (graph.kind(e) == Kind.RAW || graph.to(e) > to) continue
             val m = graph.matches(e)
-            // exact readings first; a key read alone is walked along the trie's children
-            val order = if (graph.isAbbreviation(e)) trie.matched(node, m) else m.byFlags()
-            for (i in order) {
-                val child = trie.child(node, m.syllable(i))
-                if (child < 0) continue
+            val steps = trie.steps(node, m)
+            for (k in 0 until steps.size step 2) {
+                val i = steps[k]
+                val child = steps[k + 1]
                 val off = if (m.flags(i) and MISREAD != 0) 1 else 0
                 val slip = graph.slips(e)
                 val slipAt = if (slip == null) -1 else graph.from(e) + slip.at(i)
-                shown += show(e, m.syllable(i))
                 ends += graph.to(e)
                 syllables += m.syllable(i)
                 edges += e
                 misread += off
                 if (slip != null) slips[slipAt] = slip.meant(i)
                 if (walk(graph.to(e), child)) return true
-                shown.removeAt(shown.size - 1)
                 ends.removeAt(ends.size - 1)
                 syllables.removeAt(syllables.size - 1)
                 edges.removeAt(edges.size - 1)
@@ -67,7 +63,8 @@ internal fun reading(
         return false
     }
 
-    return if (walk(from, trie.root)) Reading(shown, ends, syllables.toIntArray(), misread == 0, slips, edges.toIntArray()) else null
+    // shown only once found: most steps are dead ends, and a key alone has a score of syllables to try
+    return if (walk(from, trie.root)) Reading(edges.indices.map { show(edges[it], syllables[it]) }, ends, syllables.toIntArray(), misread == 0, slips, edges.toIntArray()) else null
 }
 
 private const val MISREAD = SyllableMatches.FUZZY or SyllableMatches.TYPO or SyllableMatches.NEIGHBOUR
@@ -78,15 +75,27 @@ private class Spelt(private val word: Int, private val dictionary: PinyinDiction
 
     val root = starts?.root ?: own?.root ?: dictionary.root
 
-    /** The indexes of [m] with a child at [node], exact first: by the dictionary's children where they are few; else every index. */
-    fun matched(node: Int, m: SyllableMatches): IntArray {
+    /**
+     * Each index of [m] with a child at [node], then that child: exact readings first, ties in syllable order. Along
+     * the dictionary's children where they are few (a key read alone stands for a score of syllables), else looked up.
+     */
+    fun steps(node: Int, m: SyllableMatches): IntArray {
         // a user's node may lie beyond the dictionary's nodes
-        if (starts != null || own != null) return m.byFlags()
-        val children = dictionary.childCount(node)
+        val children = if (starts != null || own != null) Int.MAX_VALUE else dictionary.childCount(node)
         // one number with PinyinDecoder, so the two never read apart
-        if (children > PinyinDecoder.WALKED_PER_MATCH * m.size) return m.byFlags()
+        if (children > PinyinDecoder.WALKED_PER_MATCH * m.size) {
+            val out = IntArray(2 * m.size)
+            var n = 0
+            for (i in m.byFlags()) {
+                val c = child(node, m.syllable(i))
+                if (c < 0) continue
+                out[n++] = i
+                out[n++] = c
+            }
+            return out.copyOf(n)
+        }
         val first = dictionary.firstChild(node)
-        val out = IntArray(children)
+        val out = IntArray(2 * children)
         var n = 0
         var mixed = false
         for (c in first until first + children) {
@@ -94,9 +103,11 @@ private class Spelt(private val word: Int, private val dictionary: PinyinDiction
             if (i < 0) continue
             if (n > 0 && m.flags(i) != m.flags(out[0])) mixed = true
             out[n++] = i
+            out[n++] = c
         }
-        val found = out.copyOf(n)
-        return if (mixed) found.sortedBy { m.flags(it) }.toIntArray() else found
+        if (!mixed) return out.copyOf(n)
+        val order = (0 until n / 2).sortedBy { m.flags(out[2 * it]) }
+        return IntArray(n) { out[2 * order[it / 2] + it % 2] }
     }
 
     fun child(node: Int, syllable: Int) = starts?.child(node, syllable) ?: own?.child(node, syllable) ?: dictionary.child(node, syllable)

@@ -548,6 +548,12 @@ class PinyinSession(
         recorder.pick(c, readFrom(), input.length - readFrom(), entries, candidates, shownAside, ::text, nineKeys?.anyTaken == true, pieces.isEmpty(), lastRead.ranks[c]?.original == true, slips)
     }
 
+    /** For tests: words the code row has walked the graph for, not kept from an earlier key. */
+    internal val readingsWalked get() = shows.walked
+
+    /** For tests: off, the code row walks every word's reading anew, the reference a kept one is held to. */
+    internal var keepsReadings = true
+
     /** For tests: the kept keys must cover the input a place each. */
     internal val pressedInStep get() = recorder.pressed.length == input.length
 
@@ -657,6 +663,7 @@ class PinyinSession(
         // what another input method learned since would not reach the scores the decoder keeps key to key
         decoder.reset()
         nineKeys?.clear()
+        shows.clear()
         recorder.clear()
         pieces.clear()
         pager.reset()
@@ -919,8 +926,33 @@ class PinyinSession(
             return keyed?.keysShown(meant, syllable) ?: keyed.typedOrSelf(meant)
         }
 
-        fun reading(graph: SyllableGraph, from: Int, to: Int, word: Int): Reading? =
-            reading(graph, from, to, word, data.dictionary, user?.takeIf { word >= data.vocabulary.size }) { e, syllable -> shown(graph, e, syllable) }
+        // a dictionary word's reading is the graph before its end (what SyllableGraph.sameUntil compares) and the session's
+        // fixed settings only, so a key, changing the graph near its end, keeps the rest; a user's word follows their words
+        private var keptGraph: SyllableGraph? = null
+        private val kept = HashMap<Long, Reading?>()
+        var walked = 0
+            private set
+
+        fun reading(graph: SyllableGraph, from: Int, to: Int, word: Int): Reading? {
+            if (!keepsReadings || word >= data.vocabulary.size || to >= KEPT_PLACES) return read(graph, from, to, word)
+            if (graph !== keptGraph) {
+                val same = keptGraph?.takeIf { it.start == graph.start }?.let(graph::sameUntil) ?: -1
+                kept.keys.removeIf { (it ushr TO_SHIFT).toInt() > same }
+                keptGraph = graph
+            }
+            val key = to.toLong() shl TO_SHIFT or (from.toLong() shl Int.SIZE_BITS) or word.toLong()
+            return if (kept.containsKey(key)) kept[key] else read(graph, from, to, word).also { kept[key] = it }
+        }
+
+        fun clear() {
+            keptGraph = null
+            kept.clear()
+        }
+
+        private fun read(graph: SyllableGraph, from: Int, to: Int, word: Int): Reading? {
+            walked++
+            return reading(graph, from, to, word, data.dictionary, user?.takeIf { word >= data.vocabulary.size }) { e, syllable -> shown(graph, e, syllable) }
+        }
     }
 
     companion object {
@@ -936,6 +968,10 @@ class PinyinSession(
 
 // as long as the text the context is read from, so a match is not chance
 private const val OVERLAP = 24
+
+// a kept reading's end and start, 16 bits each, beside its word: a longer input's readings are not kept
+private const val TO_SHIFT = 48
+private const val KEPT_PLACES = 1 shl (Long.SIZE_BITS - TO_SHIFT)
 
 // well over what the reranker has room for, so a commit drops only text it no longer reads
 private const val RECENT = 128

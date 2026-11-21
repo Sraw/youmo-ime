@@ -224,7 +224,10 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
    position: those onto where the graph changed or past it, at least the last key; not while a tone
    is typed, a word's tones being asked of the whole path).
    The first words keep their scores and order while the arcs from the start are the last decode's
-   and none reads to the end.
+   and none reads to the end. Each state's scorer context (the bigram looked up, the trigram run) is made
+   once a beam and kept with a kept beam: arcs from kept positions that reach where the graph changed are
+   scored again each key, over 双拼 keys read alone from a dozen positions back (`PinyinDecoderTest`'s
+   `aKeyLooksUpNoKeptSequencesContext`).
    `PinyinDecoder.work` counts what a decode took (arcs; steps, which guard `collectOn`; words scored
    in the search; first words scored anew, which guard the scores kept), the same on any
    machine: `ShuangpinKeyWorkTest` (`:lib:ime-eval:uatTest`) holds a 小鹤 key on the app's data
@@ -351,8 +354,16 @@ they share the large model's slices at a pause (`session/RefineSlices`) too.
   the first 64 whatever more is asked, so a list read further (`PinyinSession.readUntil`) begins with the one before. Over a key alone the
   decoder walks the dictionary node's children that have a word typed below (`LatticeBuilder.collectTyped`,
   `UserWords.nextTypedBelow`, `TypedNodes.nextBelow`) instead of looking up each of the key's 20–60 syllables;
-  `Reading.matched` walks a node's children the same way where they are few (`WALKED_PER_MATCH`). The lattice is
+  a reading (`Spelt.steps` in Reading.kt) walks a node's children the same way where they are few (`WALKED_PER_MATCH`),
+  over every edge, each match with its child. The lattice is
   the same either way (`PinyinDecoderTypedTest`, `ReadingSlipsTest`).
+- **The code row's readings, kept** (`PinyinSession.Shows`, every pinyin, 双拼 and 注音 session). A dictionary
+  word's reading is only the graph before its end (what `SyllableGraph.sameUntil` compares: each edge's end, kind,
+  matches with their flags, slips, the weights against it (`edgeAgainst`) and the input under it) and the session's fixed settings (`keysShown`, `spell`,
+  the keyed keyboard), so it is kept from key to key and dropped from where the graph changed on; a user's word,
+  read through the user's dictionary, is read anew each time. Whatever `shown()` or `reading()` comes to read
+  `sameUntil` must compare too (`PinyinSessionReadingsKeptTest`: random keys, places, edits, cursor moves and picks
+  on eight keyboards, held to a session reading every word anew).
 - **Across one keyboard's spellings** (U-20, D32 B; the user's rule in docs/pinyin.md 完整拼音和简拼).
   Not in the scores but in the ranking (`HabitRanker.spellings`): `SpelledForm` tells a code's keys
   as the full spelling, the 简拼 (a key a syllable) or a part of a word of two syllables or more, by
@@ -1389,3 +1400,12 @@ typed; the 6T is timed against `dev/design/061-sp-abbrev/6t-base.md` (p50, 小�
 14 keys 16.0, nine keys 21.3). w3000 is the design's draw of 3000 words by frequency (not in the tree); a history
 from the tree is `ime-eval history <pinyin.data> 3000 <words.txt>`, the likeliest 3000, typed on a device with
 `HISTORY=<words.txt> lib/ime-eval/run-on-device.sh` (specs/testing.md).
+Of that cost the code line's was its readings: each key read every word of the sentence again, a walk over a key
+alone trying a score of syllables down the dictionary. Now `PinyinSession`'s `Shows` keeps a dictionary word's
+reading from key to key while the graph before the word's end is the same (`SyllableGraph.sameUntil`), and a
+reading walks children where they are few and makes its shown text only once found; in the search the kept
+beams keep their scorer contexts. A key on the nine keys (小鹤, w3000, taps placed): 15.4 → 6.9 readings,
+5,400 → 530 child lookups, 88 → 16 contexts looked up; arcs, steps and words scored as before, and every
+candidate and code line the same (`ime-eval pinyin` on the chat set and the gate's long inputs). On the emulator
+(`EngineEvalRunner`, the three 6T sets, three rounds alternated after a warm-up) keys 41–60, p50, by the median
+of the rounds' changes: nine keys −12%, 14 keys −4%, 18 keys −3%; the 6T is to be timed.
