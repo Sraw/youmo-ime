@@ -774,7 +774,7 @@ test('17 键: 18 键 with H and JK one key of its own name, its own corner; the 
   assert.equal(letters.map((k) => k.letters || '').join('').replace(/;/g, '').split('').sort().join(''), 'abcdefghijklmnopqrstuvwxyz');
 });
 
-test("AZERTY: the French rows, the app's letter keys, ' after N; ; and * after it where 双拼 or a table asks", () => {
+test("AZERTY: the French rows, the app's letter keys, ' after N; ; and * after it where 双拼 or a table asks; 拼 only where the table has it", () => {
   const x = example('azerty').xml;
   const l = E.readOwnLayout(x).layout;
   const rows = (keys) => [0, 175, 350].map((y) => keys.filter((k) => k.bounds[1] === y).map((k) => k.id).join(' '));
@@ -782,8 +782,9 @@ test("AZERTY: the French rows, the app's letter keys, ' after N; ; and * after i
   assert.deepEqual(rows(pinyin), ['a z e r t y u i o p', 'q s d f g h j k l m', 'shift w x c v b n quote backspace']);
   for (const k of pinyin.filter((k) => /^[a-z]$/.test(k.id))) assert.equal(k.shortcut, 'full/' + k.id);
   assert.deepEqual(rows(drawn(l, { ime: 'shuangpin', schemeTypes: ['semicolon'] })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'shift w x c v b n quote semicolon backspace']);
-  assert.deepEqual(rows(drawn(l, { ime: 'table', table: 'cangjie', tableExtra: 'star' })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'lookup w x c v b n quote star backspace']);
-  assert.deepEqual(rows(drawn(l, { ime: 'table', table: 'wubi', tableExtra: 'semicolon' })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'lookup w x c v b n quote semicolon backspace']);
+  assert.deepEqual(rows(drawn(l, { ime: 'table', table: 'cangjie', tableExtra: 'star', tableLookUp: true })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'lookup w x c v b n quote star backspace']);
+  // 五笔 looks up behind z: ⇧ comes back where 拼 goes, though the file was written before `table-lookup`
+  assert.deepEqual(rows(drawn(l, { ime: 'table', table: 'wubi', tableExtra: 'semicolon' })), ['a z e r t y u i o p', 'q s d f g h j k l m', 'shift w x c v b n quote semicolon backspace']);
   assert.equal(drawn(l, { ime: 'english' }).find((k) => k.id === 'a').label, 'a');
 });
 

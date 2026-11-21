@@ -552,7 +552,9 @@ test('checkLayout answers as the app\'s import would, and writeLayout writes wha
   const r = E.checkLayout(own, '0.6.1', null);
   assert.equal(r.ok, true, JSON.stringify(r.errors));
   assert.equal(r.family, 'letters');
-  assert.equal(r.minApp, '0.6.1', 'based-on= is 0.6.1\'s');
+  assert.equal(r.minApp, '0.6.3', 'the lookup key\'s switch is 0.6.3\'s');
+  const older = E.checkLayout(own.replace(', table !table-lookup', '').replaceAll(' table-lookup', ''), '0.6.1', null);
+  assert.equal(older.minApp, '0.6.1', 'based-on= is 0.6.1\'s');
   assert.deepEqual(Array.from(r.pads), []);
   assert.deepEqual(Array.from(r.commits), []);
   assert.ok(!Array.from(r.warnings).some((w) => w.key === 'commits'));
