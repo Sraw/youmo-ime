@@ -226,7 +226,10 @@ abstract class BaseInputView(
         removeCallbacks(offerDue)
         offerGate.noticed()
         offerShown = choices.isNotEmpty()
-        val chip = undoChip ?: UndoChip(undoAnchor, theme, ::undoPlace).also { undoChip = it }
+        val chip = undoChip ?: UndoChip(undoAnchor, theme, ::undoPlace).also {
+            it.dismissed = offerGate::hidden
+            undoChip = it
+        }
         return chip.show(message, undo, aboveKeys, steady, ms, choices)
     }
 
@@ -243,6 +246,8 @@ abstract class BaseInputView(
     private val offerGate = WordOfferGate()
 
     private val offerDue = Runnable { showOffer() }
+
+    private val offerSeen = Runnable { offerGate.seen(SystemClock.uptimeMillis())?.let { id -> fcitx.runIfReady { offerShown(id) } } }
 
     // the notice shown is a word offer
     private var offerShown = false
@@ -277,7 +282,9 @@ abstract class BaseInputView(
             UndoChip.Choice("${w.text} ${w.code}", said) { remember(offer.id, i) }
         }
         if (notice(context.getString(R.string.word_offer), null, aboveKeys = true, ms = NoticeState.STAYS, choices = choices)) {
-            fcitx.runIfReady { offerShown(offer.id) }
+            offerGate.shown(offer.id, SystemClock.uptimeMillis())
+            removeCallbacks(offerSeen)
+            postDelayed(offerSeen, WordOfferGate.SEEN_MS)
         }
     }
 
@@ -290,6 +297,7 @@ abstract class BaseInputView(
 
     private fun dropOffer() {
         removeCallbacks(offerDue)
+        removeCallbacks(offerSeen)
         offerGate.released()
         offerGate.noticed()
         offerShown = false

@@ -32,7 +32,7 @@ class TableWordOffers(
     var offer: WordOffer? = null
         private set
 
-    // put up by the app: one held back (another notice up, a finger down) was never seen
+    // told by the app once up long enough to read: one held back (another notice up, a finger down) or gone at once was never seen
     private var seen = false
 
     // the code being typed has a glided key: its commit is a glide's, which ends a run
@@ -98,7 +98,7 @@ class TableWordOffers(
         offer = null
     }
 
-    /** The app showed offer [id]. */
+    /** The app's offer [id] stayed up long enough to read. */
     fun shown(id: Int) {
         if (offer?.id == id) seen = true
     }

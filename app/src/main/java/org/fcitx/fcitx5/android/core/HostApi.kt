@@ -142,7 +142,7 @@ interface TypingApi {
     /** The notice's 撤销 of [rememberWord]: [text] unsaved from [code] and its commit taken back. */
     suspend fun unrememberWord(text: String, code: String)
 
-    /** Offer [id] went up on the notice strip: one never shown is offered again. */
+    /** Offer [id] stayed up on the notice strip long enough to read (WordOfferGate.SEEN_MS): one never seen is offered again. */
     suspend fun offerShown(id: Int)
 
     suspend fun tableKeys(im: String): Set<Char>

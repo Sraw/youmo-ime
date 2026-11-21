@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.WordOfferGate
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -56,8 +57,10 @@ class TableWordOfferUatTest {
         h.advance(WordOfferGate.PAUSE_MS - 1)
         assertNull("not before the pause", h.notice())
         h.advance(1)
+        // only an offer the user had time to read counts as left once it goes: told a second on, not as it goes up
+        assertFalse(h.api.calls.toString(), "offerShown(7)" in h.api.calls)
         assertEquals(listOf(h.service.getString(R.string.word_offer), "汪小明 iije", "小明 ihje"), h.noticeTexts())
-        // only an offer the user saw counts as left once it goes
+        h.advance(WordOfferGate.SEEN_MS)
         assertTrue(h.api.calls.toString(), "offerShown(7)" in h.api.calls)
         h.capture("TableWordOfferUatTest/offer", h.notice()!!.contentView)
         h.tap(shown("小明 ihje")!!)
@@ -134,6 +137,40 @@ class TableWordOfferUatTest {
         rows.forEach { (why, run) ->
             assertTrue(why, run())
             h.notice()?.dismiss()
+            h.advance(WordOfferGate.PAUSE_MS)
+        }
+    }
+
+    // the next key often comes as it goes up: a flash is no look, so the session may offer its words again
+    @Test
+    @Uat("TBL-11b")
+    fun anOfferGoneWithinASecondIsNotToldSeen() {
+        class Row(val why: String, val id: Int, val told: Boolean, val soon: () -> Unit)
+        val rows = listOf(
+            Row("left up", 11, told = true) {},
+            Row("the next key withdrew it", 12, told = false) { h.emit(HostEvent.WordOffer(null)) },
+            Row("the field changed: withdrawn as well", 13, told = false) {
+                h.field.setText("汪小明了")
+                h.emit(HostEvent.WordOffer(null))
+            },
+            Row("another notice took its place", 14, told = false) { h.emit(HostEvent.WordRemembered(OfferedWord("汪小", "iiig"))) },
+            Row("tapped away", 15, told = false) { h.tap(h.notice()!!.contentView) },
+            // last: the letters stay away
+            Row("symbols put it away", 16, told = false) { h.tap(h.key("符")) },
+        )
+        rows.forEach { row ->
+            h.field.setText("汪小明")
+            h.field.setSelection(3)
+            h.emit(HostEvent.WordOffer(offer.copy(id = row.id)))
+            h.advance(WordOfferGate.PAUSE_MS)
+            assertTrue(row.why, shown("汪小明 iije") != null)
+            // a third of a second or so: the harness lays out as it goes, which takes a little time too
+            h.advance(300)
+            row.soon()
+            h.advance(WordOfferGate.SEEN_MS)
+            assertEquals(row.why, if (row.told) 1 else 0, h.api.calls.count { it == "offerShown(${row.id})" })
+            h.notice()?.dismiss()
+            h.emit(HostEvent.WordOffer(null))
             h.advance(WordOfferGate.PAUSE_MS)
         }
     }

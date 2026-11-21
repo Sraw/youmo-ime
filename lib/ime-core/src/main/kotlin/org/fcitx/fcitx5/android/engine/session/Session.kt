@@ -194,7 +194,7 @@ sealed class Action {
     /** The notice's 撤销 of a [Remember]: [text] saved under [code] taken back with its commit. */
     data class Unremember(val text: String, val code: String) : Action()
 
-    /** Offer [id] went up on the notice strip: left untapped, it is not offered again in the field. */
+    /** Offer [id] stayed up on the notice strip long enough to read: left untapped, it is not offered again in the field. */
     data class OfferShown(val id: Int) : Action()
 
     /** 联想 put away (the bar's ×): unlike [Reset], the context, the session's own space and a correction's undo stay. */

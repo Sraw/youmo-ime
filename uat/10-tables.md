@@ -67,7 +67,7 @@
 - **前提**：B0-五笔。空框。
 - **操作**：点 i g 空格、i h 空格、j e 空格（汪、小、明），手离开键等 1 秒，看键盘上方（截图）；点提示条上的「汪小明 iije」，看提示条；点 `，`，再点 i i j e，看候选。
 - **预期**：等 1 秒后提示条是「记住：汪小明 iije」（「小明」句子模型看是半个词，不给），候选栏照旧是联想。点了以后框里仍是「汪小明」，提示条变成「记住了『汪小明』：五笔 iije」，带 **撤销**。提示条不按时间收起（停着不动它一直在）。iije 的候选里有「汪小明」。
-- **JVM**：`TablesUatTest.aCharacterAtATimeIsOfferedAndKeptOnATap`（:lib:ime-eval:uatTest，真数据，整个宿主）+ `TableWordOfferUatTest.anOfferGoesUpAfterThePauseAndATapRemembersIt`（0.8 秒前不出、出来是两个按钮、出来后告诉引擎看到了、点了发出记住、记住了的提示条撤销）+ app `UndoChipTest`、`NoticeStateTest`（不按时间收起）+ ime-core `TableWordLearningTest`（`aLoneCodeTakesTheRememberedWordAndNothingElse`：记住的词在 iije 下排第 2）、`WordOfferGateTest`；设备上跑（看提示条和点它）。
+- **JVM**：`TablesUatTest.aCharacterAtATimeIsOfferedAndKeptOnATap`（:lib:ime-eval:uatTest，真数据，整个宿主）+ `TableWordOfferUatTest.anOfferGoesUpAfterThePauseAndATapRemembersIt`（0.8 秒前不出、出来是两个按钮、出来满 1 秒才告诉引擎看到了、点了发出记住、记住了的提示条撤销）+ app `UndoChipTest`、`NoticeStateTest`（不按时间收起）+ ime-core `TableWordLearningTest`（`aLoneCodeTakesTheRememberedWordAndNothingElse`：记住的词在 iije 下排第 2）、`WordOfferGateTest`；设备上跑（看提示条和点它）。
 
 ### TBL-11a [P1] 不点就什么都不存
 <!-- learning: U-28 -->
@@ -79,9 +79,9 @@
 ### TBL-11b [P1] 不给出的
 <!-- learning: U-28 -->
 - **前提**：B0-五笔。
-- **操作**：分别逐字打：「汪小明」打到「明」后直接打 `，`（顶字）；「我找张伟」；「吃了吗」；「李明」（s b 空格、j e 空格）；码表里已有的词；给出后点提示条空白处收起，再逐字打一遍同样的字停一下。
-- **预期**：都不给出（打 `，`、虚词、码表已有（包括更短编码下已有的）、前缀接不下去、在提示条上看到过没点的同一个输入框里不再给；还没露出来就收掉的下次照样给）。
-- **JVM**：ime-core `TableWordLearningTest`（每种不给的一行，`anOfferNeverShownIsOfferedAgain`、`aWordTheTableHasUnderAShorterCodeIsNotOffered`）+ `TableWordOfferUatTest.noOfferWhileAFingerIsDownOverAnotherNoticeOrOnceWithdrawn`；设备上不跑。
+- **操作**：分别逐字打：「汪小明」打到「明」后直接打 `，`（顶字）；「我找张伟」；「吃了吗」；「李明」（s b 空格、j e 空格）；码表里已有的词；给出后等 2 秒再点提示条空白处收起，再逐字打一遍同样的字停一下。另一个空框里逐字打 i g 空格、i h 空格，停到提示条「记住：汪小 igih」刚出来就接着点 j e 空格，点 `，`，再逐字打 i g 空格、i h 空格停一下。
+- **预期**：都不给出（打 `，`、虚词、码表已有（包括更短编码下已有的）、前缀接不下去、提示条上露出 1 秒以上没点的同一个输入框里不再给）。只闪了一下（露出不到 1 秒就被接着的按键、框里的字或光标变了、别的提示条、点空白处、切到符号收掉）的不算看过：最后一次停下来照样给「汪小」；还没露出来就收掉的也一样。
+- **JVM**：ime-core `TableWordLearningTest`（每种不给的一行，`anOfferNeverShownIsOfferedAgain`、`aWordTheTableHasUnderAShorterCodeIsNotOffered`、`anOfferGoneWithinASecondIsOfferedAgainInTheField`：300 ms 被按键、光标移动、别的提示条收掉的再给，满 1 秒的不再给，换框的都再给）、`WordOfferGateTest`（`anOfferIsSeenOnlyOnceUpASecond`、`seenFromASecondUpAndToldOnce`）+ `TableWordOfferUatTest.noOfferWhileAFingerIsDownOverAnotherNoticeOrOnceWithdrawn`、`anOfferGoneWithinASecondIsNotToldSeen`（露出满 1 秒才告诉引擎看到了，300 ms 时被收掉的不告诉）；设备上不跑。
 
 ### TBL-11c [P1] 点错了：退格删光、提示条撤销、长按删除
 <!-- learning: U-28 U-03 -->

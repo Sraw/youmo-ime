@@ -9,15 +9,22 @@ import org.fcitx.fcitx5.android.engine.session.WordOffer
 
 /**
  * When a table's offered words go up on the notice strip: [PAUSE_MS] after the last finger left the keys,
- * never over another notice. The caller times it: [due] after the pause each [timeFrom] asks for.
+ * never over another notice. The caller times it: [due] after the pause each [timeFrom] asks for. And when
+ * the one up counts as seen: [seen] once it has stayed [SEEN_MS].
  */
 class WordOfferGate {
     private var offer: WordOffer? = null
     private var fingers = 0
 
+    // the offer up on the strip and when it went up; null once it went or was told seen
+    private var up: Int? = null
+    private var upAt = 0L
+
     /** The session's offer, or null as it withdrew it. Whether to time the pause from now. */
     fun offered(offer: WordOffer?): Boolean {
         this.offer = offer
+        // the session changes its offer only by withdrawing the one up, which takes it off the strip
+        up = null
         return timeFrom()
     }
 
@@ -38,9 +45,31 @@ class WordOfferGate {
         return timeFrom()
     }
 
-    /** Another notice came: this offer is not shown. */
+    /** Another notice came: this offer is not shown, nor the one up seen. */
     fun noticed() {
         offer = null
+        hidden()
+    }
+
+    /** The one up was put away: not seen unless told so already. */
+    fun hidden() {
+        up = null
+    }
+
+    /** Offer [id] went up at [now]. */
+    fun shown(id: Int, now: Long) {
+        up = id
+        upAt = now
+    }
+
+    /**
+     * The offer to tell seen at [now], once: up [SEEN_MS] and still there. Null for one gone sooner, a flash
+     * the next key took, so that it may be offered again in the field.
+     */
+    fun seen(now: Long): Int? {
+        val id = up?.takeIf { now - upAt >= SEEN_MS } ?: return null
+        up = null
+        return id
     }
 
     private fun timeFrom() = offer != null && fingers == 0
@@ -66,5 +95,8 @@ class WordOfferGate {
     companion object {
         /** Longer than between characters typed on, shorter than stopping to look. */
         const val PAUSE_MS = 800L
+
+        /** Up this long, an offer was read and left: not offered again in the field. */
+        const val SEEN_MS = 1000L
     }
 }

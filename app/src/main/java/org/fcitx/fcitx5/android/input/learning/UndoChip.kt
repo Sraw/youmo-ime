@@ -90,6 +90,9 @@ class UndoChip(
 
     private val timeout = Runnable { dismiss(animated = true) }
 
+    /** Told as one goes, whatever put it away (a tap, a key, a menu over it); not as another takes its place. */
+    var dismissed: () -> Unit = {}
+
     // for its time again after [uncovered]
     private var shownFor = 0L
 
@@ -214,6 +217,7 @@ class UndoChip(
 
     /** Not [animated]: at once (the keyboard itself going). */
     fun dismiss(animated: Boolean = false) {
+        dismissed()
         anchor.removeCallbacks(timeout)
         state.dismiss()?.lapsed?.invoke()
         val shown = window ?: return

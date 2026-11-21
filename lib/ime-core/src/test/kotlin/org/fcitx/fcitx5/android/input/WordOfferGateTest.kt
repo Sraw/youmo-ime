@@ -84,4 +84,40 @@ class WordOfferGateTest {
         gate.released()
         assertTrue(gate.offered(offer))
     }
+
+    // the next key often comes as it goes up: a flash is no look, so its words may come again in the field
+    @Test
+    fun anOfferIsSeenOnlyOnceUpASecond() {
+        class Row(val why: String, val seen: Int?, val at300ms: WordOfferGate.() -> Unit)
+        assertRows(
+            listOf(
+                Row("still up", 1) {},
+                Row("the next key or a change in the field withdrew it", null) { offered(null) },
+                Row("withdrawn for another offer", null) { offered(offer.copy(id = 2)) },
+                Row("another notice took its place", null) { noticed() },
+                Row("put away under a menu", null) { hidden() },
+            ),
+            { it.why },
+        ) { row ->
+            val gate = WordOfferGate()
+            gate.offered(offer)
+            assertEquals(1, gate.due(noticeShown = false, touchExploring = false, letters = true) { "汪小明" }?.id)
+            gate.shown(1, now = 5000)
+            row.at300ms(gate)
+            assertEquals(row.seen, gate.seen(now = 5000 + WordOfferGate.SEEN_MS))
+        }
+    }
+
+    @Test
+    fun seenFromASecondUpAndToldOnce() {
+        val gate = WordOfferGate()
+        gate.shown(1, now = 0)
+        assertNull(gate.seen(now = WordOfferGate.SEEN_MS - 1))
+        assertEquals(1, gate.seen(now = WordOfferGate.SEEN_MS))
+        assertNull("told once", gate.seen(now = WordOfferGate.SEEN_MS * 2))
+        // an earlier showing's check comes too soon for the one up now
+        gate.shown(2, now = 900)
+        assertNull(gate.seen(now = WordOfferGate.SEEN_MS))
+        assertEquals(2, gate.seen(now = 900 + WordOfferGate.SEEN_MS))
+    }
 }

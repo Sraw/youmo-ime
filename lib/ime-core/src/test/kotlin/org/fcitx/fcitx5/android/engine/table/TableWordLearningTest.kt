@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.OfferedWord
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.fcitx.fcitx5.android.engine.user.UserScorer
+import org.fcitx.fcitx5.android.input.WordOfferGate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -158,6 +159,43 @@ class TableWordLearningTest {
         // another field: offered again
         t.apply(Action.Context("", started = true, said = true))
         assertEquals("汪小明", t.keys(wangXiaoming).wordOffer?.words?.first()?.text)
+    }
+
+    // the app tells it seen once up WordOfferGate.SEEN_MS: one gone sooner was a flash, offered again in the field
+    @Test
+    @Uat("TBL-11b")
+    fun anOfferGoneWithinASecondIsOfferedAgainInTheField() {
+        val key: (TableSession, WordOfferGate) -> Unit = { t, gate -> gate.offered(t.keys(",").wordOffer) }
+        val moved: (TableSession, WordOfferGate) -> Unit = { t, gate -> gate.offered(t.apply(Action.Context("汪小明", said = true)).wordOffer) }
+        val another: (TableSession, WordOfferGate) -> Unit = { t, gate -> gate.offered(t.apply(Action.Context("", started = true, said = true)).wordOffer) }
+        val notice: (TableSession, WordOfferGate) -> Unit = { _, gate -> gate.noticed() }
+        class Row(val why: String, val goesAtMs: Long, val goes: (TableSession, WordOfferGate) -> Unit, val again: Boolean)
+        assertRows(
+            listOf(
+                Row("the next key at 300 ms", 300, key, again = true),
+                Row("the next key at 1000 ms", WordOfferGate.SEEN_MS, key, again = false),
+                Row("the cursor moved in the field at 300 ms", 300, moved, again = true),
+                Row("the cursor moved in the field at 1000 ms", WordOfferGate.SEEN_MS, moved, again = false),
+                Row("another field at 1000 ms: a new field offers anything", WordOfferGate.SEEN_MS, another, again = true),
+                Row("another notice in its place at 300 ms", 300, notice, again = true),
+                Row("another notice in its place at 1000 ms", WordOfferGate.SEEN_MS, notice, again = false),
+            ),
+            { it.why },
+        ) { row ->
+            val t = session()
+            val gate = WordOfferGate()
+            val offer = t.keys(wangXiaoming).wordOffer!!
+            gate.offered(offer)
+            assertEquals(offer.id, gate.due(noticeShown = false, touchExploring = false, letters = true) { "汪小明" }?.id)
+            gate.shown(offer.id, now = 0)
+            // the app checks SEEN_MS after it went up: before what took it at that time, after what took it sooner
+            val check = { gate.seen(now = WordOfferGate.SEEN_MS)?.let { t.apply(Action.OfferShown(it)) } }
+            if (row.goesAtMs < WordOfferGate.SEEN_MS) row.goes(t, gate)
+            check()
+            if (row.goesAtMs >= WordOfferGate.SEEN_MS) row.goes(t, gate)
+            t.keys(",")
+            assertEquals(row.again, t.keys(wangXiaoming).wordOffer?.words?.any { it.text == "汪小明" } == true)
+        }
     }
 
     // one the app held back (another notice up, a finger down) was never seen: offered again
