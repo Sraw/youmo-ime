@@ -117,6 +117,19 @@ test('保存 the nine keys lacking 0: no errors, one warning, min-app 0.6.3', ()
   assert.ok(E.checkLayout(r.xml, FORMAT.version, null).ok);
 });
 
+// an older app reads the command as nothing, so the key would be dead there: the layout asks for the app that has it
+test('保存 a key sending 切输入法 or 选输入法: min-app 0.6.3', () => {
+  const base = FORMAT.bases.find((b) => LM.info(LM.saveCheck(E, fresh(b), FORMAT.version, material).xml).meta['min-app'] !== '0.6.3');
+  for (const name of ['switch_input_method', 'choose_input_method']) {
+    // a function key: one that types (letters, space, 分词) takes only its base key's commands
+    const xml = fresh(base).replace('<key id="backspace" ', `<key id="backspace" swipe-up="shortcut:${name}" `);
+    assert.ok(xml.includes(name), base);
+    const r = LM.saveCheck(E, xml, FORMAT.version, material);
+    assert.deepEqual(r.errors, [], name);
+    assert.equal(LM.info(r.xml).meta['min-app'], '0.6.3', name);
+  }
+});
+
 test('a new layout from each of the app boards is the board as written, under its own id, name and based-on: clean, and drawn', () => {
   for (const base of FORMAT.bases) {
     const xml = fresh(base);

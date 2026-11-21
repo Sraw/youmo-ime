@@ -35,6 +35,9 @@ interface HostApi : TypingApi, InputMethodsApi, EngineSettingsApi, PunctuationAp
 
     val inputMethodEntryCached: InputMethodEntry
 
+    /** [InputMethodsApi.enabledIme] as last changed: 选输入法's menu opens at a swipe's threshold, no time to ask the host. */
+    val enabledImeCached: List<InputMethodEntry>
+
     val statusAreaCached: List<StatusEntry>
 
     /** Null while no host has said (none started, or stopped). */
@@ -154,6 +157,9 @@ interface InputMethodsApi {
 
     suspend fun toggleIme()
     suspend fun activateIme(ime: String)
+
+    /** [ime] made the default and saved, as [enumerateIme] does; [activateIme] keeps it to this field. */
+    suspend fun switchIme(ime: String)
     suspend fun enumerateIme(forward: Boolean = true)
 
     suspend fun currentIme(): InputMethodEntry

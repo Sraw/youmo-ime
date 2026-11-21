@@ -60,6 +60,10 @@
         <item>traditional</item>
         <item>simplified</item>
     </string-array>
+    <string-array name="kw_switch_input_method">
+        <item>globe</item>
+        <item>language</item>
+    </string-array>
     <string-array name="kw_nine_keys">
         <item>T9</item>
         <item>nine keys</item>

@@ -134,11 +134,15 @@ class KotlinHost(
 
     override val isReady get() = lifecycle.currentState == HostLifecycle.State.READY
 
-    // the six below: written on the host thread, read on main
+    // the seven below: written on the host thread, read on main
     private val noInputMethod = InputMethodEntry(context.getString(R.string._not_available_))
 
     @Volatile
     override var inputMethodEntryCached = noInputMethod
+        private set
+
+    @Volatile
+    override var enabledImeCached: List<InputMethodEntry> = emptyList()
         private set
 
     @Volatile
@@ -350,6 +354,7 @@ class KotlinHost(
     override suspend fun setEnabledIme(array: Array<String>) = onHost { setInputMethods(array.toList()) }
     override suspend fun toggleIme() = onHost { toggle() }
     override suspend fun activateIme(ime: String) = onHost { setCurrentInputMethod(ime) }
+    override suspend fun switchIme(ime: String) = onHost { switchInputMethod(ime) }
     override suspend fun enumerateIme(forward: Boolean) = onHost { enumerate(forward) }
     override suspend fun currentIme() = onHost { InputMethodEntries.of(currentInputMethod()) }
 
@@ -437,6 +442,7 @@ class KotlinHost(
     // a view remade before the next host speaks would show a dead engine's code row and candidates
     private fun forgetCaches() {
         inputMethodEntryCached = noInputMethod
+        enabledImeCached = emptyList()
         statusAreaCached = emptyList()
         punctuationCached = null
         fullWidthCached = false
@@ -523,7 +529,7 @@ class KotlinHost(
         )
         made.events += HostEvents(::forward)
         made.configure(options)
-        core = made
+        core = made.also(::keepEnabledIme)
         // HostCore's constructor builds the modules: 简繁's list exists only now
         publishTraditional()
         step("HostCore")
@@ -778,9 +784,15 @@ class KotlinHost(
         EngineState.traditionalIms = modules?.chttrans?.enabledIm.orEmpty()
     }
 
+    private fun keepEnabledIme(core: HostCore) {
+        enabledImeCached = core.contexts.group?.inputMethods.orEmpty().map(InputMethodEntries::of)
+    }
+
     private fun persist(change: Persist) {
         // the keyboard reads 简繁's list from here (EngineState.traditionalIms)
         if (change is Persist.ConfChanged && change.conf == ModuleConfigs.CHTTRANS) publishTraditional()
+        // every change to the enabled list is the profile's
+        if (change is Persist.ProfileChanged) core?.let(::keepEnabledIme)
         val writer = writer ?: return
         when (change) {
             is Persist.ProfileChanged -> {

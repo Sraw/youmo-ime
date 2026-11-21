@@ -73,7 +73,12 @@ class CommonKeyActionListener :
     private val bar: KawaiiBarComponent by manager.must()
 
     private val shortcutRunner by lazy {
-        KeyShortcutRunner(service, windowManager, bar::tradSimp, bar::chooseKeyboard, { voiceTap() }) { !preeditState.isEmpty }
+        KeyShortcutRunner(
+            service, windowManager, bar::tradSimp, bar::chooseKeyboard,
+            switchInputMethod = { listener.onKeyAction(LangSwitchAction, KeyActionListener.Source.Keyboard) },
+            chooseInputMethod = { listener.onKeyAction(ShowInputMethodPickerAction, KeyActionListener.Source.Keyboard) },
+            voice = { voiceTap() },
+        ) { !preeditState.isEmpty }
     }
 
     private var lastPickerType by AppPrefs.getInstance().internal.lastPickerType
@@ -235,6 +240,8 @@ class CommonKeyActionListener :
                     KeyCommand.QuickInput -> afterPendingInput { triggerQuickPhrase() }
                     // only a swipe's selects (BeginSwipeSelectAction): a tap's is nothing
                     KeyCommand.SwipeSelect -> {}
+                    // as 🌐: what is typed left to the host's switch, not committed first
+                    KeyCommand.SwitchInputMethod, KeyCommand.ChooseInputMethod -> shortcutRunner.run(action.shortcut)
                     // the engine's stroke key whatever 在键上划 is; it does nothing with nothing typed
                     else -> when (val stroke = command?.stroke) {
                         null -> afterPendingInput {
@@ -247,6 +254,7 @@ class CommonKeyActionListener :
                 is UnicodeAction -> afterPendingInput { triggerUnicode() }
                 is LangSwitchAction -> service.postFcitxJob { nextInputMethodOrPrompt() }
                 is ShowInputMethodPickerAction -> showInputMethodPicker()
+                is KeyAction.SwitchInputMethodAction -> service.postFcitxJob { switchIme(action.uniqueName) }
                 is BeginSelectionSwipeAction -> backspaceSwipe.onTouchDown()
                 is MoveSelectionAction -> {
                     // candidates with nothing typed are predictions, which the swipe deletes before as ever

@@ -27,6 +27,7 @@ object SearchKeywords {
         listOf("page:Clipboard") to R.array.kw_clipboard,
         listOf("pref:Prediction") to R.array.kw_prediction,
         listOf("cmd:trad_simp") to R.array.kw_trad_simp,
+        listOf("cmd:switch_input_method", "cmd:choose_input_method") to R.array.kw_switch_input_method,
         listOf("value:pinyin_keyboard=NineKeys", "value:pinyin_keyboard=ZhuyinNine", "value:shuangpin_keyboard=NineKeys", "value:english_keyboard=NineKeys") to R.array.kw_nine_keys,
         listOf("value:pinyin_keyboard=Full") to R.array.kw_full_keys,
         listOf("value:space_long_press_behavior=Voice", "cmd:voice") to R.array.kw_voice,

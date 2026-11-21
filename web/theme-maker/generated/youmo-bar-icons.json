@@ -2,7 +2,7 @@
 "groups":{
 "return":["enter","go","search","send","next","done","previous"],
 "keys":["backspace","language","space","shift","shift-once","shift-locked","number-pad","lock","lock-open","emoji","voice","arrow-upward","arrow-downward","short-text"],
-"commands":["select-all","content-copy","content-cut","content-paste","undo","redo","delete-sweep","restore","field-start","field-end","cursor-move","clipboard","quick-input","emoji","voice","trad-simp","choose-keyboard","hide-keyboard","swipe-select","stroke-h","stroke-s","stroke-p","stroke-n","stroke-z"],
+"commands":["select-all","content-copy","content-cut","content-paste","undo","redo","delete-sweep","restore","field-start","field-end","cursor-move","clipboard","quick-input","emoji","voice","trad-simp","choose-keyboard","language","choose-input-method","hide-keyboard","swipe-select","stroke-h","stroke-s","stroke-p","stroke-n","stroke-z"],
 "bar":["toolbar-expand","toolbar-collapse","undo","redo","cursor-move","clipboard","more","emoji","voice","hide-keyboard","trad-simp-off","floating","one-handed","habits-off","clear-recent","theme","input-method-settings","choose-keyboard","quick-input","handwriting","trad-simp","candidates-expand","candidates-collapse","predictions-close","floating-dock","floating-resize","one-handed-exit","touch-keyboard","candidates-prev","candidates-next"],
 "panel":["theme","input-method-settings","keyboard-settings","choose-keyboard","one-handed","floating","habits-off","clear-recent","trad-simp","trad-simp-off","punctuation","punctuation-off","full-width","full-width-off","prediction","prediction-off","app-settings","clipboard","backspace"]
 },

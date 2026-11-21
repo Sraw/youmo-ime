@@ -71,6 +71,21 @@ class KeyShortcutsTest {
         assertEquals(KeyShortcut.Text("a\\b\\"), KeyShortcuts.parse("full/q\ttext:a\\b\\").resolve("full/q"))
     }
 
+    @Test
+    fun theInputMethodCommandsRoundTripByTheirKeys() {
+        KeyCommand.entries.forEach { assertEquals(it, KeyCommand.ofKey(it.key)) }
+        val shortcuts = KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.SwitchInputMethod))
+            .with("full/w", KeyShortcut.Command(KeyCommand.ChooseInputMethod))
+        assertEquals(shortcuts, KeyShortcuts.parse(shortcuts.serialize()))
+        assertEquals(KeyShortcut.Command(KeyCommand.ChooseInputMethod), KeyShortcuts.parse("full/w\tchoose_input_method").resolve("full/w"))
+        // the settings' list is this order: the two after 切键盘, 收起键盘 after them
+        val at = KeyCommand.entries.indexOf(KeyCommand.ChooseKeyboard)
+        assertEquals(
+            listOf(KeyCommand.ChooseKeyboard, KeyCommand.SwitchInputMethod, KeyCommand.ChooseInputMethod, KeyCommand.HideKeyboard),
+            KeyCommand.entries.subList(at, at + 4),
+        )
+    }
+
     // contract: the stored line format (key, tab, command or text:), which a later version must read back
     @Test
     fun badLinesAreSkippedALaterLineWins() {

@@ -1185,6 +1185,9 @@
     <string name="shortcut_voice">語音輸入</string>
     <string name="shortcut_trad_simp">切簡繁</string>
     <string name="shortcut_choose_keyboard">切鍵盤</string>
+    <string name="shortcut_switch_input_method">切輸入法</string>
+    <string name="shortcut_choose_input_method">選輸入法</string>
+    <string name="input_method_menu_more">更多…</string>
     <string name="shortcut_hide_keyboard">收起鍵盤</string>
     <string name="shortcut_stroke_h">筆畫：橫</string>
     <string name="shortcut_stroke_s">筆畫：豎</string>

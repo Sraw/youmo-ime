@@ -171,7 +171,7 @@ class KeyShortcutsHostTest {
         start("给 A 的话")
         val asked = h.service.startedField
         h.start(fieldId = 2, prefill = { it.setText("给 B 的话"); it.setSelection(it.text.length) })
-        val runner = KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { false }
+        val runner = KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}, {}, {}) { false }
         runner.clear(null, asked)
         runner.clear(HostCore.Retyping(InputMethodCatalog.PINYIN, emptyList()), asked)
         host.synced()
@@ -317,7 +317,7 @@ class KeyShortcutsHostTest {
     fun quickInputRunOpensItAfterWhatIsTyped() {
         start()
         type("nihao")
-        KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.QuickInput))
+        KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.QuickInput))
         host.until("committed, then quick input open") { h.field.text.toString() == "你好" && fcitx.inputPanelCached.quickPhrase }
         assertEquals("", host.preedit)
     }
@@ -501,7 +501,7 @@ class KeyShortcutsHostTest {
         type("nihao")
         val board = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
         board.keyActionListener!!.onKeyAction(KeyAction.ShortcutAction(KeyShortcut.Command(KeyCommand.SwipeSelect)), KeyActionListener.Source.Keyboard)
-        KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.SwipeSelect))
+        KeyShortcutRunner(h.service, InputWindowManager(), {}, {}, {}, {}, {}) { true }.run(KeyShortcut.Command(KeyCommand.SwipeSelect))
         host.synced()
         assertEquals("still typed", "nihao", host.preedit)
         assertEquals("nothing committed", "hello", h.field.text.toString())

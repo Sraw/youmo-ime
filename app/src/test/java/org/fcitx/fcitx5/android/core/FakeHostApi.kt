@@ -341,6 +341,7 @@ class FakeHostApi : HostApi {
 
     override suspend fun availableIme() = availableIme
     override suspend fun enabledIme() = enabledIme
+    override val enabledImeCached get() = enabledIme.toList()
 
     override suspend fun setEnabledIme(array: Array<String>) {
         calls += "setEnabledIme(${array.joinToString()})"
@@ -358,6 +359,11 @@ class FakeHostApi : HostApi {
 
     override suspend fun activateIme(ime: String) {
         calls += "activateIme($ime)"
+        availableIme.find { it.uniqueName == ime }?.let { inputMethodEntryCached = it }
+    }
+
+    override suspend fun switchIme(ime: String) {
+        calls += "switchIme($ime)"
         availableIme.find { it.uniqueName == ime }?.let { inputMethodEntryCached = it }
     }
 

@@ -1216,6 +1216,9 @@
     <string name="shortcut_voice">Voice input</string>
     <string name="shortcut_trad_simp">Traditional / Simplified</string>
     <string name="shortcut_choose_keyboard">Choose keyboard</string>
+    <string name="shortcut_switch_input_method">Switch input method</string>
+    <string name="shortcut_choose_input_method">Choose input method</string>
+    <string name="input_method_menu_more">More…</string>
     <string name="shortcut_hide_keyboard">Hide keyboard</string>
     <string name="shortcut_stroke_h">Stroke: horizontal</string>
     <string name="shortcut_stroke_s">Stroke: vertical</string>

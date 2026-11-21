@@ -18,7 +18,8 @@ object Icons {
     val COMMANDS = listOf(
         "select-all", "content-copy", "content-cut", "content-paste", "undo", "redo", "delete-sweep", "restore",
         "field-start", "field-end", "cursor-move", "clipboard", "quick-input", "emoji", "voice", "trad-simp",
-        "choose-keyboard", "hide-keyboard", "swipe-select", "stroke-h", "stroke-s", "stroke-p", "stroke-n", "stroke-z",
+        "choose-keyboard", "language", "choose-input-method", "hide-keyboard", "swipe-select",
+        "stroke-h", "stroke-s", "stroke-p", "stroke-n", "stroke-z",
     )
 
     /** A key's own (a layout's `icon=`, the keys the app draws an icon on). */

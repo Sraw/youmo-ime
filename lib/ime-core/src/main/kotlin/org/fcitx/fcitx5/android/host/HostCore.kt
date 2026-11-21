@@ -377,6 +377,12 @@ class HostCore(
         changedProfile()
     }
 
+    /** `setInputMethod`, not local: [im] for the most recent context and the default from then on, saved, as `enumerate` leaves it. */
+    fun switchInputMethod(im: String) = pipeline.batch {
+        contexts.setCurrentInputMethod(contexts.mostRecent, im, local = false)
+        changedProfile()
+    }
+
     /** `setEnabledInputMethods`: unknown names dropped, the default kept, every focused context switched, saved. */
     fun setInputMethods(list: List<String>) = pipeline.batch {
         contexts.setInputMethods(list, available)

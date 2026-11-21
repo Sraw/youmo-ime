@@ -197,9 +197,9 @@ internal class KeySwipes(
     private fun swipeReached(key: KeyHandle, def: KeyDef, event: CustomGestureView.Event, held: Held): Boolean {
         val preview = KeySwipe.preview(reach(key.ref, def).key, ways, event.totalY, keyboard.inPasswordField, KeyClock::calendar)
         if (preview == KeySwipe.Preview.Own) return false
-        val editMenu = preview == KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))
+        val menu = preview == EDIT_MENU || preview == INPUT_METHOD_MENU
         // a key the scene drawn last has not: nothing opens, so nothing felt
-        val bounds = if (editMenu) key.bounds ?: return false else null
+        val bounds = if (menu) key.bounds ?: return false else null
         InputFeedbacks.hapticFeedback(key.feedback)
         if (preview == SWIPE_SELECT) {
             held.select = true
@@ -210,7 +210,13 @@ internal class KeySwipes(
             return true
         }
         if (bounds == null) return false
-        keyboard.onPopupAction(PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField))
+        val down = event.totalY > 0
+        keyboard.onPopupAction(
+            if (preview == EDIT_MENU) PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField, down)
+            else PopupAction.ShowInputMethodMenuAction(key.ref, bounds, down),
+        )
+        // where it opened is where back up is measured from: a flick back onto the key is the first move after
+        if (down) keyboard.onPopupChangeFocus(key.ref, event.x, event.y)
         held.menu = true
         return true
     }
@@ -245,5 +251,7 @@ internal class KeySwipes(
 
     private companion object {
         val SWIPE_SELECT = KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.SwipeSelect))
+        val EDIT_MENU = KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.EditMenu))
+        val INPUT_METHOD_MENU = KeySwipe.Preview.Shortcut(KeyShortcut.Command(KeyCommand.ChooseInputMethod))
     }
 }

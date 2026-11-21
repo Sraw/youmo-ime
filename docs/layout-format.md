@@ -48,7 +48,7 @@
 
 ## 元素
 
-- **`<meta>`**（可选，写就写在最前面）：`author`、`version`、`license`、`description`（各 1–64 个字符，说明最多 200）和 `min-app`（需要的最低 App 版本，如 `0.6.1`；比手机上的 App 新时拒绝导入）。键盘布局页保存时自动算 `min-app`：用了 `<meta>`、`based-on`、`pads`、行中间的跨行键，或同一个 id 写了几处、只靠所在行的 `when=` 区分的，是 0.6.1；`based-on` 是必需的，所以存下来的文件至少是 0.6.1。缺了 App 那块键盘有的键（见下面「缺键的警告」），或有键在某种情况下什么都不显示的，是 0.6.3（0.6.3 以前的 App 不收）；条件里用了 `table-lookup` 的也是 0.6.3（以前的 App 不认这个开关，整块读不了），照 App 的全键盘做的都会用到它。
+- **`<meta>`**（可选，写就写在最前面）：`author`、`version`、`license`、`description`（各 1–64 个字符，说明最多 200）和 `min-app`（需要的最低 App 版本，如 `0.6.1`；比手机上的 App 新时拒绝导入）。键盘布局页保存时自动算 `min-app`：用了 `<meta>`、`based-on`、`pads`、行中间的跨行键，或同一个 id 写了几处、只靠所在行的 `when=` 区分的，是 0.6.1；`based-on` 是必需的，所以存下来的文件至少是 0.6.1。缺了 App 那块键盘有的键（见下面「缺键的警告」），或有键在某种情况下什么都不显示的，是 0.6.3（0.6.3 以前的 App 不收）；条件里用了 `table-lookup` 的也是 0.6.3（以前的 App 不认这个开关，整块读不了），照 App 的全键盘做的都会用到它；动作里用了 `shortcut:switch_input_method` 或 `shortcut:choose_input_method` 的也是 0.6.3（以前的 App 不认这两个命令，键点了没反应）。
 - **`<defaults>`**（可选，`<meta>` 之后第一个）：整块键的默认属性，写法同 `<key>` 的外观和动作属性。行里也可以有自己的 `<defaults>`。
 - **`<row>`**：一行。`height`（行高，相对值，默认 1）、`indent`、`end-indent`（两头留空，单位同宽度）、`when=`（满足时才有这一行）、`split="halves"`（分体时分成两半：这一行要有 9 或 10 个键，`split="after"` 的键和空位不算，否则按比例缩小，检查会给警告；分成两半时每个键都按一个字母宽排，不看 `width=`，9 个键时中间那个两边各放一个）或 `split="scale"`（默认：分体时整行按比例缩小）。里面是 `<key>`、`<gap>`、`<slot>`。
 - **`<key>`**：一个键，属性见下。里面可以有 `<variant when="…">`（满足条件时换掉几个属性，键不挪位置）、`<popup>`（长按列表：`<popup from="list">` 里放 `<item text="…"/>`，可选 `send=`）、`<menu>`（长按菜单：里面放 `<item label="…" do="动作"/>`）。
@@ -101,7 +101,7 @@
 | `code:U+00E9` | 原样打出这个字符，不随 Shift 变 |
 | `sym:名字` | 按一个功能键：`BackSpace`、`Return`、`space`、`Tab`、`Left`、`KP_Decimal`…… |
 | `layout:Text`、`layout:Number`、`layout:Symbol` | 回字母键盘、到数字键盘、到符号面板 |
-| `shortcut:名字` | 快捷操作：`select_all`、`copy`、`paste`、`undo`、`clipboard`、`emoji`、`voice`、`stroke_h`…… |
+| `shortcut:名字` | 快捷操作：`select_all`、`copy`、`paste`、`undo`、`clipboard`、`emoji`、`voice`、`switch_input_method`、`stroke_h`……（布局动作里 `edit_menu` 是编辑面板、`choose_input_method` 是输入法选择框，滑出一排的菜单只在按键字符和快捷键里设的滑动上） |
 | `keypad:N` | 小键盘的数字 N：没在打字时打出 N，正在打字时选第 N 个候选 |
 | `caps`、`caps:lock` | Shift、锁定大写 |
 | `lang`、`ime-picker`、`quickphrase`、`unicode`、`panel-back`、`panel-lock`、`lookup`…… | 地球键、换输入法、快速输入、Unicode、面板的返回和锁、查字 |

@@ -31,6 +31,10 @@ class KeyShortcutRunner(
     private val windowManager: InputWindowManager,
     private val tradSimp: () -> Unit,
     private val chooseKeyboard: () -> Unit,
+    /** 🌐's tap. */
+    private val switchInputMethod: () -> Unit,
+    /** 🌐's long press. */
+    private val chooseInputMethod: () -> Unit,
     private val voice: () -> Unit,
     /** No clear is put back over it. */
     private val typing: () -> Boolean,
@@ -92,6 +96,9 @@ class KeyShortcutRunner(
             KeyCommand.Voice -> voice()
             KeyCommand.TradSimp -> tradSimp()
             KeyCommand.ChooseKeyboard -> chooseKeyboard()
+            KeyCommand.SwitchInputMethod -> switchInputMethod()
+            // its menu opens as the swipe passes its threshold; a lift that got here without it, 🌐's picker
+            KeyCommand.ChooseInputMethod -> chooseInputMethod()
             KeyCommand.HideKeyboard -> service.requestHideSelf(0)
             // sent by the listener as a stroke drawn is: nothing here
             KeyCommand.StrokeHeng, KeyCommand.StrokeShu, KeyCommand.StrokePie, KeyCommand.StrokeDian, KeyCommand.StrokeZhe -> {}

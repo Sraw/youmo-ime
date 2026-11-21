@@ -407,6 +407,24 @@
 - **预期**：没选的格子是长按弹出的底色、图标是长按弹出的字色，手指所在的那一格是回车键的颜色（白色或主题的回车字色图标），一眼看得出选的是哪一格，挪到哪格哪格变色；选中的格子比别的大一点、形状不变。密码框里复制、剪切是淡的，挪上去时那一格仍是回车色、只是淡下去，看得出选中了但不能用。
 - **JVM**：画出来的样子见 `SwipePopupScreenshotTest` 的 `edit_menu_*` 金样（`uprightOnTheCanvas`、`compactOnTheCanvas`、`floatingOnTheCanvas`、`turnedOnTheCanvas`）和 `KeyShortcutsScreenshotTest.theEditMenuOverTheSpace`（选中「粘贴」）；每个内置主题浅色深色里选中格和其它格的底色对比不低于 1.6:1 见 keyboard-scene `BuiltinThemeEquivalenceTest.theMenusCellInFocusStandsOutInEveryBuiltInTheme`；格子的颜色、大小、不能用的淡下去见 keyboard-scene `PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded`，选中的那格不能用时仍是回车色、只是淡下去见 `PopupsTest.aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded`；3.0 主题换算见 keyboard-scene `LookThemeTextTest`（data/look-theme，不在 `uat.py jvm` 的结果里）。设备截图见报告。
 
+### KB-113 [P1] 关掉地球键，用滑动切输入法
+- **前提**：B0，输入法里启用拼音和英文；**按键 → 显示语言切换键** 关掉；**按键字符和快捷键** 里把 q 的上滑设成 **切输入法**。
+- **操作**：看底排；q 上滑；再 q 上滑；打着拼音 `ni` 时 q 上滑。
+- **预期**：底排没有地球键，q 右上角画着地球图标（和地球键一样）；命令列表里「切键盘」后面是「切输入法」「选输入法」。第一次上滑换到英文，空格上写着英文；再上滑回到拼音，没打出 q。打着拼音时上滑和点地球键一样。
+- **JVM**：`InputMethodCommandsHostTest.aSwipeOfSwitchInputMethodIsTheGlobesTap`、`aSwipeOfSwitchInputMethodWhilePinyinIsTypedIsTheGlobesTapToo`；存、读、旧版本读到新命令见 ime-core `SwipeSlotsTest.theInputMethodCommandsRoundTripAndALaterVersionsCommandIsSkipped`、`KeyShortcutsTest.theInputMethodCommandsRoundTripByTheirKeys`。设备截图见报告。
+
+### KB-114 [P1] 选输入法：滑出一排输入法选
+- **前提**：B0，输入法里再添加双拼（列表是拼音、英文、双拼），现在是拼音；q 的上滑设成 **选输入法**。
+- **操作**：q 上滑不松手看菜单，直接松开；切回拼音再上滑，右挪一格松开；再上滑，往下滑回 q 上松开；再上滑，一直右挪到 **更多…** 松开；切成悬浮键盘再上滑、松开。
+- **预期**：菜单弹在编辑菜单的位置：拼音（灰）、英文、双拼、更多…，手指对着英文，每挪一格轻振一下；直接松开换到英文；右挪一格松开换到双拼；滑回键上松开不换、不打出 q；在灰的那格上松开不换。挪到 **更多…** 松开弹出输入法选择框（下面列着别的应用的键盘）。悬浮时菜单在键盘朝屏幕中间那侧，格数按悬浮键盘的宽（393 dp 手机上是现在的、下一个和 **更多…** 三格），直接松开换到下一个。只启用一个输入法时菜单是它（灰）和 **更多…**，手指对着 **更多…**（JVM 上断言，设备上不跑）。
+- **JVM**：`InputMethodCommandsHostTest.aSwipeOfChooseInputMethodPicksFromItsMenu`、`withOneInputMethodItsMenuIsItAndMore`、`aPickWhilePinyinIsTypedIsTheGlobesTapToo`、`aPickBecomesTheDefault`（选中的成为默认、存下来，和地球键一样）；格子、起始格、放不下时的取法见 ime-core `InputMethodMenuTest`，行的左右位置见 `EditPlanTest.theEditMenusPasteIsOverTheFingerTheRowKeptOnTheScreen`。设备截图见报告。
+
+### KB-115 [P1] 下滑弹出的菜单：往下走不取消，滑回键上取消
+- **前提**：B0，输入法里再添加双拼。
+- **操作**：先把 q 的下滑设成 **编辑菜单**，下滑后接着往下走，看菜单；再下滑，一下滑回 q 上。再把 q 的下滑设成 **选输入法**：q 下滑不松手，直接松开；切回拼音再下滑，手指接着往下走到键盘下面再松开；切回拼音再下滑，右挪一格松开；再下滑，一下滑回 q 上松开。
+- **预期**：直接松开换到英文；接着往下走菜单一直在，松开照样换到英文；右挪一格换到双拼（和上滑一样按挪了多远算）；滑回 q 上菜单收起，松开不换、不打出 q。编辑菜单也一样：往下走不收起，滑回键上收起。上滑弹出的菜单照旧（KB-114）。
+- **JVM**：`InputMethodCommandsHostTest.aMenuOpenedByASwipeDownCancelsBackUpOnTheKeyNotGoingOnDown`、`PopupMenuUiTest.aFixedMenuOpenedDownCancelsBackUpOnTheKeyNotGoingOnDown`、ime-core `PopupFocusTest.aMenuOpenedDownCancelsBackUpOnTheKeyAndNeverGoingOnDown`。设备截图见报告。
+
 ### KB-63 [P2] 自己设的文字快捷键
 - **前提**：B0，**按键字符和快捷键** 里把 Q 的下滑设成文字「你好」。
 - **操作**：Q 键下滑（滑出键外也一样）。

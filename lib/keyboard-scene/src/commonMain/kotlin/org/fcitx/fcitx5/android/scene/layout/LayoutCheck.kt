@@ -85,6 +85,7 @@ object LayoutCheck {
         // not read but checked: a board lacking keys ([check] gives it only where `lacks` or `blank` is told)
         "lacks" to "0.6.3",
         "table-lookup" to "0.6.3",
+        "input-method-commands" to "0.6.3",
     )
 
     /** Every [Finding] key: the app's strings and the page's table must word each (LayoutCheckTest enforces it). */
@@ -219,7 +220,11 @@ object LayoutCheck {
         if (ids.values.any { cells -> cells.size > 1 && cells.any { it.condition == null } }) add("row-when")
         // an older app fails the whole board on a flag it does not know
         if (conditions(layout).any { c -> c.anyOf.any { g -> g.any { it.name == "table-lookup" } } }) add("table-lookup")
+        // an older app reads the name as nothing: a dead key, no refusal
+        if (actions(layout).any { it.second in INPUT_METHOD_COMMANDS }) add("input-method-commands")
     }
+
+    private val INPUT_METHOD_COMMANDS = setOf("shortcut:switch_input_method", "shortcut:choose_input_method")
 
     private fun conditions(layout: Layout): List<Condition> = layout.parts.flatMap { p ->
         when (p) {

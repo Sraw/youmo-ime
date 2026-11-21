@@ -300,6 +300,8 @@ class LayoutCheckTest {
             "row-when" to qwerty062.replace("</keyboard>", "<row when=\"field=url\"><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><key id=\"zz\" label=\"y\"/></row>\n</keyboard>"),
             // the app's own: an older app fails the board on the switch
             "table-lookup" to qwerty,
+            "input-method-commands" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" swipe-up=\"shortcut:switch_input_method\" label"),
+            "input-method-commands menu" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" long-press=\"shortcut:choose_input_method\" label"),
         )
         // lacks is the check's (whatABoardLacksIsToldOnceAndTaken), not the reader's
         assertEquals(LayoutCheck.FEATURES.keys - "lacks", samples.keys.map { it.substringBefore(' ') }.toSet())

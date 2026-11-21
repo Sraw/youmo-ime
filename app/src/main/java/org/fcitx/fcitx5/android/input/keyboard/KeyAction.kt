@@ -62,6 +62,9 @@ sealed class KeyAction {
 
     data object ShowInputMethodPickerAction : KeyAction()
 
+    /** 选输入法's pick, as 🌐's: [uniqueName] becomes the default, not the picker's for this field only. */
+    data class SwitchInputMethodAction(val uniqueName: String) : KeyAction()
+
     data class LayoutSwitchAction(val act: String = "") : KeyAction()
 
     data class MoveSelectionAction(val start: Int = 0, val end: Int = 0) : KeyAction()

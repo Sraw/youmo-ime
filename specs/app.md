@@ -299,7 +299,10 @@ wires it on every key with a name, by that name (`BaseKeyboard.wire`), buzzes at
 on `UndoChipPlacement`'s place, which `InputView` hands `PopupComponent.menuRoom`; over the bar where
 that is off the view), 粘贴 across from the key, not under the finger (the user, 0.5.1's test build),
 picked by how far the finger moves (`PopupFocus`), a notice shown put away or, a failure, hidden till the menu goes (`onMenuShown`, `onMenuGone`,
-`UndoChip.covered`/`uncovered`). 滑选 (`KeyCommand.SwipeSelect`) reached there takes the touch
+`UndoChip.covered`/`uncovered`). 选输入法 (`KeyCommand.ChooseInputMethod`) opens the same fixed row
+(`PopupComponent.showFixedMenu`), its cells `InputMethodMenu`'s: the enabled list read from
+`HostApi.enabledImeCached` (no time to ask the host at the threshold), the current one disabled, the
+globe's next under the finger. 滑选 (`KeyCommand.SwipeSelect`) reached there takes the touch
 instead: its sideways steps (`SwipeSteps`, the same counting and the same 10 dp threshold the
 backspace's selection gets from `KeyGestureRecognizer`) go to `CommonKeyActionListener`'s
 `SwipeSelection` (ime-core), which begins after what is typed is committed (`afterPendingInput`) and

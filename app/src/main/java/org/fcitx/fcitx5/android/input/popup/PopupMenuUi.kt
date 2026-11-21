@@ -24,7 +24,7 @@ class PopupMenuUi(
     onDismissSelf: PopupContainerUi.() -> Unit = {},
     private val items: Array<KeyDef.Popup.Menu.Item>,
     private val onFocusMoved: (View) -> Unit = {},
-    /** [Fixed.start] over the finger: the edit menu's. */
+    /** [Fixed.start] over the finger: the edit menu's, 选输入法's. */
     private val fixed: Fixed? = null,
     private val scenes: PopupScenes,
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
@@ -36,9 +36,10 @@ class PopupMenuUi(
 
     /**
      * Cells that stay where they are; [disabled] ones faded, picking nothing. Opened by a swipe up, the finger
-     * already above the key: back down onto the key cancels it. [at]: window pixels; null just over the key.
+     * already above the key: back down onto the key cancels it; opened by a swipe [down], back up onto it does.
+     * [at]: window pixels; null just over the key.
      */
-    class Fixed(val start: Int, val disabled: Set<Int>, val at: EditMenuLayout.Spot? = null)
+    class Fixed(val start: Int, val disabled: Set<Int>, val at: EditMenuLayout.Spot? = null, val down: Boolean = false)
 
     private val keySize = sceneKeys?.height?.toInt() ?: ctx.dp(CELL_DP)
 
@@ -50,7 +51,7 @@ class PopupMenuUi(
 
     override val offsetX = when {
         fixed?.at != null -> fixed.at.left - triggerBounds.left
-        fixed != null -> EditMenuLayout.rowLeft(triggerBounds.centerX(), itemWidth, outerBounds.left, outerBounds.right) - triggerBounds.left
+        fixed != null -> EditMenuLayout.rowLeft(triggerBounds.centerX(), itemWidth, outerBounds.left, outerBounds.right, items.size, fixed.start) - triggerBounds.left
         else -> ((triggerBounds.width() - itemWidth) / 2) - (itemWidth * focusColumn)
     }
     override val offsetY = fixed?.at?.let { it.top - triggerBounds.top }
@@ -84,9 +85,11 @@ class PopupMenuUi(
         startColumn = focusColumn,
         stepX = itemWidth * PopupFocus.STEP,
         stepY = keySize * PopupFocus.STEP,
-        cancelBelow = triggerBounds.height().toFloat(),
+        // a finger going on down from a swipe down is no going back
+        cancelBelow = if (fixed?.down == true) Float.POSITIVE_INFINITY else triggerBounds.height().toFloat(),
         // in onChangeFocus's coordinates (offsetY up); the edit menu's its top, the finger above it as it opens
-        cancelAt = ((if (fixed != null) 0 else triggerBounds.height()) - offsetY).toFloat(),
+        cancelAt = if (fixed?.down == true) Float.NaN else ((if (fixed != null) 0 else triggerBounds.height()) - offsetY).toFloat(),
+        cancelAboveAt = if (fixed?.down == true) (triggerBounds.height() - offsetY).toFloat() else Float.NaN,
     )
 
     override fun onChangeFocus(x: Float, y: Float) = moveFocus(focus, x, y, focusedIndex, ::drawScene) {

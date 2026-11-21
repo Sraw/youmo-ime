@@ -32,6 +32,8 @@ class KeyShortcutLooks private constructor(@StringRes val label: Int, @DrawableR
             KeyCommand.Voice -> KeyShortcutLooks(R.string.shortcut_voice, R.drawable.ic_baseline_keyboard_voice_24)
             KeyCommand.TradSimp -> KeyShortcutLooks(R.string.shortcut_trad_simp, R.drawable.ic_fcitx_status_chttrans_trad)
             KeyCommand.ChooseKeyboard -> KeyShortcutLooks(R.string.shortcut_choose_keyboard, R.drawable.ic_baseline_keyboard_24)
+            KeyCommand.SwitchInputMethod -> KeyShortcutLooks(R.string.shortcut_switch_input_method, R.drawable.ic_baseline_language_24)
+            KeyCommand.ChooseInputMethod -> KeyShortcutLooks(R.string.shortcut_choose_input_method, R.drawable.ic_baseline_translate_24)
             KeyCommand.HideKeyboard -> KeyShortcutLooks(R.string.shortcut_hide_keyboard, R.drawable.ic_baseline_keyboard_hide_24)
             // an icon, not the character: no font to lack 丿 or 乛
             KeyCommand.StrokeHeng -> KeyShortcutLooks(R.string.shortcut_stroke_h, R.drawable.ic_stroke_h)

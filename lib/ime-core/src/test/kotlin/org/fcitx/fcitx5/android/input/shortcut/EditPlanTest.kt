@@ -495,6 +495,9 @@ class EditPlanTest {
         assertEquals("at the left edge", 0, EditMenuLayout.rowLeft(100, 100, 0, 1080))
         assertEquals("at the right edge", 1080 - 500, EditMenuLayout.rowLeft(1050, 100, 0, 1080))
         assertEquals("narrower than the row", 0, EditMenuLayout.rowLeft(200, 100, 0, 300))
+        // 选输入法's row: its own cells, its start over the key
+        assertEquals(500 - 50 - 100, EditMenuLayout.rowLeft(500, 100, 0, 1080, count = 4, start = 1))
+        assertEquals("at the right edge", 1080 - 400, EditMenuLayout.rowLeft(1050, 100, 0, 1080, count = 4, start = 1))
         assertTrue(EditMenuLayout.disabled(KeyCommand.Copy, password = true))
         assertEquals(false, EditMenuLayout.disabled(KeyCommand.Paste, password = true))
         assertEquals(false, EditMenuLayout.disabled(KeyCommand.Copy, password = false))

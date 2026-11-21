@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.popup
 import android.graphics.Rect
 import android.view.View
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
@@ -85,6 +86,22 @@ class PopupMenuUiTest {
         ui.changeFocus(10f, trigger.height() - 5f)
         assertFalse(ui.changeFocus(10f, trigger.height() - 1f))
         assertTrue(ui.changeFocus(10f, trigger.height() + 1f))
+        assertTrue(dismissed)
+    }
+
+    // the edit menu or 选输入法 a swipe down opened: the finger below the key, back up onto it cancels
+    @Test
+    @Uat("KB-115")
+    fun aFixedMenuOpenedDownCancelsBackUpOnTheKeyNotGoingOnDown() {
+        val ui = menu(fixed = PopupMenuUi.Fixed(start = 1, disabled = emptySet(), down = true))
+        val first = ui.onTrigger()
+        ui.changeFocus(20f, trigger.height() + 30f)
+        assertFalse(ui.changeFocus(20f, trigger.height() + 300f))
+        assertEquals(first, ui.onTrigger())
+        assertFalse(ui.changeFocus(20f + step + 10f, trigger.height() + 200f))
+        assertNotEquals(first, ui.onTrigger())
+        assertFalse(dismissed)
+        assertTrue(ui.changeFocus(20f, trigger.height() - 1f))
         assertTrue(dismissed)
     }
 

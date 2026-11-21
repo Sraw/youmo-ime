@@ -57,6 +57,12 @@ enum class KeyCommand(val key: String, val group: Group, val stroke: Char? = nul
     Voice("voice", Group.Panel),
     TradSimp("trad_simp", Group.Switch),
     ChooseKeyboard("choose_keyboard", Group.Switch),
+
+    /** As 🌐's tap. */
+    SwitchInputMethod("switch_input_method", Group.Switch),
+
+    /** By a swipe, a menu of the input methods ([InputMethodMenu]); run any other way, as 🌐's long press. */
+    ChooseInputMethod("choose_input_method", Group.Switch),
     HideKeyboard("hide_keyboard", Group.Switch),
 
     /* A stroke for 笔画筛选, as one drawn on the keys; nothing where the input method filters by none. Fixed: never the stroke wanted next. */

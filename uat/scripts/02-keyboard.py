@@ -619,3 +619,199 @@ def kb98(d):
     then = d.expect_field(first + ".", msg=f"打着 ni 选 `.` 打出「{{got}}」，应是「{first}.」")
     check(said == "不转中文标点，已开", f"按钮排的开关读作「{said}」")
     return f"开关读作「{said}」；弹出 {[t for t in shown if t in ('.', '。', '，', '？', '！')]}；打出「{got}」，打着 ni「{then}」"
+
+
+def q_up_command(d, command, note, way="上滑"):
+    """q's [way] set to [command] from the commands' list, the list shot where it shows"""
+    st = script("14-settings")
+    st.slots_tab(d, "全键盘")
+    st.key_dialog(d, "q")
+    st.dialog_way(d, way, "命令")
+    s = d.screen()
+    change = [n for n in s.app() if n.text == "换"]
+    if len(change) != 1:
+        raise Blocked(f"{way}卡片里的「换」不是一个：{s.texts()[-16:]}")
+    d.tap(change[0].c, 0.8)
+    for _ in range(4):
+        if any(n.text == command for n in d.screen().app()):
+            break
+        st.dialog_scroll(d)
+    s = d.wait(lambda s: s if any(n.text == command for n in s.app()) else None, 5, what=f"命令列表里的{command}")
+    listed = [n.text for n in s.app() if n.text]
+    d.shot("app", note)
+    d.tap(next(n for n in s.app() if n.text == command).c, 0.6)
+    st.dialog_ok(d)
+    return listed
+
+
+def im_name(d):
+    return d.im_label().split("，", 1)[-1]
+
+
+@case("KB-113", mutates=True, visual=True)
+def kb113(d):
+    home(d, "按键")
+    d.tap_text("显示语言切换键", after=0.8)
+    listed = q_up_command(d, "切输入法", "命令列表：切键盘后面是切输入法、选输入法")
+    at = listed.index("切键盘") if "切键盘" in listed else -1
+    check(at >= 0 and listed[at + 1:at + 3] == ["切输入法", "选输入法"], f"命令列表 {listed}")
+    d.open_page("text")
+    d.clear()
+    k = d.keys(refresh=True)
+    d.shot("kb", "没有地球键，q 右上角是地球图标")
+    check("globe" not in k and "lang" not in k, f"底排还有地球键：{sorted(k)}")
+    was = im_name(d)
+    q = k["q"]
+    p = d.dpx()
+    d.swipe(q, (q[0], q[1] - 60 * p), 150, after=1.0)
+    one = im_name(d)
+    d.shot("kb", "q 上滑一次")
+    d.swipe(q, (q[0], q[1] - 60 * p), 150, after=1.0)
+    two = im_name(d)
+    typed = d.field_text() or ""
+    check(was == "拼音" and one == "英文" and two == "拼音", f"上滑前「{was}」，一次「{one}」，两次「{two}」")
+    check(typed == "", f"框里打出了「{typed}」")
+    return f"无地球键；上滑 {was} → {one} → {two}"
+
+
+def im_menu_held(d, dx_dp=0.0, back=False):
+    """q slid up past the threshold and held, then [dx_dp] sideways (or [back] down onto q): the menu's
+    texts as the screen reads them, and the lift's point"""
+    q = d.keys(refresh=True)["q"]
+    p = d.dpx()
+    top = q[1] - 60 * p
+    d.touch(("down", *q), *[("move", q[0], q[1] - dy * p) for dy in (15, 30, 45, 60)], ("sleep", 0.2),
+            ("move", q[0] + dx_dp * p, top), ("sleep", 0.3))
+    if back:
+        d.touch(("move", q[0], q[1]), ("sleep", 0.2))
+    return d.screen(), ((q[0], q[1]) if back else (q[0] + dx_dp * p, top))
+
+
+def menu_cells(s):
+    names = ("拼音", "英文", "双拼", "更多…")
+    return [n.text for n in sorted(s.nodes, key=lambda n: n.c[0]) if n.text in names and not n.key and not n.desc.startswith("空格")]
+
+
+@case("KB-114", mutates=True, visual=True)
+def kb114(d):
+    from uat import add_im
+    add_im(d, "双拼")
+    q_up_command(d, "选输入法", "命令列表：选输入法")
+    d.open_page("text")
+    d.clear()
+    d.switch_im("拼音")
+    s, at = im_menu_held(d)
+    cells = menu_cells(s)
+    d.shot("full", "q 上滑不松手：输入法菜单，拼音灰、手指对着下一个")
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    first = im_name(d)
+    check(cells[:1] == ["拼音"] and cells[-1:] == ["更多…"] and len(cells) == 4, f"菜单格子 {cells}")
+    check(first == cells[1], f"直接松开换到「{first}」，菜单 {cells}")
+
+    d.switch_im("拼音")
+    s, at = im_menu_held(d, dx_dp=60)
+    d.shot("full", "右挪一格")
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    moved = im_name(d)
+    check(moved == cells[2], f"右挪一格松开换到「{moved}」，菜单 {cells}")
+
+    s, at = im_menu_held(d, back=True)
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    kept, typed = im_name(d), d.field_text() or ""
+    check(kept == moved and typed == "", f"滑回键上松开后是「{kept}」，框里「{typed}」")
+
+    s, at = im_menu_held(d, dx_dp=400)
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    s = d.screen()
+    picker = s.find(text="选择输入法", where="all")
+    d.shot("full", "挪到更多…松开：输入法选择框")
+    check(picker is not None, f"更多… 松开后没有输入法选择框：{s.texts('all')[:10]}")
+    d.sh("input keyevent KEYCODE_BACK")
+    time.sleep(0.8)
+
+    tb = script("05-toolbar")
+    d.open_page("text")
+    tb.floating(d)
+    s, at = im_menu_held(d)
+    floating_cells = menu_cells(s)
+    d.shot("full", "悬浮键盘：输入法菜单在键盘朝屏幕中间那侧")
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    after = im_name(d)
+    # a row as wide as the floating keyboard: fewer cells, the current one first and 更多… last
+    check(floating_cells[:1] == [kept] and floating_cells[-1:] == ["更多…"] and after == floating_cells[1], f"悬浮时菜单 {floating_cells}，松开后「{after}」")
+    return f"菜单 {cells}；松开 {first}，右挪 {moved}，滑回不变，更多… 弹出选择框；悬浮 {floating_cells} → {after}"
+
+
+def down_menu(d, *moves):
+    """q slid down to where a swipe opens its menu (45 dp: the 36 dp threshold passed), then each (dx, dy) in dp
+    from q's middle in one jump, as a quick finger: the screen at the end and the last point"""
+    q = d.keys(refresh=True)["q"]
+    p = d.dpx()
+    at = lambda dx, dy: (q[0] + dx * p, q[1] + dy * p)
+    d.touch(("down", *q), *[("move", *at(0, dy)) for dy in (15, 30, 45)], ("sleep", 0.3),
+            *[step for m in moves for step in (("move", *at(*m)), ("sleep", 0.25))])
+    return d.screen(), at(*moves[-1]) if moves else at(0, 45)
+
+
+@case("KB-115", mutates=True, visual=True)
+def kb115(d):
+    from uat import add_im
+    add_im(d, "双拼")
+    # the edit menu first: the commands' list opens at the one set, 编辑菜单 above 选输入法
+    q_up_command(d, "编辑菜单", "命令列表：编辑菜单", way="下滑")
+    d.open_page("text")
+    d.clear()
+    edit = ("全选", "剪切", "复制", "粘贴", "撤销")
+    s, at = down_menu(d, (0, 160))
+    d.shot("full", "下滑出编辑菜单，接着往下走：菜单还在")
+    on = [n.text for n in s.nodes if n.text in edit and not n.key]
+    d.touch(("up", *at))
+    time.sleep(0.8)
+    s, at = down_menu(d, (0, 0))
+    d.shot("full", "下滑出编辑菜单，一下滑回 q 上：菜单收起")
+    off = [n.text for n in s.nodes if n.text in edit and not n.key]
+    d.touch(("up", *at))
+    time.sleep(0.8)
+    check(len(on) == 5 and not off, f"编辑菜单往下走 {on}，滑回 q 上 {off}")
+
+    q_up_command(d, "选输入法", "命令列表：选输入法", way="下滑")
+    d.open_page("text")
+    d.clear()
+    d.switch_im("拼音")
+    s, at = down_menu(d)
+    cells = menu_cells(s)
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    first = im_name(d)
+    check(len(cells) == 4 and first == cells[1], f"下滑直接松开换到「{first}」，菜单 {cells}")
+
+    d.switch_im("拼音")
+    s, at = down_menu(d, (0, 80), (0, 160))
+    d.shot("full", "下滑出输入法菜单后手指接着往下走：菜单还在")
+    kept_open = len(menu_cells(s)) == 4
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    drift = im_name(d)
+    check(kept_open and drift == cells[1], f"接着往下走后菜单 {menu_cells(s)}，松开换到「{drift}」")
+
+    d.switch_im("拼音")
+    s, at = down_menu(d, (60, 80))
+    d.shot("full", "下滑后右挪一格")
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    side = im_name(d)
+    check(side == cells[2], f"右挪一格松开换到「{side}」，菜单 {cells}")
+
+    s, at = down_menu(d, (0, 0))
+    d.shot("full", "下滑出输入法菜单后一下滑回 q 上：菜单收起")
+    gone = not menu_cells(s)
+    d.touch(("up", *at))
+    time.sleep(1.0)
+    back, typed = im_name(d), d.field_text() or ""
+    check(gone and back == side and typed == "", f"滑回键上：菜单 {menu_cells(s)}，松开后「{back}」，框里「{typed}」")
+    return f"编辑菜单往下走 {len(on)} 格还在、滑回收起；下滑菜单 {cells}：松开 {first}，往下走仍 {drift}，右挪 {side}，滑回不变"

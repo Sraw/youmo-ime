@@ -74,6 +74,11 @@
         <item>简繁</item>
         <item>繁简</item>
     </string-array>
+    <string-array name="kw_switch_input_method">
+        <item>地球</item>
+        <item>切换输入法</item>
+        <item>语言</item>
+    </string-array>
     <string-array name="kw_nine_keys">
         <item>九宫格</item>
         <item>T9</item>

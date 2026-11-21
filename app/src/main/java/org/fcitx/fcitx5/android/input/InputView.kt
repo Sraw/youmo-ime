@@ -498,6 +498,7 @@ class InputView(
             PopupComponent.MenuRoom(noticePlace(width, height), at[1] + bar.height / 2)
         }
         popup.onMenuShown = ::noticeCovered
+        popup.keyboardWidth = { keyboardView.width }
         popup.onMenuGone = ::noticeUncovered
 
         keyboardPrefs.registerOnChangeListener(onKeyboardSizeChangeListener)

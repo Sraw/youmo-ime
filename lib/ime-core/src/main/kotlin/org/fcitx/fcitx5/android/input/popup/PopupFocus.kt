@@ -11,7 +11,8 @@ import kotlin.math.roundToInt
  * The popup key picked by how far the finger moved since the popup opened, not where it is: wide keys took a whole
  * key's travel to move one. Past a row's ends it stays on the end key; only [cancelBelow] down picks nothing.
  * [rows]: each row's slots from the bottom, -1 empty. [cancelAt]: the pressed key's bottom in [moveTo]'s
- * coordinates, so a press near its bottom edge is not cancelled only a whole key below.
+ * coordinates, so a press near its bottom edge is not cancelled only a whole key below. [cancelAboveAt]: the
+ * key's bottom for a menu a swipe down opened, the finger below the key: back up past it cancels, nothing below does.
  */
 class PopupFocus(
     private val rows: List<IntArray>,
@@ -21,7 +22,10 @@ class PopupFocus(
     private val stepY: Float,
     private var cancelBelow: Float,
     private val cancelAt: Float = Float.NaN,
+    private val cancelAboveAt: Float = Float.NaN,
 ) {
+    private var cancelAbove = Float.POSITIVE_INFINITY
+
     private var row = startRow
     private var column = startColumn
 
@@ -35,13 +39,14 @@ class PopupFocus(
             y0 = y
             // a finger that drifted past the edge while the long press waited is cancelled only going on down from there
             if (!cancelAt.isNaN()) cancelBelow = (cancelAt - y).coerceAtLeast(HYSTERESIS * stepY)
+            if (!cancelAboveAt.isNaN()) cancelAbove = (y - cancelAboveAt).coerceAtLeast(HYSTERESIS * stepY)
         }
         return move(x - x0, y - y0)
     }
 
     /** Or [CANCELLED]. */
     fun move(dx: Float, dy: Float): Int {
-        if (dy > cancelBelow) return CANCELLED
+        if (dy > cancelBelow || -dy > cancelAbove) return CANCELLED
         row = settle(row, startRow - dy / stepY, rows.size, HYSTERESIS)
         val slots = rows[row]
         column = settle(column, startColumn + dx / stepX, slots.size, HYSTERESIS)

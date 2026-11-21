@@ -61,6 +61,8 @@ object SlotDefaults {
         "paste" -> "content-paste"
         "clear" -> "delete-sweep"
         "edit_menu" -> "cursor-move"
+        // 🌐's own: a theme's globe drawn on the swipe that does its job
+        "switch_input_method" -> "language"
         else -> command.replace('_', '-')
     }
 }

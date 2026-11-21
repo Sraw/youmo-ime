@@ -12,15 +12,19 @@ import android.view.accessibility.AccessibilityManager
 import android.widget.FrameLayout
 import androidx.annotation.VisibleForTesting
 import java.util.LinkedList
+import kotlin.math.floor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.UndoChipPlacement
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
 import org.fcitx.fcitx5.android.input.dependency.TypedComponent
 import org.fcitx.fcitx5.android.input.dependency.context
+import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.imeScope
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
@@ -34,6 +38,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupScenes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.keyTextScale
 import org.fcitx.fcitx5.android.input.shortcut.EditMenuLayout
+import org.fcitx.fcitx5.android.input.shortcut.InputMethodMenu
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.PopupMotion
@@ -57,6 +62,7 @@ class PopupComponent :
 
     private val imeScope by manager.imeScope()
     private val context by manager.context()
+    private val fcitx by manager.fcitx()
     private val theme by manager.theme()
     private val punctuation: PunctuationComponent by manager.must()
 
@@ -116,6 +122,9 @@ class PopupComponent :
     var onMenuShown: (menu: Rect) -> Unit = {}
 
     var onMenuGone: () -> Unit = {}
+
+    /** How many cells a row fits: a floating keyboard is narrower than the window this component covers. */
+    var keyboardWidth: () -> Int = { rootBounds.width() }
 
     private var menuAbove: KeyRef? = null
 
@@ -390,13 +399,46 @@ class PopupComponent :
         showPopupContainer(key, menuUi, "menu")
     }
 
-    private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean) {
+    private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean, down: Boolean) {
         val cells = EditMenuLayout.CELLS
         val scenes = scenesFor(key) ?: return
         val cell = scenes.px(Popups.MENU_CELL_DP)
+        val items = cells.map {
+            // what TalkBack reads of the cell
+            val looks = KeyShortcutLooks.of(it)
+            KeyDef.Popup.Menu.Item(context.getString(looks.label), looks.icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
+        }
+        val disabled = cells.indices.filter { EditMenuLayout.disabled(cells[it], password) }.toSet()
+        showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(EditMenuLayout.START, disabled, down = down), cell)
+    }
+
+    private fun showInputMethodMenu(key: KeyRef, bounds: Rect, down: Boolean) {
+        val scenes = scenesFor(key) ?: return
+        // cells of words, as wide as the engine draws those (Popups.menuKeys)
+        val width = floor(scenes.px(Popups.MENU_CELL_DP) * Popups.MENU_WORDS_WIDTH).toInt()
+        val (enabled, current) = fcitx.runImmediately { enabledImeCached to inputMethodEntryCached.uniqueName }
+        val byName = enabled.associateBy { it.uniqueName }
+        val menu = InputMethodMenu.of(enabled.map { it.uniqueName }, current, keyboardWidth() / width)
+        val items = menu.cells.map { cell ->
+            when (cell) {
+                // the names the space shows
+                is InputMethodMenu.Cell.Method -> KeyDef.Popup.Menu.Item(
+                    InputMethodNames.of(context, byName.getValue(cell.uniqueName)), 0, KeyAction.SwitchInputMethodAction(cell.uniqueName),
+                )
+                InputMethodMenu.Cell.More -> KeyDef.Popup.Menu.Item(context.getString(R.string.input_method_menu_more), 0, KeyAction.ShowInputMethodPickerAction)
+            }
+        }
+        showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(menu.start, menu.disabled, down = down), width)
+    }
+
+    /** A row picked by the finger's travel, [fixed]'s start over the key, where notices go ([EditMenuLayout.place]). */
+    private fun showFixedMenu(
+        key: KeyRef, bounds: Rect, scenes: PopupScenes, items: List<KeyDef.Popup.Menu.Item>, fixed: PopupMenuUi.Fixed, cellWidth: Int,
+    ) {
+        val cell = scenes.px(Popups.MENU_CELL_DP)
         // out from under the finger; a notice there put away
-        val at = menuRoom?.invoke(cell * cells.size, cell)?.let { room ->
-            EditMenuLayout.place(room.notice, bounds.centerX(), cell, rootBounds.left, rootBounds.right, rootBounds.top, room.barMiddle)
+        val at = menuRoom?.invoke(cellWidth * items.size, cell)?.let { room ->
+            EditMenuLayout.place(room.notice, bounds.centerX(), cellWidth, rootBounds.left, rootBounds.right, rootBounds.top, room.barMiddle, items.size, fixed.start)
         }
         val menuUi = PopupMenuUi(
             context,
@@ -404,17 +446,9 @@ class PopupComponent :
             rootBounds,
             bounds,
             { dismissPopup(key) },
-            cells.map {
-                // what TalkBack reads of the cell
-                val looks = KeyShortcutLooks.of(it)
-                KeyDef.Popup.Menu.Item(context.getString(looks.label), looks.icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
-            }.toTypedArray(),
+            items.toTypedArray(),
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
-            fixed = PopupMenuUi.Fixed(
-                start = EditMenuLayout.START,
-                disabled = cells.indices.filter { EditMenuLayout.disabled(cells[it], password) }.toSet(),
-                at = at,
-            ),
+            fixed = PopupMenuUi.Fixed(fixed.start, fixed.disabled, at, fixed.down),
             scenes = scenes,
         )
         if (menuUi.unmade) return
@@ -423,7 +457,7 @@ class PopupComponent :
         }
         if (at != null) {
             menuAbove = key
-            onMenuShown(Rect(at.left, at.top, at.left + cell * cells.size, at.top + cell))
+            onMenuShown(Rect(at.left, at.top, at.left + cellWidth * items.size, at.top + cell))
         }
         showPopupContainer(key, menuUi, "menu")
     }
@@ -535,7 +569,8 @@ class PopupComponent :
                 is PopupAction.PreviewUpdateAction -> updatePopup(key, content, words)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds)
                 is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds)
-                is PopupAction.ShowEditMenuAction -> showEditMenu(key, bounds, password)
+                is PopupAction.ShowEditMenuAction -> showEditMenu(key, bounds, password, down)
+                is PopupAction.ShowInputMethodMenuAction -> showInputMethodMenu(key, bounds, down)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(key)
             }
         }

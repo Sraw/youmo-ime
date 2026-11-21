@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.Snapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -506,6 +507,31 @@ class HostCoreContractTest {
         assertTrue(log.none { it is HostEvent.InputPanel })
         core.sendKey(Key(KeySyms.RETURN))
         assertEquals("", log.filterIsInstance<HostEvent.InputPanel>().last().auxUp.toString())
+    }
+
+    @Test
+    fun `switchInputMethod makes it the default and saves it, as enumerate does, setCurrentInputMethod keeps it to the field`() {
+        val core = core()
+        core.open()
+        core.setInputMethods(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.WUBI, ImGroup.KEYBOARD_US))
+        fun saved() = persisted.filterIsInstance<Persist.ProfileChanged>().lastOrNull()?.profile?.current?.defaultInputMethod
+        val was = core.contexts.group.defaultInputMethod
+        assertNotEquals(InputMethodCatalog.WUBI, was)
+        core.setCurrentInputMethod(ImGroup.KEYBOARD_US)
+        core.switchInputMethod(InputMethodCatalog.WUBI)
+        assertEquals(InputMethodCatalog.WUBI, core.currentInputMethod())
+        assertEquals(InputMethodCatalog.WUBI, core.contexts.group.defaultInputMethod)
+        assertEquals(InputMethodCatalog.WUBI, saved())
+        core.setCurrentInputMethod(ImGroup.KEYBOARD_US)
+        assertEquals(ImGroup.KEYBOARD_US, core.currentInputMethod())
+        assertEquals(InputMethodCatalog.WUBI, core.contexts.group.defaultInputMethod)
+        core.switchInputMethod(InputMethodCatalog.WUBI)
+        core.switchInputMethod(ImGroup.KEYBOARD_US)
+        assertEquals(ImGroup.KEYBOARD_US, saved())
+        // the first is the inactive state, the default left
+        core.switchInputMethod(InputMethodCatalog.PINYIN)
+        assertEquals(InputMethodCatalog.PINYIN, core.currentInputMethod())
+        assertEquals(ImGroup.KEYBOARD_US, core.contexts.group.defaultInputMethod)
     }
 
     @Test

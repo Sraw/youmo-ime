@@ -89,6 +89,21 @@ class SwipeSlotsTest {
         assertEquals(SwipeSlots.Default, SwipeSlots.parse("@1\tfirst-up\nfull/a.up\tfirst\nfull/a.down\tselect-all"))
     }
 
+    // 0.6.3's 切输入法, 选输入法 back as written; a command of a later version drops its line alone, the slot at its preset
+    @Test
+    fun theInputMethodCommandsRoundTripAndALaterVersionsCommandIsSkipped() {
+        val s = SwipeSlots.Default
+            .with("full/q", up = true, Command(KeyCommand.SwitchInputMethod))
+            .with("full/w", up = false, Command(KeyCommand.ChooseInputMethod))
+        val text = s.serialize()
+        assertTrue(text, "full/q.up\tswitch_input_method" in text && "full/w.down\tchoose_input_method" in text)
+        assertEquals(s, SwipeSlots.parse(text))
+        val later = SwipeSlots.parse(text + "\nfull/e.up\tsome_later_command\nfull/r.down\tcopy")
+        assertEquals(Command(KeyCommand.SwitchInputMethod), later.resolve("full/q", up = true))
+        assertEquals(SwipeSlots.Default.resolve("full/e", up = true), later.resolve("full/e", up = true))
+        assertEquals(copy, later.resolve("full/r", up = false))
+    }
+
     @Test
     fun aLongTextIsClipped() {
         val s = SwipeSlots.parse("full/a.up\ttext:" + "字".repeat(KeyShortcut.MAX_TEXT + 5))
