@@ -155,6 +155,7 @@
         <item quantity="other">This theme brings %1$d layouts: %2$s. Imported with it, they are in Look → Layouts.</item>
     </plurals>
     <string name="theme_pack_layouts_listed_commits">Actions in them typing text written in the layout: %1$d.</string>
+    <string name="theme_pack_layouts_lacks">%1$s lacks keys (it works all the same in Look → Layouts):</string>
     <string name="theme_pack_layouts_replaces">Replaces your existing “%1$s” (the layout an earlier import of this theme made, unchanged since).</string>
     <plurals name="theme_pack_layouts_full">
         <item quantity="one">Look → Layouts is full (%2$d): %1$d of them will not be put in it.</item>
@@ -192,6 +193,7 @@
     <string name="skin_format_gboard">Gboard themes</string>
     <string name="skin_format_cang">Cang Input skins</string>
     <string name="skin_format_apk">Themes inside an app (APK)</string>
+    <string name="skin_format_sogou_diy">Sogou\'s self-made skins (pictures and colours only, no key layout)</string>
     <string name="theme_pack_skin_notes">Converted from another keyboard\'s skin. Not carried over:</string>
     <string name="theme_pack_skin_note_layout">The positions and sizes of its keys: the app\'s own layouts are used</string>
     <string name="theme_pack_skin_note_decoration">Pictures laid over the keyboard</string>
@@ -206,7 +208,9 @@
     <string name="theme_pack_skin_note_includes">Settings taken from Trime\'s own files or from files not in the package</string>
     <string name="theme_pack_skin_note_more_themes">The file\'s other themes and colour schemes: one light and one dark are taken</string>
     <string name="theme_pack_skin_note_panels">The looks of panels the app draws its own way (clipboard, emoji, one-handed and floating modes)</string>
-    <string name="theme_pack_skin_note_layout_some">The positions of keys on some keyboards (%1$s: the skin\'s keys do not match the app\'s)</string>
+    <string name="theme_pack_skin_note_layout_some">The positions of keys on some keyboards (%1$s: the skin\'s keys do not match the app\'s, or do not fit)</string>
+    <string name="theme_pack_skin_note_layout_lacks">%1$s, left out as the skin draws none — %2$s</string>
+    <string name="theme_pack_skin_note_layout_extra">The skin\'s keys the app does not have (%1$s: a number row, a toolbar and the like)</string>
     <string name="theme_pack_skin_note_keyboard_animation">The keyboard\'s animation as it appears</string>
     <string name="theme_pack_skin_note_frame_animation">Frame animations, GIFs, Lottie and videos</string>
     <string name="theme_pack_skin_note_font">Its font (a font named with no font file, or a font file too large)</string>

@@ -18,7 +18,9 @@ import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutTexts
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.skin.SkinNote
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
@@ -56,6 +58,10 @@ object ThemePackDialogs {
             out += ctx.resources.getQuantityString(listed, layouts.listed.size, layouts.listed.size, layouts.listed.joinToString(listSeparator(ctx)))
             // what their keys type, what they write over, what has no room
             if (layouts.listedCommits > 0) out += ctx.getString(R.string.theme_pack_layouts_listed_commits, layouts.listedCommits)
+            // a skin's are said with why, in its notes; each warning a line, as an imported layout's
+            if (!pack.fromSkin) layouts.lacking.forEach { (name, lacks) ->
+                out += ctx.getString(R.string.theme_pack_layouts_lacks, name) + lacks.joinToString("") { "\n· " + LayoutTexts.finding(ctx, it) }
+            }
             layouts.replaced.forEach { out += ctx.getString(R.string.theme_pack_layouts_replaces, it) }
             if (layouts.notFitting > 0) {
                 out += ctx.resources.getQuantityString(R.plurals.theme_pack_layouts_full, layouts.notFitting, layouts.notFitting, CustomLayoutFiles.MAX_LAYOUTS)
@@ -85,6 +91,14 @@ object ThemePackDialogs {
         return when (note) {
             SkinNote.LAYOUT_SOME -> ctx.getString(
                 R.string.theme_pack_skin_note_layout_some,
+                args.joinToString(listSeparator(ctx)) { id -> builtInName(id) ?: id },
+            )
+            // one line each, as the caller marks the first
+            SkinNote.LAYOUT_LACKS -> args.map { it.split('\t') }.joinToString("\n· ") { a ->
+                ctx.getString(R.string.theme_pack_skin_note_layout_lacks, builtInName(a[0]) ?: a[0], LayoutTexts.finding(ctx, LayoutCheck.Finding(0, "lacks", a.drop(1))))
+            }
+            SkinNote.LAYOUT_EXTRA -> ctx.getString(
+                R.string.theme_pack_skin_note_layout_extra,
                 args.joinToString(listSeparator(ctx)) { id -> builtInName(id) ?: id },
             )
             SkinNote.TOOLBAR_ICONS -> count?.let { ctx.getString(R.string.theme_pack_skin_note_toolbar_icons_count, it) }

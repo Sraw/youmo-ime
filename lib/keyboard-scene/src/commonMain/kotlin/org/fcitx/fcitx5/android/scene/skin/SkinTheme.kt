@@ -188,6 +188,8 @@ class SkinTheme(
         } else {
             notes.remove(SkinNote.LAYOUT)
             if (failed.isNotEmpty()) notes[SkinNote.LAYOUT_SOME] = failed
+            out.filterValues { it.dropped > 0 }.keys.toList().takeIf { it.isNotEmpty() }?.let { notes[SkinNote.LAYOUT_EXTRA] = it }
+            out.flatMap { (id, w) -> w.lacks.map { (listOf(id) + it.args).joinToString("\t") } }.takeIf { it.isNotEmpty() }?.let { notes[SkinNote.LAYOUT_LACKS] = it }
         }
         return out
     }

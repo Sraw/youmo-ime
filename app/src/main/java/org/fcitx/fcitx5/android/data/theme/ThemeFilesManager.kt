@@ -4,6 +4,11 @@ import android.graphics.BitmapFactory
 import android.graphics.fonts.Font
 import android.icu.text.ListFormatter
 import androidx.annotation.VisibleForTesting
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -487,6 +492,21 @@ object ThemeFilesManager {
                 if (!File(temp, ThemePackFiles.THEME_XML).isFile) Opened.Json(importJson(extracted, themes)) else pack(temp, names, themes)
             }
         }
+
+    /**
+     * [open] on the IO threads, interrupted where the caller is cancelled (a conversion stops at its next image); a
+     * pack it made by then, which no one will take or discard, is removed, and how it stopped is no one's to be told.
+     */
+    suspend fun <T : Opened> opening(open: () -> T): T {
+        var made: T? = null
+        try {
+            return runInterruptible(Dispatchers.IO) { open().also { made = it } }
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            if (e !is CancellationException && currentCoroutineContext().isActive) throw e
+            (made as? Opened.Pack)?.discard()
+            throw e as? CancellationException ?: CancellationException("import let go", e)
+        }
+    }
 
     /** Baidu `.bds`/`.bdi`, Sogou `.ssf`, converted in memory to a 4.0 pack. */
     fun openSkin(src: InputStream, fileName: String, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened.Pack> =

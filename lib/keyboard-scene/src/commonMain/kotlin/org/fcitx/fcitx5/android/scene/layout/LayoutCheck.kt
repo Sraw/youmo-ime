@@ -241,6 +241,14 @@ object LayoutCheck {
 
     private const val BOM = "\uFEFF"
     internal val ROLES = setOf("backspace", "enter", "lang")
+
+    /**
+     * The `lacks` kinds 0.6.0 refused a theme pack's board for, drawing the app's (its `judge`): a slot, ⌫, 回车 or 地球键
+     * ([ROLES]), a digit. Shift, the space bar, a letter, 返回 it did not ask for.
+     */
+    val LACKS_REFUSED_060: Set<String> = ROLES + setOf(
+        "lang-no-space", "digits", "pad-digits", "handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid",
+    )
     internal val DIGIT = Regex("[0-9]")
     private const val BLANK_LIMIT = 5
 

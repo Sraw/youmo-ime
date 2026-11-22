@@ -25,11 +25,13 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant.Form
 import org.fcitx.fcitx5.android.scene.layout.Key
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
+import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutTexts
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemePackDialogs
 import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
@@ -262,6 +264,13 @@ class ThemePackLayoutsTest {
         val made = PackLayouts.convert("薄荷", null, "qwerty", qwerty, emptyMap(), CustomLayouts.sources, "0.6.1") as PackLayouts.Converted.Done
         assertEquals(listOf("full/q", "full/w"), made.problems.filter { it.key == "held" }.map { it.args.first() })
         assertTrue(opened("none", mapOf("zhuyin.xml" to zhuyin())).staged.layoutReport.listed.isEmpty())
+        // one lacking keys: listed as a user's own would be, what it lacks said
+        val lacking = opened("缺", mapOf("k18.xml" to k18.replace(Regex("<key id=\"backspace\"[^>]*/>"), "")))
+        assertEquals(listOf("缺 · 17 键"), lacking.staged.layoutReport.listed)
+        assertTrue(lacking.staged.layoutReport.unused.isEmpty())
+        val told = ThemePackDialogs.confirmText(appContext, lacking)
+        val backspace = LayoutTexts.finding(appContext, LayoutCheck.Finding(0, "lacks", listOf("backspace")))
+        assertTrue(told, told.contains(appContext.getString(R.string.theme_pack_layouts_lacks, "缺 · 17 键") + "\n· " + backspace))
     }
 
     // a pack's 注音 writing key corners and swipes: told as not taken, the app's used, the user's set first stays

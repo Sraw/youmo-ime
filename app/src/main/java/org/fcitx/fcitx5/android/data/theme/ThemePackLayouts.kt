@@ -17,6 +17,7 @@ import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.KeyAttrs
 import org.fcitx.fcitx5.android.scene.layout.KeyData
 import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.layout.Row
@@ -35,7 +36,7 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
     // 主题只管外观: held and swiped actions are the app keys'
     override val keyData: KeyData.Mode get() = KeyData.Mode.Pack
 
-    /** [ignored]: held/swiped actions not taken; [listed]: the layouts 「一起导入」 would make. */
+    /** [ignored]: held/swiped actions not taken; [listed]: the layouts 「一起导入」 would make, [lacking] what those lack. */
     class Report(
         val used: List<String>,
         val unused: List<Pair<String, String>>,
@@ -45,8 +46,9 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
         val listedCommits: Int = 0,
         val replaced: List<String> = emptyList(),
         val notFitting: Int = 0,
+        val lacking: List<Pair<String, List<LayoutCheck.Finding>>> = emptyList(),
     ) {
-        fun listing(replaced: List<String>, notFitting: Int) = Report(used, unused, commits, ignored, listed, listedCommits, replaced, notFitting)
+        fun listing(replaced: List<String>, notFitting: Int) = Report(used, unused, commits, ignored, listed, listedCommits, replaced, notFitting, lacking)
     }
 
     companion object {
@@ -146,8 +148,9 @@ class ThemePackLayouts(private val context: Context, private val pack: Theme.Pac
             ids.filter { it !in used && it !in included && it !in inList && it !in made && unused.none { u -> u.first == it } }
                 .forEach { unused += it to "a fragment no keyboard of the pack includes" }
             // in the order made, not the files'
-            val names = listed.filter { it.first in ids }.mapNotNull { (it.second as? PackLayouts.Converted.Done)?.name }
-            return Report(used, unused, commits, ignored.size, names, listedCommits)
+            val done = listed.filter { it.first in ids }.mapNotNull { it.second as? PackLayouts.Converted.Done }
+            val lacking = done.mapNotNull { d -> d.problems.filter { it.key == "lacks" }.takeIf { it.isNotEmpty() }?.let { d.name to it } }
+            return Report(used, unused, commits, ignored.size, done.map { it.name }, listedCommits, lacking = lacking)
         }
 
         private fun includes(file: File): List<String> {

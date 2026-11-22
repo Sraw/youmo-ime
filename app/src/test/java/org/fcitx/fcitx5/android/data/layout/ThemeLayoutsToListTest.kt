@@ -161,6 +161,24 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         assertEquals(ImKeyboard.KEYS18, chosen(PINYIN).first)
     }
 
+    // 0.6.0 refused a board lacking ⌫ and drew the app's: at the start from 0.6.0 (or its backup's) listed, not switched in;
+    // one lacking ⇧ it drew, so that one is
+    @Test
+    @Uat("ST-175")
+    fun aPacksBoardLackingKeysIsListedAtTheFirstStartNotChosen() {
+        val noBackspace = k17.replace(Regex("<key id=\"backspace\"[^>]*/>"), "")
+        check(noBackspace != k17)
+        val noShift = qwerty().replace(Regex("<key id=\"shift\"[^>]*/>"), "")
+        check(noShift != qwerty())
+        val mint = pack("mint", "k18.xml" to noBackspace, "qwerty.xml" to noShift)
+        start(listOf(mint), mint, null)
+        val ids = listed()
+        assertEquals(setOf("mint · 17 键", "mint · 主题 26 键"), ids.keys)
+        assertEquals(ImKeyboard.KEYS18 to null, chosen(PINYIN))
+        assertEquals(ImKeyboard.CUSTOM to ids.getValue("mint · 主题 26 键"), chosen(ENGLISH))
+        assertFalse(prefs.internal.themeLayoutsUnseen.getValue().contains("17"))
+    }
+
     @Test
     @Uat("ST-72")
     fun anImportListsAloneOnceAndOneImportedAgainUpdatesTheSameLayout() {

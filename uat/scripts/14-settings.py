@@ -846,7 +846,7 @@ SCENE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "li
 
 def push_layouts_pack(d):
     """uat-layouts.theme in 下载: Nord as a pack of its own with a 26 keys whose q types 你好, an 18 keys of
-    another name and a k14 that does not read"""
+    another name, a nine keys without 0 and a k14 that does not read"""
     def read(*p):
         with open(os.path.join(SCENE, *p), encoding="utf-8") as f:
             return f.read()
@@ -857,7 +857,9 @@ def push_layouts_pack(d):
     qwerty = edit(edit(read("layouts", "qwerty.xml"), 'name="26 键"', 'name="主题 26 键"'),
                   'id="q" label="{case:q}" send="q"', 'id="q" label="{case:q}" send="commit:你好"')
     k18 = edit(read("layouts", "k18.xml"), 'name="18 键"', 'name="主题 18 键"')
-    layouts = {"qwerty.xml": qwerty, "k18.xml": k18, "k14.xml": "<keyboard/>"}
+    nine = edit(edit(read("layouts", "nine.xml"), 'name="九键"', 'name="主题九键"'),
+                '<key id="0" kind="function" width="18" label="0" send="0" shortcut="zero"/>', '<gap width="18"/>')
+    layouts = {"qwerty.xml": qwerty, "k18.xml": k18, "nine.xml": nine, "k14.xml": "<keyboard/>"}
     p = os.path.join(tempfile.gettempdir(), f"uat-layouts-{d.port}.theme")
     with zipfile.ZipFile(p, "w") as z:
         z.writestr("theme.xml", edit(read("themes", "nord.xml"), 'name="nord"', 'name="uat-layouts"'))
@@ -901,8 +903,9 @@ def st72(d):
     push_layouts_pack(d)
     d.step("导入")
     import_theme(d, "uat-layouts", confirm=False)
-    # its 26 and 18 keys made layouts of the user's; k14 does not read; no keyboard stood for
-    for told in ("这个主题带 2 个布局：uat-layouts · 主题 26 键、uat-layouts · 主题 18 键，导入后在 外观 → 布局 里。",
+    # its 26, 18 and nine keys made layouts of the user's, the nine keys' lacking 0 told; k14 does not read; no keyboard stood for
+    for told in ("这个主题带 3 个布局：uat-layouts · 主题 26 键、uat-layouts · 主题 18 键、uat-layouts · 主题九键，导入后在 外观 → 布局 里。",
+                 "uat-layouts · 主题九键 缺键（在 外观 → 布局 里照样能用）：", "· 没有数字键 0",
                  "缺键盘必需的键，或不是已有的键盘）：k14"):
         check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
     check(not d.screen().find(contains="此主题包含自定义布局", where="all"), "确认框仍说这个主题顶替键盘")
@@ -912,6 +915,7 @@ def st72(d):
     check("你好" not in types_q(d), "用这个主题时 q 仍打出主题 26 键的「你好」")
     d.step("布局页")
     check(layout_card(d, "uat-layouts · 主题 18 键"), "布局页没有「uat-layouts · 主题 18 键」")
+    check(layout_card(d, "uat-layouts · 主题九键"), "布局页没有缺 0 的「uat-layouts · 主题九键」")
     card = layout_card(d, "uat-layouts · 主题 26 键")
     check(card, "布局页没有「uat-layouts · 主题 26 键」")
     d.tap(card.c, 1.0)
@@ -928,7 +932,7 @@ def st72(d):
     d.back(after=0.5)
     check(not any("（主题：" in t for t in opts), f"键盘选项里还有「（主题：…）」：{opts[:12]}")
     check("uat-layouts · 主题 26 键（自定义）" in opts, f"键盘选项里没有「uat-layouts · 主题 26 键（自定义）」：{opts[:12]}")
-    return "确认框列出 2 个布局、k14 不用、勾着一起导入；主题不顶替；布局页两张卡片；用在拼音后 q 打出你好"
+    return "确认框列出 3 个布局、九键缺 0 照样列并写出、k14 不用、勾着一起导入；主题不顶替；布局页三张卡片；用在拼音后 q 打出你好"
 
 SOUNDS_ICONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "theme-sounds-icons")
 
@@ -1975,8 +1979,9 @@ def skip_use(d):
 def layout_card(d, name):
     appearance_tab(d, "布局")
     n = d.screen().find(text=name)
-    # down the list, then back up: the tab comes back where it was left, possibly past the card
-    for frm, to in [((540, 1800), (540, 1200))] * 3 + [((540, 900), (540, 1500))] * 6:
+    # down the list, then back up: the tab comes back where it was left, possibly past the card; up from inside
+    # the list, as the page's keyboard preview over it (to y 982) does not scroll it
+    for frm, to in [((540, 1800), (540, 1200))] * 3 + [((540, 1300), (540, 1900))] * 6:
         if n:
             break
         d.swipe(frm, to, 300, after=1.0)

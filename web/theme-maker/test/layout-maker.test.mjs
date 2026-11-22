@@ -373,16 +373,20 @@ test("a theme pack's boards are offered made layouts of the user's, as the app's
   assert.equal(LM.refusal("the app's k18 does not read"), 'App 自带的 k18 读不出来');
   assert.equal(LM.refusal('made one that does not take: a letters board lacks the keys x'), '转出来的布局检查不过：a letters board lacks the keys x');
   assert.equal(LM.refusal('its fragment grouped-bottom does not read'), '它用的片段 grouped-bottom 读不出来');
-  assert.equal(LM.refusal('its pads lack keys: phone datetime'), '它写的数字键盘缺键：「电话」、「日期时间」');
   assert.equal(LM.refusal("over 256 when= alternatives an include's and its rows' make"), '它用的片段和片段里的行，when= 条件合起来超过 256 种');
-  assert.equal(LM.refusal('it serves no pad'), '哪种数字键盘都缺键，一种也用不了');
   assert.equal(LM.refusal('it has no slot [nine-side, symbol-grid]'), '少了 App 这块必有的位置：九键左边的符号列、符号面板的符号格子');
   assert.equal(LM.refusal('it has no key [backspace, enter]'), '少了 App 这块必有的键：删除、回车');
   assert.equal(LM.refusal('it has no key [2, 3]'), '少了 App 这块必有的键：2、3');
   const nine = E.layoutSource('nine');
-  const why = (text) => E.convertPackLayout('t', null, 'nine', text, null, FORMAT.version).why;
-  assert.equal(LM.refusal(why(nine.replace('kind="nine-side"', 'kind="symbol-grid"'))), '少了 App 这块必有的位置：九键左边的符号列');
-  assert.equal(LM.refusal(why(nine.replace('role="backspace"', ''))), '少了 App 这块必有的键：删除');
+  // made the user's own, a pack's board lacking what the app's has is judged as one they import: made, what it lacks told
+  const lacks = (text) => {
+    const c = E.convertPackLayout('t', null, 'nine', text, null, FORMAT.version);
+    assert.ok(c.ok, c.why);
+    return c.problems.filter((p) => p.key === 'lacks').map((p) => [...p.args]);
+  };
+  assert.deepEqual(lacks(nine), []);
+  assert.deepEqual(lacks(nine.replace('kind="nine-side"', 'kind="symbol-grid"')), [['nine-side']]);
+  assert.deepEqual(lacks(nine.replace('role="backspace"', '')), [['backspace']]);
   // each why the Kotlin gives, read from it: one added there and not here comes out in English
   const kotlin = (f) => readFileSync(join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonMain', 'kotlin', 'org', 'fcitx', 'fcitx5', 'android', 'scene', 'layout', f), 'utf8');
   const fun = (text, file, name) => {
@@ -398,7 +402,7 @@ test("a theme pack's boards are offered made layouts of the user's, as the app's
   };
   // the floors are each one's current distinct whys (one fewer means the pattern no longer finds one)
   const whys = new Set([
-    ...found('PackLayouts Converted.Not/ForPads', [...pack.matchAll(new RegExp('(?:Converted\\.Not\\(|ForPads\\(null, )' + literal, 'g'))].map((m) => m[1]), 8),
+    ...found('PackLayouts Converted.Not', [...pack.matchAll(new RegExp('Converted\\.Not\\(' + literal, 'g'))].map((m) => m[1]), 6),
     ...found('PackLayouts.judge', [...fun(pack, 'PackLayouts.kt', 'judge').matchAll(new RegExp('return ' + literal, 'g'))].map((m) => m[1]), 3),
     ...found('LayoutCheck.kept', [...fun(kotlin('LayoutCheck.kt'), 'LayoutCheck.kt', 'kept').matchAll(new RegExp('return ' + literal, 'g'))].map((m) => m[1].replace('$it', '[$it]')), 2),
   ]);

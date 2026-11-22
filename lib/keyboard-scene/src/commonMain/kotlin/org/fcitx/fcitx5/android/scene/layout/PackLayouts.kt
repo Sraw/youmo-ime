@@ -25,10 +25,12 @@ object PackLayouts {
     fun readable(files: Map<String, String>, has: (String) -> Boolean): Map<String, String> =
         files.filter { (id, text) -> has(id) && text.encodeToByteArray().size <= MAX_BYTES }.mapValues { it.value.removePrefix(BOM) }
 
-    fun judge(id: String, layout: Layout, fragments: Map<String, Fragment>, app: Layout?, appFragments: Map<String, Fragment>): String? {
+    /** [typable]: as typable as the app's, for one drawn in its place; else only whether it is the app's board. */
+    fun judge(id: String, layout: Layout, fragments: Map<String, Fragment>, app: Layout?, appFragments: Map<String, Fragment>, typable: Boolean = true): String? {
         if (layout.id != id) return "its id is ${layout.id}"
         app ?: return "the app's $id does not read"
         if (layout.family != app.family) return "its family is ${layout.family}, the app's ${app.family}"
+        if (!typable) return null
         if (layout.family == "letters") LayoutCheck.lettersLacking(layout, fragments).takeIf { it.isNotEmpty() }?.let { return "it has no key [${it.sorted().joinToString(", ")}]" }
         return LayoutCheck.kept(layout, fragments, app, appFragments)
     }
@@ -54,7 +56,8 @@ object PackLayouts {
     /**
      * A pack's file of a board the user picks among their own made one of those, shared by the import, upgrade, restore
      * and the layout maker; the same pack imported again gives the same id (an update). Renamed key names are returned so
-     * the caller copies the settings under them.
+     * the caller copies the settings under them. Made the user's own, it is judged as one they import: what it lacks of
+     * the app's board is a warning, not a reason to leave it out.
      */
     fun convert(
         theme: String,
@@ -92,25 +95,20 @@ object PackLayouts {
             val out = LayoutWriter.write(converted)
             return Made(out, LayoutCheck.check(out, sources, appVersion, strict = false))
         }
-        val (out, report) = forPads(layout.family, layout.pads, ::made).let { it.made ?: return Converted.Not(it.why!!) }
+        val (out, report) = forPads(layout.family, layout.pads, ::made)
         report.errors.firstOrNull()?.let { return Converted.Not("made one that does not take: $it") }
         return Converted.Done(newId, name, out, renames, report.warnings, ownName(layout.name, id), report.commits)
     }
 
     private data class Made(val text: String, val report: LayoutCheck.Report)
 
-    private class ForPads(val made: Made?, val why: String?)
-
-    private fun forPads(family: String, declared: List<String>?, made: (List<String>?) -> Made): ForPads {
-        if (family != NUMBER) return ForPads(made(declared), null)
-        val all = made(declared ?: LayoutReader.PADS)
+    // the pads written, lacking keys or not, as a user's own; 0.6.0's (none written) those it serves, else the full one
+    private fun forPads(family: String, declared: List<String>?, made: (List<String>?) -> Made): Made {
+        if (family != NUMBER || declared != null) return made(declared)
+        val all = made(LayoutReader.PADS)
         val lacking = all.report.padsLacking
-        return when {
-            lacking.isEmpty() -> ForPads(all, null)
-            declared != null -> ForPads(null, "its pads lack keys: ${lacking.joinToString(" ")}")
-            else -> LayoutReader.PADS.filter { it !in lacking }.takeIf { it.isNotEmpty() }
-                ?.let { ForPads(made(it), null) } ?: ForPads(null, "it serves no pad")
-        }
+        if (lacking.isEmpty()) return all
+        return made(LayoutReader.PADS.filter { it !in lacking }.ifEmpty { listOf(LayoutReader.PADS.first()) })
     }
 
     fun idOf(theme: String, id: String): String = "t" + hash(theme) + "-" + id
@@ -174,9 +172,8 @@ object PackLayouts {
     // outside [convert] for detekt's complexity
     private fun refused(id: String, layout: Layout, fragments: Map<String, Fragment>, own: Map<String, Fragment>, sources: LayoutCheck.Sources): String? {
         tooManyAlternatives(layout.parts, own)?.let { return it }
-        val app = sources.layout(id)
-        val appFragments = app?.parts?.filterIsInstance<Include>()?.mapNotNull { inc -> sources.fragment(inc.src)?.let { inc.src to it } }?.toMap().orEmpty()
-        return judge(id, layout, fragments, app, appFragments)
+        // what it lacks is told by LayoutCheck's lacks warnings, as for a layout the user made
+        return judge(id, layout, fragments, sources.layout(id), emptyMap(), typable = false)
     }
 
     private fun tooManyAlternatives(parts: List<Part>, own: Map<String, Fragment>): String? = parts.any { part ->

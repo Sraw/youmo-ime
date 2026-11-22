@@ -8,7 +8,8 @@ package org.fcitx.fcitx5.android.input.theme
 object ThemeFileName {
     const val EXTENSION = "theme"
 
-    val SKIN_EXTENSIONS = setOf("bds", "bdi", "ssf", "flex", "yaml", "yml", "zip")
+    /** `cskin`, `sxi`, `apk`, `pack` only to be told they are not supported (SkinConverter.unsupported), not "no theme file". */
+    val SKIN_EXTENSIONS = setOf("bds", "bdi", "bda", "ssf", "it", "flex", "yaml", "yml", "zip", "cskin", "sxi", "apk", "pack")
 
     /** A picked file's display name; the extension's case aside. */
     fun isThemeFile(name: String?): Boolean {

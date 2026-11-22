@@ -415,9 +415,7 @@
     if ((m = /^its family is (.*), the app's (.*)$/.exec(w))) return '种类是 ' + m[1] + '，App 的这块是 ' + m[2];
     if ((m = /^the app's (.*) does not read$/.exec(w))) return 'App 自带的 ' + m[1] + ' 读不出来';
     if ((m = /^made one that does not take: (.*)$/.exec(w))) return '转出来的布局检查不过：' + m[1];
-    if ((m = /^its pads lack keys: (.*)$/.exec(w))) return '它写的数字键盘缺键：' + m[1].split(' ').map((p) => '「' + (PAD_LABEL[p] || p) + '」').join('、');
     if ((m = /^over (\S+) when= alternatives an include's and its rows' make$/.exec(w))) return '它用的片段和片段里的行，when= 条件合起来超过 ' + m[1] + ' 种';
-    if (w === 'it serves no pad') return '哪种数字键盘都缺键，一种也用不了';
     if ((m = /^it has no slot \[(.*)\]$/.exec(w))) return '少了 App 这块必有的位置：' + m[1].split(', ').map((k) => SLOT_LABEL[k] || k).join('、');
     if ((m = /^it has no key \[(.*)\]$/.exec(w))) return '少了 App 这块必有的键：' + m[1].split(', ').map((k) => KEY_LABEL[k] || k).join('、');
     return w || '转不出来';

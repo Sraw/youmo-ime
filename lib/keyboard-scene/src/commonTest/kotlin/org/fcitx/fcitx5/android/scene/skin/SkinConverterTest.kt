@@ -66,7 +66,7 @@ class SkinConverterTest {
         assertEquals("#102030", hexOf(t.colors["keyText"]))
         assertEquals(mapOf(SoundKey.LETTER to "sound-letter.wav"), t.sounds)
         assertEquals(
-            setOf(SkinNote.LAYOUT, SkinNote.DECORATION, SkinNote.ANIMATION, SkinNote.LETTER_IMAGES),
+            setOf(SkinNote.LAYOUT_EXTRA, SkinNote.DECORATION, SkinNote.ANIMATION, SkinNote.LETTER_IMAGES),
             c.notes.keys,
         )
         // the theme's file names are its own
@@ -200,7 +200,9 @@ class SkinConverterTest {
         files[r + "keys.ini"] = text("[Key_A]\nFG_IMAGES=Fg_A\n[Fg_A]\nNORMAL=a.png\n")
         val c = convert(files)
         assertEquals("#00ff00", hexOf(read(c).colors["keyText"]))
-        assertTrue(SkinNote.LETTER_IMAGES in c.notes)
+        // a 26-key letter's picture is a sticker now: nothing said of it
+        assertFalse(SkinNote.LETTER_IMAGES in c.notes)
+        assertContains(c.themeXml, "sticker=\"st-a.png\"")
     }
 
     @Test

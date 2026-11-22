@@ -86,6 +86,20 @@ class SkinZipTest {
     }
 
     @Test
+    fun aZipOfOneSkinFileIsThatFile() {
+        // an issue's attachment: a ZIP is all one may upload, Finder's files beside it
+        val bdi = zip("port/gen.ini" to "[PANEL]".toByteArray(), "Info.txt" to "Name=x".toByteArray())
+        val attached = zip("x.BDI" to bdi, "__MACOSX/._x.BDI" to byteArrayOf(0))
+        assertEquals(setOf("port/gen.ini", "Info.txt"), SkinZip.readSkin(attached.inputStream(), "a.zip").keys)
+        // a skin's own ZIP holding one, a container (the converter's to open) and a format told apart by its name: as they are
+        val baidu = zip("port/gen.ini" to byteArrayOf(1), "res/old.bdi" to bdi)
+        assertEquals(setOf("port/gen.ini", "res/old.bdi"), SkinZip.readSkin(baidu.inputStream(), "a.zip").keys)
+        assertEquals(setOf("w.ssf"), SkinZip.readSkin(zip("w.ssf" to "Skin\u0003\u0000junk".toByteArray()).inputStream(), "a.zip").keys)
+        assertEquals(setOf("t.sxi"), SkinZip.readSkin(zip("t.sxi" to bdi).inputStream(), "a.zip").keys)
+        assertEquals(setOf("a.bds", "b.it"), SkinZip.readSkin(zip("a.bds" to bdi, "b.it" to bdi).inputStream(), "a.zip").keys)
+    }
+
+    @Test
     fun namesInChineseToolsEncoding() {
         val files = SkinZip.read(zip("皮肤/名.png" to byteArrayOf(1), utf8 = false))
         assertEquals(setOf("皮肤/名.png"), files.keys)

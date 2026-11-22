@@ -76,7 +76,7 @@ class ThemeListFragment : Fragment() {
                     try {
                         // read here, where it is changed, not on the importing thread
                         val themes = ThemeManager.getAllThemes()
-                        val opened = withContext(Dispatchers.IO) {
+                        val opened = ThemeFilesManager.opening {
                             // not over the start's pack listing (ThemeLayoutsToList.atStart): it would see the pack replaced under it
                             ThemeLayoutsToList.awaitStart()
                             val inputStream = cr.openInputStreamOrThrow(uri)
@@ -100,6 +100,8 @@ class ThemeListFragment : Fragment() {
                             themeListAdapter.replaceTheme(theme)
                         }
                         importedNotice(ctx, migrated, opened.imported.renamedFrom, theme.name)?.let { (text, length) -> ctx.toast(text, length) }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         ctx.importErrorDialog(e)
                     }

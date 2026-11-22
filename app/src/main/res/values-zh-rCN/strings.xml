@@ -151,6 +151,7 @@
         <item quantity="other">这个主题带 %1$d 个布局：%2$s，导入后在 外观 → 布局 里。</item>
     </plurals>
     <string name="theme_pack_layouts_listed_commits">其中 %1$d 个动作直接输入布局里写的文字。</string>
+    <string name="theme_pack_layouts_lacks">%1$s 缺键（在 外观 → 布局 里照样能用）：</string>
     <string name="theme_pack_layouts_replaces">替换已有的『%1$s』（这个主题上次导入时做的，之后没改过）。</string>
     <plurals name="theme_pack_layouts_full">
         <item quantity="other">外观 → 布局 已满（%2$d 个）：其中 %1$d 个放不进去。</item>
@@ -186,6 +187,7 @@
     <string name="skin_format_gboard">Gboard 的主题</string>
     <string name="skin_format_cang">仓输入法的皮肤</string>
     <string name="skin_format_apk">安装包（APK）里的主题</string>
+    <string name="skin_format_sogou_diy">搜狗的自制皮肤（只有图片和颜色，没有键盘布局）</string>
     <string name="theme_pack_skin_notes">从别的输入法的皮肤转换而来。以下没有转过来：</string>
     <string name="theme_pack_skin_note_layout">按键的位置和大小（用本输入法自己的布局）</string>
     <string name="theme_pack_skin_note_decoration">盖在键盘上的装饰图</string>
@@ -200,7 +202,9 @@
     <string name="theme_pack_skin_note_includes">引用了同文自带或包里没有的配置</string>
     <string name="theme_pack_skin_note_more_themes">文件里其他的主题和配色（只取一套浅色、一套深色）</string>
     <string name="theme_pack_skin_note_panels">本输入法自己画的面板的样子（剪贴板、表情、单手和悬浮模式）</string>
-    <string name="theme_pack_skin_note_layout_some">部分键盘的按键位置（%1$s：皮肤里的键和本输入法的对不上）</string>
+    <string name="theme_pack_skin_note_layout_some">部分键盘的按键位置（%1$s：皮肤里的键和本输入法的对不上，或排不下）</string>
+    <string name="theme_pack_skin_note_layout_lacks">%1$s里皮肤没画、布局里也没放——%2$s</string>
+    <string name="theme_pack_skin_note_layout_extra">皮肤里有、本输入法没有的键（%1$s：数字行、工具栏等）</string>
     <string name="theme_pack_skin_note_keyboard_animation">键盘出现时的动画</string>
     <string name="theme_pack_skin_note_frame_animation">帧动画、GIF、Lottie 和视频</string>
     <string name="theme_pack_skin_note_font">字体（只有字体名、没有字体文件，或字体文件太大）</string>

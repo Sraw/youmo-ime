@@ -310,15 +310,14 @@ class RimeComposeTest {
         val c = convertWith(skin)
         assertEquals(setOf("qwerty"), c.layouts.keys)
         assertFalse(SkinNote.LAYOUT in c.notes)
-        // the bottom row's switches the other way round from the app's: handed over, not written
+        // the bottom row's switches the other way round from the app's: written in the skin's order
         val swapped = TrimeFixtures.base.replace("Keyboard_symbols, width: 12", "Keyboard_x, width: 12")
             .replace("Keyboard_number, width: 12", "Keyboard_symbols, width: 12").replace("Keyboard_x, width: 12", "Keyboard_number, width: 12")
         val other = TrimeSkin(SkinFiles(files("b.trime.yaml" to swapped), SkinFixtures.Platform()))
         assertEquals("qwerty", other.look(Variant.LIGHT).layouts.single().id)
         val o = convertWith(other)
-        assertTrue(o.layouts.isEmpty())
-        assertTrue(SkinNote.LAYOUT in o.notes)
-        assertFalse(SkinNote.LAYOUT_SOME in o.notes)
+        assertEquals(setOf("qwerty"), o.layouts.keys)
+        assertFalse(SkinNote.LAYOUT in o.notes || SkinNote.LAYOUT_SOME in o.notes)
     }
 
     @Test

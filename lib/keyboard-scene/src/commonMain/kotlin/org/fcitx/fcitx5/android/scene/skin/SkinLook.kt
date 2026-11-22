@@ -137,6 +137,12 @@ enum class SkinNote {
     /** Some did not: the arguments are their ids ([SkinLayoutWriter.IDS]). */
     LAYOUT_SOME,
 
+    /** Keys the app does not have left out of keyboards written (a number or tool row): the arguments are their ids. */
+    LAYOUT_EXTRA,
+
+    /** What a keyboard written lacks of the app's, the skin not having it: each argument a board's id and a `lacks` finding's arguments, tab-separated. */
+    LAYOUT_LACKS,
+
     DECORATION,
 
     ANIMATION,
@@ -219,7 +225,10 @@ object SkinFormat {
     /** A theme inside an APK. */
     const val APK = "apk"
 
-    val ALL = listOf(SHOUXIN, GBOARD, CANG, APK)
+    /** Sogou's own-made skin: pictures and colours by key kind, no keys' places. */
+    const val SOGOU_DIY = "sogou-diy"
+
+    val ALL = listOf(SHOUXIN, GBOARD, CANG, APK, SOGOU_DIY)
 }
 
 /** All of it is in memory at once, in the input method's process. */

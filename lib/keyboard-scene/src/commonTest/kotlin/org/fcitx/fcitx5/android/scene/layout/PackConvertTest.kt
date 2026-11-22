@@ -207,8 +207,20 @@ class PackConvertTest {
         assertEquals(listOf("full", "phone"), LayoutReader.layout(done(convert(noDateFive, id = "number")).text).ok().pads)
         val declared = noDateFive.replaceFirst("family=\"number\"", "family=\"number\" pads=\"full datetime\"")
         assertTrue(declared != noDateFive)
-        assertIs<PackLayouts.Converted.Not>(convert(declared, id = "number"))
+        // pads written lacking keys: made as written and told, as a user's own
+        val lacking = done(convert(declared, id = "number"))
+        assertEquals(listOf("full", "datetime"), LayoutReader.layout(lacking.text).ok().pads)
+        assertTrue(lacking.problems.any { it.key == "lacks" || it.key == "pad-lacks" }, lacking.problems.toString())
         done(convert(declared.replace("pads=\"full datetime\"", "pads=\"full\""), id = "number"))
+        // one no pad is served by: the full one, what it lacks told
+        val noBackspace = number.replace(Regex("<key id=\"backspace\"[^>]*/>"), "")
+        assertTrue(noBackspace != number)
+        val full = done(convert(noBackspace, id = "number"))
+        assertEquals(listOf("full"), LayoutReader.layout(full.text).ok().pads)
+        assertEquals(listOf(listOf("backspace")), full.problems.filter { it.key == "lacks" }.map { it.args })
+        val written = done(convert(noBackspace.replaceFirst("family=\"number\"", "family=\"number\" pads=\"full phone\""), id = "number"))
+        assertEquals(listOf("full", "phone"), LayoutReader.layout(written.text).ok().pads)
+        assertEquals(listOf(listOf("backspace")), written.problems.filter { it.key == "lacks" }.map { it.args })
     }
 
     @Test
@@ -217,8 +229,9 @@ class PackConvertTest {
             "a board not listed, zhuyin" to { assertIs<PackLayouts.Converted.Not>(convert(testData("zhuyin.xml"), id = "zhuyin")) },
             "a file that does not read" to { assertIs<PackLayouts.Converted.Not>(convert("<keyboard", id = "k18")) },
             "a file of another id is not the pack's board" to { assertIs<PackLayouts.Converted.Not>(convert(k17, id = "k14")) },
-            "what the app's must have to be typed on missing: as 0.6.0 refused it" to {
-                assertIs<PackLayouts.Converted.Not>(convert(k17.replace(Regex("<key id=\"backspace\"[^>]*/>"), ""), id = "k18"))
+            "what the app's must have to be typed on missing: made, and told, as a user's own" to {
+                val c = done(convert(k17.replace(Regex("<key id=\"backspace\"[^>]*/>"), ""), id = "k18"))
+                assertEquals(listOf(listOf("backspace")), c.problems.filter { it.key == "lacks" }.map { it.args })
             },
         ) + KeyData.LISTED.map<String, Pair<String, () -> Unit>> { id -> "the app's $id, listed" to { done(convert(testData("$id.xml"), id = id)) } },
         { it.first },
@@ -233,13 +246,13 @@ class PackConvertTest {
         assertTrue(c.problems.none { it.key == "gap-look" || it.key == "bottom-left" }, c.problems.toString())
     }
 
-    // a user's letters board may lack letters (a warning); a theme pack's is not converted, as before
+    // made the user's own, a pack's letters board lacking letters is judged as one they import: a warning
     @Test
-    fun aPacksLettersBoardLackingALetterIsStillNotTaken() {
+    fun aPacksLettersBoardLackingALetterIsMadeAndTold() {
         val app = testData("qwerty.xml")
-        done(convert(app, id = "qwerty"))
+        assertTrue(done(convert(app, id = "qwerty")).problems.none { it.key == "lacks" })
         val noQ = app.replace(Regex("<key id=\"q\"[^>]*>[\\s\\S]*?</key>"), "")
-        assertEquals("it has no key [q]", assertIs<PackLayouts.Converted.Not>(convert(noQ, id = "qwerty")).why)
+        assertEquals(listOf(listOf("letters", "q")), done(convert(noQ, id = "qwerty")).problems.filter { it.key == "lacks" }.map { it.args })
     }
 
     @Test

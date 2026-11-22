@@ -253,10 +253,14 @@ class BaiduClassicTest {
     }
 
     @Test
-    fun aBoardOfKeysTheAppLacksIsSaid() {
+    fun aBoardLackingTheAppsKeysIsWrittenOfThoseItHas() {
+        // no symbols, numbers, comma or period: written without them, its keys drawn in the bottom row moved there
         val c = withLayouts(baidu())
-        assertTrue(c.layouts.isEmpty())
-        assertContains(c.notes.keys, SkinNote.LAYOUT)
+        assertEquals(setOf("qwerty"), c.layouts.keys)
+        assertTrue(SkinNote.LAYOUT !in c.notes.keys)
+        val ids = Regex("<key id=\"([^\"]+)\"").findAll(c.layouts.getValue("qwerty")).map { it.groupValues[1] }.toList()
+        assertTrue(ids.none { it in setOf("symbols", "numbers", "comma", "period") }, ids.toString())
+        assertEquals(listOf("backspace", "shift"), ids.filter { it == "backspace" || it == "shift" })
     }
 
     @Test

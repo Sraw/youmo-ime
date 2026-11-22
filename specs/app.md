@@ -907,17 +907,18 @@ fragment it includes that the pack has not is the app's, a fragment of the pack'
 keyboards. Block by block: a bad `zhuyin-nine.xml` falls back alone (`ThemePackLayoutsTest`).
 
 A pack's boards of `KeyData.LISTED` become layouts of the user's (061-custom-layout §11, `ThemeLayoutsToList`, app
-`data/layout/`): `PackLayouts.convert` (commonMain, the JS engine's `convertPackLayout` too) takes one as 0.6.0 drew it
-(reads, its includes read, `judge`; the loose check of §3.2), id `t<FNV-1a of the theme name, 8 hex>-<board>`,
+`data/layout/`): `PackLayouts.convert` (commonMain, the JS engine's `convertPackLayout` too) judges one as a layout the user
+imports (0.6.3, P9: reads, its includes read, `judge(typable = false)`: id and family; the loose check of §3.2, what it
+lacks a `lacks` warning; a number board's pads as written, one without `pads=` those it serves, else `full`), id `t<FNV-1a of the theme name, 8 hex>-<board>`,
 `based-on` the board, named 「theme · own name」 within 24, the pack's `grouped-bottom` written in, key names the rule
 refuses (a key's, a variant's, a `<defaults>`' of the layout, a row, a pack fragment: `<id>/keys`, `<id>/<row id>`)
 renamed `<id>/<key id>`, a group key of one of the app's names writing letters other than that key's (`appKeys`, as
 LayoutCheck's held finds it) `<id>/<its letters>` (0.6.0's 17 keys' HJK on `g18/h`: a key of its own, its long press
 its letters' as 0.6.0 drew it, since a user's layout's key of the app's name is the app's key), and the user's
 `key_lists`/`key_swipes` under the old copied under the new (`RenamedKeys`,
-ime-core); not made where its own `<meta min-app>` is newer than the app; a number board without `pads=` written for
-`LayoutReader.PADS` but those it lacks a key of (`lacks pad=`; none: not made), one with `pads=` not made where one
-lacks; `Done.commits` its new `commit:` texts (§13, counted in the import's confirmation). Where it goes:
+ime-core); not made where its own `<meta min-app>` is newer than the app; a number board's pads as above (`forPads`:
+without `pads=` written for `LayoutReader.PADS` but those it lacks a key of, none of them: `full`; with `pads=` as
+written; what a pad lacks a warning); `Done.commits` its new `commit:` texts (§13, counted in the import's confirmation). Where it goes:
 `CustomLayoutFiles.target` (ime-core, pure; L7 review S2) over the layout the pack's last conversion of the board made
 where that file's digest is the one recorded (an update, the confirmation says 「替换已有的『…』」), else the default
 id or the first free `-2`, `-3`… (the user's own or changed, another pack's of the same FNV kept; a file already what the board makes under that id is written over, so a run killed between its save and its record does not list it twice). `run(pack)` saves
@@ -932,7 +933,9 @@ in `noBackupFilesDir/theme-layouts-restored` (first line `switch` where the back
 a 0.6.1 beta's, none; else `list`). The first two of the start switch: `ThemeLayoutSwitch.plan` (ime-core, pure) chooses for each slot on the
 board the pack in use stood for (the shown theme's pack, else the other slot's of 跟随系统深色模式; Q15: where both
 have it the shown one's, the other's told as set aside) its layout where `ImKeyboards.usable` (S8: 双拼 not on other
-groups; one not drawn, none), and the number/symbol prefs where the app's is chosen (a pref of a layout gone or of
+groups; one not drawn, none) and it lacks nothing 0.6.0 refused it for (`LayoutCheck.LACKS_REFUSED_060`: a slot,
+⌫, 回车, 地球键, a digit; 0.6.0 drew the app's for such a one: listed only, no confirmation there to tell it; one lacking
+⇧, the space bar, a letter or 返回 0.6.0 drew, so switched), and the number/symbol prefs where the app's is chosen (a pref of a layout gone or of
 another family counts as that, as the app's card says it: `PanelLayouts.missing`, one whose file does not read kept; the number keyboard's takes effect at the next input
 start, L5); the notice is kept in
 `internal.themeLayoutsUnseen` till it is seen (`ThemeLayoutsToList.tellUnseen`, as the engine starts and as the start
@@ -1922,7 +1925,8 @@ the packs listed) is replaced, as it could not be deleted otherwise. A new pack 
 key text under 3:1 on its keys in a version (`ThemePackCheck`'s contrast). The confirmation
 (`ThemePackDialogs`) shows the preview, author, version, license, the format, that it replaces a pack or a
 3.0 theme of the name, the layouts of the user's its boards would make (`Report.listed`, `ThemeLayoutsToList.convert`;
-with 「一起导入」, ticked), the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
+with 「一起导入」, ticked) and, for a pack not a skin's, what each lacks (`Report.lacking`, `theme_pack_layouts_lacks`, a
+line a board and one a warning; a skin's said once, in its notes), the keyboards it replaces as they would be drawn (`ThemePackLayouts.report`: read by the
 engine's reader and judged as above) with the count of their `commit:` actions (as taken, KeyData's: a pack's own
 swipes are not; from the parsed layouts and the pack's fragments they include, each once: keys', variants', defaults', popup items' `send`, menu items' `do`; a
 character reference counts as what it reads as), the files never used (not an app id, unreadable, refused, a fragment

@@ -19,10 +19,12 @@ import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.RowSplit
+import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.layout.Width
 import org.fcitx.fcitx5.android.scene.skin.SkinAction.Letter
 import org.fcitx.fcitx5.android.scene.skin.SkinAction.Role
 import org.fcitx.fcitx5.android.scene.skin.SkinFixtures.appLayouts
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -52,13 +54,13 @@ class SkinLayoutWriterTest {
         ),
     ) = SkinBoard("qwerty", listOf(top, home, third, bottom), across)
 
-    private fun nine(extra: List<SkinKeyBox> = emptyList()): SkinBoard {
+    private fun nine(extra: List<SkinKeyBox> = emptyList(), zero: SkinAction = Letter('0')): SkinBoard {
         val side = 172.8
         fun digits(y: Double, s: String, last: SkinAction) = row(y, 150.0, side, *letters(s, 237.6), last to 194.4)
         val rows = listOf(
             digits(0.0, "123", Role("backspace")),
             digits(150.0, "456", Role("reset")),
-            digits(300.0, "789", Letter('0')),
+            digits(300.0, "789", zero),
             row(450.0, 150.0, 0.0, Role("symbols") to 172.8, Role("numbers") to 151.2, Role("emoji") to 100.0, Role("space") to 461.6, Role("enter") to 194.4),
             // the skin's own column of punctuation, drawn and not a key the app has
             listOf(SkinKeyBox(0.0, 0.0, side, 450.0, SkinAction.None)),
@@ -184,15 +186,183 @@ class SkinLayoutWriterTest {
             Role("space") to 380.0, Role("period") to 100.0, Role("enter") to 160.0,
         )
         assertEquals(written(qwerty()), written(qwerty(bottom = bottom)))
+        // at either end too: no indent of it
+        val ends = row(
+            450.0, 150.0, 0.0,
+            Role("emoji") to 100.0, Role("symbols") to 120.0, Role("numbers") to 120.0, Role("comma") to 100.0,
+            Role("space") to 280.0, Role("period") to 100.0, Role("enter") to 160.0, Role("settings") to 100.0,
+        )
+        assertEquals(written(qwerty()), written(qwerty(bottom = ends)))
     }
 
     @Test
-    fun aKeyMoreOrLessIsNoLayout() {
+    fun aCellDrawnWithAKeyStandingInForItsIsThatCell() {
+        // Baidu draws its pinyin board as one types: the separator where the app shows shift till then
+        val third = row(300.0, 150.0, 0.0, Role("apostrophe") to 162.0, *letters("zxcvbnm", 108.0), Role("backspace") to 162.0)
+        assertEquals(written(qwerty()), written(qwerty(third = third)))
+        // one shown in no state there is not that cell: left out, and the board lacks ⇧
+        val other = row(300.0, 150.0, 0.0, Role("emoji") to 162.0, *letters("zxcvbnm", 108.0), Role("backspace") to 162.0)
+        assertEquals(listOf(listOf("shift")), assertNotNull(SkinLayoutWriter.write(qwerty(third = other), appLayouts)).lacks.map { it.args })
+    }
+
+    private fun lacks(w: SkinLayoutWriter.Written) = w.lacks.map { it.args }
+
+    @Test
+    fun keysEitherSideLacksAreLeftOutAndTold() {
         val more = row(150.0, 150.0, 0.0, *letters("asdfghjkl", 108.0), Role("emoji") to 108.0)
-        assertNull(SkinLayoutWriter.write(qwerty(home = more), appLayouts))
+        val w = assertNotNull(SkinLayoutWriter.write(qwerty(home = more), appLayouts))
+        assertEquals(1, w.dropped)
+        assertAt(qwerty(home = more), placed(layout(w.text), states.first()), ::idOf)
+        assertEquals(0, assertNotNull(SkinLayoutWriter.write(qwerty(), appLayouts)).dropped)
+        assertEquals(emptyList(), lacks(assertNotNull(SkinLayoutWriter.write(qwerty(), appLayouts))))
+        // the app's keys the skin has not are not on the board, as a user's own layout may leave them out
         val less = row(150.0, 150.0, 54.0, *letters("asdfghjk", 108.0))
-        assertNull(SkinLayoutWriter.write(qwerty(home = less), appLayouts))
+        assertEquals(listOf(listOf("letters", "l")), lacks(assertNotNull(SkinLayoutWriter.write(qwerty(home = less), appLayouts))))
+        val noBackspace = row(300.0, 150.0, 0.0, Role("shift") to 162.0, *letters("zxcvbnm", 108.0))
+        val nb = assertNotNull(SkinLayoutWriter.write(qwerty(third = noBackspace), appLayouts))
+        assertEquals(listOf(listOf("backspace")), lacks(nb))
+        assertTrue("backspace" !in keys(layout(nb.text)).map { it.id })
+        val noSpace = row(450.0, 150.0, 0.0, Role("symbols") to 120.0, Role("numbers") to 120.0, Role("comma") to 580.0, Role("enter") to 260.0)
+        assertTrue(listOf("space") in lacks(assertNotNull(SkinLayoutWriter.write(qwerty(bottom = noSpace), appLayouts))))
         assertNull(SkinLayoutWriter.write(SkinBoard("number", qwerty().rows, across), appLayouts))
+    }
+
+    @Test
+    fun nineKeysWithoutZeroAreWrittenAndTold() {
+        val board = nine(zero = Role("emoji"))
+        val w = assertNotNull(SkinLayoutWriter.write(board, appLayouts))
+        assertEquals(listOf(listOf("digits", "0")), lacks(w))
+        val l = layout(w.text)
+        assertTrue("0" !in keys(l).map { it.id })
+        assertAt(board, placed(l, states.first()), ::idOf)
+        for (s in states) placed(l, s)
+        // for an app that takes one lacking keys, though it uses nothing newer
+        assertEquals(LayoutCheck.FEATURES["lacks"], w.minApp)
+        assertEquals(w.minApp, l.meta?.minApp)
+        assertTrue(ThemeReader.newer(w.minApp, assertNotNull(SkinLayoutWriter.write(nine(), appLayouts)).minApp))
+    }
+
+    @Test
+    fun aKeyOfTheSkinsWhereTheSideEndsIsAGapAfterIt() {
+        val rows = nine().rows.toMutableList()
+        rows[0] = row(0.0, 150.0, 172.8, Role("settings") to 237.6, *letters("23", 237.6), Role("backspace") to 194.4)
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("nine", rows, across), appLayouts))
+        assertEquals(listOf(listOf("digits", "1")), lacks(w))
+        val cells = layout(w.text).parts.filterIsInstance<Row>()[0].cells
+        assertEquals(16.0, ((cells[0] as Slot).width as Width.Units).units)
+        assertEquals(22.0, ((cells[1] as Gap).width as Width.Units).units)
+        assertEquals("2", (cells[2] as Key).id)
+    }
+
+    @Test
+    fun aKeyJoinedWhereItLeavesNoRoomIsLeftOut() {
+        // a pad of the skin's over the side: its 0 has no room before 7, so the board is written without it
+        val rows = nine(zero = Role("emoji")).rows + listOf(listOf(SkinKeyBox(0.0, 160.0, 172.8, 280.0, Letter('0'))))
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("nine", rows, across), appLayouts))
+        assertEquals(listOf(listOf("digits", "0")), lacks(w))
+        assertTrue("0" !in keys(layout(w.text)).map { it.id })
+        // its two ⊕ are the skin's own; the 0 left out is the app's key, told as lacking, not counted with them
+        assertEquals(2, w.dropped)
+    }
+
+    // a pad of digits where the side is: the board's 1 (its marks, the skin's comma), 2 and 3 are the wide keys, the pad's left out
+    @Test
+    fun aRowsKeyDrawnTwiceIsTheBoardsWidestNotAPadsBesideIt() {
+        val side = 172.8
+        val main = row(0.0, 150.0, side, Role("comma") to 237.6, *letters("23", 237.6), Role("backspace") to 194.4)
+        val pad = row(0.0, 150.0, 0.0, *letters("123", side / 3))
+        val rows = nine().rows.toMutableList()
+        rows[0] = pad + main
+        rows[4] = listOf(SkinKeyBox(0.0, 150.0, side, 300.0, SkinAction.None))
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("nine", rows, across), appLayouts))
+        assertEquals(emptyList(), lacks(w))
+        val one = main.map { if (it.action == Role("comma")) SkinKeyBox(it.x, it.y, it.w, it.h, Letter('1')) else it }
+        assertAt(SkinBoard("nine", listOf(one), across), placed(layout(w.text), states.first()), ::idOf)
+        // the side is where the pad is; its three told as the skin's own
+        assertEquals(written(nine()), written(SkinBoard("nine", nine().rows.toMutableList().also { it[0] = main }, across)))
+        assertEquals(assertNotNull(SkinLayoutWriter.write(nine(), appLayouts)).dropped + 3, w.dropped)
+    }
+
+    @Test
+    fun onlyAKeyOverTheRowAndBesideItsKeysJoinsIt() {
+        fun down(r: List<SkinKeyBox>) = r.map { SkinKeyBox(it.x, it.y + 150.0, it.w, it.h, it.action) }
+        val board = nine(zero = Role("emoji"))
+        val numbers = row(0.0, 150.0, 0.0, *letters("1234567890", 108.0))
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("nine", listOf(numbers) + board.rows.map(::down), across), appLayouts))
+        assertEquals(written(board), w.text)
+        // a ⊕ in a tool row is not the board's
+        val tools = row(0.0, 110.0, 0.0, Role("emoji") to 540.0, Role("lang") to 540.0)
+        val own = qwerty().rows.map { r -> r.map { SkinKeyBox(it.x, it.y + 110.0, it.w, it.h, it.action) } }
+        assertEquals(written(qwerty()), written(SkinBoard("qwerty", listOf(tools) + own, across)))
+    }
+
+    @Test
+    fun aKeyAcrossTwoRowsJoinsTheRowItIsIn() {
+        val rows = nine().rows.toMutableList()
+        rows[3] = row(450.0, 150.0, 0.0, Role("symbols") to 172.8, Role("numbers") to 151.2, Role("emoji") to 100.0, Role("space") to 461.6)
+        rows += listOf(SkinKeyBox(885.6, 300.0, 194.4, 300.0, Role("enter")))
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("nine", rows, across), appLayouts))
+        assertEquals(emptyList(), lacks(w))
+        val l = layout(w.text)
+        assertEquals("enter", l.parts.filterIsInstance<Row>().last().cells.filterIsInstance<Key>().last().id)
+        // its rows as high as the skin's, whatever the key across two is
+        assertTrue(l.parts.filterIsInstance<Row>().all { it.height == null || it.height == 1.0 })
+        for (s in states) placed(l, s)
+    }
+
+    @Test
+    fun aBoardThatCannotBeDrawnIsStillLeftOut() {
+        // a row past the board's edge
+        val top = row(0.0, 150.0, 0.0, *letters("qwertyuiop", 120.0))
+        assertNull(SkinLayoutWriter.write(qwerty(top = top), appLayouts))
+        // no row of the app's
+        assertNull(SkinLayoutWriter.write(SkinBoard("qwerty", listOf(row(0.0, 150.0, 0.0, Role("emoji") to 540.0)), across), appLayouts))
+    }
+
+    @Test
+    fun theBottomRowInTheSkinsOrder() {
+        val bottom = row(
+            450.0, 150.0, 0.0,
+            Role("numbers") to 120.0, Role("lang") to 100.0, Role("comma") to 100.0, Role("space") to 380.0,
+            Role("period") to 100.0, Role("symbols") to 120.0, Role("enter") to 160.0,
+        )
+        val board = qwerty(bottom = bottom)
+        val l = layout(written(board))
+        val app = layout(testAppText("qwerty"))
+        assertAt(board, placed(l, Input(langKey = true)), ::idOf)
+        for (s in states) placed(l, s)
+        // the keys the app shows in other states go with the one they stand in for
+        val ids = l.parts.filterIsInstance<Row>().last().cells.filterIsInstance<Key>().map { it.id }
+        assertEquals(listOf("numbers", "lang", "comma", "slash", "at", "space", "period", "dot", "domain", "symbols", "enter", "confirm"), ids)
+        assertEquals(keys(app).map { it.id to it.attrs.shortcut }.toSet(), keys(l).map { it.id to it.attrs.shortcut }.toSet())
+    }
+
+    @Test
+    fun aKeyDrawnInAnotherRowMovesThere() {
+        // symbols where the app has ⇧, none in the bottom row; and no period
+        val third = row(300.0, 150.0, 0.0, Role("symbols") to 162.0, *letters("zxcvbnm", 108.0), Role("backspace") to 162.0)
+        val bottom = row(450.0, 150.0, 0.0, Role("numbers") to 120.0, Role("comma") to 100.0, Role("space") to 700.0, Role("enter") to 160.0)
+        val board = qwerty(third = third, bottom = bottom)
+        val w = assertNotNull(SkinLayoutWriter.write(board, appLayouts))
+        val l = layout(w.text)
+        val rows = l.parts.filterIsInstance<Row>().map { r -> r.cells.filterIsInstance<Key>().map { it.id } }
+        assertEquals("symbols", rows[2].first())
+        // ⇧ gone with the keys shown in its cell as one types
+        assertTrue(rows.flatten().none { it in setOf("shift", "apostrophe", "lookup", "lookup-on", "period") })
+        assertTrue(listOf("shift") in lacks(w))
+        assertAt(board, placed(l, states.first()), ::idOf)
+        for (s in states) placed(l, s)
+    }
+
+    @Test
+    fun aNumberRowAndAToolRowAreLeftOut() {
+        fun down(r: List<SkinKeyBox>, by: Double) = r.map { SkinKeyBox(it.x, it.y + by, it.w, it.h, it.action) }
+        val own = qwerty().rows.map { down(it, 260.0) }
+        val tools = row(0.0, 110.0, 0.0, Role("emoji") to 540.0, Role("settings") to 540.0)
+        val numbers = row(110.0, 150.0, 0.0, *letters("1234567890", 108.0))
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("qwerty", listOf(tools, numbers) + own, across), appLayouts))
+        assertEquals(12, w.dropped)
+        assertEquals(written(SkinBoard("qwerty", own, across)), w.text)
     }
 
     @Test
@@ -269,6 +439,14 @@ class SkinLayoutWriterTest {
         assertEquals(own, keys(l).map { it.id }.take(own.size))
         assertAt(k18(), placed(l, states.first()), groupedIds(l))
         for (s in states) placed(l, s)
+    }
+
+    @Test
+    fun eighteenKeysWithShiftDrawnInTheSeparatorsCell() {
+        // the app's 18 keys have no ⇧: that cell is the separator's in every state
+        val rows = k18().rows.toMutableList()
+        rows[2] = row(300.0, 150.0, 0.0, Role("shift") to 180.0, *letters("zxvbm", 151.2), Role("backspace") to 144.0)
+        assertEquals(written(k18()), written(SkinBoard("k18", rows, across)))
     }
 
     @Test

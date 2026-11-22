@@ -22,10 +22,10 @@ class ThemeFileNameTest {
 
     @Test
     fun skinsByTheirExtensions() {
-        for (name in listOf("a.bds", "B.BDI", "x y.ssf", "c.flex", "d.trime.yaml", "e.YML", "f.zip", "a.ssf.zip")) {
+        for (name in listOf("a.bds", "B.BDI", "g.bda", "x y.ssf", "h.IT", "c.flex", "d.trime.yaml", "e.YML", "f.zip", "a.ssf.zip", "i.cskin", "j.sxi", "k.apk", "l.pack")) {
             assertTrue(name, ThemeFileName.isSkinFile(name))
         }
-        for (name in listOf("a.theme", ".ssf", "ssf", "a.json", "", null)) assertFalse(name.toString(), ThemeFileName.isSkinFile(name))
+        for (name in listOf("a.theme", ".ssf", "ssf", "a.json", "a.itx", "a.bd", "", null)) assertFalse(name.toString(), ThemeFileName.isSkinFile(name))
         assertTrue(ThemeFileName.isYaml("星天.trime.yaml"))
         assertTrue(ThemeFileName.isYaml("a.YML"))
         assertFalse(ThemeFileName.isYaml("a.yaml.zip"))

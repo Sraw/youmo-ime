@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
+import org.fcitx.fcitx5.android.scene.skin.SkinConverter
 import org.fcitx.fcitx5.android.scene.skin.SkinError
 import org.fcitx.fcitx5.android.scene.skin.SkinError.Reason
 import org.fcitx.fcitx5.android.scene.skin.SkinLimits
@@ -26,7 +27,10 @@ object SkinZip {
     /** Read to its end within [SkinLimits.MAX_ARCHIVE_BYTES]. */
     fun read(input: InputStream): Map<String, ByteArray> = read(bytes(input))
 
-    /** A lone YAML theme (Trime's) or Sogou container as itself; a ZIP holding one `.flex` and nothing of its own as that one's. [budget]: outer and inner together. */
+    /**
+     * A lone YAML theme (Trime's) or Sogou container as itself; a ZIP holding one skin file ([INNER]: one zipped
+     * itself) and nothing a reader takes of its own as that one's. [budget]: outer and inner together.
+     */
     fun readSkin(input: InputStream, fileName: String, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         val b = bytes(input)
         val name = fileName.substringAfterLast('/')
@@ -39,12 +43,17 @@ object SkinZip {
         val entries = read(b, budget)
         // macOS Finder's `__MACOSX/` and `._name` are no files of the skin's (the same rule as SkinConverter's)
         val files = entries.keys.filterNot { it.startsWith("__MACOSX/") || it.substringAfterLast('/').startsWith("._") }
-        val flex = files.filter { it.endsWith(".flex", ignoreCase = true) }
-        val own = files.any { it.substringAfterLast('/') == "extension.json" }
-        if (flex.size != 1 || own) return entries
+        val inner = files.singleOrNull { it.substringAfterLast('.', "").lowercase() in INNER }
+        // the ZIP a skin itself: a reader takes it, or it has an extension's own file
+        val own = files.any { it.substringAfterLast('/') == "extension.json" } || SkinConverter.READERS.any { it.first(files.toSet()) }
+        // a Sogou container in it is opened by the converter, as one alone is
+        if (inner == null || own || SogouContainer.isContainer(entries.getValue(inner))) return entries
         // the inner one unpacked within what the outer's files left of the one budget: both are held at once
-        return read(entries.getValue(flex[0]), budget - entries.values.sumOf { it.size.toLong() })
+        return read(entries.getValue(inner), budget - entries.values.sumOf { it.size.toLong() })
     }
+
+    // a skin's own file that is a ZIP; not a 仓, 手心 or APK one, whose name says it is not supported
+    private val INNER = setOf("flex", "bds", "bdi", "bda", "ssf", "it")
 
     private fun bytes(input: InputStream): ByteArray {
         val out = ByteArrayOutputStream()

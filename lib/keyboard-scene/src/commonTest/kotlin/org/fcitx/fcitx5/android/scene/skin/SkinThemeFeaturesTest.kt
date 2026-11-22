@@ -19,6 +19,7 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SkinThemeFeaturesTest {
@@ -263,6 +264,32 @@ class SkinThemeFeaturesTest {
         val c = convertWith(source(l))
         assertEquals(setOf("qwerty"), c.layouts.keys)
         assertEquals(listOf("nine"), c.notes[SkinNote.LAYOUT_SOME])
+        assertNull(c.notes[SkinNote.LAYOUT_EXTRA])
+        // a row of the skin's own under the keys: left out and said so
+        val tools = SkinLook(1080).apply { layouts += SkinBoard("qwerty", qwertyBoard().rows + listOf(listOf(SkinKeyBox(0.0, 600.0, 1080.0, 100.0, Role("emoji")))), 1080.0) }
+        val withTools = convertWith(source(tools))
+        assertEquals(setOf("qwerty"), withTools.layouts.keys)
+        assertEquals(listOf("qwerty"), withTools.notes[SkinNote.LAYOUT_EXTRA])
+        assertNull(c.notes[SkinNote.LAYOUT_LACKS])
+        // one without ⇧: written, and what it lacks said with the board's id
+        val noShift = qwertyBoard().rows.mapIndexed { i, r -> if (i == 2) r.filter { it.action != Role("shift") } else r }
+        val lacking = convertWith(source(SkinLook(1080).apply { layouts += SkinBoard("qwerty", noShift, 1080.0) }))
+        assertEquals(setOf("qwerty"), lacking.layouts.keys)
+        assertEquals(listOf("qwerty\tshift"), lacking.notes[SkinNote.LAYOUT_LACKS])
+        // a nine-key board without 0, alone: its min-app, and the theme's with it, an app's that takes one lacking keys
+        val nine = SkinLook(1080).apply {
+            fun row(y: Double, keys: List<Pair<SkinAction, Double>>, x0: Double = 172.8): List<SkinKeyBox> {
+                var x = x0
+                return keys.map { (a, w) -> SkinKeyBox(x, y, w, 150.0, a).also { x += w } }
+            }
+            fun digits(y: Double, s: String, last: SkinAction) = row(y, s.map { Letter(it) to 237.6 } + listOf(last to 194.4))
+            val bottom = listOf("symbols" to 172.8, "numbers" to 151.2, "emoji" to 100.0, "space" to 461.6, "enter" to 194.4).map { Role(it.first) to it.second }
+            layouts += SkinBoard("nine", listOf(digits(0.0, "123", Role("backspace")), digits(150.0, "456", Role("reset")), digits(300.0, "789", Role("emoji")), row(450.0, bottom, 0.0)), 1080.0)
+        }
+        val noZero = convertWith(source(nine))
+        assertEquals(listOf("nine\tdigits\t0"), noZero.notes[SkinNote.LAYOUT_LACKS])
+        assertContains(noZero.layouts.getValue("nine"), """min-app="0.6.3"""")
+        assertContains(noZero.themeXmlWithLayouts, """min-app="0.6.3"""")
         val qwerty = (LayoutReader.layout(c.layouts.getValue("qwerty")) as Parsed.Ok).value
         val min = LayoutCheck.minApp(qwerty)
         assertEquals(min, qwerty.meta?.minApp)
