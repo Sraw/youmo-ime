@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { serve } from '../dev/serve.mjs';
 import { browser, chromium } from './cdp.mjs';
+import { skinFixtures } from '../tools/make-skin-fixtures.mjs';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -348,6 +349,61 @@ async function main() {
     const top = await js(`[document.documentElement.scrollWidth, ...[...document.querySelectorAll('#top a.link')].map((a) => Math.round(a.getBoundingClientRect().height))]`);
     check(top[0] <= 360 && top.slice(1).every((h) => h < 24), '360 px: the top bar within the screen, its links one line each: ' + top);
     await b.send('Emulation.clearDeviceMetricsOverride');
+
+    // a skin dropped on the page, through the browser's own inflating, decrypting and decoding
+    const skins = skinFixtures();
+    const drop = async (name, bytes) => {
+      await js(`document.getElementById('toast').textContent = ''`);
+      await js(`(() => {
+        const u = Uint8Array.from(atob(${JSON.stringify(Buffer.from(bytes).toString('base64'))}), (c) => c.charCodeAt(0));
+        const dt = new DataTransfer();
+        dt.items.add(new File([u], ${JSON.stringify(name)}));
+        document.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+      })()`);
+      const during = await js(`[document.getElementById('new-panel').open, document.getElementById('busy').tagName]`);
+      let said = '';
+      for (let i = 0; i < 300 && !(said = await js(`document.getElementById('toast').textContent`)); i++) await wait(100);
+      await wait(300);
+      return { said, during };
+    };
+    const banner = () => js(`[document.getElementById('skin-note').hidden, document.querySelectorAll('#skin-lines li').length, document.getElementById('skin-layouts').checked,
+      document.getElementById('skin-layouts-row').hidden, [...document.querySelectorAll('#skin-lines li')].map((l) => l.textContent).join('|')]`);
+    const errorsShown = () => js(`document.querySelectorAll('#problems li.error').length`);
+    await js(`document.getElementById('new-panel').showModal()`);
+    const sea = await drop('sea.bds', skins['sea.bds']);
+    check(sea.during[0] === false && sea.during[1] === 'DIALOG', 'a skin opened from 新建: the dialog closed while it converts, 正在转换 a dialog of its own: ' + sea.during);
+    check(sea.said === '已从皮肤转成主题', 'sea.bds converted: ' + sea.said);
+    let note = await banner();
+    check(!note[0] && note[1] > 0 && !note[2] && !note[3], 'the banner: its notes, the layouts\' box offered and not ticked: ' + JSON.stringify(note));
+    check(await errorsShown() === 0, 'the converted theme: no errors');
+    await js(`(() => { const c = document.getElementById('skin-layouts'); c.checked = true; c.dispatchEvent(new Event('change')); })()`);
+    await wait(800);
+    await js(`(() => { window.__blob = null; const u = URL.createObjectURL; URL.createObjectURL = (b) => { window.__blob = b; return u(b); }; })()`);
+    await js(`document.querySelector('#file-menu [data-act=save]').click()`);
+    await wait(500);
+    if (await js(`document.getElementById('export-panel').open`)) await js(`document.querySelector('#export-panel button[value=save]').click()`);
+    await wait(800);
+    const saved = await js(`(async () => window.__blob ? window.YoumoLib.readZip(new Uint8Array(await window.__blob.arrayBuffer())).map((e) => e.name) : [])()`);
+    check(saved.includes('layouts/qwerty.xml') && /min-app="0\.6\.3"/.test(await source()), 'ticked: saved with layouts/qwerty.xml, min-app 0.6.3: ' + saved.join(' '));
+    await js(`document.getElementById('undo').click()`);
+    await wait(500);
+    check(!(await banner())[2], 'undone: the box not ticked again');
+    await js(`document.getElementById('new-panel').showModal()`);
+    await js(`document.querySelector('#builtins button').click()`);
+    await wait(500);
+    note = await banner();
+    check(note[0], 'a built-in theme picked after it: no banner, nothing of the skin to add: ' + JSON.stringify(note));
+    await js(`document.getElementById('undo').click()`);
+    await wait(500);
+    check(!(await banner())[0], 'undone back to the skin: its banner again');
+    const warm = await drop('warm.ssf', skins['warm.ssf']);
+    note = await banner();
+    const unread = await js(`window.YoumoMaker.SKIN_NOTES.IMAGES`);
+    check(warm.said === '已从皮肤转成主题' && !note[4].includes(unread), 'a sealed Sogou skin: opened by WebCrypto, every picture decoded: ' + warm.said + ' ' + note[4]);
+    const theme = await drop('nord.theme', skins['sea.bds'].subarray(0, 200));
+    check(/^打不开这个文件：/.test(theme.said) && !/皮肤/.test(theme.said), 'a broken .theme: the theme\'s own words: ' + theme.said);
+    const cang = await drop('lotus.cskin', skins['lotus.cskin']);
+    check(cang.said === '打不开这个文件：仓输入法的皮肤 暂不支持导入', '.cskin: ' + cang.said);
 
     // a draft restored through the page's own selects: a select id wrong threw inside the restore, and the page offered
     // to drop the draft instead

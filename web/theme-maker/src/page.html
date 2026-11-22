@@ -33,6 +33,14 @@
   <button id="help-button">帮助</button>
   <a class="link" href="layout/">键盘布局</a>
 </header>
+<div id="skin-note" class="skin-note" role="status" hidden>
+  <p id="skin-head">从别的输入法的皮肤转换而来。以下没有转过来：</p>
+  <ul id="skin-lines"></ul>
+  <p id="skin-layouts-text"></p>
+  <label id="skin-layouts-row"><input type="checkbox" id="skin-layouts"> 带上皮肤的键位</label>
+  <button type="button" id="skin-close">知道了</button>
+</div>
+<dialog id="busy" class="busy">正在转换……</dialog>
 <main id="main" inert>
   <section id="preview-area">
     <canvas id="preview" aria-label="键盘预览"></canvas>
@@ -82,7 +90,7 @@
     <div id="image-base" class="cards" role="radiogroup" aria-label="图片主题的配色"></div>
     <div class="cards" role="radiogroup" aria-label="浅色还是深色"><label><input type="radio" name="image-tone" value="light" checked> 浅色</label><label><input type="radio" name="image-tone" value="dark"> 深色</label></div>
     <button type="button" id="from-image">选图片…</button>
-    <p>或者 <button type="button" id="from-file">打开文件…</button>（.theme：4.0、3.0、2.1）</p>
+    <p>或者 <button type="button" id="from-file">打开文件…</button>（.theme：4.0、3.0、2.1；别的输入法的皮肤：百度 .bds、.bdi、.bda，讯飞 .it，搜狗 .ssf，FlorisBoard .flex，同文 .yaml，以及装着它们的 .zip）</p>
     <button value="cancel">取消</button>
   </form>
 </dialog>
@@ -98,7 +106,7 @@
   <form method="dialog">
     <h2>怎么做一个主题</h2>
     <ol>
-      <li>「文件 › 新建」：从示例、内置主题或一张图片开始，或者打开一个 .theme 文件（4.0、3.0、2.1 都行）。</li>
+      <li>「文件 › 新建」：从示例、内置主题或一张图片开始，或者打开一个 .theme 文件（4.0、3.0、2.1 都行）；别的输入法的皮肤（百度、讯飞、搜狗手机版、FlorisBoard、同文）也能打开，转成主题再改。文件也可以直接拖进页面。</li>
       <li>上面是预览，点一个键就选中它；「环境」换设备、横竖屏、键盘、深浅色；「键盘」里还能打开一个 .layout 布局文件，看主题画在它上面的样子。</li>
       <li>下面的标签页逐项改：配色、背景、按键、字和图标、栏、弹出、面板和窗口、尺寸、动效、信息；「源码」是 theme.xml 全文。</li>
       <li>「问题」里有错误时不能保存（App 会拒收），警告可以不管。点一条跳到那一行。</li>
@@ -116,7 +124,7 @@
     <button value="restore">恢复</button> <button value="discard">丢弃草稿</button>
   </form>
 </dialog>
-<input id="open-input" type="file" accept=".theme,.zip,.xml,application/zip" hidden>
+<input id="open-input" type="file" accept=".theme,.zip,.xml,application/zip,.bds,.bdi,.bda,.ssf,.it,.yaml,.yml,.flex,.cskin,.sxi,.apk,.pack" hidden>
 <input id="layout-input" type="file" accept=".layout,.xml,application/xml,text/xml" hidden>
 <input id="any-input" type="file" hidden>
 <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden>

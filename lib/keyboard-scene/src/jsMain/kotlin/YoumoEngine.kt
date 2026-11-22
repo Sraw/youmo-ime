@@ -18,6 +18,7 @@ import org.fcitx.fcitx5.android.scene.engine.BarSample
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
 import org.fcitx.fcitx5.android.scene.engine.MenuCell
+import org.fcitx.fcitx5.android.scene.engine.Paint
 import org.fcitx.fcitx5.android.scene.engine.PanelLooks
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
@@ -34,6 +35,14 @@ import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.rules.ScreenShape
+import org.fcitx.fcitx5.android.scene.skin.Pixels
+import org.fcitx.fcitx5.android.scene.skin.PixelsImage
+import org.fcitx.fcitx5.android.scene.skin.SkinConverter
+import org.fcitx.fcitx5.android.scene.skin.SkinError
+import org.fcitx.fcitx5.android.scene.skin.SkinImage
+import org.fcitx.fcitx5.android.scene.skin.SkinLimits
+import org.fcitx.fcitx5.android.scene.skin.SkinOutput
+import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.ColorExpr
@@ -45,6 +54,7 @@ import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.Values
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Theme
+import org.fcitx.fcitx5.android.scene.theme.ThemeFeatures
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.ThemeWriter
 import org.fcitx.fcitx5.android.scene.web.BuiltInFiles
@@ -57,6 +67,8 @@ import org.fcitx.fcitx5.android.scene.web.SceneJs.obj
 import org.fcitx.fcitx5.android.scene.web.SceneJs.problems
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
+import org.khronos.webgl.Uint8Array
+import org.khronos.webgl.Uint8ClampedArray
 
 @JsExport
 class YoumoTheme internal constructor(internal val theme: Theme) {
@@ -80,10 +92,13 @@ class YoumoTheme internal constructor(internal val theme: Theme) {
             "icons" to SceneJs.map(t.icons),
             // as written, a later version's class too: the maker keeps and saves them all
             "sounds" to t.soundFiles.map { (k, f) -> obj("key" to k, "src" to f) }.toTypedArray(),
-            "picture" to t.picture?.let { p ->
+            // the dark version's own where it has one: what the preview and 从背景图取色 take
+            "picture" to t.shownPicture?.let { p ->
                 obj("src" to p.src, "brightness" to p.brightness, "blurDp" to p.blurDp, "cuts" to SceneJs.map(p.cuts), "animated" to p.animated)
             },
             "meta" to t.meta?.let { m -> obj("author" to m.author, "version" to m.version, "license" to m.license, "minApp" to m.minApp, "preview" to m.preview) },
+            // the oldest app that reads and draws all of it, both versions alike (a pack's layouts are the page's to add)
+            "minApp" to if (ThemeFeatures.since063(theme)) ThemeFeatures.MIN_APP_063 else LayoutCheck.BASE_VERSION,
         )
     }
 }
@@ -430,15 +445,19 @@ object YoumoEngine {
         obj("ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>())
     }
 
-    /** Uses the painter's own op, so it matches a key's icon; an unknown icon draws nothing. */
-    fun paintIcon(ctx: dynamic, state: dynamic, name: dynamic, x: dynamic, y: dynamic, size: dynamic, tint: dynamic, rotation: dynamic): dynamic = checked {
+    /** Uses the painter's own op, so it matches a key's icon; an unknown icon draws nothing. [theme]: whose raster icons are masks. */
+    fun paintIcon(ctx: dynamic, state: dynamic, name: dynamic, x: dynamic, y: dynamic, size: dynamic, tint: dynamic, rotation: dynamic, theme: dynamic = null): dynamic = checked {
         if (ctx == null || jsTypeOf(ctx.fill) != "function") throw NotOfType("ctx: not a 2D context")
         if (ctx.canvas == null || ctx.canvas == undefined) throw NotOfType("ctx: a context with no canvas")
         val color = text(tint, "tint").takeIf { HEX_ARGB.matches(it) } ?: throw NotOfType("tint: not #aarrggbb")
         val left = number(x, "x")
         val top = number(y, "y")
         val side = number(size, "size")
-        val op = Op.Icon(text(name, "name"), Box(left, top, left + side, top + side), Argb(color.substring(1).toLong(HEX).toInt()), number(rotation, "rotation"))
+        val t = if (theme == null) null else theme as? YoumoTheme ?: throw NotOfType("theme: not a theme")
+        val box = Box(left, top, left + side, top + side)
+        val argb = Argb(color.substring(1).toLong(HEX).toInt())
+        val op = t?.let { Paint.icon(it.theme, text(name, "name"), box, argb, number(rotation, "rotation")) }
+            ?: Op.Icon(text(name, "name"), box, argb, number(rotation, "rotation"))
         CanvasPainter(ctx, assets(state, families(member(state, "fonts"))), 1.0, left + side, top + side).draw(listOf(op))
         obj("ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>())
     }
@@ -464,6 +483,99 @@ object YoumoEngine {
     }
 
     fun writeTheme(theme: YoumoTheme): String = ThemeWriter.write(theme.theme)
+
+    /** Whether app [version] is newer than [app] (ThemeReader.newer: false where either is not three numbers). */
+    fun newer(version: dynamic, app: dynamic): Boolean = ThemeReader.newer(text(version, "version"), text(app, "app"))
+
+    /** What the page holds a skin's file to before the engine has it ([SkinLimits]), and Sogou's cipher in hex. */
+    fun skinFormat(): dynamic = obj(
+        "archiveBytes" to SkinLimits.MAX_ARCHIVE_BYTES.toDouble(),
+        "entries" to SkinLimits.MAX_ENTRIES,
+        "entryBytes" to SkinLimits.MAX_ENTRY_BYTES.toDouble(),
+        "totalBytes" to SkinLimits.MAX_TOTAL_BYTES.toDouble(),
+        "ratio" to SkinLimits.MAX_RATIO,
+        "ratioFrom" to SkinLimits.RATIO_FROM.toDouble(),
+        "imagePixels" to SkinLimits.MAX_IMAGE_PIXELS.toDouble(),
+        "textBytes" to SkinLimits.MAX_TEXT_BYTES,
+        "sogouKey" to SkinPlatform.SOGOU_KEY,
+        "sogouIv" to SkinPlatform.SOGOU_IV,
+    )
+
+    /** The [SkinFormat] id of a format told apart by [fileName] and [names] (`[name]`, none: by the name alone) and not converted, else null. */
+    fun skinUnsupported(fileName: dynamic, names: dynamic): String? = SkinConverter.unsupported(text(fileName, "fileName"), names(names))
+
+    /** Whether a reader takes the files [names] as they are: a ZIP that is a skin, not one holding one (SkinZip.readSkin). */
+    fun skinTaken(names: dynamic): Boolean = names(names).let { n -> SkinConverter.READERS.any { it.first(n) } }
+
+    /**
+     * [entries] (`[{name, bytes}]`, a skin's files) as SkinConverter.open gives a reader them: `{ok, entries}`, else
+     * `{ok: false, reason, detail}` (SkinError's). [prepared] `{name: payload}` (no prototype: a name is a skin's): a
+     * Sogou container's decrypted and inflated by the page (WebCrypto is asynchronous), `"too-big"` where its stated
+     * length is past what is left to open.
+     */
+    fun skinOpen(entries: dynamic, prepared: dynamic): dynamic = skinChecked {
+        val (files, names) = skinEntries(entries)
+        val platform = object : SkinPlatform {
+            override fun image(bytes: ByteArray): SkinImage? = null
+
+            override fun legacyText(bytes: ByteArray): String = gb18030(bytes)
+
+            override fun sogouPlain(container: ByteArray, maxBytes: Int): ByteArray? {
+                val name = names.get(container) as? String ?: return null
+                val p = member(prepared, name) ?: return null
+                if (jsTypeOf(p) == "string") throw SkinError(SkinError.Reason.UNPACKED_TOO_BIG)
+                val b = signed(p, "prepared $name")
+                if (b.size > maxBytes) throw SkinError(SkinError.Reason.UNPACKED_TOO_BIG)
+                return b
+            }
+        }
+        val opened = SkinConverter.open(files, platform)
+        obj("ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>(), "entries" to opened.map { (n, b) -> obj("name" to n, "bytes" to unsigned(b)) }.toTypedArray())
+    }
+
+    /**
+     * [entries] as [skinOpen] gave them, converted ([SkinConverter.convertOpened]); [decoded] `{name: {width, height,
+     * data}}` (RGBA not premultiplied, ImageData's) its images the page decoded, [fileName] the file's own name.
+     * `{ok, name, themeXml, themeXmlWithLayouts, files: [{name, bytes} | {name, width, height, rgba, maxBytes, shrink}],
+     * layouts: [{id, xml}], notes: [{id, args}]}`, else `{ok: false, reason, detail}`.
+     */
+    fun convertSkin(entries: dynamic, decoded: dynamic, fileName: dynamic): dynamic = skinChecked {
+        val (files, names) = skinEntries(entries)
+        val platform = object : SkinPlatform {
+            override fun image(bytes: ByteArray): SkinImage? {
+                val name = names.get(bytes) as? String ?: return null
+                return pixels(member(decoded, name))?.let(::PixelsImage)
+            }
+
+            override fun legacyText(bytes: ByteArray): String = gb18030(bytes)
+
+            override fun layoutSources(): LayoutCheck.Sources = checkSources
+        }
+        val c = SkinConverter.convertOpened(files, platform, text(fileName, "fileName"))
+        obj(
+            "ok" to true, "problems" to emptyArray<dynamic>(), "warnings" to emptyArray<dynamic>(),
+            "name" to c.name, "themeXml" to c.themeXml, "themeXmlWithLayouts" to c.themeXmlWithLayouts,
+            "files" to c.files.map { f ->
+                when (f) {
+                    is SkinOutput.Bytes -> obj("name" to f.name, "bytes" to unsigned(f.bytes))
+                    is SkinOutput.Image -> obj(
+                        "name" to f.name, "width" to f.pixels.width, "height" to f.pixels.height, "rgba" to rgba(f.pixels),
+                        "maxBytes" to f.maxBytes.toDouble(), "shrink" to f.shrink,
+                    )
+                }
+            }.toTypedArray(),
+            "layouts" to c.layouts.map { (id, xml) -> obj("id" to id, "xml" to xml) }.toTypedArray(),
+            "notes" to c.notes.map { (n, args) -> obj("id" to n.name, "args" to args.toTypedArray()) }.toTypedArray(),
+        )
+    }
+
+    /** [image] (`{width, height, rgba}`, as [convertSkin] gives one) at [width]×[height], as the app halves a skin's picture (Pixels.resized). */
+    fun skinResized(image: dynamic, width: dynamic, height: dynamic): dynamic {
+        val p = pixels(obj("width" to member(image, "width"), "height" to member(image, "height"), "data" to member(image, "rgba")))
+            ?: throw NotOfType("image: not {width, height, rgba}")
+        val r = p.resized(whole(width, "width").coerceAtLeast(1), whole(height, "height").coerceAtLeast(1))
+        return obj("width" to r.width, "height" to r.height, "rgba" to rgba(r))
+    }
 
     /** `{ok, errors, warnings, family, ims, pads, commits, minApp}`, each finding `{line, key, args}`. */
     fun checkLayout(xml: dynamic, appVersion: dynamic, theme: dynamic): dynamic = checked {
@@ -503,6 +615,95 @@ object YoumoEngine {
 
 
     private class NotOfType(message: String) : Exception(message)
+
+    // a skin's numbers past what a reader holds them to are a broken file, never a page's crash
+    @Suppress("TooGenericExceptionCaught")
+    private inline fun skinChecked(answer: () -> dynamic): dynamic = checked {
+        try {
+            answer()
+        } catch (e: NotOfType) {
+            throw e
+        } catch (e: SkinError) {
+            skinFailed(e.reason, e.detail)
+        } catch (e: Throwable) {
+            skinFailed(SkinError.Reason.BROKEN, e.message.orEmpty())
+        }
+    }
+
+    private fun skinFailed(reason: SkinError.Reason, detail: String): dynamic =
+        obj("ok" to false, "reason" to reason.name, "detail" to detail, "problems" to arrayOf(obj("line" to 0, "message" to "$reason $detail".trim())), "warnings" to emptyArray<dynamic>())
+
+    // the files by name, the first of a name twice (as SkinZip's), and each array's name: a reader hands the platform
+    // the very array it was given, and a JS Map finds it by that, not by its bytes
+    private fun skinEntries(entries: dynamic): Pair<Map<String, ByteArray>, dynamic> {
+        val files = LinkedHashMap<String, ByteArray>()
+        val names: dynamic = js("new Map()")
+        array(entries, "entries").forEachIndexed { i, e ->
+            val name = text(member(e, "name"), "entries[$i].name")
+            if (name in files) return@forEachIndexed
+            val b = signed(member(e, "bytes"), "entries[$i].bytes")
+            files[name] = b
+            names.set(b, name)
+        }
+        return files to names
+    }
+
+    private fun names(v: dynamic): Set<String> = if (v == null) emptySet() else array(v, "names").mapIndexedTo(LinkedHashSet()) { i, n -> text(n, "names[$i]") }
+
+    // a view of [view]'s bytes, not a copy; no instanceof: the page's realm may not be ours
+    private fun signed(view: dynamic, what: String): ByteArray {
+        if (view == null || jsTypeOf(view.byteLength) != "number") throw NotOfType("$what: not a Uint8Array")
+        return if (view.buffer == null) {
+            Int8Array(view.unsafeCast<ArrayBuffer>()).unsafeCast<ByteArray>()
+        } else {
+            Int8Array(view.buffer.unsafeCast<ArrayBuffer>(), view.byteOffset as Int, view.byteLength as Int).unsafeCast<ByteArray>()
+        }
+    }
+
+    private fun unsigned(b: ByteArray): Uint8Array = b.unsafeCast<Int8Array>().let { Uint8Array(it.buffer, it.byteOffset, it.length) }
+
+    private fun gb18030(bytes: ByteArray): String {
+        val decoder: dynamic = js("new TextDecoder('gb18030')")
+        return decoder.decode(unsigned(bytes)) as String
+    }
+
+    // ImageData's {width, height, data}: null where it is not one, or past what a skin's image may be
+    private fun pixels(d: dynamic): Pixels? {
+        if (d == null) return null
+        val data = member(d, "data")
+        if (jsTypeOf(member(d, "width")) != "number" || jsTypeOf(member(d, "height")) != "number" || data == null) return null
+        val width = whole(d.width, "width")
+        val height = whole(d.height, "height")
+        if (width <= 0 || height <= 0 || width.toLong() * height > SkinLimits.MAX_IMAGE_PIXELS) return null
+        val b = signed(data, "data")
+        if (b.size != width * height * RGBA) return null
+        val argb = IntArray(width * height) { i ->
+            val at = i * RGBA
+            (b[at + ALPHA].toInt() and BYTE shl ALPHA_SHIFT) or (b[at].toInt() and BYTE shl RED_SHIFT) or
+                (b[at + 1].toInt() and BYTE shl GREEN_SHIFT) or (b[at + 2].toInt() and BYTE)
+        }
+        return Pixels(width, height, argb)
+    }
+
+    // the bytes written as signed are the RGBA a Uint8ClampedArray over them reads
+    private fun rgba(p: Pixels): Uint8ClampedArray {
+        val out = ByteArray(p.argb.size * RGBA)
+        for ((i, c) in p.argb.withIndex()) {
+            val at = i * RGBA
+            out[at] = (c ushr RED_SHIFT).toByte()
+            out[at + 1] = (c ushr GREEN_SHIFT).toByte()
+            out[at + 2] = c.toByte()
+            out[at + ALPHA] = (c ushr ALPHA_SHIFT).toByte()
+        }
+        return out.unsafeCast<Int8Array>().let { Uint8ClampedArray(it.buffer, it.byteOffset, it.length) }
+    }
+
+    private const val RGBA = 4
+    private const val ALPHA = 3
+    private const val BYTE = 0xFF
+    private const val ALPHA_SHIFT = 24
+    private const val RED_SHIFT = 16
+    private const val GREEN_SHIFT = 8
 
     // the app's default 候选字号 (SceneBar): 40dp high, 18sp text, 9dp each side, 32dp at least
     private const val BAR_DP = 40.0

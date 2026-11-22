@@ -12,10 +12,10 @@
   const ICONS = json('youmo-engine-icons');
   const BAR_ICONS = json('youmo-bar-icons');
   const iconCache = new WeakMap();
-  const iconsNow = () => M.iconsOf(E, ICONS, history.current, iconCache);
+  const iconsNow = () => M.iconsOf(E, ICONS, history.current, iconCache, assets.images);
   // the app's bar icons (hide-keyboard's ▾) under the theme's own
   const BAR_BASE = Object.assign({}, ICONS, BAR_ICONS.toolbarFallback);
-  const barIconsNow = () => M.iconsOf(E, BAR_BASE, history.current, iconCache);
+  const barIconsNow = () => M.iconsOf(E, BAR_BASE, history.current, iconCache, assets.images);
   const $ = (id) => document.getElementById(id);
 
   const THEME_LABEL = { material: 'Material', pixel: 'Pixel', nord: 'Nord', 'deep-blue': 'Deep Blue', monokai: 'Monokai', 'amoled-black': 'AMOLED', monet: '系统取色' };
@@ -41,6 +41,8 @@
   let edited = false;
   let keeping = null;
   let problems = [];
+  // said in the problems till the next edit (min-app= filled in)
+  let notice = null;
   let barH = 0;
   let playing = null;
   // pictures picked this session: cuts are made from them, not from the re-encoded file
@@ -59,10 +61,14 @@
   }
 
 
-  function set(d, { fresh = false } = {}) {
+  // [other]: a document of its own (another file, a built-in, an example), not an edit of the one shown
+  function set(d, { fresh = false, other = false } = {}) {
+    notice = null;
+    const from = history && history.current;
     if (fresh || !history) history = new M.History(d);
     else if (!history.push(d)) return;
     else edited = true;
+    if (!fresh && !other && fromSkin.has(from)) fromSkin.add(d);
     changed(fresh);
   }
 
@@ -90,6 +96,7 @@
     $('top').inert = $('main').inert = false;
     $('undo').disabled = !history.canUndo;
     $('redo').disabled = !history.canRedo;
+    skinShown(d);
     keep();
     return loadAssets(d).then((current) => { if (current) { preview(); refreshTab(external); } });
   }
@@ -375,7 +382,7 @@
         const name = names[i];
         const icon = 20 * dp;
         const turned = icons[name] === BAR_BASE[name] ? BAR_ICONS.turned[name] || 0 : 0;
-        E.paintIcon(ctx, { icons }, name, cx - icon / 2, (h - icon) / 2, icon, on ? lk.toolbar.onIcon : lk.toolbar.icon, turned);
+        E.paintIcon(ctx, { icons }, name, cx - icon / 2, (h - icon) / 2, icon, on ? lk.toolbar.onIcon : lk.toolbar.icon, turned, theme);
       }
     }
     ctx.restore();
@@ -598,6 +605,7 @@
     problems = list;
     const ul = $('problems');
     ul.textContent = '';
+    if (notice) ul.append(Object.assign(document.createElement('li'), { className: 'info', textContent: '提示：' + notice }));
     for (const p of list) {
       const li = document.createElement('li');
       li.className = p.level;
@@ -653,22 +661,91 @@
 
   async function openFile() {
     const f = await pick($('open-input'));
-    if (!f) return;
+    if (f) await openBytes(f);
+  }
+
+  // the browser's image codec for a skin's pictures: RGBA as drawn, not premultiplied; null where it has none
+  const skinIo = typeof DecompressionStream === 'function' && typeof OffscreenCanvas === 'function' && globalThis.crypto && crypto.subtle ? {
+    async decode(bytes) {
+      const bmp = await createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+      try {
+        const g = new OffscreenCanvas(bmp.width, bmp.height).getContext('2d', { willReadFrequently: true });
+        g.drawImage(bmp, 0, 0);
+        const d = g.getImageData(0, 0, bmp.width, bmp.height);
+        return { width: d.width, height: d.height, data: d.data };
+      } finally {
+        bmp.close();
+      }
+    },
+    async png(img) {
+      const c = new OffscreenCanvas(img.width, img.height);
+      c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(img.rgba), img.width, img.height), 0, 0);
+      return new Uint8Array(await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer());
+    },
+  } : null;
+
+  let skin = null; // the skin opened last: its layouts added or taken out by the banner's check box
+  let skinClosed = false;
+  // the documents of that skin's conversion and the edits of them, undone and redone alike: the banner is theirs alone
+  let fromSkin = new WeakSet();
+  let busy = false;
+
+  async function openBytes(f) {
+    if (busy) return;
+    busy = true;
+    // the conversion holds the page: nothing else is done meanwhile, and past 2 s it says why
+    const was = [$('top').inert, $('main').inert];
+    $('top').inert = $('main').inert = true;
+    // a modal 新建 would sit over the page's 正在转换 and stay clickable: closed, opened again if nothing opens
+    const fromNew = $('new-panel').open;
+    $('new-panel').close();
+    const slow = setTimeout(() => $('busy').showModal(), 2000);
     try {
-      const { doc, notes } = await M.open(E, L, FORMAT, new Uint8Array(await f.arrayBuffer()));
-      set(doc);
-      $('new-panel').close();
+      const { doc, notes, skin: converted } = await M.open(E, L, FORMAT, new Uint8Array(await f.arrayBuffer()), f.name, skinIo);
+      skin = converted || null;
+      fromSkin = new WeakSet();
+      if (skin) fromSkin.add(doc);
+      showSkin(notes.find((n) => n.kind === 'skin'));
+      set(doc, { other: true });
+      // the same file again is no new step: the banner is the one shown
+      if (skin) fromSkin.add(history.current);
+      skinShown(history.current);
       // one after another, only the last toast would be seen
       const said = [];
       for (const n of notes) {
         if (n.kind === 'converted') said.push('这是 ' + n.from + ' 主题，已转成 4.0');
         if (n.kind === 'layouts') said.push('带自定义布局：' + n.ids.join('、') + '，保存时原样保留');
         if (n.kind === 'dropped') said.push('包里有 App 不认的文件，已去掉：' + n.names.slice(0, 3).join('、') + (n.names.length > 3 ? ' 等 ' + n.names.length + ' 个' : ''));
+        if (n.kind === 'skin') said.push('已从皮肤转成主题');
+        if (n.kind === 'min-app') notice = M.minAppNotice(n.version);
       }
       if (said.length) toast(said.join('；'));
     } catch (e) {
+      if (fromNew) $('new-panel').showModal();
       toast('打不开这个文件：' + M.openError(e));
+    } finally {
+      clearTimeout(slow);
+      $('busy').close();
+      busy = false;
+      [$('top').inert, $('main').inert] = history ? [false, false] : was;
     }
+  }
+
+  // the banner of what a skin's conversion left out, and its layouts' check box (not ticked: the app's own layouts)
+  function showSkin(note) {
+    skinClosed = false;
+    if (!note) return;
+    $('skin-lines').replaceChildren(...note.lines.map((t) => Object.assign(document.createElement('li'), { textContent: t })));
+    $('skin-head').hidden = !note.lines.length;
+    $('skin-layouts-row').hidden = !note.layouts.length;
+    $('skin-layouts-text').textContent = note.layouts.length ? M.skinLayoutsText(note.layouts) : '';
+  }
+
+  // the banner shown over the skin's own documents only, its box ticked where they carry the skin's layouts
+  function skinShown(d) {
+    $('skin-note').hidden = !skin || skinClosed || !fromSkin.has(d);
+    const ids = skin ? Object.keys(skin.layouts) : [];
+    $('skin-layouts').checked = ids.length > 0 && ids.every((n) => n in d.layouts);
   }
 
 
@@ -759,7 +836,7 @@
     const bmp = await createImageBitmap(new Blob([cut.bytes]));
     d = colors.fromPictureAll(d, samplesOf(bmp), dark);
     bmp.close();
-    set(asDoc(d));
+    set(asDoc(d), { other: true });
     $('new-panel').close();
     tab = 'background';
     showTab();
@@ -869,8 +946,13 @@
   // an error stops it; warnings are the user's to ignore
   async function save() {
     if (!history) return;
+    const { errors, warnings, minApp } = M.exportCheck(E, L, FORMAT, history.current, E.layouts(), M.envJson(E, env));
+    if (minApp) {
+      set(minApp.doc);
+      notice = M.minAppNotice(minApp.version);
+      showProblems(problems);
+    }
     const d = history.current;
-    const { errors, warnings } = M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, env));
     if (errors.length) {
       showProblems([...errors, ...warnings]);
       $('problems-area').scrollIntoView({ block: 'nearest' });
@@ -971,7 +1053,7 @@
       b.textContent = ex.label;
       b.title = ex.note;
       b.addEventListener('click', () => {
-        set(M.exampleDoc(ex));
+        set(M.exampleDoc(ex), { other: true });
         $('new-panel').close();
         if (Object.keys(ex.layouts).length) toast('带自定义布局：' + Object.keys(ex.layouts).map((n) => n.replace(/\.xml$/, '')).join('、') + '，保存时原样保留');
       });
@@ -983,7 +1065,7 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = THEME_LABEL[id] || id;
-      b.addEventListener('click', () => { set(M.fromBuiltin(E, id)); $('new-panel').close(); });
+      b.addEventListener('click', () => { set(M.fromBuiltin(E, id), { other: true }); $('new-panel').close(); });
       cards.append(b);
     }
     for (const p of PANELS) {
@@ -1000,6 +1082,17 @@
     showTab();
     $('from-image').addEventListener('click', fromImage);
     $('from-file').addEventListener('click', openFile);
+    $('skin-layouts').addEventListener('change', () => { if (history && skin && fromSkin.has(history.current)) set(M.skinLayouts(history.current, skin, $('skin-layouts').checked)); });
+    $('skin-close').addEventListener('click', () => { skinClosed = true; $('skin-note').hidden = true; });
+    $('busy').addEventListener('cancel', (e) => e.preventDefault());
+    // a file dropped anywhere is opened as 打开文件… opens one
+    document.addEventListener('dragover', (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+    document.addEventListener('drop', (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files[0];
+      if (!f) return;
+      e.preventDefault();
+      openBytes(f);
+    });
 
     $('file').addEventListener('click', () => { $('file-menu').hidden = !$('file-menu').hidden; });
     $('file-menu').addEventListener('click', (e) => {

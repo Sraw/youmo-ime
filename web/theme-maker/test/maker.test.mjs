@@ -517,7 +517,7 @@ test("a pack's layout writing a key's long press, corner or swipes: a warning a 
 
 test('the check before a save: an error of any board or version stops it, the app\'s refusals with them, each once', () => {
   const d = M.fromBuiltin(E, 'material');
-  assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV)), { errors: [], warnings: [] });
+  assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV)), { errors: [], warnings: [], minApp: null });
   const missing = M.doc(F.setProp(d.xml, 'key', 'fill', 'image(nope.png, 0dp)'));
   assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
   const later = M.doc(F.setProp(d.xml, 'key', 'width', '10dp'));
@@ -643,4 +643,76 @@ test('a .layout opened for the preview: read as the app reads it, drawn with the
   for (const id of ['qwerty', 'number', 'grouped-bottom']) {
     assert.throws(() => M.openLayout(E, enc(text.replace('id="k17"', 'id="' + id + '"'))), new RegExp('id「' + id + '」和 App 自带的键盘重名'));
   }
+});
+
+test('a pack of raster icons, stickers and a dark picture saves: each held to its own limits, none taken for an SVG', () => {
+  const base = M.fromBuiltin(E, 'nord');
+  const xml = base.xml.replace('</theme>', [
+    '  <style select="qwerty/q" sticker="st-q.png"/>',
+    '  <style select="qwerty/w" sticker="st-w.webp"/>',
+    '  <icon name="backspace" src="icon-backspace.png" tint="true"/>',
+    '  <icon name="shift" src="icon-shift.webp"/>',
+    '</theme>'].join('\n'));
+  const webp = (w, h) => animWebp(w, h, [60], { flag: false });
+  const files = { 'st-q.png': pngHeader(512, 300), 'st-w.webp': webp(200, 200), 'icon-backspace.png': pngHeader(96, 96), 'icon-shift.webp': webp(64, 64) };
+  const d = withPicture(M.doc(xml, files), pngHeader(1080, 700), 'png');
+  const dark = P.background.ops.setPicture(P.colors.ops.dark(d, true), { type: 'png', src: pngHeader(1080, 700), cuts: { portrait: { bytes: pngHeader(1080, 700), type: 'png', rect: null } } }, 'dark');
+  assert.match(dark.xml, /<picture variant="dark"/);
+  const errors = (x) => M.saveProblems(E, L, FORMAT, x).filter((p) => p.level === 'error').map((p) => p.message);
+  assert.deepEqual(errors(dark), []);
+  assert.ok(!errors(dark).some((m) => /不是 SVG/.test(m)));
+  // each past its own limit, an animated one, one not an image
+  const lim = FORMAT.limits;
+  const over = (n, b) => errors(M.doc(dark.xml, { ...dark.files, [n]: b }, dark.layouts));
+  assert.match(over('icon-backspace.png', pngHeader(lim.rasterIconSide + 1, 10)).join(), /icon-backspace\.png（位图图标）：257×10，边长最多 256/);
+  assert.match(over('st-q.png', pngHeader(lim.stickerSide + 1, 10)).join(), /st-q\.png（贴纸）：513×10，边长最多 512/);
+  assert.match(over('st-q.png', Uint8Array.from({ length: lim.stickerBytes + 1 }, (_, i) => pngHeader(10, 10)[i] ?? 0)).join(), /（贴纸）：超过 256 KB/);
+  assert.match(over('icon-shift.webp', animWebp(64, 64, [60, 60])).join(), /动态 WebP/);
+  assert.match(over('st-w.webp', new Uint8Array([1, 2, 3])).join(), /st-w\.webp（贴纸）：不是 PNG 或 WebP/);
+  // a sticker the pack lacks: the app draws what it hides, and takes the pack
+  const { 'st-q.png': _q, ...noSticker } = dark.files;
+  assert.deepEqual(errors(M.doc(dark.xml, noSticker, dark.layouts)), []);
+  const { 'icon-shift.webp': _, ...without } = dark.files;
+  assert.ok(errors(M.doc(dark.xml, without, dark.layouts)).some((m) => /icon-shift\.webp/.test(m)), 'a missing one said');
+  // an icon of any other name is the SVG it was
+  const svg = M.doc(dark.xml.replace('icon-shift.webp', 'icon-shift.svg'), { ...dark.files, 'icon-shift.svg': pngHeader(4, 4) }, dark.layouts);
+  assert.ok(errors(svg).some((m) => /icon-shift\.svg 不是 SVG/.test(m)));
+  // the page decodes them, each within its own side
+  const names = M.decodableImages(L, FORMAT, dark);
+  for (const n of ['st-q.png', 'icon-backspace.png', 'picture-dark.png']) assert.ok(names.includes(n), n + ': ' + names);
+  assert.ok(!M.decodableImages(L, FORMAT, M.doc(dark.xml, { ...dark.files, 'icon-backspace.png': pngHeader(300, 300) })).includes('icon-backspace.png'));
+  // a raster icon drawn as the page decoded it, else the app's of its name
+  const image = { image: {}, width: 96, height: 96 };
+  const icons = M.iconsOf(E, { backspace: 'app', shift: 'app' }, dark, new WeakMap(), { 'icon-backspace.png': image });
+  assert.equal(icons.backspace, image);
+  assert.equal(icons.shift, 'app');
+});
+
+test('a pack using what 0.6.3 added gets min-app= on opening and on saving, said once; one using nothing new is left as it was', async () => {
+  const nord = M.fromBuiltin(E, 'nord');
+  assert.equal(M.withMinApp(E, nord), null, 'nothing new: no min-app= added');
+  for (const v of ['0.5.0', '0.5.9']) assert.equal(M.withMinApp(E, M.doc(F.setMeta(nord.xml, 'min-app', v))), null, v + ' and nothing new: left as it is');
+  const xml = nord.xml.replace('</theme>', '  <style select="qwerty/q" sticker="st-q.png"/>\n</theme>');
+  const d = M.doc(xml, { 'st-q.png': pngHeader(10, 10) });
+  const fixed = M.withMinApp(E, d);
+  assert.equal(fixed.version, '0.6.3');
+  assert.equal(F.meta(fixed.doc.xml)['min-app'], '0.6.3');
+  assert.ok(E.readTheme(fixed.doc.xml, null, null).warnings.every((w) => !/min-app/.test(w.message)), 'the reader\'s note of it gone');
+  assert.equal(M.withMinApp(E, fixed.doc), null);
+  assert.equal(M.minAppNotice('0.6.3'), '用到了 0.6.3 的写法，已把最低版本设为 0.6.3');
+  // an older one said is raised; a newer one kept
+  assert.equal(M.withMinApp(E, M.doc(F.setMeta(xml, 'min-app', '0.6.0'), d.files)).version, '0.6.3');
+  assert.equal(M.withMinApp(E, M.doc(F.setMeta(xml, 'min-app', '0.7.0'), d.files)), null);
+  // saved: the check is of the pack as it will be, the page told to keep it
+  const r = M.exportCheck(E, L, FORMAT, d, ['qwerty'], M.envJson(E, M.ENV));
+  assert.equal(r.minApp.version, '0.6.3');
+  assert.ok(!r.warnings.some((w) => /min-app/.test(w.message)), r.warnings.map((w) => w.message).join('\n'));
+  // opened: filled in, said in a note
+  const opened = await M.open(E, L, FORMAT, M.save(L, d).bytes);
+  assert.equal(F.meta(opened.doc.xml)['min-app'], '0.6.3');
+  assert.deepEqual(opened.notes.at(-1), { kind: 'min-app', version: '0.6.3' });
+  // a layout of the pack's newer than its theme: its version
+  const lay = M.doc(nord.xml, {}, { 'qwerty.xml': E.layoutSource('qwerty') });
+  const need = E.checkLayout(E.layoutSource('qwerty'), E.layoutFormat().version, null).minApp;
+  assert.equal(M.withMinApp(E, lay)?.version ?? '0.6.0', need);
 });

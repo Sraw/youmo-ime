@@ -2702,3 +2702,11 @@ case("ST-189", needs="manual:键盘布局网页新建、合并、保存，再导
 
 case("ST-190", needs="manual:键盘布局网页的保存检查、草稿找回、打开 .theme，主题制作网页打开 .layout：电脑浏览器上手工跑；"
      "web/theme-maker 的 layout-maker.test.mjs、layout-smoke.mjs、maker.test.mjs、panels-smoke.mjs 查")(lambda d: None)
+
+
+case("ST-212", needs="manual:主题制作网页导入皮肤，存下的包导入手机：电脑浏览器加设备，手工跑；"
+     "网页一侧 web/theme-maker 的 skin-import.test.mjs、maker.test.mjs、panels-smoke.mjs（headless Chrome）查")(lambda d: None)
+
+
+case("ST-213", needs="manual:皮肤转出的包在 0.6.2 上导入：要装旧版（降级），设备上手工跑；"
+     "网页转出的 min-app 由 web/theme-maker 的 skin-import.test.mjs 查")(lambda d: None)

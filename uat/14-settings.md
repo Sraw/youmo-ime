@@ -1107,6 +1107,35 @@
   7. 26 键、18 键都按包里的那块画，**问题** 里没有把另一块当片段读不出的行；布局页列出这两块可以从它开始，读不出的 `k14` 写着原因，原因是中文（如「读不出来」），没有英文。
 - **JVM**：web/theme-maker 的 `layout-maker.test.mjs`（`保存: errors keep it from being saved; …`、`a theme pack's boards are offered made layouts of the user's, …`、`the draft is the theme maker's, in the layout maker's own database`）、`layout-smoke.mjs`（保存、草稿找回、打开 .theme）、`maker.test.mjs`（`a .layout opened for the preview: …`，含 `qwerty` 等 App 自带 id 被拒；`the environment is the engine's: …`（平板竖拿按横屏）；`a pack's two boards the app still reads are each drawn as the pack's, its fragment where they include it`）、`layout-maker.test.mjs` 的 `group letters set: …`（旧版 `{group:hjk}` 打开、恢复时改写）和 `LM.refusal` 那几行（原因写成中文）、`layout-smoke.mjs`（平板竖拿「800 dp 宽，按横屏排」）、`panels-smoke.mjs`（环境 › 键盘 › 打开 .layout）；页面上的样子在电脑浏览器上手工看。
 
+### ST-212 [P1] 主题制作网页：导入别的输入法的皮肤
+<!-- dev/design/063-skin-import §9 -->
+- **前提**：电脑上的浏览器（新版 Chrome）打开主题制作页（同 ST-56）；样本用脚本现做，不放第三方皮肤：`node web/theme-maker/tools/make-skin-fixtures.mjs <目录>`，得到 `sea.bds`（百度，26 键）、`warm.ssf`（搜狗，用公开密钥加密的容器）、`warm-plain.ssf`（同一个皮肤不加密）、`warm-in.zip`（zip 里套着 `warm.ssf`）、`lotus.cskin`；再把 `sea.bds` 截掉后半截改名 `cut.theme`。
+- **操作**：
+  1. 先在 DevTools › Performance 把 CPU 降速调到 20×（样本小，不降速时转换远不到 2 秒）；页面一打开弹出 **新建主题** 时，点 **打开文件…** 选 `sea.bds`。看完第 1 条预期后把降速关掉。
+  2. 看顶上的提示条；勾上 **带上皮肤的键位**，**文件 › 保存 .theme**；撤销一步；再 **文件 › 新建…** 选内置 Nord，然后撤销回来。
+  3. 依次把 `warm.ssf`、`warm-plain.ssf`、`warm-in.zip` 拖到页面上。
+  4. 打开 `lotus.cskin`、`cut.theme`。
+  5. 点提示条的 **知道了**。
+  6. 把第 2 步存下的 `.theme` 导入手机（**外观 → 主题 → 新增主题 → 导入主题文件**），和在手机上直接导入 `sea.bds`（勾上键位）比较。
+- **预期**：
+  1. 转换时 **新建主题** 关掉，页面不能点；超过 2 秒显示「正在转换……」（盖在最上面）。转好后提示「已从皮肤转成主题」，预览是皮肤的样子，**问题** 里没有错误。
+  2. 提示条写「从别的输入法的皮肤转换而来。以下没有转过来：」和几条说明（文字和手机上导入时一样），还写「这个皮肤带 1 块键位：26 键……」，**带上皮肤的键位** 默认没勾。勾上后存下的包里有 `layouts/qwerty.xml`，`theme.xml` 里有 `min-app="0.6.3"`；撤销后勾选框跟着取消；换成 Nord 后提示条不见了（勾选框不会把皮肤的键位加进 Nord），撤销回皮肤那份后提示条又出现。
+  3. 三个搜狗样本转出来一样，图片都在，提示里没有「部分图片读不出来」那条。
+  4. `lotus.cskin` 提示「打不开这个文件：仓输入法的皮肤 暂不支持导入」；`cut.theme` 提示的是主题文件自己的错（「这不是主题文件（.theme 或 theme.xml）」），不提皮肤。
+  5. 提示条收起，之后编辑也不再出现；再打开一个皮肤时重新出现。
+  6. 手机上导入后和直接导入皮肤的一样（键位放进 **外观 → 布局**）。
+- 旧浏览器（没有 `DecompressionStream`、`OffscreenCanvas` 或 WebCrypto）打开皮肤时提示「这个浏览器不能导入皮肤，请用新版 Chrome、Edge、Firefox 或 Safari」：`skin-import.test.mjs` 查，不在浏览器上做。
+- **JVM**：web/theme-maker 的 `skin-import.test.mjs`（每个样本能转能打开、加密版和明文版一样、键位默认不勾、勾上带 `layouts/qwerty.xml` 和 0.6.3、报错文字和 App 一样、坏的 `.theme` 不当皮肤、旧浏览器的提示）、`maker.test.mjs`（打开和保存补 `min-app`、位图图标和贴纸的包存得下）、`panels-smoke.mjs`（headless Chrome 走拖放：新建里打开时对话框关掉、提示条、勾选框、保存的包、撤销、换成内置主题后提示条不见、加密的搜狗皮肤、`.cskin`、坏的 `.theme`）；第 1 步的「正在转换……」和第 6 步导入手机在电脑浏览器加设备上手工跑。
+
+### ST-213 [P1] 皮肤转出的主题：普通的照旧写 0.6.0，用了新东西的写 0.6.3，旧版 App 拒收后者
+<!-- dev/design/063-skin-import §0.1 -->
+- **前提**：一台模拟器，先卸掉幽默输入法，再 `adb install` v0.6.2 release 的 arm64 APK（GitHub Releases 的 v0.6.2）并导入文字包；ST-212 的样本 `sea.bds`（键位不勾时只用 0.6.0 就有的写法）和 `warm.ssf`（有深色版背景图，要 0.6.3）。在主题制作网页上分别打开这两个，键位不勾，**文件 › 保存 .theme**，再 `adb push` 到模拟器的 `/sdcard/Download/`。
+- **操作**：在 0.6.2 上从 **外观 → 主题 → 新增主题 → 导入主题文件** 导入这两个 `.theme`。
+- **预期**：
+  - 网页存下的 `sea` 包 `min-app="0.6.0"`，`warm` 包 `min-app="0.6.3"`（勾上 `sea` 的键位时也是 0.6.3，见 ST-212）。
+  - 0.6.2 上 `sea` 的能导入，样子和 0.6.3 一样；`warm` 的被拒，提示需要更新的版本；主题列表不变。
+- **JVM**：web/theme-maker 的 `skin-import.test.mjs`（`sea.bds` 转出 0.6.0、`warm.ssf` 转出 0.6.3、勾上键位 0.6.3）；App 一侧同样的 0.6.0/0.6.3 断言待 `SkinImportUatTest`（C12）补上；装 0.6.2 的那一半只能在设备上（安装、降级）手工跑。
+
 ### ST-196 [P2] 开发者「清空剪贴板数据库」连收藏一起清
 <!-- dev/design/063-clipboard-favorites -->
 - **前提**：B0-设置，复制「公园」并收藏。

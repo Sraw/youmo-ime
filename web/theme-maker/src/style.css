@@ -41,6 +41,14 @@ button[aria-pressed="true"], button[aria-selected="true"] { background: var(--ac
 #problems li { padding: 2px 0; cursor: pointer; font-size: 12px; }
 #problems li.error { color: var(--err); }
 #problems li.warning { color: var(--warn); }
+#problems li.info { color: var(--muted); }
+/* what a skin's conversion left out: over the page, not over the preview */
+.skin-note { padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12px; max-height: 30vh; overflow: auto; }
+.skin-note[hidden] { display: none; }
+.skin-note p { margin: 2px 0; }
+.skin-note ul { margin: 2px 0 4px; padding-left: 18px; }
+.busy { font-size: 15px; padding: 14px 22px; }
+.busy::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); }
 /* the desktop: the preview left, the editing right, the problems under both */
 @media (min-width: 900px) {
   #main { grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); grid-template-rows: 1fr auto; }

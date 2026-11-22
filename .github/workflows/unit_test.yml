@@ -132,7 +132,7 @@ jobs:
       - name: Run theme maker tests
         if: success() || failure()
         run: |
-          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs web/theme-maker/test/layout-maker.test.mjs
+          node --test web/theme-maker/test/format.test.mjs web/theme-maker/test/engine.test.mjs web/theme-maker/test/maker.test.mjs web/theme-maker/test/skin-import.test.mjs web/theme-maker/test/form.test.mjs web/theme-maker/test/names-and-files.test.mjs web/theme-maker/test/layout-maker.test.mjs
 
       # the maker's tabs driven in a real browser (B13: every run and before a release): the runner's Chrome, without
       # its sandbox where CI is set (Ubuntu 24.04's AppArmor keeps it from user namespaces); its exit 2 (no browser

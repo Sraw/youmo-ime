@@ -168,6 +168,243 @@
     return out;
   }
 
+  /** A skin refused, by the name of the engine's SkinError.Reason: the page's own refusals and the engine's said alike. */
+  class SkinError extends Error {
+    constructor(reason, detail = '') {
+      super((reason + ' ' + detail).trim());
+      this.reason = reason;
+      this.detail = detail;
+    }
+  }
+
+  function joined(parts, n) {
+    const out = new Uint8Array(n);
+    let at = 0;
+    for (const p of parts) {
+      out.set(p, at);
+      at += p.length;
+    }
+    return out;
+  }
+
+  /**
+   * [raw] inflated as SkinZip inflates a skin's file: past [cap] bytes, or past [lim]'s ratio to [packed] once over its
+   * floor, it stops (UNPACKED_TOO_BIG); a stream bad or cut short is NOT_ZIP.
+   */
+  async function inflateSkin(raw, cap, packed, name, lim, size = -1) {
+    const reader = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    const parts = [];
+    let n = 0;
+    for (;;) {
+      let r;
+      try {
+        r = await reader.read();
+      } catch (e) {
+        // bytes after the stream's end: the app's Inflater stops at its end and never sees them
+        if (n === size) break;
+        throw new SkinError('NOT_ZIP', name);
+      }
+      if (r.done) break;
+      n += r.value.length;
+      if (n > cap || (n > lim.ratioFrom && n > packed * lim.ratio)) {
+        await reader.cancel().catch(() => {});
+        throw new SkinError('UNPACKED_TOO_BIG', name);
+      }
+      parts.push(r.value);
+    }
+    return joined(parts, n);
+  }
+
+  const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+
+  // UTF-8 if flagged or valid, else GB18030 (Chinese tools' ZIPs); one leading out of the skin refused, not cleaned
+  function skinName(raw, flags) {
+    let text;
+    if (flags & 0x800) text = new TextDecoder('utf-8', { ignoreBOM: true }).decode(raw);
+    else {
+      try {
+        text = STRICT_UTF8.decode(raw);
+      } catch (e) {
+        text = new TextDecoder('gb18030', { ignoreBOM: true }).decode(raw);
+      }
+    }
+    const name = text.replace(/\\/g, '/');
+    const parts = name.split('/');
+    if (name.startsWith('/') || /^[A-Za-z]:/.test(name) || parts.includes('..') || /[\u0000-\u001f]/.test(name)) throw new SkinError('UNSAFE_NAME', name);
+    return parts.filter((x) => x && x !== '.').join('/') + (name.endsWith('/') ? '/' : '');
+  }
+
+  /**
+   * A skin's ZIP as SkinZip.read unpacks it: `[{name, bytes}]`, `/`-separated, no folders, the first of a name twice.
+   * By its central directory, else entry by entry from the start (skin tools write odd ZIPs); held to [lim] (the
+   * engine's skinFormat()), [budget] all of them together. Throws a SkinError.
+   */
+  async function readSkinZip(bytes, lim, budget = lim.totalBytes) {
+    const n = bytes.length;
+    if (n > lim.archiveBytes) throw new SkinError('TOO_BIG');
+    if (n >= 4 && bytes[0] === 0x53 && bytes[1] === 0x6b && bytes[2] === 0x69 && bytes[3] === 0x6e) throw new SkinError('SOGOU_ENCRYPTED');
+    const u16 = (at) => (at < 0 || at + 2 > n ? 0 : bytes[at] | (bytes[at + 1] << 8));
+    const u32 = (at) => (at < 0 || at + 4 > n ? -1 : u16(at) + u16(at + 2) * 65536);
+    const LOCAL = 0x04034b50;
+    const name = (at, len, flags) => skinName(bytes.subarray(at, at + len), flags);
+
+    // null where there is none to read, or one that says none (a tool left it empty)
+    const central = () => {
+      let end = -1;
+      for (let i = n - 22; i >= Math.max(0, n - 22 - 0xffff); i--) if (u32(i) === 0x06054b50) { end = i; break; }
+      if (end < 0) return null;
+      const count = u16(end + 10);
+      const at = u32(end + 16);
+      if (count > lim.entries) throw new SkinError('TOO_MANY_FILES');
+      if (count === 0 || at < 0 || at >= end) return null;
+      const out = [];
+      let p = at;
+      for (let i = 0; i < count; i++) {
+        if (p + 46 > n || u32(p) !== 0x02014b50) return null;
+        const flags = u16(p + 8);
+        const method = u16(p + 10);
+        const packed = u32(p + 20);
+        const nameLen = u16(p + 28);
+        if (p + 46 + nameLen > n) return null;
+        const nm = name(p + 46, nameLen, flags);
+        const local = u32(p + 42);
+        if (local < 0 || local + 30 > n || u32(local) !== LOCAL) return null;
+        const data = local + 30 + u16(local + 26) + u16(local + 28);
+        if (packed < 0 || data + packed > n) return null;
+        out.push({ name: nm, flags, method, data, packed, size: u32(p + 24) });
+        p += 46 + nameLen + u16(p + 30) + u16(p + 32);
+      }
+      return out;
+    };
+
+    // where a deflated file whose sizes follow it ends: the first descriptor that gives its own packed size (the first, so
+    // that the entries one after another are read in one pass over the file, not each to its end)
+    const descriptor = (data) => {
+      for (let q = data; q + 12 <= n; q++) {
+        if (u32(q) === 0x08074b50 && q + 16 <= n && u32(q + 8) === q - data) return [q, 16];
+        if (u32(q + 4) === q - data) {
+          const next = u32(q + 12);
+          if (q + 12 === n || next === LOCAL || next === 0x02014b50 || next === 0x06054b50) return [q, 12];
+        }
+      }
+      throw new SkinError('NOT_ZIP');
+    };
+
+    // entries read one after another from the start: a ZIP whose directory is broken or missing
+    const local = async () => {
+      const out = [];
+      let held = 0;
+      let p = 0;
+      while (p + 30 <= n && u32(p) === LOCAL) {
+        if (out.length >= lim.entries) throw new SkinError('TOO_MANY_FILES');
+        const flags = u16(p + 6);
+        const method = u16(p + 8);
+        const nameLen = u16(p + 26);
+        const data = p + 30 + nameLen + u16(p + 28);
+        if (data > n) throw new SkinError('NOT_ZIP');
+        const nm = name(p + 30, nameLen, flags);
+        let packed = u32(p + 18);
+        let inflated = null;
+        let after = 0;
+        if (flags & 8) {
+          if (method !== 8) throw new SkinError('NOT_ZIP');
+          if (flags & 1) throw new SkinError('ENCRYPTED', nm);
+          const [end, size] = descriptor(data);
+          packed = end - data;
+          inflated = await inflateSkin(bytes.subarray(data, end), Math.min(lim.entryBytes, budget - held), packed, nm, lim, u32(end + size - 4));
+          held += inflated.length;
+          after = size;
+        }
+        if (packed < 0 || data + packed > n) throw new SkinError('NOT_ZIP');
+        out.push({ name: nm, flags, method, data, packed, inflated, size: u32(p + 22) });
+        p = data + packed + after;
+      }
+      if (!out.length) throw new SkinError('NOT_ZIP');
+      return out;
+    };
+
+    const unpack = async (e, left) => {
+      if (e.flags & 1) throw new SkinError('ENCRYPTED', e.name);
+      if (e.method === 0) {
+        if (e.packed > lim.entryBytes || e.packed > left) throw new SkinError('UNPACKED_TOO_BIG', e.name);
+        return bytes.slice(e.data, e.data + e.packed);
+      }
+      if (e.method === 8) return inflateSkin(bytes.subarray(e.data, e.data + e.packed), Math.min(lim.entryBytes, left), e.packed, e.name, lim, e.size);
+      throw new SkinError('ENCRYPTED', e.name);
+    };
+
+    let entries = central();
+    if (!entries) {
+      if (u32(0) !== LOCAL) throw new SkinError('NOT_ZIP');
+      entries = await local();
+    }
+    const out = [];
+    const seen = new Set();
+    let total = 0;
+    for (const e of entries) {
+      if (!e.name || e.name.endsWith('/')) continue;
+      const b = e.inflated || await unpack(e, budget - total);
+      total += b.length;
+      if (total > budget) throw new SkinError('UNPACKED_TOO_BIG', e.name);
+      if (!seen.has(e.name)) { seen.add(e.name); out.push({ name: e.name, bytes: b }); }
+    }
+    if (!out.length) throw new SkinError('NOT_ZIP');
+    return out;
+  }
+
+  /**
+   * A Sogou container's payload (SkinPlatform.sogouPlain, as the app's codec opens it): AES-CBC with [lim]'s key, a
+   * length, then zlib inflated to exactly that length. Null where it does not open; `'too-big'` where a true length
+   * (zlib data follows) is past [maxBytes]. Read a piece at a time: past the length it stops.
+   */
+  async function sogouPlain(container, maxBytes, lim) {
+    const sealed = container.length - 8;
+    if (sealed <= 0) return null;
+    const hex = (h) => Uint8Array.from(h.match(/../g), (x) => parseInt(x, 16));
+    let plain;
+    try {
+      const key = await crypto.subtle.importKey('raw', hex(lim.sogouKey), { name: 'AES-CBC' }, false, ['decrypt']);
+      plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-CBC', iv: hex(lim.sogouIv) }, key, container.subarray(8)));
+    } catch (e) {
+      return null;
+    }
+    if (plain.length < 4) return null;
+    const raw = plain[0] + plain[1] * 0x100 + plain[2] * 0x10000 + plain[3] * 0x1000000;
+    if (raw > lim.ratioFrom && raw > lim.ratio * sealed) return null;
+    // a wrong key's random length is no payload; a true one past what is left is too big
+    if (raw > maxBytes) return plain.length >= 6 && (plain[4] & 0x0f) === 8 && ((plain[4] << 8) | plain[5]) % 31 === 0 ? 'too-big' : null;
+    const reader = new Blob([plain.subarray(4)]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
+    const parts = [];
+    let got = 0;
+    for (;;) {
+      let r;
+      try {
+        r = await reader.read();
+      } catch (e) {
+        // bytes after the stream's end, as above
+        if (got === raw) break;
+        return null;
+      }
+      if (r.done) break;
+      got += r.value.length;
+      if (got > raw) {
+        await reader.cancel().catch(() => {});
+        return null;
+      }
+      parts.push(r.value);
+    }
+    return got === raw ? joined(parts, got) : null;
+  }
+
+  /** A PNG's or WebP's type, `size` ([w, h], null unread) and whether it moves, as the app's RasterIcon reads its header; null: neither. */
+  function raster(bytes) {
+    const type = imageType(bytes);
+    if (type !== 'png' && type !== 'webp') return null;
+    const size = imageSize(bytes);
+    // a side of 0 the app reads as no image
+    return { type, size: size && size[0] > 0 && size[1] > 0 ? size : null, animated: type === 'webp' && bytes.length > 20 && String.fromCharCode(...bytes.slice(12, 16)) === 'VP8X' && (bytes[20] & 0x02) !== 0 };
+  }
+
   // the app's ThemeMakerFormatTest holds the youmo-format block to the fields ThemeLookReader reads
 
   function typeOf(v) {
@@ -604,7 +841,7 @@
   function decodeCaps(format, role) {
     const L = format.limits;
     if (role === 'source') return { side: SOURCE_SIDE, pixels: SOURCE_PIXELS, keep: L.pictureSide };
-    const side = role === 'key' ? L.keyImageSide : L.pictureSide;
+    const side = role === 'key' ? L.keyImageSide : role === 'icon' ? L.rasterIconSide : role === 'sticker' ? L.stickerSide : L.pictureSide;
     return { side, pixels: side * side, keep: side };
   }
 
@@ -636,5 +873,6 @@
   root.YoumoLib = {
     ThemeError, crc32, writeZip, readZip, readTheme, writeTheme, openZip, lookFiles, entryBreach, imageSize, decodeCaps,
     decodable, mapFiles, isPlainFileName, entryPath, from21, parseKeyName, resizeInside, imageType, fontType, contentId,
+    SkinError, readSkinZip, sogouPlain, raster,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
