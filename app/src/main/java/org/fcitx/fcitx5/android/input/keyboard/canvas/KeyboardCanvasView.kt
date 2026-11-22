@@ -203,6 +203,8 @@ class KeyboardCanvasView(
                 painted = drawn.shownLook
                 paintedIcons = drawn.icons
             }
+            // every state's pictures decoded before a press asks for them
+            drawn.icons.readAhead(s.keys)
             val old = faces
             val under = s.under(drawsBase)
             if (repainted || under != drawnUnder) dropBase()

@@ -73,6 +73,8 @@ class KeyNode(
     val fates: Map<Boolean, MarkFate> = emptyMap(),
     /** Differs only for a key across rows, whose bubble goes over its top row. */
     val head: Box = bounds,
+    /** What its glyph and sticker are placed in now: a state's picture read ahead is decoded at its size. */
+    val content: Box = bounds,
 ) {
     fun ops(pressed: Boolean): List<Op> = faces.getValue(if (pressed) states + KeyState.Pressed else states)
 }

@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardHeightCap
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.firstShown
@@ -70,6 +71,8 @@ object KeyCaps {
     // outlined in the keyboard theme's accent, whatever the settings theme; dimmed fades only its words, as the key views do
     private fun sceneKey(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
         SceneKeyCell(ctx, ThemeManager.activeTheme).apply {
+            // no board is built here to let go of what an earlier page drew
+            PackIcons.newRound()
             // the item acted on is outlined in the settings' own colour: keyboard styles draw no selected key outside a popup
             outline = when {
                 selected -> Argb(ctx.styledColor(android.R.attr.colorPrimary))

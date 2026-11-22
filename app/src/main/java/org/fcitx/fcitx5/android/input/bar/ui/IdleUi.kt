@@ -117,7 +117,9 @@ class IdleUi(
     // one that failed once read is turned for the state drawn now, not left upright till the next. A read pending
     // at a forget is followed anew; one in already is not told (PackIcons.forget tells the waiting alone)
     private fun followMenuIcons() {
-        for (state in BarIcons.menuStates) packIcons.file(state.name)?.let { packIcons.outline(it, ::menuIconRead) }
+        val px = ctx.dp(KawaiiBarComponent.ICON_DP)
+        val side = BarIconDrawables.decodeSide(ctx, px)
+        for (state in BarIcons.menuStates) packIcons.file(state.name)?.let { packIcons.icon(it, px, px, ::menuIconRead, side, side) }
     }
 
     private fun menuIconRead() {

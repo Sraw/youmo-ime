@@ -103,7 +103,7 @@ class ScenePainter(
             is Op.Picture -> picture(canvas, op)
             is Op.Text -> text(canvas, op)
             is Op.Icon -> icon(canvas, op)
-            is Op.Sticker -> draw(canvas, op.standIn)
+            is Op.Sticker -> sticker(canvas, op)
         }
     }
 
@@ -329,20 +329,19 @@ class ScenePainter(
             iconsDensity = config.densityDpi
             iconsFontScale = config.fontScale
         }
-        @Suppress("DEPRECATION") // the matrix the canvas draws with so far: its scale is what the raster is made at
-        canvas.getMatrix(scale)
-        scale.getValues(scaleValues)
-        // a matrix gone NaN taken as 1: roundToInt throws on NaN, and this is the draw
-        val pw = (w * scaleOf(scaleValues[Matrix.MSCALE_X])).roundToInt()
-        val ph = (h * scaleOf(scaleValues[Matrix.MSCALE_Y])).roundToInt()
+        pixels(canvas, w, h)
+        val pw = pixels[0]
+        val ph = pixels[1]
         // read on the decode thread, the app's of that name drawn till it is in, or for good where its file is broken
         val file = packIcons.file(op.name)
-        val outline = file?.let { f ->
-            packIcons.outline(f, redraw).also { if (it == null && packIcons.pending(f)) missed = true }
+        val own = file?.let { f ->
+            packIcons.icon(f, pw, ph, redraw).also { if ((it == null || it.lent()) && packIcons.pending(f)) missed = true }
         }
-        val source = file.takeIf { outline != null }
-        val d = icons.getOrPut(IconKey(op.name, source, op.tint.value, w, h, pw, ph)) {
-            outline?.let { PackIconDrawable(it, op.tint, pw, ph).apply { setBounds(0, 0, w, h) } }
+        val source = file.takeIf { own != null }
+        // one lent till its own size is in is drawn once, not kept for the key
+        val d = if (own.lent()) PackIconDrawable(own!!, op.tint, pw, ph, op.tintMask).apply { setBounds(0, 0, w, h) }
+        else icons.getOrPut(IconKey(op.name, source, op.tint.value, w, h, pw, ph)) {
+            own?.let { PackIconDrawable(it, op.tint, pw, ph, op.tintMask).apply { setBounds(0, 0, w, h) } }
                 ?: SceneIcons.of(op.name)?.let { ContextCompat.getDrawable(view.context, it)?.mutate() }?.also {
                     it.setTint(op.tint.value)
                     it.setBounds(0, 0, w, h)
@@ -355,6 +354,43 @@ class ScenePainter(
         canvas.restore()
     }
 
+    private val pixels = IntArray(2)
+
+    // the matrix the canvas draws with so far: its scale is what a raster is made at
+    private fun pixels(canvas: Canvas, w: Int, h: Int) {
+        @Suppress("DEPRECATION")
+        canvas.getMatrix(scale)
+        scale.getValues(scaleValues)
+        // a matrix gone NaN taken as 1: roundToInt throws on NaN, and this is the draw
+        pixels[0] = (w * scaleOf(scaleValues[Matrix.MSCALE_X])).roundToInt()
+        pixels[1] = (h * scaleOf(scaleValues[Matrix.MSCALE_Y])).roundToInt()
+    }
+
+    // decoded on the decode thread at the size drawn; the label and icon it hides are drawn till then, or for good where it never reads
+    private fun sticker(canvas: Canvas, op: Op.Sticker) {
+        val b = op.box
+        val w = b.right.roundToInt() - b.left.roundToInt()
+        val h = b.bottom.roundToInt() - b.top.roundToInt()
+        pixels(canvas, w, h)
+        val raster = packIcons.sticker(op.file, pixels[0], pixels[1], redraw)
+        // none yet or one lent, its own decoding
+        if (raster?.exact != true && packIcons.stickerPending(op.file)) missed = true
+        if (raster == null) {
+            draw(canvas, op.standIn)
+            return
+        }
+        val sw = raster.width * w.toFloat() / pixels[0]
+        val sh = raster.height * h.toFloat() / pixels[1]
+        val cx = (b.left.roundToInt() + b.right.roundToInt()) / 2f
+        val cy = (b.top.roundToInt() + b.bottom.roundToInt()) / 2f
+        rect.set(cx - sw / 2, cy - sh / 2, cx + sw / 2, cy + sh / 2)
+        imagePaint.alpha = (op.alpha * FULL_ALPHA).roundToInt().coerceIn(0, FULL_ALPHA)
+        canvas.drawBitmap(raster.bitmap, null, rect, imagePaint)
+        imagePaint.alpha = FULL_ALPHA
+    }
+
+    private fun PackIcons.PackIcon?.lent() = this is PackIcons.Raster && !exact
+
     internal companion object {
         fun scaleOf(v: Float): Float = abs(v).takeIf { it.isFinite() } ?: 1f
 
@@ -362,6 +398,7 @@ class ScenePainter(
         private const val KEPT_ICONS = 64
         private const val KEPT_BLURS = 16
         private const val OPAQUE = 0xFF000000.toInt()
+        private const val FULL_ALPHA = 255
 
         // every painter's (main thread): let go when what inflating reads changes (night mode, density, font
         // scale), not for the rest of the configuration

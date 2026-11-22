@@ -255,21 +255,21 @@ open class SceneKeyCell(context: Context, theme: Theme, private val ownSize: Boo
     @VisibleForTesting
     fun drawn(): List<Op> {
         val k = keyNode ?: return emptyList()
-        val ops = k.ops(isPressed).let { ops ->
-            if (labelAlpha == 1.0) ops
-            // a mixed-font label is several texts; never a mark that happens to read as the label
-            else ops.map {
-                if (it is Op.Text && it.part == Part.Label.xml) {
-                    it.copy(
-                        color = it.color.times(labelAlpha),
-                        stroke = it.stroke?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
-                        shadow = it.shadow?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
-                    )
-                } else it
-            }
-        }
+        val ops = k.ops(isPressed).let { ops -> if (labelAlpha == 1.0) ops else ops.map(::faded) }
         val line = outline ?: return ops
         return ops + Op.Stroke(k.shape, OUTLINE_DP * resources.displayMetrics.density / shrink, line)
+    }
+
+    // a mixed-font label is several texts; never a mark that happens to read as the label
+    private fun faded(op: Op): Op = when {
+        op is Op.Text && op.part == Part.Label.xml -> op.copy(
+            color = op.color.times(labelAlpha),
+            stroke = op.stroke?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
+            shadow = op.shadow?.let { s -> s.copy(color = s.color.times(labelAlpha)) },
+        )
+        // it stands for the label, and so does the label drawn while it is not decoded
+        op is Op.Sticker -> op.copy(alpha = op.alpha * labelAlpha, standIn = op.standIn.map(::faded))
+        else -> op
     }
 
     private fun Argb.times(a: Double) = Argb((value and RGB) or ((alpha * a).roundToInt() shl ALPHA_SHIFT))

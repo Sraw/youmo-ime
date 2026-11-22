@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.EngineNotices
 import org.fcitx.fcitx5.android.scene.theme.SoundFile
+import org.fcitx.fcitx5.android.scene.theme.RasterIcon
 import org.fcitx.fcitx5.android.scene.theme.SvgSubset
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.input.theme.ThemePackCheck
@@ -25,11 +26,9 @@ import org.fcitx.fcitx5.android.scene.look.Palette
 import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.scene.look.Text
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
-import org.fcitx.fcitx5.android.scene.theme.Effect
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.Selector
-import org.fcitx.fcitx5.android.scene.theme.Style
 import org.fcitx.fcitx5.android.scene.theme.SystemColors
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import org.fcitx.fcitx5.android.scene.theme.Value
@@ -55,7 +54,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-import org.fcitx.fcitx5.android.scene.theme.Picture as ScenePicture
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
 
 /**
@@ -129,7 +127,7 @@ object ThemePackFiles {
     /** Only what the views around the keys take; keys, bar and popups are drawn from the file ([drawn]). */
     fun look(scene: SceneTheme, palette: Palette, dir: String): ThemeLook {
         fun path(name: String) = File(dir, name).path
-        val picture = scene.picture?.let { p ->
+        val picture = scene.shownPicture?.let { p ->
             val portrait = p.cuts["portrait"] ?: p.cuts.getValue("landscape")
             Picture(
                 path(p.src), Crop(path(portrait), null, 0), p.cuts["landscape"]?.let { Crop(path(it), null, 0) },
@@ -149,21 +147,7 @@ object ThemePackFiles {
     private const val PERCENT = 100
     private const val MAX_BLUR = 25
 
-    fun drawn(scene: SceneTheme, dir: String): SceneTheme {
-        fun path(name: String) = File(dir, name).path
-        fun value(v: Value): Value = when (val e = (v as? Value.OfEffect)?.effect) {
-            is Effect.Ripple -> Value.OfEffect(e.copy(file = path(e.file)))
-            is Effect.Particles -> Value.OfEffect(e.copy(file = path(e.file)))
-            null -> ((v as? Value.OfFill)?.fill as? Fill.Image)?.let { Value.OfFill(it.copy(file = path(it.file))) } ?: v
-        }
-        val styles = scene.styles.map { s -> Style(s.selectors, s.values.mapValues { (_, v) -> value(v) }, s.order, s.line) }
-        val picture = scene.picture?.let { p -> ScenePicture(path(p.src), p.brightness, p.blurDp, p.cuts.mapValues { path(it.value) }, p.animated) }
-        return SceneTheme(
-            scene.name, scene.dark, scene.version, scene.colors, styles, scene.fonts.mapValues { path(it.value) },
-            scene.icons.mapValues { path(it.value) }, picture, scene.variants, scene.baseColors, scene.darkColors, scene.meta, scene.systemColors,
-            scene.soundFiles.map { (key, file) -> key to path(file) },
-        )
-    }
+    fun drawn(scene: SceneTheme, dir: String): SceneTheme = scene.withPaths { File(dir, it).path }
 
     /** The engine places the slices; press effects' images included. */
     fun images(scene: SceneTheme): List<NineSlice> {
@@ -244,7 +228,7 @@ object ThemePackFiles {
             badName(name) || builtinClash(name, theme.variants, builtins) -> return skipped(dir, "has a built-in's name", R.string.user_data_unreadable)
             refusedByRecheck(dir, theme, source, builtIn) -> return skipped(dir, "leaves keys blank", R.string.user_data_unreadable)
         }
-        val missing = ThemePackCheck.files(theme).all.firstOrNull { !inside(dir, it) }
+        val missing = ThemePackCheck.files(theme).required.firstOrNull { !inside(dir, it) }
         if (missing != null) return skipped(dir, "misses its file $missing", R.string.theme_file_missing)
         if (lastListed.size < LISTED_KEPT) lastListed[dir.path] = Listed(File(dir, THEME_XML).lastModified(), systemColors, theme)
         return versions(theme, dir.name, dir)
@@ -332,7 +316,7 @@ object ThemePackFiles {
         if (badName(name)) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
         checkFiles(from, files, checks)
-        val still = theme.picture?.takeIf { it.animated }?.let { p ->
+        val still = listOfNotNull(theme.picture, theme.darkPicture).filter { it.animated }.firstNotNullOfOrNull { p ->
             ThemeAssetLimits.animated(File(from, p.src))
         }
         val warnings = read.warnings.map { it.toString() } +
@@ -340,7 +324,7 @@ object ThemePackFiles {
         val listed = ThemeLayoutsToList.staged(File(from, LAYOUTS), theme.name, theme.meta, LayoutImport.appVersion(checks.appVersion))
         val report = ThemePackLayouts.report(File(from, LAYOUTS), layouts, { SceneLayouts.parseBuiltIn(appContext, it) }, BuiltInLayouts(appContext)::text, listed.listed)
             .listing(listed.replaced, listed.notFitting)
-        return Staged(theme, source, from, files.all, layouts, report, warnings, files.preview?.let { File(from, it) })
+        return Staged(theme, source, from, present(from, files), layouts, report, warnings, files.preview?.let { File(from, it) })
     }
 
     private fun readChecked(source: String, checks: Checks): Parsed.Ok<SceneTheme> =
@@ -355,19 +339,18 @@ object ThemePackFiles {
         }
 
     private fun checkFiles(from: File, files: ThemePackCheck.Files, checks: Checks) {
-        files.all.firstOrNull { !inside(from, it) || it == THEME_XML }?.let { errorRuntime(R.string.exception_theme_file, it) }
+        files.required.firstOrNull { !inside(from, it) || it == THEME_XML }?.let { errorRuntime(R.string.exception_theme_file, it) }
         fun size(name: String) = checks.probe.imageSize(File(from, name)) ?: errorRuntime(R.string.exception_theme_image, name)
         // the source photo too, though only its cuts are drawn
-        (files.pictures + listOfNotNull(files.source)).forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.picture(w, h)?.let(checks.refused) } }
+        (files.pictures + listOfNotNull(files.source) + files.darkPictures).forEach { n ->
+            size(n).let { (w, h) -> ThemeAssetLimits.picture(w, h)?.let(checks.refused) }
+        }
         files.images.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.keyImage(w, h, File(from, n).length())?.let(checks.refused) } }
         files.effects.forEach { n -> size(n).let { (w, h) -> ThemeAssetLimits.effectImage(n, w, h, File(from, n).length())?.let(checks.refused) } }
         files.preview?.let { n -> size(n).let { (w, h) -> ThemeAssetLimits.preview(w, h, File(from, n).length())?.let(checks.refused) } }
         files.fonts.forEach { n -> if (!checks.probe.fontReads(File(from, n))) errorRuntime(R.string.exception_theme_font, n) }
-        files.icons.forEach { n ->
-            val f = File(from, n)
-            ThemeAssetLimits.icon(f.length())?.let(checks.refused)
-            SvgSubset.check(f.readText()).firstOrNull()?.let { errorRuntime(R.string.exception_theme_icon, "$n: $it") }
-        }
+        files.icons.forEach { n -> icon(File(from, n), checks) }
+        files.stickers.filter { inside(from, it) }.forEach { n -> raster(File(from, n), ThemeAssetLimits::sticker, checks) }
         // an unknown class too: its file is kept and exported
         files.sounds.forEach { n ->
             val f = File(from, n)
@@ -375,6 +358,22 @@ object ThemePackFiles {
             SoundFile.check(n, f.readBytes()).firstOrNull()?.let { errorRuntime(R.string.exception_theme_sound, it.message) }
         }
     }
+
+    private fun icon(f: File, checks: Checks) {
+        if (RasterIcon.named(f.name)) return raster(f, ThemeAssetLimits::rasterIcon, checks)
+        ThemeAssetLimits.icon(f.length())?.let(checks.refused)
+        SvgSubset.check(f.readText()).firstOrNull()?.let { errorRuntime(R.string.exception_theme_icon, "${f.name}: $it") }
+    }
+
+    // its length before it is read (a header of one pixel stands in), then its header: the bytes alone say its size and whether it moves
+    private fun raster(f: File, limit: (Long, RasterIcon.Header?) -> ThemeAssetLimits.Breach?, checks: Checks) {
+        val length = f.length()
+        limit(length, RasterIcon.Header(1, 1, false))?.let(checks.refused)
+        limit(length, RasterIcon.header(f.readBytes()))?.let(checks.refused)
+    }
+
+    // a sticker the pack lacks is drawn as what it hides, and is neither copied nor exported
+    private fun present(dir: File, files: ThemePackCheck.Files) = files.required + files.stickers.filter { inside(dir, it) }
 
     private fun checkLayouts(dir: File, checks: Checks): List<String> {
         if (!dir.exists()) return emptyList()
@@ -601,8 +600,9 @@ object ThemePackFiles {
         val dir = File(pack.dir)
         val source = File(dir, THEME_XML).readText()
         val theme = read(source)
-        val names = ThemePackCheck.files(theme).all.sorted()
-        names.firstOrNull { !inside(dir, it) }?.let { errorRuntime(R.string.exception_theme_file, it) }
+        val files = ThemePackCheck.files(theme)
+        files.required.firstOrNull { !inside(dir, it) }?.let { errorRuntime(R.string.exception_theme_file, it) }
+        val names = present(dir, files).sorted()
         ZipOutputStream(dest.buffered()).use { zip ->
             zip.putNextEntry(ZipEntry(THEME_XML))
             zip.write(source.encodeToByteArray())
