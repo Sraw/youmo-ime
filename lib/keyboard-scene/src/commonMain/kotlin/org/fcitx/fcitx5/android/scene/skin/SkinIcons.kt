@@ -21,7 +21,7 @@ object SkinIcons {
         "F75" to "enter",
         "F16" to "language",
         "F6" to "number-pad",
-        "F76" to "emoji",
+        "F7" to "emoji",
     )
 
     private val TOOLBAR_WORDS = listOf(
