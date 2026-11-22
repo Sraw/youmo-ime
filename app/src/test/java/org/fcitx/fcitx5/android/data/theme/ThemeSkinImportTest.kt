@@ -6,7 +6,16 @@ package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.layout.CustomLayouts
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.skin.Pixels
+import org.fcitx.fcitx5.android.scene.skin.SkinAction
+import org.fcitx.fcitx5.android.scene.skin.SkinBoard
+import org.fcitx.fcitx5.android.scene.skin.SkinConversion
+import org.fcitx.fcitx5.android.scene.skin.SkinFormat
+import org.fcitx.fcitx5.android.scene.skin.SkinKeyBox
+import org.fcitx.fcitx5.android.scene.skin.SkinLayoutWriter
+import org.fcitx.fcitx5.android.scene.skin.SkinTheme
 import org.fcitx.fcitx5.android.scene.skin.SkinImage
 import org.fcitx.fcitx5.android.scene.skin.SkinNote
 import org.fcitx.fcitx5.android.scene.skin.PixelsImage
@@ -120,7 +129,8 @@ class ThemeSkinImportTest : ThemePackFixture() {
         assertEquals("Sea Breeze", staged.name)
         assertEquals("Ann", staged.theme.meta!!.author)
         assertEquals(mapOf(SoundKey.LETTER to "sound-letter.wav"), staged.theme.sounds)
-        assertTrue(SkinNote.LAYOUT in pack.notes)
+        assertTrue(SkinNote.LAYOUT in pack.notes.keys)
+        assertTrue(pack.fromSkin)
         // the key face cut to its body
         assertEquals("150x168", File(staged.from, "l-key-n.png").readText())
         assertTrue(File(staged.from, "board.png").isFile)
@@ -218,6 +228,82 @@ class ThemeSkinImportTest : ThemePackFixture() {
         assertEquals(0xFF102030.toInt() + 7, theme.candidateCommentColor)
         assertEquals(0xFF102030.toInt() + 13, theme.keyShadowColor)
         assertEquals(60, theme.look.picture!!.brightness)
+    }
+
+    // a 26 keys of the app's rows, at the skin's sizes
+    private fun qwertyBoard(): SkinBoard {
+        fun row(y: Double, x0: Double, keys: List<Pair<SkinAction, Double>>): List<SkinKeyBox> {
+            var x = x0
+            return keys.map { (a, w) -> SkinKeyBox(x, y, w, 150.0, a).also { x += w } }
+        }
+        fun letters(s: String) = s.map { SkinAction.Letter(it) to 108.0 }
+        fun roles(vararg r: Pair<String, Double>) = r.map { SkinAction.Role(it.first) to it.second }
+        return SkinBoard(
+            "qwerty",
+            listOf(
+                row(0.0, 0.0, letters("qwertyuiop")),
+                row(150.0, 54.0, letters("asdfghjkl")),
+                row(300.0, 0.0, roles("shift" to 162.0) + letters("zxcvbnm") + roles("backspace" to 162.0)),
+                row(450.0, 0.0, roles("symbols" to 120.0, "numbers" to 120.0, "comma" to 100.0, "space" to 480.0, "period" to 100.0, "enter" to 160.0)),
+            ),
+            1080.0,
+        )
+    }
+
+    // the Baidu skin with a layout of its own, as a reader that finds one converts it; an id not of the four is not written
+    private fun withLayout(notes: Map<SkinNote, List<String>>? = null): ThemeFilesManager.Opened.Pack {
+        val c = SkinImport.convert(baidu().inputStream(), "sea.bds", FakeCodec)
+        val written = SkinLayoutWriter.write(qwertyBoard(), CustomLayouts.sources)!!
+        val withLayouts = c.themeXml.replace("""min-app="0.6.0"""", """min-app="${written.minApp}"""")
+        val conversion = SkinConversion(c.name, c.themeXml, c.files, notes ?: c.notes, mapOf("qwerty" to written.text, "symbols" to written.text), withLayouts)
+        return ThemeFilesManager.converted(conversion, ThemeManager.getAllThemes())
+    }
+
+    @Test
+    fun aSkinsLayoutsAreLeftOutUnlessTaken() {
+        ThemeFilesManager.versionName = "0.6.3"
+        val pack = withLayout()
+        assertTrue(pack.fromSkin)
+        assertEquals(listOf("qwerty.xml"), pack.staged.layouts)
+        val text = ThemePackDialogs.confirmText(appContext, pack)
+        assertTrue(text, text.contains(appContext.resources.getQuantityString(R.plurals.theme_pack_skin_layouts, 1, 1, "Sea Breeze · 26 键")))
+        pack.commit(withLayouts = false).getOrThrow()
+        assertFalse(File(packs, "Sea Breeze/layouts").exists())
+        assertTrue(File(packs, "Sea Breeze/theme.xml").readText().contains("""min-app="0.6.0""""))
+        withLayout().commit(withLayouts = true).getOrThrow()
+        assertTrue(File(packs, "Sea Breeze/layouts/qwerty.xml").isFile)
+        assertTrue(File(packs, "Sea Breeze/theme.xml").readText().contains("""min-app="0.6.3""""))
+        assertFalse(unpacking.listFiles().orEmpty().any { it.isDirectory && it.list().orEmpty().isNotEmpty() })
+    }
+
+    @Test
+    fun notesAreToldWithWhatTheyCount() {
+        ThemeFilesManager.versionName = "0.6.3"
+        val notes = mapOf(SkinNote.LAYOUT_SOME to listOf("nine"), SkinNote.TOOLBAR_ICONS to listOf("3"), SkinNote.INCLUDES to emptyList(), SkinNote.NO_DARK to emptyList())
+        val text = ThemePackDialogs.confirmText(appContext, withLayout(notes))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_skin_note_layout_some, "九键")))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_skin_note_toolbar_icons_count, 3)))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_skin_note_includes)))
+        assertTrue(text, text.contains(appContext.getString(R.string.theme_pack_skin_note_no_dark)))
+    }
+
+    @Test
+    fun everyNoteIsSaid() {
+        val withArguments = setOf(SkinNote.LAYOUT_SOME, SkinNote.TOOLBAR_ICONS, SkinNote.INCLUDES)
+        assertEquals(SkinNote.entries.toSet() - withArguments, ThemePackDialogs.SKIN_NOTES.keys)
+    }
+
+    @Test
+    fun everyUnsupportedFormatIsSaid() {
+        assertEquals(SkinFormat.ALL.toSet(), SkinImport.FORMATS.keys)
+        assertEquals(SkinFormat.ALL.size, SkinImport.FORMATS.values.map { appContext.getString(it) }.distinct().size)
+    }
+
+    @Test
+    fun theConvertersShareOfAPackIsThePacks() {
+        assertEquals(ThemeAssetLimits.MAX_ENTRIES.toLong(), SkinTheme.MAX_PACK_ENTRIES.toLong())
+        assertEquals(ThemeAssetLimits.MAX_TOTAL_BYTES, SkinTheme.MAX_PACK_BYTES)
+        assertEquals(ThemeAssetLimits.MAX_THEME_XML_BYTES, SkinTheme.MAX_THEME_XML_BYTES)
     }
 
     @Test

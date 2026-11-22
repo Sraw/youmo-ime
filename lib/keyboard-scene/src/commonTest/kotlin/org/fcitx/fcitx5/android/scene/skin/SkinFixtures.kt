@@ -5,6 +5,10 @@
 package org.fcitx.fcitx5.android.scene.skin
 
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
+import org.fcitx.fcitx5.android.scene.listNames
+import org.fcitx.fcitx5.android.scene.testData
+import org.fcitx.fcitx5.android.scene.testDataDir
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 
@@ -46,7 +50,30 @@ object SkinFixtures {
         }
 
         override fun legacyText(bytes: ByteArray): String = "LEGACY:" + bytes.size
+
+        override fun layoutSources(): LayoutCheck.Sources = appLayouts
     }
+
+    /** The app's layouts and fragments, as the app has them (src/commonMain/layouts). */
+    val appLayouts: LayoutCheck.Sources by lazy {
+        val ids = listNames(testDataDir() + "/../../commonMain/layouts").filter { it.endsWith(".xml") }.map { it.removeSuffix(".xml") }
+        val texts = ids.associateWith { testData("$it.xml") }
+        LayoutCheck.Sources(texts.filterKeys { it != "grouped-bottom" }, texts.filterKeys { it == "grouped-bottom" })
+    }
+
+    /** A source of [light] (and [dark]) as given, for a reader's looks to be written without a file format. */
+    fun source(light: SkinLook, dark: SkinLook? = null, name: String = "Made", preview: ByteArray? = null): SkinSource = object : SkinSource {
+        override val name = name
+        override val author = ""
+        override val preview = preview
+        override val variants = if (dark == null) setOf(Variant.LIGHT) else setOf(Variant.LIGHT, Variant.DARK)
+
+        override fun look(variant: Variant) = if (variant == Variant.DARK) dark!! else light
+    }
+
+    /** [source] converted as a reader's would be, without [SkinConverter.READERS]: images in [img]'s format, the app's layouts. */
+    fun convertWith(source: SkinSource, fallback: String = "file", layouts: LayoutCheck.Sources? = appLayouts): SkinConversion =
+        SkinTheme(source, { b -> Platform().image(b)?.let { it.pixels(0, 0, it.width, it.height) } }, fallback, layouts).write()
 
     private const val HEAD = 11
 
@@ -187,8 +214,8 @@ object SkinFixtures {
     fun convert(files: Map<String, ByteArray>, platform: SkinPlatform = Platform(), fallback: String = "file"): SkinConversion =
         SkinConverter.convert(files, platform, fallback)
 
-    /** [c]'s theme.xml read, failing the test on any problem or warning. */
-    fun read(c: SkinConversion): Theme = when (val p = ThemeReader.theme(c.themeXml, appVersion = "0.6.0")) {
+    /** [c]'s theme.xml ([xml]) read by this build, failing the test on any problem or warning. */
+    fun read(c: SkinConversion, xml: String = c.themeXml): Theme = when (val p = ThemeReader.theme(xml, appVersion = "0.6.3")) {
         is Parsed.Ok -> p.value.also { check(p.warnings.isEmpty()) { "warnings: ${p.warnings}\n${c.themeXml}" } }
         is Parsed.Failed -> error("problems: ${p.problems}\n${c.themeXml}")
     }

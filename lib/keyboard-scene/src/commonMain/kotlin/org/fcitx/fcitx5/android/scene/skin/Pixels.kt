@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.skin
 
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -233,6 +234,21 @@ interface SkinPlatform {
 
     /** GB18030, as old Chinese skins are written. */
     fun legacyText(bytes: ByteArray): String
+
+    /**
+     * A Sogou container's (its `Skin` header and all) payload, decrypted ([SOGOU_KEY], [SOGOU_IV]) and inflated to
+     * exactly its stated length of at most [maxBytes]; null where any of it fails.
+     */
+    fun sogouPlain(container: ByteArray, maxBytes: Int): ByteArray? = null
+
+    /** The app's own layouts and fragments, which a skin's keys are placed on ([SkinLayoutWriter]); null: none written. */
+    fun layoutSources(): LayoutCheck.Sources? = null
+
+    companion object {
+        // AES-256-CBC, from the MIT-licensed unSSF project
+        const val SOGOU_KEY = "5236461AD38503669045162879033623DDBE6F03FF04E3CAD57FFCA350E49ED9"
+        const val SOGOU_IV = "E07AAD35E090AA038A51FD05DF8C5D0F"
+    }
 }
 
 class PixelsImage(private val p: Pixels) : SkinImage {

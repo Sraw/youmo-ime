@@ -22,7 +22,8 @@ import org.fcitx.fcitx5.android.scene.look.LegacyLook
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.skin.Pixels
-import org.fcitx.fcitx5.android.scene.skin.SkinConverter
+import org.fcitx.fcitx5.android.scene.skin.SkinConversion
+import org.fcitx.fcitx5.android.scene.skin.SkinLayoutWriter
 import org.fcitx.fcitx5.android.scene.skin.SkinNote
 import org.fcitx.fcitx5.android.scene.skin.SkinOutput
 import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
@@ -384,17 +385,22 @@ object ThemeFilesManager {
             private val packThere: Boolean,
             internal val customs: List<Theme.Custom>,
             private val unpacked: File,
-            val notes: Set<SkinNote> = emptySet(),
+            val notes: Map<SkinNote, List<String>> = emptyMap(),
+            /** Converted from a skin: its layouts are taken only where [commit] is told to, with [skinThemeXmlWithLayouts]. */
+            val fromSkin: Boolean = false,
+            private val skinThemeXmlWithLayouts: String? = null,
+            private val names: List<String> = emptyList(),
         ) : Opened {
             val replaces: Boolean get() = packThere || customs.isNotEmpty()
 
-            /** Off the main thread; what was unpacked is removed either way. */
-            fun commit(): Result<List<Theme.Pack>> = runCatching {
+            /** Off the main thread; what was unpacked is removed either way. [withLayouts] false leaves a skin's layouts out. */
+            fun commit(withLayouts: Boolean = true): Result<List<Theme.Pack>> = runCatching {
                 try {
                     if (!writable) notSettled()
+                    val placing = if (fromSkin && staged.layouts.isNotEmpty()) skinStaged(withLayouts) else staged
                     // recorded first; the replaced 3.0 themes are finished on the main thread once the pack is listed
                     val names = recordAdding(customs.map { it.name }.toSet())
-                    val placed = runCatching { writingInSaving { ThemePackFiles.place(dir, staged) } }
+                    val placed = runCatching { writingInSaving { ThemePackFiles.place(dir, placing) } }
                     if (placed.isFailure) runCatching { replaced(names) }.onFailure { placed.exceptionOrNull()!!.addSuppressed(it) }
                     placed.getOrThrow().also {
                         runCatching { ThemeSeparators.importedOverRestored(staged.name) }.onFailure { Timber.w(it, "Theme pack ${staged.name} left to be given 分词") }
@@ -402,6 +408,17 @@ object ThemeFilesManager {
                 } finally {
                     discard()
                 }
+            }
+
+            // the theme.xml whose min-app counts its layouts goes with them; checked again as it is placed
+            private fun skinStaged(withLayouts: Boolean): ThemePackFiles.Staged {
+                if (withLayouts) {
+                    File(unpacked, ThemePackFiles.THEME_XML).writeBytes(skinThemeXmlWithLayouts!!.encodeToByteArray())
+                } else {
+                    File(unpacked, ThemePackFiles.LAYOUTS).deleteRecursively()
+                }
+                val kept = if (withLayouts) names else names.filter { !it.startsWith(ThemePackFiles.LAYOUTS + "/") }
+                return ThemePackFiles.check(unpacked, kept, packChecks)
             }
 
             fun discard() {
@@ -475,24 +492,34 @@ object ThemeFilesManager {
     fun openSkin(src: InputStream, fileName: String, themes: List<Theme> = ThemeManager.getAllThemes()): Result<Opened.Pack> =
         SkinImport.backstop(runCatching {
             if (!writable) notSettled()
-            val conversion = SkinImport.convert(src, fileName, skinCodec)
-            unpacked { temp ->
-                val names = ArrayList<String>()
-                fun write(name: String, bytes: ByteArray) {
-                    check(isPlainFileName(name) && name !in names) { "skin file name $name" }
-                    File(temp, name).writeBytes(bytes)
-                    names += name
-                }
-                write(ThemePackFiles.THEME_XML, conversion.themeXml.encodeToByteArray())
-                for (out in conversion.files) {
-                    when (out) {
-                        is SkinOutput.Image -> write(out.name, SkinImport.png(out, skinCodec))
-                        is SkinOutput.Bytes -> write(out.name, out.bytes)
-                    }
-                }
-                pack(temp, names, themes, conversion.notes)
-            }
+            converted(SkinImport.convert(src, fileName, skinCodec), themes)
         })
+
+    @VisibleForTesting
+    internal fun converted(conversion: SkinConversion, themes: List<Theme>): Opened.Pack =
+        unpacked { temp ->
+            val names = ArrayList<String>()
+            fun write(name: String, bytes: ByteArray) {
+                check(isPlainFileName(name) && name !in names) { "skin file name $name" }
+                File(temp, name).writeBytes(bytes)
+                names += name
+            }
+            write(ThemePackFiles.THEME_XML, conversion.themeXml.encodeToByteArray())
+            for (out in conversion.files) {
+                when (out) {
+                    is SkinOutput.Image -> write(out.name, SkinImport.png(out, skinCodec))
+                    is SkinOutput.Bytes -> write(out.name, out.bytes)
+                }
+            }
+            // not through write(): a layout's name is a path, of one of the ids only
+            val layouts = conversion.layouts.filterKeys { it in SkinLayoutWriter.IDS }
+            if (layouts.isNotEmpty()) File(temp, ThemePackFiles.LAYOUTS).mkdir()
+            for ((id, xml) in layouts) {
+                File(temp, "${ThemePackFiles.LAYOUTS}/$id.xml").writeBytes(xml.encodeToByteArray())
+                names += "${ThemePackFiles.LAYOUTS}/$id.xml"
+            }
+            pack(temp, names, themes, conversion.notes, conversion.themeXmlWithLayouts.takeIf { layouts.isNotEmpty() })
+        }
 
     internal interface SkinCodec : SkinPlatform {
         fun png(pixels: Pixels): ByteArray
@@ -516,7 +543,13 @@ object ThemeFilesManager {
         }
     }
 
-    private fun pack(temp: File, names: List<String>, themes: List<Theme>, notes: Set<SkinNote> = emptySet()): Opened.Pack {
+    private fun pack(
+        temp: File,
+        names: List<String>,
+        themes: List<Theme>,
+        notes: Map<SkinNote, List<String>>? = null,
+        skinThemeXmlWithLayouts: String? = null,
+    ): Opened.Pack {
         val staged = ThemePackFiles.check(temp, names, packChecks)
         packClash(staged, themes)
         val packs = themes.filterIsInstance<Theme.Pack>()
@@ -532,7 +565,7 @@ object ThemeFilesManager {
         }
         val refs = ThemePackFiles.refs(staged.name, staged.theme.variants) + staged.name
         val customs = themes.filterIsInstance<Theme.Custom>().filter { it.name in refs }
-        return Opened.Pack(staged, there, customs, temp, notes)
+        return Opened.Pack(staged, there, customs, temp, notes.orEmpty(), fromSkin = notes != null, skinThemeXmlWithLayouts, names)
     }
 
     @VisibleForTesting

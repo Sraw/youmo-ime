@@ -6,11 +6,28 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.annotation.VisibleForTesting
+import org.fcitx.fcitx5.android.data.layout.CustomLayouts
 import org.fcitx.fcitx5.android.input.theme.SkinZip
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.skin.Pixels
 import org.fcitx.fcitx5.android.scene.skin.SkinImage
 import org.fcitx.fcitx5.android.scene.skin.SkinLimits
+import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
+import org.fcitx.fcitx5.android.utils.LowMemory
+import org.fcitx.fcitx5.android.utils.appContext
+import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.security.GeneralSecurityException
+import java.util.zip.Inflater
+import java.util.zip.InflaterInputStream
+import javax.crypto.Cipher
+import javax.crypto.CipherInputStream
+import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 /** An image past [SkinLimits.MAX_IMAGE_PIXELS] (by its header) is not decoded; decoded unpremultiplied, read a tile at a time. */
 internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
@@ -65,5 +82,64 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
         }
     }
 
+    override fun layoutSources(): LayoutCheck.Sources = CustomLayouts.sources
+
+    /**
+     * Read as a stream into one array of the length it gives (no doubling buffer); a byte past it or short of it is no
+     * payload. A phone low on memory takes half as much.
+     */
+    override fun sogouPlain(container: ByteArray, maxBytes: Int): ByteArray? = sogouPlain(container, maxBytes, LowMemory.on(appContext))
+
+    @VisibleForTesting
+    @Suppress("SwallowedException", "ReturnCount")
+    internal fun sogouPlain(container: ByteArray, maxBytes: Int, lowMemory: Boolean): ByteArray? {
+        val sealed = container.size - SOGOU_HEADER
+        if (sealed <= 0) return null
+        val limit = if (lowMemory) minOf(maxBytes, LOW_MEMORY_MAX_BYTES) else maxBytes
+        val inflater = Inflater()
+        return try {
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(hex(SkinPlatform.SOGOU_KEY), "AES"), IvParameterSpec(hex(SkinPlatform.SOGOU_IV)))
+            BufferedInputStream(CipherInputStream(ByteArrayInputStream(container, SOGOU_HEADER, sealed), cipher), STREAM_BUFFER).use { plain ->
+                val head = ByteArray(Int.SIZE_BYTES)
+                if (!plain.readFully(head)) return null
+                val raw = head.foldIndexed(0L) { i, v, b -> v or ((b.toLong() and BYTE) shl (Byte.SIZE_BITS * i)) }
+                if (raw > limit || (raw > SkinLimits.RATIO_FROM && raw > SkinLimits.MAX_RATIO.toLong() * sealed)) return null
+                val out = ByteArray(raw.toInt())
+                val inflated = InflaterInputStream(plain, inflater, STREAM_BUFFER)
+                if (!inflated.readFully(out) || inflated.read() != -1) return null
+                // to its end, so a wrong padding is found
+                while (plain.read(head) != -1) Unit
+                out
+            }
+        } catch (e: IOException) {
+            null
+        } catch (e: GeneralSecurityException) {
+            null
+        } finally {
+            // its native memory now, not at a later GC
+            inflater.end()
+        }
+    }
+
+    private fun InputStream.readFully(into: ByteArray): Boolean {
+        var at = 0
+        while (at < into.size) {
+            val n = read(into, at, into.size - at)
+            if (n < 0) return false
+            at += n
+        }
+        return true
+    }
+
+    private fun hex(s: String): ByteArray = ByteArray(s.length / 2) { s.substring(2 * it, 2 * it + 2).toInt(HEX).toByte() }
+
     private const val PNG_QUALITY = 100
+
+    // "Skin" and a version, before the cipher text
+    private const val SOGOU_HEADER = 8
+    const val LOW_MEMORY_MAX_BYTES = 64 * 1024 * 1024
+    private const val STREAM_BUFFER = 64 * 1024
+    private const val BYTE = 0xFFL
+    private const val HEX = 16
 }

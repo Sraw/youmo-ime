@@ -4,8 +4,13 @@
  */
 package org.fcitx.fcitx5.android.scene.skin
 
+import org.fcitx.fcitx5.android.scene.Icons
+import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.look.Gap
+import org.fcitx.fcitx5.android.scene.theme.RasterIcon
+import org.fcitx.fcitx5.android.scene.theme.ThemeFeatures
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
+import org.fcitx.fcitx5.android.scene.theme.Values
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.pow
@@ -16,20 +21,32 @@ import kotlin.math.roundToInt
  * restates what the first set that it has not, so a light style never shows in the dark; file names are its own,
  * never a name from the skin.
  */
-class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) -> Pixels?, private val fallbackName: String) {
+class SkinTheme(
+    private val source: SkinSource,
+    private val decode: (ByteArray) -> Pixels?,
+    private val fallbackName: String,
+    private val layoutSources: LayoutCheck.Sources? = null,
+) {
     private val files = LinkedHashMap<String, SkinOutput>()
+    private var uses063 = false
+
+    // a key's mark colours, after the shared `key mark` (as specific as `key mark`, they come later)
+    private val marks = ArrayList<Pair<String, String>>()
 
     // written once, whichever keys have it (Baidu's styles share an atlas's tiles)
     private val written = HashMap<SkinFill.Image, String>()
 
-    // a second version's board let go as it is read: one board in memory, not two
-    private fun readLooks(): Pair<Map<Variant, SkinLook>, Boolean> {
+    // a second version's board kept only as its dark picture, made small as it is read: two boards in memory at most
+    private fun readLooks(): Pair<Map<Variant, SkinLook>, Pixels?> {
         val order = source.variants.sortedBy { it.ordinal }
-        var darkPicture = false
+        var mainBoard: Pixels? = null
+        var darkPicture: Pixels? = null
         val looks = order.associateWith { v ->
             source.look(v).also {
-                if (v != order.first()) {
-                    darkPicture = it.board != null
+                if (v == order.first()) {
+                    mainBoard = it.board
+                } else {
+                    darkPicture = it.board?.let { b -> darkOf(b, mainBoard) }
                     it.board = null
                 }
             }
@@ -37,61 +54,281 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         return looks to darkPicture
     }
 
+    // none where it is the board itself; else at most DARK_PICTURE_SIDE and no larger than the board
+    private fun darkOf(dark: Pixels, board: Pixels?): Pixels? {
+        if (board != null && same(dark, board)) return null
+        return dark.capped(minOf(DARK_PICTURE_SIDE, board?.let { max(it.width, it.height) } ?: DARK_PICTURE_SIDE))
+    }
+
     fun write(): SkinConversion {
-        val (looks, darkPicture) = readLooks()
+        val (looks, darkBoard) = readLooks()
         val first = looks.keys.first()
         val main = looks.getValue(first)
-        val notes = LinkedHashSet<SkinNote>()
-        looks.values.forEach { notes += it.notes }
-        if (darkPicture) notes += SkinNote.DARK_PICTURE
-        val palettes = looks.mapValues { palette(it.value) }
-        val variants = if (looks.size == 1 && first == Variant.LIGHT && lum(main.boardColor ?: WHITE) < DARK_BOARD) "dark" else looks.keys.joinToString(" ") { it.word }
+        val notes = LinkedHashMap<SkinNote, List<String>>()
+        looks.values.forEach { l -> l.notes.forEach { (n, args) -> notes.getOrPut(n) { args } } }
+        val layouts = layouts(main, notes)
+        val variants = variants(looks, main)
         val body = ArrayList<String>()
-        body += colors(palettes.getValue(first), dark = false)
-        if (looks.size == 2) {
-            val light = palettes.getValue(Variant.LIGHT)
-            body += colors(palettes.getValue(Variant.DARK).filter { (k, v) -> light[k] != v }, dark = true)
-        }
-        main.board?.let { board ->
-            add(SkinOutput.Image(BOARD, board.capped(MAX_PICTURE_SIDE), MAX_PICTURE_BYTES, shrink = true))
-            body += """  <picture src="$BOARD">"""
-            body += """    <cut orientation="portrait" file="$BOARD"/>"""
-            body += "  </picture>"
-        }
-        main.font?.let { (file, bytes) ->
-            val name = "skin-" + file.filter { it in 'a'..'z' || it in '0'..'9' || it == '.' }.takeLast(MAX_FILE_PART)
-            add(SkinOutput.Bytes(name, bytes))
-            body += """  <font name="skin" src="${escape(name)}"/>"""
-        }
-        for ((variant, look) in looks) body += styles(look, variant, scene = if (variant == first) "" else "@dark ", firstKeys = main.keys.keys)
-        if (main.sounds.isNotEmpty()) {
-            body += "  <sounds>"
-            for ((key, sound) in main.sounds) {
-                val name = "sound-" + key.word + "." + sound.first.substringAfterLast('.')
-                add(SkinOutput.Bytes(name, sound.second))
-                body += """    <sound key="${key.word}" src="$name"/>"""
-            }
-            body += "  </sounds>"
+        body += colorLines(looks, first)
+        val board = main.board?.capped(MAX_PICTURE_SIDE)
+        board?.let {
+            add(SkinOutput.Image(BOARD, it, MAX_PICTURE_BYTES, shrink = true))
+            body += pictureLines(BOARD, dark = false)
         }
         val preview = source.preview?.let(decode)?.let {
             add(SkinOutput.Image(PREVIEW, it.capped(MAX_PREVIEW_SIDE), MAX_PREVIEW_BYTES, shrink = true))
             PREVIEW
         }
-        val name = themeName(source.name).ifEmpty { themeName(fallbackName) }.ifEmpty { "skin" }
-        val author = clean(source.author).take(MAX_META)
-        val xml = buildString {
-            appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
-            appendLine("""<theme xmlns="${ThemeReader.NAMESPACE}" name="${escape(name)}" variants="$variants" version="4.0">""")
-            append("  <meta")
-            if (author.isNotBlank()) append(""" author="${escape(author)}"""")
-            append(""" version="1" min-app="$MIN_APP"""")
-            if (preview != null) append(""" preview="$preview"""")
-            appendLine("/>")
-            body.forEach(::appendLine)
-            appendLine("</theme>")
+        main.font?.let { (file, bytes) -> add(SkinOutput.Bytes(fontName(file), bytes)) }
+        val sounds = soundLines(main)
+        val pack = Budget(layouts.values.map { it.text.encodeToByteArray().size.toLong() })
+        val styled = ArrayList<String>()
+        for ((variant, look) in looks) {
+            styled += styles(look, variant, scene = if (variant == first) "" else "@dark ", firstKeys = main.keys.keys, picture = variant == first && board != null)
         }
-        return SkinConversion(name, xml, files.values.toList(), notes)
+        // the dark picture after the faces, fonts and sounds the budget holds first
+        val dark = if (looks.size == 2) (main.darkPicture?.let { darkOf(it, main.board) } ?: darkBoard) else null
+        when (darkLines(dark, board, pack)) {
+            true -> {
+                body += pictureLines(DARK_BOARD_FILE, dark = true)
+                styled += listOf("""  <style select="@dark keyboard" fill="picture"/>""", """  <style select="@dark bar" fill="picture"/>""")
+            }
+            false -> notes += SkinNote.DARK_PICTURE
+            null -> Unit
+        }
+        main.font?.let { body += """  <font name="skin" src="${escape(fontName(it.first))}"/>""" }
+        body += styled
+        val iconLines = icons(main, pack, notes)
+        body += stickers(main, pack, notes)
+        body += iconLines
+        body += sounds
+        val name = themeName(source.name).ifEmpty { themeName(baseName(fallbackName)) }.ifEmpty { "skin" }
+        val own = if (uses063) ThemeFeatures.MIN_APP_063 else MIN_APP
+        val withLayouts = layouts.values.map { it.minApp }.fold(own) { v, l -> if (ThemeReader.newer(l, v)) l else v }
+        val themeXml = xml(name, variants, preview, body, own)
+        return SkinConversion(
+            name, themeXml, files.values.toList(), notes,
+            layouts.mapValues { it.value.text }, if (withLayouts == own) themeXml else xml(name, variants, preview, body, withLayouts),
+        )
     }
+
+    // a light skin with a dark board is told as dark
+    private fun variants(looks: Map<Variant, SkinLook>, main: SkinLook): String {
+        val first = looks.keys.first()
+        val dark = looks.size == 1 && first == Variant.LIGHT && lum(main.boardColor ?: WHITE) < DARK_BOARD
+        return if (dark) "dark" else looks.keys.joinToString(" ") { it.word }
+    }
+
+    private fun colorLines(looks: Map<Variant, SkinLook>, first: Variant): List<String> {
+        val palettes = looks.mapValues { palette(it.value) }
+        val out = colors(palettes.getValue(first), dark = false).toMutableList()
+        if (looks.size == 2) {
+            val light = palettes.getValue(Variant.LIGHT)
+            out += colors(palettes.getValue(Variant.DARK).filter { (k, v) -> light[k] != v }, dark = true)
+        }
+        return out
+    }
+
+    private fun pictureLines(file: String, dark: Boolean): List<String> = listOf(
+        if (dark) """  <picture variant="dark" src="$file">""" else """  <picture src="$file">""",
+        """    <cut orientation="portrait" file="$file"/>""",
+        "  </picture>",
+    )
+
+    private fun soundLines(look: SkinLook): List<String> {
+        if (look.sounds.isEmpty()) return emptyList()
+        val out = arrayListOf("  <sounds>")
+        for ((key, sound) in look.sounds) {
+            val name = "sound-" + key.word + "." + sound.first.substringAfterLast('.')
+            add(SkinOutput.Bytes(name, sound.second))
+            out += """    <sound key="${key.word}" src="$name"/>"""
+        }
+        out += "  </sounds>"
+        return out
+    }
+
+    // written (true), left out (false), or none to write (null)
+    private fun darkLines(dark: Pixels?, board: Pixels?, pack: Budget): Boolean? = when (dark) {
+        null -> null
+        else -> board != null && darkPicture(dark, pack)
+    }
+
+    // written where the pack has room for it
+    private fun darkPicture(dark: Pixels, pack: Budget): Boolean {
+        val out = SkinOutput.Image(DARK_BOARD_FILE, dark, MAX_PICTURE_BYTES, shrink = true)
+        if (!pack.fits(out, files.values)) return false
+        add(out)
+        uses063 = true
+        return true
+    }
+
+    private fun xml(name: String, variants: String, preview: String?, body: List<String>, minApp: String): String = buildString {
+        val author = clean(source.author).take(MAX_META)
+        appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
+        appendLine("""<theme xmlns="${ThemeReader.NAMESPACE}" name="${escape(name)}" variants="$variants" version="4.0">""")
+        append("  <meta")
+        if (author.isNotBlank()) append(""" author="${escape(author)}"""")
+        append(""" version="1" min-app="$minApp"""")
+        if (preview != null) append(""" preview="$preview"""")
+        appendLine("/>")
+        body.forEach(::appendLine)
+        appendLine("</theme>")
+    }
+
+    // the boards that take, by id; the rest told of
+    private fun layouts(main: SkinLook, notes: MutableMap<SkinNote, List<String>>): Map<String, SkinLayoutWriter.Written> {
+        val sources = layoutSources ?: return emptyMap()
+        val boards = main.layouts.filter { it.id in SkinLayoutWriter.IDS }.distinctBy { it.id }
+        if (boards.isEmpty()) return emptyMap()
+        val out = LinkedHashMap<String, SkinLayoutWriter.Written>()
+        val failed = ArrayList<String>()
+        for (b in boards) SkinLayoutWriter.write(b, sources)?.let { out[b.id] = it } ?: failed.add(b.id)
+        if (out.isEmpty()) {
+            notes += SkinNote.LAYOUT
+        } else {
+            notes.remove(SkinNote.LAYOUT)
+            if (failed.isNotEmpty()) notes[SkinNote.LAYOUT_SOME] = failed
+        }
+        return out
+    }
+
+    /** The pack's limits (ime-core's ThemeAssetLimits) less what is written regardless: theme.xml and the layouts. */
+    private class Budget(layouts: List<Long>) {
+        private val entries = MAX_PACK_ENTRIES - 1 - layouts.size
+        private val bytes = MAX_PACK_BYTES - MAX_THEME_XML_BYTES - layouts.sum()
+
+        fun fits(out: SkinOutput, written: Collection<SkinOutput>): Boolean =
+            written.size + 1 <= entries && written.sumOf(::bound) + bound(out) <= bytes
+
+        // a PNG is at most its pixels stored as they are, and one halved till within its bytes at most those
+        private fun bound(o: SkinOutput): Long = when (o) {
+            is SkinOutput.Bytes -> o.bytes.size.toLong()
+            is SkinOutput.Image -> {
+                val raw = 4L * o.pixels.width * o.pixels.height + o.pixels.height
+                val stored = raw + raw / PNG_OVERHEAD_PER + PNG_HEADERS
+                if (o.shrink) minOf(stored, o.maxBytes) else stored
+            }
+        }
+    }
+
+    private class Planned(val name: String, val normal: Pixels, val pressedImage: Pixels?, val pressed: SkinIcons.Pressed) {
+        var tinted = true
+    }
+
+    /**
+     * [look]'s icons as `<icon>`s and their keys' styles, written after the faces: each at rest while the pack has room, then
+     * each pressed one. One in a colour is drawn as a mask in its colour, so a pressed one in another is only that colour.
+     */
+    private fun icons(look: SkinLook, pack: Budget, notes: MutableMap<SkinNote, List<String>>): List<String> {
+        val plans = look.icons.map { (name, icon) ->
+            Planned(name, icon.normal, icon.pressed, if (SkinIcons.keyOf(name) == null) SkinIcons.Pressed.Same else SkinIcons.pressed(icon))
+        }
+        val rest = allot(plans, MAX_ICONS, pack) { SkinOutput.Image("icon-${it.name}.png", it.normal, RasterIcon.MAX_BYTES.toLong(), shrink = true) }
+        val ownPressed = rest.filter(::ownPressed)
+        val own = allot(ownPressed, MAX_ICONS - rest.size, pack) {
+            SkinOutput.Image("icon-${it.name}-p.png", it.pressedImage!!, RasterIcon.MAX_BYTES.toLong(), shrink = true)
+        }.map { it.name }.toSet()
+        val left = plans.filter { it !in rest } + ownPressed.filter { it.name !in own }
+        if (left.any { SkinIcons.keyOf(it.name) != null }) notes += SkinNote.KEY_ICONS
+        if (left.any { SkinIcons.keyOf(it.name) == null }) notes += SkinNote.TOOLBAR_ICONS
+        if (rest.isEmpty()) return emptyList()
+        uses063 = true
+        // Return's icons share one key's colours: ones in different colours are each drawn in their own
+        val returns = rest.filter { it.name in Icons.RETURN }
+        val returnsTinted = returns.map { colours(it, it.name in own) }.distinct().size <= 1
+        val styles = ArrayList<String>()
+        val pressedStyles = ArrayList<String>()
+        val elements = ArrayList<String>()
+        for (p in rest) {
+            val sel = SkinIcons.keyOf(p.name)
+            p.tinted = p.name !in Icons.RETURN || returnsTinted
+            val mono = sel?.takeIf { p.tinted }?.let { SkinIcons.mono(p.normal) }
+            elements += iconElement(p.name, "icon-${p.name}.png", mono != null)
+            if (sel != null) iconStyles(p, sel, mono, p.name in own, styles, pressedStyles, elements)
+        }
+        // Return's icons of one colour each set it
+        return (styles + pressedStyles).distinct() + elements
+    }
+
+    // an icon's colour at rest and pressed, as its key's styles would set them
+    private fun colours(p: Planned, own: Boolean): Pair<Int?, Int?> {
+        val mono = SkinIcons.mono(p.normal)
+        val pressed = if (own) SkinIcons.mono(p.pressedImage!!) else (p.pressed as? SkinIcons.Pressed.Color)?.argb ?: mono
+        return mono to pressed
+    }
+
+    // Return's pressed one by its action, and "previous" has none of its own (a `content` would show on every action)
+    private fun ownPressed(p: Planned): Boolean =
+        p.pressed == SkinIcons.Pressed.Image && !p.name.startsWith("shift-") && (p.name !in Icons.RETURN || returnAction(p.name) != null)
+
+    private fun iconElement(name: String, file: String, tint: Boolean) = """  <icon name="$name" src="$file"""" + (if (tint) """ tint="true"""" else "") + "/>"
+
+    private fun iconStyles(
+        p: Planned,
+        sel: String,
+        mono: Int?,
+        own: Boolean,
+        styles: MutableList<String>,
+        pressedStyles: MutableList<String>,
+        elements: MutableList<String>,
+    ) {
+        val state = when (p.name) {
+            "shift-once" -> ":shifted"
+            "shift-locked" -> ":locked"
+            else -> ""
+        }
+        mono?.let { styles += style("$sel$state", "icon-color" to hex(it)) }
+        if (state.isNotEmpty()) return
+        if (own) {
+            val pm = if (p.tinted) SkinIcons.mono(p.pressedImage!!) else null
+            elements += iconElement("${p.name}-pressed", "icon-${p.name}-p.png", pm != null)
+            pm?.let { pressedStyles += style("$sel:pressed", "icon-color" to hex(it)) }
+            val shown = returnAction(p.name)?.let { Values.RETURN_ICON + it } ?: "content"
+            pressedStyles += style("$sel:pressed icon", shown to "icon(${p.name}-pressed)")
+        } else if (mono != null) {
+            pressedStyles += style("$sel:pressed", "icon-color" to hex((p.pressed as? SkinIcons.Pressed.Color)?.argb ?: mono))
+        }
+    }
+
+    // 26 keys' letters drawn as pictures: each at rest while the pack has room, then each pressed one
+    private fun stickers(look: SkinLook, pack: Budget, notes: MutableMap<SkinNote, List<String>>): List<String> {
+        val letters = look.letterImages.map { (c, icon) -> c to icon }
+        val rest = allot(letters, RasterIcon.MAX_STICKERS, pack) { (l, icon) -> sticker("st-$l.png", icon.normal) }
+        val ownPressed = rest.filter { (_, icon) -> icon.pressed != null && !same(icon.pressed, icon.normal) }
+        val pressed = allot(ownPressed, RasterIcon.MAX_STICKERS - rest.size, pack) { (l, icon) -> sticker("st-$l-p.png", icon.pressed!!) }.map { it.first }.toSet()
+        if (rest.size < letters.size || pressed.size < ownPressed.size) notes += SkinNote.LETTER_IMAGES
+        if (rest.isEmpty()) return emptyList()
+        uses063 = true
+        return rest.flatMap { (l, _) ->
+            listOfNotNull(
+                style("qwerty/$l", "sticker" to "st-$l.png"),
+                style("qwerty/$l label", "hidden" to "true"),
+                if (l in pressed) style("qwerty/$l:pressed", "sticker" to "st-$l-p.png") else null,
+            )
+        }
+    }
+
+    private fun sticker(name: String, p: Pixels) = SkinOutput.Image(name, p, RasterIcon.MAX_STICKER_BYTES.toLong(), shrink = true)
+
+    // each written, in order, while the pack has room and fewer than [max] are; the ones written
+    private fun <T> allot(items: List<T>, max: Int, pack: Budget, out: (T) -> SkinOutput): List<T> {
+        val taken = ArrayList<T>()
+        for (t in items) {
+            val o = out(t)
+            if (taken.size < max && pack.fits(o, files.values)) {
+                add(o)
+                taken += t
+            }
+        }
+        return taken
+    }
+
+    private fun returnAction(icon: String): String? = (if (icon == "enter") "newline" else icon).takeIf { it in Values.RETURN_ACTIONS }
+
+    private fun style(sel: String, vararg attrs: Pair<String, String>): String =
+        """  <style select="${escape(sel)}" """ + attrs.joinToString(" ") { (k, v) -> """$k="${escape(v)}"""" } + "/>"
+
+    private fun fontName(file: String) = "skin-" + file.filter { it in 'a'..'z' || it in '0'..'9' || it == '.' }.takeLast(MAX_FILE_PART)
 
     private fun add(out: SkinOutput) {
         files[out.name] = out
@@ -130,7 +367,7 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
     }
 
     // one version's styles; [scene] '' for the first, '@dark ' for the second, which restates each of [firstKeys]
-    private fun styles(look: SkinLook, variant: Variant, scene: String, firstKeys: Set<String>): List<String> {
+    private fun styles(look: SkinLook, variant: Variant, scene: String, firstKeys: Set<String>, picture: Boolean): List<String> {
         val out = ArrayList<String>()
         val px = look.width / DP_ACROSS
         val prefix = variant.word.take(1)
@@ -140,7 +377,7 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
             val sel = selectors.split(',').joinToString(", ") { scene + it.trim() }
             out += """  <style select="${escape(sel)}" """ + set.joinToString(" ") { (k, v) -> """$k="${escape(v!!)}"""" } + "/>"
         }
-        if (look.board != null && scene.isEmpty()) {
+        if (picture) {
             st("keyboard", "fill" to "picture")
             st("bar", "fill" to "picture")
         } else {
@@ -170,6 +407,8 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
             }
         }
         st("key mark, key shortcut", "color" to "@keyHint", "icon-color" to "@keyHint")
+        for ((sel, c) in marks) st(sel, "color" to c)
+        marks.clear()
         st("candidate", "color" to "@candidateText")
         st("candidate:first", "color" to "@first")
         st("candidate label", "color" to "@candidateLabel")
@@ -206,18 +445,33 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         val fill = k.fill?.let { fill(it, prefix, sel, "n", px) }
         // a face with its symbol in it: none of the app's on top
         val color = if (k.drawn) "transparent" else k.color?.let(::hex)
-        st(sel, arrayOf("fill" to fill, "color" to color, "icon-color" to color?.takeIf { k.icons || k.drawn }))
+        st(
+            sel,
+            arrayOf(
+                "fill" to fill, "color" to color, "icon-color" to color?.takeIf { k.icons || k.drawn },
+                "scale" to k.scale?.coerceIn(Values.MIN_SCALE.toInt(), Values.MAX_SCALE.toInt())?.let { "$it%" },
+                "weight" to k.weight?.takeIf { it in WEIGHTS }?.toString(),
+            ),
+        )
         val pressed = k.pressed?.takeIf { !SkinPatch.same(it, k.fill) }?.let { fill(it, prefix, sel, "p", px) }
         val pressedColor = k.pressedColor?.takeIf { it != k.color && !k.drawn }?.let(::hex)
+        val pressedText = pressedColor ?: color?.takeIf { again }
         st(
             sel.split(',').joinToString(",") { "$it:pressed" },
             arrayOf(
                 // none of its own: its own face still (a more general kind's pressed face never shows through)
                 "fill" to (pressed ?: fill),
                 "overlay" to if (pressed != null) "transparent" else "@keyPressHighlight",
-                "color" to (pressedColor ?: color?.takeIf { again }),
+                "color" to pressedText,
+                "icon-color" to (k.pressedIconColor?.let(::hex) ?: pressedText?.takeIf { k.icons || k.drawn }),
+                "press-scale" to k.pressScale?.coerceIn(Values.MIN_PRESS_SCALE.toInt(), Values.MAX_PRESS_SCALE.toInt())?.let { "$it%" },
+                "transition" to k.transitionMs?.coerceIn(0, Values.MAX_TRANSITION_MS)?.let { "${it}ms ease-out" },
+                "press-sink" to k.pressSink?.takeIf { it.isFinite() }?.coerceIn(0.0, Values.MAX_PRESS_SINK_DP)?.let { "${dp(it)}dp" },
             ),
         )
+        fun mark(state: String) = sel.split(',').joinToString(",") { "${it.trim()}$state mark" }
+        k.markColor?.let { marks += mark("") to hex(it) }
+        k.pressedMarkColor?.let { marks += mark(":pressed") to hex(it) }
     }
 
     // a face's fill value: a colour, or an image of its own (its transparent margins cut, at most MAX_KEY_SIDE)
@@ -276,6 +530,22 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
     companion object {
         const val MIN_APP = "0.6.0"
         const val BOARD = "board.png"
+        const val DARK_BOARD_FILE = "board-dark.png"
+
+        /** A dark picture's longer side at most (a second board in memory with the first). */
+        const val DARK_PICTURE_SIDE = 2048
+        private val WEIGHTS = setOf(300, 400, 700)
+
+        /** ime-core's ThemeAssetLimits: MAX_ENTRIES, MAX_TOTAL_BYTES, MAX_THEME_XML_BYTES (held to them by the app's test). */
+        const val MAX_PACK_ENTRIES = 300
+        const val MAX_PACK_BYTES = 64L * 1024 * 1024
+        const val MAX_THEME_XML_BYTES = 1024L * 1024
+
+        /** ThemeReader's, SVG and raster alike. */
+        const val MAX_ICONS = 200
+        const val MAX_STICKER_SIDE = 256
+        private const val PNG_OVERHEAD_PER = 1000
+        private const val PNG_HEADERS = 1024L
         const val PREVIEW = "preview.png"
         const val MAX_KEY_SIDE = 512
         const val MAX_KEY_BYTES = 2L * 1024 * 1024
@@ -302,6 +572,15 @@ class SkinTheme(private val source: SkinSource, private val decode: (ByteArray) 
         private val NOT_NAME = Regex("[^a-z0-9]+")
         private val SPACES = Regex("\\s+")
         private val VARIANT_SUFFIX = Regex("#(light|dark)$", RegexOption.IGNORE_CASE)
+
+        /** A file's name with no folder and no suffix (`a/b.c.ssf` → `b.c`), as ime-core's ThemeFileName.base. */
+        fun baseName(fileName: String): String {
+            val name = fileName.substringAfterLast('/')
+            val dot = name.lastIndexOf('.')
+            return if (dot > 0) name.substring(0, dot) else name
+        }
+
+        private fun same(a: Pixels, b: Pixels) = a.width == b.width && a.height == b.height && a.argb.contentEquals(b.argb)
 
         /** [s] with no control character and one space for each run of white space. */
         fun clean(s: String): String = s.filter { it >= ' ' && it != '\u007F' }.replace(SPACES, " ").trim()
@@ -363,5 +642,16 @@ sealed interface SkinOutput {
     class Bytes(override val name: String, val bytes: ByteArray) : SkinOutput
 }
 
-/** A skin converted: the theme's [name], its `theme.xml` ([themeXml]), its [files] and what did not carry over ([notes]). */
-class SkinConversion(val name: String, val themeXml: String, val files: List<SkinOutput>, val notes: Set<SkinNote>)
+/**
+ * A skin converted: the theme's [name], its `theme.xml` ([themeXml]), its [files] and what did not carry over ([notes],
+ * in the order seen, each with its arguments). [layouts] are `layouts/<id>.xml` by id ([SkinLayoutWriter.IDS]), not in
+ * [files]: the user picks whether they come; with them the theme is [themeXmlWithLayouts], its `min-app` theirs if later.
+ */
+class SkinConversion(
+    val name: String,
+    val themeXml: String,
+    val files: List<SkinOutput>,
+    val notes: Map<SkinNote, List<String>>,
+    val layouts: Map<String, String> = emptyMap(),
+    val themeXmlWithLayouts: String = themeXml,
+)

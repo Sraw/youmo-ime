@@ -10,14 +10,16 @@ import org.fcitx.fcitx5.android.input.theme.ThemeFileName
 import org.fcitx.fcitx5.android.scene.skin.SkinConversion
 import org.fcitx.fcitx5.android.scene.skin.SkinConverter
 import org.fcitx.fcitx5.android.scene.skin.SkinError
+import org.fcitx.fcitx5.android.scene.skin.SkinFormat
 import org.fcitx.fcitx5.android.scene.skin.SkinLimits
 import org.fcitx.fcitx5.android.scene.skin.SkinOutput
+import org.fcitx.fcitx5.android.utils.appContext
 import org.fcitx.fcitx5.android.utils.errorRuntime
 import java.io.InputStream
 
 internal object SkinImport {
     fun convert(src: InputStream, fileName: String, codec: ThemeFilesManager.SkinCodec): SkinConversion = try {
-        SkinConverter.convert(src.use { SkinZip.readSkin(it, fileName) }, codec, ThemeFileName.base(fileName))
+        SkinConverter.convert(src.use { SkinZip.readSkin(it, fileName) }, codec, fileName)
     } catch (e: SkinError) {
         // a .zip that is no skin: most likely a theme exported under the old name
         if (e.reason == SkinError.Reason.UNKNOWN && ThemeFileName.isZip(fileName)) {
@@ -59,7 +61,16 @@ internal object SkinImport {
         SkinError.Reason.SOGOU_PC -> errorRuntime(R.string.exception_skin_sogou_pc)
         SkinError.Reason.NO_KEYBOARD -> errorRuntime(R.string.exception_skin_no_keyboard)
         SkinError.Reason.BROKEN -> errorRuntime(R.string.exception_skin_not_zip)
+        SkinError.Reason.UNSUPPORTED -> errorRuntime(R.string.exception_skin_unsupported, FORMATS[e.detail]?.let(appContext::getString) ?: e.detail)
     }
+
+    /** [SkinFormat]'s ids in the user's words; a test holds it to every id. */
+    internal val FORMATS = mapOf(
+        SkinFormat.SHOUXIN to R.string.skin_format_shouxin,
+        SkinFormat.GBOARD to R.string.skin_format_gboard,
+        SkinFormat.CANG to R.string.skin_format_cang,
+        SkinFormat.APK to R.string.skin_format_apk,
+    )
 
     private const val MB = 1024L * 1024
 }

@@ -143,7 +143,7 @@ class SkinFormatsTest {
         assertContains(c.themeXml, """select="key" fill="image(l-key-n.png""")
         assertContains(c.themeXml, "#444444")
         assertContains(c.themeXml, """<font name="skin" src="skin-k.ttf"/>""")
-        assertEquals(setOf(SkinNote.LAYOUT, SkinNote.TEXT_SIZE, SkinNote.INCLUDES), c.notes)
+        assertEquals(setOf(SkinNote.LAYOUT, SkinNote.TEXT_SIZE, SkinNote.INCLUDES), c.notes.keys)
     }
 
     @Test
@@ -255,7 +255,7 @@ class SkinFormatsTest {
         assertContains(c.themeXml, """select="key.function" fill="#80aaccaa"""")
         assertFalse(c.themeXml.contains("#ff0000"))
         assertContains(c.themeXml, """<font name="skin" src="skin-moss.ttf"/>""")
-        assertEquals(setOf(SkinNote.LAYOUT, SkinNote.PANELS, SkinNote.MORE_THEMES, SkinNote.IMAGES), c.notes)
+        assertEquals(setOf(SkinNote.LAYOUT, SkinNote.PANELS, SkinNote.MORE_THEMES, SkinNote.IMAGES), c.notes.keys)
     }
 
     @Test
