@@ -17,7 +17,6 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.OfferRules
 import org.fcitx.fcitx5.android.engine.session.Pager
 import org.fcitx.fcitx5.android.engine.session.Predictions
-import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.HabitRanker
 import org.fcitx.fcitx5.android.engine.learn.Habits
@@ -128,10 +127,7 @@ class TableSession(
     private val emojiOf: (String) -> List<String> = language?.emoji ?: { emptyList() }
     private val phrasesOf: (String) -> List<String> = language?.phrases ?: { emptyList() }
 
-    private var homographs: Homographs? = null
-
     private var ranked: Map<String, HabitRanker.Ranked<Int>> = emptyMap()
-    private val unrefined = RefineSlices<Homographs>(language?.refiner)
 
     // Enter between: the space is on a new line, typed
     override fun passedOn() {
@@ -279,7 +275,6 @@ class TableSession(
             val s = if (picksSpace && at - predictionsAt >= SPACE_PICK_AFTER_MS) {
                 journal.before(action, learning)
                 committedItselfAt = null
-                unrefined.drop()
                 pickOffered(selfEmoji.size).also { picked = true }
             } else {
                 picked = false
@@ -302,8 +297,6 @@ class TableSession(
         val taken = action is Action.Key && takesSpace(action.char)
         spaceTaken = taken
         committedItselfAt = null
-        // anything but a refine slice or a cursor move changes the order to weigh
-        if (action != Action.Refine && action !is Action.Cursor && action !is Action.Step) unrefined.drop()
         if (taken) return snapshot()
         if (offering()) {
             val n = selfEmoji.size
@@ -312,7 +305,7 @@ class TableSession(
                 is Action.Select -> return pager.at(action.index).let { if (it >= 0) pickOffered(it) else snapshot() }
                 Action.NextPage -> return turnPredictions(pager.page + 1)
                 Action.PreviousPage -> return turnPredictions(pager.page - 1)
-                Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke -> return snapshot()
+                is Action.Ink, is Action.Glide, is Action.Stroke -> return snapshot()
                 is Action.Forget -> return if (action.index < n) snapshot() else pressed(action.index - n, Offer.FORGET)
                 is Action.Block -> return if (action.index < n) snapshot() else pressed(action.index - n, Offer.BLOCK)
                 is Action.Pin, is Action.Unpin -> return snapshot()
@@ -358,7 +351,6 @@ class TableSession(
             if (text.isNotEmpty()) wrote(text, null)
             snapshot(commit = text, handled = text.isNotEmpty())
         }
-        Action.Refine -> refine()
         is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown,
         Action.DropPredictions -> snapshot()
         is Action.Cursor -> moveCursor(action.at)
@@ -700,8 +692,6 @@ class TableSession(
         val shown = pager.page
         update()
         pager.keep(shown) { ranking[it] != null }
-        // weighed again only on the first page, as pinyin: not to move what is shown
-        if (pager.page != 0) unrefined.drop()
         return snapshot()
     }
 
@@ -739,9 +729,6 @@ class TableSession(
         cursor = 0
         slipReader?.clear()
         ranking = Ranking.NONE
-        homographs = null
-        // a self-committed code may have set it (a row twice in the table, shown once)
-        unrefined.drop()
         pager.reset()
     }
 
@@ -760,9 +747,7 @@ class TableSession(
 
     private fun update() {
         pager.reset()
-        homographs = null
         ranking = if (input.isEmpty()) Ranking.NONE else rank(input.toString())
-        unrefined.start(homographs, homographs?.texts?.size ?: 0)
     }
 
     /** [code]'s candidates ranked lazily: outside words after the table's own of equal length (none where a lone entry commits itself), blocked ones out, the pin first. */
@@ -874,7 +859,6 @@ class TableSession(
         val scores = FloatArray(rankable.size) { k -> language.words.logProb(texts[k], prev2, prev) }
         val byScore = rankable.indices.sortedByDescending { scores[it] }
         val h = Homographs(order, rankable.toIntArray(), byScore.map { order[rankable[it]] }.toIntArray(), byScore.map { texts[it] }, byScore.map { scores[it] }, made)
-        homographs = h
         return h.place(language.reranker?.pick(predictions.context, h.texts, h.scores) ?: 0)
     }
 
@@ -894,11 +878,6 @@ class TableSession(
             for (j in entries.indices) if (j != first) placed[at[k++]] = entries[j]
             return made(placed)
         }
-    }
-
-    private fun refine(): Snapshot {
-        unrefined.slice(predictions.context, { it.texts }, { it.scores }) { h, picked -> ranking = h.place(picked) }
-        return snapshot()
     }
 
     private fun key(at: Int, length: Int, noSort: Int, isPinyin: Boolean, outside: Boolean): Long {
@@ -1034,7 +1013,6 @@ class TableSession(
             first = pager.from,
             actionable = shown.isNotEmpty(),
             labels = options.selectionKeys,
-            refines = unrefined.refines,
         )
     }
 

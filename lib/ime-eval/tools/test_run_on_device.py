@@ -16,6 +16,7 @@ OTHER = 'com.android.inputmethod.latin/.LatinIME'
 # the device's keyboard in a file; `ime set null` fails as on a device (no such keyboard)
 ADB = f'''#!/usr/bin/env bash
 state="$FAKE_DIR/keyboard"
+echo "$*" >> "$FAKE_DIR/calls"
 case "$*" in
   "shell settings get secure default_input_method") cat "$state" ;;
   "shell ime set null") exit 1 ;;
@@ -40,7 +41,7 @@ def executable(path, text):
 
 
 class RunOnDeviceTest(unittest.TestCase):
-    def run_script(self, before, import_status):
+    def run_script(self, before, import_status, args=(), **extra):
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp) / 'repo'
             (repo / 'lib' / 'ime-eval').mkdir(parents=True)
@@ -52,8 +53,12 @@ class RunOnDeviceTest(unittest.TestCase):
             env = dict(os.environ, PATH=f"{Path(tmp) / 'bin'}:{os.environ['PATH']}", FAKE_DIR=tmp,
                        FAKE_IMPORT=str(import_status))
             env.pop('INSTALL', None)
-            r = subprocess.run(['bash', str(repo / 'lib' / 'ime-eval' / 'run-on-device.sh')],
-                               env=env, capture_output=True, text=True, timeout=60)
+            env.pop('LEVEL', None)
+            env.update(extra)
+            r = subprocess.run(['bash', str(repo / 'lib' / 'ime-eval' / 'run-on-device.sh'), *args],
+                               env=env, capture_output=True, text=True, timeout=60, cwd=tmp)
+            self.calls = (Path(tmp) / 'calls').read_text().splitlines() if (Path(tmp) / 'calls').exists() else []
+            self.stdout = r.stdout
             return r.returncode, (Path(tmp) / 'keyboard').read_text().strip(), r.stderr
 
     def test_the_keyboard_before_is_put_back_and_only_one_there_was_is_missed(self):
@@ -71,6 +76,27 @@ class RunOnDeviceTest(unittest.TestCase):
                 self.assertEqual(import_status != 0, status != 0, err)
                 self.assertEqual(after, keyboard, err)
                 self.assertEqual(warned, 'not put back' in err, err)
+
+    def test_a_set_file_is_pushed_and_typed_at_the_level_asked(self):
+        with tempfile.TemporaryDirectory() as sets:
+            chat = Path(sets) / 'chat-t9.tsv'
+            chat.write_text('94\t我\t-\n')
+            status, _, err = self.run_script(OTHER, 0, args=(str(chat), 'engine-pinyin', 'out'), LEVEL='medium', INSTALL='0')
+        self.assertEqual(0, status, err)
+        eval_dir = f'/sdcard/Android/data/{PKG}/files/eval'
+        self.assertIn(f'push {chat} {eval_dir}/chat-t9.tsv', self.calls)
+        instrument = next(c for c in self.calls if 'am instrument' in c)
+        self.assertIn('-e evalSet chat-t9 ', instrument)
+        self.assertIn('-e evalLevel medium ', instrument)
+        self.assertIn(f'pull {eval_dir}/chat-t9-engine-pinyin-medium.tsv out/', self.calls)
+        self.assertIn(f'shell rm -f {eval_dir}/chat-t9.tsv', self.calls)
+        self.assertTrue(self.stdout.strip().endswith('chat-t9-engine-pinyin-medium.tsv'), self.stdout)
+
+    def test_a_level_not_of_the_three_is_refused(self):
+        status, _, err = self.run_script(OTHER, 0, LEVEL='auto', INSTALL='0')
+        self.assertEqual(1, status, err)
+        self.assertIn('LEVEL=auto', err)
+        self.assertFalse(any('am instrument' in c for c in self.calls))
 
 
 if __name__ == '__main__':

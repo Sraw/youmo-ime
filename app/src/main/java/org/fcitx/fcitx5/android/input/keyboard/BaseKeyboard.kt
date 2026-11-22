@@ -149,7 +149,7 @@ abstract class BaseKeyboard(
     var tempMode = false
         set(value) { field = value; keyWriting?.update() }
 
-    var inkSink: ((InkReading?, piece: Int) -> Unit)? = null
+    var inkSink: ((InkReading, piece: Int) -> Unit)? = null
 
     private var keyInk: KeyInk? = null
 
@@ -185,7 +185,7 @@ abstract class BaseKeyboard(
         val (color, width) = ScenePanels.ink(context, theme)
         val ink = KeyInk(
             this, color, width, pause = { prefs.keyboard.handwritingPause.getValue().millis },
-            deliver = { reading, piece -> inkSink?.invoke(reading, piece) }, finished = { inkSink?.invoke(null, it) },
+            deliver = { reading, piece -> inkSink?.invoke(reading, piece) },
         ).also { keyInk = it }
         val area = LetterArea(letters, writesAlso).also { letterArea = it }
         keyWriting = KeyWriting(this, ink, area, prefs.internal.handwritingOpen, { canvas }, { keysIm }, { inPasswordField }, { tempMode })

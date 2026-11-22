@@ -21,7 +21,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.g14
 import org.fcitx.fcitx5.android.engine.pinyin.g14Code
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.Key
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -43,8 +42,8 @@ class PinyinSessionT9Test {
         Triple("爸爸", "ba ba", -4f),
     )
 
-    private fun session(user: UserModel? = null, learner: Learner? = null, refiner: SentenceRefiner? = null) = PinyinSession(
-        data, T9Segmenter(abbreviations = false), spell = true, user = learner?.model ?: user, prediction = false, refiner = refiner,
+    private fun session(user: UserModel? = null, learner: Learner? = null) = PinyinSession(
+        data, T9Segmenter(abbreviations = false), spell = true, user = learner?.model ?: user, prediction = false,
         learnTo = learner?.learnTo() ?: LearnTo(),
     )
 
@@ -366,28 +365,13 @@ class PinyinSessionT9Test {
         assertEquals("ni", session.apply(Action.Syllable(0, typed.syllablesId)).preedit)
         assertEquals(emptyList<String>(), session.apply(Action.Syllable(0, typed.syllablesId)).syllables)
         // the same list keeps its id: a forget re-reads the input and stales no pick
-        val again = session(learner = Learner(data), refiner = { _, _, _, _ -> 0 })
+        val again = session(learner = Learner(data))
         again.type("64")
         again.apply(Action.Select(0))
         val first = again.type("64")
         val forgotten = again.apply(Action.Forget(0))
-        assertTrue(forgotten.refines)
         assertEquals(first.syllables, forgotten.syllables)
         assertEquals(first.syllablesId, forgotten.syllablesId)
-    }
-
-    @Test
-    fun aPauseThatPutsAnotherReadingFirstKeepsTheSyllablesOffered() {
-        val session = session { _, readings, _, _ -> readings.indexOfFirst { it.startsWith("米") } }
-        val typed = session.type("64426")
-        assertEquals("ni", typed.syllables[0])
-        assertTrue(typed.refines)
-        val refined = session.apply(Action.Refine)
-        assertTrue(refined.candidates[0].startsWith("米"))
-        // as shown when the user paused: a tap on it, on its way, is not dropped
-        assertEquals(typed.syllables, refined.syllables)
-        assertEquals(typed.syllablesId, refined.syllablesId)
-        assertEquals("ni'hao", session.apply(Action.Syllable(0, typed.syllablesId)).preedit)
     }
 
     @Test

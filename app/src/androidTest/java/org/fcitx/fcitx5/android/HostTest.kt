@@ -7,12 +7,19 @@ package org.fcitx.fcitx5.android
 import android.os.SystemClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import org.fcitx.fcitx5.android.core.CpuNative
 import org.fcitx.fcitx5.android.core.HostInstance
 import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.KeyState
+import org.fcitx.fcitx5.android.core.NativeMatrixKernel
+import org.fcitx.fcitx5.android.core.ThisDevice
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
+import org.fcitx.fcitx5.android.device.Affinity
+import org.fcitx.fcitx5.android.device.BigCorePin
+import org.fcitx.fcitx5.android.device.CpuFacts
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.ConfigHome
@@ -28,6 +35,7 @@ import org.junit.Test
 import org.junit.rules.Timeout
 import timber.log.Timber
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 class HostTest {
 
@@ -44,18 +52,43 @@ class HostTest {
 
         var predictionBefore: String? = null
 
+        var kernelBefore: MatrixKernel? = null
+
+        /** Stretches pinned to the test's big core. */
+        val pins = AtomicInteger()
+
+        fun allowed(status: File) = status.readLines().firstOrNull { it.startsWith("Cpus_allowed_list:") }?.substringAfter(':')?.trim()
+
+        // the emulator's cores are all alike (no big ones, no pinning): the cpuset's last core stands in, so pins happen
+        private fun pinnedToTheLastCore(): MatrixKernel {
+            val native = NativeMatrixKernel.loaded as CpuNative
+            val big = 1L shl CpuFacts.cpuList(allowed(File("/proc/self/status")).orEmpty()).last()
+            val possible = CpuFacts.cpuList(File("/sys/devices/system/cpu/possible").readText()).fold(0L) { mask, cpu -> mask or (1L shl cpu) }
+            val counting = object : Affinity {
+                override fun set(mask: Long) = native.affinitySet(mask).also { if (mask == big && it == 0L) pins.incrementAndGet() }
+            }
+            return ThisDevice.pinned(NativeMatrixKernel, BigCorePin(counting, big, possible))
+        }
+
         @BeforeClass
         @JvmStatic
-        fun setup() = harness.start {
-            // prediction on: a commit then followed by none says learning is off
-            predictionBefore = imOptions(InputMethodCatalog.PINYIN)?.get(EngineSettings.PREDICTION).orEmpty()
-            setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.PREDICTION to "True"))
+        fun setup() {
+            kernelBefore = ThisDevice.kernel
+            ThisDevice.kernel = pinnedToTheLastCore()
+            harness.start {
+                // prediction on: a commit then followed by none says learning is off
+                predictionBefore = imOptions(InputMethodCatalog.PINYIN)?.get(EngineSettings.PREDICTION).orEmpty()
+                setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.PREDICTION to "True"))
+            }
         }
 
         @AfterClass
         @JvmStatic
-        fun cleanup() = harness.stop {
-            predictionBefore?.let { setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.PREDICTION to it)) }
+        fun cleanup() {
+            harness.stop {
+                predictionBefore?.let { setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.PREDICTION to it)) }
+            }
+            kernelBefore?.let { ThisDevice.kernel = it }
         }
 
         const val WUBI = "engine-wubi"
@@ -150,6 +183,25 @@ class HostTest {
         Timber.i("commitString is $commitString")
         Assert.assertEquals(expected, commitString)
         fcitx.reset()
+    }
+
+    // a thread left on the big cores would keep them so for whatever it runs next (engine-phrases, host-config, ...)
+    @Test
+    fun noThreadKeepsTheBigCoresAfterASentence(): Unit = runBlocking {
+        fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
+        pins.set(0)
+        sendString("nihaoshijie")
+        awaitQuiet()
+        fcitx.reset()
+        awaitQuiet()
+        Assert.assertTrue("no stretch was pinned: nothing tested", pins.get() > 0)
+        val process = allowed(File("/proc/self/status"))
+        val kept = File("/proc/self/task").listFiles().orEmpty().mapNotNull { task ->
+            val mask = runCatching { allowed(File(task, "status")) }.getOrNull() ?: return@mapNotNull null
+            val name = runCatching { File(task, "comm").readText().trim() }.getOrDefault(task.name)
+            "$name=$mask".takeIf { mask != process }
+        }
+        Assert.assertEquals("threads not on the process's cpuset $process", emptyList<String>(), kept)
     }
 
     /** The long press sends the letter past the BMP (Keyboard.letterKey), which fcitx must pass whole: m then 4 is mi, never ni. */
@@ -315,7 +367,7 @@ class HostTest {
         fcitx.reset()
     }
 
-    /** A refine can reorder the list between tap and pick; the pick names its text, so a stale index is dropped. */
+    /** The list can change between tap and pick; the pick names its text, so a stale index is dropped. */
     @Test
     fun aPickOfTextTheCandidateNoLongerShowsIsDropped(): Unit = runBlocking {
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))

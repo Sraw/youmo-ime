@@ -10,14 +10,15 @@ import org.junit.Test
 class VirtualHostClockTest {
 
     @Test
-    fun aTimerDueWhileAnotherSpendsRunsLateNotBackInTime() {
-        // HostClock.uptimeMillis is monotonic: learning's now() and FieldPolicy read it in replays
+    fun timersRunAtTheirTimeInOrderAndOnlyThoseDue() {
         val clock = VirtualHostClock()
-        val seen = mutableListOf<Long>()
-        clock.schedule(10) { clock.spend(1); seen += clock.uptimeMillis() }
-        clock.schedule(10) { seen += clock.uptimeMillis() }
+        val seen = mutableListOf<Pair<Int, Long>>()
+        clock.schedule(10) { seen += 1 to clock.uptimeMillis() }
+        clock.schedule(5) { seen += 2 to clock.uptimeMillis() }
+        clock.schedule(10) { seen += 3 to clock.uptimeMillis() }
+        clock.schedule(20) { seen += 4 to clock.uptimeMillis() }
         clock.advance(10)
-        assertEquals(listOf(11L, 11L), seen)
-        assertEquals(0, clock.pending)
+        assertEquals(listOf(2 to 5L, 1 to 10L, 3 to 10L), seen)
+        assertEquals(1, clock.pending)
     }
 }

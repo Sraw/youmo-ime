@@ -32,7 +32,7 @@ import org.fcitx.fcitx5.android.engine.phrase.CustomPhrases
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
-import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
+import org.fcitx.fcitx5.android.engine.platform.jvm.JvmThreads
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.FieldFlags
@@ -133,6 +133,9 @@ class EngineBridge {
 
     private var made: Engines? = null
 
+    // one thread for every engines made: a fresh one per commit would allocate the models' buffers anew each time
+    private val contextReads = JvmThreads.single("engine-context")
+
     // what the field's last context left out of learning, kept for engines made after it
     private val fieldFlags = FieldFlags()
 
@@ -143,7 +146,8 @@ class EngineBridge {
             userDir = userDir()?.let(::restored)?.let(::JvmFiles),
             onError = ::userDataFailed,
             additions = { data().let { additions(pinyinDir(it), it.writable) } },
-            kernel = NativeMatrixKernel.loaded,
+            kernel = ThisDevice.kernel,
+            contextReads = contextReads,
             emojiShows = EmojiModifier.validator(),
             // a paint of its own: this is the fcitx thread's
             textShows = TextPaint().let { paint -> paint::hasGlyph },
@@ -407,7 +411,7 @@ class EngineBridge {
     /** What the engine throws is thrown on, for the host's router to recover from. [learning] is false in sensitive fields. */
     val host: EngineHost = object : EngineHost {
         override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot? =
-            answer(im, event) { engines.onEvent(im, event, arg, learning, payload) }
+            answer(im) { engines.onEvent(im, event, arg, learning, payload) }
 
         override fun candidates(im: String, from: Int, count: Int): List<Choice> = engines.candidates(im, from, count)
 
@@ -417,34 +421,29 @@ class EngineBridge {
     }
 
     /** Null for an input method that cannot load, whose key the host gives back. */
-    internal fun answer(im: String, event: Int, call: () -> Snapshot): Snapshot? {
+    internal fun answer(im: String, call: () -> Snapshot): Snapshot? {
         if (im in unloadable) {
-            EngineState.refining = false
             EngineState.syllablesState.value = EngineState.SyllableState(im)
             return null
         }
-        val s = try {
-            unloadable.call(im, call).also { follow(im, event, it) }
+        return try {
+            unloadable.call(im, call).also { follow(im, it) }
         } catch (@Suppress("TooGenericExceptionCaught") e: Throwable) {
             failedEvent(im)
             throw e
         }
-        EngineState.refining = s.refines
-        return s
     }
 
-    private fun follow(im: String, event: Int, s: Snapshot) {
+    private fun follow(im: String, s: Snapshot) {
         // every answer, not only while typing: the 14 keys handing back to 全拼 answer with none, which clears what they offered
-        if (event != EngineEvent.REFINE || s.handled) EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
+        EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
         if (im == InputMethodCatalog.ENGLISH) EngineState.englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
         // an answer not theirs is no reason to make them
         made?.let { e -> followed(im) { e } }
     }
 
     private fun failedEvent(im: String) {
-        // the host refines no more after a failure
-        EngineState.refining = false
-        // nor is a word being spelled: 1 left an apostrophe with nothing typed
+        // no word is being spelled: 1 left an apostrophe with nothing typed
         if (im == InputMethodCatalog.ENGLISH) EngineState.englishTypingState.value = false
         // a tap would send an id the engine drops
         EngineState.syllablesState.value = EngineState.SyllableState(im)

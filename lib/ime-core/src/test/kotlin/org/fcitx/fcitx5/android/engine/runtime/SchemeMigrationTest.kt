@@ -27,13 +27,13 @@ class SchemeMigrationTest {
         for (text in listOf("", "# ShuangpinProfile=Xiaohe\nPageSize=5\n", "PageSize=5\n")) {
             val options = read(text)
             assertNull(text, options.schemeMigrated)
-            assertEquals(text, EngineSettings.XIAOHE, options.toSettings().shuangpin)
+            assertEquals(text, EngineSettings.XIAOHE, options.toSettings(ModelLevel.HIGH).shuangpin)
         }
         // the option's default resets it; written, the default is left out (fcitx's way)
         val pinned = read("", upgrade = true)
         val page = pinned.page(InputMethodCatalog.SHUANGPIN)!!.apply { this[EngineSettings.SHUANGPIN_PROFILE].value = "" }
         assertTrue(pinned.setPage(InputMethodCatalog.SHUANGPIN, page))
-        assertEquals(EngineSettings.XIAOHE, pinned.toSettings().shuangpin)
+        assertEquals(EngineSettings.XIAOHE, pinned.toSettings(ModelLevel.HIGH).shuangpin)
         assertTrue(pinned.page(InputMethodCatalog.SHUANGPIN)!![EngineSettings.SHUANGPIN_PROFILE].implicit)
         assertTrue(EngineOptions().text().lines().contains("# ShuangpinProfile=Xiaohe"))
     }
@@ -43,12 +43,12 @@ class SchemeMigrationTest {
         for (text in listOf("", "# ShuangpinProfile=Ziranma\nPageSize=5\n", "PageSize=5\n")) {
             val options = read(text, upgrade = true)
             assertEquals(text, SchemeMigration.Outcome(EngineSettings.ZIRANMA), options.schemeMigrated)
-            assertEquals(text, EngineSettings.ZIRANMA, options.toSettings().shuangpin)
+            assertEquals(text, EngineSettings.ZIRANMA, options.toSettings(ModelLevel.HIGH).shuangpin)
             // written explicitly (not the default now), so a later read, settled, says 自然码 too
             assertTrue(text, options.text().lines().contains("ShuangpinProfile=Ziranma"))
             val again = read(options.text())
             assertNull(text, again.schemeMigrated)
-            assertEquals(text, EngineSettings.ZIRANMA, again.toSettings().shuangpin)
+            assertEquals(text, EngineSettings.ZIRANMA, again.toSettings(ModelLevel.HIGH).shuangpin)
             assertNull(text, read(options.text(), upgrade = true).schemeMigrated)
         }
     }
@@ -59,7 +59,7 @@ class SchemeMigrationTest {
             for (upgrade in listOf(false, true)) {
                 val options = read("ShuangpinProfile=$name\n", upgrade)
                 assertNull(name, options.schemeMigrated)
-                assertEquals(name, name, options.toSettings().shuangpin)
+                assertEquals(name, name, options.toSettings(ModelLevel.HIGH).shuangpin)
             }
         }
         assertEquals(listOf(EngineSettings.ZIRANMA, "MS", EngineSettings.XIAOHE), EngineSettings.SCHEMES.keys.toList())
@@ -74,12 +74,12 @@ class SchemeMigrationTest {
             for (upgrade in listOf(false, true)) {
                 val options = read("ShuangpinProfile=$quoted\nPageSize=5\n", upgrade)
                 assertEquals(name, SchemeMigration.Outcome(EngineSettings.XIAOHE, retired = name), options.schemeMigrated)
-                assertEquals(name, EngineSettings.XIAOHE, options.toSettings().shuangpin)
-                assertEquals(name, 5, options.toSettings().pageSize)
+                assertEquals(name, EngineSettings.XIAOHE, options.toSettings(ModelLevel.HIGH).shuangpin)
+                assertEquals(name, 5, options.toSettings(ModelLevel.HIGH).pageSize)
                 // written so (the default: left out), read again: nothing more to do
                 val again = read(options.text())
                 assertNull(name, again.schemeMigrated)
-                assertEquals(name, EngineSettings.XIAOHE, again.toSettings().shuangpin)
+                assertEquals(name, EngineSettings.XIAOHE, again.toSettings(ModelLevel.HIGH).shuangpin)
             }
         }
     }
@@ -89,10 +89,10 @@ class SchemeMigrationTest {
         assertRows(listOf("" to "empty", "Foo" to "no scheme, current or retired"), { "${it.first}: ${it.second}" }) { (stored, _) ->
             val options = read("ShuangpinProfile=$stored\n", upgrade = true)
             assertEquals(SchemeMigration.Outcome(EngineSettings.ZIRANMA), options.schemeMigrated)
-            assertEquals(EngineSettings.ZIRANMA, options.toSettings().shuangpin)
+            assertEquals(EngineSettings.ZIRANMA, options.toSettings(ModelLevel.HIGH).shuangpin)
             val settled = read("ShuangpinProfile=$stored\n")
             assertNull(settled.schemeMigrated)
-            assertEquals(EngineSettings.XIAOHE, settled.toSettings().shuangpin)
+            assertEquals(EngineSettings.XIAOHE, settled.toSettings(ModelLevel.HIGH).shuangpin)
         }
     }
 }

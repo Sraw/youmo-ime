@@ -15,6 +15,8 @@
 # ime=engine-pinyin, which hands them on), each as its keyboard sends them. HISTORY=<words.txt> types on that history,
 # words typed before the run as ime-eval's --history reads them (`ime-eval history <pinyin.data> <n> <words.txt>` makes
 # one of the dictionary's likeliest n): pushed to the app's eval dir, it replaces the app's learning record (EngineEvalRunner).
+# LEVEL=low|medium|high types at that 性能档位 with no emoji (the app's put back after it) into <set>-<ime>-<level>.tsv. A set given as a
+# path to a .tsv (one ime-eval made, as tier-guard.sh --device does) is pushed to the eval dir and typed from there.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -22,6 +24,13 @@ SET=${1:-pinyin}
 IME=${2:-engine-pinyin}
 PKG=${FCITX_PKG:-io.github.sraw.youmo.debug}
 OUT=${3:-$HERE/build/eval}
+SET_FILE=
+if [[ $SET == *.tsv ]]; then
+    [ -f "$SET" ] || { echo "$SET: no such set" >&2; exit 1; }
+    SET_FILE="$(cd "$(dirname "$SET")" && pwd)/$(basename "$SET")"
+    SET=$(basename "$SET" .tsv)
+fi
+case "${LEVEL:-}" in ''|low|medium|high) ;; *) echo "LEVEL=$LEVEL: one of low, medium, high" >&2; exit 1 ;; esac
 
 # a history named from where the script was called, before it moves to the repo
 if [ -n "${HISTORY:-}" ]; then
@@ -64,9 +73,13 @@ if [[ $(keyboard) == "$PKG/"* ]]; then
     fi
 fi
 EVAL_DIR="/sdcard/Android/data/$PKG/files/eval"
-REMOTE="$EVAL_DIR/$SET-$IME.tsv"
+REMOTE="$EVAL_DIR/$SET-$IME${LEVEL:+-$LEVEL}.tsv"
 # a failed run must not leave the previous result behind to be pulled as this one
 adb shell rm -f "$REMOTE"
+if [ -n "$SET_FILE" ]; then
+    adb shell mkdir -p "$EVAL_DIR"
+    adb push "$SET_FILE" "$EVAL_DIR/$SET.tsv" >/dev/null
+fi
 HISTORY_NAME=
 if [ -n "${HISTORY:-}" ]; then
     # the runner reads <name>.txt from its eval dir before its test assets (R27 F8530)
@@ -79,13 +92,14 @@ fi
 # am instrument exits 0 even when the run fails; its report is what tells
 REPORT=$(adb shell am instrument -w -e class org.fcitx.fcitx5.android.EngineEvalRunner \
     -e evalSet "$SET" -e evalIme "$IME" ${NINE:+-e evalNine true} ${GROUPED:+-e evalGrouped "$GROUPED"} \
-    ${HISTORY_NAME:+-e evalHistory "$HISTORY_NAME"} "$PKG.test/androidx.test.runner.AndroidJUnitRunner")
-# not left to be read by a later run that names the same history in the assets
+    ${HISTORY_NAME:+-e evalHistory "$HISTORY_NAME"} ${LEVEL:+-e evalLevel "$LEVEL"} "$PKG.test/androidx.test.runner.AndroidJUnitRunner")
+# not left to be read by a later run that names the same history or set in the assets
 [ -z "$HISTORY_NAME" ] || adb shell rm -f "$EVAL_DIR/$HISTORY_NAME.txt"
+[ -z "$SET_FILE" ] || adb shell rm -f "$EVAL_DIR/$SET.tsv"
 if ! grep -q "^OK (1 test)" <<<"$REPORT"; then
     echo "$REPORT" >&2
     exit 1
 fi
 mkdir -p "$OUT"
 adb pull "$REMOTE" "$OUT/" >/dev/null
-echo "$OUT/$SET-$IME.tsv"
+echo "$OUT/$SET-$IME${LEVEL:+-$LEVEL}.tsv"

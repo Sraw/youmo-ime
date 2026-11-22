@@ -225,6 +225,9 @@ class KotlinHost(
 
     override suspend fun reloadConfig() = onHost { readModuleFiles() }
     override suspend fun reloadEngine() = withContext(dispatcher) { bridge.reload() }
+
+    /** What the engine types with now: EngineEvalRunner's run compares with ime-eval's only where they agree. */
+    internal suspend fun engineSettings() = withContext(dispatcher) { bridge.engines.settings }
     override suspend fun userWords() = withContext(dispatcher) { bridge.engines.userWords() }
     override suspend fun userWords(kind: UserWord.Kind) = withContext(dispatcher) { bridge.engines.userWords(kind) }
     override suspend fun userWordCounts() = withContext(dispatcher) { bridge.engines.userWordCounts() }
@@ -283,8 +286,6 @@ class KotlinHost(
     }
 
     override suspend fun offerInk(reading: InkReading, piece: Int) = onHost { inkKey(Action.Ink(piece, reading)) }
-
-    override suspend fun inkFinished(piece: Int) = onHost { inkKey(Action.Ink(piece)) }
 
     override suspend fun rememberWord(id: Int, index: Int, before: String) = onHost { sendVirtual(Keyboard.REMEMBER, Action.Remember(id, index, before)) }
 
@@ -525,7 +526,7 @@ class KotlinHost(
         val wasFirstRun = firstRun
         val made = HostCore(
             engine.host, dispatcher, retired.profile, available, strings, firstRun = wasFirstRun,
-            showInputMethodInformation = showInputMethodInformation, persist = ::persist, modules = chinese::build,
+            autoLevel = ThisDevice.profile.autoLevel, showInputMethodInformation = showInputMethodInformation, persist = ::persist, modules = chinese::build,
         )
         made.events += HostEvents(::forward)
         made.configure(options)

@@ -140,8 +140,8 @@
 <!-- learning: U-88 -->
 - **前提**：B0，按 PY-54 在「他」后面连着选两次「点了」；在表情面板里点「😀」；然后打 s h i，长按第五个候选（记作 C）选 **固定首位**。
 - **操作**：点 **⋯ → 清掉最近**，选 **最近 1 小时**，读确认框，确认；回到框里，接着打「他」，点 d l；点 ⌫，点 s h i；打开表情面板。再从 B0 起一遍（刚重置，学习记录里只有接下来打的字）：按 PY-54 在「他」后面连着选两次「点了」，不固定、不屏蔽，同样清掉最近 1 小时；接着打「他」，点 d l；强行停止输入法，再打「他」，点 d l。
-- **预期**：确认框写明清掉以后不能"退回恢复前"；确认后键盘上方提示「已清掉」；「他 dl」第一个是「带来」，「点了」也不在第二（这段时间的选择都忘了）；shi 第一个仍是 C（主动做的固定不撤）；表情面板的"最近使用"里没有「😀」。第二遍（记录里只有这段时间的字）同样清掉：「他 dl」第一个是「带来」，提示「已清掉」；强行停止后再打仍是「带来」（文件里也没了，不是只从内存里拿掉）。
-- **JVM**：`PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins`（:lib:ime-eval:uatTest，真数据）（清掉最近 1 小时后他 dl 第一是带来、点了不在第二，shi 第一仍 C。表情最近使用的清除由 RecentlyUsedTest，确认框文字是界面）、ime-core `LearningControlTest.aClearOfAllTheRecordHoldsEmptiesIt`（记录里只有清掉的这段时：清掉后内存里没有，重读文件也没有，之后接着记、重读得到）；设备上不跑。
+- **预期**：确认框写明清掉以后不能"退回恢复前"；确认后键盘上方提示「已清掉」；「他 dl」第一个是「的脸」，「点了」也不在第二（这段时间的选择都忘了）；shi 第一个仍是 C（主动做的固定不撤）；表情面板的"最近使用"里没有「😀」。第二遍（记录里只有这段时间的字）同样清掉：「他 dl」第一个是「的脸」，提示「已清掉」；强行停止后再打仍是「的脸」（文件里也没了，不是只从内存里拿掉）。
+- **JVM**：`PrivacyUatTest.clearingTheLastHourForgetsItsPicksNotThePins`（:lib:ime-eval:uatTest，真数据）（清掉最近 1 小时后他 dl 第一是的脸、点了不在第二，shi 第一仍 C。表情最近使用的清除由 RecentlyUsedTest，确认框文字是界面）、ime-core `LearningControlTest.aClearOfAllTheRecordHoldsEmptiesIt`（记录里只有清掉的这段时：清掉后内存里没有，重读文件也没有，之后接着记、重读得到）；设备上不跑。
 
 ### PR-72 [P1] 清掉最近：这段时间里码表记住的词一起删掉，之前的留下
 <!-- learning: U-88 U-28 -->
@@ -169,8 +169,8 @@
 <!-- learning: U-86 C25 -->
 - **前提**：B0，按 PY-54 在「他」后面连着选两次「点了」，确认 **用户词库 → 学习备份** 的列表里有这次安装的自动备份（第一个打字日就存了一份）。
 - **操作**：**清空学到的**（不勾全部清空）；在 **用户词库 → 学习备份** 的列表里点这次安装的自动备份，选 **恢复**；回测试页接着打「他」，点 d l。
-- **预期**：清空后列表里这次安装的旧备份没了，只剩一份清空后的；恢复后提示"已恢复"；恢复它以后「他 dl」第一个仍是「带来」。
-- **JVM**：`PrivacyUatTest.clearedThenRestoredFromThisInstallsBackupBringsNothingBack`（:lib:ime-eval:uatTest，真数据）（清空后这次安装的自动备份换成新的一份，恢复它后他 dl 第一仍是带来）；设备上不跑。
+- **预期**：清空后列表里这次安装的旧备份没了，只剩一份清空后的；恢复后提示"已恢复"；恢复它以后「他 dl」第一个仍是「的脸」。
+- **JVM**：`PrivacyUatTest.clearedThenRestoredFromThisInstallsBackupBringsNothingBack`（:lib:ime-eval:uatTest，真数据）（清空后这次安装的自动备份换成新的一份，恢复它后他 dl 第一仍是的脸）；设备上不跑。
 
 ### PR-27 [P1] 自动备份：第一个打字日就有一份，能删
 <!-- learning: U-106 D31 -->

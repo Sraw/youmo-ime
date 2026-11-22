@@ -144,14 +144,13 @@ class EnginesOwnKeysTest : EnginesFixture() {
             assertEquals(ni.preedit, out.preedit)
             assertEquals(ni.candidates, out.candidates)
         }
-        // a pick (space) or a refine the snapshot before had is not the swallowed key's
+        // a pick (space) the snapshot before had is not the swallowed key's
         val picked = engines.onEvent(PINYIN, EngineEvent.CHAR, ' '.code)
         assertTrue(picked.toString(), picked.picked)
         val after = engines.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code)
         assertTrue(after.handled)
         assertEquals("", after.commit)
         assertFalse(after.picked)
-        assertFalse(after.refines)
         val none = engines(ownKeys = listOf("ab", "cd"), files = MemoryFiles())
         assertEquals("", none.onEvent(PINYIN, EngineEvent.CHAR, code("bn").code).commit)
         none.close()

@@ -37,7 +37,6 @@ class InkKeysTest {
                 }
             },
             { _, _ -> },
-            {},
         )
 
         fun stroke(at: Float) {

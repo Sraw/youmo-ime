@@ -90,7 +90,8 @@ class EvalSetTest {
 
     @Test
     fun everySetParses() {
-        val sets = File("data").listFiles { file -> file.name.endsWith(".tsv") }!!
+        // the tier guard's baseline sits by the sets it counts, and is its numbers, not a set
+        val sets = File("data").listFiles { file -> file.name.endsWith(".tsv") && file.name != "tier-baseline.tsv" }!!
         assertTrue(sets.any { it.name == "pinyin-chat.tsv" })
         for (set in sets) assertTrue(set.name, set.useLines { EvalSet.parse(it) }.isNotEmpty())
         // 联想's sets are context<TAB>next, apart from the input sets

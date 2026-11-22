@@ -88,8 +88,8 @@ class EngineReplay(
             crash = crash ?: e
             throw e
         }.also { s ->
-                // KeyRouter.send's rule: a refine slice or a tap that changed nothing leaves the panel as it is
-                if ((event != EngineEvent.REFINE && event != EngineEvent.CURSOR) || s.handled) panel = s
+                // KeyRouter.send's rule: a tap that changed nothing leaves the panel as it is
+                if (event != EngineEvent.CURSOR || s.handled) panel = s
             }
         override fun candidates(im: String, from: Int, count: Int): List<Choice> = this@EngineReplay.engines.candidates(im, from, count)
         override fun offers(im: String, index: Int): Set<Offer> = this@EngineReplay.engines.offers(im, index)
@@ -319,7 +319,7 @@ class EngineReplay(
         pause()
     }
 
-    /** The user pauses: the refine timer runs out, each slice that changed something shown. */
+    /** The user pauses: the host's timers run out. */
     fun pause() {
         clock.advance(PAUSE_MILLIS)
         // the engines' uptime too, as HostReplay's waits move it (a table's space taken runs out)

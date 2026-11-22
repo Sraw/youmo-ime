@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.host.KeySyms
-import org.fcitx.fcitx5.android.host.Refiner
 import org.fcitx.fcitx5.android.eval.parity.Sequence
 import org.fcitx.fcitx5.android.eval.parity.Step
 import org.junit.Assert.assertEquals
@@ -160,21 +159,6 @@ class HostReplayUatTest {
         assertEquals("hello ", text)
     }
 
-    @Test
-    fun theRefineTimerRunsOnThePause() = with(HostReplay()) {
-        "womenyiqiqugongyuan".codePoints().forEach { key(it) }
-        // the keys typed with no pause: the router's refine timer set, not run yet
-        assertTrue("no refine timer after the keys", clock.pending > 0)
-        val refinesBefore = refines
-        pause()
-        // the timer that ran was the refine's: its guards (focus, the same input method, the engine's list) let it through
-        assertTrue("no refine slice sent on the pause", refines > refinesBefore)
-        // nothing cancelled it meanwhile: the pause ran it out slice after slice (each refining slice sets the next)
-        assertEquals("timers left after the pause", 0, clock.pending)
-        space()
-        assertTrue("committed $text", text.isNotEmpty())
-    }
-
     // a word corrected, offered again on a tap; no uat/ case of its own (EN-11 taps into the corrected word), so no @Uat
     @Test
     fun aTapAfterACorrectionOffersTheWordTypedThroughTheRecallKey() = with(HostReplay(im = InputMethodCatalog.ENGLISH)) {
@@ -222,7 +206,7 @@ class HostReplayUatTest {
         pick("点了"); type(".")
         type("ta"); pick("他"); type("dl")
         val second = candidates.take(SHOWN)
-        assertEquals("first of $first", "带来", first.first())
+        assertEquals("first of $first", "的脸", first.first())
         assertTrue("点了 before 带领 in $first", "点了" in first && "带领" in first && first.indexOf("点了") < first.indexOf("带领"))
         assertEquals("first of $second", "点了", second.first())
     }
@@ -342,8 +326,7 @@ class HostReplayUatTest {
     fun keysTypedTogetherAreTappedApartAsTheDevicesDriverTapsThem() = with(HostReplay(engines = UatEngines.fresh(), im = InputMethodCatalog.PINYIN)) {
         val start = clock.uptimeMillis()
         pinyinNine("94")
-        // 200 ms between the two taps, as an `input tap` takes: the refine's pause runs out between them
-        assertTrue(200L > Refiner.PAUSE_MILLIS)
+        // 200 ms between the two taps, as an `input tap` takes
         assertEquals(200L + 5_000L, clock.uptimeMillis() - start)
     }
 

@@ -732,8 +732,8 @@ class Device:
         raise Blocked("uiautomator dump failed")
 
     def idle(self, timeout=10):
-        """wait till the debug build reports idle (UatIdleProvider: no fcitx job, refine or background
-        work, the main queue empty) twice running: a key `input` may not have arrived at the first.
+        """wait till the debug build reports idle (UatIdleProvider: no fcitx job or background work,
+        the main queue empty) twice running: a key `input` may not have arrived at the first.
         A release build is taken as idle; a debug build still busy at timeout reads anyway. A query
         with no answer (adb error, provider not yet published) is not idle: tried again"""
         if BUILD == "release":
@@ -1133,7 +1133,7 @@ class Device:
 
     def cands(self, timeout=8, want=None):
         """the candidate bar, waiting for it to show (and, with want, to contain want), once the
-        input method is idle: the first candidate a refine changes is not read before it"""
+        input method is idle"""
         self.idle()
         end = time.time() + timeout
         c = []

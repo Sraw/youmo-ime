@@ -6,7 +6,6 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
-import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -62,13 +61,6 @@ class HostReplay(
     private val firstField: String = "field1",
 ) {
     val clock = VirtualHostClock()
-
-    /** The engine's time per refine slice and per other event: a device's pace (declared before init, which already uses it). */
-    var refineMillis = 0L
-    var keyMillis = 0L
-
-    var refines = 0
-        private set
 
     // the router catches an engine throw (KeyRouter.call) and goes on: rethrown after the key or at the next pause
     private var crash: Throwable? = null
@@ -128,10 +120,7 @@ class HostReplay(
                 throw e
             }
         override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot =
-            caught { engines.onEvent(im, event, arg, learning, payload) }.also {
-                if (event == EngineEvent.REFINE) refines++
-                clock.spend(if (event == EngineEvent.REFINE) refineMillis else keyMillis)
-            }
+            caught { engines.onEvent(im, event, arg, learning, payload) }
         override fun candidates(im: String, from: Int, count: Int): List<Choice> = caught { engines.candidates(im, from, count) }
         override fun offers(im: String, index: Int): Set<Offer> = caught { engines.offers(im, index) }
         override fun settings(settings: EngineSettings) = Unit
@@ -293,15 +282,7 @@ class HostReplay(
         pause()
     }
 
-    fun typeAt(keys: String, gapMillis: Long) {
-        keys.codePoints().forEach {
-            key(it)
-            advance(gapMillis)
-        }
-        pause()
-    }
-
-    /** [keys] tapped one by one as a device's driver does: each refine runs out before the next key, as the sentences depend on. */
+    /** [keys] tapped one by one as a device's driver does, then a pause. */
     fun type(keys: String) {
         keys.codePoints().toArray().forEachIndexed { i, key ->
             if (i > 0) advance(TAP_MILLIS)

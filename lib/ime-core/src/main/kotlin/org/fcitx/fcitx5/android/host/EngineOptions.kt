@@ -61,7 +61,7 @@ class EngineOptions {
     private val emoji = Option(EngineSettings.EMOJI, Flag, TRUE)
     private val chaizi = Option(EngineSettings.CHAIZI, Flag, TRUE)
     private val builtInPhrases = Option(EngineSettings.BUILT_IN_PHRASES, Flag, TRUE)
-    private val modelLevel = Option(EngineSettings.MODEL_LEVEL, Names(ModelLevel.entries.map { it.key }), ModelLevel.HIGH.key)
+    private val modelLevel = Option(EngineSettings.MODEL_LEVEL, Names(ModelChoice.entries.map { it.key }), ModelChoice.AUTO.key)
     private val latinWords = Option(EngineSettings.LATIN_WORDS, Flag, TRUE)
     private val englishSuggest = Option(EngineSettings.ENGLISH_SUGGEST, Flag, TRUE)
     private val candidateReading = Option(EngineSettings.CANDIDATE_READING, Names(ReadingStyle.entries.map { it.key }), ReadingStyle.OFF.key)
@@ -182,8 +182,8 @@ class EngineOptions {
     /** As `safeSaveAsIni` writes it but for the description comments. */
     fun text(): String = IniFile.write(save())
 
-    /** Every value, defaults too; the nine keys' letters are the app's to merge in. */
-    fun toSettings(): EngineSettings {
+    /** Every value, defaults too, [ModelChoice.AUTO] as [auto]; the nine keys' letters are the app's to merge in. */
+    fun toSettings(auto: ModelLevel): EngineSettings {
         fun flag(path: String) = values.getValue(path) == TRUE
         return EngineSettings(
             shuangpin = values.getValue(shuangpin.key),
@@ -196,7 +196,7 @@ class EngineOptions {
             chaizi = flag(chaizi.key),
             builtInPhrases = flag(builtInPhrases.key),
             pageSize = pageSizeValue,
-            modelLevel = ModelLevel.entries.first { it.key == values.getValue(modelLevel.key) },
+            modelLevel = ModelChoice.of(values.getValue(modelLevel.key)).level ?: auto,
             latinWords = flag(latinWords.key),
             tables = tables.values.associate { group ->
                 group.key to TableSettings(
@@ -277,5 +277,18 @@ class EngineOptions {
         )
 
         private fun flag(on: Boolean) = if (on) TRUE else FALSE
+    }
+}
+
+/** 性能档位 as the config and the settings page have it; [AUTO], the device's, never reaches the engine ([EngineOptions.toSettings]). */
+enum class ModelChoice(val key: String, val level: ModelLevel?) {
+    AUTO("Auto", null),
+    LOW("Low", ModelLevel.LOW),
+    MEDIUM("Medium", ModelLevel.MEDIUM),
+    HIGH("High", ModelLevel.HIGH),
+    ;
+
+    companion object {
+        fun of(key: String): ModelChoice = entries.firstOrNull { it.key == key } ?: AUTO
     }
 }

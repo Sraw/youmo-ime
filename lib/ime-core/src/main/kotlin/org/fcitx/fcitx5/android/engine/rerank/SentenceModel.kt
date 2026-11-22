@@ -7,8 +7,6 @@ package org.fcitx.fcitx5.android.engine.rerank
 import org.fcitx.fcitx5.android.core.CoreLog
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.sqrt
 
 /**
@@ -26,6 +24,8 @@ class SentenceModel private constructor(
     val license: String,
     /** Whose text the weights were trained on: travels with them. */
     val attribution: String,
+    // gelu and the log-sums: float formulas every kernel computes to the same bits
+    private val kernel: MatrixKernel,
 ) {
     class Config(val vocab: Int, val layers: Int, val heads: Int, val width: Int, val window: Int)
 
@@ -59,14 +59,21 @@ class SentenceModel private constructor(
         internal var summed = false
     }
 
-    /** [next]'s working arrays, overwritten at each position. */
-    internal class Scratch(config: Config) {
-        val y = FloatArray(config.width)
-        val qkv = FloatArray(3 * config.width)
-        val hidden = FloatArray(4 * config.width)
+    // [nextMany]'s and [logSums]'s working arrays, grown as needed, per thread (ime-eval shares a model)
+    private class Work(config: Config) {
+        val one = FloatArray(config.width)
+        val oneQkv = FloatArray(3 * config.width)
         val att = FloatArray(config.window)
-        val add = FloatArray(config.width)
+        var y = FloatArray(0)
+        var qkv = FloatArray(0)
+        var hidden = FloatArray(0)
+        var add = FloatArray(0)
+        var normed = FloatArray(0)
+        var logits = FloatArray(0)
+        var sums = FloatArray(0)
     }
+
+    private val work = ThreadLocal.withInitial { Work(config) }
 
     private val index: Map<Char, Int> = HashMap<Char, Int>().apply {
         vocab.forEachIndexed { id, s -> if (s.length == 1 && id > BOS) put(s[0], id) }
@@ -92,44 +99,81 @@ class SentenceModel private constructor(
         return out.copyOf(n)
     }
 
-    fun next(parent: Node?, token: Int): Node = next(parent, token, Scratch(config))
+    internal fun next(parent: Node?, token: Int): Node = nextMany(listOf(parent), intArrayOf(-1), intArrayOf(token))[0]
 
-    private fun next(parent: Node?, token: Int, scratch: Scratch): Node {
-        val position = (parent?.position ?: -1) + 1
-        require(position < config.window) { "past the model's window" }
-        require(token in 0 until config.vocab) { "no token $token" }
+    /**
+     * [tokens] after their parents at once, layer by layer, each weight matrix read once for all: the j-th after
+     * `parents[j]`, or after the `pending[j]`-th new node where that is 0 or more. A node holds the same floats
+     * whatever else runs with it, as every step works on one vector at a time.
+     */
+    @Suppress("LongMethod")
+    internal fun nextMany(parents: List<Node?>, pending: IntArray, tokens: IntArray): List<Node> {
+        val m = tokens.size
+        if (m == 0) return emptyList()
         val width = config.width
-        val chain = arrayOfNulls<Node>(position)
-        var n = parent
-        while (n != null) {
-            chain[n.position] = n
-            n = n.parent
+        val nodes = ArrayList<Node>(m)
+        val chains = ArrayList<Array<Node?>>(m)
+        for (j in 0 until m) {
+            val parent = if (pending[j] >= 0) nodes[pending[j]] else parents[j]
+            val position = (parent?.position ?: -1) + 1
+            require(position < config.window) { "past the model's window" }
+            require(tokens[j] in 0 until config.vocab) { "no token ${tokens[j]}" }
+            val chain = arrayOfNulls<Node>(position)
+            var n = parent
+            while (n != null) {
+                chain[n.position] = n
+                n = n.parent
+            }
+            val x = FloatArray(width)
+            tok.row(tokens[j], x)
+            for (i in 0 until width) x[i] += pos[position * width + i]
+            nodes += Node(parent, tokens[j], position, Array(config.layers) { FloatArray(width) }, Array(config.layers) { FloatArray(width) }, x)
+            chains += chain
         }
-        val x = FloatArray(width)
-        tok.row(token, x)
-        for (i in 0 until width) x[i] += pos[position * width + i]
-        val keys = Array(config.layers) { FloatArray(width) }
-        val values = Array(config.layers) { FloatArray(width) }
-        val y = scratch.y
-        val qkv = scratch.qkv
-        val hidden = scratch.hidden
-        val att = scratch.att
-        val add = scratch.add
+        val w = work.get()
+        if (w.y.size < m * width) {
+            w.y = FloatArray(m * width)
+            w.qkv = FloatArray(m * 3 * width)
+            w.hidden = FloatArray(m * 4 * width)
+            w.add = FloatArray(m * width)
+        }
+        val y = w.y
+        val qkv = w.qkv
+        val hidden = w.hidden
+        val add = w.add
+        val one = w.one
         for ((l, b) in blocks.withIndex()) {
-            layerNorm(x, b.ln1, y)
-            b.qkv.apply(y, b.qkvBias, qkv)
-            System.arraycopy(qkv, width, keys[l], 0, width)
-            System.arraycopy(qkv, 2 * width, values[l], 0, width)
-            attend(qkv, chain, l, keys[l], values[l], att, y)
-            b.proj.times(y, add)
-            for (o in 0 until width) x[o] += add[o] + b.projBias[o]
-            layerNorm(x, b.ln2, y)
-            b.fc.apply(y, b.fcBias, hidden)
-            for (i in hidden.indices) hidden[i] = gelu(hidden[i])
-            b.out.times(hidden, add)
-            for (o in 0 until width) x[o] += add[o] + b.outBias[o]
+            for (j in 0 until m) {
+                layerNorm(nodes[j].out, b.ln1, one)
+                System.arraycopy(one, 0, y, j * width, width)
+            }
+            b.qkv.applyMany(y, m, b.qkvBias, qkv)
+            // every new node's keys before any attends: a node may follow another of this batch
+            for (j in 0 until m) {
+                System.arraycopy(qkv, j * 3 * width + width, nodes[j].keys[l], 0, width)
+                System.arraycopy(qkv, j * 3 * width + 2 * width, nodes[j].values[l], 0, width)
+            }
+            for (j in 0 until m) {
+                System.arraycopy(qkv, j * 3 * width, w.oneQkv, 0, 3 * width)
+                attend(w.oneQkv, chains[j], l, nodes[j].keys[l], nodes[j].values[l], w.att, one)
+                System.arraycopy(one, 0, y, j * width, width)
+            }
+            b.proj.timesMany(y, m, add)
+            for (j in 0 until m) {
+                val x = nodes[j].out
+                for (o in 0 until width) x[o] += add[j * width + o] + b.projBias[o]
+                layerNorm(x, b.ln2, one)
+                System.arraycopy(one, 0, y, j * width, width)
+            }
+            b.fc.applyMany(y, m, b.fcBias, hidden)
+            kernel.geluF(hidden, m * 4 * width)
+            b.out.timesMany(hidden, m, add)
+            for (j in 0 until m) {
+                val x = nodes[j].out
+                for (o in 0 until width) x[o] += add[j * width + o] + b.outBias[o]
+            }
         }
-        return Node(parent, token, position, keys, values, x)
+        return nodes
     }
 
     /** Causal attention of layer [l]: [qkv]'s query over [chain] and itself, into [out]. */
@@ -152,7 +196,7 @@ class SentenceModel private constructor(
             }
             var sum = 0f
             for (s in 0..last) {
-                att[s] = exp(att[s] - max)
+                att[s] = expF(att[s] - max)
                 sum += att[s]
             }
             for (s in 0..last) {
@@ -173,19 +217,34 @@ class SentenceModel private constructor(
     fun logit(node: Node, token: Int): Float = tok.dot(normed(node), token)
 
     /** The softmax's log-denominator after [node]: every token's logit, the costliest part, done once per node. */
-    fun logSum(node: Node): Float = if (node.summed) node.logSum else logSum(node, FloatArray(config.vocab))
-
-    private fun logSum(node: Node, logits: FloatArray): Float {
-        if (node.summed) return node.logSum
-        val normed = normed(node)
-        tok.times(normed, logits)
-        var max = Float.NEGATIVE_INFINITY
-        for (v in 0 until config.vocab) if (logits[v] > max) max = logits[v]
-        var sum = 0.0
-        for (v in 0 until config.vocab) sum += exp((logits[v] - max).toDouble())
-        node.logSum = max + ln(sum).toFloat()
-        node.summed = true
+    fun logSum(node: Node): Float {
+        logSums(listOf(node))
         return node.logSum
+    }
+
+    /** [logSum] of each of [nodes] not yet summed, the vocabulary's matrix read once per [SUM_ROWS] of them. */
+    internal fun logSums(nodes: List<Node>) {
+        val todo = nodes.filter { !it.summed }.distinct()
+        if (todo.isEmpty()) return
+        val width = config.width
+        val w = work.get()
+        // bounded: the logits stay with the thread for good, and a row's sum is the same in any batch
+        val rows = minOf(todo.size, SUM_ROWS)
+        if (w.sums.size < rows) {
+            w.sums = FloatArray(rows)
+            w.normed = FloatArray(rows * width)
+            w.logits = FloatArray(rows * config.vocab)
+        }
+        for (from in todo.indices step SUM_ROWS) {
+            val m = minOf(SUM_ROWS, todo.size - from)
+            for (j in 0 until m) System.arraycopy(normed(todo[from + j]), 0, w.normed, j * width, width)
+            tok.timesMany(w.normed, m, w.logits)
+            kernel.logSumsF(w.logits, m, config.vocab, w.sums)
+            for (j in 0 until m) {
+                todo[from + j].logSum = w.sums[j]
+                todo[from + j].summed = true
+            }
+        }
     }
 
     fun logProb(node: Node, token: Int): Float = logit(node, token) - logSum(node)
@@ -193,13 +252,12 @@ class SentenceModel private constructor(
     // a node's per-layer keys and values, its output and normed output
     private fun nodeFloats() = 2 * config.layers * config.width + 2 * config.width
 
-    /** Scores readings after one context, a keystroke at a time: nodes run are kept by token prefix for the next reading, keystroke and continued context. */
+    /**
+     * Scores readings after one context, a keystroke at a time: nodes run are kept by token prefix for the next
+     * reading, keystroke and continued context. What is kept changes the time only, never a score.
+     */
     inner class Scorer(room: Int = ROOM, private val limit: Int = KEPT_FLOATS / nodeFloats()) {
         private val maxContext = maxOf(0, window - 1 - room)
-
-        // working arrays, made once
-        private val scratch = Scratch(config)
-        private val allLogits = FloatArray(config.vocab)
 
         private val bos get() = this@SentenceModel.bos
 
@@ -214,57 +272,101 @@ class SentenceModel private constructor(
             var node: Node? = null
         }
 
-        // positions run and denominators taken in this call: the costly parts
-        private var spent = 0
-        private var budget = Int.MAX_VALUE
-
-        private fun nodeOf(step: Step): Node? =
-            step.node ?: if (spent++ >= budget) null else next(step.parent, step.token, scratch).also { step.node = it }
-
-        private fun denominator(node: Node): Float? =
-            if (node.summed) node.logSum else if (spent++ >= budget) null else logSum(node, allLogits)
-
         private val kept = HashMap<String, Step>()
 
         // [kept]'s key: the reading's tokens up to [token] as chars (ids are below 2^16)
         private fun key(tokens: StringBuilder, token: Int): String = tokens.append(token.toChar()).toString()
 
-        /** Each reading's log-probability after [context] (as much as fits the window); -infinity for an empty one. [relative] drops what all share, enough to compare them cheaply. */
-        fun score(context: String, readings: List<String>, relative: Boolean = false): FloatArray =
-            within(context, readings, relative, Int.MAX_VALUE)!!
-
-        /** As [score], or null past [budget]; work is kept so the next keystroke resumes it, readings advancing a position each in turn. */
-        fun within(context: String, readings: List<String>, relative: Boolean, budget: Int): FloatArray? {
-            this.budget = budget
-            spent = 0
-            val first = start(context) ?: return null
+        /**
+         * Each reading's log-probability after [context] (as much as fits the window); -infinity for an empty one.
+         * [relative] drops what all share, enough to compare them cheaply. The new positions of all readings run
+         * together, as do their denominators: each weight matrix is read once per call.
+         */
+        fun score(context: String, readings: List<String>, relative: Boolean = false): FloatArray {
+            val first = start(context)
             // the last token is only read, not run: one more fits
             val tokens = readings.map { r -> encode(r).let { it.copyOf(minOf(it.size, window - first.position)) } }
-            // dropping everything would make a scoring that exceeds the limit restart on every try
             if (kept.size > limit) keepOnly(tokens)
             val shared = if (relative) shared(tokens) else 0
+            val fresh = runNew(first, tokens)
+            logSums(parents(first, tokens, shared, fresh))
             val n = readings.size
             val keys = Array(n) { StringBuilder() }
-            val parents = Array(n) { first }
+            val at = Array(n) { first }
             val logits = FloatArray(n)
             val denominators = FloatArray(n)
+            // a position at a time across the readings, each sum in the same order whatever was kept
             for (t in 0 until (tokens.maxOfOrNull { it.size } ?: 0)) {
                 for (i in 0 until n) {
                     val reading = tokens[i]
                     if (t >= reading.size) continue
-                    val parent = parents[i]
+                    val parent = at[i]
                     val sum = logits[i]
-                    val step = kept.getOrPut(key(keys[i], reading[t])) { Step(parent, reading[t], sum + logit(parent, reading[t])) }
-                    if (t >= shared) denominators[i] += denominator(step.parent) ?: return null
+                    val k = key(keys[i], reading[t])
+                    val step = kept.getOrPut(k) { Step(parent, reading[t], sum + logit(parent, reading[t])) }
+                    if (step.node == null) step.node = fresh[k]
+                    if (t >= shared) denominators[i] += step.parent.logSum
                     logits[i] = step.logits
-                    if (t < reading.lastIndex) parents[i] = nodeOf(step) ?: return null
+                    if (t < reading.lastIndex) at[i] = step.node!!
                 }
             }
             return FloatArray(n) { if (tokens[it].isEmpty()) Float.NEGATIVE_INFINITY else logits[it] - denominators[it] }
         }
 
-        /** The node the readings follow; null if reaching it is past the budget. */
-        private fun start(context: String): Node? {
+        /** Reads [context] ahead of the first key (after a commit, on entering a field): what [score] would read, so the same scores either way. */
+        fun prewarm(context: String) {
+            start(context)
+        }
+
+        /** Runs together the nodes [tokens] go through that are not kept: each reading's positions before its last token, by key. */
+        private fun runNew(first: Node, tokens: List<IntArray>): Map<String, Node> {
+            val parents = ArrayList<Node?>()
+            val pending = ArrayList<Int>()
+            val run = ArrayList<Int>()
+            val index = HashMap<String, Int>()
+            for (reading in tokens) {
+                var parent = first
+                var pendingParent = -1
+                val keys = StringBuilder()
+                for (t in 0 until reading.lastIndex) {
+                    val k = key(keys, reading[t])
+                    val have = kept[k]?.node
+                    if (have != null) {
+                        parent = have
+                        pendingParent = -1
+                        continue
+                    }
+                    pendingParent = index.getOrPut(k) {
+                        parents += if (pendingParent >= 0) null else parent
+                        pending += pendingParent
+                        run += reading[t]
+                        run.size - 1
+                    }
+                }
+            }
+            val made = nextMany(parents, pending.toIntArray(), run.toIntArray())
+            return index.mapValues { made[it.value] }
+        }
+
+        /** The nodes whose denominators the scores add: each reading's parents from position [shared] on. */
+        private fun parents(first: Node, tokens: List<IntArray>, shared: Int, fresh: Map<String, Node>): List<Node> {
+            val needed = ArrayList<Node>()
+            for (reading in tokens) {
+                var parent = first
+                val keys = StringBuilder()
+                for (t in reading.indices) {
+                    if (t >= shared) needed += parent
+                    if (t < reading.lastIndex) {
+                        val k = key(keys, reading[t])
+                        parent = kept[k]?.node ?: fresh.getValue(k)
+                    }
+                }
+            }
+            return needed
+        }
+
+        /** The node the readings follow, the context's new positions run together. */
+        private fun start(context: String): Node {
             if (context != this.context) {
                 this.context = context
                 kept.clear()
@@ -273,9 +375,11 @@ class SentenceModel private constructor(
                 while (common < chain.size && common < target.size && chain[common].token == target[common]) common++
                 while (chain.size > common) chain.removeAt(chain.size - 1)
             }
-            while (chain.size < target.size) {
-                if (spent++ >= budget) return null
-                chain += next(chain.lastOrNull() ?: bos, target[chain.size], scratch)
+            if (chain.size < target.size) {
+                val from = chain.size
+                val count = target.size - from
+                val parents = List(count) { if (it == 0) chain.lastOrNull() ?: bos else null }
+                chain += nextMany(parents, IntArray(count) { it - 1 }, target.copyOfRange(from, target.size))
             }
             return chain.lastOrNull() ?: bos
         }
@@ -290,14 +394,11 @@ class SentenceModel private constructor(
             kept.keys.retainAll(needed)
         }
 
-        /** The tail of [context] to read: from where the previous read is found in it, if that fits; else all of it if it fits, or the last half of what fits. */
+        /**
+         * The tail of [context] to read: all of it if it fits, else the last half of what fits. From the context
+         * alone, never from what was read before, so a pick does not depend on what was typed or scored earlier.
+         */
         private fun target(context: IntArray): IntArray {
-            if (chain.isNotEmpty()) {
-                // the first place that fits: a later one, where committed text repeats, drops some
-                var from = maxOf(0, context.size - maxContext)
-                while (from + chain.size <= context.size && (0 until chain.size).any { context[from + it] != chain[it].token }) from++
-                if (from + chain.size <= context.size) return context.copyOfRange(from, context.size)
-            }
             val kept = if (context.size <= maxContext) context.size else maxContext / 2
             return context.copyOfRange(context.size - kept, context.size)
         }
@@ -320,6 +421,8 @@ class SentenceModel private constructor(
         const val ROOM = 24
         /** A [Scorer]'s node budget in floats (6 MB); past it only the steps of readings being scored are kept. */
         const val KEPT_FLOATS = 1_500_000
+        /** Nodes whose denominators run at once: their logits are 32 × vocab floats (1.5 MB at 25M's). */
+        internal const val SUM_ROWS = 32
         private const val EPS = 1e-5f
         private const val MAX_LAYERS = 64
 
@@ -338,21 +441,11 @@ class SentenceModel private constructor(
             for (i in 0 until n) out[i] = (x[i] - mean) * inv * norm.weight[i] + norm.bias[i]
         }
 
-        /** The exact GELU via erf: the tanh form is a different function from the one trained. */
-        fun gelu(x: Float): Float = (0.5 * x * (1 + erf(x / Math.sqrt(2.0)))).toFloat()
-
-        /** erf to about 1e-7 (Numerical Recipes' Chebyshev fit): plenty for floats. */
-        @Suppress("MagicNumber")
-        fun erf(x: Double): Double {
-            val z = Math.abs(x)
-            val t = 1 / (1 + 0.5 * z)
-            val poly = -1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 +
-                t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))
-            val r = t * Math.exp(-z * z + poly)
-            return if (x >= 0) 1 - r else r - 1
-        }
-
-        /** Weights as stored (multiplied by [kernel]) or, with [unpack], as floats; [IllegalArgumentException] if not a chinese-ime-lm v1 model. */
+        /**
+         * Weights as stored, multiplied by [kernel] on int8-rounded activations: what the app computes, to the bit on
+         * any kernel. With [unpack], as floats: quicker in Kotlin for the tools, but not the app's numbers.
+         * [IllegalArgumentException] if not a chinese-ime-lm v1 model.
+         */
         fun load(buffer: ByteBuffer, unpack: Boolean = false, kernel: MatrixKernel = MatrixKernel.JVM): SentenceModel {
             val start = System.nanoTime()
             val file = Safetensors(buffer)
@@ -378,7 +471,7 @@ class SentenceModel private constructor(
             }
             val model = SentenceModel(
                 config, vocab, matrix("tok.weight", config.vocab, w), file.floats("pos.weight", config.window, w),
-                blocks, norm("ln_f"), meta["license"].orEmpty(), meta["attribution"].orEmpty(),
+                blocks, norm("ln_f"), meta["license"].orEmpty(), meta["attribution"].orEmpty(), kernel,
             )
             // timed on the asking thread (the fcitx one in the app): how long a key waited
             val ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)

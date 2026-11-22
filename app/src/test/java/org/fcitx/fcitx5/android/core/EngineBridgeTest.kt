@@ -33,6 +33,7 @@ import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -365,26 +366,11 @@ class EngineBridgeTest {
     }
 
     @Test
-    fun aRefineReadsAsRefiningWhileEachOfItsSlicesRuns() {
-        fun refines(refines: Boolean) = Snapshot(
-            commit = "", preedit = "n", candidates = listOf("你"), page = 0, hasPreviousPage = false,
-            hasNextPage = false, handled = true, predicting = false, refines = refines,
-        )
-        val during = ArrayList<Boolean>()
-        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { refines(true) }
-        assertTrue(EngineState.refining)
-        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { during += EngineState.refining; refines(true) }
-        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { during += EngineState.refining; refines(false) }
-        // as EngineEvalRunner reads it off the host thread while a slice runs
-        assertEquals(listOf(true, true), during)
-        assertFalse(EngineState.refining)
-        // the host sends no refine after a failure, and the failure is thrown on for its router
-        bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { refines(true) }
+    fun aFailureIsThrownOnForItsRouterAndItsSyllablesGo() {
         EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("ni"), 1)
         assertThrows(IllegalStateException::class.java) {
-            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { error("a bug") }
+            bridge.answer(InputMethodCatalog.PINYIN) { error("a bug") }
         }
-        assertFalse(EngineState.refining)
         // a tap would send an id the engine drops
         assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN), EngineState.syllables.value)
         EngineState.syllablesState.value = EngineState.SyllableState()
@@ -397,19 +383,15 @@ class EngineBridgeTest {
             hasNextPage = false, handled = handled, predicting = false, syllables = syllables, syllablesId = id,
         )
         try {
-            bridge.answer(InputMethodCatalog.SHUANGPIN, EngineEvent.CHAR) { typed("ni", listOf("ni", "mi"), 1) }
+            bridge.answer(InputMethodCatalog.SHUANGPIN) { typed("ni", listOf("ni", "mi"), 1) }
             assertEquals(EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, true, listOf("ni", "mi"), 1), EngineState.syllables.value)
             // the 14 or nine keys answer as pinyin: no gate on which keys typed
-            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { typed("bn", listOf("bu", "nu"), 2) }
+            bridge.answer(InputMethodCatalog.PINYIN) { typed("bn", listOf("bu", "nu"), 2) }
             assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("bu", "nu"), 2), EngineState.syllables.value)
-            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { typed("", emptyList(), handled = false) }
-            assertEquals(listOf("bu", "nu"), EngineState.syllables.value.syllables)
-            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.REFINE) { typed("bn", listOf("nu"), 3) }
-            assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("nu"), 3), EngineState.syllables.value)
             // handed back to 全拼, which offers none: cleared
-            bridge.answer(InputMethodCatalog.PINYIN, EngineEvent.CHAR) { typed("n", emptyList()) }
+            bridge.answer(InputMethodCatalog.PINYIN) { typed("n", emptyList()) }
             assertEquals(EngineState.SyllableState(InputMethodCatalog.PINYIN, true), EngineState.syllables.value)
-            bridge.answer(InputMethodCatalog.WUBI, EngineEvent.RESET) { typed("", emptyList()) }
+            bridge.answer(InputMethodCatalog.WUBI) { typed("", emptyList()) }
             assertEquals(EngineState.SyllableState(InputMethodCatalog.WUBI), EngineState.syllables.value)
         } finally {
             EngineState.syllablesState.value = EngineState.SyllableState()
@@ -643,7 +625,7 @@ class EngineBridgeTest {
             try {
                 assertThrows(FileNotFoundException::class.java) { bridge.unloadable.call("mine") { throw FileNotFoundException("mine") } }
                 EngineState.syllablesState.value = EngineState.SyllableState("mine", true, listOf("ni", "mi"), 4)
-                assertEquals(null, bridge.answer("mine", EngineEvent.CHAR) { error("not called") })
+                assertEquals(null, bridge.answer("mine") { error("not called") })
                 assertEquals(EngineState.SyllableState("mine"), EngineState.syllables.value)
             } finally {
                 bridge.unloadable.clear()
@@ -719,14 +701,12 @@ class EngineBridgeTest {
             val scheme = EngineState.shuangpinScheme
             val suggests = EngineState.englishSuggests
             try {
-                EngineState.refining = true
                 EngineState.syllablesState.value = EngineState.SyllableState(im = "pinyin", composing = true, syllables = listOf("ni"), id = 3)
                 EngineState.englishTypingState.value = true
                 EngineState.inkEnded.value = 7
                 EngineState.shuangpinScheme = if (scheme === ShuangpinScheme.XIAOHE) ShuangpinScheme.ZIRANMA else ShuangpinScheme.XIAOHE
                 EngineState.englishSuggests = !suggests
                 bridge.close()
-                assertFalse(EngineState.refining)
                 assertEquals(EngineState.SyllableState(), EngineState.syllables.value)
                 assertFalse(EngineState.englishTyping.value)
                 assertEquals(HandwritingSession.NO_PIECE, EngineState.handwritingEnded.value)
@@ -758,7 +738,7 @@ class EngineBridgeTest {
         // the bridge's half of a first run: EngineOptions().toSettings() with AppPrefs at defaults reaches the engine unchanged
         @Test
         fun aNewInstallsEngineSettingsAreTheHostOptionsDefaults() {
-            val defaults = EngineOptions().toSettings()
+            val defaults = EngineOptions().toSettings(ModelLevel.HIGH)
             try {
                 bridge.configure(defaults)
                 assertEquals(defaults, bridge.engines.settings)

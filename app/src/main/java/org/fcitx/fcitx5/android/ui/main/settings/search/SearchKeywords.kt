@@ -41,7 +41,7 @@ object SearchKeywords {
         listOf("page:ToolbarButtons") to R.array.kw_toolbar,
         listOf("pref:candidate_text_size") to R.array.kw_candidate_size,
         listOf("pref:Fuzzy/NG_GN") to R.array.kw_typos,
-        listOf("pref:ModelLevel") to R.array.kw_model_level,
+        listOf("pref:ModelLevel", "pref:device_processor") to R.array.kw_model_level,
         listOf("pref:code_row_style") to R.array.kw_code_row,
         listOf("pref:disable_animation", "pref:keyboard_motion") to R.array.kw_motion,
         listOf("pref:key_h_spacing_choice", "pref:key_v_spacing_choice") to R.array.kw_key_spacing,

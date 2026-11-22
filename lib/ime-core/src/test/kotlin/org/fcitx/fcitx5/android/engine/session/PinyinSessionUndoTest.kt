@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
@@ -60,7 +61,7 @@ class PinyinSessionUndoTest {
     // [n] Backspaces the app takes, then another action: what they deleted whole is taken back as it comes
     private fun Session.delete(n: Int) {
         repeat(n) { assertFalse(apply(Backspace).handled) }
-        apply(Action.Refine)
+        apply(Action.Ink(NO_PIECE))
     }
 
     private fun uses(keys: String, text: String, reading: String) = learner.habits.uses(Code(Kinds.FULL, keys), Words.of(text, reading))
@@ -177,7 +178,7 @@ class PinyinSessionUndoTest {
         traditional.apply(Context("给點", after = "", learnFlags = 0))
         traditional.apply(Backspace)
         traditional.apply(Context("给", after = "", learnFlags = 0))
-        traditional.apply(Action.Refine)
+        traditional.apply(Action.Ink(NO_PIECE))
         assertEquals(0, learner.habits.uses(Code(Kinds.FULL, "dianle"), Words.of("点了", "dian le")))
     }
 
@@ -208,7 +209,7 @@ class PinyinSessionUndoTest {
         session.pick("ba", "吧")
         session.apply(Backspace)
         session.apply(Context("给打了吗", after = "", learnFlags = 0))
-        session.apply(Action.Refine)
+        session.apply(Action.Ink(NO_PIECE))
         assertEquals(0, uses("ba", "吧", "ba"))
     }
 
@@ -295,7 +296,7 @@ class PinyinSessionUndoTest {
         session.pick("ma", "吗")
         t9.pick("22", "吧")
         for (s in listOf(session, t9)) s.apply(Context("打了吗吧", after = "", learnFlags = 0))
-        session.apply(Action.Refine)
+        session.apply(Action.Ink(NO_PIECE))
         assertEquals(1, uses("dl", "打了", "da le"))
         assertEquals(1, uses("ma", "吗", "ma"))
     }

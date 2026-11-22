@@ -79,7 +79,7 @@ class GlideSession(
     private fun settled(s: Snapshot): Snapshot {
         last = s
         if (s.preedit != glided || s.predicting || s.candidates.isEmpty()) others = emptyList()
-        // the first page (refined, say) may now contain one: not offered twice
+        // the first page may now contain one: not offered twice
         if (s.first == 0 && others.isNotEmpty()) others = others.filter { it.word !in s.candidates }
         return s
     }
@@ -141,7 +141,8 @@ class GlideSession(
         return unchanged()
     }
 
-    private fun unchanged() = last?.copy(commit = "", deleteBefore = 0, handled = true) ?: session.apply(Action.Refine)
+    // only reached with others offered, so after a snapshot was settled
+    private fun unchanged() = checkNotNull(last).copy(commit = "", deleteBefore = 0, handled = true)
 
     private fun shown(s: Snapshot): Snapshot {
         if (others.isEmpty() || s.candidates.isEmpty()) return s

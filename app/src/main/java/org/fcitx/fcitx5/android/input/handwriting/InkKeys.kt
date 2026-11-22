@@ -16,7 +16,6 @@ class InkKeys(
     private val recognition: HandwritingRecognition,
     private val pad: Pad,
     private val deliver: (InkReading, piece: Int) -> Unit,
-    private val finished: (piece: Int) -> Unit,
 ) {
 
     interface Pad {
@@ -37,11 +36,6 @@ class InkKeys(
         recognition.read(read) { reading ->
             if (read.piece >= since) deliver(reading, read.piece)
         }
-    }
-
-    /** Told after its readings: the engine must have them first. */
-    fun finish(piece: Int) {
-        recognition.afterReads { if (piece >= since) finished(piece) }
     }
 
     /** Dropped if another input started, or [attached] says the keyboard is gone: it was not typed for that one. */

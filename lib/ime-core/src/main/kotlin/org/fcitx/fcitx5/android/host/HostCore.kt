@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.OfferedWord
 import org.fcitx.fcitx5.android.engine.session.WordOffer
@@ -59,6 +60,8 @@ class HostCore(
     /** `ShowInputMethodInformation` (off in the instrumented tests). */
     private val showInputMethodInformation: Boolean = true,
     private val persist: (Persist) -> Unit = {},
+    /** 性能档位 自动 on this device; the tests' and the replay's cases are written at high. */
+    private val autoLevel: ModelLevel = ModelLevel.HIGH,
     modules: (HostServices) -> HostModules = { HostModules() },
 ) : HostServices {
 
@@ -72,7 +75,7 @@ class HostCore(
 
     val contexts = InputContexts(profile.currentGroup(), ::switched)
 
-    val router = KeyRouter(host, this, clock, strings)
+    val router = KeyRouter(host, this, strings)
 
     private val modules = modules(this)
     private val activationListeners = this.modules.activationListeners
@@ -227,7 +230,7 @@ class HostCore(
     /** `AndroidEngine::reloadConfig`/`setConfigForInputMethod`. */
     fun configure(options: EngineOptions) {
         router.options = KeyRouter.Options(options.pageSizeValue, options.suggestsEnglish)
-        val settings = options.toSettings()
+        val settings = options.toSettings(autoLevel)
         val schemeChanged = scheme != null && scheme != settings.scheme
         scheme = settings.scheme
         val readingChanged = reading != null && reading != settings.candidateReading

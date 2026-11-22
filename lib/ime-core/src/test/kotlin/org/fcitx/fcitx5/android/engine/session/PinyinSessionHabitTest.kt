@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.engine.learn.Take
 import org.fcitx.fcitx5.android.engine.learn.row
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Forget
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -38,8 +37,8 @@ class PinyinSessionHabitTest {
     private val data = sessionTestData()
     private val learner = Learner(data)
 
-    private fun session(refiner: SentenceRefiner? = null) =
-        PinyinSession(data, PinyinSegmenter(), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo(), refiner = refiner)
+    private fun session() =
+        PinyinSession(data, PinyinSegmenter(), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo())
 
     private val session = session()
 
@@ -64,15 +63,6 @@ class PinyinSessionHabitTest {
         assertEquals("西安", ranked.candidates.first())
         assertEquals("xi an", ranked.preedit)
         assertEquals("xian", session.apply(CommitRaw).commit)
-    }
-
-    // a pause's refining weighs the readings again, never over the user's first (rule 1)
-    @Test
-    fun refiningKeepsTheUsersFirst() {
-        repeat(2) { session.pick("xian", "西安") }
-        val refining = session { _, readings, _, _ -> readings.indexOfFirst { it.startsWith("先") } }
-        refining.type("xian")
-        assertEquals("西安", refining.apply(Action.Refine).candidates.first())
     }
 
     @Test

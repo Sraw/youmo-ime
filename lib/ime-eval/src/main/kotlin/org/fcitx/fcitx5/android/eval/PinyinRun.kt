@@ -19,11 +19,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.rerank.GatedPicker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.CoarseCandidates
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
-import org.fcitx.fcitx5.android.engine.session.endsOnSyllable
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
@@ -42,8 +41,6 @@ class PinyinRun(
     pack: WordPack? = null,
     /** A fresh reranker per sample: one keeps what it read, so a sample's result would hang on the one before and on threading. */
     private val reranker: (() -> SentencePicker)? = null,
-    /** Weighs the whole input's readings again as the user pauses, as [PinyinSession] lets it; not timed. */
-    private val refiner: (() -> SentenceRefiner)? = null,
     /** The dictionaries the user merged, compiled: their words offered as the app's user model offers them. */
     merged: DictionaryFile? = null,
     /** [merged] compiled against another base dictionary, as after an app update till the recompile. */
@@ -87,26 +84,28 @@ class PinyinRun(
     // where the session lists the candidates with one, by the same code
     private val coarseCandidates = CoarseCandidates(coarse, data, user)
 
+    /** Keys of [run]'s samples a 高档 gate sent to the large model. */
+    var escalations = 0L
+        private set
+
     fun run(samples: List<Sample>): List<RunResult> {
         // the JIT compiles the hot loops during the first rounds, for all threads alike
         repeat(WARMUP_ROUNDS) { samples.take(WARMUP_SAMPLES).forEach { Typing().type(it.input, it.context) } }
         return samples.map { sample ->
             val typing = Typing()
+            var shown = emptyList<String>()
             val latencies = (1..sample.input.length).map { length ->
                 val started = System.nanoTime()
-                typing.type(sample.input.substring(0, length), sample.context, sample.taps?.subList(0, length), sample.touches?.subList(0, length))
+                shown = typing.type(sample.input.substring(0, length), sample.context, sample.taps?.subList(0, length), sample.touches?.subList(0, length))
                 (System.nanoTime() - started) / NANOS_PER_MICRO
             }
-            RunResult(sample.input, typing.pause(), latencies)
+            escalations += typing.escalations
+            RunResult(sample.input, shown, latencies)
         }
     }
 
-    /** Whole-input readings, then the words the input may start with, typed after [context]; once [paused], as the [refiner] has them. */
-    fun candidates(input: String, context: String = "", paused: Boolean = false): List<String> {
-        val typing = Typing()
-        val shown = typing.type(input, context)
-        return if (paused) typing.pause() else shown
-    }
+    /** Whole-input readings, then the words the input may start with, typed after [context]. */
+    fun candidates(input: String, context: String = ""): List<String> = Typing().type(input, context)
 
     /** The whole-input readings of [input] typed after [context], best first, each with the decoder's score. */
     fun sentences(input: String, context: String = ""): List<Pair<String, Float>> =
@@ -117,45 +116,26 @@ class PinyinRun(
         return decoder.decode(graph, prev2, prev, sentenceCount)
     }
 
-    /** One sample typed, with rerankers of its own, which weigh its readings as [PinyinSession]'s do. */
+    /** One sample typed, with a reranker of its own, which weighs its readings as [PinyinSession]'s does. */
     private inner class Typing {
         private val picker = reranker?.invoke()
-        private val refine = refiner?.invoke()
 
-        // of the input read last: the rerankers' context, the decoder's readings, its words and the pick
-        private var before = ""
+        val escalations get() = (picker as? GatedPicker)?.escalations ?: 0L
+
+        // of the input read last: the decoder's readings and its words
         private var sentences: List<Candidate> = emptyList()
-        private var readings: List<String> = emptyList()
-        private var scores: List<Float> = emptyList()
         private var words: List<Candidate> = emptyList()
-        private var picked = 0
-        private var refines = false
 
         /** Reads [input] typed after [context], as a key typed does, and gives what is shown; [taps] and [touches] where each key was tapped. */
         fun type(input: String, context: String, taps: List<Float>? = null, touches: List<Touch?>? = null): List<String> {
             val contextWords = textWords.lastTwo(context)
-            // text that ends in no word is no context for the rerankers either, as in the session
-            before = if (contextWords.isEmpty()) "" else context
+            // text that ends in no word is no context for the reranker either, as in the session
+            val before = if (contextWords.isEmpty()) "" else context
             val graph = segmenter.segment(input, taps?.toFloatArray(), touches?.toTypedArray())
             val decoding = decode(graph, contextWords)
             sentences = decoding.sentences
-            readings = sentences.map { it.text }
-            scores = sentences.map { it.score }
             words = decoding.words
-            picked = picker?.pick(before, readings, scores) ?: 0
-            refines = refine != null && readings.size > 1 && endsOnSyllable(graph)
-            return shown(picked)
-        }
-
-        /** What is shown once the user pauses: the [refiner]'s pick first if it makes one within the session's slices and budget, else the picker's. */
-        fun pause(): List<String> {
-            val r = refine?.takeIf { refines } ?: return shown(picked)
-            repeat(r.slices) {
-                // null: not done yet, the next slice goes on from it
-                val pick = r.refine(before, readings, scores, PinyinSession.REFINE_BUDGET) ?: return@repeat
-                return shown(if (pick == SentenceRefiner.NONE) picked else pick)
-            }
-            return shown(picked)
+            return shown(picker?.pick(before, sentences.map { it.text }, sentences.map { it.score }) ?: 0)
         }
 
         private fun shown(first: Int): List<String> {

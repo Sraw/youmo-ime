@@ -74,31 +74,19 @@ class PinyinSessionTest {
     }
 
     @Test
-    fun keysHandedOverTogetherReadAsTypedOneByOneWithARerankerAndARefiner() {
+    fun keysHandedOverTogetherReadAsTypedOneByOneWithAReranker() {
         // as Engines builds them: the decoder keeps what it read, its last reading first, then its second
         class Weighed {
             var picked = ""
-            val refined = ArrayList<String>()
-            val session = PinyinSession(
-                data, PinyinSegmenter(), pageSize = 20,
-                refiner = { context, readings, scores, _ ->
-                    refined += "$context $readings $scores"
-                    1
-                },
-            ) { context, readings, scores ->
+            val session = PinyinSession(data, PinyinSegmenter(), pageSize = 20) { context, readings, scores ->
                 picked = "$context $readings $scores"
                 readings.lastIndex
             }
         }
         val byKey = Weighed()
         val atOnce = Weighed()
-        val typed = byKey.session.type("nizai")
-        assertTrue(typed.refines)
-        assertEquals(typed, atOnce.session.typeAll("nizai"))
+        assertEquals(byKey.session.type("nizai"), atOnce.session.typeAll("nizai"))
         assertEquals(byKey.picked, atOnce.picked)
-        assertEquals(byKey.session.apply(Action.Refine), atOnce.session.apply(Action.Refine))
-        assertEquals(1, atOnce.refined.size)
-        assertEquals(byKey.refined, atOnce.refined)
         assertEquals(byKey.session.apply(Select(0)), atOnce.session.apply(Select(0)))
         assertEquals(byKey.session.type("ma"), atOnce.session.typeAll("ma"))
         assertEquals(byKey.picked, atOnce.picked)
@@ -567,16 +555,6 @@ class PinyinSessionTest {
         val user = UserModel(data.dictionary, data.vocabulary, index = data.wordIndex)
         user.own(UserModel.Entry("先", intArrayOf(Syllables.id("xian"))))
         assertEquals("x ;", PinyinSession(data, ShuangpinSegmenter(ShuangpinScheme.MICROSOFT), spell = true, user = user).type("x;").preedit)
-    }
-
-    // the refiner waits while a syllable is only begun
-    @Test
-    fun 双拼EndsOnASyllableOnlyAsTypedInWholeSyllables() {
-        val xiaohe = ShuangpinSegmenter(ShuangpinScheme.XIAOHE)
-        assertFalse(endsOnSyllable(xiaohe.segment("nih")))
-        assertTrue(endsOnSyllable(xiaohe.segment("nihc")))
-        assertFalse(endsOnSyllable(xiaohe.segment("ufmuh")))
-        assertTrue(endsOnSyllable(xiaohe.segment("xm")))
     }
 
     @Test

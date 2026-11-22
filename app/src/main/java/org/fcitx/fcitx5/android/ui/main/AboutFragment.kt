@@ -8,6 +8,11 @@ import android.content.Context
 import android.os.Bundle
 import org.fcitx.fcitx5.android.BuildConfig
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.core.ThisDevice
+import org.fcitx.fcitx5.android.device.DeviceProfile
+import org.fcitx.fcitx5.android.device.Dotprod
+import org.fcitx.fcitx5.android.device.LevelReason
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.ui.main.settings.search.PageEntry
@@ -56,6 +61,7 @@ class AboutFragment : PaddingPreferenceFragment() {
                 ) {
                     requireContext().openUrl("${Const.releasesUrl}/tag/${BuildConfig.ENGINE_DATA}")
                 }
+                addPreference(R.string.device_processor, deviceSummary(requireContext(), ThisDevice.profile), key = PROCESSOR_KEY)
             }
         }
     }
@@ -69,6 +75,7 @@ class AboutFragment : PaddingPreferenceFragment() {
         private const val COMMIT_KEY = "build_git_hash"
         private const val BUILT_KEY = "build_time"
         private const val DATA_KEY = "engine_data"
+        const val PROCESSOR_KEY = "device_processor"
 
         override fun searchEntries(context: Context) = listOf(
             R.string.privacy_policy to PRIVACY_KEY,
@@ -79,6 +86,7 @@ class AboutFragment : PaddingPreferenceFragment() {
             R.string.build_git_hash to COMMIT_KEY,
             R.string.build_time to BUILT_KEY,
             R.string.engine_data to DATA_KEY,
+            R.string.device_processor to PROCESSOR_KEY,
         ).map { (title, key) -> PageEntry(context.getString(title), SearchHighlight.PREF + key) }
     }
 }
@@ -88,4 +96,41 @@ internal fun commitUrl(repo: String, hash: String): String? {
     val commit = hash.substringBefore('-')
     val isHash = commit.isNotEmpty() && commit.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }
     return if (isHash) "$repo/commit/$commit" else null
+}
+
+internal fun levelText(context: Context, level: ModelLevel): String = context.getString(
+    when (level) {
+        ModelLevel.LOW -> R.string.device_level_low
+        ModelLevel.MEDIUM -> R.string.device_level_medium
+        ModelLevel.HIGH -> R.string.device_level_high
+    }
+)
+
+/** Why the automatic level is what it is. */
+internal fun reasonText(context: Context, profile: DeviceProfile): String = when (profile.reason) {
+    LevelReason.I8MM -> context.getString(R.string.device_reason_i8mm)
+    LevelReason.NEW_BIG_CORE -> context.getString(R.string.device_reason_new_big_core)
+    LevelReason.LITTLE_ONLY -> context.getString(R.string.device_reason_little_only)
+    LevelReason.OFFLINE -> context.resources.getQuantityString(R.plurals.device_reason_offline, profile.unread, profile.unread)
+    LevelReason.UNREAD -> context.getString(R.string.device_reason_unread)
+    LevelReason.NO_DOTPROD -> context.getString(R.string.device_reason_no_dotprod)
+    LevelReason.DOTPROD -> context.getString(R.string.device_reason_dotprod)
+}
+
+/** 「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」, and why it is medium where cores were offline or unread, as the settings say. */
+internal fun deviceSummary(context: Context, profile: DeviceProfile): String {
+    val level = levelText(context, profile.autoLevel)
+    val dotprod = context.getString(if (profile.dotprod == Dotprod.NONE) R.string.device_no_dotprod else R.string.device_dotprod)
+    val cores = profile.cores
+    val line = when {
+        cores == 0 -> context.getString(R.string.device_processor_summary_unread, level, dotprod, profile.kernel.name)
+        profile.bigCores == 0 -> context.resources.getQuantityString(R.plurals.device_processor_summary, cores, level, cores, dotprod, profile.kernel.name)
+        else -> context.resources.getQuantityString(
+            R.plurals.device_processor_summary_big, cores, level, cores, profile.bigCores, dotprod, profile.kernel.name,
+        )
+    }
+    return when (profile.reason) {
+        LevelReason.OFFLINE, LevelReason.UNREAD -> "$line · ${reasonText(context, profile)}"
+        else -> line
+    }
 }

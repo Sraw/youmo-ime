@@ -142,6 +142,9 @@
         <item>慢</item>
         <item>耗電</item>
         <item>省電</item>
+        <item>處理器</item>
+        <item>CPU</item>
+        <item>自動</item>
     </string-array>
     <string-array name="kw_code_row">
         <item>拼音顯示在哪</item>

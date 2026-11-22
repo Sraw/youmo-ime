@@ -32,25 +32,81 @@ class SentenceModelTest {
             val expected = t.logProbs(intArrayOf(SentenceModel.BOS) + tokens)
             val got = run(t.load(), tokens)
             for (i in tokens.indices) assertEquals("${t.width} wide, at $i", expected[i][tokens[i]], got[i].toDouble(), 1e-4)
-            assertArrayEquals(got, run(t.load(unpack = true), tokens), 1e-4f)
+            // unpacked, nothing is rounded to int8
+            val floats = t.logProbs(intArrayOf(SentenceModel.BOS) + tokens, q8 = false)
+            val unpacked = run(t.load(unpack = true), tokens)
+            for (i in tokens.indices) assertEquals("${t.width} wide, unpacked, at $i", floats[i][tokens[i]], unpacked[i].toDouble(), 1e-4)
         }
     }
 
     @Test
-    fun int8WeightsAreMultipliedByTheKernelGiven() {
+    fun int8WeightsAreMultipliedByTheKernelGivenOnInt8Activations() {
         val tokens = intArrayOf(3, 5, 4, 1, 7, 6)
         val shapes = HashSet<Pair<Int, Int>>()
-        // the textbook sum, row by row, in doubles: what any kernel should come near
-        val kernel = MatrixKernel { q, scales, rows, columns, x, y ->
-            shapes += rows to columns
-            // the app's kernel refuses a slice of the file that has more than its matrix
-            assertEquals(rows * columns, q.capacity())
-            for (r in 0 until rows) y[r] = (0 until columns).sumOf { x[it].toDouble() * q[r * columns + it] }.toFloat() * scales[r]
+        var floats = 0
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) {
+                floats++
+            }
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                shapes += rows to columns
+                // the app's kernel refuses a slice of the file that has more than its matrix
+                assertEquals(rows * columns, q.capacity())
+                MatrixKernel.JVM.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
         }
         val got = run(SentenceModel.load(ByteBuffer.wrap(tiny.bytes()), kernel = kernel), tokens)
-        assertArrayEquals(run(model, tokens), got, 1e-4f)
+        assertArrayEquals(run(model, tokens), got, 0f)
+        assertEquals(0, floats)
         val w = tiny.width
         assertEquals(setOf(tiny.vocab.size to w, 3 * w to w, 4 * w to w, w to 4 * w), shapes)
+    }
+
+    /** Each node of a batch, its parents in it or not, holds the floats it holds run alone. */
+    @Test
+    fun aBatchRunsEachNodeAsItRunsAlone() {
+        val root = model.next(null, SentenceModel.BOS)
+        val after = model.next(root, 3)
+        // 你 and 好 after 我; 的 after that 你; 天 after <bos>
+        val batch = model.nextMany(listOf(after, after, null, root), intArrayOf(-1, -1, 0, -1), intArrayOf(4, 5, 6, 7))
+        val alone = listOf(model.next(after, 4), model.next(after, 5)).let { it + model.next(it[0], 6) + model.next(root, 7) }
+        for (j in batch.indices) {
+            assertArrayEquals("$j", alone[j].out, batch[j].out, 0f)
+            for (l in 0 until tiny.layers) assertArrayEquals("$j at $l", alone[j].keys[l], batch[j].keys[l], 0f)
+        }
+        assertEquals(batch[0], batch[2].parent)
+        model.logSums(batch)
+        for (j in batch.indices) assertEquals("$j", model.logSum(alone[j]), batch[j].logSum, 0f)
+        assertEquals(emptyList<SentenceModel.Node>(), model.nextMany(emptyList(), IntArray(0), IntArray(0)))
+    }
+
+    /** Denominators of more nodes than run at once: each the bits it has alone, no more than [SentenceModel.SUM_ROWS] held at a time. */
+    @Test
+    fun manyDenominatorsRunABoundedBatchAtATime() {
+        var most = 0
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            override fun logSumsF(logits: FloatArray, m: Int, vocab: Int, out: FloatArray) {
+                most = maxOf(most, m)
+                super.logSumsF(logits, m, vocab, out)
+            }
+        }
+        fun tree(model: SentenceModel): List<SentenceModel.Node> {
+            val tokens = 3 until tiny.vocab.size
+            val firsts = tokens.map { model.next(model.next(null, SentenceModel.BOS), it) }
+            return firsts + firsts.flatMap { f -> tokens.map { model.next(f, it) } }
+        }
+        val counted = tiny.load(kernel = kernel)
+        val nodes = tree(counted)
+        assertTrue(nodes.size > SentenceModel.SUM_ROWS + 1)
+        counted.logSums(nodes)
+        assertEquals(SentenceModel.SUM_ROWS, most)
+        val one = tiny.load()
+        val alone = tree(one).map { one.logSum(it).toRawBits() }
+        assertEquals(alone, nodes.map { it.logSum.toRawBits() })
     }
 
     @Test
@@ -94,44 +150,19 @@ class SentenceModelTest {
         }
     }
 
+    /** What a scorer kept, from the last key or other readings, changes no score, not a bit. */
     @Test
-    fun whatTakesTooLongIsLeftForLater() {
-        val readings = listOf("我好你", "我好的", "我天")
-        val whole = model.Scorer().score("好", readings, relative = true)
-        val scorer = model.Scorer()
-        assertEquals(null, scorer.within("好", readings, relative = true, budget = 0))
-        // what each try got done is kept for the next: a few keystrokes later it is all there
-        var got: FloatArray? = null
-        var tries = 0
-        while (got == null) {
-            got = scorer.within("好", readings, relative = true, budget = 2)
-            assertTrue("never done", ++tries < 100)
-        }
-        assertTrue(tries > 1)
-        assertArrayEquals(whole, got, 1e-6f)
-        assertArrayEquals(whole, scorer.within("好", readings, relative = true, budget = 0), 1e-6f)
-    }
-
-    @Test
-    fun aScoringThatNeedsMoreThanIsKeptGoesOnFromWhatItGotDone() {
+    fun scoresAreTheSameWhateverWasKept() {
         val readings = listOf("我好你", "你好的", "天的我")
-        val whole = model.Scorer().score("好", readings, relative = true)
-        val scorer = model.Scorer(limit = 3)
-        var got: FloatArray? = null
-        var tries = 0
-        while (got == null) {
-            got = scorer.within("好", readings, relative = true, budget = 1)
-            assertTrue("never done", ++tries < 100)
-        }
-        assertArrayEquals(whole, got, 1e-6f)
-        // still a limit: steps the next readings do not go through are dropped, where a roomy scorer keeps them
-        val other = listOf("好的", "的好")
-        scorer.score("好", other)
-        assertEquals(null, scorer.within("好", readings, relative = true, budget = 0))
+        val fresh = model.Scorer().score("好", readings, relative = true)
+        val tight = model.Scorer(limit = 3)
         val roomy = model.Scorer()
-        roomy.score("好", readings, relative = true)
-        roomy.score("好", other)
-        assertArrayEquals(whole, roomy.within("好", readings, relative = true, budget = 0), 1e-6f)
+        for (scorer in listOf(tight, roomy)) {
+            // a key at a time, then other readings, then these again
+            for (k in 1..3) scorer.score("好", readings.map { it.take(k) }, relative = true)
+            scorer.score("好", listOf("好的", "的好"))
+            assertArrayEquals(fresh, scorer.score("好", readings, relative = true), 0f)
+        }
     }
 
     @Test
@@ -140,8 +171,8 @@ class SentenceModelTest {
         val scorer = model.Scorer(room = 5)
         fun after(vararg tokens: Int) = tiny.logProbs(intArrayOf(SentenceModel.BOS) + tokens)[tokens.size][4].toDouble()
         assertEquals(after(5), scorer.score("的的的我好", listOf("你"))[0].toDouble(), 1e-4)
-        // going on from what was read while it fits, then from the last half again
-        assertEquals(after(5, 3), scorer.score("的的的我好我", listOf("你"))[0].toDouble(), 1e-4)
+        // the last half again, not going on from what was read before
+        assertEquals(after(3), scorer.score("的的的我好我", listOf("你"))[0].toDouble(), 1e-4)
         assertEquals(after(5), scorer.score("的的的我好我好", listOf("你"))[0].toDouble(), 1e-4)
         assertEquals(after(6, 3), scorer.score("的我", listOf("你"))[0].toDouble(), 1e-4)
         assertEquals(after(), scorer.score("", listOf("你"))[0].toDouble(), 1e-4)
@@ -156,42 +187,24 @@ class SentenceModelTest {
         assertThrows(IllegalArgumentException::class.java) { model.next(null, tiny.vocab.size) }
     }
 
+    /** A context is read the same whatever was read before, or read ahead of the key: the scores depend on (context, readings) alone. */
     @Test
-    fun theContextIsReadWithinTheBudgetAndOnlyWhatIsNew() {
-        val scorer = model.Scorer(room = 3)
-        // nothing to score: what it costs is the context, a position a try
-        fun tries(context: String, budget: Int): Int {
-            var tries = 1
-            while (scorer.within(context, listOf(""), relative = false, budget = budget) == null) assertTrue("never done", ++tries < 100)
-            return tries
+    fun theContextIsReadAsTheContextAloneSays() {
+        val big = TinyModel(window = 32).load()
+        val readings = listOf("我好", "你的", "天")
+        val texts = listOf("我", "你", "好", "的", "天")
+        val random = java.util.Random(20261121)
+        val contexts = List(40) { (0 until random.nextInt(14)).joinToString("") { texts[random.nextInt(texts.size)] } }
+        // room 20: 11 of the context fit, beyond it 5 are read
+        val going = big.Scorer(room = 20)
+        val warmed = big.Scorer(room = 20)
+        var text = ""
+        for (context in contexts + contexts.map { text.also { text += it } }) {
+            val alone = big.Scorer(room = 20).score(context, readings, relative = true)
+            assertArrayEquals("'$context'", alone, going.score(context, readings, relative = true), 0f)
+            warmed.prewarm(context)
+            assertArrayEquals("'$context' read ahead", alone, warmed.score(context, readings, relative = true), 0f)
         }
-        assertEquals(3, tries("我好你", 1))
-        assertEquals(null, scorer.within("我好你的", listOf(""), relative = false, budget = 0))
-        assertEquals(1, tries("我好你的", 1))
-        assertEquals(1, tries("我好你的", 0))
-        assertEquals(null, scorer.within("你我", listOf(""), relative = false, budget = 0))
-        assertEquals(1, tries("你我", 2))
-        // committed text is read on from what was, until the window is full; then from half of it
-        assertEquals(1, tries("的的你我好的", 2))
-        assertEquals(2, tries("的你我好的天", 1))
-        assertEquals(1, tries("你我好的天我", 1))
-    }
-
-    @Test
-    fun whatWasReadIsFoundWhereTheMostOfTheContextFits() {
-        val scorer = model.Scorer(room = 3)
-        scorer.score("我", listOf("你"))
-        assertArrayEquals(model.Scorer(room = 3).score("我好我", listOf("你")), scorer.score("我好我", listOf("你")), 1e-6f)
-    }
-
-    @Test
-    fun erfIsCloseToTheTrueFunction() {
-        assertEquals(0.0, SentenceModel.erf(0.0), 1e-7)
-        assertEquals(0.8427007929, SentenceModel.erf(1.0), 1e-7)
-        assertEquals(-0.9953222650, SentenceModel.erf(-2.0), 1e-7)
-        assertEquals(1.0, SentenceModel.erf(10.0), 1e-7)
-        assertEquals(0f, SentenceModel.gelu(0f), 0f)
-        assertEquals(0.8413447f, SentenceModel.gelu(1f), 1e-6f)
     }
 
     private fun rejects(bytes: ByteArray) {

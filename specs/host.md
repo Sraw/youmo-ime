@@ -164,7 +164,6 @@ the candidates once at the end of the event, for the active context only.
 | `KeyRouter.EngineCandidateList` | `EngineCandidateList` (`:75-239`) | page from the snapshot, the rest a chunk of 32 at a time, those before the page once; long press asked, then checked again on the same candidate |
 | `TempCandidateList` (`TempModeCandidates` on the panel) | fcitx's `CommonCandidateList` | the temp modes' lists and punctuation's marks |
 | `Panel` | `InputPanel` | per context (`InputContext.panel`); `reset` clears the overlay too; `empty` ignores it; `code`: the preedit shown is the session's code (`KeyRouter.show`), not a temp mode's nor punctuation's marks, sent as `InputPanel.code` (what 编码行 输入框里 may write into the field) |
-| `Refiner` | `refine_` (`:26-28,706-721`) | 30 ms after a key, a slice at once after a slice; any event cancels it, a long-press menu holds it |
 | `Profile` | `InputMethodManager` load/save | fcitx's INI rules, through `IniFile`; defaults written as `# Key=`; other groups kept |
 | `HostClock` | the event loop's timers | `VirtualHostClock` (testFixtures) is also the `LearnClock`, so a replay learns the same |
 | `EnginesHost` | — | `EngineHost` on `Engines` alone, for tests and the replay |
@@ -274,7 +273,7 @@ client preedit, aux and list, sent at the event's end; a tap is the mode's candi
 `triggerQuickPhrase` turns the preedit off first, as `native-lib.cpp:286-296`; the status area goes
 out as `HostEvent.StatusArea` once at the end of an event that changed it (`HostOutput.flushed`);
 `configure(EngineOptions)` sets the router's page size and English suggestions and the engines'
-settings (`EngineOptions.toSettings`). The app takes the `HostEvent`s as they are (a tip goes to
+settings (`EngineOptions.toSettings(autoLevel)`). The app takes the `HostEvent`s as they are (a tip goes to
 `EngineNotices`, not the flow); an input method's entry is the one androidengine lists
 (`InputMethodEntries.of`), and the status area is its `StatusEntry`s, the native `Action`'s menu,
 separator and checked state never having been set.
@@ -295,9 +294,14 @@ backup read as they are, and v0.3.x reads what the host writes.
   save; a table group missing from the file is the table's defaults (`engineTable(hint)`: 仓颉 and 二笔
   without hints), a group there with an item missing gets a fresh group's (hints on), as fcitx does.
   `page(im)` is `getConfigForInputMethod` (a table's own keys at the top), `setPage` the partial save;
-  `toSettings()` is what the engine reads: every value, defaults too, each table's group among them,
+  `toSettings(auto)` is what the engine reads: every value, defaults too, each table's group among them,
   as typed `EngineSettings` (no text between the two: the addon's `pushSettings` flattened and the
-  engine parsed again, a round trip with nothing to gain once both are Kotlin).
+  engine parsed again, a round trip with nothing to gain once both are Kotlin). 性能档位 is a
+  `ModelChoice`: `Auto` (the default, so written commented out) never reaches the engine, `toSettings`
+  turns it into its `auto` argument, which has no default; `HostCore`'s `autoLevel` defaults to `HIGH`
+  for the tests and the replay, whose cases are written at high, and the app passes the device's
+  (`ThisDevice.profile.autoLevel`).
+  0.6.2 reads `Auto` as a bad value and so as its default, high.
 - `ConfigWriter`: every change is written in the background, merged per file, atomically (`.new` →
   rename), without waiting for a settings page to close; `flush` at stop and before `save()` returns.
   The drain is `synchronized`, so a flush waits for a write the background thread already took
@@ -372,7 +376,7 @@ the gettext translations are gone, the host's own texts are app resources (`AppH
   directory and whether it is written, `HostConfigDir.settle`), `start()` and `close()`. The app
   passes none, and gets `EngineSide.App` over its bridge. The JVM tests pass `ScriptedEngine` (app
   test sources), so they need no JNI. What the keyboards watch of the engine (the syllables
-  offered, English's word, the handwriting piece ended, the 双拼 scheme, refining) is
+  offered, English's word, the handwriting piece ended, the 双拼 scheme) is
   `EngineState`'s, one per process as the keyboards are.
 - **Settings pages.** `imOptions(im)` is the page's options by path (`Fuzzy/L_N`) to value, the
   leaves of `EngineOptions.page`, null for an input method with no page. `setImOptions` takes those

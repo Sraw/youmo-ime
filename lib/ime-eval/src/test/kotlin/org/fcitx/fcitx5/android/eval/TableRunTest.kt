@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingDataBytes
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.table.TableLanguage
 import org.fcitx.fcitx5.android.engine.table.TableOptions
 import org.junit.Assert.assertEquals
@@ -145,26 +145,16 @@ class TableRunTest {
     // the engine's handwriting test words: 人 likelier alone, 山 after 高
     private val pinyin = handwritingDataBytes
 
-    /** Picks [word] on the last of its [slices], before then not done: a large model taking more than the default's pause. */
-    private class Late(override val slices: Int, private val word: String) : SentenceRefiner {
-        var calls = 0
-
-        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? =
-            if (++calls < slices) null else readings.indexOf(word)
-    }
-
     @Test
     fun aWordIsCountedWhereItsCodeHasAnotherEntryAsLong() {
         val run = TableRun(CodeTable.load(ByteBuffer.wrap(homographEntries)), TableOptions.WUBI)
         val words = PinyinData.load(ByteBuffer.wrap(pinyin)).let { TextWords(it.model, it.wordIndex) }
-        val late = Late(SentenceRefiner.SLICES + 8, "人")
-        val (n, first) = run.homographs("高人天", listOf(null, TableLanguage(words), TableLanguage(words, refiner = late)))
+        val picker = SentencePicker { _, readings, _ -> readings.indexOf("人").coerceAtLeast(0) }
+        val (n, first) = run.homographs("高人天", listOf(null, TableLanguage(words), TableLanguage(words, reranker = picker)))
         // 人 alone: 高 commits itself, and 天 comes first before the longer abcd's in every row
         assertEquals(1, n)
-        // the table's order, 山 by the word model after 高, 人 again once the refiner is given its slices
+        // the table's order, 山 by the word model after 高, 人 again by the sentence model
         assertEquals(listOf(1, 0, 1), first.toList())
-        // given at least its slices: how often the session asks past them is the session's business
-        assertTrue(late.calls >= late.slices)
     }
 
     @Test

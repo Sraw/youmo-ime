@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
@@ -35,7 +36,7 @@ class PinyinSessionEnforcedTest {
 
     private val session = session()
 
-    private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.lastOrNull() ?: apply(Action.Refine)
+    private fun Session.type(keys: String): Snapshot = keys.map { apply(Key(it)) }.lastOrNull() ?: apply(Action.Ink(NO_PIECE))
 
     private fun Session.pick(keys: String, text: String) {
         val shown = type(keys).candidates
@@ -139,20 +140,5 @@ class PinyinSessionEnforcedTest {
         assertTrue(shown.toString(), shown.indexOf("汪") in 0 until shown.indexOf("往"))
     }
 
-    // the habit levels are worked out once a reading: a pause's refining re-places the sentences, never them
-    @Test
-    fun aPauseLeavesTheHabitLevelsAsTheyAre() {
-        session.pick("wangxiaoming", "汪")
-        session.pick("", "小明")
-        session.apply(Reset)
-        val refining = PinyinSession(
-            data, PinyinSegmenter(), pageSize = 20, prediction = false, user = learner.model, learnTo = learner.learnTo(),
-            refiner = { _, readings, _, _ -> readings.indexOfFirst { it.startsWith("往") } },
-        )
-        val typed = refining.type("wangxiaomingchifan").candidates
-        val refined = refining.apply(Action.Refine).candidates
-        assertTrue(refined.toString(), refined.indexOf("汪") in 0 until refined.indexOf("往"))
-        assertEquals(typed.filter { it.length == 1 }, refined.filter { it.length == 1 })
-    }
 
 }

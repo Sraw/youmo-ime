@@ -350,7 +350,6 @@ class StrokesTest {
         l.apply(Action.Key('u'))
         l.apply(Action.Key('h'))
         assertEquals("u一", l.apply(Action.Select(5)).preedit)
-        assertEquals("u一", l.apply(Action.Refine).preedit)
         assertEquals("", l.apply(Action.Reset).preedit)
         l.learning = false
         assertFalse(pinyin.learning)

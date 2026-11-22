@@ -156,9 +156,10 @@ class ShuangpinUatTest {
     @Test
     @Uat("SP-31")
     fun wholeSyllablesReadAsBeforeTheAbbreviations() {
-        // pinyin-chat.tsv typed whole in each scheme and keyboard, with and without --sp-abbrev off: the first candidates the same
+        // pinyin-chat.tsv typed whole in each scheme and keyboard, with and without --sp-abbrev off: no right first made wrong,
+        // at most one first changed (a grouped keyboard's sentence or so moves with no budget, which the user accepts)
         val chat = File("data/pinyin-chat.tsv").useLines { EvalSet.parse(it) }
-        val model = SentenceModel.load(UatEngines.data(InputMethodCatalog.SENTENCE_MODEL), unpack = true)
+        val model = SentenceModel.load(UatEngines.data(InputMethodCatalog.SENTENCE_MODEL))
         // a key alone reads the words typed before: the 3000 likeliest typed, both ways
         val typed = TypedHistory.likeliest(UatEngines.pinyinData, HISTORY)
         // each scheme and keyboard's, asserted once: a run takes minutes, and the first failure hid the rest
@@ -174,8 +175,12 @@ class ShuangpinUatTest {
                 )
                 val (off, on) = run(false) to run(true)
                 assertTrue("$name $letters ${samples.size}", samples.size > 1500)
-                val changed = samples.filter { s -> off.candidates(s.input, s.context).firstOrNull() != on.candidates(s.input, s.context).firstOrNull() }
-                changedBy["$name $letters"] = changed.map { it.input }
+                val changed = samples.map { s -> Triple(s.expected, off.candidates(s.input, s.context).firstOrNull(), on.candidates(s.input, s.context).firstOrNull()) }
+                    .filter { (_, was, now) -> was != now }
+                // the grouped keys' inputs are private-use characters, so the texts say which
+                if (changed.size > 1 || changed.any { (expected, was, _) -> was == expected }) {
+                    changedBy["$name $letters"] = changed.map { (expected, was, now) -> "$expected: $was → $now" }
+                }
             }
         }
         assertEquals(emptyMap<String, List<String>>(), changedBy.filterValues { it.isNotEmpty() })

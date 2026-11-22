@@ -29,7 +29,6 @@ class KeyInk(
     widthDp: Float,
     private val pause: () -> Long,
     private val deliver: (InkReading, piece: Int) -> Unit,
-    private val finished: (piece: Int) -> Unit,
     // asked for once written on: a keyboard of one who never writes makes no recognizer (its thread)
     recognition: () -> HandwritingRecognition = { HandwritingRecognition.shared },
 ) : InkKeys.Pad {
@@ -43,7 +42,7 @@ class KeyInk(
         }
     }
 
-    val keys: InkKeys by lazy { InkKeys(reads.value, this, deliver, finished) }
+    val keys: InkKeys by lazy { InkKeys(reads.value, this, deliver) }
 
     private val reads = lazy(recognition)
 
@@ -81,12 +80,8 @@ class KeyInk(
     private var fadeFrom = 0L
 
     private val finishCheck = Runnable {
-        val piece = pad.piece
         val done = pad.finished.toList()
-        if (pad.finish(SystemClock.uptimeMillis())) {
-            fade(done)
-            keys.finish(piece)
-        }
+        if (pad.finish(SystemClock.uptimeMillis())) fade(done)
     }
 
     @VisibleForTesting
@@ -156,7 +151,6 @@ class KeyInk(
 
     /** What it read stays typed. */
     fun hidden() {
-        if (pad.finished.isNotEmpty()) keys.finish(pad.piece)
         next()
         fading = emptyList()
     }

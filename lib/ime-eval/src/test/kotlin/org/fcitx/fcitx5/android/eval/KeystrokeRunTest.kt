@@ -74,19 +74,6 @@ class KeystrokeRunTest {
     }
 
     @Test
-    fun theFirstIsWhatTheRefinerPutsFirstOnceTheUserPauses() {
-        var asked = 0
-        // two slices to decide, then the decoder's last reading over its first, 你好
-        val session = PinyinSession(data, PinyinSegmenter(), refiner = { _, readings, _, _ -> if (++asked < 3) null else readings.lastIndex })
-        val outcome = KeystrokeRun(session).type(Sample("nihao", "你好", "daily"))
-        assertEquals(3, asked)
-        assertFalse(outcome.first)
-        // still on the first page: a pick
-        assertTrue(outcome.reached)
-        assertEquals(6, outcome.keys)
-    }
-
-    @Test
     fun aPieceIsPickedWhenTheWholeIsNotShown() {
         // 拟好 is not among the best readings: 拟 is picked, then 好
         val outcome = run(pageSize = 20).type(Sample("nihao", "拟好", "daily"))

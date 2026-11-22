@@ -46,6 +46,14 @@
     <string name="version">版本</string>
     <string name="build_time">提交时间</string>
     <string name="engine_data">基础数据</string>
+    <string name="device_processor">本机处理器</string>
+    <plurals name="device_processor_summary">
+        <item quantity="other">%1$s档 · %2$d 核 · %3$s · 内核 %4$s</item>
+    </plurals>
+    <plurals name="device_processor_summary_big">
+        <item quantity="other">%1$s档 · %2$d 核（%3$d 大）· %4$s · 内核 %5$s</item>
+    </plurals>
+    <string name="device_processor_summary_unread">%1$s档 · %2$s · 内核 %3$s</string>
     <string name="data_outdated">这一版已超过半年</string>
     <string name="data_outdated_summary">新词随新版本发布，点此去下载</string>
     <string name="build_git_hash">构建 Git 哈希</string>
@@ -761,7 +769,23 @@
     <string name="im_model_level_summary">档位越高越准，也越费电</string>
     <string name="im_model_level_low">低档：只按词频和搭配，最省电</string>
     <string name="im_model_level_medium">中档：每次按键按整句通顺程度重排</string>
-    <string name="im_model_level_high">高档：停顿时再用大模型精挑首选，最准</string>
+    <string name="im_model_level_high">高档：拿不准时用大模型复核，最准</string>
+    <string name="im_model_level_auto">自动（本机：%1$s，%2$s）</string>
+    <string name="im_model_level_auto_here">%1$s（本机自动为：%2$s）</string>
+    <string name="device_level_low">低</string>
+    <string name="device_level_medium">中</string>
+    <string name="device_level_high">高</string>
+    <string name="device_reason_i8mm">有 i8mm</string>
+    <string name="device_reason_new_big_core">大核为 A77 或更新</string>
+    <string name="device_reason_little_only">只有小核</string>
+    <plurals name="device_reason_offline">
+        <item quantity="other">检测时 %1$d 核离线</item>
+    </plurals>
+    <string name="device_reason_unread">读不到处理器信息</string>
+    <string name="device_reason_no_dotprod">无 dotprod</string>
+    <string name="device_reason_dotprod">有 dotprod，无 i8mm</string>
+    <string name="device_dotprod">有 dotprod</string>
+    <string name="device_no_dotprod">无 dotprod</string>
     <string name="im_typos">纠正错拼和按偏的键</string>
     <string name="im_typos_summary">按在键的边上、靠着旁边哪个键，也按那个键读（点在键中间不改）；全拼还认 gn 当成 ng 这类错拼，双拼全键盘还认 j、q、x、y 后的 u 按成了 ü 的键</string>
     <string name="im_latin_words">中英混输</string>

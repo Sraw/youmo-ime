@@ -11,8 +11,6 @@ import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
-import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import java.io.File
 import java.util.Locale
 
@@ -74,16 +72,6 @@ internal class HandwritingRun(private val data: PinyinData) {
     companion object {
         /** How many of the last character's candidates count as offered ("last in ten"). */
         private const val FIRST_OFFERED = 10
-
-        /** The 性能档位's high: [first]'s pick unless [refiner] picks another within a pause's slices ([RefineSlices]). */
-        fun refined(refiner: SentenceRefiner, first: (String, HandwritingDecoder.Decoding) -> Int): (String, HandwritingDecoder.Decoding) -> Int =
-            { before, d ->
-                var picked = first(before, d)
-                val slices = RefineSlices<HandwritingDecoder.Decoding>(refiner)
-                slices.start(d, d.best.size)
-                while (slices.refines) slices.slice(before, { it.best }, { it.bestScores }) { _, at -> picked = at }
-                picked
-            }
 
         fun read(path: String): List<Row> = File(path).readLines().mapNotNull { line ->
             val f = line.split('\t')

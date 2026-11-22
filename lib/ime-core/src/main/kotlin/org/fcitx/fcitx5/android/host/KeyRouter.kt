@@ -19,13 +19,12 @@ import org.fcitx.fcitx5.android.engine.session.WordOffer
 
 /**
  * The native `androidengine` addon ported (tag `native-last`): keys to [EngineEvent]s, snapshots shown,
- * Chinese punctuation, the refine after a pause. A session that throws is handled as `engineEventCallback`
+ * Chinese punctuation. A session that throws is handled as `engineEventCallback`
  * did: the key goes to the app, the panel cleared, the session reset unless it never answered.
  */
 class KeyRouter(
     private val host: EngineHost,
     private val services: HostServices,
-    private val clock: HostClock,
     private val strings: HostStrings = HostStrings.ENGLISH,
     var punctuation: EnginePunctuation? = null,
 ) : KeyEngine {
@@ -34,8 +33,6 @@ class KeyRouter(
     data class Options(val pageSize: Int = DEFAULT_PAGE_SIZE, val englishSuggest: Boolean = true)
 
     var options = Options()
-
-    internal val refiner = Refiner(clock)
 
     // English without suggestions: the last key was a glide the session took, its word held; cleared by any
     // other key, a reset or activate. Not per context: keys reach only the focused one and focus changes reset.
@@ -88,8 +85,6 @@ class KeyRouter(
         if (e.release) return
         val key = e.key
         if (key.isModifier) return
-        // any key ends a pause: a late refine would redraw a panel someone else may have put up
-        refiner.cancel()
         // shortcuts are the app's: a mark on offer goes in first, so the app's action (a paste) comes after it
         if (key.states and SHORTCUT != 0) {
             endPunctuation(ic, take = true)
@@ -217,18 +212,14 @@ class KeyRouter(
 
     /** `AndroidEngine::send`: [event] to [im]'s session, and what comes back shown; whether it took it. */
     fun send(ic: InputContext, im: String, event: Int, arg: Int = 0, payload: Action? = null): Boolean {
-        refiner.cancel()
         ic.preeditEnabled = composesText(im)
         val learning = !ic.has(Capability.PASSWORD_OR_SENSITIVE)
         val s = call(im, event, arg, learning, payload)
-        if (event != EngineEvent.REFINE) keep(Typed(event, arg, payload), s)
-        // a key may be on its way: the pause starts a little after it, the next slice at once
-        if (s.refines) refineLater(ic, im, if (event == EngineEvent.REFINE) 0 else Refiner.PAUSE_MILLIS)
-        // a refine slice that changed nothing leaves the panel as it is, the list scrolled
-        if ((event != EngineEvent.REFINE && event != EngineEvent.CURSOR) || s.handled) show(ic, im, s)
+        keep(Typed(event, arg, payload), s)
+        if (event != EngineEvent.CURSOR || s.handled) show(ic, im, s)
         // after the commit shown: the app puts its notices away as text goes in
-        // told only as it changes: a refine slice keeps it
-        if (event != EngineEvent.REFINE && s.wordOffer != offered) {
+        // told only as it changes
+        if (s.wordOffer != offered) {
             offered = s.wordOffer
             services.wordOffer(ic, s.wordOffer)
         }
@@ -272,7 +263,7 @@ class KeyRouter(
         } catch (e: Throwable) {
             failed("onEvent", im, event, e)
             // the session must be reset with its cleared panel, or its state comes back; one failing to reset is skipped till it answers
-            if (event != EngineEvent.RESET && event != EngineEvent.REFINE && im in answered) {
+            if (event != EngineEvent.RESET && im in answered) {
                 try {
                     host.event(im, EngineEvent.RESET, EngineEvent.RESET_DROP, learning, payload = null)
                 } catch (again: Throwable) {
@@ -321,16 +312,6 @@ class KeyRouter(
             CoreLog.e("engine failed again: $where, $count times")
         }
     }
-
-    private fun refineLater(ic: InputContext, im: String, delay: Long) = refiner.later(delay) {
-        // still ours: the same input method, and our list on the panel, not a quick phrase one
-        if (ic.hasFocus && services.inputMethod(ic) == im && ic.panel.candidateList is EngineCandidateList) {
-            send(ic, im, EngineEvent.REFINE)
-        }
-    }
-
-    /** A candidate pressed is acted on by its index, so refining must stop. */
-    fun stopRefining() = refiner.cancel()
 
     /** `AndroidEngine::show`. */
     @Suppress("ComplexCondition")
@@ -515,10 +496,7 @@ class KeyRouter(
             if (!actionable || word !is EngineWord) return emptyList()
             asked = word
             val offered = offers(im, word.index)
-            val actions = OFFER_ACTIONS.filter { it.first in offered }.map { (offer, event) -> CandidateAction(event, strings.offer(offer)) }
-            // a menu shown holds the list still (its choice acts by index)
-            if (actions.isNotEmpty()) stopRefining()
-            return actions
+            return OFFER_ACTIONS.filter { it.first in offered }.map { (offer, event) -> CandidateAction(event, strings.offer(offer)) }
         }
 
         @Suppress("ComplexCondition")

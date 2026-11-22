@@ -157,7 +157,7 @@ sealed class Action {
     /** Commits what was typed, as typed (Enter). */
     object CommitRaw : Action()
 
-    /** Handwriting: what the pad read of [piece], or that it finished; sent with [Keyboard.INK] so it stays in order with keys. */
+    /** Handwriting: what the pad read of [piece] (none: those held are taken); sent with [Keyboard.INK] so it stays in order with keys. */
     data class Ink(val piece: Int, val reading: InkReading? = null) : Action()
 
     /** Glide typing: the [glide] or its [readings] as read when sent; sent with [Keyboard.GLIDE], as [Ink]. */
@@ -178,9 +178,6 @@ sealed class Action {
             val END = Step(Int.MAX_VALUE)
         }
     }
-
-    /** The user pauses: a slice of work that may put a better reading first, while [Snapshot.refines]. */
-    object Refine : Action()
 
     /** The table's 拼 key: pinyin lookup toggled, as [TableOptions.pinyinKey][org.fcitx.fcitx5.android.engine.table.TableOptions.pinyinKey] typed first would. */
     object LookUp : Action()
@@ -233,7 +230,6 @@ sealed class Action {
  * @property total all candidates, -1 if not yet known
  * @property first the index of the page's first candidate
  * @property labels keys picking the candidates where not the digits (a table whose codes are digits)
- * @property refines whether [Action.Refine] would do more
  * @property syllables what the first untaken keys may be (nine keys), for [Action.Syllable]
  * @property syllablesId which list [syllables] is, below [Action.Syllable.IDS]
  * @property cursor where in [preedit] the cursor is, in characters; -1 at its end
@@ -255,7 +251,6 @@ data class Snapshot(
     val first: Int = 0,
     val actionable: Boolean = false,
     val labels: String = "",
-    val refines: Boolean = false,
     val syllables: List<String> = emptyList(),
     val syllablesId: Int = 0,
     val deleteBefore: Int = 0,

@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.HostApi
 import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.ShuangpinNames
+import org.fcitx.fcitx5.android.core.ThisDevice
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.EnglishKeyboard
@@ -35,11 +36,11 @@ import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.reading.ReadingStyle
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
-import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
 import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
 import org.fcitx.fcitx5.android.engine.table.KeyLabels
+import org.fcitx.fcitx5.android.host.ModelChoice
 import org.fcitx.fcitx5.android.input.handwriting.HandwritingPause
 import org.fcitx.fcitx5.android.input.keyboard.CustomChoice
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
@@ -50,6 +51,8 @@ import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
+import org.fcitx.fcitx5.android.ui.main.levelText
+import org.fcitx.fcitx5.android.ui.main.reasonText
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.toast
@@ -187,10 +190,20 @@ object InputMethodSettings {
     )
 
     private val MODEL_LEVELS = mapOf(
-        ModelLevel.LOW to R.string.im_model_level_low,
-        ModelLevel.MEDIUM to R.string.im_model_level_medium,
-        ModelLevel.HIGH to R.string.im_model_level_high,
+        ModelChoice.LOW to R.string.im_model_level_low,
+        ModelChoice.MEDIUM to R.string.im_model_level_medium,
+        ModelChoice.HIGH to R.string.im_model_level_high,
     )
+
+    // the summary is the chosen entry's label, so the device's level is said in each
+    internal fun modelLevelLabel(context: Context, value: String): String {
+        val device = ThisDevice.profile
+        val auto = levelText(context, device.autoLevel)
+        return when (val choice = ModelChoice.of(value)) {
+            ModelChoice.AUTO -> context.getString(R.string.im_model_level_auto, auto, reasonText(context, device))
+            else -> context.getString(R.string.im_model_level_auto_here, context.getString(MODEL_LEVELS.getValue(choice)), auto)
+        }
+    }
 
     // keyed by Fuzzy's names, as the engine reads them
     private val FUZZY = listOf(
@@ -247,10 +260,10 @@ object InputMethodSettings {
                 Toggle(EngineSettings.EMOJI, text(R.string.im_emoji), R.string.im_emoji_summary),
                 Toggle(EngineSettings.BUILT_IN_PHRASES, text(R.string.im_built_in_phrases), R.string.im_built_in_phrases_summary),
                 Choice(
-                    EngineSettings.MODEL_LEVEL, R.string.im_model_level, ModelLevel.entries.map { it.key }, R.string.im_model_level_summary,
-                    label = { ctx, v -> ctx.getString(MODEL_LEVELS.getValue(ModelLevel.entries.first { it.key == v })) },
+                    EngineSettings.MODEL_LEVEL, R.string.im_model_level, ModelChoice.entries.map { it.key }, R.string.im_model_level_summary,
+                    label = ::modelLevelLabel,
                     // what the engine reads as the default
-                    nearest = { v -> ModelLevel.entries.firstOrNull { it.key == v }?.key ?: ModelLevel.HIGH.key },
+                    nearest = { v -> ModelChoice.of(v).key },
                 ),
                 Choice(
                     EngineSettings.CANDIDATE_READING, R.string.im_candidate_reading, ReadingStyle.entries.map { it.key }, R.string.im_candidate_reading_summary,

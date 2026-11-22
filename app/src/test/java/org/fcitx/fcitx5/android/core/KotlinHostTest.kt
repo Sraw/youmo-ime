@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -106,8 +107,9 @@ class KotlinHostTest {
     fun readyIsTheFirstEventAndPinyinLeadsTheGroupOnTheFirstRun() = runBlocking {
         assertTrue(events.list().first() is HostEvent.Ready)
         assertEquals(InputMethodCatalog.PINYIN, fcitx.enabledIme().first().uniqueName)
-        // no options file yet: the host options' defaults, which UatEngines.BASELINE reads too (but for 双拼's scheme)
-        assertEquals(EngineOptions().toSettings(), engine.settings.last())
+        // no options file yet: the host options' defaults, 自动 read as the device's level
+        // medium: Robolectric's fixed profile, never HostCore's default high nor the build machine's CPU
+        assertEquals(EngineOptions().toSettings(ModelLevel.MEDIUM), engine.settings.last())
     }
 
     @Test

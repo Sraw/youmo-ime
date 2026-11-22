@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.runtime.BackgroundWork
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
 import org.fcitx.fcitx5.android.host.EngineOptions
@@ -160,7 +161,7 @@ object UatEngines {
 
     /** B0's settings, read from the host's fresh options so the replays cannot drift from the device; 双拼 is the baselines' 自然码. */
     val BASELINE: EngineSettings
-        get() = EngineOptions().toSettings().copy(shuangpin = EngineSettings.ZIRANMA)
+        get() = EngineOptions().toSettings(ModelLevel.HIGH).copy(shuangpin = EngineSettings.ZIRANMA)
 
     fun restart(): Engines {
         val settings = engines.settings

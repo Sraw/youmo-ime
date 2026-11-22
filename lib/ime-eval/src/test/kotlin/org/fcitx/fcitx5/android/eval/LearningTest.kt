@@ -9,7 +9,6 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.WordPack
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,9 +53,6 @@ class LearningTest {
         assertTrue(picked.toString(), picked.values.all { it })
         // one for each engine: the two learning, and the one learning nothing
         assertEquals(3, made)
-        val refiner = { SentenceRefiner { _, readings, _, _ -> readings.indexOf("泥好").takeIf { it >= 0 } ?: SentenceRefiner.NONE } }
-        val refined = firsts(Learning(data, PinyinSegmenter(), refiner = refiner), sample)
-        assertTrue(refined.toString(), refined.values.all { it })
     }
 
     @Test

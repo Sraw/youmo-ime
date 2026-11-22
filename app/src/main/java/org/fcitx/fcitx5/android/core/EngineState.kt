@@ -75,14 +75,8 @@ object EngineState {
     var traditionalIms: Set<String>? = null
         internal set
 
-    /** Left as it was while an event runs, so a read during a refine step (EngineEvalRunner) sees true. */
-    @Volatile
-    var refining = false
-        internal set
-
     // the config's (the scheme, suggesting) stays, read again at the next start
     internal fun reset() {
-        refining = false
         syllablesState.value = SyllableState()
         englishTypingState.value = false
         inkEnded.value = HandwritingSession.NO_PIECE

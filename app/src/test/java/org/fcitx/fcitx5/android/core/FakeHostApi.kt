@@ -268,11 +268,6 @@ class FakeHostApi : HostApi {
         return true
     }
 
-    override suspend fun inkFinished(piece: Int): Boolean {
-        calls += "inkFinished($piece)"
-        return true
-    }
-
     /** ms by the key's turn: a busy engine (FastTypingTest). */
     var keyDelay: (Int) -> Long = { 0L }
     private var keysTaken = 0

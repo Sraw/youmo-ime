@@ -195,7 +195,7 @@ evaluate() {
       dialog:$SETS/pinyin-dialog.tsv:0.20: small:$SETS/small.tsv:0.05:; do
     IFS=: read -r name set weight half <<< "$spec"
     "$EVAL" pinyin "${DATA:-pinyin.data}" "$set" evals/$name-$tag.tsv ${half:+--half $half} --neighbours on \
-      --rerank src/sentence-model.safetensors --refine src/sentence-model-large.safetensors \
+      --tier high --models src \
       $([ "$pack" != - ] && echo --pack "$pack") > /dev/null 2> evals/$name-$tag.err || return 1
     score=$("$EVAL" score "$set" evals/$name-$tag.tsv ${half:+--half $half} | top1) && [ -n "$score" ] ||
       { echo "$name: no score"; return 1; }

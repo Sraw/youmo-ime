@@ -248,7 +248,7 @@ class LexiconUatTest {
         ime(InputMethodCatalog.PINYIN)
 
         assertTrue(engines.learning(null, LearningOp.ClearLearned(all = false)) is LearningResult.Cleared)
-        assertEquals("带来", taDl(null).first())
+        assertEquals("的脸", taDl(null).first())
         focus("")
         commit("。")
         type("wxm")

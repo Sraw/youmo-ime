@@ -105,9 +105,9 @@ class InputMethodSettingsScreenTest {
     }
 
     // AndroidEngineHeaderTest holds that the host keeps these keys
-    private fun engineReads(im: String, cfg: Map<String, String>) = EngineOptions().apply { setPage(im, ConfigTree.of(cfg)) }.toSettings()
+    private fun engineReads(im: String, cfg: Map<String, String>) = EngineOptions().apply { setPage(im, ConfigTree.of(cfg)) }.toSettings(ModelLevel.HIGH)
 
-    private val defaults = EngineOptions().toSettings()
+    private val defaults = EngineOptions().toSettings(ModelLevel.HIGH)
 
     @Test
     fun theEnglishPageOpensItsWordList() {

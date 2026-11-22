@@ -117,7 +117,7 @@ for spec in $SPECS; do
     [ -n "$unbased" ] || base=$BASE/$name.tsv
   fi
   "$EVAL" pinyin "$DATA" "$set" "$OUT/$name.tsv" ${half:+--half $half} "${reading[@]}" \
-    --rerank "$MODELS/sentence-model.safetensors" --refine "$MODELS/sentence-model-large.safetensors" \
+    --tier high --models "$MODELS" \
     ${PACK:+--pack "$PACK"} > /dev/null 2>> "$OUT/$name.err" || fail "$name: the run failed"
   printf '%s\n' "$options" > "$OUT/$name.options"
   scores=$("$EVAL" score "$set" "$OUT/$name.tsv" ${base:+"$base"} ${half:+--half $half} 2>> "$OUT/$name.err") ||
@@ -145,7 +145,7 @@ echo "$line" | awk '{ s = 0; w = 0; for (i = 1; i <= NF; i++) { split($i, a, /[=
 
 # the user layer: chat typed once and twice (a correction made twice is first, U-02), and the held-out half before and after
 "$EVAL" learn "$DATA" "$SETS/pinyin-chat.tsv" --neighbours on \
-  --rerank "$MODELS/sentence-model.safetensors" --refine "$MODELS/sentence-model-large.safetensors" \
+  --tier high --models "$MODELS" \
   ${PACK:+--pack "$PACK"} > "$OUT/learn.txt" 2> "$OUT/learn.err" || fail "learn: the run failed"
 twice=$(cell top1 "tune, typed a third time" < "$OUT/learn.txt")
 nothing=$(cell top1 "held-out, learning nothing" < "$OUT/learn.txt")

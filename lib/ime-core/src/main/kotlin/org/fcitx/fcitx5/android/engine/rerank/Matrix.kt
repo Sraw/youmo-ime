@@ -6,12 +6,31 @@ package org.fcitx.fcitx5.android.engine.rerank
 
 import java.nio.ByteBuffer
 
-/** A row-major weight matrix: int8 with per-row scale as stored (a quarter of floats' memory) via a [MatrixKernel], or floats. */
+/**
+ * A row-major weight matrix: int8 with per-row scale as stored (a quarter of floats' memory), multiplied by a
+ * [MatrixKernel] on int8-rounded vectors ([MatrixKernel.timesManyQ8]); or floats.
+ */
 internal sealed class Matrix(val rows: Int, val columns: Int) {
 
     abstract fun dot(x: FloatArray, r: Int): Float
 
     abstract fun times(x: FloatArray, y: FloatArray)
+
+    /** [m] vectors laid one after another in [x], into [y] likewise: each as [times] gives it. */
+    open fun timesMany(x: FloatArray, m: Int, y: FloatArray) {
+        val xi = FloatArray(columns)
+        val yi = FloatArray(rows)
+        for (v in 0 until m) {
+            System.arraycopy(x, v * columns, xi, 0, columns)
+            times(xi, yi)
+            System.arraycopy(yi, 0, y, v * rows, rows)
+        }
+    }
+
+    fun applyMany(x: FloatArray, m: Int, bias: FloatArray, y: FloatArray) {
+        timesMany(x, m, y)
+        for (v in 0 until m) for (o in 0 until rows) y[v * rows + o] += bias[o]
+    }
 
     abstract fun row(r: Int, out: FloatArray)
 
@@ -31,10 +50,25 @@ internal sealed class Matrix(val rows: Int, val columns: Int) {
         private val kernel: MatrixKernel,
     ) : Matrix(rows, columns) {
 
-        override fun dot(x: FloatArray, r: Int): Float = dotQ(q, scales, columns, x, r)
+        // per thread (ime-eval scores on several threads with one model)
+        private val xq = ThreadLocal.withInitial { ByteArray(columns) }
+
+        // the same sum as the kernel's row r, so a logit read alone matches the one in its softmax
+        override fun dot(x: FloatArray, r: Int): Float {
+            val xq = xq.get()
+            val sx = quantize(x, 0, columns, xq)
+            val base = r * columns
+            var s = 0
+            for (i in 0 until columns) s += q[base + i] * xq[i]
+            return s.toFloat() * scales[r] * sx
+        }
 
         override fun times(x: FloatArray, y: FloatArray) {
-            kernel.times(q, scales, rows, columns, x, y)
+            kernel.timesManyQ8(q, scales, rows, columns, x, 1, y)
+        }
+
+        override fun timesMany(x: FloatArray, m: Int, y: FloatArray) {
+            kernel.timesManyQ8(q, scales, rows, columns, x, m, y)
         }
 
         override fun row(r: Int, out: FloatArray) {

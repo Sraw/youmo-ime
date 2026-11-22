@@ -57,12 +57,11 @@ class HostCoreContractTest {
         handled: Boolean = true,
         total: Int = candidates.size,
         first: Int = 0,
-        refines: Boolean = false,
         actionable: Boolean = false,
         deleteBefore: Int = 0,
         cursor: Int = -1,
     ) = Snapshot(commit, preedit, candidates, 0, false, false, handled, false, total = total, first = first,
-        refines = refines, actionable = actionable, deleteBefore = deleteBefore, cursor = cursor)
+        actionable = actionable, deleteBefore = deleteBefore, cursor = cursor)
 
     private var fake = FakeHost()
     private var clock = VirtualHostClock()
@@ -435,51 +434,6 @@ class HostCoreContractTest {
         core.candidateActions(0)
         core.triggerCandidateAction(0, EngineEvent.FORGET, "你")
         assertEquals("engine-pinyin ${EngineEvent.FORGET} 0", fake.calls.last())
-    }
-
-    @Test
-    fun `a snapshot that refines is refined after a 30 ms pause, any key first cancels it`() {
-        val core = core()
-        core.open()
-        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "n", candidates = listOf("你"), refines = true) else snap(handled = false) }
-        core.press('n')
-        clock.advance(29)
-        core.press('i')
-        clock.advance(29)
-        assertFalse(fake.calls.any { it.contains(" ${EngineEvent.REFINE} ") })
-        clock.advance(1)
-        assertEquals("engine-pinyin ${EngineEvent.REFINE} 0", fake.calls.last())
-    }
-
-    @Test
-    fun `a refining slice that changes nothing leaves the panel, the next slice at once`() {
-        val core = core()
-        core.open()
-        var slices = 0
-        fake.answer = { _, e, _ ->
-            when (e) {
-                EngineEvent.CHAR -> snap(preedit = "n", candidates = listOf("你"), refines = true)
-                EngineEvent.REFINE -> snap(handled = false, refines = ++slices < 3)
-                else -> snap()
-            }
-        }
-        core.press('n')
-        val log = core.log()
-        clock.advance(30)
-        assertEquals(3, slices)
-        assertTrue(log.none { it is HostEvent.InputPanel })
-    }
-
-    @Test
-    fun `a menu shown stops refining`() {
-        val core = core()
-        core.open()
-        fake.answer = { _, e, _ -> if (e == EngineEvent.CHAR) snap(preedit = "n", candidates = listOf("你"), refines = true, actionable = true) else snap() }
-        core.press('n')
-        fake.offered = setOf(Offer.FORGET)
-        core.candidateActions(0)
-        clock.advance(100)
-        assertFalse(fake.calls.any { it.contains(" ${EngineEvent.REFINE} ") })
     }
 
     @Test

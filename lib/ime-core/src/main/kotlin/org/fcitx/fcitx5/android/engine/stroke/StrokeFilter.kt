@@ -44,8 +44,6 @@ class StrokeFilter(
 
     private val kept = ArrayList<Kept>()
     private var scanned = 0
-    // the texts of [session]'s first [scanned]: a refine may reorder them past the page it shows
-    private val seen = ArrayList<String>()
     private var done = false
 
     // a mark or an emoji goes as the candidate before it went
@@ -74,7 +72,6 @@ class StrokeFilter(
             is Action.Block -> pressed(action.index) { action.copy(index = it) }
             Action.NextPage -> turn(pager.page + 1)
             Action.PreviousPage -> turn(pager.page - 1)
-            Action.Refine -> again(session.apply(action))
             is Action.Key -> if (session.endsInput(action.char)) left(action) else passed(action)
             else -> passed(action)
         }
@@ -164,17 +161,6 @@ class StrokeFilter(
     private fun turn(to: Int): Snapshot =
         if (pager.turn(to) { keptAt(it) != null }) snapshot() else snapshot().copy(handled = keptAt(0) != null)
 
-    // a refine reorders sentences possibly past the first page, so what was looked through is compared, not the page;
-    // unchanged, nothing is looked through again. A reread is kept again whole
-    private fun again(s: Snapshot): Snapshot {
-        val before = under
-        val same = before != null && s.preedit == before.preedit && s.candidates == before.candidates && s.total == before.total &&
-            session.candidates(0, scanned).map { it.text } == seen
-        if (!same || !typing(s)) return after(s)
-        shown(s)
-        return snapshot()
-    }
-
     private fun refilter(keepPage: Boolean): Snapshot {
         val page = pager.page
         clearKept()
@@ -191,7 +177,6 @@ class StrokeFilter(
 
     private fun clearKept() {
         kept.clear()
-        seen.clear()
         scanned = 0
         done = false
         order.clear()
@@ -248,7 +233,6 @@ class StrokeFilter(
             for (choice in chunk) {
                 val keep = keeps(choice.text, table)
                 if (keep) kept += Kept(scanned, choice)
-                seen += choice.text
                 lastKept = keep
                 scanned++
             }
@@ -303,7 +287,6 @@ class StrokeFilter(
             actionable = s.actionable,
             syllables = s.syllables,
             syllablesId = s.syllablesId,
-            refines = s.refines,
             cursor = s.cursor,
         )
     }

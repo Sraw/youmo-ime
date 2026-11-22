@@ -41,15 +41,9 @@ class VirtualHostClock(private val epochMillis: Long = 0) : HostClock, Clock {
             timers.removeAll { it.cancelled }
             val next = timers.filter { it.at <= until }.minWithOrNull(compareBy<Timer>({ it.at }, { it.seq })) ?: break
             timers.remove(next)
-            // never back: a timer due before a task's [spend] ran out runs late, as on a busy thread
             now = maxOf(now, next.at)
             next.task()
         }
         now = maxOf(now, until)
-    }
-
-    /** Time a task takes as it runs: the clock moves on [millis] without running timers, as a busy thread's does. */
-    fun spend(millis: Long) {
-        now += millis
     }
 }

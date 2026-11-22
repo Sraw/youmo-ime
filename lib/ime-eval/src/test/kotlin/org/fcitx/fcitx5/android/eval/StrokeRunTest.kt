@@ -62,7 +62,7 @@ class StrokeRunTest {
         assertEquals(1, result.skipped)
         val rows = result.rows()
         assertTrue(rows.toString(), rows.any { it.startsWith("a stroke") && "n     4" in it })
-        assertTrue(rows.toString(), rows.any { it.startsWith("a refine") && "n     1" in it })
+        assertTrue(rows.toString(), rows.any { it.startsWith("to the look-ahead") && "n     1" in it })
         assertTrue(rows.toString(), "first after 1 strokes: 100.0%" in rows)
     }
 

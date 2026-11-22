@@ -46,6 +46,14 @@
     <string name="version">版本</string>
     <string name="build_time">提交時間</string>
     <string name="engine_data">基礎資料</string>
+    <string name="device_processor">本機處理器</string>
+    <plurals name="device_processor_summary">
+        <item quantity="other">%1$s檔 · %2$d 核 · %3$s · 核心 %4$s</item>
+    </plurals>
+    <plurals name="device_processor_summary_big">
+        <item quantity="other">%1$s檔 · %2$d 核（%3$d 大）· %4$s · 核心 %5$s</item>
+    </plurals>
+    <string name="device_processor_summary_unread">%1$s檔 · %2$s · 核心 %3$s</string>
     <string name="data_outdated">這一版已超過半年</string>
     <string name="data_outdated_summary">新詞隨新版本發佈，點此去下載</string>
     <string name="build_git_hash">建構 Git 雜湊值</string>
@@ -761,7 +769,23 @@
     <string name="im_model_level_summary">檔位越高越準，也越耗電</string>
     <string name="im_model_level_low">低檔：只按詞頻和搭配，最省電</string>
     <string name="im_model_level_medium">中檔：每次按鍵按整句通順程度重排</string>
-    <string name="im_model_level_high">高檔：停頓時再用大模型精挑首選，最準</string>
+    <string name="im_model_level_high">高檔：拿不準時用大模型複核，最準</string>
+    <string name="im_model_level_auto">自動（本機：%1$s，%2$s）</string>
+    <string name="im_model_level_auto_here">%1$s（本機自動為：%2$s）</string>
+    <string name="device_level_low">低</string>
+    <string name="device_level_medium">中</string>
+    <string name="device_level_high">高</string>
+    <string name="device_reason_i8mm">有 i8mm</string>
+    <string name="device_reason_new_big_core">大核為 A77 或更新</string>
+    <string name="device_reason_little_only">只有小核</string>
+    <plurals name="device_reason_offline">
+        <item quantity="other">偵測時 %1$d 核離線</item>
+    </plurals>
+    <string name="device_reason_unread">讀不到處理器資訊</string>
+    <string name="device_reason_no_dotprod">無 dotprod</string>
+    <string name="device_reason_dotprod">有 dotprod，無 i8mm</string>
+    <string name="device_dotprod">有 dotprod</string>
+    <string name="device_no_dotprod">無 dotprod</string>
     <string name="im_typos">糾正錯拼和按偏的鍵</string>
     <string name="im_typos_summary">按在鍵的邊上、靠著旁邊哪個鍵，也按那個鍵讀（點在鍵中間不改）；全拼還認 gn 當成 ng 這類錯拼，雙拼全鍵盤還認 j、q、x、y 後的 u 按成了 ü 的鍵</string>
     <string name="im_latin_words">中英混輸</string>

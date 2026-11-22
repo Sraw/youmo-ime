@@ -46,6 +46,16 @@
     <string name="version">Version</string>
     <string name="build_time">Commit time</string>
     <string name="engine_data">Engine data</string>
+    <string name="device_processor">This device\'s processor</string>
+    <plurals name="device_processor_summary">
+        <item quantity="one">Level %1$s · %2$d core · %3$s · kernel %4$s</item>
+        <item quantity="other">Level %1$s · %2$d cores · %3$s · kernel %4$s</item>
+    </plurals>
+    <plurals name="device_processor_summary_big">
+        <item quantity="one">Level %1$s · %2$d core (%3$d big) · %4$s · kernel %5$s</item>
+        <item quantity="other">Level %1$s · %2$d cores (%3$d big) · %4$s · kernel %5$s</item>
+    </plurals>
+    <string name="device_processor_summary_unread">Level %1$s · %2$s · kernel %3$s</string>
     <string name="data_outdated">This version is over half a year old</string>
     <string name="data_outdated_summary">New words come with new versions: tap to see the releases</string>
     <string name="build_git_hash">Build Git hash</string>
@@ -786,7 +796,24 @@
     <string name="im_model_level_summary">Higher picks better and uses more battery</string>
     <string name="im_model_level_low">Low: by how common words and pairs are, least battery</string>
     <string name="im_model_level_medium">Medium: weighs the whole sentence at every key</string>
-    <string name="im_model_level_high">High: a larger model picks the first again as you pause, most accurate</string>
+    <string name="im_model_level_high">High: a larger model checks where unsure, most accurate</string>
+    <string name="im_model_level_auto">Auto (this device: %1$s, %2$s)</string>
+    <string name="im_model_level_auto_here">%1$s (auto here: %2$s)</string>
+    <string name="device_level_low">low</string>
+    <string name="device_level_medium">medium</string>
+    <string name="device_level_high">high</string>
+    <string name="device_reason_i8mm">has i8mm</string>
+    <string name="device_reason_new_big_core">big cores A77 or newer</string>
+    <string name="device_reason_little_only">little cores only</string>
+    <plurals name="device_reason_offline">
+        <item quantity="one">%1$d core offline when checked</item>
+        <item quantity="other">%1$d cores offline when checked</item>
+    </plurals>
+    <string name="device_reason_unread">the processor could not be read</string>
+    <string name="device_reason_no_dotprod">no dotprod</string>
+    <string name="device_reason_dotprod">dotprod, no i8mm</string>
+    <string name="device_dotprod">dotprod</string>
+    <string name="device_no_dotprod">no dotprod</string>
     <string name="im_typos">Fix typos and slipped keys</string>
     <string name="im_typos_summary">A key tapped at its edge, by the key next to it, is read as that key too (a tap in its middle is left alone); full pinyin also reads slips such as gn for ng, Shuangpin on the full keyboard the u after j, q, x, y typed with ü\'s key</string>
     <string name="im_latin_words">Type English words</string>

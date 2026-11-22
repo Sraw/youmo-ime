@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.english.EnglishData
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.english.EnglishSession
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.GlidePath
@@ -16,6 +17,7 @@ import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.Engines
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.lattice.Penalties
 import org.fcitx.fcitx5.android.engine.lattice.PinyinDecoder
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
@@ -30,10 +32,11 @@ import org.fcitx.fcitx5.android.engine.pinyin.Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.rerank.GatedPicker
+import org.fcitx.fcitx5.android.engine.rerank.LargeHandle
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.stroke.StrokeFilter
@@ -51,6 +54,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.channels.FileChannel
 import java.nio.file.Files
+import java.util.Collections
 import java.util.Locale
 import java.util.Random
 import kotlin.system.exitProcess
@@ -66,20 +70,20 @@ internal val COMMANDS = listOf(
     },
     Command(
         "pinyin",
-        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--latin on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--history <words.txt>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
-        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "latin", "rerank", "refine", "weight", "limit", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "history", "touch", "touched",
-    ) { args, _, _ ->
+        "<pinyin.data> <set.tsv> <result.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--neighbours on|off] [--typos on|off] [--latin on|off] [--tier low|medium|high --models <dir>] [--beam <n>] [--sentences <n>] [--layers <name>=<log10>,...] [--pack <file.words>] [--merged <dictionary.txt> [--stale]] [--threads <n>] [--taps <hand>:<α>[:<seed>]] [--sp-abbrev off|<extra penalty>] [--history <words.txt>] [--touch <keyboard>:<hand>:<clean|slip>[:<seed>] [--touched <set.tsv>]]",
+        3..3, "scheme", "fuzzy", "half", "neighbours", "typos", "latin", "tier", "models", "beam", "sentences", "layers", "pack", "merged", "stale", "threads", "taps", "sp-abbrev", "history", "touch", "touched",
+    ) { args, out, _ ->
         // --touched needs --touch
         if ("touched" in args.options && "touch" !in args.options) return@Command null
         val (dataPath, setPath, resultPath) = args.operands
-        runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options))
+        runPinyin(dataPath, setPath, resultPath, RunOptions(args.options), Models(args.options), out)
     },
     Command(
         "predict", "<pinyin.data> <predict.tsv> [--offers <out.tsv>] [--threads <n>] [--rerank <model.safetensors> [--weight <w>]]",
         2..2, "threads", "offers", "rerank", "weight",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
-        val weight = args.options["weight"]?.let { weights(it)?.first } ?: Reranker.WEIGHT
+        val weight = args.options["weight"]?.let(::weight) ?: Reranker.WEIGHT
         predict(dataPath, setPath, RunOptions(args.options).threads, args.options["offers"], args.options["rerank"], weight, out)
     },
     Command(
@@ -323,31 +327,31 @@ internal val COMMANDS = listOf(
     },
     Command(
         "ksc",
-        "<pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--threads <n>] [--outcomes <out.tsv>]",
-        2..2, "scheme", "fuzzy", "half", "rerank", "refine", "weight", "threads", "outcomes",
+        "<pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--half <half>] [--tier low|medium|high --models <dir>] [--threads <n>] [--outcomes <out.tsv>]",
+        2..2, "scheme", "fuzzy", "half", "tier", "models", "threads", "outcomes",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         ksc(dataPath, setPath, RunOptions(args.options), Models(args.options), args.options["outcomes"], out)
     },
     Command(
         "learn",
-        "<pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--neighbours on|off] [--rerank <model.safetensors>] [--refine <model.safetensors>] [--weight <rerank>[,<refine>]] [--limit <rerank>[,<refine>]] [--pack <file.words>] [--misses <out.tsv>] $USE_USAGE",
-        2..2, "scheme", "fuzzy", "neighbours", "rerank", "refine", "weight", "limit", "pack", "misses", *USE_OPTIONS,
+        "<pinyin.data> <set.tsv> [--scheme <scheme>] [--fuzzy all|<pair>,...] [--neighbours on|off] [--tier low|medium|high --models <dir>] [--pack <file.words>] [--misses <out.tsv>] $USE_USAGE",
+        2..2, "scheme", "fuzzy", "neighbours", "tier", "models", "pack", "misses", *USE_OPTIONS,
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         learn(dataPath, setPath, RunOptions(args.options), Models(args.options), args.options["pack"], learningUse(args.options), args.options["misses"], out)
     },
     Command(
         "learn-ux",
-        "<pinyin.data> <script.txt or a directory of them> [--seed <commits>] [--gate] [--rerank <model.safetensors>] [--refine <model.safetensors>] $USE_USAGE",
-        2..2, "seed", "gate", "rerank", "refine", *USE_OPTIONS,
+        "<pinyin.data> <script.txt or a directory of them> [--seed <commits>] [--gate] [--tier low|medium|high --models <dir>] $USE_USAGE",
+        2..2, "seed", "gate", "tier", "models", *USE_OPTIONS,
     ) { args, out, _ ->
         val (dataPath, scriptPath) = args.operands
         learnUx(dataPath, File(scriptPath), args.options, out)
     },
     Command(
-        "strokes", "<pinyin.data> <stroke.data> <set.tsv> [--charinfo <charinfo.data>] [--scheme <scheme>] [--look-ahead <n>] [--first-char] [--rerank <model.safetensors>] [--refine <model.safetensors>]",
-        3..3, "charinfo", "scheme", "look-ahead", "first-char", "rerank", "refine",
+        "strokes", "<pinyin.data> <stroke.data> <set.tsv> [--charinfo <charinfo.data>] [--scheme <scheme>] [--look-ahead <n>] [--first-char] [--tier low|medium|high --models <dir>]",
+        3..3, "charinfo", "scheme", "look-ahead", "first-char", "tier", "models",
     ) { args, out, _ ->
         val (dataPath, strokePath, setPath) = args.operands
         val lookAhead = args.options["look-ahead"]?.let { it.toIntOrNull()?.takeIf { n -> n > 0 } ?: return@Command null } ?: StrokeFilter.LOOK_AHEAD
@@ -366,29 +370,30 @@ internal val COMMANDS = listOf(
     },
     Command(
         "handwriting",
-        "<pinyin.data> <rows.tsv> [--weights <ink weight>,... (one with --rerank)] [--alternatives <n>] [--limit <rows>] [--rerank <small model.safetensors> [--refine <large model.safetensors>] [--model-weights <w>,...]]",
-        2..2, "weights", "alternatives", "limit", "rerank", "refine", "model-weights",
+        "<pinyin.data> <rows.tsv> [--weights <ink weight>,... (one with --models)] [--alternatives <n>] [--limit <rows>] [--tier low|medium|high --models <dir> [--model-weights <w>,...]]",
+        2..2, "weights", "alternatives", "limit", "tier", "models", "model-weights",
     ) { args, out, _ ->
         val (dataPath, rowsPath) = args.operands
         val inkWeights = args.options["weights"]?.split(',')?.size ?: 1
-        if (modelsAlone(args.options, "model-weights" to "rerank") || ("rerank" in args.options && inkWeights > 1)) {
+        val weightsAlone = "model-weights" in args.options && "models" !in args.options
+        if (weightsAlone || ("models" in args.options && inkWeights > 1)) {
             null
         } else {
             handwriting(dataPath, rowsPath, args.options, out)
         }
     },
     Command(
-        "table", "<table.data> <set.tsv> [--preset <preset> [--pinyin <pinyin.data> [--rerank <small.safetensors> [--refine <large.safetensors>]]]]",
-        2..2, "preset", "pinyin", "rerank", "refine",
+        "table", "<table.data> <set.tsv> [--preset <preset> [--pinyin <pinyin.data> [--tier low|medium|high --models <dir>]]]",
+        2..2, "preset", "pinyin", "tier", "models",
     ) { args, out, _ ->
         val (dataPath, setPath) = args.operands
         val preset = args.options["preset"] ?: DEFAULT_PRESET
-        if (modelsAlone(args.options, "rerank" to "pinyin")) {
+        if ("models" in args.options && "pinyin" !in args.options) {
             null
         } else {
             table(dataPath, setPath, preset, out)
             // the 重码 after the preceding text, as the app ranks them (TableLanguage)
-            args.options["pinyin"]?.let { tableHomographs(dataPath, setPath, preset, it, args.options["rerank"], args.options["refine"], out) }
+            args.options["pinyin"]?.let { tableHomographs(dataPath, setPath, preset, it, Models(args.options), out) }
             0
         }
     },
@@ -490,8 +495,8 @@ private fun optionsValid(options: Map<String, String>): Boolean {
         valid("preset") { it in TableRun.PRESETS },
         // a table that does not order by use keeps its order whatever the text before
         valid("pinyin") { TableRun.PRESETS[options["preset"] ?: DEFAULT_PRESET]?.orderByUse == true },
-        valid("weight") { weights(it) != null },
-        valid("limit") { limits(it) != null },
+        valid("weight") { weight(it) != null },
+        tierValid(options),
         valid("user-weight") { weight(it) != null },
         valid("max-correction") { weight(it) != null },
         valid("noise") { n -> n.toDoubleOrNull()?.let { it in 0.0..1.0 } == true },
@@ -560,20 +565,12 @@ private fun loadData(path: String): PinyinData = PinyinData.load(mapFile(path))
 
 private fun weight(spec: String): Float? = spec.toFloatOrNull()?.takeIf { it >= 0 && it.isFinite() }
 
-/** `<rerank>[,<refine>]`: the sentence models' weights against the decoder; refine defaults to rerank. */
-private fun weights(spec: String): Pair<Float, Float>? = pairOf(spec, ::weight)
+/** `--tier`: a 性能档位 by its name. */
+private fun tier(spec: String): ModelLevel? = ModelLevel.entries.firstOrNull { it.name.lowercase(Locale.ROOT) == spec }
 
-/** `<rerank>[,<refine>]`: how many readings each sentence model weighs; refine defaults to rerank. */
-private fun limits(spec: String): Pair<Int, Int>? = pairOf(spec) { it.toIntOrNull()?.takeIf { n -> n > 0 } }
-
-private fun <T : Any> pairOf(spec: String, part: (String) -> T?): Pair<T, T>? {
-    val parts = spec.split(',').map { part(it) ?: return null }
-    return when (parts.size) {
-        1 -> parts[0] to parts[0]
-        2 -> parts[0] to parts[1]
-        else -> null
-    }
-}
+// a tier that runs a model needs the models
+private fun tierValid(options: Map<String, String>): Boolean =
+    options["tier"]?.let { t -> tier(t)?.let { it == ModelLevel.LOW || "models" in options } == true } ?: true
 
 /** The options of the commands that run the engine over a set, checked already by optionsValid. */
 private class RunOptions(options: Map<String, String>) {
@@ -631,25 +628,40 @@ private class RunOptions(options: Map<String, String>) {
     }
 }
 
-/** The sentence models (at each key, and at a pause): loaded once and shared; each reranker keeps its own state. */
+/** The sentence models a 性能档位 runs (`--tier`, the app's 高档 by default with `--models <dir>`), read as the app reads them: loaded once and shared; each picker keeps its own state. */
 private class Models(options: Map<String, String>) {
-    private val rerankPath = options["rerank"]
-    private val refinePath = options["refine"]
-    private val weights = options["weight"]?.let(::weights) ?: (Reranker.WEIGHT to Reranker.WEIGHT)
-    private val limits = options["limit"]?.let(::limits) ?: (Reranker.LIMIT to Reranker.REFINE_LIMIT)
+    private val dir = options["models"]
+    val tier = options["tier"]?.let(::tier) ?: if (dir == null) ModelLevel.LOW else ModelLevel.HIGH
 
-    // floats, as the app has the smaller: the same scores, faster
-    private val rerank by lazy { rerankPath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
-    private val refine by lazy { refinePath?.let { SentenceModel.load(mapFile(it), unpack = true) } }
+    val small by lazy { load(InputMethodCatalog.SENTENCE_MODEL, ModelLevel.MEDIUM) }
+    private val large by lazy { load(InputMethodCatalog.LARGE_MODEL, ModelLevel.HIGH) }
 
-    val reranker: (() -> Reranker)? get() = rerank?.let { model -> { Reranker(model, weights.first, limit = limits.first) } }
+    /** Whether pinyin runs the 高档 gate. */
+    val gates: Boolean get() = small != null && large != null
 
-    val refiner: (() -> SentenceRefiner)? get() = refine?.let { model -> { Reranker(model, weights.second, limit = limits.second) } }
+    private fun load(name: String, from: ModelLevel) = dir?.takeIf { tier >= from }?.let { SentenceModel.load(mapFile(File(it, File(name).name).path)) }
+
+    /** The 4M alone, as tables and handwriting have it at 中档 and 高档. */
+    val reranker: (() -> Reranker)? get() = small?.let { model -> { Reranker(model) } }
+
+    /** As a pinyin session has it ([nineKeys]: on a T9Segmenter): at 高档 the gate, the large model read once and shared. */
+    fun picker(nineKeys: Boolean): (() -> SentencePicker)? {
+        val small = small ?: return null
+        val large = large ?: return { Reranker(small) }
+        return {
+            val handle = object : LargeHandle {
+                private val picker by lazy(LazyThreadSafetyMode.NONE) { Reranker(large) }
+                override fun get() = picker
+                override fun loaded() = picker
+            }
+            GatedPicker.of(Reranker(small), handle, nineKeys)
+        }
+    }
 }
 
 private fun predict(dataPath: String, setPath: String, threads: Int, offersPath: String?, rerank: String?, weight: Float, out: Appendable): Int {
     val samples = File(setPath).useLines { PredictRun.parse(it) }
-    val model = rerank?.let { SentenceModel.load(mapFile(it), unpack = true) }
+    val model = rerank?.let { SentenceModel.load(mapFile(it)) }
     val offers = dealt(samples, threads, { PredictRun(loadData(dataPath), model, weight) }) { hand -> hand.map { offers(it.context) } }
     offersPath?.let { path ->
         File(path).printWriter().use { w -> samples.zip(offers).forEach { (s, o) -> w.println("${s.context}\t${s.next}\t${o.joinToString(" ")}") } }
@@ -669,7 +681,7 @@ private fun score(setPath: String, resultPath: String, baselinePath: String?, ha
     return 0
 }
 
-private fun runPinyin(dataPath: String, setPath: String, resultPath: String, options: RunOptions, models: Models): Int {
+private fun runPinyin(dataPath: String, setPath: String, resultPath: String, options: RunOptions, models: Models, out: Appendable): Int {
     val mergedPath = options.merged
     val pack = options.pack?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
     val work = mergedPath?.let { Files.createTempDirectory("ime-eval-merged").toFile() }
@@ -686,17 +698,21 @@ private fun runPinyin(dataPath: String, setPath: String, resultPath: String, opt
         } ?: set
         // the set as tapped, for the device runner (EngineEvalRunner) to type the same
         options.touched?.let { path -> File(path).printWriter().use { w -> selected.forEach { w.println(EvalSet.line(it)) } } }
+        val runs = Collections.synchronizedList(ArrayList<PinyinRun>())
         val results = dealt(selected, options.threads, {
             val data = loadData(dataPath)
+            val segmenter = options.segmenter(data)
             PinyinRun(
-                data, options.segmenter(data), penalties = Penalties(tap = options.taps?.let { -it.alpha } ?: Penalties().tap, abbrev = options.abbrevPenalty),
+                data, segmenter, penalties = Penalties(tap = options.taps?.let { -it.alpha } ?: Penalties().tap, abbrev = options.abbrevPenalty),
                 beam = options.beam, sentenceCount = options.sentences, layers = options.layers, pack = pack,
-                reranker = models.reranker, refiner = models.refiner,
+                reranker = models.picker(segmenter is T9Segmenter),
                 merged = merged?.let { DictionaryFile.open(JvmFile(it), verify = false) }, mergedStale = options.stale,
                 typed = typed,
-            )
+            ).also(runs::add)
         }) { hand -> run(hand) }
-        File(resultPath).printWriter().use { out -> results.forEach { out.println(RunResultFormat.format(it)) } }
+        File(resultPath).printWriter().use { w -> results.forEach { w.println(RunResultFormat.format(it)) } }
+        // the gate's share of keys, which the tier guard holds to its baseline
+        if (models.gates) out.appendLine("escalated ${runs.sumOf { it.escalations }} of ${selected.sumOf { it.input.length }} keys")
     } finally {
         work?.deleteRecursively()
     }
@@ -729,8 +745,7 @@ private fun sentences(dataPath: String, setPath: String, outPath: String, option
 }
 
 private fun lm(modelPath: String, context: String, texts: List<String>, out: Appendable): Int {
-    // floats, as the other commands load it: faster than the JVM kernel per weight of the mapped file
-    val model = SentenceModel.load(mapFile(modelPath), unpack = true)
+    val model = SentenceModel.load(mapFile(modelPath))
     model.Scorer().score(context, texts).forEachIndexed { i, score ->
         out.appendLine(String.format(Locale.ROOT, "%8.3f %6.3f %s", score, score / texts[i].length, texts[i]))
     }
@@ -767,9 +782,9 @@ private fun writeT9Set(setPath: String, outPath: String, presses: T9Set.Presses,
 private fun strokes(dataPath: String, strokePath: String, setPath: String, lookAhead: Int, o: Map<String, String>, out: Appendable): Int {
     val data = loadData(dataPath)
     val strokes = Strokes(CodeTable.load(mapFile(strokePath))) { c -> data.wordIndex.find(c).let { if (it < 0) Float.NEGATIVE_INFINITY else data.model.score(it) } }
-    // the sentence models as the app's 档位 has them: without, a refine has nothing to weigh
-    val models = Models(o)
-    val session = PinyinSession(data, RunOptions(o).segmenter(data), prediction = false, reranker = models.reranker?.invoke(), refiner = models.refiner?.invoke())
+    // the sentence model as the app's 档位 has it
+    val segmenter = RunOptions(o).segmenter(data)
+    val session = PinyinSession(data, segmenter, prediction = false, reranker = Models(o).picker(segmenter is T9Segmenter)?.invoke())
     val set = readSet(setPath)
     val samples = if ("first-char" in o) firstChars(set, o["scheme"]) else set
     // the mainland's orders as the app has them (StrokeFilter); without, rime-stroke's alone
@@ -858,7 +873,8 @@ private fun tune(dataPath: String, setPath: String, slipsPath: String, threads: 
 private fun ksc(dataPath: String, setPath: String, options: RunOptions, models: Models, outcomesPath: String?, out: Appendable): Int {
     val outcomes = dealt(Halves.select(readSet(setPath), options.half), options.threads, {
         val data = loadData(dataPath)
-        Typist(data, options.segmenter(data), options.spell, models.reranker, models.refiner)
+        val segmenter = options.segmenter(data)
+        Typist(data, segmenter, options.spell, models.picker(segmenter is T9Segmenter))
     }) { hand -> hand.map { type(it) } }
     out.appendLine(KeystrokeRun.report(outcomes))
     // a line a sample, for two runs to be compared on the samples both reached
@@ -866,35 +882,24 @@ private fun ksc(dataPath: String, setPath: String, options: RunOptions, models: 
     return 0
 }
 
-/** Types one thread's samples through one session, as the app keeps one; the rerankers are new per sample, as one keeps state. */
+/** Types one thread's samples through one session, as the app keeps one; the reranker is new per sample, as one keeps state. */
 internal class Typist(
     data: PinyinData,
     segmenter: Segmenter,
     spell: Boolean = false,
     private val reranker: (() -> SentencePicker)? = null,
-    private val refiner: (() -> SentenceRefiner)? = null,
 ) {
     private lateinit var sampleReranker: SentencePicker
-    private lateinit var sampleRefiner: SentenceRefiner
-
-    private val forwardingRefiner = object : SentenceRefiner {
-        override val slices: Int get() = sampleRefiner.slices
-
-        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? =
-            sampleRefiner.refine(context, readings, scores, budget)
-    }
 
     // no prediction: KeystrokeRun reads none
     private val session = PinyinSession(
         data, segmenter, spell = spell, prediction = false,
-        refiner = if (refiner == null) null else forwardingRefiner,
         reranker = if (reranker == null) null else SentencePicker { context, readings, scores -> sampleReranker.pick(context, readings, scores) },
     )
     private val keys = KeystrokeRun(session)
 
     fun type(sample: Sample): KeystrokeRun.Outcome {
         reranker?.let { sampleReranker = it() }
-        refiner?.let { sampleRefiner = it() }
         session.apply(Action.Reset)
         return keys.type(sample)
     }
@@ -903,7 +908,8 @@ internal class Typist(
 private fun learn(dataPath: String, setPath: String, options: RunOptions, models: Models, packPath: String?, use: LearningUse, missesPath: String?, out: Appendable): Int {
     val data = loadData(dataPath)
     val pack = packPath?.let { path -> File(path).useLines { WordPack.parse(it, path) } }
-    val rows = Learning(data, options.segmenter(data), models.reranker, models.refiner, pack, use).measure(readSet(setPath))
+    val segmenter = options.segmenter(data)
+    val rows = Learning(data, segmenter, models.picker(segmenter is T9Segmenter), pack, use).measure(readSet(setPath))
     out.appendLine(KeystrokeRun.HEADER)
     rows.forEach { (label, outcomes) -> out.appendLine(KeystrokeRun.row(label, outcomes)) }
     // each row's samples not first once typed: the row, the keys, what was meant
@@ -929,8 +935,7 @@ private fun learnUx(dataPath: String, scripts: File, o: Map<String, String>, out
         val sets = (if (scripts.isDirectory) scripts else scripts.absoluteFile.parentFile).absoluteFile.parentFile
         SEED_SETS.flatMap { readSet(File(sets, "$it.tsv").path) }.shuffled(Random(SEED_SHUFFLE)).take(n)
     }.orEmpty()
-    val models = Models(o)
-    val results = LearnUx(loadData(dataPath), models.reranker, models.refiner, learningUse(o), seed).run(scenarios)
+    val results = LearnUx(loadData(dataPath), Models(o).picker(nineKeys = false), learningUse(o), seed).run(scenarios)
     out.appendLine(LearnUx.report(results))
     val checked = results.any { it.status != LearnUx.Status.NOTE }
     if (!checked) out.appendLine("no expectation checked in $scripts")
@@ -942,11 +947,7 @@ private const val SEED_SHUFFLE = 7L
 
 private const val USE_USAGE = "[--user-counts full|none|multi] [--short-guard on|off]"
 
-/** Whether [options] give a model option without its partner, which would be ignored. */
-private fun modelsAlone(options: Map<String, String>, need: Pair<String, String>) =
-    ("refine" in options && "rerank" !in options) || (need.first in options && need.second !in options)
-
-/** The rows read by ink alone, then as a sentence at each ink weight, then with the sentence models of each 性能档位. */
+/** The rows read by ink alone, then as a sentence at each ink weight, then with the sentence model of the 性能档位 asked. */
 private fun handwriting(dataPath: String, rowsPath: String, options: Map<String, String>, out: Appendable): Int {
     val run = HandwritingRun(loadData(dataPath))
     val rows = HandwritingRun.read(rowsPath).let { r -> options["limit"]?.toIntOrNull()?.let { r.take(it) } ?: r }
@@ -954,17 +955,15 @@ private fun handwriting(dataPath: String, rowsPath: String, options: Map<String,
     out.appendLine("ink alone            ${run.ink(rows)}")
     val weights = options["weights"]?.split(',')?.map { it.toDouble() } ?: listOf(HandwritingDecoder.INK_WEIGHT)
     for (w in weights) out.appendLine(String.format(Locale.ROOT, "sentence, ink %-5s %s", w, run.sentences(rows, run.decoder(w, alternatives))))
-    val small = options["rerank"]?.let { SentenceModel.load(mapFile(it), unpack = true) } ?: return 0
-    val large = options["refine"]?.let { SentenceModel.load(mapFile(it), unpack = true) }
+    val models = Models(options)
+    val small = models.small ?: return 0
+    val tier = models.tier.name.lowercase(Locale.ROOT)
     val modelWeights = options["model-weights"]?.split(',')?.map { it.toFloat() } ?: listOf(Reranker.WEIGHT)
     for (mw in modelWeights) {
         val reranker = Reranker(small, mw)
         val medium = { before: String, d: HandwritingDecoder.Decoding -> reranker.pick(before, d.best, d.bestScores) }
         val decoder = run.decoder(weights.first(), alternatives)
-        out.appendLine(String.format(Locale.ROOT, "medium %-5s     %s", mw, run.sentences(rows, decoder, medium)))
-        val refiner = large?.let { Reranker(it, mw, limit = Reranker.REFINE_LIMIT) } ?: continue
-        val high = HandwritingRun.refined(refiner, medium)
-        out.appendLine(String.format(Locale.ROOT, "high %-5s       %s", mw, run.sentences(rows, decoder, high)))
+        out.appendLine(String.format(Locale.ROOT, "%-6s %-5s     %s", tier, mw, run.sentences(rows, decoder, medium)))
     }
     return 0
 }
@@ -977,17 +976,14 @@ private fun table(dataPath: String, setPath: String, preset: String, out: Append
     return 0
 }
 
-private fun tableHomographs(dataPath: String, setPath: String, preset: String, pinyinPath: String, rerank: String?, refine: String?, out: Appendable) {
+private fun tableHomographs(dataPath: String, setPath: String, preset: String, pinyinPath: String, models: Models, out: Appendable) {
     val run = TableRun(CodeTable.load(mapFile(dataPath)), TableRun.PRESETS.getValue(preset))
     val d = loadData(pinyinPath)
     val words = TextWords(d.model, d.wordIndex)
-    val small = rerank?.let { Reranker(SentenceModel.load(mapFile(it), unpack = true), Reranker.WEIGHT) }
-    val large = refine?.let { Reranker(SentenceModel.load(mapFile(it), unpack = true), Reranker.WEIGHT, limit = Reranker.REFINE_LIMIT) }
     val languages = listOfNotNull(
         "table's order" to null,
         "word model (low)" to TableLanguage(words),
-        small?.let { "+ small model (medium)" to TableLanguage(words, reranker = it) },
-        large?.let { "+ large model (high)" to TableLanguage(words, reranker = small, refiner = it) },
+        models.reranker?.let { "+ small model (${models.tier.name.lowercase(Locale.ROOT)})" to TableLanguage(words, reranker = it()) },
     )
     val texts = readSet(setPath).map { it.expected }.distinct()
     var n = 0

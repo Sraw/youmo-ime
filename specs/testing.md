@@ -17,7 +17,7 @@ compiled is not done.
 | Python tools | `lexicon/tools`, `lib/ime-eval/tools` | `python3 -m unittest discover -s lexicon/tools` (and `-s lib/ime-eval/tools`) | the lexicon and evaluation scripts |
 | Static | all Kotlin modules | `./gradlew detekt` | syntax rules (type resolution does not work here); findings frozen in `config/detekt/baseline-*.xml` |
 | Native host tests | `lib/sherpa-onnx/host-test.sh` | the script | sherpa-onnx's C++ helpers, compiled for the host |
-| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedDebugAndroidTest`, after the two packs are imported (`uat/tools/uat.py packs`; CI's emulator job does the same) | the real host, engine and keyboard (`KotlinHost`, `TestHost`): `HostTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest`, `HostConfigTest`, `HostEnglishTest`, `HostPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh` |
+| Instrumented | `app/src/androidTest` | CI (`emulator` label / weekly); locally `connectedDebugAndroidTest`, after the two packs are imported (`uat/tools/uat.py packs`; CI's emulator job does the same) | the real host, engine and keyboard (`KotlinHost`, `TestHost`): `HostTest`, `SoftKeyboardTest`, `TypingHostActivityTest`, `NativeMatrixKernelTest` (each kernel forced by `useKernel`, SDOT, MLAL and portable, held bit for bit to `MatrixKernel.JVM` over m 1–7, columns a multiple of 16 and not, −128 and extreme scales; the SDOT self-test, the affinity calls), `HostConfigTest`, `HostEnglishTest`, `HostPreeditTest`, `SetupActivityDeviceTest`, `FileUtilTest`; `EngineEvalRunner` is the device runner behind `run-on-device.sh`, logging the settings it typed with first |
 | Evaluation | `lib/ime-eval` | see below | ranking: whether the first candidate is the sentence meant |
 | On a device | the Android emulator (arm64) or a phone | by hand / scripts | what a user sees: layout, gestures, rotation, upgrade |
 
@@ -165,9 +165,41 @@ routinely costs a point on the sets.
 E=lib/ime-eval/build/install/ime-eval/bin/ime-eval
 D=app/build/generated/engine-assets/engine/pinyin.data
 M=app/build/generated/engine-models/engine
-$E pinyin $D lib/ime-eval/data/pinyin.tsv out.tsv --neighbours on \
-   --rerank $M/sentence-model.safetensors --refine $M/sentence-model-large.safetensors
+$E pinyin $D lib/ime-eval/data/pinyin.tsv out.tsv --neighbours on --tier high --models $M
 ```
+
+`--tier low|medium|high` runs the sentence models as that 性能档位 does; `--models <dir>` holds
+`sentence-model.safetensors` and `sentence-model-large.safetensors` (with `--models` alone the tier is high).
+At high `pinyin` also prints the keys its gate sent to the large model.
+
+### The tier guard
+
+Required for any change to the sentence pickers, decoding or the models, and not in `verify` (it
+needs the built data, and minutes):
+
+```shell
+EVAL=$E DATA=$D MODELS=$M lib/ime-eval/tools/tier-guard.sh
+```
+
+It types four sets at the three tiers, every reading with neighbouring keys as the app's default:
+`pinyin-chat` as full pinyin, the same typed on the nine keys (`t9`, read `t9-strict` with
+`--latin on`) and in 小鹤 (`shuangpin xiaohe`), and `pinyin`. Each set and tier gives its rows, its
+first-candidate and first-five rows, and at high the keys escalated; `lib/ime-eval/data/tier-baseline.tsv`
+keeps them as integers with the SHA-256 of `pinyin.data` and both models. Every number must equal the
+baseline's (exit 1 otherwise; exit 3, no verdict, when the data or a model is not the baseline's).
+A change meant to move them is rebaselined with `--rebaseline`, said why in its commit, and written
+only where: full pinyin and 小鹤 escalate 25–55% of their keys and the nine keys 0.5–10%; high's first
+is ahead of medium's on full pinyin and 小鹤 and nowhere more than 0.2 points behind; medium is nowhere
+behind low. Without a work dir it works in a temporary one, removed at the end.
+
+Native against the JVM, end to end: with a work dir and an emulator or the phone connected, `--device`
+also types every set at each tier through `EngineEvalRunner` (`run-on-device.sh` with `LEVEL=`, emoji off as ime-eval has none, the
+generated sets pushed, each set on its own input method and keys: the nine keys `NINE=1`, 小鹤 on
+`engine-shuangpin`), and compares each row's input and first five candidates, no timing, with the JVM's
+(`<set>-<tier>.shown.tsv` and `.device.tsv`); one row otherwise exits 4 and leaves `<set>-<tier>.diff`.
+The runner refuses a device whose candidate-shaping settings (scheme, fuzzy, typos, prediction, Latin words, 拆字, phrases, nine-key letters)
+are not the app's defaults, so a phone set by hand fails at once rather than as row differences. The debug APK must be built from the same data and models. Tables and handwriting are checked by their own runs (`table --pinyin`, `handwriting`):
+medium no worse than low.
 
 The sets (`lib/ime-eval/data/*.tsv`): `pinyin` (main, everyday and written sentences), `pinyin-web`
 (recent pages, held out from training), `pinyin-chat` and `pinyin-dialog` (LCCC: research use, for
@@ -219,7 +251,9 @@ decodes as the tool does (`NINE=1`: a set of digits typed as pinyin's nine keys 
 set of pinyin's 14 or 18 keys' codes as those keys send them; `sp18`, `sp14`, `sp9`, `zy9`, `zy`: 双拼's 18, 14 and nine
 keys' and 注音九键's and 大千's alike; `HISTORY=<words.txt>`: typed on that history, pushed to the app and put in
 place of its learning record, as `pinyin --history` counts it, `HistoryLines` in ime-core for both, for timing what
-hangs on words typed; a history from the tree is `ime-eval history <pinyin.data> <n> <words.txt>`).
+hangs on words typed; a history from the tree is `ime-eval history <pinyin.data> <n> <words.txt>`; `LEVEL=low|medium|high`:
+typed at that 性能档位 with no emoji, the app's put back after, into `<set>-<ime>-<level>.tsv`; a set given as a path to a `.tsv` is pushed
+and typed from the app's eval dir, for a set ime-eval made).
 
 Roborazzi goldens (`app/src/test/screenshots/`) show the bar with its microphone and the space's
 voice hint: since 0.6.0 there is one build, and voice is everyone's default (the voice pack's absence

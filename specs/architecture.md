@@ -57,7 +57,7 @@ One process. Inside it:
 - **Main thread**: the service, views, settings UI.
 - **The host thread** (`fcitx-main`, still called the fcitx thread): `HostDispatcher`, one
   scheduled executor, is both the coroutine dispatcher every `HostApi` call (`suspend`) runs on
-  and the `HostClock` whose timers (the refine pause, the input method name overlay) run strictly
+  and the `HostClock` whose timers (the input method name overlay among them) run strictly
   in order with the calls around them. `HostCore` and the engine's sessions live on it alone, so
   nothing in them locks. `KotlinHost.stop` runs a last job (flush the config writer, close the
   engine) and drops timers not yet due.
@@ -113,8 +113,7 @@ first client and stops it after the last.
    Ctrl+Shift+F for 简繁); a key nobody accepted goes back to the app. See [host.md](host.md).
 4. Through the `EngineHost` port (the app's `EngineBridge`), `Engines` (ime-core) applies an
    `Action` to the input method's `Session` (`PinyinSession`, `TableSession`, `EnglishSession`, …)
-   and gets a `Snapshot` back: text to commit, the preedit, the page of candidates, hints, whether
-   there is more to refine.
+   and gets a `Snapshot` back: text to commit, the preedit, the page of candidates, hints.
 5. `KeyRouter` shows the snapshot as the context's panel; commits go through the commit filters
    (punctuation, 简繁) and the panel through the output filters (简繁 converts every candidate).
    `HostCore` emits `HostEvent`s at once for commits and keys handed back, the panel once at the end
@@ -125,8 +124,6 @@ first client and stops it after the last.
    `EditingSession` (ime-core), which keeps its own idea of cursor and selection ahead of the
    editor's lagging reports (`CursorTracker`); `InputView` broadcasts panel events to the bar
    (`KawaiiBarComponent`), the candidate views and the preedit.
-7. While the user pauses, `Refiner` sends `Refine` after a short delay so the 25M model can pick a
-   better first candidate; any key drops what is left of that work.
 
 The engine also reads the editor: on a field focused or the cursor moved, the service reads the
 text before the cursor (`ContextReads`, gated by `FieldPolicy`: nothing from a password or a field

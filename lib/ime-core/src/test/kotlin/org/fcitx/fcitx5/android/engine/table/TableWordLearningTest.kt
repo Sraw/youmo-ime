@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
@@ -316,7 +317,7 @@ class TableWordLearningTest {
         val u = session()
         u.apply(Remember(u.keys(wangXiaoming).wordOffer!!.id, 0, "汪小明"))
         repeat(3) { assertFalse(u.apply(Backspace).handled) }
-        u.apply(Action.Refine)
+        u.apply(Action.Ink(NO_PIECE))
         assertFalse(saved.isSaved("iije", "汪小明"))
     }
 

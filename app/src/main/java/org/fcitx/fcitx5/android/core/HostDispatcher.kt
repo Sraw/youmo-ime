@@ -27,7 +27,7 @@ class HostDispatcher internal constructor(private val stopWaitSeconds: Long) : C
     fun start() {
         check(executor == null) { "already running" }
         executor = ScheduledThreadPoolExecutor(1) { Thread(it, THREAD) }.apply {
-            // a refine timer is cancelled at every key
+            // a timer cancelled is not kept queued till its time
             removeOnCancelPolicy = true
         }
     }

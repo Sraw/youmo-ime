@@ -14,7 +14,6 @@ import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.data.syl
@@ -36,7 +35,6 @@ class TableLanguageTest {
         user: UserModel = UserModel(d.dictionary, d.vocabulary),
         predicts: Boolean = false,
         reranker: SentencePicker? = null,
-        refiner: SentenceRefiner? = null,
         block: ((Entry) -> Unit)? = null,
         forgotten: (String) -> Unit = {},
         habits: Habits = Habits.OFF,
@@ -49,7 +47,6 @@ class TableLanguageTest {
             reading = { text -> d.wordIndex.find(text).takeIf { it != NO_WORD }?.let(readings::reading) },
             predictor = if (predicts) readings else null,
             reranker = reranker,
-            refiner = refiner,
             block = block,
             forgotten = forgotten,
             habits = habits,
@@ -155,26 +152,13 @@ class TableLanguageTest {
     }
 
     @Test
-    fun `the sentence models weigh the 重码 again, the large one while the user pauses`() {
+    fun `the sentence model weighs the 重码 again`() {
         val seen = ArrayList<String>()
         val picker = SentencePicker { context, readings, _ -> seen += context; readings.indexOf("山").coerceAtLeast(0) }
         val medium = session(language(reranker = picker))
         medium.apply(Action.Context("我说"))
         assertEquals(listOf("山", "人"), medium.type("abcd").second.candidates)
         assertEquals("我说", seen.last())
-
-        val refiner = SentenceRefiner { _, readings, _, _ -> readings.indexOf("山").takeIf { it >= 0 } ?: SentenceRefiner.NONE }
-        val high = session(language(refiner = refiner))
-        val shown = high.type("abcd").second
-        assertEquals(listOf("人", "山"), shown.candidates)
-        assertTrue(shown.refines)
-        val refined = high.apply(Action.Refine)
-        assertEquals(listOf("山", "人"), refined.candidates)
-        assertFalse(refined.refines)
-        assertEquals("山", high.apply(Action.Select(0)).commit)
-        high.type("abcd")
-        high.apply(Action.NextPage)
-        assertEquals(listOf("人", "山"), high.apply(Action.Refine).candidates)
     }
 
     @Test
@@ -297,14 +281,12 @@ class TableLanguageTest {
     }
 
     @Test
-    fun `a code that commits itself leaves nothing to weigh, a row twice in the table too`() {
-        val refiner = SentenceRefiner { _, _, _, _ -> 0 }
-        val s = TableSession(dictionary("abcd 人", "abcd 人"), TableOptions.WUBI, language = language(refiner = refiner))
+    fun `a code that commits itself leaves nothing shown, a row twice in the table too`() {
+        val s = TableSession(dictionary("abcd 人", "abcd 人"), TableOptions.WUBI, language = language(reranker = { _, _, _ -> 0 }))
         val (commit, shown) = s.type("abcd")
         assertEquals("人", commit)
-        assertFalse(shown.refines)
         // nothing typed: the code's 重码 are not shown again, to be picked
-        assertTrue(s.apply(Action.Refine).candidates.isEmpty())
+        assertTrue(shown.candidates.isEmpty())
     }
 
     @Test

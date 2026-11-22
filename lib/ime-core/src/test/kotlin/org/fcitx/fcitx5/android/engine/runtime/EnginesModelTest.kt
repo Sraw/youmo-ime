@@ -16,6 +16,7 @@ import org.junit.Test
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.util.concurrent.Executor
 
 /** The sentence models as [Engines] reads them: when, which for which input method, and without them. */
 class EnginesModelTest {
@@ -33,38 +34,36 @@ class EnginesModelTest {
         .toByteArray()
 
     private var model: ByteArray? = TinyModel().bytes()
-    private var refining: ByteArray? = TinyModel().bytes()
+    private var large: ByteArray? = TinyModel().bytes()
 
     private val loaded = ArrayList<String>()
+
+    // the large model read ahead here at once, so what was read is known at each step
+    private val inPlace = Executor { it.run() }
 
     private fun load(path: String): ByteBuffer {
         loaded += path
         val bytes = when (path) {
             InputMethodCatalog.PINYIN_DATA -> pinyin
             InputMethodCatalog.SENTENCE_MODEL -> model
-            InputMethodCatalog.REFINING_MODEL -> refining
+            InputMethodCatalog.LARGE_MODEL -> large
             InputMethodCatalog.EMOJI_DATA -> ByteArray(0)
             else -> null
         }
         return ByteBuffer.wrap(bytes ?: throw FileNotFoundException(path))
     }
 
-    /** What the addon does while the user pauses after [typed]: refines till there is no more to do. */
-    private fun Engines.pause(im: String, typed: Snapshot): List<Snapshot> {
-        val slices = ArrayList<Snapshot>()
-        var s = typed
-        while (s.refines) {
-            s = onEvent(im, EngineEvent.REFINE, 0)
-            slices += s
-            assertTrue("never done", slices.size < MAX_SLICES)
-        }
-        return slices
-    }
-
     @Test
     fun aKernelGivenMultipliesTheSentenceModelsAsTheKotlinOneDoes() {
         var calls = 0
-        val kernel = MatrixKernel { q, scales, rows, columns, x, y -> calls++; MatrixKernel.JVM.times(q, scales, rows, columns, x, y) }
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) = error("floats")
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                calls++
+                MatrixKernel.JVM.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
         val expected = Engines(::load, null).type(InputMethodCatalog.PINYIN, "nihao").candidates
         assertEquals(0, calls)
         assertEquals(expected, Engines(::load, null, kernel = kernel).type(InputMethodCatalog.PINYIN, "nihao").candidates)
@@ -73,116 +72,109 @@ class EnginesModelTest {
 
     @Test
     fun theSentenceModelsAreLoadedOnceForBothPinyinsUnlessTurnedOff() {
-        val models = listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.REFINING_MODEL)
-        val engines = Engines(::load, null)
-        engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "ni"))
-        engines.pause(InputMethodCatalog.SHUANGPIN, engines.type(InputMethodCatalog.SHUANGPIN, "ni"))
-        assertEquals(models, loaded.filter { it in models })
+        val models = listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.LARGE_MODEL)
+        val engines = Engines(::load, null, warmUps = inPlace)
+        engines.type(InputMethodCatalog.PINYIN, "ni")
+        engines.type(InputMethodCatalog.SHUANGPIN, "ni")
+        assertEquals(models, loaded.filter { it.endsWith(".safetensors") })
         loaded.clear()
-        val off = Engines(::load, null)
+        val off = Engines(::load, null, warmUps = inPlace)
         off.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         assertEquals(listOf("你", "拟"), off.type(InputMethodCatalog.PINYIN, "ni").candidates)
-        assertTrue(loaded.none { it in models })
+        assertTrue(loaded.none { it.endsWith(".safetensors") })
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         engines.settings = EngineSettings()
-        engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "ni"))
-        assertEquals(models, loaded.filter { it in models })
+        engines.type(InputMethodCatalog.PINYIN, "ni")
+        assertEquals(models, loaded.filter { it.endsWith(".safetensors") })
     }
 
-    /** 中档 runs the small model at every key and never refines; 低档 neither; for every pinyin alike. */
+    /** 中档 runs the small model at every key, 高档 the large one too where the small is unsure; 低档 none; for every pinyin alike. */
     @Test
     fun eachLevelRunsItsModelsAndDropsThoseItNoLongerRuns() {
-        val engines = Engines(::load, null)
-        val high = Engines(::load, null)
-        for ((im, typed) in listOf(InputMethodCatalog.PINYIN to "ni", InputMethodCatalog.SHUANGPIN to "ni", InputMethodCatalog.T9 to "64")) assertTrue(im, high.type(im, typed).refines)
-        loaded.clear()
+        val engines = Engines(::load, null, warmUps = inPlace)
         engines.settings = EngineSettings(modelLevel = ModelLevel.MEDIUM)
         for ((im, typed) in listOf(InputMethodCatalog.PINYIN to "ni", InputMethodCatalog.SHUANGPIN to "ni", InputMethodCatalog.T9 to "64")) {
-            assertFalse(im, engines.type(im, typed).refines)
-            engines.onEvent(im, EngineEvent.REFINE, 0)
+            engines.type(im, typed)
             engines.onEvent(im, EngineEvent.RESET, 0)
         }
         assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL), loaded.filter { it.endsWith(".safetensors") })
         engines.settings = EngineSettings(modelLevel = ModelLevel.LOW)
         loaded.clear()
         for ((im, typed) in listOf(InputMethodCatalog.PINYIN to "ni", InputMethodCatalog.SHUANGPIN to "ni", InputMethodCatalog.T9 to "64")) {
-            assertFalse(im, engines.type(im, typed).refines)
+            engines.type(im, typed)
             engines.onEvent(im, EngineEvent.RESET, 0)
         }
         assertTrue(loaded.none { it.endsWith(".safetensors") })
-        // up to 高档 again: both read anew, the first dropped on the way down
+        // up again: read anew, dropped on the way down
         engines.settings = EngineSettings()
-        engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "ni"))
-        assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-        loaded.clear()
-        engines.settings = EngineSettings(modelLevel = ModelLevel.MEDIUM)
-        engines.settings = EngineSettings()
-        engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "ni"))
-        assertEquals(listOf(InputMethodCatalog.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
+        engines.type(InputMethodCatalog.PINYIN, "ni")
+        assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.LARGE_MODEL), loaded.filter { it.endsWith(".safetensors") })
     }
 
     @Test
-    fun theNineKeysReadTheModelsFullPinyinReads() {
+    fun theNineKeysReadTheModelFullPinyinReads() {
         val errors = ArrayList<IOException>()
-        val engines = Engines(::load, null, onError = { errors += it })
-        engines.pause(InputMethodCatalog.T9, engines.type(InputMethodCatalog.T9, "64426"))
-        assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-        // the one pair in memory, whichever of the two the user types with
+        val engines = Engines(::load, null, onError = { errors += it }, warmUps = inPlace)
+        engines.type(InputMethodCatalog.T9, "64426")
+        assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.LARGE_MODEL), loaded.filter { it.endsWith(".safetensors") })
+        // the one in memory, whichever of the two the user types with
         loaded.clear()
-        engines.pause(InputMethodCatalog.PINYIN, engines.type(InputMethodCatalog.PINYIN, "nihao"))
+        engines.type(InputMethodCatalog.PINYIN, "nihao")
         assertTrue(loaded.none { it.endsWith(".safetensors") })
         assertTrue(errors.isEmpty())
     }
 
     @Test
-    fun whileTheUserPausesTheLargerModelWeighsTheReadingsTillItHasNoMoreToDo() {
-        val engines = Engines(::load, null)
-        val typed = engines.type(InputMethodCatalog.PINYIN, "nihao")
-        assertTrue(typed.refines)
-        val slices = engines.pause(InputMethodCatalog.PINYIN, typed)
-        assertTrue(slices.isNotEmpty())
-        assertTrue(slices.all { it.commit.isEmpty() })
-        assertTrue(slices.count { it.handled } <= 1)
-        assertEquals(typed.candidates.toSet(), slices.last().candidates.toSet())
-        assertFalse(engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.REFINE, 0).handled)
-    }
-
-    @Test
-    fun withNoSentenceModelsPinyinWorksAndEachMissingOneIsReportedOnce() {
+    fun withNoSentenceModelPinyinWorksAndTheMissingOneIsReportedOnce() {
         model = null
-        refining = null
         val errors = ArrayList<IOException>()
-        val engines = Engines(::load, null, onError = { errors += it })
+        val engines = Engines(::load, null, onError = { errors += it }, warmUps = inPlace)
         val typed = engines.type(InputMethodCatalog.PINYIN, "ni")
         assertEquals(listOf("你", "拟"), typed.candidates)
-        assertTrue(engines.pause(InputMethodCatalog.PINYIN, typed).none { it.handled })
         assertEquals("拟", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 1).commit)
-        assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.REFINING_MODEL), loaded.filter { it.endsWith(".safetensors") })
-        // a build that lost them (stored compressed, say) says why pinyin reads worse
-        assertEquals(2, errors.size)
+        // the large one is asked only through the small: not read ahead for nothing
+        assertEquals(listOf(InputMethodCatalog.SENTENCE_MODEL), loaded.filter { it.endsWith(".safetensors") })
+        // a build that lost it (stored compressed, say) says why pinyin reads worse
+        assertEquals(1, errors.size)
         assertTrue(InputMethodCatalog.SENTENCE_MODEL in errors[0].message.orEmpty())
-        assertTrue(InputMethodCatalog.REFINING_MODEL in errors[1].message.orEmpty())
         assertTrue(errors.all { (it.cause ?: it) is FileNotFoundException })
     }
 
     @Test
     fun aSentenceModelThatCannotBeReadLeavesPinyinWorking() {
-        val (small, large) = model!! to refining!!
-        for (broken in listOf(InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.REFINING_MODEL)) {
-            model = if (broken == InputMethodCatalog.SENTENCE_MODEL) small.copyOf(100) else small
-            refining = if (broken == InputMethodCatalog.REFINING_MODEL) large.copyOf(100) else large
-            val errors = ArrayList<IOException>()
-            val engines = Engines(::load, null, onError = { errors += it })
-            val typed = engines.type(InputMethodCatalog.PINYIN, "ni")
-            assertEquals(broken, listOf("你", "拟"), typed.candidates)
-            assertTrue(engines.pause(InputMethodCatalog.PINYIN, typed).none { it.handled })
-            assertEquals("拟", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 1).commit)
-            assertEquals(broken, 1, errors.size)
-            assertTrue(errors[0].cause is IllegalArgumentException)
-        }
+        model = model!!.copyOf(100)
+        val errors = ArrayList<IOException>()
+        val engines = Engines(::load, null, onError = { errors += it })
+        assertEquals(listOf("你", "拟"), engines.type(InputMethodCatalog.PINYIN, "ni").candidates)
+        assertEquals("拟", engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.PICK, 1).commit)
+        assertEquals(1, errors.size)
+        assertTrue(errors[0].cause is IllegalArgumentException)
     }
 
-    private companion object {
-        const val MAX_SLICES = 10_000
+    @Test
+    fun atHighThePinyinSessionHasTheLargeModelReadOnTheWarmUpThread() {
+        val queued = ArrayList<Runnable>()
+        val engines = Engines(::load, null, warmUps = { queued += it })
+        engines.settings = EngineSettings(modelLevel = ModelLevel.MEDIUM)
+        engines.type(InputMethodCatalog.PINYIN, "ni")
+        queued.toList().forEach { it.run() }
+        assertTrue(InputMethodCatalog.LARGE_MODEL !in loaded)
+        engines.settings = EngineSettings()
+        engines.type(InputMethodCatalog.T9, "64")
+        queued.toList().forEach { it.run() }
+        assertEquals(1, loaded.count { it == InputMethodCatalog.LARGE_MODEL })
+    }
+
+    @Test
+    fun aLargeModelThatCannotBeReadPicksAsMedium() {
+        val inputs = listOf(InputMethodCatalog.PINYIN to "nihaoni", InputMethodCatalog.T9 to "6442664", InputMethodCatalog.SHUANGPIN to "nihk")
+        val medium = Engines(::load, null, warmUps = inPlace).apply { settings = EngineSettings(modelLevel = ModelLevel.MEDIUM) }
+        val expected = inputs.map { (im, typed) -> medium.type(im, typed).candidates }
+        val errors = ArrayList<IOException>()
+        large = null
+        val high = Engines(::load, null, onError = { errors += it }, warmUps = inPlace)
+        assertEquals(expected, inputs.map { (im, typed) -> high.type(im, typed).candidates })
+        assertTrue(errors.size <= 1)
+        assertTrue(errors.all { InputMethodCatalog.LARGE_MODEL in it.message.orEmpty() })
     }
 }

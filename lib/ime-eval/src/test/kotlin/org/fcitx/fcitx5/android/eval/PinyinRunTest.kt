@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.user.UserModel
@@ -132,115 +131,48 @@ class PinyinRunTest {
     }
 
     @Test
-    fun aWeightIsOneOrTwoNumbers() {
+    fun aTierIsOneOfTheThreeAndOneThatRunsAModelNeedsTheModels() {
         val data = tmp.newFile("pinyin.data").apply { writeBytes(bytes) }
         val set = tmp.newFile("set.tsv").apply { writeText("nihao\t你好\tdaily\n") }
         val result = tmp.newFile("result.tsv")
-        fun run(weight: String) = runCli(arrayOf("pinyin", data.path, set.path, result.path, "--weight", weight), StringBuilder(), StringBuilder())
-        assertEquals(0, run("0.7"))
-        assertEquals(0, run("0.4,1"))
-        assertEquals(2, run("much"))
-        assertEquals(2, run("-1"))
-        assertEquals(2, run("1,2,3"))
+        fun run(vararg tier: String) = runCli(arrayOf("pinyin", data.path, set.path, result.path, *tier), StringBuilder(), StringBuilder())
+        assertEquals(0, run("--tier", "low"))
+        assertEquals(0, run("--tier", "low", "--models", tmp.root.path))
+        assertEquals(2, run("--tier", "medium"))
+        assertEquals(2, run("--tier", "high"))
+        assertEquals(2, run("--tier", "max", "--models", tmp.root.path))
     }
 
-    /** What each reranker made was asked about: the contexts it saw, and whether it was paused on. */
-    private class Recording : SentencePicker, SentenceRefiner {
+    /** What each reranker made was asked about: the contexts it saw. */
+    private class Recording : SentencePicker {
         val contexts = HashSet<String>()
-        var refined = 0
 
         override fun pick(context: String, readings: List<String>, scores: List<Float>): Int {
             contexts += context
             return 0
-        }
-
-        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
-            contexts += context
-            refined++
-            return SentenceRefiner.NONE
         }
     }
 
     @Test
     fun eachSampleIsWeighedByRerankersOfItsOwn() {
         val pickers = ArrayList<Recording>()
-        val refiners = ArrayList<Recording>()
-        val run = PinyinRun(
-            PinyinData.load(ByteBuffer.wrap(bytes)),
-            reranker = { Recording().also { pickers += it } },
-            refiner = { Recording().also { refiners += it } },
-        )
+        val run = PinyinRun(PinyinData.load(ByteBuffer.wrap(bytes)), reranker = { Recording().also { pickers += it } })
         // the session's context: text that ends in no word (甲) is none to the rerankers either
         val samples = listOf(Sample("nihao", "你好", "daily", "你"), Sample("nihao", "你好", "daily", "甲"), Sample("nihao", "你好", "daily", "你好"))
         run.run(samples)
         // whatever a reranker keeps from one input cannot reach the next sample
-        assertEquals(pickers.size, refiners.size)
-        assertTrue(pickers.all { it.contexts.size == 1 && it.refined == 0 })
-        // the timed rounds: a picker for each sample's keys, a refiner for its pause
+        assertTrue(pickers.all { it.contexts.size == 1 })
+        // the timed rounds: a picker for each sample's keys
         assertEquals(listOf("你", "", "你好"), pickers.takeLast(3).map { it.contexts.single() })
-        assertEquals(listOf(1, 1, 1), refiners.takeLast(3).map { it.refined })
     }
 
     @Test
-    fun thePickersPickIsShownFirstAndTheRefinersOnceTheUserPauses() {
+    fun thePickersPickIsShownFirst() {
         val data = PinyinData.load(ByteBuffer.wrap(bytes))
-        fun run(pick: Int, refine: Int?) = PinyinRun(
-            data,
-            reranker = { SentencePicker { _, readings, _ -> if (readings.size > 1) pick else 0 } },
-            refiner = { SentenceRefiner { _, _, _, _ -> refine } },
-        )
+        fun run(pick: Int) = PinyinRun(data, reranker = { SentencePicker { _, readings, _ -> if (readings.size > 1) pick else 0 } })
         // nihao reads 你好, then 你hao
-        val decoders = listOf("你好", "你hao", "你")
-        val second = listOf("你hao", "你好", "你")
-        assertEquals(decoders, run(0, SentenceRefiner.NONE).candidates("nihao", paused = true))
-        assertEquals(second, run(1, SentenceRefiner.NONE).candidates("nihao"))
-        // nothing to say: the picker's order stands
-        assertEquals(second, run(1, SentenceRefiner.NONE).candidates("nihao", paused = true))
-        // the refiner's pick over the picker's, the decoder's first too, but not before the pause
-        assertEquals(second, run(0, 1).candidates("nihao", paused = true))
-        assertEquals(decoders, run(1, 0).candidates("nihao", paused = true))
-        assertEquals(decoders, run(0, 1).candidates("nihao"))
-    }
-
-    @Test
-    fun aPauseIsWeighedWhereAndForAsLongAsTheSessionWeighsIt() {
-        val data = PinyinData.load(ByteBuffer.wrap(bytes))
-        val budgets = ArrayList<Int>()
-        val late = PinyinRun(data, refiner = { SentenceRefiner { _, readings, _, budget -> budgets += budget; if (budgets.size < 3) null else readings.lastIndex } })
-        // slices that pick nothing yet, then the one that does, each of the session's budget
-        assertEquals("你hao", late.candidates("nihao", paused = true).first())
-        assertEquals(List(3) { PinyinSession.REFINE_BUDGET }, budgets)
-        var asked = 0
-        val never = PinyinRun(data, refiner = { SentenceRefiner { _, _, _, _ -> asked++; null } })
-        // given up on after its slices, as the session does: the order shown stands
-        assertEquals("你好", never.candidates("nihao", paused = true).first())
-        assertEquals(SentenceRefiner.SLICES, asked)
-        // a syllable still being typed (h), and a single reading, are not weighed again
-        asked = 0
-        assertEquals(2, never.sentences("nih").size)
-        never.candidates("nih", paused = true)
-        assertEquals(1, never.sentences("ni").size)
-        never.candidates("ni", paused = true)
-        assertEquals(0, asked)
-    }
-
-    @Test
-    fun aPauseIsWeighedForTheInputsTheSessionWeighs() {
-        val data = PinyinData.load(ByteBuffer.wrap(bytes))
-        // a whole syllable last or not (h, n), one reading or more (ni): PinyinRun's copy of the session's gate
-        val inputs = listOf("nihao", "nihaoni", "nih", "nihaon", "ni")
-        val sessionWeighs = inputs.map { input ->
-            val session = PinyinSession(data, PinyinSegmenter(), refiner = { _, _, _, _ -> SentenceRefiner.NONE })
-            input.map { session.apply(Action.Key(it)) }.last().refines
-        }
-        val runWeighs = inputs.map { input ->
-            var asked = false
-            PinyinRun(data, refiner = { SentenceRefiner { _, _, _, _ -> asked = true; SentenceRefiner.NONE } }).candidates(input, paused = true)
-            asked
-        }
-        assertEquals(sessionWeighs, runWeighs)
-        // both answers among them, or the two could agree by never weighing at all
-        assertTrue(true in sessionWeighs && false in sessionWeighs)
+        assertEquals(listOf("你好", "你hao", "你"), run(0).candidates("nihao"))
+        assertEquals(listOf("你hao", "你好", "你"), run(1).candidates("nihao"))
     }
 
     @Test

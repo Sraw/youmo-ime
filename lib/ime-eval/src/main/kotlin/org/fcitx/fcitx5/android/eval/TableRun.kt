@@ -216,9 +216,6 @@ class TableRun(private val table: CodeTable, private val options: TableOptions) 
                 session.apply(Action.Context(before))
                 var s = session.apply(Action.Key(code[0]))
                 for (c in code.substring(1)) s = session.apply(Action.Key(c))
-                val pause = language?.refiner?.slices ?: 0
-                var slices = 0
-                while (s.refines && slices++ < pause) s = session.apply(Action.Refine)
                 s.candidates
             }
             n++

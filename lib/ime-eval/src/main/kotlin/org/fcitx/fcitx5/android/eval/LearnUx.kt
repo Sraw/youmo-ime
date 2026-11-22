@@ -16,7 +16,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -28,7 +27,6 @@ import java.nio.file.Files
 class LearnUx(
     private val data: PinyinData,
     private val reranker: (() -> SentencePicker)? = null,
-    private val refiner: (() -> SentenceRefiner)? = null,
     private val use: LearningUse = LearningUse.DEFAULT,
     /** Committed before each scenario into its learning record: a user's history. */
     private val seed: List<Sample> = emptyList(),
@@ -75,7 +73,7 @@ class LearnUx(
 
     private fun session(segmenter: Segmenter, spell: Boolean, user: EvalUser, kind: String) = PinyinSession(
         data, segmenter, spell = spell, user = user.model, use = use, learnTo = user.learnTo(kind), addedWords = { user.added },
-        refiner = refiner?.invoke(), reranker = reranker?.invoke(),
+        reranker = reranker?.invoke(),
     )
 
     private inner class Run(private val scenario: Scenario, private val user: EvalUser) {
@@ -138,7 +136,7 @@ class LearnUx(
             val session = active(s)
             val index = list(session, PICKED).indexOf(s.text)
             if (index < 0) throw Stop(s, "${s.text} not offered: ${shown(session)}")
-            after(session, session.apply(Action.Pick(index)))
+            after(session.apply(Action.Pick(index)))
         }
 
         private fun settle(text: String, cleared: Boolean) {
@@ -170,13 +168,10 @@ class LearnUx(
             active = session
             var shot: Snapshot? = null
             for (c in s.keys) shot = session.apply(Action.Key(c))
-            shot?.let { after(session, it) }
+            shot?.let(::after)
         }
 
-        // the user pauses, as in KeystrokeRun: the refiner's pick is what they see
-        private fun after(session: PinyinSession, snapshot: Snapshot) {
-            var shot = snapshot
-            while (shot.refines) shot = session.apply(Action.Refine)
+        private fun after(shot: Snapshot) {
             if (shot.commit.isNotEmpty()) commits += shot.commit
             typing = shot.preedit.isNotEmpty()
             predicting = shot.predicting
@@ -186,7 +181,7 @@ class LearnUx(
         private fun space(s: Step.Space) {
             val session = active(s)
             if (!typing) throw Stop(s, if (predicting) "space with only 联想 shown: the app's space types a space then" else "space with nothing typed: the app's space types a space then")
-            after(session, session.apply(Action.Select(0)))
+            after(session.apply(Action.Select(0)))
         }
 
         private fun import(s: Step.Import) {
@@ -207,7 +202,7 @@ class LearnUx(
                 val text = commits.removeAt(commits.size - 1)
                 repeat(text.codePointCount(0, text.length)) { shot = session.apply(Action.Backspace) }
             }
-            shot?.let { after(session, it) }
+            shot?.let(::after)
         }
 
         private fun expect(s: Step.Expect) {

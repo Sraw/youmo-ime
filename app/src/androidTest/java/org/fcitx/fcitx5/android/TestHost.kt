@@ -118,7 +118,7 @@ class TestHost {
     suspend inline fun <reified T : HostEvent> receiveFirst(): T? =
         events.receiveAsFlow().mapNotNull { it as? T }.firstOrNull()
 
-    /** Refine slices may still reorder a list after it first shows. */
+    /** Events of what was sent may still be on their way. */
     suspend fun awaitQuiet() {
         while (withTimeoutOrNull(QUIET_MS) { events.receive() } != null) {
             // discard

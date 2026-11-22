@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -189,15 +188,15 @@ class MainTest {
             // a preset in the table's order ranks no 重码 by the text before: every row would be the same
             arrayOf("table", "d", "s", "--pinyin", "p"),
             arrayOf("table", "d", "s", "--preset", "cangjie", "--pinyin", "p"),
-            // the large model without the small, which the 性能档位's high never has
-            arrayOf("table", "d", "s", "--preset", "wubi", "--pinyin", "p", "--refine", "m"),
-            arrayOf("handwriting", "d", "r", "--refine", "m"),
+            // a tier that runs a model without the models, or one there is not
+            arrayOf("pinyin", "d", "s", "r", "--tier", "medium"),
+            arrayOf("ksc", "d", "s", "--tier", "high"),
+            arrayOf("pinyin", "d", "s", "r", "--tier", "max", "--models", "m"),
             // a model option without what reads it: the 重码 are weighed only with --pinyin, model weights only with a model
-            arrayOf("table", "d", "s", "--preset", "wubi", "--rerank", "m"),
-            arrayOf("table", "d", "s", "--preset", "wubi", "--rerank", "m", "--refine", "m"),
+            arrayOf("table", "d", "s", "--preset", "wubi", "--models", "m"),
             arrayOf("handwriting", "d", "r", "--model-weights", "1"),
             // the models read the sentences at one ink weight
-            arrayOf("handwriting", "d", "r", "--rerank", "m", "--weights", "1,2"),
+            arrayOf("handwriting", "d", "r", "--models", "m", "--weights", "1,2"),
             arrayOf("voice-post", "s", "--source", "best"),
             // the tagger's json and --source tagged go together: labels without a table, or a table nothing reads
             arrayOf("voice-post", "s", "--source", "tagged"),
@@ -540,41 +539,28 @@ class MainTest {
         assertEquals(listOf("pair", "2", "2", "50.0%"), oneThread.lines().first { it.startsWith("pair") }.split(Regex(" +")).take(4))
     }
 
-    /** What each reranker made was asked: the contexts it read, and the slices of a pause it was given. */
-    private class Recording(override val slices: Int = SentenceRefiner.SLICES) : SentencePicker, SentenceRefiner {
+    /** What each reranker made was asked: the contexts it read. */
+    private class Recording : SentencePicker {
         val contexts = HashSet<String>()
-        var refined = 0
 
         override fun pick(context: String, readings: List<String>, scores: List<Float>): Int {
             contexts += context
             return 0
-        }
-
-        // never done: the session stops asking after its slices
-        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
-            contexts += context
-            refined++
-            return null
         }
     }
 
     @Test
     fun kscTypesEachSampleWithRerankersOfItsOwnAfterItsOwnContext() {
         val pickers = ArrayList<Recording>()
-        val refiners = ArrayList<Recording>()
         val typist = Typist(
             PinyinData.load(ByteBuffer.wrap(dataFile().readBytes())), PinyinSegmenter(),
             reranker = { Recording().also { pickers += it } },
-            refiner = { Recording(slices = 2).also { refiners += it } },
         )
         typist.type(Sample("nihao", "你好", "daily"))
         // a context that ends with what the sample before committed
         typist.type(Sample("hao", "号", "pair", "他你好"))
         // read from the sample's own context, not kept from that commit, by rerankers that read nothing before
         assertEquals(listOf(setOf(""), setOf("他你好")), pickers.map { it.contexts })
-        assertEquals(listOf(setOf(""), setOf("他你好")), refiners.map { it.contexts })
-        // a pause as long as the sample's refiner says, not the default's
-        assertEquals(listOf(2, 2), refiners.map { it.refined })
     }
 
     @Test

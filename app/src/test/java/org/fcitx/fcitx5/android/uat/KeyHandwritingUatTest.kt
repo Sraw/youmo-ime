@@ -115,8 +115,7 @@ class KeyHandwritingUatTest {
         assertEquals(emptyList<String>(), keysSent())
         assertTrue("ink shown", board().keyInkForTest!!.shown)
         h.advance(1500)
-        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") } }
-        assertEquals(0, board().keyInkForTest!!.pad.finished.size)
+        until("finished") { board().keyInkForTest!!.pad.finished.isEmpty() }
     }
 
     // resized while a piece is written: its strokes, in the old size's pixels, would not go with the next; the piece is
@@ -137,7 +136,6 @@ class KeyHandwritingUatTest {
         h.relayout()
         assertTrue("resized: $width -> ${board().width}", board().width > width)
         assertEquals("the piece done", 0, board().keyInkForTest!!.pad.finished.size)
-        until("finished") { h.api.calls.any { it.startsWith("inkFinished(") } }
         h.api.calls.clear()
         draw(h.key("t"))
         until("read anew") { inks().isNotEmpty() }
@@ -481,17 +479,17 @@ class KeyHandwritingUatTest {
     fun backspaceTimesThePauseAgain() {
         harness()
         val pause = AppPrefs.getInstance().keyboard.handwritingPause.getValue().millis
-        fun finished() = h.api.calls.count { it.startsWith("inkFinished(") }
+        fun left() = board().keyInkForTest!!.pad.finished.size
         draw(h.key("t"))
         draw(h.key("g"))
         until("read") { inks().isNotEmpty() }
         h.advance(pause * 6 / 10)
         h.tap(h.describedKey("Backspace"))
-        until("taken back") { board().keyInkForTest!!.pad.finished.size == 1 }
+        until("taken back") { left() == 1 }
         h.advance(pause * 6 / 10)
-        assertEquals("timed again from ⌫", 0, finished())
+        assertEquals("timed again from ⌫", 1, left())
         h.advance(pause * 5 / 10)
-        until("finished") { finished() == 1 }
+        until("finished") { left() == 0 }
     }
 
     @Uat("HW-49", "QU-12")

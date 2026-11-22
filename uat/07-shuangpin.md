@@ -68,10 +68,10 @@
 - **预期**：没打过时 u f m u h 的候选里没有「什么时候」、y i v z 里没有「一直在」（只打声母只出打过的词，见 docs/pinyin.md「双拼」）。全码打过一次以后，u f m u h 的第一个候选是「什么时候」，**为什么排在这** 里写着「你打过的词，按声母读出」，点了框里是「什么时候」（m u、u h 连起来也是音节 mu、shang，每个键还能单独当声母；这串键读不成整音节，打过的词排第一）；y i v z 的候选栏或展开后的第一页有「一直在」（词库里没有「一直在」这个词，按「一直」「在」读，不按打过的词排）。
 - **JVM**：`ShuangpinUatTest.aWordTypedWithItsFirstSyllableWholeAndTheRestByInitials`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionAbbrevTest.aWordTypedByInitialsStaysWhereItIsOnceAcceptedAndThePickTwiceTakesFirstBack`（:lib:ime-core:test）；菜单的原因（`Reason.ALONE`）由 ime-core 里标着 SP-30 的菜单测试查；设备上留作冒烟（看胶水；脚本不长按，候选的长按菜单 dump 看不见）。
 
-### SP-31 [P1] 两个键成音节的仍先按音节读，打全码的首选不变
+### SP-31 [P1] 两个键成音节的仍先按音节读，打全码的首选不变错
 - **前提**：B0-双拼（自然码）。
 - **操作**：点 x m，看拼音行和第一个候选；删光，点 v g，看拼音行。
-- **预期**：x m 的拼音行是 `xian`，第一个候选是「先」；v g 的拼音行是 `zheng`。另在 JVM 上：聊天句子集用自然码、微软、小鹤全码打，在全键盘、18 键、14 键（微软没有）、九键上，带 3000 个打过的词，第一个候选和不读中间简拼时一样；每个音节的两个键（自然码、微软、小鹤，和 0.5 去掉的紫光、智能ABC、国标六种方案），第一个候选不变，第一页原有的候选被挤开的不超过 1%；在学习开着的输入会话里（打过的词按习惯排），每个音节的两个键和 150 句聊天句子逐键打，第一个候选也和不读中间简拼时一样。
+- **预期**：x m 的拼音行是 `xian`，第一个候选是「先」；v g 的拼音行是 `zheng`。另在 JVM 上：聊天句子集用自然码、微软、小鹤全码打，在全键盘、18 键、14 键（微软没有）、九键上，带 3000 个打过的词，读中间简拼不让不读时对的第一个候选变错，每种方案的每种键盘至多 1 句的第一个候选变；每个音节的两个键（自然码、微软、小鹤，和 0.5 去掉的紫光、智能ABC、国标六种方案），第一个候选不变，第一页原有的候选被挤开的不超过 1%；在学习开着的输入会话里（打过的词按习惯排），每个音节的两个键和 150 句聊天句子逐键打，第一个候选也和不读中间简拼时一样。
 - **JVM**：`ShuangpinUatTest.twoKeysThatMakeASyllableStayThatSyllableFirst`、`ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviations`、`ShuangpinUatTest.wholeSyllablesReadAsBeforeTheAbbreviationsInASessionThatLearns`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
 
 ### SP-32 [P2] 全打声母

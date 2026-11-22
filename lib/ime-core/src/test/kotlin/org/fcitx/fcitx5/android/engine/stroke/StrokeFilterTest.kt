@@ -7,11 +7,9 @@ package org.fcitx.fcitx5.android.engine.stroke
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.CodeTable
-import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.reading.WordReading
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.Offer
@@ -157,7 +155,6 @@ class StrokeFilterTest {
         filter.apply(Action.Backspace)
         filter.apply(Action.Stroke('h'))
         assertEquals(listOf("样", "杨", "望"), filter.apply(Action.Stroke('s')).candidates)
-        assertEquals("yang 一丨", filter.apply(Action.Refine).preedit)
     }
 
     @Test
@@ -239,15 +236,11 @@ class StrokeFilterTest {
     }
 
     @Test
-    fun aRefineThatChangesNothingLooksThroughNothingAgainAReadAlways() {
+    fun aRereadIsLookedThroughAgain() {
         type("yang")
         filter.apply(Action.Stroke('z'))
         val looked = pinyin.asked.size
         assertTrue(looked > 0)
-        assertEquals("yang 乛", filter.apply(Action.Refine).preedit)
-        // one read of those looked through, to tell they are as they were
-        assertEquals(looked + 1, pinyin.asked.size)
-        assertEquals(0 to yang.size, pinyin.asked.last())
         // a reread may change the order anywhere: looked through again, the same as before
         assertEquals("yang 乛", filter.reread()?.preedit)
         val reread = pinyin.asked.size
@@ -258,40 +251,6 @@ class StrokeFilterTest {
         assertTrue(pinyin.asked.size > reread)
         filter.apply(Action.Backspace)
         assertEquals(listOf("望"), filter.apply(Action.Stroke('n')).candidates)
-    }
-
-    @Test
-    fun theOrderRefinedUnderTheStrokesIsFilteredAgainOnTheSamePage() {
-        val p = FakePinyin(mapOf("yang" to yang))
-        val f = StrokeFilter(p, { strokes }, pageSize = 3)
-        "yang".forEach { f.apply(Action.Key(it)) }
-        f.apply(Action.Stroke('n'))
-        assertEquals(listOf("望"), f.apply(Action.NextPage).candidates)
-        assertEquals(listOf("羊", "🐑"), f.candidates(1, 2).map { it.text })
-        // the sentence models' order comes in under the strokes: 望 first now, the second page still shown
-        p.words["yang"] = listOf("望", "王", "养", "样", "羊", "🐑")
-        val s = f.apply(Action.Refine)
-        assertEquals("yang 丶", s.preedit)
-        assertEquals(listOf("🐑"), s.candidates)
-        assertEquals(1, s.page)
-        assertEquals(listOf("望", "养", "羊", "🐑"), f.candidates(0, 10).map { it.text })
-        f.apply(Action.Select(0))
-        assertEquals(Action.Pick(5), p.actions.last())
-    }
-
-    @Uat("PY-157")
-    @Test
-    fun aRefineThatReordersOnlyPastThePageTheSessionShowsIsFilteredAgain() {
-        val p = FakePinyin(mapOf("yang" to yang))
-        val f = StrokeFilter(p, { strokes }, pageSize = 3)
-        "yang".forEach { f.apply(Action.Key(it)) }
-        f.apply(Action.Stroke('n'))
-        assertEquals(listOf("养", "羊", "🐑", "望"), f.candidates(0, 10).map { it.text })
-        p.words["yang"] = listOf("样", "杨", "Yang", "养", "羊", "王", "望", "网", "🐑")
-        f.apply(Action.Refine)
-        assertEquals(listOf("养", "羊", "望"), f.candidates(0, 10).map { it.text })
-        assertEquals("望", f.apply(Action.Select(2)).commit)
-        assertEquals(Action.Pick(6), p.actions.last())
     }
 
     @Uat("PY-157")
@@ -535,7 +494,6 @@ class StrokeFilterTest {
         val words = (1..20).map { "王$it" } + "样"
         val (pinyin, filter) = singles(words, 1, pageSize = 5)
         assertEquals(listOf("王1", "样", "王2", "王3", "王4"), filter.candidates(0, 5).map { it.text })
-        assertEquals(listOf("王1", "样", "王2", "王3", "王4"), filter.apply(Action.Refine).candidates)
         assertEquals("样", filter.apply(Action.Select(1)).commit)
         assertEquals(Action.Pick(20), pinyin.actions.last())
     }
@@ -583,32 +541,20 @@ class StrokeFilterTest {
         assertEquals(wang.take(3), filter.candidates(0, 3).map { it.text })
     }
 
-    // [StrokeFilter] over a [PinyinSession] whose sentence models reorder its list while strokes are drawn.
-
-    // the habits' words filled the first page, so the refiner's pick went past the page the filter compared; a pin does so here
+    // the strokes move the session's first off the filter's first page: a tap on a later page commits what it showed
     @Uat("PY-157")
     @Test
-    fun aRefineThatReordersPastTheFirstPageLeavesATapTheCandidateTapped() {
+    fun aFilterThatReordersPastTheFirstPageLeavesATapTheCandidateTapped() {
         val data = sessionTestData()
-        val learner = Learner(data)
-        var weighed = false
-        val refiner = SentenceRefiner { _, readings, _, _ -> if (weighed) readings.lastIndex else null }
-        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 1, prediction = false, user = learner.model, learnTo = learner.learnTo(), refiner = refiner)
+        val session = PinyinSession(data, PinyinSegmenter(), pageSize = 1, prediction = false)
         val drawn = "...\n你\thh\n拟\tss"
         val filter = StrokeFilter(session, { Strokes(CodeTable.load(ByteBuffer.wrap(Strokes.read(drawn.reader().buffered(), "stroke").build().toByteArray()))) { 0f } }, pageSize = 1)
-        fun type(keys: String) = keys.map { filter.apply(Action.Key(it)) }.last()
-        assertEquals("你在", type("nizai").candidates.single())
-        filter.apply(Action.Pin(0))
-        filter.apply(Action.Reset)
-        type("nizai")
+        "nizai".forEach { filter.apply(Action.Key(it)) }
         assertEquals(listOf("你在", "你再", "拟再", "拟在", "你", "拟"), session.candidates(0, 10).map { it.text })
-        filter.apply(Action.Stroke('h'))
-        assertEquals(listOf("你在", "你", "你再"), filter.candidates(0, 10).map { it.text })
-        weighed = true
-        // the pin stays first, the refiner's pick after it: the page the session shows is the same
-        assertEquals(listOf("你在"), filter.apply(Action.Refine).candidates)
-        assertEquals(listOf("你在", "拟在", "你再", "拟再", "你", "拟"), session.candidates(0, 10).map { it.text })
-        assertEquals(listOf("你在", "你", "你再"), filter.candidates(0, 10).map { it.text })
-        assertEquals("你再", filter.apply(Action.Pick(2)).commit)
+        assertEquals(listOf("拟再"), filter.apply(Action.Stroke('s')).candidates)
+        assertEquals(listOf("拟再", "拟", "拟在"), filter.candidates(0, 10).map { it.text })
+        filter.apply(Action.NextPage)
+        assertEquals(listOf("拟在"), filter.apply(Action.NextPage).candidates)
+        assertEquals("拟在", filter.apply(Action.Select(0)).commit)
     }
 }

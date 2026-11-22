@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.FakeHostApi
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.host.ConfigTree
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.junit.Assert.assertEquals
@@ -47,7 +48,7 @@ class SharedInputSavesTest {
         options.setPage(InputMethodCatalog.PINYIN, ConfigTree.of(InputMethodSettings.only(InputMethodSettings.SHARED, shared)))
         behind[EngineSettings.CHAIZI] = "False"
         options.setPage(InputMethodCatalog.PINYIN, ConfigTree.of(InputMethodSettings.only(InputMethodSettings.of(InputMethodCatalog.PINYIN)!!, behind)))
-        val read = options.toSettings()
+        val read = options.toSettings(ModelLevel.HIGH)
         assertFalse(read.emoji)
         assertFalse(read.chaizi)
     }

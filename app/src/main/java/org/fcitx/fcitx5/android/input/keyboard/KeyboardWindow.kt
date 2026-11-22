@@ -250,7 +250,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.imTyping = composing && !tempMode
             it.tempMode = tempMode
             // the toolbar's 手写: the current input method's own handwriting's
-            it.inkSink = { reading, piece -> ink { if (reading != null) offerInk(reading, piece) else inkFinished(piece) } }
+            it.inkSink = { reading, piece -> ink { offerInk(reading, piece) } }
             stripOwned = it.ownsSyllables
             preedit.ui.syllables.owned = stripHidden()
             spaceKeys.attach(it) {

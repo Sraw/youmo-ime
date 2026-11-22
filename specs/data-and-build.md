@@ -74,7 +74,7 @@ GitHub release of this repository, and pinned in `EngineDataPlugin` by tag and S
 | Pinyin language model (libime's, mixed with chat-like pages of FineWeb-2 and a CommonCrawl crawl) | `engine-data-*` (`LM_RELEASE`) | `lib/ime-dict-tool/engine-data.sh` on a rented 16-core machine, ~1 h, ~100 GB down | compiled with libime's dictionary into `engine/pinyin.data` |
 | New words (curated `lexicon/add.tsv`, packed for that model) | `words-*` (`WORDS_RELEASE`) | `ime-dict-tool pack --lexicon lexicon/add.tsv` | the `new` layer of `pinyin.data` |
 | English words and trigram model (FineWeb sample-10BT) | `english-data-*` (`ENGLISH_RELEASE`) | `ime-dict-tool english-lm`, then `prune --threshold 3e-8` (relative entropy; english-data-20261015: 46 MB compiled, slips fixed 73.8%; at english-data-20261012 the prune took 117 → 44 MB and 73.8 → 72.7%) | `engine/english.data` |
-| Sentence models 4M and 25M (own training, Apache-2.0) | `sentence-models-*` (`MODELS_RELEASE`) | the training pipeline (not in this repo) | `engine/sentence-model*.safetensors` |
+| Sentence models 4M and 25M (own training, Apache-2.0) | `sentence-models-*` (`MODELS_RELEASE`) | the training pipeline (not in this repo) | `engine/sentence-model*.safetensors`, read in place as int8 (no float copy: the app's numbers are these) |
 | Voice recognizer (X-ASR zh-en, sherpa-onnx's int8 export, its decoder int8 by us, its encoder fine-tuned by us for accented Mandarin: LoRA on CosyVoice3-synthesized dialect speech and Common Voice, held to the original by AISHELL-1/LibriSpeech anchor batches, merged) in onnxruntime's ORT format | `voice-models-*` (`ORT_RELEASE` in `VoiceDataPlugin`) | onnxruntime 1.30's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `voice/encoder.ort`, `decoder.ort`, `joiner.ort`, mapped in place (lib/sherpa-onnx README) |
 | Handwriting recognizers (own training on synthetic ink), their characters and frequencies | `handwriting-models-*` (`RELEASE` in `HandwritingDataPlugin`) | the recognizers' training sources (not in this repo): `export.py` to ONNX; the dense and LSTM weights int8 by onnxruntime's `quantize_dynamic` (the release's `quantize.py`, from the float release's ORT files); onnxruntime 1.30's `convert_onnx_models_to_ort --optimization_style Fixed --target_platform arm` (its `manifest.txt`) | `handwriting/*.ort` mapped in place (`OrtModel`), `chars.txt`, `prior.data` |
 | Tones (候选词注音, the zhuyin keyboards' tone keys): Unihan's kMandarin, kHanyuPinlu, kXHC1983, kTGHZ2013, kHanyuPinyin (Unicode-3.0) as mozillazg/pinyin-data (MIT, `UNIHAN_COMMIT`) lists them, in that order (a character's first reading is its usual tone); the words of mozillazg/phrase-pinyin-data's `pinyin.txt` (MIT, `PHRASES_COMMIT`), not its `large_pinyin.txt` (CC-CEDICT, share-alike, and 汉典's, no licence) | pinned files, SHA-256 checked | compiled with the dictionary, `lexicon/tones.tsv` and `misreadings.tsv`'s readings after them (`--char-tones`, `--phrase-tones`, `--tones`) | the tones sections of `engine/pinyin.data` (`ToneTable`); measured by `ime-eval readings`. Version 4 adds each character's readings in order with each reading's commonest words, a dictionary's only (phrase-pinyin-data's, `tones.tsv`'s or `misreadings.tsv`'s, not the model's others: 荣和, 去呢) (`CharReadings`, sections 29–34, `CharReadingsBuilder`: which readings 通用规范 ∪ 现汉, else 频率词典's, else kMandarin's; for the candidates a neutral tone only where the syllable has no full tone or kMandarin reads it so, the card's the others too, flagged `CARD_ONLY` in the tone byte, last; the order 频率词典's, then the model's words) |
@@ -114,7 +114,9 @@ Decided by the owner (2026-10-15), for every model the app ships, the ones to co
   quantized as each layer runs. The voice recognizer is sherpa-onnx's int8 export, made so (its
   encoder's 344 MatMulInteger, its 82 Conv float), with its decoder quantized the same way by us;
   the handwriting recognizers by the release's `quantize.py`; the sentence models are int8
-  safetensors (a scale per output row, `MatrixKernel`).
+  safetensors (a scale per output row, `MatrixKernel`), and their activations are quantized too (a
+  scale per row, `quantize`) before each int8 product: the same bits on the JVM, in ime-eval and on
+  every phone (`SentenceModel.load` without `unpack`; `unpack` is the tools' float copy, not the app's numbers).
   - **Convolutions are never quantized.** Measured: the handwriting image model with its
     convolutions int8 too ran 15.6 → 44.3 ms a character (onnxruntime's ConvInteger is a slow
     generic kernel that converts the activations to int8 and back at every layer, where the float
@@ -286,9 +288,14 @@ What an import leaves out past a count limit is said in its toast (`import_over_
 
 The app has no native code of its own; the fcitx host is Kotlin ([host.md](host.md)).
 `lib/handwriting` builds `libyoumo-handwriting` (linked to onnxruntime, loaded only when
-handwriting is used) and `libyoumo-matrix` (`matrix-kernel.cpp`, the sentence models' kernel,
-`-O3` even in debug, no onnxruntime); `NativeMatrixKernel.loaded` falls back to
-`MatrixKernel.JVM` when it does not load. `lib/sherpa-onnx` builds the recognizer (its models are the voice pack's).
+handwriting is used) and `libyoumo-matrix` (`matrix-kernel.cpp`, `matrix-q8.cpp` and
+`matrix-q8-dotprod.cpp`, the last alone with `+dotprod`: the sentence models' kernels, `-O3` even in
+debug, no onnxruntime, no thread pool); `NativeMatrixKernel.loaded` falls back to
+`MatrixKernel.JVM` when it does not load. Its int8 products go by SDOT where the CPU has dotprod
+(its hwcap, or the profile's self-test) and the columns are a multiple of 16, else MLAL for two vectors
+or more in a batch (m ≥ 2) on arm64, else a portable loop (x86_64 always); MLAL falls back to the portable loop where
+an activation is −128, which its int16 sums would overflow. The whole target is built with
+`-ffp-contract=off`: with no fused multiply-adds every kernel gives `MatrixKernel.JVM`'s bits. `lib/sherpa-onnx` builds the recognizer (its models are the voice pack's).
 The APK's `.so` files are those, onnxruntime's and `libc++_shared`. Host tests for native helpers:
 `lib/sherpa-onnx/host-test.sh` (CI runs it).
 

@@ -19,7 +19,6 @@ class KeystrokeRun(private val session: Session, private val maxPages: Int = MAX
         session.apply(if (sample.context.isEmpty()) Action.Reset else Action.Context(sample.context))
         var shown: Snapshot? = null
         for (c in sample.input) shown = session.apply(Action.Key(c))
-        while (shown?.refines == true) shown = session.apply(Action.Refine)
         var keys = sample.input.length
         val first = shown?.candidates?.firstOrNull() == sample.expected
         var picked = ""

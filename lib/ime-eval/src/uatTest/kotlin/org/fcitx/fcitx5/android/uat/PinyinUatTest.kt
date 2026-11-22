@@ -177,9 +177,9 @@ class PinyinUatTest {
             type("dl")
             return candidates.also { if (pick != null) pick(pick) }
         }
-        assertEquals("带来", taDl("点了").first())
-        assertEquals(listOf("带来", "点了"), taDl("点了").take(2))
-        assertEquals(listOf("点了", "带来"), taDl(null).take(2))
+        assertEquals("的脸", taDl("点了").first())
+        assertEquals(listOf("的脸", "点了"), taDl("点了").take(2))
+        assertEquals(listOf("点了", "的脸"), taDl(null).take(2))
     }
     // U-20 (D32 B): the input after 他, picked or not, the list as shown; the field then emptied
     private fun EngineReplay.afterTa(keys: String, pick: String?, after: Boolean = true): List<String> {
@@ -206,7 +206,7 @@ class PinyinUatTest {
         assertEquals("picked twice under fh", "奉化", afterTa("fh", null).first())
         repeat(2) { afterTa("dianle", "点了") }
         val dl = afterTa("dl", null)
-        assertEquals("dl $dl", "带来", dl.first())
+        assertEquals("dl $dl", "的脸", dl.first())
         assertTrue("dl $dl", "点了" in dl.take(3))
     }
 
@@ -463,7 +463,7 @@ class PinyinUatTest {
         expectText("他")
         type("dl")
         val after = candidates
-        assertEquals("forgotten: $after (before ${start.take(4)})", "带来", after.first())
+        assertEquals("forgotten: $after (before ${start.take(4)})", "的脸", after.first())
         assertNotEquals("点了", after[1])
     }
 

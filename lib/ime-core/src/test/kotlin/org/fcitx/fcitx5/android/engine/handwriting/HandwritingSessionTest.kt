@@ -13,7 +13,6 @@ import org.fcitx.fcitx5.android.engine.learn.KeyedRows
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.Learner
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.session.Action
@@ -236,11 +235,10 @@ class HandwritingSessionTest {
     }
 
     @Test
-    fun `a sentence model puts the sentence it reads best first, the refiner once the character is finished`() {
+    fun `a sentence model puts the sentence it reads best first`() {
         val d = handwritingData
         val seen = ArrayList<String>()
         val picker = SentencePicker { context, readings, _ -> seen += context; readings.indexOf("淡话").coerceAtLeast(0) }
-        val refiner = SentenceRefiner { _, readings, _, _ -> readings.indexOf("淡话").takeIf { it >= 0 } ?: SentenceRefiner.NONE }
         val written = listOf(read("淡", "谈", step = 0.3), read("话"))
         val words = TextWords(d.model, d.wordIndex)
 
@@ -250,31 +248,7 @@ class HandwritingSessionTest {
         val shown = medium.apply(Action.Ink(NO_PIECE))
         assertEquals("淡话", shown.preedit)
         assertEquals("我说", seen.last())
-        assertFalse(shown.refines)
         assertEquals(1, shown.candidates.count { it == "话" })
-
-        val high = HandwritingSession(handwritingDecoder(), words, refiner = refiner)
-        written.forEach { high.show(it) }
-        val before = high.apply(Action.Ink(NO_PIECE))
-        assertEquals("谈话", before.preedit)
-        assertFalse(before.refines)
-        high.hold(Action.Ink(pieces - 2))
-        assertFalse(high.apply(Action.Ink(NO_PIECE)).refines)
-        high.hold(Action.Ink(pieces - 1))
-        assertTrue(high.apply(Action.Ink(NO_PIECE)).refines)
-        val after = high.apply(Action.Refine)
-        assertEquals("淡话", after.preedit)
-        assertFalse(after.refines)
-        assertEquals(after, high.apply(Action.Refine))
-        assertEquals("淡话", high.apply(Action.Pick(0)).commit)
-        // a page turned while it weighs: the order shown stays, the weighing dropped
-        val paged = HandwritingSession(handwritingDecoder(), words, pageSize = 1, refiner = refiner)
-        written.forEach { paged.show(it) }
-        paged.hold(Action.Ink(pieces - 1))
-        assertTrue(paged.apply(Action.Ink(NO_PIECE)).refines)
-        val turned = paged.apply(Action.NextPage)
-        assertFalse(turned.refines)
-        assertEquals(turned, paged.apply(Action.Refine))
     }
 
     @Test
@@ -343,10 +317,13 @@ class HandwritingSessionTest {
     fun `what no handwriting does changes nothing`() {
         val s = session()
         val shown = s.show(read("天"))
-        for (a in listOf(Action.Refine, Action.Forget(0), Action.Pin(0), Action.Unpin(0), Action.Block(0), Action.Syllable(0), Action.Letter('a'))) {
+        for (a in listOf(Action.Forget(0), Action.Pin(0), Action.Unpin(0), Action.Block(0), Action.Syllable(0), Action.Letter('a'))) {
             assertEquals(shown, s.apply(a))
         }
         assertFalse(s.apply(Action.Cursor(0)).handled)
+        // a piece told without a reading (the pad's pen up) reads nothing
+        s.hold(Action.Ink(pieces - 1))
+        assertEquals(shown, s.apply(Action.Ink(NO_PIECE)))
         // nothing learned, nothing to block it in: a candidate's long press offers nothing
         assertTrue(s.offers(0).isEmpty())
     }
@@ -406,52 +383,6 @@ class HandwritingSessionTest {
         assertEquals("", next.show(read("人"), piece = 1).preedit)
         assertEquals("", next.show(read("山"), piece = 2).preedit)
         assertEquals("山", next.show(read("山"), piece = 3).preedit)
-    }
-
-    // a session whose refiner prefers 淡话 to the decoder's 谈话
-    private fun refining() = HandwritingSession(
-        handwritingDecoder(), TextWords(handwritingData.model, handwritingData.wordIndex),
-        refiner = SentenceRefiner { _, readings, _, _ -> readings.indexOf("淡话").takeIf { it >= 0 } ?: SentenceRefiner.NONE },
-    )
-
-    @Test
-    fun `the weighing waits through what changes nothing, and comes back for a finished character taken back to`() {
-        val s = refining()
-        s.show(read("淡", "谈", step = 0.3), piece = 0)
-        s.show(read("话"), piece = 1)
-        s.hold(Action.Ink(1))
-        assertTrue(s.apply(Action.Ink(NO_PIECE)).refines)
-        // the cursor, which handwriting keeps none of; an Ink that reads nothing new, the next one's first dot
-        assertTrue(s.apply(Action.Cursor(0)).refines)
-        assertTrue(s.apply(Action.Step(1)).refines)
-        assertTrue(s.show(InkReading.NONE, piece = 2).refines)
-        // a character after it is not weighed while written; taken back, the one before it is again
-        assertFalse(s.show(read("天"), piece = 2).refines)
-        val back = s.apply(Action.Backspace)
-        assertEquals("谈话", back.preedit)
-        assertTrue(back.refines)
-        assertEquals("淡话", s.apply(Action.Refine).preedit)
-    }
-
-    @Test
-    fun `a character finished at the Ink that reads it again is weighed, one written after it is not`() {
-        val s = refining()
-        s.show(read("淡", "谈", step = 0.3), piece = 0)
-        s.show(read("天"), piece = 1)
-        // its last stroke read and the pen up long enough, told at one Ink
-        s.hold(Action.Ink(1, read("话")))
-        s.hold(Action.Ink(1))
-        val shown = s.apply(Action.Ink(NO_PIECE))
-        assertEquals("谈话", shown.preedit)
-        assertTrue(shown.refines)
-        assertEquals("淡话", s.apply(Action.Refine).preedit)
-        // finished, then the next character begun, at one Ink: the last is not finished
-        val other = refining()
-        other.show(read("淡", "谈", step = 0.3), piece = 0)
-        other.hold(Action.Ink(1, read("话")))
-        other.hold(Action.Ink(1))
-        other.hold(Action.Ink(2, read("天")))
-        assertFalse(other.apply(Action.Ink(NO_PIECE)).refines)
     }
 
     @Test

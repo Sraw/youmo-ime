@@ -54,8 +54,6 @@ import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ZhuyinKeys
 import org.fcitx.fcitx5.android.engine.pinyin.UserLatinWords
 import org.fcitx.fcitx5.android.engine.reading.CandidateReadings
-import org.fcitx.fcitx5.android.engine.rerank.Reranker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.PinyinSession
@@ -72,6 +70,7 @@ import org.fcitx.fcitx5.android.engine.table.TableSlips
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserScorer
 import org.fcitx.fcitx5.android.engine.user.WordLists
+import java.util.concurrent.Executor
 
 /** Makes each input method's session from [settings] and the user's habits, from [assets], [lexicon], tables, [learner] and English. Handwriting and tables share one [ChineseLanguage] per user model and one coarse-word list per set of added words. On the engines' thread. */
 internal class SessionFactory(
@@ -90,6 +89,10 @@ internal class SessionFactory(
     private val uptimeMillis: () -> Long,
     private val learnClock: LearnClock,
     simplifier: () -> Simplifier,
+    // the large model is read here at high, off the fcitx thread, so its first unsure key need not wait
+    private val warmUps: Executor,
+    // where the sentence models read a commit's context
+    private val contextReads: Executor,
 ) {
     private val simplified by lazy(LazyThreadSafetyMode.NONE) { simplifier() }
 
@@ -145,7 +148,7 @@ internal class SessionFactory(
             assets::charSyllables, language.user, language.coarse, held = lexicon.gate()::holds,
         )
         return HandwritingSession(
-            decoder, TextWords(data.model, data.wordIndex), s.pageSize, language.user, language.predictor, reranker(), refiner(),
+            decoder, TextWords(data.model, data.wordIndex), s.pageSize, language.user, language.predictor, assets.picker(minOf(s.modelLevel, ModelLevel.MEDIUM), nineKeys = false, warmUps, contextReads),
             block = lexicon::block, forgotten = { learner.forgottenEverywhere(it) }, ended = inkEndedBefore(), habits = learner.habitsNow(), simplify = simplified::simplify,
         )
     }
@@ -312,8 +315,7 @@ internal class SessionFactory(
             language.user,
             reading = { text -> data.wordIndex.find(text).takeIf { it != NO_WORD }?.let(language.readings::reading) },
             predictor = language.predictor,
-            reranker = reranker(),
-            refiner = refiner(),
+            reranker = assets.picker(minOf(settings().modelLevel, ModelLevel.MEDIUM), nineKeys = false, warmUps, contextReads),
             block = lexicon::block,
             forgotten = { learner.forgottenEverywhere(it) },
             emoji = emoji(),
@@ -366,7 +368,8 @@ internal class SessionFactory(
             pageSize = s.pageSize, user = user, prediction = s.prediction, spacePicksPrediction = s.spacePicksPrediction, uptime = uptimeMillis,
             prior = lexicon.prior(), phraseBook = phraseBook(),
             builtInPhrases = s.builtInPhrases, commonWords = commonWords(kind),
-            reranker = reranker(), refiner = refiner(), block = lexicon::block, emoji = emoji(), chaizi = chaizi, now = learnClock::calendar,
+            reranker = assets.picker(s.modelLevel, nineKeys = segmenter is T9Segmenter, warmUps, contextReads), pin = assets.pin,
+            block = lexicon::block, emoji = emoji(), chaizi = chaizi, now = learnClock::calendar,
             charReadings = assets::charSyllables, extensions = { assets.decoderExtensions(user) }, addedWords = ::addedNow, coarse = coarse(),
             learnTo = LearnTo(learner.habitsNow(), kind, simplified::simplify),
         )
@@ -456,11 +459,6 @@ internal class SessionFactory(
         override fun shownIn(text: String, before: String, hint: String?) = candidateReadings.oneOf(text, before, hint)?.let { Syllables.spelling(it.syllable) }
     }
 
-    /** One reranker for all sessions: all run on the fcitx thread, one input at a time, restarting for another input. */
-    private fun reranker(): Reranker? = if (settings().modelLevel >= ModelLevel.MEDIUM) assets.sentenceModel.reranker(Reranker.LIMIT) else null
-
-    /** Over the larger model, reweighing while the user pauses. */
-    private fun refiner(): SentenceRefiner? = if (settings().modelLevel == ModelLevel.HIGH) assets.lateRefiner else null
 }
 
 /**

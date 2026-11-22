@@ -22,21 +22,19 @@ class StrokeRun(
 
     private val filter = StrokeFilter(session, { strokes }, lookAhead = lookAhead) { cp, drawn -> charInfo.orderStartsWith(cp, drawn) }
 
-    /** A sample's: microseconds of each stroke, the pause's refine and the look-ahead; the strokes after which it was first (-1 never). */
-    data class Outcome(val strokeMicros: List<Long>, val refineMicros: Long, val scanMicros: Long, val firstAfter: Int)
+    /** A sample's: microseconds of each stroke and the look-ahead; the strokes after which it was first (-1 never). */
+    data class Outcome(val strokeMicros: List<Long>, val scanMicros: Long, val firstAfter: Int)
 
     data class Result(
         val samples: Int,
         val skipped: Int,
         val strokeMicros: List<Long>,
-        val refineMicros: List<Long>,
         val scanMicros: List<Long>,
         val firstAfter: List<Int>,
     ) {
         fun rows(): List<String> = listOf(
             "samples %d (left out: %d, a first character with no strokes)".format(Locale.ROOT, samples, skipped),
             row("a stroke", strokeMicros),
-            row("a refine", refineMicros),
             row("to the look-ahead", scanMicros),
         ) + (0..MAX_STROKES).map { k ->
             "first after %d strokes: %5.1f%%".format(Locale.ROOT, k, 100.0 * firstAfter.count { it in 0..k } / firstAfter.size.coerceAtLeast(1))
@@ -57,7 +55,6 @@ class StrokeRun(
         var firstAfter = if (filter.candidates(0, 1).firstOrNull()?.text?.firstOrNull() == c) 0 else -1
         val times = ArrayList<Long>()
         var scan = 0L
-        var refine = 0L
         for ((k, s) in order.take(MAX_STROKES).withIndex()) {
             val start = System.nanoTime()
             val shown = filter.apply(Action.Stroke(s))
@@ -65,17 +62,12 @@ class StrokeRun(
             if (firstAfter < 0 && shown.candidates.firstOrNull()?.firstOrNull() == c) firstAfter = k + 1
             // after the first, the most left to look through: those kept of all to the end
             if (k == 0) {
-                val paused = System.nanoTime()
-                filter.apply(Action.Refine)
-                refine = (System.nanoTime() - paused) / NANOS_PER_MICRO
-                // what the pause put first counts as first after the one stroke, as the user sees it then
-                if (firstAfter < 0 && filter.candidates(0, 1).firstOrNull()?.text?.firstOrNull() == c) firstAfter = 1
                 val from = System.nanoTime()
                 filter.candidates(0, lookAhead)
                 scan = (System.nanoTime() - from) / NANOS_PER_MICRO
             }
         }
-        return Outcome(times, refine, scan, firstAfter)
+        return Outcome(times, scan, firstAfter)
     }
 
     fun run(samples: List<Sample>): Result {
@@ -83,7 +75,7 @@ class StrokeRun(
         samples.firstNotNullOfOrNull(::type)
         val outcomes = samples.map(::type)
         val kept = outcomes.filterNotNull()
-        return Result(kept.size, outcomes.size - kept.size, kept.flatMap { it.strokeMicros }, kept.map { it.refineMicros }, kept.map { it.scanMicros }, kept.map { it.firstAfter })
+        return Result(kept.size, outcomes.size - kept.size, kept.flatMap { it.strokeMicros }, kept.map { it.scanMicros }, kept.map { it.firstAfter })
     }
 
     companion object {

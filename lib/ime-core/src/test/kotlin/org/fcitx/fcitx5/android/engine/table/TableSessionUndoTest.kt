@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.GlideReading
 import org.fcitx.fcitx5.android.engine.glide.GlideSession
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.TextWords
@@ -73,7 +74,7 @@ class TableSessionUndoTest {
     // [n] Backspaces the app takes, then another action: what they deleted whole taken back
     private fun Session.delete(n: Int) {
         repeat(n) { assertFalse(apply(Backspace).handled) }
-        apply(Action.Refine)
+        apply(Action.Ink(NO_PIECE))
     }
 
     private fun uses(keys: String, text: String) = learner.habits.uses(Code(kind, keys), Words.of(text))
@@ -120,7 +121,7 @@ class TableSessionUndoTest {
     fun aDeletedPredictionIsTakenBackAlone() {
         val t = session()
         assertEquals("高", t.apply(Action.Key('g')).let { t.apply(Select(0)) }.commit)
-        val offered = t.apply(Action.Refine).candidates
+        val offered = t.apply(Action.Ink(NO_PIECE)).candidates
         assertTrue(offered.toString(), "山" in offered)
         assertEquals("山", t.apply(Select(offered.indexOf("山"))).commit)
         assertTrue("高 山" in learner.used())

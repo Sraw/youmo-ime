@@ -447,7 +447,7 @@ class SettingsMenuUatTest {
     fun aboutListsVersionsSourceAndLicenses() {
         st.open(SettingsRoute.About)
         val titles = st.titles()
-        for (id in listOf(R.string.current_version, R.string.build_git_hash, R.string.build_time, R.string.engine_data,
+        for (id in listOf(R.string.current_version, R.string.build_git_hash, R.string.build_time, R.string.engine_data, R.string.device_processor,
             R.string.source_code, R.string.privacy_policy, R.string.license, R.string.open_source_licenses)) {
             assertTrue("${st.s(id)} in $titles", st.s(id) in titles)
         }

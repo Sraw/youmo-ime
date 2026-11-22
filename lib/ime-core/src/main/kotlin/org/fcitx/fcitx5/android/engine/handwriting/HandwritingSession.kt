@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.engine.learn.Words
 import org.fcitx.fcitx5.android.engine.learn.rankView
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.engine.session.Choice
 import org.fcitx.fcitx5.android.engine.session.CommitJournal
@@ -28,7 +27,6 @@ import org.fcitx.fcitx5.android.engine.session.Offer
 import org.fcitx.fcitx5.android.engine.session.OfferRules
 import org.fcitx.fcitx5.android.engine.session.Pager
 import org.fcitx.fcitx5.android.engine.session.Predictions
-import org.fcitx.fcitx5.android.engine.session.RefineSlices
 import org.fcitx.fcitx5.android.engine.session.Retype
 import org.fcitx.fcitx5.android.engine.session.Session
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -46,8 +44,7 @@ import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
  *
  * While [learning], a sentence put in is learned into [habits]: each character under its ink's first three
  * readings (no two hands write alike), the whole sentence by text for 联想 only. Never pinned: a slip would
- * then put the wrong character in on its own. A [refiner] re-weighs only [finished] characters: a half-written
- * one is no sentence to weigh.
+ * then put the wrong character in on its own.
  */
 class HandwritingSession(
     private val decoder: HandwritingDecoder?,
@@ -56,7 +53,6 @@ class HandwritingSession(
     private val user: UserModel? = null,
     private val predictor: Predictor? = null,
     private val reranker: SentencePicker? = null,
-    private val refiner: SentenceRefiner? = null,
     private val block: ((Entry) -> Unit)? = null,
     private val forgotten: (String) -> Unit = {},
     ended: Int = NO_PIECE,
@@ -67,9 +63,7 @@ class HandwritingSession(
 
     private class Offered(val reading: InkReading?, val piece: Int)
 
-    private class Written(val piece: Int, var reading: InkReading) {
-        var finished = false
-    }
+    private class Written(val piece: Int, var reading: InkReading)
 
     private val offered = ArrayDeque<Offered>()
     private val written = ArrayList<Written>()
@@ -81,8 +75,6 @@ class HandwritingSession(
 
     private val predictions = Predictions(predictor, words, user, block, forgotten, habits = habits) { learning }
 
-    private var decoding: HandwritingDecoder.Decoding? = null
-    private val unrefined = RefineSlices<HandwritingDecoder.Decoding>(refiner)
 
     private val pager = Pager(pageSize)
 
@@ -121,14 +113,8 @@ class HandwritingSession(
     override fun reads(c: Char): Boolean = false
 
     override fun apply(action: Action): Snapshot {
-        if (!keepsOrder(action)) unrefined.drop()
         journal.before(action, learning)
         return if (action == Action.DropPredictions && written.isEmpty()) unoffer() else act(action)
-    }
-
-    private fun keepsOrder(action: Action) = when (action) {
-        Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Cursor, is Action.Step, is Action.Forget, is Action.Block, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey -> true
-        else -> false
     }
 
     private fun act(action: Action): Snapshot = when (action) {
@@ -151,7 +137,6 @@ class HandwritingSession(
             reset()
         }
         is Action.Cursor, is Action.Step -> snapshot(handled = false)
-        Action.Refine -> refine()
         is Action.Forget -> pressed(action.index, Offer.FORGET)
         is Action.Block -> pressed(action.index, Offer.BLOCK)
         is Action.Glide, is Action.Stroke, is Action.Pin, is Action.Unpin, is Action.Syllable, is Action.Letter, is Action.NineKey, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown,
@@ -202,22 +187,13 @@ class HandwritingSession(
         lastInk = ink
         hold(ink)
         var changed = false
-        var finished = false
         while (offered.isNotEmpty()) {
             val o = offered.removeFirst()
-            val reading = o.reading
-            if (reading == null) finished = finish(o.piece) || finished else changed = take(o, reading) || changed
+            val reading = o.reading ?: continue
+            changed = take(o, reading) || changed
         }
         if (changed) decode()
-        // whether told in the same Ink as its last reading, with a later piece adding a character, or alone
-        if ((changed || finished) && written.lastOrNull()?.finished == true) refineLast()
         return snapshot()
-    }
-
-    private fun finish(piece: Int): Boolean {
-        val w = written.lastOrNull { it.piece == piece } ?: return false
-        w.finished = true
-        return w === written.last()
     }
 
     private fun unoffer(handled: Boolean = true): Snapshot {
@@ -263,7 +239,6 @@ class HandwritingSession(
     private fun decode() {
         pager.reset()
         predictions.unoffer()
-        unrefined.drop()
         val d = decoder
         val decoded = when {
             written.isEmpty() -> HandwritingDecoder.Decoding(emptyList())
@@ -277,7 +252,6 @@ class HandwritingSession(
             }
         }
         place(decoded, if (d == null) 0 else reranker?.pick(predictions.context, decoded.best, decoded.bestScores) ?: 0)
-        decoding = decoded
     }
 
     private fun place(decoded: HandwritingDecoder.Decoding, first: Int) {
@@ -308,15 +282,6 @@ class HandwritingSession(
 
     private fun view(h: Habits) = h.rankView(pins = false, mine = false, imports = false)
 
-    private fun refineLast() {
-        unrefined.start(decoding, decoding?.top?.size ?: 0)
-    }
-
-    private fun refine(): Snapshot {
-        unrefined.slice(predictions.context, { it.best }, { it.bestScores }, ::place)
-        return snapshot()
-    }
-
     private fun shown(): List<String> = if (written.isEmpty()) predictions.offered.map { it.text } else sentences.map { lastCharacter(it.text) }
 
     private fun pick(index: Int, offer: Boolean = true): Snapshot {
@@ -328,8 +293,6 @@ class HandwritingSession(
         ended = maxOf(ended, written.last().piece)
         written.clear()
         sentences = emptyList()
-        decoding = null
-        unrefined.drop()
         if (offer) predict() else pager.reset()
         return snapshot(commit = sentence.text)
     }
@@ -400,14 +363,12 @@ class HandwritingSession(
         if (offer == Offer.FORGET) forgotten(text) else decoder?.alone(text)?.let { block?.invoke(it) }
         decoder?.forgetSearch()
         decode()
-        if (written.last().finished) refineLast()
         return snapshot()
     }
 
     private fun takeBack(): Snapshot {
         ended = maxOf(ended, written.removeAt(written.size - 1).piece)
         decode()
-        if (written.lastOrNull()?.finished == true) refineLast()
         return snapshot()
     }
 
@@ -417,8 +378,6 @@ class HandwritingSession(
         ended = maxOf(ended, latest)
         written.clear()
         sentences = emptyList()
-        decoding = null
-        unrefined.drop()
         predictions.unoffer()
         pager.reset()
         return snapshot()
@@ -442,7 +401,6 @@ class HandwritingSession(
             handled = handled,
             predicting = predicting,
             actionable = predicting || written.isNotEmpty(),
-            refines = unrefined.refines,
             total = all.size,
             first = pager.from,
         )

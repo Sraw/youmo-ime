@@ -39,9 +39,6 @@ object EngineEvent {
     /** Argument: index among all candidates. */
     const val FORGET = 9
 
-    /** The user pauses and the last snapshot [refines][Snapshot.refines]; [handled][Snapshot.handled] only if it changed. */
-    const val REFINE = 10
-
     /** Argument: index among all candidates. */
     const val PIN = 11
 
@@ -100,7 +97,6 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
             EngineEvent.PICK -> session.apply(Action.Pick(arg))
             EngineEvent.FORGET, EngineEvent.PIN, EngineEvent.UNPIN, EngineEvent.BLOCK -> session.apply(pressed(event, arg))
             EngineEvent.RESET -> reset(arg).copy(handled = false)
-            EngineEvent.REFINE -> refine()
             EngineEvent.TYPED -> typed(arg)
             EngineEvent.DROP_PREDICTIONS -> if (shown.predicting) session.apply(Action.DropPredictions) else again(handled = false)
             else -> passOn()
@@ -267,13 +263,6 @@ class Keyboard(private val session: Session, private val nineKeys: Boolean) {
     // [codePoints] into [text] in UTF-16 units, capped at its end: the host's tap counts code points (PreeditUi.preeditAt)
     private fun utf16Offset(text: String, codePoints: Int) =
         text.offsetByCodePoints(0, codePoints.coerceIn(0, text.codePointCount(0, text.length)))
-
-    private fun refine(): Snapshot {
-        val last = again(handled = true)
-        if (!last.refines) return last.copy(handled = false)
-        val next = session.apply(Action.Refine)
-        return if (next.copy(refines = false) == last.copy(refines = false)) next.copy(handled = false) else next
-    }
 
     // the last snapshot again with its commit and deletion done: androidengine deletes before the cursor for any
     // snapshot it shows, handled or not

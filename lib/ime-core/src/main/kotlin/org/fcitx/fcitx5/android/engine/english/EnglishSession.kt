@@ -186,7 +186,7 @@ class EnglishSession(
         is Action.Unpin -> unpin(action.index)
         is Action.Block -> block(action.index)
         Action.DropPredictions -> { unoffer(); snapshot() }
-        Action.Refine, is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Syllable, is Action.Letter, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> snapshot()
+        is Action.Ink, is Action.Stroke, is Action.Pin, is Action.Syllable, is Action.Letter, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> snapshot()
     }
 
     private fun commitRaw() = if (input.isEmpty()) snapshot(handled = false) else commit(typed(), space = false, learned = false).copy(handled = false)

@@ -259,7 +259,6 @@ class PinyinSessionCursorTest {
         moved.apply(Action.Letter('a'))
         moved.type("6")
         moved.apply(Step(-1))
-        moved.apply(Action.Refine)
         val s = moved.apply(Action.Letter('b', again = true))
         val typed = nineKeys()
         typed.apply(Action.Letter('a'))

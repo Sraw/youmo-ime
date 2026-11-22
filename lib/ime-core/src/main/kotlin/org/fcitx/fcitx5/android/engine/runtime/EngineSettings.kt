@@ -91,7 +91,7 @@ data class EngineSettings(
     }
 }
 
-/** 性能档位, by config [key]: how much of the sentence models pinyin runs. */
+/** 性能档位, by config [key]: how much of the sentence models pinyin runs; 自动 is the host's to resolve (`ModelChoice`), so it never reaches an engine. */
 enum class ModelLevel(val key: String) {
     /** The decoder's n-gram alone. */
     LOW("Low"),
@@ -99,7 +99,7 @@ enum class ModelLevel(val key: String) {
     /** Plus the small sentence model at every key. */
     MEDIUM("Medium"),
 
-    /** Plus the large one once the user pauses. */
+    /** Plus the large one where the small one is unsure, within the key. */
     HIGH("High"),
 }
 

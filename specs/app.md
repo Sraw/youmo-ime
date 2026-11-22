@@ -8,7 +8,7 @@ an ime-core class with a test.
 
 | Package | Holds |
 |---|---|
-| `core/` | The host's Android side: `KotlinHost` (the `HostApi` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinhost)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `HostApi` (suspend calls into the host; its `eventFlow`, the host's own `HostEvent`s out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel`; the Android-free DTOs of the same package (`KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
+| `core/` | The host's Android side: `KotlinHost` (the `HostApi` over ime-core's `HostCore`, its lifecycle and config files, [host.md](host.md#the-apps-side-kotlinhost)), `HostDispatcher` (the host thread and clock), `HostResources` (`AppHostStrings`, the host's texts from app resources), `HostApi` (suspend calls into the host; its `eventFlow`, the host's own `HostEvent`s out of it), `EngineBridge` (ime-core's `Engines` with their Android side: assets, user dir, saves; the host's `EngineHost`), `SubtypeManager`, `InputMethodNames`, `NativeMatrixKernel` (also the `CpuNative`), `CpuProbe` and `ThisDevice`; the Android-free DTOs of the same package (`KeySym`, `KeyStates`, `CandidateWord`, `InputMethodEntry`, `FormattedText`) are in ime-core, their `KeyEvent` conversions here (`KeySymEvents.kt`, `KeyStateEvents.kt`) |
 | `daemon/` | `HostDaemon`: the one fcitx instance, shared by connections (`HostConnection`) |
 | `input/` | The `InputMethodService` (`FcitxInputMethodService`), `InputView`, and what the keyboard shows: `bar/` (the candidate bar / toolbar, `KawaiiBarComponent`), `candidates/` (horizontal bar, expanded grid, floating window for physical keyboards), `keyboard/` (`TextKeyboard`, `T9Keyboard`, `NumberKeyboard`, `KeyDef`/`SceneKeyDef`, `KeyGesture`, `CommonKeyActionListener`, `canvas/`: the scene drawing), `picker/` (symbols, emoji), `popup/` (key previews, long-press keyboards), `clipboard/` (the panel's two pages, 最近 and 收藏, picked and laid out by ime-core's `ClipboardPages` (the page it opens on: the remembered one unless `ClipboardManager.copies`, a count in memory, grew since it was left; each entry's menu; the empty favourites' hint); a favourite is a copy, a row with `pinned=1` (`ClipboardEntry.favorite`), ordered by its `timestamp`, untouched by the limit, the trash and a paste; a copy looks for its text among the recent alone; unfavouriting one with no recent copy moves it to 最近 first (with the history off or a limit of 0, which keep none, it is marked deleted instead, the undo's to give back); 「切词」, `ClipboardChunksWindow`, shows ime-core's `ClipboardChunks` pieces, picked by tap or by a sideways sweep (ime-core's `SwipePick`), Chinese split by `HostApi.wordBoundaries`; the history at scale measured by `ClipboardScale`, JVM and device: on redroid at 10 000 entries opening ~30 ms, clearing ~0.2 s, a backup ~0.2 s; at 100 000 opening ~0.1 s, a page half way down ~0.35 s, clearing ~1.5 s, a backup ~2 s), `editing/` (text editing panel, `InputConnectionEditor`), `status/` (the "more" panel), `preedit/`, `broadcast/`, `wm/` (`InputWindowManager`), `handwriting/`, `floating/` (the floating keyboard), `dialog/`, `editorinfo/` (the `EditorInfo` inspector), `learning/` (a candidate's long-press menu worded by the app from the engine's `LearningResult.Menu`, `CandidateLearningMenu`; its head, `BaseInputView.showCandidateActionMenu`, the engine's `CandidateCard` stepped through by ime-core's `CardNav`: the reading line `CompactLineView`, `WordCardView`, `CharCardView` (`candidates/`), each a view tapped on its own in the list's first row, one column in the floating candidates window; the undo chip, `UndoChip`, the keyboard's one notice: see [Notices](#notices)) |
 | `data/` | File-backed managers: `pack/` (the resource packs: `PackStore` the installed shelf and its state, `PackImports` an import from the picker in the app's scope with its progress and results, `AppData` every data file's door, a pack's file or the APK's asset; data-and-build.md#resource-packs), `prefs/` (`AppPrefs`, the managed preference framework), `theme/`, `clipboard/` (Room), `pinyin/` (imported dictionaries, custom phrases; sources are `<name>.txt.gz[.disable]`, named through `SourceNames`; `MergedDictionary` compiles the dictionaries turned on into `merged.ymd` on one `dictionary-compile` thread, keyed by a stamp of the sources, the base data and a compiler revision; the engine maps the file, uses a stale one until the new one is made, and is reloaded through `made`. An older build's plain `.txt` is work by itself (`SourceNames.unconverted`: `current()`, `pending()`, `mergedWords` count it): the next compile gzips it first (`Step.CONVERT`, the progress's first share, 正在转换 on the 词库 page, the idle bar's 正在升级词库格式) through `<name>.txt.gz.convert.tmp`, and is an upgrade (UPGRADE) only by what it finds: a text converted or not, a v1 `merged.ymd` dropped, or `.merged.upgrading` (written before the first conversion or the drop, deleted when a non-import compile ends, so a kill in between is still an upgrade at the next start); never by files' times. A text that cannot be read, or a `.gz` that is not gzip or is cut short, is skipped and listed in `.merged.unreadable` (the page: 读不了 / 文件损坏，可能不全, delete and import again; a damaged `.gz` keeps what was read before the damage); a text whose gzip cannot be written (the disk full) stays as it is, listed in `.merged.unwritten` (the page: 没转换成, free space and reopen). A text converted whose delete is refused is listed in `.merged.left`: not converted again while its `.gz` of the same state is there (its words are in it); each compile tries its delete again (no reconversion, no UPGRADE) and drops the entry once it is gone, or once that `.gz` is (deleted outside the page, or a restore left only the other state), the text then converted like any other. The entry is the text's name on, length and mtime (`leftKey`), so a turn keeps it. Listed files are skipped at each start and reload till they change; only a `.merged.left` text leaves `pending()` false, an unreadable or unwritten one keeps it true (its words are owed). Opening the 词库 page (`retry`) clears `.merged.unwritten` and `.merged.unreadable` (but a damaged `.gz`'s entry), never `.merged.left`. Imported words are missing until it ends. `turn`/`delete` resolve a dictionary by name under the sources lock, never the `File` the page listed, and act on all its files together: `turn` renames a text and its `.gz` both (the text turned back if the `.gz`'s rename is refused), `delete` deletes the text first and keeps the `.gz` if that is refused, so the two never split), `punctuation/`, `quickphrase/` (`QuickPhraseManager`: the user's quick input, `mine.mb` (entries with notes, and folders) and `mine.used` read, changed and written whole under one lock, the settings page and the keyboard both writing; files of before read converted and written as version 2 at the next change, host.md `QuickPhraseFiles`; backups take `data/quickphrase.d` as a followed directory, an old backup restored read the same way), `layout/` (`CustomLayouts`: the user's own layouts, `files/layouts/<id>.xml`, written through `<uuid>.saving` and a rename under the lock the list clears a kill's `.saving` under (one over a minute old: a save of another process is younger), listed parsed once a file (path, mtime, size; its text not kept, a throw reading one makes it 读不出), names shown without `LayoutCheck.hidden` characters, the `.converted` record of theme packs' layouts turned into custom ones; the rules, ime-core `input/layout/`: `CustomLayoutFiles` names and limits, `LayoutImport` an import's verdict, `LayoutThumbnail` a card's keys; 061-custom-layout §4), `UserDataManager` (backup/restore; `layouts/` goes in a backup, a restore lays the backup's over the phone's by id, each held to `CustomLayoutFiles.restorable` (the non-strict check, a family of the list, no app id or key-name prefix) and the phone kept within 100, its own first; `.converted` merged; best effort: a failure is logged, the restore goes on) |
@@ -722,9 +722,7 @@ backspace a stroke first, a key for the engine wiping the piece) while written o
 `restartInk` drops the pad at each new input; detaching finishes it.
 How long the pen stays up before a piece is done (`InkPad.finishMillis`) is the app's setting
 `AppPrefs.keyboard.handwritingPause` (`HandwritingPause`, 0.3–1.5 s), on 通用输入's 手写 section, read at each
-pen up. A piece so done is told to the engine (`HostApi.inkFinished`, an Ink key carrying the piece and no
-reading, after the piece's readings: `HandwritingRecognition.afterReads`), for the large sentence model to weigh
-the finished character's sentence. The recognizer skips a read only for a newer one of the same piece.
+pen up. The recognizer skips a read only for a newer one of the same piece.
 
 The 060 redraw (`input/keyboard/canvas/`; the only drawing since 060-render-p2 S8a, which deleted the
 key views and the 开发者 → 新绘制键盘 switch, its stored key retired): `TextKeyboard` (qwerty.xml) and, since 060-render-p2 S4a, `GroupedKeyboard` (the 14
@@ -1430,6 +1428,56 @@ on, read from `EngineState.englishSuggests`), a long press's letter then pinned 
 apostrophe then, else `. , ? ! ' -` in turn) and the column, comes from
 `EngineState.englishTyping`. ⇧ stands where 重输 is, its state `NineKeyShift` (ime-core), lit by
 auto-caps through `AutoCapsKeys`, which both boards implement. No glide on it.
+
+## This device's processor (`core/CpuProbe.kt`, ime-core `device/`)
+
+`ThisDevice.profile` is the one `DeviceProfile` of the process, which the 性能档位's 自动 (`ModelChoice.AUTO`,
+the default), the engine's matrix kernel and the pinning read, and the settings and 关于 show:
+
+- `CpuProbe` reads raw facts alone under an injectable root: `possible` cores, each one's MIDR
+  (`regs/identification/midr_el1`, else `/proc/cpuinfo`, which lists the online alone), `cpu_capacity`,
+  `cpufreq/cpuinfo_max_freq`, HWCAP/HWCAP2 through `CpuNative`; `Cpus_allowed_list` for the log only.
+- `DeviceProfile.of(facts)` decides, pure: LOW when every core was read and all are little (first: A510 and A520
+  have i8mm); else HIGH for i8mm (HWCAP2 bit 13, read here in Kotlin: the native side never looks at it) or a big
+  core A77 or newer (`Midr.newBig`); MEDIUM otherwise, never LOW with a core unread (it may be a big one).
+  The kernel is SDOT where HWCAP says dotprod, MLAL on other arm64, the portable one elsewhere; a dotprod
+  known by MIDR alone (pytorch/cpuinfo's list) runs MLAL until tried. The big cores are those above the midpoint of
+  `cpu_capacity`, else of the top frequency; none where all are alike.
+- `DeviceProfiles` decides once per key (`Build.FINGERPRINT`, version code, commit) and keeps it in
+  device-protected preferences (`device_profile`, so before the first unlock too); the settings may be the first
+  to ask, on the main thread (a few milliseconds). The SDOT trial for a MIDR-only dotprod writes `sdot_trial`
+  (`commit()`) before running `CpuNative.sdotSelfTest` pinned to each core in turn, the thread put back on every
+  possible core after (as `BigCorePin` does): a trial left behind is a process killed by SIGILL, MLAL for good; a core it could not reach, or whose
+  kernel ran the test elsewhere, is tried by the next process, MLAL for good after three. `sdotSelfTest(cpu)` answers
+  in three: `SDOT_ELSEWHERE` when `sched_getcpu()` is not `cpu` before or after the sum (core_ctl may run an isolated
+  core's thread elsewhere despite the mask), `SDOT_FAILED` for a wrong sum (always on x86_64), else `SDOT_PASSED`.
+- The engine asks for the profile's kernel (`NativeMatrixKernel.useKernel`: `PORTABLE` 1, `MLAL` 2, `SDOT` 3); SDOT is
+  taken only where HWCAP says dotprod or the trial passed, else MLAL, and x86_64 is always portable. `dotsQ8` then
+  dispatches each call (the test entry `dotsQ8` returns the kernel that ran, which the sums cannot tell):
+
+  | Kernel in force | m = 1 | m ≥ 2 |
+  |---|---|---|
+  | SDOT, `columns % 16 == 0` | SDOT | SDOT |
+  | SDOT, other column counts | portable | MLAL |
+  | MLAL (arm64 without dotprod) | portable | MLAL |
+  | MLAL due and −128 in the activations (MLAL's int16 would overflow) | portable | portable |
+  | x86_64 | portable | portable |
+
+  Every kernel gives the JVM's bits (no FMA contraction natively), so the choice changes speed alone.
+- `BigCorePin` (a `CorePin`) pins a stretch of the engine's computation to the big cores and then puts the thread
+  on every possible core (`DeviceProfile.possibleMask`; every bit where that is refused), which the kernel cuts to
+  the cpuset, once for nested stretches; refused (EINVAL, a cpuset without them), it is not tried for 10 s. Never
+  the mask read before: `sched_getaffinity` leaves out the cores offline or core_ctl-isolated then (the 6T's 4 and 6
+  idle), so restoring it shrank the thread a little more each key, and from Linux 6.2 a mask set outlives a cpuset
+  change.
+  Pinning and the kernel change speed alone, never a candidate. `BigCorePin.enabled` is off for measurements
+  (`EngineEvalRunner`'s `-e pin off`).
+- Wiring: `EngineBridge` hands `Engines` `ThisDevice.kernel` (the native kernel set to the profile's, its calls
+  forwarded with the `BigCorePin` as `MatrixKernel.pin`; `MatrixKernel.JVM` and no pin without the library);
+  `KotlinHost` makes its `HostCore` with `autoLevel = ThisDevice.profile.autoLevel`. `HostTest` pins to the cpuset's
+  last core through `ThisDevice.kernel`'s test setter (the emulator has no big cores), checks that it did, and that no
+  thread is left off the process's cpuset after a sentence. Under Robolectric (`Build.FINGERPRINT` `robolectric`)
+  the profile is `ThisDevice.TEST_FACTS`'s, MEDIUM, never the build machine's `/sys`.
 
 ## Settings
 

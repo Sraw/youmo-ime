@@ -8,7 +8,6 @@ import org.fcitx.fcitx5.android.engine.handwriting.HandwritingDecoder
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingData
 import org.fcitx.fcitx5.android.engine.handwriting.handwritingDataBytes
 import org.fcitx.fcitx5.android.engine.handwriting.read
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -57,36 +56,6 @@ class HandwritingRunTest {
         assertEquals(listOf(3, 1, 2, 3), run.sentences(rows, decoder()) { _, _ -> 1 }.counts())
         // past the best: the decoder's
         assertEquals(listOf(3, 3, 2, 3), run.sentences(rows, decoder()) { _, _ -> 9 }.counts())
-    }
-
-    /** Picks [word] on the last of its [slices], before then not done: a large model taking more than the default's pause. */
-    private class Late(override val slices: Int, private val word: String) : SentenceRefiner {
-        var calls = 0
-
-        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? =
-            if (++calls < slices) null else readings.indexOf(word).takeIf { it >= 0 } ?: SentenceRefiner.NONE
-    }
-
-    @Test
-    fun highPutsTheLargeModelsPickFirstOnceItIsGivenItsSlices() {
-        // 山 after 高 as the decoder reads it: the large model picks 人, the second, on its last slice
-        val late = Late(SentenceRefiner.SLICES + 8, "人")
-        assertEquals(listOf(1, 0, 0, 1), run.sentences(rows.drop(1), decoder(), HandwritingRun.refined(late) { _, _ -> 0 }).counts())
-        // one that has nothing to say keeps the small model's pick
-        val none = Late(1, "无")
-        assertEquals(listOf(1, 1, 1, 1), run.sentences(rows.drop(1), decoder(), HandwritingRun.refined(none) { _, _ -> 0 }).counts())
-        // and one that never picks in its slices: given no more than them, the small model's pick stands
-        val never = object : SentenceRefiner {
-            var calls = 0
-            override val slices = 3
-
-            override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
-                calls++
-                return null
-            }
-        }
-        assertEquals(listOf(1, 1, 1, 1), run.sentences(rows.drop(1), decoder(), HandwritingRun.refined(never) { _, _ -> 0 }).counts())
-        assertTrue(never.calls > 0)
     }
 
     @Test

@@ -10,7 +10,6 @@ import org.fcitx.fcitx5.android.engine.learn.Code
 import org.fcitx.fcitx5.android.engine.learn.Habits
 import org.fcitx.fcitx5.android.engine.learn.Simplifier
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
@@ -21,7 +20,6 @@ class TableLanguage(
     val reading: (String) -> IntArray? = { null },
     val predictor: Predictor? = null,
     val reranker: SentencePicker? = null,
-    val refiner: SentenceRefiner? = null,
     val block: ((Entry) -> Unit)? = null,
     /** Told a forgotten prediction's text, for the tables' copy too: [user] forgets it by its reading alone. */
     val forgotten: (String) -> Unit = {},

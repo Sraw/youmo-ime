@@ -45,18 +45,6 @@ class EnginesTest : EnginesFixture() {
 
     private val root = MemoryFiles()
 
-    /** What the addon does while the user pauses after [typed]: refines till there is no more to do. */
-    private fun Engines.pause(im: String, typed: Snapshot): List<Snapshot> {
-        val slices = ArrayList<Snapshot>()
-        var s = typed
-        while (s.refines) {
-            s = onEvent(im, EngineEvent.REFINE, 0)
-            slices += s
-            assertTrue("never done", slices.size < MAX_SLICES)
-        }
-        return slices
-    }
-
     @Test
     fun pinyinIsTypedAndPicked() {
         val engines = Engines(::load, null)
@@ -120,10 +108,10 @@ class EnginesTest : EnginesFixture() {
 
     @Test
     fun aTableIsLoadedOnlyWhenItsInputMethodIsUsed() {
-        val engines = Engines(::load, null)
+        val engines = Engines(::load, null, warmUps = inPlace)
         engines.type(InputMethodCatalog.PINYIN, "ni")
-        // the larger model only once the user pauses; the emoji as the first candidates are listed
-        assertEquals(listOf(InputMethodCatalog.PINYIN_DATA, InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.EMOJI_DATA), loaded)
+        // the larger model read ahead as pinyin's session is made, once the small reads; the emoji as the first candidates are listed
+        assertEquals(listOf(InputMethodCatalog.PINYIN_DATA, InputMethodCatalog.SENTENCE_MODEL, InputMethodCatalog.LARGE_MODEL, InputMethodCatalog.EMOJI_DATA), loaded)
         loaded.clear()
         val s = engines.type(InputMethodCatalog.WUBI, "vbg")
         assertEquals(listOf("好", "妤"), s.candidates)
@@ -696,7 +684,6 @@ class EnginesTest : EnginesFixture() {
 
     private companion object {
         const val MAX_PICKS = 10
-        const val MAX_SLICES = 10_000
     }
 
     // the host's 清除 log ends there, as the list id sent is one the session moved past

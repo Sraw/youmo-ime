@@ -29,9 +29,13 @@ class SafetensorsTest {
     @Test
     fun anInt8MatrixIsHandedToTheKernelWhereItLiesInTheMappedFile() {
         var given: ByteBuffer? = null
-        val kernel = MatrixKernel { q, scales, rows, columns, x, y ->
-            given = q
-            MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) = error("floats")
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                given = q
+                MatrixKernel.JVM.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
         }
         val y = FloatArray(2)
         Safetensors(mapped(before = 5)).matrix("w", 2, 3, kernel).times(floatArrayOf(1f, 1f, 1f), y)
@@ -41,6 +45,7 @@ class SafetensorsTest {
         assertTrue(q.isReadOnly)
         assertEquals(6, q.capacity())
         assertEquals(listOf<Byte>(1, 2, 3, 4, 5, 6), (0 until 6).map { q[it] })
-        assertArrayEquals(floatArrayOf(6 * 0.5f, 15 * 2f), y, 0f)
+        // the ones are rounded to int8 as 127 times 1/127, not quite 1
+        assertArrayEquals(floatArrayOf(6 * 0.5f, 15 * 2f), y, 1e-5f)
     }
 }

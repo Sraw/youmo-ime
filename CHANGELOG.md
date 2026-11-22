@@ -19,6 +19,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 语音把听到的换成你的同音词时看整句：说得通才换，不再一见到同音就换。加了「攻势」，「敌人的公式很猛」打成「敌人的攻势很猛」，「推导这个公式」照样是「公式」；手动加的词比打字学成的更容易换。语音在那儿不肯换、你删掉重打成你的词时，会问「以后总是把『公式』写成『攻势』？」（语音在那儿会换的，问「记住」），点 **总是换** 以后这个词不看整句、总是换；在 **用户词库 → 手动添加的词** 里点这个词选 **取消语音总是换** 可以取消。
 - 码表（五笔、二笔、五笔拼音等）逐字打出一个词后停一下，键盘上方的提示条给出「记住：汪小明 iije」，点了才记住，以后按组词规则的编码打得出；不点什么都不存，提示条在接着按键、换输入框、收起键盘时收起。记住的词在自动学到的词里带日期，长按选 **为什么排在这** 写着「你在五笔里记住的词」。码表里的 **忘掉学到的** 只忘掉这个编码下学到的顺序，不再连拼音里学到的一起忘掉。点错了可以在提示条上撤销，长按这个候选选 **删除**，或在 **用户词库 → 自动学到的词** 里删掉。每个码表的设置里有 **逐字打出后给出组词**，默认开。
 - 新开关 **空格上屏联想词**（**通用输入**，默认关）：开着时上屏后的联想第一个词画成首选的样子，按空格上屏它，不加空格。
+- 候选不再在停顿后跳动：同样的输入总给出同样的候选。
+- **性能档位** 新增「自动」并设为默认，按本机处理器定一次；原来没改过档位或选的是高档的，都会变成自动，想固定高档请重新选一次。
 
 ### 小改动
 
@@ -34,6 +36,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 注音键盘打不打声调学的是同一份：带声调选过两次的词，不带声调打也排第一，反过来也一样；打了声调时，学到的第一和固定的词只在声调对得上时才提前（在 ㄇㄚ 下选惯了「马」，打 ㄇㄚˉ 第一个还是「妈」）。0.6.3 以前带着声调学到的顺序和固定不再起作用，要重新学，已学条目里旧的带声调固定标成「旧记录，已不起作用」。
 
 - 新快捷键 **切输入法** 和 **选输入法**，能设在任意键的上滑或下滑：切输入法和点地球键一样，这样关掉 **显示语言切换键** 也能换输入法；选输入法像编辑菜单那样弹出一排启用的输入法（最后一格 **更多…** 打开输入法选择框），左右挪选、松开就换，滑出直接松开是地球键会换到的那个。
+- 关于页显示本机处理器和自动档在本机定成的档位（「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」）。
+- 手写高档不再在停笔后重排，和中档相同。
 
 ### 修复
 
@@ -59,6 +63,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Voice now looks at the whole sentence before writing one of your homophones for what it heard: it replaces only where the sentence reads right, not every time it hears a word read alike. With 攻势 added, 「敌人的公式很猛」 is written 「敌人的攻势很猛」 while 「推导这个公式」 keeps 公式; words added by hand go in more readily than words learned from typing. Typed again as your word where voice left it, it asks 「以后总是把『公式』写成『攻势』？」: tap **总是换** and voice always writes the word; tap it in **用户词库 → 手动添加的词** and choose **取消语音总是换** (Stop always writing it in voice) to stop.
 - In a table (Wubi, Erbi, Wubi-Pinyin and the others), a word typed a character at a time is offered on the notice strip above the keys after a pause, as 「记住：汪小明 iije」. It is remembered only when tapped, under the code its rules give, and nothing is kept otherwise; the strip goes at the next key, a field change or the keyboard closing. A remembered word shows its date in the learned words, and **为什么排在这** names it remembered. A table's **忘掉学到的** forgets the order under that code alone, no longer what pinyin learned. A mistaken tap is undone on the strip, or deleted by long-pressing the candidate (**删除**) or in **用户词库 → 自动学到的词**. Each table's settings have **逐字打出后给出组词**, on by default.
 - A new switch, **空格上屏联想词** (**通用输入**, off by default): the first word predicted after a commit is drawn as the first choice and Space puts it in, with no space after it.
+- Candidates no longer jump after a pause: the same input always gives the same candidates.
+- **性能档位** has a new **自动** (auto), now the default, set once from this device's processor. Who never changed the level or chose high gets auto; to keep high, choose it again.
 
 ### Smaller changes
 
@@ -74,6 +80,8 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The zhuyin keyboards learn a word as one whether its tones are typed or not: picked twice with tones, it is first without them too, and the other way round; with a tone typed, a learned first or pinned word comes forward only where the tone agrees (马 picked under ㄇㄚ, ㄇㄚˉ still gives 妈 first). Orders and pins learned with tones before 0.6.3 no longer apply and are learned anew; in **已学条目** an old toned pin is marked 「旧记录，已不起作用」.
 
 - Two new shortcuts for any key's swipe: **切输入法** does what a tap of the globe key does, so input methods still switch with **显示语言切换键** off; **选输入法** pops a row of the enabled input methods where the edit menu goes (its last cell, **更多…**, opens the input method picker), picked by sliding left or right and switched to on release, the one the globe would go to under the finger.
+- The about page shows this device's processor and the level Auto picks here (「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」).
+- Handwriting at the high level no longer reorders after the pen stops: it is the same as medium.
 
 ### Fixes
 

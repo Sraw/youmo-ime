@@ -4,13 +4,14 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.device.CorePin
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAIZI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAR_INFO_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.CHAR_LEVELS_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.EMOJI_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.ENGLISH_DATA
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN_DATA
-import org.fcitx.fcitx5.android.engine.InputMethodCatalog.REFINING_MODEL
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog.LARGE_MODEL
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SENTENCE_MODEL
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.STROKE_DATA
 import org.fcitx.fcitx5.android.engine.data.CharLevels
@@ -28,16 +29,23 @@ import org.fcitx.fcitx5.android.engine.pinyin.LatinWords
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.platform.Blobs
 import org.fcitx.fcitx5.android.engine.reading.ToneMark
+import org.fcitx.fcitx5.android.engine.rerank.GatedPicker
+import org.fcitx.fcitx5.android.engine.rerank.LargeHandle
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
+import org.fcitx.fcitx5.android.engine.rerank.PinnedPicker
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
+import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
 import org.fcitx.fcitx5.android.engine.stroke.Strokes
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.imports.WordText
 import org.fcitx.fcitx5.android.input.voice.VoiceHomophones
 import org.fcitx.fcitx5.android.input.voice.VoiceRerank
 import java.io.IOException
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executor
+import java.util.concurrent.FutureTask
 
 /**
  * What [Engines] reads from the app's assets, each on first ask and kept: pinyin data and what its sessions
@@ -114,46 +122,94 @@ internal class EngineAssets(
         if (user.countsVersion != extensionsCounts) dropDecoderExtensions()
     }
 
-    /** A sentence model read on first ask; dropped when turned off, read again when turned on. */
-    inner class ModelFile(private val path: String, private val unpack: Boolean) {
-        private var model: SentenceModel? = null
-        private var tried = false
-        private var reranker: Reranker? = null
-        private var rerankerLimit = 0
+    /**
+     * A sentence model's [Reranker], read on first ask; dropped when turned off, read again when turned on. Its
+     * task is made and dropped on the fcitx thread; the model, made whole inside it, reaches whichever thread gets it.
+     */
+    inner class ModelFile(private val path: String) {
+        @Volatile
+        private var task: FutureTask<Reranker>? = null
+        private var limit = 0
 
-        fun get(): SentenceModel? {
-            if (tried) return model
-            tried = true
-            // missing or unreadable: pinyin reads by the decoder alone
-            model = readOr(null, "cannot read $path: pinyin reads by the decoder alone") {
-                SentenceModel.load(blobs.load(path), unpack, kernel ?: MatrixKernel.JVM)
-            }
-            return model
-        }
+        // the failed task already told, so a model that does not read is reported once
+        private var told: FutureTask<Reranker>? = null
 
-        /** The one reranker over the model, made at first need; a model is asked with one limit. */
-        fun reranker(limit: Int): Reranker? {
-            reranker?.let { made ->
-                check(limit == rerankerLimit) { "$path's reranker compares $rerankerLimit readings, not $limit" }
+        // [ahead] where the reranker is first made: what reads a commit's context ahead
+        private fun task(limit: Int, ahead: Executor?): FutureTask<Reranker> {
+            task?.let { made ->
+                check(limit == this.limit) { "$path's reranker compares ${this.limit} readings, not $limit" }
                 return made
             }
-            return get()?.let { Reranker(it, limit = limit) }?.also {
-                reranker = it
-                rerankerLimit = limit
-            }
+            val ahead = ahead?.let(::pinnedOn)
+            return FutureTask(Callable { Reranker(SentenceModel.load(blobs.load(path), kernel = kernel ?: MatrixKernel.JVM), limit = limit, ahead = ahead) })
+                .also {
+                    task = it
+                    this.limit = limit
+                }
+        }
+
+        /**
+         * The one reranker over the model, read on this thread unless already reading elsewhere; a model is asked with
+         * one limit. [ahead]: where it reads a commit's context (`Reranker.ahead`), null on the asking thread.
+         */
+        fun reranker(limit: Int, ahead: Executor? = null): Reranker? = Handle(task(limit, ahead)).get()
+
+        /** The reranker as it will be once read, without reading it yet. */
+        fun handle(limit: Int, ahead: Executor? = null): LargeHandle = Handle(task(limit, ahead))
+
+        /** Starts reading on [executor], so the first key that needs the model need not wait for all of it; [ahead] as [handle]'s. */
+        fun preload(limit: Int, executor: Executor, ahead: Executor? = executor) {
+            executor.execute(task(limit, ahead))
         }
 
         fun drop() {
-            model = null
-            tried = false
-            reranker = null
+            task?.cancel(false)
+            task = null
+        }
+
+        private inner class Handle(private val task: FutureTask<Reranker>) : LargeHandle {
+            override fun loaded(): Reranker? = if (task.isDone) get() else null
+
+            override fun get(): Reranker? {
+                // run() does nothing where another thread has it or it is done: get() then waits or returns
+                task.run()
+                if (task.isCancelled) return null
+                return try {
+                    task.get()
+                } catch (e: ExecutionException) {
+                    // out of memory too: the picks are then the small model's or the decoder's
+                    if (told !== task) {
+                        told = task
+                        onError(IOException("cannot read $path: pinyin reads without it", e.cause))
+                    }
+                    null
+                }
+            }
         }
     }
 
-    // Kotlin multiplies floats faster than int8 (17 MB not 4.5); a kernel is faster still on int8
-    val sentenceModel = ModelFile(SENTENCE_MODEL, unpack = kernel == null)
-    // int8 as stored: as floats it would be 100 MB, half of what an app may take on some phones
-    val refiningModel = ModelFile(REFINING_MODEL, unpack = false)
+    val sentenceModel = ModelFile(SENTENCE_MODEL)
+    val largeModel = ModelFile(LARGE_MODEL)
+
+    /** Where the matrix work runs: the kernel's cores, or anywhere. */
+    val pin: CorePin get() = kernel?.pin ?: CorePin.NONE
+
+    // pinned on the thread that runs it, as a thread started inside a pin would keep it
+    private fun pinnedOn(executor: Executor) = Executor { work -> executor.execute { pin.run(work::run) } }
+
+    /**
+     * What picks the first sentence at [level]: none at low; the small model at medium; at high the small one, the
+     * large deciding where the small is unsure (by the nine keys' gate where [nineKeys]: 九键, 14/18 键, 注音). The
+     * large is read at its first such key, or ahead on [background]. None where the small cannot be read, and then
+     * the large is not read either. On [reads] each model reads a commit's context, so the commit need not wait.
+     */
+    fun picker(level: ModelLevel, nineKeys: Boolean, background: Executor? = null, reads: Executor? = background): SentencePicker? {
+        if (level < ModelLevel.MEDIUM) return null
+        val small = sentenceModel.reranker(Reranker.LIMIT, reads) ?: return null
+        if (level < ModelLevel.HIGH) return PinnedPicker(small, pin)
+        background?.let { largeModel.preload(Reranker.LIMIT, it, reads) }
+        return PinnedPicker(GatedPicker.of(small, largeModel.handle(Reranker.LIMIT, reads), nineKeys), pin)
+    }
 
     fun pinyinOf(text: String, strayFirst: Boolean = false): String? = pinyinsOf(listOf(text), strayFirst)[text]
 
@@ -395,17 +451,6 @@ internal class EngineAssets(
         if (emoji) this.emoji
         if (chaizi) this.chaizi
         if (charReadings) this.charReadings
-    }
-
-    val lateRefiner: SentenceRefiner = LateRefiner()
-
-    /** Reads the larger model at the first pause, not at session creation, so switching to pinyin does not wait; unreadable, it says nothing and the session stops asking. */
-    private inner class LateRefiner : SentenceRefiner {
-        override fun refine(context: String, readings: List<String>, scores: List<Float>, budget: Int): Int? {
-            val r = refiningModel.reranker(Reranker.REFINE_LIMIT) ?: return SentenceRefiner.NONE
-            // null means more slices to come; NONE would end it after the first
-            return r.refine(context, readings, scores, budget)
-        }
     }
 
     private companion object {

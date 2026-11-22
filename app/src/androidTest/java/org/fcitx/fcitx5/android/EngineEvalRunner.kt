@@ -9,34 +9,40 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.fcitx.fcitx5.android.core.EngineBridge
-import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.HostInstance
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.pack.AppData
+import org.fcitx.fcitx5.android.device.BigCorePin
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
+import org.fcitx.fcitx5.android.engine.learn.LearnRecord
+import org.fcitx.fcitx5.android.engine.learn.backup.BackupMerge
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
+import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFiles
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.store.RecordFormat
 import org.fcitx.fcitx5.android.engine.user.HistoryLines
 import org.fcitx.fcitx5.android.engine.user.UserModel
+import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.host.HostEvent
+import org.fcitx.fcitx5.android.host.ModelChoice
 import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
+import kotlin.reflect.KProperty1
 
 /**
  * Runs a lib/ime-eval set through the shipped engine and writes `eval/<evalSet>-<evalIme>.tsv` for `:lib:ime-eval`
@@ -44,10 +50,10 @@ import java.io.File
  *
  * Scores compare only on an app with no data of its own, so it stops where the app has learned words or logs
  * unless `-e evalLearned true`. `-e evalHistory <name>` replaces the learning record with that history first.
+ * `-e evalLevel low|medium|high` types at that 性能档位 with no emoji, as ime-eval lists none, refuses other settings than the defaults, and writes
+ * `eval/<evalSet>-<evalIme>-<level>.tsv` (tier-guard.sh --device); a set pushed to `eval/<evalSet>.tsv` is read before the test assets.
  */
 class EngineEvalRunner {
-
-    private var unrefined = 0
 
     // -e evalNine true: digits as the nine keys send them (Keyboard.pinyinNineKey, Keyboard.nineKey)
     private var nine = false
@@ -69,24 +75,22 @@ class EngineEvalRunner {
         english = ime == InputMethodCatalog.ENGLISH
         grouped = args.getString("evalGrouped")?.also { require(it in GROUPED) { "evalGrouped $it: one of $GROUPED" } }
         require(!(nine && grouped != null)) { "evalNine and evalGrouped: one at a time" }
+        val level = args.getString("evalLevel")?.let { key ->
+            requireNotNull(ModelLevel.entries.firstOrNull { it.key.equals(key, ignoreCase = true) }) { "evalLevel $key: one of low, medium, high" }
+        }
+        // -e pin off: unpinned, to measure what the big cores bring
+        BigCorePin.enabled = args.getString("pin") != "off"
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
-        val samples = testContext.assets.open("$set.tsv").bufferedReader().useLines { lines ->
-            lines.filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
-                // input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches[<TAB>places]]], as EvalSet reads it; `-` for none
-                val fields = line.split('\t')
-                val places = fields.getOrNull(5)?.split(' ')?.map { it.toFloatOrNull() ?: Float.NaN }
-                Sample(fields[0], fields.getOrElse(3) { "" }, fields.getOrNull(4)?.split(' ')?.map(Touch::parse), places)
-            }.toList()
-        }
         val dir = checkNotNull(context.getExternalFilesDir("eval")) { "external storage unavailable" }
-        val out = File(dir, "$set-$ime.tsv")
+        val samples = samples(File(dir, "$set.tsv").takeIf { it.isFile }?.bufferedReader() ?: testContext.assets.open("$set.tsv").bufferedReader())
+        val out = File(dir, "$set-$ime${level?.let { "-${it.key.lowercase()}" } ?: ""}.tsv")
         history?.let { name ->
             val lines = historyLines(dir, testContext, name)
             val counted = writeHistory(File(context.filesDir, ENGINE_USER_DIR), lines)
             android.util.Log.i("EngineEvalRunner", "history $name: $counted words of ${lines.count { it.isNotBlank() }} lines")
         }
-        val fcitx: HostInstance = KotlinHost(context)
+        val fcitx = KotlinHost(context)
         val scope = MainScope()
         try {
             runBlocking {
@@ -110,24 +114,30 @@ class EngineEvalRunner {
                 fcitx.focus(true)
                 // setEnabledIme saves the profile at once; put the user's list back afterwards
                 val enabledBefore = fcitx.enabledIme().map { it.uniqueName }.toTypedArray()
+                // shared by the Chinese input methods and saved at once, like the list: put back afterwards
+                val optionsBefore = fcitx.imOptions(InputMethodCatalog.PINYIN).orEmpty().filterKeys { it == EngineSettings.MODEL_LEVEL || it == EngineSettings.EMOJI }
                 try {
+                    level?.let { useLevel(fcitx, it) }
                     fcitx.setEnabledIme(arrayOf(ime))
                     // fcitx takes a misspelt name silently and would score the previous input method
                     assertEquals("input method", ime, fcitx.currentIme().uniqueName)
                     // the first keystrokes pay for class loading and page faults
                     samples.take(WARM_UP_INPUTS).forEach { typeAndCollect(fcitx, it) }
-                    unrefined = 0
+                    val s = fcitx.engineSettings()
+                    android.util.Log.i(
+                        "EngineEvalRunner",
+                        "settings: level ${s.modelLevel}, fuzzy ${s.fuzzy}, typos ${s.typos}, latin ${s.latinWords}, " +
+                            "shuangpin ${s.shuangpin}, nine keys ${s.nineKeys}, prediction ${s.prediction}, emoji ${s.emoji}, page ${s.pageSize}",
+                    )
                     out.bufferedWriter().use { writer ->
                         samples.forEach { sample ->
                             writer.write(typeAndCollect(fcitx, sample))
                             writer.newLine()
                         }
                     }
-                    check(unrefined == 0) {
-                        "$unrefined of ${samples.size} samples still refining after $REFINE_TIMEOUT_MS ms: their lists in $out are unrefined"
-                    }
                     fcitx.reset()
                 } finally {
+                    if (level != null) fcitx.setImOptions(InputMethodCatalog.PINYIN, optionsBefore)
                     fcitx.setEnabledIme(enabledBefore)
                     fcitx.focus(false)
                     fcitx.deactivate(UID)
@@ -161,15 +171,27 @@ class EngineEvalRunner {
             fcitx.isEmpty()
             micros
         }
-        tsvLine(sample.input, latencies, candidatesOncePaused(fcitx))
+        tsvLine(sample.input, latencies, fcitx.getCandidates(0, CANDIDATES).map { it.text })
     }
 
-    /** The candidates once refining is done ([EngineState.refining]); past [REFINE_TIMEOUT_MS] read as they stand and counted in [unrefined]. */
-    private suspend fun candidatesOncePaused(fcitx: HostInstance): List<String> {
-        val deadline = SystemClock.uptimeMillis() + REFINE_TIMEOUT_MS
-        while (EngineState.refining && SystemClock.uptimeMillis() < deadline) delay(REFINE_POLL_MS)
-        if (EngineState.refining) unrefined++
-        return fcitx.getCandidates(0, CANDIDATES).map { it.text }
+    private suspend fun useLevel(fcitx: KotlinHost, wanted: ModelLevel) {
+        val choice = ModelChoice.entries.single { it.level == wanted }.key
+        fcitx.setImOptions(InputMethodCatalog.PINYIN, mapOf(EngineSettings.MODEL_LEVEL to choice, EngineSettings.EMOJI to "False"))
+        val s = fcitx.engineSettings()
+        check(s.modelLevel == wanted && !s.emoji) { "evalLevel ${wanted.key}: the engine reads $s" }
+        // tier-guard.sh holds the rows to the JVM's, which reads the app's defaults: another setting would differ for no fault of the engine
+        val defaults = EngineOptions().toSettings(wanted)
+        val changed = SHAPING.filter { it.get(s) != it.get(defaults) }.map { "${it.name} ${it.get(s)}" }
+        check(changed.isEmpty()) { "evalLevel ${wanted.key}: settings not the defaults ($changed): put them back, or adb shell pm clear" }
+    }
+
+    private fun samples(set: java.io.BufferedReader): List<Sample> = set.useLines { lines ->
+        lines.filter { it.isNotBlank() && !it.startsWith("#") }.map { line ->
+            // input<TAB>expected<TAB>tag[<TAB>context[<TAB>touches[<TAB>places]]], as EvalSet reads it; `-` for none
+            val fields = line.split('\t')
+            val places = fields.getOrNull(5)?.split(' ')?.map { it.toFloatOrNull() ?: Float.NaN }
+            Sample(fields[0], fields.getOrElse(3) { "" }, fields.getOrNull(4)?.split(' ')?.map(Touch::parse), places)
+        }.toList()
     }
 
     private fun historyLines(dir: File, testContext: android.content.Context, name: String): List<String> {
@@ -201,7 +223,8 @@ class EngineEvalRunner {
     /** The logs under [dir] that hold a record; a header alone, or an empty learning-record snapshot, learned nothing. */
     private fun learnedLogs(dir: File): List<File> = dir.walkTopDown().filter {
         it.isFile && when {
-            it.name == LearnLog.FILE -> !LearnLog.replay(it.readBytes()).isEmpty()
+            // the install's backup origin, which a fresh app writes before anything is learned
+            it.name == LearnLog.FILE -> !LearnLog.replay(it.readBytes()).apply { kept.removeAll { r -> r is LearnRecord.Unknown && r.type == BackupMerge.ORIGIN } }.isEmpty()
             else -> it.name.endsWith(LOG_SUFFIX) && it.length() > RecordFormat.HEADER_SIZE
         }
     }.toList()
@@ -225,14 +248,17 @@ class EngineEvalRunner {
         const val WARM_UP_INPUTS = 10
         const val STARTUP_TIMEOUT_MS = 60_000L
         const val INPUT_TIMEOUT_MS = 10_000L
-        /** Reached only by an engine that never stops refining. */
-        const val REFINE_TIMEOUT_MS = 5_000L
-        const val REFINE_POLL_MS = 10L
         /** Must match EngineBridge's user data dir. */
         const val ENGINE_USER_DIR = "engine"
         const val LOG_SUFFIX = ".user"
         val SEPARATORS = Regex("[\t\r\n]")
 
         val GROUPED = setOf("14", "18", "sp18", "sp14", "sp9", "zy9", "zy")
+
+        // beside the level and emoji, what changes the candidates a set's keys show
+        val SHAPING = listOf<KProperty1<EngineSettings, *>>(
+            EngineSettings::shuangpin, EngineSettings::fuzzy, EngineSettings::typos, EngineSettings::prediction, EngineSettings::latinWords,
+            EngineSettings::chaizi, EngineSettings::builtInPhrases, EngineSettings::nineKeys, EngineSettings::ownKeys,
+        )
     }
 }

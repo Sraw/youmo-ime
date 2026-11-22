@@ -133,7 +133,7 @@ object InputMethodCatalog {
     const val CHAR_LEVELS_DATA = "engine/charlevels.data"
     /** Optional; without it the engine types by the decoder alone. */
     const val SENTENCE_MODEL = "engine/sentence-model.safetensors"
-    const val REFINING_MODEL = "engine/sentence-model-large.safetensors"
+    const val LARGE_MODEL = "engine/sentence-model-large.safetensors"
     const val TABLE_DIR = "engine/table"
 
     fun hasTableKeys(im: String) = im in TABLES

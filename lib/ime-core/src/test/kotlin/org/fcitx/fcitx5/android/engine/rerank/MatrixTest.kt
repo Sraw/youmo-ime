@@ -32,19 +32,32 @@ class MatrixTest {
             val x = FloatArray(columns) { random.nextGaussian().toFloat() }
             val bias = FloatArray(w.rows) { it.toFloat() }
             val quantized = Matrix.quantized(w.rows, columns, ByteBuffer.wrap(w.q), w.scales)
+            // int8 weights take x rounded to int8 too
+            val q = ByteArray(columns)
+            val sx = quantize(x, 0, columns, q)
+            val rounded = FloatArray(columns) { q[it] * sx }
             for ((form, m) in listOf("int8" to quantized, "floats" to Matrix.of(w.rows, columns, w.floats), "unpacked" to quantized.unpacked())) {
+                val input = if (form == "int8") rounded else x
                 val y = FloatArray(w.rows)
-                m.times(x, y)
+                m.times(input, y)
                 val applied = FloatArray(w.rows)
-                m.apply(x, bias, applied)
+                m.apply(input, bias, applied)
                 val row = FloatArray(columns)
                 for (r in 0 until w.rows) {
                     val at = "$form, $columns wide, row $r"
-                    assertEquals(at, w.dot(x, r), m.dot(x, r), 1e-3f)
-                    assertEquals(at, w.dot(x, r), y[r], 1e-3f)
-                    assertEquals(at, w.dot(x, r) + bias[r], applied[r], 1e-3f)
+                    assertEquals(at, w.dot(input, r), m.dot(input, r), 1e-3f)
+                    assertEquals(at, w.dot(input, r), y[r], 1e-3f)
+                    assertEquals(at, w.dot(input, r) + bias[r], applied[r], 1e-3f)
                     m.row(r, row)
                     assertArrayEquals(at, w.floats.copyOfRange(r * columns, (r + 1) * columns), row, 0f)
+                }
+                // several vectors at once, each as alone
+                val xs = FloatArray(3 * columns) { random.nextGaussian().toFloat() }
+                val ys = FloatArray(3 * w.rows)
+                m.timesMany(xs, 3, ys)
+                for (j in 0 until 3) {
+                    m.times(xs.copyOfRange(j * columns, (j + 1) * columns), y)
+                    assertArrayEquals("$form, $columns wide, vector $j", y, ys.copyOfRange(j * w.rows, (j + 1) * w.rows), 0f)
                 }
             }
         }
@@ -71,7 +84,14 @@ class MatrixTest {
     fun int8IsMultipliedByItsKernelAndFloatsAreAlreadyUnpacked() {
         val w = weights(2, 5)
         val asked = ArrayList<Pair<Int, Int>>()
-        val kernel = MatrixKernel { q, scales, rows, columns, x, y -> asked += rows to columns; MatrixKernel.JVM.times(q, scales, rows, columns, x, y) }
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) = error("floats")
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                asked += rows to columns
+                MatrixKernel.JVM.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
         val y = FloatArray(2)
         Matrix.quantized(2, 5, ByteBuffer.wrap(w.q), w.scales, kernel).times(FloatArray(5) { 1f }, y)
         assertEquals(listOf(2 to 5), asked)

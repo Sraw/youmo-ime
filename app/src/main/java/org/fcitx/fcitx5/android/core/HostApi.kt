@@ -74,7 +74,7 @@ interface TypingApi {
 
     suspend fun sendKey(sym: KeySym, states: KeyStates, code: Int = 0, up: Boolean = false, timestamp: Int = -1, touch: Touch? = null)
 
-    /** False if a refine moved another word to [idx]; a null [text] (a key's pick) is not checked. */
+    /** False if the list changed under a tap and another word is at [idx]; a null [text] (a key's pick) is not checked. */
     suspend fun select(idx: Int, text: String? = null): Boolean
     suspend fun isEmpty(): Boolean
 
@@ -133,8 +133,6 @@ interface TypingApi {
 
     /** False where the input method does not glide, cannot load or cannot read the path. */
     suspend fun offerGlide(glide: Glide): Boolean
-
-    suspend fun inkFinished(piece: Int): Boolean
 
     /** A table's offered word tapped: word [index] of offer [id], [before] the field's text before the cursor as tapped. */
     suspend fun rememberWord(id: Int, index: Int, before: String)

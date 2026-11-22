@@ -356,8 +356,6 @@ class HandwritingUatTest {
         assertFalse(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") })
     }
 
-    private fun finishes() = h.api.calls.count { it.startsWith("inkFinished") }
-
     // the recognizer's model (native) swapped for a reader of fixed readings; the composing 人 and its candidates are
     // the engine's (HostCasesUatTest)
     @Test
@@ -375,11 +373,9 @@ class HandwritingUatTest {
             stroke(0.5f, 0.2f, 0.3f, 0.8f)
             until("read while writing") { h.api.calls.any { it.startsWith("offerInk") } }
             assertEquals("still writing", 1, pad.strokes.size)
-            assertEquals(0, finishes())
             stroke(0.5f, 0.4f, 0.7f, 0.8f)
             h.advance(1500)
-            until("finished") { finishes() == 1 }
-            assertEquals("wiped", 0, pad.strokes.size)
+            until("wiped") { pad.strokes.isEmpty() }
         } finally {
             shared.reader = was
         }
@@ -395,17 +391,16 @@ class HandwritingUatTest {
             stroke(0.3f, 0.2f, 0.5f, 0.8f)
             stroke(0.5f, 0.4f, 0.7f, 0.8f)
             h.advance(500)
-            until("finished") { finishes() == 1 }
+            until("finished") { pad.strokes.isEmpty() }
             pause.setValue(HandwritingPause.Slowest)
             stroke(0.2f, 0.5f, 0.8f, 0.5f)
             h.advance(1000)
             Thread.sleep(200)
             h.idle()
-            assertEquals(1, finishes())
             assertEquals(1, pad.strokes.size)
             stroke(0.5f, 0.2f, 0.5f, 0.8f)
             h.advance(1600)
-            until("finished again") { finishes() == 2 }
+            until("finished again") { pad.strokes.isEmpty() }
         } finally {
             pause.setValue(pause.defaultValue)
         }

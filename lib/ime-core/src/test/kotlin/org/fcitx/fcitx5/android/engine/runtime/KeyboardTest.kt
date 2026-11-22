@@ -35,8 +35,6 @@ class KeyboardTest {
         var flags = 0
         private var input = ""
         private var predicting = false
-        private var slices = 0
-        private var refined = false
 
         override var learning = true
 
@@ -58,18 +56,12 @@ class KeyboardTest {
         private fun all() = when {
             predicting -> listOf("next")
             input.isEmpty() -> emptyList()
-            else -> listOf(input.uppercase(), input.take(1) + "!").let { if (refined) it.reversed() else it }
+            else -> listOf(input.uppercase(), input.take(1) + "!")
         }
 
         override fun apply(action: Action): Snapshot {
             actions += action
             learned += learning
-            if (action == Action.Refine) {
-                if (--slices == 0) refined = true
-            } else {
-                slices = 0
-                refined = false
-            }
             var commit = ""
             var handled = true
             when (action) {
@@ -77,7 +69,6 @@ class KeyboardTest {
                     predicting = false
                     if (reads(action.char)) {
                         input += action.char
-                        slices = 2
                     } else if (endsInPart && input.length > 1) {
                         commit = input.take(1).uppercase()
                         input = input.drop(1)
@@ -122,11 +113,11 @@ class KeyboardTest {
                     predicting = false
                 }
                 Action.DropPredictions -> predicting = false
-                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, Action.Refine, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, is Action.Cursor, is Action.Step, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> {}
+                Action.NextPage, Action.PreviousPage, is Action.Forget, is Action.Pin, is Action.Unpin, is Action.Block, is Action.Ink, is Action.Glide, is Action.Stroke, is Action.Syllable, is Action.Letter, is Action.NineKey, is Action.Cursor, is Action.Step, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> {}
             }
             val shown = all()
             val remembered = (action as? Action.Remember)?.let { OfferedWord(it.before, "iije") }
-            return Snapshot(commit, input, shown, 0, false, false, handled, predicting, refines = slices > 0, remembered = remembered, wordOffer = offer)
+            return Snapshot(commit, input, shown, 0, false, false, handled, predicting, remembered = remembered, wordOffer = offer)
         }
     }
 
@@ -251,33 +242,6 @@ class KeyboardTest {
         assertTrue(s.handled)
         assertEquals("nih", s.preedit)
         assertEquals(listOf(Action.Key('n'), Action.Key('i'), Action.Key('h')), session.actions)
-    }
-
-    @Test
-    fun whileTheUserPausesTheSessionRefinesTillItHasNoMoreToDo() {
-        assertFalse(keyboard.onEvent(EngineEvent.REFINE, 0).handled)
-        assertTrue(session.actions.isEmpty())
-        type("ab")
-        val first = keyboard.onEvent(EngineEvent.REFINE, 0)
-        assertFalse(first.handled)
-        assertTrue(first.refines)
-        val second = keyboard.onEvent(EngineEvent.REFINE, 0)
-        assertTrue(second.handled)
-        assertFalse(second.refines)
-        assertEquals(listOf("a!", "AB"), second.candidates)
-        session.actions.clear()
-        assertFalse(keyboard.onEvent(EngineEvent.REFINE, 0).handled)
-        assertTrue(session.actions.isEmpty())
-        char('c')
-        char(',')
-        val afterPunctuation = keyboard.onEvent(EngineEvent.REFINE, 0)
-        assertEquals("", afterPunctuation.commit)
-        assertFalse(afterPunctuation.handled)
-        type("ab")
-        char('2')
-        val afterPick = keyboard.onEvent(EngineEvent.REFINE, 0)
-        assertEquals("", afterPick.commit)
-        assertFalse(afterPick.handled)
     }
 
     @Test

@@ -122,6 +122,8 @@
         <item>battery</item>
         <item>slow</item>
         <item>lag</item>
+        <item>processor</item>
+        <item>CPU</item>
     </string-array>
     <string-array name="kw_code_row">
         <item>composing</item>

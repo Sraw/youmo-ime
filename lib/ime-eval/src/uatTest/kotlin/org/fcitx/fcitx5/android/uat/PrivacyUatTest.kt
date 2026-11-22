@@ -69,7 +69,7 @@ class PrivacyUatTest {
         engines.learning(im, LearningOp.Pin(4, c))
         assertTrue(engines.learning(null, LearningOp.ClearRecent(LearningOp.Span.HOUR)) is LearningResult.Cleared)
         val after = taDl(null)
-        assertEquals("带来", after.first())
+        assertEquals("的脸", after.first())
         assertTrue("$after", after.getOrNull(1) != "点了")
         assertEquals(c, typed("shi").first())
     }
@@ -118,7 +118,7 @@ class PrivacyUatTest {
         assertEquals("$after", 1, after.size)
         assertTrue(after.single().name != before.single().name)
         assertTrue(backups(BackupOp.RestoreKept(after.single().name)).ok)
-        assertEquals("带来", taDl(null).first())
+        assertEquals("的脸", taDl(null).first())
     }
 
     @Test

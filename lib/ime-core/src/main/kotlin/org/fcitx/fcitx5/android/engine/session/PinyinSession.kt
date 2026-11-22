@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.device.CorePin
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.lattice.Candidate
@@ -41,7 +42,6 @@ import org.fcitx.fcitx5.android.engine.platform.jvm.JvmClock
 import org.fcitx.fcitx5.android.engine.reading.WordReading
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
-import org.fcitx.fcitx5.android.engine.rerank.SentenceRefiner
 import org.fcitx.fcitx5.android.engine.user.LearningUse
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
@@ -55,8 +55,7 @@ import java.util.Calendar
  *
  * Committed words stay the context of what is typed next until [Action.Reset] or raw text; [Action.Context]
  * makes the app's text the context. Commits are learned ([learnTo]) and candidates ordered by habits ([HabitOrder]).
- * A [reranker] reweighs the best readings as each key is typed; a slower [refiner] in [REFINE_BUDGET] slices
- * while the user pauses ([Action.Refine]).
+ * A [reranker] reweighs the best readings as each key is typed.
  *
  * @param spell show each syllable spelt out, not as typed: for 双拼, whose keys say little
  * @param keysShown show 双拼's syllables as the scheme's keys pressed instead (a slipped key as meant)
@@ -88,7 +87,6 @@ class PinyinSession(
     /** Characters by their parts' pinyin after [Chaizi.KEY] (no pinyin starts with u). */
     private val chaizi: PartsLookup = PartsLookup { emptyList() },
     private val now: () -> Calendar = JvmClock::calendar,
-    private val refiner: SentenceRefiner? = null,
     /** Keeps a word the user blocked ([Action.Block]); none offered without. */
     private val block: ((Entry) -> Unit)? = null,
     /** Asked for when first needed: one map for the sessions over [data] to share. */
@@ -102,6 +100,8 @@ class PinyinSession(
     /** [LearningUse.DEFAULT] but to measure the channels' worth (ime-eval). */
     use: LearningUse = LearningUse.DEFAULT,
     learnTo: LearnTo = LearnTo(),
+    // a key's reading runs within it: thread-free work only, as what it starts would keep its cores
+    private val pin: CorePin = CorePin.NONE,
     // last, so a test's picker can follow as a lambda
     private val reranker: SentencePicker? = null,
 ) : Session {
@@ -159,8 +159,6 @@ class PinyinSession(
 
     private var lastRead = Read()
     private val candidates get() = lastRead.candidates
-    private var unrefined: List<Candidate>? = null // the decoder's sentences, till the refiner picks one
-    private var refined = 0
     private val keyed = segmenter as? KeyedSegmenter
     private val recorder = CommitRecorder(
         learnTo, keyed?.letters, user, { habitOrder.isAdded(it) || data.wordIndex.find(it) != NO_WORD }, segmenter::segment,
@@ -208,16 +206,13 @@ class PinyinSession(
         // posts one before a cursor report's context
         if (action !is Action.Context) recorder.settle()
         val moves = action is Action.Cursor || action is Action.Step
-        // what the refiner weighs is the input as last read; a cursor moved reads nothing
-        if (action != Action.Refine && !moves) unrefined = null
         // the keyboard counts presses unaware of a tap on the preedit: the next press is a press of its own
         val afterMove = cursorMoved
-        cursorMoved = moves || (afterMove && action == Action.Refine)
+        cursorMoved = moves
         return if (afterMove && action is Action.Letter) letter(action.letter, action.again, runFrom = cursor, glided = action.glided) else act(action)
     }
 
     private fun act(action: Action): Snapshot = when (action) {
-        Action.Refine -> refine()
         is Action.Ink, is Action.Glide, is Action.Stroke, is Action.NineKey, Action.LookUp, is Action.Remember, is Action.Unremember, is Action.OfferShown -> snapshot()
         is Action.Key -> type(action.char, action.glided, action.at, action.touch)
         is Action.Letter -> letter(action.letter, action.again, glided = action.glided)
@@ -263,7 +258,6 @@ class PinyinSession(
     /** [keys] typed as [Action.Key]s one after another, read once; on the nine keys and for non-letters still one at a time, as each may change what the next means. */
     fun typeAll(keys: String): Snapshot {
         if (keys.isEmpty() || nineKeys != null || !keys.all { it in 'a'..'z' }) return keys.fold(snapshot()) { before, c -> apply(Action.Key(c)).let { it.copy(commit = before.commit + it.commit) } }
-        unrefined = null
         insert(keys)
         read()
         return snapshot()
@@ -292,6 +286,7 @@ class PinyinSession(
             context = textWords.lastTwo(before)
             if (context.isNotEmpty()) recent = recentTail(before)
         }
+        reranker?.prewarm(textBefore())
         return snapshot()
     }
 
@@ -645,6 +640,7 @@ class PinyinSession(
         recorder.committed(text, learning)
         if (context.lastOrNull() == NO_WORD) dropContext()
         clear()
+        reranker?.prewarm(textBefore())
         // what may follow a password is no one's business
         if (prediction && learning) lastRead = predict()
         predicting = candidates.isNotEmpty()
@@ -712,6 +708,16 @@ class PinyinSession(
             nineKeys?.clear()
             return
         }
+        val decoded = pin.run { decode() }
+        place(decoded)
+        // a phrase goes where its order says only in a list that long: read that far, or it would move as more are read
+        lastRead.placed.values.maxOfOrNull { it.order }?.let { readUntil(it + lastRead.placed.size + 1) }
+        while (lastRead.unsettled && lastRead.moreWords) readUntil(candidates.size + 1)
+        // offered here only: placing again would drop a tap on the list shown
+        nineKeys?.offer(input, readFrom(), decoded.graph)
+    }
+
+    private fun decode(): Decoded {
         // tap places as the input stands: the 14 keys' letters weighed by them and neighbour keys corrected
         val taps = if (keyed?.letters?.isGrouped == true) recorder.pressed.taps(readFrom(), input.length) else null
         val graph = segmenter.segment(input.substring(readFrom()), taps, recorder.pressed.touches(readFrom(), input.length))
@@ -719,22 +725,12 @@ class PinyinSession(
         val decoding = decoder.decode(graph, prev2, prev)
         val after = rankedAfter()
         val sentences = habitOrder.enforce(graph, readFrom(), after, decoding.sentences)
-        // a syllable still being typed is no reading to weigh: the refiner's pick there only flashed before the next key
-        if (refiner != null && sentences.size > 1 && endsOnSyllable(graph)) {
-            unrefined = sentences
-            refined = 0
-        }
         nineKeys?.forgetBest()
         val decoderFirst = decoding.sentences.firstOrNull() ?: decoding.words.firstOrNull()
         val more = decoding.words.size >= PinyinDecoder.DEFAULT_WORDS
         // level 2 by the decoder's own first, before anything was put in
         val levels = habitOrder.levels(graph, readFrom(), after, decoderFirst, sentences + decoding.words)
-        place(Decoded(graph, rerank(sentences), decoding.words, more = more, first = decoderFirst, levels = levels))
-        // a phrase goes where its order says only in a list that long: read that far, or it would move as more are read
-        lastRead.placed.values.maxOfOrNull { it.order }?.let { readUntil(it + lastRead.placed.size + 1) }
-        while (lastRead.unsettled && lastRead.moreWords) readUntil(candidates.size + 1)
-        // offered here only: the refiner reordering them would drop a tap on the list shown
-        nineKeys?.offer(input, readFrom(), graph)
+        return Decoded(graph, rerank(sentences), decoding.words, more = more, first = decoderFirst, levels = levels)
     }
 
     private fun place(decoded: Decoded, time: Calendar? = null) {
@@ -799,20 +795,6 @@ class PinyinSession(
         return first(sentences, reranker.pick(textBefore(), sentences.map { it.text }, sentences.map { it.score }))
     }
 
-    private fun refine(): Snapshot {
-        val sentences = unrefined ?: return snapshot()
-        if (refiner == null || refined++ >= refiner.slices) {
-            unrefined = null
-            return snapshot()
-        }
-        val picked = refiner.refine(textBefore(), sentences.map { it.text }, sentences.map { it.score }, REFINE_BUDGET)
-            ?: return snapshot()
-        unrefined = null
-        val decoded = lastRead.decoded
-        if (picked != SentenceRefiner.NONE && decoded != null) place(decoded.copy(sentences = first(sentences, picked)), lastRead.time)
-        return snapshot()
-    }
-
     private fun snapshot(commit: String = "", handled: Boolean = true): Snapshot {
         val shown = pager.of(candidates)
         return Snapshot(
@@ -829,7 +811,6 @@ class PinyinSession(
             total = if (lastRead.moreWords) -1 else candidates.size,
             first = pager.from,
             actionable = candidates.isNotEmpty(),
-            refines = unrefined != null,
             // zhuyin's in symbols
             syllables = nineKeys?.offered.orEmpty().map { keyed?.shownOffered(it) ?: it },
             syllablesId = nineKeys?.id ?: 0,
@@ -841,7 +822,7 @@ class PinyinSession(
     private val owned = Owned()
 
     private inner class Owned {
-        // the replacements found per reading, as a later page or a refined pick places it again
+        // the replacements found per reading, as a later page places it again
         private var foundOf: SyllableGraph? = null
         private var foundFor = ""
         private var foundIn: CommonWords? = null
@@ -994,9 +975,6 @@ class PinyinSession(
 
         /** The nine keys' 分词 key: a separator while something is typed, the app's 1 otherwise. */
         const val NINE_KEYS_SEPARATOR = '1'
-
-        /** The [refiner]'s work at most per [Action.Refine]: one large-model position; a key pressed meanwhile waits for it. */
-        const val REFINE_BUDGET = 1
     }
 }
 
@@ -1015,18 +993,6 @@ internal fun recentTail(text: String): String {
     if (text.length <= RECENT) return text
     val from = text.length - RECENT
     return text.substring(if (Character.isLowSurrogate(text[from])) from + 1 else from)
-}
-
-/**
- * Whether the input's longest last syllable is whole: zhong, not zho, nor an initial. n, m, ng, r, a, o and e
- * at the end are likelier the start of a longer one. Read in whole syllables: 小鹤 `nih` ends on h begun.
- */
-fun endsOnSyllable(graph: SyllableGraph): Boolean {
-    val whole = graph.withoutOtherReadings()
-    val last = (0 until whole.edgeCount).filter { whole.to(it) == whole.end }
-    val from = last.minOfOrNull { whole.from(it) } ?: return false
-    val longest = last.filter { whole.from(it) == from }.map { whole.kind(it) }
-    return Kind.SYLLABLE in longest && Kind.INITIAL !in longest
 }
 
 /**

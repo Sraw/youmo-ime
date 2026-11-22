@@ -22,7 +22,12 @@ target_link_options(youmo-handwriting PRIVATE "-Wl,-z,max-page-size=16384")
 
 # the sentence models' inner loop (NativeMatrixKernel), a library of its own: every user's first key
 # loads it, and onnxruntime (25 MB on arm64) is loaded only when handwriting is used
-add_library(youmo-matrix SHARED matrix-kernel.cpp)
-# vectorised at -O3 even in a debug build, which is -O0
-target_compile_options(youmo-matrix PRIVATE -O3 -Wall -Wextra -Werror)
+add_library(youmo-matrix SHARED matrix-kernel.cpp matrix-q8.cpp matrix-q8-dotprod.cpp)
+# vectorised at -O3 even in a debug build, which is -O0; no fused multiply-add anywhere, as ART never fuses:
+# the JVM's bits, so a key's candidates do not depend on the phone
+target_compile_options(youmo-matrix PRIVATE -O3 -ffp-contract=off -Wall -Wextra -Werror)
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+  # SDOT in this file alone, run only where the CPU has it
+  set_source_files_properties(matrix-q8-dotprod.cpp PROPERTIES COMPILE_OPTIONS "-march=armv8.2-a+dotprod")
+endif()
 target_link_options(youmo-matrix PRIVATE "-Wl,-z,max-page-size=16384")

@@ -46,7 +46,7 @@ class HandwritingSessionUndoTest {
     // [n] Backspaces the app takes, then another action: what they deleted whole taken back
     private fun delete(n: Int) {
         repeat(n) { assertFalse(session.apply(Action.Backspace).handled) }
-        session.apply(Action.Refine)
+        session.apply(Action.Ink(NO_PIECE))
     }
 
     private fun code(vararg read: String) = Code(Kinds.HANDWRITING, KeyedRows.handwriting(read.toList()))
@@ -180,7 +180,7 @@ class HandwritingSessionUndoTest {
     @Test
     fun aDeletedPredictionIsTakenBack() {
         assertEquals("高", put(read("高"), "高"))
-        val shown = session.apply(Action.Refine).candidates
+        val shown = session.apply(Action.Ink(NO_PIECE)).candidates
         assertTrue(shown.toString(), "山" in shown)
         assertEquals("山", session.apply(Action.Pick(shown.indexOf("山"))).commit)
         assertTrue("高 山" in learner.used())

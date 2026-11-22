@@ -321,8 +321,8 @@ adb push uat/fixtures/userwords.txt uat/fixtures/dict-words.txt uat/fixtures/wor
 <!-- learning: U-86 D17 F3108 -->
 - **前提**：B0，按 PY-54 在「他」后面连着选两次「点了」，按 PY-34 让「汪小明」成为你的词，点 s h i，长按第五个候选 C 选 **固定首位**，按 PY-29 屏蔽「是」；另外按 TBL-36 在五笔的 fghy 下屏蔽「寸」。
 - **操作**：打开 **用户词库**，点 **清空学到的**，读确认框，不勾 **全部清空**，确认；回测试页打「他」，点 d l；点 ⌫ 删掉，点 **。**，点 w x m；点 ⌫，点 s h i。再打开 **用户词库**，点 **清空学到的**，勾 **全部清空**，读确认框，确认；回测试页点 w a n g x i a o m i n g；点 ⌫，点 s h i；切到五笔，点 f g h y。
-- **预期**：不勾时确认框逐项写着清什么、留什么，写明自定义短语不在这里清、清空以后不能"退回恢复前"；清空后「他 dl」第一个是「带来」；wxm 里仍有「汪小明」（还是你的词，次数 0）；shi 的第一个仍是 C；候选里仍没有「是」。勾上后确认框写明"屏蔽的 2 个词会重新出现"（「是」和码表里的「寸」），并改为"回到刚装好，清掉：…"，固定、屏蔽、你的词都列在清掉里，"留下"只有自定义短语；清空后「王小明」第一、候选里没有「汪小明」；shi 里有「是」，C 不再固定；fghy 下「寸」又出现了。
-- **JVM**：`LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll`（:lib:ime-eval:uatTest，真数据）（不勾：他 dl 带来第一、wxm 有汪小明、shi 第一仍 C、没有是；勾上：王小明第一、没有汪小明、是回来、fghy 有寸（确认框文字是界面））；勾上时词表里这一版读不懂的行（以后的版本写的）也删掉、不在下一版里回来见 ime-core `WordListsTest.aClearEmptiesTheListsAndTheLinesThatDoNotRead`、`EnginesLearningTest.aClearOfEverythingEmptiesTheWordListsOfTheLinesThisBuildDoesNotRead`（只有后来的版本写的文件才看得到，设备上造不出），这次没读出来的词表文件也删掉、下次启动不回来见 `WordListsTest.aClearDeletesAListThatDidNotRead`；设备上不跑。
+- **预期**：不勾时确认框逐项写着清什么、留什么，写明自定义短语不在这里清、清空以后不能"退回恢复前"；清空后「他 dl」第一个是「的脸」；wxm 里仍有「汪小明」（还是你的词，次数 0）；shi 的第一个仍是 C；候选里仍没有「是」。勾上后确认框写明"屏蔽的 2 个词会重新出现"（「是」和码表里的「寸」），并改为"回到刚装好，清掉：…"，固定、屏蔽、你的词都列在清掉里，"留下"只有自定义短语；清空后「王小明」第一、候选里没有「汪小明」；shi 里有「是」，C 不再固定；fghy 下「寸」又出现了。
+- **JVM**：`LexiconUatTest.clearingTheLearnedKeepsYourWordsUnlessAll`（:lib:ime-eval:uatTest，真数据）（不勾：他 dl 的脸第一、wxm 有汪小明、shi 第一仍 C、没有是；勾上：王小明第一、没有汪小明、是回来、fghy 有寸（确认框文字是界面））；勾上时词表里这一版读不懂的行（以后的版本写的）也删掉、不在下一版里回来见 ime-core `WordListsTest.aClearEmptiesTheListsAndTheLinesThatDoNotRead`、`EnginesLearningTest.aClearOfEverythingEmptiesTheWordListsOfTheLinesThisBuildDoesNotRead`（只有后来的版本写的文件才看得到，设备上造不出），这次没读出来的词表文件也删掉、下次启动不回来见 `WordListsTest.aClearDeletesAListThatDidNotRead`；设备上不跑。
 
 ### WD-30 [P1] 搜索、多选删除、点"撤销"就回来
 <!-- learning: U-80 -->

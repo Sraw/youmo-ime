@@ -28,13 +28,13 @@ FCITX_CONFIGURATION(
         Option<bool> s{this, "S_SH", _("s <-> sh"), false};
         Option<bool> z{this, "Z_ZH", _("z <-> zh"), false};)
 
-// the 性能档位, in the app's own words on its page: the decoder alone, the small sentence model at
-// every key, and the large one too at a pause (ime-core's ModelLevel)
+// the 性能档位, in the app's own words on its page: the device's, the decoder alone, the small sentence
+// model at every key, and the large one too where the small one is unsure (ime-core's ModelChoice)
 #undef FCITX_GETTEXT_DOMAIN
 #define FCITX_GETTEXT_DOMAIN "fcitx5-android"
-enum class EngineModelLevel { Low, Medium, High };
+enum class EngineModelLevel { Auto, Low, Medium, High };
 
-FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineModelLevel, N_("Low"), N_("Medium"), N_("High"))
+FCITX_CONFIG_ENUM_NAME_WITH_I18N(EngineModelLevel, N_("Auto"), N_("Low"), N_("Medium"), N_("High"))
 #undef FCITX_GETTEXT_DOMAIN
 #define FCITX_GETTEXT_DOMAIN "fcitx5-chinese-addons"
 
@@ -98,7 +98,7 @@ inline T engineTable(bool hint) {
     Option<bool> builtInPhrases{this, "BuiltInPhrases", D_("fcitx5-android", "Built-in date and time"), true};
 #define ENGINE_MODEL_LEVEL \
     OptionWithAnnotation<EngineModelLevel, EngineModelLevelI18NAnnotation> modelLevel{ \
-            this, "ModelLevel", D_("fcitx5-android", "Performance level"), EngineModelLevel::High};
+            this, "ModelLevel", D_("fcitx5-android", "Performance level"), EngineModelLevel::Auto};
 #define ENGINE_LATIN_WORDS \
     Option<bool> latinWords{this, "LatinWords", D_("fcitx5-android", "Type English words in pinyin"), true};
 #define ENGINE_FUZZY Option<EngineFuzzyConfig> fuzzy{this, "Fuzzy", _("Fuzzy Pinyin")};

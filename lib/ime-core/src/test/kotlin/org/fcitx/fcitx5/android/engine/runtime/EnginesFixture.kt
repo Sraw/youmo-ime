@@ -82,7 +82,7 @@ open class EnginesFixture {
         .toByteArray()
 
     private var model: ByteArray? = TinyModel().bytes()
-    private var refining: ByteArray? = TinyModel().bytes()
+    private var large: ByteArray? = TinyModel().bytes()
 
     protected var strokes: ByteArray? = Strokes.read("...\n你\tpsnpzsn\n好\tzphzsh\n".reader().buffered(), "stroke")
         .build().toByteArray()
@@ -123,7 +123,7 @@ open class EnginesFixture {
             InputMethodCatalog.PINYIN_DATA -> pinyin
             "${InputMethodCatalog.TABLE_DIR}/wbx.data" -> wubiData
             InputMethodCatalog.SENTENCE_MODEL -> model
-            InputMethodCatalog.REFINING_MODEL -> refining
+            InputMethodCatalog.LARGE_MODEL -> large
             InputMethodCatalog.STROKE_DATA -> strokes
             InputMethodCatalog.ENGLISH_DATA -> english
             InputMethodCatalog.EMOJI_DATA -> emoji

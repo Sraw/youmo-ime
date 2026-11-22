@@ -65,7 +65,7 @@ import java.util.concurrent.Executor
  * The input methods the androidengine addon lists, each session made on first use; user data under [userDir]
  * (memory only if null). A facade that makes and wires [EngineAssets], [UserLexicon], [EnglishLexicon],
  * [TableRegistry], [LearningFacade], [LexiconFacade], [SessionFactory] and [FieldContext]; [invalidate] remakes
- * every session. Everything runs on the fcitx thread except what goes to [warmUps].
+ * every session. Everything runs on the fcitx thread except what goes to [warmUps] and [contextReads].
  */
 class Engines(
     private val blobs: Blobs,
@@ -74,6 +74,8 @@ class Engines(
     private val additions: () -> Additions? = { null },
     private val kernel: MatrixKernel? = null,
     warmUps: Executor = JvmThreads.each("engine-warm-up"),
+    /** Where the sentence models read a commit's context: the app's one thread keeps their buffers ([JvmThreads.single]). */
+    contextReads: Executor = warmUps,
     /** Emoji the phone cannot draw are no candidates. */
     private val emojiShows: (String) -> Boolean = { true },
     /** Rare characters the phone cannot draw are no candidates. */
@@ -148,6 +150,7 @@ class Engines(
 
     // counted for the debug build's idle signal (BackgroundWork)
     private val warmUps = BackgroundWork.counted(warmUps)
+    private val contextReads = BackgroundWork.counted(contextReads)
 
     // its lambdas reach parts made below only when called, never during construction
     private val lexicon: UserLexicon = UserLexicon(
@@ -361,7 +364,7 @@ class Engines(
             assets.dropDecoderExtensionsIfLearned()
             // what a lower level no longer runs leaves memory, read again if the level goes up
             if (value.modelLevel < ModelLevel.MEDIUM) assets.sentenceModel.drop()
-            if (value.modelLevel < ModelLevel.HIGH) assets.refiningModel.drop()
+            if (value.modelLevel < ModelLevel.HIGH) assets.largeModel.drop()
         }
 
     // the session typing on a layout's own groups alone, remade at its next code on the groups told now
@@ -391,7 +394,8 @@ class Engines(
     internal val factory: SessionFactory = SessionFactory(
         assets, lexicon, tables, learner, english, { settings }, latin.words,
         englishData = { field.warmUpEnglish() }, inkEndedBefore = ::latestPiece,
-        uptimeMillis = clock::uptimeMillis, learnClock = clock, simplifier = simplifier,
+        uptimeMillis = clock::uptimeMillis, learnClock = clock, simplifier = simplifier, warmUps = this.warmUps,
+        contextReads = this.contextReads,
     )
 
     /** Nothing picked is learned unless [learning]; [payload] as [Keyboard.onEvent]. */
@@ -401,9 +405,9 @@ class Engines(
         // a layout's own-keyboard code with none told: swallowed, nothing changed, never handed back to be typed
         // (the app tells its keyboard first: EngineBridge)
         if (!ownKeys && event == EngineEvent.CHAR && isOwnKeysCode(arg)) {
-            // a refine or pick of the previous snapshot is not this key's
+            // a pick of the previous snapshot is not this key's
             val shown = pairs[im]?.showing ?: keyboard(im).showing
-            return annotated(im, shown.copy(commit = "", deleteBefore = 0, handled = true, refines = false, picked = false))
+            return annotated(im, shown.copy(commit = "", deleteBefore = 0, handled = true, picked = false))
         }
         // 联想 on show: picking it is no typed word (VoiceEdits)
         val predicting = (pairs[im]?.showing ?: keyboards[im]?.showing)?.predicting == true

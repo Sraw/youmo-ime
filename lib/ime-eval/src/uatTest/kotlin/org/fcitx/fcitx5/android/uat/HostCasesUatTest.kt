@@ -6,8 +6,12 @@ package org.fcitx.fcitx5.android.uat
 
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.engine.learn.HabitRanker
+import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
+import org.fcitx.fcitx5.android.engine.learn.control.LearningResult
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -124,7 +128,8 @@ class HostCasesUatTest {
         assertTrue("才 本 村 among ${candidates.take(SHOWN)}", candidates.containsAll(listOf("才", "本", "村")))
     }
 
-    // PY-75 as uat.py runs it: 他 and 点了 learned with nothing before them, so in another field 他 dl still has 带来 first
+    // PY-75 as uat.py runs it: 他 and 点了 learned with nothing before them, so in another field 他 dl has no 他 → 点了 of its own
+    // (点了 may still lead there, used twice under dl)
     @Test
     @Uat("PY-75")
     fun wordsSentFromAChatBoxAreLearnedWithNothingBefore() = with(HostReplay(firstField = "chat")) {
@@ -146,7 +151,9 @@ class HostCasesUatTest {
         type("ta")
         pick("他")
         type("dl")
-        expectFirst("带来")
+        assertTrue("点了 among ${candidates.take(SHOWN)}", "点了" in candidates)
+        val why = (engines.learning(im, LearningOp.Menu(candidates.indexOf("点了"), "点了")) as LearningResult.Menu).why
+        assertNotEquals("why 点了 is at ${candidates.indexOf("点了")} of ${candidates.take(SHOWN)}", HabitRanker.Tier.FIRST_HERE, why?.tier)
     }
 
     @Test

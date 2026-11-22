@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.glide
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.handwriting.HandwritingSession.Companion.NO_PIECE
 import org.fcitx.fcitx5.android.engine.learn.control.Why
 import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.reading.WordReading
@@ -225,7 +226,7 @@ class GlideSessionTest {
         var swap = false
         val inner = object : Session by tableSession {
             override fun apply(action: Action) = tableSession.apply(action).let {
-                if (swap && action == Action.Refine) it.copy(commit = "📢", deleteBefore = 2) else it
+                if (swap && action is Action.Ink) it.copy(commit = "📢", deleteBefore = 2) else it
             }
         }
         tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "𠀾𠀾", -1f))
@@ -233,7 +234,7 @@ class GlideSessionTest {
         session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))
         assertEquals("𠀾𠀾", session.apply(Action.Pick(1)).commit)
         swap = true
-        session.apply(Action.Refine)
+        session.apply(Action.Ink(NO_PIECE))
         swap = false
         tableReadings = listOf(GlideReading("wqiy", "你", 0f), GlideReading("vbg", "奻", -1f))
         session.apply(session.read(Glide(floatArrayOf(0f, 0f), GlideLayout.QWERTY)))

@@ -110,7 +110,7 @@ class TinyModel(
             .putLong(headerBytes.size.toLong()).put(headerBytes).put(data.toByteArray()).array()
     }
 
-    fun load(unpack: Boolean = false): SentenceModel = SentenceModel.load(ByteBuffer.wrap(bytes()), unpack)
+    fun load(unpack: Boolean = false, kernel: MatrixKernel = MatrixKernel.JVM): SentenceModel = SentenceModel.load(ByteBuffer.wrap(bytes()), unpack, kernel)
 
     private fun t(name: String) = tensors.getValue(name).second
 
@@ -122,20 +122,28 @@ class TinyModel(
         return FloatArray(x.size) { ((x[it] - mean) / sqrt(variance + 1e-5) * w[it] + b[it]).toFloat() }
     }
 
-    private fun linear(x: FloatArray, name: String): FloatArray {
+    /** [x] as the model hands it to an int8 matrix: rounded to int8 by its largest magnitude. */
+    private fun rounded(x: FloatArray): FloatArray {
+        val q = ByteArray(x.size)
+        val scale = quantize(x, 0, x.size, q)
+        return FloatArray(x.size) { q[it] * scale }
+    }
+
+    private fun linear(x0: FloatArray, name: String, q8: Boolean): FloatArray {
+        val x = if (q8 && "$name.weight" in quantized) rounded(x0) else x0
         val w = t("$name.weight")
         val b = t("$name.bias")
         return FloatArray(b.size) { o -> b[o] + x.indices.sumOf { (x[it] * w[o * x.size + it]).toDouble() }.toFloat() }
     }
 
-    /** log P(each next token) after each of [tokens], by the textbook pass over the whole run. */
-    fun logProbs(tokens: IntArray): List<DoubleArray> {
+    /** log P(each next token) after each of [tokens], by the textbook pass over the whole run; [q8]: int8 matrices' inputs rounded as the model rounds them. */
+    fun logProbs(tokens: IntArray, q8: Boolean = true): List<DoubleArray> {
         val w = width
         val d = w / heads
         var x = tokens.mapIndexed { p, token -> FloatArray(w) { t("tok.weight")[token * w + it] + t("pos.weight")[p * w + it] } }
         for (l in 0 until layers) {
             val p = "blocks.$l."
-            val qkv = x.map { linear(norm(it, p + "ln1"), p + "qkv") }
+            val qkv = x.map { linear(norm(it, p + "ln1"), p + "qkv", q8) }
             x = x.indices.map { i ->
                 val attended = FloatArray(w)
                 for (h in 0 until heads) {
@@ -144,18 +152,30 @@ class TinyModel(
                     val e = scores.map { exp(it - max) }
                     for (s in 0..i) for (k in 0 until d) attended[h * d + k] += (e[s] / e.sum() * qkv[s][2 * w + h * d + k]).toFloat()
                 }
-                val mid = FloatArray(w) { x[i][it] + linear(attended, p + "proj")[it] }
-                val hidden = linear(norm(mid, p + "ln2"), p + "fc").map { v -> 0.5 * v * (1 + SentenceModel.erf(v / sqrt(2.0))) }
-                val out = linear(FloatArray(hidden.size) { hidden[it].toFloat() }, p + "out")
+                val mid = FloatArray(w) { x[i][it] + linear(attended, p + "proj", q8)[it] }
+                val hidden = linear(norm(mid, p + "ln2"), p + "fc", q8).map { v -> 0.5 * v * (1 + erf(v / sqrt(2.0))) }
+                val out = linear(FloatArray(hidden.size) { hidden[it].toFloat() }, p + "out", q8)
                 FloatArray(w) { mid[it] + out[it] }
             }
         }
         return x.map { h ->
-            val n = norm(h, "ln_f")
+            val n = norm(h, "ln_f").let { if (q8) rounded(it) else it }
             val logits = DoubleArray(vocab.size) { v -> (0 until w).sumOf { (n[it] * t("tok.weight")[v * w + it]).toDouble() } }
             val max = logits.max()
             val log = max + Math.log(logits.sumOf { exp(it - max) })
             DoubleArray(logits.size) { logits[it] - log }
+        }
+    }
+
+    private companion object {
+        /** erf to about 1e-7 (Numerical Recipes' Chebyshev fit), apart from the model's own. */
+        fun erf(x: Double): Double {
+            val z = Math.abs(x)
+            val t = 1 / (1 + 0.5 * z)
+            val poly = -1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 +
+                t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))
+            val r = t * Math.exp(-z * z + poly)
+            return if (x >= 0) 1 - r else r - 1
         }
     }
 }
