@@ -205,8 +205,8 @@
     <string name="theme_pack_skin_note_no_dark">A dark version (the skin has one look: the dark version uses its colours)</string>
     <string name="theme_pack_skin_note_includes_count">Settings taken from Trime\'s own files or from files not in the package (%1$d of them)</string>
     <plurals name="theme_pack_skin_layouts">
-        <item quantity="one">This skin brings %1$d keyboard: %2$s. Imported with it, it is in Look → Layouts.</item>
-        <item quantity="other">This skin brings %1$d keyboards: %2$s. Imported with it, they are in Look → Layouts.</item>
+        <item quantity="one">This skin brings %1$d keyboard: %2$s. Tick “Import its layouts too” to put it in Look → Layouts.</item>
+        <item quantity="other">This skin brings %1$d keyboards: %2$s. Tick “Import its layouts too” to put them in Look → Layouts.</item>
     </plurals>
     <string name="theme_pack_draw_failed">Theme %1$s failed to show last time: the default theme is used instead</string>
     <string name="theme_not_saved">The theme could not be saved: the phone\'s storage may be full</string>

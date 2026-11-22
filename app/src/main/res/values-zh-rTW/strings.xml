@@ -201,7 +201,7 @@
     <string name="theme_pack_skin_note_no_dark">深色版（皮膚只有一套，深色版用它的顏色）</string>
     <string name="theme_pack_skin_note_includes_count">引用了同文內建或包裡沒有的設定（%1$d 處）</string>
     <plurals name="theme_pack_skin_layouts">
-        <item quantity="other">這個皮膚帶 %1$d 塊鍵位：%2$s，匯入後在 外觀 → 佈局 裡。</item>
+        <item quantity="other">這個皮膚帶 %1$d 塊鍵位：%2$s。勾上「一起匯入」，匯入後放進 外觀 → 佈局。</item>
     </plurals>
     <string name="theme_pack_draw_failed">主題 %1$s 上次顯示時出錯，已換回預設主題</string>
     <string name="theme_not_saved">主題沒能儲存：手機儲存空間可能滿了</string>

@@ -201,16 +201,17 @@ class ThemeListFragment : Fragment() {
     }
 
     // taken on 导入, else let go
-    private fun confirmPack(pack: ThemeFilesManager.Opened.Pack) {
+    @VisibleForTesting
+    internal fun confirmPack(pack: ThemeFilesManager.Opened.Pack) {
         val ctx = requireContext()
         val title = ctx.getString(R.string.theme_pack_import_title, pack.staged.name)
         // let go however the dialog closes but by 导入; one left by a destroyed fragment is cleared by a later open
         var taken = false
-        // its user-pickable boards put in 外观 → 布局 too, ticked unless unticked
+        // its user-pickable boards put in 外观 → 布局 too; a skin's unticked, so the app's own keys stay unless asked
         val withLayouts = pack.staged.layoutReport.listed.takeIf { it.isNotEmpty() }?.let {
             CheckBox(ctx).apply {
                 setText(R.string.theme_pack_layouts_with)
-                isChecked = true
+                isChecked = !pack.fromSkin
             }
         }
         ThemePackDialogs.builder(ctx, title, ThemePackDialogs.confirmText(ctx, pack), pack.staged.preview, withLayouts)
@@ -219,7 +220,7 @@ class ThemeListFragment : Fragment() {
                 val listLayouts = withLayouts?.isChecked == true
                 lifecycleScope.withLoadingDialog(ctx) {
                     try {
-                        withContext(Dispatchers.IO) { pack.commit().getOrThrow() }
+                        withContext(Dispatchers.IO) { pack.commit(withLayouts = listLayouts).getOrThrow() }
                         ThemeManager.packPlaced(pack.staged.name)
                         // its versions one card, a pack it replaced gone: the list rebuilt
                         themeListAdapter.resetThemes(ThemeManager.getAllThemes())
