@@ -275,6 +275,20 @@ class KeyboardHarness(
         relayout()
     }
 
+    /** Another field of the app's focused: the framework finishes this input and starts that one in one go. */
+    fun another() {
+        val info = EditorInfo().also {
+            it.packageName = this.info.packageName
+            it.fieldId = this.info.fieldId + 1
+        }
+        field.onCreateInputConnection(info)
+        this.info = info
+        doStartInput(connection, info, restarting = false)
+        service.onStartInputView(info, false)
+        idle()
+        relayout()
+    }
+
     /** Input restarted with the same EditorInfo (resetStateForNewConfiguration). */
     fun turn() {
         doStartInput(connection, info, restarting = true)

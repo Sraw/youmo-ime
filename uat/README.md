@@ -177,6 +177,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。模拟器有自己的内核，和别的用例同一台设备上跑；**只在模拟器里造虚拟键盘**（容器类设备如 redroid 和宿主机共用内核，造出来的键盘宿主机也会收到） |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
 | 宠物的内存（MN-31） | 默认模拟器（测试页要 API 34+）；预算按它的 heapgrowthlimit 定，低端机的 3 MB 预算要在 ≤192 MB 的镜像上量 |
+| 用 node 做样本的（ST-203、ST-215） | 任何模拟器；跑 `uat.py` 的电脑要装 node（ST-203 用 `web/theme-maker/tools/make-skin-fixtures.mjs` 做加密的搜狗皮肤，ST-215 还要先 `./gradlew :lib:keyboard-scene:youmoEngine`）；没有 node 时记阻塞 |
 | 语音（12） | 真机，有麦克风，导入语音包；arm64 debug 包导入语音包后也能在模拟器上跑（片段麦克风，见「实体键盘和语音」） |
 
 模拟器快照里装了浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
@@ -227,7 +228,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 1146 条（P0 150、P1 863、P2 133）：模拟器上跑 201 条（其中 150 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 945 条（JVM 834、发版时 20、真机或手工 69、语音 22）。
+现在共 1160 条（P0 150、P1 869、P2 141）：模拟器上跑 205 条（其中 154 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 955 条（JVM 844、发版时 20、真机或手工 69、语音 22）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

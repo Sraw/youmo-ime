@@ -360,7 +360,7 @@ async function main() {
         dt.items.add(new File([u], ${JSON.stringify(name)}));
         document.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
       })()`);
-      const during = await js(`[document.getElementById('new-panel').open, document.getElementById('busy').tagName]`);
+      const during = await js(`[document.getElementById('new-panel').open, document.getElementById('busy').tagName, document.querySelectorAll('dialog[open]:not(#busy)').length]`);
       let said = '';
       for (let i = 0; i < 300 && !(said = await js(`document.getElementById('toast').textContent`)); i++) await wait(100);
       await wait(300);
@@ -369,9 +369,12 @@ async function main() {
     const banner = () => js(`[document.getElementById('skin-note').hidden, document.querySelectorAll('#skin-lines li').length, document.getElementById('skin-layouts').checked,
       document.getElementById('skin-layouts-row').hidden, [...document.querySelectorAll('#skin-lines li')].map((l) => l.textContent).join('|')]`);
     const errorsShown = () => js(`document.querySelectorAll('#problems li.error').length`);
+    await js(`document.getElementById('help-panel').showModal()`);
+    const helped = await drop('sea.bds', skins['sea.bds']);
+    check(helped.during[2] === 0 && helped.said === '已从皮肤转成主题', 'a skin dropped over 帮助: no dialog left open while it converts: ' + helped.during);
     await js(`document.getElementById('new-panel').showModal()`);
     const sea = await drop('sea.bds', skins['sea.bds']);
-    check(sea.during[0] === false && sea.during[1] === 'DIALOG', 'a skin opened from 新建: the dialog closed while it converts, 正在转换 a dialog of its own: ' + sea.during);
+    check(sea.during[0] === false && sea.during[1] === 'DIALOG' && sea.during[2] === 0, 'a skin opened from 新建: the dialog closed while it converts, 正在转换 a dialog of its own: ' + sea.during);
     check(sea.said === '已从皮肤转成主题', 'sea.bds converted: ' + sea.said);
     let note = await banner();
     check(!note[0] && note[1] > 0 && !note[2] && !note[3], 'the banner: its notes, the layouts\' box offered and not ticked: ' + JSON.stringify(note));
@@ -411,6 +414,21 @@ async function main() {
     await b.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.confirm = (m) => { window.__asked = m; return false; };' });
     const url = 'http://127.0.0.1:' + server.address().port + '/page.html';
     const offered = (q) => js(`(async () => { for (let i = 0; i < 300 && !document.getElementById('restore-panel')?.open; i++) await new Promise((r) => setTimeout(r, 50)); return ${q}; })()`);
+    // a skin dropped while the draft is asked about: the question stays, the draft is not replaced, 新建 not shown
+    const draftOf = `(async () => { const d = await window.YoumoMaker.draft(window.YoumoMaker.idbStore(indexedDB)); return d ? d.at + ' ' + d.doc.xml.length : ''; })()`;
+    await wait(800);
+    await js(`window.YoumoMaker.keepDraft(window.YoumoMaker.idbStore(indexedDB), window.YoumoMaker.doc(document.getElementById('source').value), window.YoumoMaker.ENV)`);
+    await b.send('Page.navigate', { url });
+    check(await offered(`document.getElementById('restore-panel').open`), 'the draft offered before a skin is dropped');
+    const kept = await js(draftOf);
+    const asked = await drop('sea.bds', skins['sea.bds']);
+    await wait(1500);
+    const after = await js(`[document.getElementById('restore-panel').open, document.getElementById('new-panel').open]`);
+    check(after[0] && !after[1] && kept !== '' && await js(draftOf) === kept && /草稿/.test(asked.said),
+      'a skin dropped while the draft is asked about: the question kept, 新建 not shown, the draft as it was: ' + JSON.stringify([after, asked.said]));
+    // answered, the page has the draft's theme for the cases below to keep
+    await js(`document.querySelector('#restore-panel button[value=restore]').click()`);
+    await wait(1500);
     for (const board of ['handwriting', '@own', '@open']) {
       // the page's own pending draft written first, so it does not replace the one put in below on leaving
       await wait(800);

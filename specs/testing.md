@@ -494,7 +494,10 @@ What holds the library to the app:
 - `web/theme-maker/test/engine.test.mjs` (node, needs the built engine; CI's unit test job runs it
   with format.test.mjs) builds every snapshot through the facade from shots.json and compares
   `scene.text()` with it, converts look-3.0.json, writes a theme, reads layouts with and without
-  their fragments, and paints each scene of `testdata/paint.txt` on a recording 2D context.
+  their fragments, and paints each scene of `testdata/paint.txt` on a recording 2D context. Raster icons and
+  stickers, which paint.txt has not, are its own cases: the recording context writes a `raster <tag> <box> a=<alpha>`
+  line for each picture laid and ` within` on a fill laid `source-in` (a tinted icon's colour in its shape), so the
+  test holds the 3-times cap, the tint's alpha and a sticker over the face with its words where it is not in.
 - `paint.txt` is the app's `EnginePaintTest` (Robolectric, NATIVE graphics):
   ScenePainter's calls on a recording Canvas for 20 shots, normalized to device pixels to a tenth
   (fills, fills less a shape, blurs as their sigma, strokes, text with its weight, size, squeeze,
@@ -525,6 +528,22 @@ What holds the library to the app:
   more than 16 (the plain board against the app's with q pressed must fail it, and does).
 - `node web/theme-maker/test/panels-smoke.mjs` (CI's unit test job on every push and PR, with the runner's
   Chrome, DECISIONS.md B13; locally the same Chromium as pixel-smoke) drives the maker's 字和图标 tab by mouse and by touch: a field edited, then the next field typed into or a box tapped, both kept (a value edit updates the controls in place, never draws the tab anew); after undo with a field focused every field shows the document; a colour row after undoing a rename edits the colour it names, and the crop shows a picture replaced by one of its size (a row of another name, a box of another data-key is put in whole). After 用这个裁切 replaces its box the focus stays in the tab; the tabs 栏, 弹出, 面板和窗口, 尺寸, 动效 and 信息 each draw, an 信息 edit keeps the next field focused, 试一下 plays, and the environment's typing bar grows the preview.
+- `web/theme-maker/test/skin-import.test.mjs` (node, needs the built engine; with the others): the skins of
+  `tools/make-skin-fixtures.mjs`, made afresh each run (none in the repository: a Baidu `.bds`, a Sogou skin sealed
+  with the public key, sealed in a ZIP and plain, an iFlytek `.it`, a Trime theme on its `__include`, a Finder ZIP,
+  a 仓 `.cskin`), each converted and opened as the app converts it, the sealed and the plain alike, the notes and
+  errors in the app's words, the layouts' box not ticked, a broken `.theme` not taken for a skin, ZIPs as skin tools
+  write them, and the pixel and byte budgets. `pet.test.mjs` (the same): the 宠物 panel's `<pet>` read by the engine,
+  its sheets held to `PetLimits` as the app's import holds them, a theme with a pet saved with `min-app` 0.6.3.
+  `panels-smoke.mjs` also drops `sea.bds` on the page (新建 open, or another dialog: each closed while it converts),
+  then the sealed Sogou skin, the `.cskin` and a broken `.theme`.
+- The app's side of a skin: keyboard-scene's `commonTest/…/scene/skin/` (each reader's fixtures and tests, `SkinFormatsTest`,
+  `SkinWiringTest`, `SkinLayoutWriterTest`, `SkinIconsTest`, `SogouContainerTest`, `RimeComposeTest`, `ProtoWireTest`),
+  the app's `ThemeSkinImportTest`, `AndroidSkinCodecSogouTest` (the real AES), `ThemeImportLayoutsTest`, and
+  `uat/SkinImportUatTest` (ST-200–211, ST-213, ST-214 on samples `SkinUatSamples` makes in memory: the converted
+  `theme.xml`, the pixels of the files it writes, the confirmation's text, the export, `ThemeLayoutsToList` into
+  `CustomLayouts`, the 0.6.0/0.6.3 `min-app` and an older app's refusal). A real skin, which the repository never
+  holds, is tried by hand: `UAT_SKINS=<dir>` for ST-101 on a device.
 - `node web/theme-maker/dev/serve.mjs` serves `dev/engine.html`, a preview of any board, theme,
   size and form drawn by the engine; development only, never published.
 

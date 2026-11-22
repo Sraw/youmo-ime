@@ -156,9 +156,11 @@
     const c = canvas.getContext('2d');
     const fw = bmp.width / n.columns;
     const fh = bmp.height / n.rows;
-    const s = Math.min(canvas.width / fw, canvas.height / fh);
+    const fit = Math.min(canvas.width / fw, canvas.height / fh);
+    // as the app: twice or more a whole number of times, unsmoothed, so pixel art stays sharp
+    const s = fit >= 2 ? Math.floor(fit) : fit;
     c.clearRect(0, 0, canvas.width, canvas.height);
-    c.imageSmoothingEnabled = true;
+    c.imageSmoothingEnabled = fit < 2;
     c.drawImage(bmp, (i % n.columns) * fw, Math.floor(i / n.columns) * fh, fw, fh, (canvas.width - fw * s) / 2, (canvas.height - fh * s) / 2, fw * s, fh * s);
   }
 

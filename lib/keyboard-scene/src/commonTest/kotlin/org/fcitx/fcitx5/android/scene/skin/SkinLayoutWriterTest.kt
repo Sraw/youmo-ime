@@ -283,6 +283,20 @@ class SkinLayoutWriterTest {
         assertEquals(assertNotNull(SkinLayoutWriter.write(nine(), appLayouts)).dropped + 3, w.dropped)
     }
 
+    // a side of one digit a row, wider than the board's keys: each row's digit is the board's, in its columns
+    @Test
+    fun aSidesDigitWiderThanTheBoardsIsNotTheBoards() {
+        val side = 300.0
+        val key = (across - side - 194.4) / 3
+        fun digits(y: Double, s: String, last: SkinAction) = row(y, 150.0, side, *letters(s, key), last to 194.4)
+        val main = listOf(digits(0.0, "123", Role("backspace")), digits(150.0, "456", Role("reset")), digits(300.0, "789", Letter('0')))
+        val sides = "147".mapIndexed { i, c -> SkinKeyBox(0.0, 150.0 * i, side, 150.0, Letter(c)) }
+        val rows = main.mapIndexed { i, r -> listOf(sides[i]) + r } + listOf(nine().rows[3])
+        val w = assertNotNull(SkinLayoutWriter.write(SkinBoard("nine", rows, across), appLayouts))
+        assertEquals(emptyList(), lacks(w))
+        assertAt(SkinBoard("nine", main, across), placed(layout(w.text), states.first()), ::idOf)
+    }
+
     @Test
     fun onlyAKeyOverTheRowAndBesideItsKeysJoinsIt() {
         fun down(r: List<SkinKeyBox>) = r.map { SkinKeyBox(it.x, it.y + 150.0, it.w, it.h, it.action) }

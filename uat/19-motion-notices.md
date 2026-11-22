@@ -97,6 +97,13 @@
 - **预期**：第一次的 toast 约 1 秒就收起（不是系统的 2 秒）；长 toast（比如主题没保存）约 2 秒。调成 10 秒后，toast 停约 10 秒（系统自己按这个设置延长，本应用不提前收起）。
 - **JVM**：`ToastTest`（短 1 秒、长 2 秒后取消，按 `getRecommendedTimeoutMillis` 延长，新的一条马上顶掉还在的一条；SDK 29 和 35）、`UndoChipTest.aLongerTimeoutAskedOfTheSystemIsKept`（键盘上方提示同样延长：只说一句的按阅读时长，带按钮的也按操作时长）；设备上见 impl report 的模拟器核对。
 
+### MN-27 [P2] 皮肤转来的按下缩放受「键盘动效」开关管
+<!-- dev/design/063-skin-import §1 -->
+- **前提**：B0-设置，**跟随系统深色模式** 关掉；脚本现做的百度皮肤 `uat-skin-press.bds`：退格按下时缩到 90%、255 ms（放在退格上：字母键按住时有气泡盖着键面）。
+- **操作**：导入、选用；按住退格。到 **外观 → 大小与样式** 关掉 **键盘动效**，再按住退格；最后把它打开。
+- **预期**：开着时按住的退格比松开时窄，约九成，动画很短（不超过 80 ms）；关掉后不缩。
+- **JVM**：转换出的 `press-scale`、`transition`（最长 80 ms）由 `BaiduClassicTest` 断言，这个样本只在退格上写由 `SkinImportUatTest.aSkinsPressShrinkComesOverOnBackspace` 断言；按下后缩没缩在设备上看（动画，同 ST-26，`19-motion-notices.py` 截图量退格键面的宽度）。
+
 ## 宠物
 
 格式和规则见 [theme-pet.md](../docs/theme-pet.md)。宠物都用 `scripts/19-motion-notices.py` 现画的帧图：`uat-pet.theme` 每个状态一种颜色（idle 紫、typing 红、delete 蓝、enter 绿、space 黄、sleep 深灰、wake 青），帧上写着状态名和帧号，动作状态每秒 2 帧、6 帧，截图赶得上。
@@ -104,7 +111,7 @@
 ### MN-28 [P1] 宠物跟着按键换动作
 - **前提**：B0-设置，导入 `uat-pet.theme` 并选用，在「普通文本」框。
 - **操作**：依次按字母、退格、回车、空格，每下之后看宠物、等它播完；连按两个字母；点一下宠物盖住的那个键；不按键等 30 s；按一个键；切到表情面板再切回来；收起键盘再弹出。
-- **预期**：每一下宠物换成对应颜色的那组帧，播完回 idle；连按字母时 typing 接着播、不从头重播；点宠物盖住的键，打出的是那个键；30 s 后变成 sleep，按一个键醒来（先 wake 再 typing）；表情面板上看不到宠物，回来、以及重新弹出后都是 idle 第一帧。
+- **预期**：每一下宠物换成对应颜色的那组帧，播完回 idle；连按字母时 typing 接着播、不从头重播；点宠物盖住的键，打出的是那个键；30 s 后变成 sleep，按一个键醒来（先 wake 再 typing）；换到同一个 App 的另一个输入框时接着播，不藏起、不回 idle；表情面板上看不到宠物，回来、以及重新弹出后都是 idle 第一帧。
 - **JVM**：`PetUatTest.thePetChangesWithEachKindOfKey`（Robolectric 主线程 Looper 推时间，每个状态截一张）；设备上留作冒烟（四类键、睡着醒来、收起再弹出，看键盘右上角的颜色）。
 
 ### MN-29 [P1] 「键盘动效」关掉时宠物不动

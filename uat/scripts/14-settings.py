@@ -474,7 +474,7 @@ def st101(d):
     push_file(d, bad, "uat-bad.ssf")
     os.remove(bad)
     import_theme(d, "uat-bad", confirm=False)
-    check(d.wait_text("这个搜狗皮肤是加密的", timeout=8, where="all", contains=True), "选加密的 .ssf 没有说原因")
+    check(d.wait_text("这个搜狗皮肤读不出来", timeout=8, where="all", contains=True), "选坏的 .ssf 没有说原因")
     d.shot("full", "坏皮肤的提示")
     d.back(after=1.0)
     appearance_tab(d, "主题")
@@ -482,8 +482,242 @@ def st101(d):
     real = os.environ.get("UAT_SKINS")
     extra = real_skins(d, real) if real else []
     d.sh("rm -f /sdcard/Download/uat-skin.bds /sdcard/Download/uat-skin-mac.zip /sdcard/Download/uat-bad.ssf")
-    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）、键面没有拼缝；{gaps}；Finder 的 zip 也认；坏皮肤说是加密的" + \
+    return f"皮肤收下、确认框列出没转过来的、选用是橙键蓝底（橙 {o} 蓝 {b}）、键面没有拼缝；{gaps}；Finder 的 zip 也认；坏皮肤说读不出来" + \
         (f"；真皮肤：{'、'.join(extra)}" if extra else "")
+
+
+# ICON_COLORS of SkinUatSamples: backspace, pressed backspace, shift, once, locked, enter
+SKIN_ICONS = [(0xE5, 0x39, 0x35), (0x8E, 0x24, 0xAA), (0x43, 0xA0, 0x47), (0x1E, 0x88, 0xE5), (0xFD, 0xD8, 0x35), (0x6D, 0x4C, 0x41)]
+SKIN_FACES = {"letter": (0xFF, 0x99, 0x33), "function": (0x88, 0x99, 0xAA), "pressed": (0x44, 0x77, 0xFF)}
+SKIN_PANELS = {"": (0x20, 0x50, 0xA0), "light/": (0x20, 0x50, 0xA0), "dark/": (0x10, 0x10, 0x10)}
+
+
+def baidu_skin_full(path, name, roots=("",), icons=False, press=False):
+    """the Baidu skin of SkinUatSamples.baidu, in solid colours a screenshot can measure: letters orange, the
+    function keys grey, a pressed key blue, the panel blue (black under dark/). [icons]: backspace (pressed another),
+    shift's three states and enter as colour pictures (SKIN_ICONS); [press]: backspace pressed shrinks to 90% in 255 ms
+    (backspace: a held letter's bubble would cover its face)"""
+    import io
+    from PIL import Image, ImageDraw
+
+    def png(im):
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        return out.getvalue()
+
+    def face(colour, w=162, h=180, m=6):
+        im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rectangle((m, m, w - m - 1, h - m - 1), fill=colour + (255,))
+        return im
+
+    files = {"Info.txt": f"[Info]\nName={name}\nAuthor=uat\nVersion=1\n", "demo.png": png(Image.new("RGB", (400, 300), (0x33, 0x66, 0x99)))}
+    for r in roots:
+        atlas = Image.new("RGBA", (600, 200), (0, 0, 0, 0))
+        atlas.paste(face((0x33, 0x33, 0x33) if "dark" in r else SKIN_FACES["letter"]), (0, 0))
+        atlas.paste(face(SKIN_FACES["function"]), (200, 0))
+        atlas.paste(face(SKIN_FACES["pressed"]), (400, 0))
+        files[r + "res/keys.png"] = png(atlas)
+        files[r + "res/keys.til"] = ("[IMG1]\nSOURCE_RECT=0,0,162,180\nINNER_RECT=30,30,102,120\n"
+                                     "[IMG2]\nSOURCE_RECT=200,0,162,180\nINNER_RECT=230,30,102,120\n[IMG3]\nSOURCE_RECT=400,0,162,180\n")
+        files[r + "res/panel.png"] = png(Image.new("RGB", (1080, 600), SKIN_PANELS[r]))
+        files[r + "res/panel.til"] = "[IMG1]\nSOURCE_RECT=0,0,1080,600\n"
+        css = ("[STYLE1]\nNM_IMG=keys,1\nHL_IMG=keys,3\n[STYLE2]\nNM_IMG=keys,2\nHL_IMG=keys,3\n[STYLE3]\nNM_COLOR=ffffff\nHL_COLOR=ffff00\n"
+               "[STYLE4]\nNM_IMG=panel,1\n[STYLE5]\nNM_COLOR=CC336699\n[STYLE6]\nNM_COLOR=ff6600\n"
+               f"[STYLE10]\nNM_COLOR={'eeeeee' if 'dark' in r else '112233'}\nHL_COLOR=ff0000\n[STYLE11]\nNM_COLOR=ff00aa00\n")
+        fore = {"F36": "3", "F10": "3", "F39": "3"}
+        more = {"F36": "", "F10": "", "F39": ""}
+        tips = ""
+        if icons:
+            atlas = Image.new("RGBA", (48 * len(SKIN_ICONS), 48), (0, 0, 0, 0))
+            for i, c in enumerate(SKIN_ICONS):
+                # two colours each, the left half its own: one colour alone would be taken as a tint
+                atlas.paste(face((255, 255, 255), 48, 48, 8), (48 * i, 0))
+                ImageDraw.Draw(atlas).rectangle((48 * i + 8, 8, 48 * i + 23, 39), fill=c + (255,))
+            files[r + "res/icons.png"] = png(atlas)
+            files[r + "res/icons.til"] = "".join(f"[IMG{i + 1}]\nSOURCE_RECT={48 * i},0,48,48\n" for i in range(len(SKIN_ICONS)))
+            css += "[STYLE20]\nNM_IMG=icons,1\nHL_IMG=icons,2\n[STYLE21]\nNM_IMG=icons,3\n[STYLE22]\nNM_IMG=icons,4\n" \
+                   "[STYLE23]\nNM_IMG=icons,5\n[STYLE24]\nNM_IMG=icons,6\n"
+            fore = {"F36": "20", "F10": "21", "F39": "24"}
+            more["F10"] = "STAT_STYLE=S1_1|S2_2\n"
+            tips = "[TIP1]\nFORE_STYLE=22\n[TIP2]\nFORE_STYLE=23\n"
+        if press:
+            files[r + "port/res/anim.ini"] = "[ANIM1]\nTYPE=4\nFROM=100,100\nTO=90,90\nDURATION=255\n"
+            css += "[STYLE12]\nPRESS_ANIM=1\n"
+            more["F36"] += "ANIM_STYLE=12\n"
+        files[r + "port/res/default.css"] = css
+        files[r + "port/gen.ini"] = "[PANEL]\nSIZE=1080,600\nBACK_STYLE=4,5\n[CAND]\nLAYOUT_NAME=cand1\nVIEW_RECT=0,0,1080,126\n[INPUT]\nFORE_STYLE=6\n"
+        files[r + "port/cand1.cnd"] = "[CAND]\nBACK_STYLE=5\nFORE_STYLE=3\nFIRST_FORE=6\n"
+        keys = []
+
+        def key(x, y, w, back, f, centre):
+            keys.append(f"[KEY{len(keys) + 1}]\nVIEW_RECT={x},{y},{w},150\nBACK_STYLE={back}\nFORE_STYLE={f}\n{more.get(centre, '')}CENTER={centre}\n")
+        for i, c in enumerate("qwertyuiop"):
+            key(i * 108, 0, 108, 1, "10,11", c)
+        for i, c in enumerate("asdfghjkl"):
+            key(54 + i * 108, 150, 108, 1, "10,11", c)
+        key(0, 300, 162, 2, fore["F10"], "F10")
+        for i, c in enumerate("zxcvbnm"):
+            key(162 + i * 108, 300, 108, 1, "10,11", c)
+        key(918, 300, 162, 2, fore["F36"], "F36")
+        x = 0
+        for c, w in (("F1", 160), ("F6", 120), ("F38", 520), ("F12", 120), ("F39", 160)):
+            key(x, 450, w, 2, fore.get(c, "3"), c)
+            x += w
+        files[r + "port/py_26.ini"] = "".join(keys) + tips
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, data in files.items():
+            z.writestr(n, data)
+
+
+def use_skin(d, path, filename):
+    """[path] pushed as [filename], imported (导入 on its confirm dialog) and picked, the test page's keyboard up"""
+    push_file(d, path, filename)
+    os.remove(path)
+    import_theme(d, filename.rsplit(".", 1)[0])
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, f"导入 {filename} 后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.open_page("text")
+    return item
+
+
+def near(d, label, colour, im=None, half=0.5):
+    """pixels within 60 (summed over RGB) of [colour] in a box round the key [label], [half] a letter's pitch each side"""
+    k = d.keys(refresh=True)
+    check(label in k and "g" in k and "h" in k, f"键盘上找不到 {label}")
+    pitch = abs(k["h"][0] - k["g"][0])
+    cx, cy = k[label]
+    im = (im or d.png()).convert("RGB")
+    box = im.crop((int(cx - pitch * half), int(cy - pitch * 0.6), int(cx + pitch * half), int(cy + pitch * 0.6)))
+    return sum(1 for p in box.getdata() if sum(abs(a - b) for a, b in zip(p, colour)) < 60)
+
+
+@case("ST-201", base="B0-设置", mutates=True)
+def st201(d):
+    """the device's smoke: each icon the skin's colour picture, the first press of backspace its pressed one, the
+    version 0.6.3; each icon's file and the export are SkinImportUatTest's"""
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", False)
+    p = os.path.join(tempfile.gettempdir(), f"uat-skin-icons-{d.port}.bds")
+    baidu_skin_full(p, "uat 图标皮肤", icons=True)
+    item = use_skin(d, p, "uat-skin-icons.bds")
+    red, purple, green, blue, yellow, brown = SKIN_ICONS
+    # a textarea: Return is 换行 there, the one action the skin's picture stands for
+    d.open_page("sentence")
+    d.shot("kb", "皮肤的图标")
+    got = {"退格": near(d, "bksp", red), "Shift": near(d, "shift", green), "回车": near(d, "enter", brown)}
+    check(all(n > 20 for n in got.values()), f"图标不是皮肤的彩色图：{got}")
+    bk = d.keys()["bksp"]
+    d.touch(("down", bk[0], bk[1]))
+    try:
+        im = d.png()
+    finally:
+        d.touch(("up", bk[0], bk[1]))
+    d.clear()
+    held = (near(d, "bksp", purple, im), near(d, "bksp", red, im))
+    check(held[0] > 20 and held[1] < 5, f"第一次按住退格不是按下的那张图（紫 {held[0]} 红 {held[1]}）")
+    sh = d.keys()["shift"]
+    d.tap(sh, 0.8)
+    once = near(d, "shift", blue)
+    d.shot("kb", "Shift 点一下：单次的图")
+    time.sleep(1.0)
+    d.tap(sh, 0.8)   # back to 未按
+    time.sleep(1.0)
+    d.touch(("down", sh[0], sh[1]), ("up", sh[0], sh[1]), ("sleep", 0.1), ("down", sh[0], sh[1]), ("up", sh[0], sh[1]))
+    time.sleep(0.8)
+    locked = near(d, "shift", yellow)
+    d.shot("kb", "Shift 点两下：锁定的图")
+    d.tap(sh, 0.8)
+    check(once > 20 and locked > 20, f"Shift 单次、锁定不是各自的图（蓝 {once} 黄 {locked}）")
+    d.open_page("search")
+    search = near(d, "enter", brown)
+    d.shot("kb", "搜索框里的回车：皮肤的「搜索」图不转，是自带的")
+    check(search < 5, f"搜索框里的回车用了常态回车的图（{search}）")
+    appearance_tab(d, "主题")
+    theme_action(d, custom_item(d), "信息")
+    texts = " ".join(d.screen().texts("all"))
+    d.shot("full", "主题信息")
+    check("0.6.3" in texts, f"信息里没写 0.6.3：{texts[:200]}")
+    d.back(after=1.0)
+    delete_custom(d)
+    d.sh("rm -f /sdcard/Download/uat-skin-icons.bds")
+    return f"图标都是皮肤的（{got}）；第一次按住退格紫 {held[0]}；Shift 单次蓝 {once}、锁定黄 {locked}；搜索框回车是自带的（棕 {search}）；信息 0.6.3"
+
+
+@case("ST-203", base="B0-设置", mutates=True)
+def st203(d):
+    """the device's smoke: the encrypted Sogou skin and its plain copy (make-skin-fixtures.mjs's warm.ssf and
+    warm-plain.ssf) ask the same; the files alike are SkinImportUatTest's"""
+    if not shutil.which("node"):
+        raise Blocked("这台电脑没有 node，做不出加密的搜狗皮肤")
+    repo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+    tmp = tempfile.mkdtemp()
+    r = subprocess.run(["node", os.path.join(repo, "web", "theme-maker", "tools", "make-skin-fixtures.mjs"), tmp],
+                       capture_output=True, text=True, timeout=120)
+    if r.returncode:
+        raise Blocked(f"node 做不出样本：{r.stderr[-300:]}")
+    asked = []
+    for src, name in (("warm.ssf", "uat-sogou-enc.ssf"), ("warm-plain.ssf", "uat-sogou.ssf")):
+        push_file(d, os.path.join(tmp, src), name)
+        import_theme(d, name.rsplit(".", 1)[0], confirm=False)
+        check(d.wait_text("导入主题", timeout=8, where="all", contains=True), f"选 {name} 没有弹出导入确认框")
+        texts = d.screen().texts("all")
+        # the dialog's own lines: the status bar's clock and notifications around it change
+        at = next(i for i, t in enumerate(texts) if t.startswith("导入主题"))
+        asked.append(texts[at:texts.index("导入", at) + 1])
+        d.shot("full", f"{name} 的确认框")
+        # the first left: imported, the second's dialog would say it replaces it
+        if len(asked) == 1:
+            d.back(after=1.0)
+        else:
+            d.tap_text("导入", where="all", scroll=False, after=3.0)
+    shutil.rmtree(tmp, ignore_errors=True)
+    check(asked[0] == asked[1], f"加密的和明文的确认框不一样：{asked[0][:10]} / {asked[1][:10]}")
+    check(not any("加密" in t for t in asked[0]), "确认框里出现了「加密」")
+    appearance_tab(d, "主题")
+    item = custom_item(d)
+    check(item, "导入后主题列表里没有它")
+    d.tap(item.c, 1.5)
+    d.open_page("text")
+    d.shot("kb", "加密的搜狗皮肤选用后")
+    delete_custom(d)
+    d.sh("rm -f /sdcard/Download/uat-sogou-enc.ssf /sdcard/Download/uat-sogou.ssf")
+    return "加密的和明文的确认框一样，没有「加密」两个字，导入后能选用"
+
+
+@case("ST-209", base="B0-设置", mutates=True)
+def st209(d):
+    """the device's half: the dark picture drawn in dark mode, the light one in light; the export is SkinImportUatTest's"""
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", True)
+    p = os.path.join(tempfile.gettempdir(), f"uat-skin-dark-{d.port}.bds")
+    baidu_skin_full(p, "uat 深色皮肤", roots=("light/", "dark/"))
+    use_skin(d, p, "uat-skin-dark.bds")
+
+    def panel():
+        # between g and h: the panel's picture, no key on it
+        k = d.keys(refresh=True)
+        x, y = (k["g"][0] + k["h"][0]) / 2, k["g"][1]
+        return d.png().convert("RGB").getpixel((int(x), int(y)))
+    light = panel()
+    d.shot("kb", "浅色：蓝色的背景图")
+    d.sh("cmd uimode night yes")
+    try:
+        time.sleep(1.5)
+        d.open_page("text")
+        dark = panel()
+        d.shot("kb", "深色：黑色的背景图")
+    finally:
+        d.sh("cmd uimode night no")
+    time.sleep(1.5)
+    d.open_page("text")
+    back = panel()
+    delete_custom(d)
+    d.sh("rm -f /sdcard/Download/uat-skin-dark.bds")
+    check(light[2] > 120 and back[2] > 120, f"浅色时不是浅色版的蓝背景：{light} / 切回后 {back}")
+    check(max(dark) < 60, f"深色时不是深色版的黑背景：{dark}")
+    return f"背景 浅 {light}、深 {dark}、切回 {back}"
 
 
 case("ST-141", needs="manual:横屏的主题预览和键盘比高度（常见手机和折叠屏、三键和手势导航）；预览用的可用高度由 KeyboardAreaTest.theRoomPredictedLeavesTheStatusBarAndTheInputMethodsBarOut 查")(lambda d: None)

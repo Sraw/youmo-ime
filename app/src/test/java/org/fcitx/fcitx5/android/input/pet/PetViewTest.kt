@@ -5,6 +5,9 @@
 package org.fcitx.fcitx5.android.input.pet
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
@@ -20,7 +23,10 @@ import org.fcitx.fcitx5.android.input.floating.BoardFollowers
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
 import org.fcitx.fcitx5.android.input.wm.InputWindow
+import org.fcitx.fcitx5.android.scene.pet.Pet
+import org.fcitx.fcitx5.android.scene.pet.PetLimits
 import org.fcitx.fcitx5.android.scene.pet.PetMachine
+import org.fcitx.fcitx5.android.scene.pet.PetState
 import org.fcitx.fcitx5.android.scene.pet.PetState.Name
 import org.fcitx.fcitx5.android.scene.pet.PetTrigger
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
@@ -41,6 +47,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.util.ReflectionHelpers
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.Duration
 
@@ -105,6 +112,44 @@ class PetViewTest {
         v.on(PetTrigger.ENTER)
         assertEquals(Name.IDLE, v.at.first)
         assertTrue(v.ticking)
+    }
+
+    // a frame of [w] × 2 px, its left half black, drawn in a box [size] px square
+    private fun drawn(w: Int, size: Int): Bitmap {
+        val sheet = Bitmap.createBitmap(w, 2, Bitmap.Config.ARGB_8888).apply {
+            for (x in 0 until w) for (y in 0 until 2) setPixel(x, y, if (x < w / 2) Color.BLACK else Color.WHITE)
+        }
+        val file = File(folder.root, "pet-idle.png").apply { writeBytes(ByteArrayOutputStream().also { sheet.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()) }
+        val pet = Pet(Pet.Place.KEYBOARD, Pet.Align.TOP_END, 40.0, 0.0, 0.0, mapOf(Name.IDLE to PetState(file.path, 1, 1, 4, PetLimits.resting(Name.IDLE))))
+        val v = shown(PetView(activity, pet, size, PetFrames.BUDGET_BYTES))
+        return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
+    }
+
+    @Test
+    fun pixelArtMadeBigIsSharp() {
+        // 25 times: whole pixels, not smoothed into one another
+        val out = drawn(4, 100)
+        assertEquals(Color.BLACK, out.getPixel(49, 50))
+        assertEquals(Color.WHITE, out.getPixel(50, 50))
+    }
+
+    @Test
+    fun pixelArtIsMadeBigAWholeNumberOfTimes() {
+        // 2.5 times fits: twice, 80 px at the middle, sharp
+        val out = drawn(40, 100)
+        assertEquals(Color.TRANSPARENT, out.getPixel(9, 50))
+        assertEquals(Color.BLACK, out.getPixel(10, 50))
+        assertEquals(Color.BLACK, out.getPixel(49, 50))
+        assertEquals(Color.WHITE, out.getPixel(50, 50))
+        assertEquals(Color.WHITE, out.getPixel(89, 50))
+        assertEquals(Color.TRANSPARENT, out.getPixel(90, 50))
+    }
+
+    @Test
+    fun underTwiceItIsSmoothedAsBefore() {
+        // 1.5 times: the halves meet at 4.5 px, a pixel of both
+        val mid = drawn(6, 9).getPixel(4, 4)
+        assertTrue(Integer.toHexString(mid), mid != Color.BLACK && mid != Color.WHITE && Color.alpha(mid) > 0)
     }
 
     @Test

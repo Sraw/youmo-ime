@@ -692,13 +692,18 @@
 
   async function openBytes(f) {
     if (busy) return;
+    // closing it would answer for the user: start() goes on to a new theme, and the kept draft is replaced
+    if ($('restore-panel').open) {
+      toast('先回答要不要恢复上次的草稿，再打开文件');
+      return;
+    }
     busy = true;
     // the conversion holds the page: nothing else is done meanwhile, and past 2 s it says why
     const was = [$('top').inert, $('main').inert];
     $('top').inert = $('main').inert = true;
-    // a modal 新建 would sit over the page's 正在转换 and stay clickable: closed, opened again if nothing opens
+    // a modal (新建, 导出, 帮助…) would sit over the page's 正在转换 and stay clickable: each closed, 新建 opened again if nothing opens
     const fromNew = $('new-panel').open;
-    $('new-panel').close();
+    for (const d of document.querySelectorAll('dialog[open]')) if (d.id !== 'busy') d.close();
     const slow = setTimeout(() => $('busy').showModal(), 2000);
     try {
       const { doc, notes, skin: converted } = await M.open(E, L, FORMAT, new Uint8Array(await f.arrayBuffer()), f.name, skinIo);

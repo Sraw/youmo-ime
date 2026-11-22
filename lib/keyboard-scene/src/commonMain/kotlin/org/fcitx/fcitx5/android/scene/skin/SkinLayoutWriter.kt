@@ -158,8 +158,9 @@ object SkinLayoutWriter {
             shiftless && k.attrs.role == "apostrophe" && a == SkinAction.Role("shift")
     }
 
-    // each row's keys by the skin's key drawn for them: of its name, else of one standing in for it, the widest where
-    // several are (the board's own, not a pad's beside it); a key the skin draws only in another of its rows moves there
+    // each row's keys by the skin's key drawn for them: of its name, else of one standing in for it; where several are, the
+    // one nearest the columns of the row's keys drawn once, then the widest (the board's own, not a pad's or side's beside
+    // it, however wide); a key the skin draws only in another of its rows moves there
     private fun drawn(
         ref: List<ExpandedRow>,
         skin: List<List<SkinKeyBox>>,
@@ -169,10 +170,14 @@ object SkinLayoutWriter {
         val keys = ref.map { er -> er.items.filterIsInstance<ExpandedKey>() }
         val out = ref.indices.map { HashMap<Int, ExpandedKey>() }
         for (i in ref.indices) {
+            val once = keys[i].mapNotNull { k -> skin[i].filter { fits[i](k, it.action) }.singleOrNull() }
+            val lo = once.minOfOrNull { it.x } ?: Double.NEGATIVE_INFINITY
+            val hi = once.maxOfOrNull { it.x + it.w } ?: Double.POSITIVE_INFINITY
+            fun off(b: SkinKeyBox) = maxOf(0.0, lo - (b.x + b.w), b.x - hi)
             for (named in listOf(true, false)) {
                 for (k in keys[i].filter { it !in out[i].values }) {
                     skin[i].indices.filter { j -> j !in out[i] && if (named) exact(k, skin[i][j].action) else fits[i](k, skin[i][j].action) }
-                        .maxByOrNull { skin[i][it].w }?.let { out[i][it] = k }
+                        .maxWithOrNull(compareBy({ -off(skin[i][it]) }, { skin[i][it].w }))?.let { out[i][it] = k }
                 }
             }
         }

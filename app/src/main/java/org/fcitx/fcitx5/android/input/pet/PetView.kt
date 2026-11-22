@@ -21,6 +21,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyMotionSwitch
 import org.fcitx.fcitx5.android.scene.pet.Pet
 import org.fcitx.fcitx5.android.scene.pet.PetMachine
 import org.fcitx.fcitx5.android.scene.pet.PetTrigger
+import kotlin.math.floor
 
 /**
  * The pet over the keys, in a box of [sizePx] that [place] puts; touches pass through to the keys. One bitmap drawn
@@ -152,8 +153,11 @@ class PetView(context: Context, private val pet: Pet, val sizePx: Int, private v
         val x = i % sheet.columns * sheet.frameWidth
         val y = i / sheet.columns * sheet.frameHeight
         src.set(x, y, x + sheet.frameWidth, y + sheet.frameHeight)
-        // the frame's own shape, as large as the box allows, at its middle
-        val scale = sizePx.toFloat() / maxOf(sheet.frameWidth, sheet.frameHeight)
+        // the frame's own shape, as large as the box allows, at its middle; twice or more a whole number of times, unsmoothed,
+        // so pixel art stays sharp
+        val fit = sizePx.toFloat() / maxOf(sheet.frameWidth, sheet.frameHeight)
+        val scale = if (fit >= 2f) floor(fit) else fit
+        paint.isFilterBitmap = fit < 2f
         val w = (sheet.frameWidth * scale).toInt()
         val h = (sheet.frameHeight * scale).toInt()
         val c = sizePx / 2

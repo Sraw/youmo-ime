@@ -168,6 +168,7 @@
     <string name="theme_info_version">版本：%1$s</string>
     <string name="theme_info_license">许可：%1$s</string>
     <string name="theme_info_format">主题格式 %1$s</string>
+    <string name="theme_info_format_min_app">主题格式 %1$s，需要 %2$s 或更新的版本</string>
     <string name="exception_theme_file_clash">主题的文件 %1$s 和另一个主题的文件重名</string>
     <string name="exception_theme_version">这个主题是更新版本的幽默输入法做的（主题格式 %1$s），更新输入法后才能用</string>
     <string name="exception_theme_newer_kept">已有一个同名的主题，是更新版本的幽默输入法做的：这一版读不了它，不替换</string>

@@ -1935,8 +1935,9 @@ character reference counts as what it reads as), the files never used (not an ap
 no keyboard used includes), how many held or swiped settings they write are not taken (`Report.ignored`,
 `theme_pack_layouts_ignored`, one line), and the warnings; 导入 places it, 取消 (or back) deletes what was unpacked.
 
-Skins of other input methods (`ThemeFilesManager.openSkin`, picked by `ThemeFileName.isSkinFile`: `.bds`, `.bdi`,
-`.ssf`, `.flex`, `.yaml`/`.yml`, `.zip`): read whole into memory by `SkinZip.readSkin` (a lone YAML as itself, 1 MB at
+Skins of other input methods (`ThemeFilesManager.openSkin`, picked by `ThemeFileName.isSkinFile`: `ThemeFileName.SKIN_EXTENSIONS`,
+`.bds`, `.bdi`, `.bda`, `.ssf`, `.it`, `.flex`, `.yaml`/`.yml`, `.zip`, and `.cskin`, `.sxi`, `.apk`, `.pack` only to be
+told they are not supported, an APK by its name before it is read): read whole into memory by `SkinZip.readSkin` (a lone YAML as itself, 1 MB at
 most; a ZIP holding one `.flex` and no `extension.json` as that `.flex`; a `.zip` that is no skin refused with
 `exception_theme_filename`, as a theme exported under the old name most likely is) and unpacked there by `SkinZip` (ime-core; central directory, else a local-header
 scan; `SkinLimits`: 64 MB file, 5000 entries, 32 MB an entry and 128 MB in all as they inflate, a zipped `.flex`'s
@@ -1947,8 +1948,13 @@ picture shrunk before the bar is put on it, so a board is never past 4096 a side
 `StackOverflowError` all the same a refusal, as a backstop), then its
 `theme.xml` and files written under the converter's own names into the same `theme-import/<uuid>` and checked and
 offered by the same `pack()` as a pack's; `Opened.Pack.notes` (`SkinNote`) are listed in the confirmation as not
-carried over. `SkinError.Reason` maps to `exception_skin_*`. The theme keeps the skin's name and author (no suffix:
-a name clash replaces, as a pack's does). The theme maker's web entry for skins is not done yet.
+carried over. `SkinError.Reason` maps to `exception_skin_*` (`UNSUPPORTED` with the format's `skin_format_*`). The theme keeps the skin's name and author (no suffix:
+a name clash replaces, as a pack's does). `SkinImport` bounds a conversion: past 60 s (`maxMillis`) or with its thread
+interrupted (`ThemeFilesManager.opening` runs it interruptible on the IO threads; the import let go, a pack it made is
+discarded) its codec stops it at the next image, tile or text, refused as a broken file. A skin's boards come as
+layouts the confirmation offers with 「一起导入」 unticked (`ThemeListFragment`: `isChecked = !pack.fromSkin`;
+`commit(withLayouts)` leaves `layouts/` out and the theme's own `min-app`). The theme maker's web page converts skins
+with the same code (`YoumoEngine.skinOpen`, `convertSkin`; docs/theme-maker.md).
 
 Placing (`ThemePackFiles.place`) copies it into `v4/.saving/new-<uuid>/`, each file synced, renames an old
 pack of the name aside into `v4/.saving/old-<uuid>/<name>`, renames the new one into place, syncs `v4/`, and

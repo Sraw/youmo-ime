@@ -111,6 +111,9 @@ class PetUatTest {
         assertTrue(at > 0)
         h.tap(h.key("e"))
         assertEquals(Name.TYPING to at, state to index)
+        // another field (its finish and start in one message, through the service): neither hidden nor back to idle
+        h.another()
+        assertEquals(Name.TYPING to at, state to index)
         h.after(7000)
         // the key under the pet takes the touch
         val box = petBox()

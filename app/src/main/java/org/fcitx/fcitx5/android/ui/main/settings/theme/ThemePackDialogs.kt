@@ -24,18 +24,24 @@ import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutTexts
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.scene.skin.SkinNote
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
+import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import splitties.dimensions.dp
 import java.io.File
 
 object ThemePackDialogs {
 
-    /** [format]: `4.0`, `3.0`; what is not given is left out. */
+    /** [format]: `4.0`, `3.0`, with the app version it needs past 0.6.0; what is not given is left out. */
     fun lines(ctx: Context, meta: Meta?, format: String): List<String> = listOfNotNull(
         meta?.author?.let { ctx.getString(R.string.theme_info_author, it) },
         meta?.version?.let { ctx.getString(R.string.theme_info_version, it) },
         meta?.license?.let { ctx.getString(R.string.theme_info_license, it) },
-        ctx.getString(R.string.theme_info_format, format),
+        meta?.minApp?.takeIf { ThemeReader.newer(it, FIRST_4_0_APP) }
+            ?.let { ctx.getString(R.string.theme_info_format_min_app, format, it) }
+            ?: ctx.getString(R.string.theme_info_format, format),
     )
+
+    // every app reading 4.0 reads this far: not worth a word
+    private const val FIRST_4_0_APP = "0.6.0"
 
     // Chinese joins with 、, others with a comma
     private fun listSeparator(ctx: Context) = ctx.getString(R.string.list_separator)

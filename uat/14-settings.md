@@ -116,7 +116,7 @@
 ### ST-101 [P1] 主题：导入别的输入法的皮肤（百度 .bds），坏的皮肤说清原因
 - **前提**：B0-设置，**外观 → 大小与样式** 里 **跟随系统深色模式** 关掉；"下载"里有脚本现做的百度皮肤 `uat-skin.bds`（不放第三方皮肤：面板是蓝色，字母键是橙色的图，名字「UAT 皮肤」，作者 `uat`）和一个坏的 `uat-bad.ssf`（开头是搜狗加密皮肤的 `Skin` 头，后面是乱码）。
 - **操作**：**主题 → 新增主题** 选 `uat-skin.bds`，看确认框，点 **导入**；在主题列表里点它，回测试页看键盘，按住空格和一个字母看键；**大小与样式** 的 **键盘高度** 选 **紧凑** 再看，再改回 **标准**。**新增主题** 选脚本用同样的文件另打的 `uat-skin-mac.zip`（像 macOS 访达压缩一个文件夹那样：文件都在一个顶层文件夹里，带 `__MACOSX/` 和 `._` 开头的项），看到确认框后按返回。再 **新增主题** 选 `uat-bad.ssf`。
-- **预期**：选 `.bds` 弹出「导入主题 UAT 皮肤？」确认框，作者是 `uat`，下面列出「从别的输入法的皮肤转换而来。以下没有转过来：」和「按键的位置和大小」；导入后主题列表最前面是它，选用后键盘上是橙色的键、蓝色的底（候选栏也是面板的蓝色），橙色键面上没有细线（键面图是九宫格拼起来的，拼缝处不透出底下的蓝色；按住的键也一样，脚本从 g 和按住的退格的键中心向上下左右走到键缝，查 1–2 px 宽、从键面色偏向底色的细线；z 按住时有气泡盖着键面，不量）；按住的空格和字母键变暗（皮肤没有按下的样子时也有按下的颜色，设备上看截图；脚本截按住 z 的图（截图约一秒，z 的长按气泡可能也弹出），空格手动看：按住空格久了会进语音）；紧凑时上下键缝比标准时窄（缩到约四成，至少留 1 dp），左右键缝不变。选 `uat-skin-mac.zip` 同样弹出「导入主题 UAT 皮肤？」确认框。访达打包的单个 FlorisBoard `.flex`（`__MACOSX/._x.flex` 不算第二个）只由 JVM 查：ime-core `SkinZipTest.aFinderZipOfOneFlexIsUnpackedLikeAnyOther`。选 `uat-bad.ssf` 弹出「这个搜狗皮肤是加密的……」，主题列表不变。
+- **预期**：选 `.bds` 弹出「导入主题 UAT 皮肤？」确认框，作者是 `uat`，下面列出「从别的输入法的皮肤转换而来。以下没有转过来：」和「按键的位置和大小」；导入后主题列表最前面是它，选用后键盘上是橙色的键、蓝色的底（候选栏也是面板的蓝色），橙色键面上没有细线（键面图是九宫格拼起来的，拼缝处不透出底下的蓝色；按住的键也一样，脚本从 g 和按住的退格的键中心向上下左右走到键缝，查 1–2 px 宽、从键面色偏向底色的细线；z 按住时有气泡盖着键面，不量）；按住的空格和字母键变暗（皮肤没有按下的样子时也有按下的颜色，设备上看截图；脚本截按住 z 的图（截图约一秒，z 的长按气泡可能也弹出），空格手动看：按住空格久了会进语音）；紧凑时上下键缝比标准时窄（缩到约四成，至少留 1 dp），左右键缝不变。选 `uat-skin-mac.zip` 同样弹出「导入主题 UAT 皮肤？」确认框。访达打包的单个 FlorisBoard `.flex`（`__MACOSX/._x.flex` 不算第二个）只由 JVM 查：ime-core `SkinZipTest.aFinderZipOfOneFlexIsUnpackedLikeAnyOther`。选 `uat-bad.ssf` 弹出「这个搜狗皮肤读不出来（文件可能不完整或是新的格式）」，主题列表不变（加密的搜狗皮肤能导入，见 ST-203）。
 - 另：环境变量 `UAT_SKINS=<目录>` 指向一批真皮肤（`.bds`、`.bdi`、`.ssf`、同文的 `.yaml`、FlorisBoard 的 `.flex`、装着它们的 `.zip`，不进仓库）时，每个都导入一次：收下的选用后截 26 键、九键、符号面板三张图，再删掉；拒绝的截下提示。图要人看，脚本只查导入成没成。
 
 ### ST-35 [P1] App 里不做主题：新增主题导入或去网页制作，长按看信息、导出或删除
@@ -1107,6 +1107,125 @@
   7. 26 键、18 键都按包里的那块画，**问题** 里没有把另一块当片段读不出的行；布局页列出这两块可以从它开始，读不出的 `k14` 写着原因，原因是中文（如「读不出来」），没有英文。
 - **JVM**：web/theme-maker 的 `layout-maker.test.mjs`（`保存: errors keep it from being saved; …`、`a theme pack's boards are offered made layouts of the user's, …`、`the draft is the theme maker's, in the layout maker's own database`）、`layout-smoke.mjs`（保存、草稿找回、打开 .theme）、`maker.test.mjs`（`a .layout opened for the preview: …`，含 `qwerty` 等 App 自带 id 被拒；`the environment is the engine's: …`（平板竖拿按横屏）；`a pack's two boards the app still reads are each drawn as the pack's, its fragment where they include it`）、`layout-maker.test.mjs` 的 `group letters set: …`（旧版 `{group:hjk}` 打开、恢复时改写）和 `LM.refusal` 那几行（原因写成中文）、`layout-smoke.mjs`（平板竖拿「800 dp 宽，按横屏排」）、`panels-smoke.mjs`（环境 › 键盘 › 打开 .layout）；页面上的样子在电脑浏览器上手工看。
 
+### ST-200 [P1] 百度皮肤：字号、粗细、角标颜色、按下时图标变色
+<!-- dev/design/063-skin-import §1 -->
+- **前提**：B0-设置；脚本现做的百度皮肤 `uat-skin2.bds`（不放第三方皮肤）：字母字号是默认的 1.2 倍，粗体；角标是绿色；功能键的图标是白色的单色图，按下时变成黄色。
+- **操作**：导入它并选用。在测试页看 26 键，按住退格。
+- **预期**：
+  - 字母比默认主题的大，而且是粗体；
+  - 键角的小字是绿色；
+  - 按住时，退格图标从白色变成黄色；
+  - 确认框的「以下没有转过来」里没有「单个按键的字号」那一条。
+- **JVM**：`SkinImportUatTest.baiduTextSizeWeightMarkAndPressedIconColorComeOver`（转出的 `theme.xml`：字母 `scale` 约 120%、`weight="700"`，角标绿色，功能键按下的 `icon-color` 是黄色，说明里没有字号）；设备上不跑。
+
+### ST-201 [P1] 位图图标和按下换图标
+<!-- dev/design/063-skin-import §2 -->
+- **前提**：B0-设置，**跟随系统深色模式** 关掉；脚本现做的 `uat-skin-icons.bds`：退格、Shift（三态各一张）、回车都是彩色的位图，按下时退格换成另一张图。
+- **操作**：
+  - 导入、选用；
+  - 按住退格（导入后的**第一次**按下）；
+  - Shift 点一下、再点两下；
+  - 在多行的框（回车是换行）和搜索框里看回车；
+  - 长按这个主题 → **信息**。
+- **预期**：
+  - 各个图标都是皮肤里的彩色图，不是 App 自带的线条图标；
+  - 第一次按住退格就换成按下的那张图，不先闪自带的；
+  - Shift 一次、锁定各是各的图；
+  - 换行的回车是皮肤的那张；搜索框里是 App 自带的搜索图标（百度皮肤「搜索」那张这一版不转，主题只有 `enter` 这一张，别的动作照旧画自带的）；
+  - 信息里主题格式那一行写需要 0.6.3。
+- **JVM**：`SkinImportUatTest.rasterIconsAndThePressedIconAreTheSkins`（五个图标各是皮肤那张图的颜色、退格按下用 `content` 换成 `backspace-pressed`、`min-app="0.6.3"`）；设备上留作冒烟（`14-settings.py` 截图量退格、Shift、回车上皮肤图标的颜色，第一次按住退格量按下那张的颜色，信息里有 0.6.3）。
+
+### ST-202 [P2] 工具栏、候选栏的位图图标
+<!-- dev/design/063-skin-import §2 -->
+- **前提**：脚本现做的 `uat-skin-toolbar.bdi`：带 3 张能对上的工具栏图（表情、剪贴板、设置）和 1 张对不上的（「搜索」），每张都有 `Select` 版。
+- **操作**：导入，看确认框；选用，展开工具栏，按住表情按钮。
+- **预期**：
+  - 确认框写「部分工具栏和候选栏的图标（1 个没对上）」；
+  - 工具栏上表情、剪贴板、设置三个按钮是皮肤的图，其余是自带的；
+  - 按住时还是常态那张图（按下的图这一版不转）。
+- **JVM**：`SkinImportUatTest.toolbarIconsThatMatchComeOverAndTheRestAreCounted`；设备上不跑。
+
+### ST-203 [P1] 加密的搜狗手机皮肤
+<!-- dev/design/063-skin-import §3 -->
+- **前提**：B0-设置；`node web/theme-maker/tools/make-skin-fixtures.mjs <目录>` 做出的 `warm.ssf`（用公开密钥加密的容器）和 `warm-plain.ssf`（同一个皮肤的明文版），放进「下载」时改名 `uat-sogou-enc.ssf`、`uat-sogou.ssf`。
+- **操作**：先后选这两个，看确认框；导入明文的那个并选用。
+- **预期**：
+  - 两次的确认框内容一样，导入后的样子一样；
+  - 不出现「加密」两个字。
+- **JVM**：`SkinImportUatTest.anEncryptedSogouSkinImportsLikeItsPlainCopy`（测试里用 `javax.crypto` 真加密；两个包转出的文件逐字节一样、确认框一样；截短的容器提示「这个搜狗皮肤读不出来……」）；设备上留作冒烟（`14-settings.py`，要 node）。
+
+### ST-204 [P2] 搜狗皮肤带的字体
+<!-- dev/design/063-skin-import §3 -->
+- **前提**：脚本现做的 `uat-sogou-font.ssf`：`TYPEFACE` 指向皮肤里的一个小字体（`web/theme-maker/test/testdata/tiny.ttf`）。
+- **操作**：导入、选用，看 26 键；长按这个主题 → **导出**。
+- **预期**：字母用这个字体画；导出的包里有这个字体。
+- **JVM**：`SkinImportUatTest.aSogouSkinsFontDrawsTheLettersAndIsExported`（`theme.xml` 有 `<font>`、按键用它，导出的包里有字体文件）；设备上不跑。
+
+### ST-205 [P1] 皮肤的键位：默认不勾
+<!-- dev/design/063-skin-import §4 -->
+- **前提**：脚本现做的 `uat-skin-layout.bds`：26 键之外还有一块九键（九键没画 0，0 的位置是表情键）。
+- **操作**：导入，看确认框，**不改勾选**直接点 **导入**；再到 **外观 → 布局** 看。
+- **预期**：
+  - 确认框写「这个皮肤带 2 块键位：……」，**一起导入** 没有勾上；
+  - 导入后布局列表里没有这两块，键盘还是 App 自带的键位；
+  - 长按这个主题 → **信息**，最低版本没有因为键位变成 0.6.3。
+- **JVM**：`SkinImportUatTest.skinLayoutsAreOfferedUncheckedAndLeftOut`（确认框列出两块、主题目录里没有 `layouts/`、`min-app="0.6.0"`）、`ThemeImportLayoutsTest.aSkinsKeyboardsAreOfferedUntickedAndLeftOut`（勾选框的初值）；设备上不跑。
+
+### ST-206 [P1] 皮肤的键位：勾上以后
+<!-- dev/design/063-skin-import §4 -->
+- **操作**：再导入一次 `uat-skin-layout.bds`，这次勾上 **一起导入**；到 **外观 → 布局**，给拼音选「uat 布局皮肤 · 26 键」。再切到英文、在网址框里看一次。
+- **预期**：
+  - 列表里出现「uat 布局皮肤 · 26 键」和「uat 布局皮肤 · 九键」；
+  - 选上 26 键后，键的位置和宽度照皮肤，键缝不变；网址框里底行的键排得下，没有挤出屏幕；
+  - 长按 Q、看键角，和自带的一样（跟着 App 走）；
+  - 主题的最低版本是 0.6.3；
+  - 皮肤的九键没画 0，九键照样列出，确认框「以下没有转过来」里有一行「九键里皮肤没画、布局里也没放——没有数字键 0」，不再另列「缺键」那行。
+- **JVM**：`SkinImportUatTest.checkedSkinLayoutsAreListedAndKeepTheAppsKeys`（包里有 `layouts/qwerty.xml`、`min-app="0.6.3"`、布局里不写皮肤的长按和角标、经 `ThemeLayoutsToList` 后 `CustomLayouts.list` 按确认框的名字列出两块）、`ThemeSkinImportTest.aSkinsBoardsLackingKeysAreListedAsTheUsersOwnAndTold`（缺 0 的九键、缺 ⇧ 的 26 键照样列出，说明里各一行，最低版本 0.6.3）；各状态下每行的宽度由 `SkinLayoutWriterTest` 查；设备上不跑（排在真机上的样子要用真实输入法做的皮肤，仓库里不放）。
+
+### ST-207 [P1] 百度 `.bda`
+<!-- dev/design/063-skin-import §5 -->
+- **前提**：脚本现做的 `uat-skin.bda`：紫色背景，青色键面，键面是九宫格图，带一个 GIF 资源。
+- **操作**：导入、选用。
+- **预期**：
+  - 颜色、键面都对，键面的圆角没有被拉变形；
+  - 确认框里没有「暂不支持」，列出「帧动画、GIF、Lottie 和视频」。
+- **JVM**：`SkinImportUatTest.aBdaSkinImportsWithItsNineSliceFaces`（背景是紫色；键面图四周透明的边裁掉、按内框九宫格拉伸，中间是青色；说明里有帧动画）；设备上不跑。
+
+### ST-208 [P2] 同文：用 include、patch 写的主题
+<!-- dev/design/063-skin-import §6 -->
+- **前提**：脚本现做的 `uat-trime-include.zip`，里面有 `base.yaml` 和 `uat.trime.yaml`。后者只有 `__include: base:/` 和一个 `__patch`（把按键颜色改成红色），还引用了一个 `trime:/` 的东西。
+- **操作**：导入。
+- **预期**：
+  - 能导入，按键是红色；
+  - 说明里有「引用了同文自带或包里没有的配置（1 处）」。
+- **JVM**：`SkinImportUatTest.aTrimeThemeOfIncludesAndPatchesImports`；设备上不跑。
+
+### ST-209 [P2] 深色版背景图
+<!-- dev/design/063-skin-import §7 -->
+- **前提**：B0-设置；脚本现做的 `uat-skin-dark.bds`：`light/` 的背景是蓝色，`dark/` 的背景是黑色。
+- **操作**：打开 **跟随系统深色模式**；导入、选用；把系统切到深色，再切回浅色。长按这个主题 → **导出**。
+- **预期**：深色时背景是黑色，浅色时是蓝色，切换时不闪出别的图；导出的包里两张背景图都在。
+- **JVM**：`SkinImportUatTest.theDarkPictureIsDrawnInDarkModeAndExported`（`<picture variant="dark">`、深色版的样子用 `board-dark.png`、浅色版用 `board.png`、导出的包里两张都有）；深浅色切换在设备上（`14-settings.py` 量 g、h 之间的背景色）；切换时不闪要人看。
+
+### ST-210 [P2] 画成图片的字母
+<!-- dev/design/063-skin-import §7 -->
+- **前提**：脚本现做的 `uat-skin-letters.bds`：26 个字母各有正常、按下两张图。
+- **操作**：导入、选用；按住 Q；切到手写再切回来；换到九键。
+- **预期**：
+  - 字母键显示皮肤的图，没有和 App 自己画的字母叠在一起；
+  - 按住 Q 时换成按下的那张；
+  - 换到九键，是 App 画的字母，颜色是皮肤的。
+- **JVM**：`SkinImportUatTest.letterStickersReplaceTheLettersOnTwentySixKeysOnly`（26 个字母各有 `st-<字母>.png`、`st-<字母>-p.png`，贴纸只写在 `qwerty/<字母>` 上，`min-app="0.6.3"`）；贴纸的画法、手写时跟着字一起淡由 `ThemeStickerTest`、`StickerCacheTest` 查；设备上不跑。
+
+### ST-211 [P2] 讯飞 `.it`
+<!-- dev/design/063-skin-import §8 -->
+- **前提**：脚本照商店的结构现做的 `uat-skin.it`（顶层目录、`theme_info.ini`、`480/`、`720/`）：深蓝背景，白色的字，按下时键面变亮。
+- **操作**：导入、选用；按住一个字母。
+- **预期**：
+  - 颜色、键面都对，按下时变亮；
+  - 说明里有「深色版（皮肤只有一套……）」「按键的位置和大小」。
+- **JVM**：`SkinImportUatTest.anIflytekSkinImportsWithItsFacesAndColors`（名字取 `theme_info.ini` 的、字是白色、键面和按下的键面是皮肤的颜色、说明两条）；设备上不跑。
+
 ### ST-212 [P1] 主题制作网页：导入别的输入法的皮肤
 <!-- dev/design/063-skin-import §9 -->
 - **前提**：电脑上的浏览器（新版 Chrome）打开主题制作页（同 ST-56）；样本用脚本现做，不放第三方皮肤：`node web/theme-maker/tools/make-skin-fixtures.mjs <目录>`，得到 `sea.bds`（百度，26 键）、`warm.ssf`（搜狗，用公开密钥加密的容器）、`warm-plain.ssf`（同一个皮肤不加密）、`warm-in.zip`（zip 里套着 `warm.ssf`）、`lotus.cskin`；再把 `sea.bds` 截掉后半截改名 `cut.theme`。
@@ -1134,7 +1253,14 @@
 - **预期**：
   - 网页存下的 `sea` 包 `min-app="0.6.0"`，`warm` 包 `min-app="0.6.3"`（勾上 `sea` 的键位时也是 0.6.3，见 ST-212）。
   - 0.6.2 上 `sea` 的能导入，样子和 0.6.3 一样；`warm` 的被拒，提示需要更新的版本；主题列表不变。
-- **JVM**：web/theme-maker 的 `skin-import.test.mjs`（`sea.bds` 转出 0.6.0、`warm.ssf` 转出 0.6.3、勾上键位 0.6.3）；App 一侧同样的 0.6.0/0.6.3 断言待 `SkinImportUatTest`（C12）补上；装 0.6.2 的那一半只能在设备上（安装、降级）手工跑。
+- **JVM**：web/theme-maker 的 `skin-import.test.mjs`（`sea.bds` 转出 0.6.0、`warm.ssf` 转出 0.6.3、勾上键位 0.6.3）；App 一侧 `SkinImportUatTest.plainConversionsKeepMinApp060AndNewOnesWrite063`（普通转换照旧写 `min-app="0.6.0"`，用了位图图标的写 `0.6.3`；导出后在版本名 0.6.2 下前者收下、后者拒收并提到 0.6.3）；装 0.6.2 的那一半只能在设备上（安装、降级）手工跑。
+
+### ST-214 [P2] 暂不支持的格式给出明确提示
+<!-- dev/design/063-skin-import §11.2 -->
+- **前提**：脚本现做 4 个文件：一个手心形状的 zip（`skin.json` 加 `light/res/skin.proto`）、一个 Gboard 形状的 zip（`metadata.json` 加 `style_sheet_md2.css`）、一个 `x.cskin`、一个只有 `AndroidManifest.xml` 和 `resources.arsc` 的 `x.apk`。
+- **操作**：逐个导入。
+- **预期**：分别提示「手心输入法的皮肤暂不支持导入」「Gboard 的主题暂不支持导入」「仓输入法的皮肤暂不支持导入」「安装包（APK）里的主题暂不支持导入」；没有一个提示「只能导入主题文件和……」；主题列表不变。
+- **JVM**：`SkinImportUatTest.unsupportedSkinsSayWhichAndAreNotImported`；设备上不跑。
 
 ### ST-215 [P2] 网页做宠物
 <!-- dev/design/063-skin-import §15 -->

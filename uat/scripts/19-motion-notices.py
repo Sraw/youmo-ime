@@ -15,6 +15,59 @@ from uat import PKG, Blocked, case, check
 case("MN-13", base="B0-设置", needs="manual:要 TalkBack 读屏，在模拟器（google_apis 镜像带 TalkBack）或真机上手动做")(lambda d: None)
 
 
+@case("MN-27", base="B0-设置", mutates=True)
+def mn27(d):
+    """a skin's press shrink (backspace's, to 90%) drawn with 键盘动效 on, not with it off; its press-scale and
+    transition are BaiduClassicTest's"""
+    s14 = sys.modules["uat_14_settings"]
+    s14.appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", False)
+    d.switch("键盘动效", True)
+    p = os.path.join(tempfile.gettempdir(), f"uat-skin-press-{d.port}.bds")
+    s14.baidu_skin_full(p, "uat 按下皮肤", press=True)
+    s14.use_skin(d, p, "uat-skin-press.bds")
+
+    def width(colour, held):
+        # the face's span along the key's middle row: its leftmost to rightmost pixel of [colour]
+        k = d.keys(refresh=True)
+        pitch = int(abs(k["h"][0] - k["g"][0]))
+        cx, cy = (int(v) for v in k["bksp"])
+        if held:
+            # past the press's transition (at most 80 ms): a screenshot right after the down shows its first frame, unshrunk
+            d.touch(("down", cx, cy), ("sleep", 0.15))
+        try:
+            im = d.png().convert("RGB")
+        finally:
+            if held:
+                d.touch(("up", cx, cy))
+        if held:
+            raw = io.BytesIO()
+            im.save(raw, "PNG")
+            d.shot("kb", "按住退格", png=raw.getvalue())
+        # backspace is at the screen's edge: the span looked at stops there
+        xs = [x for x in range(max(0, cx - pitch), min(im.width, cx + pitch))
+              if sum(abs(a - b) for a, b in zip(im.getpixel((x, cy - int(pitch * 0.3))), colour)) < 60]
+        return (max(xs) - min(xs) + 1) if xs else 0
+    faces = s14.SKIN_FACES
+    up, down = width(faces["function"], False), width(faces["pressed"], True)
+    d.shot("kb", "键盘动效开着")
+    s14.appearance_tab(d, "大小与样式")
+    d.switch("键盘动效", False)
+    try:
+        d.open_page("text")
+        off = width(faces["pressed"], True)
+    finally:
+        s14.appearance_tab(d, "大小与样式")
+        d.switch("键盘动效", True)
+    d.clear()
+    delete_themes(d)
+    d.sh("rm -f /sdcard/Download/uat-skin-press.bds")
+    check(up > 0, "退格的键面找不到")
+    check(0.85 <= down / up <= 0.95, f"动效开着时按住退格没缩到约九成：{down}/{up} px")
+    check(off / up >= 0.97, f"动效关掉后按住退格还缩小：{off}/{up} px")
+    return f"退格键面 {up} px，按住 {down} px（动效开）、{off} px（动效关）"
+
+
 # ---- 宠物（MN-28、MN-31；MN-29、30、32 只在 JVM 上） ----
 THEME_XML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "web", "theme-maker", "test", "testdata",
                          "from-maker.theme")
@@ -177,4 +230,3 @@ def mn31(d):
     print(f"{d.serial}: MN-31 有宠物连按 1000 下后 {after} KB，比没有宠物时多长 {grew} KB", flush=True)
     check(grew <= 1024, f"有宠物连按 1000 下比没有宠物时多长 {grew} KB")
     delete_themes(d)
-
