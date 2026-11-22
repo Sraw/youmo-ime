@@ -35,7 +35,7 @@ class VersionsTest {
     // the base must stay above the published version, or install -r fails with INSTALL_FAILED_VERSION_DOWNGRADE
     @Test
     fun theBaseIsAboveTheLastPublishedRelease() {
-        assertTrue(Versions.baseVersionName, Versions.baseVersionCode > Versions.versionCodeOf("0.6.1"))
+        assertTrue(Versions.baseVersionName, Versions.baseVersionCode > Versions.versionCodeOf("0.6.2"))
     }
 
     @Test
