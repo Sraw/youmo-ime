@@ -149,6 +149,7 @@
         if (!r.ok) bad(r.problems[0].message);
       }
     }
+    if (root.YoumoPet) out.push(...root.YoumoPet.petProblems(L, lim.pet, read, d));
     const animSrcs = new Set([false, true].map((dark) => read.theme.info(dark).picture).filter((p) => p && p.animated).map((p) => p.src));
     for (const animSrc of animSrcs) {
       if (!d.files[animSrc]) continue;

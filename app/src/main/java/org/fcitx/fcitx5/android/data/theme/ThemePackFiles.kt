@@ -39,6 +39,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.input.layout.LayoutImport
 import org.fcitx.fcitx5.android.utils.errorRuntime
+import org.fcitx.fcitx5.android.input.pet.PetFiles
 import org.fcitx.fcitx5.android.utils.isPlainFileName
 import timber.log.Timber
 import java.io.File
@@ -315,6 +316,7 @@ object ThemePackFiles {
         val name = theme.name
         if (badName(name)) errorRuntime(R.string.exception_theme_pack_name, name)
         val files = ThemePackCheck.files(theme)
+        PetFiles.check(from, theme)
         checkFiles(from, files, checks)
         val still = listOfNotNull(theme.picture, theme.darkPicture).filter { it.animated }.firstNotNullOfOrNull { p ->
             ThemeAssetLimits.animated(File(from, p.src))

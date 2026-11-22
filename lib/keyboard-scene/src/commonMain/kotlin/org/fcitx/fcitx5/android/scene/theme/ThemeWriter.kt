@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.theme
 
+import org.fcitx.fcitx5.android.scene.pet.PetWriter
 import org.fcitx.fcitx5.android.scene.xml.Xml
 
 /**
@@ -54,6 +55,7 @@ object ThemeWriter {
             theme.soundFiles.forEach { (key, src) -> element("    ", "sound", listOf("key" to key, "src" to src)) }
             appendLine("  </sounds>")
         }
+        theme.pet?.let { append(PetWriter.write(it)) }
         appendLine("</theme>")
     }
 

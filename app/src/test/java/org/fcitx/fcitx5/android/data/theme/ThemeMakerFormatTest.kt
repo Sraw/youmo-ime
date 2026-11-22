@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.scene.look.Picture
 import org.fcitx.fcitx5.android.scene.look.PressEffect
 import org.fcitx.fcitx5.android.scene.look.Text
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
+import org.fcitx.fcitx5.android.scene.pet.PetLimits
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -206,6 +207,7 @@ class ThemeMakerFormatTest {
         put("effectImageSide", ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE)
         put("effectImageBytes", ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES)
         put("themeXmlBytes", ThemeAssetLimits.MAX_THEME_XML_BYTES)
+        put("pet", JsonObject(PetLimits.FORMAT.mapValues { JsonPrimitive(it.value) }))
     }
 
     @Test

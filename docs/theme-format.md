@@ -88,7 +88,7 @@
 </theme>
 ```
 
-子元素必须按这个顺序出现：`meta`、`colors`、`picture`、`font`、`style`、`icon`、`sounds`。
+子元素必须按这个顺序出现：`meta`、`colors`、`picture`、`font`、`style`、`icon`、`sounds`、`pet`（宠物，见 [theme-pet.md](theme-pet.md)）。
 
 ### `<theme>`
 

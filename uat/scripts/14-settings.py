@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import zipfile
@@ -2710,3 +2711,55 @@ case("ST-212", needs="manual:主题制作网页导入皮肤，存下的包导入
 
 case("ST-213", needs="manual:皮肤转出的包在 0.6.2 上导入：要装旧版（降级），设备上手工跑；"
      "网页转出的 min-app 由 web/theme-maker 的 skin-import.test.mjs 查")(lambda d: None)
+
+
+# the page's own code, run by node as the pet panel would: idle and typing added, the pack saved as 导出 saves it
+WEB_PET = r"""
+const [repo, out, idle, typing] = process.argv.slice(1);
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const src = path.join(repo, 'web', 'theme-maker', 'src');
+for (const f of ['lib.js', 'form.js', 'maker.js']) vm.runInThisContext(fs.readFileSync(path.join(src, f), 'utf8'));
+globalThis.YoumoPanels = [];
+for (const f of fs.readdirSync(path.join(src, 'panels')).sort()) vm.runInThisContext(fs.readFileSync(path.join(src, 'panels', f), 'utf8'));
+const E = require(path.join(repo, 'lib', 'keyboard-scene', 'build', 'youmo-engine', 'youmo-engine.js')).YoumoEngine;
+const lim = JSON.parse(fs.readFileSync(path.join(repo, 'web', 'theme-maker', 'generated', 'youmo-format.json'), 'utf8')).limits.pet;
+const L = globalThis.YoumoLib, M = globalThis.YoumoMaker, F = globalThis.YoumoForm;
+const pet = globalThis.YoumoPanels.find((p) => p.id === 'pet').ops;
+let d = M.fromBuiltin(E, 'nord');
+d = { ...d, xml: M.withName(d.xml, 'uat-web-pet') };
+d = pet.setSheet(d, L, lim, 'idle', 'idle.png', new Uint8Array(fs.readFileSync(idle)));
+d = pet.setSheet(d, L, lim, 'typing', 'typing.png', new Uint8Array(fs.readFileSync(typing)));
+d = pet.setState(d, 'typing', 'fps', '2');
+const m = M.withMinApp(E, d);
+fs.writeFileSync(out, M.save(L, m.doc).bytes);
+console.log(m.version);
+"""
+
+
+@case("ST-215", base="B0-设置", mutates=True)
+def st215(d):
+    """the device's half: the page's pack imported, the pet moves; the panel's preview is pet.test.mjs's"""
+    mn = sys.modules["uat_19_motion_notices"]
+    repo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+    if not os.path.exists(os.path.join(repo, "lib", "keyboard-scene", "build", "youmo-engine", "youmo-engine.js")):
+        raise Blocked("网页的引擎没构建：./gradlew :lib:keyboard-scene:youmoEngine")
+    tmp = tempfile.mkdtemp()
+    sheets = []
+    for state, (frames, _) in (("idle", (4, 4)), ("typing", (6, 2))):
+        p = os.path.join(tmp, f"{state}.png")
+        with open(p, "wb") as f:
+            f.write(mn.pet_sheet(state, frames))
+        sheets.append(p)
+    out = os.path.join(tmp, "uat-web-pet.theme")
+    r = subprocess.run(["node", "-e", WEB_PET, repo, out, *sheets], capture_output=True, text=True, timeout=120)
+    if r.returncode:
+        raise Blocked(f"node 做不出主题：{r.stderr[-300:]}")
+    check(r.stdout.strip() == "0.6.3", f"网页存下的宠物主题 min-app 是 {r.stdout.strip()}，不是 0.6.3")
+    mn.delete_themes(d)
+    push_download(d, out, "uat-web-pet")
+    mn.use_theme(d, "uat-web-pet")
+    check(mn.pet_state(d) == "idle", f"网页做的宠物没出现：{mn.pet_state(d)}")
+    d.type("q")
+    check(mn.pet_state(d) == "typing", f"按字母宠物没动：{mn.pet_state(d)}")
+    shutil.rmtree(tmp, ignore_errors=True)
+    mn.delete_themes(d)

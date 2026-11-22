@@ -29,7 +29,7 @@
 | [16-landscape-split.md](16-landscape-split.md) | 横屏、分体键盘、分体时其他面板靠边，竖屏、横屏键盘样式 |
 | [17-hardware-keyboard.md](17-hardware-keyboard.md) | 实体键盘 |
 | [18-lifecycle.md](18-lifecycle.md) | 转屏、切换应用、换输入框、引擎重启这些时刻 |
-| [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号 |
+| [19-motion-notices.md](19-motion-notices.md) | 提示条（位置、替换、配色）、始终显示悬浮条、候选字号、主题里的宠物 |
 | [20-accessibility.md](20-accessibility.md) | 读屏：开着 TalkBack 探索触摸每个键盘、表情/颜文字/符号面板的格子、长按候选的菜单（读的话、节点框、焦点） |
 | [fixtures/](fixtures/) | 测试页 `fields.html` 和导入用的词表 |
 
@@ -176,6 +176,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 大部分 | 真机或 Android 模拟器（arm64-v8a 镜像，装的就是发布用的 arm64 包；Apple 芯片上原生跑）。发版前至少在一台真机上跑一遍 P0；语音的 VO-23、VO-24、VO-26 也在真机上照「操作」跑（时间戳、开麦前的全零、真实的小声，片段麦克风测不到），VO-55 在真机上量松开到出字的时间（模拟器上只是中位数 ≤ 1500 ms 的粗线） |
 | 实体键盘（17） | 真机接蓝牙或 USB 键盘；或者模拟器加一个 uinput 键盘（见 [17-hardware-keyboard.md](17-hardware-keyboard.md) 开头）。模拟器有自己的内核，和别的用例同一台设备上跑；**只在模拟器里造虚拟键盘**（容器类设备如 redroid 和宿主机共用内核，造出来的键盘宿主机也会收到） |
 | 横屏与分体（16） | 屏幕横过来宽度不少于 600 dp 的手机或平板，模拟器也行 |
+| 宠物的内存（MN-31） | 默认模拟器（测试页要 API 34+）；预算按它的 heapgrowthlimit 定，低端机的 3 MB 预算要在 ≤192 MB 的镜像上量 |
 | 语音（12） | 真机，有麦克风，导入语音包；arm64 debug 包导入语音包后也能在模拟器上跑（片段麦克风，见「实体键盘和语音」） |
 
 模拟器快照里装了浏览器"WebView Browser Tester"（`org.chromium.webview_shell`），测试页在它里面打开（`am start -a android.intent.action.VIEW -d <地址> -n org.chromium.webview_shell/.WebViewBrowserActivity`）。
@@ -226,7 +227,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 1140 条（P0 150、P1 860、P2 130）：模拟器上跑 198 条（其中 148 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 942 条（JVM 831、发版时 20、真机或手工 69、语音 22）。
+现在共 1146 条（P0 150、P1 863、P2 133）：模拟器上跑 201 条（其中 150 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 945 条（JVM 834、发版时 20、真机或手工 69、语音 22）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

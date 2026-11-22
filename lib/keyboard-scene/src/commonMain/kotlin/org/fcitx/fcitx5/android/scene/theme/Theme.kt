@@ -26,6 +26,7 @@ class Theme(
     val darkPicture: Picture? = null,
     /** Raster icons whose alpha alone is drawn, in `icon-color` (`tint="true"`). */
     val tintedIcons: Set<String> = emptySet(),
+    val pet: org.fcitx.fcitx5.android.scene.pet.Pet? = null,
 ) {
     /** The picture this version draws. */
     val shownPicture: Picture? get() = if (dark) darkPicture ?: picture else picture
@@ -49,7 +50,7 @@ class Theme(
         this
     } else {
         val drawn = if (dark) darkColors ?: baseColors else baseColors
-        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors, soundFiles, darkPicture, tintedIcons)
+        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors, soundFiles, darkPicture, tintedIcons, pet)
     }
 
     /** Every file it draws named through [path] (a pack's directory), the rest as it is; one place, so a field added is not dropped. */
@@ -69,7 +70,7 @@ class Theme(
         val styles = styles.map { s -> Style(s.selectors, s.values.mapValues { (k, v) -> value(k, v) }, s.order, s.line) }
         return Theme(
             name, dark, version, colors, styles, fonts.mapValues { path(it.value) }, icons.mapValues { path(it.value) }, picture?.at(), variants,
-            baseColors, darkColors, meta, systemColors, soundFiles.map { (key, file) -> key to path(file) }, darkPicture?.at(), tintedIcons,
+            baseColors, darkColors, meta, systemColors, soundFiles.map { (key, file) -> key to path(file) }, darkPicture?.at(), tintedIcons, pet?.withPaths(path),
         )
     }
 }

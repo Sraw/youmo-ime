@@ -1136,6 +1136,13 @@
   - 0.6.2 上 `sea` 的能导入，样子和 0.6.3 一样；`warm` 的被拒，提示需要更新的版本；主题列表不变。
 - **JVM**：web/theme-maker 的 `skin-import.test.mjs`（`sea.bds` 转出 0.6.0、`warm.ssf` 转出 0.6.3、勾上键位 0.6.3）；App 一侧同样的 0.6.0/0.6.3 断言待 `SkinImportUatTest`（C12）补上；装 0.6.2 的那一半只能在设备上（安装、降级）手工跑。
 
+### ST-215 [P2] 网页做宠物
+<!-- dev/design/063-skin-import §15 -->
+- **前提**：B0-设置；脚本现画两组帧图（idle 紫、typing 红，见 [MN-28](19-motion-notices.md)）。
+- **操作**：主题制作网页打开内置主题，在「宠物」面板加 idle 和 typing 两组帧，点 typing 的「播放」；导出，导入手机并选用，在「普通文本」框按一个字母；看主题信息里的最低版本。
+- **预期**：面板的预览里 typing 播一遍回到 idle；导出的包 `min-app="0.6.3"`；手机上有宠物，按字母时它变成 typing。
+- **JVM**：web/theme-maker 的 `pet.test.mjs`（面板写出的 `<pet>` 引擎读得出、超限的帧图存盘时报错、导出 `min-app` 是 0.6.3）；导入手机那一半在设备上（`14-settings.py` 用 node 跑网页的面板代码做出这个包）；预览的播放在浏览器里人工看一眼。
+
 ### ST-196 [P2] 开发者「清空剪贴板数据库」连收藏一起清
 <!-- dev/design/063-clipboard-favorites -->
 - **前提**：B0-设置，复制「公园」并收藏。

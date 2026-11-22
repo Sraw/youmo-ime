@@ -196,8 +196,10 @@ class CommonKeyActionListener :
         }
     }
 
+    var pet: ((KeyAction) -> Unit)? = null
     val listener: KeyActionListener by lazy {
         KeyActionListener { action, source ->
+            pet?.invoke(action)
             // another key acting (a second finger) ends a 滑选 under way
             if (action !is BeginSwipeSelectAction && action !is SwipeSelectAction) endSwipeSelect(lifted = action is EndSwipeSelectAction)
             when (action) {

@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.theme
 import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
+import org.fcitx.fcitx5.android.scene.pet.PetReader
 import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
 import org.fcitx.fcitx5.android.scene.xml.XmlElement
@@ -60,9 +61,9 @@ object ThemeReader {
         val variants = variants(a)
         val version = a.matching("version", VERSION, "4.x") ?: a.required("version")
         a.done()
-        val order = listOf("meta", "colors", "picture", "font", "style", "icon", "sounds")
+        val order = listOf("meta", "colors", "picture", "font", "style", "icon", "sounds", "pet")
         root.children.filter { it.name in order }.zipWithNext().firstOrNull { (x, y) -> order.indexOf(x.name) > order.indexOf(y.name) }
-            ?.let { (_, y) -> p.add(y.line, "<${y.name}> is out of order (meta, colors, picture, font, style, icon, sounds)") }
+            ?.let { (_, y) -> p.add(y.line, "<${y.name}> is out of order (meta, colors, picture, font, style, icon, sounds, pet)") }
         root.children.filter { it.name !in order }.forEach {
             if (it.name in RESERVED_ELEMENTS) p.warn(it.line, ignored("<${it.name}>")) else p.add(it.line, "<${it.name}> is not allowed in <theme>")
         }
@@ -85,11 +86,12 @@ object ThemeReader {
         if (soundsEls.size > 1) p.add(soundsEls[1].line, "<sounds> given twice")
         val soundFiles = soundsEls.firstOrNull()?.let { sounds(it, p) }.orEmpty()
         listOfNotNull(picture, darkPicture).firstOrNull { it.animated }?.let { seeThroughWarnings(styles, it.brightness, p) }
+        val pet = PetReader.read(root.all("pet"), p)
         return p.result {
             val drawn = if (dark) darkColors ?: colors else colors
             Theme(
                 name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system, soundFiles,
-                darkPicture, tinted,
+                darkPicture, tinted, pet,
             ).also { ThemeFeatures.minApp(it, meta, root, p) }
         }
     }

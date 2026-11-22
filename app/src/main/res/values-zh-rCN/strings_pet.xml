@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="exception_theme_pet">主题里宠物的帧图不合格（要静态 PNG 或 WebP，不超过 512 KB、边长 2048 像素，每帧不超过 256 像素且能整齐切开）：%1$s</string>
+</resources>

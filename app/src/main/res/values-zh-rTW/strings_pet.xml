@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="exception_theme_pet">主題裡寵物的影格圖不合格（要靜態 PNG 或 WebP，不超過 512 KB、邊長 2048 像素，每格不超過 256 像素且能整齊切開）：%1$s</string>
+</resources>

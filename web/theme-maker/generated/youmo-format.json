@@ -191,7 +191,19 @@
         "animatedFrameMs": 50,
         "effectImageSide": 256,
         "effectImageBytes": 131072,
-        "themeXmlBytes": 1048576
+        "themeXmlBytes": 1048576,
+        "pet": {
+            "sheetBytes": 524288,
+            "sheetSide": 2048,
+            "frameSide": 256,
+            "frames": 24,
+            "totalFrames": 96,
+            "fps": 30,
+            "restingFps": 8,
+            "minSizeDp": 16,
+            "maxSizeDp": 64,
+            "offsetDp": 32
+        }
     },
     "builtinNames": [
         "MonetLight",

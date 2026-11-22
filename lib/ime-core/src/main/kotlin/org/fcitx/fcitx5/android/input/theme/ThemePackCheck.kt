@@ -28,9 +28,10 @@ object ThemePackCheck {
         /** The dark version's picture: its source and cuts. */
         val darkPictures: Set<String> = emptySet(),
         val stickers: Set<String> = emptySet(),
+        val pets: Set<String> = emptySet(),
     ) {
         /** What a pack must hold: a sticker it lacks is drawn as its stand-in, and a 0.6.2 pack's reserved one was never copied. */
-        val required: Set<String> get() = pictures + images + fonts + icons + effects + sounds + darkPictures + listOfNotNull(source, preview)
+        val required: Set<String> get() = pictures + images + fonts + icons + effects + sounds + darkPictures + pets + listOfNotNull(source, preview)
 
         /** What is placed and exported where it is there. */
         val all: Set<String> get() = required + stickers
@@ -47,6 +48,7 @@ object ThemePackCheck {
         sounds = theme.soundFiles.map { it.second }.toSet(),
         darkPictures = theme.darkPicture?.let { it.cuts.values + it.src }?.toSet().orEmpty(),
         stickers = theme.styles.mapNotNull { (it.values["sticker"] as? Value.Word)?.word?.takeIf { w -> w != Values.NONE } }.toSet(),
+        pets = theme.pet?.states?.values?.map { it.sheet }?.toSet().orEmpty(),
     )
 
     val REQUIRED_ROLES = BlankKeys.REQUIRED_ROLES

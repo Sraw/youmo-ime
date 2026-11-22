@@ -73,6 +73,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.pet.PetHost
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SplitDock
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
@@ -468,6 +469,11 @@ class InputView(
             })
         }
 
+        PetHost.of(context, theme, windowManager.view, kawaiiBar.view)?.let { pet ->
+            overKeys(pet.view, underBar = false)
+            scope += pet
+            commonKeyActionListener.pet = pet::onKey
+        }
         SceneTrace.section("updateKeyboardSize") { updateKeyboardSize() }
         scope += DockFollower()
         keyboardWindow.onLayoutShown = {

@@ -96,3 +96,37 @@
 - **操作**：在本应用设置里做一件会弹 toast 的事（比如 **开发者** → 清空剪贴板数据库，弹「完成」），数着看它停多久。再把上面那一项调成 10 秒，回来再做一次。
 - **预期**：第一次的 toast 约 1 秒就收起（不是系统的 2 秒）；长 toast（比如主题没保存）约 2 秒。调成 10 秒后，toast 停约 10 秒（系统自己按这个设置延长，本应用不提前收起）。
 - **JVM**：`ToastTest`（短 1 秒、长 2 秒后取消，按 `getRecommendedTimeoutMillis` 延长，新的一条马上顶掉还在的一条；SDK 29 和 35）、`UndoChipTest.aLongerTimeoutAskedOfTheSystemIsKept`（键盘上方提示同样延长：只说一句的按阅读时长，带按钮的也按操作时长）；设备上见 impl report 的模拟器核对。
+
+## 宠物
+
+格式和规则见 [theme-pet.md](../docs/theme-pet.md)。宠物都用 `scripts/19-motion-notices.py` 现画的帧图：`uat-pet.theme` 每个状态一种颜色（idle 紫、typing 红、delete 蓝、enter 绿、space 黄、sleep 深灰、wake 青），帧上写着状态名和帧号，动作状态每秒 2 帧、6 帧，截图赶得上。
+
+### MN-28 [P1] 宠物跟着按键换动作
+- **前提**：B0-设置，导入 `uat-pet.theme` 并选用，在「普通文本」框。
+- **操作**：依次按字母、退格、回车、空格，每下之后看宠物、等它播完；连按两个字母；点一下宠物盖住的那个键；不按键等 30 s；按一个键；切到表情面板再切回来；收起键盘再弹出。
+- **预期**：每一下宠物换成对应颜色的那组帧，播完回 idle；连按字母时 typing 接着播、不从头重播；点宠物盖住的键，打出的是那个键；30 s 后变成 sleep，按一个键醒来（先 wake 再 typing）；表情面板上看不到宠物，回来、以及重新弹出后都是 idle 第一帧。
+- **JVM**：`PetUatTest.thePetChangesWithEachKindOfKey`（Robolectric 主线程 Looper 推时间，每个状态截一张）；设备上留作冒烟（四类键、睡着醒来、收起再弹出，看键盘右上角的颜色）。
+
+### MN-29 [P1] 「键盘动效」关掉时宠物不动
+- **前提**：同 MN-28。
+- **操作**：键盘开着时到设置里关掉 **键盘动效**，回来按这几类键、等 30 s；再打开，按一个字母。
+- **预期**：宠物马上停在 idle 第一帧、一直不动，按键也不变；再打开后按键又会动。
+- **JVM**：`PetUatTest.thePetStandsStillWithKeyboardMotionOff`；设备上不跑。
+
+### MN-30 [P2] 候选栏右端的宠物
+- **前提**：导入 `uat-pet-bar.theme`（`place="bar-end"`）并选用。
+- **操作**：打 n i h a o 出一排候选，再点开工具栏。
+- **预期**：宠物在候选栏最右、竖直居中；候选不压在它下面，能滑到最后一个候选；工具栏按钮也不压在它下面。
+- **JVM**：`PetUatTest.aBarPetLeavesItsWidthToTheCandidates`；设备上不跑。
+
+### MN-31 [P1] 低端机的预算
+- **前提**：模拟器（测试页的浏览器要 API 34+，youmo29 跑不了），B0-设置。脚本先记下 `dalvik.vm.heapgrowthlimit`（不超过 192 MB 时按低内存手机的 3 MB 预算，否则 6 MB）。
+- **操作**：同一个主题不带宠物（`uat-nopet.theme`）和带宠物（`uat-pet.theme`）各选用一次，打几个字再清空，量 `dumpsys meminfo` 的 TOTAL PSS（先让 ART 回收一次，取三次的中位数）；两个主题下都在空输入框里连按退格 1000 下再量（不带宠物的先按一轮热身）。
+- **预期**：带宠物比不带的多出的不超过预算 + 1 MB；带宠物连按 1000 下比不带宠物时多长的不超过 1 MB（按键时不解码、不分配）。按键到画出的时间和不带宠物时一样（perf 的噪声范围内，发版时用 `uat/tools/perf.py` 人工比）。
+- 只能在设备上。解码次数（启动那一次之外为 0）和重复排帧用同一个 `Runnable` 由 `PetFramesTest`、`PetViewTest` 在 JVM 上查。
+
+### MN-32 [P2] 宠物跟着键盘走；写错的宠物
+- **前提**：同 MN-28；另有 `uat-pet-broken.theme`（`<pet>` 少了 idle）。
+- **操作**：开单手模式（靠左、靠右各一次），再开悬浮键盘拖到别处；再导入 `uat-pet-broken.theme` 并选用。
+- **预期**：单手、悬浮时宠物都在键盘区的右上角，不在侧边按钮那一列；`uat-pet-broken` 照常导入、能选用，没有宠物；主题列表的缩略图里都没有宠物。
+- **JVM**：`PetUatTest.thePetGoesWithTheBoardAndABrokenPetIsLeftOut`（单手靠左、靠右、悬浮各截一张，核宠物在键盘区的角上、在字母键的范围里；坏的那个导入成功、没有宠物）；设备上不跑。

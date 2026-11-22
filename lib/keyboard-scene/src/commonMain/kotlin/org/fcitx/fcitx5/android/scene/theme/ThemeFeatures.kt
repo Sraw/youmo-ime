@@ -12,10 +12,10 @@ import org.fcitx.fcitx5.android.scene.xml.XmlElement
 object ThemeFeatures {
     const val MIN_APP_063 = "0.6.3"
 
-    /** A raster icon, `content`, a sticker or a dark version's picture. */
+    /** A raster icon, `content`, a sticker, a dark version's picture or a pet. */
     fun since063(theme: Theme): Boolean =
         theme.icons.values.any(RasterIcon::named) ||
-            theme.darkPicture != null ||
+            theme.darkPicture != null || theme.pet != null ||
             theme.styles.any { s -> "content" in s.values || (s.values["sticker"] as? Value.Word)?.word.let { it != null && it != Values.NONE } }
 
     // 0.6.0–0.6.2 read any file name as a reserved sticker and ignored it: such a pack still imports

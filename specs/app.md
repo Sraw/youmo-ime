@@ -210,6 +210,8 @@ take it from the board's brightness to its own (`PictureWindow.seeThroughDarken`
 pack is imported (`theme_pack_animated_still`). Elsewhere (the settings' preview, thumbnails, the voice glass, the
 floating code strip) it is still. `AnimatedPictureTest`.
 
+A theme's `<pet>` (063, `input/pet/`, docs/theme-pet.md): `PetHost` puts a `PetView` of its own box over a corner of the keys or at the bar's end (the bar given the room by a margin), told each key through `CommonKeyActionListener.pet` (`PetTriggers`); `PetFrames` decodes the sheets once off the main thread within 6 MB (3 MB on `LowMemory`), `PetMachine` (keyboard-scene) picks each frame, and it stands still with `KeyMotionSwitch` off, hidden over other windows and as input finishes (not between fields). No `<pet>`, nothing made.
+
 A theme's popups move too (060-render-p3 A2), asked of the engine (`SceneBuilder.popupMotion`, a `PopupMotion`):
 `appear` on `popup`, `preview` or `menu` (`fade`, `scale` from 60% or `rise` 12dp, each faded in, 0–250 ms, the
 app's enter curve) and `transition` on `popup` or `preview`, the fade it goes in. `PopupComponent` plays them by the
