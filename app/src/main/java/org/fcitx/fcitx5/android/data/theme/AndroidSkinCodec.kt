@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.data.layout.CustomLayouts
 import org.fcitx.fcitx5.android.input.theme.SkinZip
 import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.skin.Pixels
+import org.fcitx.fcitx5.android.scene.skin.SkinError
 import org.fcitx.fcitx5.android.scene.skin.SkinImage
 import org.fcitx.fcitx5.android.scene.skin.SkinLimits
 import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
@@ -86,7 +87,7 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
 
     /**
      * Read as a stream into one array of the length it gives (no doubling buffer); a byte past it or short of it is no
-     * payload. A phone low on memory takes half as much.
+     * payload. A phone low on memory takes half as much: a length past it is too big, as past [maxBytes].
      */
     override fun sogouPlain(container: ByteArray, maxBytes: Int): ByteArray? = sogouPlain(container, maxBytes, LowMemory.on(appContext))
 
@@ -104,7 +105,12 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
                 val head = ByteArray(Int.SIZE_BYTES)
                 if (!plain.readFully(head)) return null
                 val raw = head.foldIndexed(0L) { i, v, b -> v or ((b.toLong() and BYTE) shl (Byte.SIZE_BITS * i)) }
-                if (raw > limit || (raw > SkinLimits.RATIO_FROM && raw > SkinLimits.MAX_RATIO.toLong() * sealed)) return null
+                if (raw > SkinLimits.RATIO_FROM && raw > SkinLimits.MAX_RATIO.toLong() * sealed) return null
+                // a true length (zlib data follows) past what is left is too big; a wrong key's random one is no payload
+                if (raw > limit) {
+                    if (zlibFollows(plain)) throw SkinError(SkinError.Reason.UNPACKED_TOO_BIG)
+                    return null
+                }
                 val out = ByteArray(raw.toInt())
                 val inflated = InflaterInputStream(plain, inflater, STREAM_BUFFER)
                 if (!inflated.readFully(out) || inflated.read() != -1) return null
@@ -120,6 +126,14 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
             // its native memory now, not at a later GC
             inflater.end()
         }
+    }
+
+    private fun zlibFollows(plain: InputStream): Boolean {
+        val h = ByteArray(2)
+        if (!plain.readFully(h)) return false
+        val cmf = h[0].toInt() and BYTE.toInt()
+        val flg = h[1].toInt() and BYTE.toInt()
+        return cmf and ZLIB_METHOD_MASK == ZLIB_DEFLATE && (cmf shl Byte.SIZE_BITS or flg) % ZLIB_CHECK == 0
     }
 
     private fun InputStream.readFully(into: ByteArray): Boolean {
@@ -142,4 +156,7 @@ internal object AndroidSkinCodec : ThemeFilesManager.SkinCodec {
     private const val STREAM_BUFFER = 64 * 1024
     private const val BYTE = 0xFFL
     private const val HEX = 16
+    private const val ZLIB_METHOD_MASK = 0x0F
+    private const val ZLIB_DEFLATE = 8
+    private const val ZLIB_CHECK = 31
 }

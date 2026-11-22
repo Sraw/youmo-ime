@@ -238,6 +238,8 @@ interface SkinPlatform {
     /**
      * A Sogou container's (its `Skin` header and all) payload, decrypted ([SOGOU_KEY], [SOGOU_IV]) and inflated to
      * exactly its stated length of at most [maxBytes]; null where any of it fails.
+     *
+     * @throws SkinError [SkinError.Reason.UNPACKED_TOO_BIG] where the stated length, of a payload that opens, is past [maxBytes]
      */
     fun sogouPlain(container: ByteArray, maxBytes: Int): ByteArray? = null
 

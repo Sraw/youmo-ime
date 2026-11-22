@@ -5,10 +5,12 @@
 package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.scene.skin.SkinError
 import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -59,7 +61,9 @@ class AndroidSkinCodecSogouTest {
 
     @Test
     fun pastTheLimitOrTheRatioIsNotInflated() {
-        assertNull(plain(container(payload), max = payload.size - 1))
+        // a true length past the limit is too big; a random one (a wrong key's, no zlib after it) is no payload
+        assertEquals(SkinError.Reason.UNPACKED_TOO_BIG, assertThrows(SkinError::class.java) { plain(container(payload), max = payload.size - 1) }.reason)
+        assertNull(plain(seal(ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(payload.size).array() + payload), max = payload.size - 1))
         // 4 MB of zeros deflate to a few KB: past 200 to 1
         val zeros = ByteArray(4 shl 20)
         assertNull(plain(container(zeros), max = 8 shl 20))
@@ -71,7 +75,7 @@ class AndroidSkinCodecSogouTest {
         // a tail past the deflated zeros keeps it within the ratio
         val c = container(big, tail = ByteArray(1 shl 19))
         assertEquals(big.size, AndroidSkinCodec.sogouPlain(c, Int.MAX_VALUE, lowMemory = false)?.size)
-        assertNull(AndroidSkinCodec.sogouPlain(c, Int.MAX_VALUE, lowMemory = true))
+        assertThrows(SkinError::class.java) { AndroidSkinCodec.sogouPlain(c, Int.MAX_VALUE, lowMemory = true) }
     }
 
     @Test

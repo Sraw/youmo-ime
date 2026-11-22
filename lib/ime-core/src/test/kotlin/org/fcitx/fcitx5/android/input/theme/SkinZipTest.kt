@@ -165,8 +165,17 @@ class SkinZipTest {
     }
 
     @Test
+    fun aSogouContainerIsHandedOnWhole() {
+        // opened by the converter; `read` (a ZIP's, a .flex's inside one) still refuses it
+        val container = "Skin\u0003\u0000junk".toByteArray()
+        val files = SkinZip.readSkin(container.inputStream(), "dl/warm.ssf")
+        assertEquals(setOf("warm.ssf"), files.keys)
+        assertArrayEquals(container, files.getValue("warm.ssf"))
+        assertEquals(Reason.SOGOU_ENCRYPTED, reason(container))
+    }
+
+    @Test
     fun notAZip() {
-        assertEquals(Reason.SOGOU_ENCRYPTED, reason("Skin\u0003\u0000junk".toByteArray()))
         assertEquals(Reason.NOT_ZIP, reason("hello world".toByteArray()))
         assertEquals(Reason.NOT_ZIP, reason(ByteArray(0)))
         assertEquals(Reason.NOT_ZIP, reason(ByteArray(40).also { it[0] = 0x50; it[1] = 0x4b; it[2] = 3; it[3] = 4 }))

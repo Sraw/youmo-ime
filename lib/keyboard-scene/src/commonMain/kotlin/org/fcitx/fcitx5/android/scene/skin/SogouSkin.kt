@@ -12,8 +12,8 @@ import kotlin.math.roundToInt
  * `time.ini` (periods of the day, each a folder), `<width>/[<period>/]phoneSkin.ini` (the background under bar and
  * keys, the bar's, key faces by class: `KeyBg_Default`, `KeyBg_Function_Qwerty`, `KeyBg_Space_Qwerty`; single keys
  * `Key_<X>`; text colours `TextStyle_*`), an image section's `NORMAL=file.png,left,right,top,bottom` (the stretchable
- * band) and `default/` (sounds, fonts). The keys' places are not in the skin (they go by class), so a Sogou skin
- * fits the app's layouts as it is. The day's period (the one holding noon) is the light version, another the dark.
+ * band) and `default/` (sounds, fonts). Key faces go by class; where the keys are is `<width>/port/26.ini` and `9.ini`
+ * where a skin has them. The day's period (the one holding noon) is the light version, the night's (midnight) the dark.
  *
  * Checked on eight real skins from Sogou's own shop (dev/design/060-skin-formats.md §1): a picture under the keys
  * may be `[Keyboard] BG_IMAGE` (a file's name or a section's), a band of six numbers as well as four, a key face
@@ -44,13 +44,13 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             val order = listed.ifEmpty { folders }
             periods = order.size
             fun hours(key: String, period: String) = time[period]?.get(key).orEmpty().split(',').mapNotNull { it.trim().toIntOrNull() }
-            fun noon(period: String): Boolean {
+            fun holds(period: String, hour: Int): Boolean {
                 val ends = hours("END", period)
-                return hours("START", period).withIndex().any { (i, start) -> start <= NOON && NOON <= (ends.getOrNull(i) ?: -1) }
+                return hours("START", period).withIndex().any { (i, start) -> start <= hour && hour <= (ends.getOrNull(i) ?: -1) }
             }
-            val day = order.firstOrNull(::noon) ?: order[0]
+            val day = order.firstOrNull { holds(it, NOON) } ?: order[0]
             roots[Variant.LIGHT] = "$res/$day/"
-            order.firstOrNull { it != day }?.let { roots[Variant.DARK] = "$res/$it/" }
+            (order.firstOrNull { it != day && holds(it, 0) } ?: order.firstOrNull { it != day })?.let { roots[Variant.DARK] = "$res/$it/" }
         }
         val general = f.ini("phoneTheme.ini")["General"].orEmpty()
         name = general["skin_name"].orEmpty()
@@ -61,8 +61,10 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
 
     override val variants: Set<Variant> get() = roots.keys
 
-    override fun look(variant: Variant): SkinLook = Reader(roots.getValue(variant)).look().also {
+    // icons, letter pictures and places are the first version's only: the converter reads no other's
+    override fun look(variant: Variant): SkinLook = Reader(roots.getValue(variant)).look(variant == Variant.LIGHT).also {
         if (periods > 2) it.notes += SkinNote.MORE_PERIODS
+        if (variant == Variant.LIGHT) it.layouts += SogouBoards.read(f)
     }
 
     private inner class Reader(private val r: String) {
@@ -116,7 +118,7 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             return SkinText.color(s["TEXT_COLOR"]) to SkinText.color(s["TEXT_COLOR_PRESSED"])
         }
 
-        fun look(): SkinLook {
+        fun look(main: Boolean): SkinLook {
             val look = SkinLook(res.toIntOrNull()?.takeIf { it in MIN_WIDTH..MAX_WIDTH } ?: DEFAULT_WIDTH)
             board(look)
             keys(look)
@@ -124,9 +126,10 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             look.first = textStyle("TextStyle_Candidate_Highlight").first
             look.preedit = textStyle("TextStyle_Composing").first
             look.hintText = textStyle("TextStyle_Popup_Qwerty", "TextStyle_Popup").first
-            skin["TextStyle_Qwerty"]?.get("TYPEFACE")?.let(::file)?.takeIf { it.lowercase().endsWith(".ttf") || it.lowercase().endsWith(".otf") }?.let {
-                val bytes = f.bytes(it)!!
-                if (bytes.size <= SkinLimits.MAX_FONT_BYTES) look.font = it.substringAfterLast('/').lowercase() to bytes else look.notes += SkinNote.TEXT_SIZE
+            font(look)
+            if (main) {
+                icons(look)
+                letters(look)
             }
             sounds(look)
             if (f.names.any { it.endsWith("anim.ini") || it.lowercase().endsWith(".webp") }) look.notes += SkinNote.ANIMATION
@@ -212,7 +215,7 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
                 if (nm != null) look.keys["qwerty/" + m.groupValues[1].lowercase()] = SkinKey(nm, hl, null, null, icons = false)
             }
             var key = look.keys["key"] ?: throw SkinError(SkinError.Reason.NO_KEYBOARD)
-            // letters drawn as pictures (keys.ini FG_IMAGES): their colour is all that carries over
+            // letters drawn as pictures (keys.ini FG_IMAGES): their colour for the keys' text where none is given
             if (key.color == null) {
                 val keys = f.ini(r + "keys.ini")
                 val glyph = keys.entries.firstOrNull { (s, d) -> LETTER.matches(s) && d["FG_IMAGES"] != null }?.let { (_, d) ->
@@ -221,7 +224,6 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
                 if (glyph != null) {
                     key = SkinKey(key.fill, key.pressed, glyph.pixels.glyphColor(), key.pressedColor, key.icons, key.drawn)
                     look.keys["key"] = key
-                    look.notes += SkinNote.LETTER_IMAGES
                 }
             }
             // Sogou's keys fill their cell: the gap between them is the face's transparent margin, cut off as it is
@@ -232,6 +234,70 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
                 fun dp(v: Int) = (v / 2.0 / scale).roundToInt().coerceIn(0, MAX_INSET_DP)
                 look.inset = dp(box.top + px.height - box.bottom) to dp(box.left + px.width - box.right)
             }
+        }
+
+        // the keys' font: the one the letters' style names (the phone's own: none), else one another style names or
+        // the skin's own by name; one at most
+        private fun font(look: SkinLook) {
+            val letters = listOf("TextStyle_Qwerty", "TextStyle").firstNotNullOfOrNull { skin[it]?.get("TYPEFACE")?.trim()?.takeIf(String::isNotEmpty) }
+            if (letters != null && (!isFont(letters) || systemFont(letters))) return
+            val named = letters ?: skin.values.firstNotNullOfOrNull { s -> s["TYPEFACE"]?.trim()?.takeIf { isFont(it) && !systemFont(it) } }
+            val own = f.names.filter { n ->
+                isFont(n) && !systemFont(n) && n.substringBeforeLast('/', "").substringAfterLast('/').lowercase() in FONT_FOLDERS
+            }.sorted()
+            val at = named?.let { n -> file(n) ?: own.firstOrNull { it.substringAfterLast('/').equals(n, ignoreCase = true) } } ?: own.firstOrNull()
+            val bytes = at?.let(f::bytes)
+            when {
+                at == null || bytes == null -> if (named != null) look.notes += SkinNote.FONT
+                bytes.size > SOGOU_FONT_BYTES -> look.notes += SkinNote.FONT
+                else -> look.font = at.substringAfterLast('/').lowercase() to bytes
+            }
+        }
+
+        // an ICON= picture, not transparent.png (the symbol in the face); a name not read is said
+        private fun icon(value: String?, look: SkinLook): Pixels? {
+            val name = value?.trim()?.takeIf { it.isNotEmpty() && !transparent(it) } ?: return null
+            return f.pixels(file(name)).also { if (it == null) look.notes += SkinNote.KEY_ICONS }
+        }
+
+        private fun list(section: String, key: String) = skin[section]?.get(key).orEmpty().split(',').map { it.trim() }
+
+        // the function keys' ICON and ICON_PRESSED by the app's icon name; Shift's ICONS at rest, once, locked
+        private fun icons(look: SkinLook) {
+            for ((name, owners) in ICONS) {
+                val s = owners.firstOrNull { skin[it]?.get("ICON") != null } ?: continue
+                icon(list(s, "ICON")[0], look)?.let { look.icon(name, it, icon(list(s, "ICON_PRESSED")[0], look)) }
+            }
+            val shift = SHIFT_OWNERS.firstOrNull { skin[it]?.get("ICON") != null || skin[it]?.get("ICONS") != null } ?: return
+            val states = list(shift, "ICONS").takeIf { it.any(String::isNotEmpty) } ?: list(shift, "ICON")
+            val pressed = list(shift, "ICON_PRESSED")
+            for ((i, name) in SHIFT_ICONS.withIndex()) {
+                val normal = icon(states.getOrNull(i), look) ?: continue
+                look.icon(name, normal, icon(pressed.getOrNull(i), look))
+            }
+        }
+
+        // a picture's file named in a value ('file.png,band…'), not transparent.png
+        private fun picture(value: String?): Pixels? =
+            value?.split(',')?.get(0)?.trim()?.takeIf { IMAGE.matches(it) && !transparent(it) }?.let { f.pixels(file(it)) }
+
+        // a letter's picture on the 26 keys (keys.ini FG_IMAGES, or its own ICON=) as a sticker; any other said
+        private fun letters(look: SkinLook) {
+            val keys = f.ini(r + "keys.ini")
+            fun fg(section: String, state: String) = keys[section]?.get("FG_IMAGES")?.split(',')?.get(0)?.trim()?.let { keys[it]?.get(state) }
+            for (c in 'A'..'Z') {
+                val names = listOf("Key_$c", "Key_${c}_PY", "Key_${c}_EN")
+                val drawn = names.firstOrNull { keys[it]?.get("FG_IMAGES") != null }
+                val got = if (drawn != null) {
+                    picture(fg(drawn, "NORMAL"))?.let { SkinIcon(it, picture(fg(drawn, "PRESSED"))) }
+                } else {
+                    names.firstNotNullOfOrNull { n -> picture(skin[n]?.get("ICON"))?.let { SkinIcon(it, picture(skin[n]?.get("ICON_PRESSED"))) } }
+                }
+                if (got != null) look.letterImage(c, got.normal, got.pressed)
+            }
+            val drawn = keys.filterValues { "FG_IMAGES" in it }.keys
+            val left = drawn.any { s -> LETTER.matchEntire(s)?.groupValues?.get(1)?.single()?.lowercaseChar()?.let { it !in look.letterImages } == true }
+            if (left || drawn.any(NINE_LETTERS::matches)) look.notes += SkinNote.LETTER_IMAGES
         }
 
         private fun sounds(look: SkinLook) {
@@ -254,7 +320,26 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
         private val IMAGE = Regex(".+\\.(png|webp|jpe?g)", RegexOption.IGNORE_CASE)
         private val SINGLE = Regex("Key_([A-Z])(?:_PY)?")
         // Key_G, and as real skins name them, Key_G_L, Key_G_Land_Left
-        private val LETTER = Regex("Key_[A-Z](_.+)?")
+        private val LETTER = Regex("Key_([A-Z])(_.+)?")
+        private val NINE_LETTERS = Regex("Key_(ABC|DEF|GHI|JKL|MNO|PQRS|TUV|WXYZ)(_.+)?")
+        private val ICONS = listOf(
+            "backspace" to listOf("Key_Backspace_Qwerty", "Key_Backspace"),
+            "enter" to listOf("Key_Enter_Qwerty", "Key_Enter"),
+            "language" to listOf("Key_SwitchToEN_Qwerty", "Key_SwitchToEN"),
+            "number-pad" to listOf("Key_Symbols_Qwerty", "Key_Digits"),
+            "emoji" to listOf("Key_Emotion"),
+        )
+        private val SHIFT_OWNERS = listOf("Key_Shift_Qwerty", "Key_Shift")
+        private val SHIFT_ICONS = listOf("shift", "shift-once", "shift-locked")
+        private val FONT_FOLDERS = setOf("res_typeface", "fonts", "default")
+        private val SYSTEM_FONTS = listOf("roboto", "droidsans", "notosans", "arial")
+        // half of SkinLimits.MAX_FONT_BYTES: a keyboard's font, not the CJK fallback some Sogou skins copy in
+        private const val SOGOU_FONT_BYTES = 8 * 1024 * 1024
+
+        private fun isFont(name: String) = name.lowercase().let { it.endsWith(".ttf") || it.endsWith(".otf") }
+
+        // a font the phone has anyway, which a skin names or carries a copy of
+        private fun systemFont(name: String) = name.substringAfterLast('/').lowercase().let { n -> SYSTEM_FONTS.any(n::startsWith) }
         private const val BAND = 4
         private const val BAND_MODES = 6
         private val CLEAR = SkinFill.Color(0)
@@ -276,5 +361,76 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
 
         /** Whether [names], which no reader takes, are a Sogou computer skin's (`skin.ini`): said so, not just unknown. */
         fun isComputerSkin(names: Set<String>): Boolean = names.any { it.substringAfterLast('/').equals("skin.ini", ignoreCase = true) }
+    }
+}
+
+/**
+ * Where a Sogou skin's keys are: `[Keyboard] W,H` (to the screen's width), `ROWS`, `H_GAP_QWERTY`, `PADDINGS`; a row's
+ * `V_OFFSET` (to the keyboard's height; none: below the row before), `H_OFFSET` (to its width) and `KEYS`, placed one after
+ * another unless a key has its own `X`; a key's `W` and `H` in its section or `[Key]`, one of them 0 a hole. Boards in
+ * the keyboard's width; a file not holding together is left out.
+ */
+internal object SogouBoards {
+    private val FILES = listOf("26.ini" to "qwerty", "9.ini" to "nine")
+    private val LETTER = Regex("Key_([A-Z])(?:_PY|_EN)?")
+    private val NINE = listOf("Key_PunctPY", "Key_ABC", "Key_DEF", "Key_GHI", "Key_JKL", "Key_MNO", "Key_PQRS", "Key_TUV", "Key_WXYZ")
+    private val ROLES = listOf(
+        "Key_Apostrophe_Shift" to "shift", "Key_Shift" to "shift", "Key_Backspace" to "backspace", "Key_SymbolTable" to "symbols",
+        "Key_Symbols_Qwerty" to "numbers", "Key_Digits" to "numbers", "Key_UDSymbol1" to "comma", "Key_UDSymbol2" to "period",
+        "Key_Space" to "space", "Key_SwitchToEN" to "lang", "Key_Enter" to "enter", "Key_ClearInput" to "reset",
+    )
+    private const val MAX_ROWS = 8
+    private const val MAX_KEYS = 20
+    private const val MAX_SIZE = 2.0
+    private const val PADDINGS = 4
+    private const val PREFERRED = 1080
+
+    /** Each board from the first width's folder (1080, then the widest) whose `port/` file reads. */
+    fun read(f: SkinFiles): List<SkinBoard> = FILES.mapNotNull { (file, id) ->
+        val widths = f.names.mapNotNull { n -> n.removeSuffix("/port/$file").takeIf { it != n }?.toIntOrNull() }
+        widths.sortedWith(compareBy<Int> { it != PREFERRED }.thenByDescending { it }).firstNotNullOfOrNull { board(f.ini("$it/port/$file"), id) }
+    }
+
+    // the skin's name for a key as the app's: a letter, a nine key's digit, a role or id; else its own name (not matched)
+    fun action(section: String): SkinAction {
+        LETTER.matchEntire(section)?.let { return SkinAction.Letter(it.groupValues[1].single().lowercaseChar()) }
+        NINE.indexOf(section).takeIf { it >= 0 }?.let { return SkinAction.Letter('1' + it) }
+        if (section == "Key_Edits") return SkinAction.Letter('0')
+        return SkinAction.Role(ROLES.firstOrNull { section.startsWith(it.first) }?.second ?: section)
+    }
+
+    // the shop's skins have no padding, so how it adds to the offsets is a guess: an offset given stands for it
+    private fun board(ini: Ini, id: String): SkinBoard? {
+        val kb = ini["Keyboard"] ?: return null
+        val w = size(kb["W"])?.takeIf { it > 0 } ?: return null
+        val tall = (size(kb["H"]) ?: return null) / w
+        val gap = size(kb["H_GAP_QWERTY"] ?: kb["H_GAP"]) ?: 0.0
+        val pad = kb["PADDINGS"]?.split(',')?.map { size(it) ?: return null }?.takeIf { it.size == PADDINGS } ?: List(PADDINGS) { 0.0 }
+        val rows = names(kb["ROWS"]).takeIf { it.size in 1..MAX_ROWS } ?: return null
+        var below = pad[1] * tall
+        val out = rows.map { name ->
+            row(ini, name, pad[0], below, tall, gap)?.also { r -> below = r.maxOfOrNull { it.y + it.h } ?: below } ?: return null
+        }
+        return SkinBoard(id, out, 1.0)
+    }
+
+    private fun names(v: String?) = v.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+
+    private fun size(v: String?) = v?.trim()?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 && it <= MAX_SIZE }
+
+    // a row's keys one after another from its offset, heights as fractions of the width; a V_OFFSET not given (or
+    // negative, Sogou's own "none") puts it at [below]
+    private fun row(ini: Ini, name: String, left: Double, below: Double, tall: Double, gap: Double): List<SkinKeyBox>? {
+        val row = ini[name] ?: return null
+        val keys = names(row["KEYS"]).takeIf { it.size in 1..MAX_KEYS } ?: return null
+        val v = row["V_OFFSET"]?.trim()?.toDoubleOrNull()?.takeIf { it >= 0 }
+        val y = if (v == null) below else (v.takeIf { it.isFinite() && it <= MAX_SIZE } ?: return null) * tall
+        var x = size(row["H_OFFSET"]) ?: left
+        return keys.mapNotNull { key ->
+            val kw = size(ini[key]?.get("W") ?: ini["Key"]?.get("W")) ?: return null
+            val kh = size(ini[key]?.get("H") ?: ini["Key"]?.get("H")) ?: return null
+            ini[key]?.get("X")?.let { x = size(it) ?: return null }
+            SkinKeyBox(x, y, kw, kh * tall, action(key)).takeIf { kw > 0 && kh > 0 }.also { x += kw + gap }
+        }.takeIf { it.isNotEmpty() }
     }
 }

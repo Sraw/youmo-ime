@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.input.theme
 import org.fcitx.fcitx5.android.scene.skin.SkinError
 import org.fcitx.fcitx5.android.scene.skin.SkinError.Reason
 import org.fcitx.fcitx5.android.scene.skin.SkinLimits
+import org.fcitx.fcitx5.android.scene.skin.SogouContainer
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -25,7 +26,7 @@ object SkinZip {
     /** Read to its end within [SkinLimits.MAX_ARCHIVE_BYTES]. */
     fun read(input: InputStream): Map<String, ByteArray> = read(bytes(input))
 
-    /** A lone YAML theme (Trime's) as itself; a ZIP holding one `.flex` and nothing of its own as that one's. [budget]: outer and inner together. */
+    /** A lone YAML theme (Trime's) or Sogou container as itself; a ZIP holding one `.flex` and nothing of its own as that one's. [budget]: outer and inner together. */
     fun readSkin(input: InputStream, fileName: String, budget: Long = SkinLimits.MAX_TOTAL_BYTES): Map<String, ByteArray> {
         val b = bytes(input)
         val name = fileName.substringAfterLast('/')
@@ -33,6 +34,8 @@ object SkinZip {
             if (b.size > SkinLimits.MAX_TEXT_BYTES) fail(Reason.TOO_BIG)
             return mapOf(name to b)
         }
+        // Sogou's encrypted container: opened by the converter, which has the platform's cipher
+        if (SogouContainer.isContainer(b)) return mapOf(name to b)
         val entries = read(b, budget)
         // macOS Finder's `__MACOSX/` and `._name` are no files of the skin's (the same rule as SkinConverter's)
         val files = entries.keys.filterNot { it.startsWith("__MACOSX/") || it.substringAfterLast('/').startsWith("._") }
