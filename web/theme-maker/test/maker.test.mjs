@@ -520,10 +520,10 @@ test('the check before a save: an error of any board or version stops it, the ap
   assert.deepEqual(M.exportCheck(E, L, FORMAT, d, E.layouts(), M.envJson(E, M.ENV)), { errors: [], warnings: [] });
   const missing = M.doc(F.setProp(d.xml, 'key', 'fill', 'image(nope.png, 0dp)'));
   assert.ok(M.exportCheck(E, L, FORMAT, missing, E.layouts(), M.envJson(E, M.ENV)).errors.some((p) => /nope\.png/.test(p.message)));
-  const later = M.doc(F.setProp(d.xml, 'key', 'sticker', 'none'));
+  const later = M.doc(F.setProp(d.xml, 'key', 'width', '10dp'));
   const w = M.exportCheck(E, L, FORMAT, later, E.layouts(), M.envJson(E, M.ENV));
   assert.deepEqual(w.errors, []);
-  assert.equal(w.warnings.filter((p) => /sticker/.test(p.message)).length, 1, JSON.stringify(w.warnings));
+  assert.equal(w.warnings.filter((p) => /width/.test(p.message)).length, 1, JSON.stringify(w.warnings));
 });
 
 test("a pack's layouts the app refuses on import stop a save, by the app's own limits; one it would not use is not previewed", () => {

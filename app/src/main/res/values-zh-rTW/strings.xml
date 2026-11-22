@@ -112,6 +112,10 @@
     <string name="exception_theme_preview_size">主題的預覽圖超過 %1$s KB</string>
     <string name="exception_theme_preview_side">主題的預覽圖邊長超過 %1$s 像素</string>
     <string name="exception_theme_icon_size">主題的某個圖示超過 %1$s KB</string>
+    <string name="exception_theme_raster_icon_side">主題的某個點陣圖示邊長超過 %1$s 像素</string>
+    <string name="exception_theme_sticker_side">主題的某張貼紙邊長超過 %1$s 像素</string>
+    <string name="exception_theme_sticker_size">主題的某張貼紙超過 %1$s KB</string>
+    <string name="exception_theme_raster_type" formatted="false">主題的圖示或貼紙只能是不會動的 PNG 或 WebP</string>
     <string name="exception_theme_sound">主題的按鍵音不合格（要 Ogg Vorbis、8/16 位元 PCM 的 WAV 或 MP3，不超過 1 秒）：%1$s</string>
     <string name="exception_theme_sound_size">主題的某個按鍵音超過 %1$s KB</string>
     <string name="exception_theme_effect_image_side">有按鍵特效圖片的邊長超過 %1$s 像素</string>

@@ -159,7 +159,21 @@ sealed interface Op {
         val part: String? = null,
     ) : Op
 
-    data class Icon(val name: String, val box: Box, val tint: Argb, val rotation: Double = 0.0) : Op
+    /** [raster]: the theme's PNG or WebP, fitted into [box] keeping its proportions; [tintMask]: only its alpha, coloured [tint]. */
+    data class Icon(
+        val name: String,
+        val box: Box,
+        val tint: Argb,
+        val rotation: Double = 0.0,
+        val raster: Boolean = false,
+        val tintMask: Boolean = false,
+    ) : Op
+
+    /**
+     * A theme's image over a key's face, under its text and icon, fitted into [box] keeping its proportions; [standIn] is
+     * the label and icon it hides, drawn instead while the image is not decoded, so a key is never blank.
+     */
+    data class Sticker(val file: String, val box: Box, val alpha: Double = 1.0, val standIn: List<Op> = emptyList()) : Op
 }
 
 data class TextStroke(val width: Double, val color: Argb)

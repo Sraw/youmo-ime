@@ -323,7 +323,7 @@ async function main() {
     await wait(500);
     await js(`(() => { window.__saved = 0; const u = URL.createObjectURL; URL.createObjectURL = (b) => { window.__saved++; return u(b); }; })()`);
     const edit = (f) => js(`(() => { const s = document.getElementById('source'); s.value = (${f})(s.value); s.dispatchEvent(new Event('input')); })()`);
-    await edit(`(t) => t.replace('<style select="key"', '<style select="key" sticker="none"')`);
+    await edit(`(t) => t.replace('<style select="key"', '<style select="key" width="10dp"')`);
     await wait(800);
     const ask = async (button) => {
       await js(`document.querySelector('#file-menu [data-act=save]').click()`);

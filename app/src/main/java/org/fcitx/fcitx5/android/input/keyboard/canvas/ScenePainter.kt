@@ -103,6 +103,7 @@ class ScenePainter(
             is Op.Picture -> picture(canvas, op)
             is Op.Text -> text(canvas, op)
             is Op.Icon -> icon(canvas, op)
+            is Op.Sticker -> draw(canvas, op.standIn)
         }
     }
 

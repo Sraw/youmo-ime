@@ -76,7 +76,7 @@ class Cascade(theme: Theme, private val scene: Set<String>) {
     companion object {
         val INHERITED = setOf(
             "color", "icon-color", "font", "weight", "scale", "hidden",
-            "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content",
+            "align", "letter-spacing", "stroke", "text-shadow", "font-han", "font-latin", "space-content", "content",
         ) + Values.RETURN_ACTIONS.map { "return-icon-$it" }
 
         // a key's `hidden` never hides its swipes' shortcuts; the hint only by its own style
@@ -143,6 +143,9 @@ class KeyLook(private val v: Map<String, Value>, private val theme: Theme) {
 
     val effect: Effect? get() = (v["effect"] as? Value.OfEffect)?.effect
 
+    /** The file; null where none is set or `none`. */
+    val sticker: String? get() = word("sticker")?.takeIf { it != Values.NONE }
+
     private fun word(name: String): String? = (v[name] as? Value.Word)?.word
 
     private companion object {
@@ -175,6 +178,12 @@ class TextLook(private val v: Map<String, Value>, private val theme: Theme) {
     val spaceContent: Shown? get() = (v["space-content"] as? Value.OfShown)?.shown
 
     fun returnIcon(action: String): Shown? = (v["return-icon-$action"] as? Value.OfShown)?.shown
+
+    /** The icon drawn in place of the key's own (`content="icon(name)"`). */
+    val content: String? get() = ((v["content"] as? Value.OfShown)?.shown as? Shown.Icon)?.name
+
+    /** Itself, but not hidden: the label a sticker stands in for. */
+    fun shown(): TextLook = if (hidden) TextLook(v + ("hidden" to Value.Flag(false)), theme) else this
 
     private companion object {
         val BLACK = Argb(0xFF000000.toInt())

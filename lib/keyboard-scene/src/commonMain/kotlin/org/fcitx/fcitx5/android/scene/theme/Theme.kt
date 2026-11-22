@@ -22,7 +22,14 @@ class Theme(
     val systemColors: SystemColors = SystemColors.NONE,
     /** A key this version does not know too: its file is kept and [ThemeWriter] writes them back as they are. */
     val soundFiles: List<Pair<String, String>> = emptyList(),
+    /** `<picture variant="dark">`, drawn by the dark version in place of [picture]. */
+    val darkPicture: Picture? = null,
+    /** Raster icons whose alpha alone is drawn, in `icon-color` (`tint="true"`). */
+    val tintedIcons: Set<String> = emptySet(),
 ) {
+    /** The picture this version draws. */
+    val shownPicture: Picture? get() = if (dark) darkPicture ?: picture else picture
+
     val sounds: Map<SoundKey, String> by lazy { soundFiles.mapNotNull { (k, f) -> SoundKey.of(k)?.let { it to f } }.toMap() }
 
     // once, not a function object each colour
@@ -42,7 +49,28 @@ class Theme(
         this
     } else {
         val drawn = if (dark) darkColors ?: baseColors else baseColors
-        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors, soundFiles)
+        Theme(name, dark, version, drawn, styles, fonts, icons, picture, variants, baseColors, darkColors, meta, systemColors, soundFiles, darkPicture, tintedIcons)
+    }
+
+    /** Every file it draws named through [path] (a pack's directory), the rest as it is; one place, so a field added is not dropped. */
+    fun withPaths(path: (String) -> String): Theme {
+        fun value(prop: String, v: Value): Value {
+            val effect = (v as? Value.OfEffect)?.effect
+            val image = (v as? Value.OfFill)?.fill as? Fill.Image
+            return when {
+                effect is Effect.Ripple -> Value.OfEffect(effect.copy(file = path(effect.file)))
+                effect is Effect.Particles -> Value.OfEffect(effect.copy(file = path(effect.file)))
+                image != null -> Value.OfFill(image.copy(file = path(image.file)))
+                prop == "sticker" && v is Value.Word && v.word != Values.NONE -> Value.Word(path(v.word))
+                else -> v
+            }
+        }
+        fun Picture.at() = Picture(path(src), brightness, blurDp, cuts.mapValues { path(it.value) }, animated)
+        val styles = styles.map { s -> Style(s.selectors, s.values.mapValues { (k, v) -> value(k, v) }, s.order, s.line) }
+        return Theme(
+            name, dark, version, colors, styles, fonts.mapValues { path(it.value) }, icons.mapValues { path(it.value) }, picture?.at(), variants,
+            baseColors, darkColors, meta, systemColors, soundFiles.map { (key, file) -> key to path(file) }, darkPicture?.at(), tintedIcons,
+        )
     }
 }
 

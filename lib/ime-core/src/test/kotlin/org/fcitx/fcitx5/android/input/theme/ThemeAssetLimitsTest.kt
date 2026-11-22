@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.input.theme.LookFixtures.PALETTE
 import org.fcitx.fcitx5.android.scene.look.KeyLabel
 import org.fcitx.fcitx5.android.scene.look.KeyOverride
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.theme.RasterIcon
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -133,6 +134,27 @@ class ThemeAssetLimitsTest {
         assertTrue("$reads reads", reads <= 1 + l.MAX_ANIMATED_FRAMES + AnimatedWebp.OTHER_CHUNKS)
         val big = java.io.File.createTempFile("big", ".webp").apply { deleteOnExit(); writeBytes(ByteArray(l.MAX_ANIMATED_BYTES.toInt() + 1)) }
         assertEquals(ThemeAssetLimits.Still.Size, l.animated(big))
+    }
+
+    @Test
+    fun aRasterIconOrAStickerPastItsSideOrSize() {
+        val l = ThemeAssetLimits
+        assertNull(l.rasterIcon(128L * 1024, 256, 256))
+        assertEquals(ThemeAssetLimits.Breach.RasterIconSide, l.rasterIcon(10, 257, 1))
+        assertEquals(ThemeAssetLimits.Breach.RasterIconSide, l.rasterIcon(10, 1, 257))
+        assertEquals(ThemeAssetLimits.Breach.RasterIconSize, l.rasterIcon(129L * 1024, 16, 16))
+        assertNull(l.sticker(256L * 1024, 512, 512))
+        assertEquals(ThemeAssetLimits.Breach.StickerSide, l.sticker(10, 513, 1))
+        assertEquals(ThemeAssetLimits.Breach.StickerSize, l.sticker(256L * 1024 + 1, 16, 16))
+        assertEquals(ThemeAssetLimits.Breach.RasterIconSide, l.rasterIcon(10, 0, 16))
+        assertEquals(ThemeAssetLimits.Breach.StickerSide, l.sticker(10, 16, -1))
+        // by the header read
+        assertNull(l.rasterIcon(10, RasterIcon.Header(16, 16, animated = false)))
+        assertEquals(ThemeAssetLimits.Breach.RasterType, l.rasterIcon(10, null))
+        assertEquals(ThemeAssetLimits.Breach.RasterType, l.sticker(10, RasterIcon.Header(16, 16, animated = true)))
+        assertEquals(ThemeAssetLimits.Breach.StickerSide, l.sticker(10, RasterIcon.Header(513, 16, animated = false)))
+        // an SVG's own, half a raster's
+        assertEquals(ThemeAssetLimits.Breach.IconSize, l.icon(65L * 1024))
     }
 
     @Test

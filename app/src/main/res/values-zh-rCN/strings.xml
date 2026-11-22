@@ -112,6 +112,10 @@
     <string name="exception_theme_preview_size">主题的预览图超过 %1$s KB</string>
     <string name="exception_theme_preview_side">主题的预览图边长超过 %1$s 像素</string>
     <string name="exception_theme_icon_size">主题的某个图标超过 %1$s KB</string>
+    <string name="exception_theme_raster_icon_side">主题的某个位图图标边长超过 %1$s 像素</string>
+    <string name="exception_theme_sticker_side">主题的某张贴纸边长超过 %1$s 像素</string>
+    <string name="exception_theme_sticker_size">主题的某张贴纸超过 %1$s KB</string>
+    <string name="exception_theme_raster_type" formatted="false">主题的图标或贴纸只能是不会动的 PNG 或 WebP</string>
     <string name="exception_theme_sound">主题的按键音不合格（要 Ogg Vorbis、8/16 位 PCM 的 WAV 或 MP3，不超过 1 秒）：%1$s</string>
     <string name="exception_theme_sound_size">主题的某个按键音超过 %1$s KB</string>
     <string name="exception_theme_effect_image_side">有按键特效图片的边长超过 %1$s 像素</string>

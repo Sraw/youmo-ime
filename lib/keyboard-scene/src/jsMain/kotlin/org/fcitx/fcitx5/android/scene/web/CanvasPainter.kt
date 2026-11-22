@@ -78,6 +78,7 @@ internal class CanvasPainter(
             is Op.Picture -> picture(op)
             is Op.Text -> text(op)
             is Op.Icon -> icon(op)
+            is Op.Sticker -> draw(op.standIn)
         }
     }
 

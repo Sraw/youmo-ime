@@ -130,6 +130,13 @@ object Shots {
                 "qwerty-return-long", "qwerty", block.copy(texts = block.texts.copy(returnIcon = "send")),
                 styled("<style select=\"*/enter\" return-icon-send=\"text(发送这条消息)\"/>"),
             ),
+            Shot(
+                "qwerty-sticker", "qwerty", block,
+                styled(
+                    "<style select=\"qwerty/q\" sticker=\"st-q.png\"/>", "<style select=\"qwerty/q:pressed\" sticker=\"st-q-p.webp\"/>",
+                    "<style select=\"qwerty/q label\" hidden=\"true\"/>", "<style select=\"*/space\" sticker=\"st-space.png\"/>",
+                ),
+            ),
         )
     }
 

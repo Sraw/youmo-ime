@@ -312,6 +312,7 @@ internal class PopupBuilder(
             is Op.Icon -> op.copy(tint = op.tint.of())
             is Op.Picture -> op.copy(over = op.over?.of())
             is Op.NineSlice -> op.copy(fallback = op.fallback?.of())
+            is Op.Sticker -> op.copy(alpha = op.alpha * share, standIn = op.standIn.map { faded(it, share) })
         }
     }
 

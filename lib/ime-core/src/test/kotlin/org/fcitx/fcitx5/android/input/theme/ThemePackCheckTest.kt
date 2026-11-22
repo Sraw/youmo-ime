@@ -68,6 +68,21 @@ class ThemePackCheckTest {
         assertEquals(ThemePackCheck.Files(emptySet(), null, emptySet(), emptySet(), emptySet(), null), ThemePackCheck.files(theme()))
     }
 
+    // the dark version's picture and the stickers are the pack's too: placed, checked and exported with the rest
+    @Test
+    fun theDarkPictureAndTheStickersAreListed() {
+        val t = theme(
+            styles = """<style select="qwerty/q" sticker="q.png"/><style select="qwerty/q:pressed" sticker="q-p.webp"/><style select="qwerty/w" sticker="none"/>""",
+            before = """<picture src="a.jpg"><cut orientation="portrait" file="a-p.png"/></picture><picture variant="dark" src="d.jpg"><cut orientation="portrait" file="d-p.png"/></picture>""",
+        )
+        val f = ThemePackCheck.files(t)
+        assertEquals(setOf("d.jpg", "d-p.png"), f.darkPictures)
+        assertEquals(setOf("q.png", "q-p.webp"), f.stickers)
+        assertEquals(setOf("a.jpg", "a-p.png", "d.jpg", "d-p.png", "q.png", "q-p.webp"), f.all)
+        // a pack without its sticker still lists and imports: 0.6.2 never copied a reserved one
+        assertEquals(setOf("a.jpg", "a-p.png", "d.jpg", "d-p.png"), f.required)
+    }
+
     // the app's boards, as keyboard-scene has them (the app copies the same files)
     private val boards: List<BlankKeys.Board> by lazy {
         val dir = File(LAYOUTS)

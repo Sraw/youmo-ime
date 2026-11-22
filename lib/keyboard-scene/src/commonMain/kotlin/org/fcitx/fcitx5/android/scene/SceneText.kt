@@ -119,14 +119,24 @@ object SceneText {
         is Op.Fill -> "fill ${shape(o.shape)} ${o.color}" + (o.less?.let { " less=${shape(it)}" } ?: "")
         is Op.Gradient -> "gradient ${shape(o.shape)} ${n(o.angle)} ${o.stops.joinToString(" ") { "${it.first}@${n(it.second)}" }}"
         is Op.NineSlice -> "nine-slice ${shape(o.shape)} ${q(o.file)} ${o.insets.joinToString(",")} ${o.pxPerDp}" + (o.fallback?.let { " else=$it" } ?: "")
-        is Op.Picture -> "picture ${shape(o.shape)} blur=${o.blurDp?.let(::n) ?: "-"} brightness=${o.brightness?.let(::n) ?: "-"}" + (o.over?.let { " over=$it" } ?: "")
+        is Op.Picture -> picture(o)
         is Op.Shadow -> "shadow ${shape(o.shape)} blur=${n(o.blur)} ${o.color}"
         is Op.InnerShadow -> "inner-shadow ${shape(o.shape)} hole=${shape(o.hole)} ring=${box(o.ring)} blur=${n(o.blur)} ${o.color}"
         is Op.Stroke -> "stroke ${shape(o.shape)} ${n(o.width)} ${o.color}"
         is Op.Ripple -> "ripple ${shape(o.shape)} ${o.color}"
         is Op.Text -> text(o)
-        is Op.Icon -> "icon ${o.name} ${box(o.box)} ${o.tint}" + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "")
+        is Op.Icon -> icon(o)
+        is Op.Sticker -> sticker(o)
     }
+
+    private fun picture(o: Op.Picture): String =
+        "picture ${shape(o.shape)} blur=${o.blurDp?.let(::n) ?: "-"} brightness=${o.brightness?.let(::n) ?: "-"}" + (o.over?.let { " over=$it" } ?: "")
+
+    private fun sticker(o: Op.Sticker): String = "sticker ${q(o.file)} ${box(o.box)}" + (if (o.alpha != 1.0) " alpha=${n(o.alpha)}" else "") +
+        o.standIn.joinToString("") { " stand-in=" + op(it) }
+
+    private fun icon(o: Op.Icon): String = "icon ${o.name} ${box(o.box)} ${o.tint}" + (if (o.rotation != 0.0) " rotate=${n(o.rotation)}" else "") +
+        (if (o.raster) " raster" else "") + (if (o.tintMask) " mask" else "")
 
     // what a text has besides its place, font and colour only where it has it (a snapshot of none as before)
     private fun text(o: Op.Text): String = "text ${q(o.text)} ${n(o.x)},${n(o.baseline)} ${o.font} ${o.weight} ${n(o.size)} ${o.color}" +

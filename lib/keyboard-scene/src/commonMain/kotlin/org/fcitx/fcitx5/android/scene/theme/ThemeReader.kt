@@ -71,23 +71,26 @@ object ThemeReader {
         val meta = metas.firstOrNull()?.let { meta(it, p, appVersion) }
         val (colors, darkColors) = colorTables(root, variants, p, system)
         val dark = variants == setOf(true)
-        val pictures = root.all("picture")
-        if (pictures.size > 1) p.add(pictures[1].line, "<picture> given twice")
-        val picture = pictures.firstOrNull()?.let { picture(it, p) }
+        val (picture, darkPicture) = ThemeFeatures.pictures(root, variants, p) { picture(it, p) }
         val fonts = named(atMost(root.all("font"), MAX_FONTS, p, "fonts"), p, "font")
         val icons = named(atMost(root.all("icon"), MAX_ICONS, p, "icons"), p, "icon")
+        val tinted = root.all("icon").filter { it["tint"] == "true" }.mapNotNullTo(HashSet()) { it["name"] }.filterTo(HashSet()) { it in icons }
         val styleEls = root.all("style")
         if (styleEls.size > maxStyles) p.add(styleEls[maxStyles].line, "over $maxStyles styles")
         // the file is refused already, and a million styles would each be a problem
         val styles = styleEls.take(maxStyles).mapIndexedNotNull { i, el -> style(el, i, p, colors.keys, fonts.keys, icons.keys) }
         undrawnIcons(root.all("icon"), icons.keys, styles, p)
+        ThemeFeatures.stickers(styles, p)
         val soundsEls = root.all("sounds")
         if (soundsEls.size > 1) p.add(soundsEls[1].line, "<sounds> given twice")
         val soundFiles = soundsEls.firstOrNull()?.let { sounds(it, p) }.orEmpty()
-        if (picture?.animated == true) seeThroughWarnings(styles, picture.brightness, p)
+        listOfNotNull(picture, darkPicture).firstOrNull { it.animated }?.let { seeThroughWarnings(styles, it.brightness, p) }
         return p.result {
             val drawn = if (dark) darkColors ?: colors else colors
-            Theme(name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system, soundFiles)
+            Theme(
+                name.orEmpty(), dark, version.orEmpty(), drawn, styles, fonts, icons, picture, variants, colors, darkColors, meta, system, soundFiles,
+                darkPicture, tinted,
+            ).also { ThemeFeatures.minApp(it, meta, root, p) }
         }
     }
 
@@ -230,6 +233,7 @@ object ThemeReader {
 
     private fun picture(el: XmlElement, p: Problems): Picture? {
         val a = Attributes(el, p)
+        a.oneOf("variant", listOf("dark"))
         val src = a.matching("src", FILE, "a file name") ?: a.required("src")
         val brightness = a.value("brightness", "0%–100%") { Values.percent(it)?.takeIf { v -> v <= PERCENT } } ?: PERCENT
         val blur = a.value("blur", "0dp–25dp") { Values.dp(it, MAX_BLUR) } ?: 0.0
@@ -274,6 +278,7 @@ object ThemeReader {
         val src = a.matching(file, FILE, "a file name")
         if (name == null) a.required("name")
         if (src == null) a.required(file)
+        if (el.name == "icon") ThemeFeatures.icon(a, src)
         a.done()
         return if (name != null && src != null) name to src else null
     }
@@ -329,12 +334,15 @@ object ThemeReader {
                 values[prop] = v
             }
         }
-        reserved += sizesAndReserved(el, a, p, colors, selectors.orEmpty(), values)
+        reserved += sizesAndReserved(el, a, p, colors, selectors.orEmpty(), values) + ThemeFeatures.oldSticker(values, el.line, p)
         a.done()
         selectors?.let { selectorWarnings(el, p, it) }
         selectors?.let { frame(it, values, el.line, p) }
         named(values, a, colors, fonts, icons)
-        selectors?.let { readElsewhere(it, values.keys, el.line, p) }
+        selectors?.let {
+            readElsewhere(it, values.keys, el.line, p)
+            ThemeFeatures.keyOnly(it, values.keys, el.line, p)
+        }
         reserved += selectors?.let { shapes(it, values, el.line, p) } ?: 0
         selectors?.let { unread(it, values, el.line, p) }
         if (values.isEmpty() && reserved == 0) a.problem("a style that sets nothing")
@@ -412,7 +420,7 @@ object ThemeReader {
     // a key's properties read from one part only: set on another part they do nothing, which a warning says
     private fun readElsewhere(selectors: List<Selector>, props: Set<String>, line: Int, p: Problems) {
         for (prop in props) {
-            val from = if (prop.startsWith(Values.RETURN_ICON)) "icon" else if (prop in LABEL_READ) "label" else continue
+            val from = if (prop.startsWith(Values.RETURN_ICON) || prop == "content") "icon" else if (prop in LABEL_READ) "label" else continue
             selectors.mapNotNull { it.part }.filter { it != from }.distinct()
                 .forEach { p.warn(line, "$prop= on a key's $it does nothing: it is read from its $from") }
         }
@@ -437,7 +445,7 @@ object ThemeReader {
     }
 
     // each told once, by its own table's check
-    private fun readByTable(widget: String) = widget in WINDOW_READS || widget in Selector.PANEL_WIDGETS || widget in Selector.BAR_WIDGETS
+    internal fun readByTable(widget: String) = widget in WINDOW_READS || widget in Selector.PANEL_WIDGETS || widget in Selector.BAR_WIDGETS
 
     private fun unread(selectors: List<Selector>, values: Map<String, Value>, line: Int, p: Problems) {
         unreadByWindow(selectors, values.keys, line, p)

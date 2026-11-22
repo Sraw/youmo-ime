@@ -118,6 +118,7 @@ object Values {
         "blur", "ink-color", "ink-width", "grid-color", "grid",
         "transition", "press-scale", "press-sink", "effect",
         "appear",
+        "content", "sticker",
     ) + RETURN_ACTIONS.map { "$RETURN_ICON$it" }
 
     private const val LEN = "(-?[0-9]+(\\.[0-9]+)?dp|0)"
@@ -141,7 +142,6 @@ object Values {
         "width" to form(LEN),
         "side-padding" to form(LEN_OR_PERCENT),
         "bottom-padding" to form(LEN_OR_PERCENT),
-        "sticker" to form("none|$FILE"),
     )
 
     /** Set on `keyboard` alone, under no scene; the same names on the handle are its grip's, the bar's `height` its own. */
@@ -175,6 +175,9 @@ object Values {
 
     const val FOLLOW = "follow"
 
+    /** `sticker="none"`: no sticker, over one a less specific style sets. */
+    const val NONE = "none"
+
     fun read(property: String, raw: String): Value? = when (property) {
         "fill" -> fill(raw)?.let(Value::OfFill)
         "overlay", "color", "icon-color" -> ColorExpr.parse(raw)?.let(Value::OfColor)
@@ -196,6 +199,8 @@ object Values {
         "weight" -> raw.takeIf { it in listOf("300", "400", "700") }?.let { Value.Number(it.toDouble()) }
         "press" -> raw.takeIf { it in listOf("tint", "ripple", "face") }?.let(Value::Word)
         "label-style" -> raw.takeIf { it in LABEL_STYLES }?.let(Value::Word)
+        "content" -> ICON_SHOWN.matchEntire(raw)?.let { Value.OfShown(Shown.Icon(it.groupValues[1])) }
+        "sticker" -> raw.takeIf { it == NONE || ThemeReader.FILE.matches(it) }?.let(Value::Word)
         else -> null
     }
 

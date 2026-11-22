@@ -37,16 +37,17 @@ object HandwritingMode {
         themeInk?.takeIf { Contrast.ratio(it, letterFill) >= INK_CONTRAST } ?: keyText
 
     /** Texts and icons at [LETTERS_FADED] alpha, outline and shadow with them; the face as is. */
-    fun faded(ops: List<Op>): List<Op> = ops.map {
-        when (it) {
-            is Op.Text -> it.copy(
-                color = it.color.faded(),
-                stroke = it.stroke?.let { s -> s.copy(color = s.color.faded()) },
-                shadow = it.shadow?.let { s -> s.copy(color = s.color.faded()) },
-            )
-            is Op.Icon -> it.copy(tint = it.tint.faded())
-            else -> it
-        }
+    fun faded(ops: List<Op>): List<Op> = ops.map(::faded)
+
+    private fun faded(op: Op): Op = when (op) {
+        is Op.Text -> op.copy(
+            color = op.color.faded(),
+            stroke = op.stroke?.let { s -> s.copy(color = s.color.faded()) },
+            shadow = op.shadow?.let { s -> s.copy(color = s.color.faded()) },
+        )
+        is Op.Icon -> op.copy(tint = op.tint.faded())
+        is Op.Sticker -> op.copy(alpha = op.alpha * LETTERS_FADED, standIn = op.standIn.map(::faded))
+        else -> op
     }
 
     private fun Argb.faded() = Argb((value and RGB) or ((alpha * LETTERS_FADED).roundToInt() shl ALPHA_SHIFT))

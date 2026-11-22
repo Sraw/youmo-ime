@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.engine
 
+import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.TextShadow
@@ -11,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.TextStroke
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import org.fcitx.fcitx5.android.scene.theme.Fill
 import org.fcitx.fcitx5.android.scene.theme.KeyLook
+import org.fcitx.fcitx5.android.scene.theme.RasterIcon
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import org.fcitx.fcitx5.android.scene.theme.Theme
 
@@ -83,7 +85,7 @@ internal class Paint(private val theme: Theme, private val density: Double) {
     fun content(d: Drawn, looks: (Part) -> TextLook): List<Op> = buildList {
         for (i in d.icons) {
             val tint = looks(i.part).iconColor
-            if (!tint.transparent) add(Op.Icon(i.name, i.box, tint))
+            if (!tint.transparent) add(icon(theme, i.name, i.box, tint))
         }
         val texts = d.texts.mapNotNull { t ->
             val look = looks(t.part)
@@ -103,7 +105,13 @@ internal class Paint(private val theme: Theme, private val density: Double) {
         texts.filter { !it.color.transparent }.forEach { add(it.copy(stroke = null, shadow = null)) }
     }
 
-    private companion object {
-        val NO_FILL = Argb(0)
+    companion object {
+        private val NO_FILL = Argb(0)
+
+        /** The only way one is made, so a raster icon and its mask are never drawn as an SVG. */
+        fun icon(theme: Theme, name: String, box: Box, tint: Argb, rotation: Double = 0.0): Op.Icon {
+            val raster = theme.icons[name]?.let(RasterIcon::named) == true
+            return Op.Icon(name, box, tint, rotation, raster, raster && name in theme.tintedIcons)
+        }
     }
 }

@@ -132,8 +132,8 @@ data class BarLook(
         private fun base(v: Value?, theme: Theme): Base? = when (val f = (v as? Value.OfFill)?.fill) {
             is Fill.Solid -> theme.color(f.color).takeIf { !it.transparent }?.let(Base::Solid)
             is Fill.Picture -> Base.Picture(
-                f.blurDp ?: theme.picture?.blurDp ?: 0.0,
-                f.brightness ?: theme.picture?.brightness ?: FULL,
+                f.blurDp ?: theme.shownPicture?.blurDp ?: 0.0,
+                f.brightness ?: theme.shownPicture?.brightness ?: FULL,
                 f.over?.let(theme::color),
                 variable(theme, BAR_COLOR),
             )

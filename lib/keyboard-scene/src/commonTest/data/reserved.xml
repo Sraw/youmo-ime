@@ -77,7 +77,7 @@
   <style select="@floating keyboard" radius="7dp"/>
   <style select="handle" fill="mix(@background, @keyText, 10%)"/>
   <style select="@im=wubi @field=password key, clipboard, candidate:first comment" fill="@key" transition="150ms ease-out"/>
-  <style select="key" align="top-left" stroke="1dp #000000" depth="2dp" press-scale="95%" effect="particles(star.png, 12, 24dp, 600ms)" sticker="cat.png"/>
+  <style select="key" align="top-left" stroke="1dp #000000" depth="2dp" press-scale="95%" effect="particles(star.png, 12, 24dp, 600ms)"/>
   <style select="preview" shape="path(M0 0 L1 0 L1 1 Z)" size="120%" tail="true" appear="scale 150ms"/>
   <style select="keyboard" height="38% 52%" side-padding="8dp 48dp"/>
   <sounds><sound key="key" src="tap.ogg"/></sounds>

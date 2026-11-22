@@ -111,11 +111,23 @@ class Content(
 
     private class Shows(val label: String?, val icon: String?, val textSize: Double?, val own: Boolean = false)
 
+    /** The icon a key draws in a state in place of [drawn]: its `return-icon-*` first, then `content`. */
+    fun icon(key: ExpandedKey, looks: Looks, drawn: String): String {
+        val returned = if (returns(key)) RETURN_ACTION[env.texts.returnIcon]?.let { looks.icon.returnIcon(it) } else null
+        return when (returned) {
+            is Shown.Icon -> returned.name
+            null, Shown.ImeName -> looks.icon.content ?: drawn
+            else -> drawn
+        }
+    }
+
+    private fun returns(key: ExpandedKey) = key.attrs.role == ENTER && (key.attrs.icon as? Text.Binding)?.name == RETURN_ICON
+
     // Return's theme text is as large as the 确定 key's (the layout's size is its letters')
     private fun shows(key: ExpandedKey, looks: Looks): Shows {
         val shown = when {
             key.attrs.role == SPACE -> looks.label.spaceContent
-            key.attrs.role == ENTER && (key.attrs.icon as? Text.Binding)?.name == RETURN_ICON ->
+            returns(key) ->
                 RETURN_ACTION[env.texts.returnIcon]?.let { looks.icon.returnIcon(it) }
             else -> null
         }

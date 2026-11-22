@@ -20,6 +20,7 @@ import org.fcitx.fcitx5.android.core.HostConfigDir
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.core.zipOf
 import org.fcitx.fcitx5.android.host.ConfigHome
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.look.Insets
 import org.fcitx.fcitx5.android.scene.look.KeyFill
 import org.fcitx.fcitx5.android.scene.look.KeyLabel
@@ -124,6 +125,12 @@ class ThemeFilesManagerTest {
         Json.encodeToString(CustomThemeSerializer, TestThemes.TransparentDark.deriveCustomBackground(name, cropped, src))
 
     private fun zip(vararg entries: Pair<String, String>) = zipOf(*entries).inputStream()
+
+    @Test
+    fun everyBreachIsToldInWords() {
+        assertEquals(ThemeAssetLimits.Breach.entries.toSet(), ThemeFilesManager.REFUSALS.keys)
+        assertEquals(128L, ThemeFilesManager.REFUSALS.getValue(ThemeAssetLimits.Breach.RasterIconSize).second)
+    }
 
     @Test
     fun aThemeNamedLikeAPathIsRefused() {

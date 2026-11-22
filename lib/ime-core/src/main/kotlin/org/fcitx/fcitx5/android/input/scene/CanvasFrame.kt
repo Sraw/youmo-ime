@@ -42,22 +42,26 @@ object CanvasFrame {
                 is Op.Gradient -> op.shape.bounds
                 is Op.NineSlice -> op.shape.bounds
                 is Op.Picture -> op.shape.bounds
+                // its stand-in drawn when the image does not decode
+                is Op.Sticker -> extent(op.box, op.standIn, 0.0)
                 is Op.Icon -> op.box.let { i -> if (op.rotation == 0.0) i else turned(i, (i.left + i.right) / 2, (i.top + i.bottom) / 2) }
-                is Op.Text -> {
-                    // letter spacing (em) widens it; a stroke reaches round it, a shadow moved and blurred
-                    val spaced = op.size * op.letterSpacing.coerceAtLeast(0.0) * op.text.length
-                    val wide = op.size * op.scaleX * (op.text.length + 1) + spaced
-                    val o = op.stroke?.width ?: 0.0
-                    val glyphs = Box(op.x - op.size - o, op.baseline - op.size * TEXT_UP - o, op.x + wide + o, op.baseline + op.size * TEXT_DOWN + o)
-                    val ink = op.shadow?.let { sh ->
-                        glyphs.union(Box(glyphs.left + sh.dx - sh.blur, glyphs.top + sh.dy - sh.blur, glyphs.right + sh.dx + sh.blur, glyphs.bottom + sh.dy + sh.blur))
-                    } ?: glyphs
-                    if (op.rotation == 0.0) ink else turned(ink, op.x, op.baseline)
-                }
+                is Op.Text -> ink(op)
             }
             b = b.union(reach)
         }
         return Box(b.left - pad, b.top - pad, b.right + pad, b.bottom + pad)
+    }
+
+    private fun ink(op: Op.Text): Box {
+        // letter spacing (em) widens it; a stroke reaches round it, a shadow moved and blurred
+        val spaced = op.size * op.letterSpacing.coerceAtLeast(0.0) * op.text.length
+        val wide = op.size * op.scaleX * (op.text.length + 1) + spaced
+        val o = op.stroke?.width ?: 0.0
+        val glyphs = Box(op.x - op.size - o, op.baseline - op.size * TEXT_UP - o, op.x + wide + o, op.baseline + op.size * TEXT_DOWN + o)
+        val ink = op.shadow?.let { sh ->
+            glyphs.union(Box(glyphs.left + sh.dx - sh.blur, glyphs.top + sh.dy - sh.blur, glyphs.right + sh.dx + sh.blur, glyphs.bottom + sh.dy + sh.blur))
+        } ?: glyphs
+        return if (op.rotation == 0.0) ink else turned(ink, op.x, op.baseline)
     }
 
     // the square round ([x], [y]) reaching its farthest corner

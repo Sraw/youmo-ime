@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.look.Keys
 import org.fcitx.fcitx5.android.scene.look.NineSlice
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
+import org.fcitx.fcitx5.android.scene.theme.RasterIcon
 import org.fcitx.fcitx5.android.scene.theme.SoundFile
 
 /**
@@ -39,6 +40,15 @@ object ThemeAssetLimits {
     /** More than a few KB is a drawing, not an icon. */
     const val MAX_ICON_BYTES = 64L * 1024
 
+    /** A PNG or WebP icon, decoded whole at most a few times its box. */
+    const val MAX_RASTER_ICON_BYTES = RasterIcon.MAX_BYTES * 1L
+    const val MAX_RASTER_ICON_SIDE = RasterIcon.MAX_SIDE
+
+    /** A sticker over a key's face, decoded at the size it is drawn. */
+    const val MAX_STICKER_BYTES = RasterIcon.MAX_STICKER_BYTES * 1L
+    const val MAX_STICKER_SIDE = RasterIcon.MAX_STICKER_SIDE
+    const val MAX_STICKERS = RasterIcon.MAX_STICKERS
+
     /** Each pack is read whole as themes are listed (the keyboard's start); past this a new one is refused. */
     const val MAX_PACKS = 100
 
@@ -55,6 +65,7 @@ object ThemeAssetLimits {
         Entries, FileSize, TotalSize, PictureSide, KeyImageSide, KeyImageSize, Overrides,
         ThemeXml, Layouts, LayoutSize, PreviewSize, PreviewSide, IconSize,
         EffectImageSide, EffectImageSize, EffectImageType, SoundSize,
+        RasterIconSide, RasterIconSize, StickerSide, StickerSize, RasterType,
     }
 
     /** Not refused (ThemeFilesManager's [Breach] refuses). */
@@ -117,6 +128,26 @@ object ThemeAssetLimits {
     }
 
     fun icon(bytes: Long): Breach? = if (bytes > MAX_ICON_BYTES) Breach.IconSize else null
+
+    // a side not positive is no image to decode either
+    fun rasterIcon(bytes: Long, width: Int, height: Int): Breach? = when {
+        minOf(width, height) <= 0 || maxOf(width, height) > MAX_RASTER_ICON_SIDE -> Breach.RasterIconSide
+        bytes > MAX_RASTER_ICON_BYTES -> Breach.RasterIconSize
+        else -> null
+    }
+
+    fun sticker(bytes: Long, width: Int, height: Int): Breach? = when {
+        minOf(width, height) <= 0 || maxOf(width, height) > MAX_STICKER_SIDE -> Breach.StickerSide
+        bytes > MAX_STICKER_BYTES -> Breach.StickerSize
+        else -> null
+    }
+
+    /** By its header ([RasterIcon.header]): none read or an animated one is [Breach.RasterType]. */
+    fun rasterIcon(bytes: Long, header: RasterIcon.Header?): Breach? =
+        if (header == null || header.animated) Breach.RasterType else rasterIcon(bytes, header.width, header.height)
+
+    fun sticker(bytes: Long, header: RasterIcon.Header?): Breach? =
+        if (header == null || header.animated) Breach.RasterType else sticker(bytes, header.width, header.height)
 
     /** Before it is read (a 32 MB ".ogg" never read in); the rest is [SoundFile.check]'s. */
     fun soundSize(bytes: Long): Breach? = if (bytes > SoundFile.MAX_BYTES) Breach.SoundSize else null

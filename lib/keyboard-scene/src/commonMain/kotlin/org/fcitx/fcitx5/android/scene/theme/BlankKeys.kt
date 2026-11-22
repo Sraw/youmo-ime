@@ -35,7 +35,7 @@ object BlankKeys {
     val TOO_MANY = Blank("*", "*", emptySet(), emptySet())
 
     /** Bumped when what is found changes: a pack checked under another rule is checked again (the app's stamp). */
-    const val RULE = 4
+    const val RULE = 5
 
     // a theme past it is refused (TOO_MANY), never let through half asked
     private const val MAX_SCENE_SETS = 512
@@ -48,7 +48,7 @@ object BlankKeys {
      * Stricter than the keyboard: a required key is tried in every state the styles name, even one its role never enters.
      */
     fun find(theme: Theme, boards: List<Board>, limit: Int = 1): List<Blank> {
-        val deciding = theme.styles.filter { "fill" in it.values || "hidden" in it.values }
+        val deciding = theme.styles.filter { "fill" in it.values || "hidden" in it.values || "sticker" in it.values }
             .flatMap { it.selectors }.filter { it.widget == "key" }
         val sceneSets = unions(deciding.map { it.scenes }.toSet(), ::possible) ?: return listOf(TOO_MANY)
         val stateSets = unions(deciding.map { sel -> sel.states.mapNotNullTo(HashSet()) { KeyState.of(it) } - KeyState.Pressed }.toSet())

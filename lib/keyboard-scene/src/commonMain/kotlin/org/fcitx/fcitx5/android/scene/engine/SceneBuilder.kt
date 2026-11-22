@@ -281,7 +281,8 @@ class SceneBuilder(
                 fun hides(part: Part) = TextLook(c.of(whole.copy(part = part.xml)), theme).hidden
                 val shown = (key.label != null && !hides(Part.Label)) || (key.icon != null && !hides(Part.Icon))
                 val hidden = !shown && (key.label != null || key.icon != null)
-                if (hidden && KeyLook(c.of(whole), theme).fill !is Fill.Image) out += key to states
+                val look = KeyLook(c.of(whole), theme)
+                if (hidden && look.fill !is Fill.Image && look.sticker == null) out += key to states
             }
         }
         return out
@@ -438,13 +439,31 @@ class SceneBuilder(
 
     private fun mark(m: MarkDrawn) = KeyMarkYield.Mark(m.drawn.ink.toInk(), m.slot, m.drop, m.drawn.grows(measurer), m.user)
 
+    private fun iconsFor(k: Prepared, glyph: Drawn, looks: Looks): Drawn {
+        if (glyph.icons.none { it.part == Part.Icon }) return glyph
+        return glyph.copy(icons = glyph.icons.map { if (it.part == Part.Icon) it.copy(name = content.icon(k.key, looks, it.name)) else it })
+    }
+
+    // the label a hidden one would be, drawn while the sticker is decoded
+    private fun sticker(k: Prepared, states: Set<KeyState>, file: String): Op.Sticker {
+        val g = k.geometry.getValue(states)
+        val parts = k.parts.getValue(states)
+        val standIn = if (!parts(Part.Label).hidden) emptyList() else {
+            val shown: (Part) -> TextLook = { part -> parts(part).let { if (part == Part.Label) it.shown() else it } }
+            content.of(k.key, k.placed.cell, g.content, Looks(shown), g).glyph?.let { paint.content(iconsFor(k, it, Looks(shown)), shown) }.orEmpty()
+        }
+        return Op.Sticker(file, g.content, standIn = standIn)
+    }
+
     private fun node(k: Prepared, s: Settled): KeyNode {
         val cell = k.placed.cell
         val normal = k.geometry.getValue(k.states)
         val faces = k.looks.keys.associateWith { states ->
             val looks = k.parts.getValue(states)
-            val ops = paint.face(k.geometry.getValue(states), k.looks.getValue(states), KeyState.Pressed in states) +
-                listOfNotNull(s.glyph).flatMap { paint.content(it, looks) } +
+            val look = k.looks.getValue(states)
+            val ops = paint.face(k.geometry.getValue(states), look, KeyState.Pressed in states) +
+                listOfNotNull(look.sticker?.let { sticker(k, states, it) }) +
+                listOfNotNull(s.glyph).flatMap { paint.content(iconsFor(k, it, Looks(looks)), looks) } +
                 s.marks.filterNotNull().flatMap { paint.content(it, looks) }
             // a key that takes no press (展开候选's page that cannot turn): faded as a blank is
             if (KeyState.Disabled in states) ops.map { popups.faded(it, Popups.DISABLED_ALPHA) } else ops

@@ -112,6 +112,10 @@
     <string name="exception_theme_preview_size">The theme\'s preview image is over %1$s KB</string>
     <string name="exception_theme_preview_side">The theme\'s preview image is over %1$s pixels a side</string>
     <string name="exception_theme_icon_size">An icon of the theme is over %1$s KB</string>
+    <string name="exception_theme_raster_icon_side">A PNG or WebP icon of the theme is over %1$s pixels a side</string>
+    <string name="exception_theme_sticker_side">A sticker of the theme is over %1$s pixels a side</string>
+    <string name="exception_theme_sticker_size">A sticker of the theme is over %1$s KB</string>
+    <string name="exception_theme_raster_type" formatted="false">An icon or sticker of the theme is not a still PNG or WebP</string>
     <string name="exception_theme_sound">A key sound of the theme is not taken (Ogg Vorbis, 8/16-bit PCM WAV or MP3, at most 1 s): %1$s</string>
     <string name="exception_theme_sound_size">A key sound of the theme is over %1$s KB</string>
     <string name="exception_theme_effect_image_side">An effect image of the theme is over %1$s pixels a side</string>

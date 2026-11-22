@@ -356,14 +356,13 @@ class ThemeTest {
         val reserved = listOf(
             "side-padding=\"2% 5%\"", "bottom-padding=\"1%\"",
             "height=\"38% 52%\"", "width=\"24dp\"", "side-padding=\"8dp 48dp\"", "bottom-padding=\"0 0\"",
-            "sticker=\"cat.png\"",
         )
         assertEquals(Values.RESERVED.size, reserved.map { it.substringBefore('=') }.toSet().size, "every one tried")
         for (attr in reserved) {
             val w = warnings(withStyle("<style select=\"key\" $attr/>"))
             assertTrue(w.single().contains("${attr.substringBefore('=')}= is not supported"), "$attr: $w")
         }
-        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" sticker=\"cat.png\"/>")).getOr { error("$it") }
+        val t = ThemeReader.theme(withStyle("<style select=\"key\" fill=\"#123456\" width=\"24dp\"/>")).getOr { error("$it") }
         assertTrue(t.styles.last().values.keys == setOf("fill"))
         assertTrue(problems(withStyle("<style select=\"key\" color=\"#000000\" align=\"middle\"/>")).single().contains("align"))
         assertTrue(problems(withStyle("<style select=\"key\" transition=\"fast\"/>")).isNotEmpty())
@@ -512,7 +511,6 @@ class ThemeTest {
             listOf("79|transition= on clipboard does nothing: it reads fill radius color") +
             "79|fill= on candidate:first comment does nothing: it reads color" +
             "79|transition= on candidate:first comment does nothing: it reads color" +
-            listOf("80|sticker=").map { "$it is not supported by this version, ignored" } +
             "81|tail= does nothing beside a shape that is no bubble: only a bubble has a tail" +
             "83|<sound key=\"key\"> is not supported by this version, ignored"
         assertEquals(ignored, t.warnings().map { "${it.line}|${it.message}" })

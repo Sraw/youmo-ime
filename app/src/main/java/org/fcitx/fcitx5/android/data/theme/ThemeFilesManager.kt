@@ -685,27 +685,35 @@ object ThemeFilesManager {
     }
 
     private fun refused(breach: ThemeAssetLimits.Breach): Nothing {
-        val (message, limit) = when (breach) {
-            ThemeAssetLimits.Breach.Entries -> R.string.exception_theme_entries to ThemeAssetLimits.MAX_ENTRIES.toLong()
-            ThemeAssetLimits.Breach.FileSize -> R.string.exception_theme_file_size to ThemeAssetLimits.MAX_FILE_BYTES / MB
-            ThemeAssetLimits.Breach.TotalSize -> R.string.exception_theme_total_size to ThemeAssetLimits.MAX_TOTAL_BYTES / MB
-            ThemeAssetLimits.Breach.PictureSide -> R.string.exception_theme_picture_side to ThemeAssetLimits.MAX_PICTURE_SIDE.toLong()
-            ThemeAssetLimits.Breach.KeyImageSide -> R.string.exception_theme_key_image_side to ThemeAssetLimits.MAX_KEY_IMAGE_SIDE.toLong()
-            ThemeAssetLimits.Breach.KeyImageSize -> R.string.exception_theme_key_image_size to ThemeAssetLimits.MAX_KEY_IMAGE_BYTES / MB
-            ThemeAssetLimits.Breach.Overrides -> R.string.exception_theme_overrides to ThemeAssetLimits.MAX_OVERRIDES.toLong()
-            ThemeAssetLimits.Breach.ThemeXml -> R.string.exception_theme_xml_size to ThemeAssetLimits.MAX_THEME_XML_BYTES / KB
-            ThemeAssetLimits.Breach.Layouts -> R.string.exception_theme_layouts to ThemeAssetLimits.MAX_LAYOUTS.toLong()
-            ThemeAssetLimits.Breach.LayoutSize -> R.string.exception_theme_layout_size to ThemeAssetLimits.MAX_LAYOUT_BYTES / KB
-            ThemeAssetLimits.Breach.PreviewSize -> R.string.exception_theme_preview_size to ThemeAssetLimits.MAX_PREVIEW_BYTES / KB
-            ThemeAssetLimits.Breach.PreviewSide -> R.string.exception_theme_preview_side to ThemeAssetLimits.MAX_PREVIEW_SIDE.toLong()
-            ThemeAssetLimits.Breach.IconSize -> R.string.exception_theme_icon_size to ThemeAssetLimits.MAX_ICON_BYTES / KB
-            ThemeAssetLimits.Breach.EffectImageSide -> R.string.exception_theme_effect_image_side to ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE.toLong()
-            ThemeAssetLimits.Breach.EffectImageSize -> R.string.exception_theme_effect_image_size to ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES / KB
-            ThemeAssetLimits.Breach.EffectImageType -> R.string.exception_theme_effect_image_type to 0L
-            ThemeAssetLimits.Breach.SoundSize -> R.string.exception_theme_sound_size to SoundFile.MAX_BYTES / KB
-        }
+        val (message, limit) = REFUSALS.getValue(breach)
         errorRuntime(message, limit.toString())
     }
+
+    // a table, not a when: one entry per breach, held to every breach by a test
+    internal val REFUSALS: Map<ThemeAssetLimits.Breach, Pair<Int, Long>> = mapOf(
+        ThemeAssetLimits.Breach.Entries to (R.string.exception_theme_entries to ThemeAssetLimits.MAX_ENTRIES.toLong()),
+        ThemeAssetLimits.Breach.FileSize to (R.string.exception_theme_file_size to ThemeAssetLimits.MAX_FILE_BYTES / MB),
+        ThemeAssetLimits.Breach.TotalSize to (R.string.exception_theme_total_size to ThemeAssetLimits.MAX_TOTAL_BYTES / MB),
+        ThemeAssetLimits.Breach.PictureSide to (R.string.exception_theme_picture_side to ThemeAssetLimits.MAX_PICTURE_SIDE.toLong()),
+        ThemeAssetLimits.Breach.KeyImageSide to (R.string.exception_theme_key_image_side to ThemeAssetLimits.MAX_KEY_IMAGE_SIDE.toLong()),
+        ThemeAssetLimits.Breach.KeyImageSize to (R.string.exception_theme_key_image_size to ThemeAssetLimits.MAX_KEY_IMAGE_BYTES / MB),
+        ThemeAssetLimits.Breach.Overrides to (R.string.exception_theme_overrides to ThemeAssetLimits.MAX_OVERRIDES.toLong()),
+        ThemeAssetLimits.Breach.ThemeXml to (R.string.exception_theme_xml_size to ThemeAssetLimits.MAX_THEME_XML_BYTES / KB),
+        ThemeAssetLimits.Breach.Layouts to (R.string.exception_theme_layouts to ThemeAssetLimits.MAX_LAYOUTS.toLong()),
+        ThemeAssetLimits.Breach.LayoutSize to (R.string.exception_theme_layout_size to ThemeAssetLimits.MAX_LAYOUT_BYTES / KB),
+        ThemeAssetLimits.Breach.PreviewSize to (R.string.exception_theme_preview_size to ThemeAssetLimits.MAX_PREVIEW_BYTES / KB),
+        ThemeAssetLimits.Breach.PreviewSide to (R.string.exception_theme_preview_side to ThemeAssetLimits.MAX_PREVIEW_SIDE.toLong()),
+        ThemeAssetLimits.Breach.IconSize to (R.string.exception_theme_icon_size to ThemeAssetLimits.MAX_ICON_BYTES / KB),
+        ThemeAssetLimits.Breach.EffectImageSide to (R.string.exception_theme_effect_image_side to ThemeAssetLimits.MAX_EFFECT_IMAGE_SIDE.toLong()),
+        ThemeAssetLimits.Breach.EffectImageSize to (R.string.exception_theme_effect_image_size to ThemeAssetLimits.MAX_EFFECT_IMAGE_BYTES / KB),
+        ThemeAssetLimits.Breach.EffectImageType to (R.string.exception_theme_effect_image_type to 0L),
+        ThemeAssetLimits.Breach.SoundSize to (R.string.exception_theme_sound_size to SoundFile.MAX_BYTES / KB),
+        ThemeAssetLimits.Breach.RasterIconSide to (R.string.exception_theme_raster_icon_side to ThemeAssetLimits.MAX_RASTER_ICON_SIDE.toLong()),
+        ThemeAssetLimits.Breach.RasterIconSize to (R.string.exception_theme_icon_size to ThemeAssetLimits.MAX_RASTER_ICON_BYTES / KB),
+        ThemeAssetLimits.Breach.StickerSide to (R.string.exception_theme_sticker_side to ThemeAssetLimits.MAX_STICKER_SIDE.toLong()),
+        ThemeAssetLimits.Breach.StickerSize to (R.string.exception_theme_sticker_size to ThemeAssetLimits.MAX_STICKER_BYTES / KB),
+        ThemeAssetLimits.Breach.RasterType to (R.string.exception_theme_raster_type to 0L),
+    )
 
     private const val MB = 1024L * 1024
     private const val KB = 1024L

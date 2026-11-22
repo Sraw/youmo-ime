@@ -35,8 +35,8 @@ object ThemeWriter {
             colors(it)
             appendLine("  </colors>")
         }
-        theme.picture?.let { p ->
-            appendLine("""  <picture src="${escape(p.src)}" brightness="${number(p.brightness)}%" blur="${length(p.blurDp)}"${if (p.animated) " animated=\"true\"" else ""}>""")
+        listOfNotNull(theme.picture?.let { it to "" }, theme.darkPicture?.let { it to " variant=\"dark\"" }).forEach { (p, variant) ->
+            appendLine("""  <picture$variant src="${escape(p.src)}" brightness="${number(p.brightness)}%" blur="${length(p.blurDp)}"${if (p.animated) " animated=\"true\"" else ""}>""")
             p.cuts.entries.sortedBy { (o, _) -> CUTS.indexOf(o).takeIf { it >= 0 } ?: CUTS.size }.forEach { (o, file) ->
                 appendLine("""    <cut orientation="${escape(o)}" file="${escape(file)}"/>""")
             }
@@ -48,7 +48,7 @@ object ThemeWriter {
             val props = WRITTEN.mapNotNull { p -> s.values[p]?.let { p to value(p, it) } }
             element("  ", "style", listOf("select" to s.selectors.joinToString(", ", transform = ::selector)) + props)
         }
-        theme.icons.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "icon", listOf("name" to name, "src" to src)) }
+        theme.icons.entries.sortedBy { it.key }.forEach { (name, src) -> element("  ", "icon", listOf("name" to name, "src" to src) + listOfNotNull(("tint" to "true").takeIf { name in theme.tintedIcons })) }
         if (theme.soundFiles.isNotEmpty()) {
             appendLine("  <sounds>")
             theme.soundFiles.forEach { (key, src) -> element("    ", "sound", listOf("key" to key, "src" to src)) }
