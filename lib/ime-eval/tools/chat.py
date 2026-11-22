@@ -3,7 +3,7 @@
 """
 What make-chat-set.py, make-dialog-sets.py and make-mixed-set.py share: the runs they cut chat
 text into, which runs they keep, and how a run is typed. A module of its own, as a script's
-name cannot be imported; the three import it by name from this directory.
+name cannot be imported; they and make-long-set.py import it by name from this directory.
 """
 import re
 from collections import defaultdict

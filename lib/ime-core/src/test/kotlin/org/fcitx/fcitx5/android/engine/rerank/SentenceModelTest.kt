@@ -11,6 +11,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.LockSupport
 import kotlin.math.exp
 
 class SentenceModelTest {
@@ -167,13 +174,13 @@ class SentenceModelTest {
 
     @Test
     fun onlyWhatFitsTheWindowIsRead() {
-        // window 8, room for 5: 2 of the context fit, and 1 is read when it all does not
+        // window 8, room for 5: 2 of the context fit, and 1 from tailStart is read when it all does not
         val scorer = model.Scorer(room = 5)
         fun after(vararg tokens: Int) = tiny.logProbs(intArrayOf(SentenceModel.BOS) + tokens)[tokens.size][4].toDouble()
-        assertEquals(after(5), scorer.score("的的的我好", listOf("你"))[0].toDouble(), 1e-4)
-        // the last half again, not going on from what was read before
-        assertEquals(after(3), scorer.score("的的的我好我", listOf("你"))[0].toDouble(), 1e-4)
-        assertEquals(after(5), scorer.score("的的的我好我好", listOf("你"))[0].toDouble(), 1e-4)
+        fun tail(text: String) = model.encode(text).let { it.copyOfRange(SentenceModel.tailStart(it, 2), it.size) }
+        for (text in listOf("的的的我好", "的的的我好我", "的的的我好我好", "天我好")) {
+            assertEquals(text, after(*tail(text)), scorer.score(text, listOf("你"))[0].toDouble(), 1e-4)
+        }
         assertEquals(after(6, 3), scorer.score("的我", listOf("你"))[0].toDouble(), 1e-4)
         assertEquals(after(), scorer.score("", listOf("你"))[0].toDouble(), 1e-4)
         val long = "我".repeat(20)
@@ -195,7 +202,7 @@ class SentenceModelTest {
         val texts = listOf("我", "你", "好", "的", "天")
         val random = java.util.Random(20261121)
         val contexts = List(40) { (0 until random.nextInt(14)).joinToString("") { texts[random.nextInt(texts.size)] } }
-        // room 20: 11 of the context fit, beyond it 5 are read
+        // room 20: 11 of the context fit, beyond it 6 to 8 are read
         val going = big.Scorer(room = 20)
         val warmed = big.Scorer(room = 20)
         var text = ""
@@ -204,7 +211,209 @@ class SentenceModelTest {
             assertArrayEquals("'$context'", alone, going.score(context, readings, relative = true), 0f)
             warmed.prewarm(context)
             assertArrayEquals("'$context' read ahead", alone, warmed.score(context, readings, relative = true), 0f)
+            // nor what lies before the 12 tokens the start is chosen from
+            val end = context.takeLast(12 + random.nextInt(4))
+            if (context.length > 12) assertArrayEquals("'$context' as '$end'", alone, going.score(end, readings, relative = true), 0f)
         }
+    }
+
+    /**
+     * A long text's start is its last tokens' alone: half to three quarters of what fits, the same whatever came
+     * before them, and kept as text is added until it no longer fits or the start just let in hashes higher.
+     */
+    @Test
+    fun aLongContextIsReadFromAStartTheTextAloneSays() {
+        val random = java.util.Random(20261121)
+        val text = IntArray(3000) { 3 + random.nextInt(200) }
+        for (limit in listOf(1, 2, 39, 103)) {
+            val shortest = (limit + 1) / 2
+            val longest = maxOf(shortest, 3 * limit / 4)
+            var last = -1
+            var moves = 0
+            for (n in limit + 1..text.size) {
+                val start = SentenceModel.tailStart(text.copyOf(n), limit)
+                assertTrue("$limit at $n: $start", n - start in shortest..longest)
+                // what lies before the last limit + 1 tokens changes nothing
+                val from = n - limit - 1 - random.nextInt(n - limit)
+                assertEquals("$limit at $n from $from", start, from + SentenceModel.tailStart(text.copyOfRange(from, n), limit))
+                if (last >= 0 && start != last) {
+                    moves++
+                    assertTrue("$limit at $n: moved from $last to $start", n - last > longest || start == n - shortest)
+                }
+                last = start
+            }
+            // a start held while it is in range: about twice a range's width apart
+            if (limit >= 39) assertTrue("$limit: moved $moves times", moves < text.size * 3 / (longest - shortest + 1))
+        }
+        assertEquals(5, SentenceModel.tailStart(IntArray(5) { 3 }, 0))
+        assertEquals(0, SentenceModel.tailStart(IntArray(5) { 3 }, 5))
+    }
+
+    /** Text added to a long context is all that is read of it, mostly: the start moves seldom. */
+    @Test
+    fun theNextStartIsKnownWhateverTextFollows() {
+        val random = java.util.Random(3)
+        val text = IntArray(2000) { 3 + random.nextInt(200) }
+        for (limit in listOf(39, 103)) {
+            val within = (limit + 3) / 4
+            var positions = 0
+            var known = 0
+            for (n in limit - within..text.size - within) {
+                val next = SentenceModel.nextStart(text.copyOf(n), limit, within)
+                // where the start goes as the text goes on, and as other text would
+                for (more in listOf(text.copyOf(n + within), text.copyOf(n) + IntArray(within) { 3 + random.nextInt(200) })) {
+                    val now = SentenceModel.tailStart(more.copyOf(n), limit)
+                    val moved = (n + 1..n + within).map { SentenceModel.tailStart(more.copyOf(it), limit) }.firstOrNull { it != now }
+                    if (next >= 0) assertEquals("$limit at $n", moved, next)
+                }
+                if (next >= 0) known++
+                if (n > limit) positions++
+            }
+            assertTrue("$limit: $known of $positions known", known > positions * 9 / 10)
+        }
+        assertEquals(-1, SentenceModel.nextStart(IntArray(5) { 3 }, 0, 4))
+    }
+
+    /** The next start's chain read ahead, whole, one step of it or not at all, changes no score; read, a commit reads less. */
+    @Test
+    fun aChainReadAheadChangesNoScore() {
+        val chars = "一二三四五六七八九十百千万上下左右前后东南西北春夏秋冬风花雪月山水天地人你我他的是不了在有"
+        val t = TinyModel(vocab = listOf("<pad>", "<unk>", "<bos>") + chars.map { it.toString() }, window = 128)
+        var run = 0
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                if (rows == 3 * t.width) run += m
+                super.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
+        val counted = t.load(kernel = kernel)
+        val plain = t.load()
+        val scorers = listOf(counted.Scorer(), counted.Scorer(readsNext = true), counted.Scorer(readsNext = true))
+        val read = IntArray(scorers.size)
+        val readings = listOf("我你", "天地")
+        val random = java.util.Random(11)
+        var text = ""
+        while (text.length < 900) {
+            text += (0 until 1 + random.nextInt(4)).joinToString("") { chars[random.nextInt(chars.length)].toString() }
+            val context = text.takeLast(128)
+            val alone = plain.Scorer().score(context, readings)
+            for ((i, scorer) in scorers.withIndex()) {
+                run = 0
+                scorer.prewarm(context)
+                if (text.length > 300) read[i] += run / t.layers
+                assertArrayEquals("$i '$context'", alone, scorer.score(context, readings), 0f)
+                var steps = 0
+                if (i == 1) scorer.readNext(context)
+                if (i == 2) scorer.readNext(context) { steps++ > 0 }
+            }
+        }
+        assertTrue(read.joinToString(), read[1] < read[0] / 2 && read[2] < read[0])
+    }
+
+    /**
+     * A key taking another context while the chain is read ahead waits for the step being read and no other, takes
+     * the half-read chain and scores as a scorer of its own; the read ends there.
+     */
+    @Test
+    fun aKeyWaitsForTheStepOfAReadAheadAndNoMore() {
+        val chars = "一二三四五六七八九十百千万上下左右前后东南西北春夏秋冬风花雪月山水天地人你我他的是不了在有"
+        val t = TinyModel(vocab = listOf("<pad>", "<unk>", "<bos>") + chars.map { it.toString() }, window = 128)
+        val reader = AtomicReference<Thread>()
+        val inStep = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val run = ConcurrentHashMap<Thread, AtomicInteger>()
+        val step = SentenceModel.NEXT_STEP * t.layers
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                if (rows == 3 * t.width) {
+                    val counted = run.getOrPut(Thread.currentThread()) { AtomicInteger() }
+                    // the reader's second step begun: on the chain's lock
+                    if (Thread.currentThread() === reader.get() && counted.get() == step && inStep.count > 0) {
+                        inStep.countDown()
+                        release.await()
+                    }
+                    counted.addAndGet(m)
+                }
+                super.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
+        val counted = t.load(kernel = kernel)
+        val limit = t.window - 1 - SentenceModel.ROOM
+        val random = java.util.Random(5)
+        fun more() = chars[random.nextInt(chars.length)].toString()
+        // a context whose start moves soon, and the text that moves it
+        var context = (0 until limit + 1).joinToString("") { more() }
+        while (SentenceModel.nextStart(counted.encode(context), limit, (limit + 3) / 4) < 0) context += more()
+        val from = SentenceModel.nextStart(counted.encode(context), limit, (limit + 3) / 4)
+        var moved = context
+        while (SentenceModel.tailStart(counted.encode(moved), limit) != from) moved += more()
+        assertTrue("${moved.length - from} of ${context.length - from}", context.length - from > 3 * SentenceModel.NEXT_STEP)
+        val readings = listOf("我你", "天地")
+        val alone = counted.Scorer()
+        // <bos> read first, so what is counted is the context's and the readings'
+        alone.prewarm("")
+        run.clear()
+        val expected = alone.score(moved, readings)
+        val readAlone = run.values.sumOf { it.get() }
+
+        val scorer = counted.Scorer(readsNext = true)
+        scorer.prewarm(context)
+        val reading = Thread { scorer.readNext(context) }.also(reader::set)
+        reading.start()
+        assertTrue(inStep.await(1, TimeUnit.MINUTES))
+        val key = FutureTask { scorer.score(moved, readings) }
+        val keyThread = Thread(key).apply { start() }
+        try {
+            val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(1)
+            while (LockSupport.getBlocker(keyThread) == null && !key.isDone && System.nanoTime() < deadline) Thread.yield()
+            assertTrue("the key is not waiting on the chain's lock", LockSupport.getBlocker(keyThread) != null)
+        } finally {
+            release.countDown()
+        }
+        assertArrayEquals(expected, key.get(1, TimeUnit.MINUTES), 0f)
+        reading.join(TimeUnit.MINUTES.toMillis(1))
+        assertEquals("the read ahead went on past the key", 2 * step, run.getValue(reading).get())
+        assertEquals("the key did not take the two steps read", readAlone - 2 * step, run.getValue(keyThread).get())
+    }
+
+    @Test
+    fun aCommitReadsWhatItAddedNotTheWholeContext() {
+        val chars = "一二三四五六七八九十百千万上下左右前后东南西北春夏秋冬风花雪月山水天地人你我他的是不了在有"
+        val t = TinyModel(vocab = listOf("<pad>", "<unk>", "<bos>") + chars.map { it.toString() }, window = 128)
+        var run = 0
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                // the attention's input, once a layer for each node run
+                if (rows == 3 * t.width) run += m
+                super.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
+        val counted = t.load(kernel = kernel)
+        val scorer = counted.Scorer()
+        val limit = t.window - 1 - SentenceModel.ROOM
+        val random = java.util.Random(7)
+        var text = ""
+        var commits = 0
+        while (text.length < 1200) {
+            text += (0 until 1 + random.nextInt(4)).joinToString("") { chars[random.nextInt(chars.length)].toString() }
+            // as the session keeps it: its last 128 chars
+            scorer.prewarm(text.takeLast(128))
+            if (text.length > 300) commits++ else run = 0
+        }
+        val tokens = run / t.layers
+        // a start moved every commit (half of what fits) would read limit / 2 each
+        assertTrue("$tokens tokens over $commits commits", tokens < commits * (limit / 2) / 3)
+        val readings = listOf("我你", "天地")
+        assertArrayEquals(t.load().Scorer().score(text.takeLast(128), readings), scorer.score(text.takeLast(128), readings), 0f)
     }
 
     private fun rejects(bytes: ByteArray) {

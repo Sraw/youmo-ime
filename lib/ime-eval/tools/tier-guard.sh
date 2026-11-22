@@ -1,12 +1,13 @@
 #!/bin/bash
-# The 性能档位 guard: four sets typed at each tier, held row for row to lib/ime-eval/data/tier-baseline.tsv.
+# The 性能档位 guard: five sets typed at each tier, held row for row to lib/ime-eval/data/tier-baseline.tsv.
 #
 #   EVAL=<ime-eval launcher> DATA=<pinyin.data> MODELS=<dir> tier-guard.sh [--rebaseline] [--device] [<work dir>]
 #
 # MODELS holds sentence-model.safetensors and sentence-model-large.safetensors (as
 # app/build/generated/engine-models/engine has them). Sets: full pinyin (pinyin-chat.tsv), the nine keys
 # (pinyin-chat.tsv typed by `t9`, read t9-strict with 中英混输), 小鹤 (pinyin-chat.tsv typed by `shuangpin
-# xiaohe`) and the main set (pinyin.tsv); every one with neighbouring keys, as the app reads by default.
+# xiaohe`), the main set (pinyin.tsv) and full pinyin past the large model's window (pinyin-long.tsv), where
+# the start it reads from is chosen; every one with neighbouring keys, as the app reads by default.
 # Each set × tier gives its first-candidate and first-five rows; high also the keys its gate sent to the
 # large model. Exits 0 when every number equals the baseline's, 1 when one differs, 2 when a run fails,
 # and 3 when the data or a model is not the baseline's (a new baseline is due: no verdict). Without a work dir it
@@ -66,6 +67,7 @@ RUNS=(
   "t9	$WORK/chat-t9.tsv	--scheme t9-strict --latin on --neighbours on	engine-pinyin NINE=1"
   "xiaohe	$WORK/chat-xiaohe.tsv	--scheme xiaohe --neighbours on	engine-shuangpin"
   "main	$SETS/pinyin.tsv	--neighbours on	engine-pinyin"
+  "long	$SETS/pinyin-long.tsv	--neighbours on	engine-pinyin"
 )
 # rows, first-candidate rows and first-five rows of <set> <result>: as Metrics scores them, a result line a sample in order
 count() {

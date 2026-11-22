@@ -20,7 +20,7 @@ KEYS = ROWS * KEY_LENGTH
 FAKE = r'''#!/usr/bin/env python3
 import json, os, sys
 from pathlib import Path
-NAMES = {"pinyin-chat": "pinyin", "chat-t9": "t9", "chat-xiaohe": "xiaohe", "pinyin": "main"}
+NAMES = {"pinyin-chat": "pinyin", "chat-t9": "t9", "chat-xiaohe": "xiaohe", "pinyin": "main", "pinyin-long": "long"}
 
 def samples(path):
     lines = [l for l in Path(path).read_text().splitlines() if l.strip() and not l.startswith("#")]
@@ -71,6 +71,7 @@ def plan():
         'xiaohe': {'low': [600, 900], 'medium': [650, 900], 'high': [670, 900], 'escalated': KEYS * 30 // 100},
         # 0.2 points of 1000 rows: two behind is still in
         'main': {'low': [700, 850], 'medium': [720, 850], 'high': [718, 850], 'escalated': 100},
+        'long': {'low': [700, 850], 'medium': [720, 850], 'high': [720, 850], 'escalated': 100},
     }
 
 
@@ -91,7 +92,7 @@ class TierGuardTest(unittest.TestCase):
         executable(self.tmp / 'ime-eval', FAKE)
         sets = here / 'data'
         sets.mkdir()
-        for name in ('pinyin-chat', 'pinyin'):
+        for name in ('pinyin-chat', 'pinyin', 'pinyin-long'):
             rows = ''.join('k%05d\t词%d\ttag\n' % (i, i) for i in range(ROWS))
             (sets / f'{name}.tsv').write_text('# a set\n' + rows)
         self.baseline = sets / 'tier-baseline.tsv'
@@ -184,12 +185,13 @@ class TierGuardTest(unittest.TestCase):
         self.assertEqual(0, status, out)
         self.assertIn('the device as the JVM', out)
         calls = self.calls.read_text().splitlines()
-        self.assertEqual(12, len(calls), calls)
+        self.assertEqual(15, len(calls), calls)
         # installed once, then typed on what it installed
-        self.assertEqual(['1'] + ['0'] * 11, [c.split()[4] for c in calls])
+        self.assertEqual(['1'] + ['0'] * 14, [c.split()[4] for c in calls])
         self.assertIn('chat-t9.tsv engine-pinyin medium 1 0', calls)
         self.assertIn('chat-xiaohe.tsv engine-shuangpin high - 0', calls)
         self.assertIn('pinyin.tsv engine-pinyin low - 0', calls)
+        self.assertIn('pinyin-long.tsv engine-pinyin high - 0', calls)
         # no timing in what is compared
         self.assertEqual('k00000\t词0\tx1\tx2\tx3\tx4', (work / 'main-low.shown.tsv').read_text().splitlines()[0])
 

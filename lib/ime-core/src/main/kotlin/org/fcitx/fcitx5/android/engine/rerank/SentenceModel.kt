@@ -7,6 +7,9 @@ package org.fcitx.fcitx5.android.engine.rerank
 import org.fcitx.fcitx5.android.core.CoreLog
 import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.math.sqrt
 
 /**
@@ -252,19 +255,32 @@ class SentenceModel private constructor(
     // a node's per-layer keys and values, its output and normed output
     private fun nodeFloats() = 2 * config.layers * config.width + 2 * config.width
 
+    /** A chain of its own lock, so [Scorer.readNext] fills it on another thread while a key scores on the scorer's. */
+    private class Spare {
+        val lock = ReentrantLock()
+        var chain = ArrayList<Node>()
+    }
+
     /**
      * Scores readings after one context, a keystroke at a time: nodes run are kept by token prefix for the next
      * reading, keystroke and continued context. What is kept changes the time only, never a score.
      */
-    inner class Scorer(room: Int = ROOM, private val limit: Int = KEPT_FLOATS / nodeFloats()) {
+    inner class Scorer(room: Int = ROOM, private val limit: Int = KEPT_FLOATS / nodeFloats(), readsNext: Boolean = false) {
         private val maxContext = maxOf(0, window - 1 - room)
+
+        // the chain from the start the context's tail moves to next, read ahead by [readNext]
+        private val next = if (readsNext) Spare() else null
 
         private val bos get() = this@SentenceModel.bos
 
-        private var context: String? = null
+        // read by [readNext] off the scorer's thread
+        @Volatile private var context: String? = null
+
+        // moved on by each new context [start] takes: a [readNext] begun before gives the chain up at its next step
+        private val started = AtomicInteger()
 
         // the context read so far, a node per token after <bos>, and what remains to read
-        private val chain = ArrayList<Node>()
+        private var chain = ArrayList<Node>()
         private var target = IntArray(0)
 
         /** A token after [parent], [logits] summed up to it; run into a node only once something follows, as the last needs only its logit. */
@@ -318,6 +334,39 @@ class SentenceModel private constructor(
             start(context)
         }
 
+        /**
+         * Once the start [context]'s tail is read from will move within a quarter of what fits, reads the chain from
+         * where it moves to, [NEXT_STEP] tokens at a time on its own lock, so the commit that moves it reads only what it
+         * added. Only [start] takes the chain, where it holds more of its context: it changes the time, never a score.
+         * The one call that may run beside the others. It ends at the step after [start] takes another context or
+         * [stop] says so, both looked at on the lock, so a key waits for one step at most; [pause] runs between steps.
+         */
+        fun readNext(context: String, stop: () -> Boolean = { false }, pause: () -> Unit = {}) {
+            val next = next ?: return
+            val at = started.get()
+            if (context != this.context) return
+            val tokens = encode(context)
+            val from = nextStart(tokens, maxContext, within = (maxContext + 3) / 4)
+            if (from < 0) return
+            val target = tokens.copyOfRange(from, tokens.size)
+            while (true) {
+                pause()
+                val done = next.lock.withLock {
+                    if (started.get() != at || stop()) return
+                    val chain = next.chain
+                    val have = common(chain, target)
+                    while (chain.size > have) chain.removeAt(chain.size - 1)
+                    val count = minOf(NEXT_STEP, target.size - have)
+                    if (count > 0) {
+                        val parents = List(count) { if (it == 0) chain.lastOrNull() ?: bos else null }
+                        chain += nextMany(parents, IntArray(count) { it - 1 }, target.copyOfRange(have, have + count))
+                    }
+                    have + count == target.size
+                }
+                if (done) return
+            }
+        }
+
         /** Runs together the nodes [tokens] go through that are not kept: each reading's positions before its last token, by key. */
         private fun runNew(first: Node, tokens: List<IntArray>): Map<String, Node> {
             val parents = ArrayList<Node?>()
@@ -369,10 +418,21 @@ class SentenceModel private constructor(
         private fun start(context: String): Node {
             if (context != this.context) {
                 this.context = context
+                started.incrementAndGet()
                 kept.clear()
                 target = target(encode(context))
-                var common = 0
-                while (common < chain.size && common < target.size && chain[common].token == target[common]) common++
+                var common = common(chain, target)
+                // the step [readNext] is in, at most: it sees the context moved on before another
+                next?.lock?.withLock {
+                    val ahead = common(next.chain, target)
+                    if (ahead > common) {
+                        // the chain let go starts before any start to come: given up, not kept as a third
+                        val taken = next.chain
+                        next.chain = chain.apply { clear() }
+                        chain = taken
+                        common = ahead
+                    }
+                }
                 while (chain.size > common) chain.removeAt(chain.size - 1)
             }
             if (chain.size < target.size) {
@@ -382,6 +442,12 @@ class SentenceModel private constructor(
                 chain += nextMany(parents, IntArray(count) { it - 1 }, target.copyOfRange(from, target.size))
             }
             return chain.lastOrNull() ?: bos
+        }
+
+        private fun common(nodes: List<Node>, tokens: IntArray): Int {
+            var common = 0
+            while (common < nodes.size && common < tokens.size && nodes[common].token == tokens[common]) common++
+            return common
         }
 
         /** Drops steps none of [tokens] goes through. */
@@ -395,13 +461,11 @@ class SentenceModel private constructor(
         }
 
         /**
-         * The tail of [context] to read: all of it if it fits, else the last half of what fits. From the context
-         * alone, never from what was read before, so a pick does not depend on what was typed or scored earlier.
+         * The tail of [context] to read: all of it if it fits, else from [tailStart]. From the context alone, never
+         * from what was read before, so a pick does not depend on what was typed or scored earlier.
          */
-        private fun target(context: IntArray): IntArray {
-            val kept = if (context.size <= maxContext) context.size else maxContext / 2
-            return context.copyOfRange(context.size - kept, context.size)
-        }
+        private fun target(context: IntArray): IntArray =
+            if (context.size <= maxContext) context else context.copyOfRange(tailStart(context, maxContext), context.size)
 
         /** Leading positions all [tokens] share: each adds the same denominator to every reading. */
         private fun shared(tokens: List<IntArray>): Int {
@@ -425,6 +489,62 @@ class SentenceModel private constructor(
         internal const val SUM_ROWS = 32
         private const val EPS = 1e-5f
         private const val MAX_LAYERS = 64
+
+        /** Tokens [Scorer.readNext] runs at a time on its lock: a key that takes the chain waits at most for these. */
+        internal const val NEXT_STEP = 8
+
+        /**
+         * Where [tokens] past [limit] are read from: of the starts leaving 1/2 to 3/4 of [limit], the one whose pair of
+         * tokens about it hashes highest, the last of equals. Chosen by the text, it stays as text is added until it
+         * falls out or a higher one comes in, so most commits read only what they added; a move reads no more than
+         * 3/4 of it, and a big commit, skipping a start, about the half a fixed cut read.
+         */
+        internal fun tailStart(tokens: IntArray, limit: Int): Int {
+            if (tokens.size <= limit) return 0
+            if (limit < 1) return tokens.size
+            return highest(tokens, tokens.size - longest(limit), tokens.size - shortest(limit))
+        }
+
+        /**
+         * The start [tailStart] moves to as tokens are added to [tokens], whichever they are, if it moves within
+         * [within] of them; -1 if not, or if that start's pair is not yet in [tokens]. The range being narrower than
+         * the shortest tail, it mostly is.
+         */
+        internal fun nextStart(tokens: IntArray, limit: Int, within: Int): Int {
+            if (limit < 1) return -1
+            val now = tailStart(tokens, limit)
+            for (size in maxOf(tokens.size, limit) + 1..tokens.size + within) {
+                if (size - shortest(limit) >= tokens.size) return -1
+                val start = highest(tokens, size - longest(limit), size - shortest(limit))
+                if (start != now) return start
+            }
+            return -1
+        }
+
+        private fun shortest(limit: Int) = (limit + 1) / 2
+
+        private fun longest(limit: Int) = maxOf(shortest(limit), 3 * limit / 4)
+
+        private fun highest(tokens: IntArray, from: Int, to: Int): Int {
+            var best = -1
+            var bestHash = 0
+            for (p in from..to) {
+                val h = cutHash(tokens[p - 1], tokens[p])
+                if (best < 0 || Integer.compareUnsigned(h, bestHash) >= 0) {
+                    best = p
+                    bestHash = h
+                }
+            }
+            return best
+        }
+
+        // murmur3's finaliser on the pair (ids are below 2^16): the same bits on every machine
+        private fun cutHash(a: Int, b: Int): Int {
+            var h = a shl 16 or b
+            h = (h xor (h ushr 16)) * -0x7a143595
+            h = (h xor (h ushr 13)) * -0x3d4d51cb
+            return h xor (h ushr 16)
+        }
 
         internal fun layerNorm(x: FloatArray, norm: Norm, out: FloatArray) {
             val n = norm.weight.size

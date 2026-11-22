@@ -181,9 +181,15 @@ needs the built data, and minutes):
 EVAL=$E DATA=$D MODELS=$M lib/ime-eval/tools/tier-guard.sh
 ```
 
-It types four sets at the three tiers, every reading with neighbouring keys as the app's default:
+It types five sets at the three tiers, every reading with neighbouring keys as the app's default:
 `pinyin-chat` as full pinyin, the same typed on the nine keys (`t9`, read `t9-strict` with
-`--latin on`) and in 小鹤 (`shuangpin xiaohe`), and `pinyin`. Each set and tier gives its rows, its
+`--latin on`) and in 小鹤 (`shuangpin xiaohe`), `pinyin`, and `pinyin-long` (`tools/make-long-set.py`:
+web runs after 110–200 chars of the web set's lines joined, past the large model's window, so the start it
+reads from is held; joined fragments, mostly of other pages, not one text). `pinyin-long-docs`
+(`make-long-set.py --docs`: runs of docs/'s help pages after 110–200 chars of the same page) is one text
+each and is not in the guard: measure a change to how much the models read before on it as well, at
+medium and high, with `$E pinyin $D lib/ime-eval/data/pinyin-long-docs.tsv out.tsv --neighbours on --tier high --models $M`
+and the first candidates counted against the second column. Each set and tier gives its rows, its
 first-candidate and first-five rows, and at high the keys escalated; `lib/ime-eval/data/tier-baseline.tsv`
 keeps them as integers with the SHA-256 of `pinyin.data` and both models. Every number must equal the
 baseline's (exit 1 otherwise; exit 3, no verdict, when the data or a model is not the baseline's).

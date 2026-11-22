@@ -272,6 +272,144 @@ class RerankerTest {
         }
     }
 
+    private val chars = "一二三四五六七八九十百千万上下左右前后东南西北春夏秋冬风花雪月山水天地人你我他的是不了在有"
+
+    // past the context that fits, so the next start's chain is read ahead
+    private val wide = TinyModel(vocab = listOf("<pad>", "<unk>", "<bos>") + chars.map { it.toString() }, window = 128)
+
+    /** A newer context asked for ends a read ahead at its next step, though a key took the ask before the read saw it. */
+    @Test
+    fun aReadAheadEndsForANewerContextThoughAKeyTookTheAsk() {
+        val reader = AtomicReference<Thread>()
+        val inStep = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val run = ConcurrentHashMap<Thread, AtomicInteger>()
+        val limit = wide.window - 1 - SentenceModel.ROOM
+        val random = java.util.Random(5)
+        var context = (0 until limit + 1).joinToString("") { chars[random.nextInt(chars.length)].toString() }
+        val plain = wide.load()
+        while (SentenceModel.nextStart(plain.encode(context), limit, (limit + 3) / 4) < 0) context += chars[random.nextInt(chars.length)]
+        val warmed = context.length - SentenceModel.tailStart(plain.encode(context), limit)
+        val step = SentenceModel.NEXT_STEP * wide.layers
+        val kernel = object : MatrixKernel {
+            override fun times(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            @Suppress("LongParameterList")
+            override fun timesManyQ8(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                if (rows == 3 * wide.width) {
+                    val counted = run.getOrPut(Thread.currentThread()) { AtomicInteger() }
+                    // the read ahead's second step begun
+                    if (Thread.currentThread() === reader.get() && counted.get() == warmed * wide.layers + step && inStep.count > 0) {
+                        inStep.countDown()
+                        release.await()
+                    }
+                    counted.addAndGet(m)
+                }
+                super.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
+        val queued = ArrayList<Runnable>()
+        // <bos> read here, so the reader's first reads are the context's
+        val counted = wide.load(kernel = kernel).apply { Scorer().prewarm("") }
+        val ahead = Reranker(counted, ahead = { if (reader.get() == null) Thread(it).also(reader::set).start() else queued += it })
+        ahead.prewarm(context)
+        assertTrue(inStep.await(1, TimeUnit.MINUTES))
+        val expected = Reranker(plain).combined(context, readings, priors).map(Float::toRawBits)
+        try {
+            ahead.prewarm(context + "的")
+            // the context the scorer has: it takes no chain and leaves the read alone
+            assertEquals(expected, ahead.combined(context, readings, priors).map(Float::toRawBits))
+        } finally {
+            release.countDown()
+        }
+        reader.get().join(TimeUnit.MINUTES.toMillis(1))
+        assertEquals("the read ahead went on for a context no longer asked for", warmed * wide.layers + 2 * step, run.getValue(reader.get()).get())
+        queued.single().run()
+        assertEquals(expected, ahead.combined(context, readings, priors).map(Float::toRawBits))
+    }
+
+    /** A key that reads the commit's context before the read ahead does leaves the next start's chain to it, and the move takes that chain. */
+    @Test
+    fun aKeyBeforeTheReadAheadLeavesItTheNextChain() {
+        var run = 0
+        val kernel = object : MatrixKernel {
+            override fun times(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            @Suppress("LongParameterList")
+            override fun timesManyQ8(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                if (rows == 3 * wide.width) run += m
+                super.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
+        val limit = wide.window - 1 - SentenceModel.ROOM
+        val plain = wide.load()
+        val random = java.util.Random(5)
+        fun more() = chars[random.nextInt(chars.length)].toString()
+        var context = (0 until limit + 1).joinToString("") { more() }
+        while (SentenceModel.nextStart(plain.encode(context), limit, (limit + 3) / 4) < 0) context += more()
+        val from = SentenceModel.nextStart(plain.encode(context), limit, (limit + 3) / 4)
+        var moved = context
+        while (SentenceModel.tailStart(plain.encode(moved), limit) != from) moved += more()
+        val counted = wide.load(kernel = kernel).apply { Scorer().prewarm("") }
+        val queued = ArrayList<Runnable>()
+        val ahead = Reranker(counted, ahead = { queued += it })
+        ahead.prewarm(context)
+        assertEquals(Reranker(plain).combined(context, readings, priors).map(Float::toRawBits), ahead.combined(context, readings, priors).map(Float::toRawBits))
+        run = 0
+        queued.removeAt(0).run()
+        assertEquals("the next chain read", context.length - from, run / wide.layers)
+        ahead.prewarm(moved)
+        run = 0
+        queued.removeAt(0).run()
+        val next = SentenceModel.nextStart(plain.encode(moved), limit, (limit + 3) / 4)
+        // what came after the chain taken, then the chain after the move
+        assertEquals("the move read the tail anew", moved.length - context.length + (if (next < 0) 0 else moved.length - next), run / wide.layers)
+        assertEquals(Reranker(plain).combined(moved, readings, priors).map(Float::toRawBits), ahead.combined(moved, readings, priors).map(Float::toRawBits))
+    }
+
+    /** Commits and keys as they come, the next start's chain read ahead on a thread of its own: every score as read in place. */
+    @Test
+    fun aChainReadAheadOnItsOwnThreadChangesNoScore() {
+        val pool = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            val plain = wide.load()
+            val main = Thread.currentThread()
+            val pooled = AtomicInteger()
+            val kernel = object : MatrixKernel {
+                override fun times(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                    MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+                @Suppress("LongParameterList")
+                override fun timesManyQ8(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                    if (Thread.currentThread() !== main) pooled.addAndGet(m)
+                    super.timesManyQ8(q, scales, rows, columns, x, m, y)
+                }
+            }
+            val ahead = Reranker(wide.load(kernel = kernel), ahead = pool)
+            val random = java.util.Random(13)
+            fun some(n: Int) = (0 until n).joinToString("") { chars[random.nextInt(chars.length)].toString() }
+            var text = ""
+            while (text.length < 900) {
+                text += some(1 + random.nextInt(4))
+                val context = text.takeLast(128)
+                ahead.prewarm(context)
+                repeat(1 + random.nextInt(3)) {
+                    val keyed = List(5) { some(2 + random.nextInt(3)) }
+                    val alone = Reranker(plain).combined(context, keyed, priors).map(Float::toRawBits)
+                    assertEquals("'$context' $keyed", alone, ahead.combined(context, keyed, priors).map(Float::toRawBits))
+                }
+                // now and then the read ahead done before the next commit, so a commit takes a whole chain
+                if (random.nextInt(4) == 0) pool.submit(Runnable {}).get(1, TimeUnit.MINUTES)
+            }
+            assertTrue("no chain was read ahead", pooled.get() > 0)
+        } finally {
+            pool.shutdown()
+            assertTrue(pool.awaitTermination(1, TimeUnit.MINUTES))
+        }
+    }
+
     @Test
     fun oneReadingIsLeftAlone() {
         assertEquals(0, Reranker(model).pick("的", readings.take(1), even))

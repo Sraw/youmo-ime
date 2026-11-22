@@ -246,14 +246,32 @@ its learning still its own), and handwriting and the tables keep the text before
    it waits for it, so no result hangs on load time. One it cannot read leaves every key with the 4M pick,
    as `MEDIUM`, until the level is changed. Each model reads the text before by one rule, from that text
    alone: all of it if it fits beside `<bos>` and `SentenceModel.ROOM` positions for the readings, else
-   the last half of what fits (`Scorer.target`); never
+   from `SentenceModel.tailStart`: of the starts leaving 1/2 to 3/4 of what fits, the one whose two
+   tokens about it hash highest (murmur3's finaliser, the last of equals). That start is the last tokens'
+   alone, whatever came before them, and stays as text is added until it leaves the range or the start just
+   let in hashes higher, so most commits read only what they added (the start moved with every commit
+   before, re-reading half of what fits each time). A move re-reads at most 3/4; the range was measured:
+   one centred on that half (3/8 to 5/8) re-reads at most 5/8 but picked fewer first candidates at both
+   tiers, a wider one (up to all that fits) re-reads all of it after a long commit. The session keeps the last 128 code
+   points (`readTail`), the models' tokens, so text of emoji still holds more than they read whole; never
    "from where the last read stopped", which would make a pick depend on what was read before.
    A key's decoding and picking run within the kernel's `CorePin` (`EngineAssets.pin`), so nothing in
    them hands work to another thread. After a commit and as the text before is told, `prewarm` hands
    the text to `Engines`' `contextReads` (pinned there; in the app one kept thread,
    `JvmThreads.single`, so the models' per-thread buffers are reused), so a commit does not wait for the read (past the
-   window every commit moves the half read: 19 tokens at 4M, 51 at 25M); a key waits for a read begun
-   and does one not begun itself, so it scores the same either way.
+   window a commit mostly reads only what it added; when the start moves, 20–29 tokens at 4M, 52–77 at 25M); a key waits for a read begun
+   and does one not begun itself, so it scores the same either way. There too, after the read,
+   `Scorer.readNext` reads the chain from the start the tail moves to next once that move is due within a
+   quarter of what fits (26 tokens at 25M, 10 at 4M): the range being narrower than the shortest tail, that
+   start is already in the text whatever is typed (`SentenceModel.nextStart`). Only pinyin sessions prewarm,
+   so only their text is read ahead. The chain is a second one on its own lock, read `NEXT_STEP` (8) tokens at
+   a time. Between steps it waits while a key is scored, and on the lock it looks at two counters that only
+   go up: the scorer's, moved by every context a key or read takes, and the `Reranker`'s, moved by every
+   prewarm; either moved ends it. So a key that needs the chain waits for the step being read and no more,
+   however the lock is handed over. The key takes the chain
+   only where it holds more of the key's context, so it changes the time, never a score; the chain it lets go
+   is emptied at once. Two chains at most: the second is up to 77 nodes of 32 KB at 25M (2.5 MB), 29 of
+   10.5 KB at 4M.
    A key's result is a pure function of (the text before, the keys), given the user's data, the
    settings and the date: never of typing pace, a pause or what ran before; nothing changes after a
    pause. Adding to, not replacing, the decoder's score was the measured choice (replacing lost

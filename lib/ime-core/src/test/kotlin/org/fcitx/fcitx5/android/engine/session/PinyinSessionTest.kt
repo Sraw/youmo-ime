@@ -16,6 +16,10 @@ import org.fcitx.fcitx5.android.engine.pinyin.PinyinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
+import org.fcitx.fcitx5.android.engine.rerank.Reranker
+import org.fcitx.fcitx5.android.engine.rerank.SentencePicker
+import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Action.Backspace
 import org.fcitx.fcitx5.android.engine.session.Action.CommitRaw
 import org.fcitx.fcitx5.android.engine.session.Action.Key
@@ -403,6 +407,50 @@ class PinyinSessionTest {
         assertEquals(committed.toString(), contexts.last())
         val pairs = "\uD840\uDC00".repeat(100)
         assertEquals(pairs.substring(74) + "b", recentTail("a" + pairs + "b"))
+    }
+
+    /** Past what the large model reads whole, a commit reads about what it added, emoji (a pair, one token) and all. */
+    @Test
+    fun aCommitAfterALongContextReadsAboutWhatItAdded() {
+        val tiny = TinyModel(window = 128)
+        var run = 0
+        val kernel = object : MatrixKernel {
+            override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+            override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                // the attention's input, once a layer for each node run
+                if (rows == 3 * tiny.width) run += m
+                super.timesManyQ8(q, scales, rows, columns, x, m, y)
+            }
+        }
+        val reranker = Reranker(tiny.load(kernel = kernel))
+        var read = 0
+        val handed = ArrayList<String>()
+        val picker = object : SentencePicker {
+            override fun pick(context: String, readings: List<String>, scores: List<Float>) = reranker.pick(context, readings, scores)
+
+            override fun prewarm(context: String) {
+                val before = run
+                reranker.prewarm(context)
+                read += run - before
+                handed += context
+            }
+        }
+        val session = PinyinSession(data, PinyinSegmenter(), reranker = picker)
+        // as many emoji as the host's 64 chars hold: 128 chars of them and what follows are fewer tokens than the model reads
+        session.apply(Action.Context("\uD83D\uDE02".repeat(31) + "我"))
+        val syllables = listOf("ni", "hao", "wo", "zai", "ma", "jian")
+        val random = java.util.Random(5)
+        val commits = 120
+        repeat(commits) {
+            session.type(syllables[random.nextInt(syllables.size)])
+            session.apply(Select(0))
+        }
+        // read anew on each commit, as it slides, the emoji-led context would cost some 97 tokens a commit for a while
+        val tokens = read / tiny.layers
+        assertTrue("$tokens tokens over $commits commits", tokens < commits * 5)
+        assertEquals(128, handed.last().codePointCount(0, handed.last().length))
     }
 
     @Test

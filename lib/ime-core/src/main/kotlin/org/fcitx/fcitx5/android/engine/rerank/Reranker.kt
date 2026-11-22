@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.engine.rerank
 
 import org.fcitx.fcitx5.android.core.CoreLog
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -23,7 +24,8 @@ fun interface SentencePicker {
  * decoder's; added, not replacing, so the decoder's margin holds where the dictionary has evidence and the
  * model decides where it is thin (简拼, pieced-together sentences). Every reading is scored to the end, so a
  * pick depends on (context, readings, scores) alone. With [ahead], [prewarm] reads on it, so a commit does not
- * wait for that; a pick waits for a read begun and does one not begun itself.
+ * wait for that; a pick waits for a read begun and does one not begun itself. There too the chain of the start
+ * the context's tail moves to next is read ([SentenceModel.Scorer.readNext]).
  */
 class Reranker(
     model: SentenceModel,
@@ -32,7 +34,7 @@ class Reranker(
     private val ahead: Executor? = null,
 ) : SentencePicker {
 
-    private val scorer = model.Scorer()
+    private val scorer = model.Scorer(readsNext = ahead != null)
 
     // the scorer is one thread's at a time; sessions on the fcitx thread share it
     private val lock = ReentrantLock()
@@ -40,17 +42,23 @@ class Reranker(
     // the context last handed to [ahead] and not yet read: a read finding another here leaves it to whoever comes next
     private val asked = AtomicReference<String?>()
 
+    // moved on by each prewarm, never back, so a pick clearing [asked] cannot hide a newer context from a read ahead
+    private val asks = AtomicInteger()
+
     override fun prewarm(context: String) {
         val ahead = ahead ?: return lock.withLock { scorer.prewarm(context) }
         asked.set(context)
-        ahead.execute { readAhead(context) }
+        val ask = asks.incrementAndGet()
+        ahead.execute { readAhead(context, ask) }
     }
 
     @Suppress("TooGenericExceptionCaught")
-    private fun readAhead(context: String) = lock.withLock {
-        if (!asked.compareAndSet(context, null)) return@withLock
+    private fun readAhead(context: String, ask: Int) {
         try {
-            scorer.prewarm(context)
+            // a key that read the context first leaves the next chain still to read
+            lock.withLock { if (asked.compareAndSet(context, null)) scorer.prewarm(context) }
+            // off the lock a pick takes, given up for a newer context, and out of the way of a key being scored
+            scorer.readNext(context, stop = { asks.get() != ask }, pause = { if (lock.isLocked) lock.withLock {} })
         } catch (e: Throwable) {
             // off the fcitx thread nothing catches it; the next pick reads the context anew. The class only: the text is typed
             CoreLog.e("context read ahead failed: ${e.javaClass.name}")

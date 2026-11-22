@@ -284,7 +284,7 @@ class PinyinSession(
         // kept no longer than the input and not at all without learning; text ending in no word is no reranker context
         if (learning) {
             context = textWords.lastTwo(before)
-            if (context.isNotEmpty()) recent = recentTail(before)
+            if (context.isNotEmpty()) recent = readTail(before)
         }
         reranker?.prewarm(textBefore())
         return snapshot()
@@ -636,7 +636,7 @@ class PinyinSession(
     private fun commit(text: String, words: IntArray): Snapshot {
         context = (context + words).takeLast(2).toIntArray()
         contextLearnable = false
-        recent = if (learning) recentTail(recent + text) else ""
+        recent = if (learning) readTail(recent + text) else ""
         recorder.committed(text, learning)
         if (context.lastOrNull() == NO_WORD) dropContext()
         clear()
@@ -985,7 +985,7 @@ private const val OVERLAP = 24
 private const val TO_SHIFT = 48
 private const val KEPT_PLACES = 1 shl (Long.SIZE_BITS - TO_SHIFT)
 
-// well over what the reranker has room for, so a commit drops only text it no longer reads
+// past the 103 tokens the large model reads whole: else a buffer sliding under it is read anew on every commit
 private const val RECENT = 128
 
 /** The last [RECENT] chars of [text], not starting in the middle of a pair. */
@@ -994,6 +994,10 @@ internal fun recentTail(text: String): String {
     val from = text.length - RECENT
     return text.substring(if (Character.isLowSurrogate(text[from])) from + 1 else from)
 }
+
+/** The last [RECENT] code points of [text], the sentence models' tokens, so text of pairs (emoji) holds as many. */
+internal fun readTail(text: String): String =
+    if (text.codePointCount(0, text.length) <= RECENT) text else text.substring(text.offsetByCodePoints(text.length, -RECENT))
 
 /**
  * A word often misread ([PinyinData.misreadings]) typed by a misreading: the true reading with tones (般若 banruo:
