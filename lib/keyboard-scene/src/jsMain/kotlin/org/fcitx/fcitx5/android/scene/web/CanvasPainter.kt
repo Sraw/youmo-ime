@@ -28,6 +28,7 @@ internal interface PaintAssets {
 
     fun picture(blurDp: Int?, brightness: Int?): dynamic
 
+    /** An app icon's or a theme SVG's paths, or a raster icon decoded as [image] gives one: `{image, width, height}`. */
     fun icon(name: String): dynamic
 }
 
@@ -78,7 +79,7 @@ internal class CanvasPainter(
             is Op.Picture -> picture(op)
             is Op.Text -> text(op)
             is Op.Icon -> icon(op)
-            is Op.Sticker -> draw(op.standIn)
+            is Op.Sticker -> sticker(op)
         }
     }
 
@@ -329,9 +330,57 @@ internal class CanvasPainter(
         c.fillText(text, x, 0.0)
     }
 
+    // not decoded (yet): the words and icon it hides, as the app draws them until its own decode is in
+    private fun sticker(op: Op.Sticker) {
+        val image = assets.image(op.file)
+        if (image == null || image == undefined) {
+            draw(op.standIn)
+            return
+        }
+        if (op.alpha <= 0) return
+        val at = fitted((image.width as Number).toDouble(), (image.height as Number).toDouble(), op.box)
+        c.save()
+        c.globalAlpha = op.alpha.coerceAtMost(1.0)
+        c.drawImage(image.image, at.left, at.top, at.width, at.height)
+        c.restore()
+    }
+
+    private fun raster(op: Op.Icon, image: dynamic) {
+        val b = op.box
+        val at = fitted((image.width as Number).toDouble(), (image.height as Number).toDouble(), b)
+        val turned = op.rotation != 0.0
+        val turn = {
+            if (turned) {
+                c.translate(b.centerX, b.centerY)
+                c.rotate(op.rotation * PI / HALF_TURN)
+                c.translate(-b.centerX, -b.centerY)
+            }
+        }
+        if (!op.tintMask) {
+            c.save()
+            turn()
+            c.globalAlpha = op.tint.alpha / OPAQUE_ALPHA.toDouble()
+            c.drawImage(image.image, at.left, at.top, at.width, at.height)
+            c.restore()
+            return
+        }
+        // its alpha alone, in the tint: drawn on a layer, the colour laid over it source-in, the layer laid at the tint's alpha
+        val r = if (turned) sqrt(at.width * at.width + at.height * at.height) / 2 else 0.0
+        val reach = if (turned) Box(at.centerX - r, at.centerY - r, at.centerX + r, at.centerY + r) else at
+        laid(area(reach), op.tint, 0.0) {
+            turn()
+            c.drawImage(image.image, at.left, at.top, at.width, at.height)
+            c.globalCompositeOperation = "source-in"
+            c.fillRect(at.left, at.top, at.width, at.height)
+            c.globalCompositeOperation = "source-over"
+        }
+    }
+
     private fun icon(op: Op.Icon) {
         val icon = assets.icon(op.name)
         if (icon == null || icon == undefined || op.tint.transparent) return
+        // a raster icon not decoded yet has the app's of its name here, drawn as its own is
+        if (icon.image != null && icon.image != undefined) return raster(op, icon)
         val b = op.box
         val left = b.left.roundToInt()
         val top = b.top.roundToInt()
@@ -445,11 +494,21 @@ internal class CanvasPainter(
 
         fun font(weight: Int, size: Double, family: String): String = "$weight ${size}px $family"
 
+        /** An image [w]×[h] scaled alike to sit in [box], centred, never past 3 times its own size (a raster icon, a sticker). */
+        fun fitted(w: Double, h: Double, box: Box): Box {
+            if (w <= 0 || h <= 0) return Box(box.centerX, box.centerY, box.centerX, box.centerY)
+            val k = minOf(box.width / w, box.height / h, MAX_UPSCALE)
+            val dw = w * k
+            val dh = h * k
+            return Box(box.centerX - dw / 2, box.centerY - dh / 2, box.centerX + dw / 2, box.centerY + dh / 2)
+        }
+
         fun sigma(radius: Double): Double = if (radius > 0) SIGMA_SCALE * radius + SIGMA_BIAS else 0.0
 
         private const val SIGMA_SCALE = 0.57735
         private const val SIGMA_BIAS = 0.5
         private const val MITER_LIMIT = 4.0
+        private const val MAX_UPSCALE = 3.0
 
         private const val ASCENT = 1.25
         private const val DESCENT = 0.5

@@ -225,8 +225,12 @@
   }
 
 
-  function picture(xml) {
-    const p = elements(xml, 'picture')[0];
+  // the <picture> of [variant] ('dark' or none: the light one), by its variant= and not its place (ThemeReader's rule)
+  const pictureEl = (xml, variant) => elements(xml, 'picture').find((e) => (Object.fromEntries(e.attrs).variant || null) === (variant || null)) || null;
+
+  /** [xml]'s picture of [variant] (`'dark'`: the dark version's; none: the light one), null where there is none. */
+  function picture(xml, variant = null) {
+    const p = pictureEl(xml, variant);
     if (!p) return null;
     const a = Object.fromEntries(p.attrs);
     const cuts = {};
@@ -237,9 +241,12 @@
     return { src: a.src, brightness: a.brightness ? parseFloat(a.brightness) : 100, blur: a.blur ? parseFloat(a.blur) : 0, cuts };
   }
 
-  /** An existing <picture> is changed in place, keeping what the form does not know; `gone`: files nothing names any more. */
-  function setPicture(xml, p) {
-    const old = elements(xml, 'picture')[0];
+  /**
+   * The <picture> of [variant] changed in place, keeping what the form does not know; a new one goes where ThemeWriter
+   * writes it (the light one before the dark). `gone`: files nothing names any more.
+   */
+  function setPicture(xml, p, variant = null) {
+    const old = pictureEl(xml, variant);
     const before = old ? xml.slice(old.start, old.end) : '';
     const cutText = (o, c) => '<cut orientation="' + o + '" file="' + escape(c.file) + '"' + (c.rect ? ' rect="' + c.rect.map(Math.round).join(' ') + '"' : '') + '/>';
     if (old && p) {
@@ -266,12 +273,14 @@
     } else {
       let text = '';
       if (p) {
-        text = '<picture src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
+        text = '<picture' + (variant ? ' variant="' + escape(variant) + '"' : '') + ' src="' + escape(p.src) + '"' + (p.brightness != null && p.brightness !== 100 ? ' brightness="' + p.brightness + '%"' : '') +
           (p.blur ? ' blur="' + p.blur + 'dp"' : '') + (p.animated ? ' animated="true"' : '') + '>';
         for (const o of ['portrait', 'landscape']) if (p.cuts[o]) text += '\n    ' + cutText(o, p.cuts[o]);
         text += '\n  </picture>';
       }
+      const dark = variant ? null : pictureEl(xml, 'dark');
       if (old) xml = splice(xml, old.start, old.end, text);
+      else if (text && dark) xml = xml.slice(0, dark.start) + text + '\n  ' + xml.slice(dark.start);
       else if (text) xml = insert(xml, 'picture', text);
     }
     const gone = [...before.matchAll(/\b(?:src|file)\s*=\s*(?:"([^"]+)"|'([^']+)')/g)].map((m) => unescape(m[1] ?? m[2])).filter((f) => !isNamed(xml, f));

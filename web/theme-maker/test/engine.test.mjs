@@ -225,7 +225,7 @@ class RecordingContext {
 
   static line(e) {
     const blur = e.blur != null ? ' blur=' + n(e.blur) : '';
-    if (e.t === 'fill') return 'fill ' + RecordingContext.box(e.b) + ' ' + e.color + (e.less ? ' less=' + RecordingContext.box(e.less) : '') + blur;
+    if (e.t === 'fill') return 'fill ' + RecordingContext.box(e.b) + ' ' + e.color + (e.less ? ' less=' + RecordingContext.box(e.less) : '') + blur + (e.within ? ' within' : '');
     return 'text "' + e.text + '" ' + n(e.x) + ',' + n(e.y) + ' w=' + e.w + ' s=' + n(e.size) + ' sx=' + n2(e.sx) + ' ls=' + n2(e.ls) + ' ' + e.color + e.stroke + blur +
       (e.rot !== 0 ? ' rot=' + e.rot : '');
   }
@@ -290,6 +290,11 @@ class RecordingContext {
   }
 
   clearRect() { this.lines = []; }
+
+  // a raster icon's colour laid in its shape (source-in): ' within' on its line
+  fillRect(x, y, w, h) {
+    this.lines.push({ t: 'fill', b: RecordingContext.bounds([this.map(x, y), this.map(x + w, y + h)]), color: argb(this.s.fillStyle), within: this.s.globalCompositeOperation === 'source-in' });
+  }
 
   fill(a, rule) {
     if (a instanceof Path2D) return this.icon(a);
@@ -360,6 +365,11 @@ class RecordingContext {
 
   drawImage(image, sx, sy, sw, sh, dx, dy) {
     const layer = image.getContext ? image.getContext('2d') : null;
+    // a page's decoded image of a name: where it is laid, at what alpha
+    if (image.tag && sh !== undefined && dx === undefined) {
+      const b = RecordingContext.bounds([this.map(sx, sy), this.map(sx + sw, sy + sh)]);
+      return this.lines.push('raster ' + image.tag + ' ' + RecordingContext.box(b) + ' a=' + n2(this.s.globalAlpha));
+    }
     if (!(layer instanceof RecordingContext)) return this.lines.push('image');
     assert.equal(this.s.globalCompositeOperation, 'source-over');
     const [ox, oy] = this.map(dx - sx, dy - sy);
@@ -471,6 +481,48 @@ test('a page with no icon or image for an op draws what it can: a nine-slice its
   const some = new RecordingContext();
   assert.ok(E.paint(s.scene, some, { images: { 'full-space.png': { image: {}, width: 72, height: 72 } } }).ok);
   assert.equal(some.written().filter((l) => l === 'image').length, 9);
+});
+
+test('a raster icon is laid in its box scaled alike, never past 3 times: its own colours at the tint\'s alpha, or its shape in the tint; a sticker over the face, its words where it is not in', () => {
+  const xml = E.themeSource('nord').replace('</theme>', [
+    '  <style select="qwerty/shift icon" icon-color="#80434c5e"/>',
+    '  <style select="qwerty/q" sticker="st-q.png"/>',
+    '  <style select="qwerty/q label" hidden="true"/>',
+    '  <icon name="backspace" src="icon-backspace.png" tint="true"/>',
+    '  <icon name="shift" src="icon-shift.webp"/>',
+    '</theme>'].join('\n'));
+  const t = E.readTheme(xml, null, null);
+  assert.ok(t.ok, JSON.stringify(t.problems));
+  const s = E.buildScene('qwerty', t.theme, { width: 1080, height: 700, density: 2.625 }, fixed);
+  assert.ok(s.ok, JSON.stringify(s.problems));
+  const text = s.scene.text();
+  const boxOf = (re) => re.exec(text).slice(1, 5).map(Number);
+  // the box, the image's size: where it is laid, as the app's PackIconDrawable fits it
+  const fit = ([l, t2, r, b], w, h) => {
+    const k = Math.min((r - l) / w, (b - t2) / h, 3);
+    const [cx, cy] = [(l + r) / 2, (t2 + b) / 2];
+    return [cx - w * k / 2, cy - h * k / 2, cx + w * k / 2, cy + h * k / 2].map((v) => n(v)).join(',');
+  };
+  const back = boxOf(/icon backspace ([\d.]+),([\d.]+),([\d.]+),([\d.]+) #ff434c5e raster mask\n/);
+  const shift = boxOf(/icon shift ([\d.]+),([\d.]+),([\d.]+),([\d.]+) #80434c5e raster\n/);
+  const sticker = boxOf(/sticker "st-q.png" ([\d.]+),([\d.]+),([\d.]+),([\d.]+) stand-in=text/);
+  const icons = { backspace: { image: { tag: 'back' }, width: 16, height: 16 }, shift: { image: { tag: 'shift' }, width: 120, height: 60 } };
+  const images = { 'st-q.png': { image: { tag: 'st' }, width: 90, height: 45 } };
+  const ctx = new RecordingContext();
+  assert.ok(E.paint(s.scene, ctx, { icons, images }).ok);
+  const lines = ctx.written();
+  const at = lines.indexOf('raster back ' + fit(back, 16, 16) + ' a=1.00');
+  assert.ok(at >= 0, 'the tinted one on its layer, 3 times its 16 px: ' + lines.filter((l) => l.startsWith('raster')));
+  assert.equal(lines[at + 1], 'fill ' + fit(back, 16, 16) + ' #ff434c5e within', 'its shape in the icon colour');
+  assert.ok(lines.includes('raster shift ' + fit(shift, 120, 60) + ' a=0.50'), 'its own colours at the icon colour\'s alpha');
+  const face = lines.findIndex((l) => l.startsWith('raster st '));
+  assert.equal(lines[face], 'raster st ' + fit(sticker, 90, 45) + ' a=1.00');
+  assert.ok(lines[face - 1].startsWith('fill '), 'over the face');
+  assert.ok(!lines.some((l) => l.startsWith('text "q"')), 'its words hidden');
+  const bare = new RecordingContext();
+  assert.ok(E.paint(s.scene, bare, { icons: {}, images: {} }).ok);
+  assert.ok(bare.written().some((l) => l.startsWith('text "q"')), 'no sticker image: the letter it hides');
+  assert.ok(!bare.written().some((l) => l.startsWith('raster')));
 });
 
 test("the facade's answers to values of the wrong type are problems, never a throw", () => {

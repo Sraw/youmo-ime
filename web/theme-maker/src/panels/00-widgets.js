@@ -42,6 +42,16 @@
     return prefix + name + '.' + type;
   };
 
+  /** A PNG's or WebP's type, `size` ([w, h], null unread) and whether it moves, as the app's RasterIcon reads its header; null: neither. */
+  panels.raster = (L, bytes) => {
+    const type = L.imageType(bytes);
+    if (type !== 'png' && type !== 'webp') return null;
+    const chunk = String.fromCharCode(...bytes.slice(12, 16));
+    const size = L.imageSize(bytes);
+    // a side of 0 the app reads as no image
+    return { type, size: size && size[0] > 0 && size[1] > 0 ? size : null, animated: type === 'webp' && chunk === 'VP8X' && bytes.length > 20 && (bytes[20] & 0x02) !== 0 };
+  };
+
   /** A tab of widgets' styles: the page chooses a part and a scene, and edits the style of exactly that select=. */
   panels.widgetTab = (def) => {
     const F = root.YoumoForm;

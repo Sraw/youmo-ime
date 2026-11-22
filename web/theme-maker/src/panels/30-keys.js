@@ -1,6 +1,7 @@
 // 按键: a range of keys (all, letters, function, space, Return, the picked key, the
 // board's every key), a scene, a state, then the face's properties; the line on top says which select= the
-// changes go to, the cascade check under it where each of the picked key's values comes from (the engine's own answer).
+// changes go to, the cascade check under it where each of the picked key's values comes from (the engine's own answer);
+// a sticker (a picture over the face, under the words: a letter drawn as an image), its words hidden or not.
 // Every control reads the document when it is used, not when it was drawn: the page leaves a tab as it is while a
 // field of it is typed in (ui.js refreshTab), so a control drawn before the last change must still do the right thing.
 (function (root) {
@@ -64,6 +65,37 @@
       const files = panels.filesOf(d);
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
+    },
+    /** The sticker files the theme's styles name (`none` is none). */
+    stickers: (xml) => [...new Set(F.styles(xml).flatMap((s) => s.attrs.filter((a) => a[0] === 'sticker' && a[1] !== 'none').map((a) => a[1])))].sort(),
+    /**
+     * [d] with [bytes] ([name]) [select]'s sticker, `sticker-<name>`: refused (throws) where the app would (a PNG or a
+     * still WebP, its long side and bytes in [lim]'s stickerSide, stickerBytes; at most lim.stickers files).
+     */
+    addSticker(d, L, lim, select, name, bytes) {
+      const r = panels.raster(L, bytes);
+      if (!r || !r.size) throw new Error(name + ' 不是 PNG 或 WebP');
+      if (r.animated) throw new Error(name + ' 是动态 WebP，贴纸只能是静态图');
+      if (Math.max(r.size[0], r.size[1]) > lim.stickerSide) throw new Error(name + ' 太大：最大 ' + lim.stickerSide + '×' + lim.stickerSide);
+      if (bytes.length > lim.stickerBytes) throw new Error(name + ' 超过 ' + lim.stickerBytes + ' 字节');
+      const file = panels.fileName(d.files, 'sticker-', name, r.type);
+      const files = panels.filesOf(d);
+      files[file] = bytes;
+      // counted after: the one it takes the place of may stay, named by another key
+      const out = ops.sticker({ xml: d.xml, files, layouts: d.layouts }, select, file);
+      if (ops.stickers(out.xml).length > lim.stickers) throw new Error('贴纸最多 ' + lim.stickers + ' 张');
+      return out;
+    },
+    /**
+     * [d] with [select]'s sticker [v] (a file, 'none', null not set); the file it had goes where nothing names it, and
+     * with no sticker its words hidden for it are shown again.
+     */
+    sticker(d, select, v) {
+      const was = F.valueOf(d.xml, select, 'sticker');
+      let xml = F.setProp(d.xml, select, 'sticker', v);
+      if ((!v || v === 'none') && F.valueOf(xml, select + ' label', 'hidden') === 'true') xml = F.setProp(xml, select + ' label', 'hidden', null);
+      const gone = was && was !== 'none' && was !== v && !F.isNamed(xml, was) ? [was] : [];
+      return { xml, files: panels.without(d.files, gone), layouts: d.layouts };
     },
     /** The preview's environment [env] (the page's) as the scene [scene] (F.SCENES') has it: where the cascade check looks. */
     envOf(env, scene) {
@@ -188,6 +220,27 @@
     } } });
   }
 
+  // a picture over the face, under the words: one of the theme's, none (over a wider style's) or not set; its words hidden
+  function stickerForm(api, sel, value) {
+    const { h, row, select } = panels.ui;
+    const files = ops.stickers(api.doc().xml);
+    const choices = [['', '不设'], ['none', '无（盖掉更宽样式的贴纸）']].concat(files.map((f) => [f, f]));
+    if (value && !choices.some(([v]) => v === value)) choices.push([value, value]);
+    const set = (v) => api.apply((x) => ops.sticker(x, sel, v));
+    const label = sel + ' label';
+    const hide = h('input', { type: 'checkbox', checked: F.valueOf(api.doc().xml, label, 'hidden') === 'true', on: { change: () => api.apply((x) => panels.next(x, F.setProp(x.xml, label, 'hidden', hide.checked ? 'true' : null))) } });
+    const out = h('div', { className: 'group' });
+    out.append(row('贴纸', select(choices, value || '', (v) => set(v || null)), h('button', { type: 'button', textContent: '上传贴纸…', on: { click: async () => {
+      const f = await api.pickFile('image/png,image/webp,.png,.webp');
+      if (!f) return;
+      api.apply((x) => ops.addSticker(x, api.lib, api.limits(), sel, f.name, new Uint8Array(f.bytes)));
+    } } })));
+    if (value && value !== 'none') out.append(row('藏起主字（贴纸画的就是字时）', hide));
+    const lim = api.limits();
+    out.append(h('p', { className: 'muted', textContent: '贴纸画在键面上、字和图标下，放进键的内容框里，不放大到原图的 3 倍以上；PNG 或静态 WebP，边长不超过 ' + lim.stickerSide + '、' + Math.round(lim.stickerBytes / 1024) + ' KB，最多 ' + lim.stickers + ' 张。要 0.6.3 以上的输入法。' }));
+    return out;
+  }
+
   /**
    * A border's or a shadow's 有/无/不设: 不设 the wider style's shows (the property taken out), 无 none over it
    * (`none`), 有 its fields: [p] of [made].sel, [text] its text as drawn, [made].fresh what 有 writes first.
@@ -212,6 +265,7 @@
     const now = (p) => F.valueOf(api.doc().xml, sel, p);
     const set = (p) => (v) => api.apply((x) => ops.set(x, sel, p, v));
     el.append(fillForm(api, sel, val('fill')));
+    el.append(stickerForm(api, sel, val('sticker')));
     panels.ui.propRows(el, api, F, sel, [{ prop: 'radius', label: '圆角', kind: 'radius' }], true);
 
     const borderText = val('border');

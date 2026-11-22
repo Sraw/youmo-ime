@@ -56,8 +56,13 @@
   const ops = {
     /** [d] with colour [name] [value] (null: taken out) in the version [dark] shows. */
     set: (d, name, value, dark) => panels.next(d, F.setColor(d.xml, name, value, version(d.xml, dark))),
-    /** [d] with its dark version on or off. */
-    dark: (d, on) => panels.next(d, F.withDark(d.xml, on)),
+    /** [d] with its dark version on or off; off takes the dark version's own picture with it. */
+    dark: (d, on) => {
+      const xml = F.withDark(d.xml, on);
+      if (on || F.variants(xml).includes('dark') || !F.picture(xml, 'dark')) return panels.next(d, xml);
+      const set = F.setPicture(xml, null, 'dark');
+      return panels.next(d, set.xml, panels.without(d.files, set.gone));
+    },
     /** [d] with [colors] (fromPicture's) written in the version [dark] shows. */
     many: (d, colors, dark) => {
       let xml = d.xml;

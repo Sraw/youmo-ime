@@ -1,6 +1,6 @@
 // 背景: the keyboard's picture, a crop for portrait and one for landscape (a box of
 // the keyboard's shape, moved and zoomed on the picture; each cut its own file, as the app draws the cut), its
-// brightness and blur, the keys see-through to it.
+// brightness and blur, the keys see-through to it; a theme with both versions may give the dark one its own picture.
 (function (root) {
   'use strict';
   const panels = root.YoumoPanels;
@@ -27,34 +27,50 @@
   // a file's content id, worked out once per bytes (the tab is drawn again after every change)
   const ids = new WeakMap();
   const contentIdOf = (lib, bytes) => { if (!ids.has(bytes)) ids.set(bytes, lib.contentId(bytes)); return ids.get(bytes); };
+  // the files of [variant]'s picture: picture.png, picture-portrait.png; the dark one's picture-dark.png, picture-dark-portrait.png
+  const fileOf = (variant, what, type) => 'picture' + (variant ? '-' + variant : '') + (what ? '-' + what : '') + '.' + type;
 
   const ops = {
     /**
      * [d] with [p] its picture: `{type, src: bytes, cuts: {portrait: {bytes, type, rect}, landscape: …}, animated?}`
      * (the picture and its cuts made as the page encodes pictures; an animated one kept as picked), the keyboard showing it; null: none, the keyboard its
-     * colour again. Files the old one had that nothing else names go.
+     * colour again. Files the old one had that nothing else names go. [variant] 'dark': the dark version's picture
+     * (null: none, the dark version shows the light one's); the light one taken off takes the dark one with it (a dark
+     * one alone the app refuses).
      */
-    setPicture(d, p) {
+    setPicture(d, p, variant = null) {
       let files = panels.filesOf(d);
       let xml = d.xml;
       let written = null;
       if (p) {
-        const src = 'picture.' + p.type;
+        const src = fileOf(variant, null, p.type);
         const cuts = {};
         for (const [o] of ORIENTATIONS) {
           const c = p.cuts[o];
           if (!c) continue;
-          cuts[o] = { file: 'picture-' + o + '.' + c.type, rect: c.rect };
+          cuts[o] = { file: fileOf(variant, o, c.type), rect: c.rect };
         }
         // a picture picked says whether it is animated (an animated WebP the app plays, kept as it is: ui.js
         // choosePicture); an animated="true" of the one it replaces goes with it otherwise
         written = { src, brightness: 100, blur: 0, cuts, animated: !!p.animated };
-        const old = F.picture(xml);
+        const old = F.picture(xml, variant);
         if (old) Object.assign(written, { brightness: old.brightness, blur: p.animated ? 0 : old.blur }); // the app blurs no animated one
       }
-      const set = F.setPicture(xml, written);
+      const set = F.setPicture(xml, written, variant);
       xml = set.xml;
       files = panels.without(files, set.gone);
+      if (!p && !variant && F.picture(xml, 'dark')) {
+        const dark = F.setPicture(xml, null, 'dark');
+        xml = dark.xml;
+        files = panels.without(files, dark.gone);
+      }
+      if (variant) {
+        if (p) {
+          files[written.src] = p.src;
+          for (const [o, c] of Object.entries(written.cuts)) files[c.file] = p.cuts[o].bytes;
+        }
+        return { xml, files, layouts: d.layouts };
+      }
       if (p) {
         files[written.src] = p.src;
         for (const [o, c] of Object.entries(written.cuts)) files[c.file] = p.cuts[o].bytes;
@@ -69,24 +85,27 @@
       return { xml, files, layouts: d.layouts };
     },
 
-    /** [d] with one orientation's cut made anew: [cut] `{bytes, type, rect}`. */
-    setCut(d, orientation, cut) {
-      const p = F.picture(d.xml);
+    /** [d] with one orientation's cut of [variant]'s picture made anew: [cut] `{bytes, type, rect}`. */
+    setCut(d, orientation, cut, variant = null) {
+      const p = F.picture(d.xml, variant);
       if (!p) return d;
-      const file = 'picture-' + orientation + '.' + cut.type;
+      const file = fileOf(variant, orientation, cut.type);
       p.cuts[orientation] = { file, rect: cut.rect };
-      const set = F.setPicture(d.xml, p);
+      const set = F.setPicture(d.xml, p, variant);
       const files = panels.without(d.files, set.gone);
       files[file] = cut.bytes;
       return { xml: set.xml, files, layouts: d.layouts };
     },
 
-    /** [d] with its picture's brightness (%) and blur (dp) as [t] has them. */
-    tune(d, t) {
-      const p = F.picture(d.xml);
+    /** [d] with [variant]'s picture's brightness (%) and blur (dp) as [t] has them. */
+    tune(d, t, variant = null) {
+      const p = F.picture(d.xml, variant);
       if (!p) return d;
-      return panels.next(d, F.setPicture(d.xml, Object.assign(p, t)).xml);
+      return panels.next(d, F.setPicture(d.xml, Object.assign(p, t), variant).xml);
     },
+
+    /** Whether [xml] may give its dark version a picture of its own: it has both versions and a light picture. */
+    darkPictureOffered: (xml) => ['light', 'dark'].every((v) => F.variants(xml).includes(v)) && !!F.picture(xml),
 
     /** [d] with every key see-through to the picture (a light veil over it), or its fill its colour again. */
     through(d, on) {
@@ -105,9 +124,9 @@
   const moved = new Map();
 
   // the crop box on the picture: a canvas of it, the box dragged, a slider zooms
-  function cropper(api, d, orientation) {
+  function cropper(api, d, orientation, variant) {
     const { h, row } = panels.ui;
-    const p = F.picture(d.xml);
+    const p = F.picture(d.xml, variant);
     const bmp = api.bitmap(p.src);
     const box = h('div', { className: 'crop' });
     if (!bmp) return h('p', { className: 'muted', textContent: '图片还没读进来' });
@@ -161,7 +180,7 @@
       try {
         const cut = await api.cutPicture(p.src, rect());
         moved.delete(key);
-        api.apply((x) => ops.setCut(x, orientation, cut));
+        api.apply((x) => ops.setCut(x, orientation, cut, variant));
       } catch (e) {
         api.toast('裁切失败：' + (e.message || e));
       }
@@ -174,28 +193,43 @@
     return box;
   }
 
-  function render(el, api) {
+  // one version's picture: chosen, taken off, its brightness, blur and crops
+  function pictureForm(el, api, d, variant, note) {
     const { h, row, number } = panels.ui;
-    const d = api.doc();
-    const p = F.picture(d.xml);
-    const lim = api.limits();
+    const p = F.picture(d.xml, variant);
     el.append(h('p', {}, h('button', { type: 'button', textContent: p ? '换一张图片…' : '选图片…', on: { click: async () => {
       const made = await api.choosePicture();
-      if (made) api.apply((x) => ops.setPicture(x, made));
-    } } }), ' ', p ? h('button', { type: 'button', textContent: '去掉图片', on: { click: () => api.apply((x) => ops.setPicture(x, null)) } }) : null));
-    el.append(h('p', { className: 'muted', textContent: '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP（在 App 的限制内：' + Math.round(lim.animatedBytes / 1048576) + ' MB、长边 ' + lim.animatedSide + '、' + lim.animatedFrames + ' 帧、每帧至少 ' + lim.animatedFrameMs + ' ms）原样保留成动态背景，App 里居中铺满播放、不按裁切框；裁切框只管静态图（第一帧，键盘不动时显示）。超过限制的存成静态图（第一帧）。' }));
+      if (made) api.apply((x) => ops.setPicture(x, made, variant));
+    } } }), ' ', p ? h('button', { type: 'button', textContent: variant ? '去掉深色版的图片' : '去掉图片', on: { click: () => api.apply((x) => ops.setPicture(x, null, variant)) } }) : null));
+    el.append(h('p', { className: 'muted', textContent: note }));
     if (!p) return;
     el.append(
-      row('亮度', number(p.brightness, (v) => api.apply((x) => ops.tune(x, { brightness: Math.max(0, Math.min(100, v ?? 100)) })), { min: 0, max: 100, unit: '%' })),
-      row('模糊', number(p.blur, (v) => api.apply((x) => ops.tune(x, { blur: Math.max(0, Math.min(25, v ?? 0)) })), { min: 0, max: 25, unit: 'dp' })),
+      row('亮度', number(p.brightness, (v) => api.apply((x) => ops.tune(x, { brightness: Math.max(0, Math.min(100, v ?? 100)) }, variant)), { min: 0, max: 100, unit: '%' })),
+      row('模糊', number(p.blur, (v) => api.apply((x) => ops.tune(x, { blur: Math.max(0, Math.min(25, v ?? 0)) }, variant)), { min: 0, max: 25, unit: 'dp' })),
     );
-    const through = F.valueOf(d.xml, 'key', 'fill') === THROUGH;
-    const box = h('input', { type: 'checkbox', checked: through, on: { change: () => api.apply((x) => ops.through(x, box.checked)) } });
-    el.append(row('键透出背景（字母、功能、回车、空格键都半透明，透出图片）', box));
-    for (const [o, label] of ORIENTATIONS) {
-      el.append(h('h3', { textContent: label + '裁切（框是这台设备' + label + '键盘的形状，拖动、放大）' }));
-      el.append(cropper(api, d, o));
+    if (!variant) {
+      const through = F.valueOf(d.xml, 'key', 'fill') === THROUGH;
+      const box = h('input', { type: 'checkbox', checked: through, on: { change: () => api.apply((x) => ops.through(x, box.checked)) } });
+      el.append(row('键透出背景（字母、功能、回车、空格键都半透明，透出图片）', box));
     }
+    for (const [o, label] of ORIENTATIONS) {
+      el.append(h('h3', { textContent: (variant ? '深色版' : '') + label + '裁切（框是这台设备' + label + '键盘的形状，拖动、放大）' }));
+      el.append(cropper(api, d, o, variant));
+    }
+  }
+
+  function render(el, api) {
+    const { h } = panels.ui;
+    const d = api.doc();
+    const lim = api.limits();
+    pictureForm(el, api, d, null, '图片：PNG、JPEG、WebP；保存时重新编码，长边不超过 2560，JPEG（有透明的用 PNG）。动画 WebP（在 App 的限制内：' + Math.round(lim.animatedBytes / 1048576) + ' MB、长边 ' + lim.animatedSide + '、' + lim.animatedFrames + ' 帧、每帧至少 ' + lim.animatedFrameMs + ' ms）原样保留成动态背景，App 里居中铺满播放、不按裁切框；裁切框只管静态图（第一帧，键盘不动时显示）。超过限制的存成静态图（第一帧）。');
+    if (!F.picture(d.xml)) return;
+    el.append(h('h3', { textContent: '深色版背景图' }));
+    if (!ops.darkPictureOffered(d.xml)) {
+      el.append(h('p', { className: 'muted', textContent: '主题有深色版（在「配色」里打开）时，可以给深色版另选一张图；不选时深浅两版用同一张。' }));
+      return;
+    }
+    pictureForm(el, api, d, 'dark', '深色版（手机是深色模式时）用这张；不选时用上面那张。把预览切到「深色」看它。要 0.6.3 以上的输入法。');
   }
 
   panels.push({ id: 'background', label: '背景', ops, render });

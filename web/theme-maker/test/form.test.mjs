@@ -229,19 +229,130 @@ test('the 按键 panel writes each property as the engine reads it', () => {
   read(k.fill(doc, 'key', nine).xml);
 });
 
-test('an icon the app would refuse (a PNG, an SVG past its subset) is named, and a pack holding one cannot be saved', () => {
+// a PNG's signature and IHDR, [w]×[h], [pad] bytes more; a WebP of a VP8X chunk, moving where [animated]
+const png = (w, h, pad = 0) => {
+  const b = new Uint8Array(33 + pad);
+  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  new DataView(b.buffer).setUint32(16, w);
+  new DataView(b.buffer).setUint32(20, h);
+  b.set([8, 6, 0, 0, 0], 24);
+  return b;
+};
+const webp = (w, h, animated) => {
+  const b = new Uint8Array(30);
+  b.set([...'RIFF'].map((c) => c.charCodeAt(0)));
+  new DataView(b.buffer).setUint32(4, 22, true);
+  b.set([...'WEBPVP8X'].map((c) => c.charCodeAt(0)), 8);
+  new DataView(b.buffer).setUint32(16, 10, true);
+  b[20] = animated ? 0x02 : 0;
+  b.set([(w - 1) & 0xff, ((w - 1) >> 8) & 0xff, 0, (h - 1) & 0xff, ((h - 1) >> 8) & 0xff, 0], 24);
+  return b;
+};
+const LIM = { iconBytes: 65536, rasterIconBytes: 131072, rasterIconSide: 256, stickerBytes: 262144, stickerSide: 512, stickers: 120 };
+
+test('an icon the app would refuse (a PNG cut short, one too big or moving, an SVG past its subset) is named, and a pack holding one cannot be saved', () => {
   const t = P.text.ops;
-  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
-  const stroked = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24" stroke="#000" transform="scale(2)"/></svg>');
-  assert.equal(t.iconProblems(E, png, 65536).length, 1);
-  assert.ok(t.iconProblems(E, stroked, 65536).length > 0);
-  assert.ok(t.iconProblems(E, new Uint8Array(70000), 65536)[0].includes('65536'));
   const L = globalThis.YoumoLib;
+  const short = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+  const stroked = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24" stroke="#000" transform="scale(2)"/></svg>');
+  assert.equal(t.iconProblems(E, L, short, LIM).length, 1);
+  assert.ok(t.iconProblems(E, L, stroked, LIM).length > 0);
+  assert.ok(t.iconProblems(E, L, new Uint8Array(70000), LIM)[0].includes('65536'));
+  assert.deepEqual(t.iconProblems(E, L, png(256, 16), LIM), [], 'a PNG of the app\'s side');
+  assert.deepEqual(t.iconProblems(E, L, webp(48, 48, false), LIM), [], 'a still WebP');
+  assert.match(t.iconProblems(E, L, png(257, 16), LIM)[0], /257×16/);
+  assert.match(t.iconProblems(E, L, png(16, 16, 131072), LIM)[0], /131072/, 'a raster icon past its own bytes, not the SVG\'s');
+  assert.match(t.iconProblems(E, L, webp(48, 48, true), LIM)[0], /动态/);
   const FORMAT = { limits: { iconBytes: 65536, keyImageSide: 1024, pictureSide: 4096, keyImageBytes: 1 << 21, entries: 64, fileBytes: 1 << 25, totalBytes: 1 << 26 } };
-  for (const bad of [png, stroked]) {
+  for (const bad of [short, stroked]) {
     const d = t.setIcon({ xml: nord, files: {}, layouts: {} }, 'backspace', bad);
-    assert.ok(globalThis.YoumoMaker.saveProblems(E, L, FORMAT, d).some((p) => p.message.includes('icon-backspace.svg')));
+    assert.ok(globalThis.YoumoMaker.saveProblems(E, L, FORMAT, d).some((p) => p.message.includes('icon-backspace.')));
   }
+});
+
+test('字和图标: a raster icon its file\'s type, tint= on and off, a name of the theme\'s own drawn by content= on a key\'s state', () => {
+  const t = P.text.ops;
+  const doc = { xml: nord, files: {}, layouts: {} };
+  const tinted = t.setIcon(doc, 'backspace', png(48, 48), true);
+  assert.match(tinted.xml, /<icon name="backspace" src="icon-backspace.png" tint="true"\/>/);
+  assert.deepEqual(t.tinted(tinted.xml), ['backspace']);
+  assert.equal(read(tinted.xml).theme.info(false).icons.backspace, 'icon-backspace.png');
+  const own = t.setTint(tinted, 'backspace', false);
+  assert.match(own.xml, /<icon name="backspace" src="icon-backspace.png"\/>/);
+  assert.equal(t.setTint(own, 'backspace', true).xml, tinted.xml);
+  read(own.xml);
+  const still = t.setIcon(doc, 'enter', webp(32, 32, false), true);
+  assert.match(still.xml, /src="icon-enter.webp" tint="true"/);
+  assert.doesNotMatch(t.setIcon(doc, 'enter', new TextEncoder().encode('<svg/>'), true).xml, /tint=/, 'an SVG is drawn in the icon colour: no tint=');
+
+  const app = ['backspace', 'shift'];
+  assert.ok(t.newIconName(nord, app, 'backspace-pressed'));
+  for (const bad of ['backspace', 'Back', 'a--b', '-a', '', 'a'.repeat(65)]) assert.ok(!t.newIconName(nord, app, bad), bad);
+  const pressed = t.setIcon(doc, 'backspace-pressed', png(48, 48));
+  assert.ok(!t.newIconName(pressed.xml, app, 'backspace-pressed'), 'taken');
+  const sel = 'qwerty/backspace:pressed icon';
+  const drawn = t.set(pressed, sel, 'content', 'icon(backspace-pressed)');
+  assert.equal(F.valueOf(drawn.xml, sel, 'content'), 'icon(backspace-pressed)');
+  const r = read(drawn.xml);
+  assert.ok(!r.warnings.some((w) => w.message.includes('backspace-pressed')), JSON.stringify(r.warnings));
+  const s = E.buildScene('qwerty', r.theme, ENV, E.fixedMeasurer());
+  assert.ok(s.ok, JSON.stringify(s.problems));
+  assert.match(s.scene.text(), /\n {4}\+\d+ icon backspace-pressed [^\n]* raster\n/, 'the pressed state draws it');
+  assert.ok(read(pressed.xml).warnings.some((w) => w.message.includes('backspace-pressed')), 'a name no content= draws is said to be undrawn');
+  const back = t.setIcon(pressed, 'backspace-pressed', null);
+  assert.equal(back.xml, nord);
+  assert.deepEqual(Object.keys(back.files), []);
+  // one of its own taken off while content= draws it: the reader would refuse the name, so the values naming it go
+  const both = t.set(t.set(drawn, 'qwerty/backspace icon', 'color', '#ff0000'), 'qwerty/backspace icon', 'content', 'icon(backspace-pressed)');
+  const dropped = t.dropIcon(both, 'backspace-pressed');
+  read(dropped.xml);
+  assert.doesNotMatch(dropped.xml, /backspace-pressed/);
+  assert.equal(dropped.xml, t.set(doc, 'qwerty/backspace icon', 'color', '#ff0000').xml, 'a style left with its colour kept, one left bare gone');
+  assert.deepEqual(Object.keys(dropped.files), []);
+  assert.equal(t.dropIcon(t.setIcon(drawn, 'backspace', png(16, 16)), 'backspace').xml, drawn.xml, 'another name\'s values kept');
+  for (const [w, h] of [[0, 0], [1, 0], [0, 1]]) assert.deepEqual(t.iconProblems(E, globalThis.YoumoLib, png(w, h), LIM), ['读不出图片的大小'], w + '×' + h + ': the app reads no image');
+});
+
+test('按键: a sticker over a key, its words hidden, as the engine reads it; one past the app\'s limits refused; its file gone with it', () => {
+  const k = P.keys.ops;
+  const L = globalThis.YoumoLib;
+  const doc = { xml: nord, files: {}, layouts: {} };
+  const made = k.addSticker(doc, L, LIM, 'qwerty/q', 'Q.png', png(120, 120));
+  assert.equal(F.valueOf(made.xml, 'qwerty/q', 'sticker'), 'sticker-q.png');
+  assert.deepEqual(Object.keys(made.files), ['sticker-q.png']);
+  const pressed = k.addSticker(made, L, LIM, 'qwerty/q:pressed', 'Q.png', webp(120, 120, false));
+  assert.equal(F.valueOf(pressed.xml, 'qwerty/q:pressed', 'sticker'), 'sticker-q.webp');
+  assert.deepEqual(k.stickers(pressed.xml), ['sticker-q.png', 'sticker-q.webp']);
+  const hidden = { ...pressed, xml: F.setProp(pressed.xml, 'qwerty/q label', 'hidden', 'true') };
+  const r = read(hidden.xml);
+  const s = E.buildScene('qwerty', r.theme, ENV, E.fixedMeasurer());
+  assert.ok(s.ok, JSON.stringify(s.problems));
+  const q = s.scene.text().split('\n').filter((l) => l.includes('sticker "sticker-q.png"'));
+  assert.ok(q.length && q.every((l) => l.includes('stand-in=text')), 'the hidden letter its stand-in: ' + q);
+  assert.match(s.scene.text(), /sticker "sticker-q.webp"/);
+  for (const [bytes, why] of [[png(513, 10), /513|512/], [webp(64, 64, true), /动态/], [png(16, 16, 262144), /262144/], [new Uint8Array([1, 2, 3]), /PNG/]]) {
+    assert.throws(() => k.addSticker(doc, L, LIM, 'qwerty/w', 'w.png', bytes), why);
+  }
+  assert.throws(() => k.addSticker(made, L, { ...LIM, stickers: 1 }, 'qwerty/w', 'w.png', png(10, 10)), /最多 1/);
+  assert.ok(k.addSticker(made, L, { ...LIM, stickers: 1 }, 'qwerty/q', 'q2.png', png(10, 10)), 'one in place of the only one');
+  const shared = { ...made, xml: F.setProp(made.xml, 'qwerty/w', 'sticker', 'sticker-q.png') };
+  assert.throws(() => k.addSticker(shared, L, { ...LIM, stickers: 1 }, 'qwerty/q', 'q2.png', png(10, 10)), /最多 1/, 'the one it replaces stays, named by w');
+  for (const [w, h] of [[0, 0], [1, 0]]) assert.throws(() => k.addSticker(doc, L, LIM, 'qwerty/w', 'w.png', png(w, h)), /PNG/, w + '×' + h);
+  // its words hidden for it come back with the sticker gone, or none over a wider one
+  for (const v of [null, 'none']) {
+    const shown = k.sticker(hidden, 'qwerty/q', v);
+    assert.equal(F.valueOf(shown.xml, 'qwerty/q label', 'hidden'), null, String(v));
+    const text = E.buildScene('qwerty', read(shown.xml).theme, ENV, E.fixedMeasurer()).scene.text();
+    assert.match(text, /\n {4}text "q" /, String(v));
+  }
+  assert.equal(F.valueOf(k.sticker(hidden, 'qwerty/q', 'sticker-q.webp').xml, 'qwerty/q label', 'hidden'), 'true', 'another sticker keeps them hidden');
+  const none = k.sticker(pressed, 'qwerty/q:pressed', 'none');
+  assert.equal(F.valueOf(none.xml, 'qwerty/q:pressed', 'sticker'), 'none');
+  assert.deepEqual(Object.keys(none.files), ['sticker-q.png'], 'the file no style names any more goes');
+  read(none.xml);
+  const off = k.sticker(k.sticker(none, 'qwerty/q:pressed', null), 'qwerty/q', null);
+  assert.equal(off.xml, nord);
+  assert.deepEqual(Object.keys(off.files), []);
 });
 
 test('the forms\' bounds are the engine\'s', () => {
@@ -281,7 +392,7 @@ test('the 字和图标 panel: each part apart, its properties as the engine read
   for (const n of ['a', 'b', 'c', 'd']) four = t.addFont(four, n + '.ttf', ttf);
   assert.throws(() => t.addFont(four, 'e.ttf', ttf), /4/);
   const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24z"/></svg>');
-  assert.deepEqual(t.iconProblems(E, svg, 65536), []);
+  assert.deepEqual(t.iconProblems(E, globalThis.YoumoLib, svg, LIM), []);
   const icon = t.setIcon(doc, 'backspace', svg);
   assert.match(icon.xml, /<icon name="backspace" src="icon-backspace.svg"\/>/);
   assert.ok(icon.xml.lastIndexOf('<icon') > icon.xml.lastIndexOf('<style'), 'icons last');
@@ -318,6 +429,49 @@ test('the 背景 panel: a picture with a cut for each orientation, its crop kept
   assert.deepEqual(Object.keys(gone.files), []);
   assert.equal(F.valueOf(gone.xml, 'keyboard', 'fill'), '@background', 'the keyboard back to its colour');
   read(gone.xml);
+});
+
+test('the 背景 panel: the dark version\'s own picture written after the light one, read by its variant=, tuned and cut apart; the light one taken off takes it', () => {
+  const b = P.background.ops;
+  const pic = (n) => ({ type: 'png', src: new Uint8Array([n]), cuts: { portrait: { bytes: new Uint8Array([n + 1]), type: 'png', rect: [0, 0, 100, 50] } } });
+  const light = b.setPicture({ xml: nord, files: {}, layouts: {} }, pic(1));
+  assert.ok(b.darkPictureOffered(light.xml));
+  assert.ok(!b.darkPictureOffered(nord), 'no light picture yet');
+  assert.ok(!b.darkPictureOffered(P.colors.ops.dark(light, false).xml), 'no dark version');
+  const both = b.setPicture(light, pic(5), 'dark');
+  assert.ok(both.xml.indexOf('<picture src="picture.png"') < both.xml.indexOf('<picture variant="dark" src="picture-dark.png"'), 'light first, as ThemeWriter writes them');
+  assert.deepEqual(F.picture(both.xml, 'dark'), { src: 'picture-dark.png', brightness: 100, blur: 0, cuts: { portrait: { file: 'picture-dark-portrait.png', rect: [0, 0, 100, 50] } } });
+  assert.equal(F.picture(both.xml).src, 'picture.png');
+  assert.deepEqual(Object.keys(both.files).sort(), ['picture-dark-portrait.png', 'picture-dark.png', 'picture-portrait.png', 'picture.png']);
+  const r = read(both.xml);
+  assert.deepEqual(r.warnings.map((w) => w.message).filter((m) => !m.includes('min-app')), [], 'the 0.6.3 note alone (the maker writes min-app on save)');
+  const tuned = b.tune(both, { brightness: 60 }, 'dark');
+  assert.equal(F.picture(tuned.xml, 'dark').brightness, 60);
+  assert.equal(F.picture(tuned.xml).brightness, 100, 'the light one as it was');
+  const cut = b.setCut(tuned, 'landscape', { bytes: new Uint8Array([9]), type: 'png', rect: [0, 0, 100, 30] }, 'dark');
+  assert.equal(F.picture(cut.xml, 'dark').cuts.landscape.file, 'picture-dark-landscape.png');
+  assert.equal(F.picture(cut.xml).cuts.landscape, undefined);
+  read(cut.xml);
+  const noDark = b.setPicture(cut, null, 'dark');
+  assert.equal(noDark.xml, light.xml);
+  assert.deepEqual(Object.keys(noDark.files).sort(), ['picture-portrait.png', 'picture.png']);
+  const none = b.setPicture(cut, null);
+  assert.equal(F.picture(none.xml), null);
+  assert.equal(F.picture(none.xml, 'dark'), null, 'a dark one alone the app refuses');
+  assert.deepEqual(Object.keys(none.files), []);
+  read(none.xml);
+  const off = P.colors.ops.dark(both, false);
+  assert.equal(F.picture(off.xml, 'dark'), null, 'no dark version: no dark picture');
+  assert.deepEqual(Object.keys(off.files).sort(), ['picture-portrait.png', 'picture.png']);
+  read(off.xml);
+  // hand-written dark first: each still found by its variant=, a light one put in before it
+  const darkFirst = nord.replace('<style', '<picture variant="dark" src="d.png"/>\n  <picture src="l.png"/>\n  <style');
+  assert.equal(F.picture(darkFirst).src, 'l.png');
+  assert.equal(F.picture(darkFirst, 'dark').src, 'd.png');
+  const onlyDark = nord.replace('<style', '<picture variant="dark" src="d.png"><cut orientation="portrait" file="d-p.png"/></picture>\n  <style');
+  const added = F.setPicture(onlyDark, { src: 'l.png', brightness: 100, blur: 0, cuts: { portrait: { file: 'l-p.png', rect: null } } });
+  assert.ok(added.xml.indexOf('src="l.png"') < added.xml.indexOf('src="d.png"'), added.xml);
+  read(added.xml);
 });
 
 test('the crop is the biggest box of the keyboard\'s ratio, zoomed and moved inside the picture', () => {

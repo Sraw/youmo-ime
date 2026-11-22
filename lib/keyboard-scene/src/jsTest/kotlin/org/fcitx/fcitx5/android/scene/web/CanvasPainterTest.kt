@@ -287,6 +287,79 @@ class CanvasPainterTest {
             calls.dropWhile { it != "scale(1,1)" }.drop(1).dropLast(1),
         )
     }
+
+    @Test
+    fun anImageIsFittedAlikeAndCentredNeverPastThreeTimesItsSize() {
+        val box = Box(0.0, 0.0, 100.0, 100.0)
+        assertEquals(Box(26.0, 26.0, 74.0, 74.0), CanvasPainter.fitted(16.0, 16.0, box), "a small one at 3 times")
+        assertEquals(Box(0.0, 25.0, 100.0, 75.0), CanvasPainter.fitted(200.0, 100.0, box))
+        assertEquals(Box(25.0, 0.0, 75.0, 100.0), CanvasPainter.fitted(40.0, 80.0, box))
+        assertEquals(Box(50.0, 50.0, 50.0, 50.0), CanvasPainter.fitted(0.0, 10.0, box), "no size: nothing")
+    }
+
+    @Test
+    fun aRasterIconKeepsItsColoursAtTheTintsAlpha() {
+        val bmp: dynamic = js("({ image: 'BMP', width: 48, height: 24 })")
+        val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.of(128, 255, 0, 0), raster = true), Assets(icons = mapOf("x" to bmp)))
+        assertEquals(listOf("save()", "globalAlpha=${round(128 / 255.0)}", "drawImage(BMP,0,6,24,12)", "restore()"), calls)
+        val none = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), Argb.TRANSPARENT, raster = true), Assets(icons = mapOf("x" to bmp)))
+        assertEquals(emptyList(), none)
+    }
+
+    @Test
+    fun aTintedRasterIconIsItsAlphaInTheTintLaidOnce() {
+        val bmp: dynamic = js("({ image: 'BMP', width: 24, height: 24 })")
+        val calls = drawn(Op.Icon("x", Box(0.0, 0.0, 24.0, 24.0), half, raster = true, tintMask = true), Assets(icons = mapOf("x" to bmp)))
+        val layer = calls.filter { it.startsWith("layer.") && !it.startsWith("layer.setTransform") && !it.startsWith("layer.clearRect") }
+        assertEquals(
+            listOf(
+                "layer.save()", "layer.fillStyle=rgba(0,0,255,1)", "layer.strokeStyle=rgba(0,0,255,1)", "layer.drawImage(BMP,0,0,24,24)",
+                "layer.globalCompositeOperation=source-in", "layer.fillRect(0,0,24,24)", "layer.globalCompositeOperation=source-over", "layer.restore()",
+            ),
+            layer,
+        )
+        assertTrue("globalAlpha=${round(128 / 255.0)}" in calls, "$calls")
+        assertTrue(calls.any { it.startsWith("drawImage(LAYER,") }, "$calls")
+        assertTrue(calls.none { it.startsWith("drawImage(BMP") }, "never laid as it is: $calls")
+    }
+
+    @Test
+    fun aTurnedRasterIconTurnsAboutItsMiddle() {
+        val bmp: dynamic = js("({ image: 'BMP', width: 24, height: 24 })")
+        val calls = drawn(Op.Icon("x", Box(10.0, 10.0, 34.0, 34.0), red, rotation = 90.0, raster = true), Assets(icons = mapOf("x" to bmp)))
+        assertEquals(listOf("translate(22,22)", "rotate(${round(kotlin.math.PI / 2)})", "translate(-22,-22)"), calls.filter { it.startsWith("translate") || it.startsWith("rotate") })
+        assertTrue("drawImage(BMP,10,10,24,24)" in calls, "$calls")
+    }
+
+    @Test
+    fun aRasterIconNotDecodedYetIsTheAppsOfItsName() {
+        val app: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L24 24Z' }] })")
+        val calls = drawn(Op.Icon("backspace", Box(0.0, 0.0, 24.0, 24.0), red, raster = true), Assets(icons = mapOf("backspace" to app)))
+        assertTrue("fill(PATH M0 0L24 24Z,nonzero)" in calls, "$calls")
+    }
+
+    @Test
+    fun aStickerIsItsImageFittedInItsBoxAtItsAlpha() {
+        val image: dynamic = js("({ image: 'IMG', width: 90, height: 45 })")
+        val op = Op.Sticker("st-q.png", Box(10.0, 20.0, 110.0, 70.0), alpha = 0.5)
+        assertEquals(listOf("save()", "globalAlpha=0.5", "drawImage(IMG,10,20,100,50)", "restore()"), drawn(op, Assets(mapOf("st-q.png" to image))))
+        assertEquals(emptyList(), drawn(op.copy(alpha = 0.0), Assets(mapOf("st-q.png" to image))))
+    }
+
+    @Test
+    fun aStickerWithNoImageIsTheWordsAndIconItHidesOrNothing() {
+        val word = Op.Text("q", 50.0, 50.0, "system", 400, 20.0, red)
+        val op = Op.Sticker("st-q.png", Box(10.0, 20.0, 110.0, 70.0), standIn = listOf(word))
+        val calls = drawn(op)
+        assertTrue("fillText(q,0,0)" in calls, "$calls")
+        assertTrue(calls.none { it.startsWith("drawImage") }, "$calls")
+        assertEquals(emptyList(), drawn(op.copy(standIn = emptyList())))
+        val app: dynamic = js("({ vw: 24, vh: 24, paths: [{ d: 'M0 0L24 24Z' }] })")
+        val shift = op.copy(standIn = listOf(Op.Icon("shift", Box(0.0, 0.0, 24.0, 24.0), red)))
+        assertTrue("fill(PATH M0 0L24 24Z,nonzero)" in drawn(shift, Assets(icons = mapOf("shift" to app))), "an icon key's sticker not in: its icon")
+    }
+
+    private fun round(v: Double) = (kotlin.math.round(v * 1000) / 1000).toString()
 }
 
 /** A 2D context that writes down each call and property set; a canvas made of its document writes `layer.` calls on the same list. */
