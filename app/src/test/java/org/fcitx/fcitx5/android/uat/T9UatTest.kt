@@ -113,7 +113,8 @@ class T9UatTest {
 
     private fun KeyboardHarness.sentKeys() = api.calls.filter { it.startsWith("sendKey") }.map { Regex("key=([^,]*)").find(it)?.groupValues?.get(1) ?: it }
 
-    // the number pad is on the nine keys' frame, so 123 from them moves none of their keys; the way back is where 123 was
+    // the number pad is on the nine keys' frame, so 123 from them moves none of their keys; the way back starts where 123 was,
+    // a little narrower so it and the lock fill 1's column
     @Test
     @Uat("KB-90")
     fun going123FromTheNineKeysMovesNoKey() {
@@ -126,10 +127,13 @@ class T9UatTest {
                 Triple("backspace", "backspace", "⌫ at the top right on both"),
                 Triple("enter", "enter", "Return at the bottom right on both"),
                 Triple("symbols", "symbols", "符 first in the bottom row, as on every letter board"),
-                Triple("back", "numbers", "the way back where 123 was"),
             ),
             { (pad, _, why) -> "$pad: $why" },
         ) { (pad, there, _) -> assertEquals(nine.getValue(there), h.keyNamed(pad).bounds) }
+        val back = h.keyNamed("back").bounds
+        val numbers = nine.getValue("numbers")
+        assertEquals("the way back starts where 123 was", Rect(numbers.left, numbers.top, back.right, numbers.bottom), back)
+        assertTrue("$back covers most of 123 $numbers", back.right > numbers.left + numbers.width() * 0.8)
         assertEquals("符", h.keyNamed("symbols").label)
         assertEquals(h.service.getString(R.string.picker_back), h.keyNamed("back").label)
         h.tap(h.keyNamed("back"))

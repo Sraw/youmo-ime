@@ -78,9 +78,9 @@ class NumberPadsTest {
     ) { (pad, form, _) ->
         val s = scene(pad, form)
         val nine = Forms.scene("nine", Forms.env("nine", Forms.all.getValue(form)))
-        // the pad's key to the nine keys' in its place: the digits, ⌫, Return, 符, and 返回 where 123 is
+        // the pad's key to the nine keys' in its place: the digits, ⌫, Return and 符
         val match = (1..9).associate { "$it" to "$it" } +
-            mapOf("backspace" to "backspace", "enter" to "enter", "symbols" to "symbols", "back" to "numbers")
+            mapOf("backspace" to "backspace", "enter" to "enter", "symbols" to "symbols")
         for ((id, there) in match) {
             val b = key(s, id).bounds
             val n = key(nine, there).bounds
@@ -89,10 +89,17 @@ class NumberPadsTest {
             assertEquals(n.top, b.top, eps, "$id's top on the nine keys' $there")
             assertEquals(n.bottom, b.bottom, eps, "$id's bottom on the nine keys' $there")
         }
-        // 0 under 8, the digits' column as on a phone's: wider for the lock beside it, over 8's middle
-        val eight = key(s, "8").bounds
-        val zero = key(s, "0").bounds
-        assertTrue((eight.left + eight.right) / 2 in zero.left..zero.right, "0 under 8")
+        // 返回 starts where 123 does, a little narrower so it and the lock fill 1's column; 0 and . in the digits' columns
+        val back = key(s, "back").bounds
+        val numbers = key(nine, "numbers").bounds
+        assertEquals(numbers.left, back.left, eps, "返回 starts where 123 does")
+        assertTrue(back.right > numbers.left + (numbers.right - numbers.left) * 0.8, "返回 covers most of 123")
+        for ((id, above) in listOf("0" to "8", "back" to "1")) {
+            assertEquals(key(s, above).bounds.left, key(s, id).bounds.left, eps, "$id's left under $above")
+        }
+        assertEquals(key(s, "8").bounds.right, key(s, "0").bounds.right, eps, "0's right under 8")
+        assertEquals(key(s, "1").bounds.right, key(s, "lock").bounds.right, eps, "the lock's right under 1")
+        if (pad != "phone") assertEquals(key(s, "9").bounds.right, key(s, ".").bounds.right, eps, ". under 9")
     }
 
     // 符 as the letter boards' 符 (its words, its function face: drawn the same), the way back saying 返回 as the panels' does
@@ -109,7 +116,12 @@ class NumberPadsTest {
         val letters = key(nine, "symbols")
         assertEquals(letters.label, sym.label, "符's words")
         assertEquals(letters.kind, sym.kind, "a function key, as the letter boards' 符")
-        assertEquals(letters.ops(false), sym.ops(false), "drawn as the nine keys' 符, in the same place")
+        val shapes = { k: KeyNode -> k.ops(false).filterNot { it is Op.Text } }
+        assertEquals(shapes(letters), shapes(sym), "drawn as the nine keys' 符, in the same place")
+        // a row's labels share one size, so where 返回 is squeezed (floating) 符's word comes out a little smaller
+        val word = { k: KeyNode -> k.ops(false).filterIsInstance<Op.Text>().single() }
+        assertEquals(word(letters).text, word(sym).text, "符's word")
+        assertTrue(word(sym).size in word(letters).size * 0.9..word(letters).size, "符's word near the nine keys' size")
         val back = key(s, "back")
         assertEquals(Forms.block.texts.back, back.label, "返回, the panels' word")
         assertEquals(key(nine, "numbers").kind, back.kind, "a function key as the 123 it stands for")

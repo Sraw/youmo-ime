@@ -180,8 +180,8 @@ class FieldPadUatTest {
         // a stretch this share of the width at least is a place, not the gap between two keys
         const val BLANK_AT_LEAST = 20
 
-        // number.xml's widths: = and .
+        // number.xml's widths: = and . (in 9's column)
         const val RIGHT = 0.18f
-        const val DOT = 0.12f
+        const val DOT = 0.22f
     }
 }

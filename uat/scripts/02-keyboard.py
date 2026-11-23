@@ -459,14 +459,18 @@ def kb90(d):
     tap_key(d, "numbers")
     pad = board_keys(d)
     d.shot("kb", "九键点 123 后的数字键盘")
-    pairs = [(i, i) for i in ids[:-1]] + [("back", "numbers")]
+    pairs = [(i, i) for i in ids[:-1]]
     moved = [f"{p}{pad.get(p, (None,))[0]}≠{nine[t][0]}" for p, t in pairs if pad.get(p, (None,))[0] != nine[t][0]]
     check(not moved, f"不在九键的位置：{moved}")
+    # 返回 starts where 123 was, a little narrower: it and the lock fill 1's column
+    back, n123 = pad["back"][0], nine["numbers"][0]
+    check(back[0] == n123[0] and back[1] == n123[1] and back[3] == n123[3] and back[2] > n123[0] + (n123[2] - n123[0]) * 0.8,
+          f"返回 {back} 不是从 123 {n123} 的位置起")
     check(pad["symbols"][1] == "符" and pad["back"][1] == "返回", f"符、返回 写的是「{pad['symbols'][1]}」「{pad['back'][1]}」")
     tap_key(d, "back")
     again = board_keys(d)
     check(all(again.get(i, (None,))[0] == nine[i][0] for i in ids), "返回 后九键的键挪了")
-    return "1–9、⌫、回车、符 原位，返回 在 123 的位置；返回 后九键不变"
+    return "1–9、⌫、回车、符 原位，返回 从 123 的位置起；返回 后九键不变"
 
 
 @case("KB-91", visual=True)
