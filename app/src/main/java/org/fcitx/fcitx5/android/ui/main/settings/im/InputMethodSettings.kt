@@ -52,7 +52,6 @@ import org.fcitx.fcitx5.android.input.keyboard.SwipeSlotsCache
 import org.fcitx.fcitx5.android.input.keyboard.T9EnglishTyping
 import org.fcitx.fcitx5.android.input.keyboard.T9MultiTap
 import org.fcitx.fcitx5.android.ui.main.levelText
-import org.fcitx.fcitx5.android.ui.main.reasonText
 import org.fcitx.fcitx5.android.ui.main.settings.LearningRestore
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.toast
@@ -195,14 +194,9 @@ object InputMethodSettings {
         ModelChoice.HIGH to R.string.im_model_level_high,
     )
 
-    // the summary is the chosen entry's label, so the device's level is said in each
-    internal fun modelLevelLabel(context: Context, value: String): String {
-        val device = ThisDevice.profile
-        val auto = levelText(context, device.autoLevel)
-        return when (val choice = ModelChoice.of(value)) {
-            ModelChoice.AUTO -> context.getString(R.string.im_model_level_auto, auto, reasonText(context, device))
-            else -> context.getString(R.string.im_model_level_auto_here, context.getString(MODEL_LEVELS.getValue(choice)), auto)
-        }
+    internal fun modelLevelLabel(context: Context, value: String): String = when (val choice = ModelChoice.of(value)) {
+        ModelChoice.AUTO -> context.getString(R.string.im_model_level_auto, levelText(context, ThisDevice.profile.autoLevel))
+        else -> context.getString(MODEL_LEVELS.getValue(choice))
     }
 
     // keyed by Fuzzy's names, as the engine reads them

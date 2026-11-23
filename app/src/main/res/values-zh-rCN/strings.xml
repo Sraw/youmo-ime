@@ -777,20 +777,14 @@
     <string name="im_model_level_low">低档：只按词频和搭配，最省电</string>
     <string name="im_model_level_medium">中档：每次按键按整句通顺程度重排</string>
     <string name="im_model_level_high">高档：拿不准时用大模型复核，最准</string>
-    <string name="im_model_level_auto">自动（本机：%1$s，%2$s）</string>
-    <string name="im_model_level_auto_here">%1$s（本机自动为：%2$s）</string>
+    <string name="im_model_level_auto">自动：根据 CPU 性能推荐（本机：%1$s）</string>
     <string name="device_level_low">低</string>
     <string name="device_level_medium">中</string>
     <string name="device_level_high">高</string>
-    <string name="device_reason_i8mm">有 i8mm</string>
-    <string name="device_reason_new_big_core">大核为 A77 或更新</string>
-    <string name="device_reason_little_only">只有小核</string>
     <plurals name="device_reason_offline">
         <item quantity="other">检测时 %1$d 核离线</item>
     </plurals>
     <string name="device_reason_unread">读不到处理器信息</string>
-    <string name="device_reason_no_dotprod">无 dotprod</string>
-    <string name="device_reason_dotprod">有 dotprod，无 i8mm</string>
     <string name="device_dotprod">有 dotprod</string>
     <string name="device_no_dotprod">无 dotprod</string>
     <string name="im_typos">纠正错拼和按偏的键</string>

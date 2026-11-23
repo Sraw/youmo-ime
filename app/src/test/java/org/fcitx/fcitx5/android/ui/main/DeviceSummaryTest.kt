@@ -62,7 +62,7 @@ class DeviceSummaryTest {
         val noMidr = sixT.copy(cores = sixT.cores.map { it.copy(midr = null) })
         assertEquals("中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL · 读不到处理器信息", deviceSummary(context, DeviceProfile.of(noMidr)))
         ThisDevice.profiles = DeviceProfiles(Store(), "", { noMidr }, null)
-        assertEquals("自动（本机：中，读不到处理器信息）", InputMethodSettings.modelLevelLabel(context, ModelChoice.AUTO.key))
+        assertEquals("自动：根据 CPU 性能推荐（本机：中）", InputMethodSettings.modelLevelLabel(context, ModelChoice.AUTO.key))
     }
 
     @Test
@@ -86,7 +86,7 @@ class DeviceSummaryTest {
     @Test
     fun theLevelSaysWhatAutoIsHere() {
         ThisDevice.profiles = DeviceProfiles(Store(), "", { sixT }, null)
-        assertEquals("自动（本机：中，无 dotprod）", InputMethodSettings.modelLevelLabel(context, ModelChoice.AUTO.key))
-        assertEquals("高档：拿不准时用大模型复核，最准（本机自动为：中）", InputMethodSettings.modelLevelLabel(context, ModelChoice.HIGH.key))
+        assertEquals("自动：根据 CPU 性能推荐（本机：中）", InputMethodSettings.modelLevelLabel(context, ModelChoice.AUTO.key))
+        assertEquals("高档：拿不准时用大模型复核，最准", InputMethodSettings.modelLevelLabel(context, ModelChoice.HIGH.key))
     }
 }

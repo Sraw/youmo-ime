@@ -106,18 +106,7 @@ internal fun levelText(context: Context, level: ModelLevel): String = context.ge
     }
 )
 
-/** Why the automatic level is what it is. */
-internal fun reasonText(context: Context, profile: DeviceProfile): String = when (profile.reason) {
-    LevelReason.I8MM -> context.getString(R.string.device_reason_i8mm)
-    LevelReason.NEW_BIG_CORE -> context.getString(R.string.device_reason_new_big_core)
-    LevelReason.LITTLE_ONLY -> context.getString(R.string.device_reason_little_only)
-    LevelReason.OFFLINE -> context.resources.getQuantityString(R.plurals.device_reason_offline, profile.unread, profile.unread)
-    LevelReason.UNREAD -> context.getString(R.string.device_reason_unread)
-    LevelReason.NO_DOTPROD -> context.getString(R.string.device_reason_no_dotprod)
-    LevelReason.DOTPROD -> context.getString(R.string.device_reason_dotprod)
-}
-
-/** 「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」, and why it is medium where cores were offline or unread, as the settings say. */
+/** 「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」, and why it is medium where cores were offline or unread. */
 internal fun deviceSummary(context: Context, profile: DeviceProfile, kernel: String = profile.kernel.name): String {
     val level = levelText(context, profile.autoLevel)
     val dotprod = context.getString(if (profile.dotprod == Dotprod.NONE) R.string.device_no_dotprod else R.string.device_dotprod)
@@ -130,7 +119,9 @@ internal fun deviceSummary(context: Context, profile: DeviceProfile, kernel: Str
         )
     }
     return when (profile.reason) {
-        LevelReason.OFFLINE, LevelReason.UNREAD -> "$line · ${reasonText(context, profile)}"
+        LevelReason.OFFLINE ->
+            "$line · ${context.resources.getQuantityString(R.plurals.device_reason_offline, profile.unread, profile.unread)}"
+        LevelReason.UNREAD -> "$line · ${context.getString(R.string.device_reason_unread)}"
         else -> line
     }
 }

@@ -804,21 +804,15 @@
     <string name="im_model_level_low">Low: by how common words and pairs are, least battery</string>
     <string name="im_model_level_medium">Medium: weighs the whole sentence at every key</string>
     <string name="im_model_level_high">High: a larger model checks where unsure, most accurate</string>
-    <string name="im_model_level_auto">Auto (this device: %1$s, %2$s)</string>
-    <string name="im_model_level_auto_here">%1$s (auto here: %2$s)</string>
+    <string name="im_model_level_auto">Auto: suggested from the CPU (this device: %1$s)</string>
     <string name="device_level_low">low</string>
     <string name="device_level_medium">medium</string>
     <string name="device_level_high">high</string>
-    <string name="device_reason_i8mm">has i8mm</string>
-    <string name="device_reason_new_big_core">big cores A77 or newer</string>
-    <string name="device_reason_little_only">little cores only</string>
     <plurals name="device_reason_offline">
         <item quantity="one">%1$d core offline when checked</item>
         <item quantity="other">%1$d cores offline when checked</item>
     </plurals>
     <string name="device_reason_unread">the processor could not be read</string>
-    <string name="device_reason_no_dotprod">no dotprod</string>
-    <string name="device_reason_dotprod">dotprod, no i8mm</string>
     <string name="device_dotprod">dotprod</string>
     <string name="device_no_dotprod">no dotprod</string>
     <string name="im_typos">Fix typos and slipped keys</string>
