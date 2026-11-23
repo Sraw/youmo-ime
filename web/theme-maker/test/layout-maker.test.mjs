@@ -421,7 +421,7 @@ test("a theme pack's boards are offered made layouts of the user's, as the app's
 // just above its size, so it grows only on purpose
 test('the layout maker built is no bigger than its budget', () => {
   const page = assemble(LAYOUT_SRC, ENGINE);
-  assert.ok(Buffer.byteLength(page) <= 2_630_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
+  assert.ok(Buffer.byteLength(page) <= 2_640_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
   assert.ok(statSync(ENGINE).size < Buffer.byteLength(page));
 });
 

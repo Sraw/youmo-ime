@@ -1,7 +1,7 @@
 """uat/02-keyboard.md. The .md is the source of truth; each function follows its case's 前提/操作/预期."""
 import time
 
-from uat import Blocked, case, check, choose, has, home, script
+from uat import Blocked, case, check, choose, has, home, open_url, script
 
 
 @case("KB-01")
@@ -122,11 +122,11 @@ case("KB-105", needs="jvm:SwipePopupScreenshotTest.uprightOnTheCanvas、SwipePop
      "PopupsTest.aMenusCellInFocusIsLargerAndReturnsColourOneDisabledFaded、PopupsTest.aMenusCellInFocusThatIsDisabledKeepsReturnsColourFaded")(lambda d: None)
 
 
-def testbed_field(d, rid):
-    """the testbed's types page, its field [rid] tapped: the keyboard up on it"""
+def testbed_field(d, rid, page="types"):
+    """the testbed's [page], its field [rid] tapped: the keyboard up on it"""
     from uat import TESTBED
     d.sh(f"am force-stop {TESTBED}")
-    d.testbed("types")
+    d.testbed(page)
     def field(s):
         n = next((x for x in s.app() if x.rid == rid and x.pkg == TESTBED), None)
         # the date and later fields are below the first screen
@@ -621,11 +621,11 @@ def kb98(d):
     return f"开关读作「{said}」；弹出 {[t for t in shown if t in ('.', '。', '，', '？', '！')]}；打出「{got}」，打着 ni「{then}」"
 
 
-def q_up_command(d, command, note, way="上滑"):
-    """q's [way] set to [command] from the commands' list, the list shot where it shows"""
+def q_up_command(d, command, note, way="上滑", key="q"):
+    """[key]'s [way] set to [command] from the commands' list, the list shot where it shows"""
     st = script("14-settings")
     st.slots_tab(d, "全键盘")
-    st.key_dialog(d, "q")
+    st.key_dialog(d, key)
     st.dialog_way(d, way, "命令")
     s = d.screen()
     change = [n for n in s.app() if n.text == "换"]
@@ -815,3 +815,86 @@ def kb115(d):
     back, typed = im_name(d), d.field_text() or ""
     check(gone and back == side and typed == "", f"滑回键上：菜单 {menu_cells(s)}，松开后「{back}」，框里「{typed}」")
     return f"编辑菜单往下走 {len(on)} 格还在、滑回收起；下滑菜单 {cells}：松开 {first}，往下走仍 {drift}，右挪 {side}，滑回不变"
+
+
+@case("KB-116", mutates=True, visual=True)
+def kb116(d):
+    listed = q_up_command(d, "选中至文首", "命令列表：光标到结尾后面是选中至文首、选中至文尾", way="下滑")
+    at = listed.index("光标到结尾") if "光标到结尾" in listed else -1
+    check(at >= 0 and listed[at + 1:at + 3] == ["选中至文首", "选中至文尾"], f"命令列表 {listed}")
+    q_up_command(d, "选中至文尾", "w 下滑设成选中至文尾", way="下滑", key="w")
+    d.step("多行框")
+    testbed_field(d, "multiline")
+    d.type("hello")
+    d.enter()
+    d.enter()
+    d.type("world")
+    d.enter()
+    time.sleep(0.5)
+    ml = lambda: d.testbed_state()["multiline"]
+    t = ml()["text"]
+    check(t == "hello\nworld", f"框里是 {t!r}")
+    for _ in range(3):
+        d.sh("input keyevent KEYCODE_DPAD_LEFT")
+    time.sleep(0.5)
+    sel = lambda: (lambda f: (min(f["selStart"], f["selEnd"]), max(f["selStart"], f["selEnd"])))(ml())
+    if sel() != (8, 8):
+        raise Blocked(f"光标没放到 wo 后面：{sel()}")
+    p = d.dpx()
+
+    def down(key):
+        x, y = d.keys(refresh=True)[key]
+        d.swipe((x, y), (x, y + 60 * p), 150, after=0.8)
+
+    down("q")
+    s1 = sel()
+    d.shot("app", "Q 下滑：从开头选到 wo 后面")
+    check(s1 == (0, 8), f"选中至文首后选区 {s1}")
+    down("w")
+    s2 = sel()
+    d.shot("app", "W 下滑：开头不动，选到末尾")
+    check(s2 == (0, 11), f"接着选中至文尾后选区 {s2}")
+    d.sh("input keyevent KEYCODE_MOVE_END")
+    time.sleep(0.4)
+    if sel() != (11, 11):
+        raise Blocked(f"光标没放到末尾：{sel()}")
+    d.type("nihao")
+    d.cands()
+    down("q")
+    time.sleep(0.5)
+    f = ml()
+    s3 = sel()
+    check(f["text"] == "hello\nworld你好" and s3 == (0, 13), f"打着拼音选中至文首后框里 {f['text']!r}，选区 {s3}")
+    d.step("网页框")
+    open_url(d, "text")
+    d.type("hello")
+    d.enter()
+    time.sleep(0.5)
+    web = lambda: d.field_text()
+    check(web() == "hello", f"网页框里 {web()!r}")
+    for _ in range(2):
+        d.sh("input keyevent KEYCODE_DPAD_LEFT")
+    time.sleep(0.3)
+    # 选到 hel，再选中至文尾：先把光标放到开头再发键，顺序乱了或没放光标，退格后剩 hello 或 hel
+    down("q")
+    down("w")
+    d.shot("app", "网页框：Q 下滑再 W 下滑，整段选中")
+    d.sh("input keyevent KEYCODE_DEL")
+    time.sleep(0.5)
+    w = web()
+    check(w == "", f"网页框选中至文首、文尾后退格，框里 {w!r}")
+    d.step("终端框")
+    testbed_field(d, "terminal", page="behavior")
+    d.type("ls")
+    d.enter()
+    time.sleep(0.5)
+    t = d.testbed_state()["terminal"]["text"]
+    if t != "ls":
+        raise Blocked(f"终端框没打进 ls：{t!r}")
+    told = "这个输入框不能选中文字"
+    down("q")
+    d.wait(lambda s: s.find(contains=told, where="all"), 5, step=0.2, what=f"提示条「{told}」")
+    d.shot("ime", "终端框 Q 下滑：提示条说不能选中，什么也没发")
+    term = d.testbed_state()["terminal"]
+    check(term["text"] == "ls" and term["focused"], f"终端框里 {term['text']!r}，焦点 {term['focused']}")
+    return f"多行框 {s1} → {s2}；打着拼音 {s3}；网页框整段选中；终端框只提示"

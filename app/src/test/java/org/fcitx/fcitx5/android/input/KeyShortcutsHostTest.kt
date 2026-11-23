@@ -322,6 +322,103 @@ class KeyShortcutsHostTest {
         assertEquals("", host.preedit)
     }
 
+    // q down 选中至文首, w down 选中至文尾
+    private fun selectToEdgesOnQW() = prefs.setShortcuts(
+        KeyShortcuts.Empty.with("full/q", KeyShortcut.Command(KeyCommand.SelectToStart)).with("full/w", KeyShortcut.Command(KeyCommand.SelectToEnd)),
+    )
+
+    private fun selectTo(start: Boolean, then: String) {
+        swipe(h.key(if (start) "q" else "w"), up = false)
+        host.synced()
+        host.until("$then selected", { "field [${h.field.text}] ${selected()}" }) { ordered() == then }
+    }
+
+    private fun ordered() = h.field.let { "${minOf(it.selectionStart, it.selectionEnd)}..${maxOf(it.selectionStart, it.selectionEnd)}" }
+
+    @Test
+    @Uat("KB-116")
+    fun selectToStartAndToEndFromTheMiddleOfTheWholeField() {
+        selectToEdgesOnQW()
+        start()
+        h.start(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, prefill = { it.setText("one\ntwo\nthree"); it.setSelection(5) })
+        host.synced()
+        selectTo(start = true, then = "0..5")
+        h.field.setSelection(5)
+        host.synced()
+        selectTo(start = false, then = "5..13")
+        assertEquals("nothing typed", "one\ntwo\nthree", h.field.text.toString())
+    }
+
+    // the end farther from the edge kept, whichever way the selection was made
+    @Test
+    @Uat("KB-116")
+    fun selectToAnEdgeKeepsTheSelectionsFarEnd() {
+        selectToEdgesOnQW()
+        start()
+        for ((a, b) in listOf(2 to 5, 5 to 2)) {
+            h.start(prefill = { it.setText("hello world"); it.setSelection(a, b) })
+            host.synced()
+            selectTo(start = true, then = "0..5")
+            h.field.setSelection(a, b)
+            host.synced()
+            selectTo(start = false, then = "2..11")
+        }
+    }
+
+    @Test
+    @Uat("KB-116")
+    fun selectToAnEdgeCommitsWhatIsTypedFirst() {
+        selectToEdgesOnQW()
+        start("hi")
+        type("nihao")
+        selectTo(start = true, then = "0..4")
+        assertEquals("hi你好", h.field.text.toString())
+        assertEquals("", host.preedit)
+    }
+
+    @Test
+    fun selectToAnEdgeAtItOrInAnEmptyFieldSelectsNothing() {
+        selectToEdgesOnQW()
+        start("hello")
+        selectTo(start = false, then = "5..5")
+        h.field.setSelection(0)
+        host.synced()
+        selectTo(start = true, then = "0..0")
+        h.start()
+        host.synced()
+        selectTo(start = true, then = "0..0")
+        selectTo(start = false, then = "0..0")
+    }
+
+    // past what a read of the field reaches (KeyShortcutRunner's 10 000); the EditText's own cap at 5000 taken off
+    @Test
+    fun selectToEndReachesALongFieldsVeryEnd() {
+        selectToEdgesOnQW()
+        start()
+        val long = "字".repeat(30_000)
+        h.start(prefill = { it.filters = arrayOf(); it.setText(long); it.setSelection(3) })
+        host.synced()
+        assertEquals(long, h.field.text.toString())
+        selectTo(start = false, then = "3..${long.length}")
+    }
+
+    // a TextView here would take Shift+Home as its line's start (4..5): a sent key would show
+    @Test
+    @Uat("KB-116")
+    fun aRawKeyFieldIsSentNothingAndToldSo() {
+        selectToEdgesOnQW()
+        start()
+        h.start(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, terminal = true, prefill = { it.setText("one\ntwo\nthree"); it.setSelection(5) })
+        host.synced()
+        for (k in listOf("q", "w")) {
+            swipe(h.key(k), up = false)
+            host.until("told") { appContext.getString(R.string.cannot_select_here) in said() }
+            host.synced()
+            assertEquals(k, "5..5", ordered())
+            assertEquals("one\ntwo\nthree", h.field.text.toString())
+        }
+    }
+
     // up past the threshold, then sideways to each of [dxs] (dp from the key's middle; 10 dp a character), lifted at the last
     private fun swipeSelect(vararg dxs: Float, on: ShownKey? = null, then: (Int) -> Unit = {}) {
         val k = on ?: h.key("q")

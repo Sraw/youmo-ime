@@ -30,6 +30,9 @@ object ThemeMakerTestdata {
 
     fun file(name: String) = File(dir, name)
 
+    /** web/theme-maker/[path]: the maker's own source. */
+    fun maker(path: String) = File(dir.parentFile.parentFile, path)
+
     // web/theme-maker/generated/<id>.json, which tools/assemble.mjs puts into the pages
     private val generated = File(dir.parentFile.parentFile, "generated")
 

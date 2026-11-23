@@ -1,0 +1,13 @@
+<!-- 选中至文尾: >| over the stretch it selects -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M7.19,6.31L10.63,9.75l-3.44,3.44L8.25,14.25l4.5,-4.5 -4.5,-4.5zM15,5.25h1.5v9H15z" />
+    <path
+        android:fillColor="#ffffff"
+        android:pathData="M7.19,16.5h9.31v2.25H7.19z" />
+</vector>

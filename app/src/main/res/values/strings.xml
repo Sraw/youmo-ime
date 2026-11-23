@@ -1263,6 +1263,8 @@
     <string name="shortcut_restore">Restore what was deleted</string>
     <string name="shortcut_field_start">To the start</string>
     <string name="shortcut_field_end">To the end</string>
+    <string name="shortcut_select_to_start">Select to start</string>
+    <string name="shortcut_select_to_end">Select to end</string>
     <string name="shortcut_edit_menu">Edit menu</string>
     <string name="shortcut_swipe_select">Swipe to select</string>
     <string name="shortcut_clipboard">Clipboard</string>
@@ -1282,6 +1284,7 @@
     <string name="field_cleared">Cleared</string>
     <string name="nothing_to_restore">Nothing to restore</string>
     <string name="nothing_to_copy">Nothing to copy</string>
+    <string name="cannot_select_here">This field can\'t select text</string>
     <string name="nothing_to_cut">Nothing to cut</string>
     <string name="shortcut_command">Command</string>
     <string name="shortcut_command_is">%1$s: %2$s</string>

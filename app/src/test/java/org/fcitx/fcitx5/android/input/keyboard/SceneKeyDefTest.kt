@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
 import org.fcitx.fcitx5.android.data.theme.TestThemes
+import org.fcitx.fcitx5.android.data.theme.ThemeMakerTestdata
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
@@ -50,6 +51,16 @@ class SceneKeyDefTest {
     private fun sym(code: Int) = KeyAction.SymAction(KeySym(code), KeyStates.Virtual)
 
     private fun keypad(code: Int) = KeyAction.SymAction(KeySym(code), NumLockState)
+
+    // the layout maker's `shortcut:` suggestions are written by hand: a command added here is added there
+    @Test
+    fun theLayoutMakerSuggestsEveryCommandInOrder() {
+        val page = ThemeMakerTestdata.maker("src/layout/page.html").readText()
+        val list = Regex("""<datalist id="action-args-shortcut">(.*?)</datalist>""", RegexOption.DOT_MATCHES_ALL).find(page)
+        assertNotNull("the page's shortcut list", list)
+        val names = Regex("""value="([^"]+)"""").findAll(list!!.groupValues[1]).map { it.groupValues[1] }.toList()
+        assertEquals(KeyCommand.entries.map { it.key }, names)
+    }
 
     @Test
     fun eachWordIsTheActionTheOldKeysHad() {

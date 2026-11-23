@@ -47,6 +47,10 @@ enum class KeyCommand(val key: String, val group: Group, val stroke: Char? = nul
     Restore("restore", Group.Edit),
     FieldStart("field_start", Group.Edit),
     FieldEnd("field_end", Group.Edit),
+
+    /** To the field's edge as [FieldStart] and [FieldEnd] go, selecting ([SelectToEdge]). */
+    SelectToStart("select_to_start", Group.Edit),
+    SelectToEnd("select_to_end", Group.Edit),
     EditMenu("edit_menu", Group.Edit),
 
     /** Only by a swipe, selecting as the finger moves sideways; run any other way, nothing. */

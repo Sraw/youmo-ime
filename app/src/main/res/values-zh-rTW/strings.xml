@@ -1228,6 +1228,8 @@
     <string name="shortcut_restore">恢復剛刪除的</string>
     <string name="shortcut_field_start">游標到開頭</string>
     <string name="shortcut_field_end">游標到結尾</string>
+    <string name="shortcut_select_to_start">選取至文首</string>
+    <string name="shortcut_select_to_end">選取至文尾</string>
     <string name="shortcut_edit_menu">編輯選單</string>
     <string name="shortcut_swipe_select">滑選</string>
     <string name="shortcut_clipboard">剪貼簿</string>
@@ -1247,6 +1249,7 @@
     <string name="field_cleared">已清除</string>
     <string name="nothing_to_restore">沒有可恢復的內容</string>
     <string name="nothing_to_copy">沒有內容可以複製</string>
+    <string name="cannot_select_here">這個輸入框不能選取文字</string>
     <string name="nothing_to_cut">沒有內容可以剪下</string>
     <string name="shortcut_command">命令</string>
     <string name="shortcut_command_is">%1$s：%2$s</string>

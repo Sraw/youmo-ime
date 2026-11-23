@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.shortcut.ClearedText
 import org.fcitx.fcitx5.android.input.shortcut.EditPlan
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
+import org.fcitx.fcitx5.android.input.shortcut.SelectToEdge
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 
 /** On the main thread, what was typed already put in; clears kept ([ClearedText]) and said with 撤销. */
@@ -78,6 +79,8 @@ class KeyShortcutRunner(
             KeyCommand.Restore -> restore()
             KeyCommand.FieldStart -> fieldEdge(KeyEvent.KEYCODE_MOVE_HOME)
             KeyCommand.FieldEnd -> fieldEdge(KeyEvent.KEYCODE_MOVE_END)
+            KeyCommand.SelectToStart -> selectToEdge(KeyEvent.KEYCODE_MOVE_HOME, SelectToEdge.collapseAt(range.start, range.end, true))
+            KeyCommand.SelectToEnd -> selectToEdge(KeyEvent.KEYCODE_MOVE_END, SelectToEdge.collapseAt(range.start, range.end, false))
             // the menu opens as the swipe passes its threshold; a lift that got here without it, the panel
             KeyCommand.EditMenu -> windowManager.attachWindow(TextEditingWindow())
             // selects as a swipe that reached it moves on (KeySwipes); run any other way, nothing to select by
@@ -158,12 +161,21 @@ class KeyShortcutRunner(
 
     // a character each side tells an empty field. A side not read is no empty one: the field is then taken whole
     private fun nothingToTake(start: Int, end: Int) = start == end &&
-        EditPlan.nothingToTake(start, end, read(1, bothSides = true)?.field, service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true)
+        EditPlan.nothingToTake(start, end, read(1, bothSides = true)?.field, rawKeys)
 
-    private fun fieldEdge(keyCode: Int) = service.sendCombinationKeyEvents(
-        keyCode,
-        ctrl = fieldEdgeCtrl(service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true),
-    )
+    private val rawKeys get() = service.currentInputEditorInfo?.toEditorTraits()?.isRawKeyInput == true
+
+    private fun fieldEdge(keyCode: Int, shift: Boolean = false) = service.sendCombinationKeyEvents(keyCode, ctrl = fieldEdgeCtrl(rawKeys), shift = shift)
+
+    // a terminal selects nothing by keys: Termux sends Shift+Home on as ESC[1;2H, which a shell types out
+    private fun selectToEdge(keyCode: Int, collapseAt: Int?) {
+        if (rawKeys) {
+            service.say(R.string.cannot_select_here)
+            return
+        }
+        collapseAt?.let { apply(listOf(EditPlan.Step.Select(it, it))) }
+        fieldEdge(keyCode, shift = true)
+    }
 
     // past the session: a commit waiting can no longer be read back (CommitCheck.moved)
     private fun apply(steps: List<EditPlan.Step>) {

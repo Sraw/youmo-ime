@@ -425,6 +425,12 @@
 - **预期**：直接松开换到英文；接着往下走菜单一直在，松开照样换到英文；右挪一格换到双拼（和上滑一样按挪了多远算）；滑回 q 上菜单收起，松开不换、不打出 q。编辑菜单也一样：往下走不收起，滑回键上收起。上滑弹出的菜单照旧（KB-114）。
 - **JVM**：`InputMethodCommandsHostTest.aMenuOpenedByASwipeDownCancelsBackUpOnTheKeyNotGoingOnDown`、`PopupMenuUiTest.aFixedMenuOpenedDownCancelsBackUpOnTheKeyNotGoingOnDown`、ime-core `PopupFocusTest.aMenuOpenedDownCancelsBackUpOnTheKeyAndNeverGoingOnDown`。设备截图见报告。
 
+### KB-116 [P1] 快捷键「选中至文首」「选中至文尾」：从光标选到整个框的开头、结尾
+- **前提**：B0，**按键字符和快捷键** 里把 Q 的 **下滑** 设成命令 **选中至文首**，W 的 **下滑** 设成 **选中至文尾**。
+- **操作**：看命令列表。在测试台「多行」框（`multiline`）里写两行 `hello`、`world`，光标放在 `wo` 后面；Q 下滑。接着（选区还在）W 下滑。光标放到末尾，打拼音 `nihao`（不选候选），Q 下滑。再到测试页（WebView）的文字框打 `hello`，光标放在 `hel` 后面，Q 下滑，接着 W 下滑，按退格。再到测试台「终端」框（`terminal`）打 `ls`，Q 下滑。
+- **预期**：命令列表里「光标到结尾」后面是「选中至文首」「选中至文尾」。Q 下滑选中从开头到 `wo` 后面（跨过换行，选到整个框的开头，不只是这一行）；接着 W 下滑，原来离结尾远的那一端（开头）不动，一直选到末尾：整段都选中。打着拼音时先上屏「你好」，再从开头选到「你好」后面。框里除了上屏的「你好」没有别的变化，没打出 q、w。网页框里 Q 下滑选中 `hel`，W 下滑后整段选中，退格后框是空的。终端框里键盘上方的提示条说「这个输入框不能选中文字」，框里还是 `ls`，焦点还在终端框（什么键也没发）。
+- **JVM**：`KeyShortcutsHostTest.selectToStartAndToEndFromTheMiddleOfTheWholeField`、`selectToAnEdgeKeepsTheSelectionsFarEnd`（往两个方向选的选区）、`selectToAnEdgeCommitsWhatIsTypedFirst`、`aRawKeyFieldIsSentNothingAndToldSo`（终端这类 TYPE_NULL 的框什么键也不发，只提示）（真 `KotlinHost` + 真 `EditText`；`selectToAnEdgeAtItOrInAnEmptyFieldSelectsNothing`、`selectToEndReachesALongFieldsVeryEnd` 是已在边上、空框、3 万字的框），规则见 ime-core `SelectToEdgeTest`；设备上留作冒烟（真应用的输入框认不认 Shift+Ctrl+Home / End，终端框的提示条）。
+
 ### KB-63 [P2] 自己设的文字快捷键
 - **前提**：B0，**按键字符和快捷键** 里把 Q 的下滑设成文字「你好」。
 - **操作**：Q 键下滑（滑出键外也一样）。

@@ -336,7 +336,7 @@ shortcut named in the key's bubble (`PopupAction.PreviewUpdateAction.words`) is 
 `PreviewLabel`: a function key's size scaled as the keys' text (a letter's too, `engine/Popups.SYMBOL_DP`),
 characters counted and cut as seen (`BreakIterator` graphemes: a flag, a family, an accent are one), a bubble five of them wide, smaller
 to a least, then cut with an ellipsis; `KeyShortcutRunner` runs a shortcut after what is
-typed is in, the field's edits as `EditPlan` steps. 清除 (`EditPlan.clear`: what is typed, else the
+typed is in, the field's edits as `EditPlan` steps. 选中至文首 / 选中至文尾 (`KeyCommand.SelectToStart`, `SelectToEnd`) send |< >|'s key with Ctrl and Shift, so the editor finds the edge and no length is read; a selection is first collapsed onto its end farther from that edge (`SelectToEdge`), as Shift extends from the anchor. A raw-key field is sent nothing and told `cannot_select_here` on the notice bar: a terminal reads Shift+Home as `ESC[1;2H`, selecting nothing. 清除 (`EditPlan.clear`: what is typed, else the
 selection, else all before the cursor, else all after) is kept in memory (`ClearedText`, under the EditorInfo input started with, by identity, forgotten as
 input starts in another field or finishes; at most 16) with the runs of deletions (`ClearedText.deleting`:
 Backspace pressed, held, the panel's, or the backspace swipe's selection deleted, one after another,

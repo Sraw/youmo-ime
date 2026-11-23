@@ -258,7 +258,9 @@ class KeyShortcutsPageScreenshotTest {
         val commands = KeyboardHarness.all((ShadowDialog.getLatestDialog() as AlertDialog).window!!.decorView)
             .filterIsInstance<TextView>().map { it.text.toString() }.toList()
         assertTrue(commands.toString(), st.s(R.string.shortcut_paste) in commands)
-        assertTrue(commands.toString(), st.s(R.string.shortcut_voice) in commands)
+        // past the dialog's first screen: the list's own items, not the rows drawn
+        val offered = (ShadowDialog.getLatestDialog() as AlertDialog).listView.adapter.let { a -> (0 until a.count).map { a.getItem(it).toString() } }
+        assertTrue(offered.toString(), st.s(R.string.shortcut_voice) in offered)
         assertEquals(commands.toString(), commands.indexOf(st.s(R.string.shortcut_clipboard)) + 1, commands.indexOf(st.s(R.string.quick_phrases)))
         captureScreen("dialog_commands")
         (ShadowDialog.getLatestDialog() as AlertDialog).dismiss()

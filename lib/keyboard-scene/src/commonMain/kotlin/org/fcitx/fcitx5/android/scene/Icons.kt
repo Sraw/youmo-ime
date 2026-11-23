@@ -17,7 +17,7 @@ object Icons {
     /** A shortcut's command's (TextBoardScene.icon of each KeyCommand). */
     val COMMANDS = listOf(
         "select-all", "content-copy", "content-cut", "content-paste", "undo", "redo", "delete-sweep", "restore",
-        "field-start", "field-end", "cursor-move", "clipboard", "quick-input", "emoji", "voice", "trad-simp",
+        "field-start", "field-end", "select-to-start", "select-to-end", "cursor-move", "clipboard", "quick-input", "emoji", "voice", "trad-simp",
         "choose-keyboard", "language", "choose-input-method", "hide-keyboard", "swipe-select",
         "stroke-h", "stroke-s", "stroke-p", "stroke-n", "stroke-z",
     )
