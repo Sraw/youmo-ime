@@ -35,6 +35,7 @@ object SearchKeywords {
         listOf("page:PinyinDict") to R.array.kw_dictionaries,
         listOf("page:UserWords") to R.array.kw_user_words,
         listOf("page:PopupOverrides") to R.array.kw_popup_overrides,
+        listOf("view:keys/board/scroll") to R.array.kw_scroll_lists,
         listOf("pref:space_swipe_move_cursor") to R.array.kw_space_cursor,
         listOf("pref:english_auto_caps") to R.array.kw_auto_caps,
         listOf("pref:app_language") to R.array.kw_app_language,

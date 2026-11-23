@@ -118,7 +118,7 @@ class LayoutLacksTest {
             val r = check(renamed, strict)
             assertEquals(emptyList(), r.errors, "strict $strict")
             assertEquals(check(number, strict).warnings.filter { it.key != "unnamed" }, r.warnings.filter { it.key != "unnamed" }, "strict $strict")
-            assertEquals("0.6.1", r.minApp, "strict $strict")
+            assertEquals(check(number, strict).minApp, r.minApp, "strict $strict")
         }
         assertRows(
             listOf(
@@ -131,7 +131,7 @@ class LayoutLacksTest {
         ) { (_, key, told) ->
             val r = check(withRow(key, number))
             assertEquals(told, r.warnings.filter { it.key == "pad-letters" }.map { it.args[0] }, r.errors.toString())
-            assertEquals("0.6.1", r.minApp, "pad-letters asks no newer app")
+            assertEquals(check(number).minApp, r.minApp, "pad-letters asks no newer app")
         }
     }
 

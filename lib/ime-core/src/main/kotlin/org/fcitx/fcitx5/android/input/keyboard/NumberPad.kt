@@ -4,22 +4,21 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.input.editing.EditorTraits
 import org.fcitx.fcitx5.android.input.editing.NumberKind
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 
 /**
- * The number keyboard's keys beside its digits, by field: [FULL] from the 123 key and for every number field, as what
- * a field declares often is not what it takes (an amount declared decimal that takes a minus) and a field drops what
- * it refuses; a phone's and a date's their own ([of]). "" is a blank key, kept so the digits stay put. [left] top to
- * bottom; [besideNine] right of 9 below the space; [bottom] left of the symbols key, right of 0, left of Return.
+ * The number keyboard by field: [FULL] from the 123 key and for every number field, as what a field declares often
+ * is not what it takes (an amount declared decimal that takes a minus) and a field drops what it refuses; a phone's
+ * and a date's their own ([of]). [list]: the scroll list its column shows, the signs beside the digits.
  */
-enum class NumberPad(val left: List<String>, val besideNine: String, val bottom: List<String>) {
-    FULL(listOf("+", "-", "*"), "/", listOf(",", "=", ".")),
+enum class NumberPad(val list: String) {
+    FULL(ScrollDefaults.NUMBER),
 
-    /** `,` is a dialler's pause. */
-    PHONE(listOf("+", "*", "#"), "-", listOf("(", ")", ",")),
+    PHONE(ScrollDefaults.PHONE),
 
-    /** `2026-10-31`, `31/10`, `13:45`, `31.10` */
-    DATETIME(listOf("-", "/", ":"), "", listOf("", "", ".")),
+    DATETIME(ScrollDefaults.DATETIME),
     ;
 
     val layout: String get() = if (this == FULL) FULL_LAYOUT else "$FULL_LAYOUT.$name"
@@ -38,6 +37,9 @@ enum class NumberPad(val left: List<String>, val besideNine: String, val bottom:
             NumberKind.PHONE -> PHONE
             NumberKind.DATETIME -> DATETIME
         }
+
+        /** The scene's `fieldPad`: a phone's or a date's field, on whichever keyboard shows; null for the rest. */
+        fun fieldOf(traits: EditorTraits): String? = of(traits.number)?.takeIf { it != FULL }?.id
 
         val layouts: Set<String> = entries.mapTo(LinkedHashSet()) { it.layout }
 

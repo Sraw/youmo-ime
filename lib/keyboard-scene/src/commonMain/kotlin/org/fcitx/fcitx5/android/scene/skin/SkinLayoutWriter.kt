@@ -476,7 +476,7 @@ object SkinLayoutWriter {
     private fun Cell.withWidth(w: Width): Cell = when (this) {
         is Key -> withWidth(w)
         is Gap -> Gap(id, w, condition, line)
-        is Slot -> Slot(id, kind, w, rows, face, look, classes, condition, line)
+        is Slot -> Slot(id, kind, w, rows, face, look, classes, condition, line, list, direction, show)
     }
 
     private fun Key.withWidth(w: Width): Key = Key(id, condition, attrs.copy(width = w), popup, menu, line, variants, letters, lean, place)

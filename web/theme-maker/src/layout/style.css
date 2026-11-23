@@ -30,3 +30,12 @@ canvas.icon { width: 24px; height: 24px; border: 1px solid var(--line); border-r
 #preview:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #problems button { font: inherit; color: inherit; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+/* the scroll columns over the preview: the canvas's own box, each column scrolling its items */
+#preview-stage { position: relative; display: inline-block; max-width: 100%; line-height: 0; }
+#preview-stage #preview { display: block; }
+#preview-columns { position: absolute; inset: 0; pointer-events: none; }
+#preview-columns .column { position: absolute; display: flex; flex-direction: column; overflow: auto; pointer-events: auto; line-height: normal; font-size: 12px; color: var(--muted); scrollbar-width: none; }
+#preview-columns .column.across { flex-direction: row; }
+#preview-columns .column span { flex: none; display: flex; align-items: center; justify-content: center; }
+#preview-columns .column.across span { height: 100%; }
+#preview-columns .column:not(.across) span { width: 100%; }

@@ -4,9 +4,15 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.text.InputType
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.widget.HorizontalScrollView
 import android.widget.ScrollView
+import android.widget.TextView
+import androidx.core.view.children
+import androidx.core.view.isVisible
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -16,6 +22,8 @@ import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
+import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.fixture
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -29,6 +37,7 @@ import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
+import org.fcitx.fcitx5.android.input.sent
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
@@ -38,6 +47,9 @@ import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
@@ -143,6 +155,77 @@ class CustomKeyboardTest {
         val column = (0 until t9.childCount).map { t9.getChildAt(it) }.filterIsInstance<ScrollView>().single()
         assertEquals(View.VISIBLE, column.visibility)
         assertEquals(slot.bounds.width.roundToInt(), column.width)
+    }
+
+    // ST-221's layout: a row of its own over the bottom one, the nine keys' list across it
+    @Test
+    @Uat("ST-221")
+    fun aLetterLayoutsHorizontalColumnShowsTheFieldsListAndTypesIt() {
+        File(dir, "uat-qwerty-scroll.xml").writeText(fixture("layouts/uat-qwerty-scroll.layout").readText())
+        CustomKeyboards.forget("uat-qwerty-scroll")
+        val mine = CustomKeyboards.choice("uat-qwerty-scroll")!!
+        assertTrue(mine.drawn)
+        prefs.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, mine.id)
+        val h = KeyboardHarness()
+        try {
+            fun column() = KeyboardHarness.all(h.keyboard).filterIsInstance<HorizontalScrollView>().single { h.shown(it) && it.parent is BaseKeyboard }
+            fun items() = (column().getChildAt(0) as ViewGroup).children.filterIsInstance<TextView>().filter { it.isVisible }.toList()
+            fun texts(id: String) = ScrollDefaults.of(id)!!.map { (it as ScrollItem.Text).text }
+            h.start()
+            val slot = KeyboardHarness.all(h.keyboard).filterIsInstance<KeyboardCanvasView>().single { h.shown(it) }.scene!!.slots.single { it.kind == "scroll" }
+            val v = column()
+            assertEquals(slot.bounds.width.roundToInt(), v.width)
+            assertEquals(ScrollDefaults.of(ScrollDefaults.NINE)!!.size, items().size)
+            // six in view across the row
+            assertEquals((v.width - v.paddingLeft - v.paddingRight) / 6f, items().first().width.toFloat(), 1f)
+            h.start(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+            assertEquals(texts(ScrollDefaults.URL), items().map { it.text.toString() })
+            h.tap(items().first { it.text.toString() == ".com" })
+            assertEquals(".com", h.field.text.toString())
+            // a phone field's list on the letters 返回 leads to: the field decides, whichever keyboard
+            h.start(InputType.TYPE_CLASS_PHONE)
+            h.tap(h.keyNamed("back"))
+            assertTrue(h.texts().toString(), "q" in h.texts())
+            assertEquals(texts(ScrollDefaults.PHONE), items().map { it.text.toString() })
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    @Uat("ST-221")
+    fun aTouchInTheColumnIsItsAloneAndTheSpaceStillMovesTheCursor() {
+        File(dir, "uat-qwerty-scroll.xml").writeText(fixture("layouts/uat-qwerty-scroll.layout").readText())
+        CustomKeyboards.forget("uat-qwerty-scroll")
+        prefs.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, CustomKeyboards.choice("uat-qwerty-scroll")!!.id)
+        val h = KeyboardHarness()
+        try {
+            h.start()
+            val column = KeyboardHarness.all(h.keyboard).filterIsInstance<HorizontalScrollView>().single { h.shown(it) && it.parent is BaseKeyboard }
+            val box = h.box(column)
+            h.api.calls.clear()
+            // a slide along it scrolls it: no key pressed, no glide read
+            h.drag(box, box.left + box.width() * 0.1f, box.exactCenterY())
+            assertTrue(column.scrollX > 0)
+            assertEquals(emptyList<String>(), h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") })
+            assertEquals("", h.field.text.toString())
+            val space = h.keyNamed("space")
+            h.swipe(space, -space.width * 0.6f, 0f)
+            assertTrue(h.sent().toString(), h.sent().isNotEmpty() && h.sent().all { "sym=${FcitxKeyMapping.FcitxKey_Left}," in it })
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun theNineKeysColumnOnAnotherKeyboardShowsNoSyllablesAndEnglishsOwnList() {
+        val keyboard = TextKeyboard(context, TestThemes.PixelDark)
+        fun shown() = keyboard.sideInput().let { ScrollLists.shown(ScrollLists.NINE_SIDE, null, null, null, it.pad, it.ime, it.composing) }
+        keyboard.onInputMethodUpdate(KeyboardHarness.PINYIN)
+        assertFalse(keyboard.sideInput().composing)
+        assertEquals(ScrollLists.Shown.Category(ScrollDefaults.NINE), shown())
+        keyboard.onInputMethodUpdate(KeyboardHarness.ENGLISH)
+        assertEquals(ScrollLists.Shown.Category(ScrollDefaults.NINE_ENGLISH), shown())
     }
 
     @Test

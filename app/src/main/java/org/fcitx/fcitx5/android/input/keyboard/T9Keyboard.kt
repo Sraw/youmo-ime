@@ -6,21 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Rect
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.StateListDrawable
 import android.os.SystemClock
-import android.util.TypedValue
-import android.view.Gravity
-import android.view.MotionEvent
-import android.view.View
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import androidx.annotation.Keep
-import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.view.isInvisible
-import androidx.core.view.isVisible
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,37 +21,30 @@ import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
 import org.fcitx.fcitx5.android.core.KeySym
 import org.fcitx.fcitx5.android.core.UNICODE
-import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
-import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.glide.Glide
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
-import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
-import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.scene.TextBoardState
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.LetterCaseRule
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
-import org.fcitx.fcitx5.android.scene.theme.SoundKey
-import splitties.dimensions.dp
-import splitties.views.dsl.constraintlayout.lParams
-import splitties.views.dsl.constraintlayout.leftOfParent
-import splitties.views.dsl.constraintlayout.topOfParent
-import splitties.views.dsl.core.add
 
 /**
  * Pinyin's digit keys send [Keyboard.pinyinNineKey] codes, since a plain digit would pick a candidate as a
@@ -93,13 +73,9 @@ class T9Keyboard(
 
         const val ShuangpinPlainName = "T9ShuangpinPlain"
 
-        private const val SIDE_KIND = "nine-side"
-
-        internal const val ITEM_TEXT_DP = 16f
+        internal const val ITEM_TEXT_DP = ScrollColumn.ITEM_TEXT_DP
 
         const val LAYOUT = "nine"
-
-        private val PUNCTUATION = listOf(",", ".", "?", "!", "…", "、", ":", "~", "@")
 
         internal const val ONE = ",.?!"
 
@@ -107,27 +83,25 @@ class T9Keyboard(
 
         private fun marked(c: Char, marks: Map<String, String>) = c.toString().let { marks[it] ?: it }
 
-        /** Typed through English, which puts a word's space behind them. */
-        private val ENGLISH_PUNCTUATION = listOf(",", ".", "?", "!", "'", "-", ":", ";", "@")
-
         private const val APOSTROPHE = "'"
 
         internal const val ENGLISH_TAP_MILLIS = 600L
 
-        private const val SHOWN = 4
-
         private fun T9State.offersSyllables() = composing && syllables.isNotEmpty()
 
+        private fun sideShown(state: T9State, english: Boolean, address: AddressKeys) = ScrollLists.shown(
+            ScrollLists.NINE_SIDE, null, ScrollColumn.fieldOf(address), null, null, if (english) "english" else "pinyin", !english && state.offersSyllables(),
+        )
+
+        /** The side column as the defaults have it, for tests: the keyboard's reads the user's lists (ScrollColumns). */
         internal fun labels(
             state: T9State,
             english: Boolean = false,
             address: AddressKeys = AddressKeys.NONE,
             marks: Map<String, String> = emptyMap(),
-        ): List<String> = when {
-            !english && state.offersSyllables() -> state.syllables
-            address != AddressKeys.NONE -> AddressKeys.column(address)
-            english -> ENGLISH_PUNCTUATION
-            else -> PUNCTUATION.map { marks[it] ?: it }
+        ): List<String> = when (val shown = sideShown(state, english, address)) {
+            ScrollLists.Shown.Syllables -> state.syllables
+            is ScrollLists.Shown.Category -> ScrollDefaults.of(shown.id).orEmpty().map { ScrollColumn.text(shown.id, it as ScrollItem.Text, english, marks) }
         }
 
         internal fun pick(
@@ -136,17 +110,13 @@ class T9Keyboard(
             english: Boolean = false,
             address: AddressKeys = AddressKeys.NONE,
             marks: Map<String, String> = emptyMap(),
-        ): KeyAction =
-            if (!english && state.offersSyllables()) {
-                // the list's id: a pick shown before a key replaced the list is dropped
-                KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
-            } else if (address != AddressKeys.NONE) {
-                KeyAction.CommitAction(AddressKeys.column(address)[i])
-            } else if (english) {
-                KeyAction.HostKeyAction(ENGLISH_PUNCTUATION[i])
-            } else {
-                PUNCTUATION[i].let { KeyAction.CommitAction(marks[it] ?: it, punctuation = it.singleOrNull()?.code?.let(::isAsciiMark) == true) }
-            }
+        ): KeyAction = when (val shown = sideShown(state, english, address)) {
+            ScrollLists.Shown.Syllables -> syllable(state, i)
+            is ScrollLists.Shown.Category -> ScrollColumn.typed(shown.id, ScrollDefaults.of(shown.id).orEmpty()[i], english, marks)!!
+        }
+
+        // the list's id: a pick shown before a key replaced the list is dropped
+        private fun syllable(state: T9State, i: Int) = KeyAction.SymAction(KeySym(UNICODE + Keyboard.syllableKey(i, state.id).code), KeyStates.Virtual)
 
         /**
          * 1 while [composing] is the separator, or with [semicolon] (微软's) `;`, which the engine reads as
@@ -301,19 +271,15 @@ class T9Keyboard(
         internal fun multiTapOf(setting: T9MultiTap) = MultiTap(setting.timeout)
     }
 
-    override fun onPunctuationUpdate(mapping: Map<String, String>) {
-        val changed = mapping != keysPunctuation
-        super.onPunctuationUpdate(mapping)
-        // labels only: show() would take the engine's last word for whether 1 is typing and cancel a press on the column
-        if (changed) showLabels()
-    }
+    override fun scrollInput() = Input(ime = if (english) "english" else "pinyin", composing = !english && columnState.offersSyllables())
 
-    override var address: AddressKeys = AddressKeys.NONE
-        set(value) {
-            if (field == value) return
-            field = value
-            show(columnState)
-        }
+    override fun sideInput() = scrollInput()
+
+    override val columnEnglish: Boolean get() = english
+
+    override fun columnSyllables(): List<String> = columnState.syllables
+
+    override fun pickSyllable(i: Int): KeyAction = syllable(columnState, i)
 
     override fun typingKeys(): List<Pair<Char, KeyRef>> =
         if (shuangpin) {
@@ -363,29 +329,6 @@ class T9Keyboard(
 
     private var runUpper = false
 
-    private val items = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-
-    private val column = object : ScrollView(context) {
-        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-            super.onSizeChanged(w, h, oldw, oldh)
-            itemHeight = (h - paddingTop - paddingBottom) / SHOWN
-            for (i in 0 until items.childCount) items.getChildAt(i).layoutParams.height = itemHeight
-            post { items.requestLayout() }
-        }
-    }.apply {
-        isVerticalScrollBarEnabled = false
-        overScrollMode = OVER_SCROLL_NEVER
-        // its face is the scene's slot (nine.xml's `side`): the column draws only its items
-        val keys = ThemeManager.shownLook(theme).keys
-        val landscape = KeyboardArea.landscape(context)
-        val h = dp(if (landscape) keys.gap.hLand else keys.gap.h)
-        val v = dp(if (landscape) keys.gap.vLand else keys.gap.v)
-        setPadding(h, v, h, v)
-        addView(items)
-    }
-
-    private var itemHeight = 0
-
     private var columnState = T9State()
 
     private var typing = false
@@ -401,8 +344,7 @@ class T9Keyboard(
     override val ownsSyllables: Boolean get() = !english
 
     init {
-        column.isInvisible = true
-        add(column, lParams(0, 0))
+        columns.addSide()
         multiTapPref.registerOnChangeListener(multiTapListener)
         show(T9State())
     }
@@ -434,58 +376,15 @@ class T9Keyboard(
         super.onDetachedFromWindow()
     }
 
-    private val columnHit = Rect()
-
-    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
-        column.getHitRect(columnHit)
-        if (columnHit.contains(ev.x.toInt(), ev.y.toInt())) return false
-        return super.onInterceptTouchEvent(ev)
-    }
-
     internal fun show(state: T9State) {
-        // a press on the replaced list is cancelled: its pick would take what now sits there
-        MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0).also {
-            items.dispatchTouchEvent(it)
-            it.recycle()
-        }
-        // and so is a click released but not run yet (View posts it on ACTION_UP)
-        items.cancelPendingInputEvents()
         // what was typed gone (a candidate picked on the bar): the next press is a key of its own. Only then:
         // 1's punctuation resets the engine, and its next press must still be the next symbol
         val was = columnState.composing
         if (!state.composing && was) multiTap.reset()
         columnState = state
         typing = state.composing
-        showLabels()
-        column.scrollTo(0, 0)
+        columns.update()
         if (state.composing != was) canvas?.invalidateScene()
-    }
-
-    private fun showLabels() {
-        val labels = labels(columnState, english, address, keysPunctuation)
-        while (items.childCount < labels.size) items.addView(item(items.childCount))
-        for (i in 0 until items.childCount) {
-            val view = items.getChildAt(i) as TextView
-            view.isVisible = i < labels.size
-            if (view.isVisible) view.text = labels[i]
-        }
-    }
-
-    // one line: a syllable longer than the column (zhuang) shrinks to fit, not wrapped onto a cut-off line
-    private fun item(i: Int) = AutoScaleTextView(context).apply {
-        setTextSize(TypedValue.COMPLEX_UNIT_DIP, ITEM_TEXT_DP)
-        scaleMode = AutoScaleTextView.Mode.Proportional
-        isSingleLine = true
-        gravity = Gravity.CENTER
-        setTextColor(theme.altKeyTextColor)
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, itemHeight.takeIf { it > 0 } ?: dp(40))
-        background = pressHighlight()
-        isClickable = true
-        setOnClickListener {
-            InputFeedbacks.hapticFeedback(this)
-            InputFeedbacks.soundEffect(SoundKey.LETTER)
-            onAction(pick(columnState, i, english, address, keysPunctuation))
-        }
     }
 
     override fun onAction(action: KeyAction, source: KeyActionListener.Source) {
@@ -575,10 +474,6 @@ class T9Keyboard(
         super.onPopupAction(shown ?: action)
     }
 
-    private fun pressHighlight() = StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(theme.keyPressHighlightColor))
-    }
-
     override val keysIm: String get() = imeName
 
     override val strokesDrawn get() = glide != null
@@ -620,59 +515,8 @@ class T9Keyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, input = input, shift = caps, texts = texts, marks = keyMarks(layout))
     }
 
-    private val columnSlot = Rect()
-
-    // the column where the scene has its slot of nine-side, in the same pass as the canvas: never a frame elsewhere
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        super.onLayout(changed, left, top, right, bottom)
-        val c = canvas ?: return
-        placing = true
-        val placed = try {
-            c.slot(SIDE_KIND, columnSlot)
-        } finally {
-            placing = false
-        }
-        column.isInvisible = !placed
-        if (!placed) return
-        columnSlot.offset(c.left, c.top)
-        // set only when the slot moved: else the constraint pass (0×0) and this pass would fight, each
-        // onSizeChanged posting another layout, never done
-        val lp = column.layoutParams as ConstraintLayout.LayoutParams
-        val moved = lp.leftMargin != columnSlot.left || lp.topMargin != columnSlot.top
-        if (moved || lp.width != columnSlot.width() || lp.height != columnSlot.height()) {
-            column.layoutParams = lParams(columnSlot.width(), columnSlot.height()) {
-                topOfParent(columnSlot.top)
-                leftOfParent(columnSlot.left)
-            }
-        }
-        val exactly = { size: Int -> MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY) }
-        if (column.width != columnSlot.width() || column.height != columnSlot.height() || column.isLayoutRequested) {
-            column.measure(exactly(columnSlot.width()), exactly(columnSlot.height()))
-        }
-        column.layout(columnSlot.left, columnSlot.top, columnSlot.right, columnSlot.bottom)
-    }
-
-    private var placing = false
-
-    override fun onSceneBuilt(scene: Scene?) {
-        if (placing) return
-        // a scene remade for Shift or Return alone lays nothing out
-        val slot = scene?.slots?.firstOrNull { it.kind == SIDE_KIND }
-        val c = canvas ?: return
-        if (slot == null) {
-            if (column.isVisible) requestLayout()
-            return
-        }
-        builtSlot.set(slot.bounds)
-        builtSlot.offset(c.left, c.top)
-        if (!column.isVisible || builtSlot != columnSlot) requestLayout()
-    }
-
-    private val builtSlot = Rect()
-
     // last: the scene reads the state above
     init {
         drawKeysWithScene(custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, LAYOUT))
-        column.bringToFront()
     }
 }

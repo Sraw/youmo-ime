@@ -238,7 +238,7 @@ class InputView(
         keyboardWindow.remakeKeyboards()
         windowManager.attachWindow(KeyboardWindow)
         kawaiiBar.keyboardsRemade()
-        info?.let { startInput(it, capFlags) }
+        if (info != null) startInput(info, capFlags) else keyboardWindow.keyboardHidden()
         if (handleEvents) onStartHandleFcitxEvent()
     }
 
@@ -725,9 +725,13 @@ class InputView(
 
     fun finishInput(finishingInput: Boolean) {
         hold?.inputEnded(if (finishingInput) Hold.InputEnd.LEFT else Hold.InputEnd.HIDDEN)
+        if (!finishingInput) keyboardWindow.keyboardHidden()
         floatingController.inputEnded()
         broadcaster.onFinishInput()
     }
+
+    /** The keys gone from the user's view: hidden, or a hardware keyboard took over. */
+    fun keyboardHidden() = keyboardWindow.keyboardHidden()
 
     // the candidates too: a remade view mid-typing showed the code row over an empty bar till the next key
     override fun onStartHandleFcitxEvent() {

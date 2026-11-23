@@ -51,6 +51,11 @@ object KeyData {
 
     private val NONE = Held()
 
+    private const val NUMBER = "number"
+
+    // a 0.6.2 board's sign keys still do nothing held or swiped, as then, though the app's board has them no more
+    private fun Board.withLegacy() = Board(popups, named, LegacyNumberKeys.SENDS.keys.associateWith { NONE } + unnamed, places)
+
     private sealed interface Taken {
         class App(val held: Held, val place: Int?) : Taken
 
@@ -70,7 +75,7 @@ object KeyData {
         app: Map<String, Board> = BuiltInKeyData.BOARDS,
         shape: String = basedOn ?: id,
     ): Result {
-        val own = listOfNotNull(app[id], basedOn?.let { app[it] })
+        val own = listOfNotNull(id, basedOn).mapNotNull { n -> app[n]?.let { if (n == NUMBER) it.withLegacy() else it } }
         val all = (listOfNotNull(id, basedOn) + ORDER + app.keys.sorted()).distinct().mapNotNull { app[it] }
         val rows = layout.parts.filterIsInstance<Row>().map { it to layout.defaults } +
             fragments.values.flatMap { f -> f.rows.map { it to f.defaults.over(layout.defaults) } }

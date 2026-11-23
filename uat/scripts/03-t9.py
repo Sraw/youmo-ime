@@ -330,3 +330,25 @@ def t971(d):
           f"墨迹高度 1「{one['1']}」空格「{one['空格']}」，2「{one['2']}」3「{one['3']}」")
     check(0 < twelve["1"] < twelve["2"] - 1, f"「12」墨迹高 {twelve['1']}，「2」{twelve['2']}")
     return f"墨迹高度：设「1」时 {one}；设「12」时 {twelve}"
+
+
+@case("T9-72", base="B0-九键", mutates=True)
+def t972(d):
+    from uat import gear
+    p = script("04-panels")
+    d.hide_keyboard()
+    d.open_settings()
+    gear(d, "英文")
+    choose(d, "键盘", "九键")
+    d.open_page("text")
+    pinyin = p.column_all(d)
+    d.switch_im("英文")
+    english = p.column_all(d)
+    check(english == [",", ".", "?", "!", "'", "-", ":", ";", "@"], f"英文九键左列是 {english}")
+    p.hold_item(d, p.item_of(d, "@"), pick="删除这一项")
+    after = p.column_all(d)
+    check("@" not in after, f"删了 @ 后英文左列 {after}")
+    d.switch_im("拼音")
+    back = p.column_all(d)
+    check(back == pinyin and "@" in back, f"拼音九键左列 {back}（之前 {pinyin}）")
+    return f"英文 {english} → 删 @ {after}；拼音 {back}"

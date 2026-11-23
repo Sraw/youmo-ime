@@ -421,7 +421,7 @@ test("a theme pack's boards are offered made layouts of the user's, as the app's
 // just above its size, so it grows only on purpose
 test('the layout maker built is no bigger than its budget', () => {
   const page = assemble(LAYOUT_SRC, ENGINE);
-  assert.ok(Buffer.byteLength(page) <= 2_640_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
+  assert.ok(Buffer.byteLength(page) <= 2_667_000, 'the page is ' + Buffer.byteLength(page) + ' bytes');
   assert.ok(statSync(ENGINE).size < Buffer.byteLength(page));
 });
 
@@ -719,7 +719,9 @@ test('rows: added, moved, taken out; their height and indent; the app\'s bottom 
 });
 
 test('a key the scene shows found where it is written: once, twice (each its when=), by its problem\'s line', () => {
-  const xml = fresh('number');
+  // 0.6.2's number board, its * written once for each of two pads (the app's has its marks in a scroll column now)
+  const xml = readFileSync(join(here, '..', '..', '..', 'lib', 'keyboard-scene', 'src', 'commonTest', 'data', 'layout-check', 'number-062.xml'), 'utf8')
+    .replace('id="number"', 'id="my-number" based-on="number"');
   const drawn = (pad) => (t) => {
     const r = E.readOwnLayout(t);
     const s = E.buildScene(r.layout, material, LM.envJson(E, { ...LM.ENV, pad }, 'number', r.layout), fixed);
@@ -841,4 +843,50 @@ test('a layout from an example: its id and name, the example\'s notes and <meta>
   }
   assert.match(LM.fromExample(E, example('k17'), 'my-k17', '我的17 键'), /<key id="hjk"[^>]* shortcut="my-k17\/hjk"/);
   assert.match(LM.fromExample(E, example('azerty'), 'fr', 'FR'), /<key id="a"[^>]* shortcut="full\/a"/);
+});
+
+// the 「滑动列」 tab: a column put left of the chosen cell, its category, direction and show written; saved for 0.6.3
+test('滑动列: added where it can go, its options written, saved with min-app 0.6.3; 加一列 off where the app has none', () => {
+  // a row of its own above the bottom one, its placeholder gap gone: the full rows have no room for another cell
+  const part = LE.parse(fresh('qwerty')).rows[3];
+  const xml = LE.addRow(fresh('qwerty'), LE.partOfRow(fresh('qwerty'), 3), '<gap/>');
+  assert.ok(part && LE.parse(xml).rows.length === 5);
+  const at = { row: 3, index: 0 };
+  assert.equal(LE.scrollProblem(xml, 'letters', at, FORMAT), null);
+  const r = LE.addScroll(xml, at, 'letters', FORMAT);
+  assert.ok(!r.error, r.error);
+  const p = LE.parse(LE.remove(r.xml, { row: 3, index: 1 }));
+  // 16 of a hundred columns, as the app's columns are: 1.5 of qwerty's 10
+  assert.deepEqual(LE.scrolls(p).map((s) => s.a), [{ id: 'scroll', kind: 'scroll', list: 'nine', width: '1.5', rows: '1' }]);
+  let out = LE.setAttrs(LE.remove(r.xml, { row: 3, index: 1 }), LE.scrolls(p)[0].at, { list: 'url', direction: 'horizontal', show: '6', width: '10' });
+  assert.match(out, /<slot id="scroll" kind="scroll" list="url" width="10" rows="1" direction="horizontal" show="6"\/>/);
+  const saved = LM.saveCheck(E, out, FORMAT.version, material);
+  assert.deepEqual(saved.errors, []);
+  assert.equal(LM.info(saved.xml).meta['min-app'], '0.6.3');
+  // a second, then no third
+  out = LE.addScroll(out, { row: 3, index: 0 }, 'letters', FORMAT).xml;
+  assert.equal(LE.scrolls(LE.parse(out)).length, 2);
+  assert.match(LE.scrollProblem(out, 'letters', at, FORMAT), /最多 2/);
+  // the families the reader refuses one on, and a row split in halves
+  for (const family of ['symbols', 'emoji-search']) assert.ok(LE.addScroll(xml, at, family, FORMAT).error, family);
+  assert.match(LE.scrollProblem(xml, 'letters', { row: 0, index: 0 }, FORMAT), /两半/);
+  assert.deepEqual(FORMAT.scroll.families, ['letters', 'grouped', 'nine', 'number']);
+  // on the number pad across the rows under it, three at most as the app's: four items a column not under 20 dp
+  const pad = fresh('number');
+  const added = (xml, row, family = 'number') => LE.scrolls(LE.parse(LE.addScroll(xml, { row, index: 1 }, family, FORMAT).xml)).find((s) => s.a.id === 'scroll').a.rows;
+  assert.deepEqual([added(pad, 0), added(pad, 2), added(pad, 3)], ['3', '2', '1']);
+  assert.equal(added(pad.replace(/(<\/row>\s*<row)/, '$1 when="landscape"'), 0), '1', 'not across a row of a when=');
+  // the nine keys' rows under it are full: across them it would make each too wide
+  assert.equal(added(fresh('nine'), 0, 'nine'), '1');
+  for (const id of FORMAT.scroll.lists) assert.ok(LM.SCROLL_LABEL[id], id);
+  assert.ok(LM.SLOT_LABEL.scroll);
+});
+
+// the phone's and the date's fields: a number field naming its pad, as the app sets it
+test('输入框 电话、日期: field=number and its fieldPad', () => {
+  for (const pad of ['phone', 'datetime']) {
+    assert.ok(LM.FIELDS.some(([f]) => f === pad), pad);
+    assert.deepEqual(LM.envJson(E, { ...LM.ENV, field: pad }, 'nine', null).input, { ime: 'pinyin', field: 'number', fieldPad: pad });
+    assert.deepEqual(M.envJson(E, { ...M.ENV, field: pad }).input, { field: 'number', ime: 'pinyin', fieldPad: pad });
+  }
 });

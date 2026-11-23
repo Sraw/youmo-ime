@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.KeyState
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.layout.Condition
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
@@ -36,6 +37,8 @@ data class Env(
     val typed: Set<String>? = null,
     val keyStyle: KeyStyleOver? = null,
     val base: String? = null,
+    /** By category id; null where the app's own views show the scroll lists, so they are not drawn twice. */
+    val scrollItems: Map<String, List<ScrollItem>>? = null,
 ) {
     /** As Android's configuration has it (rounded down). */
     val widthDp: Int get() = (width / density + DP_EPSILON).toInt()
@@ -126,6 +129,8 @@ data class Input(
     val composing: Boolean = false,
     val lookingUp: Boolean = false,
     val pad: String? = null,
+    /** The field's own pad (`phone`, `datetime`) on whichever keyboard is shown; [field] stays `number` there for `when=` and themes. */
+    val fieldPad: String? = null,
 )
 
 /** What the layout's bindings read; [alts] by key name (`full/q`, `g14/qw`, `t9/2`), [other] by `name:arg`. */

@@ -60,6 +60,7 @@ object LayoutTexts {
         "pad-letters" to R.string.layout_finding_pad_letters,
         "bottom-left" to R.string.layout_finding_bottom_left,
         "split-scaled" to R.string.layout_finding_split_scaled,
+        "scroll-tight" to R.string.layout_finding_scroll_tight,
     )
 
     private fun words(ctx: Context, f: LayoutCheck.Finding): String {

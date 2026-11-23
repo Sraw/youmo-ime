@@ -59,7 +59,8 @@ class KeyboardUatTest {
         h.tap(h.key("123"))
         val rows = h.texts()
         val back = h.service.getString(R.string.picker_back)
-        assertEquals(listOf("+", "1", "2", "3", "-", "4", "5", "6", "*", "7", "8", "9", "/", "符", back, ",", "0", "=", "."), rows)
+        // the keys, then the column's items
+        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "=", "符", back, "0", ".", "+", "-", "*", "/", "%", ",", ":", "(", ")", "#"), rows)
         space(h)
         val del = h.describedKey("Backspace").bounds
         assertEquals("⌫ in the row of 3", h.key("3").bounds.top, del.top)

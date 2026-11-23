@@ -8,6 +8,11 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Rect
 import android.text.InputType
+import android.view.ViewGroup
+import android.widget.ScrollView
+import android.widget.TextView
+import androidx.core.view.children
+import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
@@ -45,18 +50,14 @@ class FieldPadUatTest {
     fun dateAndTimeFieldsGetTheirSeparators() {
         for (variation in listOf(InputType.TYPE_DATETIME_VARIATION_DATE, InputType.TYPE_DATETIME_VARIATION_TIME, InputType.TYPE_DATETIME_VARIATION_NORMAL)) {
             val keys = keys(InputType.TYPE_CLASS_DATETIME or variation)
-            assertTrue("$variation: $keys", keys.containsAll(digits + listOf("-", "/", ":")) && "q" !in keys)
+            assertTrue("$variation: $keys", keys.containsAll(digits + listOf("-", "/", ":", ".")) && "q" !in keys)
             assertTrue("$variation: $keys", listOf("+", "*", "=").none { it in keys })
+            assertEquals(listOf("-", "/", ":"), column())
         }
         // the blank places take no press, type nothing, have nothing for TalkBack
         val shown = h.keys()
         assertTrue(shown.toString(), shown.none { !it.enabled && (it.label.isNotEmpty() || it.description != null) })
-        val blanks = blankPlaces(shown)
-        val width = h.keyboard.width
-        val wide = listOf(RIGHT, BOTTOM_LEFT, BOTTOM_MIDDLE)
-        assertEquals(blanks.toString(), wide.size, blanks.size)
-        val shares = blanks.map { it.width().toFloat() / width }.sorted()
-        for ((want, got) in wide.sorted().zip(shares)) assertEquals("$blanks", want, got, 2f / width)
+        val blanks = blanks(shown, listOf(RIGHT))
         // drawn nothing: each place's middle the keyboard's fill (a key's face is inset from its corner)
         val at = IntArray(2).also(h.keyboard::getLocationInWindow)
         val board = Bitmap.createBitmap(h.keyboard.width, h.keyboard.height, Bitmap.Config.ARGB_8888).also { h.keyboard.draw(Canvas(it)) }
@@ -64,6 +65,19 @@ class FieldPadUatTest {
             val ground = board.getPixel(r.left - at[0] + 1, r.top - at[1] + 1)
             assertEquals("$r drawn on", Integer.toHexString(ground), Integer.toHexString(board.getPixel(r.centerX() - at[0], r.centerY() - at[1])))
         }
+        pressedNothing(shown, blanks)
+    }
+
+    private fun blanks(shown: List<ShownKey>, wide: List<Float>): List<Rect> {
+        val blanks = blankPlaces(shown)
+        val width = h.keyboard.width
+        assertEquals(blanks.toString(), wide.size, blanks.size)
+        val shares = blanks.map { it.width().toFloat() / width }.sorted()
+        for ((want, got) in wide.sorted().zip(shares)) assertEquals("$blanks", want, got, 2f / width)
+        return blanks
+    }
+
+    private fun pressedNothing(shown: List<ShownKey>, blanks: List<Rect>) {
         h.api.calls.clear()
         val before = h.field.text.toString()
         for (at in blanks) {
@@ -80,19 +94,27 @@ class FieldPadUatTest {
     @Uat("PAN-17")
     fun phoneFieldsGetPlusStarAndHash() {
         val keys = keys(InputType.TYPE_CLASS_PHONE)
-        assertTrue(keys.toString(), keys.containsAll(digits + listOf("+", "*", "#")))
-        assertTrue(keys.toString(), listOf("/", "=").none { it in keys })
+        assertTrue(keys.toString(), keys.containsAll(digits) && "q" !in keys)
+        assertEquals(listOf("+", "*", "#", "-", "(", ")", ","), column())
+        assertTrue(keys.toString(), listOf("/", "=", ".").none { it in keys })
+        val shown = h.keys()
+        pressedNothing(shown, blanks(shown, listOf(RIGHT, DOT)))
     }
+
+    private fun columnView() = KeyboardHarness.all(h.keyboard).filterIsInstance<ScrollView>().first { h.shown(it) }
+
+    private fun column(): List<String> = (columnView().getChildAt(0) as ViewGroup).children.filterIsInstance<TextView>().filter { it.isVisible }.map { it.text.toString() }.toList()
 
     // the stretches along each row's middle no key covers, wider than a key's gap
     private fun blankPlaces(shown: List<ShownKey>): List<Rect> {
-        val keys = shown.filter { it.enabled }
+        // the scroll column is no key but no blank either
+        val keys = shown.filter { it.enabled }.map { it.bounds } + h.box(columnView())
         val width = h.keyboard.width
-        val rows = keys.map { it.bounds.top to it.bounds.bottom }.distinct()
+        val rows = shown.filter { it.enabled }.map { it.bounds.top to it.bounds.bottom }.distinct()
         return rows.flatMap { (top, bottom) ->
             val y = (top + bottom) / 2
             val left = IntArray(2).also(h.keyboard::getLocationInWindow)[0]
-            val free = (left until left + width).map { x -> keys.none { it.bounds.contains(x, y) } }
+            val free = (left until left + width).map { x -> keys.none { it.contains(x, y) } }
             buildList {
                 var start = -1
                 for (i in 0..free.size) {
@@ -131,7 +153,7 @@ class FieldPadUatTest {
         val keys = keys(InputType.TYPE_CLASS_NUMBER or flags)
         assertTrue(keys.toString(), keys.containsAll(full) && "q" !in keys)
         h.api.calls.clear()
-        h.tap(h.key("-"))
+        h.tap(KeyboardHarness.all(columnView()).filterIsInstance<TextView>().first { it.text.toString() == "-" })
         assertTrue(h.api.calls.toString(), h.api.calls.any { it.startsWith("sendKey") && "sym=${FcitxKeyMapping.FcitxKey_KP_Subtract}," in it })
     }
 
@@ -148,19 +170,18 @@ class FieldPadUatTest {
         h.tap(h.key(h.service.getString(R.string.picker_back)))
         assertTrue(h.texts().toString(), letters())
         h.tap(h.key("123"))
-        assertTrue(h.texts().toString(), "#" in h.texts() && "=" !in h.texts())
+        assertTrue(h.texts().toString(), "#" in h.texts() && "%" !in h.texts())
         h.start()
         h.tap(h.key("123"))
-        assertTrue(h.texts().toString(), "=" in h.texts() && "#" !in h.texts())
+        assertTrue(h.texts().toString(), "=" in h.texts() && "%" in h.texts())
     }
 
     private companion object {
         // a stretch this share of the width at least is a place, not the gap between two keys
         const val BLANK_AT_LEAST = 20
 
-        // number.xml's widths
+        // number.xml's widths: = and .
         const val RIGHT = 0.18f
-        const val BOTTOM_LEFT = 0.08f
-        const val BOTTOM_MIDDLE = 0.12f
+        const val DOT = 0.12f
     }
 }

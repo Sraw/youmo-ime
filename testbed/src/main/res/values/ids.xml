@@ -21,6 +21,13 @@
     <item name="email" type="id" />
     <item name="finish_composing" type="id" />
     <item name="finish_composing_async" type="id" />
+    <item name="form_amount" type="id" />
+    <item name="form_default" type="id" />
+    <item name="form_email" type="id" />
+    <item name="form_note" type="id" />
+    <item name="form_text" type="id" />
+    <item name="form_text2" type="id" />
+    <item name="form_text3" type="id" />
     <item name="ime_done" type="id" />
     <item name="ime_go" type="id" />
     <item name="ime_next" type="id" />

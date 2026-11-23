@@ -507,7 +507,8 @@
     }
     return e;
   }
-  const FIELDS = ['text', 'password', 'url', 'number', 'email'];
+  const FIELDS = ['text', 'password', 'url', 'number', 'email', 'phone', 'datetime'];
+  const FIELD_PADS = ['phone', 'datetime'];
   const IMES = ['pinyin', 'shuangpin', 'english', 'wubi', 'cangjie'];
 
   /** As the app ships it (`punc.mb.zh_CN`): the test holds it to the app's file. */
@@ -524,6 +525,8 @@
     if (e.dark) out.dark = true;
     if (e.shift && e.shift !== 'none') out.shift = e.shift;
     if ((e.field && e.field !== 'text') || (e.ime && e.ime !== 'pinyin')) out.input = { field: e.field || 'text', ime: e.ime || 'pinyin' };
+    // a phone's or a date's field is a number field the app names its pad of, as it does
+    if (FIELD_PADS.includes(e.field)) Object.assign(out.input, { field: 'number', fieldPad: e.field });
     if (e.form === 'compact') out.compact = true;
     else if (e.form === 'floating') out.floating = 1;
     else if (e.form === 'left' || e.form === 'right') out.oneHanded = e.form;
@@ -588,6 +591,7 @@
    * those whole (none of the defaults filled in for a member it leaves out); one without, with the board's default
    * marks (defaultMarksOf).
    */
+  let scrollDefaults = null;
   function check(E, d, board, env, measurer) {
     try {
       return checked(E, d, board, env, measurer);
@@ -605,7 +609,9 @@
     // a layout of the user's (环境 › 键盘 › 打开 .layout, 061-custom-layout §10) drawn as it is: the pack's own boards only replace the app's
     const layout = typeof board === 'string' ? layoutOf(E, d, board, (list) => add('warning', list)) : board;
     const marks = env.marks ? null : defaultMarksOf(E, layout, env);
-    const drawn = marks ? Object.assign({}, env, { marks }) : env;
+    // the scroll columns' items: the app draws them itself, a preview has the lists a new install has
+    if (!scrollDefaults) scrollDefaults = E.scrollDefaults();
+    const drawn = Object.assign({ scrollItems: scrollDefaults }, env, marks ? { marks } : {});
     const s = E.buildScene(layout, r.theme, drawn, measurer || E.fixedMeasurer());
     add('error', s.problems);
     add('warning', s.ok ? s.scene.json().warnings : s.warnings);

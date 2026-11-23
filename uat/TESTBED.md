@@ -117,12 +117,25 @@ adb shell am start -n org.fcitx.fcitx5.android.testbed/.MainActivity --es page b
 assets 里的本地 `web.html`，不访问网络。框的 id：`w_text` `w_search` `w_email` `w_number` `w_tel` `w_url`
 `w_password` `w_textarea` `w_editable`（contenteditable）、`w_form_input`（表单回车提交后清空）、`w_rewrite`
 （JS 在 input 事件里转大写）、`w_noauto`（autocomplete=off）、`w_moveselect`（每次输入 JS 把光标移到开头）。
-一页里多个框，用来测 WebView 共用 fieldId。
+一页里多个框，用来测 WebView 共用 fieldId（这个 WebView 没设 id，`fieldId` 是 -1）。网页上方的按钮「restartInput（网页）」对
+WebView `restartInput`：输入法收到同一个框的新 EditorInfo（`restarting` 为真）。
 
 ### `switch` 切换场景
 
 `switch_a` `switch_b` 两个框；按钮「2 秒后把焦点切到另一个框」（测说着话换框）；按钮「2 秒后跳到另一个
 Activity，再自动回来」（另一个 Activity 停 2 秒自己 finish）。
+
+### `form` 表单：跨框保持数字键盘
+
+| id | 测什么 |
+|---|---|
+| `form_text` `form_text2` `form_text3` | 普通文本（`form_text` 的提示是「请录入数字」），带 IME_ACTION_NEXT 和 NAVIGATE_NEXT，回车是 →\| |
+| `form_amount` | 小数（NUMBER + DECIMAL），也带 →\|，夹在普通框中间 |
+| `form_default` | 多行文本（没设 `inputType` 的 EditText 就是这个类型） |
+| `form_email` | 邮箱 |
+| `form_note` | 多行 |
+
+点了 123 以后按 →| 一路走、再手点邮箱和后面的框，看数字键盘在哪些框保持（PAN-39、PAN-40、PAN-42）。
 
 定时任务和延时动作跟着页面走：换页或 Activity 销毁时取消，开着的对话框也一起关掉。转屏后仍停在原来的页面；在页面里按返回回到页面列表。
 

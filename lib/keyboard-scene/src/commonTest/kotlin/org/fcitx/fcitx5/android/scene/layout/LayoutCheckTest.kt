@@ -77,7 +77,7 @@ class LayoutCheckTest {
             val r = check(own(id))
             assertEquals(emptyList(), r.errors, id)
             assertEquals(ims, r.ims, id)
-            assertEquals(if (id == "qwerty") "0.6.3" else "0.6.1", r.minApp, "$id: based-on= is 0.6.1's, the lookup key's switch 0.6.3's")
+            assertEquals(if (id == "qwerty" || id == "number") "0.6.3" else "0.6.1", r.minApp, "$id: based-on= is 0.6.1's, the lookup key's switch and the scroll column 0.6.3's")
         }
         assertEquals(listOf("full"), check(own("number")).pads, "a number board with no pads= is for 123's")
         val every = own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"${LayoutReader.PADS.joinToString(" ")}\"")
@@ -293,7 +293,7 @@ class LayoutCheckTest {
         val samples = mapOf(
             "meta" to qwerty062.replaceFirst("<defaults", "<meta author=\"me\"/>\n  <defaults"),
             "based-on" to qwerty062,
-            "pads" to own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"full\""),
+            "pads" to ScrollCheckTest.number062.replaceFirst("family=\"number\"", "family=\"number\" pads=\"full\""),
             "rows-middle" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" rows=\"2\" label"),
             // a key id twice in rows each shown on its own (the old app refused the second); a gap's id too
             "row-when gap" to qwerty062.replace("</keyboard>", "<row when=\"field=url\"><gap id=\"g1\" width=\"1\"/><key id=\"zz\" label=\"x\"/></row>\n<row when=\"!field=url\"><gap id=\"g1\" width=\"1\"/></row>\n</keyboard>"),
@@ -303,6 +303,8 @@ class LayoutCheckTest {
             "commands-063" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" swipe-up=\"shortcut:switch_input_method\" label"),
             "commands-063 menu" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" long-press=\"shortcut:choose_input_method\" label"),
             "commands-063 select" to qwerty062.replace("<key id=\"g\" label", "<key id=\"g\" swipe-up=\"shortcut:select_to_start\" label"),
+            "scroll" to qwerty062.replace("</keyboard>", "<row><slot kind=\"scroll\" list=\"nine\" direction=\"horizontal\"/></row>\n</keyboard>"),
+            "number-lock" to withRow("<key id=\"lk\" kind=\"function\" label=\"锁\" send=\"panel-lock\"/>", ScrollCheckTest.number062),
         )
         // lacks is the check's (whatABoardLacksIsToldOnceAndTaken), not the reader's
         assertEquals(LayoutCheck.FEATURES.keys - "lacks", samples.keys.map { it.substringBefore(' ') }.toSet())
@@ -312,7 +314,7 @@ class LayoutCheckTest {
             assertTrue(feature in LayoutCheck.features(layout), feature)
             assertEquals(LayoutCheck.FEATURES.getValue(feature), LayoutCheck.minApp(layout), feature)
         }
-        for (id in boards - "qwerty") assertEquals(LayoutCheck.BASE_VERSION, LayoutCheck.minApp(LayoutReader.layout(testData("$id.xml")).ok()), id)
+        for (id in boards - "qwerty" - "number") assertEquals(LayoutCheck.BASE_VERSION, LayoutCheck.minApp(LayoutReader.layout(testData("$id.xml")).ok()), id)
         val nine = LayoutReader.layout(testData("nine.xml")).ok()
         assertTrue("rows-middle" !in LayoutCheck.features(nine))
     }
@@ -518,8 +520,8 @@ class LayoutCheckTest {
         val own = qwerty.replace("</keyboard>", "<row><key id=\"h2\" label=\"H\" send=\"commit:h\" shortcut=\"my-qwerty/h2\" swipe-up=\"commit:嗨\"/></row>\n</keyboard>")
         assertTrue(check(own).warnings.none { it.key == "held" })
         assertEquals(listOf("h", "嗨"), check(own).commits)
-        val bare = check(own("number").replaceFirst("send=\"sym:KP_Add\"", "send=\"sym:KP_Add\" swipe-up=\"x\"")).warnings.filter { it.key == "held" }
-        assertEquals(listOf(listOf("+", "number")), bare.map { it.args })
+        val bare = check(own("number").replaceFirst("send=\"sym:KP_Equal\"", "send=\"sym:KP_Equal\" swipe-up=\"x\"")).warnings.filter { it.key == "held" }
+        assertEquals(listOf(listOf("=", "number")), bare.map { it.args })
     }
 
     // letters= other than an app key's make its long press none of theirs, told

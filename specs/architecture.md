@@ -51,7 +51,7 @@ never throws, depth 64; `SkinJson`: null for what is no JSON), no library.
 
 Decision logic goes in `lib/ime-core`; `app` reads Android state and preferences, passes plain
 values into an `ime-core` class, and applies what it returns. The pattern to copy is
-`PendingInputPolicy`, `LayoutSwitchPolicy`, `BackspaceSwipeBehavior`: a pure class, preferences as
+`PendingInputPolicy`, `LayoutSwitchPolicy`, `StickyNumbers`, `FieldTrack`, `BackspaceSwipeBehavior`: a pure class, preferences as
 arguments, no `AppPrefs`, no `Context`. Measured and deliberately not done: an `ImeHost`
 interface over the service, injecting `AppPrefs` everywhere, a DI framework.
 

@@ -155,6 +155,9 @@ class SceneKeyDef(
             "KP_Equal" to KP_EQUAL,
         ) + (0..9).associate { "KP_$it" to FcitxKeyMapping.FcitxKey_KP_0 + it }
 
+        /** A keypad key's keysym by its name (`KP_Add`), as a scene's key sends it. */
+        internal fun keypad(name: String): Int? = KEYPAD[name]
+
         // not the keypad's: the number row's, as its keys sent them
         private val DIGITS = ('0'..'9').associate { it.toString() to it.code }
 

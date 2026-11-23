@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 
@@ -27,7 +28,8 @@ import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
  * "typed": [scene, …] or null, "states": {id or role: ["on", …]}, "input": {…Input's},
  * "texts": {…Texts', "letterCase": "lower"|"shift"|"upper"}, "marks": {…MarkSettings', "upAt" and
  * "downAt": "top-right"|"bottom-right"|"top-left"|"bottom-left"|"top"|"bottom"|"none", "shortcuts":
- * {"name:up"|"name:down": {"icon": name} or {"text": text} or {"symbol": text} or {}}}}`: the members are the classes' own names.
+ * {"name:up"|"name:down": {"icon": name} or {"text": text} or {"symbol": text} or {}}}, "scrollItems": {category:
+ * [{"text": text, "asIs": true|false} or {"command": key}, …]} or null}`: the members are the classes' own names.
  */
 object EnvJson {
     /** [source] read; its problems, each with its line, where it does not say an environment. */
@@ -75,6 +77,7 @@ object EnvJson {
             board = m.nullableString("board", d.board),
             base = m.nullableString("base", d.base),
             typed = m.nullableStrings("typed", d.typed?.toList())?.toSet(),
+            scrollItems = m.obj("scrollItems")?.let(::scrollItems) ?: d.scrollItems,
         )
         m.done()
         if (!(env.width > 0 && env.height > 0 && env.density > 0)) throw EnvException(m.line, "width, height and density are to be above 0")
@@ -99,6 +102,7 @@ object EnvJson {
             lookingUp = m.bool("lookingUp", d.lookingUp),
             tableLookUp = m.bool("tableLookUp", d.tableLookUp),
             pad = m.nullableString("pad", d.pad),
+            fieldPad = m.nullableString("fieldPad", d.fieldPad),
         ).also { m.done() }
     }
 
@@ -160,6 +164,22 @@ object EnvJson {
 
     private fun states(m: Members): Map<String, Set<KeyState>> = m.all { id, v ->
         id to Members.strings(v).map { KeyState.of(it) ?: throw EnvException(v.line, "no key state \"$it\"") }.toSet()
+    }
+
+    private fun scrollItems(m: Members): Map<String, List<ScrollItem>> = m.all { id, v ->
+        val items = (v as? JsonValue.Array)?.items ?: throw EnvException(v.line, "a list is to be here")
+        id to items.map { item ->
+            val i = Members(item)
+            val command = i.nullableString("command", null)
+            val out = if (command != null) {
+                ScrollItem.Command(command)
+            } else {
+                val text = i.nullableString("text", null) ?: throw EnvException(item.line, "an item is {\"text\"} or {\"command\"}")
+                ScrollItem.Text(text, i.bool("asIs", false))
+            }
+            i.done()
+            out
+        }
     }
 
     private fun strings(m: Members): Map<String, String> = m.all { name, v -> name to Members.string(v) }

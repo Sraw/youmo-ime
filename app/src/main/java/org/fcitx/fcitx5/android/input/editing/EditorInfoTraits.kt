@@ -31,11 +31,14 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
     val type = inputType and InputType.TYPE_MASK_CLASS
     val variation = inputType and InputType.TYPE_MASK_VARIATION
     val action = imeOptions and EditorInfo.IME_MASK_ACTION
+    val isUri = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI
+    val isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS
+    val isPassword = CapabilityFlags.isPassword(this)
     return EditorTraits(
         isRawKeyInput = type == InputType.TYPE_NULL,
-        isUri = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_URI,
-        isEmail = type == InputType.TYPE_CLASS_TEXT && variation in EMAIL_VARIATIONS,
-        isPassword = CapabilityFlags.isPassword(this),
+        isUri = isUri,
+        isEmail = isEmail,
+        isPassword = isPassword,
         isNumber = type == InputType.TYPE_CLASS_NUMBER || type == InputType.TYPE_CLASS_PHONE || type == InputType.TYPE_CLASS_DATETIME,
         number = numberKind(type),
         isSearch = action == EditorInfo.IME_ACTION_SEARCH,
@@ -55,5 +58,6 @@ fun EditorInfo.toEditorTraits(ownPackage: String? = null): EditorTraits {
             inputType and (InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE) != 0,
         showsLines = type == InputType.TYPE_CLASS_TEXT && inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0,
         isShortMessage = type == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE,
+        isPlainText = type == InputType.TYPE_CLASS_TEXT && !isUri && !isEmail && !isPassword,
     )
 }

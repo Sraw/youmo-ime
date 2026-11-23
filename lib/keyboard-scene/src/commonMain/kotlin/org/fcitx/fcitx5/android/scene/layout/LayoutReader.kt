@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.Problems
 import org.fcitx.fcitx5.android.scene.SceneText
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.xml.Attributes
 import org.fcitx.fcitx5.android.scene.xml.Xml
@@ -73,6 +74,7 @@ object LayoutReader {
         }
         if (parts.isEmpty()) p.add(root.line, "<keyboard> has no rows")
         checkKeys(parts.filterIsInstance<Row>(), p)
+        scrolls(family, parts.filterIsInstance<Row>(), p)
         if (onSplit == OnSplit.Split) splitSides(parts.filterIsInstance<Row>(), p)
         val named = composedNamed(family, parts, p)
         return p.result { Layout(id.orEmpty(), name.orEmpty(), family.orEmpty(), columns, onSplit, defaults, named, preview, popups, basedOn, meta, pads) }
@@ -127,8 +129,20 @@ object LayoutReader {
             if (child.name == "row") row(child, p) else null.also { p.add(child.line, "<${child.name}> is not allowed in <fragment>") }
         }
         if (rows.isEmpty()) p.add(root.line, "<fragment> has no rows")
+        // its board's family and count of them are not known here
+        rows.flatMap { it.cells }.filter { it is Slot && it.kind == SCROLL }.forEach { p.add(it.line, "a scroll slot goes in a board's own rows, not a fragment") }
         checkKeys(rows, p)
         return p.result { Fragment(id.orEmpty(), defaults, rows) }
+    }
+
+    // the app draws a column on these boards only; a split row's halves want keys, and a column is none
+    private fun scrolls(family: String?, rows: List<Row>, p: Problems) {
+        val scrolls = rows.flatMap { r -> r.cells.filter { it is Slot && it.kind == SCROLL }.map { r to it } }
+        if (scrolls.size > MAX_SCROLLS) p.add(scrolls[MAX_SCROLLS].second.line, "more than $MAX_SCROLLS scroll slots")
+        if (family != null && family !in SCROLL_FAMILIES && scrolls.isNotEmpty()) {
+            p.add(scrolls[0].second.line, "a scroll slot is for ${SCROLL_FAMILIES.joinToString("|")} boards, not $family")
+        }
+        scrolls.filter { it.first.split == RowSplit.Halves }.forEach { p.add(it.second.line, "a scroll slot cannot be in a row split in halves") }
     }
 
     private fun namespace(a: Attributes) {
@@ -226,9 +240,16 @@ object LayoutReader {
     private fun slot(el: XmlElement, p: Problems): Slot {
         val a = Attributes(el, p)
         val kind = a.oneOf("kind", SLOT_KINDS) ?: a.required("kind")
+        val scroll = kind == SCROLL
+        val list = a.oneOf("list", ScrollDefaults.IDS)
+        val direction = a.value("direction", "vertical|horizontal") { raw -> Direction.entries.firstOrNull { it.xml == raw } }
+        val show = a.value("show", "1–$MAX_SHOW") { raw -> raw.toIntOrNull()?.takeIf { it in 1..MAX_SHOW && raw == it.toString() } }
+        if (scroll && list == null && a.string("list") == null) a.problem("list= is required on a scroll slot")
+        if (!scroll) listOf("list", "direction", "show").filter { a.string(it) != null }.forEach { a.problem("$it= is a scroll slot's") }
         val slot = Slot(
             a.matching("id", IDENT, "a name"), kind.orEmpty(), width(a) ?: Width.Units(1.0), a.positiveInt("rows") ?: 1,
-            face(a) ?: Face.Default, a.oneOf("look", KINDS), classes(a).orEmpty(), condition(a), el.line,
+            face(a) ?: if (scroll) SCROLL_FACE else Face.Default, a.oneOf("look", KINDS) ?: SCROLL_LOOK.takeIf { scroll }, classes(a).orEmpty(), condition(a), el.line,
+            list = list.takeIf { scroll }, direction = direction ?: Direction.Vertical, show = show ?: Slot.DEFAULT_SHOW,
         )
         a.done()
         noChildren(el, p)
@@ -440,7 +461,18 @@ object LayoutReader {
     private val GROUP_ARG = Regex("[a-z;]{1,2}")
     private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting", "emoji-search", "expanded-side", "number-row")
     private val KINDS = listOf("letter", "function", "space", "enter")
-    internal val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid")
+    const val SCROLL = "scroll"
+    internal val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid", SCROLL)
+
+    /** The kinds a board lacks when its app board has them: a scroll slot is the layout's own choice. */
+    internal val NEEDED_SLOTS = SLOT_KINDS - SCROLL
+    val SCROLL_FAMILIES = listOf("letters", "grouped", "nine", "number")
+    const val MAX_SCROLLS = 2
+    const val MAX_SHOW = 8
+
+    // a column is drawn on the function keys' block, as the nine keys' side column always was
+    const val SCROLL_LOOK = "function"
+    val SCROLL_FACE = Face.Keep
     private val ACTIONS = listOf("send", "long-press", "swipe-up", "swipe-down", "double-tap")
     private val BOOLEAN = Regex("true|false|1|0")
     private val COUNT = Regex("[0-9]{1,3}")

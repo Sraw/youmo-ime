@@ -158,11 +158,14 @@ class PanelUatTest {
     fun inAPhoneNumbersFieldThePadsBracketsAreAlone() {
         // a dialler formats the number as it is typed: a bracket put in for it would be in its way
         h.start(InputType.TYPE_CLASS_PHONE)
-        h.tap(h.key("("))
+        h.tap(columnItem("("))
         assertEquals("(|", shown())
-        h.tap(h.key(")"))
+        h.tap(columnItem(")"))
         assertEquals("()|", shown())
     }
+
+    private fun columnItem(text: String): TextView = KeyboardHarness.all(h.keyboard).filterIsInstance<android.widget.ScrollView>().first { h.shown(it) }
+        .let { KeyboardHarness.all(it) }.filterIsInstance<TextView>().first { it.text.toString() == text }
 
     @Test
     @Uat("PAN-34")
@@ -214,6 +217,8 @@ class PanelUatTest {
         ),
         { (where, _) -> where },
     ) { (_, open) ->
+        // the keyboard opened anew each time: the 123 key's pad would be kept for the next field
+        h.hide()
         open()
         assertEquals(back(), h.keyNamed("back").label)
         assertFalse(h.texts().toString(), "ABC" in h.texts())

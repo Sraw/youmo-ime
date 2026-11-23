@@ -231,18 +231,10 @@ internal object BuiltInKeyData {
             "num/9" to NONE,
         ),
         unnamed = mapOf(
-            "#" to NONE,
-            "(" to NONE,
-            ")" to NONE,
-            "*" to NONE,
-            "+" to NONE,
-            "," to NONE,
-            "-" to NONE,
             "." to NONE,
-            "/" to NONE,
-            ":" to NONE,
             "=" to NONE,
             "back" to NONE,
+            "lock" to NONE,
         ),
     )
 

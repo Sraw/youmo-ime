@@ -45,6 +45,34 @@ class PopupEditorTest {
         assertEquals(0, e.selected)
     }
 
+    // dragged: the selection stays on its item, wherever that went
+    @Test
+    fun aDraggedItemGoesWhereItIsDropped() {
+        val e = editor()
+        e.tap(4)
+        e.move(6, 0)
+        assertEquals(listOf("#", "Q", "1", "q", "w", "!", "@"), e.items)
+        assertEquals(5, e.selected)
+        e.move(5, 6)
+        assertEquals(listOf("#", "Q", "1", "q", "w", "@", "!"), e.items)
+        assertEquals(6, e.selected)
+        e.move(0, 7)
+        e.move(-1, 0)
+        assertEquals("#", e.items.first())
+        e.tap(6)
+        e.move(1, 2)
+        assertEquals(-1, e.selected)
+    }
+
+    @Test
+    fun aLongerListTakesItsOwnMost() {
+        val e = PopupEditor(emptyList(), null, max = 24)
+        assertTrue(e.add((1..24).joinToString(" ")))
+        assertEquals(24, e.items.size)
+        assertFalse(e.add("x"))
+        assertFalse(PopupEditor(emptyList(), null).add((1..17).joinToString(" ")))
+    }
+
     @Test
     fun theEndsMoveNoFurther() {
         val e = editor()

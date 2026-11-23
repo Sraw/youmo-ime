@@ -105,6 +105,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyboardArea
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyleState
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyles
 import org.fcitx.fcitx5.android.input.keyboard.SpaceCursor
+import org.fcitx.fcitx5.android.input.keyboard.StickyNumbers
 import org.fcitx.fcitx5.android.input.keyboard.PendingInputPolicy
 import org.fcitx.fcitx5.android.input.keyboard.SwipeSelection
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
@@ -174,6 +175,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         }
         if (isVirtualKeyboard) {
             if (inputViewStarted) currentInputEditorInfo?.let { inputView?.startInput(it, capabilityFlags) }
+        } else {
+            // to the user the keys went as if hidden, without onFinishInputView
+            inputView?.keyboardHidden()
         }
     }
 
@@ -336,6 +340,16 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     val startedField: EditorInfo? get() = startedWith
+
+    // here, not in the keyboard window: replacing the input view (a turn, floating, a theme) keeps the lock
+    val sticky = StickyNumbers()
+
+    /** The field the keys last started in; [startedWith] already holds the next one when they start. */
+    var stickyInfo: EditorInfo? = null
+
+    /** onStartInputView's, for the keys starting in it. */
+    var restartingInput = false
+        private set
 
     val clearedText = ClearedText()
 
@@ -1449,6 +1463,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             editingSession.inlineCompletion = it.isUri || it.isEmail
         }
         inputViewStarted = true
+        restartingInput = restarting
         if (virtual) {
             // onStartInputView always follows onStartInput: editorInfo and capFlags are up to date
             inputView?.startInput(info, capabilityFlags)
@@ -1627,8 +1642,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     fun sameField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
         VoiceCommit.sameField(said.voiceField(), now.voiceField(), said === now)
 
-    private fun EditorInfo.voiceField() =
-        VoiceCommit.Field(packageName, fieldId, inputType, fieldName, hintText?.toString())
 
     fun watchVoice(taken: ((how: EditingSession.Taken) -> Unit)?) {
         editingSession.provisionalTaken = taken
@@ -1786,3 +1799,6 @@ internal suspend fun HostApi.tell(c: Action.Context, learning: Boolean) =
         c.before, learning, cleared = c.cleared, learnFlags = c.learnFlags ?: 0, started = c.started,
         after = c.after, selected = c.selected, said = c.said,
     )
+
+internal fun EditorInfo.voiceField() =
+    VoiceCommit.Field(packageName, fieldId, inputType, fieldName, hintText?.toString())

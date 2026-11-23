@@ -546,10 +546,48 @@
     return Math.min(100, Math.max(stepBy, Math.round(units / stepBy) * stepBy));
   }
 
+  /** The scroll columns of [p] (what parse gave), each `{at, a}`. */
+  const scrolls = (p) => p.rows.flatMap((r) => r.cells.filter((c) => c.name === 'slot' && c.a.kind === 'scroll').map((c) => ({ at: { row: c.row, index: c.index }, a: c.a })));
+
+  /** Why a scroll column cannot go at [at] of [xml], a [family] board ([format]: the engine's layoutFormat), or null. */
+  function scrollProblem(xml, family, at, format) {
+    const f = format.scroll;
+    if (!f.families.includes(family)) return '滑动列只能放在字母、字母分组、九键、数字键盘上';
+    const p = parse(xml);
+    if (scrolls(p).length >= f.most) return '一块键盘最多 ' + f.most + ' 个滑动列';
+    const row = p.rows[at ? at.row : 0];
+    if (!row) return '先加一行';
+    // the reader refuses one there: a halves row is the letters' 9 or 10 keys, split between the hands
+    if (row.a.split === 'halves') return '分成两半的行放不了滑动列：放到别的行';
+    return null;
+  }
+
+  /** A scroll column put left of [at] (else at the first row's start): `{xml, at}`, or `{error}` as scrollProblem says. */
+  function addScroll(xml, at, family, format, source = null) {
+    const where = at || { row: 0, index: 0 };
+    const why = scrollProblem(xml, family, where, format);
+    if (why) return { error: why };
+    // the app's columns are 16 of a hundred
+    const kb = F.elements(xml, 'keyboard')[0];
+    const columns = Number((kb && attrs(kb).columns) || 10);
+    const text = el('slot', { id: freeId(xml, 'scroll', null, source), kind: 'scroll', list: family === 'number' ? 'number' : 'nine', width: num(snap(columns * 0.16, columns)), rows: family === 'number' ? span(xml, where.row) : 1 });
+    return { xml: insert(xml, where, text), at: where };
+  }
+
+  // the number pad's side column, down to three rows as the app's, so four items are not under 20 dp; the rows under
+  // one on the nine keys or the letters are full already. Only rows right after it with no when=.
+  function span(xml, row) {
+    const rows = parse(xml).rows;
+    let n = 1;
+    while (n < 3 && rows[row + n] && !rows[row + n].a.when && /^\s*(<!--[\s\S]*?-->\s*)*$/.test(xml.slice(rows[row + n - 1].end, rows[row + n].start))) n++;
+    return n;
+  }
+
   root.YoumoLayoutEdit = {
     PROBE, MERGED, ACTION_TYPES, ACTIONS, FN_LABEL,
     parse, cellAt, setAttrs, setLetters, setRow, insert, remove, move, step, addRow, removePart, movePart, partOfRow, ownRows, includeOf, locate, atLine,
     freeId, letterKey, groupLabel, lettersProblem, charKey, functionKeys, withFreeId, lettersOf, merge, coverage,
     labelParts, labelProblem, labelText, actionParts, actionText, sharedName, popupOf, setPopup, snap, num, widthOf,
+    scrolls, scrollProblem, addScroll,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

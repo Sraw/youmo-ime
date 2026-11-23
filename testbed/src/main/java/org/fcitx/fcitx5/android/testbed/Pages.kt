@@ -103,6 +103,7 @@ object Pages {
         Page("behavior", "模拟应用行为") { behavior() },
         Page("webview", "WebView 本地网页") { webview() },
         Page("switch", "切换场景") { switching() },
+        Page("form", "表单：跨框保持数字键盘") { form() },
     )
 
     private fun PageBuilder.types() {
@@ -154,6 +155,18 @@ object Pages {
         field("initial_text", "有初始文字") { setText("已经有的文字") }
         field("preselected", "预先选中一段") { setText("前面选中的后面"); setSelection(2, 4) }
         field("max10", "最多 10 个字（maxLength=10）") { filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH)) }
+    }
+
+    // the first four step on with →|, as a form's fields that each say only text
+    private fun PageBuilder.form() {
+        val next = EditorInfo.IME_ACTION_NEXT or EditorInfo.IME_FLAG_NAVIGATE_NEXT
+        field("form_text", "请录入数字", ime = next)
+        field("form_text2", "普通文本", ime = next)
+        field("form_amount", "金额（小数）", NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL, next)
+        field("form_text3", "普通文本", ime = next)
+        field("form_default", "没设类型的 EditText（多行文本）", TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
+        field("form_email", "邮箱", TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        field("form_note", "备注（多行）", TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE)
     }
 
     private const val MAX_LENGTH = 10
@@ -312,6 +325,8 @@ object Pages {
             (web.parent as? ViewGroup)?.removeView(web)
             web.destroy()
         }
+        // above the page, so it is on screen whichever field is focused; a button takes no focus from the page
+        button("restartInput（网页）") { imm.restartInput(web); log.event("webview", "app", JSONObject().put("detail", "restartInput")) }
         add(web)
     }
 

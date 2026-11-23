@@ -80,11 +80,9 @@ class TextKeyboard(
 
     }
 
-    override var address: AddressKeys = AddressKeys.NONE
-        set(value) {
-            field = value
-            canvas?.invalidateScene()
-        }
+    override fun onAddressChanged() {
+        canvas?.invalidateScene()
+    }
 
     // English's follows Shift (remade when it changes)
     private val letterCaseChoice by AppPrefs.getInstance().keyboard.letterCase

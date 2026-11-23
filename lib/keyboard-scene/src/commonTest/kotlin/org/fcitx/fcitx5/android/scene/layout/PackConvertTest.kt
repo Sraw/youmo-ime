@@ -223,6 +223,18 @@ class PackConvertTest {
         assertEquals(listOf(listOf("backspace")), written.problems.filter { it.key == "lacks" }.map { it.args })
     }
 
+    // a pack's number board of 0.6.2, its marks keys of no name: made as it was, told nothing; one of 0.6.3 keeps its column
+    @Test
+    fun aPacksNumberBoardKeepsItsMarksOrItsScrollColumn() {
+        val old = done(convert(testData("layout-check/number-062.xml"), id = "number"))
+        assertEquals(emptyList(), old.problems.filter { it.key == "unnamed" || it.key == "commits" || it.key == "pad-lacks" }, old.problems.toString())
+        val oldKeys = LayoutReader.layout(old.text).ok().parts.filterIsInstance<Row>().flatMap { it.cells }.mapNotNull { it.id }
+        assertTrue(oldKeys.containsAll(listOf("+", "-", "*", "/", "#", ":")), oldKeys.toString())
+        val column = testData("number.xml").replace("kind=\"scroll\" list=\"number\"", "kind=\"scroll\" list=\"url\" direction=\"horizontal\" show=\"3\"")
+        val slot = LayoutReader.layout(done(convert(column, id = "number")).text).ok().parts.filterIsInstance<Row>().flatMap { it.cells }.filterIsInstance<Slot>().single()
+        assertEquals(listOf("url", "horizontal", "3"), listOf(slot.list, slot.direction.xml, slot.show.toString()))
+    }
+
     @Test
     fun onlyTheBoardsListedAndThoseTakenIn060AreMadeOnes() = assertRows(
         listOf<Pair<String, () -> Unit>>(

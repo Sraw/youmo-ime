@@ -9,8 +9,11 @@ import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.UserList
 
-/** A key's long press as settings edit it: every item alike; one selected (-1 none), its [first] (null none), [marks] moving with items. */
-class PopupEditor(items: List<String>, first: String?, marks: Map<String, ItemMark> = emptyMap()) {
+/**
+ * A key's long press (or a scroll list) as settings edit it: every item alike; one selected (-1 none), its [first] (null
+ * none), [marks] moving with items; [max] items at most.
+ */
+class PopupEditor(items: List<String>, first: String?, marks: Map<String, ItemMark> = emptyMap(), val max: Int = KeyLists.MAX_ITEMS) {
 
     private val list = items.distinct().toMutableList()
 
@@ -57,14 +60,16 @@ class PopupEditor(items: List<String>, first: String?, marks: Map<String, ItemMa
         if (selected in list.indices) first = list[selected]
     }
 
-    fun moveLeft() = move(selected - 1)
+    fun moveLeft() = move(selected, selected - 1)
 
-    fun moveRight() = move(selected + 1)
+    fun moveRight() = move(selected, selected + 1)
 
-    private fun move(to: Int) {
-        if (!canDelete || to !in list.indices) return
-        list.add(to, list.removeAt(selected))
-        selected = to
+    /** Dragged: [from] put at [to]; whatever was selected stays selected. */
+    fun move(from: Int, to: Int) {
+        if (from !in list.indices || to !in list.indices || from == to) return
+        val was = list.getOrNull(selected)
+        list.add(to, list.removeAt(from))
+        selected = was?.let(list::indexOf) ?: -1
     }
 
     /** The first, if it was, falls back to the list's first (none with none). */
@@ -78,7 +83,7 @@ class PopupEditor(items: List<String>, first: String?, marks: Map<String, ItemMa
     }
 
     /**
-     * Adds [text]'s items not there yet, up to [KeyLists.MAX_ITEMS]; false when some did not fit. [ItemMark.Variables]:
+     * Adds [text]'s items not there yet, up to [max]; false when some did not fit. [ItemMark.Variables]:
      * one item ([template]), marked whether it holds a variable or not (the user's mark, drawn as 「变量」); [ItemMark.AsIs]:
      * those [canKeepAsIs]. An unmarked item already there takes [mark].
      */
@@ -86,7 +91,7 @@ class PopupEditor(items: List<String>, first: String?, marks: Map<String, ItemMa
         val wasEmpty = list.isEmpty()
         val typed = if (mark == ItemMark.Variables) listOfNotNull(template(text).takeIf { it.isNotEmpty() }) else PopupOverrides.tokens(text)
         val new = typed.distinct().filter { it !in list }
-        val room = (KeyLists.MAX_ITEMS - list.size).coerceAtLeast(0)
+        val room = (max - list.size).coerceAtLeast(0)
         val added = new.take(room)
         list += added
         for (item in typed.distinct().filter { it in list && it !in marked }) {

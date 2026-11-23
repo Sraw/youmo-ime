@@ -124,6 +124,10 @@ sealed class SettingsRoute : Parcelable {
     @Serializable
     data object PopupOverrides : SettingsRoute()
 
+    /** 按键字符和快捷键 at one scroll list's editor; [id] one of ScrollDefaults.IDS. */
+    @Serializable
+    data class ScrollList(val id: String) : SettingsRoute()
+
     // not NineKeyLetters, the letters' class that NineKeyLettersFragment edits
     @Serializable
     data object T9Letters : SettingsRoute()
@@ -195,6 +199,9 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.quick_phrases)
             }
             fragment<PopupOverridesFragment, PopupOverrides> {
+                label = ctx.getString(R.string.long_press_characters)
+            }
+            fragment<PopupOverridesFragment, ScrollList> {
                 label = ctx.getString(R.string.long_press_characters)
             }
             fragment<NineKeyLettersFragment, T9Letters> {

@@ -11,7 +11,11 @@ data class KeyName(val board: String, val key: String) {
     override fun toString() = "$board/$key"
 }
 
-/** Keys a theme can style by name: by place, or a function key by role. Names go into theme files: never changed or removed once released. The theme maker reads this list. */
+/**
+ * Keys a theme can style by name: by place, or a function key by role. Names go into theme files: never changed or
+ * removed once released, but a key gone from its board takes its name with it (a theme naming it still reads, styling
+ * nothing). The theme maker reads this list.
+ */
 object KeyNames {
 
     const val ALL = "*"
@@ -47,8 +51,8 @@ object KeyNames {
         ZHUYIN_NINE to cells(listOf(5, 5, 5, 5)) - "r1c5",
         K14 to cells(listOf(5, 5, 4)),
         K18 to cells(listOf(7, 6, 5)),
-        // the digits and every sign a pad has beside them (NumberPad)
-        NUMBER to (0..9).map(Int::toString) + listOf("+", "-", "*", "/", ",", "=", ".", "#", "(", ")", ":"),
+        // the digits, the two signs still keys and the scroll column; the other signs are the column's items
+        NUMBER to (0..9).map(Int::toString) + listOf("=", ".", "side"),
         SYMBOLS to emptyList(),
         EMOJI to emptyList(),
     )

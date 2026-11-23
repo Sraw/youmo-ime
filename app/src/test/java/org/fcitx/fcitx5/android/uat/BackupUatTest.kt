@@ -24,6 +24,9 @@ import org.fcitx.fcitx5.android.data.pinyin.ImportedDictionaries
 import org.fcitx.fcitx5.android.data.pinyin.MergedDictionary
 import org.fcitx.fcitx5.android.data.pinyin.dict.SourceNames
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keys.ScrollListStore
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.prefs.ShuangpinKeyboard
 import org.fcitx.fcitx5.android.engine.learn.control.BackupOp
@@ -186,6 +189,24 @@ class BackupUatTest {
         val read = Regex("""<string name="([a-z_]+)">([A-Za-z0-9]+)</string>""").findAll(file.readText()).associate { it.groupValues[1] to it.groupValues[2] }
         assertEquals(PinyinKeyboard.Keys14, PinyinKeyboard.valueOf(read.getValue(AppPrefs.PINYIN_KEYBOARD)))
         assertEquals(ShuangpinKeyboard.Keys18, ShuangpinKeyboard.valueOf(read.getValue(AppPrefs.SHUANGPIN_KEYBOARD)))
+    }
+
+    @Test
+    @Uat("ST-222")
+    fun aBackupBringsTheScrollListsChanged() {
+        val lists = ScrollListStore.Empty.with(ScrollDefaults.NUMBER, listOf(ScrollItem.Text("+"), ScrollItem.Command("copy"))).serialize()
+        fun prefs(dirs: UserDataManager.Dirs, value: String) = File(dirs.sharedPrefs.apply { mkdirs() }, "${appContext.packageName}_preferences.xml").apply {
+            val escaped = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            writeText("<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n    <string name=\"${AppPrefs.SCROLL_LISTS}\">$escaped</string>\n</map>\n")
+        }
+        val old = install("old")
+        prefs(old, lists)
+        val zip = backup(old)
+        val phone = install("phone")
+        val file = prefs(phone, "")
+        UserDataManager.import(zip.inputStream(), phone).getOrThrow()
+        val read = Regex("""<string name="${AppPrefs.SCROLL_LISTS}">([^<]*)</string>""").find(file.readText())!!.groupValues[1]
+        assertEquals(ScrollListStore.parse(lists), ScrollListStore.parse(read))
     }
 
     @Test

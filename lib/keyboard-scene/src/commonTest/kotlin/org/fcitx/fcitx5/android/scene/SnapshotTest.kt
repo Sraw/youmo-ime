@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Shift
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.theme.Cascades
 import org.fcitx.fcitx5.android.scene.theme.Theme
 import org.fcitx.fcitx5.android.scene.theme.ThemeReader
@@ -57,6 +58,8 @@ object Shots {
 
     val forms: List<Shot> = everyForm.filter { it.board == "qwerty" || it.name.removePrefix("${it.board}-") in othersForms }
 
+    private val scrollDefaults = ScrollDefaults.IDS.associateWith { ScrollDefaults.of(it).orEmpty() }
+
     val states: List<Shot> by lazy {
         val block = Forms.block
         fun on(board: String, change: (Env) -> Env) = change(Forms.env(board, block))
@@ -102,7 +105,10 @@ object Shots {
             Shot("k14-url", "k14", on("k14") { it.copy(input = it.input.copy(field = "url")) }),
             Shot("zhuyin-nine-composing", "zhuyin-nine", on("zhuyin-nine") { it.copy(input = it.input.copy(composing = true)) }),
             Shot("symbols-locked", "symbols", on("symbols") { it.copy(states = mapOf("lock" to setOf(KeyState.Locked))) }),
-        ) + PADS.map { pad -> Shot("number-pad-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad)) }) }
+        ) + PADS.map { pad -> Shot("number-pad-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad)) }) } +
+            // the columns' items as the app passes them: drawn, each pad's own list
+            (listOf("full") + PADS).map { pad -> Shot("number-items-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad), scrollItems = scrollDefaults) }) } +
+            Shot("nine-items", "nine", on("nine") { it.copy(scrollItems = scrollDefaults) })
     }
 
     val looks: List<Shot> by lazy {

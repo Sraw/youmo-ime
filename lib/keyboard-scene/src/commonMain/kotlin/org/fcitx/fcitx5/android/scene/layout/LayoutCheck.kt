@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.scene.Parsed
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Expand
 import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
+import org.fcitx.fcitx5.android.scene.engine.ExpandedSlot
 import org.fcitx.fcitx5.android.scene.engine.FixedMeasurer
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Item
@@ -86,6 +87,9 @@ object LayoutCheck {
         "lacks" to "0.6.3",
         "table-lookup" to "0.6.3",
         "commands-063" to "0.6.3",
+        "scroll" to "0.6.3",
+        // an older app draws a 锁 that does nothing
+        "number-lock" to "0.6.3",
     )
 
     /** Every [Finding] key: the app's strings and the page's table must word each (LayoutCheckTest enforces it). */
@@ -96,7 +100,7 @@ object LayoutCheck {
         "name-no-slash", "name-prefix", "groups", "hidden-chars", "command",
         // warnings
         "lacks", "blank", "pad-letters", "no-way", "narrow", "commits", "theme-blank", "unnamed", "held", "held-letters", "held-popups", "gap-look", "pad-lacks", "bottom-left",
-        "split-scaled",
+        "split-scaled", "scroll-tight",
     )
 
     const val MAX_ID = 32
@@ -139,6 +143,7 @@ object LayoutCheck {
         // names are looked up by the layout's own based-on, as its styles are
         warnings += heldData(layout, fragments, sources, layout.basedOn ?: baseId(layout, sources))
         shown.padLacks.forEach { warnings += it }
+        warnings += shown.tight
         warnings += ScaledRows.find(layout, fragments, scenes(layout, ims, pads))
         if (strict) {
             gapLooks(source).forEach { warnings += it }
@@ -195,7 +200,7 @@ object LayoutCheck {
     ): String? {
         val mine = cells(layout, fragments)
         val theirs = cells(base, baseFragments)
-        fun slots(c: List<Cell>) = c.filterIsInstance<Slot>().map { it.kind }.toSet()
+        fun slots(c: List<Cell>) = c.filterIsInstance<Slot>().map { it.kind }.filter { it in LayoutReader.NEEDED_SLOTS }.toSet()
         fun roles(c: List<Cell>) = c.filterIsInstance<Key>().mapNotNull { it.attrs.role }.filter { it in ROLES }.toSet()
         fun digits(c: List<Cell>) = c.filterIsInstance<Key>().map { it.id }.filter { DIGIT.matches(it) }.toSet()
         (slots(theirs) - slots(mine)).takeIf { it.isNotEmpty() }?.let { return "it has no slot $it" }
@@ -222,6 +227,8 @@ object LayoutCheck {
         if (conditions(layout).any { c -> c.anyOf.any { g -> g.any { it.name == "table-lookup" } } }) add("table-lookup")
         // an older app reads the name as nothing: a dead key, no refusal
         if (actions(layout).any { it.second in COMMANDS_063 }) add("commands-063")
+        if (ownCells(layout).any { it is Slot && it.kind == LayoutReader.SCROLL }) add("scroll")
+        if (layout.family == "number" && actions(layout).any { it.second == "panel-lock" }) add("number-lock")
     }
 
     private val COMMANDS_063 = setOf(
@@ -315,7 +322,8 @@ object LayoutCheck {
             if (a.shortcut in app) return each
             return each + listed(k) + listOfNotNull((a.alt as? Text.Literal)?.text?.takeIf { a.actions["swipe-up"] == null }?.let(::firstTyped)?.let { "commit:$it" })
         }
-        val theirs = base?.let { b -> cells(b, baseFragments).filterIsInstance<Key>().flatMap { k -> (texts(actions(k)) + alts(k).mapNotNull(::firstTyped)).map { k.id to it } } }.orEmpty().toSet()
+        val legacy = if (base?.family == "number") LegacyNumberKeys.SENDS.filterValues { it.startsWith("commit:") }.map { (id, send) -> id to send.removePrefix("commit:") } else emptyList()
+        val theirs = base?.let { b -> cells(b, baseFragments).filterIsInstance<Key>().flatMap { k -> (texts(actions(k)) + alts(k).mapNotNull(::firstTyped)).map { k.id to it } } }.orEmpty().toSet() + legacy
         return layout.parts.filterIsInstance<Row>().flatMap { r -> r.cells.filterIsInstance<Key>().flatMap { k -> texts(typed(k, r.defaults.over(layout.defaults))).filter { (k.id to it) !in theirs } } } +
             texts(defaultsActions(layout).map { it.first })
     }
@@ -548,6 +556,7 @@ object LayoutCheck {
         val padLacks: List<Finding>,
         val blank: List<Finding>,
         val bottomLeft: Finding?,
+        val tight: List<Finding>,
     )
 
     data class Screen(val widthDp: Int, val turned: Boolean, val tallDp: Int) {
@@ -652,11 +661,17 @@ object LayoutCheck {
         val padNeeds = LinkedHashMap<String, List<String>>()
         val padLacks = ArrayList<Finding>()
         var bottomLeft: Finding? = null
+        val tight = LinkedHashMap<Int, Finding>()
         for (scene in scenes(layout, ims, pads)) {
             val built = SceneBuilder(PLAIN, scene.env, FixedMeasurer).build(layout, fragments)
             built.problems().forEach { errors.getOrPut(it.line to it.message) { Finding(it.line, "scene", listOf(scene.name, it.message)) } }
             val rows = Expand.rows(layout, fragments, scene.env).orNull() ?: continue
             val keys = rows.flatMap { it.items }.filterIsInstance<ExpandedKey>()
+            val scrolls = rows.flatMap { it.items }.filterIsInstance<ExpandedSlot>().map { it.slot }.filter { it.kind == LayoutReader.SCROLL }
+            built.orNull()?.slots?.filter { it.kind == LayoutReader.SCROLL }?.zip(scrolls)?.forEach { (node, slot) ->
+                val along = if (node.direction == Direction.Vertical) node.bounds.height else node.bounds.width
+                if (along / node.show / scene.env.density < SCROLL_ITEM_DP) tight.getOrPut(slot.line) { Finding(slot.line, "scroll-tight") }
+            }
             // the space bar is its face (the symbols' is blank)
             keys.filter { it.label.isNullOrBlank() && it.icon == null && it.key.letters == null && it.attrs.kind != "space" }.forEach {
                 blank.getOrPut(it.key.line) { Finding(it.key.line, "blank", listOf(it.key.id, scene.name)) }
@@ -664,11 +679,11 @@ object LayoutCheck {
             val pad = scene.env.input.pad
             if (pad != null && pad !in padNeeds) {
                 padNeeds[pad] = padNeeds(keys)
-                padLacks(pad, keys)?.let { padLacks += it }
+                if (scrolls.isEmpty()) padLacks(pad, keys)?.let { padLacks += it }
             }
             if (bottomLeft == null && (layout.family == "number" || layout.family == "symbols")) bottomLeft = bottomLeft(layout.family, rows.lastOrNull()?.items.orEmpty())
         }
-        return Shown(errors.values.toList(), padNeeds, padLacks, blank.values.toList(), bottomLeft)
+        return Shown(errors.values.toList(), padNeeds, padLacks, blank.values.toList(), bottomLeft, tight.values.toList())
     }
 
     // what every number field needs of its pad: the digits by what they type, ⌫, Return, 返回
@@ -678,7 +693,10 @@ object LayoutCheck {
         return (0..9).map { it.toString() }.filter { it !in types } + listOf("backspace", "enter", "back").filter { it !in roles }
     }
 
-    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it
+    // the lowest compact landscape keyboard gives the built-in columns about 25 dp an item
+    private const val SCROLL_ITEM_DP = 20.0
+
+    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it; a scroll column shows a pad's own list
     private fun padLacks(pad: String, keys: List<ExpandedKey>): Finding? {
         val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet()
         val told = when (pad) {
@@ -738,6 +756,7 @@ object LayoutCheck {
             }
             for ((row, defaults) in rows) for (k in row.cells.filterIsInstance<Key>()) baseNamed[k.id] = (baseNamed[k.id] ?: false) || named(k, row.defaults.over(defaults))
         }
+        if (base.family == "number") LegacyNumberKeys.SENDS.keys.forEach { baseNamed.getOrPut(it) { false } }
         return layout.parts.filterIsInstance<Row>().flatMap { row ->
             row.cells.filterIsInstance<Key>().filter { k -> !named(k, row.defaults.over(layout.defaults)) && baseNamed[k.id] != false }
                 .map { Finding(it.line, "unnamed", listOf(it.id)) }

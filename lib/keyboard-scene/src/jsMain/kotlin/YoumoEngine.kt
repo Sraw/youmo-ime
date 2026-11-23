@@ -124,11 +124,11 @@ class YoumoLayout internal constructor(
 class YoumoMeasurer internal constructor(internal val measurer: TextMeasurer)
 
 @JsExport
-class YoumoScene internal constructor(internal val scene: Scene, internal val density: Double) {
+class YoumoScene internal constructor(internal val scene: Scene, internal val density: Double, internal val env: Env? = null) {
     val width: Double get() = scene.width
     val height: Double get() = scene.height
 
-    fun json(): dynamic = SceneJs.scene(scene)
+    fun json(): dynamic = SceneJs.scene(scene, env)
 
     fun text(): String = SceneText.of(scene)
 
@@ -191,7 +191,10 @@ object YoumoEngine {
         answer
     }
 
-    /** The app's own lists for the layout maker's page: `version`, `families`, `bases`, `pads`, `prefixes`, `builtIn`, `limits`, `keys`. */
+    /**
+     * The app's own lists for the layout maker's page: `version`, `families`, `bases`, `pads`, `prefixes`, `builtIn`,
+     * `limits`, `keys`, and the scroll columns' `scroll` (`lists`, `families`, `most` a board, `maxShow`).
+     */
     fun layoutFormat(): dynamic = obj(
         "version" to LayoutCheck.FEATURES.values.fold(LayoutCheck.BASE_VERSION) { v, f -> if (ThemeReader.newer(f, v)) f else v },
         "families" to LayoutCheck.FAMILIES.toTypedArray(),
@@ -201,7 +204,10 @@ object YoumoEngine {
         "builtIn" to (builtIns.layouts + builtIns.fragments.keys).sorted().toTypedArray(),
         "limits" to obj("bytes" to PackLayouts.MAX_BYTES.toInt(), "id" to LayoutCheck.MAX_ID, "name" to LayoutCheck.MAX_NAME),
         "keys" to LayoutCheck.KEYS.toTypedArray(),
+        "scroll" to SceneJs.scrollFormat(),
     )
+
+    fun scrollDefaults(): dynamic = SceneJs.scrollDefaults()
 
     fun screenLandscape(turned: Boolean, widthDp: Int): Boolean = ScreenShape.landscape(turned, widthDp)
 
@@ -269,7 +275,7 @@ object YoumoEngine {
         // a user's layout is styled by its based-on's name too, where the env names none
         val based = if (e.base == null && l.variantOf != l.layout.id) e.copy(base = l.variantOf) else e
         val built = builder(theme, based, measurer).build(l.layout, l.fragments)
-        result(built) { "scene" to YoumoScene(it, based.density) }
+        result(built) { "scene" to YoumoScene(it, based.density, based) }
     }
 
     /** `{ok, problems, sources: [{property, line, order}]}`: each property's winning style; [target] `{widget: "key", key, part?, states?}`. */

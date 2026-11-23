@@ -24,8 +24,11 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keys.First
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
+import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
@@ -858,7 +861,8 @@ class PopupOverridesFragmentTest {
         fun multiSelectsStripsChooseAKeyboardsKeysAllOrNone() {
             open()
             clickText(R.string.swipe_multi_select)
-            val strips = KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().toList()
+            val strips = KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().filter { it.isShown }.toList()
+            // the scroll lists' card has none
             assertEquals(8, strips.size)
             fun strip(form: String) = KeyboardHarness.all(board(form)).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().first()
             assertEquals(com.google.android.material.checkbox.MaterialCheckBox.STATE_UNCHECKED, strip("full").state)
@@ -951,6 +955,270 @@ class PopupOverridesFragmentTest {
                 assertTrue(upField.isShown)
                 dismiss()
             }
+        }
+    }
+
+    @RunWith(RobolectricTestRunner::class)
+    @Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+    class ScrollLists : EditorDialog() {
+
+        private val decor get() = st.activity.window.decorView
+        private val pref get() = AppPrefs.getInstance().internal.scrollLists
+        private fun store() = ScrollListStore.parse(pref.getValue())
+
+        private fun open(lists: String = "") {
+            prefs.set(pref, lists)
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+        }
+
+        private fun board(form: String): View = KeyboardHarness.all(decor).first { it.tag == "view:keys/board/$form" }
+        private fun body(form: String): View = KeyboardHarness.all(board(form)).first { it.hasOnClickListeners() }
+        private fun row(id: String): View = KeyboardHarness.all(decor).first { it.tag == "view:keys/scroll/$id" }
+
+        private fun editorOf(id: String): AlertDialog {
+            body("scroll").performClick()
+            st.idle()
+            row(id).performClick()
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        private fun AlertDialog.field() = KeyboardHarness.all(window!!.decorView).filterIsInstance<EditText>().first()
+        private fun AlertDialog.texts() = KeyboardHarness.all(window!!.decorView).filterIsInstance<TextView>().filter { it.isShown }.map { it.text.toString() }
+
+        @Test
+        @Uat("ST-218")
+        fun theScrollListsAreACardBeforeTheFunctionKeysARowEach() {
+            open()
+            val boards = KeyboardHarness.all(decor).mapNotNull { it.tag as? String }.filter { it.startsWith("view:keys/board/") }.toList()
+            assertEquals(boards.indexOf("view:keys/board/fn") - 1, boards.indexOf("view:keys/board/scroll"))
+            body("scroll").performClick()
+            st.idle()
+            ScrollDefaults.IDS.forEach { id -> assertTrue(id, row(id).isShown) }
+            // the number pad's row: its name and first six
+            val said = row(ScrollDefaults.NUMBER).contentDescription.toString()
+            assertEquals((listOf(st.s(R.string.scroll_list_number)) + listOf("+", "-", "*", "/", "%", ",")).joinToString(", "), said)
+            assertNull(androidx.core.view.ViewCompat.getStateDescription(row(ScrollDefaults.NUMBER)))
+        }
+
+        @Test
+        @Uat("ST-219")
+        fun aListsItemsAreAddedDeletedAndACommandAdded() {
+            open()
+            val command = KeyCommand.Copy
+            editorOf(ScrollDefaults.NUMBER).apply {
+                tapItem("+")
+                button(R.string.delete)
+                // a scroll list has no first
+                assertTrue(texts().none { it == st.s(R.string.long_press_make_first) })
+                button(R.string.scroll_list_add_command)
+                (ShadowDialog.getLatestDialog() as AlertDialog).listView.performItemClick(null, ScrollListStore.COMMANDS.indexOf(command), 0)
+                st.idle()
+                // drawn as its icon, said by its name; a text of the same name is another item
+                val label = st.s(org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks.of(command).label)
+                assertTrue(KeyboardHarness.all(window!!.decorView).any { it.contentDescription?.toString() == label && it.hasOnClickListeners() })
+                field().setText("copy y")
+                ok()
+            }
+            val want = ScrollDefaults.of(ScrollDefaults.NUMBER)!!.drop(1) + ScrollItem.Command(command.key) + ScrollItem.Text("copy") + ScrollItem.Text("y")
+            assertEquals(want, store()[ScrollDefaults.NUMBER])
+            // the card says one category is changed, and its row is marked
+            val selected = st.s(R.string.shortcut_card_selected)
+            assertEquals(st.s(R.string.scroll_lists_card_edited, selected, 1), androidx.core.view.ViewCompat.getStateDescription(body("scroll")).toString())
+            assertNotNull(androidx.core.view.ViewCompat.getStateDescription(row(ScrollDefaults.NUMBER)))
+            // no undo step: undo is the long presses' and swipes'
+            assertFalse(menuItem(R.string.undo).isEnabled)
+        }
+
+        @Test
+        @Uat("ST-218")
+        fun onlyTheNineKeysListsOfferNotConvertingAndNoneLeftCannotBeKept() {
+            open()
+            editorOf(ScrollDefaults.NUMBER).apply {
+                assertTrue(texts().none { it == st.s(R.string.text_as_is) || it == st.s(R.string.text_variables_use) })
+                // every item can be dragged; left and right stay
+                val items = KeyboardHarness.all(window!!.decorView).filter { it.contentDescription?.toString() == "+" && it.hasOnClickListeners() }.toList()
+                assertTrue(items.single().isLongClickable)
+                tapItem("+")
+                repeat(ScrollDefaults.of(ScrollDefaults.NUMBER)!!.size) { button(R.string.delete) }
+                assertFalse(getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
+                assertTrue(st.s(R.string.scroll_list_keep_one) in texts())
+                dismiss()
+            }
+            st.idle()
+            assertFalse(store().isSet(ScrollDefaults.NUMBER))
+            editorOf(ScrollDefaults.NINE).apply {
+                assertTrue(st.s(R.string.text_as_is) in texts())
+                assertTrue(texts().none { it == st.s(R.string.text_variables_use) })
+                dismiss()
+            }
+        }
+
+        // a long press's items are never dragged
+        @Test
+        @Uat("ST-218")
+        fun aLongPressEditorsItemsAreNotHeld() {
+            open()
+            clickText(R.string.shortcut_page_g14)
+            dialogOf("QW").apply {
+                val q = KeyboardHarness.all(window!!.decorView).first { it.contentDescription?.toString() == "q" && it.hasOnClickListeners() }
+                assertFalse(q.isLongClickable)
+                dismiss()
+            }
+        }
+
+        @Test
+        @Uat("ST-218")
+        fun aListIsPutBackAloneOrWithEverythingByResetAll() {
+            val set = ScrollListStore.Empty.with(ScrollDefaults.URL, listOf(ScrollItem.Text("/"))).with(ScrollDefaults.EMAIL, listOf(ScrollItem.Text("@")))
+            open(set.serialize())
+            editorOf(ScrollDefaults.URL).apply {
+                getButton(AlertDialog.BUTTON_NEUTRAL).performClick()
+                st.idle()
+            }
+            assertFalse(store().isSet(ScrollDefaults.URL))
+            assertTrue(store().isSet(ScrollDefaults.EMAIL))
+            // a default list has no 恢复默认
+            editorOf(ScrollDefaults.URL).apply {
+                assertFalse(getButton(AlertDialog.BUTTON_NEUTRAL).isShown)
+                dismiss()
+            }
+            st.idle()
+            // the long presses are all default: still enabled, for the scroll list
+            assertTrue(menuItem(R.string.reset_all).isEnabled)
+            val item = menuItem(R.string.reset_all)
+            item.javaClass.getMethod("invoke").invoke(item)
+            st.idle()
+            (ShadowDialog.getLatestDialog() as AlertDialog).ok()
+            assertFalse(store().isSet(ScrollDefaults.EMAIL))
+        }
+
+        private fun resetAll(): AlertDialog {
+            val item = menuItem(R.string.reset_all)
+            item.javaClass.getMethod("invoke").invoke(item)
+            st.idle()
+            return ShadowDialog.getLatestDialog() as AlertDialog
+        }
+
+        private fun AlertDialog.message() = findViewById<TextView>(android.R.id.message)!!.text.toString()
+
+        // the one step that changes both: its 撤销 puts the scroll lists back with the long presses
+        @Test
+        fun undoAfterResetAllBringsTheScrollListsBackToo() {
+            val set = ScrollListStore.Empty.with(ScrollDefaults.NUMBER, listOf(ScrollItem.Text("#"))).serialize()
+            val keys = KeyLists.HEADER + "\nfull/q\toff"
+            prefs.set(pref, set)
+            prefs.set(AppPrefs.getInstance().internal.keyLists, keys)
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            resetAll().ok()
+            assertFalse(store().isSet(ScrollDefaults.NUMBER))
+            undo()
+            assertEquals(set, pref.getValue())
+            assertEquals(keys, AppPrefs.getInstance().internal.keyLists.getValue())
+            // the scroll lists alone changed: a step too
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
+            st.open(SettingsRoute.PopupOverrides)
+            resetAll().ok()
+            assertTrue(menuItem(R.string.undo).isEnabled)
+            undo()
+            assertEquals(set, pref.getValue())
+        }
+
+        // a later version's are left as they are, so the question names only what is put back
+        @Test
+        fun resetAllSaysOnlyWhatItPutsBack() {
+            prefs.set(pref, ScrollListStore.Empty.with(ScrollDefaults.NUMBER, listOf(ScrollItem.Text("#"))).serialize())
+            prefs.set(AppPrefs.getInstance().internal.keyLists, "@9\nfull/q\toff")
+            st.activity
+            st.open(SettingsRoute.PopupOverrides)
+            resetAll().apply {
+                assertEquals(st.s(R.string.reset_all_scroll_lists_message), message())
+                dismiss()
+            }
+            prefs.set(pref, "@9\nnumber\tt|x")
+            prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER + "\nfull/q\toff")
+            st.open(SettingsRoute.PopupOverrides)
+            resetAll().apply {
+                assertEquals(st.s(R.string.reset_all_long_presses_only_message), message())
+                dismiss()
+            }
+        }
+
+        // what is typed is added at OK, so it alone can be kept
+        @Test
+        fun aListEmptiedThenTypedCanBeKept() {
+            open()
+            editorOf(ScrollDefaults.DATETIME).apply {
+                tapItem("-")
+                repeat(ScrollDefaults.of(ScrollDefaults.DATETIME)!!.size) { button(R.string.delete) }
+                assertFalse(getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
+                field().setText("+")
+                assertTrue(getButton(AlertDialog.BUTTON_POSITIVE).isEnabled)
+                ok()
+            }
+            assertEquals(listOf(ScrollItem.Text("+")), store()[ScrollDefaults.DATETIME])
+        }
+
+        // a fixed cell broke `.com` inside the word, showing `.co`
+        @Test
+        @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+        fun aRowsItemsAreWhole() {
+            open()
+            body("scroll").performClick()
+            st.idle()
+            val com = KeyboardHarness.all(row(ScrollDefaults.URL)).filterIsInstance<TextView>().first { it.text.toString() == ".com" }
+            val layout = com.layout!!
+            assertEquals(".com".length, layout.getLineEnd(0))
+            assertEquals(0, layout.getEllipsisCount(0))
+            assertTrue(layout.getLineWidth(0) <= com.width - com.paddingLeft - com.paddingRight)
+        }
+
+        @Test
+        fun multiSelectLeavesTheScrollListsCardOut() {
+            open()
+            clickText(R.string.swipe_multi_select)
+            fun strips(form: String) = KeyboardHarness.all(board(form)).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().filter { it.isShown }
+            assertTrue(strips("scroll").none())
+            assertTrue(strips("full").any())
+        }
+
+        @Test
+        fun aLaterVersionsListsAreShownNotWritten() {
+            val later = "@9\nnumber\tt|x"
+            open(later)
+            body("scroll").performClick()
+            st.idle()
+            assertTrue(st.s(R.string.scroll_list_newer) in st.texts())
+            row(ScrollDefaults.NUMBER).performClick()
+            st.idle()
+            val d = ShadowDialog.getLatestDialog() as AlertDialog
+            assertEquals(st.s(R.string.scroll_list_newer), d.findViewById<TextView>(android.R.id.message)!!.text.toString())
+            d.ok()
+            assertEquals(later, pref.getValue())
+        }
+
+        @Test
+        fun theLongPressMenusRouteOpensItsListsEditor() {
+            open()
+            st.open(SettingsRoute.ScrollList(ScrollDefaults.URL))
+            val d = ShadowDialog.getLatestDialog() as AlertDialog
+            assertTrue(d.isShowing)
+            assertTrue(st.s(R.string.scroll_list_url) in KeyboardHarness.all(d.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList())
+            assertTrue(body("scroll").createAccessibilityNodeInfo().isChecked)
+        }
+
+        @Test
+        fun searchFindsEachList() {
+            val entries = PopupOverridesFragment.searchEntries(st.activity)
+            val titles = entries.map { it.title }
+            assertTrue(st.s(R.string.scroll_lists) in titles)
+            ScrollDefaults.IDS.forEach { id ->
+                assertTrue(id, entries.any { it.id == "view:keys/scroll/$id" })
+            }
+            assertTrue("${st.s(R.string.scroll_lists)} · ${st.s(R.string.scroll_list_url)}" in titles)
         }
     }
 

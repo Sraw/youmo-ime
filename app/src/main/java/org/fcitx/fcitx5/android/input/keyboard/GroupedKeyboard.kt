@@ -148,11 +148,9 @@ class GroupedKeyboard private constructor(
         }
     }
 
-    override var address: AddressKeys = AddressKeys.NONE
-        set(value) {
-            field = value
-            canvas?.invalidateScene()
-        }
+    override fun onAddressChanged() {
+        canvas?.invalidateScene()
+    }
 
     private fun groupPlaces(): List<Pair<Char, ScenePlace>> =
         canvas?.shownKeys.orEmpty().mapNotNull { k -> k.letters?.let { it.group[0] to scenePlace(k.id, k.copy == 1) } }

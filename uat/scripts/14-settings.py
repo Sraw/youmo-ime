@@ -2,6 +2,7 @@
 前提/操作/预期."""
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -3048,3 +3049,128 @@ def st216(d):
           f"退格键上不是 APNG 的第一帧、一直不动（红 {first[0]}、{later[0]}，蓝 {first[1]}、{later[1]}）")
     mn.delete_themes(d)
     return f"退格键红 {first[0]}、{later[0]}，蓝 {first[1]}、{later[1]}"
+
+
+def scroll_list_edit(d, name):
+    """the 滑动列 card's row [name] tapped: its editor up"""
+    slots_tab(d, "滑动列")
+    d.tap_text(name, after=1.5)
+    d.wait_text("确定", timeout=5, where="all")
+
+
+def scroll_list_drop(d, items):
+    """[items] deleted from the open 滑动列 editor, one by one"""
+    for item in items:
+        n = next((n for n in d.screen().app() if n.clickable and n.desc == item), None)
+        if not n:
+            raise Blocked(f"编辑框里没有 {item}")
+        d.tap(n.c, 0.4)
+        # a delete leaves the next item selected: tapping it then unselects it, 删除 greyed
+        if not any(n.text == "删除" and n.enabled for n in d.screen().app()):
+            d.tap(n.c, 0.4)
+        d.tap_text("删除", scroll=False, after=0.4)
+
+
+def scroll_list_add(d, text):
+    """[text] (letters and . typed in English, anything else sent as a hardware key) added to the open
+    滑动列 editor"""
+    e = next((n for n in d.screen().app() if n.cls.endswith("EditText") and n.text in ("", "添加字符，空格分隔")), None)
+    if not e:
+        raise Blocked("编辑框里没有添加字符的框")
+    d.tap(e.c, 0.8)
+    d.need_keyboard()
+    for _ in range(3):
+        if "英文" in d.im_label():
+            break
+        d.press("globe", after=0.8)
+        d._keys = None
+    for ch in text:
+        if ch.isalpha() or ch == ".":
+            d.type(ch)
+            continue
+        # a hardware key, English passing it through as is (the soft keyboard turns to its 实体键盘 bar)
+        d.sh(f"input text {shlex.quote(ch)}")
+        time.sleep(0.5)
+        s = d.screen()
+        # the toolbar's button, or with no toolbar the small floating one (it has no description)
+        bar = s.find(desc="显示屏幕键盘", where="ime") or next(
+            (n for n in s.nodes if n.pkg.startswith("io.github.sraw.youmo") and n.cls == "View"
+             and n.b[2] - n.b[0] < 200 and n.b[3] - n.b[1] < 200), None)
+        if bar and not s.find(rid="keyboard_view", where="ime"):
+            d.tap(bar.c, 0.8)
+    add = d.screen().find(text="添加")
+    if not add:
+        raise Blocked("编辑框里没有「添加」")
+    d.tap(add.c, 0.6)
+    d.sh("input keyevent 4")   # the keyboard down: 确定 under it
+    time.sleep(0.8)
+
+
+@case("ST-220", base="B0-设置", mutates=True, visual=True)
+def st220(d):
+    p = script("04-panels")
+    url = ["/", ".", ".com", ":", "-", "_", "?", "=", "&", "#", ".cn", ".net", ".org"]
+    scroll_list_edit(d, "网址")
+    scroll_list_drop(d, url[1:])
+    scroll_list_add(d, ".io")
+    d.shot("app", "网址那一类改成 / .io")
+    dialog_ok(d)
+    scroll_list_edit(d, "电话")
+    scroll_list_add(d, ";")
+    dialog_ok(d)
+    d.open_page("url")
+    d.clear()
+    p.key(d, "numbers")
+    on_url = p.column_all(d)
+    d.shot("kb", "网址框里数字键盘的列：/ .io")
+    d.open_page("text")
+    d.clear()
+    p.key(d, "numbers")
+    plain = p.column_all(d)
+    d.open_page("tel")
+    tel = p.column_all(d)
+    d.shot("kb", "电话框的列：最后是 ;")
+    check(on_url == ["/", ".io"], f"网址框里的列是 {on_url}")
+    check(plain == ["+", "-", "*", "/", "%", ",", ":", "(", ")", "#"], f"普通框数字键盘的列是 {plain}")
+    check(tel and tel[-1] == ";" and ";" not in plain + on_url, f"电话框的列是 {tel}")
+    return f"网址框 {on_url}；普通框 {plain}；电话框 {tel}"
+
+
+@case("ST-221", base="B0-设置", mutates=True, visual=True)
+def st221(d):
+    p = script("04-panels")
+    push_layout(d, "uat-qwerty-scroll")
+    import_layout(d, "uat-qwerty-scroll")
+    d.wait_text("导入布局 UAT 26 键滑动列？", timeout=8, where="all")
+    # the confirm box lists author, version, licence and description; min-app only refuses an older build
+    d.shot("app", "导入确认框：没有拒收（文件写着 min-app 0.6.3）")
+    d.tap_text("导入", where="all", scroll=False, after=3.0)
+    d.wait_text("现在就用在", timeout=6, where="all", contains=True)
+    d.tap_text("拼音", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
+    d.open_page("text")
+    d.clear()
+    v = p.column_node(d)
+    check(v.cls == "HorizontalScrollView", f"滑动列是 {v.cls}")
+    first = p.column_texts(d)
+    d.shot("kb", "26 键底排上面一条横的滑动列，一屏 6 项")
+    every = p.column_all(d)
+    check(len(every) > len(first), f"左右滑没有更多：{first} → {every}")
+    p.column_tap(d, every[0])
+    t = d.field_text() or ""
+    check(t in ("，", ","), f"点「{every[0]}」打出「{t}」")
+    k = d.keys(refresh=True)
+    d.swipe(k["space"], (k["space"][0] - 200, k["space"][1]), 400, after=0.6)
+    t2 = d.field_text() or ""
+    check(t2 == t, f"空格上滑动后框里「{t2}」")
+    d.open_page("url")
+    url = p.column_all(d)
+    check(url[:3] == ["/", ".", ".com"], f"网址框里的列是 {url}")
+    d.open_page("tel")
+    check(p.wait_board(d, "数字") == "数字", f"电话框是{p.board(d)}键盘")
+    p.key(d, "back")
+    check(p.wait_board(d, "字母") == "字母", f"电话框返回后是{p.board(d)}")
+    tel = p.column_all(d)
+    d.shot("kb", "电话框里点返回到 26 键：列是电话那一类")
+    check(tel == ["+", "*", "#", "-", "(", ")", ","], f"电话框 26 键上的列是 {tel}")
+    return f"确认框照常；列 {every}，点打出「{t}」；网址 {url[:4]}…；电话 {tel}"

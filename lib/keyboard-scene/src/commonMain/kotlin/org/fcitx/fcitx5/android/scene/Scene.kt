@@ -4,9 +4,11 @@
  */
 package org.fcitx.fcitx5.android.scene
 
+import org.fcitx.fcitx5.android.scene.layout.Direction
 import org.fcitx.fcitx5.android.scene.layout.Letters
 import org.fcitx.fcitx5.android.scene.layout.MenuItem
 import org.fcitx.fcitx5.android.scene.layout.Popup
+import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.theme.Argb
 
 /** What the engine makes of a layout, a theme and an environment, in px: plain data, the same on the JVM and in JS. */
@@ -119,7 +121,16 @@ sealed interface KeyEffect {
     }
 }
 
-class SlotNode(val kind: String, val id: String?, val bounds: Box, val ops: List<Op> = emptyList(), val ink: Ink? = null)
+class SlotNode(
+    val kind: String,
+    val id: String?,
+    val bounds: Box,
+    val ops: List<Op> = emptyList(),
+    val ink: Ink? = null,
+    val list: String? = null,
+    val direction: Direction = Direction.Vertical,
+    val show: Int = Slot.DEFAULT_SHOW,
+)
 
 data class Ink(val color: Argb, val width: Double)
 

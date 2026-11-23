@@ -9,6 +9,7 @@ import android.content.Intent
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.host.QuickPhraseBook
 import org.fcitx.fcitx5.android.host.QuickPhraseEntry
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.ui.main.ClipboardEditActivity
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
@@ -34,6 +35,7 @@ object AppUtil {
     fun isLaunchRoute(route: SettingsRoute) = when (route) {
         SettingsRoute.Keys, SettingsRoute.InputMethodList, SettingsRoute.Theme, SettingsRoute.Packs,
         is SettingsRoute.InputMethodConfig, is SettingsRoute.QuickPhrase -> true
+        is SettingsRoute.ScrollList -> ScrollDefaults.of(route.id) != null
         else -> false
     }
 
@@ -45,6 +47,10 @@ object AppUtil {
 
     fun launchMainToInputMethodList(context: Context) =
         launchMainToDest(context, SettingsRoute.InputMethodList)
+
+    /** A scroll list's editor, from its long press menu. */
+    fun launchMainToScrollList(context: Context, id: String) =
+        launchMainToDest(context, SettingsRoute.ScrollList(id))
 
     fun launchMainToThemeList(context: Context) =
         launchMainToDest(context, SettingsRoute.Theme)

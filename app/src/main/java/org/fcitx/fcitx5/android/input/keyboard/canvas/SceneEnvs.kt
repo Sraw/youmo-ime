@@ -14,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 
@@ -60,6 +61,8 @@ object SceneEnvs {
         texts: Texts = Texts(),
         marks: MarkSettings = MarkSettings(),
         resized: Boolean = true,
+        /** Settings' cards: the lists as being edited; the keyboard's own shows none, the column draws them. */
+        scrollItems: Map<String, List<ScrollItem>>? = null,
     ): Env {
         val context = view.context
         val floating = if (context.inInputMethod() && KeyboardStyles.floating(context)) KeyboardArea.floatingSize(KeyboardArea.screen(context)) else null
@@ -80,6 +83,7 @@ object SceneEnvs {
             texts = texts,
             marks = marks,
             typed = typing.takeIf { context.inInputMethod() },
+            scrollItems = scrollItems,
         )
     }
 }

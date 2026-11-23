@@ -35,13 +35,15 @@ import com.google.android.material.R as MaterialR
 
 /**
  * The long press editor's item marks (使用变量, 不转中文标点): toggles on the button row, the line over it, and the
- * check boxes by [field]. [convertible]: the marks a Chinese punctuation table converts; [changed] redraws the editor.
+ * check boxes by [field]. [convertible]: the marks a Chinese punctuation table converts; [changed] redraws the editor;
+ * [offered]: the marks shown (a scroll list's 不转中文标点 at most).
  */
 class PopupItemMarks(
     private val ctx: Context,
     private val editor: PopupEditor,
     private val field: EditText,
     private val convertible: Set<String>,
+    private val offered: List<ItemMark> = ItemMark.entries,
     private val changed: () -> Unit,
 ) {
     /** Always one line so nothing under it moves: a hint with nothing selected, what a variable item types now, else blank. */
@@ -51,7 +53,7 @@ class PopupItemMarks(
         ellipsize = TextUtils.TruncateAt.END
     }
 
-    private val toggles = MARKS.map { (mark, title) ->
+    private val toggles = MARKS.filter { it.first in offered }.map { (mark, title) ->
         val button = textButton(ctx, title).apply {
             isCheckable = true
             // a text button has no border: a toggle on is filled, so on and off tell apart
@@ -72,8 +74,14 @@ class PopupItemMarks(
         setText(R.string.text_as_is_hint)
         isVisible = false
     }
-    private val addVariables = CheckBox(ctx).apply { setText(R.string.text_variables_use) }
-    private val addAsIs = CheckBox(ctx).apply { setText(R.string.text_as_is) }
+    private val addVariables = CheckBox(ctx).apply {
+        setText(R.string.text_variables_use)
+        isVisible = ItemMark.Variables in offered
+    }
+    private val addAsIs = CheckBox(ctx).apply {
+        setText(R.string.text_as_is)
+        isVisible = ItemMark.AsIs in offered
+    }
 
     init {
         addVariables.setOnCheckedChangeListener { _, on ->

@@ -1,9 +1,4 @@
-*: shortcut=null bothWays=false actions=[press SymAction(sym=0xffaa, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
-+: shortcut=null bothWays=false actions=[press SymAction(sym=0xffab, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
-,: shortcut=null bothWays=false actions=[press SymAction(sym=0xffac, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
--: shortcut=null bothWays=false actions=[press SymAction(sym=0xffad, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
 .: shortcut=null bothWays=false actions=[press SymAction(sym=0xffae, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
-/: shortcut=null bothWays=false actions=[press SymAction(sym=0xffaf, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
 0: shortcut=num/0 bothWays=false actions=[press SymAction(sym=0xffb0, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
 1: shortcut=num/1 bothWays=false actions=[press SymAction(sym=0xffb1, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
 2: shortcut=num/2 bothWays=false actions=[press SymAction(sym=0xffb2, states=KeyStates(states=536870928))] popups=[] sound=Standard space=false backspace=false enabled=true
@@ -18,5 +13,6 @@
 back: shortcut=null bothWays=false actions=[press LayoutSwitchAction(act=Text)] popups=[] sound=Standard space=false backspace=false enabled=true
 backspace: shortcut=backspace bothWays=true actions=[press SymAction(sym=0xff08, states=KeyStates(states=536870912)), repeat SymAction(sym=0xff08, states=KeyStates(states=536870912))] popups=[] sound=Delete space=false backspace=true enabled=true
 enter: shortcut=return bothWays=false actions=[press SymAction(sym=0xff0d, states=KeyStates(states=536870912))] popups=[menu [PickerSwitchAction(key=null)]] sound=Return space=false backspace=false enabled=true
+lock: shortcut=null bothWays=false actions=[press PanelLockAction] popups=[] sound=Standard space=false backspace=false enabled=true
 space: shortcut=space bothWays=true actions=[long SpaceLongPressAction(pointer=-1), press SymAction(sym=0x0020, states=KeyStates(states=536870912))] popups=[] sound=SpaceBar space=true backspace=false enabled=true
 symbols: shortcut=symbols bothWays=false actions=[long QuickPhraseAction, press LayoutSwitchAction(act=Symbol)] popups=[] sound=Standard space=false backspace=false enabled=true

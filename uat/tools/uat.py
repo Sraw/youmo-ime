@@ -413,7 +413,7 @@ def _load_scripts(areas, files):
 
 class Node:
     __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "a11y", "selected",
-                 "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt")
+                 "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt", "actions")
 
     def __init__(self, e, parent):
         # an empty field reports its hint as its text; fields.html's placeholder is zero-width spaces
@@ -435,6 +435,8 @@ class Node:
         # a key the canvas draws: its scene id and corner (Dumper's, from the node's extras); "" for others
         self.key = e.get("key") or ""
         self.alt = e.get("alt") or ""
+        # custom accessibility actions by label (Dumper's), [] for none
+        self.actions = [x for x in (e.get("actions") or "").split("|") if x]
         self.parent, self.kids = parent, []
 
     @property
@@ -771,8 +773,10 @@ class Device:
         """the composing row's text (its left part, code_row_text), None when it is not up. The id is
         looked for first: the syllable strip beside it (code_row_syllables) scrolls too"""
         s = s or self.screen()
+        kb = s.find(rid="keyboard_view", where="ime")
+        # a layout's horizontal scroll column sits inside the keys' view
         return s.find(rid="code_row_text", where="ime") or \
-            next((n for n in s.ime() if n.cls == "HorizontalScrollView"), None)
+            next((n for n in s.ime() if n.cls == "HorizontalScrollView" and not (kb and n.b[1] >= kb.b[1])), None)
 
     def preedit(self, s=None):
         row = self.code_row(s)
@@ -1376,12 +1380,11 @@ class Device:
             # near the field's bottom-right corner: in a field with text the cursor lands at its end
             at = (f.b[2] - 40, f.b[3] - 25) if f.b[3] - f.b[1] > 150 else f.c
             self.tap(at, 0.8)
-            if self.kb_plugged():
-                # with a hardware keyboard a tap in a web field tells the input method nothing; the touch keyboard comes back by its button
-                s = self.screen()
-                b = s.find(desc="显示屏幕键盘", where="ime")
-                if b and not s.find(rid="keyboard_view", where="ime"):
-                    self.tap(b.c, 0.8)
+            # after a hardware key (one plugged, or adb's input text) a tap in a web field tells the input method nothing; the touch keyboard comes back by its button
+            s = self.screen()
+            b = s.find(desc="显示屏幕键盘", where="ime")
+            if b and not s.find(rid="keyboard_view", where="ime"):
+                self.tap(b.c, 0.8)
             try:
                 self.need_keyboard(8 + 8 * i)
                 break
@@ -1648,7 +1651,9 @@ class Device:
             s = self.screen()
             top = [n for n in s.ime() if n.rid == "candidate_view" or n.desc == "展开工具栏"]
             kb = s.find(rid="input_window", where="ime")
-            y0 = min((n.b[1] for n in s.ime() if n.cls == "HorizontalScrollView"), default=None)
+            keys = s.find(rid="keyboard_view", where="ime")
+            # the candidate bar's, not a layout's horizontal scroll column among the keys
+            y0 = min((n.b[1] for n in s.ime() if n.cls == "HorizontalScrollView" and not (keys and keys.b[1] <= n.b[1] < keys.b[3])), default=None)
             if y0 is None:
                 y0 = min((n.b[1] for n in top), default=kb.b[1] if kb else H // 2)
             y1 = kb.b[3] if kb else H

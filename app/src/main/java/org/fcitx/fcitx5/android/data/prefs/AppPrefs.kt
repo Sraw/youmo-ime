@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.input.keyboard.VoiceEndMark
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
 import org.fcitx.fcitx5.android.input.keys.KeyListsMigration
+import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -91,6 +92,9 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
          * is stored ([storedKeyLists]), never through this, which reads the default where nothing is.
          */
         val keyLists = string(KEY_LISTS, KeyLists.HEADER)
+
+        /** The scroll lists the user set ([ScrollListStore]); not `hidden`, for the reason [keyLists] is not. */
+        val scrollLists = string(SCROLL_LISTS, ScrollListStore.HEADER)
 
         /**
          * The bar's buttons, their order and which show (ToolbarConfig.serialize; empty, as
@@ -711,6 +715,15 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             }
         }
 
+    // the keyboard's long press menu changes them with no settings page stopping after to sync
+    @Keep
+    private val scrollListsFollowed = ManagedPreference.OnChangeListener<String> { _, value ->
+        PreferenceManager.getDefaultSharedPreferences(appContext.createDeviceProtectedStorageContext()).edit { putString(SCROLL_LISTS, value) }
+    }
+
+    /** Unlocked: the device-protected copy of [Internal.scrollLists] kept as it is changed, for a restart before the next unlock. */
+    fun followScrollListsInDeviceEncryptedStorage() = internal.scrollLists.registerOnChangeListener(scrollListsFollowed)
+
     fun syncToDeviceEncryptedStorage() {
         val ctx = appContext.createDeviceProtectedStorageContext()
         val sp = PreferenceManager.getDefaultSharedPreferences(ctx)
@@ -722,6 +735,8 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
                 internal.keySwipes,
                 // the bar is there before the first unlock too
                 internal.toolbarButtons,
+                // the nine keys' and the number pad's column, there before the first unlock too
+                internal.scrollLists,
                 advanced.disableAnimation,
                 advanced.keyboardMotion,
             ).forEach {
@@ -981,6 +996,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         // 0.6's long presses of every key (060-keys-unify), and 0.5's and the betas' they are made of
         const val KEY_LISTS = "key_lists"
+        const val SCROLL_LISTS = "scroll_lists"
         const val POPUP_OVERRIDES = "popup_overrides"
         const val KEY_POPUPS = "key_popups"
         const val T9_SYMBOLS = "t9_symbols"

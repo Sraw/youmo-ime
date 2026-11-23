@@ -10,6 +10,12 @@ import org.fcitx.fcitx5.android.scene.Point
 import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.Shape
+import org.fcitx.fcitx5.android.scene.SlotNode
+import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 
 /** Plain JS objects of the engine's values, for a page: what it reads of a scene (never its ops: [CanvasPainter] draws them). */
 internal object SceneJs {
@@ -43,9 +49,9 @@ internal object SceneJs {
     /**
      * [scene] as a page reads it: its size and board, its keys (id, which copy, kind, role, states, shape, cell,
      * touch area, middle, up, texts as shown, what a screen reader says, actions, long press as written) and
-     * slots, in drawing order; warnings as problems.
+     * slots, in drawing order (a column's with the category [env] shows and its items); warnings as problems.
      */
-    fun scene(scene: Scene): dynamic = obj(
+    fun scene(scene: Scene, env: Env? = null): dynamic = obj(
         "width" to scene.width,
         "height" to scene.height,
         "board" to box(scene.board),
@@ -53,8 +59,26 @@ internal object SceneJs {
         "popups" to scene.popups,
         "warnings" to problems(scene.warnings),
         "keys" to scene.keys.map(::key).toTypedArray(),
-        "slots" to scene.slots.map { obj("kind" to it.kind, "id" to it.id, "bounds" to box(it.bounds)) }.toTypedArray(),
+        "slots" to scene.slots.map {
+            val shown = env?.let { e -> shown(it, e) }
+            obj(
+                "kind" to it.kind, "id" to it.id, "bounds" to box(it.bounds), "list" to it.list, "direction" to it.direction.xml, "show" to it.show,
+                "shown" to shown,
+                "items" to shown?.let { id -> items(id, env) },
+            )
+        }.toTypedArray(),
     )
+
+    // the category the column shows in [e]'s field and input method, as the app picks it; null where it shows syllables
+    private fun shown(s: SlotNode, e: Env): String? {
+        if (s.kind != LayoutReader.SCROLL && s.kind != ScrollLists.NINE_SIDE) return null
+        val i = e.input
+        return (ScrollLists.shown(s.kind, s.list, i.field, i.fieldPad, i.pad, i.ime, i.composing) as? ScrollLists.Shown.Category)?.id
+    }
+
+    private fun items(id: String, e: Env): Array<dynamic> = (e.scrollItems?.get(id) ?: ScrollDefaults.of(id).orEmpty()).map { item ->
+        obj("label" to ScrollLists.label(id, item, e.input.ime, e.texts.punctuation), "command" to (item as? ScrollItem.Command)?.key)
+    }.toTypedArray()
 
     private fun key(k: KeyNode): dynamic = obj(
         "id" to k.id,
@@ -83,5 +107,25 @@ internal object SceneJs {
         "sound" to k.sound,
         "shortcut" to k.shortcut,
         "letters" to k.letters?.rows?.toTypedArray(),
+    )
+
+    /** The scroll columns' `lists`, the `families` they go on, the `most` a board has and `maxShow`. */
+    fun scrollFormat(): dynamic = obj(
+        "lists" to ScrollDefaults.IDS.toTypedArray(),
+        "families" to LayoutReader.SCROLL_FAMILIES.toTypedArray(),
+        "most" to LayoutReader.MAX_SCROLLS,
+        "maxShow" to LayoutReader.MAX_SHOW,
+    )
+
+    /** The scroll lists' categories, in the settings' order, each its built-in items as an env's `scrollItems` takes them. */
+    fun scrollDefaults(): dynamic = obj(
+        *ScrollDefaults.IDS.map { id ->
+            id to ScrollDefaults.of(id).orEmpty().map { item ->
+                when (item) {
+                    is ScrollItem.Text -> obj("text" to item.text, "asIs" to item.asIs)
+                    is ScrollItem.Command -> obj("command" to item.key)
+                }
+            }.toTypedArray()
+        }.toTypedArray(),
     )
 }

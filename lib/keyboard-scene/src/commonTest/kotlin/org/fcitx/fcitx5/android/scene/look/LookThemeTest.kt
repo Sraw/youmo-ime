@@ -390,7 +390,7 @@ class LookThemeTest {
         val slice = NineSlice("/data/themes/t/key.png", Insets(1, 2, 3, 4), 2)
         val base = LookDefaults.look(palette(themeFile("material-light.xml")))
         val layout = (LayoutReader.layout(testData("number.xml")) as Parsed.Ok).value
-        for ((id, pad) in listOf("*" to "full", "," to "full", "." to "full", ":" to "datetime")) {
+        for ((id, pad) in listOf("=" to "full", "." to "full", "." to "datetime", "0" to "phone")) {
             val look = base.copy(keys = base.keys.copy(overrides = mapOf("number/$id" to KeyOverride(KeyFill.Image(slice), null, KeyLabel.Hide))))
             val env = portrait.copy(input = portrait.input.copy(pad = pad))
             val built = SceneBuilder(theme(LookTheme.xml(look, "T", false)), env, measurer).build(layout, emptyMap())

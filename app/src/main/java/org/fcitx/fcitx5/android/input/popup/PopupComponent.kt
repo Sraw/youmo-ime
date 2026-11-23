@@ -380,7 +380,7 @@ class PopupComponent :
         showPopupContainer(key, keyboardUi, "popup")
     }
 
-    private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect) {
+    private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect, disabled: Set<Int>) {
         val scenes = scenesFor(key) ?: return
         val menuUi = PopupMenuUi(
             context,
@@ -391,6 +391,7 @@ class PopupComponent :
             menu.items,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             scenes = scenes,
+            disabled = disabled,
         )
         if (menuUi.unmade) return
         showingEntryUi[key]?.let {
@@ -409,7 +410,7 @@ class PopupComponent :
             KeyDef.Popup.Menu.Item(context.getString(looks.label), looks.icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
         }
         val disabled = cells.indices.filter { EditMenuLayout.disabled(cells[it], password) }.toSet()
-        return showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(EditMenuLayout.START, disabled, down = down), cell)
+        return showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(EditMenuLayout.START, down = down), disabled, cell)
     }
 
     private fun showInputMethodMenu(key: KeyRef, bounds: Rect, down: Boolean): Boolean {
@@ -428,12 +429,12 @@ class PopupComponent :
                 InputMethodMenu.Cell.More -> KeyDef.Popup.Menu.Item(context.getString(R.string.input_method_menu_more), 0, KeyAction.ShowInputMethodPickerAction)
             }
         }
-        return showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(menu.start, menu.disabled, down = down), width)
+        return showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(menu.start, down = down), menu.disabled, width)
     }
 
     /** A row picked by the finger's travel, [fixed]'s start over the key, where notices go ([EditMenuLayout.place]). */
     private fun showFixedMenu(
-        key: KeyRef, bounds: Rect, scenes: PopupScenes, items: List<KeyDef.Popup.Menu.Item>, fixed: PopupMenuUi.Fixed, cellWidth: Int,
+        key: KeyRef, bounds: Rect, scenes: PopupScenes, items: List<KeyDef.Popup.Menu.Item>, fixed: PopupMenuUi.Fixed, disabled: Set<Int>, cellWidth: Int,
     ): Boolean {
         val cell = scenes.px(Popups.MENU_CELL_DP)
         // out from under the finger; a notice there put away
@@ -448,8 +449,9 @@ class PopupComponent :
             { dismissPopup(key) },
             items.toTypedArray(),
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
-            fixed = PopupMenuUi.Fixed(fixed.start, fixed.disabled, at, fixed.down),
+            fixed = PopupMenuUi.Fixed(fixed.start, at, fixed.down),
             scenes = scenes,
+            disabled = disabled,
         )
         if (menuUi.unmade) return false
         showingEntryUi[key]?.let {
@@ -569,7 +571,7 @@ class PopupComponent :
                 is PopupAction.PreviewAction -> showPopup(key, content, bounds)
                 is PopupAction.PreviewUpdateAction -> updatePopup(key, content, words)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds)
-                is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds)
+                is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds, disabled)
                 is PopupAction.ShowEditMenuAction -> outShown = showEditMenu(key, bounds, password, down)
                 is PopupAction.ShowInputMethodMenuAction -> outShown = showInputMethodMenu(key, bounds, down)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(key)

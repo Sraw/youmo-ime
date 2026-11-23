@@ -11,7 +11,7 @@ family grouped ims [pinyin, shuangpin] pads [] min-app 0.6.1 commits []
 family nine ims [pinyin, shuangpin, english] pads [] min-app 0.6.1 commits []
 
 # number
-family number ims [] pads [full] min-app 0.6.1 commits []
+family number ims [] pads [full] min-app 0.6.3 commits []
 
 # symbols
 family symbols ims [] pads [] min-app 0.6.1 commits []

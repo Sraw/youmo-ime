@@ -15,6 +15,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
+import androidx.annotation.StringRes
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.isVisible
@@ -102,6 +103,14 @@ class ChoiceCard(ctx: Context, val name: String, private val glyph: KeyboardGlyp
             look()
         }
 
+    /** How [edited] is said: keys, or the scroll lists' categories. */
+    @StringRes
+    var editedSaid: Int = R.string.shortcut_card_edited
+        set(value) {
+            field = value
+            look()
+        }
+
     var showStrip: Boolean
         get() = strip.isVisible
         set(value) {
@@ -175,7 +184,7 @@ class ChoiceCard(ctx: Context, val name: String, private val glyph: KeyboardGlyp
         badge.isVisible = edited > 0 && !showStrip
         // with a stateDescription set a reader no longer says the checked state itself: said here in full
         val state = ctx.getString(if (selected) R.string.shortcut_card_selected else R.string.shortcut_card_unselected)
-        ViewCompat.setStateDescription(body, if (edited > 0) ctx.getString(R.string.shortcut_card_edited, state, edited) else state)
+        ViewCompat.setStateDescription(body, if (edited > 0) ctx.getString(editedSaid, state, edited) else state)
     }
 
     /** For tests. */

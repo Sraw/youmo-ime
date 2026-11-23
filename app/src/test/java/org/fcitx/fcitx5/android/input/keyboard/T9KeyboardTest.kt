@@ -29,9 +29,12 @@ import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.host.ChinesePunctuation
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.ShownKey
+import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupKeyboardUi
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -175,6 +178,30 @@ class T9KeyboardTest {
             // … and 、 no key's mark: as they are, not held back
             assertEquals(KeyAction.CommitAction("…"), T9Keyboard.pick(state, 4, marks = zh))
             assertEquals(KeyAction.CommitAction("@", punctuation = true), T9Keyboard.pick(state, T9Keyboard.labels(state).lastIndex))
+        }
+    }
+
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun theKeyboardsColumnTypesTheUsersListAsTheInputMethodMarksIt() {
+        val pref = AppPrefs.getInstance().internal.scrollLists
+        try {
+            val keyboard = T9Keyboard(PlaceholderStrings(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, semicolon = false)
+            val sent = mutableListOf<KeyAction>()
+            keyboard.keyActionListener = KeyActionListener { action, _ -> sent += action.placeless() }
+            val items = (0 until keyboard.childCount).map { keyboard.getChildAt(it) }.filterIsInstance<ScrollView>().single().getChildAt(0) as ViewGroup
+            fun column() = (0 until items.childCount).map { items.getChildAt(it) as TextView }.filter { it.isVisible }.map { it.text.toString() }
+            keyboard.onPunctuationUpdate(ChinesePunctuation.map)
+            assertEquals(T9Keyboard.labels(T9State(), marks = ChinesePunctuation.map), column())
+            items.getChildAt(0).performClick()
+            assertEquals(T9Keyboard.pick(T9State(), 0, marks = ChinesePunctuation.map), sent.last())
+            // the user's list, which the defaults' labels and pick never read
+            pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Text("!"), ScrollItem.Text("x"))).serialize())
+            assertEquals(listOf("！", "x"), column())
+            items.getChildAt(1).performClick()
+            assertEquals(KeyAction.CommitAction("x"), sent.last())
+        } finally {
+            pref.setValue(ScrollListStore.HEADER)
         }
     }
 
@@ -482,11 +509,11 @@ class T9KeyboardTest {
             fun pickFirst() = items.getChildAt(0).performClick()
             assertTrue(listOf(R.id.button_slash, R.id.button_at, R.id.button_dot, R.id.button_domain).all { keyboard.findViewById<View>(it) == null })
             keyboard.address = AddressKeys.URL
-            assertEquals(AddressKeys.column(AddressKeys.URL), column())
+            assertEquals(listOf("/", ".", ".com", ":", "-", "_", "?", "=", "&", "#", ".cn", ".net", ".org"), column())
             pickFirst()
             assertEquals(KeyAction.CommitAction("/"), sent.last())
             keyboard.address = AddressKeys.EMAIL
-            assertEquals(AddressKeys.column(AddressKeys.EMAIL), column())
+            assertEquals(listOf("@", ".", ".com", "-", "_", "+", ".cn", ".net", ".org"), column())
             pickFirst()
             assertEquals(KeyAction.CommitAction("@"), sent.last())
             keyboard.address = AddressKeys.NONE

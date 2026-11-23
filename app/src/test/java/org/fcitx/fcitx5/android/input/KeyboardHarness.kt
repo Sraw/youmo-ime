@@ -458,13 +458,17 @@ class KeyboardHarness(
         relayout()
     }
 
-    /** Both lifted, the second first unless [firstLifts] (two thumbs overlapping); each event's work done before the next. */
-    fun secondFingerThenLift(x: Float, y: Float, firstLifts: Boolean = false) {
-        val (fx, fy) = fingerAt
+    /**
+     * Both lifted, the second first unless [firstLifts] (two thumbs overlapping); each event's work done before the next.
+     * [meanwhile] runs with both down (the first moved by [move]).
+     */
+    fun secondFingerThenLift(x: Float, y: Float, firstLifts: Boolean = false, meanwhile: () -> Unit = {}) {
         val props = Array(2) { MotionEvent.PointerProperties().apply { id = it; toolType = MotionEvent.TOOL_TYPE_FINGER } }
-        val coords = arrayOf(MotionEvent.PointerCoords().apply { this.x = fx; this.y = fy }, MotionEvent.PointerCoords().apply { this.x = x; this.y = y })
         val target = (inputView.parent as? ViewGroup) ?: inputView
         for (action in listOf(MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_POINTER_UP)) {
+            if (action == MotionEvent.ACTION_POINTER_UP) meanwhile()
+            val (fx, fy) = fingerAt
+            val coords = arrayOf(MotionEvent.PointerCoords().apply { this.x = fx; this.y = fy }, MotionEvent.PointerCoords().apply { this.x = x; this.y = y })
             after(16)
             val index = if (firstLifts && action == MotionEvent.ACTION_POINTER_UP) 0 else 1
             val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), action or (index shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
@@ -475,11 +479,11 @@ class KeyboardHarness(
         }
         if (firstLifts) {
             after(16)
-            val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, 1, arrayOf(props[1]), arrayOf(coords[1]), 0, 0, 1f, 1f, 0, 0, 0, 0)
+            val e = MotionEvent.obtain(downAt, SystemClock.uptimeMillis(), MotionEvent.ACTION_UP, 1, arrayOf(props[1]), arrayOf(MotionEvent.PointerCoords().apply { this.x = x; this.y = y }), 0, 0, 1f, 1f, 0, 0, 0, 0)
             target.dispatchTouchEvent(e)
             e.recycle()
         } else {
-            finger(MotionEvent.ACTION_UP, fx, fy)
+            finger(MotionEvent.ACTION_UP, fingerAt.first, fingerAt.second)
         }
         idle()
         relayout()

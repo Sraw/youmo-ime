@@ -5,7 +5,7 @@ own neither, ever gets the focus) explores, so the script checks the nodes (word
 touch is done by hand (see the .md)."""
 import time
 
-from uat import PKG, Blocked, case, check
+from uat import PKG, Blocked, case, check, script
 
 def area(s):
     """the box below the bar that holds the keys or the panel"""
@@ -168,3 +168,34 @@ case("AX-21", needs="jvm:GroupCardTest.a card read body then strip, the next car
                "ChoiceCardTest.the body is one node read as a radio button named by the keyboard、"
                "FoldCardTest.the title row is one button saying the summary and whether it is open、"
                "RareCharsCardsUatTest.theCardsAndTheLettersAreReadOut")(lambda d: None)
+
+
+@case("AX-23", base="B0-九键", mutates=True)
+def ax23(d):
+    # what TalkBack is offered, read off the tree: the words and the actions (TalkBack itself: by ear on a phone)
+    p = script("04-panels")
+    d.open_page("text")
+    items = p.column(d)
+    said = [t for t, _ in items]
+    check(said and all(said), f"九键左列的项读不出：{said}")
+    first, q = items[0][1], p.item_of(d, "？", "?")
+    check("移到最前" not in first.actions and {"删除这一项", "编辑这一列"} <= set(first.actions), f"第一项的动作 {first.actions}")
+    check({"删除这一项", "移到最前", "编辑这一列"} <= set(q.actions), f"? 的动作 {q.actions}")
+    return f"九键左列读 {said}；第一项动作 {first.actions}，? 的 {q.actions}；动作的执行在 JVM（ScrollColumnMenuTest.talkBackDoesTheMenusThreeThings）"
+
+
+@case("AX-24", base="B0")
+def ax24(d):
+    p = script("04-panels")
+    d.open_page("text")
+    p.numbers(d)
+    was = p.lock_node(d).desc
+    p.key(d, "lock", after=0.8)
+    now = p.lock_node(d).desc
+    p.key(d, "lock", after=0.8)
+    check((was, now) == ("锁定", "解锁"), f"数字键盘的锁读「{was}」，点后读「{now}」")
+    p.key(d, "symbols", after=1.0)
+    s = d.screen()
+    panel = next((n.desc for n in s.ime() if n.desc in ("选完符号后停留", "选完符号后返回")), None)
+    check(panel == "选完符号后停留", f"符号面板的锁读「{panel}」")
+    return f"数字键盘的锁「{was}」→「{now}」，符号面板的锁「{panel}」"

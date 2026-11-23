@@ -4,14 +4,18 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.ClipData
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
 import android.text.TextPaint
+import android.text.TextUtils
 import android.util.TypedValue
+import android.view.DragEvent
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuInflater
@@ -23,6 +27,8 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
@@ -35,8 +41,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.CollectionInfoCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
+import androidx.navigation.NavController
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.fragment.findNavController
+import androidx.navigation.toRoute
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.material.R as MaterialR
@@ -51,13 +62,17 @@ import org.fcitx.fcitx5.android.engine.runtime.TableSettings
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.KeyShortcutLooks
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
+import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.fcitx.fcitx5.android.input.keys.KeyEdit
 import org.fcitx.fcitx5.android.input.keys.KeyLists
 import org.fcitx.fcitx5.android.input.keys.KeyListsCache
+import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.keys.UserList
 import org.fcitx.fcitx5.android.input.popup.PopupEditor
 import org.fcitx.fcitx5.android.input.popup.PopupOverrides
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPages
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcutPreset
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
@@ -67,6 +82,8 @@ import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.keys.DefaultList
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.ui.cards.CardColumns
 import org.fcitx.fcitx5.android.ui.main.MainViewModel
 import org.fcitx.fcitx5.android.ui.main.settings.cards.AccordionLayout
@@ -139,6 +156,8 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         // null where not yet migrated (an old backup imported, migrated at the next start)
         val swipes: String, val lists: String?,
         val up: Boolean, val down: Boolean, val upAt: KeyMarkPosition, val downAt: KeyMarkPosition,
+        // only a step that reset them holds the scroll lists: an edit of one takes no undo step
+        val scroll: String? = null,
     )
 
     internal data class Step(val before: Snapshot, val after: Snapshot)
@@ -147,7 +166,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         super.onCreate(savedInstanceState)
         savedInstanceState ?: return
         val form = savedInstanceState.getString(STATE_PAGE)
-        page = pages.firstOrNull { it.form == form } ?: page
+        page = choices.firstOrNull { it.form == form } ?: page
         selecting = savedInstanceState.getBoolean(STATE_SELECTING)
         savedInstanceState.getStringArrayList(STATE_SELECTED)?.let(selected::addAll)
     }
@@ -159,12 +178,15 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         outState.putStringArrayList(STATE_SELECTED, ArrayList(selected))
     }
 
-    private fun snapshot() = with(prefs) {
+    private fun snapshot(scroll: Boolean = false) = with(prefs) {
         Snapshot(
             internal.keySwipes.getValue(), storedKeyLists(),
             keyboard.swipeUp.getValue(), keyboard.swipeDown.getValue(), keyboard.swipeUpPosition.getValue(), keyboard.swipeDownPosition.getValue(),
+            internal.scrollLists.getValue().takeIf { scroll },
         )
     }
+
+    private fun snapshotAs(s: Snapshot) = snapshot(scroll = s.scroll != null)
 
     private fun restore(s: Snapshot) = with(prefs) {
         internal.keySwipes.setValue(s.swipes)
@@ -173,12 +195,13 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         keyboard.swipeDown.setValue(s.down)
         keyboard.swipeUpPosition.setValue(s.upAt)
         keyboard.swipeDownPosition.setValue(s.downAt)
+        s.scroll?.let(internal.scrollLists::setValue)
     }
 
-    private fun change(block: () -> Unit) {
-        val before = snapshot()
+    private fun change(scroll: Boolean = false, block: () -> Unit) {
+        val before = snapshot(scroll)
         block()
-        val after = snapshot()
+        val after = snapshot(scroll)
         if (after != before) {
             undo = Step(before, after)
             view?.let { v -> Snackbar.make(v, R.string.swipe_changed, Snackbar.LENGTH_LONG).setAction(R.string.undo) { undoLast() }.show() }
@@ -190,12 +213,15 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         val step = undo ?: return
         undo = null
         // changed since elsewhere: nothing put back over that
-        if (snapshot() == step.after) restore(step.before)
+        if (snapshotAs(step.after) == step.after) restore(step.before)
         // 撤销 after the page was left: onStop is past, so the device-protected copy is synced here
         if (isAdded && view != null) rebuild() else AppPrefs.getInstance().syncToDeviceEncryptedStorage()
     }
 
     private val pages get() = KeyShortcutPages.all(layoutTabs ?: layoutPages().also { layoutTabs = it })
+
+    // the scroll lists' card always just before the function keys'
+    private val choices get() = pages.let { it.dropLast(1) + ScrollListsCard.PAGE + it.last() }
 
     private fun layoutPages(): List<KeyShortcutPages.Page> {
         val ctx = context ?: return emptyList()
@@ -209,7 +235,9 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     private fun boardOf(page: KeyShortcutPages.Page, name: String = page.names.first()): String = page.layout ?: KeyCaps.defaultBoard(name)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        val opened = ScrollListsCard.opened(findNavController()).takeIf { savedInstanceState == null }?.also { page = ScrollListsCard.PAGE }
         super.onViewCreated(view, savedInstanceState)
+        opened?.let { ScrollListsCard(punctuationKeys, ::rebuild).edit(requireContext(), it) }
         requireActivity().addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
                 val ctx = context ?: return
@@ -223,7 +251,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
                     isEnabled = back
                 }.setOnMenuItemClickListener { undoLast(); true }
                 menu.add(R.string.reset_all).apply {
-                    isEnabled = !listsNewer && lists.lists.isNotEmpty()
+                    isEnabled = !listsNewer && lists.lists.isNotEmpty() || ScrollListsCard.edited() > 0
                 }.setOnMenuItemClickListener { confirmResetAll(); true }
             }
 
@@ -233,17 +261,17 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     }
 
     override fun reveal(id: String, found: (View) -> Unit) {
-        val form = id.removePrefix(BOARD)
-        if (form != id) pages.firstOrNull { it.form == form }?.takeIf { it !== page }?.let { page = it; rebuild() }
+        val form = if (id.startsWith(ScrollListsCard.ROW)) ScrollListsCard.FORM else id.removePrefix(BOARD)
+        if (form != id) choices.firstOrNull { it.form == form }?.takeIf { it !== page }?.let { page = it; rebuild() }
         view?.findViewWithTag<View>(id)?.let(found)
     }
 
     override fun rebuild() {
         val ctx = requireContext()
         // another page changed what the step would put back: undoing would silently undo that too
-        if (undo?.after?.let { it != snapshot() } == true) undo = null
+        if (undo?.after?.let { it != snapshotAs(it) } == true) undo = null
         layoutTabs = null
-        page = pages.firstOrNull { it.form == page.form } ?: KeyShortcutPages.Full
+        page = choices.firstOrNull { it.form == page.form } ?: KeyShortcutPages.Full
         val stored = slots
         val user = lists
         wide.apply {
@@ -253,7 +281,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         }
         content.apply {
             removeAllViews()
-            add(keyCard(ctx, stored, user), lParams(matchParent))
+            add(if (page === ScrollListsCard.PAGE) ScrollListsCard(punctuationKeys, ::rebuild).view(ctx) else keyCard(ctx, stored, user), lParams(matchParent))
             add(if (selecting) selectionBar(ctx) else actionBar(ctx), lParams(matchParent) { topMargin = ctx.dp(8) })
         }
         activity?.invalidateMenu()
@@ -393,24 +421,25 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         val width = config.screenWidthDp.toFloat()
         val columns = CardColumns.columns(width, config.fontScale, CardColumns.CHOICE_MIN_DP, CardColumns.CHOICE)
         val nameSp = CardColumns.nameSp(CardColumns.cardWidth(width, columns), config.fontScale)
-        val names = pages.map(::titleOf)
+        val names = choices.map(::titleOf)
         // one name breaking makes every name two lines high, so a row's cards line up
         val paint = TextPaint().apply { textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, nameSp.toFloat(), resources.displayMetrics) }
         val room = ctx.dp(CardColumns.cardWidth(width, columns)) - 2 * ctx.dp(ChoiceCard.NAME_EDGE_DP)
         val lines = if (names.any { paint.measureText(it) > room }) 2 else 1
         // the badges hang over the cards' corners, past their cells
         val grid = CardGrid(ctx, columns, CollectionInfoCompat.SELECTION_MODE_SINGLE).apply { clipChildren = false }
-        pages.forEachIndexed { i, p ->
-            val glyph = KeyboardGlyphView(ctx, p.rows.map { it.size }, bars = p.form == KeyShortcuts.FUNCTION)
+        choices.forEachIndexed { i, p ->
+            val glyph = KeyboardGlyphView(ctx, if (p === ScrollListsCard.PAGE) List(ScrollListsCard.GLYPH_ROWS) { 1 } else p.rows.map { it.size }, bars = p.form == KeyShortcuts.FUNCTION)
             val card = ChoiceCard(ctx, names[i], glyph).apply {
                 cell.tag = BOARD + p.form
                 this.nameSp = nameSp
                 nameLines = lines
                 selected = p.form == page.form
-                edited = KeyShortcutPages.edited(p, stored, user)
+                if (p === ScrollListsCard.PAGE) ScrollListsCard.badge(this) else edited = KeyShortcutPages.edited(p, stored, user)
                 onPick = { page = p; rebuild() }
             }
-            if (selecting) strip(card, names[i], slotKeys(p))
+            // 多选 picks keys, and this card has none
+            if (selecting && p !== ScrollListsCard.PAGE) strip(card, names[i], slotKeys(p))
             grid.addView(card.cell)
         }
         return grid
@@ -732,8 +761,15 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     private fun confirmResetAll() {
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.reset_all)
-            .setMessage(R.string.reset_all_long_press_message)
-            .setPositiveButton(android.R.string.ok) { _, _ -> change { lists = KeyLists.Empty } }
+            .setMessage(
+                when {
+                    // a later version's are left as they are: said is only what is put back
+                    listsNewer -> R.string.reset_all_scroll_lists_message
+                    ScrollListsCard.store.newer -> R.string.reset_all_long_presses_only_message
+                    else -> R.string.reset_all_long_press_message
+                },
+            )
+            .setPositiveButton(android.R.string.ok) { _, _ -> change(scroll = true) { lists = KeyLists.Empty; ScrollListsCard.resetAll() } }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
@@ -749,7 +785,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         private const val MULTI = "view:keys/multi"
 
         override fun searchEntries(context: Context): List<PageEntry> =
-            KeyShortcutPages.all.map { PageEntry(context.getString(pageTitle(it)), BOARD + it.form) } + listOf(
+            (KeyShortcutPages.all.dropLast(1) + ScrollListsCard.PAGE + KeyShortcutPages.Function).map { PageEntry(context.getString(pageTitle(it)), BOARD + it.form) } + ScrollListsCard.entries(context) + listOf(
                 PageEntry(context.getString(R.string.swipe_presets), PRESETS),
                 PageEntry(context.getString(R.string.swipe_flip_all), FLIP),
                 PageEntry(context.getString(R.string.swipe_multi_select), MULTI),
@@ -783,10 +819,11 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             KeyShortcutPreset.ZHUYIN_FULL -> R.string.shortcut_page_zyfull
             KeyShortcutPreset.NUMBER -> R.string.shortcut_page_number
             KeyShortcuts.FUNCTION -> R.string.shortcut_page_function
+            ScrollListsCard.FORM -> R.string.scroll_lists
             else -> error("no title for the shortcut page ${page.form}")
         }
 
-        private const val KEY_CARD_PAD_DP = 12
+        internal const val KEY_CARD_PAD_DP = 12
         private const val FUNCTION_MIN_DP = 64
         private val FUNCTION_COLUMNS = listOf(4, 3)
 
@@ -805,6 +842,191 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             "symbols" to R.string.fn_key_symbols, "numbers" to R.string.fn_key_numbers, "lang" to R.string.fn_key_lang,
             "retype" to R.string.fn_key_retype, "zero" to R.string.fn_key_zero, "separator" to R.string.fn_key_separator,
         )
+    }
+}
+
+/** 按键字符和快捷键's 滑动列 card, a row a category, and each one's editor; [changed] redraws the page. */
+private class ScrollListsCard(private val convertible: Set<String>, private val changed: () -> Unit) {
+
+    fun view(ctx: Context): View {
+        val lists = store
+        val box = ctx.verticalLayout {
+            val pad = ctx.dp(PopupOverridesFragment.KEY_CARD_PAD_DP)
+            setPadding(pad, pad, pad, pad)
+            add(TextView(ctx).apply {
+                setText(R.string.scroll_lists)
+                textSize = 14f
+                setTextColor(ctx.styledColor(android.R.attr.colorPrimary))
+            }, lParams(matchParent))
+            add(text(ctx, ctx.getString(R.string.scroll_lists_hint), body = true), lParams(matchParent) { topMargin = ctx.dp(4) })
+            if (lists.newer) add(text(ctx, ctx.getString(R.string.scroll_list_newer), body = true), lParams(matchParent) { topMargin = ctx.dp(8) })
+            ScrollDefaults.IDS.forEach { id -> add(scrollRow(ctx, lists, id), lParams(matchParent) { topMargin = ctx.dp(6) }) }
+        }
+        return settingsCard(ctx).apply { addView(box) }
+    }
+
+    /** 「数字键盘　+ - * / % ,」: its name and first few, outlined where changed. */
+    private fun scrollRow(ctx: Context, store: ScrollListStore, id: String): View {
+        val name = ctx.getString(nameOf(id))
+        val items = store[id]
+        return ctx.horizontalLayout {
+            tag = ROW + id
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = ctx.dp(ROW_DP)
+            setPadding(ctx.dp(8), 0, ctx.dp(8), 0)
+            if (store.isSet(id)) {
+                background = GradientDrawable().apply {
+                    cornerRadius = ctx.dp(8).toFloat()
+                    setStroke(ctx.dp(1), ctx.styledColor(android.R.attr.colorPrimary))
+                }
+            }
+            foreground = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground)).run { getDrawable(0).also { recycle() } }
+            add(text(ctx, name, body = true).apply {
+                setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurface))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, lParams(ctx.dp(ROW_NAME_DP), wrapContent))
+            items.take(ROW_ITEMS).forEach { item ->
+                val width = if (item is ScrollItem.Text) wrapContent else ctx.dp(ROW_ITEM_DP)
+                add(scrollItemView(ctx, item), lParams(width, ctx.dp(ROW_ITEM_DP)) { marginEnd = ctx.dp(4) })
+            }
+            contentDescription = (listOf(name) + items.take(ROW_ITEMS).map { said(ctx, it) }).joinToString(", ")
+            ViewCompat.setStateDescription(this, ctx.getString(R.string.edited_x, name).takeIf { store.isSet(id) })
+            setOnClickListener { edit(ctx, id) }
+        }
+    }
+
+    private fun said(ctx: Context, item: ScrollItem): String = when (item) {
+        is ScrollItem.Text -> item.text
+        is ScrollItem.Command -> KeyCommand.ofKey(item.key)?.let { ctx.getString(KeyShortcutLooks.of(it).label) } ?: item.key
+    }
+
+    private fun scrollItemView(ctx: Context, item: ScrollItem): View {
+        val command = (item as? ScrollItem.Command)?.let { KeyCommand.ofKey(it.key) }
+        return if (command != null) {
+            commandIcon(ctx, command)
+        } else {
+            text(ctx, said(ctx, item), body = true).apply {
+                gravity = Gravity.CENTER
+                // a fixed cell broke `.com` inside the word, the line after cut off: as wide as it is, `…` only at the row's end
+                minWidth = ctx.dp(ROW_ITEM_DP)
+                setSingleLine()
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(ctx.styledColor(MaterialR.attr.colorOnSurface))
+            }
+        }.apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+    }
+
+    /** One category's items: added, deleted, dragged, 不转中文标点 on the nine keys' two; none left is no list (恢复默认 is). */
+    fun edit(ctx: Context, id: String) {
+        val lists = store
+        val name = ctx.getString(nameOf(id))
+        if (lists.newer) {
+            AlertDialog.Builder(ctx).setTitle(name).setMessage(R.string.scroll_list_newer).setPositiveButton(android.R.string.ok, null).show()
+            return
+        }
+        val (items, marks) = ScrollListStore.editing(lists[id])
+        val editor = PopupEditor(items, null, marks, ScrollListStore.MAX_ITEMS)
+        val field = EditText(ctx).apply {
+            hint = ctx.getString(R.string.long_press_add_hint)
+            inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            isSingleLine = true
+        }
+        var dialog: AlertDialog? = null
+        // what is typed is added at OK, so it alone makes a list to keep
+        fun okEnabled() = editor.items.isNotEmpty() || field.text.isNotBlank()
+        field.doAfterTextChanged { dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = okEnabled() }
+        var addTyped: () -> Boolean = { true }
+        val cards = EditorCards(
+            ctx, press = true, hint = ctx.getString(R.string.scroll_list_editor_hint), ways = emptyList(), sections = emptyList(),
+            first = { null }, pressSummary = { ctx.getString(R.string.scroll_list_summary, editor.items.size) }, pressTitle = ctx.getString(R.string.scroll_lists),
+        )
+        val list = ScrollEditing(ScrollListStore.keepsAsIs(id)) { add -> chooseCommand(ctx, add) }
+        cards.fill(chars(ctx, editor, field, R.string.scroll_list_keep_one, convertible, {
+            cards.changed()
+            dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.isEnabled = okEnabled()
+        }, { addTyped = it }, list))
+        cards.changed()
+        val builder = AlertDialog.Builder(ctx)
+            .setTitle(name)
+            .setView(cards.layout)
+            .setPositiveButton(android.R.string.ok, null)
+            .setNegativeButton(android.R.string.cancel, null)
+        if (lists.isSet(id)) builder.setNeutralButton(R.string.scroll_list_reset) { _, _ -> store = store.without(listOf(id)); changed() }
+        val shown = builder.show().apply { setCanceledOnTouchOutside(false); window?.let(::aboveTheKeyboard) }
+        dialog = shown
+        shown.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = okEnabled()
+        shown.onPositiveButtonClick onClick@{
+            if (!addTyped()) return@onClick false.also { cards.showError(way = null) }
+            if (editor.items.isEmpty()) return@onClick false
+            store = store.with(id, ScrollListStore.edited(editor.items, editor.marks))
+            changed()
+            true
+        }
+    }
+
+    private fun chooseCommand(ctx: Context, add: (KeyCommand) -> Unit) {
+        val commands = ScrollListStore.COMMANDS
+        AlertDialog.Builder(ctx)
+            .setTitle(R.string.scroll_list_add_command)
+            .setItems(commands.map { ctx.getString(KeyShortcutLooks.of(it).label) }.toTypedArray()) { _, i -> add(commands[i]) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    companion object {
+        /** Never written where a later version's: [ScrollListStore.with] and the rest leave it as it is. */
+        var store: ScrollListStore
+            get() = ScrollListStore.parse(AppPrefs.getInstance().internal.scrollLists.getValue())
+            set(value) {
+                if (!value.newer) AppPrefs.getInstance().internal.scrollLists.setValue(value.serialize())
+            }
+
+        /** The categories set. */
+        fun edited(): Int = store.let { s -> ScrollDefaults.IDS.count(s::isSet) }
+
+        fun badge(card: ChoiceCard) {
+            card.edited = edited()
+            card.editedSaid = R.string.scroll_lists_card_edited
+        }
+
+        fun resetAll() {
+            store = store.without(ScrollDefaults.IDS)
+        }
+
+        /** SettingsRoute.ScrollList's category: opened from the keyboard's long press menu. */
+        fun opened(nav: NavController): String? {
+            val entry = nav.currentBackStackEntry?.takeIf { it.destination.hasRoute<SettingsRoute.ScrollList>() } ?: return null
+            return entry.toRoute<SettingsRoute.ScrollList>().id.takeIf { ScrollDefaults.of(it) != null }
+        }
+
+        /** 「滑动列 · 网址」 and the rest, for the settings' search. */
+        fun entries(ctx: Context): List<PageEntry> =
+            // two names, not one format: the index tells titles apart by their strings
+            ScrollDefaults.IDS.map { PageEntry(listOf(R.string.scroll_lists, nameOf(it)).joinToString(" · ", transform = ctx::getString), ROW + it) }
+
+        const val FORM = "scroll"
+
+        /** The card has no keys, so it is no page of KeyShortcutPages. */
+        val PAGE = KeyShortcutPages.Page(FORM, emptyList())
+
+        const val ROW = "view:keys/scroll/"
+        const val GLYPH_ROWS = 4
+        private const val ROW_DP = 48
+        private const val ROW_NAME_DP = 88
+        private const val ROW_ITEM_DP = 28
+        private const val ROW_ITEMS = 6
+
+        fun nameOf(id: String) = when (id) {
+            ScrollDefaults.NINE -> R.string.scroll_list_nine
+            ScrollDefaults.NINE_ENGLISH -> R.string.scroll_list_nine_english
+            ScrollDefaults.NUMBER -> R.string.scroll_list_number
+            ScrollDefaults.PHONE -> R.string.scroll_list_phone
+            ScrollDefaults.DATETIME -> R.string.scroll_list_datetime
+            ScrollDefaults.URL -> R.string.scroll_list_url
+            ScrollDefaults.EMAIL -> R.string.scroll_list_email
+            else -> error("no name for the scroll list $id")
+        }
     }
 }
 
@@ -828,7 +1050,51 @@ private fun otherParams(ctx: Context) = FlexboxLayout.LayoutParams(ctx.dp(PopupO
 
 private class Action(@StringRes val text: Int, val enabled: () -> Boolean, val run: () -> Unit)
 
-/** A tap only selects; buttons act on it (a moving tap or a × beside it surprised). Buttons always there, so nothing moves. */
+/** A scroll list's editor: no first, items dragged, commands drawn and added; 不转中文标点 only where [asIs]. */
+private class ScrollEditing(asIs: Boolean, private val chooseCommand: ((KeyCommand) -> Unit) -> Unit) {
+    val offered = if (asIs) listOf(ItemMark.AsIs) else emptyList()
+    val full = R.string.scroll_list_full
+
+    fun addCommandButton(ctx: Context, actions: FlexboxLayout, editor: PopupEditor, field: EditText, render: () -> Unit) {
+        val button = PopupItemMarks.textButton(ctx, R.string.scroll_list_add_command).apply {
+            setOnClickListener {
+                chooseCommand { command ->
+                    if (!editor.add(ScrollListStore.editorItem(ScrollItem.Command(command.key)))) field.error = ctx.getString(full, editor.max)
+                    render()
+                }
+            }
+        }
+        with(actions) { add(button, FlexboxLayout.LayoutParams(wrapContent, wrapContent)) }
+    }
+
+    /** A command drawn as its icon; held, any item is dragged. */
+    fun key(ctx: Context, editor: PopupEditor, i: Int, tag: String?, moved: () -> Unit): View {
+        val item = editor.items[i]
+        val command = ScrollListStore.commandIn(item)?.let(KeyCommand::ofKey)
+        val key = KeyCaps.key(ctx, if (command != null) "" else item, "", marked = false, dimmed = false, selected = i == editor.selected, tag = tag)
+        if (command != null) {
+            key.addView(commandIcon(ctx, command).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO },
+                FrameLayout.LayoutParams(ctx.dp(ICON_DP), ctx.dp(ICON_DP), Gravity.CENTER))
+            key.contentDescription = ctx.getString(KeyShortcutLooks.of(command).label)
+        }
+        draggable(key, i, editor, moved)
+        return key
+    }
+}
+
+/** The command's icon in the settings' colour, its name said. */
+private fun commandIcon(ctx: Context, command: KeyCommand) = ImageView(ctx).apply {
+    val look = KeyShortcutLooks.of(command)
+    setImageDrawable(ContextCompat.getDrawable(ctx, look.icon)?.mutate()?.apply { setTint(ctx.styledColor(MaterialR.attr.colorOnSurface)) })
+    scaleType = ImageView.ScaleType.FIT_CENTER
+    contentDescription = ctx.getString(look.label)
+}
+
+/**
+ * A tap only selects; buttons act on it (a moving tap or a × beside it surprised). Buttons always there, so nothing moves.
+ * Dragging only in a [scroll] list: a long press's items are never dragged.
+ */
+@Suppress("LongParameterList")
 private fun chars(
     ctx: Context,
     editor: PopupEditor,
@@ -837,14 +1103,16 @@ private fun chars(
     punctuationKeys: Set<String>,
     onChange: () -> Unit,
     adder: (() -> Boolean) -> Unit,
+    scroll: ScrollEditing? = null,
 ): List<Pair<View, Int>> {
     val keys = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
     val empty = text(ctx, ctx.getString(emptyText), body = true)
     val actions = FlexboxLayout(ctx).apply { flexWrap = FlexWrap.WRAP }
     lateinit var render: () -> Unit
-    val marks = PopupItemMarks(ctx, editor, field, punctuationKeys) { render() }
-    val buttons = listOf(
-        Action(R.string.long_press_make_first, { editor.canMakeFirst }, editor::makeFirst),
+    val marks = PopupItemMarks(ctx, editor, field, punctuationKeys, scroll?.offered ?: ItemMark.entries) { render() }
+    val full = scroll?.full ?: R.string.long_press_full
+    val buttons = listOfNotNull(
+        Action(R.string.long_press_make_first, { editor.canMakeFirst }, editor::makeFirst).takeIf { scroll == null },
         Action(R.string.long_press_move_left, { editor.canMoveLeft }, editor::moveLeft),
         Action(R.string.long_press_move_right, { editor.canMoveRight }, editor::moveRight),
         Action(R.string.delete, { editor.canDelete }, editor::delete),
@@ -856,10 +1124,12 @@ private fun chars(
         button to action.enabled
     }
     marks.addTo(actions)
+    scroll?.addCommandButton(ctx, actions, editor, field) { render() }
     render = {
         keys.removeAllViews()
         editor.items.forEachIndexed { i, item ->
-            val key = KeyCaps.key(ctx, item, "", marked = item == editor.first, dimmed = false, selected = i == editor.selected, tag = marks.tag(item))
+            val key = scroll?.key(ctx, editor, i, marks.tag(item)) { keys.post { render() } }
+                ?: KeyCaps.key(ctx, item, "", marked = item == editor.first, dimmed = false, selected = i == editor.selected, tag = marks.tag(item))
             key.setOnClickListener { editor.tap(i); render() }
             keys.add(key, otherParams(ctx))
         }
@@ -874,7 +1144,7 @@ private fun chars(
         val fit = editor.add(field.text.toString(), marks.adding, punctuationKeys)
         field.text = null
         if (!fit) {
-            field.error = ctx.getString(R.string.long_press_full, KeyLists.MAX_ITEMS)
+            field.error = ctx.getString(full, editor.max)
             field.requestFocus()
         }
         render()
@@ -904,6 +1174,21 @@ private fun chars(
     }
     return listOf(keys to 4, empty to 0, marks.line to 4, actions to 0, rule to 4, addRow to 4) + marks.underField()
 }
+
+/** Held, it is carried to the item it is let go on (left and right stay for a screen reader). */
+private fun draggable(key: View, i: Int, editor: PopupEditor, moved: () -> Unit) {
+    key.setOnLongClickListener { v -> v.startDragAndDrop(ClipData.newPlainText("", ""), View.DragShadowBuilder(v), i, 0) }
+    key.setOnDragListener { _, e ->
+        if (e.action == DragEvent.ACTION_DROP) {
+            (e.localState as? Int)?.let { from -> editor.move(from, i) }
+            // not while the drag is still being dispatched to these views
+            moved()
+        }
+        true
+    }
+}
+
+private const val ICON_DP = 24
 
 /** A key code is never kept (a key typing it would read as that key): said, not silently dropped. */
 private fun rejected(ctx: Context, field: EditText): Boolean {
@@ -940,8 +1225,9 @@ private class EditorCards(
     private val sections: List<SwipeSlotSection>,
     private val first: () -> String?,
     private val pressSummary: () -> String,
+    pressTitle: String = ctx.getString(R.string.long_press_card),
 ) {
-    private val pressCard = if (press) FoldCard(ctx, ctx.getString(R.string.long_press_card), hint) else null
+    private val pressCard = if (press) FoldCard(ctx, pressTitle, hint) else null
     private val wayCards = ways.map { FoldCard(ctx, it) }
     private val cards = listOfNotNull(pressCard) + wayCards
 

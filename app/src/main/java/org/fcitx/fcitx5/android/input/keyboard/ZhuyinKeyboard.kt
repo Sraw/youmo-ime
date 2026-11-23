@@ -106,11 +106,9 @@ class ZhuyinKeyboard(
         }
     }
 
-    override var address: AddressKeys = AddressKeys.NONE
-        set(value) {
-            field = value
-            canvas?.invalidateScene()
-        }
+    override fun onAddressChanged() {
+        canvas?.invalidateScene()
+    }
 
     private fun mapped(p: String) = keysPunctuation.getOrDefault(p, p)
 

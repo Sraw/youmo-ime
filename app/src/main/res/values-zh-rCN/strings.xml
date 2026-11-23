@@ -385,7 +385,9 @@
     <string name="toolbar_trad_simp">简繁切换</string>
     <string name="reset_this_key">恢复此键默认</string>
     <string name="long_press_editor_hint">带框的是长按后直接松手得到的字符，也是滑动这个键输入的字符，也就是键上的小字。键自己的字母、数字也和别的字符一样能挪、删、设为首个。18 键 L 上的 : 只在微软双拼的 18 键上出现。点一个字符选中它，再用下面的按钮调整。</string>
-    <string name="reset_all_long_press_message">将所有按键的长按字符恢复为内置默认值？</string>
+    <string name="reset_all_long_press_message">将所有按键的长按字符和滑动列恢复为内置默认值？</string>
+    <string name="reset_all_long_presses_only_message">将所有按键的长按字符恢复为内置默认值？滑动列是新版本的设置，保持不变。</string>
+    <string name="reset_all_scroll_lists_message">将所有滑动列恢复为内置默认值？长按字符是新版本的设置，保持不变。</string>
     <string name="reset_all">全部恢复默认</string>
     <string name="my_words">用户词库</string>
     <string name="my_words_added">手动添加的词</string>
@@ -874,6 +876,29 @@
     <string name="long_press_none">长按这个键不弹出字符。</string>
     <string name="long_press_off">这个键的长按已关。添加字符就重新打开。</string>
     <string name="long_press_newer">长按字符是新版本的应用设置的：原样保留，这里不能改。</string>
+    <string name="scroll_list_remove">删除这一项</string>
+    <string name="scroll_list_to_front">移到最前</string>
+    <string name="scroll_list_edit">编辑这一列…</string>
+    <string name="a11y_scroll_list_remove">删除这一项</string>
+    <string name="a11y_scroll_list_to_front">移到最前</string>
+    <string name="a11y_scroll_list_edit">编辑这一列</string>
+    <string name="scroll_list_keep_one">至少留一项，或恢复默认</string>
+    <string name="scroll_list_newer">这是新版本的设置</string>
+    <string name="scroll_lists">滑动列</string>
+    <string name="scroll_lists_hint">九键和数字键盘左边那一列能滑的符号（自定义布局里放的滑动列也用这几类），按键盘和输入框分成几类，每类一行。点一行改它的内容。</string>
+    <string name="scroll_list_nine">九键</string>
+    <string name="scroll_list_nine_english">九键英文</string>
+    <string name="scroll_list_number">数字键盘</string>
+    <string name="scroll_list_phone">电话</string>
+    <string name="scroll_list_datetime">日期时间</string>
+    <string name="scroll_list_url">网址</string>
+    <string name="scroll_list_email">邮箱</string>
+    <string name="scroll_list_editor_hint">点一项选中；长按一项拖到别处。</string>
+    <string name="scroll_list_summary">共 %1$d 项</string>
+    <string name="scroll_list_add_command">加命令…</string>
+    <string name="scroll_list_full">一列最多 %1$d 项，多出的没有加上。</string>
+    <string name="scroll_list_reset">恢复默认</string>
+    <string name="scroll_lists_card_edited">%1$s，改过 %2$d 类</string>
     <string name="long_press_add_hint">添加字符，空格分隔</string>
     <string name="text_variables_use">使用变量</string>
     <string name="text_as_is">不转中文标点</string>
@@ -1004,6 +1029,8 @@
     <string name="emoji_search">按拼音搜索表情</string>
     <string name="emoji_search_hint">打拼音找表情</string>
     <string name="picker_unlock">选完符号后返回</string>
+    <string name="number_pad_lock">锁定</string>
+    <string name="number_pad_unlock">解锁</string>
     <string name="picker_title">符号</string>
     <string name="picker_chinese">中文标点</string>
     <string name="picker_short_recent">最近</string>
@@ -1612,6 +1639,7 @@
     <string name="layout_finding_full_lacks">数字键盘缺 %1$s：数字框里打不出来（比如金额的负号、小数点）</string>
     <string name="layout_finding_bottom_left">左下角通常是 %1$s（和 App 自带的一样）</string>
     <string name="layout_finding_split_scaled">分体时这一行在「%2$s」有 %1$s 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小</string>
+    <string name="layout_finding_scroll_tight">滑动列太挤：一项不到 20 dp，减少 show= 或加宽</string>
     <string name="word_offer">记住：</string>
     <string name="word_offer_said">可以记住：%1$s，%2$s编码 %3$s</string>
     <string name="word_remembered">记住了『%1$s』：%2$s %3$s</string>

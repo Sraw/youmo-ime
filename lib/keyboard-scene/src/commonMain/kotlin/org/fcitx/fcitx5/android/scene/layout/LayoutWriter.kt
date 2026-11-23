@@ -73,15 +73,7 @@ object LayoutWriter {
                     "    ", "gap",
                     listOf("id" to cell.id, "width" to cell.width.takeIf { it != Width.Units(1.0) }?.let(::width), "when" to cell.condition?.toString()),
                 )
-                is Slot -> element(
-                    "    ", "slot",
-                    listOf(
-                        "id" to cell.id, "kind" to cell.kind, "width" to cell.width.takeIf { it != Width.Units(1.0) }?.let(::width),
-                        "rows" to cell.rows.takeIf { it != 1 }?.toString(), "face" to cell.face.takeIf { it != Face.Default }?.xml,
-                        "look" to cell.look, "class" to cell.classes.takeIf { it.isNotEmpty() }?.joinToString(" "),
-                        "when" to cell.condition?.toString(),
-                    ),
-                )
+                is Slot -> slot(cell)
             }
         }
         appendLine("  </row>")
@@ -90,6 +82,24 @@ object LayoutWriter {
     private fun StringBuilder.defaults(indent: String, d: KeyAttrs) {
         val attrs = look(d) + listOf("width" to d.width?.let(::width))
         if (attrs.any { it.second != null }) element(indent, "defaults", attrs)
+    }
+
+    private fun StringBuilder.slot(cell: Slot) {
+        val scroll = cell.kind == LayoutReader.SCROLL
+        element(
+            "    ", "slot",
+            listOf(
+                "id" to cell.id, "kind" to cell.kind, "list" to cell.list,
+                "direction" to cell.direction.takeIf { it != Direction.Vertical && scroll }?.xml,
+                "show" to cell.show.takeIf { it != Slot.DEFAULT_SHOW && scroll }?.toString(),
+                "width" to cell.width.takeIf { it != Width.Units(1.0) }?.let(::width),
+                "rows" to cell.rows.takeIf { it != 1 }?.toString(),
+                "face" to cell.face.takeIf { it != if (scroll) LayoutReader.SCROLL_FACE else Face.Default }?.xml,
+                "look" to cell.look.takeIf { !scroll || it != LayoutReader.SCROLL_LOOK },
+                "class" to cell.classes.takeIf { it.isNotEmpty() }?.joinToString(" "),
+                "when" to cell.condition?.toString(),
+            ),
+        )
     }
 
     private fun StringBuilder.key(k: Key) {

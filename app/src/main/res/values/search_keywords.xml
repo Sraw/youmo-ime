@@ -165,4 +165,9 @@
         <item>Ctrl+Space</item>
         <item>switch shortcut</item>
     </string-array>
+    <string-array name="kw_scroll_lists">
+        <item>scroll list</item>
+        <item>symbol column</item>
+        <item>left column</item>
+    </string-array>
 </resources>

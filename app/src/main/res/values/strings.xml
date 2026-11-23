@@ -396,7 +396,9 @@
     <string name="toolbar_trad_simp">Simplified / Traditional</string>
     <string name="reset_this_key">Restore this key\'s default</string>
     <string name="long_press_editor_hint">The outlined one is what you get by holding the key and letting go, and by swiping it, and the small character on the key. A key\'s own letters and digit are moved, deleted and made the first like any other character. The : on the 18 keys\' L shows only with Microsoft 双拼. Tap a character to select it, then use the buttons below.</string>
-    <string name="reset_all_long_press_message">Restore every key to its built-in long-press characters?</string>
+    <string name="reset_all_long_press_message">Restore every key to its built-in long-press characters, and every scroll list to its default?</string>
+    <string name="reset_all_long_presses_only_message">Restore every key to its built-in long-press characters? The scroll lists, set by a newer version, are left as they are.</string>
+    <string name="reset_all_scroll_lists_message">Restore every scroll list to its default? The long presses, set by a newer version, are left as they are.</string>
     <string name="reset_all">Reset all</string>
     <string name="my_words">User dictionary</string>
     <string name="my_words_added">Words you added</string>
@@ -902,6 +904,29 @@
     <string name="long_press_none">Holding this key offers nothing.</string>
     <string name="long_press_off">Holding this key offers nothing: its long press is turned off. Adding a character turns it on again.</string>
     <string name="long_press_newer">These long presses were set by a newer version of the app: they are kept as they are and cannot be edited here.</string>
+    <string name="scroll_list_remove">Remove this item</string>
+    <string name="scroll_list_to_front">Move to the front</string>
+    <string name="scroll_list_edit">Edit this list…</string>
+    <string name="a11y_scroll_list_remove">Remove this item</string>
+    <string name="a11y_scroll_list_to_front">Move to the front</string>
+    <string name="a11y_scroll_list_edit">Edit this list</string>
+    <string name="scroll_list_keep_one">Keep at least one item, or restore the default</string>
+    <string name="scroll_list_newer">These were set by a newer version</string>
+    <string name="scroll_lists">Scroll lists</string>
+    <string name="scroll_lists_hint">The column of symbols the nine keys and the number pad scroll, and the scroll columns of your own layouts, one list per kind of keyboard and field. Tap one to change what it holds.</string>
+    <string name="scroll_list_nine">Nine keys</string>
+    <string name="scroll_list_nine_english">Nine keys, English</string>
+    <string name="scroll_list_number">Number pad</string>
+    <string name="scroll_list_phone">Phone</string>
+    <string name="scroll_list_datetime">Date and time</string>
+    <string name="scroll_list_url">Web address</string>
+    <string name="scroll_list_email">Email</string>
+    <string name="scroll_list_editor_hint">Tap an item to choose it; hold it to drag it elsewhere.</string>
+    <string name="scroll_list_summary">%1$d items</string>
+    <string name="scroll_list_add_command">Add a command…</string>
+    <string name="scroll_list_full">A list holds %1$d items at most; the rest were not added.</string>
+    <string name="scroll_list_reset">Restore the default</string>
+    <string name="scroll_lists_card_edited">%1$s, lists changed: %2$d</string>
     <string name="long_press_add_hint">Add, space between several</string>
     <string name="text_variables_use">Use variables</string>
     <string name="text_as_is">Keep English punctuation</string>
@@ -1036,6 +1061,8 @@
     <string name="emoji_search">Search emoji by pinyin</string>
     <string name="emoji_search_hint">Type pinyin</string>
     <string name="picker_unlock">Go back after a symbol is picked</string>
+    <string name="number_pad_lock">Lock the number pad</string>
+    <string name="number_pad_unlock">Unlock the number pad</string>
     <string name="picker_title">Symbols</string>
     <string name="picker_chinese">Chinese punctuation</string>
     <string name="picker_short_recent">Recent</string>
@@ -1647,6 +1674,7 @@
     <string name="layout_finding_full_lacks">The number keyboard lacks %1$s: number fields cannot take it (an amount\'s minus, a decimal point)</string>
     <string name="layout_finding_bottom_left">The bottom left is usually %1$s (as in the app’s)</string>
     <string name="layout_finding_split_scaled">Split, this row has %1$s keys in %2$s, not 9 or 10: it cannot be halved and is scaled instead</string>
+    <string name="layout_finding_scroll_tight">The scroll list is too tight: an item is under 20 dp; lower show= or make it wider</string>
     <string name="word_offer">Remember:</string>
     <string name="word_offer_said">Can remember: %1$s, %2$s code %3$s</string>
     <string name="word_remembered">Remembered “%1$s”: %2$s %3$s</string>

@@ -110,6 +110,37 @@
     canvas.height = r.scene.height;
     shown = { scene: r.scene, keys: r.scene.json().keys, at: new Map() };
     paintShown();
+    columns();
+  }
+
+  // the scroll columns over the preview, the category the app shows in the env's field, to scroll through: a tap
+  // types nothing here, it selects the column as a tap on a key does
+  function columns() {
+    const over = $('preview-columns');
+    over.textContent = '';
+    if (!shown) return;
+    const j = shown.scene.json();
+    const placed = LE.scrolls(parsed());
+    j.slots.filter((x) => x.kind === 'scroll').forEach((s, n) => {
+      const across = s.direction === 'horizontal';
+      const items = (s.items || []).map((i) => {
+        const span = h('span', {}, i.label != null ? i.label : LE.FN_LABEL[i.command] || i.command);
+        span.style[across ? 'width' : 'height'] = 100 / s.show + '%';
+        return span;
+      });
+      // by its id, else the nth as the rows have it
+      const at = (s.id ? placed.find((p) => p.a.id === s.id) : placed[n]) || null;
+      const col = h('div', { className: across ? 'column across' : 'column', 'aria-hidden': 'true', onclick: () => {
+        if (!at) return;
+        sel = [withId(at.at)];
+        fragmentKey = null;
+        showTab('key');
+        paintShown();
+      } }, ...items);
+      const [l, t, r, b] = s.bounds;
+      Object.assign(col.style, { left: l / j.width * 100 + '%', top: t / j.height * 100 + '%', width: (r - l) / j.width * 100 + '%', height: (b - t) / j.height * 100 + '%' });
+      over.append(col);
+    });
   }
 
   function showProblems(list) {
@@ -448,6 +479,7 @@
     if (t === 'key') return keyTab(parsed());
     if (t === 'row') return rowTab(parsed());
     if (t === 'board') return boardTab();
+    if (t === 'scroll') return scrollTab(parsed());
     if (t === 'meta') return metaTab();
     return null;
   }
@@ -699,6 +731,9 @@
     const widths = line('宽度', field(a.width === 'fill' ? '' : a.width, (v) => set1({ width: v.trim() }), { type: 'number', min: 0, max: 100, step: 0.5, placeholder: units || '默认', disabled: fill, 'aria-label': '宽度' }),
       h('label', { className: 'inline' }, h('input', { type: 'checkbox', checked: fill, onchange: (e) => set1({ width: e.target.checked ? 'fill' : null }) }), '占满'), slider);
     const out = [h('h3', {}, (c.name === 'key' ? '键 ' : c.name === 'gap' ? '空位 ' : '位置 ') + (a.id || '')), moves, widths];
+    const span = line('跨行', field(a.rows, (v) => set1({ rows: v === '1' ? null : v }), { type: 'number', min: 1, max: 4, step: 1, placeholder: '1', 'aria-label': '跨几行' }));
+    if (c.name === 'slot') out.push(span);
+    if (c.name === 'slot' && a.kind === 'scroll') out.push(...scrollOptions(at, a));
     if (c.name !== 'key') return out;
     const shared = LE.sharedName(a, FORMAT.prefixes);
     const label = LE.labelParts(a.label);
@@ -717,7 +752,7 @@
       line('图标', a.icon && !iconName ? h('code', {}, a.icon) : choice(icons, iconName, (v) => set1({ icon: v || null }), { 'aria-label': '图标' }), iconPreview(iconName)),
       line('读屏念', field(a.a11y, (v) => set1({ a11y: v }), { 'aria-label': '读屏念什么', maxlength: 32 }),
         a.icon && !a.label && !a.a11y ? h('span', { className: 'bad' }, '图标键必填') : null),
-      line('跨行', field(a.rows, (v) => set1({ rows: v === '1' ? null : v }), { type: 'number', min: 1, max: 4, step: 1, placeholder: '1', 'aria-label': '跨几行' })),
+      span,
       line('种类', choice(KINDS, a.kind || '', (v) => set1({ kind: v || null }), { 'aria-label': '种类' })),
     );
     if (a.letters || (LM.info(xml) || {}).family === 'grouped') {
@@ -831,6 +866,37 @@
       } }), LM.PAD_LABEL[pad] || pad))));
     }
     if (a.family === 'grouped') out.push(h('h3', {}, '分组字母'), groupBar());
+    return out;
+  }
+
+  // a scroll column's category, direction and how many items it shows: the 「滑动列」 tab's and the key tab's alike
+  function scrollOptions(at, a) {
+    const set1 = (values) => edit(LE.setAttrs(xmlNow(), at, values));
+    const most = FORMAT.scroll.maxShow;
+    return [
+      line('类别', choice(FORMAT.scroll.lists.map((id) => [id, LM.SCROLL_LABEL[id] || id]), a.list || '', (v) => set1({ list: v }), { 'aria-label': '滑动列类别' })),
+      line('方向', choice(LM.DIRECTIONS, a.direction || 'vertical', (v) => set1({ direction: v === 'vertical' ? null : v }), { 'aria-label': '滑动方向' })),
+      line('显示几项', choice(Array.from({ length: most }, (_, i) => [String(i + 1), String(i + 1)]), a.show || '4', (v) => set1({ show: v === '4' ? null : v }), { 'aria-label': '显示几项' })),
+    ];
+  }
+
+  function scrollTab(p) {
+    const xml = xmlNow();
+    const family = (LM.info(xml) || {}).family;
+    const at = sel.length === 1 ? sel[0] : null;
+    const why = LE.scrollProblem(xml, family, at, FORMAT);
+    const out = [h('p', { className: 'muted' }, '滑动列是一列能滑动的符号，内容由 App 按类别给（用户在「按键字符和快捷键」的「滑动列」里改）。宽度、跨几行在「键」页调，删除也在「键」页。')];
+    for (const s of LE.scrolls(p)) {
+      out.push(h('h3', {}, '滑动列 ' + (s.a.id || '') + '（第 ' + (s.at.row + 1) + ' 行）'),
+        line('', button('选中它', () => { sel = [withId(s.at)]; fragmentKey = null; showTab('key'); paintShown(); })),
+        ...scrollOptions(s.at, s.a));
+    }
+    out.push(line('', button('加一列', () => {
+      const r = LE.addScroll(xmlNow(), at, family, FORMAT, source);
+      if (r.error) return toast(r.error);
+      edit(r.xml, r.at);
+      toast('在' + (at ? '选中的格子' : '第一行') + '左边加了一列（宽是整行的 16%、跨 ' + (LE.cellAt(LE.parse(r.xml), r.at).a.rows || 1) + ' 行）：到「键」页改宽度和跨几行');
+    }, { disabled: !!why, title: why || '' })), why && h('p', { className: 'muted' }, why));
     return out;
   }
 

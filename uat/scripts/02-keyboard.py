@@ -898,3 +898,57 @@ def kb116(d):
     term = d.testbed_state()["terminal"]
     check(term["text"] == "ls" and term["focused"], f"终端框里 {term['text']!r}，焦点 {term['focused']}")
     return f"多行框 {s1} → {s2}；打着拼音 {s3}；网页框整段选中；终端框只提示"
+
+
+@case("KB-117", base="B0-九键", mutates=True, visual=True)
+def kb117(d):
+    p = script("04-panels")
+    d.open_page("text")
+    d.clear()
+    before = p.column_texts(d)
+    q = p.item_of(d, "？", "?")
+    menu = p.hold_item(d, q, pick="移到最前")
+    check(set(menu) == set(p.MENU), f"长按 ? 的菜单是 {sorted(menu)}")
+    now = p.column_texts(d)
+    check(now and now[0] in ("？", "?"), f"移到最前后左列是 {now}（之前 {before}）")
+    check(not (d.field_text() or ""), f"长按后框里有「{d.field_text()}」")
+    q = p.item_of(d, "？", "?")
+    x, y = q.c
+    d.touch(("down", x, y), ("sleep", 0.9))
+    menu = p.menu_nodes(d.screen())
+    d.shot("kb", "1-2. 菜单在 ? 上，三项有图标；已在最前，移到最前是灰的")
+    d.touch(("up", x, y))
+    time.sleep(0.6)
+    check("移到最前" in menu and not menu["移到最前"].enabled, f"已在最前，移到最前 {'灰' if '移到最前' in menu and not menu['移到最前'].enabled else '不灰'}")
+    check(not p.menu_nodes(d.screen()) and not (d.field_text() or ""), f"原地松开后：菜单 {sorted(p.menu_nodes(d.screen()))}，框里「{d.field_text()}」")
+    check(p.column_texts(d)[:1] == now[:1], f"原地松开后左列变成 {p.column_texts(d)}")
+    t = p.item_of(d, "～", "~")
+    p.hold_item(d, t, pick="删除这一项")
+    every = p.column_all(d)
+    check("～" not in every and "~" not in every, f"删了 ~ 后左列还有：{every}")
+    nine = every
+    d.open_page("url")
+    url = p.item_of(d, ".com")
+    p.hold_item(d, url, pick="删除这一项")
+    urls = p.column_all(d)
+    check(".com" not in urls, f"网址框删了 .com 后：{urls}")
+    d.open_page("text")
+    again = p.column_all(d)
+    check(again == nine, f"普通框的九键左列变了：{again}（之前 {nine}）")
+    n = p.column(d)[0][1]
+    p.hold_item(d, n, pick="编辑这一列…")
+    d.wait(lambda s: s.find(text="确定"), 10, what="滑动列的编辑框")
+    d.shot("app", "5. 编辑这一列…：滑动列卡片上九键的编辑框")
+    s = d.screen()
+    check(s.find(text="九键") or s.find(contains="九键"), f"编辑框不是九键的：{s.texts()[:12]}")
+    d.back()
+    d.open_page("text")
+    v = p.column_node(d)
+    x0, y0, x1, y1 = v.b
+    cx = (x0 + x1) // 2
+    d.touch(("down", cx, y1 - 20), *[("move", cx, y1 - 20 - (y1 - y0) * i // 12) for i in range(1, 6)], ("sleep", 1.0))
+    held = p.menu_nodes(d.screen())
+    d.touch(("up", cx, y1 - 20 - (y1 - y0) * 5 // 12))
+    time.sleep(0.5)
+    check(not held, f"滑到一半停住弹了菜单：{sorted(held)}")
+    return f"移到最前后 {now[:3]}；删 ~ 后 {nine}；网址删 .com 后 {urls}；编辑框九键；滑停不弹"

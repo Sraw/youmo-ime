@@ -132,6 +132,18 @@ class KeyDataTest {
     }
 
     @Test
+    fun a062NumberBoardsSignKeysStillTakeNothingWrittenHeldOrSwiped() {
+        val text = testData("layout-check/number-062.xml")
+            .replace("<key id=\"+\"", "<key id=\"+\" swipe-up=\"commit:x\"").replace("<key id=\"#\"", "<key id=\"#\" long-press=\"commit:y\"")
+        val r = pack("number", text)
+        assertNull(keys(r.layout).getValue("+").attrs.actions["swipe-up"])
+        assertNull(keys(r.layout).getValue("#").attrs.actions["long-press"])
+        assertEquals(listOf("swipe-up", "long-press"), r.ignored.map { it.what })
+        val own = KeyData.of("my-number", read(text.replaceFirst("id=\"number\"", "id=\"my-number\" based-on=\"number\"")), emptyMap(), KeyData.Mode.Own)
+        assertNull(keys(own.layout).getValue("+").attrs.actions["swipe-up"])
+    }
+
+    @Test
     fun theLookupOrderOnABoardThatReads() {
         val held = { s: String -> KeyData.Held(actions = mapOf("swipe-up" to s)) }
         val app = mapOf(

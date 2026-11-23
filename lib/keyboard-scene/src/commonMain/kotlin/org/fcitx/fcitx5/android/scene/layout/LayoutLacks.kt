@@ -80,7 +80,7 @@ internal object LayoutLacks {
 
     private fun order(what: String): Int = LACKS_ORDER.indexOf(what).let { if (it < 0) LACKS_ORDER.size else it }
 
-    private fun slots(c: List<Cell>) = c.filterIsInstance<Slot>().map { it.kind }.toSet()
+    private fun slots(c: List<Cell>) = c.filterIsInstance<Slot>().map { it.kind }.filter { it in LayoutReader.NEEDED_SLOTS }.toSet()
 
     private fun roles(c: List<Cell>) = c.filterIsInstance<Key>().mapNotNull { it.attrs.role }.toSet()
 
@@ -95,9 +95,9 @@ internal object LayoutLacks {
     private const val PANEL_BACK = "panel-back"
 
     /** What 0.6.0 refused any theme pack's board for lacking, drawing the app's (its `judge`): a slot, ⌫, 回车, 地球键, a digit. */
-    val REFUSED_060: Set<String> = LayoutCheck.ROLES + LayoutReader.SLOT_KINDS + setOf(LANG_NO_SPACE, DIGITS, PAD_DIGITS)
+    val REFUSED_060: Set<String> = LayoutCheck.ROLES + LayoutReader.NEEDED_SLOTS + setOf(LANG_NO_SPACE, DIGITS, PAD_DIGITS)
 
-    private val LACKS_ORDER = listOf("backspace", "enter", "back", PANEL_BACK, LANG, SPACE, "shift", DIGITS, PAD_DIGITS, LETTERS) + LayoutReader.SLOT_KINDS
+    private val LACKS_ORDER = listOf("backspace", "enter", "back", PANEL_BACK, LANG, SPACE, "shift", DIGITS, PAD_DIGITS, LETTERS) + LayoutReader.NEEDED_SLOTS
 
     /** A number board's keys typing a letter (a tap's text, or `letters=`): told, a number field wants none. */
     fun padLetters(layout: Layout, fragments: Map<String, Fragment>): List<Finding> {

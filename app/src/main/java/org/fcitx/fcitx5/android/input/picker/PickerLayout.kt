@@ -19,7 +19,6 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.keyboard.customLayout
 import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Texts
@@ -52,11 +51,8 @@ class PickerLayout(
     class Keyboard(context: Context, theme: Theme, board: String, sceneLayout: String, custom: String? = null) :
         BaseKeyboard(context, theme, themeBoard = board) {
 
-        private var locked = false
-
         fun showLocked(locked: Boolean) {
             this.locked = locked
-            canvas?.invalidateScene()
         }
 
         /** False with no scene. */
@@ -72,15 +68,7 @@ class PickerLayout(
                 back = context.getString(R.string.picker_back),
                 punctuation = keysPunctuation, // , and . as typed ({punct:,}: 显示和输出一致)
             ).withReturn()
-            val env = SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = keyMarks(layout))
-            return if (locked) env.copy(states = LOCKED) else env
-        }
-
-        // said as what a tap does, as its view said
-        override fun sceneString(name: String): String? = when (name) {
-            "a11y_key_panel_lock_on" -> context.getString(R.string.picker_unlock)
-            "a11y_key_panel_lock_off" -> context.getString(R.string.picker_lock)
-            else -> null
+            return SceneEnvs.of(this, look, theme.isDark, width, height, Input(holdVoice = holdsToTalk), texts = texts, marks = keyMarks(layout))
         }
 
         // last: the scene reads the keyboard's state
@@ -91,10 +79,6 @@ class PickerLayout(
             canvas?.addOnLayoutChangeListener { _, l, t, r, b, oldL, oldT, oldR, oldB ->
                 if (r - l != oldR - oldL || b - t != oldB - oldT) post { (parent as? View)?.requestLayout() }
             }
-        }
-
-        private companion object {
-            val LOCKED = mapOf("lock" to setOf(KeyState.Locked))
         }
     }
 

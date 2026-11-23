@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.layout.Condition
+import org.fcitx.fcitx5.android.scene.layout.Direction
 import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.scene.layout.Gap
 import org.fcitx.fcitx5.android.scene.layout.Key
@@ -363,5 +364,53 @@ class LayoutReaderTest {
         assertEquals(listOf("zy9/2", null, "zy9/3"), names("zhuyin-nine", taken))
         val twice = "<row><key id=\"2\" label=\"ABC\" shortcut=\"t9/9\"><popup from=\"nine\"/></key><key id=\"9\" label=\"WXYZ\"><popup from=\"nine\"/></key></row>"
         assertEquals(listOf("t9/9", null), names("nine", twice))
+    }
+
+    private fun scrollBoard(cells: String, family: String = "number", row: String = "<row>") =
+        "<keyboard xmlns=\"$ns\" id=\"test\" name=\"t\" family=\"$family\" columns=\"10\">\n$row$cells<key id=\"1\" label=\"1\"/></row>\n</keyboard>"
+
+    // a layout names a scroll column's category and look; its items are the app's
+    @Test
+    fun aScrollSlotReadsItsListDirectionAndShow() {
+        val l = LayoutReader.layout(scrollBoard("<slot id=\"s\" kind=\"scroll\" list=\"url\" direction=\"horizontal\" show=\"6\" width=\"3\"/>")).ok()
+        val s = assertIs<Slot>(l.parts.filterIsInstance<Row>().single().cells[0])
+        assertEquals("scroll", s.kind)
+        assertEquals("url", s.list)
+        assertEquals(Direction.Horizontal, s.direction)
+        assertEquals(6, s.show)
+        val d = assertIs<Slot>(LayoutReader.layout(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>")).ok().parts.filterIsInstance<Row>().single().cells[0])
+        assertEquals(Direction.Vertical, d.direction)
+        assertEquals(Slot.DEFAULT_SHOW, d.show)
+        assertEquals("function" to Face.Keep, d.look to d.face, "drawn on the function keys' block when the layout says nothing")
+        val own = assertIs<Slot>(LayoutReader.layout(scrollBoard("<slot kind=\"scroll\" list=\"nine\" look=\"letter\" face=\"default\"/>")).ok().parts.filterIsInstance<Row>().single().cells[0])
+        assertEquals("letter" to Face.Default, own.look to own.face)
+        for (family in LayoutReader.SCROLL_FAMILIES) assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", family)), family)
+    }
+
+    @Test
+    fun aScrollSlotWrittenWrongDoesNotRead() {
+        // each with what its problem says, so another problem of the board does not stand for it
+        val wrong = mapOf(
+            "no list" to (scrollBoard("<slot kind=\"scroll\"/>") to "list= is required"),
+            "a category the app has not" to (scrollBoard("<slot kind=\"scroll\" list=\"symbols\"/>") to "list=\"symbols\" is not"),
+            "a list on the nine keys' column" to (scrollBoard("<slot kind=\"nine-side\" list=\"nine\"/>", "nine") to "list= is a scroll slot's"),
+            "a direction on another kind" to (scrollBoard("<slot kind=\"nine-side\" direction=\"vertical\"/>", "nine") to "direction= is a scroll slot's"),
+            "show of 0" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\" show=\"0\"/>") to "show=\"0\" is not"),
+            "show of 9" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\" show=\"9\"/>") to "show=\"9\" is not"),
+            "a direction it has not" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\" direction=\"diagonal\"/>") to "direction=\"diagonal\" is not"),
+            "items" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"><item text=\"a\"/></slot>") to "<item> is not allowed in <slot>"),
+            "three" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>".repeat(3)) to "more than 2 scroll slots"),
+            "the symbol panel" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "symbols") to "not symbols"),
+            "the emoji search" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "emoji-search") to "not emoji-search"),
+            "a row split in halves" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "letters", "<row split=\"halves\">") to "split in halves"),
+        )
+        for ((why, case) in wrong) {
+            val (text, says) = case
+            assertTrue(problems(text).any { says in it }, "$why: ${problems(text)}")
+        }
+        assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "letters", "<row split=\"halves\">").replace("scroll", "nine-side").replace(" list=\"nine\"", "")))
+        assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>".repeat(2))), "two are allowed")
+        val fragment = "<fragment xmlns=\"$ns\" id=\"f\"><row><slot kind=\"scroll\" list=\"nine\"/></row></fragment>"
+        assertTrue(LayoutReader.fragment(fragment).problems().any { "not a fragment" in it.message }, "a fragment's board is not known")
     }
 }

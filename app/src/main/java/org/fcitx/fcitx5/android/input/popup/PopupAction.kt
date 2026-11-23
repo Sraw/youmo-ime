@@ -38,10 +38,12 @@ sealed class PopupAction {
         val bounds: Rect,
     ) : PopupAction()
 
+    /** [disabled]: items faded, picking nothing. */
     data class ShowMenuAction(
         override val key: KeyRef,
         val menu: KeyDef.Popup.Menu,
-        val bounds: Rect
+        val bounds: Rect,
+        val disabled: Set<Int> = emptySet(),
     ) : PopupAction()
 
     /** [down]: opened by a swipe down (PopupMenuUi.Fixed). [outShown]: whether it opened. */

@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.theme
 
-import org.fcitx.fcitx5.android.input.keyboard.NumberPad
 import org.fcitx.fcitx5.android.input.theme.LookFixtures.slice
 import org.fcitx.fcitx5.android.scene.look.KeyFill
 import org.fcitx.fcitx5.android.scene.look.KeyKind
@@ -54,9 +53,9 @@ class KeyNamesTest {
     }
 
     @Test
-    fun everySignOfEveryPadIsNamed() {
-        val signs = NumberPad.entries.flatMap { it.left + it.besideNine + it.bottom }.filter { it.isNotEmpty() }
-        assertTrue(KeyNames.POSITIONS.getValue("number").containsAll(signs))
+    fun everySignAPadKeepsAsAKeyIsNamed() {
+        // the rest are items of its scroll list, no keys
+        assertEquals((0..9).map(Int::toString) + listOf("=", ".", "side"), KeyNames.POSITIONS.getValue("number"))
     }
 
     @Test

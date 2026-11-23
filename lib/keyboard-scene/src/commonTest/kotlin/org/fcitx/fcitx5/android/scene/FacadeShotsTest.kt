@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.engine.MarkSettings
 import org.fcitx.fcitx5.android.scene.engine.Shift
 import org.fcitx.fcitx5.android.scene.engine.Texts
 import org.fcitx.fcitx5.android.scene.json.EnvJson
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.ThemeLookReader
 import org.fcitx.fcitx5.android.scene.engine.LetterCase
@@ -92,6 +93,7 @@ class FacadeShotsTest {
             states = mapOf("reading" to setOf(KeyState.On), "lock" to setOf(KeyState.Locked, KeyState.Disabled)),
             board = "qwerty",
             typed = setOf("letters"),
+            scrollItems = mapOf("nine" to listOf(ScrollItem.Text("，"), ScrollItem.Text("#", asIs = true), ScrollItem.Command("copy")), "url" to emptyList()),
         )
         assertEquals(env, EnvJson.read(FacadeShots.env(env)).ok())
     }
@@ -111,6 +113,8 @@ class FacadeShotsTest {
         assertTrue(EnvJson.read("{\"width\": \"1\", \"height\": 2, \"density\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"dark\": 1}") is Parsed.Failed)
         assertTrue(EnvJson.read("{") is Parsed.Failed)
+        val blank = EnvJson.read("{\"width\": 1, \"height\": 2, \"density\": 1, \"scrollItems\": {\"nine\": [\n{}]}}")
+        assertTrue(blank is Parsed.Failed && blank.problems.single().line == 2 && "command" in blank.problems.single().message, "$blank")
     }
 }
 
@@ -152,6 +156,20 @@ object FacadeShots {
             "states" to env.states.takeIf { it != d.states }?.let { s -> obj(s.entries.map { (k, v) -> k to arr(v.map { str(it.xml) }.sorted()) }) },
             "board" to (if (env.board == d.board) null else nullable(env.board)),
             "typed" to (if (env.typed == d.typed) null else env.typed?.let { t -> arr(t.sorted().map(::str)) } ?: "null"),
+            "scrollItems" to env.scrollItems?.let { lists ->
+                obj(
+                    lists.entries.map { (id, items) ->
+                        id to arr(
+                            items.map {
+                                when (it) {
+                                    is ScrollItem.Text -> obj("text" to str(it.text), "asIs" to bool(it.asIs, false))
+                                    is ScrollItem.Command -> obj("command" to str(it.key))
+                                }
+                            },
+                        )
+                    },
+                )
+            },
         )
     }
 
@@ -166,7 +184,7 @@ object FacadeShots {
             s("field", i.field, d.field), s("action", i.action, d.action), b("voice", i.voice, d.voice), b("holdVoice", i.holdVoice, d.holdVoice),
             b("langKey", i.langKey, d.langKey), b("composing", i.composing, d.composing), b("lookingUp", i.lookingUp, d.lookingUp),
             b("tableLookUp", i.tableLookUp, d.tableLookUp),
-            s("pad", i.pad, d.pad),
+            s("pad", i.pad, d.pad), s("fieldPad", i.fieldPad, d.fieldPad),
         )
     }
 

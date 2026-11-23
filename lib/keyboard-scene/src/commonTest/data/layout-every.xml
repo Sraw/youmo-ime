@@ -26,6 +26,7 @@
   <row>
     <key id="d" label="d" width="1"><popup from="preset" preset="q"/></key>
     <key id="e" label="e"><popup from="none"/></key>
+    <slot id="sc" kind="scroll" list="url" direction="horizontal" show="6" width="10" look="function" face="keep"/>
   </row>
   <include src="grouped-bottom" when="!roots"/>
 </keyboard>

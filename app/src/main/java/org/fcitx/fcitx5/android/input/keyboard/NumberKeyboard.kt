@@ -40,6 +40,13 @@ class NumberKeyboard(
         return SceneEnvs.of(this, look, theme.isDark, width, height, Input(pad = pad.id), texts = texts, marks = keyMarks(layout))
     }
 
+    // the panel's words (选完符号后停留) say nothing of a pad kept across fields
+    override fun sceneString(name: String): String? = when (name) {
+        "a11y_key_panel_lock_on" -> context.getString(R.string.number_pad_unlock)
+        "a11y_key_panel_lock_off" -> context.getString(R.string.number_pad_lock)
+        else -> super.sceneString(name)
+    }
+
     // last: the scene reads the pad. The user's board where it reads and is taken, the app's where it is not
     init {
         drawKeysWithScene(custom?.let { customLayout(context, it) } ?: SceneLayouts.of(context, LAYOUT))

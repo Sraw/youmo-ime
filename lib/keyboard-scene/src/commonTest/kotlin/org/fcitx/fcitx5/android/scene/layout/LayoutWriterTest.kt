@@ -63,6 +63,18 @@ class LayoutWriterTest {
     }
 
     @Test
+    fun aScrollSlotsLookIsWrittenWhereItIsNotAColumnsOwn() {
+        fun slot(attrs: String) = LayoutWriter.write(
+            LayoutReader.layout(
+                "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"number\">" +
+                    "<row><slot kind=\"scroll\" list=\"number\"$attrs/><key id=\"a\" label=\"a\"/></row></keyboard>",
+            ).ok(),
+        ).lines().single { "<slot" in it }.trim()
+        assertEquals("<slot kind=\"scroll\" list=\"number\"/>", slot(" look=\"function\" face=\"keep\""))
+        assertEquals("<slot kind=\"scroll\" list=\"number\" face=\"default\" look=\"letter\"/>", slot(" look=\"letter\" face=\"default\""))
+    }
+
+    @Test
     fun aGapsLookIsNotWritten() {
         val l = LayoutReader.layout(
             "<keyboard xmlns=\"${LayoutReader.NAMESPACE}\" id=\"t\" name=\"t\" family=\"symbols\">" +

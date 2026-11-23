@@ -83,6 +83,40 @@ test("a scene's keys, slots and size as a page reads them", () => {
   assert.ok(space && space.sound === 'space', JSON.stringify(space));
 });
 
+test("a scroll column's category, direction and show, and the app's lists a page draws it with", () => {
+  const s = built(shots.shots.find((x) => x.name === 'number-items-full'));
+  const side = s.json().slots.find((x) => x.kind === 'scroll');
+  assert.deepEqual([side.id, side.list, side.direction, side.show], ['side', 'number', 'vertical', 4]);
+  const d = E.scrollDefaults();
+  assert.deepEqual(Object.keys(d), ['nine', 'nine-english', 'number', 'phone', 'datetime', 'url', 'email']);
+  assert.deepEqual(d.number.slice(0, 2), [{ text: '+', asIs: false }, { text: '-', asIs: false }]);
+  assert.ok(Object.values(d).every((items) => items.length > 0 && items.every((i) => typeof i.text === 'string' || typeof i.command === 'string')));
+  // the lists passed back in: drawn in the column, none passed: nothing there
+  const env = shots.shots.find((x) => x.name === 'number-block').env;
+  const light = theme(shots.shots.find((x) => x.name === 'number-block').theme);
+  const texts = (e) => E.buildScene('number', light, e, fixed).scene.text().split('\n').filter((l) => l.startsWith('  text "+"'));
+  assert.equal(texts(env).length, 0);
+  assert.equal(texts(Object.assign({}, env, { scrollItems: d })).length, 1);
+});
+
+test("a column's category and items as the app shows them in the env's field and input method", () => {
+  const block = shots.shots.find((x) => x.name === 'number-block');
+  const light = theme(block.theme);
+  const column = (board, input) => E.buildScene(board, light, Object.assign({}, block.env, { input }), fixed).scene.json().slots.find((x) => x.kind === 'scroll' || x.kind === 'nine-side');
+  const full = column('number', { pad: 'full' });
+  assert.equal(full.shown, 'number');
+  assert.deepEqual(full.items.slice(0, 3).map((i) => i.label), ['+', '-', '*']);
+  const phone = column('number', { field: 'number', pad: 'phone' });
+  assert.equal(phone.shown, 'phone');
+  assert.deepEqual(phone.items.slice(0, 3).map((i) => i.label), ['+', '*', '#']);
+  // the nine keys' marks to the env's Chinese punctuation, a url field's own list; syllables while typing: none here
+  assert.deepEqual(column('nine', { ime: 'pinyin' }).items.slice(0, 2).map((i) => i.label), ['，', '。']);
+  assert.equal(column('nine', { ime: 'pinyin', field: 'url' }).shown, 'url');
+  const typing = column('nine', { ime: 'pinyin', composing: true });
+  assert.equal(typing.shown, null);
+  assert.equal(typing.items, null);
+});
+
 test('a theme 3.0 is made 4.0 as the JVM makes it, its files named alike', () => {
   const c = E.convert30(read(data, 'look-3.0.json'));
   assert.ok(c.ok, JSON.stringify(c.problems));

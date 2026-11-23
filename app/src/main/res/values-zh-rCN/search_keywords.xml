@@ -185,4 +185,11 @@
         <item>切换输入法快捷键</item>
         <item>Ctrl+Space</item>
     </string-array>
+    <string-array name="kw_scroll_lists">
+        <item>左列</item>
+        <item>符号列</item>
+        <item>九键左边</item>
+        <item>数字键盘符号</item>
+        <item>运算符</item>
+    </string-array>
 </resources>

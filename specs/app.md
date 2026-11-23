@@ -283,7 +283,8 @@ encrypted storage, where before the first unlock the cache migrates the old keys
 (按键字符和快捷键, eight keyboards' cards over one card of the picked board's keys, the 九键 one replacing 0.5's 按键长按) draws the current theme's layouts,
 starts a key from the resolver (`SceneBoard.resolver` with the variant given: `semicolon = true`, the user's 按键字母,
 so 18 键's L shows its `:`), every item moved, deleted and made the first alike, and saves the whole list through
-`KeyLists.with`. The symbol picker's cells keep a built-in long press (`PickerLongPress`), outside the model. Every key has two slots, up and down
+`KeyLists.with`. The symbol picker's cells keep a built-in long press (`PickerLongPress`), outside the model.
+The scroll lists (the nine keys' and the number pads' left column, seven categories of keyboard-scene's `ScrollDefaults`: `nine`, `nine-english`, `number`, `phone`, `datetime`, `url`, `email`) are the user's in `scroll_lists`, read and written by ime-core's `ScrollListStore`: `@1`, then a line a category, `id\t<t|r|c>|item\t…` (`t` a text, `r` one 不转中文标点, `c` a `KeyCommand`'s key), at most 24 items, a text 16 code points, a command whole; a category equal to its default, empty or unreadable is no line (the default), an unknown command kept as it is and written back, a later head (`@2`) read as no lists and never written over (the editor read only). Kept out of `key_lists`: a layout may name a key `scroll/x`, an older version rewrites all of `key_lists` (16 items) on any long press edit, and a `UserList`'s items are bare texts, a command and a text of its name one item. Like `key_lists` a plain `string`, not `hidden`, so a backup brings it; 0.6.2 never reads it. Its editor is 按键字符和快捷键's 滑动列 card (`ScrollListsCard`, before 功能键; not a page of `KeyShortcutPages`, so presets, flip, multi-select and undo never reach it), the same `chars()` and `PopupEditor` with no first, items dragged (`View.startDragAndDrop`; a long press's are never), commands added and drawn as their icons (an editor item `\u0000`+key, `ScrollListStore.editorItem`), 不转中文标点 on `nine` and `nine-english` alone, no 使用变量; saved by itself, no undo step; 全部恢复默认 resets it too, and that step alone records it (`Snapshot.scroll`), so its undo brings the lists back (voided once they change after). In `syncToDeviceEncryptedStorage`'s list and followed there on every change (`AppPrefs.followScrollListsInDeviceEncryptedStorage`, the keyboard's menu writing it with no settings page to stop): before the first unlock the column reads that copy and its menu is all disabled, a write there being lost to the next sync. `SettingsRoute.ScrollList(id)` opens a category's editor, a launch route for the seven ids alone (`AppUtil.isLaunchRoute`, `launchMainToScrollList`). Every key has two slots, up and down
 (060-swipe-slots; `SwipeSlots` in ime-core, `KeyDef.shortcut` naming the key, `fn/<name>` a function
 key; stored in `key_swipes` as `@1\t<first-up|first-down>` then a line a slot over `SwipeSlotPreset`'s),
 each the long press's first, a command, a text or nothing; 上滑 and 下滑 (`swipe_up`, `swipe_down`)
@@ -1064,26 +1065,53 @@ is often not what it takes, and a field drops what it refuses. A user's board na
 `signed`, `decimal`, `signed-decimal`) in `pads=` is read as for `full` (`LayoutReader`, with a reader warning); a key
 `when="pad=…"` of them never holds (a reader warning too); a board whose full pad lacks `-` or `.` is warned of (`pad-lacks`). The board has one
 id, `number`, as the theme names the board (P3 styles `number/<key>`), each pad's
-own `NumberKeyboard` drawing it. Its digits and `+ - * / , = .` are `sym:KP_…`: the `action:` table sends
+own `NumberKeyboard` drawing it. Its digits, `=` and `.` are `sym:KP_…`: the `action:` table sends
 every `KP_` keysym with NumLock (`NumLockState`), as `NumPadKey` did (`keypad:`, a typing keyboard's
 corner digit, stays Virtual). The board's `preview="off" popups="off"` are applied to each key
 (`SceneKeyDef.onBoard`): no bubble, and a key of no name pops up no long press; a named key (`fn/…`, `num/N`)
 keeps the resolver's list, the user's data (`KeyResolving.opens` does not read the board: the emoji panel's ，。, the pad's
 space and digits); a menu written on a key pops up, so
 Return offers Emoji as on every other keyboard (the views swallowed it: rules C 疑问 8, fixed on the
-canvas alone, `NumberSceneGesturesTest`). ⌫ is right of 3 on every pad, as on the nine keys (0.6.1); the key a
-pad had there (`/`, the phone's `-`, `NumberPad.besideNine`) is right of 9. A place a pad has no key for is a `<gap>`:
+canvas alone, `NumberSceneGesturesTest`). ⌫ is right of 3 on every pad, as on the nine keys (0.6.1); right of 9 the
+full pad's `=` (`kind="letter" class="alt-text"`), a gap on the others. A place a pad has no key for is a `<gap>`:
 drawn nothing, the keyboard's fill showing (0.6.1, user 2026-11-13: 0.6.0 drew a faded key's face there, which
 the 按键样式's spacing left bigger than the keys), no touch, no node. A 0.6.0 layout's `<gap look=…>` still reads
 and is drawn nothing all the same, a theme pack's number.xml too (`NumberPadsTest`). The space is still `button_mini_space` to TalkBack (`KeyNames.BOARD_RESOURCES`, read by board).
 Since 0.6.1 (user 2026-11-14, dev/design/061-layout-survey.md Q1-A, Q3-1) the pads are on the nine keys' frame,
 columns 16 / 22 / 22 / 22 / 18, and the bottom row's first two places are the letter boards': `符` first (the
 nine keys' key: `kind="function"`, its look and words), then the way back where the letters have 123 (`返回`,
-`label="{back}"`, `Texts.back` = `picker_back`, as the panels'); `符 16 | 返回 14 | , 8 | 0 22 | = 12 | . 10 | ⏎ 18`,
-0 under 8. Going 123 from the nine keys moves none of 1–9, ⌫, Return, 符; 返回 sits on 123
+`label="{back}"`, `Texts.back` = `picker_back`, as the panels'); since 0.6.3 `符 16 | 返回 14 | 锁 10 | 0 30 | . 12 | ⏎ 18`,
+0's centre under 8, the phone's `.` a gap; 锁 is `role="lock" send="panel-lock"` (`StickyNumbers`, below). Going 123 from the nine keys moves none of 1–9, ⌫, Return, 符; 返回 sits on 123
 (`NumberPadsTest.everyPadSitsOnTheNineKeysFrame`). The symbol panel's row is the other way round (Q4-a):
 `返回 | 123 | 锁 | 空格 | ⌫ | ⏎`, its 123 the letters' (words, function face, no `a11y=`, read 123). The emoji's
 and emoticons' way back says `{back}` too (Q2; was ABC). A pack's own number.xml or symbols.xml keeps its own row.
+
+Since 0.6.3 (dev/design/063-number-pad-t9) the pads' left column over rows 1–3 is a `scroll` slot (`list="number"`), the
+pad's signs no keys of their own: one native view for every scroll slot and the nine keys' `nine-side`, `ScrollColumn`
+(a `ScrollView`, a `HorizontalScrollView` for `direction="horizontal"`; `show` items in view, 16 dp, `altKeyTextColor`, a
+command its `KeyShortcutLooks` icon), over the slot whose face the scene draws. `ScrollColumns`, one per keyboard on
+`BaseKeyboard`, makes a column per slot by place, lays them out in the canvas's pass (`KeyboardCanvasView.slots`) and
+reads what each shows from keyboard-scene's `ScrollLists.shown(kind, list, field, fieldPad, pad, ime, composing)`: an
+address field's `url`/`email`, else a phone or date field's (`BaseKeyboard.fieldPad`, `NumberPad.fieldOf`) or pad's
+`phone`/`datetime`, on every keyboard, else the slot's `list=` (`nine-side`: `nine` or `nine-english`, pinyin's
+syllables while typing); the items the user's (`ScrollListStore`, `scroll_lists`, above), read again as it changes.
+A tap types `ScrollLists.typed`: the pads' `+ - * / , . =` the keypad keys they were (`KP_…` with NumLock, so the engine
+commits a candidate first and no input method makes them full-width), the nine keys' marks as the punctuation keys
+(held while 中文标点 is not known; English types a single one as its key), a `KeyCommand` run unless it reads the field
+in a password. Touches: `BaseKeyboard.findTouchTarget` asks the columns first and hands a finger landing in one to it
+alone, as its own target in the keyboard's per-finger dispatch (the keyboard intercepts as before: a child taking the
+finger would have the others cancelled); a second finger on a column does nothing and voids the first's tap (not its
+drag once the column has moved), one on a key types, a column's finger never glides. A press held `longPressDelay` without passing the touch slop or scrolling opens the item's menu
+(删除这一项 / 移到最前 / 编辑这一列…, `KeyAction.ScrollList`, each a TalkBack action too; picked by moving onto an item
+and lifting, the last item's delete, the first's 移到最前 and all three of a newer `scroll_lists` or before the first unlock disabled), written
+back through `ScrollListStore`; 编辑这一列… is `AppUtil.launchMainToScrollList`. Syllables have no menu.
+Where a column sits: another field shows every column from its start, the keyboards kept for later too
+(`KeyboardWindow.onStartInput` → `toStart`); the same field keeps it. ime-core's `FieldTrack` tells which, the last
+start only (a field in between is a new start): the same EditorInfo, else the same app, view id, input type, field name
+and hint, a view id unset (a WebView made in code, say) only on onStartInputView's `restarting`, so such a WebView's inputs
+alike in all are one and it left and come back to starts anew. A list changed in place (a delete, 中文标点, the items
+read again) keeps the place; the nine keys' syllables and a category changed start over. A keyboard remade (a turn,
+a theme, a setting) starts over too: its columns are new views.
 
 Any key in the `:disabled` state is faded the same way by the engine (`SceneBuilder.node`: every op of the face,
 words and marks at `Popups.DISABLED_ALPHA`), and `SceneTouch.Pointer` takes no press on it (no tap, no long press,
@@ -1215,14 +1243,40 @@ report descriptor), whose event node takes the same `sendevent`; `up` fails if n
 A number's, a phone's or a date's field opens a number pad of its own (`NumberPad.of(EditorTraits.number)`:
 the keys beside the digits blank (a `<gap>` of number.xml: no press, drawn nothing, no node, nothing for TalkBack) where the field takes none, a plain number
 field's the whole pad, a PIN's the digits alone; `FieldPad` in `KeyboardWindow` maps the 123 key and
-`Unchanged` to that pad within the field; a pad is never remembered, so the next text field gets its letters).
+`Unchanged` to that pad within the field; a pad is never remembered, so the next text field gets its letters unless `StickyNumbers` keeps the number pad, below).
+
+Whether the number pad stays for the next field is `StickyNumbers` (ime-core), one instance held by the service,
+so replacing the `InputView` (a turn, one-handed, floating, a theme) keeps it; nothing is saved to prefs. Its modes:
+- `Off`;
+- `Armed`: the user opened the pad (123) in a field without a pad of its own; the next field of the same app keeps it
+  while the keyboard stays up and that field is plain text (`EditorTraits.isPlainText`: `TYPE_CLASS_TEXT` but not an
+  address, an email or a text password). Hiding (`onFinishInputView(false)`), a hardware keyboard taking over (counted
+  as hiding), another keyboard shown, a field wanting letters (an email, an address, a password, a terminal's `TYPE_NULL`)
+  or another app's field let go of it;
+- `Locked`: the pad's lock (`panel-lock`, taken only while the current keyboard is `NumberKeyboard`; a letter
+  layout's `panel-lock` locks nothing). Hiding and letter fields keep it (those fields show letters, the next plain
+  field the pad again); 返回, the lock again, or a field of another app let go of it.
+
+Its rules:
+- The same field: the same `EditorInfo` object as the last start (`stickyInfo` in the service), or `restarting` with
+  `VoiceCommit.sameField`. Started again, a field shows what it showed (`numbersHere`): a locked keyboard's letters in
+  an email field stay letters through a turn.
+- Another app is judged by the package of the next field that starts with the keyboard shown, not by
+  `onBindInput`: the system binds the input method to whichever window has focus, so the home screen, recents or
+  another app's dialog bind it without being an app switch to the user. A field in SystemUI (the lock screen's
+  password, a notification's reply) is another package and lets go.
+- A field's own pad (number, phone, date) shows and the mode stays; its 返回 then 123 does not arm.
+- The lock's icon is set only on the current number keyboard (`syncLock`), after each change of mode.
+- The emoji and kaomoji panels' 返回 sends `layout:Text` and lets go; the symbol panel's sends `panel-back`, back to
+  the keyboard under it, and keeps it.
 
 Address fields swap the comma and the full stop for `/` or `@` and `.com` (`AddressKeys`); a key's
 digit or symbol goes in there as it is, what is typed committed as typed
 (`PendingInputPolicy.typesAsIs`, in `CommonKeyActionListener`), but for a key the input method
 types with (`InputMethodCatalog.readsAsKey`: the nine keys' digits, the `;` of every 双拼 scheme whose layout types it (微软), the pinyins' `'` and a
 table's keys, 二笔's `;`, while something is typed, the table's from `Engines.tableKeys`); the nine
-keys' column, separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`.
+keys' separator and multi-tap are in `T9Keyboard` with decisions in `MultiTap`, `NineKeys`; its column is the
+`nine-side` slot's `ScrollColumn` (above), `T9Keyboard` giving it the syllables and the English state.
 A nine key's long press shows one row, its letters in capitals, its digit, its letters (A B C 2 a
 b c, `Explicit.inRow` the digit's place: in that order, the digit under the finger, narrower keys
 when they don't fit; owner 2026-10-20), each committed as it is (`CommitAction`, after the first
@@ -1234,7 +1288,7 @@ press is (the first candidate, then the mark: quotes in turn, brackets paired; `
 separator, as there); 1's too (owner decision: the nine keys' 1 and left column follow the punctuation mode, what
 shows is what is typed). A digit or a lone letter is never a symbol: the
 long press has those already. In an address field the column offers what addresses are made of
-(`AddressKeys.column`: `/` or `@`, `.`, `.com` …) in place of punctuation, pinyin's syllables still
+(the `url` or `email` scroll list: `/` or `@`, `.`, `.com` …) in place of punctuation, pinyin's syllables still
 while typing, from the same `address` both boards take from `KeyboardWindow`; the bottom row is as
 always (keys of their own there left the space an eighth of the width, its label pushed off). (A probe with `adb shell input text` showed the nine
 keys committing the pinyin as typed before a mark: that is a hardware key's path, not the screen's.)

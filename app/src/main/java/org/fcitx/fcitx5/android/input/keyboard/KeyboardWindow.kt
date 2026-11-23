@@ -36,6 +36,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
+import org.fcitx.fcitx5.android.input.voiceField
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -54,6 +55,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import timber.log.Timber
 
 class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), EssentialWindow,
     InputBroadcastReceiver {
@@ -211,6 +213,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         when {
             heldBack(it) -> {}
             it is KeyAction.LayoutSwitchAction -> switchLayout(it.act)
+            // the listener is every keyboard's: a letter layout's panel-lock locks nothing
+            it is KeyAction.PanelLockAction && currentKeyboard is NumberKeyboard -> {
+                sticky.toggleLock()
+                syncLock()
+            }
             else -> commonKeyActionListener.listener.onKeyAction(it, source)
         }
     }
@@ -246,6 +253,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.inPasswordField = service.inPasswordField
             (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
+            it.fieldPad = fieldPadId
+            (it as? NumberKeyboard)?.locked = sticky.locked
             it.inMultiLineField = multiLine
             it.imTyping = composing && !tempMode
             it.tempMode = tempMode
@@ -316,6 +325,19 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private val fieldPad = FieldPad()
 
+    private val sticky get() = service.sticky
+
+    /** The lock's look: the number keyboard shown's alone, where the state may have changed with no switch. */
+    fun syncLock() {
+        (keyboards[currentKeyboardName] as? NumberKeyboard)?.locked = sticky.locked
+    }
+
+    /** Hidden, or a hardware keyboard took over: the number keyboard kept so far is let go, a locked one not. */
+    fun keyboardHidden() {
+        sticky.hidden()
+        syncLock()
+    }
+
     fun switchLayout(to: String, remember: Boolean = true) {
         val lastSymbol = lastSymbolType
         ContextCompat.getMainExecutor(context).execute {
@@ -324,16 +346,26 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             when (val target = fieldPad.shown(outcome.target, currentKeyboardName)) {
                 LayoutSwitchPolicy.Target.Unchanged -> {}
                 is LayoutSwitchPolicy.Target.Keyboard -> showLayout(target.name)
-                LayoutSwitchPolicy.Target.SymbolPicker ->
+                // the keys under the panel stay: a number keyboard kept stays kept
+                LayoutSwitchPolicy.Target.SymbolPicker -> {
                     windowManager.attachWindow(PickerWindow.Key.Symbol)
+                    return@execute
+                }
             }
+            sticky.shown(NumberPad.shownBy(currentKeyboardName) != null, byUser = remember)
+            syncLock()
         }
     }
 
     private var address = AddressKeys.NONE
+
+    /** NumberPad.fieldOf's, which every keyboard's scroll lists read; [fieldPad] is what the switching shows. */
+    private var fieldPadId: String? = null
     private var multiLine = false
 
     private var noSuggestions = false
+
+    private val fieldTrack = FieldTrack()
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         standingInFor = null
@@ -343,11 +375,21 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.inPasswordField = service.inPasswordField
         currentKeyboard?.catchUpMinute()
         val traits = info.toEditorTraits()
+        val identical = info === service.stickyInfo
+        service.stickyInfo = info
+        // those kept for later too: a number keyboard shown next must not open where another field's was left
+        if (!fieldTrack.started(info.voiceField(), identical, service.restartingInput)) keyboards.values.forEach { it.columns.toStart() }
+        val was = sticky.mode
+        val kept = sticky.fieldStarted(traits.isPlainText, traits.number, info.voiceField(), identical, service.restartingInput)
+        if (kept) Timber.d("number keyboard kept: %s", was) else if (sticky.mode != was) Timber.d("number keyboard let go: %s", was)
+        syncLock()
         address = AddressKeys.of(traits)
+        fieldPadId = NumberPad.fieldOf(traits)
         multiLine = traits.showsLines
         typingField = SceneTyping.field(traits, service.inPasswordField)
         typingChanged()
         currentKeyboard?.address = address
+        currentKeyboard?.fieldPad = fieldPadId
         currentKeyboard?.inMultiLineField = multiLine
         fieldPad.field = NumberPad.of(traits.number)
         fieldPad.numbers = keyboardPrefs.drawnPanelLayout(PanelLayouts.Panel.NUMBER)
@@ -355,9 +397,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         // fires no update, so its letters are picked here (switchLayout would find the letters already there)
         spaceKeys.current?.let {
             lettersLayout.inputMethodChanged(lettersOf(it.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField), currentKeyboardName)
-                ?.takeIf { fieldPad.field == null }?.let(::showLayout)
+                ?.takeIf { fieldPad.field == null && !kept }?.let(::showLayout)
         }
-        switchLayout(if (fieldPad.field != null) NumberKeyboard.Name else TextKeyboard.Name, remember = false)
+        switchLayout(if (fieldPad.field != null || kept) NumberKeyboard.Name else TextKeyboard.Name, remember = false)
         // after the layout, which switchLayout posts
         ContextCompat.getMainExecutor(context).execute(::updateAutoCaps)
     }

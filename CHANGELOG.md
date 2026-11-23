@@ -23,6 +23,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **性能档位** 新增「自动」并设为默认，按本机处理器定一次；原来没改过档位或选的是高档的，都会变成自动，想固定高档请重新选一次。
 - 导入别的输入法的皮肤转得更全：百度皮肤的按键图标（彩色的图，按下时换的图或颜色）、画成图片的字母、字号和粗细、角标颜色、按下缩放、深色版的背景图，搜狗皮肤带的字体，都转过来。新支持加密的搜狗手机皮肤、讯飞的 `.it`、同文用 `__include`、`__patch` 写的主题，百度新引擎的 `.bda` 初步支持。皮肤里画的 26 键、九键、18 键、14 键可以勾上 **一起导入**，放进 **外观 → 布局**（默认不勾，用 App 自己的键位）。网页制作页也能打开这些皮肤（**打开文件…** 或拖进页面），转成主题接着改。转出来的主题用到这些 0.6.3 才有的东西时最低版本是 0.6.3，没用到的照旧是 0.6.0，在 0.6.0–0.6.2 上也能导入。
 - 主题可以带一只小宠物，待在键盘角上或候选栏右边：按字母、退格、回车、空格时各做一个小动作，久不按会睡着。由「键盘动效」开关管。在网页制作页里可以给自己的主题加宠物。
+- 数字键盘换成九键的样子：左边是一条能上下滑的符号列（`+ - * /` 一开始就看得到，往下滑是 `% , : ( ) #`），`=` 挪到 9 右边，0 在 8 下面加宽，底排不再有 `,` 和 `=`。
+- 九键、数字键盘左边的滑动列能自己改：**按键字符和快捷键** 里多了一张 **滑动列** 卡片，九键、九键英文、数字键盘、电话、日期时间、网址、邮箱七类各改各的，能加字、加命令（画成图标）、删、拖动排序、恢复默认；电话、网址这类框里自动换成那一类。在键盘上长按列里的一项，能删掉它、移到最前，或打开这一列的编辑框。
+- 自定义键盘布局、网页布局编辑器里能放横的或竖的滑动列（`<slot kind="scroll">`），内容用上面那七类；用了滑动列的布局要 0.6.3。
+- 在普通框里点 123 打开数字键盘后，跳到同一个 App 的下一个文字框还是数字键盘（邮箱、网址、密码框除外）；数字键盘加了锁，锁上后收起再弹出也还是数字键盘，点 返回、再点锁，或在别的 App 的输入框里弹出键盘，才解开。
 
 ### 小改动
 
@@ -43,6 +47,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 新快捷键 **切输入法** 和 **选输入法**，能设在任意键的上滑或下滑：切输入法和点地球键一样，这样关掉 **显示语言切换键** 也能换输入法；选输入法像编辑菜单那样弹出一排启用的输入法（最后一格 **更多…** 打开输入法选择框），左右挪选、松开就换，滑出直接松开是地球键会换到的那个。
 - 关于页显示本机处理器和自动档在本机定成的档位（「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」）。
 - 手写高档不再在停笔后重排，和中档相同。
+- 数字键盘的运算符从键变成列里的项，字号和颜色跟着变；主题里给 `+`、`,` 这些运算键单独设的样子不再起作用。
 
 ### 修复
 
@@ -63,6 +68,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - **性能档位** has a new **自动** (auto), now the default, set once from this device's processor. Who never changed the level or chose high gets auto; to keep high, choose it again.
 - Other input methods' skins come over more fully: a Baidu skin's key icons (colour pictures, a pressed picture or colour), letters drawn as pictures, text size and weight, mark colour, press shrink and dark background, and a Sogou skin's font. New: encrypted Sogou phone skins, iFlytek's `.it`, Trime themes written with `__include` and `__patch`, and, as a first step, Baidu's new-engine `.bda`. A skin's 26, nine, 18 and 14 keys can come too as layouts in **外观 → 布局** with **一起导入** ticked (unticked by default: the app's own keys). The web theme maker opens these skins as well (**打开文件…** or a drop on the page) and turns them into a theme to go on editing. A converted theme needs 0.6.3 where it uses one of these 0.6.3 things, else still 0.6.0, and imports on 0.6.0–0.6.2.
 - A theme can carry a little pet, sitting in a corner of the keys or at the end of the candidate bar: it does a small move for letters, backspace, Return and space, and falls asleep when no key is pressed for a while. With 「键盘动效」 off it stands still. The web theme maker adds one to your own theme.
+- The number pad looks like the nine keys now: a column of symbols on the left that scrolls (`+ - * /` in sight, `% , : ( ) #` further down), `=` right of 9, a wider 0 under 8, and no `,` or `=` on the bottom row.
+- The scroll column left of the nine keys and the number pad can be changed: **按键字符和快捷键** has a **滑动列** card, its seven categories (nine keys, nine keys English, number pad, phone, date and time, address, email) each your own, with texts and commands (drawn as icons) added, deleted, dragged and put back; a phone or address field switches to its own category. Long-press an item of the column on the keyboard to delete it, move it to the front or open the column's editor.
+- Custom keyboard layouts and the web layout maker can hold a scroll column, vertical or horizontal (`<slot kind="scroll">`), its items from the seven categories above; a layout with one needs 0.6.3.
+- 123 opened in a plain field stays on for the same app's next text field (not an email, address or password field); the number pad has a lock that keeps it through hiding and showing the keyboard, let go by 返回, the lock again, or the keyboard shown in another app's field.
 
 ### Smaller changes
 
@@ -83,6 +92,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Two new shortcuts for any key's swipe: **切输入法** does what a tap of the globe key does, so input methods still switch with **显示语言切换键** off; **选输入法** pops a row of the enabled input methods where the edit menu goes (its last cell, **更多…**, opens the input method picker), picked by sliding left or right and switched to on release, the one the globe would go to under the finger.
 - The about page shows this device's processor and the level Auto picks here (「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」).
 - Handwriting at the high level no longer reorders after the pen stops: it is the same as medium.
+- The number pad's operators are items of the column now, not keys, in its size and colour; a theme's own style for an operator key such as `+` or `,` no longer applies.
 
 ### Fixes
 

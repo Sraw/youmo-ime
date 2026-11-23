@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import androidx.preference.PreferenceManager
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows as assertNamedRows
@@ -20,9 +21,12 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.shortcut.SwipeOrientation
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -382,5 +386,26 @@ class AppPrefsTest {
             "隐藏敏感信息" to { assertEquals(true, enabled["clipboard_mask_sensitive"]) },
             "the limit: copies alone" to { assertEquals(false, enabled["clipboard_limit"]) },
         )
+    }
+
+    // the column's lists before the first unlock: what a direct boot's AppPrefs reads, copied at a sync and at every change
+    @Test
+    @Config(application = FcitxApplication::class)
+    fun theScrollListsAreInTheDeviceProtectedCopy() {
+        val de = PreferenceManager.getDefaultSharedPreferences(RuntimeEnvironment.getApplication().createDeviceProtectedStorageContext())
+        val set = ScrollListStore.Empty.with(ScrollDefaults.NUMBER, listOf(ScrollItem.Text("#"))).serialize()
+        de.edit { remove(AppPrefs.SCROLL_LISTS) }
+        sp.edit { putString(AppPrefs.SCROLL_LISTS, set) }
+        AppPrefs(sp).syncToDeviceEncryptedStorage()
+        fun locked() = ScrollListStore.parse(AppPrefs(de).internal.scrollLists.getValue())[ScrollDefaults.NUMBER]
+        assertEquals(listOf(ScrollItem.Text("#")), locked())
+        // the keyboard's menu, no page stopping after it to sync
+        val pref = AppPrefs.getInstance().internal.scrollLists
+        try {
+            pref.setValue(ScrollListStore.parse(set).with(ScrollDefaults.NUMBER, listOf(ScrollItem.Text("@"))).serialize())
+            assertEquals(listOf(ScrollItem.Text("@")), locked())
+        } finally {
+            pref.setValue(ScrollListStore.HEADER)
+        }
     }
 }

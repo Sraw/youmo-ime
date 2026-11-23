@@ -19,6 +19,7 @@ class AppUtilTest {
             SettingsRoute.InputMethodList,
             SettingsRoute.Theme,
             SettingsRoute.InputMethodConfig("Pinyin", "pinyin"),
+            SettingsRoute.ScrollList("url"),
         ).forEach { assertTrue("$it", AppUtil.isLaunchRoute(it)) }
     }
 
@@ -28,6 +29,8 @@ class AppUtilTest {
             SettingsRoute.Clipboard,
             SettingsRoute.Developer,
             SettingsRoute.PinyinDict("content://elsewhere/words.dict"),
+            // only a category there is
+            SettingsRoute.ScrollList("../keys"),
         ).forEach { assertFalse("$it", AppUtil.isLaunchRoute(it)) }
     }
 }

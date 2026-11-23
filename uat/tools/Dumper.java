@@ -106,6 +106,12 @@ public class Dumper {
         if (key != null) attr(sb, "key", key);
         String alt = n.getExtras().getString("youmo.alt");
         if (alt != null) attr(sb, "alt", alt);
+        // the custom actions TalkBack offers on a node (a scroll column's item: its long press menu's), by label
+        StringBuilder acts = new StringBuilder();
+        for (AccessibilityNodeInfo.AccessibilityAction a : n.getActionList()) {
+            if (a.getLabel() != null && a.getId() > 0xffff) acts.append(acts.length() > 0 ? "|" : "").append(a.getLabel());
+        }
+        if (acts.length() > 0) attr(sb, "actions", acts);
         attr(sb, "bounds", "[" + b.left + "," + b.top + "][" + b.right + "," + b.bottom + "]");
         sb.append(">");
         for (int i = 0; i < n.getChildCount(); i++) {

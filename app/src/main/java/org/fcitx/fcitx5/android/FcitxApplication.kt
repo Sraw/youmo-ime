@@ -170,6 +170,7 @@ class FcitxApplication : Application() {
         }
         if (!isDirectBootMode) {
             AppPrefs.getInstance().syncToDeviceEncryptedStorage()
+            AppPrefs.getInstance().followScrollListsInDeviceEncryptedStorage()
             ThemeManager.syncToDeviceEncryptedStorage()
             // settled off the main thread before an editor or the host would wait on its copy; only with external storage present
             val external = getExternalFilesDir(null)

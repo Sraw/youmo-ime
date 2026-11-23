@@ -5,15 +5,19 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import org.fcitx.fcitx5.android.assertRows
+import org.fcitx.fcitx5.android.input.editing.EditorTraits
 import org.fcitx.fcitx5.android.input.editing.NumberKind
 import org.fcitx.fcitx5.android.input.keyboard.LayoutSwitchPolicy.Target
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NumberPadTest {
 
-    private fun keys(pad: NumberPad) = (pad.left + pad.besideNine + pad.bottom).filter { it.isNotEmpty() }.toSet()
+    private fun list(pad: NumberPad?) = ScrollDefaults.of(pad!!.list)!!.map { (it as ScrollItem.Text).text }.toSet()
 
     @Test
     fun eachFieldGetsThePadOfWhatItTakes() = assertRows(
@@ -21,22 +25,28 @@ class NumberPadTest {
         // an amount declared decimal takes a minus: what a field declares is no list of what it takes
         "any number field, decimal, signed or a PIN: the whole pad, a point and a minus at hand" to {
             assertEquals(NumberPad.FULL, NumberPad.of(NumberKind.NUMBER))
-            assertEquals(setOf("+", "-", "*", "/", ",", "=", "."), keys(NumberPad.FULL))
+            assertEquals(ScrollDefaults.NUMBER, NumberPad.FULL.list)
+            assertEquals(setOf("+", "-", "*", "/", "%", ",", ":", "(", ")", "#"), list(NumberPad.FULL))
         },
-        "a phone field: a dialler's signs" to {
-            assertEquals(setOf("+", "*", "#"), keys(NumberPad.of(NumberKind.PHONE)!!) - setOf("-", "(", ")", ","))
-        },
-        "a date, a time: their separators" to { assertEquals(setOf("-", "/", ":", "."), keys(NumberPad.of(NumberKind.DATETIME)!!)) },
+        // as 0.6.2's phone pad had them on three places (c8e399386): its left column, right of 9, its bottom row
+        "a phone field: a dialler's signs" to { assertEquals(setOf("+", "*", "#", "-", "(", ")", ","), list(NumberPad.of(NumberKind.PHONE))) },
+        "a date, a time: their separators, the point a key" to { assertEquals(setOf("-", "/", ":"), list(NumberPad.of(NumberKind.DATETIME))) },
     )
 
     @Test
-    fun everyPadHasItsKeysInTheSamePlaces() {
-        for (pad in NumberPad.entries) {
-            assertEquals(pad.name, 3, pad.left.size)
-            assertEquals(pad.name, 3, pad.bottom.size)
-        }
-        // the point where the full pad has it
-        assertEquals(NumberPad.FULL.bottom.indexOf("."), NumberPad.DATETIME.bottom.indexOf("."))
+    fun aPhonesOrADatesFieldNamesItsPadForTheScrollLists() = assertRows(
+        "a text field: none" to { assertNull(NumberPad.fieldOf(EditorTraits())) },
+        "a number field: none, its list the number pad's own" to { assertNull(NumberPad.fieldOf(EditorTraits(number = NumberKind.NUMBER))) },
+        "a phone field" to { assertEquals("phone", NumberPad.fieldOf(EditorTraits(number = NumberKind.PHONE))) },
+        "a date or time field" to { assertEquals("datetime", NumberPad.fieldOf(EditorTraits(number = NumberKind.DATETIME))) },
+    )
+
+    @Test
+    fun everyPadsListIsACategoryOfItsOwn() {
+        assertEquals(listOf("number", "phone", "datetime"), NumberPad.entries.map { it.list })
+        assertTrue(ScrollDefaults.IDS.containsAll(NumberPad.entries.map { it.list }))
+        // the field's pad names the list of the same name, which the scroll lists' rule takes for it
+        assertEquals(NumberPad.entries.drop(1).map { it.id }, NumberPad.entries.drop(1).map { it.list })
     }
 
     @Test

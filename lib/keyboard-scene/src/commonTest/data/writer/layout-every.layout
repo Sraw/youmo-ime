@@ -26,6 +26,7 @@
     <key id="e" label="e">
       <popup from="none"/>
     </key>
+    <slot id="sc" kind="scroll" list="url" direction="horizontal" show="6" width="10"/>
   </row>
   <include src="grouped-bottom" when="!roots"/>
 </keyboard>

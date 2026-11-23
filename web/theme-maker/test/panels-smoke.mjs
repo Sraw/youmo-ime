@@ -320,6 +320,14 @@ async function main() {
     const keysTab = await js(`[document.querySelector('#tab-keys .selector code') ? document.querySelector('#tab-keys .selector code').textContent : '', document.querySelectorAll('#tab-keys table.sources tr').length]`);
     check(String(keysTab[0]).includes('k17/hjk'), '按键: the key picked named by the layout\'s id: ' + keysTab);
     check(keysTab[1] > 0, '按键: the sources of hjk on it: ' + keysTab);
+    // the number board in a phone's field: the phone pad, as the app shows it there, not the full one by default
+    const setEnv = (id, v) => js(`(() => { const s = document.getElementById('${id}'); s.value = '${v}'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    await setEnv('env-board', 'number');
+    await setEnv('env-field', 'phone');
+    await wait(500);
+    const padSaid = await js(`document.getElementById('problems').textContent`);
+    check(!/pad/.test(padSaid), '数字键盘 in a phone field: its pad given: ' + padSaid);
+    await setEnv('env-field', 'text');
     await js(`(() => { const s = document.getElementById('env-board'); s.value = 'qwerty'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
     await wait(500);
     await js(`(() => { window.__saved = 0; const u = URL.createObjectURL; URL.createObjectURL = (b) => { window.__saved++; return u(b); }; })()`);

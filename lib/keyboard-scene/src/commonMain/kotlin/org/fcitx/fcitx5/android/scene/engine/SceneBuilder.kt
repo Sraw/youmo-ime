@@ -19,9 +19,15 @@ import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.SlotNode
 import org.fcitx.fcitx5.android.scene.getOr
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
+import org.fcitx.fcitx5.android.scene.keys.SlotDefaults
+import org.fcitx.fcitx5.android.scene.layout.Direction
 import org.fcitx.fcitx5.android.scene.layout.Face
 import org.fcitx.fcitx5.android.scene.layout.Fragment
 import org.fcitx.fcitx5.android.scene.layout.Layout
+import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
@@ -151,7 +157,10 @@ class SceneBuilder(
         val slots = placed.mapNotNull { p ->
             val s = (p.item as? ExpandedSlot)?.slot ?: return@mapNotNull null
             val face = surface(layout.id, s.id, s.look, s.classes, s.face, p.cell)
-            if (s.kind == Pads.KIND) pad(layout.id, s, p.cell, face) else SlotNode(s.kind, s.id, p.cell, face)
+            when (s.kind) {
+                Pads.KIND -> pad(layout.id, s, p.cell, face)
+                else -> SlotNode(s.kind, s.id, p.cell, face + scrollItems(layout.id, s, p.cell), list = s.list, direction = s.direction, show = s.show)
+            }
         }
         val whole = Box(0.0, 0.0, env.width, env.height)
         val side = sideRoom(board, whole)?.let { SlotNode(SIDE_BUTTONS, null, it) }
@@ -197,6 +206,40 @@ class SceneBuilder(
         val c = cascadeFor(face)
         val l = KeyLook(c.of(Selector.Target("key", board, id, null, setOf(look) + classes, emptySet(), slot = true, base = env.base)), theme)
         return paint.face(Faces.of(cell, l, face, true, env.flat && face != Face.Keep, env.density), l, false)
+    }
+
+    // where no view of the app's draws a column (a card, the web), its first items as the column shows them
+    private fun scrollItems(board: String, s: Slot, cell: Box): List<Op> {
+        val lists = env.scrollItems ?: return emptyList()
+        if (s.kind != LayoutReader.SCROLL && s.kind != ScrollLists.NINE_SIDE) return emptyList()
+        val i = env.input
+        val id = (ScrollLists.shown(s.kind, s.list, i.field, i.fieldPad, i.pad, i.ime, i.composing) as? ScrollLists.Shown.Category)?.id ?: return emptyList()
+        val items = lists[id] ?: ScrollDefaults.of(id).orEmpty()
+        val nineSide = s.kind == ScrollLists.NINE_SIDE
+        val show = if (nineSide) Slot.DEFAULT_SHOW else s.show
+        val vertical = nineSide || s.direction == Direction.Vertical
+        val look = TextLook(cascade.of(Selector.Target("key", board, null, null, SCROLL_CLASSES, part = Part.Label.xml, base = env.base)), theme)
+        val size = SCROLL_TEXT_DP * env.density
+        return items.take(show).flatMapIndexed { n, item ->
+            val box = if (vertical) {
+                val h = cell.height / show
+                Box(cell.left, cell.top + n * h, cell.right, cell.top + (n + 1) * h)
+            } else {
+                val w = cell.width / show
+                Box(cell.left + n * w, cell.top, cell.left + (n + 1) * w, cell.bottom)
+            }
+            paint.content(scrollItem(id, item, box, look, size)) { look }
+        }
+    }
+
+    private fun scrollItem(id: String, item: ScrollItem, box: Box, look: TextLook, size: Double): Drawn {
+        val label = ScrollLists.label(id, item, env.input.ime, env.texts.punctuation)
+        if (label == null) {
+            val name = SlotDefaults.icon((item as ScrollItem.Command).key)
+            val (w, h) = icons.dp(name).let { (w, h) -> minOf(w * env.density, box.width) to minOf(h * env.density, box.height) }
+            return Drawn.of(PlacedIcon(name, Box(box.centerX - w / 2, box.centerY - h / 2, box.centerX + w / 2, box.centerY + h / 2), Part.Icon))
+        }
+        return Content.measure(measurer, label, look, look.weight, size).squeezed(box.width).at(box.centerX, box.centerY, Part.Label)
     }
 
     // no app board has a pad any more (Pads.KIND), but a user's or a pack's layout may
@@ -529,6 +572,10 @@ class SceneBuilder(
         private const val FIT_STEPS = 16
 
         const val GAP_DP = 1.0
+
+        /** The app's column items' size (AutoScaleTextView, shrunk where it has no room) and colour, altKeyTextColor. */
+        const val SCROLL_TEXT_DP = 16.0
+        private val SCROLL_CLASSES = setOf("letter", "alt-text")
 
         // its first character and 「…」, then the short-text icon (MarkContent.Text.ladder)
         const val LADDER_STEPS = 2

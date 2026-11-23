@@ -17,7 +17,11 @@
   const ROLE_LABEL = { symbols: '符', back: '返回', numbers: '123' };
   const SLOT_LABEL = {
     'handwriting-pad': '手写区', 'nine-side': '九键左边的符号列', 'handwriting-candidates': '手写候选栏', 'symbol-categories': '符号面板的分类栏', 'symbol-grid': '符号面板的符号格子',
+    scroll: '滑动列',
   };
+  /** The scroll columns' categories (ScrollDefaults.IDS) as the settings name them. */
+  const SCROLL_LABEL = { nine: '九键', 'nine-english': '九键英文', url: '网址', email: '邮箱', number: '数字', phone: '电话', datetime: '日期时间' };
+  const DIRECTIONS = [['vertical', '竖'], ['horizontal', '横']];
   const KEY_LABEL = { backspace: '删除', enter: '回车', lang: '地球键' };
   const BOARD_LABEL = { Number: '数字键盘', Symbol: '符号面板' };
   const APP_BOARD_LABEL = {
@@ -97,6 +101,7 @@
     'pad-letters': ([key]) => '键' + q(key) + '打出的是字母：数字输入框多半不收字母',
     'bottom-left': ([want]) => '左下角通常是 ' + want.split(' ').map((r) => ROLE_LABEL[r] || r).join('、') + '（和 App 自带的一样）',
     'split-scaled': ([n, where]) => '分体时这一行在「' + where + '」有 ' + n + ' 个键，不是 9 或 10 个，分不成左右两半，只能整行缩小',
+    'scroll-tight': () => '滑动列太挤：一项不到 20 dp，减少 show= 或加宽',
   };
 
   function words(f) {
@@ -278,7 +283,9 @@
     { id: 'english', label: '英文', input: { ime: 'english' } },
   ];
   /** The fields a letters board is previewed in (LayoutCheck's); a number board's are its pads. */
-  const FIELDS = [['text', '普通'], ['url', '网址'], ['email', '邮箱']];
+  const FIELDS = [['text', '普通'], ['url', '网址'], ['email', '邮箱'], ['phone', '电话'], ['datetime', '日期']];
+  // a phone's or a date's field is a number field the app names its pad of
+  const FIELD_PADS = ['phone', 'datetime'];
   const SHIFTS = [['none', '关'], ['once', '一次'], ['lock', '锁定']];
   const FORMS = [['normal', '普通'], ['compact', '紧凑'], ['floating', '悬浮'], ['left', '单手（左）'], ['right', '单手（右）'], ['split', '分体']];
   /** Where the up and down swipes' marks go (EnvJson.AT): '' the app's default. */
@@ -340,6 +347,7 @@
     const ime = (IMES.find((x) => x.id === e.ime) || IMES[0]).input;
     const input = Object.assign({}, ime);
     if (family === 'number') Object.assign(input, { field: 'number', pad: e.pad || 'full' });
+    else if (FIELD_PADS.includes(e.field)) Object.assign(input, { field: 'number', fieldPad: e.field });
     else if (e.field && e.field !== 'text') input.field = e.field;
     out.input = input;
     const punctuation = ime.ime === 'english' ? null : M.ZH_PUNCTUATION;
@@ -441,7 +449,7 @@
   }
 
   root.YoumoLayoutMaker = {
-    BASE_LABEL, FAMILY_LABEL, PAD_LABEL, IMES, SHIFTS, FIELDS, FORMS, AT, ENV, WORDS,
+    BASE_LABEL, FAMILY_LABEL, PAD_LABEL, SLOT_LABEL, SCROLL_LABEL, DIRECTIONS, IMES, SHIFTS, FIELDS, FORMS, AT, ENV, WORDS,
     words, findings, info, withAttr, setKeyboard, setMeta, idProblem, nameProblem, suggested, fromBuiltin, fromExample, openText, fileName, saveCheck,
     restoreEnv, shape, envJson, check, themeBoards, refusal,
   };

@@ -461,10 +461,12 @@
   }
   let checked = null;
 
-  // a pad named, as the app shows it from 123: avoids the engine's no-pad warning
+  // a pad named, as the app shows it: a phone's or a date's field's own, else the full one from 123; avoids the engine's no-pad warning
   function ownEnv(board) {
     const e = M.envJson(E, env);
-    if (typeof board === 'object' && board.family === 'number') e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: 'full' });
+    if (board === 'number' || (typeof board === 'object' && board.family === 'number')) {
+      e.input = Object.assign({ field: 'number', ime: 'pinyin' }, e.input, { pad: (e.input && e.input.fieldPad) || 'full' });
+    }
     return e;
   }
   function preview() {

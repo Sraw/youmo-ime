@@ -13,6 +13,7 @@ import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import kotlin.math.absoluteValue
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -50,6 +51,7 @@ import org.fcitx.fcitx5.android.input.theme.KeyNames
 import org.fcitx.fcitx5.android.input.theme.KeyStyleResolver
 import org.fcitx.fcitx5.android.pack.PackKind
 import org.fcitx.fcitx5.android.scene.KeyNode
+import org.fcitx.fcitx5.android.scene.KeyState as SceneKeyState
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.engine.Env
 import org.fcitx.fcitx5.android.scene.engine.Input
@@ -78,6 +80,10 @@ abstract class BaseKeyboard(
     var keyActionListener: KeyActionListener? = null
 
     private val prefs = AppPrefs.getInstance()
+
+    internal val columns = ScrollColumns(
+        this, theme, { canvas }, { keysPunctuation }, { onAction(it) }, { onPopupAction(it) }, ::onPopupChangeFocus, { onPopupTrigger(it, false) },
+    )
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
 
@@ -136,7 +142,32 @@ abstract class BaseKeyboard(
         canvas?.invalidateScene()
     }
 
-    open var address: AddressKeys = AddressKeys.NONE
+    var address: AddressKeys = AddressKeys.NONE
+        set(value) {
+            if (field == value) return
+            field = value
+            columns.update()
+            onAddressChanged()
+        }
+
+    protected open fun onAddressChanged() {}
+
+    /** The field's pad (`phone`, `datetime`) or null, for the scroll lists on every keyboard (NumberPad.fieldOf). */
+    var fieldPad: String? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            canvas?.invalidateScene()
+            columns.update()
+        }
+
+    /** A panel lock's state (`send="panel-lock"`): the symbol panel's, and the number pad's. */
+    var locked = false
+        set(value) {
+            if (field == value) return
+            field = value
+            canvas?.invalidateScene()
+        }
 
     private val keyDrawing = prefs.keyboard.keyDrawing
 
@@ -215,8 +246,14 @@ abstract class BaseKeyboard(
 
     fun inputMethodShown() = keyWriting?.update()
 
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean =
-        glide?.dispatch(ev) { super.dispatchTouchEvent(it) } ?: super.dispatchTouchEvent(ev)
+    // a stroke never starts in a scroll column: that touch is the column's
+    private var downInColumn = false
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) downInColumn = columns.at(ev.x, ev.y)
+        val g = glide?.takeUnless { downInColumn } ?: return super.dispatchTouchEvent(ev)
+        return g.dispatch(ev) { super.dispatchTouchEvent(it) }
+    }
 
     override fun dispatchDraw(canvas: Canvas) {
         super.dispatchDraw(canvas)
@@ -536,7 +573,7 @@ abstract class BaseKeyboard(
     protected fun drawKeysWithScene(layout: SceneLayout?) {
         // a second canvas would sit under the first, taking the touches
         check(canvas == null) { "drawKeysWithScene called twice" }
-        val board = SceneBoard(context, theme, layout) { look, read, width, height -> sceneEnv(look, read, width, height) }
+        val board = SceneBoard(context, theme, layout) { look, read, width, height -> sharedEnv(sceneEnv(look, read, width, height)).also { sceneInput = it.input } }
         sceneBoard = board
         val view = board.view(keyImages(theme, themeBoard, layout), ::sceneString, { node -> sceneKey(node) }) { onSceneBuilt(it) }
         releaseAllTouchTargets()
@@ -551,6 +588,32 @@ abstract class BaseKeyboard(
             leftOfParent()
             rightOfParent()
         })
+        columns.toFront()
+    }
+
+    // every keyboard's, over what its own env says: the lock and the field's pad
+    private fun sharedEnv(env: Env): Env = env.copy(
+        input = env.input.copy(fieldPad = fieldPad),
+        states = if (locked) env.states + ("lock" to env.states["lock"].orEmpty() + SceneKeyState.Locked) else env.states,
+    )
+
+    private var sceneInput = Input()
+
+    /** What the scroll lists read: the scene's input as last made. */
+    internal open fun scrollInput(): Input = sceneInput
+
+    /** The nine keys' column on a keyboard without their typing: no syllables, English's marks as English types. */
+    internal open fun sideInput(): Input = scrollInput().copy(ime = if (columnEnglish) "english" else "pinyin", composing = false)
+
+    internal open val columnEnglish: Boolean get() = imeName == InputMethodCatalog.ENGLISH
+
+    internal open fun columnSyllables(): List<String> = emptyList()
+
+    internal open fun pickSyllable(i: Int): KeyAction? = null
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        columns.place()
     }
 
     protected open fun sceneEnv(look: ThemeLook, layout: SceneLayout, width: Int, height: Int): Env =
@@ -558,13 +621,19 @@ abstract class BaseKeyboard(
 
     internal fun shownAs(look: ThemeLook, width: Int, height: Int): Pair<SceneLayout, Env>? =
         // nothing is drawn here: put back the minute [keyMarks] took as drawn, else [catchUpMinute] skips stale keys
-        drawnLayout?.let { val drawn = minuteDrawn; (it to sceneEnv(look, it, width, height)).also { minuteDrawn = drawn } }
+        drawnLayout?.let { val drawn = minuteDrawn; (it to sharedEnv(sceneEnv(look, it, width, height))).also { minuteDrawn = drawn } }
 
     protected open val sceneDrawsBase: Boolean get() = true
 
-    internal open fun onSceneBuilt(scene: Scene?) {}
+    @CallSuper
+    internal open fun onSceneBuilt(scene: Scene?) = columns.built(scene)
 
-    protected open fun sceneString(name: String): String? = null
+    // a lock said as what a tap does
+    protected open fun sceneString(name: String): String? = when (name) {
+        "a11y_key_panel_lock_on" -> context.getString(R.string.picker_unlock)
+        "a11y_key_panel_lock_off" -> context.getString(R.string.picker_lock)
+        else -> null
+    }
 
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
 
@@ -587,8 +656,11 @@ abstract class BaseKeyboard(
         touchTargets.clear()
     }
 
-    private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? =
-        sceneKeys.touch?.find(event.getX(pointerIndex), event.getY(pointerIndex))
+    private fun findTouchTarget(event: MotionEvent, pointerIndex: Int): TouchTarget? {
+        val x = event.getX(pointerIndex)
+        val y = event.getY(pointerIndex)
+        return columns.target(x, y, touchTargets.values) ?: sceneKeys.touch?.find(x, y)
+    }
 
     private fun dispatchDown(event: MotionEvent, pointerIndex: Int, target: TouchTarget) {
         // a disabled key takes no touch: CustomGestureView refuses its Down, not its Up
@@ -694,7 +766,7 @@ abstract class BaseKeyboard(
         // ask popup keyboard whether there's a pending KeyAction
         onPopupAction(triggerAction)
         val action = triggerAction.outAction ?: return triggerAction.outConsumed
-        onAction(resolving.output(key.id, action), KeyActionListener.Source.Popup)
+        if (action is KeyAction.ScrollList) columns.change(action) else onAction(resolving.output(key.id, action), KeyActionListener.Source.Popup)
         onPopupAction(PopupAction.DismissAction(key))
         return true
     }
@@ -793,6 +865,7 @@ abstract class BaseKeyboard(
         if (mapping == keysPunctuation) return
         keysPunctuation = mapping
         canvas?.invalidateScene()
+        columns.update()
     }
 
     @CallSuper

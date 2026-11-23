@@ -11,6 +11,7 @@ import org.fcitx.fcitx5.android.scene.skin.assertRows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * The number pads of 0.6.1 (user 2026-11-13): ⌫ at the top right of every pad, as on the nine keys; a place a pad has
@@ -27,16 +28,16 @@ class NumberPadsTest {
 
     private fun key(s: Scene, id: String) = s.keys.single { it.id == id }
 
-    // the key a pad had at the top right before ⌫ took it: right of 9 now
-    private val corners = mapOf("full" to "/", "phone" to "-")
+    // the key right of 9 on a pad that has one there; the other pads' place is blank
+    private val corners = mapOf("full" to "=")
 
     // a key's right edge as placed, the last key's a sum of widths
     private val eps = 1e-6
 
     // every pad, each with what it is: the rows of the tests below, each in every form
     private val pads = listOf(
-        "full" to "the 123 key's pad, whose / it had there moves below the space",
-        "phone" to "a dialler's, whose - moves below the space",
+        "full" to "the 123 key's pad, = right of 9",
+        "phone" to "a dialler's, blank right of 9",
         "datetime" to "a date's or time's",
     ).flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } }
 
@@ -87,9 +88,10 @@ class NumberPadsTest {
             assertEquals(n.top, b.top, eps, "$id's top on the nine keys' $there")
             assertEquals(n.bottom, b.bottom, eps, "$id's bottom on the nine keys' $there")
         }
-        // 0 under 8, the digits' column as on a phone's
-        assertEquals(key(s, "8").bounds.left, key(s, "0").bounds.left, eps, "0 under 8")
-        assertEquals(key(s, "8").bounds.right, key(s, "0").bounds.right, eps, "0 under 8")
+        // 0 under 8, the digits' column as on a phone's: wider for the lock beside it, over 8's middle
+        val eight = key(s, "8").bounds
+        val zero = key(s, "0").bounds
+        assertTrue((eight.left + eight.right) / 2 in zero.left..zero.right, "0 under 8")
     }
 
     // 符 as the letter boards' 符 (its words, its function face: drawn the same), the way back saying 返回 as the panels' does
@@ -101,7 +103,7 @@ class NumberPadsTest {
         val s = scene("full", form)
         val nine = Forms.scene("nine", Forms.env("nine", Forms.all.getValue(form)))
         val bottom = s.keys.filter { it.bounds.top == key(s, "0").bounds.top }.sortedBy { it.bounds.left }.map { it.id }
-        assertEquals(listOf("symbols", "back", ",", "0", "=", ".", "enter"), bottom, "the bottom row, left to right")
+        assertEquals(listOf("symbols", "back", "lock", "0", ".", "enter"), bottom, "the bottom row, left to right")
         val sym = key(s, "symbols")
         val letters = key(nine, "symbols")
         assertEquals(letters.label, sym.label, "符's words")
@@ -150,7 +152,7 @@ class NumberPadsTest {
     @Test
     fun aBlankPlaceDrawsNothingAndTakesNoTouch() = assertRows(
         // its other blanks are two of the bottom row: the place right of 9 is the one probed
-        listOf("datetime" to "a date's or time's").flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
+        listOf("phone" to "a dialler's", "datetime" to "a date's or time's").flatMap { (pad, why) -> Forms.all.keys.map { form -> Triple(pad, form, why) } },
         { (pad, form, why) -> "$pad $form: $why" },
     ) { (pad, form, _) ->
         val s = scene(pad, form)
@@ -161,7 +163,7 @@ class NumberPadsTest {
     }
 
     // a board copied from the app's when a PIN's, a decimal's and a signed field's pads were their own: their keys and
-    // blanks (when="pad=digits|…") never shown, each pad it is for laid out as the app's is now
+    // blanks (when="pad=digits|…") never shown, each pad it is for laid out as 0.6.2's app's was
     @Test
     fun anOlderCopyWithTheMergedPadsConditionsIsLaidOutAsTheAppsPads() = assertRows(
         listOf("full" to "123's and every number field's", "phone" to "a dialler's", "datetime" to "a date's, not its but drawn all the same"),
@@ -170,7 +172,7 @@ class NumberPadsTest {
         val old = LayoutReader.layout(testData("../../../../../uat/fixtures/layouts/uat-number-1.0.layout")).ok()
         val e = Forms.env("number", Forms.block).let { it.copy(input = it.input.copy(pad = pad)) }
         val mine = SceneBuilder(Fixtures.materialLight, e, FakeMeasurer).build(old, Forms.fragments).ok()
-        val app = Forms.scene("number", e)
+        val app = SceneBuilder(Fixtures.materialLight, e, FakeMeasurer).build(LayoutReader.layout(testData("layout-check/number-062.xml")).ok(), Forms.fragments).ok()
         assertEquals(app.keys.map { it.id to it.bounds }, mine.keys.map { it.id to it.bounds })
     }
 
@@ -184,5 +186,21 @@ class NumberPadsTest {
         val s = scene(text)
         assertEquals(scene(text.replace(" look=\"function\" class=\"alt-text\"", "")).base, s.base, "the keyboard's fill alone")
         assertEquals(listOf("1", "2"), s.keys.map { it.id })
+    }
+
+    // the marks are the scroll column's, left of 1 4 7 down the top three rows; = right of 9 on 123's pad alone; the lock on every pad
+    @Test
+    fun theMarksAreAScrollColumnAndTheLockIsOnEveryPad() = assertRows(pads, { (pad, form, why) -> "$pad $form: $why" }) { (pad, form, _) ->
+        val s = scene(pad, form)
+        val side = s.slots.single { it.kind == "scroll" }
+        assertEquals("scroll", side.kind)
+        assertEquals("number", side.list)
+        assertEquals(key(s, "1").bounds.top, side.bounds.top, eps, "from the row of 1")
+        assertEquals(key(s, "7").bounds.bottom, side.bounds.bottom, eps, "to the row of 7")
+        assertEquals(key(s, "4").bounds.left, side.bounds.right, eps, "left of 4")
+        assertEquals(pad == "full", s.keys.any { it.id == "=" }, "= on 123's pad alone")
+        assertEquals(pad != "phone", s.keys.any { it.id == "." }, ". but on the dialler's")
+        assertEquals("panel-lock", key(s, "lock").actions["send"], "the lock")
+        for (id in listOf("+", "-", "*", "/", ",", "#", "(", ")", ":")) assertTrue(s.keys.none { it.id == id }, "$id is the column's")
     }
 }

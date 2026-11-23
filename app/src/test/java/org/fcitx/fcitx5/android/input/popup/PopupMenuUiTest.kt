@@ -48,6 +48,7 @@ class PopupMenuUiTest {
         items: Array<KeyDef.Popup.Menu.Item> = this.items,
         fixed: PopupMenuUi.Fixed? = null,
         measuring: (TextMeasurer) -> TextMeasurer = { it },
+        disabled: Set<Int> = emptySet(),
     ) = PopupMenuUi(
         ctx = RuntimeEnvironment.getApplication(),
         theme = TestThemes.PixelDark,
@@ -58,6 +59,7 @@ class PopupMenuUiTest {
         onFocusMoved = { moved++ },
         fixed = fixed,
         scenes = PopupScenes(View(RuntimeEnvironment.getApplication()), TestThemes.PixelDark, measuring),
+        disabled = disabled,
     )
 
     private val words = arrayOf("关", "拼音", "注音符号").map { KeyDef.Popup.Menu.Item(it, 0, KeyAction.CommitAction(it)) }.toTypedArray()
@@ -93,7 +95,7 @@ class PopupMenuUiTest {
     @Test
     @Uat("KB-115")
     fun aFixedMenuOpenedDownCancelsBackUpOnTheKeyNotGoingOnDown() {
-        val ui = menu(fixed = PopupMenuUi.Fixed(start = 1, disabled = emptySet(), down = true))
+        val ui = menu(fixed = PopupMenuUi.Fixed(start = 1, down = true))
         val first = ui.onTrigger()
         ui.changeFocus(20f, trigger.height() + 30f)
         assertFalse(ui.changeFocus(20f, trigger.height() + 300f))
@@ -160,8 +162,8 @@ class PopupMenuUiTest {
     @Test
     fun onTheCanvasTheEditMenuKeepsItsPlaceAndItsDisabled() {
         val at = EditMenuLayout.Spot(300, 100)
-        val fixed = PopupMenuUi.Fixed(start = 0, disabled = setOf(1), at = at)
-        val ui = menu(fixed = fixed)
+        val fixed = PopupMenuUi.Fixed(start = 0, at = at)
+        val ui = menu(fixed = fixed, disabled = setOf(1))
         assertEquals(at.left - trigger.left to at.top - trigger.top, ui.offsetX to ui.offsetY)
         val keys = (ui.root as PopupSceneView).scene!!.keys
         assertEquals(listOf("0", "1", "2"), keys.map { it.label })
@@ -173,7 +175,7 @@ class PopupMenuUiTest {
 
     @Test
     fun onTheCanvasTalkBackReadsEachItem() {
-        val ui = menu(fixed = PopupMenuUi.Fixed(start = 0, disabled = setOf(2)))
+        val ui = menu(fixed = PopupMenuUi.Fixed(start = 0), disabled = setOf(2))
         val nodes = (ui.root as PopupSceneView).spokenKeys()
         assertEquals(listOf("0", "1", "2"), nodes.map { it.contentDescription.toString() })
         assertEquals(listOf(true, false, false), nodes.map { it.isSelected })

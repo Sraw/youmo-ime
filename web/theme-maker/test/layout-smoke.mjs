@@ -113,13 +113,22 @@ async function main() {
     const full = await js(`document.getElementById('preview').toDataURL()`);
     await choose('env-pad', 'phone');
     check((await js(`document.getElementById('preview').toDataURL()`)) !== full, 'the phone pad drawn apart from the full one');
+    // the column shows the phone's category, as the app's does, and a tap on it selects it
+    const phoneItems = await js(`[...document.querySelectorAll('#preview-columns .column span')].slice(0, 3).map((s) => s.textContent).join(' ')`);
+    check(phoneItems === '+ * #', 'the phone pad\'s column shows the phone list: ' + phoneItems);
+    await js(`document.querySelector('#preview-columns .column').click()`);
+    await wait(300);
+    const picked = await js(`[...document.querySelectorAll('#tab-key:not([hidden]) h3')].map((e) => e.textContent).join('|')`);
+    check(picked.split('|').includes('位置 side'), 'a tap on the column selects it: ' + picked);
+    check(await js(`!!document.querySelector('#tab-key:not([hidden]) input[aria-label="跨几行"]')`), 'a slot\'s rows set on the key tab');
 
     await js(`window.__saved = []; HTMLAnchorElement.prototype.click = function () { window.__saved.push(this.download); }`);
     await js(`document.querySelector('#file-menu [data-act=save]').click()`);
     await wait(500);
     const saved = await js(`window.__saved`);
     check(saved.length === 1 && saved[0] === '我的数字键盘.layout', '保存: ' + JSON.stringify(saved));
-    check(/<meta min-app="0\.6\.1"\/>/.test(await source()), '保存 wrote min-app');
+    // a new number board has the scroll column and the lock, both first read by 0.6.3
+    check(/<meta min-app="0\.6\.3"\/>/.test(await source()), '保存 wrote min-app: ' + ((await source()).match(/<meta[^>]*>/) || [''])[0]);
     // Ctrl+S in the source: what is typed now saved, not waiting for the pause to read it
     await js(`(() => { const t = document.getElementById('source'); t.value = t.value.replace('name="我的数字键盘"', 'name="键盘 2"'); t.dispatchEvent(new Event('input')); t.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })); })()`);
     await wait(500);

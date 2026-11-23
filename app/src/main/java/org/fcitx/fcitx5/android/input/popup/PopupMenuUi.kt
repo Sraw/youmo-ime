@@ -27,6 +27,8 @@ class PopupMenuUi(
     /** [Fixed.start] over the finger: the edit menu's, 选输入法's. */
     private val fixed: Fixed? = null,
     private val scenes: PopupScenes,
+    /** Faded, picking nothing. */
+    private val disabled: Set<Int> = emptySet(),
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     // made again as the focus moves
@@ -35,11 +37,11 @@ class PopupMenuUi(
     private val sceneKeys = scenes.made("menu's size", builder?.menuKeys(cells))
 
     /**
-     * Cells that stay where they are; [disabled] ones faded, picking nothing. Opened by a swipe up, the finger
+     * Cells that stay where they are. Opened by a swipe up, the finger
      * already above the key: back down onto the key cancels it; opened by a swipe [down], back up onto it does.
      * [at]: window pixels; null just over the key.
      */
-    class Fixed(val start: Int, val disabled: Set<Int>, val at: EditMenuLayout.Spot? = null, val down: Boolean = false)
+    class Fixed(val start: Int, val at: EditMenuLayout.Spot? = null, val down: Boolean = false)
 
     private val keySize = sceneKeys?.height?.toInt() ?: ctx.dp(CELL_DP)
 
@@ -69,7 +71,7 @@ class PopupMenuUi(
     // never shown (PopupComponent)
     override val root: View = sceneView ?: View(ctx)
 
-    private fun made(focus: Int) = scenes.made("menu", builder?.menu(cells, columnOrder.toList(), focus, fixed?.disabled.orEmpty()))
+    private fun made(focus: Int) = scenes.made("menu", builder?.menu(cells, columnOrder.toList(), focus, disabled))
 
     // false where it could not be: the one before kept with the focus, so a lift picks the cell drawn selected
     private fun drawScene(focus: Int): Boolean {
@@ -104,7 +106,7 @@ class PopupMenuUi(
         onFocusMoved(root)
     }
 
-    override fun onTrigger() = items.getOrNull(focusedIndex)?.takeIf { fixed?.disabled?.contains(focusedIndex) != true }?.action
+    override fun onTrigger() = items.getOrNull(focusedIndex)?.takeIf { focusedIndex !in disabled }?.action
 
     companion object {
         /** In dp: a key's. */

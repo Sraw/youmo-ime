@@ -166,7 +166,7 @@ class SettingsCardsLayoutTest : RarePageUat() {
         prefs.set(AppPrefs.getInstance().internal.keyLists, KeyLists.HEADER)
         st.open(SettingsRoute.PopupOverrides)
         val cells = forms.map(::board)
-        if (land) assertEquals("one row on the side", 1, cells.map { rect(it).top }.distinct().size)
+        if (land) assertEquals("eight a row on the side", 1, (cells.dropLast(1) + board("scroll")).map { rect(it).top }.distinct().size)
         cells.groupBy { rect(it).top }.values.forEach { row -> assertEquals("a row's heights", 1, row.map { it.height }.distinct().size) }
         var badges = 0
         forms.zip(cells).forEach { (form, cell) ->

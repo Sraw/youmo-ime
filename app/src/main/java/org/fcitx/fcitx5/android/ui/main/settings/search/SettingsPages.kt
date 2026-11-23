@@ -95,6 +95,7 @@ object SettingsPages {
         SettingsRoute.QuickPhrase::class.java to Source.Hand(SettingsRoute.QuickPhrase(), R.string.quick_phrases, QuickPhraseFragment, under = listOf(R.string.word_packs)),
         SettingsRoute.Theme::class.java to Source.Managed(SettingsRoute.Theme, R.string.theme_and_size, { ThemeSettingsFragment.build(it) }, also = ThemeFragment),
         SettingsRoute.Keys::class.java to Source.Managed(SettingsRoute.Keys, R.string.virtual_keyboard, { KeysSettingsFragment.build(it) }),
+        SettingsRoute.ScrollList::class.java to Source.Elsewhere("each category's, with 按键字符和快捷键's cards"),
         SettingsRoute.PopupOverrides::class.java to Source.Hand(
             SettingsRoute.PopupOverrides, R.string.long_press_characters, PopupOverridesFragment, under = listOf(R.string.virtual_keyboard),
             summary = R.string.long_press_characters_summary, more = { ctx, path, into -> SettingsIndex.commands(ctx, path, into) },

@@ -28,7 +28,7 @@ class EditorInfoTraitsTest {
 
     @Test
     fun aPlainTextFieldHasNoSpecialTraits() {
-        assertEquals(EditorTraits(), info { inputType = InputType.TYPE_CLASS_TEXT })
+        assertEquals(EditorTraits(isPlainText = true), info { inputType = InputType.TYPE_CLASS_TEXT })
     }
 
     @Test
@@ -179,5 +179,36 @@ class EditorInfoTraitsTest {
             ),
             { it.first },
         ) { (_, type, kind) -> assertEquals(kind, info { inputType = type }.number) }
+    }
+
+    @Test
+    fun aPlainTextFieldIsAnyTextButAnAddressOrAPassword() {
+        val t = InputType.TYPE_CLASS_TEXT
+        val n = InputType.TYPE_CLASS_NUMBER
+        assertRows(
+            listOf(
+                Triple("text", t, true),
+                Triple("a URI", t or InputType.TYPE_TEXT_VARIATION_URI, false),
+                Triple("an email", t or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, false),
+                Triple("a web email", t or InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS, false),
+                Triple("a password", t or InputType.TYPE_TEXT_VARIATION_PASSWORD, false),
+                Triple("a web password", t or InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD, false),
+                Triple("a visible password", t or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, false),
+                Triple("a PIN is a number's, which has its pad", n or InputType.TYPE_NUMBER_VARIATION_PASSWORD, false),
+                Triple("lines (an EditText of no type)", t or InputType.TYPE_TEXT_FLAG_MULTI_LINE, true),
+                Triple("a person's name", t or InputType.TYPE_TEXT_VARIATION_PERSON_NAME, true),
+                Triple("an address", t or InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS, true),
+                Triple("a short message", t or InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE, true),
+                Triple("a filter", t or InputType.TYPE_TEXT_VARIATION_FILTER, true),
+                Triple("no suggestions", t or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, true),
+                Triple("a number", n, false),
+                Triple("a phone", InputType.TYPE_CLASS_PHONE, false),
+                Triple("a date", InputType.TYPE_CLASS_DATETIME, false),
+                Triple("TYPE_NULL", InputType.TYPE_NULL, false),
+            ),
+            { it.first },
+        ) { (_, type, plain) -> assertEquals(plain, info { inputType = type }.isPlainText) }
+        assertTrue("incognito asks for no letters", info { inputType = t; imeOptions = EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING }.isPlainText)
+        assertTrue("nor search", info { inputType = t; imeOptions = EditorInfo.IME_ACTION_SEARCH }.isPlainText)
     }
 }

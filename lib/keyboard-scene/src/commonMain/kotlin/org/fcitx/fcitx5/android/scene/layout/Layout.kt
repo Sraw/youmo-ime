@@ -108,7 +108,18 @@ class Slot(
     val classes: List<String>,
     override val condition: Condition?,
     override val line: Int,
-) : Cell
+    /** A `scroll` slot's category ([org.fcitx.fcitx5.android.scene.keys.ScrollDefaults]); null on every other kind. */
+    val list: String? = null,
+    val direction: Direction = Direction.Vertical,
+    /** Items in view at once. */
+    val show: Int = DEFAULT_SHOW,
+) : Cell {
+    companion object {
+        const val DEFAULT_SHOW = 4
+    }
+}
+
+enum class Direction(val xml: String) { Vertical("vertical"), Horizontal("horizontal") }
 
 class Variant(val condition: Condition, val attrs: KeyAttrs, val line: Int)
 

@@ -34,7 +34,10 @@
 </header>
 <main id="main" inert>
   <section id="preview-area">
-    <canvas id="preview" tabindex="0" aria-label="键盘预览：点键或用方向键选键，Delete 删除选中的键，Esc 不选"></canvas>
+    <div id="preview-stage">
+      <canvas id="preview" tabindex="0" aria-label="键盘预览：点键或用方向键选键，Delete 删除选中的键，Esc 不选"></canvas>
+      <div id="preview-columns"></div>
+    </div>
     <span id="selected" class="sr" aria-live="polite"></span>
     <form id="env-bar" aria-label="预览环境">
       <label>设备 <select id="env-device"></select></label>
@@ -54,12 +57,14 @@
       <button role="tab" data-tab="key" aria-selected="true">键</button>
       <button role="tab" data-tab="row">行</button>
       <button role="tab" data-tab="board">整块</button>
+      <button role="tab" data-tab="scroll">滑动列</button>
       <button role="tab" data-tab="meta">信息</button>
       <button role="tab" data-tab="source">源码</button>
     </nav>
     <div id="tab-key" class="tab"></div>
     <div id="tab-row" class="tab" hidden></div>
     <div id="tab-board" class="tab" hidden></div>
+    <div id="tab-scroll" class="tab" hidden></div>
     <div id="tab-meta" class="tab" hidden></div>
     <div id="tab-source" class="tab" hidden>
       <p class="muted">布局文件全文：改完即时重读，问题在下面列出，点一条跳到那一行。打开的文件换行一律存成 LF（Windows 的 CRLF 也改成 LF）。</p>

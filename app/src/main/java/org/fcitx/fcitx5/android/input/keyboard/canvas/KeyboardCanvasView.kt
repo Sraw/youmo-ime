@@ -41,6 +41,7 @@ import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Motion
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.SlotNode
 import org.fcitx.fcitx5.android.scene.theme.Transition
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import timber.log.Timber
@@ -592,6 +593,10 @@ class KeyboardCanvasView(
         out.set(s.bounds)
         return true
     }
+
+    /** Every slot of [kinds] in the scene's order, its box in the view's pixels; built as [slot] has it. */
+    fun slots(kinds: Set<String>): List<Pair<SlotNode, Rect>> =
+        scene?.slots.orEmpty().filter { it.kind in kinds }.map { it to Rect().apply { set(it.bounds) } }
 
     fun popupBounds(ref: KeyRef, out: Rect, head: Boolean = false): Boolean {
         val k = current?.keys?.firstOrNull { it.of(ref) } ?: return false

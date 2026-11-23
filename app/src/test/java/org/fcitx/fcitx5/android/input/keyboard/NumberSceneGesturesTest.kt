@@ -79,15 +79,11 @@ class NumberSceneGesturesTest {
         val keys = h.keys()
         fun of(id: String) = h.keyNamed(id).bounds
         fun covered(x: Int, y: Int) = keys.any { it.enabled && it.bounds.contains(x, y) }
+        // the left of 1–7 is the scroll column's, no blank
         val places = listOf(
-            "left 1" to of("1").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
-            "left 4" to of("4").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
-            "left 7" to of("7").let { b -> android.graphics.Rect(0, b.top, b.left, b.bottom) },
             "right 9" to of("9").let { b -> android.graphics.Rect(b.right, b.top, of("space").right, b.bottom) },
-            // as wide as number.xml's: 符 16 返回 14 | 8 | 0 22 | 12 | 10 | ⏎ 18
-            "left 0" to of("0").let { b -> android.graphics.Rect(of("back").right, b.top, b.left, b.bottom) },
-            "right 0" to of("0").let { b -> android.graphics.Rect(b.right, b.top, b.right + b.width() * 12 / 22, b.bottom) },
-            "left enter" to of("enter").let { b -> android.graphics.Rect(b.left - of("0").width() * 10 / 22, b.top, b.left, b.bottom) },
+            // as wide as number.xml's: 0 30 | . 12
+            "right 0" to of("0").let { b -> android.graphics.Rect(b.right, b.top, b.right + b.width() * 12 / 30, b.bottom) },
         )
         return places.filter { (_, r) -> r.width() > 0 && !covered(r.centerX(), r.centerY()) }
     }
