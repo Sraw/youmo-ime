@@ -19,6 +19,7 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -394,8 +395,9 @@ abstract class BaseInputView(
             val adapter = object : ArrayAdapter<CharSequence>(themedContext, android.R.layout.simple_list_item_1, ArrayList()) {
                 override fun areAllItemsEnabled() = false
                 override fun isEnabled(position: Int) = position >= firstLine && shown[position - firstLine].enabled
-                override fun getViewTypeCount() = 2
-                override fun getItemViewType(position: Int) = if (position == 0 && head != null) 1 else 0
+                // a header's type keeps the one live head out of the list's scrap: a measure put it there, and the
+                // list scrolling then detached it from the window while shown, its taps posted and never run
+                override fun getItemViewType(position: Int) = if (position == 0 && head != null) AdapterView.ITEM_VIEW_TYPE_HEADER_OR_FOOTER else 0
                 override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
                     if (position == 0 && head != null) head else super.getView(position, convertView, parent)
             }

@@ -609,3 +609,29 @@ def py160(d):
     d.space()
     off = d.expect_field("今天 ", msg="关着时空格没打出空格：「{got}」")
     return f"开着：「{want}」，再一下空格加空格；关着：「{off}」"
+
+
+@case("PY-166", base="B0")
+def py166(d):
+    """a word card's rows scrolled, then a row tapped: its character's card (FB: after a scroll no row opened)"""
+    d.open_page("text")
+    d.type("zhonghuarenmingongheguo")
+    d.long_pick("中华人民共和国")
+    line = d.screen().find(desc="中华人民共和国，zhōng huá rén mín gòng hé guó", where="all")
+    check(line is not None, "没有读音行")
+    d.tap(line.c, after=0.8)
+    s = d.screen()
+    rows = [n for n in s.nodes if n.desc.startswith(("中，", "华，", "人，", "民，", "共，", "和，", "国，"))]
+    check(len(rows) >= 2, f"词卡里没有字的行：{[n.desc for n in s.nodes if n.desc][:12]}")
+    top, low = rows[0], rows[-1]
+    for how, a, b in (("往上滑", low.c, top.c), ("往下滑", top.c, low.c)):
+        d.swipe(a, b, 300, after=1.5)
+        s = d.screen()
+        row = next((n for n in s.nodes if n.desc.startswith("和，")), None) or \
+            next((n for n in s.nodes if n.desc.startswith("华，")), None)
+        check(row is not None, f"{how}后词卡里找不到行")
+        d.tap(row.c, after=0.8)
+        s = d.screen()
+        check(s.find(desc="返回 中华人民共和国", where="all") is not None, f"{how}后点「{row.desc[:1]}」没打开字卡")
+        d.tap(s.find(desc="返回 中华人民共和国", where="all").c, after=0.8)
+    return "上滑、下滑后点字都打开字卡"

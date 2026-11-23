@@ -223,6 +223,12 @@
 - **预期**：勾着时前 30 个候选里有「自己」（长按选的 ㄓ 也读成 ㄗ）；取消勾选后没有。
 - **JVM**：`FuzzyUatTest.aZhuyinSymbolLongPressedReadsItsFuzzyPartner`（:lib:ime-eval:uatTest，真数据，按键盘长按发的符号码）、`T9SegmenterZhuyinTest.aTakenSyllableOrSymbolReadsTheFuzzyPairsOn`（ime-core）；设备上不跑。
 
+### PY-166 [P1] 词卡上下滑过以后，点字照样打开字卡
+- **前提**：B0，「普通文本」框。
+- **操作**：打 zhonghuarenmingongheguo，长按候选「中华人民共和国」，点读音行；在词卡的字行上往上滑到底，点「和」那一行；点「‹ 中华人民共和国」返回，往下滑到顶，点「华」那一行。
+- **预期**：两次都打开那个字的字卡（最上面「‹ 中华人民共和国」）；滑动停下后第一次点就打开，不用点两下。
+- **JVM**：app `WordCardScrollUatTest.aWordCardScrolledToItsEndStillOpensARowOnTheFirstTap`。
+
 ### PY-24 [P1] u 开头按笔画查字
 - **前提**：B0。
 - **操作**：点 u h s p。
