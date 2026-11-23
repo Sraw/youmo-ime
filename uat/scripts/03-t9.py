@@ -1,9 +1,10 @@
 """uat/03-t9.md (B0-九键). The .md is the source of truth; each function follows its case's
 前提/操作/预期."""
 
+import statistics
 import time
 
-from uat import case, check, choose, first, home, keys_at, script
+from uat import Blocked, case, check, choose, first, home, keys_at, script
 
 
 def t9(d, digits, gap=0.35, after=0.6):
@@ -261,3 +262,71 @@ def t969(d):
 @case("T9-70", base="B0-九键", mutates="learn", visual=True)
 def t970(d):
     return script("06-pinyin").latin_mix(d, t9, "9633474663", "474663", "96636546842678244326")
+
+
+def text_digits(d, way, digits):
+    """the open key dialog's [way] (上滑, 下滑) set to the text [digits], typed on the keyboard's 123 page"""
+    st = script("14-settings")
+    ed = st.dialog_text_field(d, way)
+    d.tap((ed.b[2] - 12, ed.c[1]), 0.8)
+    k = d.keys(refresh=True)
+    for _ in range(len(ed.text) + 2 if ed.text else 0):
+        d.tap(k["bksp"], 0.15)
+    if "123" not in k:
+        raise Blocked(f"键盘上没有 123：{sorted(k)[:20]}")
+    d.tap(k["123"], 0.8)
+    d.type(digits)
+    d.sh("input keyevent 4")
+    time.sleep(0.8)
+    st.dialog_ok(d)
+
+
+def corner_height(im, b):
+    """the height in px of the ink in the top third of key box b's right half (its 右上 mark), against the key's
+    colour there"""
+    x0, y0, x1, y1 = b
+    box = (x0 + (x1 - x0) // 2, y0 + 3, x1 - 3, y0 + (y1 - y0) // 3)
+    g = im.crop(box).convert("L")
+    w, h = g.size
+    px = g.load()
+    bg = statistics.mode(px[x, y] for x in range(w) for y in range(h))
+    rows = [y for y in range(h) if any(abs(px[x, y] - bg) > 60 for x in range(w))]
+    return rows[-1] - rows[0] + 1 if rows else 0
+
+
+@case("T9-71", base="B0-九键", mutates=True, visual=True)
+def t971(d):
+    st = script("14-settings")
+
+    def heights():
+        d.open_page("text")
+        d.clear()
+        kb = d.need_keyboard()
+        descs = {n.desc: n.b for n in kb.walk() if n.clickable and n.desc}
+        # as a screen reader says them: 1 by its marks (「，。？！」), 2 「ABC，2」, the space 「空格，拼音」
+        said = {"1": lambda t: t.startswith("，。"), "2": lambda t: t.endswith("，2"), "3": lambda t: t.endswith("，3"),
+                "空格": lambda t: t.startswith("空格")}
+        keys = {k: next((b for t, b in descs.items() if f(t)), None) for k, f in said.items()}
+        if None in keys.values():
+            raise Blocked(f"键盘上找不到 1、2、3、空格：{sorted(descs)[:20]}")
+        im = d.png()
+        return {k: corner_height(im, b) for k, b in keys.items()}
+
+    st.slots_tab(d, "九键")
+    st.key_dialog(d, "1")
+    text_digits(d, "上滑", "1")
+    st.slots_tab(d, "功能键")
+    st.key_dialog(d, "空格")
+    text_digits(d, "上滑", "0")
+    one = heights()
+    d.shot("kb", "1 上的「1」、空格上的「0」和 2、3 的键角小字一样大、一样粗")
+    d.step("1 键改成「12」")
+    st.slots_tab(d, "九键")
+    st.key_dialog(d, "1")
+    text_digits(d, "上滑", "12")
+    twelve = heights()
+    d.shot("kb", "1 上的「12」是快捷键文字的样子，比 2 的「2」小、细")
+    check(abs(one["1"] - one["2"]) <= 1 and abs(one["空格"] - one["2"]) <= 1 and one["2"] > 0,
+          f"墨迹高度 1「{one['1']}」空格「{one['空格']}」，2「{one['2']}」3「{one['3']}」")
+    check(0 < twelve["1"] < twelve["2"] - 1, f"「12」墨迹高 {twelve['1']}，「2」{twelve['2']}")
+    return f"墨迹高度：设「1」时 {one}；设「12」时 {twelve}"

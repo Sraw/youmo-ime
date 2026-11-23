@@ -234,16 +234,18 @@ class Content(
         val slots = if (char) charSlots(ways) else functionSlots(ways)
         // the shortcuts first, the up one before the down one, then the symbols (the old order)
         val sorted = slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).map { it.key to it.value }
-        val firstShortcut = sorted.indexOfFirst { it.second.symbol == null }
+        // a text of one character drawn as a symbol is no shortcut here
+        val firstShortcut = sorted.indices.indexOfFirst { steps(sorted[it].second, short[it]) >= 0 }
         fun drawn(i: Int, slot: Slot, w: Way, room: Double): MarkDrawn {
             var fate: MarkFate? = null
-            val m = if (w.symbol != null) {
-                symbolMark(w.symbol, slot, content, looks)
+            val steps = steps(w, short[i])
+            val m = if (steps < 0) {
+                symbolMark(w.symbol ?: (w.shortcut as MarkContent.Text).text, slot, content, looks)
             } else {
                 val drop = if (i == firstShortcut) KeyMarkYield.DROP_SHORTCUT else KeyMarkYield.DROP_DOWN_SHORTCUT
                 val s = w.shortcut!!
                 // the room between the corners may differ by a pixel between the whole-pixel and the loose pass
-                val shown = if (s is MarkContent.Text) stepped(s, short[i] ?: 0, room, cell, looks) else s
+                val shown = if (s is MarkContent.Text) stepped(s, steps, room, cell, looks) else s
                 if (w.user) fate = fateOf(s, shown)
                 shortcutMark(shown, slot, drop, cell, content, looks, snap)
             }
@@ -257,6 +259,17 @@ class Content(
         // the corners first: else 「你好」 at 顶部 read on into 右上's 「1」 as 「你好1」
         val corners = sorted.mapIndexed { i, (slot, w) -> if (slot.centred) null else drawn(i, slot, w, Double.POSITIVE_INFINITY) }
         return sorted.mapIndexed { i, (slot, w) -> corners[i] ?: drawn(i, slot, w, between(slot, corners.filterNotNull(), content)) }
+    }
+
+    // -1: drawn as a symbol. A text of one character looks as a first does (else 九键's 「1」 set on 1 is thinner
+    // than 2's 「2」), its first step down the text's own look.
+    private fun steps(w: Way, short: Int?): Int {
+        val t = w.shortcut as? MarkContent.Text
+        return when {
+            w.symbol != null -> -1
+            t != null && clusterEnds(t.text).size == 1 -> (short ?: 0) - 1
+            else -> short ?: 0
+        }
     }
 
     private fun stepped(s: MarkContent.Text, from: Int, room: Double, cell: Box, looks: Looks): MarkContent {

@@ -327,7 +327,10 @@ internal class PopupBuilder(
     }
 }
 
-/** Grapheme clusters as Android's BreakIterator draws them, without java.text (JS). */
+/**
+ * Grapheme clusters near Android's BreakIterator's, without java.text (JS): Hangul jamo, Thai SARA AM, marks past
+ * the BMP and Indic conjuncts come apart.
+ */
 internal fun clusterEnds(s: String): List<Int> {
     val ends = ArrayList<Int>()
     var i = 0

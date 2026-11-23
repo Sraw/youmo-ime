@@ -344,7 +344,9 @@ class SceneBuilder(
         val b = KeyMarkYield.board(listOf(m), gap)
         val dropped = texts.filter { b.keys[0].marks[it] == null }
         if (dropped.isNotEmpty()) return dropped.toSet()
-        return if (b.shortcut < 1.0) texts.filter { it in KeyMarkYield.crowded(m, gap) }.toSet() else emptySet()
+        // by its own class: a text of one character is drawn a symbol until it steps down (Content.marks)
+        val crowded = KeyMarkYield.crowded(m, gap)
+        return texts.filter { it in crowded && b.markScale(m.marks[it]) < 1.0 }.toSet()
     }
 
     private fun settle(keys: List<Prepared>, loose: List<KeyContent>, shortened: Set<Int>): List<Settled> {
