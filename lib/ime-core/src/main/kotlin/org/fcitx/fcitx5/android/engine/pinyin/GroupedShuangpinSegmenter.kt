@@ -50,6 +50,10 @@ class GroupedShuangpinSegmenter(
     // each syllable's codes in letters, fuzzy ones too: what [keysShown] picks from
     private val codesOf = HashMap<Int, ArrayList<String>>()
 
+    // fuzzy pairs on: a bar-taken syllable's spelling, or a taken initial at the end, to what it reads; null when off
+    private val picked = if (fuzzy.isEmpty()) null else HashMap<String, SyllableMatches>()
+    private val pickedInitial = if (fuzzy.isEmpty()) null else HashMap<String, SyllableMatches>()
+
     init {
         val table = HashMap<String, TreeMap<Int, Int>>()
         val spelt = ArrayList<Triple<String, Int, Int>>()
@@ -58,6 +62,7 @@ class GroupedShuangpinSegmenter(
         // a scheme's keys as group codes; null if a key is on no group
         fun grouped(code: String): String? = code.map { letters.key(it) }.takeIf { it.all(letters::isCode) }?.joinToString("")
         val finalIds = HashMap<String, TreeMap<Int, Int>>()
+        val pickedIds = HashMap<String, TreeMap<Int, Int>>()
         fun keep(code: String, id: Int, flags: Int, init: String) {
             val keys = grouped(code) ?: return
             keepBest(table.getOrPut(keys) { TreeMap() }, id, flags)
@@ -66,11 +71,13 @@ class GroupedShuangpinSegmenter(
         }
         for (id in 0 until Syllables.count) {
             val (init, fin) = SpellingIndex.split(Syllables.spelling(id)) ?: continue
+            if (picked != null) keepBest(pickedIds.getOrPut(init + fin) { TreeMap() }, id, 0)
             if (init.isNotEmpty()) keepBest(initialIds.getOrPut(init) { TreeMap() }, id, SyllableMatches.COMPLETION)
             val finalRules = fuzzy.filter { !it.onInitial && it.appliesAfter(init) }
             for ((i, iFlags) in SpellingIndex.variants(init, initialRules)) {
                 for ((f, fFlags) in SpellingIndex.finalsAfter(i, fin, finalRules)) {
                     val flags = iFlags or fFlags
+                    if (picked != null && flags != 0 && Syllables.id(i + f) >= 0) keepBest(pickedIds.getOrPut(i + f) { TreeMap() }, id, flags)
                     for (code in scheme.codes(i, f)) keep(code, id, flags, i)
                     if (i.isEmpty() && f.length == 2) spelt += Triple(f, id, flags)
                 }
@@ -102,6 +109,13 @@ class GroupedShuangpinSegmenter(
         }
         initialIds.forEach { (k, m) -> byInitial[k] = toMatches(m) }
         finalIds.forEach { (k, m) -> withFinal[k] = toMatches(m) }
+        pickedIds.forEach { (k, m) -> picked?.put(k, toMatches(m)) }
+        // a taken initial reads its fuzzy partners' syllables too, as withFinal does
+        if (pickedInitial != null) initialIds.forEach { (init, m) ->
+            val all = TreeMap(m)
+            for (rule in initialRules) rule.partner(init)?.let(initialIds::get)?.keys?.forEach { keepBest(all, it, SyllableMatches.FUZZY or SyllableMatches.COMPLETION) }
+            pickedInitial[init] = toMatches(all)
+        }
     }
 
     /** Whether [final] ends a syllable after [lead] (a key code, or a bar-taken initial's letters). */
@@ -110,14 +124,15 @@ class GroupedShuangpinSegmenter(
 
     /**
      * The scheme's letters that read [syllable] off [text] (codes, after a bar-taken initial or syllable): of the
-     * syllable's codes, the one most on the keys pressed, as many letters as were pressed; a taken syllable its code.
+     * syllable's codes, the one most on the keys pressed, as many letters as were pressed; a taken syllable its own code,
+     * whichever fuzzy partner is read.
      */
     override fun keysShown(text: String, syllable: Int): String? {
         val codes = codesOf[syllable] ?: return null
         var taken = 0
         while (taken < text.length && text[taken] in 'a'..'z') taken++
         val initial = text.substring(0, taken)
-        if (taken > 0 && initial !in byInitial) return scheme.encode(syllable) ?: codes.first()
+        if (taken > 0 && initial !in byInitial) return scheme.encode(Syllables.id(initial).takeIf { it >= 0 } ?: syllable) ?: codes.first()
         // what each place may be: a taken initial's keys, then each key's letters
         val places = listOfNotNull(initial.takeIf { it.isNotEmpty() }?.let(scheme::initialKeys)) + text.filter(letters::isCode).map(letters::letters)
         val best = codes.maxBy { code -> places.indices.count { j -> j < code.length && code[j] in places[j] } }
@@ -162,9 +177,9 @@ class GroupedShuangpinSegmenter(
             // alone; at the end, the initial
             text in byInitial -> {
                 val bound = if (input.getOrNull(end) == SEPARATOR) input.getOrNull(end + 1)?.let { withFinal[text + it] } else null
-                if (bound != null) edges.add(at, end + 2 - at, Kind.SYLLABLE, bound) else edges.add(at, end - at, Kind.INITIAL, byInitial.getValue(text))
+                if (bound != null) edges.add(at, end + 2 - at, Kind.SYLLABLE, bound) else edges.add(at, end - at, Kind.INITIAL, pickedInitial?.get(text) ?: byInitial.getValue(text))
             }
-            id >= 0 -> edges.add(at, end - at, Kind.SYLLABLE, single(id))
+            id >= 0 -> edges.add(at, end - at, Kind.SYLLABLE, picked?.get(text) ?: single(id))
         }
     }
 

@@ -16,13 +16,14 @@ import java.util.TreeMap
  * syllable it may become; before another digit, initials (简拼) where no longer syllable is read (with
  * [abbreviations]).
  *
- * A letter typed as itself (upper case in the input, from a long press or 连按) keeps only syllables with
- * that letter there. A bar-chosen syllable is in the input as its letters and a separator. On grouped
+ * A letter typed as itself (upper case in the input, from 连按 or a glide; a zhuyin symbol long-pressed) keeps only
+ * syllables spelt with that letter there. A bar-chosen syllable is in the input as its letters and a separator.
+ * Both still read the [Fuzzy] pairs on, each priced by the spelling that fits: JIN's jing stays fuzzy. On grouped
  * keyboards each two-letter key may carry a tap place, weighed per syllable ([SyllableGraph.against]). With
- * [neighbours], whole syllables with one key slipped to a neighbour are read too ([SlipCost]); in zhuyin
- * never onto a tone key. Keys may spell zhuyin instead ([KeySpelling]), a tone after a syllable acting as
- * a separator. With [latin] / [userLatin] (pinyin only), keys typing a Latin word (`474663` iphone) also get
- * [Kind.LETTER] edges, each of the key's letters a match, as [PinyinSegmenter] does.
+ * [neighbours], whole syllables with one key slipped to a neighbour are read too ([SlipCost]); in zhuyin never onto
+ * a tone key. Keys may spell zhuyin instead ([KeySpelling]), a tone after a syllable acting as a separator. With
+ * [latin] / [userLatin] (pinyin only), keys typing a Latin word (`474663` iphone) also get [Kind.LETTER] edges,
+ * each of the key's letters a match, as [PinyinSegmenter] does.
  */
 class T9Segmenter(
     fuzzy: Set<Fuzzy> = emptySet(),
@@ -55,6 +56,11 @@ class T9Segmenter(
     private val wholeLetters = tables.wholeLetters
     private val startLetters = tables.startLetters
     private val initialLetters = tables.initialLetters
+    private val wholeWays = tables.wholeWays
+    private val startWays = tables.startWays
+    private val initialWays = tables.initialWays
+    private val picked = tables.picked
+    private val pickedInitial = tables.pickedInitial
     private val slips = neighbours
 
     /** Ties of two spellings with the same keys and flags but different letters: should be 0, else [SyllableGraph.against] depends on read order. */
@@ -83,6 +89,15 @@ class T9Segmenter(
         var letterTies = 0
             private set
 
+        // fuzzy pairs on: per keys, the spellings typing them, for letters typed as themselves; null when off, the old reading
+        val wholeWays = if (fuzzy.isEmpty()) null else HashMap<String, Ways>()
+        val startWays = if (fuzzy.isEmpty()) null else HashMap<String, Ways>()
+        val initialWays = if (fuzzy.isEmpty()) null else HashMap<String, Ways>()
+
+        // fuzzy pairs on: a bar-taken syllable's spelling, or a taken initial, to what it reads
+        val picked = if (fuzzy.isEmpty()) null else HashMap<String, SyllableMatches>()
+        val pickedInitial = if (fuzzy.isEmpty()) null else HashMap<String, SyllableMatches>()
+
         // each key's a–z as letter syllables, for Latin words
         val keyLetters = letters.codes.associateWith { code ->
             val ls = letters.letters(code).filter { it in 'a'..'z' }.toSortedSet()
@@ -98,11 +113,17 @@ class T9Segmenter(
             val wholeChoices = HashMap<String, TreeMap<Int, Int>>()
             val startChoices = HashMap<String, TreeMap<Int, Int>>()
             val initialChoices = HashMap<String, TreeMap<Int, Int>>()
-            // keepBest, plus on grouped keyboards the kept spelling's letters
-            fun keep(ids: HashMap<String, TreeMap<Int, Int>>, choices: HashMap<String, TreeMap<Int, Int>>, keys: String, id: Int, flags: Int, typed: String) {
+            val wholeSpelt = HashMap<String, TreeMap<Int, LinkedHashMap<String, Int>>>()
+            val startSpelt = HashMap<String, TreeMap<Int, LinkedHashMap<String, Int>>>()
+            val initialSpelt = HashMap<String, TreeMap<Int, LinkedHashMap<String, Int>>>()
+            val pickedIds = HashMap<String, TreeMap<Int, Int>>()
+            val ways = fuzzy.isNotEmpty()
+            // keepBest, plus on grouped keyboards the kept spelling's letters, and with fuzzy pairs every spelling
+            fun keep(ids: HashMap<String, TreeMap<Int, Int>>, choices: HashMap<String, TreeMap<Int, Int>>, spelt: HashMap<String, TreeMap<Int, LinkedHashMap<String, Int>>>, keys: String, id: Int, flags: Int, typed: String) {
                 val into = ids.getOrPut(keys) { TreeMap() }
                 val old = into[id]
                 keepBest(into, id, flags)
+                if (ways) spelt.getOrPut(keys) { TreeMap() }.getOrPut(id) { LinkedHashMap() }.merge(typed, flags, ::minOf)
                 if (!grouped) return
                 val choice = choiceOf(keys, typed)
                 val kept = choices.getOrPut(keys) { TreeMap() }
@@ -122,11 +143,15 @@ class T9Segmenter(
                     SpellingIndex.variants(init, initialRules).flatMap { (i, iFlags) ->
                         if (i.isNotEmpty()) {
                             val spelt = keySpelling.initial(i)
-                            if (spelt != null) for (keys in letters.typings(spelt)) keep(initialIds, initialChoices, keys, id, iFlags or SyllableMatches.COMPLETION, spelt)
+                            if (spelt != null) for (keys in letters.typings(spelt)) keep(initialIds, initialChoices, initialSpelt, keys, id, iFlags or SyllableMatches.COMPLETION, spelt)
                         }
                         // with no initial the final is the syllable: ou's partner u is none, as in 双拼
                         SpellingIndex.finalsAfter(i, fin, finalRules).map { (f, fFlags) -> i + f to (iFlags or fFlags) }
                     }
+                }
+                if (ways) {
+                    keepBest(pickedIds.getOrPut(spelling) { TreeMap() }, id, 0)
+                    for ((s, flags) in spellings) if (flags != 0 && Syllables.id(s) >= 0) keepBest(pickedIds.getOrPut(s) { TreeMap() }, id, flags)
                 }
                 for ((s, flags) in spellings) {
                     // üe is typed ue too (略 lue): u and v may be on different keys
@@ -136,8 +161,8 @@ class T9Segmenter(
                         for (keys in letters.typings(t)) {
                             if (!seen.add(keys)) continue
                             if (parts != null && t.length > 1) regular += keys
-                            keep(wholeIds, wholeChoices, keys, id, flags, t)
-                            for (n in 1 until keys.length) keep(startIds, startChoices, keys.substring(0, n), id, flags or SyllableMatches.COMPLETION, t)
+                            keep(wholeIds, wholeChoices, wholeSpelt, keys, id, flags, t)
+                            for (n in 1 until keys.length) keep(startIds, startChoices, startSpelt, keys.substring(0, n), id, flags or SyllableMatches.COMPLETION, t)
                         }
                     }
                 }
@@ -150,6 +175,16 @@ class T9Segmenter(
             wholeChoices.forEach { (k, m) -> wholeLetters[k] = m.values.toIntArray() }
             startChoices.forEach { (k, m) -> startLetters[k] = m.values.toIntArray() }
             initialChoices.forEach { (k, m) -> initialLetters[k] = m.values.toIntArray() }
+            wholeSpelt.forEach { (k, m) -> wholeWays?.put(k, Ways.of(m)) }
+            startSpelt.forEach { (k, m) -> startWays?.put(k, Ways.of(m)) }
+            initialSpelt.forEach { (k, m) -> initialWays?.put(k, Ways.of(m)) }
+            pickedIds.forEach { (k, m) -> picked?.put(k, toMatches(m)) }
+            // a taken initial reads its fuzzy partners' syllables too, not z's zh as typing does
+            if (pickedInitial != null) letterIds.forEach { (init, m) ->
+                val all = TreeMap(m)
+                for (rule in initialRules) rule.partner(init)?.let(letterIds::get)?.keys?.forEach { keepBest(all, it, SyllableMatches.FUZZY or SyllableMatches.COMPLETION) }
+                pickedInitial[init] = toMatches(all)
+            }
         }
 
         // which letter of its key each of [typed] is: LETTER_BITS a key
@@ -157,6 +192,14 @@ class T9Segmenter(
             var choice = 0
             for (k in keys.indices) choice = choice or (letters.letters(keys[k]).indexOf(typed[k]).coerceIn(0, LETTER_MASK) shl (LETTER_BITS * k))
             return choice
+        }
+    }
+
+    /** Per match of a table's keys, in match order: the spellings typing those keys and the flags each reads with. */
+    private class Ways(val spelt: Array<Array<String>>, val flags: Array<IntArray>) {
+        companion object {
+            fun of(m: TreeMap<Int, LinkedHashMap<String, Int>>) =
+                Ways(m.values.map { it.keys.toTypedArray() }.toTypedArray(), m.values.map { it.values.toIntArray() }.toTypedArray())
         }
     }
 
@@ -235,7 +278,7 @@ class T9Segmenter(
     private fun slippedRun(input: String, at: Int, length: Int, edges: GraphEdges, taps: FloatArray?, passing: Array<List<Passing>?>) {
         val typed = input.substring(at, at + length)
         val keys = keysOf(typed)
-        val full = whole[keys]?.let { fitting(it, typed) }
+        val full = whole[keys]?.let { fitting(it, typed, wholeWays?.get(keys)) }
         // made at the first slip read
         var best: TreeMap<Int, Slip>? = null
         for (j in 0 until length) passing[at + j]?.forEach { best = slipOnto(typed, keys, j, it, full, best) }
@@ -252,7 +295,8 @@ class T9Segmenter(
         val d = p.near.char
         val cost = if (full != null) slipCost.legal(p.cost) else p.cost
         if (cost.isNaN()) return best
-        val m = whole[replaced(keys, j, d)]?.let { fitting(it, replaced(typed, j, d)) } ?: return best
+        val slipped = replaced(keys, j, d)
+        val m = whole[slipped]?.let { fitting(it, replaced(typed, j, d), wholeWays?.get(slipped)) } ?: return best
         val out = best ?: TreeMap()
         for (i in 0 until m.size) {
             val syllable = m.syllable(i)
@@ -298,8 +342,8 @@ class T9Segmenter(
         val id = Syllables.id(text)
         when {
             // a letter is taken as the initial it is offered as: m for ma, mi …, not 呣
-            text.length == 1 && text in byInitial -> edges.add(at, 1, Kind.INITIAL, byInitial.getValue(text))
-            id >= 0 -> edges.add(at, end - at, Kind.SYLLABLE, SyllableMatches(intArrayOf(id), intArrayOf(0)))
+            text.length == 1 && text in byInitial -> edges.add(at, 1, Kind.INITIAL, pickedInitial?.get(text) ?: byInitial.getValue(text))
+            id >= 0 -> edges.add(at, end - at, Kind.SYLLABLE, picked?.get(text) ?: SyllableMatches(intArrayOf(id), intArrayOf(0)))
         }
     }
 
@@ -312,7 +356,7 @@ class T9Segmenter(
             val typed = input.substring(at, at + length)
             val keys = keysOf(typed)
             if (read(input, at, typed, keys, edges, taps)) longest = length
-            initials[keys]?.let { fitting(it, typed) }?.let { initialEdges += Triple(length, it, taps?.let { t -> against(it, initials[keys], initialLetters[keys], typed, at, t) }) }
+            initials[keys]?.let { fitting(it, typed, initialWays?.get(keys)) }?.let { initialEdges += Triple(length, it, taps?.let { t -> against(it, initials[keys], initialLetters[keys], typed, at, t) }) }
             // no syllable goes on from here: nor from a longer one
             if (keys !in starts) break
         }
@@ -325,11 +369,11 @@ class T9Segmenter(
 
     // adds what [typed] (keys [keys] from [at]) is, whole or started; returns whether a regular one is whole
     private fun read(input: String, at: Int, typed: String, keys: String, edges: GraphEdges, taps: FloatArray?): Boolean {
-        val full = whole[keys]?.let { fitting(it, typed) }
+        val full = whole[keys]?.let { fitting(it, typed, wholeWays?.get(keys)) }
         // no taps: skip the lookups in the key's hottest loop
         full?.let { edges.add(at, typed.length, Kind.SYLLABLE, it, taps?.let { t -> against(it, whole[keys], wholeLetters[keys], typed, at, t) }) }
         if (endsAt(input, at + typed.length)) {
-            starts[keys]?.let { fitting(it, typed) }?.let {
+            starts[keys]?.let { fitting(it, typed, startWays?.get(keys)) }?.let {
                 edges.add(at, typed.length, if (full != null) Kind.EXTENDED else Kind.PARTIAL, it, taps?.let { t -> against(it, starts[keys], startLetters[keys], typed, at, t) })
             }
         }
@@ -381,15 +425,44 @@ class T9Segmenter(
         else -> (0 until full.size).any { Syllables.spelling(full.syllable(it)).let { s -> s.length > 1 && SpellingIndex.split(s) != null } }
     }
 
-    /** Those of [matches] with each letter typed as itself in place; null if none. */
-    private fun fitting(matches: SyllableMatches, typed: String): SyllableMatches? {
+    /** Those of [matches] with each letter typed as itself in place; null if none. With [ways], by the spellings that typed the keys, each at the fewest flags of those that fit. */
+    private fun fitting(matches: SyllableMatches, typed: String, ways: Ways?): SyllableMatches? {
         if (typed.none { spelling.isFixed(it) }) return matches
+        if (ways != null) return fittingAny(matches, typed, ways)
         val kept = (0 until matches.size).filter { i ->
             val spelt = spelling.of(matches.syllable(i))
             typed.indices.all { k -> !spelling.isFixed(typed[k]) || spells(spelt, k, spelling.letterOf(typed[k])) }
         }
         if (kept.isEmpty()) return null
         return SyllableMatches(IntArray(kept.size) { matches.syllable(kept[it]) }, IntArray(kept.size) { matches.flags(kept[it]) })
+    }
+
+    private fun fittingAny(matches: SyllableMatches, typed: String, ways: Ways): SyllableMatches? {
+        val fit = IntArray(matches.size)
+        var n = 0
+        for (i in fit.indices) {
+            var best = -1
+            val spelt = ways.spelt[i]
+            val flags = ways.flags[i]
+            for (w in spelt.indices) if ((best < 0 || flags[w] < best) && fits(spelt[w], typed)) best = flags[w]
+            fit[i] = best
+            if (best >= 0) n++
+        }
+        if (n == 0) return null
+        val ids = IntArray(n)
+        val kept = IntArray(n)
+        var j = 0
+        for (i in fit.indices) if (fit[i] >= 0) {
+            ids[j] = matches.syllable(i)
+            kept[j++] = fit[i]
+        }
+        return SyllableMatches(ids, kept)
+    }
+
+    // each letter of [typed] typed as itself where [spelt] has it
+    private fun fits(spelt: String, typed: String): Boolean {
+        for (k in typed.indices) if (spelling.isFixed(typed[k]) && !spells(spelt, k, spelling.letterOf(typed[k]))) return false
+        return true
     }
 
     /** As shown or committed: fixed letters lower case, grouped codes as first letters; in zhuyin, symbols and tones as themselves and bar syllables in symbols (ㄇㄧ). */

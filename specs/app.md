@@ -734,7 +734,7 @@ its three pads by `when="pad=…"`) and, since S4c, `ZhuyinKeyboard`'s 大千
 (zhuyin.xml) and, since S4d, its 注音九键 (zhuyin-nine.xml) draw their keys with a `KeyboardCanvasView`,
 no view a key — the next paragraph but one says how a keyboard moves. The canvas draws the scene `lib/keyboard-scene` makes of its layout in the look converted by keyboard-scene's
 `LookTheme` (`scene/look/`) (a 3.0 single key's name the selector of that key, written by `ThemeWriter` with what selectors read escaped: `zhuyin/,` its comma
-key, `number/*` the star; a board's key of a role, `qwerty/shift`, has on its own styles what it does not set of the role's `*/shift`, as 3.0's `KeyStyleResolver` drew it, and a key of a face of its own and no pressed one its kind's pressed face by its name; the look's files named as theme 4 takes a file's name (`LookTheme.fileNames`: `a (1).png` is `a__1_.png`, at most 128 characters, numbered where two meet), the theme's name cut to 64; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
+key, `number/.` the decimal point (a 3.0 theme's `number/*` still reads and, the signs being the column's items since 0.6.3, styles no key); a board's key of a role, `qwerty/shift`, has on its own styles what it does not set of the role's `*/shift`, as 3.0's `KeyStyleResolver` drew it, and a key of a face of its own and no pressed one its kind's pressed face by its name; the look's files named as theme 4 takes a file's name (`LookTheme.fileNames`: `a (1).png` is `a__1_.png`, at most 128 characters, numbered where two meet), the theme's name cut to 64; `ScenePainter`: one `RenderNode` a key a face, both kept in the tree and a press only their alpha, since a node left out of a frame loses its recording; a
 software canvas, a screenshot's, gets the ops drawn straight); `TextKeyboard.scene` builds the
 `Env` from its state (`TextBoardState`, `SceneMarks`, the texts) through `SceneEnvs.of`, which adds
 what every keyboard's has alike (size, density, landscape, compact, floating's text scale in the input
@@ -1109,7 +1109,8 @@ Where a column sits: another field shows every column from its start, the keyboa
 (`KeyboardWindow.onStartInput` → `toStart`); the same field keeps it. ime-core's `FieldTrack` tells which, the last
 start only (a field in between is a new start): the same EditorInfo, else the same app, view id, input type, field name
 and hint, a view id unset (a WebView made in code, say) only on onStartInputView's `restarting`, so such a WebView's inputs
-alike in all are one and it left and come back to starts anew. A list changed in place (a delete, 中文标点, the items
+alike in all are one and it left and come back to starts anew. A native list's rows sharing a view id (a cart's
+quantity fields) are one field too: moving between them keeps the place. A list changed in place (a delete, 中文标点, the items
 read again) keeps the place; the nine keys' syllables and a category changed start over. A keyboard remade (a turn,
 a theme, a setting) starts over too: its columns are new views.
 
@@ -1241,8 +1242,8 @@ reads `Generic.kl`/`Generic.kcm`) and `sendevent` to its `/dev/input/eventN` as 
 report descriptor), whose event node takes the same `sendevent`; `up` fails if no keyboard appears.
 
 A number's, a phone's or a date's field opens a number pad of its own (`NumberPad.of(EditorTraits.number)`:
-the keys beside the digits blank (a `<gap>` of number.xml: no press, drawn nothing, no node, nothing for TalkBack) where the field takes none, a plain number
-field's the whole pad, a PIN's the digits alone; `FieldPad` in `KeyboardWindow` maps the 123 key and
+every number field's, a PIN's too, the whole pad (`FULL`); a phone's and a date's their column's category (`NumberPad.list`)
+for the signs, and where they take no `=` or `.` a `<gap>` of number.xml: no press, drawn nothing, no node, nothing for TalkBack); `FieldPad` in `KeyboardWindow` maps the 123 key and
 `Unchanged` to that pad within the field; a pad is never remembered, so the next text field gets its letters unless `StickyNumbers` keeps the number pad, below).
 
 Whether the number pad stays for the next field is `StickyNumbers` (ime-core), one instance held by the service,
@@ -1682,7 +1683,8 @@ Rules for settings, all decided:
   (`n` columns of at least a width × the font scale), a row as high as its highest. Three kinds: `GroupCard`
   (生僻字屏蔽: a body that opens, a strip that checks the group; a tap on one never does the other's job),
   `ChoiceCard` (按键字符和快捷键's keyboards: a radio button named by the keyboard, the keys changed said in its
-  stateDescription and drawn as a badge hung over its corner, `ChoiceCard.OVERHANG_DP` the room kept above a row),
+  stateDescription and drawn as a badge hung over its corner, `ChoiceCard.OVERHANG_DP` the room kept above a row;
+  the 滑动列 card counts the lists changed instead, `editedSaid` = `scroll_lists_card_edited`),
   `FoldCard` in `AccordionLayout` (the key editor: one card open at a time, ime-core `Accordion`; the titles stay
   put with the open one capped while it has `Accordion.MIN_CONTENT_DP` × the font scale, else the whole scrolls,
   all folded at the start; the first bounded measure decides; one view tree that never changes, so a focused

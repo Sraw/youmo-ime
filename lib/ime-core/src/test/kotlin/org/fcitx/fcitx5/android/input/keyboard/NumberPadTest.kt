@@ -28,7 +28,7 @@ class NumberPadTest {
             assertEquals(ScrollDefaults.NUMBER, NumberPad.FULL.list)
             assertEquals(setOf("+", "-", "*", "/", "%", ",", ":", "(", ")", "#"), list(NumberPad.FULL))
         },
-        // as 0.6.2's phone pad had them on three places (c8e399386): its left column, right of 9, its bottom row
+        // as 0.6.2's phone pad had them on three places: its left column, right of 9, its bottom row
         "a phone field: a dialler's signs" to { assertEquals(setOf("+", "*", "#", "-", "(", ")", ","), list(NumberPad.of(NumberKind.PHONE))) },
         "a date, a time: their separators, the point a key" to { assertEquals(setOf("-", "/", ":"), list(NumberPad.of(NumberKind.DATETIME))) },
     )

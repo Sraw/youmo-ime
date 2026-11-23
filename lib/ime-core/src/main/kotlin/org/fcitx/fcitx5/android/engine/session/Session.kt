@@ -148,7 +148,7 @@ sealed class Action {
         }
     }
 
-    /** Types [letter] as itself (nine keys: chosen from a long press); [again]: 连按 came to it (see [org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]). */
+    /** Types [letter] as itself (nine keys: from 连按 or a glide); [again]: 连按 came to it (see [org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter]). */
     data class Letter(val letter: Char, val again: Boolean = false, val glided: Boolean = false) : Action()
 
     /** A nine-key press for English: [digit] (2 to 9), any of its letters ([upper] with Shift), or a pinned letter itself; [touch] as for [Key]. */

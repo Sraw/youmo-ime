@@ -162,7 +162,13 @@ its learning still its own), and handwriting and the tables keep the text before
    on, off by default, a key pressed again soon is its next letter and nothing else, `MultiTap`: the
    session puts it in as a letter typed as itself, upper case, in place of the digit, so `4 4` fast
    is `H`. The 2026-10-12 hybrid, read as keys too with a `Penalties.tapped`, went 2026-10-19: a
-   learned 广告 overrode the h the key's preview showed). The 14 keys (拼音 14 键) are the same
+   learned 广告 overrode the h the key's preview showed). A syllable or initial taken off the bar and a
+   letter typed as itself (连按 or a glide on the nine keys, a symbol long-pressed on 注音九键) still read the fuzzy pairs on, priced
+   fuzzy as typed (DECISIONS.md 「0.6.3 双拼模糊音」, dev/design/063-fuzzy-readings.md): both segmenters build,
+   with the pairs on, what a taken spelling or initial reads (`picked`, `pickedInitial`), and `T9Segmenter` which
+   spellings typed each table's keys (`Ways`), a letter typed as itself kept where one of them has it, at the
+   fewest flags of those that do (JIN's jing stays fuzzy, JING reads jin~); with all off, the old reading, as
+   allocated. A taken 双拼 syllable shows as its own keys (`keysShown`) whichever partner is read. The 14 keys (拼音 14 键) are the same
    segmenter over a grouped layout: see [The 14 keys](#the-14-keys-grouped-keys) below.
 
    **Keys tapped off-centre** (纠正错拼和按偏的键; dev/design/061-neighbour-correction.md). A typing key's

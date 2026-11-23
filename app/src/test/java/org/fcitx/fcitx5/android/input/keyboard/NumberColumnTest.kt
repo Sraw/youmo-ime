@@ -14,6 +14,7 @@ import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.KeyboardHarness
@@ -102,29 +103,32 @@ class NumberColumnTest {
         assertEquals(KeyAction.CommitAction("?"), ScrollColumn.typed(ScrollDefaults.NINE, ScrollItem.Text("?", asIs = true), english = false, marks = mapOf("?" to "？")))
     }
 
-    @Test
-    @Uat("PAN-37")
-    fun aFingerOnTheColumnAndOneOnAKeyEachType() {
+    // the first finger down owns its target: each order goes through another one's touch handling
+    private fun bothType(first: () -> Unit, second: () -> Rect, key: Int) {
         numbers()
-        h.api.calls.clear()
-        h.press(item("+"))
-        val one = h.key("1").bounds
-        h.secondFingerThenLift(one.exactCenterX(), one.exactCenterY())
-        assertTrue(h.api.calls.toString(), sent(FcitxKeyMapping.FcitxKey_KP_Add))
-        assertTrue(h.api.calls.toString(), sent(FcitxKeyMapping.FcitxKey_KP_1))
+        try {
+            h.api.calls.clear()
+            first()
+            val at = second()
+            h.secondFingerThenLift(at.exactCenterX(), at.exactCenterY())
+            assertTrue(h.api.calls.toString(), sent(FcitxKeyMapping.FcitxKey_KP_Add))
+            assertTrue(h.api.calls.toString(), sent(key))
+        } finally {
+            // put away: the next row's field opens on the letters again
+            h.hide()
+        }
     }
 
     @Test
     @Uat("PAN-37")
-    fun aFingerOnAKeyAndOneOnTheColumnEachType() {
-        numbers()
-        h.api.calls.clear()
-        h.press(h.key("5"))
-        val plus = h.box(item("+"))
-        h.secondFingerThenLift(plus.exactCenterX(), plus.exactCenterY())
-        assertTrue(h.api.calls.toString(), sent(FcitxKeyMapping.FcitxKey_KP_Add))
-        assertTrue(h.api.calls.toString(), sent(FcitxKeyMapping.FcitxKey_KP_5))
-    }
+    fun aFingerOnTheColumnAndOneOnAKeyEachType() = assertRows(
+        "the column first: a key's finger is not the column's second" to {
+            bothType({ h.press(item("+")) }, { h.key("1").bounds }, FcitxKeyMapping.FcitxKey_KP_1)
+        },
+        "a key first: the column's finger is not the key's second" to {
+            bothType({ h.press(h.key("5")) }, { h.box(item("+")) }, FcitxKeyMapping.FcitxKey_KP_5)
+        },
+    )
 
     @Test
     @Uat("PAN-37")
@@ -183,30 +187,37 @@ class NumberColumnTest {
         assertEquals(0, columnView().scrollY)
     }
 
-    @Test
-    @Uat("PAN-36")
-    fun theSameFieldKeepsWhereTheColumnWas() {
-        h.start(fieldId = 7)
-        h.tap(h.key("123"))
-        val at = scrolledToEnd()
-        // restartInput's new EditorInfo
-        h.restart()
-        assertEquals(at, columnView().scrollY)
-        // left and come back to: the keyboard kept for later shows it there
-        h.tap(h.key(h.service.getString(R.string.picker_back)))
-        h.hide()
-        h.start(fieldId = 7)
-        h.tap(h.key("123"))
-        assertEquals(at, columnView().scrollY)
+    // restartInput's new EditorInfo
+    private fun restartedKeeps(fieldId: Int) {
+        h.start(fieldId = fieldId)
+        try {
+            h.tap(h.key("123"))
+            val at = scrolledToEnd()
+            h.restart()
+            assertEquals(at, columnView().scrollY)
+        } finally {
+            h.hide()
+        }
     }
 
     @Test
     @Uat("PAN-36")
-    fun aWebViewWithoutAnIdRestartedKeepsWhereTheColumnWas() {
-        h.start(fieldId = -1)
+    fun aFieldRestartedKeepsWhereTheColumnWas() = assertRows(
+        "an app's field, told by its id" to { restartedKeeps(7) },
+        "a WebView's field without an id: the restart is all that says it is the same" to { restartedKeeps(-1) },
+    )
+
+    @Test
+    @Uat("PAN-36")
+    fun theSameFieldLeftAndComeBackToKeepsWhereTheColumnWas() {
+        h.start(fieldId = 7)
         h.tap(h.key("123"))
         val at = scrolledToEnd()
-        h.restart()
+        // the keyboard kept for later shows it there
+        h.tap(h.key(h.service.getString(R.string.picker_back)))
+        h.hide()
+        h.start(fieldId = 7)
+        h.tap(h.key("123"))
         assertEquals(at, columnView().scrollY)
     }
 
@@ -227,6 +238,29 @@ class NumberColumnTest {
         pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NUMBER, listOf(ScrollItem.Text("="), ScrollItem.Text("+"))).serialize())
         h.idle()
         assertEquals(listOf("=", "+"), labels())
+    }
+
+    @Test
+    @Uat("KB-118")
+    fun aCommandInTheColumnRunsOnATap() {
+        pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NUMBER, listOf(ScrollItem.Command(KeyCommand.SelectToStart.key))).serialize())
+        h.start(prefill = { it.setText("hello world"); it.setSelection(5) })
+        h.tap(h.key("123"))
+        h.tap(column().single())
+        assertEquals(0 to 5, h.field.let { minOf(it.selectionStart, it.selectionEnd) to maxOf(it.selectionStart, it.selectionEnd) })
+        assertEquals("nothing typed", "hello world", h.field.text.toString())
+    }
+
+    @Test
+    fun aSceneRemadeForTheLockLeavesTheColumnAsItWas() {
+        numbers()
+        val board = KeyboardHarness.all(h.keyboard).filterIsInstance<NumberKeyboard>().first { h.shown(it) }
+        val updates = board.columns.updates
+        board.locked = true
+        h.relayout()
+        // a scene remade (the lock, Shift, each letter on the English nine keys) reads no list again: no menus nor TalkBack names rebuilt
+        assertEquals(updates, board.columns.updates)
+        assertEquals("+", labels().first())
     }
 
     @Test

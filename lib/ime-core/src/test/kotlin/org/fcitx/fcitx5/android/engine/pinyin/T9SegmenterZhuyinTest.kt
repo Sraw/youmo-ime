@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.phrase.PhraseKeys
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.junit.Assert.assertEquals
@@ -62,6 +63,29 @@ class T9SegmenterZhuyinTest {
         assertTrue(read.contains("ni"))
         assertFalse(read.contains("mi"))
     }
+
+    // the flags [syllable] is read with from [at], or null if not read
+    private fun SyllableGraph.flagsOf(at: Int, syllable: String): Int? = edges(at).firstNotNullOfOrNull { e ->
+        matches(e).indexOf(Syllables.id(syllable)).takeIf { it >= 0 }?.let { matches(e).flags(it) }
+    }
+
+    private fun on(vararg fuzzy: Fuzzy) = T9Segmenter(fuzzy.toSet(), abbreviations = false, letters = ZhuyinKeys.NINE)
+
+    private val ni = ZhuyinKeys.symbolCode('ㄋ').toString() + nine("ㄧ")
+    private val zh = ZhuyinKeys.symbolCode('ㄓ').toString()
+
+    // a taken syllable is its pinyin and a taken initial its symbol typed as itself: each reads the fuzzy pairs on, priced fuzzy
+    @Test
+    fun aTakenSyllableOrSymbolReadsTheFuzzyPairsOn() = assertRows(
+        "a taken syllable reads its partner" to { assertEquals(SyllableMatches.FUZZY, on(Fuzzy.IN_ING).segment("jing'").flagsOf(0, "jin")) },
+        "a taken syllable reads itself unflagged" to { assertEquals(0, on(Fuzzy.IN_ING).segment("jing'").flagsOf(0, "jing")) },
+        "a symbol typed as itself reads its partner's syllables" to { assertEquals(SyllableMatches.FUZZY, on(Fuzzy.L_N).segment(ni).flagsOf(0, "li")) },
+        "a symbol typed as itself reads its own unflagged" to { assertEquals(0, on(Fuzzy.L_N).segment(ni).flagsOf(0, "ni")) },
+        "ㄓ alone reads zi under z ↔ zh" to { assertEquals(SyllableMatches.FUZZY, on(Fuzzy.Z_ZH).segment(zh).flagsOf(0, "zi")) },
+        "with all off a taken syllable reads no partner" to { assertNull(nine.segment("jing'").flagsOf(0, "jin")) },
+        "with all off a symbol reads no partner" to { assertNull(nine.segment(ni).flagsOf(0, "li")) },
+        "with all off ㄓ reads no zi" to { assertNull(nine.segment(zh).flagsOf(0, "zi")) },
+    )
 
     @Test
     fun theInputShowsAsItsSymbolsAndMarks() {

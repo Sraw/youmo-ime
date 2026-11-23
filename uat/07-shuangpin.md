@@ -360,3 +360,23 @@
 - **操作**：回测试页换到双拼，点 BN IO H JK，看框里；点「你好」。
 - **预期**：框里带下划线的是 `ni hk`（不是 `ni hao`）；点「你好」后框里是「你好」。
 - **JVM**：ime-eval `ShuangpinUatTest.theCodeShowsTheKeysPressedOnEveryKeyboardWhenSet`（输入框里写的就是编码行的文字，`CodeInFieldUatTest` 管它怎样放进框里）；设备上跑（冒烟）。
+
+## 模糊音
+
+### SP-62 [P1] 模糊音在双拼里和全拼一样起作用
+- **前提**：B0-双拼（自然码），**通用输入** 的 **模糊音** 里只勾 in ↔ ing，**通用输入** 的 **在键上划** 里选 **笔画筛选**。
+- **操作**：点 j y（jing），展开候选往下翻；删光，点 j n（jin），展开候选往下翻；删光，点 j n j i；把 **方案** 换成小鹤（jing = j k，jin = j b）、微软（jing = j ;，jin = j n）各做一遍；再到 **拼音** 里打 jing、jin 对照；再点 j y y u（jing yu）后在键盘上划一撇（笔画筛选）；最后取消勾选 in ↔ ing，双拼里再点 j y，再点 j y y u 划一撇。
+- **预期**：j y 的候选里有「金」，j n 的候选里有「京」，单字的先后和全拼打 jing、jin 时一样（读成另一个音的字排在本音的常用字后面，「金」在第 15 个左右，不在第一页）；j n j i 第一页有「经济」；j y y u 划一撇后第一页有「金鱼」，往下有「金」。取消勾选后 j y 没有「金」，j y y u 划一撇后没有「金鱼」「金」。三个方案都这样。
+- **JVM**：`FuzzyUatTest.fuzzyPinyinReadsEverySchemeAsFullPinyinDoes`（:lib:ime-eval:uatTest，真数据）；设备上不跑。
+
+### SP-63 [P1] 双拼音节条点定的音节照样按模糊音读
+- **前提**：B0-双拼（自然码），**输入法 → 双拼** 的键盘选 18 键并打开 **编码行显示双拼按键**，**通用输入** 的 **模糊音** 里只勾 in ↔ ing，**在键上划** 里选 **笔画筛选**。
+- **操作**：点 jy 两键，在音节条上点 jing，看候选和编码行；再点 y u 两键后划一撇（笔画筛选）；选「金鱼」上屏，再这样打一遍（也划一撇）、选一次；清空后不点音节条直接打 jy yu；取消勾选 in ↔ ing，点 jy、点 jing，看候选；键盘换成 14 键、九键（音节在左边一列），方案换成小鹤各做一遍。
+- **预期**：点了 jing 后单字的先后和全键盘双拼打 jing 时一样，往下有「金」；编码行仍是点的那两键（不是 jin 的）；划一撇后前 30 个候选里有「金鱼」和「金」；学过以后不点音节条打 jy yu，第一页有「金鱼」。取消勾选后点了 jing 没有「金」。
+- **JVM**：`FuzzyUatTest.aSyllableTakenOnTheGroupedKeysStillReadsTheFuzzyPairsOn`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionShuangpinKeysTest.aSyllableTakenReadsItsFuzzyPartnerShownAsItsOwnKeys`（ime-core）；设备上不跑。
+
+### SP-64 [P1] 双拼音节条点定的声母照样按模糊音读
+- **前提**：B0-双拼（自然码），**输入法 → 双拼** 的键盘选 18 键，**通用输入** 的 **模糊音** 里只勾 c ↔ ch。
+- **操作**：点 XC，在音节条上点 c，往下翻候选；再点 IO，往下翻候选；取消勾选 c ↔ ch 再做一遍；键盘换成九键（点 2 键，在左边一列点 c，再点 6 键）各做一遍。
+- **预期**：勾着时只点了 c 的候选里有「吃」，再点 IO 后前 30 个有「错」，往下有「戳」（chuo）；取消勾选后只有 c 开头的字，没有「吃」「戳」。
+- **JVM**：`FuzzyUatTest.anInitialTakenOnTheGroupedKeysReadsItsFuzzyPartner`（:lib:ime-eval:uatTest，真数据，18 键和九键）、`GroupedShuangpinSegmenterTest.aTakenSyllableOrInitialReadsItsFuzzyPartner`（ime-core）；设备上不跑。

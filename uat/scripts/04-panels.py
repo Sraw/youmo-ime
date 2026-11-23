@@ -156,6 +156,9 @@ def column_scroll(d, back=False):
 def column_all(d):
     """every item of the column, scrolled through to its end and back to its start"""
     seen = []
+    # an item deleted or picked down the column leaves it scrolled there
+    for _ in range(4):
+        column_scroll(d, back=True)
     for _ in range(8):
         now = column_texts(d)
         new = [t for t in now if t not in seen]
@@ -280,8 +283,33 @@ def pan36(d):
     d.taps([k["3"], k["="]], after=0.6)
     t2 = d.field_text() or ""
     check(t2 == "12*3=", f"打 12*3= 框里「{t2}」")
+    form = pan36_form(d)
     web = pan36_web(d)
-    return f"左列 {first[:4]}，滑到底 {every}；点 % ( 「{t}」；「{t2}」；{web}"
+    return f"左列 {first[:4]}，滑到底 {every}；点 % ( 「{t}」；「{t2}」；{form}；{web}"
+
+
+def pan36_form(d):
+    """a native form: →| starts the next field's column over; the same field shown again, none between, keeps its place"""
+    testbed_page(d, "form")
+    tb_field(d, "form_text")
+    numbers(d)
+    column_scroll(d)
+    was = column_texts(d)
+    check(was[:1] != ["+"], f"form_text 里左列滑不动：{was}")
+    next_field(d, "form_text2")
+    on(d, "→| 到 form_text2", "数字")
+    moved = column_texts(d)
+    check(moved[:4] == ["+", "-", "*", "/"], f"→| 到 form_text2 后左列 {moved}")
+    column_scroll(d)
+    at = column_texts(d)
+    check(at[:1] != ["+"], f"form_text2 里左列滑不动：{at}")
+    d.back()
+    tb_field(d, "form_text2")
+    if board(d) != "数字":
+        numbers(d)
+    again = column_texts(d)
+    check(again == at, f"收起再点 form_text2 后左列 {again}（之前 {at}）")
+    return f"→| 到 form_text2 左列回到 {moved[:4]}，收起再点它停在 {again[:2]}"
 
 
 def pan36_web(d):
@@ -375,15 +403,17 @@ def pan38(d):
     r = tb.resizer(d)
     tb.drag(d, r.c, (r.c[0] + 240, r.c[1] - 240))
     look("悬浮拖小")
-    return "、".join(seen) + "：列都在它那一格上，能滚、能点（分体：数字键盘不分体，见横屏）"
+    return "、".join(seen) + "：列都在它那一格上，能滚、能点（横屏默认分体，数字键盘缩成单手宽靠一边）"
 
 
 # STICKY.md: the number pad kept across an app's plain fields, its lock
 
-def testbed_page(d, page):
-    """the testbed at [page], started afresh"""
+def testbed_page(d, page, fresh=True):
+    """the testbed at [page], started afresh; not [fresh]: the running testbed turned to it, as a user goes to
+    another page (a force-stop brings the browser's field up between: another app's, which lets the lock go)"""
     from uat import TESTBED
-    d.sh(f"am force-stop {TESTBED}")
+    if fresh:
+        d.sh(f"am force-stop {TESTBED}")
     d.testbed(page)
     d.page = None
     d.host = None
@@ -604,8 +634,13 @@ def pan42(d):
     d.step("9. 最近任务再返回")
     d.sh("input keyevent KEYCODE_APP_SWITCH")
     time.sleep(2.0)
-    d.sh("input keyevent KEYCODE_BACK")
-    time.sleep(1.5)
+    from uat import TESTBED
+    # the first Overview of a fresh emulator swallows a Back while it loads: Back again till the testbed has focus
+    for _ in range(4):
+        d.sh("input keyevent KEYCODE_BACK")
+        time.sleep(1.5)
+        if TESTBED in d.sh("dumpsys window | grep mCurrentFocus"):
+            break
     tb_field(d, "form_text2")
     seen.append(on(d, "9. 收起、最近任务再返回、点 form_text2", "数字"))
     d.back()
@@ -618,6 +653,55 @@ def pan42(d):
     seen.append(on(d, "10. 收起、通知栏、点 form_text", "数字"))
     check(lock_node(d).desc == "解锁", f"通知栏后锁读「{lock_node(d).desc}」")
     key(d, "back")   # the lock outlives the case otherwise: the next one starts locked
+    return "；".join(seen)
+
+
+def emoji_panel(d):
+    """the emoji panel opened from the number pad: the toolbar's 表情, else Return's menu (Emoji)"""
+    s = d.screen()
+    n = s.find(desc="表情", where="ime") or s.find(text="表情", where="ime")
+    if n:
+        d.tap(n.c, 0.8)
+    else:
+        x, y = d.keys(refresh=True)["enter"]
+        d.touch(("down", x, y), ("sleep", 0.9))
+        item = d.screen().find(text="Emoji", where="ime")
+        if not item:
+            d.touch(("up", x, y))
+            raise Blocked("数字键盘上打不开表情面板：工具栏没有「表情」，长按 ⏎ 没有 Emoji")
+        px, py = item.c
+        d.touch(*[("move", x + (px - x) * i // 6, y + (py - y) * i // 6) for i in range(1, 7)], ("sleep", 0.15), ("up", px, py))
+        time.sleep(0.8)
+    d._keys = None
+    check("按拼音搜索表情" in ime_texts(d), f"不是表情面板：{ime_texts(d)[:12]}")
+
+
+@case("PAN-43", mutates=True)
+def pan43(d):
+    seen = []
+    testbed_page(d, "form")
+    tb_field(d, "form_text")
+    numbers(d)
+    lock(d)
+    key(d, "symbols", after=1.0)
+    ime(d, "返回", after=0.8)
+    d._keys = None
+    seen.append(on(d, "1. 符号面板返回", "数字"))
+    check(lock_node(d).desc == "解锁", f"符号面板返回后锁读「{lock_node(d).desc}」")
+    testbed_page(d, "behavior", fresh=False)
+    tb_field(d, "terminal")
+    seen.append(on(d, "2. terminal", "字母"))
+    testbed_page(d, "form", fresh=False)
+    tb_field(d, "form_text")
+    seen.append(on(d, "2. 回 form_text", "数字"))
+    check(lock_node(d).desc == "解锁", f"经过 terminal 后锁读「{lock_node(d).desc}」")
+    emoji_panel(d)
+    ime(d, "返回", after=0.8)
+    d._keys = None
+    seen.append(on(d, "3. 表情面板返回", "字母"))
+    d.back()
+    tb_field(d, "form_text2")
+    seen.append(on(d, "3. 收起、点 form_text2", "字母"))
     return "；".join(seen)
 
 

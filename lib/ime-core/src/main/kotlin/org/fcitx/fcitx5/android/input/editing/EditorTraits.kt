@@ -31,7 +31,7 @@ data class EditorTraits(
     /** `TYPE_TEXT_FLAG_MULTI_LINE` alone: the field shows lines (the space's slide moves among them). */
     val showsLines: Boolean = false,
     val isShortMessage: Boolean = false,
-    /** A text field that asks for no letters (an address, a password): the number keyboard opened before may stay. */
+    /** A text field not asking for an address's, a mail's or a password's letters: the number keyboard opened before may stay. */
     val isPlainText: Boolean = false,
 )
 

@@ -205,6 +205,24 @@
 - **预期**：同 PY-158。
 - **JVM**：`LatinOnKeysUatTest.chineseAndEnglishMixedOnEveryKeyboard`（:lib:ime-eval:uatTest，真数据）、`PinyinSessionLatinTest.aLatinWordIsTypedOnEveryPinyinKeyboardAsOnTheFullOne`（ime-core）；设备上留作冒烟。
 
+### PY-163 [P1] 14 键音节条点定的音节照样按模糊音读
+- **前提**：B0-14键，**通用输入** 的 **模糊音** 里只勾 l ↔ n。
+- **操作**：点 `bn ui`，在音节条上点 ni，再点 `zx ui as bn gh`（xiang），往下翻候选；取消勾选 l ↔ n 再做一遍。
+- **预期**：勾着时候选前面（前 30 个以内）有「理想」；取消勾选后没有。
+- **JVM**：`Keys14UatTest.aSyllableTakenStillReadsTheFuzzyPairsOn`（:lib:ime-eval:uatTest，真数据）、`T9SegmenterTest.aTakenOrFixedReadingReadsTheFuzzyPairsOn` 的 14 键那一行（ime-core）；设备上不跑。
+
+### PY-164 [P1] 注音九键点定的声母照样按模糊音读
+- **前提**：B0-注音九键，**通用输入** 的 **模糊音** 里只勾 z ↔ zh。
+- **操作**：点 ㄓㄗㄢㄦ，在码行右边的条上点 ㄓ，再点 ㄍㄐㄞ、ㄔㄘㄣㄧ，看候选；取消勾选 z ↔ zh 再做一遍。
+- **预期**：勾着时前 30 个候选里有「自己」（点的 ㄓ 也读成 ㄗ）；取消勾选后没有。
+- **JVM**：`FuzzyUatTest.aZhuyinInitialTakenReadsItsFuzzyPartner`（:lib:ime-eval:uatTest，真数据）、`T9SegmenterZhuyinTest.aTakenSyllableOrSymbolReadsTheFuzzyPairsOn`（ime-core）；设备上不跑。
+
+### PY-165 [P1] 注音九键长按选的符号照样按模糊音读
+- **前提**：B0-注音九键，**通用输入** 的 **模糊音** 里只勾 z ↔ zh。
+- **操作**：长按 ㄓㄗㄢㄦ 选 ㄓ，再点 ㄍㄐㄞ、ㄔㄘㄣㄧ，看候选；取消勾选 z ↔ zh 再做一遍。
+- **预期**：勾着时前 30 个候选里有「自己」（长按选的 ㄓ 也读成 ㄗ）；取消勾选后没有。
+- **JVM**：`FuzzyUatTest.aZhuyinSymbolLongPressedReadsItsFuzzyPartner`（:lib:ime-eval:uatTest，真数据，按键盘长按发的符号码）、`T9SegmenterZhuyinTest.aTakenSyllableOrSymbolReadsTheFuzzyPairsOn`（ime-core）；设备上不跑。
+
 ### PY-24 [P1] u 开头按笔画查字
 - **前提**：B0。
 - **操作**：点 u h s p。

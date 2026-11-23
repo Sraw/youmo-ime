@@ -4,6 +4,8 @@
  */
 package org.fcitx.fcitx5.android.scene.keys
 
+import org.fcitx.fcitx5.android.scene.layout.LegacyNumberKeys
+
 /** Which list a `scroll` or `nine-side` slot shows: one rule for the keyboard, the settings' cards and the web pages. */
 object ScrollLists {
     const val NINE_SIDE = "nine-side"
@@ -49,13 +51,15 @@ object ScrollLists {
     }
 
     private val MARKED = setOf(ScrollDefaults.NINE, ScrollDefaults.NINE_ENGLISH)
+
+    /** Whether [category]'s marks go to the input method's 中文标点, so an item may be kept as it is. */
+    fun convertsMarks(category: String): Boolean = category in MARKED
     private val PADS = setOf(ScrollDefaults.NUMBER, ScrollDefaults.PHONE, ScrollDefaults.DATETIME)
     private const val ENGLISH = "english"
 
     // the 0.6.2 number pad's keys typed these as keypad keys, which no input method turns full-width
-    private val KEYPAD = mapOf(
-        "+" to "KP_Add", "-" to "KP_Subtract", "*" to "KP_Multiply", "/" to "KP_Divide", "," to "KP_Separator", "." to "KP_Decimal", "=" to "KP_Equal",
-    )
+    private val KEYPAD = LegacyNumberKeys.SENDS.mapNotNull { (text, send) -> send.removePrefix(SYM).takeIf { it != send }?.let { text to it } }.toMap()
+    private const val SYM = "sym:"
 
     /** [item] of [category] tapped under [ime]; [marks]: ASCII marks to the input method's 中文标点. */
     fun typed(category: String, item: ScrollItem, ime: String?, marks: Map<String, String> = emptyMap()): Typed = when (item) {
@@ -64,7 +68,7 @@ object ScrollLists {
             in MARKED -> when {
                 ime == ENGLISH -> if (item.text.length == 1) Typed.English(item.text) else Typed.Commit(item.text)
                 item.asIs -> Typed.Commit(item.text)
-                else -> Typed.Commit(marks[item.text] ?: item.text, punctuation = item.text.singleOrNull()?.let(::isAsciiMark) == true)
+                else -> Typed.Commit(marks[item.text] ?: item.text, punctuation = item.text.singleOrNull()?.code?.let(::isAsciiMark) == true)
             }
             in PADS -> KEYPAD[item.text]?.let(Typed::Keypad) ?: Typed.Commit(item.text)
             else -> Typed.Commit(item.text)
@@ -77,5 +81,6 @@ object ScrollLists {
         is ScrollItem.Text -> if (category in MARKED && ime != ENGLISH && !item.asIs) marks[item.text] ?: item.text else item.text
     }
 
-    private fun isAsciiMark(c: Char): Boolean = c in '!'..'~' && !c.isLetterOrDigit()
+    /** A mark the 中文标点 mapping may turn full-width, a key's code or a keysym alike: ASCII's printable non-alphanumerics. */
+    fun isAsciiMark(code: Int): Boolean = code in '!'.code..'~'.code && !code.toChar().isLetterOrDigit()
 }

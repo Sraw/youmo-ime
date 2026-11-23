@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.popup
 
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.keys.ItemMark
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,24 +46,33 @@ class PopupEditorTest {
         assertEquals(0, e.selected)
     }
 
-    // dragged: the selection stays on its item, wherever that went
     @Test
-    fun aDraggedItemGoesWhereItIsDropped() {
-        val e = editor()
-        e.tap(4)
-        e.move(6, 0)
-        assertEquals(listOf("#", "Q", "1", "q", "w", "!", "@"), e.items)
-        assertEquals(5, e.selected)
-        e.move(5, 6)
-        assertEquals(listOf("#", "Q", "1", "q", "w", "@", "!"), e.items)
-        assertEquals(6, e.selected)
-        e.move(0, 7)
-        e.move(-1, 0)
-        assertEquals("#", e.items.first())
-        e.tap(6)
-        e.move(1, 2)
-        assertEquals(-1, e.selected)
-    }
+    fun aDraggedItemGoesWhereItIsDropped() = assertRows(
+        "another item dragged past the selected one: the selection stays on its item" to {
+            val e = editor().apply { tap(4) }
+            e.move(6, 0)
+            assertEquals(listOf("#", "Q", "1", "q", "w", "!", "@"), e.items)
+            assertEquals(5, e.selected)
+        },
+        "the selected item dragged: the selection goes with it" to {
+            val e = editor().apply { tap(4) }
+            e.move(4, 6)
+            assertEquals(listOf("Q", "1", "q", "w", "@", "#", "!"), e.items)
+            assertEquals(6, e.selected)
+        },
+        "nothing selected stays so" to {
+            val e = editor()
+            e.move(1, 2)
+            assertEquals(-1, e.selected)
+        },
+        "a drop out of the list moves nothing" to {
+            val e = editor().apply { tap(4) }
+            e.move(0, 7)
+            e.move(-1, 0)
+            assertEquals(editor().items, e.items)
+            assertEquals(4, e.selected)
+        },
+    )
 
     @Test
     fun aLongerListTakesItsOwnMost() {

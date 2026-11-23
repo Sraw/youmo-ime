@@ -13,7 +13,6 @@ import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import kotlin.math.absoluteValue
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.InputMethodNames
@@ -628,12 +627,7 @@ abstract class BaseKeyboard(
     @CallSuper
     internal open fun onSceneBuilt(scene: Scene?) = columns.built(scene)
 
-    // a lock said as what a tap does
-    protected open fun sceneString(name: String): String? = when (name) {
-        "a11y_key_panel_lock_on" -> context.getString(R.string.picker_unlock)
-        "a11y_key_panel_lock_off" -> context.getString(R.string.picker_lock)
-        else -> null
-    }
+    protected open fun sceneString(name: String): String? = null
 
     protected open val sceneTable: SceneKeyDef.Table = object : SceneKeyDef.Table {}
 

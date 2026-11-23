@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.keys
 
 import org.fcitx.fcitx5.android.scene.keys.ScrollLists.Shown
 import org.fcitx.fcitx5.android.scene.keys.ScrollLists.Typed
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -13,9 +14,10 @@ import kotlin.test.assertNull
 class ScrollListsTest {
     private fun texts(items: List<ScrollItem>?) = items?.map { (it as ScrollItem.Text).text }
 
-    // 0.6.2's lists, written out as c8e399386 had them (T9Keyboard, AddressKeys, NumberPad), which this module cannot see
+    // contract: each category's built-in list, which 恢复默认, the store's 「is it the default」 and a backup lean on. 0.6.2's
+    // (T9Keyboard, AddressKeys, NumberPad, which this module cannot see), the number pad's with % : ( ) # added
     @Test
-    fun eachCategorysDefaultIsWhat062Had() {
+    fun eachCategorysDefaultIs062sOrAsChosen() {
         assertEquals(listOf("nine", "nine-english", "number", "phone", "datetime", "url", "email"), ScrollDefaults.IDS)
         assertEquals(listOf(",", ".", "?", "!", "…", "、", ":", "~", "@"), texts(ScrollDefaults.of("nine")))
         assertEquals(listOf(",", ".", "?", "!", "'", "-", ":", ";", "@"), texts(ScrollDefaults.of("nine-english")))
@@ -53,33 +55,36 @@ class ScrollListsTest {
     private val marks = mapOf("," to "，", "." to "。", "?" to "？", "#" to "＃")
     private fun text(t: String, asIs: Boolean = false) = ScrollItem.Text(t, asIs)
 
+    private class Tap(val why: String, val category: String, val item: ScrollItem, val ime: String, val typed: Typed)
+
+    private val nines = listOf("nine", "nine-english")
+    private val pads = listOf("number", "phone", "datetime")
+    private val imes = listOf("english", "pinyin")
+
     // a category × the input method, each cell; 0.6.2's own pairs typed as there (T9Keyboard.pick, the number pad's keys)
+    private val taps: List<Tap> = nines.flatMap { nine ->
+        listOf(
+            Tap("English types a single character as a key of its own, so its space follows", nine, text(","), "english", Typed.English(",")),
+            Tap("English commits a longer text", nine, text(".com"), "english", Typed.Commit(".com")),
+            Tap("marked, an ASCII mark held back as punctuation", nine, text(","), "pinyin", Typed.Commit("，", punctuation = true)),
+            Tap("marked, not ASCII: no punctuation", nine, text("…"), "pinyin", Typed.Commit("…", punctuation = false)),
+            Tap("shuangpin as pinyin", nine, text("@"), "shuangpin", Typed.Commit("@", punctuation = true)),
+            Tap("不转中文标点", nine, text("#", asIs = true), "pinyin", Typed.Commit("#")),
+        )
+    } + pads.flatMap { pad ->
+        imes.flatMap { ime ->
+            mapOf("+" to "KP_Add", "-" to "KP_Subtract", "*" to "KP_Multiply", "/" to "KP_Divide", "," to "KP_Separator", "." to "KP_Decimal", "=" to "KP_Equal")
+                .map { (t, sym) -> Tap("the pad's keypad key", pad, text(t), ime, Typed.Keypad(sym)) } +
+                // the 0.6.2 number board's # ( ) : were commit:
+                listOf("#", "(", ")", ":", "%").map { t -> Tap("a pad's other mark committed", pad, text(t), ime, Typed.Commit(t)) }
+        }
+    } + listOf("url", "email").flatMap { address ->
+        imes.flatMap { ime -> listOf("/", ".com", "@", "#").map { t -> Tap("an address's as it is", address, text(t), ime, Typed.Commit(t)) } }
+    } + ScrollDefaults.IDS.flatMap { id -> imes.map { ime -> Tap("a command on any list", id, ScrollItem.Command("copy"), ime, Typed.Command("copy")) } }
+
     @Test
-    fun whatATapTypesByCategoryAndInputMethod() {
-        for (nine in listOf("nine", "nine-english")) {
-            // English types a single character as a key of its own, so its space follows
-            assertEquals(Typed.English(","), ScrollLists.typed(nine, text(","), "english", marks), nine)
-            assertEquals(Typed.Commit(".com"), ScrollLists.typed(nine, text(".com"), "english", marks), nine)
-            // T9Keyboard.kt:148: marked, an ASCII mark held back as punctuation
-            assertEquals(Typed.Commit("，", punctuation = true), ScrollLists.typed(nine, text(","), "pinyin", marks), nine)
-            assertEquals(Typed.Commit("…", punctuation = false), ScrollLists.typed(nine, text("…"), "pinyin", marks), nine)
-            assertEquals(Typed.Commit("@", punctuation = true), ScrollLists.typed(nine, text("@"), "shuangpin", marks), nine)
-            assertEquals(Typed.Commit("#"), ScrollLists.typed(nine, text("#", asIs = true), "pinyin", marks), "$nine: 不转中文标点")
-        }
-        for (pad in listOf("number", "phone", "datetime")) {
-            for (ime in listOf("english", "pinyin")) {
-                mapOf("+" to "KP_Add", "-" to "KP_Subtract", "*" to "KP_Multiply", "/" to "KP_Divide", "," to "KP_Separator", "." to "KP_Decimal", "=" to "KP_Equal")
-                    .forEach { (t, sym) -> assertEquals(Typed.Keypad(sym), ScrollLists.typed(pad, text(t), ime, marks), "$pad $ime $t") }
-                // number.xml of c8e399386: # ( ) : were commit:
-                for (t in listOf("#", "(", ")", ":", "%")) assertEquals(Typed.Commit(t), ScrollLists.typed(pad, text(t), ime, marks), "$pad $ime $t")
-            }
-        }
-        for (address in listOf("url", "email")) for (ime in listOf("english", "pinyin")) {
-            for (t in listOf("/", ".com", "@", "#")) assertEquals(Typed.Commit(t), ScrollLists.typed(address, text(t), ime, marks), "$address $ime $t")
-        }
-        for (id in ScrollDefaults.IDS) for (ime in listOf("english", "pinyin")) {
-            assertEquals(Typed.Command("copy"), ScrollLists.typed(id, ScrollItem.Command("copy"), ime, marks), "$id $ime")
-        }
+    fun whatATapTypesByCategoryAndInputMethod() = assertRows(taps, { "${it.category} ${it.ime} ${it.item}: ${it.why}" }) {
+        assertEquals(it.typed, ScrollLists.typed(it.category, it.item, it.ime, marks))
     }
 
     @Test

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import android.content.Intent
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
@@ -40,6 +41,7 @@ import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
 import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.uat.PrefsRule
 import org.fcitx.fcitx5.android.uat.SettingsHarness
+import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -864,6 +866,7 @@ class PopupOverridesFragmentTest {
             val strips = KeyboardHarness.all(decor).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().filter { it.isShown }.toList()
             // the scroll lists' card has none
             assertEquals(8, strips.size)
+            assertTrue(KeyboardHarness.all(board("scroll")).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().none { it.isShown })
             fun strip(form: String) = KeyboardHarness.all(board(form)).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().first()
             assertEquals(com.google.android.material.checkbox.MaterialCheckBox.STATE_UNCHECKED, strip("full").state)
             keyCalled("q").performClick()
@@ -1177,15 +1180,6 @@ class PopupOverridesFragmentTest {
         }
 
         @Test
-        fun multiSelectLeavesTheScrollListsCardOut() {
-            open()
-            clickText(R.string.swipe_multi_select)
-            fun strips(form: String) = KeyboardHarness.all(board(form)).filterIsInstance<org.fcitx.fcitx5.android.ui.main.settings.cards.CheckStrip>().filter { it.isShown }
-            assertTrue(strips("scroll").none())
-            assertTrue(strips("full").any())
-        }
-
-        @Test
         fun aLaterVersionsListsAreShownNotWritten() {
             val later = "@9\nnumber\tt|x"
             open(later)
@@ -1208,6 +1202,20 @@ class PopupOverridesFragmentTest {
             assertTrue(d.isShowing)
             assertTrue(st.s(R.string.scroll_list_url) in KeyboardHarness.all(d.window!!.decorView).filterIsInstance<TextView>().map { it.text.toString() }.toList())
             assertTrue(body("scroll").createAccessibilityNodeInfo().isChecked)
+        }
+
+        // 编辑这一列… with the page open makes it anew: the old page's editor goes too, not left to write over the new one
+        @Test
+        fun theRouteWithThePageOpenLeavesNoOldEditor() {
+            open()
+            val old = editorOf(ScrollDefaults.NUMBER)
+            st.newIntent(
+                Intent(st.activity, MainActivity::class.java).setAction(Intent.ACTION_RUN)
+                    .putExtra(MainActivity.EXTRA_SETTINGS_ROUTE, SettingsRoute.ScrollList(ScrollDefaults.URL)),
+            )
+            assertFalse(old.isShowing)
+            val now = ShadowDialog.getLatestDialog() as AlertDialog
+            assertTrue(now !== old && now.isShowing)
         }
 
         @Test

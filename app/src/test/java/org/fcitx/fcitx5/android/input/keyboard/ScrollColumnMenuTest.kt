@@ -25,6 +25,7 @@ import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.popup.PopupFocus
+import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
@@ -318,5 +319,49 @@ class ScrollColumnMenuTest {
         pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Command("copy"), ScrollItem.Text("?"))).serialize())
         h.idle()
         assertEquals(s(R.string.shortcut_copy), column()[0].contentDescription?.toString())
+    }
+
+    @Test
+    @Uat("KB-117")
+    fun aListChangedUnderAHeldItemShowsNoMenu() {
+        start()
+        h.press(column()[2])
+        // another window's settings saved meanwhile: another item sits where the finger is
+        pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Text("a"), ScrollItem.Text("b"), ScrollItem.Text("c"))).serialize())
+        h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        assertEquals(emptyList<Item>(), menu())
+        h.release()
+        assertEquals(listOf("a", "b", "c"), stored(ScrollDefaults.NINE).map { (it as ScrollItem.Text).text })
+    }
+
+    @Test
+    @Uat("PAN-36")
+    fun punctuationSwitchedUnderAHeldItemKeepsItsTap() {
+        start()
+        h.chinesePunctuation()
+        h.press(column()[0])
+        h.chinesePunctuation(marks = emptyMap())
+        h.api.calls.clear()
+        h.release()
+        assertEquals(typed.toString(), ",", h.field.text.toString())
+    }
+
+    @Test
+    @Uat("KB-118")
+    fun aCommandInTheNineKeysColumnRunsOnATap() {
+        pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Command(KeyCommand.SelectToStart.key))).serialize())
+        start()
+        h.start(prefill = { it.setText("hello world"); it.setSelection(5) })
+        h.tap(column().single())
+        assertEquals(0 to 5, h.field.let { minOf(it.selectionStart, it.selectionEnd) to maxOf(it.selectionStart, it.selectionEnd) })
+        assertEquals("nothing typed", "hello world", h.field.text.toString())
+    }
+
+    @Test
+    @Uat("ST-220")
+    fun aPhoneFieldsColumnOnTheNineKeysIsThePhones() {
+        start(inputType = InputType.TYPE_CLASS_PHONE)
+        h.tap(h.key(s(R.string.picker_back)))
+        assertEquals(listOf("+", "*", "#", "-", "(", ")", ","), column().map { it.text.toString() })
     }
 }

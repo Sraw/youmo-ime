@@ -23,6 +23,8 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
         var words = 0
         var right = 0
         var top3 = 0
+        /** pinyin-glide with a session: its first candidate the word. */
+        var sessionRight = 0
         var nanos = 0L
         /** Words left out: a key the layout lacks (微软's ; for ing), or all on one key. */
         var skipped = 0
@@ -36,6 +38,7 @@ internal class GlideRun(private val data: EnglishData, private val weights: Glid
             words += other.words
             right += other.right
             top3 += other.top3
+            sessionRight += other.sessionRight
             nanos += other.nanos
             skipped += other.skipped
             samplesSkipped += other.samplesSkipped

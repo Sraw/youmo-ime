@@ -162,6 +162,13 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
 
     internal data class Step(val before: Snapshot, val after: Snapshot)
 
+    // plain AlertDialogs outlive the view: one tapped after the page was left wrote over newer edits, then crashed in rebuild
+    private val dialogs = mutableListOf<AlertDialog>()
+
+    private fun AlertDialog.Builder.owned(): AlertDialog = show().also { dialogs.removeAll { d -> !d.isShowing }; dialogs += it }
+
+    private fun scrollCard() = ScrollListsCard(punctuationKeys, { if (isAdded && view != null) rebuild() }) { it.owned() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         savedInstanceState ?: return
@@ -237,7 +244,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val opened = ScrollListsCard.opened(findNavController()).takeIf { savedInstanceState == null }?.also { page = ScrollListsCard.PAGE }
         super.onViewCreated(view, savedInstanceState)
-        opened?.let { ScrollListsCard(punctuationKeys, ::rebuild).edit(requireContext(), it) }
+        opened?.let { scrollCard().edit(requireContext(), it) }
         requireActivity().addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
                 val ctx = context ?: return
@@ -281,7 +288,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
         }
         content.apply {
             removeAllViews()
-            add(if (page === ScrollListsCard.PAGE) ScrollListsCard(punctuationKeys, ::rebuild).view(ctx) else keyCard(ctx, stored, user), lParams(matchParent))
+            add(if (page === ScrollListsCard.PAGE) scrollCard().view(ctx) else keyCard(ctx, stored, user), lParams(matchParent))
             add(if (selecting) selectionBar(ctx) else actionBar(ctx), lParams(matchParent) { topMargin = ctx.dp(8) })
         }
         activity?.invalidateMenu()
@@ -361,7 +368,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             .setTitle(R.string.swipe_which_way)
             .setItems(names.toTypedArray()) { _, i -> then(ways[i]) }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .owned()
     }
 
     private fun choosePreset() {
@@ -371,7 +378,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             .setTitle(R.string.swipe_presets)
             .setItems(names.toTypedArray()) { _, i -> confirmPreset(names[i]) { change { applyPreset(presets[i]) } } }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .owned()
     }
 
     private fun confirmPreset(name: String, apply: () -> Unit) {
@@ -380,7 +387,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             .setMessage(R.string.swipe_preset_confirm)
             .setPositiveButton(android.R.string.ok) { _, _ -> apply() }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .owned()
     }
 
     private fun applyPreset(orientation: SwipeOrientation) {
@@ -608,6 +615,8 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
     override fun onDestroyView() {
         fates.releaseView()
         mainHandler.removeCallbacksAndMessages(null)
+        dialogs.forEach(AlertDialog::dismiss)
+        dialogs.clear()
         pagesMade++
         super.onDestroyView()
     }
@@ -738,7 +747,7 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
             open = false
             mainHandler.removeCallbacks(compute)
         }
-        builder.show().apply { setCanceledOnTouchOutside(false); window?.let(::aboveTheKeyboard) }
+        builder.owned().apply { setCanceledOnTouchOutside(false); window?.let(::aboveTheKeyboard) }
             // a word left typed counts as added; an error keeps the dialog open on its card
             .onPositiveButtonClick onClick@{
                 val chosen = sections.mapIndexed { i, section -> section.chosen() ?: return@onClick false.also { cards.showError(way = i) } }
@@ -765,13 +774,13 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
                 when {
                     // a later version's are left as they are: said is only what is put back
                     listsNewer -> R.string.reset_all_scroll_lists_message
-                    ScrollListsCard.store.newer -> R.string.reset_all_long_presses_only_message
+                    ScrollListsCard.load().newer -> R.string.reset_all_long_presses_only_message
                     else -> R.string.reset_all_long_press_message
                 },
             )
             .setPositiveButton(android.R.string.ok) { _, _ -> change(scroll = true) { lists = KeyLists.Empty; ScrollListsCard.resetAll() } }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .owned()
     }
 
     companion object : SearchablePage {
@@ -846,10 +855,14 @@ class PopupOverridesFragment : KeyCapsPageFragment(), SearchAnchors {
 }
 
 /** 按键字符和快捷键's 滑动列 card, a row a category, and each one's editor; [changed] redraws the page. */
-private class ScrollListsCard(private val convertible: Set<String>, private val changed: () -> Unit) {
+private class ScrollListsCard(
+    private val convertible: Set<String>,
+    private val changed: () -> Unit,
+    private val show: (AlertDialog.Builder) -> AlertDialog,
+) {
 
     fun view(ctx: Context): View {
-        val lists = store
+        val lists = load()
         val box = ctx.verticalLayout {
             val pad = ctx.dp(PopupOverridesFragment.KEY_CARD_PAD_DP)
             setPadding(pad, pad, pad, pad)
@@ -918,10 +931,10 @@ private class ScrollListsCard(private val convertible: Set<String>, private val 
 
     /** One category's items: added, deleted, dragged, 不转中文标点 on the nine keys' two; none left is no list (恢复默认 is). */
     fun edit(ctx: Context, id: String) {
-        val lists = store
+        val lists = load()
         val name = ctx.getString(nameOf(id))
         if (lists.newer) {
-            AlertDialog.Builder(ctx).setTitle(name).setMessage(R.string.scroll_list_newer).setPositiveButton(android.R.string.ok, null).show()
+            show(AlertDialog.Builder(ctx).setTitle(name).setMessage(R.string.scroll_list_newer).setPositiveButton(android.R.string.ok, null))
             return
         }
         val (items, marks) = ScrollListStore.editing(lists[id])
@@ -952,14 +965,14 @@ private class ScrollListsCard(private val convertible: Set<String>, private val 
             .setView(cards.layout)
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
-        if (lists.isSet(id)) builder.setNeutralButton(R.string.scroll_list_reset) { _, _ -> store = store.without(listOf(id)); changed() }
-        val shown = builder.show().apply { setCanceledOnTouchOutside(false); window?.let(::aboveTheKeyboard) }
+        if (lists.isSet(id)) builder.setNeutralButton(R.string.scroll_list_reset) { _, _ -> save(load().without(listOf(id))); changed() }
+        val shown = show(builder).apply { setCanceledOnTouchOutside(false); window?.let(::aboveTheKeyboard) }
         dialog = shown
         shown.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = okEnabled()
         shown.onPositiveButtonClick onClick@{
             if (!addTyped()) return@onClick false.also { cards.showError(way = null) }
             if (editor.items.isEmpty()) return@onClick false
-            store = store.with(id, ScrollListStore.edited(editor.items, editor.marks))
+            save(load().with(id, ScrollListStore.edited(editor.items, editor.marks)))
             changed()
             true
         }
@@ -967,23 +980,24 @@ private class ScrollListsCard(private val convertible: Set<String>, private val 
 
     private fun chooseCommand(ctx: Context, add: (KeyCommand) -> Unit) {
         val commands = ScrollListStore.COMMANDS
-        AlertDialog.Builder(ctx)
-            .setTitle(R.string.scroll_list_add_command)
-            .setItems(commands.map { ctx.getString(KeyShortcutLooks.of(it).label) }.toTypedArray()) { _, i -> add(commands[i]) }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        show(
+            AlertDialog.Builder(ctx)
+                .setTitle(R.string.scroll_list_add_command)
+                .setItems(commands.map { ctx.getString(KeyShortcutLooks.of(it).label) }.toTypedArray()) { _, i -> add(commands[i]) }
+                .setNegativeButton(android.R.string.cancel, null),
+        )
     }
 
     companion object {
-        /** Never written where a later version's: [ScrollListStore.with] and the rest leave it as it is. */
-        var store: ScrollListStore
-            get() = ScrollListStore.parse(AppPrefs.getInstance().internal.scrollLists.getValue())
-            set(value) {
-                if (!value.newer) AppPrefs.getInstance().internal.scrollLists.setValue(value.serialize())
-            }
+        fun load(): ScrollListStore = ScrollListStore.parse(AppPrefs.getInstance().internal.scrollLists.getValue())
+
+        /** Nothing written where [value] is a later version's: [ScrollListStore.with] and the rest leave it as it is. */
+        fun save(value: ScrollListStore) {
+            if (!value.newer) AppPrefs.getInstance().internal.scrollLists.setValue(value.serialize())
+        }
 
         /** The categories set. */
-        fun edited(): Int = store.let { s -> ScrollDefaults.IDS.count(s::isSet) }
+        fun edited(): Int = load().let { s -> ScrollDefaults.IDS.count(s::isSet) }
 
         fun badge(card: ChoiceCard) {
             card.edited = edited()
@@ -991,7 +1005,7 @@ private class ScrollListsCard(private val convertible: Set<String>, private val 
         }
 
         fun resetAll() {
-            store = store.without(ScrollDefaults.IDS)
+            save(load().without(ScrollDefaults.IDS))
         }
 
         /** SettingsRoute.ScrollList's category: opened from the keyboard's long press menu. */

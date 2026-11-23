@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.skin.assertRows
 import kotlin.test.Test
@@ -193,7 +194,6 @@ class NumberPadsTest {
     fun theMarksAreAScrollColumnAndTheLockIsOnEveryPad() = assertRows(pads, { (pad, form, why) -> "$pad $form: $why" }) { (pad, form, _) ->
         val s = scene(pad, form)
         val side = s.slots.single { it.kind == "scroll" }
-        assertEquals("scroll", side.kind)
         assertEquals("number", side.list)
         assertEquals(key(s, "1").bounds.top, side.bounds.top, eps, "from the row of 1")
         assertEquals(key(s, "7").bounds.bottom, side.bounds.bottom, eps, "to the row of 7")
@@ -202,5 +202,36 @@ class NumberPadsTest {
         assertEquals(pad != "phone", s.keys.any { it.id == "." }, ". but on the dialler's")
         assertEquals("panel-lock", key(s, "lock").actions["send"], "the lock")
         for (id in listOf("+", "-", "*", "/", ",", "#", "(", ")", ":")) assertTrue(s.keys.none { it.id == id }, "$id is the column's")
+    }
+
+    // where no view of the app's draws it (a card, the web): a command item its icon, whole and in proportion inside its
+    // item's place; a horizontal column's items side by side
+    @Test
+    fun aColumnsCommandIsItsIconInItsPlaceAcrossOrDown() {
+        val items = mapOf("number" to listOf(ScrollItem.Text("+"), ScrollItem.Command("select_to_start")))
+        val e = Forms.env("number", Forms.block).copy(scrollItems = items)
+        val down = Forms.scene("number", e).slots.single { it.kind == "scroll" }
+        // narrow: an item's place a third of a tenth of the width, narrower than the icon
+        val text = "<keyboard xmlns=\"https://youmo-ime/layout/1\" id=\"n\" name=\"n\" family=\"number\" columns=\"10\">" +
+            "<row><slot kind=\"scroll\" list=\"number\" direction=\"horizontal\" show=\"3\"/><key id=\"1\" label=\"1\" width=\"9\"/></row></keyboard>"
+        val across = SceneBuilder(Fixtures.materialLight, e, FakeMeasurer).build(LayoutReader.layout(text).ok(), emptyMap()).ok().slots.single()
+        assertRows(listOf(down to true, across to false), { (_, vertical) -> if (vertical) "down the pad's column" else "across a narrow one" }) { (slot, vertical) ->
+            val b = slot.bounds
+            val place = if (vertical) {
+                val h = b.height / slot.show
+                Box(b.left, b.top + h, b.right, b.top + 2 * h) to Box(b.left, b.top, b.right, b.top + h)
+            } else {
+                val w = b.width / slot.show
+                Box(b.left + w, b.top, b.left + 2 * w, b.bottom) to Box(b.left, b.top, b.left + w, b.bottom)
+            }
+            val icon = slot.ops.filterIsInstance<Op.Icon>().single()
+            assertEquals("select-to-start", icon.name)
+            val (second, first) = place
+            assertTrue(icon.box.left >= second.left - eps && icon.box.right <= second.right + eps, "${icon.box} across in $second")
+            assertTrue(icon.box.top >= second.top - eps && icon.box.bottom <= second.bottom + eps, "${icon.box} down in $second")
+            assertEquals(icon.box.width, icon.box.height, eps, "a square icon stays square")
+            val plus = slot.ops.filterIsInstance<Op.Text>().single { it.text == "+" }
+            assertTrue(plus.x in first.left..first.right && plus.baseline in first.top..first.bottom, "+ at ${plus.x}, ${plus.baseline} in $first")
+        }
     }
 }

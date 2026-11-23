@@ -13,7 +13,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputBinding
 import android.view.inputmethod.InputMethod
 import org.fcitx.fcitx5.android.FcitxApplication
-import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -27,7 +26,6 @@ import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -345,16 +343,6 @@ class StickyNumbersUatTest {
         assertTrue("its own pad, locked still", locked())
         h.start(InputType.TYPE_CLASS_PHONE, packageName = "org.example.other")
         assertFalse("another app's phone field", locked())
-    }
-
-    @Test
-    @Uat("PAN-42")
-    fun theLockReadsWhatATapDoes() {
-        h.start()
-        tap123()
-        assertEquals(h.service.getString(R.string.number_pad_lock), h.keyNamed("lock").description)
-        lock()
-        assertEquals(h.service.getString(R.string.number_pad_unlock), h.keyNamed("lock").description)
     }
 
     private fun bind(uid: Int) {

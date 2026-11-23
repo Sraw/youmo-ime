@@ -571,4 +571,26 @@ class PinyinSessionT9Test {
         session.apply(Action.Pin(0))
         assertTrue(habits.pins.toString(), habits.pins.single().startsWith("${Kinds.keys(NineKeyLetters.G14.tag())}:"))
     }
+
+    // a syllable taken off the bar reads its fuzzy partner as well, priced as typed: jing's 金 and 金鱼
+    @Test
+    fun aSyllableTakenReadsItsFuzzyPartnerToo() {
+        val words = pinyinDataOf(Triple("金", "jin", -2.5f), Triple("经", "jing", -3f), Triple("鱼", "yu", -3f), Triple("金鱼", "jin yu", -4f))
+        val habits = RecordingHabits()
+        fun taken(fuzzy: Set<Fuzzy>): Pair<Session, Snapshot> {
+            val s = PinyinSession(words, T9Segmenter(fuzzy, abbreviations = false), spell = true, prediction = false, learnTo = LearnTo(habits))
+            val typed = s.type("5464")
+            return s to s.apply(Action.Syllable(typed.syllables.indexOf("jing")))
+        }
+        assertTrue(taken(setOf(Fuzzy.IN_ING)).second.candidates.containsAll(listOf("金", "经")))
+        val session = taken(setOf(Fuzzy.IN_ING)).first
+        val jinyu = session.type("98")
+        assertEquals("金鱼", jinyu.candidates[0])
+        // picked, it is learned as read (jin yu) under the nine keys' kind
+        session.apply(Action.Select(0))
+        val row = habits.commits.last().single { it.words.text == "金鱼" }
+        assertEquals("jin yu", row.words.reading)
+        assertEquals(Kinds.nineKeys(NineKeyLetters.STANDARD.tag()), row.code.kind)
+        assertFalse("金" in taken(emptySet()).second.candidates)
+    }
 }

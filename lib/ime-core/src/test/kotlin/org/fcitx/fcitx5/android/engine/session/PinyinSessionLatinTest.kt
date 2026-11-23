@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.session
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
@@ -157,8 +158,9 @@ class PinyinSessionLatinTest {
         assertEquals("啧啧啧", session.typeOn(keys, "zzz").candidates.first())
     }
 
-    // the nine keys' long press or 连按 puts a letter itself (upper case in the input): a word must have that letter there
+    // the nine keys' 连按 or a glide puts a letter itself (upper case in the input): a word must have that letter there
     @Test
+    @Uat("T9-77")
     fun aLetterTypedAsItselfOnTheNineKeysKeepsOnlyWordsWithIt() = assertRows(
         listOf(
             Triple('i', true, "i is iPhone's first letter"),

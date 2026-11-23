@@ -698,15 +698,19 @@
   3. 长按 `~`，移到 **删除这一项** 松开；
   4. 到网址框，长按左列的 `.com`，删掉它；回到普通框看九键左列；
   5. 长按左列任一项，选 **编辑这一列…**；
-  6. 上下滑左列，滑到一半停住手指不动；
-  7. 长按一项，手指在原地小小左右抖一下松开。
+  6. 上下滑左列，滑到一半停住手指不动。
 - **预期**：
   1. 菜单弹在 `?` 上，三项都有图标；松开后 `?` 马上在第一个，没打出字；
   2. 已经在最前时 **移到最前** 是灰的；手指没移到菜单项上，松开什么都不做；
   3. `~` 马上没了；
   4. 网址框里删的是网址那一类，九键平常的左列不变；
   5. 打开 **按键 → 按键字符和快捷键** 的 **滑动列**，直接是「九键」的编辑框；
-  6. 只滚动，不弹菜单；
-  7. 什么都不删。
-  - 一类只剩一项时 **删除这一项** 是灰的；拼音音节不能长按。
+  6. 只滚动，不弹菜单。
+  - 一类只剩一项时 **删除这一项** 是灰的；拼音音节不能长按；长按一项后手指在原地小小抖一下松开，什么都不删（这三点只在 JVM 上查）。
 - **JVM**：`ScrollColumnMenuTest.aHeldItemShowsTheMenuAndMovesToTheFront`、`.removingIsGreyedOnTheLastItem`、`.anAddressFieldsListIsTheOneChanged`、`.editOpensTheListsCard`、`.aDragHeldStillShowsNoMenu`、`.syllablesAreNotHeld`、`.aWobbleUnderTheMenuPicksNothing`、`.beforeTheFirstUnlockTheListsAreNotChanged`（重启后第一次解锁前，锁屏上长按一项，菜单三项都是灰的；设备上不跑这一点）；设备上照跑。
+
+### KB-118 [P1] 滑动列里的「选中至文首」：点一下从光标选到框的开头
+- **前提**：B0，**按键字符和快捷键 → 滑动列** 里给「数字键盘」那一类 **加命令…** 加上 **选中至文首**。
+- **操作**：在测试台「多行」框（`multiline`）里写两行 `hello`、`world`，光标放在 `wo` 后面；点 **123**，在左列里点选中至文首的图标。再到测试台「终端」框（`terminal`）打 `ls`，点 **123**，点同一项。
+- **预期**：多行框里选中从开头到 `wo` 后面（选区 0–8，跨过换行），框里的字不变，没打出别的；终端框里键盘上方的提示条说「这个输入框不能选中文字」，框里还是 `ls`，什么键也没发。
+- **JVM**：`NumberColumnTest.aCommandInTheColumnRunsOnATap`（数字键盘的列）、`ScrollColumnMenuTest.aCommandInTheNineKeysColumnRunsOnATap`（拼音九键的左列），都是选区 0–5、没打出字；命令本身是 KB-116 的 `KeyShortcutsHostTest`；设备上跑（真的多行框、终端框的提示条）。

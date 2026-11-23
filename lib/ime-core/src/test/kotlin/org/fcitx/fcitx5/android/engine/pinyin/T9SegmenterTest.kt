@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.SyllableGraph.Kind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,6 +66,44 @@ class T9SegmenterTest {
         assertFalse("zhong" in segmenter.segment("9664").read(0, 4))
         assertFalse("lan" in segmenter.segment("65").read(0, 1, Kind.INITIAL))
     }
+
+    private val ing = T9Segmenter(setOf(Fuzzy.IN_ING), abbreviations = false)
+    private val ln = T9Segmenter(setOf(Fuzzy.L_N), abbreviations = false)
+
+    // the slips over [to] keys from the start, marked
+    private fun SyllableGraph.slipsTo(to: Int): Set<String> =
+        edges(0).filter { to(it) == to && isSlip(it) }.flatMap { matches(it).toString().split(' ') }.toSet()
+
+    // taken off the bar or letters typed as themselves (连按, a glide) read the fuzzy pairs on, priced fuzzy
+    @Test
+    fun aTakenOrFixedReadingReadsTheFuzzyPairsOn() = assertRows(
+        "a taken syllable reads its partner" to { assertEquals(setOf("jing", "jin~"), ing.segment("jing'").marked(0, 5)) },
+        "on the 14 keys a taken syllable reads its partner" to {
+            assertEquals(setOf("ni", "li~"), T9Segmenter(setOf(Fuzzy.L_N), abbreviations = false, letters = NineKeyLetters.G14).segment("ni'").marked(0, 3))
+        },
+        // u and v share a key: only a taken reading tells them apart
+        "a taken lv reads lu under u ↔ v" to { T9Segmenter(setOf(Fuzzy.V_U), abbreviations = false).segment("lv'").marked(0, 3).let { assertTrue(it.toString(), "lv" in it && "lu~" in it) } },
+        "a taken initial reads its partner's syllables" to { ln.segment("n'").marked(0, 2, Kind.INITIAL).let { assertTrue(it.toString(), "ni…" in it && "li~…" in it) } },
+        "fixed letters read a partner of another final" to { ing.segment("JING").marked(0, 4).let { assertTrue(it.toString(), "jing" in it && "jin~" in it) } },
+        "fixed letters read a partner of another initial" to { ln.segment("NI").marked(0, 2).let { assertTrue(it.toString(), "ni" in it && "li~" in it) } },
+        "fixed letters fitting only a fuzzy spelling stay fuzzy" to { ing.segment("JIN").marked(0, 3).let { assertTrue(it.toString(), "jing~" in it && "jing" !in it && "jin" in it) } },
+        "a fixed initial's partner stays fuzzy" to {
+            T9Segmenter(setOf(Fuzzy.Z_ZH), abbreviations = false).segment("Z6").marked(0, 1, Kind.INITIAL).let { assertTrue(it.toString(), "zhi~…" in it && "zhi…" !in it && "zi…" in it) }
+        },
+        // NI goes on as nian and, by its n spelling, lian
+        "fixed letters ending mid-syllable read the start table's partners" to { ln.segment("NI").marked(0, 2, Kind.EXTENDED).let { assertTrue(it.toString(), "nian…" in it && "lian~…" in it) } },
+        // N45 with the 5 tapped towards 6 is N46: nin, and by its n spelling lin, each a slip (?)
+        "a slip beside a fixed letter reads the slipped keys' partners" to {
+            val slips = T9Segmenter(setOf(Fuzzy.L_N), abbreviations = false, neighbours = true).segment("N45", null, TouchBoxes.touchesAt(3, 2, TouchBoxes.tap(TouchBoxes.NINE, '5', dx = 0.45f))).slipsTo(3)
+            assertTrue(slips.toString(), "nin?" in slips && "lin~?" in slips)
+        },
+        "with all off a taken syllable reads itself" to { assertEquals(setOf("jing"), segmenter.segment("jing'").marked(0, 5)) },
+        "with all off a taken initial reads its own" to { assertTrue(segmenter.segment("n'").marked(0, 2, Kind.INITIAL).none { it.startsWith("l") }) },
+        "with all off fixed letters read themselves" to {
+            assertEquals(setOf("jing"), segmenter.segment("JING").marked(0, 4))
+            assertEquals(setOf("ni"), segmenter.segment("NI").marked(0, 2))
+        },
+    )
 
     @Test
     fun aSyllableOfOneLetterKeepsNoInitialOffItsDigitAndReadsWhatItStartsAsExtended() {

@@ -882,7 +882,7 @@
     <string name="a11y_scroll_list_remove">刪除這一項</string>
     <string name="a11y_scroll_list_to_front">移到最前</string>
     <string name="a11y_scroll_list_edit">編輯這一列</string>
-    <string name="scroll_list_keep_one">至少留一項，或恢復預設</string>
+    <string name="scroll_list_keep_one">至少留一項</string>
     <string name="scroll_list_newer">這是新版本的設定</string>
     <string name="scroll_lists">滑動列</string>
     <string name="scroll_lists_hint">九鍵和數字鍵盤左邊那一列能滑的符號（自訂佈局裡放的滑動列也用這幾類），按鍵盤和輸入框分成幾類，每類一行。點一行改它的內容。</string>
@@ -892,8 +892,8 @@
     <string name="scroll_list_phone">電話</string>
     <string name="scroll_list_datetime">日期時間</string>
     <string name="scroll_list_url">網址</string>
-    <string name="scroll_list_email">郵箱</string>
-    <string name="scroll_list_editor_hint">點一項選中；長按一項拖到別處。</string>
+    <string name="scroll_list_email">電子郵件</string>
+    <string name="scroll_list_editor_hint">點一項選取；長按一項拖到別處。</string>
     <string name="scroll_list_summary">共 %1$d 項</string>
     <string name="scroll_list_add_command">加命令…</string>
     <string name="scroll_list_full">一列最多 %1$d 項，多出的沒有加上。</string>

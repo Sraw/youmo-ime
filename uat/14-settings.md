@@ -826,10 +826,10 @@
 - **JVM**：`BarIconsThemeTest.aThemesBarIconsAreDrawnTheOnesItDoesNotWriteTheApps`（写了的画主题的、没写的画自带的、剪贴板条）、`BarIconsThemeTest.aBuiltInThemeDrawsTheAppsAgain`；ime-core `BarIconsTest.everyToolbarButtonAndTheMenuKeyHaveANameAThemeMayWrite`（每个按钮都有名字）；设备上不跑。
 
 ### ST-129 [P1] 主题换 `undo`：工具栏的撤销和键上的撤销快捷键一起换
-- **前提**：B0-设置，跟随系统深色模式关；一个只带 `<icon name="undo">` 的主题包（0.6.0 做的、换过 `undo` 的主题也是这样）；**按键字符和快捷键** 里 z 的上滑设成 **撤销**。
-- **操作**：导入并点这个主题，看 z 键角的撤销图标；点开工具栏看撤销按钮。
-- **预期**：两处是同一张主题的图（一个名字一个意思）；升级到 0.6.1 后 0.6.0 的这种主题，工具栏的撤销也换成主题的图（CHANGELOG 写明）。
-- **JVM**：`BarIconsThemeTest.aThemesUndoIsTheToolbarsAndTheShortcutsAlike`；ime-core `BarIconsTest.aNameIsOneThingDone`（和快捷键同名的正好是做同一件事的 10 个）；设备上不跑。
+- **前提**：B0-设置，跟随系统深色模式关；一个只带 `<icon name="undo">` 的主题包（0.6.0 做的、换过 `undo` 的主题也是这样）；**按键字符和快捷键** 里 z 的上滑设成 **撤销**，**滑动列** 里给「数字键盘」那一类 **加命令…** 加上 **撤销**、**复制**。
+- **操作**：导入并点这个主题，看 z 键角的撤销图标；点开工具栏看撤销按钮；到测试页普通框点 **123**，把左列滑到最下面看撤销、复制。
+- **预期**：三处的撤销是同一张主题的图（一个名字一个意思）；列里的复制是 App 自己的图标（主题没带 `copy`），不空着；列里的图标不先闪 App 的再换成主题的。升级到 0.6.1 后 0.6.0 的这种主题，工具栏的撤销也换成主题的图（CHANGELOG 写明）。
+- **JVM**：`BarIconsThemeTest.aThemesUndoIsTheToolbarsAndTheShortcutsAlike`；`ScrollColumnIconTest.aCommandDrawsTheThemesIconElseTheApps`（列里的命令：主题有就画主题的，没有画 App 的，还没读出来时什么都不画、读出来再画主题的）；ime-core `BarIconsTest.aNameIsOneThingDone`（和快捷键同名的正好是做同一件事的 10 个）；设备上不跑。
 
 ### ST-130 [P2] 只换菜单键的一态；没换 `hide-keyboard` 时栏上和键上的收起图标各是各的
 - **前提**：B0-设置，跟随系统深色模式关；一个只带 `<icon name="toolbar-expand">` 的主题包；一个只带 `undo` 的主题包。
@@ -1295,7 +1295,7 @@
 <!-- dev/design/063-number-pad-t9 -->
 - **前提**：B0-设置，拼音九键，开着中文标点。
 - **操作**：**按键字符和快捷键**，看卡片的顺序，点 **滑动列**；点「九键」那一行，勾输入框旁的 **不转中文标点**，加 `#`，长按 `#` 拖到第 2 位，确定；在测试 App 里九键没打字时滑左列点 `#`。回来点「九键」那一行，点 **恢复默认**。再点「数字键盘」那一行，看有没有 **不转中文标点** 和 **使用变量**，把项删光；最后打开 14 键的 QW，长按一项。
-- **预期**：**滑动列** 卡片在 **功能键** 前面，大卡片一类一行（九键、九键英文、数字键盘、电话、日期时间、网址、邮箱），每行写名字和前六项；改过九键后那一行描边，卡片右上角写 1（读屏念「改过 1 类」）；键盘上 `#` 在第 2 位，键帽下边写「原样」，中文标点下打出 `#`。恢复默认后描边和角上的数没了，键盘上是 `, . ? ! … 、 : ~ @`。数字键盘那一类没有 **不转中文标点**、**使用变量**，也没有 **设为首选**；删光时 **确定** 是灰的，写「至少留一项，或恢复默认」。长按列表（QW）里的项只点不拖。⋮ 的 **全部恢复默认** 连滑动列一起恢复，提示上的 **撤销** 连滑动列一起撤回；多选时滑动列卡片没有勾选条；↶ 不撤滑动列。
+- **预期**：**滑动列** 卡片在 **功能键** 前面，大卡片一类一行（九键、九键英文、数字键盘、电话、日期时间、网址、邮箱），每行写名字和前六项；改过九键后那一行描边，卡片右上角写 1（读屏念「改过 1 类」）；键盘上 `#` 在第 2 位，键帽下边写「原样」，中文标点下打出 `#`。恢复默认后描边和角上的数没了，键盘上是 `, . ? ! … 、 : ~ @`。数字键盘那一类没有 **不转中文标点**、**使用变量**，也没有 **设为首选**；删光时 **确定** 是灰的，写「至少留一项」。长按列表（QW）里的项只点不拖。⋮ 的 **全部恢复默认** 连滑动列一起恢复，提示上的 **撤销** 连滑动列一起撤回；多选时滑动列卡片没有勾选条；↶ 不撤滑动列。
 - **JVM**：`PopupOverridesFragmentTest$ScrollLists.theScrollListsAreACardBeforeTheFunctionKeysARowEach`、`.onlyTheNineKeysListsOfferNotConvertingAndNoneLeftCannotBeKept`、`.aLongPressEditorsItemsAreNotHeld`、`.aListIsPutBackAloneOrWithEverythingByResetAll`、`.undoAfterResetAllBringsTheScrollListsBackToo`；拖动本身（`View.startDragAndDrop`）Robolectric 发不出，排序规则见 ime-core `PopupEditorTest.aDraggedItemGoesWhereItIsDropped`；键盘上打出的样子在设备上看。
 
 ### ST-219 [P1] 数字键盘列加命令「复制」和文字 `copy`
@@ -1310,7 +1310,7 @@
 - **前提**：B0-设置。
 - **操作**：**滑动列** 里把「网址」那一类改成只有 `/` `.io`，「电话」那一类加 `;`；在测试 App 的网址框、普通文字框里点 123（网址框里九键或数字键盘的列）看列；在电话框里看列。
 - **预期**：网址框里的列是 `/ .io`，普通框的数字键盘列还是 `+ - * / % , : ( ) #`；电话框里列的最后是 `;`，别的框里没有。
-- **JVM**：没有（设置这边见 ST-218、ST-219；按框换类别由键盘那边的测试管，`ScrollLists` 归 A）；设备上跑。
+- **JVM**：`ScrollColumnMenuTest.aPhoneFieldsColumnOnTheNineKeysIsThePhones`（电话框里返回到九键，左列是电话那一类的默认）；设置这边见 ST-218、ST-219；改过的类别在设备上跑。
 
 ### ST-221 [P1] 布局里的横向滑动列
 <!-- dev/design/063-number-pad-t9 -->
@@ -1325,3 +1325,22 @@
 - **操作**：把数字键盘那一类恢复默认，再从这份备份恢复；看 **滑动列** 和键盘。卸载，装 0.6.2，从同一份备份恢复，打开数字键盘。
 - **预期**：恢复后数字键盘那一类又有 **复制**，卡片写改过 1 类；0.6.2 上恢复成功，数字键盘是 0.6.2 的样子，没有报错。
 - **JVM**：`BackupUatTest.aBackupBringsTheScrollListsChanged`（`scroll_lists` 跟着设置进备份、恢复回来）；0.6.2 那一半设备上手动，发版时跑。
+
+### ST-223 [P2] 搜「网址」：打开滑动列，网址那一行闪一下
+- **前提**：B0-设置。
+- **操作**：点 🔍，输入「网址」，点「滑动列 · 网址」（下面写「虚拟键盘 › 按键字符和快捷键」）那条；返回，再搜「滑动列」，点「滑动列」那条。
+- **预期**：第一条打开按键字符和快捷键，选中的是 **滑动列** 卡片，下面「网址」那一行闪一下（按下的样子，半秒多就恢复），不打开它的编辑框；第二条打开同一页，滑动列卡片闪一下。什么都没改。
+- **JVM**：没有（`SettingsPagesTest.everyTappableTextOnAHandPageIsSearched` 只查页上有字的都搜得到，不查点了打开哪一行）；设备上跑，同 ST-165。
+
+### ST-224 [P1] 键盘布局网页：滑动列页加一列，导入 App 后画出来
+- **前提**：同 ST-189（电脑浏览器打开键盘布局页；手机上 B0-设置）。
+- **操作**：**新建键盘布局**，**从内置键盘开始** 选 18 键，id 填 `my-k18-scroll`；在预览里点第一行的 `Q`，到 **滑动列** 页点 **加一列**，**类别** 选电话、**方向** 选横、**显示几项** 填 5；看预览；**文件 › 保存 .layout**，用文本编辑器看文件里的 `<meta>`；照 ST-189 导入手机，「现在就用在」点 **拼音**，到测试页看键盘，左右滑那一列、点一项。再新建一块，从 26 键开始，点第一行的 `Q`，看 **滑动列** 页。
+- **预期**：18 键 `Q` 的左边多了一列，横着露出 5 项电话那一类（`+ * # - (`），能左右滑；保存的文件写 `min-app="0.6.3"`；App 收下它，拼音打字时那一列在 `Q` 左边、横着露出 5 项，点一项打出它。26 键第一行分成两半，**加一列** 是灰的，并写着放不了的原因。
+- **JVM**：web/theme-maker 的 `layout-maker.test.mjs`（`滑动列: added where it can go, its options written, saved with min-app 0.6.3; 加一列 off where the app has none`）；App 一侧 `CustomKeyboardTest.aLetterLayoutsHorizontalColumnShowsTheFieldsListAndTypesIt`；网页到 App 的整条路在电脑浏览器和设备上手工跑。
+
+### ST-225 [P2] 数字键盘布局的滑动列是别的类别：完整的数字键盘缺 `-` 时提醒
+<!-- dev/design/063-number-pad-t9 -->
+- **前提**：B0-设置，没导入过布局；「下载」里有 `uat/fixtures/layouts/uat-number-nine-column.layout`（App 的数字键盘，`pads="full phone datetime"`，左边的滑动列写 `list="nine"`）。
+- **操作**：**外观 → 布局 → + → 导入布局文件** 选它，看确认框。
+- **预期**：确认框只有一条提醒「数字键盘缺 -：数字框里打不出来（比如金额的负号、小数点）」（九键那一类没有 `-`，`.` 有键）；电话框、日期框的数字键盘不提醒（那两种框里列换成电话、日期那一类）；照样能导入。
+- **JVM**：ime-core `LayoutImportTest.theUatsNumberBoardWithANineColumnIsToldItsFullPadLacksTheMinus`；规则见 keyboard-scene `ScrollCheckTest.aScrollColumnHoldsWhatAPadLacks`；设备上不跑。

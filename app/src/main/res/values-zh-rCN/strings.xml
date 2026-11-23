@@ -882,7 +882,7 @@
     <string name="a11y_scroll_list_remove">删除这一项</string>
     <string name="a11y_scroll_list_to_front">移到最前</string>
     <string name="a11y_scroll_list_edit">编辑这一列</string>
-    <string name="scroll_list_keep_one">至少留一项，或恢复默认</string>
+    <string name="scroll_list_keep_one">至少留一项</string>
     <string name="scroll_list_newer">这是新版本的设置</string>
     <string name="scroll_lists">滑动列</string>
     <string name="scroll_lists_hint">九键和数字键盘左边那一列能滑的符号（自定义布局里放的滑动列也用这几类），按键盘和输入框分成几类，每类一行。点一行改它的内容。</string>

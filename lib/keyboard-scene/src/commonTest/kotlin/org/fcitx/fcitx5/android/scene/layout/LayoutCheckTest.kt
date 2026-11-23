@@ -30,6 +30,9 @@ class LayoutCheckTest {
 
     private val qwerty = own("qwerty")
 
+    // a number board on every pad
+    private val every = own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"${LayoutReader.PADS.joinToString(" ")}\"")
+
     // as 0.6.2 shipped it, before the lookup key's switch: what each feature alone asks
     private val qwerty062 = qwerty.replace(", table !table-lookup", "").replace(" table-lookup", "")
 
@@ -80,7 +83,6 @@ class LayoutCheckTest {
             assertEquals(if (id == "qwerty" || id == "number") "0.6.3" else "0.6.1", r.minApp, "$id: based-on= is 0.6.1's, the lookup key's switch and the scroll column 0.6.3's")
         }
         assertEquals(listOf("full"), check(own("number")).pads, "a number board with no pads= is for 123's")
-        val every = own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"${LayoutReader.PADS.joinToString(" ")}\"")
         val r = check(every)
         assertEquals(emptyList(), r.errors)
         assertEquals(LayoutReader.PADS, r.pads)

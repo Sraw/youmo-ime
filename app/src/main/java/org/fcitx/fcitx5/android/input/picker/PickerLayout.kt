@@ -51,6 +51,13 @@ class PickerLayout(
     class Keyboard(context: Context, theme: Theme, board: String, sceneLayout: String, custom: String? = null) :
         BaseKeyboard(context, theme, themeBoard = board) {
 
+        // the panel's lock said as what a tap does: another keyboard's panel-lock locks nothing to say
+        override fun sceneString(name: String): String? = when (name) {
+            "a11y_key_panel_lock_on" -> context.getString(R.string.picker_unlock)
+            "a11y_key_panel_lock_off" -> context.getString(R.string.picker_lock)
+            else -> null
+        }
+
         fun showLocked(locked: Boolean) {
             this.locked = locked
         }

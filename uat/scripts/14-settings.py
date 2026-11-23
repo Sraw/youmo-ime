@@ -2097,7 +2097,8 @@ def open_result(d, title, under):
     """the result titled title whose line under it has under, tapped (the log emptied first: flash_shot reads it)"""
     def row(s):
         for t in s.app():
-            if t.text == title and any(under in n.text and t.b[1] < n.c[1] < t.b[1] + 260 for n in s.app()):
+            # not the search field, which reads the same when the word typed is the title
+            if t.text == title and not t.cls.endswith("EditText") and any(under in n.text and t.b[1] < n.c[1] < t.b[1] + 260 for n in s.app()):
                 return t
     n = d.wait(row, 10, step=0.3, what=f"「{title}」（{under}）那条结果")
     d.sh("logcat -c")
@@ -2132,6 +2133,25 @@ def st165(d):
     open_result(d, "翻转上下滑", "按键字符和快捷键")
     flash_shot(d, "view:keys/flip", "搜翻转点翻转上下滑：翻转上下滑按钮按下的样子")
     return "注音九键选中，两张注音九键的字；翻转上下滑的页"
+
+
+@case("ST-223", base="B0-设置", visual=True)
+def st223(d):
+    def card(what):
+        # the 滑动列 card is taller than the screen: 翻转上下滑 under it is out of view
+        s = d.wait(lambda s: s.find(text="按键字符和快捷键") and s, 8, step=0.3, what=f"{what}：按键字符和快捷键")
+        n = next((n for n in s.app() if n.cls.endswith("RadioButton") and n.text == "滑动列"), None)
+        check(n and n.checked, f"{what}：选中的不是滑动列卡片")
+        check(s.find(text="网址") and not s.find(text="确定", where="all"), f"{what}：没有网址那一行，或打开了编辑框")
+    settings_search(d, "wangzhi", "网址")
+    open_result(d, "滑动列 · 网址", "按键字符和快捷键")
+    flash_shot(d, "view:keys/scroll/url", "搜网址点滑动列 · 网址：滑动列卡片选中，网址那一行按下的样子")
+    card("网址")
+    settings_search(d, "huadonglie", "滑动列")
+    open_result(d, "滑动列", "按键字符和快捷键")
+    flash_shot(d, "view:keys/board/scroll", "搜滑动列点滑动列：滑动列卡片按下的样子")
+    card("滑动列")
+    return "网址那一行闪、滑动列卡片闪，都停在按键字符和快捷键的滑动列，没打开编辑框"
 
 
 @case("ST-166", base="B0-设置", visual=True)
@@ -2951,6 +2971,10 @@ case("ST-189", needs="manual:键盘布局网页新建、合并、保存，再导
      "网页一侧 web/theme-maker 的 layout-maker.test.mjs、layout-smoke.mjs 查")(lambda d: None)
 
 
+case("ST-224", needs="manual:键盘布局网页加滑动列、保存，再导入 App 看列：电脑浏览器加设备，手工跑；"
+     "网页一侧 web/theme-maker 的 layout-maker.test.mjs 查")(lambda d: None)
+
+
 case("ST-190", needs="manual:键盘布局网页的保存检查、草稿找回、打开 .theme，主题制作网页打开 .layout：电脑浏览器上手工跑；"
      "web/theme-maker 的 layout-maker.test.mjs、layout-smoke.mjs、maker.test.mjs、panels-smoke.mjs 查")(lambda d: None)
 
@@ -3054,7 +3078,12 @@ def st216(d):
 def scroll_list_edit(d, name):
     """the 滑动列 card's row [name] tapped: its editor up"""
     slots_tab(d, "滑动列")
-    d.tap_text(name, after=1.5)
+    # 「数字键盘」 is also a tab above the card: the row, not the tab
+    row = next((n for n in d.screen().app() if n.clickable and n.desc.startswith(name + ", ")), None)
+    if row:
+        d.tap(row.c, 1.5)
+    else:
+        d.tap_text(name, after=1.5)
     d.wait_text("确定", timeout=5, where="all")
 
 

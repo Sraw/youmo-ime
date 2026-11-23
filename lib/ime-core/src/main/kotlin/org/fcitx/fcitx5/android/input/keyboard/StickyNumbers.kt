@@ -46,7 +46,10 @@ class StickyNumbers {
         last = field
         val kept = when {
             mode == Mode.Off -> false
-            pkg == null || pkg != app -> letGo()
+            pkg == null || pkg != app -> {
+                letGo()
+                false
+            }
             // its own pad shows; the next plain field has the number keyboard again
             number != null -> false
             same -> numbersHere
@@ -87,6 +90,7 @@ class StickyNumbers {
                 mode = Mode.Locked
                 app = now.pkg
             }
+            // not back to Armed: a hide while locked would have let that go, and the lock does not track one
             now.ownPad -> letGo()
             else -> arm(now.pkg)
         }
@@ -97,9 +101,8 @@ class StickyNumbers {
         app = pkg
     }
 
-    private fun letGo(): Boolean {
+    private fun letGo() {
         mode = Mode.Off
         app = null
-        return false
     }
 }

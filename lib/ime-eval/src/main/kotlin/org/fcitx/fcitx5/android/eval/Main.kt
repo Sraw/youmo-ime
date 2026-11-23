@@ -138,10 +138,13 @@ internal val COMMANDS = listOf(
         0
     },
     Command(
-        "pinyin-glide", "<pinyin.data> <set.tsv> [--syllables <n; 0, the words>] [--word <letters>] [--shuangpin <scheme, as EngineSettings names it>] [--keys nine] [--table <x.data>] [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>]",
-        2..2, "syllables", "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "word", "shuangpin", "keys", "table",
+        "pinyin-glide", "<pinyin.data> <set.tsv> [--syllables <n; 0, the words>] [--word <letters>] [--shuangpin <scheme, as EngineSettings names it>] [--keys nine [--fuzzy off|all|<pair>,...]] [--table <x.data>] [--wobble <key widths>] [--shape <w>] [--proximity <w>] [--edges <w>] [--corner <w>] [--turn <cos>] [--near <r>] [--ends <r>] [--misses <out.tsv>]",
+        2..2, "syllables", "wobble", "shape", "proximity", "edges", "corner", "turn", "near", "ends", "misses", "word", "shuangpin", "keys", "table", "fuzzy",
     ) { args, out, _ ->
         if (args.options["keys"].let { it != null && it != "nine" }) return@Command null
+        // --fuzzy types pinyin into the nine keys' session
+        val pinyinOnNine = args.options["keys"] == "nine" && listOf("shuangpin", "table").none { it in args.options }
+        if (args.options["fuzzy"] != null && !pinyinOnNine) return@Command null
         val (dataPath, setPath) = args.operands
         val o = args.options
         o["word"]?.let { word ->
@@ -162,10 +165,11 @@ internal val COMMANDS = listOf(
         }
         val r = PinyinGlideRun(data, weights).run(
             samples, o["syllables"]?.toInt() ?: 0, o["wobble"]?.toFloat() ?: GLIDE_WOBBLE, ENGLISH_SEED,
-            spelling ?: PinyinGlide.Spelling.FULL, layout, table,
+            spelling ?: PinyinGlide.Spelling.FULL, layout, table, o["fuzzy"]?.let { fuzzyPairs(it) },
         )
         out.appendLine(GlideRun.Result.HEADER)
         out.appendLine(r.row("wobble"))
+        if (o["fuzzy"] != null) out.appendLine(String.format(Locale.ROOT, "first in a nine-key session, fuzzy %s: %.2f%% (%d)", o["fuzzy"], r.sessionRight * 100.0 / r.words.coerceAtLeast(1), r.sessionRight))
         if (r.skipped > 0) out.appendLine("${r.skipped} words left out: a key the layout lacks, or all on one key")
         if (r.samplesSkipped > 0) out.appendLine("${r.samplesSkipped} samples left out: their syllables are not one a character")
         out.appendLine(r.stepsRow())
@@ -544,6 +548,7 @@ private fun usage(err: Appendable): Int {
 
 private fun fuzzyPairs(names: String): Set<Fuzzy>? {
     if (names == "all") return Fuzzy.entries.toSet()
+    if (names == "off") return emptySet()
     val byName = Fuzzy.entries.associateBy { it.name.lowercase() }
     return names.split(',').map { byName[it] ?: return null }.toSet()
 }

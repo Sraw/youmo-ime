@@ -5,9 +5,9 @@
 package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.StateListDrawable
 import android.os.SystemClock
 import android.util.TypedValue
@@ -23,8 +23,8 @@ import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.Keep
 import androidx.annotation.StringRes
+import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
@@ -38,7 +38,10 @@ import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.AutoScaleTextView
+import org.fcitx.fcitx5.android.input.bar.BarIconDrawables
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
+import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.popup.PopupAction
@@ -48,6 +51,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.SlotNode
+import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
@@ -81,6 +85,7 @@ internal class ScrollColumn(
 
     private val altColor = theme.altKeyTextColor
     private val pressColor = theme.keyPressHighlightColor
+    private val icons = PackIcons.of(theme)
 
     private val items = LinearLayout(context).apply { orientation = if (vertical) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL }
 
@@ -133,11 +138,12 @@ internal class ScrollColumn(
     /**
      * The labels read again, a press on a changed list cancelled. [anew]: another list, from its start; [typing]: the
      * syllables, from their start when they change. A list edited in place keeps its place, the layout pass clamping it.
+     * [sameItems]: only how they read changed (the marks), so a press keeps its item.
      */
-    fun refresh(anew: Boolean = false, typing: Boolean = false) {
+    fun refresh(anew: Boolean = false, typing: Boolean = false, sameItems: Boolean = false) {
         val now = labels()
         val changed = now != shown
-        if (anew || changed) cancelPress()
+        if (anew || changed && !sameItems) cancelPress()
         val was = shown
         shown = now
         while (items.childCount < now.size) items.addView(item(items.childCount))
@@ -184,7 +190,7 @@ internal class ScrollColumn(
     private fun label(v: TextView, i: Int, l: Label, looks: Boolean, anew: Boolean) {
         if (looks) {
             v.text = l.text
-            v.foreground = if (l.icon == 0) null else ContextCompat.getDrawable(v.context, l.icon)?.mutate()?.apply { setTintList(ColorStateList.valueOf(altColor)) }
+            v.foreground = icon(v, i, l.icon)
             v.contentDescription = l.said
         }
         val now = actions(i)
@@ -193,6 +199,13 @@ internal class ScrollColumn(
         actionIds[i]?.forEach { ViewCompat.removeAccessibilityAction(v, it) }
         actionIds[i] = now.map { (name, run) -> ViewCompat.addAccessibilityAction(v, name) { _, _ -> run(); true } }
         actionNames[i] = names
+    }
+
+    // a theme's icon of the command's name, as the keys and the bar draw it; none till it is read, never the app's first
+    private fun icon(v: TextView, i: Int, @DrawableRes res: Int): Drawable? {
+        if (res == 0) return null
+        val ready = { if (shown.getOrNull(i)?.icon == res) v.foreground = icon(v, i, res) }
+        return BarIconDrawables.of(v.context, icons, SceneIcons.nameOf(res), res, altColor, v.dp(ICON_DP), ready)
     }
 
     // one line: a syllable longer than the column (zhuang) shrinks to fit, not wrapped onto a cut-off line
@@ -240,6 +253,8 @@ internal class ScrollColumn(
         internal const val ITEM_TEXT_DP = 16f
 
         private const val FIRST_SIZE_DP = 40
+
+        private const val ICON_DP = 24
 
         /** A field's own list (`url`, `email`), as the scroll lists' rule reads the field. */
         fun fieldOf(address: AddressKeys): String? = when (address) {
@@ -338,12 +353,14 @@ internal class ScrollColumns(
 
     // by place: a slot of another kind or direction gets a column of its own; the nine keys' own stays, hidden
     private fun sync(slots: List<SlotNode>) {
+        var added = false
         slots.forEachIndexed { i, s ->
             val vertical = s.direction == Direction.Vertical
             val c = columns.getOrNull(i)
             if (c == null || !c.fits(s, vertical)) {
                 if (c != null) keyboard.removeView(columns.removeAt(i).view.view)
                 add(s.kind, vertical, s.show, i)
+                added = true
             }
             columns[i].slot = s
         }
@@ -351,8 +368,21 @@ internal class ScrollColumns(
             keyboard.removeView(columns.removeAt(columns.lastIndex).view.view)
         }
         columns.drop(slots.size).forEach { it.slot = null }
-        update()
+        // a scene remade for Shift or a key typed (English's nine keys, each key) reads the same: its items, menus and
+        // TalkBack's names are not made again
+        if (added || reading() != read) update()
     }
+
+    // what [update] reads that a scene remade may change; the rest tells it itself (address, fieldPad, marks, the lists)
+    private data class Read(val input: Input, val side: Input, val lists: List<String?>, val readOnly: Boolean)
+
+    private var read: Read? = null
+
+    private fun reading() = Read(keyboard.scrollInput(), keyboard.sideInput(), columns.map { it.slot?.list }, readOnly)
+
+    @VisibleForTesting
+    internal var updates = 0
+        private set
 
     private val expected = Rect()
 
@@ -374,9 +404,10 @@ internal class ScrollColumns(
     /** In the same pass as the canvas: never a frame elsewhere. */
     fun place() {
         val c = canvas() ?: return
-        if (columns.isEmpty() && c.scene?.slots.orEmpty().none { it.kind in KINDS }) return
+        // reading the scene may make it, whose built() must not sync in the middle of this layout pass
         placing = true
         val slots = try {
+            if (columns.isEmpty() && c.scene?.slots.orEmpty().none { it.kind in KINDS }) return
             c.slots(KINDS)
         } finally {
             placing = false
@@ -387,15 +418,25 @@ internal class ScrollColumns(
 
     /** What each column shows read again: another list from its start, the same one edited where it was. */
     fun update() {
-        val input = keyboard.scrollInput()
-        val side = keyboard.sideInput()
+        updates++
+        val now = reading().also { read = it }
         val field = ScrollColumn.fieldOf(keyboard.address)
         for (c in columns) {
-            val the = if (c.kind == ScrollLists.NINE_SIDE) side else input
+            val columnInput = if (c.kind == ScrollLists.NINE_SIDE) now.side else now.input
             val was = c.shown
-            c.shown = ScrollLists.shown(c.kind, c.slot?.list, field, keyboard.fieldPad, the.pad, the.ime, the.composing)
+            val itemsWere = c.items
+            c.shown = ScrollLists.shown(
+                kind = c.kind,
+                list = c.slot?.list,
+                field = field,
+                fieldPad = keyboard.fieldPad,
+                pad = columnInput.pad,
+                ime = columnInput.ime,
+                composing = columnInput.composing,
+            )
             c.items = (c.shown as? ScrollLists.Shown.Category)?.let { store[it.id] }.orEmpty()
-            c.view.refresh(anew = c.shown != was, typing = c.shown == ScrollLists.Shown.Syllables)
+            val sameItems = c.shown is ScrollLists.Shown.Category && c.shown == was && c.items == itemsWere
+            c.view.refresh(anew = c.shown != was, typing = c.shown == ScrollLists.Shown.Syllables, sameItems = sameItems)
         }
     }
 
@@ -419,7 +460,7 @@ internal class ScrollColumns(
     private fun menu(c: Column, i: Int): Pair<List<KeyDef.Popup.Menu.Item>, Set<Int>>? {
         val s = c.shown as? ScrollLists.Shown.Category ?: return null
         if (i !in c.items.indices) return null
-        val items = OPS.map { (op, label, icon) -> KeyDef.Popup.Menu.Item(context.getString(label), icon, KeyAction.ScrollList(s.id, i, op)) }
+        val items = OPS.mapIndexed { j, (op, _, icon) -> KeyDef.Popup.Menu.Item(opLabels[j], icon, KeyAction.ScrollList(s.id, i, op)) }
         val disabled = if (readOnly) items.indices.toSet() else setOfNotNull(0.takeIf { c.items.size <= 1 }, 1.takeIf { i == 0 })
         return items to disabled
     }
@@ -428,11 +469,13 @@ internal class ScrollColumns(
     // credential-encrypted copy synced over it
     private val readOnly: Boolean get() = store.newer || FcitxApplication.getInstance().isDirectBootMode
 
+    // read once: every item's menu and TalkBack names are made again on each refresh
+    private val opLabels by lazy(LazyThreadSafetyMode.NONE) { OPS.map { context.getString(it.label) } }
+    private val opNames by lazy(LazyThreadSafetyMode.NONE) { OPS.map { context.getString(A11Y.getValue(it.op)) } }
+
     private fun actions(c: Column, i: Int): List<Pair<String, () -> Unit>> {
         val (items, disabled) = menu(c, i) ?: return emptyList()
-        return items.indices.filter { it !in disabled }.map { j ->
-            context.getString(A11Y.getValue(OPS[j].op)) to { change(items[j].action as KeyAction.ScrollList) }
-        }
+        return items.indices.filter { it !in disabled }.map { j -> opNames[j] to { change(items[j].action as KeyAction.ScrollList) } }
     }
 
     /** The menu's pick: the list shown changed, or its card opened. */
@@ -479,6 +522,7 @@ internal class ScrollColumns(
         private var downY = 0f
         private var scrolled = 0
         private var item = -1
+        private var pressed: ScrollItem? = null
         private var menuShown = false
         private var lastX = 0f
         private var menuX = 0f
@@ -517,6 +561,7 @@ internal class ScrollColumns(
                     downY = y
                     scrolled = v.scrollX + v.scrollY
                     item = column.view.itemAt(x - v.left, y - v.top)
+                    pressed = column.items.getOrNull(item)
                     if (menu(column, item) != null) keyboard.postDelayed(longPress, AppPrefs.getInstance().keyboard.longPressDelay.getValue().toLong())
                 }
                 MotionEvent.ACTION_MOVE -> if (menuShown) {
@@ -550,6 +595,8 @@ internal class ScrollColumns(
         }
 
         private fun showMenu() {
+            // the list changed under the finger: the place held now has another item
+            if (column.items.getOrNull(item) != pressed) return
             val (items, disabled) = menu(column, item) ?: return
             val v = column.view.view
             forward(SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, 0f, 0f)

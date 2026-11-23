@@ -135,6 +135,14 @@ class LayoutImportTest {
         assertEquals(listOf(listOf("symbol-grid")), lacks("uat-symbols-no-grid"))
     }
 
+    // a number board whose column is the nine keys' list: taken, told only that the full pad lacks -
+    @Test
+    @Uat("ST-225")
+    fun theUatsNumberBoardWithANineColumnIsToldItsFullPadLacksTheMinus() {
+        val ok = judge(File("../../uat/fixtures/layouts/uat-number-nine-column.layout").readText(), app = "0.6.3") as Verdict.Ok
+        assertEquals(listOf(LayoutCheck.Finding(0, "pad-lacks", listOf("full", "-"))), ok.report.warnings)
+    }
+
     // the UAT's uat-names.layout: taken, its WE's 下滑 told (the 18 keys' is used) and not among what it types
     @Test
     @Uat("ST-188")

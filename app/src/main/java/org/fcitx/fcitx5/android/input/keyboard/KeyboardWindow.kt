@@ -36,7 +36,7 @@ import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.editing.toEditorTraits
-import org.fcitx.fcitx5.android.input.voiceField
+import org.fcitx.fcitx5.android.input.fieldIdentity
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneEnvs
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTrace
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
@@ -49,6 +49,7 @@ import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.scene.engine.section
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 import org.fcitx.fcitx5.android.scene.look.ThemeLook
 import org.mechdancer.dependency.manager.must
 import splitties.views.dsl.core.add
@@ -196,8 +197,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private fun heldBack(action: KeyAction): Boolean {
         if (known()) return false
         val mark = when (action) {
-            is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code?.let(::isAsciiMark) == true
-            is KeyAction.SymAction -> isAsciiMark(action.sym.sym)
+            is KeyAction.HostKeyAction -> action.act.singleOrNull()?.code?.let(ScrollLists::isAsciiMark) == true
+            is KeyAction.SymAction -> ScrollLists.isAsciiMark(action.sym.sym)
             is KeyAction.CommitAction -> action.punctuation
             else -> false
         }
@@ -225,7 +226,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val popupActionListener: PopupActionListener by lazy {
         val shown = popup.listener
         PopupActionListener { a ->
-            if (a !is PopupAction.PreviewAction || known() || a.content.singleOrNull()?.code?.let(::isAsciiMark) != true) shown.onPopupAction(a)
+            if (a !is PopupAction.PreviewAction || known() || a.content.singleOrNull()?.code?.let(ScrollLists::isAsciiMark) != true) shown.onPopupAction(a)
         }
     }
 
@@ -253,7 +254,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             it.inPasswordField = service.inPasswordField
             (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
-            it.fieldPad = fieldPadId
+            it.fieldPad = fieldPad
             (it as? NumberKeyboard)?.locked = sticky.locked
             it.inMultiLineField = multiLine
             it.imTyping = composing && !tempMode
@@ -323,7 +324,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         if (windowManager.isAttached(this)) notifyBarLayoutChanged()
     }
 
-    private val fieldPad = FieldPad()
+    private val padSwitch = FieldPad()
 
     private val sticky get() = service.sticky
 
@@ -341,9 +342,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     fun switchLayout(to: String, remember: Boolean = true) {
         val lastSymbol = lastSymbolType
         ContextCompat.getMainExecutor(context).execute {
-            val outcome = lettersLayout.switchTo(to, lastSymbol, fieldPad.known(currentKeyboardName), remember)
+            val outcome = lettersLayout.switchTo(to, lastSymbol, padSwitch.known(currentKeyboardName), remember)
             outcome.remember?.let { lastSymbolType = it }
-            when (val target = fieldPad.shown(outcome.target, currentKeyboardName)) {
+            when (val target = padSwitch.shown(outcome.target, currentKeyboardName)) {
                 LayoutSwitchPolicy.Target.Unchanged -> {}
                 is LayoutSwitchPolicy.Target.Keyboard -> showLayout(target.name)
                 // the keys under the panel stay: a number keyboard kept stays kept
@@ -359,8 +360,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     private var address = AddressKeys.NONE
 
-    /** NumberPad.fieldOf's, which every keyboard's scroll lists read; [fieldPad] is what the switching shows. */
-    private var fieldPadId: String? = null
+    /** NumberPad.fieldOf's, which every keyboard's scroll lists read. */
+    private var fieldPad: String? = null
     private var multiLine = false
 
     private var noSuggestions = false
@@ -378,28 +379,28 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         val identical = info === service.stickyInfo
         service.stickyInfo = info
         // those kept for later too: a number keyboard shown next must not open where another field's was left
-        if (!fieldTrack.started(info.voiceField(), identical, service.restartingInput)) keyboards.values.forEach { it.columns.toStart() }
+        if (!fieldTrack.started(info.fieldIdentity(), identical, service.restartingInput)) keyboards.values.forEach { it.columns.toStart() }
         val was = sticky.mode
-        val kept = sticky.fieldStarted(traits.isPlainText, traits.number, info.voiceField(), identical, service.restartingInput)
+        val kept = sticky.fieldStarted(traits.isPlainText, traits.number, info.fieldIdentity(), identical, service.restartingInput)
         if (kept) Timber.d("number keyboard kept: %s", was) else if (sticky.mode != was) Timber.d("number keyboard let go: %s", was)
         syncLock()
         address = AddressKeys.of(traits)
-        fieldPadId = NumberPad.fieldOf(traits)
+        fieldPad = NumberPad.fieldOf(traits)
         multiLine = traits.showsLines
         typingField = SceneTyping.field(traits, service.inPasswordField)
         typingChanged()
         currentKeyboard?.address = address
-        currentKeyboard?.fieldPad = fieldPadId
+        currentKeyboard?.fieldPad = fieldPad
         currentKeyboard?.inMultiLineField = multiLine
-        fieldPad.field = NumberPad.of(traits.number)
-        fieldPad.numbers = keyboardPrefs.drawnPanelLayout(PanelLayouts.Panel.NUMBER)
+        padSwitch.field = NumberPad.of(traits.number)
+        padSwitch.numbers = keyboardPrefs.drawnPanelLayout(PanelLayouts.Panel.NUMBER)
         // English in a password is the full keyboard, its own again in the next field: the same input method
         // fires no update, so its letters are picked here (switchLayout would find the letters already there)
         spaceKeys.current?.let {
             lettersLayout.inputMethodChanged(lettersOf(it.uniqueName, keyboardPrefs.imKeyboards(), EngineState.shuangpinScheme, service.inPasswordField), currentKeyboardName)
-                ?.takeIf { fieldPad.field == null && !kept }?.let(::showLayout)
+                ?.takeIf { padSwitch.field == null && !kept }?.let(::showLayout)
         }
-        switchLayout(if (fieldPad.field != null || kept) NumberKeyboard.Name else TextKeyboard.Name, remember = false)
+        switchLayout(if (padSwitch.field != null || kept) NumberKeyboard.Name else TextKeyboard.Name, remember = false)
         // after the layout, which switchLayout posts
         ContextCompat.getMainExecutor(context).execute(::updateAutoCaps)
     }
@@ -555,5 +556,3 @@ internal class SpaceKeyInputMethod {
         if (keyboard !is NumberKeyboard) seen = ime
     }
 }
-
-internal fun isAsciiMark(c: Int): Boolean = c in '!'.code..'~'.code && !Character.isLetterOrDigit(c)

@@ -10,8 +10,9 @@ import org.fcitx.fcitx5.android.scene.Point
 import org.fcitx.fcitx5.android.scene.Problem
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.Shape
-import org.fcitx.fcitx5.android.scene.SlotNode
 import org.fcitx.fcitx5.android.scene.engine.Env
+import org.fcitx.fcitx5.android.scene.engine.scrollCategory
+import org.fcitx.fcitx5.android.scene.engine.scrollList
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.keys.ScrollLists
@@ -60,7 +61,7 @@ internal object SceneJs {
         "warnings" to problems(scene.warnings),
         "keys" to scene.keys.map(::key).toTypedArray(),
         "slots" to scene.slots.map {
-            val shown = env?.let { e -> shown(it, e) }
+            val shown = env?.scrollCategory(it.kind, it.list)
             obj(
                 "kind" to it.kind, "id" to it.id, "bounds" to box(it.bounds), "list" to it.list, "direction" to it.direction.xml, "show" to it.show,
                 "shown" to shown,
@@ -69,14 +70,7 @@ internal object SceneJs {
         }.toTypedArray(),
     )
 
-    // the category the column shows in [e]'s field and input method, as the app picks it; null where it shows syllables
-    private fun shown(s: SlotNode, e: Env): String? {
-        if (s.kind != LayoutReader.SCROLL && s.kind != ScrollLists.NINE_SIDE) return null
-        val i = e.input
-        return (ScrollLists.shown(s.kind, s.list, i.field, i.fieldPad, i.pad, i.ime, i.composing) as? ScrollLists.Shown.Category)?.id
-    }
-
-    private fun items(id: String, e: Env): Array<dynamic> = (e.scrollItems?.get(id) ?: ScrollDefaults.of(id).orEmpty()).map { item ->
+    private fun items(id: String, e: Env): Array<dynamic> = e.scrollList(id).map { item ->
         obj("label" to ScrollLists.label(id, item, e.input.ime, e.texts.punctuation), "command" to (item as? ScrollItem.Command)?.key)
     }.toTypedArray()
 

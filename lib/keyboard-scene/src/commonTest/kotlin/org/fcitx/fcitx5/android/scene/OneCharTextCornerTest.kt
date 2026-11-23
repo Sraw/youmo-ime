@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.engine.ExpandedKey
 import org.fcitx.fcitx5.android.scene.engine.Looks
 import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.theme.TextLook
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,40 +36,29 @@ class OneCharTextCornerTest {
     private fun corner(s: Scene, name: String, text: String): Op.Text =
         s.keys.first { it.shortcut == name }.ops(false).filterIsInstance<Op.Text>().first { it.text == text }
 
-    @Test
-    @Uat("T9-71")
-    fun aOneCharacterTextLooksAsTheFirstsBesideIt() {
-        val s = scene(mapOf("t9/1:up" to MarkContent.Text("1"), "fn/space:up" to MarkContent.Text("0")))
-        val two = style(corner(s, "t9/2", "2"))
-        assertEquals(two, style(corner(s, "t9/1", "1")))
-        assertEquals(two, style(corner(s, "fn/space", "0")))
-    }
+    private class Row(val why: String, val name: String, val text: String, val check: (two: Op.Text, it: Op.Text) -> Unit)
+
+    private val alike: (Op.Text, Op.Text) -> Unit = { two, t -> assertEquals(style(two), style(t)) }
+
+    private val sized: (Op.Text, Op.Text) -> Unit = { two, t -> assertEquals(listOf(two.weight, two.size), listOf(t.weight, t.size), "drawn as ${style(t)}") }
+
+    private val rows = listOf(
+        Row("on 1, as 2's 「2」 beside it", "t9/1", "1", alike),
+        Row("on the space", "fn/space", "0", alike),
+        Row("a longer text keeps the shortcut's look", "t9/1", "12") { two, t ->
+            assertTrue(t.size < two.size && t.weight < two.weight, "「12」 ${style(t)} beside 「2」 ${style(two)}")
+        },
+        Row("two clusters stay a text", "t9/1", "❤️❤️") { two, t -> assertTrue(t.weight < two.weight, "drawn as ${style(t)}") },
+    ) + listOf(
+        // ❤️ with its VS16, a flag, a ZWJ family, a keycap, e and a combining acute, 中, 𠀀 past the BMP, 👍 and its skin tone
+        "❤️", "🇨🇳", "👨‍👩‍👧", "1️⃣", "é", "中", "𠀀", "👍🏽",
+    ).map { Row("one cluster is one character, not one code point", "t9/1", it, sized) }
 
     @Test
     @Uat("T9-71")
-    fun aLongerTextKeepsTheShortcutsLook() {
-        val s = scene(mapOf("t9/1:up" to MarkContent.Text("12")))
-        val two = corner(s, "t9/2", "2")
-        val twelve = corner(s, "t9/1", "12")
-        assertTrue(twelve.size < two.size && twelve.weight < two.weight, "「12」 ${style(twelve)} beside 「2」 ${style(two)}")
-    }
-
-    @Test
-    @Uat("T9-71")
-    fun oneCharacterIsOneClusterNotOneCodePoint() {
-        // ❤️ with its VS16, a flag, a ZWJ family, a keycap, e and a combining acute, 中, 𠀀 past the BMP,
-        // 👍 and its skin tone: each one character seen
-        val clusters = listOf("❤️", "🇨🇳", "👨‍👩‍👧", "1️⃣", "é", "中", "𠀀", "👍🏽")
-        val s0 = scene(emptyMap())
-        val two = corner(s0, "t9/2", "2")
-        for (c in clusters) {
-            val s = scene(mapOf("t9/1:up" to MarkContent.Text(c)))
-            val t = corner(s, "t9/1", c)
-            assertEquals(listOf(two.weight, two.size), listOf(t.weight, t.size), "「$c」 drawn as ${style(t)}")
-        }
-        // two clusters stay a text
-        val pair = corner(scene(mapOf("t9/1:up" to MarkContent.Text("❤️❤️"))), "t9/1", "❤️❤️")
-        assertTrue(pair.weight < two.weight, "two hearts drawn as ${style(pair)}")
+    fun aOneCharacterTextLooksAsTheFirstsBesideIt() = assertRows(rows, { "「${it.text}」 on ${it.name}: ${it.why}" }) {
+        val s = scene(mapOf("${it.name}:up" to MarkContent.Text(it.text)))
+        it.check(corner(s, "t9/2", "2"), corner(s, it.name, it.text))
     }
 
     @Test

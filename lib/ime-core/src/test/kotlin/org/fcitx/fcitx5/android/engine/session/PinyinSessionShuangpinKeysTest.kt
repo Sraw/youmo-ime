@@ -8,6 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
 import org.fcitx.fcitx5.android.engine.learn.Kinds
 import org.fcitx.fcitx5.android.engine.learn.LearnTo
 import org.fcitx.fcitx5.android.engine.learn.RecordingHabits
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.GroupedShuangpinSegmenter
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
@@ -100,5 +101,18 @@ class PinyinSessionShuangpinKeysTest {
             session.apply(Action.Pick(0))
             assertEquals(Kinds.shuangpinKeys(scheme, NineKeyLetters.NINE_SP.tag()), habits.last.first().code.kind)
         }
+    }
+
+    // jing taken reads jin's 金 too (in ↔ ing), first here though fuzzy, shown as the keys of jing: what was taken, not what is read
+    @Test
+    fun aSyllableTakenReadsItsFuzzyPartnerShownAsItsOwnKeys() {
+        val words = pinyinDataOf(Triple("金", "jin", -1f), Triple("经", "jing", -4f))
+        val session = PinyinSession(
+            words, GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, NineKeyLetters.G18, setOf(Fuzzy.IN_ING)), spell = true, keysShown = true, prediction = false,
+        )
+        val typed = session.type("jy")
+        val jing = session.apply(Action.Syllable(typed.syllables.indexOf("jing")))
+        assertEquals("金", jing.candidates[0])
+        assertEquals("jy", jing.preedit)
     }
 }

@@ -121,6 +121,14 @@ async function main() {
     const picked = await js(`[...document.querySelectorAll('#tab-key:not([hidden]) h3')].map((e) => e.textContent).join('|')`);
     check(picked.split('|').includes('位置 side'), 'a tap on the column selects it: ' + picked);
     check(await js(`!!document.querySelector('#tab-key:not([hidden]) input[aria-label="跨几行"]')`), 'a slot\'s rows set on the key tab');
+    // a source that does not read: the last drawing's columns go with it
+    const columns = () => js(`document.querySelectorAll('#preview-columns .column').length`);
+    await type(`(t) => t.replace('</keyboard>', '')`);
+    const broken = await columns();
+    await js(`document.getElementById('undo').click()`);
+    await wait(900);
+    const mended = await columns();
+    check(broken === 0 && mended === 1, 'the columns gone while the source does not read, back once it does: ' + broken + ' ' + mended);
 
     await js(`window.__saved = []; HTMLAnchorElement.prototype.click = function () { window.__saved.push(this.download); }`);
     await js(`document.querySelector('#file-menu [data-act=save]').click()`);
@@ -432,6 +440,17 @@ async function main() {
     await wait(500);
     const bigPad = await js(`[document.getElementById('env-pad-label').hidden, document.getElementById('preview').width > 0, document.getElementById('count').textContent]`);
     check(bigPad[0] === false && bigPad[1] && (/^0 个错误/.test(bigPad[2]) || bigPad[2] === '没有'), '大按键数字键盘: drawn on its pads, no errors: ' + bigPad);
+    // the nine keys' side column is drawn over too, a tap on it selecting its slot
+    await js(`document.querySelector('#file-menu [data-act=new]').click()`);
+    await make('nine', 'my-nine');
+    await until(`!document.getElementById('new-panel').open`, '新建 from 九键 did not close');
+    await wait(500);
+    const side = await js(`document.querySelectorAll('#preview-columns .column').length`);
+    check(side === 1, 'the nine keys: its side column drawn over: ' + side);
+    await js(`document.querySelector('#preview-columns .column').click()`);
+    await wait(300);
+    const sidePicked = await js(`[...document.querySelectorAll('#tab-key:not([hidden]) h3')].map((e) => e.textContent).join('|')`);
+    check(sidePicked.split('|').includes('位置 side'), 'a tap on the nine keys\' side column selects it: ' + sidePicked);
     await js(`document.getElementById('help-button').click()`);
     await wait(200);
     const help = await js(`document.getElementById('help-panel').open ? [...document.querySelectorAll('#help-panel a')].map((a) => a.href).join(' ') : ''`);

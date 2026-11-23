@@ -334,7 +334,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // fields tell nothing apart, so there they stay
     private fun commitsStartIn(attribute: EditorInfo, sensitive: Boolean) {
         // the same field restarted (restartInput): a waiting commit is not judged by what a read finds there
-        if (commitsField?.voiceField() != attribute.voiceField()) editingSession.commits.forget() else editingSession.commits.moved()
+        if (commitsField?.fieldIdentity() != attribute.fieldIdentity()) editingSession.commits.forget() else editingSession.commits.moved()
         commitsField = attribute
         editingSession.commits.on = !sensitive && !CapabilityFlags.isPassword(attribute) && !attribute.isTypeNull()
     }
@@ -1640,7 +1640,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val voiceOwnsComposing get() = editingSession.composingText.isEmpty() || editingSession.provisional
 
     fun sameField(said: EditorInfo?, now: EditorInfo? = currentInputEditorInfo): Boolean = said != null && now != null &&
-        VoiceCommit.sameField(said.voiceField(), now.voiceField(), said === now)
+        VoiceCommit.sameField(said.fieldIdentity(), now.fieldIdentity(), said === now)
 
 
     fun watchVoice(taken: ((how: EditingSession.Taken) -> Unit)?) {
@@ -1800,5 +1800,5 @@ internal suspend fun HostApi.tell(c: Action.Context, learning: Boolean) =
         after = c.after, selected = c.selected, said = c.said,
     )
 
-internal fun EditorInfo.voiceField() =
+internal fun EditorInfo.fieldIdentity() =
     VoiceCommit.Field(packageName, fieldId, inputType, fieldName, hintText?.toString())

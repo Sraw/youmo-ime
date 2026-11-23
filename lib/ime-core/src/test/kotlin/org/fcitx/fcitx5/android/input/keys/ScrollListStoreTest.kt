@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keys
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
@@ -14,6 +15,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// contract: scroll_lists' stored @1 format, which a backup, a later version and a downgrade read back
 class ScrollListStoreTest {
     private fun roundTrip(s: ScrollListStore) = ScrollListStore.parse(s.serialize())
 
@@ -76,6 +78,8 @@ class ScrollListStoreTest {
         assertEquals(ScrollDefaults.of("number"), s["number"])
         assertEquals(listOf(Command("later_command")), s.stored("number"))
         assertEquals(ScrollDefaults.of("number")!!.drop(1) + Command("later_command"), roundTrip(s.removed("number", 0)).stored("number"))
+        // emptied, as removed() leaves them too
+        assertEquals(listOf(Command("later_command")), roundTrip(s.with("number", emptyList())).stored("number"))
     }
 
     @Test
@@ -94,20 +98,16 @@ class ScrollListStoreTest {
     }
 
     @Test
-    fun aLaterVersionsIsReadAsTheDefaultsAndKept() {
-        val text = "@2\nnumber\tx|+"
+    fun aLaterVersionsIsReadAsTheDefaultsAndKept() = assertRows(
+        "a later version's, a kind this one does not know" to { laterKept("@2\nnumber\tx|+") },
+        "a version past an Int is still a later one" to { laterKept("@99999999999\nnumber\tt|x") },
+    )
+
+    private fun laterKept(text: String) {
         val s = ScrollListStore.parse(text)
         assertTrue(s.newer)
         assertEquals(ScrollDefaults.of("number"), s["number"])
-        assertEquals(text, s.with("number", listOf<ScrollItem>(Text("1"))).removed("number", 0).serialize())
-    }
-
-    @Test
-    fun aVersionPastAnIntIsALaterOne() {
-        val text = "@99999999999\nnumber\tt|x"
-        val s = ScrollListStore.parse(text)
-        assertTrue(s.newer)
-        assertEquals(text, s.removed("number", 0).serialize())
+        assertEquals(text, s.with("number", listOf<ScrollItem>(Text("1"))).removed("number", 0).toFront("number", 1).serialize())
     }
 
     @Test
@@ -127,7 +127,7 @@ class ScrollListStoreTest {
     fun onlyTheNineKeysListsKeepAsIsAndNoStrokeIsOffered() {
         assertEquals(listOf("nine", "nine-english"), ScrollDefaults.IDS.filter(ScrollListStore::keepsAsIs))
         val commands = ScrollListStore.COMMANDS
-        assertTrue(KeyCommand.Copy in commands && KeyCommand.SwitchInputMethod in commands)
+        assertTrue(commands.containsAll(listOf(KeyCommand.Copy, KeyCommand.SwitchInputMethod, KeyCommand.SelectToStart, KeyCommand.SelectToEnd)))
         assertTrue(commands.none { it.group == KeyCommand.Group.Stroke || it == KeyCommand.SwipeSelect })
     }
 }

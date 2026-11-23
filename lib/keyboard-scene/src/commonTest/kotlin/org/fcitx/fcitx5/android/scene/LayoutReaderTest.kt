@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.scene.layout.RowSplit
 import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.layout.Width
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -384,7 +385,7 @@ class LayoutReaderTest {
         assertEquals("function" to Face.Keep, d.look to d.face, "drawn on the function keys' block when the layout says nothing")
         val own = assertIs<Slot>(LayoutReader.layout(scrollBoard("<slot kind=\"scroll\" list=\"nine\" look=\"letter\" face=\"default\"/>")).ok().parts.filterIsInstance<Row>().single().cells[0])
         assertEquals("letter" to Face.Default, own.look to own.face)
-        for (family in LayoutReader.SCROLL_FAMILIES) assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", family)), family)
+        assertRows(LayoutReader.SCROLL_FAMILIES.toList(), { "on $it" }) { assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", it))) }
     }
 
     @Test
@@ -404,9 +405,9 @@ class LayoutReaderTest {
             "the emoji search" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "emoji-search") to "not emoji-search"),
             "a row split in halves" to (scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "letters", "<row split=\"halves\">") to "split in halves"),
         )
-        for ((why, case) in wrong) {
+        assertRows(wrong.entries.toList(), { it.key }) { (_, case) ->
             val (text, says) = case
-            assertTrue(problems(text).any { says in it }, "$why: ${problems(text)}")
+            assertTrue(problems(text).any { says in it }, "${problems(text)}")
         }
         assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>", "letters", "<row split=\"halves\">").replace("scroll", "nine-side").replace(" list=\"nine\"", "")))
         assertEquals(emptyList(), problems(scrollBoard("<slot kind=\"scroll\" list=\"nine\"/>".repeat(2))), "two are allowed")

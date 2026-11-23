@@ -158,6 +158,10 @@ class MainTest {
             arrayOf("ksc", "d", "s", "--threads", "many"),
             arrayOf("ksc", "d", "s", "--neighbours", "on"), // not ksc's
             arrayOf("pinyin", "d", "s", "r", "--typos", "maybe"),
+            // --fuzzy types pinyin into the nine keys' session: not without them, nor 双拼's or a table's codes
+            arrayOf("pinyin-glide", "d", "s", "--fuzzy", "all"),
+            arrayOf("pinyin-glide", "d", "s", "--keys", "nine", "--fuzzy", "all", "--shuangpin", "Ziranma"),
+            arrayOf("pinyin-glide", "d", "s", "--keys", "nine", "--fuzzy", "all", "--table", "t.data"),
             arrayOf("pinyin", "d", "s", "r", "--scheme", "t9", "--typos", "off"), // the nine keys read none
             arrayOf("ksc", "d", "s", "--typos", "off"), // not ksc's
             arrayOf("pinyin", "d", "s", "r", "--scheme", "xiaohe", "--sp-abbrev", "maybe"),

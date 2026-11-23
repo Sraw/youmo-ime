@@ -7,9 +7,9 @@ package org.fcitx.fcitx5.android.input.keyboard
 import org.fcitx.fcitx5.android.input.voice.VoiceCommit
 
 /**
- * Whether the keys start in the field they last started in: by app, view id and traits. A view without an id (a
- * WebView made in code) is the same one only restarted with all of them alike, so its inputs alike in all are taken as
- * one, and it left and come back to starts anew.
+ * Whether the keys start in the field they last started in: by the same EditorInfo, else by app, view id, input type,
+ * field name and hint. An unset id (a WebView made in code) counts only so or on a restart with all of them alike, so
+ * leaving such a view and coming back starts anew; a list's rows sharing one id are taken as one field.
  */
 class FieldTrack {
 

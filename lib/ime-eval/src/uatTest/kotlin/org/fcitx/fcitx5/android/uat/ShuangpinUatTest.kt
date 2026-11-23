@@ -428,15 +428,6 @@ class ShuangpinUatTest {
         expectFirst("什么时候")
     }
 
-    // 自然码's [keys] as the keyboard sends them on [letters] (the 14 keys as 双拼's own keys); ' the separator
-    private fun EngineReplay.typeOn(letters: NineKeyLetters, keys: String) = keys.forEach { c ->
-        when {
-            c == '\'' -> type("'")
-            letters == NineKeyLetters.G14 -> key(EngineReplay.symOf(Keyboard.shuangpin14Key(letters.key(c))))
-            else -> type(letters.key(c).toString())
-        }
-    }
-
     private fun EngineReplay.pickOn(letters: NineKeyLetters, keys: String, text: String) {
         focus("")
         typeOn(letters, keys)
@@ -650,6 +641,9 @@ class ShuangpinUatTest {
         // the words typed before where a run needs some
         const val HISTORY = 3000
 
+        // the single characters compared: full pinyin's jing puts 金 15th
+        const val FIRST = 30
+
         // the chat samples a session types a key at a time, on each keyboard of each scheme, with and without keys alone
         const val CHAT_IN_SESSION = 150
         val GROUPED = listOf(NineKeyLetters.G18, NineKeyLetters.G14, NineKeyLetters.NINE_SP)
@@ -677,5 +671,14 @@ class ShuangpinUatTest {
                 "a",
             ),
         )
+    }
+}
+
+// a scheme's [keys] as the keyboard sends them on [letters] (the 14 keys as 双拼's own keys); ' the separator
+internal fun EngineReplay.typeOn(letters: NineKeyLetters, keys: String) = keys.forEach { c ->
+    when {
+        c == '\'' -> type("'")
+        letters == NineKeyLetters.G14 -> key(EngineReplay.symOf(Keyboard.shuangpin14Key(letters.key(c))))
+        else -> type(letters.key(c).toString())
     }
 }

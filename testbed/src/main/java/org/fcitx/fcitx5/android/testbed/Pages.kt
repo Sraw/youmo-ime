@@ -157,7 +157,7 @@ object Pages {
         field("max10", "最多 10 个字（maxLength=10）") { filters = arrayOf(InputFilter.LengthFilter(MAX_LENGTH)) }
     }
 
-    // the first four step on with →|, as a form's fields that each say only text
+    // the first four step on with →|, as a form's fields do, a number field among them
     private fun PageBuilder.form() {
         val next = EditorInfo.IME_ACTION_NEXT or EditorInfo.IME_FLAG_NAVIGATE_NEXT
         field("form_text", "请录入数字", ime = next)

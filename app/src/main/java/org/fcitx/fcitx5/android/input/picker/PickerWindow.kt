@@ -27,7 +27,6 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
-import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
@@ -36,6 +35,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 import org.mechdancer.dependency.manager.must
 
 class PickerWindow(
@@ -109,7 +109,7 @@ class PickerWindow(
     private val heldBackPopups: PopupActionListener by lazy {
         val shown = popup.listener
         PopupActionListener { a ->
-            if (a is PopupAction.PreviewAction && a.content.singleOrNull()?.code?.let(::isAsciiMark) == true) {
+            if (a is PopupAction.PreviewAction && a.content.singleOrNull()?.code?.let(ScrollLists::isAsciiMark) == true) {
                 if (!punctuation.known) punctuation.update(PunctuationStartKeys.known)
                 if (!punctuation.known) return@PopupActionListener
             }

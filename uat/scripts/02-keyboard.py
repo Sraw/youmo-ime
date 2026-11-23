@@ -952,3 +952,57 @@ def kb117(d):
     time.sleep(0.5)
     check(not held, f"滑到一半停住弹了菜单：{sorted(held)}")
     return f"移到最前后 {now[:3]}；删 ~ 后 {nine}；网址删 .com 后 {urls}；编辑框九键；滑停不弹"
+
+
+@case("KB-118", mutates=True, visual=True)
+def kb118(d):
+    st, p = script("14-settings"), script("04-panels")
+    command = "选中至文首"
+    st.scroll_list_edit(d, "数字键盘")
+    d.tap_text("加命令…", where="all", scroll=False, after=0.8)
+    for _ in range(4):
+        if d.screen().find(text=command, where="all"):
+            break
+        st.dialog_scroll(d)
+    d.tap_text(command, where="all", scroll=False, after=0.8)
+    d.shot("app", "数字键盘那一类最后多了选中至文首的图标")
+    st.dialog_ok(d)
+    d.step("多行框")
+    testbed_field(d, "multiline")
+    d.type("hello")
+    d.enter()
+    d.enter()
+    d.type("world")
+    d.enter()
+    time.sleep(0.5)
+    ml = lambda: d.testbed_state()["multiline"]
+    t = ml()["text"]
+    if t != "hello\nworld":
+        raise Blocked(f"多行框里是 {t!r}")
+    for _ in range(3):
+        d.sh("input keyevent KEYCODE_DPAD_LEFT")
+    time.sleep(0.5)
+    sel = lambda: (lambda f: (min(f["selStart"], f["selEnd"]), max(f["selStart"], f["selEnd"])))(ml())
+    if sel() != (8, 8):
+        raise Blocked(f"光标没放到 wo 后面：{sel()}")
+    p.key(d, "numbers")
+    p.column_tap(d, command, after=0.8)
+    s1, t1 = sel(), ml()["text"]
+    d.shot("app", "多行框点列里的选中至文首：从开头选到 wo 后面，字没变")
+    check(s1 == (0, 8) and t1 == t, f"点列里的选中至文首后选区 {s1}，框里 {t1!r}")
+    d.step("终端框")
+    testbed_field(d, "terminal", page="behavior")
+    d.type("ls")
+    d.enter()
+    time.sleep(0.5)
+    term = lambda: d.testbed_state()["terminal"]
+    if term()["text"] != "ls":
+        raise Blocked(f"终端框没打进 ls：{term()['text']!r}")
+    p.key(d, "numbers")
+    told = "这个输入框不能选中文字"
+    p.column_tap(d, command, after=0.3)
+    d.wait(lambda s: s.find(contains=told, where="all"), 5, step=0.2, what=f"提示条「{told}」")
+    d.shot("ime", "终端框点列里的选中至文首：提示条说不能选中，什么也没发")
+    f = term()
+    check(f["text"] == "ls" and f["focused"], f"终端框里 {f['text']!r}，焦点 {f['focused']}")
+    return f"多行框选区 {s1}；终端框只提示，框里 {f['text']!r}"

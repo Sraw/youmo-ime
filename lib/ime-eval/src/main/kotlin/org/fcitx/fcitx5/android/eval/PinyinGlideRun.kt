@@ -7,13 +7,22 @@ package org.fcitx.fcitx5.android.eval
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.GlidePath
+import org.fcitx.fcitx5.android.engine.glide.GlideReading
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.pinyin.T9Segmenter
+import org.fcitx.fcitx5.android.engine.session.Action
+import org.fcitx.fcitx5.android.engine.session.PinyinSession
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
 import kotlin.random.Random
 
-/** Pinyin glide typing measured: each word of a sample glided as [GlideRun.path] does, in [spelling]'s keys over [layout]. */
+/**
+ * Pinyin glide typing measured: each word of a sample glided as [GlideRun.path] does, in [spelling]'s keys over [layout].
+ * With [inSession] (the nine keys), the first reading's letters also go into a nine-key session under those fuzzy pairs,
+ * as GlideSession types them, its first candidate counted in [GlideRun.Result.sessionRight]; that session has no Latin words.
+ */
 internal class PinyinGlideRun(private val data: PinyinData, private val weights: GlidePath.Weights = PinyinGlide.WEIGHTS) {
 
     fun run(
@@ -24,8 +33,10 @@ internal class PinyinGlideRun(private val data: PinyinData, private val weights:
         spelling: PinyinGlide.Spelling = PinyinGlide.Spelling.FULL,
         layout: GlideLayout = GlideLayout.QWERTY,
         table: Pair<TableDictionary, TableGlide>? = null,
+        inSession: Set<Fuzzy>? = null,
     ): GlideRun.Result {
         val glide = PinyinGlide(data, weights)
+        val session = sessionOf(inSession)
         val result = GlideRun.Result()
         for ((i, sample) in samples.withIndex()) {
             val (input, expected) = sample
@@ -62,9 +73,21 @@ internal class PinyinGlideRun(private val data: PinyinData, private val weights:
                 val typed = got.map { it.keys }
                 if (typed.firstOrNull() == reading) result.right++ else result.misses += "$reading\t$text\t${got.joinToString(" ") { "${it.keys}:${it.word}" }}"
                 if (reading in typed) result.top3++
+                result.sessionRight += firstIn(session, got, text)
             }
         }
         return result
+    }
+
+    private fun sessionOf(fuzzy: Set<Fuzzy>?) = fuzzy?.let { PinyinSession(data, T9Segmenter(it, abbreviations = false), spell = true, prediction = false) }
+
+    // 1 if the first reading typed into [session] as GlideSession types it shows [text] first
+    private fun firstIn(session: PinyinSession?, got: List<GlideReading>, text: String): Int {
+        val keys = got.firstOrNull()?.keys
+        if (session == null || keys.isNullOrEmpty()) return 0
+        session.apply(Action.Reset)
+        val shown = keys.map { c -> session.apply(if (c == PinyinGlide.SEPARATOR) Action.Key(c, glided = true) else Action.Letter(c, glided = true)) }.last()
+        return if (shown.candidates.firstOrNull() == text) 1 else 0
     }
 
     // a key the layout lacks (微软's ; for ing) or all on one key: no glide types it

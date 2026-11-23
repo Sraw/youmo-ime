@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.input.editing.NumberKind
 import org.fcitx.fcitx5.android.input.keyboard.StickyNumbers.Mode
@@ -108,6 +109,7 @@ class StickyNumbersTest {
     )
 
     @Test
+    @Uat("PAN-43")
     fun theLockKeepsThroughHidingAndLetterFields() = assertRows(
         "locked, hidden, another plain field" to {
             keys {

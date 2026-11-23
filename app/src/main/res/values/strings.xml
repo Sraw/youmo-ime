@@ -910,7 +910,7 @@
     <string name="a11y_scroll_list_remove">Remove this item</string>
     <string name="a11y_scroll_list_to_front">Move to the front</string>
     <string name="a11y_scroll_list_edit">Edit this list</string>
-    <string name="scroll_list_keep_one">Keep at least one item, or restore the default</string>
+    <string name="scroll_list_keep_one">Keep at least one item</string>
     <string name="scroll_list_newer">These were set by a newer version</string>
     <string name="scroll_lists">Scroll lists</string>
     <string name="scroll_lists_hint">The column of symbols the nine keys and the number pad scroll, and the scroll columns of your own layouts, one list per kind of keyboard and field. Tap one to change what it holds.</string>
@@ -922,7 +922,7 @@
     <string name="scroll_list_url">Web address</string>
     <string name="scroll_list_email">Email</string>
     <string name="scroll_list_editor_hint">Tap an item to choose it; hold it to drag it elsewhere.</string>
-    <string name="scroll_list_summary">%1$d items</string>
+    <string name="scroll_list_summary">%1$d in all</string>
     <string name="scroll_list_add_command">Add a command…</string>
     <string name="scroll_list_full">A list holds %1$d items at most; the rest were not added.</string>
     <string name="scroll_list_reset">Restore the default</string>

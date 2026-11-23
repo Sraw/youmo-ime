@@ -119,13 +119,13 @@
 ### PAN-16 [P0] 日期、时间框的数字键盘带 - / :
 - **前提**：B0，一个应用里 `inputType` 为日期或时间的输入框（测试页的 date/time 在 Chrome 里弹的是它自己的选择器，不用键盘）。
 - **操作**：点这个框。
-- **预期**：直接是数字键盘，左边一列是 - / :，没有 + *；9 下面 = 的位置空着：什么都不画，露出键盘底色，点了没反应；0 右边照常是 `.`。
+- **预期**：直接是数字键盘，左边一列是 - / :，没有 + *；9 右边 = 的位置空着：什么都不画，露出键盘底色，点了没反应；0 右边照常是 `.`。
 - **JVM**：`FieldPadUatTest.dateAndTimeFieldsGetTheirSeparators`（日期、时间、日期时间三种框的左列都是 - / :，有数字和 `.`，没有字母和 + * =；= 的空位点一下不发键、不打字，中间和角上同是键盘底色）；设备上不跑。
 
 ### PAN-17 [P0] 电话框的数字键盘有 + * #
 - **前提**：B0。
 - **操作**：点「电话」框；再点「电话（inputmode=tel）」框。
-- **预期**：数字键盘左边一列先是 + * #，往下滑还有 - ( ) ,；右上角是 ⌫；9 下面 = 和 0 右边 . 的位置空着；没有 /。
+- **预期**：数字键盘左边一列先是 + * #，往下滑还有 - ( ) ,；右上角是 ⌫；9 右边 = 和 0 右边 . 的位置空着；没有 /。
 - **JVM**：`FieldPadUatTest.phoneFieldsGetPlusStarAndHash`（电话框的左列是 + * # - ( ) ,，没有 / = .，两处空位点了不发键）；设备上不跑。
 
 ### PAN-18 [P1] 数字密码框是完整的数字键盘
@@ -143,7 +143,7 @@
 ### PAN-35 [P1] 说是小数却收负号的框能打 -，带负号的框也能
 - **前提**：B0；装了输入测试台（uat/TESTBED.md）。
 - **操作**：点测试页「小数（inputmode=decimal）」框（声明小数、什么都收，同记账应用的金额框），点 - 5；再到输入测试台 **普通 EditText 输入类型** 页点「带符号数字」框，点 - 3。
-- **预期**：两个框都是完整的数字键盘（左边一列 + - * / 往下还有别的，9 下面 =，0 右边 .）；小数框里是「-5」，带符号数字框里是「-3」。
+- **预期**：两个框都是完整的数字键盘（左边一列 + - * / 往下还有别的，9 右边 =，0 右边 .）；小数框里是「-5」，带符号数字框里是「-3」。
 - **JVM**：`FieldPadUatTest.everyNumberFieldGetsTheFullPadItsMinusSent`（各种数字框都是完整的数字键盘，点 - 发出 -）；设备上照跑：真的应用框收没收到 -。
 
 ### PAN-20 [P0] 离开数字框回到原来的键盘
@@ -203,9 +203,9 @@
 
 ### PAN-36 [P0] 数字键盘左列：先露出 + - * /，往下滑有别的
 - **前提**：B0。
-- **操作**：在普通框点 **123**；看左列；往下滑左列；点 `%`、`(`；清空，打 `12*3=`。滑到 `% , : (` 后按 →| 到下一个框，看左列；回到原来的框（收起再点它），点 123 看左列。再到测试台 `webview` 页：点 `w_text`、123，把左列滑下去，点网页上方的「restartInput（网页）」看左列；再点 `w_search` 看左列。
-- **预期**：左列一开始是 `+ - * /`，往下滑有 `% , : ( ) #`；点 `%`、`(` 上屏 `%()`（括号成对默认开着，补上 `)`）；`12*3=` 照打出来（应用自己算的出计算结果）。换框回到 `+ - * /`；同一个框停在原处。网页（没设 id 的 WebView）restartInput 后左列停在原处，点 `w_search` 回到 `+ - * /`。
-- **JVM**：`NumberColumnTest.theFullPadsColumnShowsTheOperatorsFirst`、`.aTapTypesAsThePadsKeysDid`、`.anotherFieldShowsTheColumnFromItsStart`、`.aNumberKeyboardKeptForLaterOpensFromItsStartInAnotherField`、`.theSameFieldKeepsWhereTheColumnWas`、`.aWebViewWithoutAnIdRestartedKeepsWhereTheColumnWas`、`FieldTrackTest.anUnsetIdTellsByTheEditorInfoItselfOrARestartAlike`、`ScrollColumnMenuTest.theNineKeysColumnStaysPutThrough123AndBack`、`.aListEditedInPlaceKeepsItsPlace`；设备上照跑：真的计算器框。
+- **操作**：在普通框点 **123**；看左列；往下滑左列；点 `%`、`(`；清空，打 `12*3=`。再到测试台 `form` 页：点 `form_text`、**123**，把左列滑下去，按 →| 到 `form_text2` 看左列；在 `form_text2` 把左列滑下去，收起键盘，再点 `form_text2`（这时是字母键盘）、点 **123** 看左列。再到测试台 `webview` 页：点 `w_text`、123，把左列滑下去，点网页上方的「restartInput（网页）」看左列；再点 `w_search` 看左列。
+- **预期**：左列一开始是 `+ - * /`，往下滑有 `% , : ( ) #`；列里的符号和九键左列一个样子（字色是主题的功能键字色）；点 `%`、`(` 上屏 `%()`（括号成对默认开着，补上 `)`）；`12*3=` 照打出来（应用自己算的出计算结果）。→| 到 `form_text2` 还是数字键盘，左列回到 `+ - * /`；收起再点同一个 `form_text2`，左列停在原处（中间没到过别的框；去过别的框再回来算新的开始，回到 `+ - * /`）。网页（没设 id 的 WebView）restartInput 后左列停在原处，点 `w_search` 回到 `+ - * /`。
+- **JVM**：`NumberColumnTest.theFullPadsColumnShowsTheOperatorsFirst`、`.aTapTypesAsThePadsKeysDid`、`.anotherFieldShowsTheColumnFromItsStart`、`.aNumberKeyboardKeptForLaterOpensFromItsStartInAnotherField`、`.aFieldRestartedKeepsWhereTheColumnWas`（应用的框、没设 id 的 WebView restartInput 后停在原处）、`.theSameFieldLeftAndComeBackToKeepsWhereTheColumnWas`（收起再点同一个框）、`FieldTrackTest.aFieldIsTheSameByItsEditorInfoOrItsViewAppAndTraitsOrARestartAlike`、`ScrollColumnMenuTest.theNineKeysColumnStaysPutThrough123AndBack`、`.aListEditedInPlaceKeepsItsPlace`、`.punctuationSwitchedUnderAHeldItemKeepsItsTap`（按着列里一项时切了中英标点，松手照打）；设备上照跑：真的计算器框。
 
 ### PAN-37 [P1] 拼音打字中点左列的 +，和以前的 + 键一样
 - **前提**：B0-拼音。
@@ -213,9 +213,9 @@
 - **预期**：打字中左列仍是符号；点 `+` 先上屏第一个候选，再打出半角 `+`（和 0.6.2 数字键盘上的 `+` 键一样）。快打时一个字都不丢，框里是「12+34」。两根手指同时按在左列上，什么也不打；一根手指正拖着左列时另一根碰到它，拖动照常。
 - **JVM**：`NumberColumnTest.aPlusIsThePadsKey`、`.aFingerOnTheColumnAndOneOnAKeyEachType`、`.twoFingersOnTheColumnTypeNothing`、`.aSecondFingerOnTheColumnLeavesItsDragGoingOn`；设备上照跑（两手快打）。
 
-### PAN-38 [P1] 横屏、分体、单手、悬浮下左列对齐它的位置
+### PAN-38 [P1] 横屏、单手、悬浮下左列对齐它的位置
 - **前提**：B0。
-- **操作**：点 **123**；分别在横屏、分体、单手、悬浮（拖大拖小各一次）下看左列，上下滑、点一项。
+- **操作**：点 **123**；分别在横屏、单手、悬浮（拖大拖小各一次）下看左列，上下滑、点一项。数字键盘不分成两半：横屏默认分体时它连同工具栏缩成单手宽靠一边，横屏这一项看的就是它。
 - **预期**：左列总是正好盖在它那一格上（底色是那一格的），能滚、能点，点了打出那一项。
 - **JVM**：`NumberColumnTest.theColumnSitsOnItsSlot`（列的位置就是场景里那一格）；设备上照跑。
 
@@ -275,3 +275,15 @@
   - 第 8、9、10 步都是数字键盘，锁着：只有在别的 App 的框里弹出键盘才算换 App，桌面、最近任务、通知栏都不算（回桌面时系统把输入法绑到桌面，日志里有 `onBindInput`，锁也不解开）；
   - TalkBack 下锁读「锁定」/「解锁」。
 - **JVM**：`StickyNumbersUatTest.theLockKeepsThroughHidingAndLetterFields`；设备上跑。
+
+### PAN-43 [P1] 锁着时：符号面板返回仍锁着，表情面板返回解开，终端框是字母
+- **前提**：B0；testbed `form` 页、`behavior` 页（页下面的 `terminal` 框，TYPE_NULL）。
+- **操作**：
+  1. 在 `form_text` 点 123、点 **锁**，点 **符**，再点符号面板的 **返回**；
+  2. 到 `behavior` 页点 `terminal` 框；再回 `form` 页点 `form_text`；
+  3. 打开表情面板（工具栏的 **表情**，或长按 ⏎ 选 Emoji），点 **返回**；收起键盘，点 `form_text2`。
+- **预期**：
+  - 第 1 步回到数字键盘，锁还锁着（锁读「解锁」）；
+  - 第 2 步 `terminal` 是字母键盘，回到 `form_text` 又是数字键盘、锁着；
+  - 第 3 步表情面板的返回回到字母键盘，`form_text2` 也是字母键盘：锁解开了。
+- **JVM**：ime-core `StickyNumbersTest.theLockKeepsThroughHidingAndLetterFields`（「locked, back」：表情面板那种返回解锁；「locked, an email field's letters, a plain field」：字母的框不解锁，回到普通框又是数字）；两种面板的返回各发什么在设备上看；设备上跑。

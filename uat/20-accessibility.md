@@ -136,10 +136,10 @@
 - **JVM**：`ClipboardFavoritesUatTest.tabsCardsAndTheirActionsAreRead`（节点的角色说明、选中、圆点卡片的说明、动作的名字）；TalkBack 本身真机上手工听一次。
 
 ### AX-23 [P1] 读屏：滑动列的每一项和它的动作
-- **前提**：B0-九键，开着 TalkBack；**滑动列** 的数字键盘那一类加了命令「复制」。
-- **操作**：逐个滑过九键左列；在 `?` 上打开动作菜单（TalkBack 的「操作」），选「移到最前」；点 **123**，滑到左列的「复制」；在 `+` 上用动作删除它。
-- **预期**：每项读出它的字，命令项读命令名（「复制」）；动作里有「删除这一项」「移到最前」「编辑这一列」（第一项没有移到最前，只剩一项时没有删除）；选了马上生效。
-- **JVM**：`ScrollColumnMenuTest.talkBackDoesTheMenusThreeThings`；TalkBack 本身真机上手工听一次。
+- **前提**：B0-九键，开着 TalkBack。
+- **操作**：逐个滑过九键左列；在第一项和 `?` 上打开动作菜单（TalkBack 的「操作」）。
+- **预期**：每项读出它的字；`?` 的动作有「删除这一项」「移到最前」「编辑这一列」，第一项没有「移到最前」。
+- **JVM**：`ScrollColumnMenuTest.talkBackDoesTheMenusThreeThings`（动作选了马上生效；命令项读命令名，「复制」读「复制」）、`.aSceneRemadeLeavesTalkBacksActionsAsTheyWere`；设备上从节点树读字和动作。TalkBack 本身真机上手工听一次：在 **滑动列** 的数字键盘那一类加命令「复制」，点 **123** 听它读「复制」，在 `+` 上用动作删除它。
 
 ### AX-24 [P1] 读屏：数字键盘的锁
 - **前提**：B0，开着 TalkBack。

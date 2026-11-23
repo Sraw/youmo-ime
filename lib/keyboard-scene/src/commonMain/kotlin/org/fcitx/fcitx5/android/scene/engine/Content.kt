@@ -234,11 +234,12 @@ class Content(
         val slots = if (char) charSlots(ways) else functionSlots(ways)
         // the shortcuts first, the up one before the down one, then the symbols (the old order)
         val sorted = slots.entries.sortedWith(compareBy({ it.value.symbol != null }, { !it.value.up })).map { it.key to it.value }
+        val stepsOf = sorted.mapIndexed { i, (_, w) -> steps(w, short[i]) }
         // a text of one character drawn as a symbol is no shortcut here
-        val firstShortcut = sorted.indices.indexOfFirst { steps(sorted[it].second, short[it]) >= 0 }
+        val firstShortcut = stepsOf.indexOfFirst { it >= 0 }
         fun drawn(i: Int, slot: Slot, w: Way, room: Double): MarkDrawn {
             var fate: MarkFate? = null
-            val steps = steps(w, short[i])
+            val steps = stepsOf[i]
             val m = if (steps < 0) {
                 symbolMark(w.symbol ?: (w.shortcut as MarkContent.Text).text, slot, content, looks)
             } else {

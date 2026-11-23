@@ -14,11 +14,14 @@ import org.fcitx.fcitx5.android.scene.engine.Input
 import org.fcitx.fcitx5.android.scene.engine.Item
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.Texts
+import org.fcitx.fcitx5.android.scene.engine.scrollCategory
 import org.fcitx.fcitx5.android.scene.keys.Commit
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
 import org.fcitx.fcitx5.android.scene.keys.KeyDefaults
 import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.NodeFacts
+import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
+import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.ScreenShape
 import org.fcitx.fcitx5.android.scene.theme.BlankKeys
@@ -679,7 +682,8 @@ object LayoutCheck {
             val pad = scene.env.input.pad
             if (pad != null && pad !in padNeeds) {
                 padNeeds[pad] = padNeeds(keys)
-                if (scrolls.isEmpty()) padLacks(pad, keys)?.let { padLacks += it }
+                val column = scrolls.flatMap { slot -> scene.env.scrollCategory(slot.kind, slot.list)?.let(ScrollDefaults::of).orEmpty() }
+                padLacks(pad, keys, column.filterIsInstance<ScrollItem.Text>().map { it.text })?.let { padLacks += it }
             }
             if (bottomLeft == null && (layout.family == "number" || layout.family == "symbols")) bottomLeft = bottomLeft(layout.family, rows.lastOrNull()?.items.orEmpty())
         }
@@ -696,9 +700,10 @@ object LayoutCheck {
     // the lowest compact landscape keyboard gives the built-in columns about 25 dp an item
     private const val SCROLL_ITEM_DP = 20.0
 
-    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it; a scroll column shows a pad's own list
-    private fun padLacks(pad: String, keys: List<ExpandedKey>): Finding? {
-        val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet()
+    // a phone's `+ * #`, a date's `- / :`, the full pad's `-` and `.`, as every number field has it; [column]: what the
+    // scroll columns show there by default, which the user may change
+    private fun padLacks(pad: String, keys: List<ExpandedKey>, column: List<String>): Finding? {
+        val types = keys.mapNotNull { typed(it.attrs.actions["send"]) }.toSet() + column
         val told = when (pad) {
             "phone" -> listOf("+", "*", "#")
             "datetime" -> listOf("-", "/", ":")

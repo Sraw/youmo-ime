@@ -193,7 +193,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | 只能在设备上 | 模拟器 | 不写 `needs=` | 真窗口和 insets、系统界面（向导、输入法选择框、导航栏、TalkBack）、麦克风、真实体键盘、安装/升级/降级、杀进程、转屏和切应用、锁屏、内存和堆 |
 | 冒烟 | 模拟器，另有 JVM 断言 | 不写 `needs=`，`.md` 有 **JVM** 行并写"设备上留作冒烟" | 每区一条胶水最重的 |
 
-设备上跑的是下面这些（2026-11 搬到模拟器前 redroid 上的 33 条，加上原来单独在模拟器上跑的实体键盘 17 条）：
+搬到模拟器时（2026-11）设备上跑的是下面这些（redroid 上的 33 条，加上原来单独在模拟器上跑的实体键盘 17 条），之后只零星补过几条（PAN-35、T9-71）。这张表不是全部：之后的用例 JVM 断言什么、设备上还看什么写在各条的 **JVM** 行，现在的条数见下面「现在共」那一行：
 
 | 类 | 用例 |
 |---|---|
@@ -223,12 +223,12 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 | `voice:…` | 导入了语音包的 debug 包（默认就是；`--no-voice` 时、发布包上在别处跑：发布包没有片段麦克风） | 12 语音 |
 | `release:…` | 发版时手动（要上一版正式包或两个版本的包） | PR-13、PR-14、PR-35、PR-36、PR-37、PR-38、TBL-43、WD-14v、QU-20、ST-82、ST-85、TB-76、PR-71 |
 | `release,scripted:…` | 发版时用发布包脚本跑（`UAT_BUILD=release` 时脚本照跑，平时不跑；要雾凇拼音，一条三四分钟） | WD-14d、WD-14h、TBL-12c |
-| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、VO-40、PY-121a、LC-33、ST-131、ST-141、ST-189、ST-190、PY-156 |
+| `manual:…` | 真机或手工 | HK-03a、HK-03b、HK-30、HK-33、MN-13、SET-11、ST-56、ST-57、ST-58、QU-24、ST-68、ST-69、ST-70、ST-73、ST-74、TB-53、VO-37、ST-75、ST-76、ST-77、ST-78、ST-79、ST-80、ST-81、TB-46a、PR-51、ST-83、ST-84、ST-86、ST-87、ST-88、ST-89、ST-91、ST-92、ST-93、ST-94、ST-102、ST-103、KB-84、ST-111、WD-49、PR-52a、ST-116、KB-88、VO-40、PY-121a、LC-33、ST-131、ST-141、ST-189、ST-190、PY-156、ST-224 |
 | `jvm:<测试>` | JVM 上的测试（.md 有 **JVM** 行、脚本里没有这条的，`uat.py` 自动按 jvm 算，测试名从 `@Uat` 读；`:app:testDebugUnitTest`、`:app:testDebugUnitTestAt29` 的 Robolectric，`:lib:ime-eval:uatTest` 的引擎回放，`:lib:ime-core:test`，`:lib:keyboard-scene:jvmTest`），`uat.py jvm` 记录 | T9-01、PAN-09、ST-01、MN-20 |
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 1184 条（P0 153、P1 887、P2 144）：模拟器上跑 224 条（其中 170 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 960 条（JVM 849、发版时 20、真机或手工 69、语音 22）。
+现在共 1200 条（P0 153、P1 900、P2 147）：模拟器上跑 227 条（其中 173 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 973 条（JVM 861、发版时 20、真机或手工 70、语音 22）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 

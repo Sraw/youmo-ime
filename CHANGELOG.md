@@ -26,7 +26,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 数字键盘换成九键的样子：左边是一条能上下滑的符号列（`+ - * /` 一开始就看得到，往下滑是 `% , : ( ) #`），`=` 挪到 9 右边，0 在 8 下面加宽，底排不再有 `,` 和 `=`。
 - 九键、数字键盘左边的滑动列能自己改：**按键字符和快捷键** 里多了一张 **滑动列** 卡片，九键、九键英文、数字键盘、电话、日期时间、网址、邮箱七类各改各的，能加字、加命令（画成图标）、删、拖动排序、恢复默认；电话、网址这类框里自动换成那一类。在键盘上长按列里的一项，能删掉它、移到最前，或打开这一列的编辑框。
 - 自定义键盘布局、网页布局编辑器里能放横的或竖的滑动列（`<slot kind="scroll">`），内容用上面那七类；用了滑动列的布局要 0.6.3。
-- 在普通框里点 123 打开数字键盘后，跳到同一个 App 的下一个文字框还是数字键盘（邮箱、网址、密码框除外）；数字键盘加了锁，锁上后收起再弹出也还是数字键盘，点 返回、再点锁，或在别的 App 的输入框里弹出键盘，才解开。
+- 在普通框里点 123 打开数字键盘后，键盘没收起时跳到同一个 App 的下一个文字框还是数字键盘（邮箱、网址、密码框除外）；数字键盘加了锁，锁上后收起再弹出也还是数字键盘，点 返回、在别的 App 的输入框里弹出键盘，或再点锁后收起键盘，才解开。
 
 ### 小改动
 
@@ -48,6 +48,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 关于页显示本机处理器和自动档在本机定成的档位（「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」）。
 - 手写高档不再在停笔后重排，和中档相同。
 - 数字键盘的运算符从键变成列里的项，字号和颜色跟着变；主题里给 `+`、`,` 这些运算键单独设的样子不再起作用。
+- 在音节条或九键左边的拼音选择栏点定的音节和声母、九键连按和滑行定下的字母、注音九键长按选的符号，照样按开着的模糊音读：开了 in ↔ ing 点 jing 也出「金」。九键上 u ↔ v 也在这些地方起作用。
 
 ### 修复
 
@@ -71,7 +72,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The number pad looks like the nine keys now: a column of symbols on the left that scrolls (`+ - * /` in sight, `% , : ( ) #` further down), `=` right of 9, a wider 0 under 8, and no `,` or `=` on the bottom row.
 - The scroll column left of the nine keys and the number pad can be changed: **按键字符和快捷键** has a **滑动列** card, its seven categories (nine keys, nine keys English, number pad, phone, date and time, address, email) each your own, with texts and commands (drawn as icons) added, deleted, dragged and put back; a phone or address field switches to its own category. Long-press an item of the column on the keyboard to delete it, move it to the front or open the column's editor.
 - Custom keyboard layouts and the web layout maker can hold a scroll column, vertical or horizontal (`<slot kind="scroll">`), its items from the seven categories above; a layout with one needs 0.6.3.
-- 123 opened in a plain field stays on for the same app's next text field (not an email, address or password field); the number pad has a lock that keeps it through hiding and showing the keyboard, let go by 返回, the lock again, or the keyboard shown in another app's field.
+- 123 opened in a plain field stays on for the same app's next text field while the keyboard stays up (not an email, address or password field); the number pad has a lock that keeps it through hiding and showing the keyboard, let go by 返回, the keyboard shown in another app's field, or the lock tapped again and the keyboard hidden.
 
 ### Smaller changes
 
@@ -93,6 +94,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The about page shows this device's processor and the level Auto picks here (「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」).
 - Handwriting at the high level no longer reorders after the pen stops: it is the same as medium.
 - The number pad's operators are items of the column now, not keys, in its size and colour; a theme's own style for an operator key such as `+` or `,` no longer applies.
+- A syllable or initial picked in the syllable bar or the nine keys' pinyin column, letters typed by 连按 or a glide on the nine keys, and a symbol long-pressed on 注音九键 still read the fuzzy pairs on: with in ↔ ing, picking jing also gives 金. On the nine keys u ↔ v applies there too.
 
 ### Fixes
 

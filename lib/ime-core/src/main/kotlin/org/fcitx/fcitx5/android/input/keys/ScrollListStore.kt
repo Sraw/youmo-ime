@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcuts
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 
 /**
  * The scroll lists the user set, by category: [HEADER] then `category<TAB>kind|text…` lines, kind `t` a text, `r` one
@@ -30,13 +31,13 @@ class ScrollListStore private constructor(
 
     fun isSet(id: String): Boolean = id in lists
 
-    /** [items] as [id]'s shown ones, the commands not offered kept after them; none, or the default's, is no setting. */
+    /** [items] as [id]'s shown ones, the commands not offered kept after them; none, or the default's, is no setting unless those are kept. */
     fun with(id: String, items: List<ScrollItem>): ScrollListStore {
         if (newer) return this
         val shown = cleaned(items)
         val all = cleaned(shown + stored(id).filterNot(::offered))
         val t = LinkedHashMap(lists)
-        if (shown.isEmpty() || all == ScrollDefaults.of(id)) t.remove(id) else t[id] = all
+        if (all.isEmpty() || all == ScrollDefaults.of(id)) t.remove(id) else t[id] = all
         return ScrollListStore(t, newer = false)
     }
 
@@ -109,8 +110,8 @@ class ScrollListStore private constructor(
         /** What 加命令… offers. */
         val COMMANDS: List<KeyCommand> get() = KeyCommand.entries.filter { offered(ScrollItem.Command(it.key)) }
 
-        /** Only these two convert marks, so only their items can be 不转中文标点. */
-        fun keepsAsIs(id: String): Boolean = id == ScrollDefaults.NINE || id == ScrollDefaults.NINE_ENGLISH
+        /** Only a list converting marks has items that can be 不转中文标点. */
+        fun keepsAsIs(id: String): Boolean = ScrollLists.convertsMarks(id)
 
         // no typed item (PopupOverrides.tokens) nor stored text starts with it, so a text named as a command stays a text
         private const val EDITOR_COMMAND = "\u0000"
@@ -134,11 +135,11 @@ class ScrollListStore private constructor(
         }
 
         private fun itemOf(stored: String): ScrollItem? {
-            val rest = KeyShortcuts.unescape(stored.drop(TEXT.length))
+            fun rest(prefix: String) = KeyShortcuts.unescape(stored.removePrefix(prefix))
             return when {
-                stored.startsWith(TEXT) -> ScrollItem.Text(rest)
-                stored.startsWith(AS_IS) -> ScrollItem.Text(rest, asIs = true)
-                stored.startsWith(COMMAND) -> ScrollItem.Command(rest)
+                stored.startsWith(TEXT) -> ScrollItem.Text(rest(TEXT))
+                stored.startsWith(AS_IS) -> ScrollItem.Text(rest(AS_IS), asIs = true)
+                stored.startsWith(COMMAND) -> ScrollItem.Command(rest(COMMAND))
                 else -> null
             }
         }

@@ -210,11 +210,9 @@ class SceneBuilder(
 
     // where no view of the app's draws a column (a card, the web), its first items as the column shows them
     private fun scrollItems(board: String, s: Slot, cell: Box): List<Op> {
-        val lists = env.scrollItems ?: return emptyList()
-        if (s.kind != LayoutReader.SCROLL && s.kind != ScrollLists.NINE_SIDE) return emptyList()
-        val i = env.input
-        val id = (ScrollLists.shown(s.kind, s.list, i.field, i.fieldPad, i.pad, i.ime, i.composing) as? ScrollLists.Shown.Category)?.id ?: return emptyList()
-        val items = lists[id] ?: ScrollDefaults.of(id).orEmpty()
+        if (env.scrollItems == null) return emptyList()
+        val id = env.scrollCategory(s.kind, s.list) ?: return emptyList()
+        val items = env.scrollList(id)
         val nineSide = s.kind == ScrollLists.NINE_SIDE
         val show = if (nineSide) Slot.DEFAULT_SHOW else s.show
         val vertical = nineSide || s.direction == Direction.Vertical
@@ -232,14 +230,19 @@ class SceneBuilder(
         }
     }
 
-    private fun scrollItem(id: String, item: ScrollItem, box: Box, look: TextLook, size: Double): Drawn {
-        val label = ScrollLists.label(id, item, env.input.ime, env.texts.punctuation)
-        if (label == null) {
-            val name = SlotDefaults.icon((item as ScrollItem.Command).key)
-            val (w, h) = icons.dp(name).let { (w, h) -> minOf(w * env.density, box.width) to minOf(h * env.density, box.height) }
-            return Drawn.of(PlacedIcon(name, Box(box.centerX - w / 2, box.centerY - h / 2, box.centerX + w / 2, box.centerY + h / 2), Part.Icon))
+    private fun scrollItem(id: String, item: ScrollItem, box: Box, look: TextLook, size: Double): Drawn = when (item) {
+        is ScrollItem.Command -> {
+            val name = SlotDefaults.icon(item.key)
+            val (w, h) = icons.dp(name).let { (w, h) ->
+                val k = minOf(1.0, box.width / (w * env.density), box.height / (h * env.density))
+                w * env.density * k to h * env.density * k
+            }
+            Drawn.of(PlacedIcon(name, Box(box.centerX - w / 2, box.centerY - h / 2, box.centerX + w / 2, box.centerY + h / 2), Part.Icon))
         }
-        return Content.measure(measurer, label, look, look.weight, size).squeezed(box.width).at(box.centerX, box.centerY, Part.Label)
+        is ScrollItem.Text -> {
+            val label = ScrollLists.label(id, item, env.input.ime, env.texts.punctuation).orEmpty()
+            Content.measure(measurer, label, look, look.weight, size).squeezed(box.width).at(box.centerX, box.centerY, Part.Label)
+        }
     }
 
     // no app board has a pad any more (Pads.KIND), but a user's or a pack's layout may
@@ -585,3 +588,13 @@ class SceneBuilder(
         private val UP = Point(0.0, -1.0)
     }
 }
+
+/** The category a scroll or nine-side slot of [kind] shows here, as the app picks it; null for any other slot, or syllables. */
+internal fun Env.scrollCategory(kind: String, list: String?): String? {
+    if (kind != LayoutReader.SCROLL && kind != ScrollLists.NINE_SIDE) return null
+    val i = input
+    return (ScrollLists.shown(kind, list, i.field, i.fieldPad, i.pad, i.ime, i.composing) as? ScrollLists.Shown.Category)?.id
+}
+
+/** [id]'s items as the app passed them, else its defaults. */
+internal fun Env.scrollList(id: String): List<ScrollItem> = scrollItems?.get(id) ?: ScrollDefaults.of(id).orEmpty()

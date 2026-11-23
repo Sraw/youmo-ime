@@ -104,11 +104,13 @@
     if (!r.scene) {
       shown = null;
       canvas.width = canvas.width; // cleared: a layout the engine cannot read draws nothing
+      columns();
       return;
     }
     canvas.width = r.scene.width;
     canvas.height = r.scene.height;
-    shown = { scene: r.scene, keys: r.scene.json().keys, at: new Map() };
+    const json = r.scene.json();
+    shown = { scene: r.scene, json, keys: json.keys, at: new Map() };
     paintShown();
     columns();
   }
@@ -119,23 +121,24 @@
     const over = $('preview-columns');
     over.textContent = '';
     if (!shown) return;
-    const j = shown.scene.json();
-    const placed = LE.scrolls(parsed());
-    j.slots.filter((x) => x.kind === 'scroll').forEach((s, n) => {
+    const j = shown.json;
+    const cells = parsed().rows.flatMap((r) => r.cells);
+    // by its id, else the nth unnamed: none where a when= hides one
+    const cellOf = (s) => {
+      const like = cells.filter((c) => c.name === 'slot' && c.a.kind === s.kind && c.a.id == s.id);
+      const drawn = j.slots.filter((x) => x.kind === s.kind && x.id == s.id);
+      return like.length === drawn.length ? like[drawn.indexOf(s)] : null;
+    };
+    j.slots.filter((x) => x.kind === 'scroll' || x.kind === 'nine-side').forEach((s) => {
       const across = s.direction === 'horizontal';
       const items = (s.items || []).map((i) => {
         const span = h('span', {}, i.label != null ? i.label : LE.FN_LABEL[i.command] || i.command);
         span.style[across ? 'width' : 'height'] = 100 / s.show + '%';
         return span;
       });
-      // by its id, else the nth as the rows have it
-      const at = (s.id ? placed.find((p) => p.a.id === s.id) : placed[n]) || null;
+      const c = cellOf(s);
       const col = h('div', { className: across ? 'column across' : 'column', 'aria-hidden': 'true', onclick: () => {
-        if (!at) return;
-        sel = [withId(at.at)];
-        fragmentKey = null;
-        showTab('key');
-        paintShown();
+        if (c) selectCell({ row: c.row, index: c.index });
       } }, ...items);
       const [l, t, r, b] = s.bounds;
       Object.assign(col.style, { left: l / j.width * 100 + '%', top: t / j.height * 100 + '%', width: (r - l) / j.width * 100 + '%', height: (b - t) / j.height * 100 + '%' });
@@ -155,10 +158,7 @@
         li.append(h('button', { type: 'button', onclick: () => {
           const at = LE.atLine(history.current.xml, p.line);
           if (!at) return goToLine(p.line);
-          sel = [withId(at)];
-          fragmentKey = null;
-          showTab('key');
-          paintShown();
+          selectCell(at);
         } }, text));
       } else li.textContent = text;
       ul.append(li);
@@ -267,6 +267,13 @@
   function withId(at) {
     const c = LE.cellAt(parsed(), at);
     return { row: at.row, index: at.index, id: c && c.a.id };
+  }
+
+  function selectCell(at) {
+    sel = [withId(at)];
+    fragmentKey = null;
+    showTab('key');
+    paintShown();
   }
 
   function relocate() {
@@ -379,7 +386,7 @@
     const c = LE.cellAt(pp, sel[0]);
     const columns = columnsOf(xmlNow());
     const w = parseFloat(LE.widthOf(xmlNow(), pp, c));
-    const per = Number.isFinite(w) && kw > 0 ? w / kw : columns / shown.scene.json().width;
+    const per = Number.isFinite(w) && kw > 0 ? w / kw : columns / shown.json.width;
     press.px = px;
     press.units = LE.snap(px * per, columns);
   }
@@ -888,7 +895,7 @@
     const out = [h('p', { className: 'muted' }, '滑动列是一列能滑动的符号，内容由 App 按类别给（用户在「按键字符和快捷键」的「滑动列」里改）。宽度、跨几行在「键」页调，删除也在「键」页。')];
     for (const s of LE.scrolls(p)) {
       out.push(h('h3', {}, '滑动列 ' + (s.a.id || '') + '（第 ' + (s.at.row + 1) + ' 行）'),
-        line('', button('选中它', () => { sel = [withId(s.at)]; fragmentKey = null; showTab('key'); paintShown(); })),
+        line('', button('选中它', () => selectCell(s.at))),
         ...scrollOptions(s.at, s.a));
     }
     out.push(line('', button('加一列', () => {

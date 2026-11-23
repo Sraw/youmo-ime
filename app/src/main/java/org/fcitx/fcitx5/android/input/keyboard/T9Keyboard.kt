@@ -73,8 +73,6 @@ class T9Keyboard(
 
         const val ShuangpinPlainName = "T9ShuangpinPlain"
 
-        internal const val ITEM_TEXT_DP = ScrollColumn.ITEM_TEXT_DP
-
         const val LAYOUT = "nine"
 
         internal const val ONE = ",.?!"
@@ -89,17 +87,27 @@ class T9Keyboard(
 
         private fun T9State.offersSyllables() = composing && syllables.isNotEmpty()
 
-        private fun sideShown(state: T9State, english: Boolean, address: AddressKeys) = ScrollLists.shown(
-            ScrollLists.NINE_SIDE, null, ScrollColumn.fieldOf(address), null, null, if (english) "english" else "pinyin", !english && state.offersSyllables(),
+        private fun sideShown(state: T9State, english: Boolean, address: AddressKeys, fieldPad: String?) = ScrollLists.shown(
+            kind = ScrollLists.NINE_SIDE,
+            list = null,
+            field = ScrollColumn.fieldOf(address),
+            fieldPad = fieldPad,
+            pad = null,
+            ime = if (english) "english" else "pinyin",
+            composing = !english && state.offersSyllables(),
         )
 
-        /** The side column as the defaults have it, for tests: the keyboard's reads the user's lists (ScrollColumns). */
+        /**
+         * The side column as the defaults have it, for tests: the keyboard's reads the user's lists (ScrollColumns).
+         * [fieldPad]: a phone's or a date's field, back on the nine keys from its pad.
+         */
         internal fun labels(
             state: T9State,
             english: Boolean = false,
             address: AddressKeys = AddressKeys.NONE,
             marks: Map<String, String> = emptyMap(),
-        ): List<String> = when (val shown = sideShown(state, english, address)) {
+            fieldPad: String? = null,
+        ): List<String> = when (val shown = sideShown(state, english, address, fieldPad)) {
             ScrollLists.Shown.Syllables -> state.syllables
             is ScrollLists.Shown.Category -> ScrollDefaults.of(shown.id).orEmpty().map { ScrollColumn.text(shown.id, it as ScrollItem.Text, english, marks) }
         }
@@ -110,7 +118,8 @@ class T9Keyboard(
             english: Boolean = false,
             address: AddressKeys = AddressKeys.NONE,
             marks: Map<String, String> = emptyMap(),
-        ): KeyAction = when (val shown = sideShown(state, english, address)) {
+            fieldPad: String? = null,
+        ): KeyAction = when (val shown = sideShown(state, english, address, fieldPad)) {
             ScrollLists.Shown.Syllables -> syllable(state, i)
             is ScrollLists.Shown.Category -> ScrollColumn.typed(shown.id, ScrollDefaults.of(shown.id).orEmpty()[i], english, marks)!!
         }

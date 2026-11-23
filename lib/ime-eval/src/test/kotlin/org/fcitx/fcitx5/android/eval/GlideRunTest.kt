@@ -10,8 +10,10 @@ import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishData
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
 import org.fcitx.fcitx5.android.engine.glide.PinyinGlide
 import org.fcitx.fcitx5.android.engine.glide.TableGlide
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.table.TableDictionary
@@ -91,6 +93,27 @@ class GlideRunTest {
         assertEquals(1, r.words)
         assertEquals(0, r.right)
         assertEquals(listOf("fang'an\t方案\tfan'gan:反感"), r.misses)
+    }
+
+    // jing glided on the nine keys, typed into a session: alone 京 is first; with in ↔ ing the likelier 金 (jin)
+    @Test
+    fun aNineKeyGlideIsCountedFirstInASessionUnderTheFuzzyPairsGiven() {
+        val data = PinyinData.load(
+            ByteBuffer.wrap(
+                PinyinDataBuilder()
+                    .unigram("<unk>", -7f, 0f)
+                    .unigram("金", -2f, 0f)
+                    .unigram("京", -5f, 0f)
+                    .entry("金", intArrayOf(Syllables.id("jin")))
+                    .entry("京", intArrayOf(Syllables.id("jing")))
+                    .build().toByteArray(),
+            ),
+        )
+        fun run(fuzzy: Set<Fuzzy>?) = PinyinGlideRun(data).run(listOf("jing" to "京"), syllables = 0, wobble = 0f, seed = 1, layout = GlideLayout.nineKeys(), inSession = fuzzy)
+        assertEquals(1, run(null).right)
+        assertEquals(0, run(null).sessionRight)
+        assertEquals(1, run(emptySet()).sessionRight)
+        assertEquals(0, run(setOf(Fuzzy.IN_ING)).sessionRight)
     }
 
     @Test

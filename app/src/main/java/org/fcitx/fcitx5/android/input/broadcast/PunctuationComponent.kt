@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.input.broadcast
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.host.FullWidth
 import org.fcitx.fcitx5.android.input.dependency.TypedComponent
-import org.fcitx.fcitx5.android.input.keyboard.isAsciiMark
+import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
@@ -71,6 +71,6 @@ class PunctuationComponent :
 
     private companion object {
         // not letters or digits, which are not punctuation keys; the same the keyboard holds back while not known
-        val ASCII_MARKS = ('!'..'~').filter { isAsciiMark(it.code) }.map { it.toString() }
+        val ASCII_MARKS = ('!'..'~').filter { ScrollLists.isAsciiMark(it.code) }.map { it.toString() }
     }
 }

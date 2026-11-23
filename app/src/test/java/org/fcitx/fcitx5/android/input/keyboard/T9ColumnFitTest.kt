@@ -160,7 +160,7 @@ class T9ColumnFitTest {
             val inside = ink.left >= item.paddingLeft - 0.5f && ink.right <= item.width - item.paddingRight + 0.5f &&
                 ink.top >= -0.5f && ink.bottom <= item.height + 0.5f
             assertTrue("${longest[i]} at font scale $scale: ink $ink in ${item.width}x${item.height}", inside)
-            assertEquals(T9Keyboard.ITEM_TEXT_DP * density, item.textSize, 0.5f)
+            assertEquals(ScrollColumn.ITEM_TEXT_DP * density, item.textSize, 0.5f)
             if (item.paint.measureText(longest[i]) > item.width - item.paddingLeft - item.paddingRight) shrunk = true
         }
         // narrower than the syllables at full size: the fit was needed

@@ -585,13 +585,14 @@
     return { id: r.layout.id, name: r.layout.name, layout: r.layout, oldFaces: read.keys };
   }
 
+  let scrollDefaults = null;
+
   /**
    * What is wrong with [d] drawn on [board] (an app board's id, or a layout of the user's as readOwnLayout reads it) in [env] (EnvJson): `[{level: "error"|"warning", line, message}]`,
    * the theme's own, then the scene's; `theme` and `scene` where they were made. An [env] with `marks` is drawn with
    * those whole (none of the defaults filled in for a member it leaves out); one without, with the board's default
    * marks (defaultMarksOf).
    */
-  let scrollDefaults = null;
   function check(E, d, board, env, measurer) {
     try {
       return checked(E, d, board, env, measurer);

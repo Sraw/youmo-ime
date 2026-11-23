@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.pinyin
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.G14
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.G18
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters.Companion.NINE_SP
@@ -105,6 +106,34 @@ class GroupedShuangpinSegmenterTest {
         assertEquals("zh", segmenter.started(Syllables.id("zhang"), 1))
         assertEquals("a", segmenter.started(Syllables.id("an"), 1))
         assertEquals("b", segmenter.asTyped(codes("b", G18)))
+    }
+
+    private fun marked(on: GroupedShuangpinSegmenter, typed: String, kind: Kind): Set<String> {
+        val g = on.segment(typed)
+        return g.edges(0).filter { g.kind(it) == kind }.flatMap { g.matches(it).toString().split(' ') }.toSet()
+    }
+
+    private val ing = GroupedShuangpinSegmenter(ZIRANMA, G18, setOf(Fuzzy.IN_ING))
+
+    @Test
+    fun aTakenSyllableOrInitialReadsItsFuzzyPartner() = assertRows(
+        "a taken syllable reads its partner" to { assertEquals(setOf("jing", "jin~"), marked(ing, "jing'", Kind.SYLLABLE)) },
+        "with all off a taken syllable reads itself" to { assertEquals(setOf("jing"), marked(GroupedShuangpinSegmenter(ZIRANMA, G18), "jing'", Kind.SYLLABLE)) },
+        "a taken initial at the end reads its partner's syllables" to {
+            val n = marked(GroupedShuangpinSegmenter(ZIRANMA, G18, setOf(Fuzzy.L_N)), "n'", Kind.INITIAL)
+            assertTrue(n.toString(), "ni…" in n && "li~…" in n)
+        },
+        "with all off a taken initial reads its own" to { assertTrue(marked(GroupedShuangpinSegmenter(ZIRANMA, G18), "n'", Kind.INITIAL).none { it.startsWith("l") }) },
+    )
+
+    // shown as the keys taken, whichever is read: jing's jy, not jin's jn; n's n, not li's l; 自然码 zh's v, not zi's z
+    @Test
+    fun aTakenSyllableOrInitialShowsItsOwnKeysWhicheverIsRead() {
+        assertEquals("jy", ing.keysShown("jing'", Syllables.id("jin")))
+        assertEquals("jy", ing.keysShown("jing'", Syllables.id("jing")))
+        assertEquals("n", GroupedShuangpinSegmenter(ZIRANMA, G18, setOf(Fuzzy.L_N)).keysShown("n", Syllables.id("li")))
+        assertEquals("v", GroupedShuangpinSegmenter(ZIRANMA, G18, setOf(Fuzzy.Z_ZH)).keysShown("zh", Syllables.id("zi")))
+        assertEquals("z", GroupedShuangpinSegmenter(ZIRANMA, G18, setOf(Fuzzy.Z_ZH)).keysShown("z", Syllables.id("zhi")))
     }
 
     @Test

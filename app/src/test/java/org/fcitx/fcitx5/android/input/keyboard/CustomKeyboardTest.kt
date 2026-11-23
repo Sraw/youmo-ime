@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
+import org.fcitx.fcitx5.android.core.FormattedText
 import org.fcitx.fcitx5.android.core.fixture
 import org.fcitx.fcitx5.android.core.phoneStorage
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
@@ -34,6 +35,7 @@ import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.materialPack
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
+import org.fcitx.fcitx5.android.host.HostEvent
 import org.fcitx.fcitx5.android.input.SceneShownKey
 import org.fcitx.fcitx5.android.input.KeyboardHarness
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
@@ -49,7 +51,6 @@ import org.fcitx.fcitx5.android.scene.keys.KeyId
 import org.fcitx.fcitx5.android.scene.keys.KeyboardVariant
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
-import org.fcitx.fcitx5.android.scene.keys.ScrollLists
 import org.fcitx.fcitx5.android.ui.main.settings.KeyCaps
 import org.fcitx.fcitx5.android.ui.main.settings.PlaceholderStrings
 import org.fcitx.fcitx5.android.ui.main.settings.im.InputMethodSettings
@@ -219,13 +220,34 @@ class CustomKeyboardTest {
 
     @Test
     fun theNineKeysColumnOnAnotherKeyboardShowsNoSyllablesAndEnglishsOwnList() {
-        val keyboard = TextKeyboard(context, TestThemes.PixelDark)
-        fun shown() = keyboard.sideInput().let { ScrollLists.shown(ScrollLists.NINE_SIDE, null, null, null, it.pad, it.ime, it.composing) }
-        keyboard.onInputMethodUpdate(KeyboardHarness.PINYIN)
-        assertFalse(keyboard.sideInput().composing)
-        assertEquals(ScrollLists.Shown.Category(ScrollDefaults.NINE), shown())
-        keyboard.onInputMethodUpdate(KeyboardHarness.ENGLISH)
-        assertEquals(ScrollLists.Shown.Category(ScrollDefaults.NINE_ENGLISH), shown())
+        val text = fixture("layouts/uat-qwerty-scroll.layout").readText()
+            .replace("id=\"uat-qwerty-scroll\"", "id=\"my-side\"")
+            .replace("kind=\"scroll\" list=\"nine\" direction=\"horizontal\" show=\"6\"", "kind=\"nine-side\"")
+        File(dir, "my-side.xml").writeText(text)
+        CustomKeyboards.forget("my-side")
+        val mine = CustomKeyboards.choice("my-side")!!
+        assertTrue(mine.drawn)
+        prefs.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, mine.id)
+        prefs.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.CUSTOM, mine.id)
+        val h = KeyboardHarness()
+        try {
+            fun shown() = KeyboardHarness.all(h.keyboard).filterIsInstance<ScrollView>().single { h.shown(it) && it.parent is BaseKeyboard }
+                .let { it.getChildAt(0) as ViewGroup }.children.filterIsInstance<TextView>().filter { it.isVisible }.map { it.text.toString() }.toList()
+            fun texts(id: String) = ScrollDefaults.of(id)!!.map { (it as ScrollItem.Text).text }
+            h.start()
+            assertEquals(texts(ScrollDefaults.NINE), shown())
+            // typing pinyin on letters: the nine keys' syllables are theirs alone
+            h.emit(HostEvent.InputPanel(FormattedText(arrayOf("ni"), intArrayOf(0), 2), FormattedText.Empty, FormattedText.Empty))
+            assertEquals(texts(ScrollDefaults.NINE), shown())
+            h.emit(HostEvent.InputPanel(FormattedText.Empty, FormattedText.Empty, FormattedText.Empty))
+            h.api.inputMethodEntryCached = KeyboardHarness.ENGLISH
+            h.emit(HostEvent.InputMethodChanged(KeyboardHarness.ENGLISH))
+            // the scene made for English, as drawing it would
+            h.keys()
+            assertEquals(texts(ScrollDefaults.NINE_ENGLISH), shown())
+        } finally {
+            h.close()
+        }
     }
 
     @Test

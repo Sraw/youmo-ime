@@ -7,6 +7,8 @@ package org.fcitx.fcitx5.android.uat
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
+import org.fcitx.fcitx5.android.engine.glide.GlideLayout
+import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
@@ -338,9 +340,69 @@ class NineKeysUatTest {
         assertEquals(first + "00", text)
     }
 
+    private val inIng = EngineSettings(fuzzy = setOf(Fuzzy.IN_ING))
+
+    // a fuzzy reading's word ranks past a page or more of singles, so 丿 narrows to 金鱼's first stroke
+    private fun EngineReplay.expectJinyu(s: EngineSettings, how: String, among: Int = FIRST) {
+        stroke("p")
+        assertEquals("$how ${s.fuzzy}: ${candidates.take(among)}", s.fuzzy.isNotEmpty(), "金鱼" in candidates.take(among))
+    }
+
+    // jing taken off the bar still reads jin with the fuzzy pair on: 5464, jing, 98 gives 金鱼
+    @Test
+    @Uat("T9-73")
+    fun aSyllableTakenStillReadsTheFuzzyPairsOn() {
+        for (s in listOf(inIng, EngineSettings())) with(EngineReplay(settings(s), im = InputMethodCatalog.PINYIN)) {
+            type(EngineReplay.nineKeys("5464"))
+            syllable("jing")
+            type(EngineReplay.nineKeys("98"))
+            expectJinyu(s, "jing taken")
+        }
+    }
+
+    // letters glided are typed as themselves and still read the fuzzy pairs: the glide reads ling yu first, its fuzzy lin yu 淋浴 among the first
+    @Test
+    @Uat("T9-74")
+    fun lettersGlidedStillReadTheFuzzyPairsOn() {
+        for (s in listOf(inIng, EngineSettings())) with(EngineReplay(settings(s), im = InputMethodCatalog.PINYIN)) {
+            glide("jingyu", GlideLayout.nineKeys())
+            assertEquals("glided ${s.fuzzy}: ${candidates.take(FIRST)}", s.fuzzy.isNotEmpty(), "淋浴" in candidates.take(FIRST))
+        }
+    }
+
+    // letters picked by 连按 (a long press commits its letter) the same: J I N G, 98 gives 金鱼
+    @Test
+    @Uat("T9-75")
+    fun lettersMultiTappedStillReadTheFuzzyPairsOn() {
+        for (s in listOf(inIng, EngineSettings())) with(EngineReplay(settings(s), im = InputMethodCatalog.PINYIN)) {
+            press('5', 4)
+            press('4', 3)
+            press('6', 2)
+            press('4', 4)
+            type(EngineReplay.nineKeys("98"))
+            // JI and JIN's singles come first here
+            expectJinyu(s, "multi-tapped", among = candidates.size)
+        }
+    }
+
+    // u and v share 8, yet lv taken off the bar reads lu with u ↔ v on: 58, lv, then shang gives 路上
+    @Test
+    @Uat("T9-76")
+    fun lvTakenReadsLuUnderUV() {
+        for (s in listOf(EngineSettings(fuzzy = setOf(Fuzzy.V_U)), EngineSettings())) with(EngineReplay(settings(s), im = InputMethodCatalog.PINYIN)) {
+            type(EngineReplay.nineKeys("58"))
+            syllable("lv")
+            type(EngineReplay.nineKeys("74264"))
+            assertEquals("lv taken ${s.fuzzy}: ${candidates.take(FIRST)}", s.fuzzy.isNotEmpty(), "路上" in candidates.take(FIRST))
+        }
+    }
+
     private companion object {
         // the case's 0.3 s and 1 s and more between presses
         const val QUICK = 300L
         const val SLOW = 1_200L
+
+        // the candidates looked at: a fuzzy reading's word may be past the first page
+        const val FIRST = 30
     }
 }

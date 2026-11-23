@@ -10,6 +10,7 @@ import android.graphics.PorterDuffColorFilter
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
 import androidx.annotation.ColorInt
+import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIconDrawable
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
@@ -21,8 +22,12 @@ import splitties.dimensions.dp
 object BarIconDrawables {
 
     /** Null: the theme's not read yet. */
-    fun of(context: Context, icons: PackIcons, icon: BarIcons.Icon, @ColorInt tint: Int, px: Int, ready: () -> Unit): Drawable? {
-        val file = icons.file(icon.name) ?: return fallback(context, icon, tint)
+    fun of(context: Context, icons: PackIcons, icon: BarIcons.Icon, @ColorInt tint: Int, px: Int, ready: () -> Unit): Drawable? =
+        of(context, icons, icon.name, ToolbarButtonLooks.drawable(icon.fallback), tint, px, ready)
+
+    /** The theme's icon [name], else the app's [fallback]; null: the theme's not read yet. */
+    fun of(context: Context, icons: PackIcons, name: String, @DrawableRes fallback: Int, @ColorInt tint: Int, px: Int, ready: () -> Unit): Drawable? {
+        val file = icons.file(name) ?: return fallback(context, fallback, tint)
         val side = decodeSide(context, px)
         // a view keeps the drawable it is given: one lent at another size would stay
         val own = icons.icon(file, px, px, ready, side, side)?.takeUnless { it is PackIcons.Raster && !it.exact }
@@ -31,7 +36,7 @@ object BarIconDrawables {
             // a picture's own colours as they are: the place's colour is for a mask or an outline
             own != null -> PackIconDrawable(own, if (own is PackIcons.Raster && !mask) WHITE else Argb(tint), px, px, mask)
             icons.pending(file) -> null
-            else -> fallback(context, icon, tint)
+            else -> fallback(context, fallback, tint)
         }
     }
 
@@ -52,8 +57,8 @@ object BarIconDrawables {
     /** One gone, broken or too long draws the app's: a restored backup's pack is not held to the import's checks. */
     fun drawsOwn(icons: PackIcons, icon: BarIcons.Icon): Boolean = icons.file(icon.name)?.let(icons::draws) == true
 
-    private fun fallback(context: Context, icon: BarIcons.Icon, @ColorInt tint: Int): Drawable =
-        ContextCompat.getDrawable(context, ToolbarButtonLooks.drawable(icon.fallback))!!.mutate().apply { setTint(tint) }
+    private fun fallback(context: Context, @DrawableRes res: Int, @ColorInt tint: Int): Drawable =
+        ContextCompat.getDrawable(context, res)!!.mutate().apply { setTint(tint) }
 
     /** The bar is made with the input view: told nothing, kept for its draw (a PNG's decoded once, at [decodeSide]). */
     fun readAhead(icons: PackIcons) {

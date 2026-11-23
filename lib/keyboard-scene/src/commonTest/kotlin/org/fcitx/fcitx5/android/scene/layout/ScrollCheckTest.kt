@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.layout
 
+import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.testData
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +22,9 @@ class ScrollCheckTest {
 
     private fun check(text: String, strict: Boolean = true) = LayoutCheck.check(text, sources, "0.6.1", strict = strict)
 
+    // a number board on every pad
+    private val every = own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"${LayoutReader.PADS.joinToString(" ")}\"")
+
     // a board made from 0.6.2's number board, its + - * / and the rest where the scroll column now is: as it was
     @Test
     fun aBoardMadeFrom062sNumberBoardIsCheckedAsThen() {
@@ -33,27 +37,43 @@ class ScrollCheckTest {
         }
     }
 
-    // the column shows each pad's own marks, so a pad's board with one is not told it lacks them
+    // what a pad lacks, its keys and the column's list there by default counted: the full pad shows its list=, the dialler's
+    // and the date's their own
     @Test
     fun aScrollColumnHoldsWhatAPadLacks() {
-        val every = own("number").replaceFirst("family=\"number\"", "family=\"number\" pads=\"${LayoutReader.PADS.joinToString(" ")}\"")
-        assertTrue(check(every).warnings.none { it.key == "pad-lacks" || it.key == "scroll-tight" || it.key == "bottom-left" || it.key == "narrow" }, check(every).warnings.toString())
-        val bare = check(every.replace(Regex("<slot id=\"side\"[^>]*/>"), "")).warnings.filter { it.key == "pad-lacks" }.map { it.args[0] }
-        assertEquals(listOf("full", "phone", "datetime"), bare)
+        assertTrue(check(every).warnings.none { it.key == "scroll-tight" || it.key == "bottom-left" || it.key == "narrow" }, check(every).warnings.toString())
+        assertRows(
+            listOf(
+                Triple("the app's column: each pad's marks in it", every, emptyList()),
+                Triple("no column: each pad lacks its marks", every.replace(Regex("<slot id=\"side\"[^>]*/>"), ""), listOf(listOf("full", "-"), listOf("phone", "+ * #"), listOf("datetime", "- / :"))),
+                Triple("a nine column: that list has no -", every.replace("kind=\"scroll\" list=\"number\"", "kind=\"scroll\" list=\"nine\""), listOf(listOf("full", "-"))),
+                Triple("the number column and no . key: that list has no .", every.replace(Regex("<key id=\"\\.\"[^>]*/>"), "<gap width=\"12\" when=\"pad=full|datetime\"/>"), listOf(listOf("full", "."))),
+                Triple("ST-225's file: a nine column on every pad", testData("../../../../../uat/fixtures/layouts/uat-number-nine-column.layout"), listOf(listOf("full", "-"))),
+            ),
+            { it.first },
+        ) { (_, board, lacks) -> assertEquals(lacks, check(board).warnings.filter { it.key == "pad-lacks" }.map { it.args }) }
     }
 
     // a column's items under 20 dp along it: told once, at its line
     @Test
     fun aScrollColumnTooTightIsTold() {
         val board = own("number")
-        val line = board.lines().indexOfFirst { "<slot id=\"side\"" in it } + 1
-        fun tight(show: String, width: String) = check(board.replace("kind=\"scroll\" list=\"number\" width=\"16\"", "kind=\"scroll\" list=\"number\" direction=\"horizontal\" show=\"$show\" width=\"$width\""))
-            .warnings.filter { it.key == "scroll-tight" }
-        assertEquals(listOf(LayoutCheck.Finding(line, "scroll-tight")), tight("8", "16"))
-        // the narrowest screen is 344 dp: 23 % in four is 19.8 dp an item, 24 % 20.6
-        assertEquals(listOf(LayoutCheck.Finding(line, "scroll-tight")), tight("4", "23"))
-        assertEquals(emptyList(), tight("4", "24"))
-        assertTrue(check(board).warnings.none { it.key == "scroll-tight" })
+        fun tight(show: String, width: String) = board.replace("kind=\"scroll\" list=\"number\" width=\"16\"", "kind=\"scroll\" list=\"number\" direction=\"horizontal\" show=\"$show\" width=\"$width\"")
+        val second = board.replace("</keyboard>", "<row>\n<slot kind=\"scroll\" list=\"number\" direction=\"horizontal\" show=\"8\" width=\"16\"/><gap width=\"fill\"/></row>\n</keyboard>")
+        assertRows(
+            listOf(
+                Triple("eight in 16 %", tight("8", "16"), "<slot id=\"side\""),
+                // the narrowest screen is 344 dp: 23 % in four is 19.8 dp an item, 24 % 20.6
+                Triple("four in 23 %", tight("4", "23"), "<slot id=\"side\""),
+                Triple("four in 24 %", tight("4", "24"), null),
+                Triple("the app's column", board, null),
+                Triple("two columns: each told at its own line", second, "show=\"8\""),
+            ),
+            { it.first },
+        ) { (_, text, at) ->
+            val told = at?.let { mark -> LayoutCheck.Finding(text.lines().indexOfFirst { mark in it } + 1, "scroll-tight") }
+            assertEquals(listOfNotNull(told), check(text).warnings.filter { it.key == "scroll-tight" })
+        }
     }
 
     // the nine keys' side column is the nine-side slot: a scroll column of the same list does not stand for it
