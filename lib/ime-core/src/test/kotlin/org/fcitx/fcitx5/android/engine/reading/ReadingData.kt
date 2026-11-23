@@ -8,7 +8,7 @@ import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.ReadingSource
 import org.fcitx.fcitx5.android.engine.data.ToneSources
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
+import org.fcitx.fcitx5.android.engine.data.syl
 import java.nio.ByteBuffer
 
 /** Pinyin data with a few characters' readings as Unihan lists them: 行, 和, 子, 了, 能. */
@@ -104,8 +104,6 @@ object ReadingData {
         了解: liǎo jiě
         好了: hǎo le
     """.trimIndent()
-
-    private fun syl(vararg s: String) = IntArray(s.size) { Syllables.id(s[it]) }
 
     /** The file, as the app's assets have it. */
     val bytes: ByteArray by lazy {

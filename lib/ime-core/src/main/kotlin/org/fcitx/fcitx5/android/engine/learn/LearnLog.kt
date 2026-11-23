@@ -223,7 +223,7 @@ class LearnLog(
     /** A word [im]'s table remembers under [code], from today. */
     fun rememberTableWord(im: String, code: String, text: String) {
         val stamp = LearnClock.stamp(clock, state, commit = false)
-        write(Absorbed(stamp.minute, listOf(LearnRecord.TableWordRow(im, code, text, stamp.day)), emptyList()))
+        write(Absorbed(stamp.minute, listOf(LearnRecord.TableWordRow(im, code, text, stamp.day)), emptyList(), remembered = true))
     }
 
     /** Removes words a table remembered, stamped now. */

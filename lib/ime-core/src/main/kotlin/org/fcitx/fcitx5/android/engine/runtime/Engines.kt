@@ -198,7 +198,11 @@ class Engines(
         /** As the host shows it (繁體 via chttrans), which the op names. */
         shown: (String) -> String = { it },
         act: (event: Int, index: Int, text: String) -> Boolean = { event, index, _ -> pressShown(im, event, index) },
-    ): LearningResult = checked { learner.apply(im, op, shown, act) }
+    ): LearningResult = checked {
+        // what was said is learning data too: a clear forgets it
+        if (op is LearningOp.ClearRecent || op is LearningOp.ClearLearned) voiceEdits.end()
+        learner.apply(im, op, shown, act)
+    }
 
     // false with no keyboard made, where a pair would make one just to take it
     internal fun pressShown(im: String?, event: Int, index: Int): Boolean = im?.takeIf { keyboards.containsKey(pairs.shownSession(it)) }?.let { pairs[it]?.onEvent(event, index) ?: keyboards[it]?.onEvent(event, index) } != null
@@ -433,8 +437,8 @@ class Engines(
         if (learner.useHabits) voiceEdits.edits.said(text, before) else voiceEdits.end()
     }
 
-    /** A talk's stretches as voice kept them, for 记住 to be judged on the stretch voice judged. */
-    fun voiceStretches(texts: List<String>) = checked { voiceEdits.stretches(texts) }
+    /** A talk's stretches as voice kept them, for 记住 to be judged on the stretch voice judged; none kept with habits off. */
+    fun voiceStretches(texts: List<String>) = checked { if (learner.useHabits) voiceEdits.stretches(texts) }
 
     /** [VoiceEdits.putIn]. */
     fun voicePutIn(text: String): VoiceEdits.Reply = checked { voiceEdits.edits.putIn(text) }
@@ -697,6 +701,8 @@ class Engines(
         lexicon.closed()
         english.closed()
         tables.closed()
+        // a read ahead queued would still take the context-read thread's time
+        assets.stopReading()
         invalidate()
     }
 

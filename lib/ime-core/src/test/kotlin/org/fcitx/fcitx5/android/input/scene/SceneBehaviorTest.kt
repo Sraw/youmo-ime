@@ -251,7 +251,7 @@ class SceneBehaviorTest {
         assertNull(SceneBehavior.of(keys("qwerty").getValue("backspace")).longPress)
     }
 
-    // a theme layout writing long-press= or swipe-up= on a function key changes nothing; an unnamed key keeps its own
+    // contract: a theme layout writing long-press= or swipe-up= on a function key changes nothing; an unnamed key keeps its own
     @Test
     fun aThemesLongPressAndSwipeOnAFunctionKeyAreIgnored() {
         val space = SceneBehavior.of(node("<key id=\"space\" kind=\"function\" send=\"sym:space\" shortcut=\"space\" long-press=\"ime-picker\" swipe-up=\"!\"/>"))

@@ -150,7 +150,7 @@ class PetReaderTest {
     @Test
     fun writtenAndReadBackItIsTheSame() {
         val all = PetState.Name.entries.map { """<state name="${it.id}" sheet="${it.id}&amp;1.png" frames="3" columns="2" fps="5"/>""" }.toTypedArray()
-        for (attrs in listOf(""" size="48.5dp" offset-x="-4dp" offset-y="2dp" align="bottom-start"""", """ place="bar-end" size="20dp"""", "")) {
+        for (attrs in listOf(""" size="48.5dp" offset-x="-4dp" offset-y="2dp" align="bottom-start"""", """ place="bar-end" size="20dp"""", """ place="bar-end" align="top-start"""", "")) {
             val t = read(pet(attrs, *all))
             val again = ThemeReader.theme(ThemeWriter.write(t)).ok()
             assertEquals(t.pet, again.pet)

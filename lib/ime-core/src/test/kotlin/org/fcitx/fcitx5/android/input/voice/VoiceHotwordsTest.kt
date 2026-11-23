@@ -54,6 +54,18 @@ class VoiceHotwordsTest {
         assertEquals(VoiceHotwords.ofUser(words), VoiceHotwords.ofUser(words).withHabits(true))
     }
 
+    // 记住 in a table keeps the word to the table: the code is no reading, and voice uses none of them
+    @Test
+    fun aWordATableRememberedIsNoHotword() {
+        val words = listOf(
+            UserWord("经验", "xcgw", Kind.LEARNED, table = "wbx"),
+            UserWord("幽默", "xcgw", Kind.LEARNED, table = "wbx"),
+            UserWord("幽默", "you mo", Kind.LEARNED, 2f),
+        )
+        assertEquals("pinyin's own word of the same text still listened for", VoiceHotwords.Words("幽 默", ""), VoiceHotwords.ofUser(words))
+        assertEquals(VoiceHotwords.Words.NONE, VoiceHotwords.ofUser(words.take(1)))
+    }
+
     // 生僻字屏蔽: the engine's answer for the words and the recognizer's characters
     @Test
     fun aWordWithACharacterHeldBackIsNoHotwordAndTheCharactersAreNeverCompleted() {

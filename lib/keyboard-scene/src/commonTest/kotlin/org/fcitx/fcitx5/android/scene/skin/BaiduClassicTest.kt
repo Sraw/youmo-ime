@@ -49,6 +49,7 @@ class BaiduClassicTest {
         return h
     }
 
+    // contract: a skin using none of 0.6.3's settings converts byte for byte as 0.6.2 wrote it; the text and hashes change only on purpose
     @Test
     fun aSkinWithoutTheNewSettingsIsWrittenAsBefore() {
         assertEquals(ONE_VERSION, convert(baidu()).themeXml)

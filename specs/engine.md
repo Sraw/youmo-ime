@@ -70,10 +70,10 @@ its learning still its own), and handwriting and the tables keep the text before
 - **Homophones** (dev/design/063-voice-model-replace): on the stretch reranking chose, before the polish, a
   stretch reading exactly as a user's word (toned, char by char, `CharReadings`/`ToneTable`) may become it
   (徐静→徐婧; `VoiceHomophones`): added words, learned ones typed more than 3 times. Never the user's own
-  word, one across a common word's edge (unigram log10 P ≥ -5.5: 和瑞 of 和瑞典), nor inside a longer
+  word (a word a table remembered among them: `UserWord.table` set; voice never writes those, not as hotwords, homophones nor in the 「记住」 judgement, but leaves them as heard), one across a common word's edge (unigram log10 P ≥ -5.5: 和瑞 of 和瑞典), nor inside a longer
   dictionary word (徐静 of 徐静蕾), nor holding a dictionary word read otherwise (那个 of 是那个, not the
   user's 是哪个). Where they allow, the word model decides (`VoiceHomophones.pick`): each way of writing it
-  (each stretch alone, then those not overlapping together, 16 at most) is scored log10 P after the stretch
+  (each stretch alone, then those not overlapping together, 16 at most; the places past them left as heard) is scored log10 P after the stretch
   before it plus a bonus per word put in, added 1.5 and learned 1, and the best wins over the stretch as
   heard only if higher (公式→攻势 after 敌人的, not after 推导这个). Added words marked 「总是换」
   (`UserWord.voiceAlways`, the file `words.voice-always` beside `words.added`, a text a line) go in unasked.
@@ -102,7 +102,7 @@ its learning still its own), and handwriting and the tables keep the text before
   (`EngineAssets.voiceReadings`; Q2), is asked about once a window (Q6) only if voice's own homophones, the
   word added as the settings add it (one this window added at the place left out, review M4), would put
   it in at that place, judged by `voicePick` on the stretch voice judged after the one kept before it (the talk's stretches as
-  kept, told by `Engines.voiceStretches` at its end; the clause after what is before it where none is found,
+  kept, told by `Engines.voiceStretches` at its end, only where voice's text is followed (询问 on, the field not sensitive, 输入习惯 on; `VoiceAsking.asks`; the talks kept in memory only, 4000 characters at most, the oldest dropped, none kept with 输入习惯 off or in a field that does not learn, all forgotten when the window ends or learning is cleared); the clause after what is before it where none is found,
   as the polish wrote it otherwise) (`Words.takes`; so a
   word blocked, inside a longer word or across a common one's edge is not; a common word is). Where only
   「总是换」 would (the word model does not take it there; `Takes.IF_ALWAYS`), or a word added already is
@@ -927,8 +927,8 @@ notice, nor with touch exploration, nor over symbols; only the words the field t
 cursor, as the tap checks them); a tap is `Keyboard.REMEMBER` with `Action.Remember(id, index, before)`,
 the text read before the cursor at the tap deciding (`CommitJournal.lastWhole`, which a passed-on key's
 unverified journal does not stop): the run's commits are taken back and the word committed and saved as
-an `Absorbed(added = [TableWordRow])`, `HostEvent.WordRemembered` after the commit; 撤销 is
-`Action.Unremember`. The strip has no timer: the next key, a field change or the keyboard closing puts it
+an `Absorbed(added = [TableWordRow], remembered = true)` (the flag appended, only where set; 清掉最近 takes out these alone, not a table word taken in), `HostEvent.WordRemembered` after the commit; 撤销 is
+`Action.Unremember`, sent to the table the word was remembered in (`KotlinHost.rememberedIn`), set aside if another input method is shown since. The strip has no timer: the next key, a field change or the keyboard closing puts it
 away. Once up the app sends `Keyboard.REMEMBER` with `Action.OfferShown(id)`, and only an offer so seen is
 not offered again in the field when withdrawn; a field read as unreadable (`Context.said` false, nothing
 before) gets none. A word so
@@ -1281,7 +1281,7 @@ place. Rules that keep old files and old users working:
   (`LearnLog.fold`): what is older than the cut becomes a snapshot, the rest stays as written.
   Till 0.4 an older build's logs (`pinyin.user`, a table's `<im>.user`, `english.user`, libime's
   `user.dict` and `user.history`) were converted into it once; this build reads none of them (an
-  install of 0.4 or before upgrades through 0.5 to 0.6.2 first), and the clears delete them, a
+  install of 0.4 or before upgrades to 0.6.2 first), and the clears delete them, a
   table's log and its `<im>.user.told` with a clear of everything or once read into the record
   (`learn.table-logs-read`; `LearningControl.retired`). The tables' saved
   phrases are the record's `TableWordRow`s, offered in the order saved (`SavedPhrases`). A

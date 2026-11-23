@@ -143,7 +143,8 @@ differed only in their inputs; they became 27 tables.
   state. The table checks every row, then fails once, naming each failed row by its why.
 - Don't write a test of a bare default (`startsIdle`). Assert the default as the first line of a
   test that uses it, unless it is a default the user sees.
-- A test pinned to a bug names the bug in a comment (UAT id, review id, commit). It is never deleted
+- A test pinned to a bug says which: its `@Uat("…")`, or the failing scenario in plain words (its name or
+  a one-sentence comment); no review or item numbers, no commits (git keeps those). It is never deleted
   or folded into another test's assertions. It may become a row, keeping its name as the row's why
   and its comment.
 - A test of a contract that mutation cannot see (a C++ header, a data file, a format, a fixture)
@@ -202,7 +203,9 @@ Native against the JVM, end to end: with a work dir and an emulator or the phone
 also types every set at each tier through `EngineEvalRunner` (`run-on-device.sh` with `LEVEL=`, emoji off as ime-eval has none, the
 generated sets pushed, each set on its own input method and keys: the nine keys `NINE=1`, 小鹤 on
 `engine-shuangpin`), and compares each row's input and first five candidates, no timing, with the JVM's
-(`<set>-<tier>.shown.tsv` and `.device.tsv`); one row otherwise exits 4 and leaves `<set>-<tier>.diff`.
+(`<set>-<tier>.shown.tsv` and `.device.tsv`), where the device row has more of the app's built-in date, time and weekday phrases (they follow the clock and ime-eval
+doesn't add them), after dropping them on both sides and cutting the JVM's row first by as many as the app added (they pushed
+that many off the device's five); every other row is held whole, so a short device row or a 周一 placed otherwise still counts; one row otherwise exits 4 and leaves `<set>-<tier>.diff`.
 The runner refuses a device whose candidate-shaping settings (scheme, fuzzy, typos, prediction, Latin words, 拆字, phrases, nine-key letters)
 are not the app's defaults, so a phone set by hand fails at once rather than as row differences. The debug APK must be built from the same data and models. Tables and handwriting are checked by their own runs (`table --pinyin`, `handwriting`):
 medium no worse than low.
@@ -387,7 +390,8 @@ upgraded by putting the fixture's files into its own directories and gets backup
 the release APK is upgraded with `install -r`. Gate 5 (start, latency, memory side by side) is gone:
 `uat/tools/perf.py` measures that. `uat/fixtures/upgrade/make.py` still exits (made for redroid): the
 fixtures are the ones it made on 0.3.x/0.4.0, an in-place upgrade this build no longer supports, so gate 2
-is paused till there are 0.5.x fixtures.
+is paused till there are 0.5.x fixtures; till then the release's in-place upgrade is the manual cases
+PR-14, ST-64, ST-67, ST-195 and TB-76.
 
 ## The testbed app (`:testbed`)
 
@@ -461,7 +465,7 @@ not know, comments and spacing kept), the engine reads every result, and the cas
 its saves, which `ThemePackImportTest` imports. `test/names-and-files.test.mjs` (the same): names and files as theme.xml has them: a name with XML's special characters, values with `>`, which files are still named, the effect images the app checks (≤ 256 px a side, size limit, .png/.webp only), theme.xml's size limit, the draft's files written once. The
 site is `index.html` with the engine put in: the Pages workflow leaves `src/`, `tools/`, `test/`,
 `fonts/`, `examples/`, `generated/`, `dev/` and `build/` out and writes its `index.html` (and `layout/index.html` beside it) with `assemble.mjs --engine <file>`; the workflow fails where the layout page lacks its script, its examples or its engine.
-`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine, a `.theme`'s boards offered as the app's import makes them (`themeBoards`), and its size to 2,100,000 bytes; `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser in a 1400 px wide window (`cdp.mjs`) and at 360 px: new from a base and from each example, editing, save, help, a `.theme` opened (its theme the preview's, a board of it started from).
+`test/layout-maker.test.mjs` (node, with the others) holds the layout page's document, editing and examples to the engine, a `.theme`'s boards offered as the app's import makes them (`themeBoards`), and its size to a budget (the number is the test's; `format.test.mjs` holds the engine's the same way); `node web/theme-maker/test/layout-smoke.mjs` (CI's unit test job, Chrome as panels-smoke) drives the page in a browser in a 1400 px wide window (`cdp.mjs`) and at 360 px: new from a base and from each example, editing, save, help, a `.theme` opened (its theme the preview's, a board of it started from).
 
 ### The engine in the page (060-render-p3 W1)
 

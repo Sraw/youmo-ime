@@ -440,7 +440,7 @@ object LayoutReader {
     private val GROUP_ARG = Regex("[a-z;]{1,2}")
     private val FAMILIES = listOf("letters", "zhuyin", "nine", "zhuyin-nine", "grouped", "number", "symbols", "handwriting", "emoji-search", "expanded-side", "number-row")
     private val KINDS = listOf("letter", "function", "space", "enter")
-    private val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid")
+    internal val SLOT_KINDS = listOf("handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid")
     private val ACTIONS = listOf("send", "long-press", "swipe-up", "swipe-down", "double-tap")
     private val BOOLEAN = Regex("true|false|1|0")
     private val COUNT = Regex("[0-9]{1,3}")

@@ -635,7 +635,6 @@ class EnginesLearningTest : EnginesFixture() {
         engines.close()
     }
 
-
     // each commit in the learning record, read back as it ranks
     @Test
     fun aCommitIsRecordedInTheLearningLog() {

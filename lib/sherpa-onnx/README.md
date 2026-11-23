@@ -101,7 +101,8 @@ the transducer's fields (the C++ `OnlineModelConfig` keeps upstream's others, un
 `VadModelConfig` only silero's; the JNI reads no more than those, except the transducer's QNN fields (`QnnConfig`,
 `csrc/qnn-config.cc`, the JNI's three QNN strings and `prependAdspLibraryPath`): they are part of
 upstream's transducer config, so they stay to keep its diff small, and are inert since `Validate`
-refuses the `qnn` provider. An empty `model_type` is taken as a transducer without reading the
+refuses the `qnn` provider. The JNI's `newFromAsset` (recognizer and VAD) and `prependAdspLibraryPath` have no
+Kotlin declaration (the app reads its models from files and runs no QNN); they stay, exported, for the same small diff. An empty `model_type` is taken as a transducer without reading the
 encoder's metadata, as upstream did to choose among families: a non-transducer model with no
 `model_type` fails late rather than at `Create`.
 Layer C is the build options that would now configure a broken build: speech synthesis, speaker

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <vector>
 #if defined(__linux__)
 #include <sched.h>
@@ -132,6 +133,7 @@ const int8_t *checked(JNIEnv *env, jobject q, jfloatArray scales, jint rows, jin
 
 } // namespace
 
+// MatrixKernel's float times and timesMany: no sentence model runs them, but they are the interface's own and checked against JVM's
 extern "C"
 JNIEXPORT void JNICALL
 Java_org_fcitx_fcitx5_android_core_NativeMatrixKernel_times(JNIEnv *env, jobject, jobject q, jfloatArray scales,
@@ -173,20 +175,22 @@ Java_org_fcitx_fcitx5_android_core_NativeMatrixKernel_timesManyQ8(JNIEnv *env, j
                                                                   jint rows, jint columns, jfloatArray x, jint m, jfloatArray y) {
     const int8_t *qs = checked(env, q, scales, rows, columns, x, m, y);
     if (!qs) return;
-    std::vector<float> ss(rows), xs(static_cast<size_t>(m) * columns), ys(static_cast<size_t>(m) * rows), sx(m);
+    std::vector<float> ss(rows), xs(static_cast<size_t>(m) * columns), sx(m);
     std::vector<int8_t> xq(static_cast<size_t>(m) * columns);
-    std::vector<int32_t> dots(static_cast<size_t>(m) * rows);
+    // left uninitialised: a vocabulary's batch is megabytes, every element written before it is read
+    std::unique_ptr<float[]> ys(new float[static_cast<size_t>(m) * rows]);
+    std::unique_ptr<int32_t[]> dots(new int32_t[static_cast<size_t>(m) * rows]);
     env->GetFloatArrayRegion(scales, 0, rows, ss.data());
     env->GetFloatArrayRegion(x, 0, m * columns, xs.data());
     for (jint v = 0; v < m; v++) sx[v] = youmo::quantize(xs.data() + static_cast<size_t>(v) * columns, columns, xq.data() + static_cast<size_t>(v) * columns);
-    youmo::dotsQ8(qs, columns, xq.data(), m, rows, dots.data());
+    youmo::dotsQ8(qs, columns, xq.data(), m, rows, dots.get());
     for (jint v = 0; v < m; v++)
         for (jint r = 0; r < rows; r++) {
             size_t k = static_cast<size_t>(v) * rows + r;
             float f = static_cast<float>(dots[k]) * ss[r];
             ys[k] = f * sx[v];
         }
-    env->SetFloatArrayRegion(y, 0, m * rows, ys.data());
+    env->SetFloatArrayRegion(y, 0, m * rows, ys.get());
 }
 
 extern "C"

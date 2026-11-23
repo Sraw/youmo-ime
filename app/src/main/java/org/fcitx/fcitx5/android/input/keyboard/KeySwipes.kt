@@ -200,7 +200,8 @@ internal class KeySwipes(
         val menu = preview == EDIT_MENU || preview == INPUT_METHOD_MENU
         // a key the scene drawn last has not: nothing opens, so nothing felt
         val bounds = if (menu) key.bounds ?: return false else null
-        InputFeedbacks.hapticFeedback(key.feedback)
+        // a menu's once it opened
+        if (!menu) InputFeedbacks.hapticFeedback(key.feedback)
         if (preview == SWIPE_SELECT) {
             held.select = true
             selecting = key.ref
@@ -211,10 +212,14 @@ internal class KeySwipes(
         }
         if (bounds == null) return false
         val down = event.totalY > 0
-        keyboard.onPopupAction(
-            if (preview == EDIT_MENU) PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField, down)
-            else PopupAction.ShowInputMethodMenuAction(key.ref, bounds, down),
-        )
+        val shown = if (preview == EDIT_MENU) {
+            PopupAction.ShowEditMenuAction(key.ref, bounds, keyboard.inPasswordField, down).also(keyboard::onPopupAction).outShown
+        } else {
+            PopupAction.ShowInputMethodMenuAction(key.ref, bounds, down).also(keyboard::onPopupAction).outShown
+        }
+        // no room nor scene for it: as with no bounds, the lift runs the swipe's command (the input methods' picker)
+        if (!shown) return false
+        InputFeedbacks.hapticFeedback(key.feedback)
         // where it opened is where back up is measured from: a flick back onto the key is the first move after
         if (down) keyboard.onPopupChangeFocus(key.ref, event.x, event.y)
         held.menu = true

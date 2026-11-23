@@ -228,7 +228,7 @@ adb shell su 0 am start -n io.github.sraw.youmo.debug/org.fcitx.fcitx5.android.i
 
 `skip:…`／`block:…` 只留给别的原因，记"跳过"／"阻塞"。
 
-现在共 1160 条（P0 150、P1 869、P2 141）：模拟器上跑 205 条（其中 154 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 955 条（JVM 844、发版时 20、真机或手工 69、语音 22）。
+现在共 1166 条（P0 150、P1 873、P2 143）：模拟器上跑 209 条（其中 157 条在 JVM 上也断言，设备上留作冒烟或照跑），在别处跑 957 条（JVM 846、发版时 20、真机或手工 69、语音 22）。
 
 （2026-11 从 redroid 搬到模拟器时 `needs=` 改了两处：原来的 `emu:` 去掉，实体键盘用例不再单独跑；`release,redroid:` 改名 `release,scripted:`，意思不变：发版时脚本跑。）
 
@@ -281,7 +281,7 @@ debug 包（要先有 arm64-v8a debug 包），只当宿主应用、把它自己
 有些用例的 **预期** 在 JVM 上就能完整断言：`app/src/test` 里的 `KeyboardHarness` 在 Robolectric 里造出整个键盘
 （真的输入法服务和 `InputView`，引擎换成 `FakeHostApi`，候选等用假事件推进来），设置页用 `MainActivity` 加同一个假引擎；
 样子用 Roborazzi 截图，和 `app/src/test/screenshots/` 里提交的金图比。测试方法上标 `@Uat("<编号>")`（keyboard-scene 的测试用它自己的 `org.fcitx.fcitx5.android.scene.Uat`），用例 .md 里多一行
-**JVM** 写测试名；整条搬走的，脚本里不再登记（`uat.py` 把它算作 `jvm:`，测试名从 `@Uat` 读），设备上不跑。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
+**JVM** 写测试名（「暂无」「没有」「无」开头的不算 JVM 行）；整条搬走的，脚本里不再登记（`uat.py` 把它算作 `jvm:`，测试名从 `@Uat` 读），设备上不跑。`uat.py counts`（CI 跑）把没有一个测试标它的 `@Uat` 的、**JVM** 行写的 `类.方法` 不是哪个测试的，都报成问题。还在设备上留一条冒烟的（看引擎和界面之间的胶水），
 .md 里写明。
 
 ```sh

@@ -278,8 +278,9 @@ class ClipboardWindow(private val backFrom: ClipboardPage? = null) :
         }
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
         prefs.clipboardHistoryLimit.registerOnChangeListener(clipboardLimitListener)
-        // said once: an upgrade's pins are the favourites now; a new install has none and is told nothing
-        if (!internal.clipboardPinsMovedTold.getValue()) {
+        // said once: an upgrade's pins are the favourites now; a new install has none and is told nothing. Not before the
+        // file's favourites are counted, or an upgrade's would be taken for none
+        if (!internal.clipboardPinsMovedTold.getValue() && ClipboardManager.countedTheFile) {
             internal.clipboardPinsMovedTold.setValue(true)
             if (ClipboardManager.favoriteCount > 0) service.say(R.string.clipboard_pins_moved)
         }

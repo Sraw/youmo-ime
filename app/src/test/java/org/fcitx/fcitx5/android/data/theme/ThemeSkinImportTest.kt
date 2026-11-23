@@ -4,6 +4,10 @@
  */
 package org.fcitx.fcitx5.android.data.theme
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
@@ -11,24 +15,18 @@ import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.skin.Pixels
-import org.fcitx.fcitx5.android.scene.skin.SkinAction
-import org.fcitx.fcitx5.android.scene.skin.SkinBoard
+import org.fcitx.fcitx5.android.scene.skin.PixelsImage
 import org.fcitx.fcitx5.android.scene.skin.SkinConversion
 import org.fcitx.fcitx5.android.scene.skin.SkinFormat
-import org.fcitx.fcitx5.android.scene.skin.SkinKeyBox
-import org.fcitx.fcitx5.android.scene.skin.SkinLayoutWriter
-import org.fcitx.fcitx5.android.scene.skin.SkinTheme
 import org.fcitx.fcitx5.android.scene.skin.SkinImage
+import org.fcitx.fcitx5.android.scene.skin.SkinLayoutWriter
 import org.fcitx.fcitx5.android.scene.skin.SkinNote
-import org.fcitx.fcitx5.android.scene.skin.PixelsImage
+import org.fcitx.fcitx5.android.scene.skin.SkinTheme
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
+import org.fcitx.fcitx5.android.uat.SkinUatSamples
 import org.fcitx.fcitx5.android.ui.main.settings.layout.LayoutTexts
 import org.fcitx.fcitx5.android.ui.main.settings.theme.ThemePackDialogs
 import org.fcitx.fcitx5.android.utils.appContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -193,12 +191,13 @@ class ThemeSkinImportTest : ThemePackFixture() {
             override fun image(bytes: ByteArray): SkinImage? = FakeCodec.image(bytes).also { decoded++ }
         }
         val broken = appContext.getString(R.string.exception_skin_not_zip)
+        val was = SkinImport.maxMillis
         try {
             SkinImport.maxMillis = 0
             assertEquals(broken, skinRefusal(baidu()))
             assertEquals(0, decoded)
         } finally {
-            SkinImport.maxMillis = 60_000
+            SkinImport.maxMillis = was
         }
         Thread.currentThread().interrupt()
         try {
@@ -393,30 +392,10 @@ class ThemeSkinImportTest : ThemePackFixture() {
         assertEquals(60, theme.look.picture!!.brightness)
     }
 
-    // a 26 keys of the app's rows, at the skin's sizes
-    private fun qwertyBoard(): SkinBoard {
-        fun row(y: Double, x0: Double, keys: List<Pair<SkinAction, Double>>): List<SkinKeyBox> {
-            var x = x0
-            return keys.map { (a, w) -> SkinKeyBox(x, y, w, 150.0, a).also { x += w } }
-        }
-        fun letters(s: String) = s.map { SkinAction.Letter(it) to 108.0 }
-        fun roles(vararg r: Pair<String, Double>) = r.map { SkinAction.Role(it.first) to it.second }
-        return SkinBoard(
-            "qwerty",
-            listOf(
-                row(0.0, 0.0, letters("qwertyuiop")),
-                row(150.0, 54.0, letters("asdfghjkl")),
-                row(300.0, 0.0, roles("shift" to 162.0) + letters("zxcvbnm") + roles("backspace" to 162.0)),
-                row(450.0, 0.0, roles("symbols" to 120.0, "numbers" to 120.0, "comma" to 100.0, "space" to 480.0, "period" to 100.0, "enter" to 160.0)),
-            ),
-            1080.0,
-        )
-    }
-
     // the Baidu skin with a layout of its own, as a reader that finds one converts it; an id not of the four is not written
     private fun withLayout(notes: Map<SkinNote, List<String>>? = null): ThemeFilesManager.Opened.Pack {
         val c = SkinImport.convert(baidu().inputStream(), "sea.bds", FakeCodec)
-        val written = SkinLayoutWriter.write(qwertyBoard(), CustomLayouts.sources)!!
+        val written = SkinLayoutWriter.write(SkinUatSamples.qwertyBoard(), CustomLayouts.sources)!!
         val withLayouts = c.themeXml.replace("""min-app="0.6.0"""", """min-app="${written.minApp}"""")
         val conversion = SkinConversion(c.name, c.themeXml, c.files, notes ?: c.notes, mapOf("qwerty" to written.text, "symbols" to written.text), withLayouts)
         return ThemeFilesManager.converted(conversion, ThemeManager.getAllThemes())

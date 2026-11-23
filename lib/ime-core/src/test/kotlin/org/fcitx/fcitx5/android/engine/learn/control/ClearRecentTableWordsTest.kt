@@ -15,6 +15,7 @@ import org.fcitx.fcitx5.android.engine.learn.backup.LearnBackup
 import org.fcitx.fcitx5.android.engine.platform.MemoryFiles
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** 清掉最近 and the words a table remembered. */
@@ -41,5 +42,18 @@ class ClearRecentTableWordsTest {
         // a backup made after the clear carries what the clear left, restored here or on another phone
         val backup = LearnBackup.read(LearnBackup.bytes(BackupHead(0L, 1, 1L, BackupHead.SAVED, "0.6.3"), log.state, emptyList(), emptyList())).state
         assertEquals(expected, BackupMerge.merge(LearnState(), backup, from = 1L, sameInstall = false, minute = 2000).tableWords.keys)
+    }
+
+    // a table's word taken in meanwhile (an older build's, an import), not remembered at a tap, is no typing to clear
+    @Test
+    fun aTablesWordTakenInMeanwhileStays() {
+        val log = LearnLog(dir.file(LearnLog.FILE), clock, { throw it }, compactAt = 1L shl 30).also { it.open() }
+        log.rememberTableWord("engine-wubi", "iije", "汪小明")
+        assertTrue(log.absorb(listOf(LearnRecord.TableWordRow("engine-wubi", "wqvb", "你好", log.state.day))))
+        val control = LearningControl({ log }, clock, legacy = { emptyList() }, onError = { throw it }).also { it.attach(log) }
+        assertNotNull(control.clearRecent(LearningOp.Span.TEN_MINUTES))
+        val expected = setOf(Triple("engine-wubi", "wqvb", "你好"))
+        assertEquals(expected, log.state.tableWords.keys)
+        assertEquals(expected, LearnLog.replay(dir.file(LearnLog.FILE).read()).tableWords.keys)
     }
 }

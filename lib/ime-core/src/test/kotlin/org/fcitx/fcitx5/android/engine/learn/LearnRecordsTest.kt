@@ -85,6 +85,8 @@ class LearnRecordsTest {
             listOf(MineRow("鲸园", Mine("jing yuan", Mine.TAKEN_IN, 3, 3, 1, 20_746, 0)), TableWordRow("engine-wbx", "aaaa", "工工", 3)),
             listOf(TableWordRow("engine-wbx", "bbbb", "子子", 0)),
         ),
+        // a table's word remembered at a tap
+        LearnRecord.Absorbed(29_874_011, listOf(TableWordRow("engine-wbx", "aaaa", "工工", 3)), emptyList(), remembered = true),
     )
 
     private val rows: List<LearnRecord> = listOf(

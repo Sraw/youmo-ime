@@ -40,6 +40,9 @@ class VoiceEditsGlueTest {
                 assertNull(judged(listOf(listOf("这个公", "式很猛")), "这个公式很猛", "公式"))
                 assertNull(judged(listOf(listOf("十一点开会")), "11点开会", "开会"))
             },
+            "a place holding a mark the stretch has not: measured without it" to {
+                assertEquals(Triple("推导这个公式", 2, ""), VoiceEditsGlue.stretchAt(listOf(listOf("推导这个公式")), "推导这个，公式", 2, 5)?.let { Triple(it.text, it.at, it.before) })
+            },
             "the clause otherwise: to the marks around the place, after what is before it" to {
                 val c = VoiceEditsGlue.clauseAt("敌人的攻势很猛，推导这个公式", 12, 2)
                 assertEquals(Triple("推导这个公式", 4, "敌人的攻势很猛，"), Triple(c.text, c.at, c.before))

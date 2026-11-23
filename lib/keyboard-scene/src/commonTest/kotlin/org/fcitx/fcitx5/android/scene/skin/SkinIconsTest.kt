@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.scene.skin
 
+import org.fcitx.fcitx5.android.scene.Icons
 import org.fcitx.fcitx5.android.scene.skin.SkinFixtures.face
 import org.fcitx.fcitx5.android.scene.skin.SkinFixtures.gradient
 import kotlin.test.Test
@@ -64,8 +65,10 @@ class SkinIconsTest {
         assertEquals("key.enter", SkinIcons.keyOf("search"))
         assertEquals("key[role=shift]", SkinIcons.keyOf("shift-locked"))
         assertNull(SkinIcons.keyOf("emoji"))
-        // every name a key is styled by is one the app has
-        assertEquals(emptyList(), SkinIcons.NAMES.filter { it.isBlank() })
+        // every name a key or the bar is styled by is one the app has
         assertEquals(true, SkinIcons.byBaiduCode.values.all { it in SkinIcons.NAMES })
+        assertEquals(emptyList(), SkinIcons.TOOLBAR_WORDS.map { it.second }.filter { it !in SkinIcons.NAMES })
+        val keyed = listOf("backspace", "shift", "shift-once", "shift-locked", "language") + Icons.RETURN
+        assertEquals(keyed, keyed.filter { SkinIcons.keyOf(it) != null && it in SkinIcons.NAMES })
     }
 }

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input.pet
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -179,6 +180,28 @@ class PetViewTest {
         assertFalse(v.ticking)
     }
 
+    // as the developer options' animator scale sets it: hidden API
+    private fun animatorScale(scale: Float) {
+        ReflectionHelpers.callStaticMethod<Any?>(ValueAnimator::class.java, "setDurationScale", ReflectionHelpers.ClassParameter.from(Float::class.javaPrimitiveType!!, scale))
+    }
+
+    // the system's animator scale tells no one: the key that finds it back on plays, not only restarts idle
+    @Test
+    fun aKeyFindingMotionBackWithoutACallbackPlays() {
+        val v = shown()
+        try {
+            animatorScale(0f)
+            v.on(PetTrigger.TYPING)
+            assertFalse(v.ticking)
+            animatorScale(1f)
+            v.on(PetTrigger.TYPING)
+            assertEquals(Name.TYPING to 0, v.at)
+            assertTrue(v.ticking)
+        } finally {
+            animatorScale(1f)
+        }
+    }
+
     @Test
     fun detachedItListensToNothingAndLetsItsFramesGo() {
         val v = shown()
@@ -252,11 +275,11 @@ class PetViewTest {
         val v = shown(PetView(activity, p, 100, PetFrames.BUDGET_BYTES))
         assertFalse(v.ticking)
         sheet.writeBytes(good)
-        val before = PetFrames.decodes
+        val before = PetFrames.decodes.get()
         v.show(false)
         v.show(true)
         idle()
-        assertEquals(0, PetFrames.decodes - before)
+        assertEquals(0, PetFrames.decodes.get() - before)
         assertFalse(v.ticking)
     }
 
@@ -300,6 +323,9 @@ class PetViewTest {
             bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID
         })
         activity.setContentView(board)
+        // as InputView.startInput does
+        host.onStartInput(EditorInfo(), CapabilityFlags.DefaultFlags)
+        host.onWindowAttached(KeyboardWindow())
         layOut()
         return host
     }
@@ -398,6 +424,22 @@ class PetViewTest {
         host.onFinishInput()
         idle()
         assertEquals(View.INVISIBLE, host.view.visibility)
+    }
+
+    // a setting changed with the keyboard down remakes the keys' window: nothing on screen to play for
+    @Test
+    fun theKeysWindowAttachedAfterAHideLeavesItHidden() {
+        val host = host("""<pet>""")
+        assertTrue(host.view.ticking)
+        host.onFinishInput()
+        idle()
+        host.onWindowAttached(KeyboardWindow())
+        idle(1000)
+        assertEquals(View.INVISIBLE, host.view.visibility)
+        assertFalse(host.view.ticking)
+        host.onStartInput(EditorInfo(), CapabilityFlags.DefaultFlags)
+        host.onWindowAttached(KeyboardWindow())
+        assertTrue("back at the next start", host.view.ticking)
     }
 
     @Test

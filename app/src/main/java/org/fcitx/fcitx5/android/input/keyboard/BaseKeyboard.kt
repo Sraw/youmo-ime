@@ -703,11 +703,11 @@ abstract class BaseKeyboard(
         private set
 
     protected fun showInputMethodName(ime: InputMethodEntry) {
-        val imeName = InputMethodNames.of(context, ime)
+        val shown = InputMethodNames.of(context, ime)
         // otherwise silent: the name is only on the Space key, untouched. The first update is the keyboard
         // appearing, which TalkBack announces itself
-        if (shownImeName != null && shownImeName != imeName) announce(imeName)
-        shownImeName = imeName
+        if (shownImeName != null && shownImeName != shown) announce(shown)
+        shownImeName = shown
         canvas?.invalidateScene()
     }
 
@@ -843,5 +843,10 @@ private fun keyImages(theme: Theme, board: String?, layout: SceneLayout?): Board
 }
 
 private fun SceneLayout.keyIds(): List<String> =
-    layout.parts.flatMap { p -> if (p is Row) p.cells else fragments[(p as Include).src]?.rows.orEmpty().flatMap { it.cells } }
+    layout.parts.flatMap { p ->
+        when (p) {
+            is Row -> p.cells
+            is Include -> fragments[p.src]?.rows.orEmpty().flatMap { it.cells }
+        }
+    }
         .filterIsInstance<Key>().map { it.id }

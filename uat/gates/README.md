@@ -18,8 +18,9 @@ first start moves them); a released build in gate 3 before 0.6.0 has no pack to 
 | 3 | `python3 uat/gates/gates.py backups <new.apk> --old <dir>` | the new build's 备份全部 restored into v0.3.0/0.3.1/0.3.2; each fixture's `backup.zip` restored into the new build |
 
 Gate 2 upgrades each `uat/fixtures/upgrade` fixture (v0.3.0–v0.4.0) in place, a path this build no longer
-supports (0.4 and before upgrade through 0.6.2 first), so it is paused till there are 0.5.x fixtures
-(`make.py` still runs on redroid only). Gate 3 still puts the v0.3.2 fixture's files in as its starting point.
+supports (0.4 and before upgrade to 0.6.2 first), so it is paused till there are 0.5.x fixtures
+(`make.py` still runs on redroid only). Till then a release's in-place upgrade is checked by hand: PR-14
+(settings from the last release, v0.6.2), ST-64, ST-67, ST-195 and TB-76, each in its `uat/*.md`. Gate 3 still puts the v0.3.2 fixture's files in as its starting point.
 
 `<dir>`: the released text APKs, `gh release download v0.3.x -p '*text-arm64*'` for each (0.3.x and
 0.4.0 shipped a text and a voice APK; 0.6.0 on ships one). Gate 5 (start, latency, memory) is gone: `uat/tools/perf.py`.

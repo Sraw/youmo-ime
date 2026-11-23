@@ -4,7 +4,9 @@
  */
 package org.fcitx.fcitx5.android.input.pet
 
+import android.graphics.Bitmap
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.data.theme.ThemeAssets
 import org.fcitx.fcitx5.android.scene.pet.Pet
 import org.fcitx.fcitx5.android.scene.pet.PetState
@@ -123,9 +125,9 @@ class PetFramesTest {
     @Test
     fun loadedOnceAtTheirSizeWithinTheBudget() {
         val p = PetSheets.pet(folder.root, Name.IDLE to (4 to 4), Name.TYPING to (6 to 12), Name.SLEEP to (2 to 2), framePx = 200)
-        val before = PetFrames.decodes
+        val before = PetFrames.decodes.get()
         val f = load(p, 100)!!
-        assertEquals(3, PetFrames.decodes - before)
+        assertEquals(3, PetFrames.decodes.get() - before)
         val idle = f.sheet(Name.IDLE)!!
         assertEquals(Triple(100, 100, 4), Triple(idle.frameWidth, idle.frameHeight, idle.columns))
         assertEquals(400 to 100, idle.bitmap.width to idle.bitmap.height)
@@ -135,6 +137,47 @@ class PetFramesTest {
         f.release()
         assertNull(f.sheet(Name.IDLE))
         assertTrue(idle.bitmap.isRecycled)
+    }
+
+    // a load that fails lets every sheet it decoded go at once, not left to the GC
+    @Test
+    fun aLoadThatFailsLetsEverySheetItDecodedGo() {
+        // why, the load with its failure put in (and taken out again), each pet in a folder of its own
+        val rows = listOf(
+            "idle decoded after another and unreadable: the other's sheet goes" to {
+                val p = PetSheets.pet(folder.newFolder(), Name.TYPING to (2 to 8), Name.IDLE to (4 to 4))
+                loadRecording(p, 64, unreadable = p.idle.sheet)
+            },
+            "a scale that threw (an OOM): the sheet it was scaling, in no slot yet, goes too" to {
+                val scaleWas = PetFrames.scale
+                PetFrames.scale = { _, _, _ -> throw OutOfMemoryError("no room") }
+                try {
+                    loadRecording(PetSheets.pet(folder.newFolder(), Name.IDLE to (4 to 4), framePx = 150), 100)
+                } finally {
+                    PetFrames.scale = scaleWas
+                }
+            },
+        )
+        assertRows(rows, { it.first }) { (_, run) ->
+            val (got, made) = run()
+            assertNull(got)
+            assertEquals(listOf(true), made.map { it.isRecycled })
+        }
+    }
+
+    // the load and every bitmap it decoded; [unreadable] reads as nothing
+    private fun loadRecording(p: Pet, box: Int, unreadable: String? = null): Pair<PetFrames?, List<Bitmap>> {
+        val real = ThemeAssets.decoder
+        val made = ArrayList<Bitmap>()
+        ThemeAssets.decoder = object : ThemeAssets.Decoder by real {
+            override fun decode(path: String, sample: Int): Bitmap? =
+                if (path == unreadable) null else real.decode(path, sample)?.also { made += it }
+        }
+        return try {
+            load(p, box) to made
+        } finally {
+            ThemeAssets.decoder = real
+        }
     }
 
     @Test

@@ -6,10 +6,8 @@ package org.fcitx.fcitx5.android.engine.session
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import java.nio.ByteBuffer
-
-internal fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
+import org.fcitx.fcitx5.android.engine.data.syl
 
 /** The dictionary and model the pinyin session tests read. */
 internal fun sessionTestData() = PinyinData.load(

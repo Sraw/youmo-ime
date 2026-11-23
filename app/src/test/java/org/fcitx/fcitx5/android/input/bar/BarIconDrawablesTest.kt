@@ -17,16 +17,15 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePainter
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import splitties.dimensions.dp
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import splitties.dimensions.dp
 
 /** A theme's PNG on the toolbar: its own colours unless a mask, told apart from a broken one, read ahead. */
 @RunWith(RobolectricTestRunner::class)
@@ -62,6 +61,14 @@ class BarIconDrawablesTest {
         assertTrue(own is PackIconDrawable)
         assertEquals(Color.RED, middle(own!!))
         assertEquals(Color.BLUE, middle(of(icons(RasterPacks.png(24, 24, Color.RED), tint = true))!!))
+    }
+
+    @Test
+    fun aMaskKeepsThePlacesColourWhenAViewClearsItsFilter() {
+        val d = of(icons(RasterPacks.png(24, 24, Color.RED), tint = true))!!
+        // what ImageView.applyColorMod does once a view has had a filter and is given null
+        d.colorFilter = null
+        assertEquals(Color.BLUE, middle(d))
     }
 
     @Test

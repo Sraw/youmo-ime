@@ -464,7 +464,7 @@ class ZhuyinSceneGesturesTest {
             val sizes = run {
                 harness(InputType.TYPE_CLASS_TEXT).use { h -> listOf("ㄅ", "ˇ", "ㄥ").map { h.key(it).textSize(it)!! } }
             }
-            // the size itself is the keyboard-scene snapshots' to pin
+            // the 0.9 itself is pinned by keyboard-scene's ContentTest
             assertEquals("level $level: $sizes", 1, sizes.toSet().size)
         }
     }

@@ -94,7 +94,11 @@ class PetView(context: Context, private val pet: Pet, val sizePx: Int, private v
             if (motion) motionChanged()
             return
         }
-        if (!motion) return start()
+        if (!motion) {
+            // back on with no callback (the system's animator scale): started here, and this key plays too
+            start()
+            if (!motion) return
+        }
         m.on(trigger, SystemClock.uptimeMillis())
         advance()
     }

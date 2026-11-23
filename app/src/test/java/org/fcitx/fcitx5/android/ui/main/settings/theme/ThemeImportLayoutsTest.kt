@@ -15,16 +15,14 @@ import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFixture
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.scene.skin.SkinAction
-import org.fcitx.fcitx5.android.scene.skin.SkinBoard
 import org.fcitx.fcitx5.android.scene.skin.SkinFill
 import org.fcitx.fcitx5.android.scene.skin.SkinKey
-import org.fcitx.fcitx5.android.scene.skin.SkinKeyBox
 import org.fcitx.fcitx5.android.scene.skin.SkinLook
 import org.fcitx.fcitx5.android.scene.skin.SkinSource
 import org.fcitx.fcitx5.android.scene.skin.SkinTheme
 import org.fcitx.fcitx5.android.scene.skin.Variant
 import org.fcitx.fcitx5.android.uat.SettingsHarness
+import org.fcitx.fcitx5.android.uat.SkinUatSamples
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.until
 import org.junit.After
@@ -48,31 +46,11 @@ class ThemeImportLayoutsTest : ThemePackFixture() {
     @After
     fun close() = st.close()
 
-    // the app's 26 keys at a skin's sizes, as a reader that finds them makes them
-    private fun qwertyBoard(): SkinBoard {
-        fun row(y: Double, x0: Double, keys: List<Pair<SkinAction, Double>>): List<SkinKeyBox> {
-            var x = x0
-            return keys.map { (a, w) -> SkinKeyBox(x, y, w, 150.0, a).also { x += w } }
-        }
-        fun letters(s: String) = s.map { SkinAction.Letter(it) to 108.0 }
-        fun roles(vararg r: Pair<String, Double>) = r.map { SkinAction.Role(it.first) to it.second }
-        return SkinBoard(
-            "qwerty",
-            listOf(
-                row(0.0, 0.0, letters("qwertyuiop")),
-                row(150.0, 54.0, letters("asdfghjkl")),
-                row(300.0, 0.0, roles("shift" to 162.0) + letters("zxcvbnm") + roles("backspace" to 162.0)),
-                row(450.0, 0.0, roles("symbols" to 120.0, "numbers" to 120.0, "comma" to 100.0, "space" to 480.0, "period" to 100.0, "enter" to 160.0)),
-            ),
-            1080.0,
-        )
-    }
-
     private fun skin(): ThemeFilesManager.Opened.Pack {
         val look = SkinLook(1080).apply {
             boardColor = 0xFFDDE4EE.toInt()
             keys["key"] = SkinKey(SkinFill.Color(0xFFFFFFFF.toInt()), SkinFill.Color(0xFFCCCCCC.toInt()), 0xFF222222.toInt(), null, icons = false)
-            layouts += qwertyBoard()
+            layouts += SkinUatSamples.qwertyBoard()
         }
         val source = object : SkinSource {
             override val name = "Sea Breeze"

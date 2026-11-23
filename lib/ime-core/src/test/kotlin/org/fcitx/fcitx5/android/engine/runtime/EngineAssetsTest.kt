@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.pinyin.Fuzzy
 import org.fcitx.fcitx5.android.engine.rerank.Reranker
 import org.fcitx.fcitx5.android.engine.rerank.SentenceModel
@@ -23,6 +24,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.lang.ref.WeakReference
 import java.nio.ByteBuffer
 import java.util.Random
 import java.util.concurrent.CountDownLatch
@@ -341,6 +343,42 @@ class EngineAssetsTest : EnginesFixture() {
         picker.prewarm("天天的我好你")
         assertEquals("one read per model", 2, reads.get())
         assertEquals(1, background.get())
+    }
+
+    /** Each high-level session makes a picker: the large model handed to the background once. */
+    @Test
+    fun theLargeModelGoesToTheBackgroundOnceHoweverManyPickers() {
+        val background = AtomicInteger()
+        val ran = Executor {
+            background.incrementAndGet()
+            it.run()
+        }
+        val assets = models()
+        repeat(3) { assertNotNull(assets.picker(ModelLevel.HIGH, nineKeys = it == 1, ran)) }
+        assertEquals(1, background.get())
+    }
+
+    /** Lowered from high, the large model read ahead is let go, so lowering the level gives back its memory. */
+    @Test
+    @Suppress("ExplicitGarbageCollectionCall") // whether the model is let go shows only once the GC has run
+    fun aLargeModelReadAheadIsLetGoWhenDropped() {
+        val assets = models()
+        val read = readAhead(assets)
+        assets.largeModel.drop()
+        var tries = 0
+        while (read.get() != null && tries++ < 100) {
+            System.gc()
+            Thread.sleep(10)
+        }
+        assertNull("held after the drop", read.get())
+        // kept reachable till here: the model is let go by the assets, not with them
+        assertNotNull(assets.picker(ModelLevel.MEDIUM, nineKeys = false))
+    }
+
+    // the large model read ahead at high, nothing but [assets] holding it
+    private fun readAhead(assets: EngineAssets): WeakReference<SentencePicker> {
+        assertNotNull(assets.picker(ModelLevel.HIGH, nineKeys = false, inPlace))
+        return WeakReference(assets.largeModel.handle(Reranker.LIMIT).loaded()!!)
     }
 
     /** A large model that does not read, a file missing or memory short, leaves every pick the medium level's, to the bit; told once. */

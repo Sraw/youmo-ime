@@ -19,7 +19,7 @@ class VoiceQuietTest {
 
     private fun VoiceQuiet.feed(power: Double, times: Int, voiced: Boolean = false) = repeat(times) { window(window(power), speech = voiced) }
 
-    // resources/voice/quiet-golden.tsv is written by quiet_golden.py; a change to either side without the other fails here
+    // contract: resources/voice/quiet-golden.tsv is written by quiet_golden.py; a change to either side without the other fails here
     @Test
     fun goldenCases() {
         val lines = javaClass.getResourceAsStream("/voice/quiet-golden.tsv")!!.bufferedReader().readLines()

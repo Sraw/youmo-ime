@@ -18,6 +18,12 @@ import java.util.Collections
 class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost {
     val events: MutableList<Int> = Collections.synchronizedList(ArrayList())
 
+    /** The input method of each of [events]. */
+    val ims: MutableList<String> = Collections.synchronizedList(ArrayList())
+
+    /** What went to an input method not shown ([KotlinHost.EngineSide.aside]), as input method and payload. */
+    val asides: MutableList<Pair<String, Action?>> = Collections.synchronizedList(ArrayList())
+
     val payloads: MutableList<Action?> = Collections.synchronizedList(ArrayList())
     val settings: MutableList<EngineSettings> = Collections.synchronizedList(ArrayList())
     private var typed = ""
@@ -30,8 +36,13 @@ class ScriptedEngine(private val home: File) : KotlinHost.EngineSide, EngineHost
     override fun start() = Unit
     override fun close() = Unit
 
+    override fun aside(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?) {
+        asides += im to payload
+    }
+
     override fun event(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?): Snapshot {
         events += event
+        ims += im
         if (event == EngineEvent.CHAR) payloads += payload
         var commit = ""
         when (event) {

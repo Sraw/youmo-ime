@@ -56,10 +56,13 @@ async function launch(shell, name) {
     ws = new WebSocket(pages.find((p) => p.type === 'page').webSocketDebuggerUrl);
     await new Promise((r) => ws.addEventListener('open', r));
   } catch (e) {
-    // a browser that never came up: no orphan Chromium, no profile left behind
-    proc.kill();
-    rmSync(dir, { recursive: true, force: true });
+    // a browser that never came up: no orphan Chromium, no profile left behind; one it still writes to is left rather
+    // than its error taking the place of this one (the retry is for exactly this start)
     e.notRun = true;
+    proc.kill();
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch (ignored) { /* left in the temporary folder */ }
     throw e;
   }
   let id = 0;

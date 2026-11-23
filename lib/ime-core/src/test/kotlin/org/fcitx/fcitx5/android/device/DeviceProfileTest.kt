@@ -51,15 +51,10 @@ class DeviceProfileTest {
     private val dp = BASE_HWCAP or DeviceProfile.HWCAP_ASIMDDP
 
     @Test
-    fun theSixTIsMediumWithoutDotprodPinnedToItsGoldCores() {
+    fun theSixTIsPinnedToItsGoldCores() {
         val profile = DeviceProfile.of(facts(bigLittle(kryo385Silver, kryo385Gold)))
-        assertEquals(ModelLevel.MEDIUM, profile.autoLevel)
-        assertEquals(Kernel.MLAL, profile.kernel)
-        assertEquals(Dotprod.NONE, profile.dotprod)
         assertEquals(0xf0L, profile.bigMask)
         assertTrue(profile.complete)
-        assertEquals(LevelReason.NO_DOTPROD, profile.reason)
-        assertEquals(SdotTrial.NONE, profile.trial)
         assertEquals(8, profile.cores)
         assertEquals(4, profile.bigCores)
     }
@@ -80,6 +75,7 @@ class DeviceProfileTest {
             Row("Kirin 980, not said", facts(bigLittle(a55r1, midr(0x48, 0, 0xd40))), ModelLevel.MEDIUM, Dotprod.MIDR, Kernel.MLAL, LevelReason.DOTPROD),
             Row("A55 r0 beside an A76", facts(bigLittle(a55r0, a76)), ModelLevel.MEDIUM, Dotprod.NONE, Kernel.MLAL, LevelReason.NO_DOTPROD),
             Row("A75 r2 and A55 r1", facts(bigLittle(a55r1, arm(0xd0a, variant = 2))), ModelLevel.MEDIUM, Dotprod.MIDR, Kernel.MLAL, LevelReason.DOTPROD),
+            Row("Kryo 385 (6T, SD845)", facts(bigLittle(kryo385Silver, kryo385Gold)), ModelLevel.MEDIUM, Dotprod.NONE, Kernel.MLAL, LevelReason.NO_DOTPROD),
             Row("A75 r1", facts(bigLittle(a55r1, arm(0xd0a, variant = 1))), ModelLevel.MEDIUM, Dotprod.NONE, Kernel.MLAL, LevelReason.NO_DOTPROD),
             Row("Exynos M4", facts(bigLittle(a55r1, midr(0x53, 1, 0x003))), ModelLevel.MEDIUM, Dotprod.MIDR, Kernel.MLAL, LevelReason.DOTPROD),
             Row("A53 alone", facts(cores(a53, a53, a53, a53)), ModelLevel.LOW, Dotprod.NONE, Kernel.MLAL, LevelReason.LITTLE_ONLY),
@@ -102,15 +98,31 @@ class DeviceProfileTest {
         assertEquals("trial", if (row.dotprod == Dotprod.MIDR) SdotTrial.PENDING else SdotTrial.NONE, profile.trial)
     }
 
-    // only what is decided as big counts: an A78 under the midpoint beside an unknown big core is no sign of a strong CPU
+    private class BigRow(val why: String, val cores: List<CoreFacts>, val mask: Long, val level: ModelLevel, val reason: LevelReason)
+
+    // only the cores decided big say a CPU is strong
     @Test
-    fun aNewCoreCountsOnlyAsABigOne() {
-        val cores = listOf(CoreFacts(0, a55r1, 100, null), CoreFacts(1, a78, 300, null), CoreFacts(2, unknown, 1024, null))
-        val profile = DeviceProfile.of(facts(cores, dp))
-        assertEquals(0b100L, profile.bigMask)
-        assertEquals(ModelLevel.MEDIUM, profile.autoLevel)
-        // all alike: every core counts
-        assertEquals(ModelLevel.HIGH, DeviceProfile.of(facts(cores(a78, a78), dp)).autoLevel)
+    fun aNewCoreCountsOnlyAsABigOne() = assertRows(
+        listOf(
+            // core 65 is not core 1: the A78 there would make it HIGH
+            BigRow(
+                "a core past the mask's 64 bits is never big",
+                listOf(CoreFacts(0, a55r1, 100, null), CoreFacts(1, unknown, 1024, null), CoreFacts(65, a78, null, null)),
+                0b10L, ModelLevel.MEDIUM, LevelReason.DOTPROD,
+            ),
+            BigRow(
+                "an A78 under the midpoint beside an unknown big core is no sign",
+                listOf(CoreFacts(0, a55r1, 100, null), CoreFacts(1, a78, 300, null), CoreFacts(2, unknown, 1024, null)),
+                0b100L, ModelLevel.MEDIUM, LevelReason.DOTPROD,
+            ),
+            BigRow("all alike: every core counts", cores(a78, a78), 0L, ModelLevel.HIGH, LevelReason.NEW_BIG_CORE),
+        ),
+        { it.why },
+    ) { row ->
+        val profile = DeviceProfile.of(facts(row.cores, dp))
+        assertEquals("mask", row.mask, profile.bigMask)
+        assertEquals("level", row.level, profile.autoLevel)
+        assertEquals("reason", row.reason, profile.reason)
     }
 
     @Test

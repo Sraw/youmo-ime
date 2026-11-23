@@ -19,10 +19,13 @@ class DeviceProfilesTest {
     private class MapStore : ProfileStore {
         val values = HashMap<String, String>()
         val writes = ArrayList<Map<String, String?>>()
+        var fails = false
         override fun read(): Map<String, String> = HashMap(values)
-        override fun write(values: Map<String, String?>) {
+        override fun write(values: Map<String, String?>): Boolean {
+            if (fails) return false
             writes += values
             values.forEach { (k, v) -> if (v == null) this.values.remove(k) else this.values[k] = v }
+            return true
         }
     }
 
@@ -60,8 +63,8 @@ class DeviceProfilesTest {
     private var probes = 0
     private fun probe(facts: CpuFacts): () -> CpuFacts = { probes++; facts }
 
-    private fun profiles(store: ProfileStore, checks: SdotChecks?, facts: CpuFacts = sd855, key: String = KEY) =
-        DeviceProfiles(store, key, probe(facts), checks, cpuset = { "0-7" })
+    private fun profiles(store: ProfileStore, checks: SdotChecks?, facts: CpuFacts = sd855, key: String = KEY, trialKey: String = key) =
+        DeviceProfiles(store, key, probe(facts), checks, cpuset = { "0-7" }, trialKey = trialKey)
 
     @Test
     fun aProfileIsDecidedOnceAndReadBackWhileTheKeyHolds() {
@@ -115,6 +118,39 @@ class DeviceProfilesTest {
         assertEquals(ModelLevel.MEDIUM, DeviceProfile.decode(store.writes.first().getValue(DeviceProfiles.PROFILE)!!)!!.autoLevel)
         assertNull(store.values[DeviceProfiles.TRIAL])
         assertEquals(profile, profiles(store, FakeChecks()).get())
+    }
+
+    // a trial whose mark did not reach the disk is not run: its death would go unseen and come back each start
+    @Test
+    fun noTrialRunsWithoutItsMarkWritten() {
+        val checks = FakeChecks()
+        val profile = profiles(MapStore().apply { fails = true }, checks).get()
+        assertEquals(Kernel.MLAL, profile.kernel)
+        assertEquals(SdotTrial.PENDING, profile.trial)
+        assertTrue(checks.ran.isEmpty())
+    }
+
+    // an app update changes the key, not the trial's: a trial that died is not run again until the system changes
+    @Test
+    fun aTrialThatDiedIsNotRunAgainAfterAnAppUpdate() {
+        val store = MapStore()
+        try {
+            profiles(store, FakeChecks(dies = 5), trialKey = "system").get()
+            fail("the trial died")
+        } catch (e: IllegalStateException) {
+            assertEquals("SIGILL", e.message)
+        }
+        val updated = FakeChecks()
+        val profile = profiles(store, updated, key = "app 2", trialKey = "system").get()
+        assertEquals(Kernel.MLAL, profile.kernel)
+        assertEquals(SdotTrial.FAILED, profile.trial)
+        assertTrue(updated.ran.isEmpty())
+        assertNull(store.values[DeviceProfiles.TRIAL])
+        assertEquals(SdotTrial.FAILED, profiles(store, FakeChecks(), key = "app 3", trialKey = "system").get().trial)
+        // a system update tries again
+        val newSystem = FakeChecks()
+        assertEquals(SdotTrial.PASSED, profiles(store, newSystem, key = "app 4", trialKey = "system 2").get().trial)
+        assertEquals((0..7).toList(), newSystem.ran)
     }
 
     // a process that died in its trial (SIGILL) left the trial behind: MLAL for good, and no second try

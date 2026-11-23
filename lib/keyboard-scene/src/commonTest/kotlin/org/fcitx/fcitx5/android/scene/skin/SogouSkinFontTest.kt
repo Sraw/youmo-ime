@@ -67,5 +67,9 @@ class SogouSkinFontTest {
         assertFalse("<font " in missing.themeXml)
         assertTrue(SkinNote.FONT in missing.notes)
         assertFalse(SkinNote.FONT in convert(skin(emptyMap())).notes)
+        // the letters' one missing: not another of the skin's in its place
+        val other = convert(skin(mapOf("res_typeface/symbols.ttf" to text("s")), typeface = "gone.ttf"))
+        assertFalse("<font " in other.themeXml)
+        assertTrue(SkinNote.FONT in other.notes)
     }
 }

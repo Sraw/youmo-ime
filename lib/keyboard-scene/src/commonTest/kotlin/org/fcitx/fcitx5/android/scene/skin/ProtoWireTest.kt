@@ -9,7 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -119,15 +118,16 @@ class ProtoWireTest {
         val m = ProtoWire(
             proto {
                 varint(3, 7)
-                message(4) { varint(1, 1) }
+                message(4) { repeat(1_000) { varint(1, 1) } }
                 repeat(100_000) { varint(99, 0) }
             },
         ).root
         val start = TimeSource.Monotonic.markNow()
-        // a scan of its fields each time: minutes
+        // a scan each time: minutes, so a loaded machine is far within this
         repeat(100_000) { assertEquals(7, m.int(3)) }
-        assertTrue(start.elapsedNow() < 2.seconds, "${start.elapsedNow()}")
-        assertSame(m.message(4), m.message(4))
+        assertTrue(start.elapsedNow() < 20.seconds, "${start.elapsedNow()}")
+        // a message looked up again is not read again: its fields count once against MAX_FIELDS, not a million times
+        repeat(1_000) { assertEquals(1, m.message(4)!!.int(1)) }
     }
 
     @Test

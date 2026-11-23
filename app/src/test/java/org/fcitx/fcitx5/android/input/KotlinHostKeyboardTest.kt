@@ -82,7 +82,7 @@ class KotlinHostKeyboardTest {
         h.tap(tapped)
         host.until("the commit in the field") { h.field.text.toString() == "你好" }
         assertEquals("你好", h.field.text.toString())
-        host.until("the bar cleared", { "bar ${h.texts().take(12)} engine ${engine.events} host.preedit [${fcitx.inputPanelCached.preedit}]" }) { shownText("你") == null }
+        host.until("the bar cleared", { "bar ${h.texts().take(12)} engine ${engine.events} preedit [${host.preedit}]" }) { shownText("你") == null }
         assertTrue(fcitx.inputPanelCached.preedit.toString().isEmpty())
     }
 

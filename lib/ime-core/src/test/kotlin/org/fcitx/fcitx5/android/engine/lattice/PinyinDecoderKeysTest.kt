@@ -16,7 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-/** A decoder going on from its last decode ([PinyinDecoder] collectOn) on keys standing for several letters, Latin words among them. */
+/** A decoder going on from its last decode (LatticeBuilder collectOn) on keys standing for several letters, Latin words among them. */
 class PinyinDecoderKeysTest {
     // Latin words sharing keys with pinyin (de, hao, ok on the nine keys) and with each other (cpu, crt)
     private val latinData = pinyinDataOf(

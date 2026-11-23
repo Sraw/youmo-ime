@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The 0.3.x native host's data in device-protected storage (device_root: usr/, descriptor.json, README.md),
+<!-- The 0.3.x native host's data in device-protected storage (device_root: usr/, learn/, descriptor.json, README.md),
      left on an install upgraded from 0.3.x and read by nothing;
      the resource packs (device_file packs/), far over the backup's 25 MB. Read on Android 11 and earlier
      only, where allowBackup="false" turns backup and phone-to-phone transfer off anyway: from such a phone
@@ -17,6 +17,9 @@
     <exclude
         domain="device_root"
         path="README.md" />
+    <exclude
+        domain="device_root"
+        path="learn" />
     <exclude
         domain="root"
         path="no_backup" />

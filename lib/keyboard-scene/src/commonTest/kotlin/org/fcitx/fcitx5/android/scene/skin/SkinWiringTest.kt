@@ -134,6 +134,10 @@ class SkinWiringTest {
         val cang = mapOf("t/config.yaml" to text(TrimeFixtures.base), "t/jsonnet/main.jsonnet" to text("{}"))
         assertEquals(Reason.UNSUPPORTED to SkinFormat.CANG, unsupported(cang))
         assertEquals(Reason.UNSUPPORTED to SkinFormat.CANG, unsupported(mapOf("base.trime.yaml" to text(TrimeFixtures.base)), "a.CSKIN"))
+        // a Trime theme's repository with sources in jsonnet/, a skin with a picture zipped beside it: neither of those
+        assertEquals("Base", convert(mapOf("base.trime.yaml" to text(TrimeFixtures.base), "jsonnet/main.jsonnet" to text("{}"))).name)
+        assertEquals("Sea Breeze", convert(SkinFixtures.baidu().also { it["res/extra"] = proto; it["res/extra.zip"] = proto }, "a.bds").name)
+        assertEquals("Sea Breeze", convert(SkinFixtures.baidu().also { it["x"] = proto; it["x.zip"] = proto }, "a.bds").name)
         assertEquals(Reason.UNSUPPORTED to SkinFormat.APK, unsupported(mapOf("AndroidManifest.xml" to proto, "resources.arsc" to proto)))
         assertEquals(Reason.UNSUPPORTED to SkinFormat.APK, unsupported(mapOf("classes.dex" to proto), "theme.apk"))
         // a Sogou own-made skin: settings by screen width and no keys' places, said so rather than no keyboard

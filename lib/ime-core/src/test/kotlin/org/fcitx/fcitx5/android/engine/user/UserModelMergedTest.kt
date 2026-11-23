@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.NgramModel.Companion.NO_WORD
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.lattice.StartWords
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.Row
@@ -13,7 +14,6 @@ import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.data
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.entry
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.inTrie
-import org.fcitx.fcitx5.android.engine.user.UserFixtures.syl
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

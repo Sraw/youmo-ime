@@ -76,13 +76,12 @@
   // RasterIcon.named: by the file's suffix, whatever its bytes are
   const RASTER_NAME = /\.(png|webp)$/i;
 
-  /** The sticker files the theme's styles name (`none` is none). */
-  const stickerFiles = (xml) => new Set(F.styles(xml).flatMap((st) => st.attrs.filter((a) => a[0] === 'sticker' && a[1] !== 'none').map((a) => a[1])));
-
-  // RasterIcon.problem in the page's words: a still PNG or WebP within [side] and [max] bytes
+  // RasterIcon.problem in the page's words: a still PNG or WebP within [side] and [max] bytes; the panels' checks too
   function rasterProblem(L, bytes, side, max) {
     const r = L.raster(bytes);
-    if (!r || !r.size) return '不是 PNG 或 WebP 图片';
+    if (!r) return '不是 PNG 或 WebP 图片';
+    // a side of 0 the app reads as no image
+    if (!r.size) return '读不出图片的大小';
     if (r.animated) return '动态 WebP，App 只收静态图';
     if (Math.max(r.size[0], r.size[1]) > side) return r.size[0] + '×' + r.size[1] + '，边长最多 ' + side;
     if (bytes.length > max) return '超过 ' + Math.round(max / 1024) + ' KB';
@@ -110,7 +109,7 @@
     for (const m of xml.matchAll(srcOf('picture|cut|font|icon|sound', 'src|file'))) named.add(fileOf(m) + '|' + m[1]);
     for (const m of xml.matchAll(IMAGE_FN)) named.add(m[2].replace(/^["']|["']$/g, '') + '|' + (m[1] === 'image' ? 'image' : 'effect'));
     for (const m of xml.matchAll(srcOf('meta', 'preview'))) named.add(fileOf(m) + '|preview');
-    for (const file of stickerFiles(xml)) named.add(file + '|sticker');
+    for (const file of F.stickers(xml)) named.add(file + '|sticker');
     for (const key of named) {
       const [file, role] = key.split('|');
       const bytes = d.files[file];
@@ -196,7 +195,7 @@
     for (const m of xml.matchAll(srcOf('cut', 'file'))) name(fileOf(m), 'picture');
     for (const m of xml.matchAll(IMAGE_FN)) if (m[1] === 'image') name(m[2].replace(/^["']|["']$/g, ''), 'key');
     for (const m of xml.matchAll(srcOf('icon', 'src'))) if (RASTER_NAME.test(fileOf(m))) name(fileOf(m), 'icon');
-    for (const file of stickerFiles(xml)) name(file, 'sticker');
+    for (const file of F.stickers(xml)) name(file, 'sticker');
     let spent = 0;
     const out = [];
     for (const [n, role] of roles) {
@@ -233,7 +232,7 @@
    * of another input method converted ([io]: openSkin's), its `skin` too.
    */
   async function open(E, L, format, bytes, fileName = '', io = null) {
-    const r = await opened(E, L, format, bytes, fileName, io);
+    const r = await openAsIs(E, L, format, bytes, fileName, io);
     const fixed = withMinApp(E, r.doc);
     if (fixed) {
       r.doc = fixed.doc;
@@ -242,7 +241,7 @@
     return r;
   }
 
-  async function opened(E, L, format, bytes, fileName, io) {
+  async function openAsIs(E, L, format, bytes, fileName, io) {
     if (fileName && isSkinFile(fileName) && extension(fileName) !== 'zip') return openSkin(E, L, bytes, fileName, io);
     if (!isZip(bytes)) {
       if (bytes.length > format.limits.fileBytes) throw new L.ThemeError('limit', 'fileBytes');
@@ -895,11 +894,14 @@
     return on ? said + '（数字键盘「' + on + '」）' : said;
   }
 
-  // the name the app's own layout of that id has (ThemePackDialogs.builtInName)
-  function layoutName(E, id) {
-    const m = /<keyboard\b[^>]*?\bname\s*=\s*"([^"]*)"/.exec(E.layoutSource(id) || '');
+  // a layout's <keyboard name=>, null where it has none
+  function keyboardName(xml) {
+    const m = /<keyboard\b[^>]*?\bname\s*=\s*"([^"]*)"/.exec(xml || '');
     return m ? unescape(m[1]) : null;
   }
+
+  // the name the app's own layout of that id has (ThemePackDialogs.builtInName)
+  const layoutName = (E, id) => keyboardName(E.layoutSource(id));
 
   /** A SkinNote (`{id, args}`) as the app says it, a line each (ThemePackDialogs.skinNote). */
   function skinNoteLines(E, { id, args }) {
@@ -1004,7 +1006,7 @@
     }
     const layouts = Object.create(null);
     for (const l of c.layouts) layouts[l.id + '.xml'] = l.xml;
-    const names = c.layouts.map((l) => (/<keyboard\b[^>]*?\bname\s*=\s*"([^"]*)"/.exec(l.xml) || [])[1]).map((n, i) => (n ? unescape(n) : c.layouts[i].id));
+    const names = c.layouts.map((l) => keyboardName(l.xml) || l.id);
     const lines = c.notes.flatMap((n) => skinNoteLines(E, n));
     const skin = { themeXml: c.themeXml, themeXmlWithLayouts: c.themeXmlWithLayouts, layouts };
     return { doc: doc(c.themeXml, files), notes: [{ kind: 'skin', lines, layouts: names }], skin };
@@ -1036,7 +1038,7 @@
 
   root.YoumoMaker = {
     THEME_XML, UNDO_LIMIT, DEVICES, KEYBOARD_DP, FORMS, BOARDS, ENV, FIELDS, IMES, ZH_PUNCTUATION,
-    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, saveProblems, decodableImages, openError, open, save, same, History, keepDraft, draft, dropDraft, idbStore, shape, envJson, restoreEnv, check, layoutText, oldGroupFaces, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
+    doc, themeName, withName, fromBuiltin, PICTURE_SAVE, DECODE_BUDGET, pictureFile, rasterProblem, saveProblems, decodableImages, openError, open, save, same, History, keepDraft, draft, dropDraft, idbStore, shape, envJson, restoreEnv, check, layoutText, oldGroupFaces, openLayout, layoutOf, ignoredNotice, exportCheck, animatedWebp, animatedStill, keepsAnimated, iconsOf, exampleDoc,
     withMinApp, minAppNotice, SKIN_EXTENSIONS, SKIN_PIXELS, SKIN_NOTES, SKIN_NOTES_HEAD, SKIN_FORMATS, isSkinFile, skinError, skinNoteLines, lacks, openSkin, skinLayouts, skinLayoutsText,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

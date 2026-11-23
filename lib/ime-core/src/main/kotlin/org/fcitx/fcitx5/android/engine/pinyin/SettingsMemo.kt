@@ -14,6 +14,7 @@ internal class SettingsMemo<K : Any, V : Any>(private val capacity: Int, private
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?) = size > capacity
     }
 
+    // makes under the lock: a caller waits for another thread's build (the warm-up's) rather than building twice
     @Synchronized
     operator fun get(key: K): V = held[key] ?: make(key).also { held[key] = it }
 

@@ -4,7 +4,10 @@
  */
 package org.fcitx.fcitx5.android.core
 
+import android.os.Build
 import android.util.Log
+import org.fcitx.fcitx5.android.device.DeviceProfile
+import org.fcitx.fcitx5.android.device.SdotTrial
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.expF
 import org.fcitx.fcitx5.android.engine.rerank.geluF
@@ -35,10 +38,7 @@ class NativeMatrixKernelTest {
         }
 
         val arm64 = System.getProperty("os.arch") == "aarch64"
-        val hwcapDotprod by lazy { NativeMatrixKernel.hwcaps()[0] and HWCAP_ASIMDDP != 0L }
-
-        // AT_HWCAP's ASIMDDP bit on arm64
-        const val HWCAP_ASIMDDP = 1L shl 20
+        val hwcapDotprod by lazy { NativeMatrixKernel.hwcaps()[0] and DeviceProfile.HWCAP_ASIMDDP != 0L }
 
         val kernels by lazy {
             when {
@@ -51,11 +51,11 @@ class NativeMatrixKernelTest {
 
     private val random = Random(20261009)
 
-    // the kernel is the process's: a failed test must not leave the next on a forced one (SDOT without
-    // permission is the default, the best AT_HWCAP allows)
+    // the kernel is the process's: a failed test must not leave the next on a forced one, nor on another than ThisDevice chose
     @After
     fun reset() {
-        NativeMatrixKernel.useKernel(NativeMatrixKernel.SDOT, false)
+        val profile = ThisDevice.profile
+        NativeMatrixKernel.useKernel(ThisDevice.kind(profile.kernel), profile.trial == SdotTrial.PASSED)
     }
 
     private fun forced(kernel: Int) = assertEquals("kernel $kernel", kernel, NativeMatrixKernel.useKernel(kernel, false))
@@ -328,7 +328,8 @@ class NativeMatrixKernelTest {
         val p50 = nanos[rounds / 2] / 1000.0
         val p99 = nanos[rounds * 99 / 100] / 1000.0
         Log.i(TAG, "affinity get + set + set, $rounds rounds: p50 $p50 µs, p99 $p99 µs")
-        assertTrue("p99 $p99 µs", p99 < PIN_P99_MICROS)
+        val limit = if (emulator) EMULATOR_PIN_P99_MICROS else PIN_P99_MICROS
+        assertTrue("p99 $p99 µs", p99 < limit)
     }
 
     @Test
@@ -374,3 +375,8 @@ private const val TAG = "NativeMatrixKernelTest"
 
 // a key pins once; past this the pinning eats into the few milliseconds it is meant to save
 private const val PIN_P99_MICROS = 50.0
+
+// an emulator's vCPUs are unpinned and preempted by the host: a gross regression alone, the phone holds the 50
+private const val EMULATOR_PIN_P99_MICROS = 1000.0
+
+private val emulator = Build.HARDWARE in setOf("ranchu", "goldfish") || Build.FINGERPRINT.startsWith("generic")

@@ -79,18 +79,25 @@ class PopupMenuUi(
     }
 
     // as a long press's keys pick: by how far the finger moves, down off the key none
-    private val focus = PopupFocus(
-        rows = listOf(columnOrder.copyOf()),
-        startRow = 0,
-        startColumn = focusColumn,
-        stepX = itemWidth * PopupFocus.STEP,
-        stepY = keySize * PopupFocus.STEP,
-        // a finger going on down from a swipe down is no going back
-        cancelBelow = if (fixed?.down == true) Float.POSITIVE_INFINITY else triggerBounds.height().toFloat(),
-        // in onChangeFocus's coordinates (offsetY up); the edit menu's its top, the finger above it as it opens
-        cancelAt = if (fixed?.down == true) Float.NaN else ((if (fixed != null) 0 else triggerBounds.height()) - offsetY).toFloat(),
-        cancelAboveAt = if (fixed?.down == true) (triggerBounds.height() - offsetY).toFloat() else Float.NaN,
-    )
+    private val focus = run {
+        // in onChangeFocus's coordinates (offsetY up). Opened down: a finger going on down from a swipe down is no going
+        // back. Else the edit menu's its top, the finger above it as it opens
+        val (below, at, aboveAt) = if (fixed?.down == true) {
+            Triple(Float.POSITIVE_INFINITY, Float.NaN, (triggerBounds.height() - offsetY).toFloat())
+        } else {
+            Triple(triggerBounds.height().toFloat(), ((if (fixed != null) 0 else triggerBounds.height()) - offsetY).toFloat(), Float.NaN)
+        }
+        PopupFocus(
+            rows = listOf(columnOrder.copyOf()),
+            startRow = 0,
+            startColumn = focusColumn,
+            stepX = itemWidth * PopupFocus.STEP,
+            stepY = keySize * PopupFocus.STEP,
+            cancelBelow = below,
+            cancelAt = at,
+            cancelAboveAt = aboveAt,
+        )
+    }
 
     override fun onChangeFocus(x: Float, y: Float) = moveFocus(focus, x, y, focusedIndex, ::drawScene) {
         focusedIndex = it

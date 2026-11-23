@@ -6,13 +6,12 @@ package org.fcitx.fcitx5.android.engine.user
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.pinyinDataOf
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel.Entry
 
 /** A dictionary of five words and user models over it, shared by the tests of the user's words and of the sessions. */
 internal object UserFixtures {
-    fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
     val data: PinyinData = pinyinDataOf(
         Triple("你", "ni", -2f),
         Triple("拟", "ni", -5f),

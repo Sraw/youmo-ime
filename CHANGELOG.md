@@ -13,7 +13,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### 主要变化
 
 - 语音输入时暂停别的应用在放的音乐、视频，免得被当成说的话听进去：麦克风一开就暂停，说完交还，它们通常自己接着放。说着时来电话、响闹钟就当作说完，已经说的照常上屏。**按键 → 语音输入时暂停播放** 可以关掉。
-- 双拼可以让编码行显示按下的双拼字母，不显示完整拼音：双拼设置里打开 **编码行显示双拼按键**（默认关），小鹤打 `nihc` 编码行就是 `ni hc`。全键盘、18 键、14 键、九键和每个方案都能用；18 键、14 键、九键显示每个键读出的那个字母（九键 6 4 4 5 显示 `ni hk`），按回车上屏的也是这些字母。
+- 双拼可以让编码行显示按下的双拼字母，不显示完整拼音：双拼设置里打开 **编码行显示双拼按键**（默认关），小鹤打 `nihc` 编码行就是 `ni hc`。全键盘、18 键、14 键、九键和每个方案都能用；18 键、14 键、九键显示每个键读出的那个字母（九键自然码 6 4 4 5 显示 `ni hk`），按回车上屏的也是这些字母。
 - 剪贴板加了 **收藏**：面板栏上分「最近」「收藏」两页，在最近里长按一条选 **收藏**，它就一直留着，不算进上限，清空最近也不影响；收藏里能 **取消收藏**（可撤销）、**移到最前**。以前置顶的条目升级后在收藏里。恢复备份时收藏和手机上的合并，手机上的收藏（包括敏感的）都留着。关掉「记录剪贴板历史」后收藏照样能用。
 - 九键、14 键、18 键的拼音也能中英混输了：按英文词每个字母所在的键，比如九键 `474663` 出 iPhone，`9633474663` 出「我的iPhone」，和全键盘一样由 **中英混输** 开关管，也打得出英文里学到的词。编码行上英文那段显示小写字母，按回车上屏的就是它（`iphone`）。
 - 语音把听到的换成你的同音词时看整句：说得通才换，不再一见到同音就换。加了「攻势」，「敌人的公式很猛」打成「敌人的攻势很猛」，「推导这个公式」照样是「公式」；手动加的词比打字学成的更容易换。语音在那儿不肯换、你删掉重打成你的词时，会问「以后总是把『公式』写成『攻势』？」（语音在那儿会换的，问「记住」），点 **总是换** 以后这个词不看整句、总是换；在 **用户词库 → 手动添加的词** 里点这个词选 **取消语音总是换** 可以取消。
@@ -39,7 +39,6 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 语音打出词库里的常见词（「莉莉」），你删掉重打成同音的「丽丽」，现在也问「让语音记住『丽丽』？」；你的词（手动加的、点了 **记住** 的、打字学成的）也可能换掉同音的常见词（见上）。
 - 九键、14 键、18 键双拼每按一个键更快：0.6.1 起这几种键盘把单个键也当声母读（读你打过的词），每键慢了不少，现在编码行和候选的计算少做了大部分重复的工作，候选和以前完全一样。
 - 注音键盘打不打声调学的是同一份：带声调选过两次的词，不带声调打也排第一，反过来也一样；打了声调时，学到的第一和固定的词只在声调对得上时才提前（在 ㄇㄚ 下选惯了「马」，打 ㄇㄚˉ 第一个还是「妈」）。0.6.3 以前带着声调学到的顺序和固定不再起作用，要重新学，已学条目里旧的带声调固定标成「旧记录，已不起作用」。
-
 - 新快捷键 **切输入法** 和 **选输入法**，能设在任意键的上滑或下滑：切输入法和点地球键一样，这样关掉 **显示语言切换键** 也能换输入法；选输入法像编辑菜单那样弹出一排启用的输入法（最后一格 **更多…** 打开输入法选择框），左右挪选、松开就换，滑出直接松开是地球键会换到的那个。
 - 关于页显示本机处理器和自动档在本机定成的档位（「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」）。
 - 手写高档不再在停笔后重排，和中档相同。
@@ -53,7 +52,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 ### Main changes
 
 - Voice input pauses music and videos playing in other apps, so they are not heard as speech: paused as the microphone opens and handed back once you finish, the apps usually going on by themselves. A call or an alarm while you speak ends the talk as if you had finished, what you said typed. **按键 → 语音输入时暂停播放** turns it off.
-- 双拼 can show the keys pressed in the code row instead of the full pinyin: turn on **编码行显示双拼按键** in 双拼's settings (off by default) and 小鹤's `nihc` shows `ni hc`. On the full, 18, 14 and nine keys and with every scheme; on the 18, 14 and nine keys each key shows the letter it was read as (the nine keys' 6 4 4 5 shows `ni hk`), and Enter puts in those letters.
+- 双拼 can show the keys pressed in the code row instead of the full pinyin: turn on **编码行显示双拼按键** in 双拼's settings (off by default) and 小鹤's `nihc` shows `ni hc`. On the full, 18, 14 and nine keys and with every scheme; on the 18, 14 and nine keys each key shows the letter it was read as (自然码's 6 4 4 5 on the nine keys shows `ni hk`), and Enter puts in those letters.
 - The clipboard has **Favorites**: its panel has two pages, Recent and Favorites. Long-press an entry in Recent and pick **Favorite** to keep it: it does not count against the limit and clearing Recent leaves it. In Favorites, **Remove from favorites** (undoable) and **Move to top**. Pinned entries are favorites after the upgrade. Restoring a backup merges the favorites with the phone's, every one on the phone kept, sensitive ones too. With clipboard history off the favorites still work.
 - 中英混输 on pinyin's nine, 14 and 18 keys: tap the keys of an English word's letters, as `474663` for iPhone or `9633474663` for 我的iPhone on the nine keys, under the same **中英混输** switch as the full keyboard, words learned in English included. The code row shows such a word in lower case, and Enter commits that (`iphone`).
 - Voice now looks at the whole sentence before writing one of your homophones for what it heard: it replaces only where the sentence reads right, not every time it hears a word read alike. With 攻势 added, 「敌人的公式很猛」 is written 「敌人的攻势很猛」 while 「推导这个公式」 keeps 公式; words added by hand go in more readily than words learned from typing. Typed again as your word where voice left it, it asks 「以后总是把『公式』写成『攻势』？」: tap **总是换** and voice always writes the word; tap it in **用户词库 → 手动添加的词** and choose **取消语音总是换** (Stop always writing it in voice) to stop.
@@ -62,7 +61,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - Candidates no longer jump after a pause: the same input always gives the same candidates.
 - **性能档位** has a new **自动** (auto), now the default, set once from this device's processor. Who never changed the level or chose high gets auto; to keep high, choose it again.
 - Other input methods' skins come over more fully: a Baidu skin's key icons (colour pictures, a pressed picture or colour), letters drawn as pictures, text size and weight, mark colour, press shrink and dark background, and a Sogou skin's font. New: encrypted Sogou phone skins, iFlytek's `.it`, Trime themes written with `__include` and `__patch`, and, as a first step, Baidu's new-engine `.bda`. A skin's 26, nine, 18 and 14 keys can come too as layouts in **外观 → 布局** with **一起导入** ticked (unticked by default: the app's own keys). The web theme maker opens these skins as well (**打开文件…** or a drop on the page) and turns them into a theme to go on editing. A converted theme needs 0.6.3 where it uses one of these 0.6.3 things, else still 0.6.0, and imports on 0.6.0–0.6.2.
-- A theme can carry a little pet, sitting in a corner of the keys or at the end of the candidate bar: it does a small move for letters, backspace, Return and space, and falls asleep when no key is pressed for a while. 「键盘动效」 turns it off. The web theme maker adds one to your own theme.
+- A theme can carry a little pet, sitting in a corner of the keys or at the end of the candidate bar: it does a small move for letters, backspace, Return and space, and falls asleep when no key is pressed for a while. With 「键盘动效」 off it stands still. The web theme maker adds one to your own theme.
 
 ### Smaller changes
 
@@ -79,7 +78,6 @@ Each release lists its **main changes** (new features, large improvements), its 
 - A common dictionary word voice wrote (莉莉), deleted and typed again as a homophone (丽丽), is now asked about too (「让语音记住『丽丽』？」), and the user's words (added by hand or **记住**, or learned from typing) may now replace a common homophone in voice too (see above).
 - 双拼 on the nine, 14 and 18 keys is quicker a key: since 0.6.1 those keyboards also read a key alone as an initial (for words you typed), which made each key much slower; the code row and the candidates now skip most of the work repeated from key to key, the candidates exactly as before.
 - The zhuyin keyboards learn a word as one whether its tones are typed or not: picked twice with tones, it is first without them too, and the other way round; with a tone typed, a learned first or pinned word comes forward only where the tone agrees (马 picked under ㄇㄚ, ㄇㄚˉ still gives 妈 first). Orders and pins learned with tones before 0.6.3 no longer apply and are learned anew; in **已学条目** an old toned pin is marked 「旧记录，已不起作用」.
-
 - Two new shortcuts for any key's swipe: **切输入法** does what a tap of the globe key does, so input methods still switch with **显示语言切换键** off; **选输入法** pops a row of the enabled input methods where the edit menu goes (its last cell, **更多…**, opens the input method picker), picked by sliding left or right and switched to on release, the one the globe would go to under the finger.
 - The about page shows this device's processor and the level Auto picks here (「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」).
 - Handwriting at the high level no longer reorders after the pen stops: it is the same as medium.

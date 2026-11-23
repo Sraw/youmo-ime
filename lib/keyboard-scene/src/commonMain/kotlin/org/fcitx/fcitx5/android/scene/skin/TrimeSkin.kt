@@ -28,8 +28,11 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
     override val author: String
     override val preview: ByteArray? = null
 
-    // the YAML read to put a theme together, held to MAX_COMPOSED_BYTES in all
+    // the YAML read to put the theme file being tried together, held to MAX_COMPOSED_BYTES
     private var composedBytes = 0L
+
+    // what one theme file tried includes is parsed once for every other tried after it
+    private val parsed = HashMap<String, Any?>()
 
     // the shallowest file of each name, made before init reads includes by it
     private val byFileName = f.names.groupBy { it.substringAfterLast('/') }.mapValues { (_, ns) -> ns.minBy { n -> n.count { it == '/' } } }
@@ -74,8 +77,8 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
         val tops = candidates(f.names).sortedWith(compareBy<String> { it.equals("trime.yaml", ignoreCase = true) }.thenByDescending { f.bytes(it)?.size ?: 0 })
             .take(MAX_CANDIDATES)
         val main = tops.firstOrNull() ?: throw SkinError(SkinError.Reason.NO_KEYBOARD)
-        val composer = RimeCompose(::included)
         var broken = false
+        var mainError: SkinError? = null
         for (name in tops) {
             val text = text(name)
             val tree = SkinYaml.parse(text)
@@ -84,15 +87,21 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
                 continue
             }
             val id = idOf(name)
-            val composed = if (DIRECTIVES.any { it in text } || fileOf("$id.custom") != null) {
-                composedBytes += f.bytes(name)!!.size
-                composer.compose(tree, id)
-            } else {
-                RimeCompose.Composed(tree, emptyList())
+            val composed = try {
+                if (DIRECTIVES.any { it in text } || fileOf("$id.custom") != null) {
+                    // each its own limits: a larger file without colours tried first leaves the theme after it all of them
+                    composedBytes = f.bytes(name)!!.size.toLong()
+                    RimeCompose(::included).compose(tree, id)
+                } else {
+                    RimeCompose.Composed(tree, emptyList())
+                }
+            } catch (e: SkinError) {
+                if (name == main) mainError = e
+                null
             }
-            if ((composed.root as? Map<*, *>)?.get("preset_color_schemes") is Map<*, *>) return name to composed
+            if (composed != null && (composed.root as? Map<*, *>)?.get("preset_color_schemes") is Map<*, *>) return name to composed
         }
-        throw SkinError(if (broken) SkinError.Reason.BROKEN else SkinError.Reason.NO_KEYBOARD, main)
+        throw mainError ?: SkinError(if (broken) SkinError.Reason.BROKEN else SkinError.Reason.NO_KEYBOARD, main)
     }
 
     // the first letter keyboard `style/keyboards` lists, a Chinese one before an English one: as the app's 26 keys
@@ -153,7 +162,7 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
         val size = f.bytes(name)!!.size
         composedBytes += size
         if (size > SkinLimits.MAX_TEXT_BYTES || composedBytes > MAX_COMPOSED_BYTES) throw SkinError(SkinError.Reason.BROKEN, name)
-        return SkinYaml.parse(f.text(name))
+        return parsed.getOrPut(name) { SkinYaml.parse(f.text(name)) }
     }
 
     private fun fileOf(id: String): String? {
@@ -300,7 +309,10 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
 
         private fun truthy(v: Any?) = v == "1" || v == "true"
 
-        /** The YAML one theme is put together from, in all: a real one with all its bases is some hundred KB. */
+        /**
+         * The YAML one theme file is put together from, in all: a real one with all its bases is some hundred KB. Each of
+         * up to [MAX_CANDIDATES] files tried has its own (and RimeCompose's node cap), so an import's worst is that many times it.
+         */
         const val MAX_COMPOSED_BYTES = 4L * 1024 * 1024
 
         private val DIRECTIVES = listOf("__include", "__patch", "__append", "__merge")
@@ -312,11 +324,14 @@ class TrimeSkin(private val f: SkinFiles) : SkinSource {
          * The theme's files, at the top: the `*.trime.yaml` and `trime.yaml` (a theme's repository has variants and
          * patches beside it), or the one YAML there is.
          */
-        private fun candidates(names: Set<String>): List<String> {
-            val top = names.filter { '/' !in it }
-            val trime = top.filter { it.endsWith(".trime.yaml", ignoreCase = true) || it.equals("trime.yaml", ignoreCase = true) }
-            return trime.ifEmpty { top.filter { YAML.containsMatchIn(it) }.takeIf { it.size == 1 }.orEmpty() }
-        }
+        private fun candidates(names: Set<String>): List<String> =
+            trimeFiles(names).ifEmpty { names.filter { '/' !in it && YAML.containsMatchIn(it) }.takeIf { it.size == 1 }.orEmpty() }
+
+        private fun trimeFiles(names: Set<String>) =
+            names.filter { '/' !in it && (it.endsWith(".trime.yaml", ignoreCase = true) || it.equals("trime.yaml", ignoreCase = true)) }
+
+        /** Whether [names] have a Trime theme's own file at the top (not the one YAML another format's may be taken for). */
+        fun isTheme(names: Set<String>): Boolean = trimeFiles(names).isNotEmpty()
 
         fun accepts(names: Set<String>): Boolean = candidates(names).isNotEmpty()
     }

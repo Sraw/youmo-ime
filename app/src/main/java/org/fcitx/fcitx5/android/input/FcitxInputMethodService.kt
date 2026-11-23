@@ -14,7 +14,6 @@ import android.graphics.Rect
 import android.hardware.input.InputManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyCharacterMap
@@ -214,7 +213,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 undo?.lapsed?.invoke()
                 false
             }
-            !view.say(message, undo, steady, ms) -> {
+            !view.say(message, undo, steady = steady, ms = ms) -> {
                 if (toast) toast(message, length)
                 false
             }
@@ -223,8 +222,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     private val engineSayer = object : EngineNotices.Sayer {
-        override fun say(message: String, steady: Boolean) = this@FcitxInputMethodService.say(message, null, steady, toast = false)
-        override fun say(message: String, steady: Boolean, ms: Long?) = this@FcitxInputMethodService.say(message, null, steady, toast = false, ms = ms)
+        override fun say(message: String, steady: Boolean) = this@FcitxInputMethodService.say(message, steady = steady, toast = false)
+        override fun say(message: String, steady: Boolean, ms: Long?) = this@FcitxInputMethodService.say(message, steady = steady, toast = false, ms = ms)
     }
 
     val inPasswordField get() = fieldPolicy.password
@@ -291,8 +290,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private fun announce(line: String) {
         listOfNotNull(inputView, candidatesView).firstOrNull { it.isAttachedToWindow && it.isShown }?.announceForAccessibility(line)
     }
-
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     private fun syncCodePlace() {
         val now = codeInFieldNow
@@ -570,7 +567,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         editingSession.commits.changed = kept::changed
         editingSession.commits.clock = SystemClock::uptimeMillis
         EngineNotices.sayer = engineSayer
-        appLanguage?.pickedChanged()
+        localeResources?.pickedChanged()
         PunctuationStartKeys.preload(this)
         // listed off the main thread: an input start (KeyboardPicker.offers) reads no file
         CustomKeyboards.relist()
@@ -782,7 +779,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private var phoneField = false
 
     private fun commitTyped(text: String, cursor: Int = -1) {
-        kept.first()
+        kept.writeBeforeCommit()
         if (cursor != -1 || !pairing || !editingSession.pairs.type(text)) {
             val start = editingSession.commitStart
             commitText(text, cursor)
@@ -894,7 +891,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
-        kept.first()
+        kept.writeBeforeCommit()
         val landed = editingSession.commitText(text, cursor)
         contextMemory.committed(landed, if (landed.length == text.length) cursor else -1, SystemClock.elapsedRealtime())
         voiceAsking.put(landed)
@@ -945,6 +942,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private val voiceAsk = VoiceAsk()
 
     private val voiceAsking = VoiceAsking(this, voiceAsk, editingSession, sensitive = { fieldPolicy.sensitive }, started = { startedWith != null })
+
+    val voiceAsks: Boolean get() = voiceAsking.asks
+
+    /** Whether a talk's stretches go to the engine: only where it follows voice's text and learns, else no spoken text is held. */
+    val voiceKeepsStretches: Boolean get() = voiceAsks && AppPrefs.getInstance().internal.useHabits.getValue()
 
     fun voiceTalkBegan() = voiceAsk.began()
 
@@ -1093,9 +1095,9 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     private lateinit var lastKnownConfig: Configuration
 
     // null while the service is constructed, should the framework read its resources that early
-    private val appLanguage: AppLanguage? = AppLanguage(this)
+    private val localeResources: ServiceLocaleResources? = ServiceLocaleResources(this)
 
-    override fun getResources(): Resources = super.getResources().let { appLanguage?.resources(it) ?: it }
+    override fun getResources(): Resources = super.getResources().let { localeResources?.resources(it) ?: it }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         // the field's composing text committed, not wiped. If super restarts input the context is told twice
@@ -1431,7 +1433,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         Timber.d("onStartInputView: restarting=$restarting")
-        if (appLanguage?.pickedChanged() == true) {
+        if (localeResources?.pickedChanged() == true) {
             rebuilding(ViewRebuild.LANGUAGE)
             replaceInputViews(ThemeManager.activeTheme)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

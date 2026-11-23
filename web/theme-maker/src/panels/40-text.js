@@ -30,12 +30,9 @@
   // what is wrong with [bytes] as an <icon>, by the app's rules ([lim]: iconBytes, rasterIconBytes, rasterIconSide) and,
   // for an SVG, the engine's own (SvgSubset): `[message]`
   function iconProblems(E, L, bytes, lim) {
-    const r = raster(L, bytes);
-    if (r) {
-      if (!r.size) return ['读不出图片的大小'];
-      if (r.animated) return ['动态 WebP 不能当图标'];
-      if (Math.max(r.size[0], r.size[1]) > lim.rasterIconSide) return ['太大：' + r.size[0] + '×' + r.size[1] + '，位图图标最多 ' + lim.rasterIconSide + '×' + lim.rasterIconSide];
-      return bytes.length > lim.rasterIconBytes ? ['超过 ' + lim.rasterIconBytes + ' 字节（位图图标）'] : [];
+    if (raster(L, bytes)) {
+      const why = root.YoumoMaker.rasterProblem(L, bytes, lim.rasterIconSide, lim.rasterIconBytes);
+      return why ? [why] : [];
     }
     if (lim.iconBytes != null && bytes.length > lim.iconBytes) return ['超过 ' + lim.iconBytes + ' 字节'];
     let text;
@@ -44,8 +41,8 @@
     } catch (e) {
       return ['不是 SVG、PNG 或 WebP'];
     }
-    const r2 = E.readIcon(text);
-    return r2.ok ? [] : r2.problems.map((p) => (p.line ? '第 ' + p.line + ' 行：' : '') + p.message);
+    const svg = E.readIcon(text);
+    return svg.ok ? [] : svg.problems.map((p) => (p.line ? '第 ' + p.line + ' 行：' : '') + p.message);
   }
 
   // the reader refuses icon(name) where no <icon> nor the app has it: each value naming [name] taken out, a style left bare gone
@@ -90,7 +87,7 @@
      * [d] with the icon [name] (the app's, or a name of the theme's own) drawn as [bytes] (an SVG's, a PNG's or a WebP's;
      * a raster one only its shape in the icon colour where [tint]); null bytes: the app's again, or a name of its own gone.
      */
-    setIcon(d, name, bytes, tint = false) {
+    setIcon(d, L, name, bytes, tint = false) {
       const own = iconOf(d.xml, name);
       let xml = d.xml;
       let files = panels.filesOf(d);
@@ -101,7 +98,7 @@
       }
       if (bytes) {
         // never over a file the theme has (another style may name it)
-        const type = raster(root.YoumoLib, bytes) ? root.YoumoLib.imageType(bytes) : 'svg';
+        const type = raster(L, bytes) ? L.imageType(bytes) : 'svg';
         const file = panels.fileName(files, 'icon-', name, type);
         files[file] = bytes;
         xml = F.insert(xml, 'icon', '<icon name="' + name + '" src="' + file + '"' + (tint && type !== 'svg' ? ' tint="true"' : '') + '/>');
@@ -111,7 +108,7 @@
 
     /** [d] without the theme's own icon [name] (none of the app's) nor any 画的图标 naming it. */
     dropIcon(d, name) {
-      const r = ops.setIcon(d, name, null);
+      const r = ops.setIcon(d, null, name, null);
       return { xml: unnamed(r.xml, name), files: r.files, layouts: r.layouts };
     },
 
@@ -220,7 +217,7 @@
       const bytes = new Uint8Array(f.bytes);
       const wrong = iconProblems(api.engine, api.lib, bytes, api.limits());
       if (wrong.length) api.toast(f.name + ' 用不了：' + wrong[0]);
-      else api.apply((x) => ops.setIcon(x, name, bytes, tint));
+      else api.apply((x) => ops.setIcon(x, api.lib, name, bytes, tint));
     }
 
     function iconRow(name, notes) {
@@ -238,7 +235,7 @@
       const tintBox = isRaster ? h('input', { type: 'checkbox', checked: tinted.includes(name), title: '上色：只用图的形状，颜色是图标颜色', on: { change: () => api.apply((x) => ops.setTint(x, name, tintBox.checked)) } }) : null;
       return row(name, thumb, h('span', { className: problems.length ? 'bad' : 'muted', textContent: (own[name] ? own[name] + (problems.length ? '：' + problems[0] : '') : 'App 自带') + (notes.length ? '（' + notes.join('；') + '）' : '') }),
         h('button', { type: 'button', textContent: '换…', on: { click: () => pickIcon(name, ops.tinted(api.doc().xml).includes(name)) } }),
-        own[name] ? h('button', { type: 'button', textContent: appNames.includes(name) ? '用 App 的' : '删掉', on: { click: () => api.apply((x) => (appNames.includes(name) ? ops.setIcon(x, name, null) : ops.dropIcon(x, name))) } }) : null,
+        own[name] ? h('button', { type: 'button', textContent: appNames.includes(name) ? '用 App 的' : '删掉', on: { click: () => api.apply((x) => (appNames.includes(name) ? ops.setIcon(x, api.lib, name, null) : ops.dropIcon(x, name))) } }) : null,
         tintBox, tintBox ? h('span', { textContent: '上色' }) : null);
     }
   }

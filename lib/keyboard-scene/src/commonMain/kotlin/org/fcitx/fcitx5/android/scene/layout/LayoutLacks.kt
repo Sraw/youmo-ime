@@ -13,7 +13,6 @@ internal object LayoutLacks {
      * letters. A number board's digits are held by what they type, each pad's by its scenes ([padNeeds]); a pad is named
      * only where not every pad of [pads] lacks it.
      */
-    @Suppress("CyclomaticComplexMethod")
     fun lacks(
         layout: Layout,
         fragments: Map<String, Fragment>,
@@ -23,57 +22,82 @@ internal object LayoutLacks {
         padNeeds: Map<String, List<String>>,
     ): List<Finding> {
         if (layout.family !in LayoutCheck.FAMILIES) return emptyList()
-        val mine = LayoutCheck.cells(layout, fragments)
-        val theirs = LayoutCheck.cells(base, baseFragments)
-        fun slots(c: List<Cell>) = c.filterIsInstance<Slot>().map { it.kind }.toSet()
-        fun roles(c: List<Cell>) = c.filterIsInstance<Key>().mapNotNull { it.attrs.role }.toSet()
-        fun digits(c: List<Cell>) = c.filterIsInstance<Key>().map { it.id }.filter { LayoutCheck.DIGIT.matches(it) }.toSet()
-        val everywhere = LinkedHashSet<Pair<String, String>>()
-        (slots(theirs) - slots(mine)).forEach { everywhere += it to "" }
-        (roles(theirs).filter { it in LayoutCheck.ROLES } - roles(mine)).forEach { everywhere += it to "" }
-        if (layout.family != "number") (digits(theirs) - digits(mine)).forEach { everywhere += DIGITS to it }
-        val own = roles(mine)
-        when (layout.family) {
-            "letters" -> {
-                listOf("space", "shift").filter { it !in own }.forEach { everywhere += it to "" }
-                LayoutCheck.lettersLacking(layout, fragments).forEach { everywhere += LETTERS to it }
-            }
-            "grouped" -> {
-                if ("space" !in own) everywhere += "space" to ""
-                Groups.missing(LayoutCheck.groups(layout, fragments)).forEach { everywhere += LETTERS to it.toString() }
-            }
-            "symbols" -> if (mine.filterIsInstance<Key>().none { it.attrs.actions["send"] == "panel-back" }) everywhere += "panel-back" to ""
-        }
-        val onPads = LinkedHashMap<Pair<String, String>, MutableSet<String>>()
-        for ((pad, needs) in padNeeds) for (n in needs) {
-            val thing = if (LayoutCheck.DIGIT.matches(n)) PAD_DIGITS to n else n to ""
-            if (thing !in everywhere) onPads.getOrPut(thing) { LinkedHashSet() } += pad
-        }
-        fun padsOf(thing: Pair<String, String>): String =
-            onPads[thing]?.takeIf { lacking -> !lacking.containsAll(pads) }?.let { lacking -> pads.filter { it in lacking }.joinToString(" ") }.orEmpty()
-        val things = (everywhere + onPads.keys).toList()
-        val lang = "lang" to ""
-        val space = "space" to ""
-        // 地球键's way round (空格键长按) needs the space bar: lacking both, one finding says both
-        val noSpace = lang in things && space in things && padsOf(space).isEmpty()
-        return things.filter { !noSpace || it != space }.groupBy { (what, _) -> what }.toList().sortedBy { (what, _) -> LACKS_ORDER.indexOf(what).let { if (it < 0) LACKS_ORDER.size else it } }
-            .flatMap { (what, each) ->
-                when (what) {
-                    DIGITS, PAD_DIGITS, LETTERS -> each.groupBy(::padsOf).map { (on, items) -> listOf(what, items.map { it.second }.sorted().joinToString(" "), on) }
-                    "lang" -> listOf(listOf(if (noSpace) "lang-no-space" else what, "", padsOf(lang)))
-                    else -> each.map { listOf(what, "", padsOf(it)) }
-                }
-            }.map { args -> Finding(0, "lacks", args.dropLastWhile { it.isEmpty() }) }
+        val everywhere = everywhere(layout, fragments, LayoutCheck.cells(base, baseFragments))
+        val onPads = onPads(padNeeds, everywhere)
+        fun padsOf(lack: Lack): String =
+            onPads[lack]?.takeIf { lacking -> !lacking.containsAll(pads) }?.let { lacking -> pads.filter { it in lacking }.joinToString(" ") }.orEmpty()
+        return findings((everywhere + onPads.keys).toList(), ::padsOf)
     }
 
-    private const val DIGITS = "digits"
-    private const val PAD_DIGITS = "pad-digits"
-    private const val LETTERS = "letters"
+    /** A thing lacked: a role, a slot's kind, a key the family wants; [item] one digit or letter of [what]. */
+    private data class Lack(val what: String, val item: String? = null)
 
-    private val LACKS_ORDER = listOf(
-        "backspace", "enter", "back", "panel-back", "lang", "space", "shift", DIGITS, PAD_DIGITS, LETTERS, "nine-side",
-        "symbol-categories", "symbol-grid",
-    )
+    private fun everywhere(layout: Layout, fragments: Map<String, Fragment>, theirs: List<Cell>): Set<Lack> {
+        val mine = LayoutCheck.cells(layout, fragments)
+        val own = roles(mine)
+        val out = LinkedHashSet<Lack>()
+        (slots(theirs) - slots(mine)).mapTo(out) { Lack(it) }
+        (roles(theirs).filter { it in LayoutCheck.ROLES } - own).mapTo(out) { Lack(it) }
+        if (layout.family != "number") (digits(theirs) - digits(mine)).mapTo(out) { Lack(DIGITS, it) }
+        out += familyLacks(layout, fragments, mine, own)
+        return out
+    }
+
+    private fun familyLacks(layout: Layout, fragments: Map<String, Fragment>, mine: List<Cell>, own: Set<String>): List<Lack> = when (layout.family) {
+        "letters" -> listOf(SPACE, "shift").filter { it !in own }.map { Lack(it) } + letters(LayoutCheck.lettersLacking(layout, fragments))
+        "grouped" -> listOf(SPACE).filter { it !in own }.map { Lack(it) } + letters(Groups.missing(LayoutCheck.groups(layout, fragments)))
+        "symbols" -> if (mine.filterIsInstance<Key>().any { it.attrs.actions["send"] == PANEL_BACK }) emptyList() else listOf(Lack(PANEL_BACK))
+        else -> emptyList()
+    }
+
+    private fun letters(missing: String): List<Lack> = missing.map { Lack(LETTERS, it.toString()) }
+
+    // each pad's needs not lacked everywhere, with the pads lacking them
+    private fun onPads(padNeeds: Map<String, List<String>>, everywhere: Set<Lack>): Map<Lack, Set<String>> {
+        val out = LinkedHashMap<Lack, MutableSet<String>>()
+        for ((pad, needs) in padNeeds) for (n in needs) {
+            val lack = if (LayoutCheck.DIGIT.matches(n)) Lack(PAD_DIGITS, n) else Lack(n)
+            if (lack !in everywhere) out.getOrPut(lack) { LinkedHashSet() } += pad
+        }
+        return out
+    }
+
+    private fun findings(lacks: List<Lack>, padsOf: (Lack) -> String): List<Finding> {
+        // 地球键's way round (空格键长按) needs the space bar: lacking both, one finding says both
+        val noSpace = Lack(LANG) in lacks && Lack(SPACE) in lacks && padsOf(Lack(SPACE)).isEmpty()
+        return lacks.filter { !noSpace || it != Lack(SPACE) }.groupBy { it.what }.toList().sortedBy { (what, _) -> order(what) }
+            .flatMap { (what, each) -> told(what, each, noSpace, padsOf) }
+    }
+
+    // the digits and letters of one set of pads in one finding
+    private fun told(what: String, each: List<Lack>, noSpace: Boolean, padsOf: (Lack) -> String): List<Finding> = when (what) {
+        DIGITS, PAD_DIGITS, LETTERS -> each.groupBy(padsOf).map { (on, items) -> finding(what, items.mapNotNull { it.item }.sorted().joinToString(" "), on) }
+        LANG -> listOf(finding(if (noSpace) LANG_NO_SPACE else what, "", padsOf(Lack(LANG))))
+        else -> each.map { finding(what, "", padsOf(it)) }
+    }
+
+    private fun finding(what: String, items: String, on: String) = Finding(0, "lacks", listOf(what, items, on).dropLastWhile { it.isEmpty() })
+
+    private fun order(what: String): Int = LACKS_ORDER.indexOf(what).let { if (it < 0) LACKS_ORDER.size else it }
+
+    private fun slots(c: List<Cell>) = c.filterIsInstance<Slot>().map { it.kind }.toSet()
+
+    private fun roles(c: List<Cell>) = c.filterIsInstance<Key>().mapNotNull { it.attrs.role }.toSet()
+
+    private fun digits(c: List<Cell>) = c.filterIsInstance<Key>().map { it.id }.filter { LayoutCheck.DIGIT.matches(it) }.toSet()
+
+    const val DIGITS = "digits"
+    const val PAD_DIGITS = "pad-digits"
+    const val LETTERS = "letters"
+    private const val LANG = "lang"
+    private const val LANG_NO_SPACE = "lang-no-space"
+    private const val SPACE = "space"
+    private const val PANEL_BACK = "panel-back"
+
+    /** What 0.6.0 refused any theme pack's board for lacking, drawing the app's (its `judge`): a slot, ⌫, 回车, 地球键, a digit. */
+    val REFUSED_060: Set<String> = LayoutCheck.ROLES + LayoutReader.SLOT_KINDS + setOf(LANG_NO_SPACE, DIGITS, PAD_DIGITS)
+
+    private val LACKS_ORDER = listOf("backspace", "enter", "back", PANEL_BACK, LANG, SPACE, "shift", DIGITS, PAD_DIGITS, LETTERS) + LayoutReader.SLOT_KINDS
 
     /** A number board's keys typing a letter (a tap's text, or `letters=`): told, a number field wants none. */
     fun padLetters(layout: Layout, fragments: Map<String, Fragment>): List<Finding> {

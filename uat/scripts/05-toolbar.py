@@ -130,7 +130,9 @@ def tb70(d):
             d.shot((0, back.b[1], 1080, 2340) if back else "full", ("深色" if night else "浅色") + "：收藏页列出「公园」，标签「收藏」是选中的颜色，栏上没有垃圾桶")
             shots.append(night)
             if night:
-                d.tap(clip_item(d, "公园").c, 0.8)
+                item = clip_item(d, "公园")
+                check(item, f"深色收藏页 {[n.text for n in clip_items(d)][:4]}")
+                d.tap(item.c, 0.8)
                 t = d.field_text(d.screen())
                 check(t == "公园", f"框里「{t}」")
             else:

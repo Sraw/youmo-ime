@@ -45,7 +45,7 @@ class DeviceSummaryTest {
 
     private class Store : ProfileStore {
         override fun read() = emptyMap<String, String>()
-        override fun write(values: Map<String, String?>) = Unit
+        override fun write(values: Map<String, String?>) = true
     }
 
     @Test
@@ -56,6 +56,8 @@ class DeviceSummaryTest {
         assertEquals("中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL · 检测时 1 核离线", deviceSummary(context, DeviceProfile.of(offline)))
         val unread = DeviceProfile.of(CpuFacts(true, 0, 0, emptyList()))
         assertEquals("中档 · 无 dotprod · 内核 MLAL · 读不到处理器信息", deviceSummary(context, unread))
+        // the kernel that runs, not the profile's, where the library did not load
+        assertEquals("中档 · 8 核（4 大）· 无 dotprod · 内核 JVM", deviceSummary(context, DeviceProfile.of(sixT), "JVM"))
         // possible read, no MIDR anywhere: unread, as the settings say, never all eight offline
         val noMidr = sixT.copy(cores = sixT.cores.map { it.copy(midr = null) })
         assertEquals("中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL · 读不到处理器信息", deviceSummary(context, DeviceProfile.of(noMidr)))
@@ -72,10 +74,13 @@ class DeviceSummaryTest {
         assertEquals("Level medium · 8 cores (4 big) · no dotprod · kernel MLAL · 1 core offline when checked", deviceSummary(context, offline))
     }
 
-    // what ThisDevice tells Robolectric by, to give every JVM test the same profile whatever the build machine's CPU
+    // every JVM test gets the same profile whatever the build machine's /sys and /proc say
     @Test
     fun robolectricIsKnownByItsFingerprint() {
+        // contract: Robolectric's fingerprint, the literal ThisDevice tells it by
         assertEquals("robolectric", Build.FINGERPRINT)
+        ThisDevice.forget()
+        assertEquals(DeviceProfile.of(ThisDevice.TEST_FACTS), ThisDevice.profile)
     }
 
     @Test

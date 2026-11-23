@@ -71,9 +71,9 @@ internal object LogRewrites {
         return true
     }
 
-    // a table's word remembered at or after [cut]: a word made then is no longer the user's
-    private fun remembered(r: LearnRecord?, cut: Int) =
-        r is Absorbed && r.minute >= cut && r.removed.isEmpty() && r.added.isNotEmpty() && r.added.all { it is TableWordRow }
+    // a table's word remembered at or after [cut]: a word made then is no longer the user's; one taken in (an older
+    // build's, an import) looks the same but for the flag, and stays
+    private fun remembered(r: LearnRecord?, cut: Int) = r is Absorbed && r.remembered && r.minute >= cut
 
     // the flag a reverted English commit set, without the commit
     private fun neverCorrected(c: EnCommit) =

@@ -44,18 +44,20 @@ sealed class PopupAction {
         val bounds: Rect
     ) : PopupAction()
 
-    /** [down]: opened by a swipe down (PopupMenuUi.Fixed). */
+    /** [down]: opened by a swipe down (PopupMenuUi.Fixed). [outShown]: whether it opened. */
     data class ShowEditMenuAction(
         override val key: KeyRef,
         val bounds: Rect,
         val password: Boolean,
         val down: Boolean = false,
+        var outShown: Boolean = false,
     ) : PopupAction()
 
     data class ShowInputMethodMenuAction(
         override val key: KeyRef,
         val bounds: Rect,
         val down: Boolean = false,
+        var outShown: Boolean = false,
     ) : PopupAction()
 
     data class ChangeFocusAction(

@@ -119,7 +119,7 @@ def unicode_table(sym_ucs):
     # entries split over two lines in keydata.h (Odoubleacute, ...) count too: 777, not 738
     rows = "".join("        " + " ".join(f"0x{k:04x}, 0x{u:04x}," for k, u in c) + "\n" for c in chunks(sym_ucs, 6))
     return (HEADER % ("1995-1997 Peter Mattis, Spencer Kimball and Josh MacDonald", "keydata.h") +
-            "// keysym_to_unicode_tab: keysym, code point, keysym, code point, ..., sorted by keysym.\n"
+            "// keysym_to_unicode_tab: keysym, code point, ..., sorted by keysym.\n"
             '@Suppress("LargeClass", "MagicNumber")\ninternal object KeySymUnicodeTable {\n'
             f"    val PAIRS = intArrayOf(\n{rows}    )\n}}\n")
 
@@ -131,17 +131,14 @@ def name_table(names, values, compat):
     named = blob([f"{n}={v:x}" for n, v in zip(names, values)], 6)
     comp = blob([f"{n}={v:x}" for n, v in compat], 5)
     return (HEADER % ("2015~2025 CSSlayer <wengxt@gmail.com>", "keynametable.h, keynametable-compat.h") + f'''
-/**
- * fcitx's key names as `name=keysym` words (keysyms in hex). Strings, not arrays, so the class
- * initializer stays far below the JVM's 64 KB method limit; parsed on first use.
- */
+/** `name=keysym` words in strings, not arrays, so the class initializer stays below the JVM's 64 KB method limit. */
 @Suppress("LargeClass")
 internal object KeySymNameTable {{
-    /** `keyNameList` + `keyValueByNameOffset`: sorted by name (bytes; all ASCII). */
+    /** `keyNameList` + `keyValueByNameOffset`: sorted by name. */
     val names: Array<String> by lazy {{ words(NAMES).map {{ it.substringBefore('=') }}.toTypedArray() }}
     val nameSyms: IntArray by lazy {{ words(NAMES).map {{ it.substringAfter('=').toInt(16) }}.toIntArray() }}
 
-    /** keynametable-compat.h `keyNameListCompat`: fcitx 4's names, sorted. */
+    /** `keyNameListCompat`: fcitx 4's names, sorted. */
     val compatNames: Array<String> by lazy {{ words(COMPAT).map {{ it.substringBefore('=') }}.toTypedArray() }}
     val compatSyms: IntArray by lazy {{ words(COMPAT).map {{ it.substringAfter('=').toInt(16) }}.toIntArray() }}
 

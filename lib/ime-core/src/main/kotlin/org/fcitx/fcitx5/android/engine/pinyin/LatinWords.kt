@@ -170,8 +170,8 @@ class LatinWords private constructor(private val dictionary: PinyinDictionary, v
         /** Each letter a–z as its syllable alone: a [SyllableGraph.Kind.LETTER] edge's matches. */
         internal val MATCHES = Array(LETTERS) { SyllableMatches(intArrayOf(syllable('a' + it)), intArrayOf(0)) }
 
-        // the keyboards a user switches among: nine keys, 14, 18, a custom one
-        private const val KEYBOARDS = 4
+        // nine keys, 14, 18 and a custom one, plus that custom one before an edit so the edit evicts no built-in
+        private const val KEYBOARDS = 5
 
         internal const val MAX_KEY_NODES = 100_000
 

@@ -88,7 +88,8 @@ object VoiceHotwords {
     fun ofUser(words: List<UserWord>, held: Set<String> = emptySet(), chars: Collection<String> = emptyList()): Words {
         val kept = unheld(words, held)
         fun spell(kinds: (UserWord.Kind) -> Boolean) = kept.asSequence()
-            .filter { kinds(it.kind) }
+            // a table's remembered words are the table's: voice does not listen for them
+            .filter { kinds(it.kind) && it.table.isEmpty() }
             .mapNotNull { word -> HotwordSpelling.spelled(word.text)?.let { it to word.kind } }
             // added and learned both: added, which comes first
             .distinctBy { it.first }

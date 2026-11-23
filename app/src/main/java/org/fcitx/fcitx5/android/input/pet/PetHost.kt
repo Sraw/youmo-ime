@@ -34,11 +34,18 @@ class PetHost private constructor(
 
     private val density = view.resources.displayMetrics.density
     private val relayout = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
-    private val hide = Runnable { view.show(false) }
+    // a settings change remakes the keys' window with the keyboard down too: shown only from a start to the next hide
+    private var started = false
+    private val hide = Runnable {
+        started = false
+        view.show(false)
+    }
 
     init {
         keys.addOnLayoutChangeListener(relayout)
         bar.addOnLayoutChangeListener(relayout)
+        // made with the keys' window attached already, which a start attaches again
+        view.show(false)
     }
 
     fun onKey(action: KeyAction) {
@@ -46,7 +53,7 @@ class PetHost private constructor(
     }
 
     override fun onWindowAttached(window: InputWindow) {
-        view.show(window is KeyboardWindow)
+        view.show(started && window is KeyboardWindow)
     }
 
     // hiding the keyboard leaves the IME window visible on newer Android (the insets animate it away), so a finish hides it;
@@ -57,6 +64,7 @@ class PetHost private constructor(
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         view.removeCallbacks(hide)
+        started = true
     }
 
     private fun place() {

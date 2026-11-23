@@ -16,7 +16,8 @@ KEY_LENGTH = 6
 KEYS = ROWS * KEY_LENGTH
 
 # ime-eval and run-on-device.sh in one: per set and tier, the rows whose first candidate is the expected one, then
-# those where it is second; at high the escalated keys, none printed where the plan has none
+# those where it is second; at high the escalated keys, none printed where the plan has none; on the device the app's
+# built-in phrases after the first of the rows in the plan's clock, and either side's rows in its listed as listed there
 FAKE = r'''#!/usr/bin/env python3
 import json, os, sys
 from pathlib import Path
@@ -26,13 +27,16 @@ def samples(path):
     lines = [l for l in Path(path).read_text().splitlines() if l.strip() and not l.startswith("#")]
     return [l.split("\t") for l in lines]
 
-def listed(set_path, tier, plan, count, timing):
+def listed(set_path, tier, plan, count, timing, clock, side):
     name = NAMES[Path(set_path).stem]
     top1, top5 = plan[name][tier]
+    rows = plan.get("listed", {}).get(side, {}).get("%s-%s" % (name, tier), {})
     out = []
     for i, (key, want, *_) in enumerate(samples(set_path)):
         others = ["x%d" % j for j in range(count)]
         cands = [want] + others[1:] if i < top1 else (others[:1] + [want] + others[2:] if i < top5 else others)
+        phrases = clock.get(str(i), [])
+        cands = rows.get(str(i), cands[:1] + phrases + cands[1:count - len(phrases)])
         out.append("\t".join([key, timing] + cands))
     return name, out
 
@@ -42,7 +46,9 @@ if os.path.basename(sys.argv[0]) == "run-on-device.sh":
     level = os.environ["LEVEL"]
     with open(os.environ["FAKE_CALLS"], "a") as calls:
         calls.write("%s %s %s %s %s\n" % (Path(set_path).name, ime, level, os.environ.get("NINE", "-"), os.environ.get("INSTALL", "-")))
-    _, rows = listed(set_path, level, plan.get("device", plan), 5, "900,800")
+    name = NAMES[Path(set_path).stem]
+    _, rows = listed(set_path, level, dict(plan.get("device", plan), listed=plan.get("listed", {})), 5, "900,800",
+                     plan.get("clock", {}).get(name, {}), "device")
     os.makedirs(out_dir, exist_ok=True)
     result = os.path.join(out_dir, "%s-%s-%s.tsv" % (Path(set_path).stem, ime, level))
     Path(result).write_text("\n".join(rows) + "\n")
@@ -55,7 +61,7 @@ else:
     args = sys.argv[1:]
     set_path, result = args[2], args[3]
     tier = args[args.index("--tier") + 1]
-    name, rows = listed(set_path, tier, plan, 10, "1,2")
+    name, rows = listed(set_path, tier, plan, 10, "1,2", {}, "jvm")
     Path(result).write_text("\n".join(rows) + "\n")
     escalated = plan[name].get("escalated")
     if tier == "high" and escalated is not None:
@@ -195,16 +201,42 @@ class TierGuardTest(unittest.TestCase):
         # no timing in what is compared
         self.assertEqual('k00000\t词0\tx1\tx2\tx3\tx4', (work / 'main-low.shown.tsv').read_text().splitlines()[0])
 
-    def test_a_row_the_device_shows_otherwise_fails_the_device_check(self):
+    def test_the_device_check_holds_each_row_to_the_jvms_less_the_apps_built_in_phrases(self):
         self.rebaselined()
-        device = plan()
-        device['t9']['medium'] = [519, 800]
-        the_plan = dict(plan(), device=device)
-        work = self.tmp / 'work'
-        status, out = self.guard(the_plan, '--device', str(work))
-        self.assertEqual(4, status, out)
-        self.assertIn('t9 medium: the device shows 1 rows otherwise', out)
-        self.assertEqual(['t9-medium.diff'], sorted(p.name for p in work.glob('*.diff') if p.stat().st_size))
+        # one of each built-in shape (rq, sj, xq) after the first candidate on the device
+        clock = {'main': {'3': ['15:06', '15时06分'], '4': ['2026年11月22日', '2026-11-22'], '5': ['二〇二六年十一月二十二日'],
+                          '6': ['星期日', '周日'], '699': ['15:06', '15时06分']}}
+
+        def device(name, tier, top):
+            d = plan()
+            d[name][tier] = top
+            return dict(plan(), device=d)
+        rows = (
+            # the JVM's row cut by as many as the app put in, as they pushed that many off the device's five
+            ('every shape of them left out', plan(), None,
+             {3: 'k00003\t词3\tx1\tx2', 4: 'k00004\t词4\tx1\tx2', 5: 'k00005\t词5\tx1\tx2\tx3', 6: 'k00006\t词6\tx1\tx2'}),
+            ('another first candidate on the nine keys', device('t9', 'medium', [519, 800]), 't9-medium', {}),
+            # row 699 has the wanted one second on the device, after the phrases
+            ('another first candidate on a row with them', device('main', 'low', [699, 850]), 'main-low', {}),
+            ('a device row short of candidates, none of them in it',
+             dict(plan(), listed={'device': {'main-low': {'7': ['词7', 'x1', 'x2']}}}), 'main-low', {}),
+            # 周一 is a word too: where both sides list it the app added nothing, so where it stands is held
+            ('a word of their shape the device places otherwise',
+             dict(plan(), listed={'jvm': {'main-low': {'9': ['词9', '周一', 'x2', 'x3', 'x4']}},
+                                  'device': {'main-low': {'9': ['周一', '词9', 'x2', 'x3', 'x4']}}}), 'main-low', {}),
+        )
+        for why, the_plan, differs, cut in rows:
+            with self.subTest(why):
+                work = self.tmp / 'work'
+                shutil.rmtree(work, ignore_errors=True)
+                status, out = self.guard(dict(the_plan, clock=clock), '--device', str(work))
+                self.assertEqual(4 if differs else 0, status, out)
+                self.assertEqual([differs + '.diff'] if differs else [], sorted(p.name for p in work.glob('*.diff') if p.stat().st_size))
+                if differs:
+                    self.assertIn('%s: the device shows 1 rows otherwise' % differs.replace('-', ' '), out)
+                for r, want in cut.items():
+                    self.assertEqual(want, (work / 'main-low.device.tsv').read_text().splitlines()[r])
+                    self.assertEqual(want, (work / 'main-low.shown.tsv').read_text().splitlines()[r])
 
     def test_the_device_check_keeps_its_rows_in_a_work_dir(self):
         self.rebaselined()

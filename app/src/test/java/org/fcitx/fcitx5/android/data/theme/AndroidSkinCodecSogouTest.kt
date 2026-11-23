@@ -6,7 +6,7 @@ package org.fcitx.fcitx5.android.data.theme
 
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.scene.skin.SkinError
-import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
+import org.fcitx.fcitx5.android.uat.SkinUatSamples
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -19,23 +19,14 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.DeflaterOutputStream
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 /** Sogou's container sealed here with its published key, as the app reads it. */
 @RunWith(RobolectricTestRunner::class)
 @Config(application = FcitxApplication::class)
 class AndroidSkinCodecSogouTest {
-    private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(2 * it, 2 * it + 2).toInt(16).toByte() }
-
     private fun zlib(b: ByteArray) = ByteArrayOutputStream().also { o -> DeflaterOutputStream(o).use { it.write(b) } }.toByteArray()
 
-    private fun seal(plain: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(hex(SkinPlatform.SOGOU_KEY), "AES"), IvParameterSpec(hex(SkinPlatform.SOGOU_IV)))
-        return "Skin".toByteArray() + byteArrayOf(2, 0, 0, 0) + cipher.doFinal(plain)
-    }
+    private fun seal(plain: ByteArray) = SkinUatSamples.sogouSeal(plain)
 
     // rawLen as said, then the payload deflated
     private fun container(payload: ByteArray, rawLen: Int = payload.size, tail: ByteArray = ByteArray(0)) =

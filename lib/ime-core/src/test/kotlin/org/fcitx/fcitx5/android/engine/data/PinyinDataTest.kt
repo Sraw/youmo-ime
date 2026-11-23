@@ -17,8 +17,6 @@ import kotlin.random.Random
 
 class PinyinDataTest {
 
-    private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
-
     /** A model small enough that every value quantises exactly (fewer values than levels). */
     private fun builder() = PinyinDataBuilder()
         .unigram("<unk>", -7f, 0f)

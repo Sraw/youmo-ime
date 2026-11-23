@@ -53,7 +53,7 @@ class KeptCommits(
     }
 
     /** Written first, synchronously: after it the order would be reversed, and that commit landing would not let it go. */
-    fun first() {
+    fun writeBeforeCommit() {
         val commits = session.commits
         if (!commits.toWrite || commits.isWaiting) return
         handler.removeCallbacks(writeAsked)

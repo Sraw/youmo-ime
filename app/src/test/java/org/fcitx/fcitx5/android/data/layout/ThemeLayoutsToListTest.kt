@@ -179,6 +179,19 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         assertFalse(prefs.internal.themeLayoutsUnseen.getValue().contains("17"))
     }
 
+    // one lacking a key 0.6.0 refused it for: listed, but its user drew the app's and is not switched to it
+    @Test
+    fun aPacksBoardLackingWhat060RefusedIsListedNotChosen() {
+        val noQ = qwerty().replace(Regex("<key id=\"q\"[^>]*>[\\s\\S]*?</key>"), "")
+        check(noQ != qwerty())
+        val mint = pack("mint", "qwerty.xml" to noQ)
+        val before = chosen(ENGLISH)
+        start(listOf(mint), mint, null)
+        val ids = listed()
+        assertTrue(ids.toString(), "mint · 主题 26 键" in ids)
+        assertEquals(before, chosen(ENGLISH))
+    }
+
     @Test
     @Uat("ST-72")
     fun anImportListsAloneOnceAndOneImportedAgainUpdatesTheSameLayout() {

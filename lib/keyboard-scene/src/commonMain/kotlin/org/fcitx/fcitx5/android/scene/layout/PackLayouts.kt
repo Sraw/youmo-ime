@@ -31,7 +31,7 @@ object PackLayouts {
         app ?: return "the app's $id does not read"
         if (layout.family != app.family) return "its family is ${layout.family}, the app's ${app.family}"
         if (!typable) return null
-        if (layout.family == "letters") LayoutCheck.lettersLacking(layout, fragments).takeIf { it.isNotEmpty() }?.let { return "it has no key [${it.sorted().joinToString(", ")}]" }
+        if (layout.family == "letters") LayoutCheck.lettersLacking(layout, fragments).takeIf { it.isNotEmpty() }?.let { return "it has no key [${it.toList().joinToString(", ")}]" }
         return LayoutCheck.kept(layout, fragments, app, appFragments)
     }
 
@@ -48,6 +48,8 @@ object PackLayouts {
             val problems: List<LayoutCheck.Finding>,
             val own: String = name,
             val commits: List<String> = emptyList(),
+            /** Lacking what 0.6.0 refused it for ([LayoutCheck.refusedBy060]): its user drew the app's, so it is not switched in for them. */
+            val refusedBy060: Boolean = false,
         ) : Converted
 
         class Not(val why: String) : Converted
@@ -97,7 +99,8 @@ object PackLayouts {
         }
         val (out, report) = forPads(layout.family, layout.pads, ::made)
         report.errors.firstOrNull()?.let { return Converted.Not("made one that does not take: $it") }
-        return Converted.Done(newId, name, out, renames, report.warnings, ownName(layout.name, id), report.commits)
+        val refused060 = report.warnings.any { LayoutCheck.refusedBy060(layout.family, it) }
+        return Converted.Done(newId, name, out, renames, report.warnings, ownName(layout.name, id), report.commits, refused060)
     }
 
     private data class Made(val text: String, val report: LayoutCheck.Report)

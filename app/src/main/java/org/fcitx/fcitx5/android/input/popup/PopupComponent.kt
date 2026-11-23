@@ -399,9 +399,9 @@ class PopupComponent :
         showPopupContainer(key, menuUi, "menu")
     }
 
-    private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean, down: Boolean) {
+    private fun showEditMenu(key: KeyRef, bounds: Rect, password: Boolean, down: Boolean): Boolean {
         val cells = EditMenuLayout.CELLS
-        val scenes = scenesFor(key) ?: return
+        val scenes = scenesFor(key) ?: return false
         val cell = scenes.px(Popups.MENU_CELL_DP)
         val items = cells.map {
             // what TalkBack reads of the cell
@@ -409,13 +409,13 @@ class PopupComponent :
             KeyDef.Popup.Menu.Item(context.getString(looks.label), looks.icon, KeyAction.ShortcutAction(KeyShortcut.Command(it)))
         }
         val disabled = cells.indices.filter { EditMenuLayout.disabled(cells[it], password) }.toSet()
-        showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(EditMenuLayout.START, disabled, down = down), cell)
+        return showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(EditMenuLayout.START, disabled, down = down), cell)
     }
 
-    private fun showInputMethodMenu(key: KeyRef, bounds: Rect, down: Boolean) {
-        val scenes = scenesFor(key) ?: return
+    private fun showInputMethodMenu(key: KeyRef, bounds: Rect, down: Boolean): Boolean {
+        val scenes = scenesFor(key) ?: return false
         // cells of words, as wide as the engine draws those (Popups.menuKeys)
-        val width = floor(scenes.px(Popups.MENU_CELL_DP) * Popups.MENU_WORDS_WIDTH).toInt()
+        val width = floor(scenes.px(Popups.MENU_CELL_DP) * Popups.MENU_WORDS_WIDTH).toInt().coerceAtLeast(1)
         val (enabled, current) = fcitx.runImmediately { enabledImeCached to inputMethodEntryCached.uniqueName }
         val byName = enabled.associateBy { it.uniqueName }
         val menu = InputMethodMenu.of(enabled.map { it.uniqueName }, current, keyboardWidth() / width)
@@ -428,13 +428,13 @@ class PopupComponent :
                 InputMethodMenu.Cell.More -> KeyDef.Popup.Menu.Item(context.getString(R.string.input_method_menu_more), 0, KeyAction.ShowInputMethodPickerAction)
             }
         }
-        showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(menu.start, menu.disabled, down = down), width)
+        return showFixedMenu(key, bounds, scenes, items, PopupMenuUi.Fixed(menu.start, menu.disabled, down = down), width)
     }
 
     /** A row picked by the finger's travel, [fixed]'s start over the key, where notices go ([EditMenuLayout.place]). */
     private fun showFixedMenu(
         key: KeyRef, bounds: Rect, scenes: PopupScenes, items: List<KeyDef.Popup.Menu.Item>, fixed: PopupMenuUi.Fixed, cellWidth: Int,
-    ) {
+    ): Boolean {
         val cell = scenes.px(Popups.MENU_CELL_DP)
         // out from under the finger; a notice there put away
         val at = menuRoom?.invoke(cellWidth * items.size, cell)?.let { room ->
@@ -451,7 +451,7 @@ class PopupComponent :
             fixed = PopupMenuUi.Fixed(fixed.start, fixed.disabled, at, fixed.down),
             scenes = scenes,
         )
-        if (menuUi.unmade) return
+        if (menuUi.unmade) return false
         showingEntryUi[key]?.let {
             dismissPopupEntry(key, it, atOnce = true)
         }
@@ -460,6 +460,7 @@ class PopupComponent :
             onMenuShown(Rect(at.left, at.top, at.left + cellWidth * items.size, at.top + cell))
         }
         showPopupContainer(key, menuUi, "menu")
+        return true
     }
 
     private fun showPopupContainer(key: KeyRef, ui: PopupContainerUi, widget: String) {
@@ -569,8 +570,8 @@ class PopupComponent :
                 is PopupAction.PreviewUpdateAction -> updatePopup(key, content, words)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds)
                 is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds)
-                is PopupAction.ShowEditMenuAction -> showEditMenu(key, bounds, password, down)
-                is PopupAction.ShowInputMethodMenuAction -> showInputMethodMenu(key, bounds, down)
+                is PopupAction.ShowEditMenuAction -> outShown = showEditMenu(key, bounds, password, down)
+                is PopupAction.ShowInputMethodMenuAction -> outShown = showInputMethodMenu(key, bounds, down)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(key)
             }
         }

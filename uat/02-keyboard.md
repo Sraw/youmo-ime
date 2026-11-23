@@ -237,7 +237,7 @@
 ### KB-107 [P1] 分词不动 ⇧ 的状态；英文、码表打字时 ⇧ 不变
 - **前提**：B0（全拼，全键盘）。
 - **操作**：点 ⇧（字母变大写），点 x i，点「分词」，点 a n，点空格；看字母。切到英文打 `he`，看 ⇧ 的位置；切到五笔打 `gg`，看那个位置。
-- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是「拼」键（反查），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。之后导入的、恢复 0.6.1 及以后做的备份带进来的主题自带全键盘布局（没写分词键），在 **外观 → 布局** 里选它给拼音用后，⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`；升级时已装的见 ST-143，旧备份恢复的见 PR-63。
+- **预期**：分词打出 `'`，不是大写的 `"`；上屏后 ⇧ 还亮着（字母大写，下一个字母大写）。英文打字时那里仍是 ⇧（点了下一个字母大写）；五笔打字时那里仍是 ⇧（五笔没有「拼」键），不是分词。按住 ⇧ 时打出第一个字母（另一指）、在分词上松手：打出分词，⇧ 不变。按住「分词」时上屏（另一指点空格）再松手：打出 `'`，⇧ 还亮着。之后导入的、恢复 0.6.1 及以后做的备份带进来的主题自带全键盘布局（没写分词键），在 **外观 → 布局** 里选它给拼音用后，⇧ 一直是 ⇧：打拼音时点它字母变大写，不打 `'`；升级时已装的见 ST-143，旧备份恢复的见 PR-63。
 - **JVM**：`ShiftSeparatorCanvasTest.aShiftKeptBesideTheSeparatorStaysShift`（布局另有分词键、⇧ 还在时点 ⇧ 仍是 ⇧）、`ShiftSeparatorCanvasTest.theSeparatorKeepsShiftAsItWas`（分词发 `'`、不带 Shift，打完 ⇧ 还开着）、`ShiftSeparatorCanvasTest.shiftDownAsTypingBeginsUpIsTheSeparator`（⇧ 上按下、换成分词后松手发 `'`）、`ShiftSeparatorCanvasTest.theSeparatorLiftedAfterTypingEndedKeepsShiftOnce`（打完才松开的分词发 `'`，⇧ 不用掉）、`ShiftSeparatorCanvasTest.aThemesOwnShiftStaysShiftWhilePinyinIsTyped`（没分词键的主题布局 ⇧ 照旧是 Shift，点、长按都不发 `'`）、`ShiftSeparatorCanvasTest.aThemesPlainApostropheKeyUsesUpShiftOnce`（主题里发 `'` 的普通键照旧：带 Shift，一次性大写用掉）；ime-core `ShiftSeparatorTest.neverEnglishATableNorZhuyin`；设备上切英文、五笔看一眼。
 
 ### KB-41 [P2] 等长按时已滑出键的下边，弹出后第一下往旁边挪不关掉
@@ -416,8 +416,8 @@
 ### KB-114 [P1] 选输入法：滑出一排输入法选
 - **前提**：B0，输入法里再添加双拼（列表是拼音、英文、双拼），现在是拼音；q 的上滑设成 **选输入法**。
 - **操作**：q 上滑不松手看菜单，直接松开；切回拼音再上滑，右挪一格松开；再上滑，往下滑回 q 上松开；再上滑，一直右挪到 **更多…** 松开；切成悬浮键盘再上滑、松开。
-- **预期**：菜单弹在编辑菜单的位置：拼音（灰）、英文、双拼、更多…，手指对着英文，每挪一格轻振一下；直接松开换到英文；右挪一格松开换到双拼；滑回键上松开不换、不打出 q；在灰的那格上松开不换。挪到 **更多…** 松开弹出输入法选择框（下面列着别的应用的键盘）。悬浮时菜单在键盘朝屏幕中间那侧，格数按悬浮键盘的宽（393 dp 手机上是现在的、下一个和 **更多…** 三格），直接松开换到下一个。只启用一个输入法时菜单是它（灰）和 **更多…**，手指对着 **更多…**（JVM 上断言，设备上不跑）。
-- **JVM**：`InputMethodCommandsHostTest.aSwipeOfChooseInputMethodPicksFromItsMenu`、`withOneInputMethodItsMenuIsItAndMore`、`aPickWhilePinyinIsTypedIsTheGlobesTapToo`、`aPickBecomesTheDefault`（选中的成为默认、存下来，和地球键一样）；格子、起始格、放不下时的取法见 ime-core `InputMethodMenuTest`，行的左右位置见 `EditPlanTest.theEditMenusPasteIsOverTheFingerTheRowKeptOnTheScreen`。设备截图见报告。
+- **预期**：菜单弹在编辑菜单的位置：拼音（灰）、英文、双拼、更多…，手指对着英文，每挪一格轻振一下；直接松开换到英文；右挪一格松开换到双拼；滑回键上松开不换、不打出 q；在灰的那格上松开不换。挪到 **更多…** 松开弹出输入法选择框（下面列着别的应用的键盘）。悬浮时菜单在键盘朝屏幕中间那侧，格数按悬浮键盘的宽（393 dp 手机上是现在的、下一个和 **更多…** 三格），直接松开换到下一个。只启用一个输入法时菜单是它（灰）和 **更多…**，手指对着 **更多…**（JVM 上断言，设备上不跑）。菜单弹不出来时（没有画菜单的地方、放不下），松开弹出输入法选择框，和长按地球键一样（JVM 上断言，设备上不跑）。
+- **JVM**：`InputMethodCommandsHostTest.aSwipeOfChooseInputMethodPicksFromItsMenu`、`withOneInputMethodItsMenuIsItAndMore`、`aMenuThatCannotOpenIsTheGlobesLongPress`（菜单建不出时改成长按地球键的输入法选择框）、`PopupComponentTest.aMenuTheEngineCannotMakeIsToldAsNotShown`（引擎画不出菜单时报没弹出，上滑才会改成长按地球键）、`aPickWhilePinyinIsTypedIsTheGlobesTapToo`、`aPickBecomesTheDefault`（选中的成为默认、存下来，和地球键一样）；格子、起始格、放不下时的取法见 ime-core `InputMethodMenuTest`，行的左右位置见 `EditPlanTest.theEditMenusPasteIsOverTheFingerTheRowKeptOnTheScreen`。设备截图见报告。
 
 ### KB-115 [P1] 下滑弹出的菜单：往下走不取消，滑回键上取消
 - **前提**：B0，输入法里再添加双拼。

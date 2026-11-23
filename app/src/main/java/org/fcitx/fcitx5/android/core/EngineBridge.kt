@@ -434,6 +434,11 @@ class EngineBridge {
         }
     }
 
+    /** For an input method not shown: what the keyboards watch stays the shown one's, as [answer] would write [im]'s. */
+    internal fun aside(im: String, call: () -> Snapshot) {
+        if (im !in unloadable) unloadable.call(im, call)
+    }
+
     private fun follow(im: String, s: Snapshot) {
         // every answer, not only while typing: the 14 keys handing back to 全拼 answer with none, which clears what they offered
         EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)

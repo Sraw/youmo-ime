@@ -65,9 +65,9 @@ class PackIconsRasterTest {
         raster(icons, f, 50, 50)!!.let { assertEquals(50 to 25, it.width to it.height) }
         raster(icons, f, 1000, 1000)!!.let { assertEquals(600 to 300, it.width to it.height) }
         // the same box is the same bitmap, not decoded again
-        val decodes = PackIcons.RASTERS.decodes
+        val decodes = PackIcons.RASTERS.decodes.get()
         raster(icons, f, 50, 50)
-        assertEquals(decodes, PackIcons.RASTERS.decodes)
+        assertEquals(decodes, PackIcons.RASTERS.decodes.get())
     }
 
     @Test
@@ -79,9 +79,9 @@ class PackIconsRasterTest {
         assertNotNull(raster(icons, files[0], 768, 768))
         // drawn on this board: the newer is not kept for it
         assertNull(raster(icons, files[1], 768, 768))
-        val decodes = PackIcons.RASTERS.decodes
+        val decodes = PackIcons.RASTERS.decodes.get()
         assertNull(raster(icons, files[1], 768, 768))
-        assertEquals(decodes, PackIcons.RASTERS.decodes)
+        assertEquals(decodes, PackIcons.RASTERS.decodes.get())
         // the board built anew: the one it no longer draws makes room
         icons.readAhead(emptyList())
         assertNotNull(raster(icons, files[1], 768, 768))

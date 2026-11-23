@@ -34,8 +34,9 @@ import java.io.File
 import java.util.zip.ZipInputStream
 
 /**
- * Other input methods' skins imported in the app (uat/14-settings.md ST-200–214): each sample as the device script makes
- * it, through the app's own codec, conversion, import dialog's text and placing, as the settings' import does.
+ * Other input methods' skins imported in the app (uat/14-settings.md ST-200–214 but ST-212, the web page's): each
+ * sample as the device script makes it, through the app's own codec, conversion, import dialog's text and placing, as
+ * the settings' import does.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -167,9 +168,10 @@ class SkinImportUatTest : ThemePackFixture() {
         val pack = opened(SkinUatSamples.withLayouts(), "uat-skin-layout.bds")
         assertTrue(pack.fromSkin)
         assertEquals(listOf("nine.xml", "qwerty.xml"), pack.staged.layouts.sorted())
-        val offered = appContext.resources.getQuantityString(R.plurals.theme_pack_skin_layouts, 2, 2, "uat 布局皮肤 · 26 键, uat 布局皮肤 · 九键")
+        val boards = listOf("uat 布局皮肤 · 26 键", "uat 布局皮肤 · 九键").joinToString(s(R.string.list_separator))
+        val offered = appContext.resources.getQuantityString(R.plurals.theme_pack_skin_layouts, 2, 2, boards)
         val text = pack.confirm()
-        assertTrue(text, text.contains(offered.substringBefore("：")))
+        assertTrue(text, text.contains(offered))
         // the dialog's box is ticked as ThemeListFragment's isChecked = !fromSkin (ThemeImportLayoutsTest); taken as left
         placed(pack, withLayouts = false)
         assertFalse(File(packs, "uat 布局皮肤/layouts").exists())

@@ -73,6 +73,9 @@ class TableDictionary(private val table: CodeTable) {
         return out.toIntArray()
     }
 
+    /** The entries whose code starts with [prefix], in table order: [match] without the copy. */
+    fun prefixRange(prefix: String): IntRange = table.prefixRange(prefix)
+
     fun firstOf(prefix: String): Int = table.prefixRange(prefix).let { if (it.isEmpty()) -1 else it.first }
 
     /** Whether typing on can lead anywhere: some code, or pinyin entry, starts with [pattern] (a wildcard too, unlike [match]). */

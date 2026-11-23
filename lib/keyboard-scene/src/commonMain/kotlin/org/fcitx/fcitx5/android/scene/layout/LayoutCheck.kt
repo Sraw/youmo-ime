@@ -145,11 +145,11 @@ object LayoutCheck {
             shown.bottomLeft?.let { warnings += it }
         }
         val padsLacking = pads.filter { !shown.padNeeds[it].isNullOrEmpty() }
-        return Report(errors, warnings, layout.family, ims, pads, commits, relaxed(minApp, warnings), padsLacking)
+        return Report(errors, warnings, layout.family, ims, pads, commits, minAppWithWarnings(minApp, warnings), padsLacking)
     }
 
     // a board lacking keys, or one blank somewhere, an older app refuses: the file says so
-    private fun relaxed(minApp: String, warnings: List<Finding>): String =
+    private fun minAppWithWarnings(minApp: String, warnings: List<Finding>): String =
         FEATURES.getValue("lacks").takeIf { v -> warnings.any { it.key == "lacks" || it.key == "blank" } && ThemeReader.newer(v, minApp) } ?: minApp
 
     private fun includes(layout: Layout, sources: Sources, errors: MutableList<Finding>): Map<String, Fragment> {
@@ -243,12 +243,15 @@ object LayoutCheck {
     internal val ROLES = setOf("backspace", "enter", "lang")
 
     /**
-     * The `lacks` kinds 0.6.0 refused a theme pack's board for, drawing the app's (its `judge`): a slot, ⌫, 回车 or 地球键
-     * ([ROLES]), a digit. Shift, the space bar, a letter, 返回 it did not ask for.
+     * Whether 0.6.0 refused a theme pack's [family] board for [finding], drawing the app's: a `lacks` of a slot, ⌫, 回车 or
+     * 地球键 ([ROLES]), a digit (its `judge`), or a letters board's letter (its reader's error). Shift, the space bar, 返回
+     * and a grouped board's letter it did not ask for.
      */
-    val LACKS_REFUSED_060: Set<String> = ROLES + setOf(
-        "lang-no-space", "digits", "pad-digits", "handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid",
-    )
+    fun refusedBy060(family: String, finding: Finding): Boolean {
+        val what = finding.args.firstOrNull()
+        return finding.key == "lacks" && (what in LayoutLacks.REFUSED_060 || (what == LayoutLacks.LETTERS && family == "letters"))
+    }
+
     internal val DIGIT = Regex("[0-9]")
     private const val BLANK_LIMIT = 5
 
@@ -515,9 +518,11 @@ object LayoutCheck {
     private fun groupShape(layout: Layout, fragments: Map<String, Fragment>): List<Finding> =
         if (layout.family != "grouped") emptyList() else listOfNotNull(Groups.shape(groups(layout, fragments))?.let { Finding(0, "groups", listOf(it)) })
 
-    /** The letters a to z no key of a `letters` board has by id (a theme pack's such board is not drawn). */
-    fun lettersLacking(layout: Layout, fragments: Map<String, Fragment>): Set<String> =
-        KeyNames.LETTERS.toSet() - cells(layout, fragments).mapNotNull { it.id }.toSet()
+    /** The letters a to z no key of a `letters` board has by id, as [Groups.missing] (a theme pack's such board is not drawn). */
+    fun lettersLacking(layout: Layout, fragments: Map<String, Fragment>): String {
+        val ids = cells(layout, fragments).mapNotNull { it.id }.toSet()
+        return KeyNames.LETTERS.filter { it !in ids }.joinToString("")
+    }
 
     internal fun groups(layout: Layout, fragments: Map<String, Fragment>): List<String> =
         cells(layout, fragments).filterIsInstance<Key>().mapNotNull { k -> k.letters?.rows?.joinToString(" ") }

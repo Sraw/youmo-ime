@@ -86,9 +86,9 @@
 - **预期**：安装成功；键盘不提示导入文字包；「澜境花园」还在，排第一（同 WD-03）；导入语音包后长按空格是语音输入（第一次会问录音权限）。
 
 ### PR-14 [P0] 从上一版升级后设置原样沿用
-- **前提**：装着上一版正式版（现在是 v0.6.0，不是要测的这一版），在它的设置里添加 **双拼**、把它拖到英文前面，状态面板切到 **繁体**，**通用输入 → 中文标点** 把 `,` 改成「、」，加自定义短语 `dz` → 「北京市海淀区」，**实体键盘** 里每页候选数设成 5，**外观 → 主题** 里建一个带背景图的自定义主题并用上；**外观 → 大小与样式** 里 **按键圆角** 选「直角」、**横向间距** 和 **纵向间距** 都选「宽松」，**按键 → 上滑图标位置** 选「底部」；**按键** 里 **上滑**、**下滑** 都关掉。0.4 及更早不再直接升级（要先升到 0.6.2），`uat/fixtures/upgrade` 的 0.3.x、0.4.0 夹具不用在这里；v0.5.x 的夹具还没有（做夹具的 `uat/fixtures/upgrade/make.py` 还是 redroid 的，没搬到模拟器）。
-- **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`），再在 **设置 → 资源包** 导入这一版的文字包（`uat/tools/uat.py packs --port <端口> --no-voice` 只用于模拟器的 debug 包；正式版经文件选择器导入）；打开设置看 **输入法**、**通用输入**、**实体键盘**、自定义短语、**按键**（**上滑**、**下滑**、**上滑图标位置**）、**外观 → 主题**；回测试页弹出键盘，看状态面板，打 g u o j i a、d z，长按 **符** 打 y a w n。
-- **预期**：输入法列表和顺序和升级前一样；繁体还开着，guojia 打出「國家」；`,` 是自带的「，」（0.6.1 没有中文标点页，升级时删掉改过的标点表，ST-145）；dz 第一候选是「北京市海淀区」；快速输入里 yawn 出颜文字；每页候选数是 5；建的自定义主题还在主题列表里、仍在用，键盘上背景图照样显示；键是直角、键之间缝隙比默认宽，**外观 → 大小与样式** 里 **按键圆角**「直角」、**横向间距**、**纵向间距**「宽松」照旧（0.5.1 起这些就是这里的设置，压在主题上，不再存进主题，所以从 0.5.1 及以后升级不提示「跟着主题走」，那条提示只在从 0.5.0 及更早升级时出现）；**按键** 里 **上滑**、**下滑** 都是关；**按键 → 上滑图标位置** 是「底部」，字母键的小字在字母下面；**外观 → 主题** 里导出那个主题，解开是最外层一个 `theme.xml`（4.0），背景图在包里，导回来样子不变（键的直角、宽松是 **大小与样式** 的设置，不在包里）；强停应用再弹出键盘，以上都照旧、不再提示。另跑一次动态取色的分支：升级前主题选动态取色的内置主题（Monet），**按键圆角** 选「直角」，设一个字母密码锁屏；升级后先弹出一次键盘（让新版本的输入法进程跑一次，把这个样式存进解锁前也读得到的地方），再重启手机，不解锁，在锁屏的密码框弹出键盘：键是直角（首次解锁前也读得到这个样式）。这一条在发版时用正式版跑。
+- **前提**：装着上一版正式版（现在是 v0.6.2，不是要测的这一版），在它的设置里添加 **双拼**、把它拖到英文前面，状态面板切到 **繁体**，**通用输入 → 性能档位** 选「低档」，加自定义短语 `dz` → 「北京市海淀区」，**实体键盘** 里每页候选数设成 5，**外观 → 主题** 里导入一个带背景图的主题（网页制作页做的）并用上；**外观 → 大小与样式** 里 **按键圆角** 选「直角」、**横向间距** 和 **纵向间距** 都选「宽松」，**按键 → 上滑图标位置** 选「底部」；**按键** 里 **上滑**、**下滑** 都关掉。0.4 及更早不再直接升级（要先升到 0.6.2），`uat/fixtures/upgrade` 的 0.3.x、0.4.0 夹具不用在这里；v0.5.x 的夹具还没有（做夹具的 `uat/fixtures/upgrade/make.py` 还是 redroid 的，没搬到模拟器）。
+- **操作**：不卸载，直接安装要测的这一版正式版（`adb install -r`），再在 **设置 → 资源包** 导入这一版的文字包（`uat/tools/uat.py packs --port <端口> --no-voice` 只用于模拟器的 debug 包；正式版经文件选择器导入）；打开设置看 **输入法**、**通用输入**（含 **性能档位**）、**实体键盘**、自定义短语、**按键**（**上滑**、**下滑**、**上滑图标位置**）、**外观 → 主题**；回测试页弹出键盘，看状态面板，打 g u o j i a、d z，长按 **符** 打 y a w n。
+- **预期**：输入法列表和顺序和升级前一样；繁体还开着，guojia 打出「國家」；**性能档位** 仍是低档（摘要以「低档」开头，后面括号里写着本机自动为哪档）；dz 第一候选是「北京市海淀区」；快速输入里 yawn 出颜文字；每页候选数是 5；导入的主题还在主题列表里、仍在用，键盘上背景图照样显示；键是直角、键之间缝隙比默认宽，**外观 → 大小与样式** 里 **按键圆角**「直角」、**横向间距**、**纵向间距**「宽松」照旧（0.5.1 起这些就是这里的设置，压在主题上，不再存进主题，所以从 0.5.1 及以后升级不提示「跟着主题走」，那条提示只在从 0.5.0 及更早升级时出现）；**按键** 里 **上滑**、**下滑** 都是关；**按键 → 上滑图标位置** 是「底部」，字母键的小字在字母下面；**外观 → 主题** 里导出那个主题，解开是最外层一个 `theme.xml`（4.0），背景图在包里，导回来样子不变（键的直角、宽松是 **大小与样式** 的设置，不在包里）；强停应用再弹出键盘，以上都照旧、不再提示（性能档位摘要仍以「低档」开头）。另跑一次档位没改过的分支：升级前 **性能档位** 保持 0.6.2 的默认（高档；特意选了高档的分不出来，一样）；升级后摘要是「自动（本机：X，原因）」，X 和 **⋮ → 关于** 的 **本机处理器** 一致（同 ST-199），强停后不变。另跑一次动态取色的分支：升级前主题选动态取色的内置主题（Monet），**按键圆角** 选「直角」，设一个字母密码锁屏；升级后先弹出一次键盘（让新版本的输入法进程跑一次，把这个样式存进解锁前也读得到的地方），再重启手机，不解锁，在锁屏的密码框弹出键盘：键是直角（首次解锁前也读得到这个样式）。这一条在发版时用正式版跑。
 
 ### PR-42 [P1] 设置读不出或没搬好时提示，不覆盖、不备份
 - **前提**：B0-设置，已有自定义短语 `dz` →「北京市海淀区」（同 WD-18）；设置文件读不出来，或这次启动没能把设置、数据目录放到位（手工触发不了，只在 JVM 上做）。
@@ -147,8 +147,8 @@
 <!-- learning: U-88 U-28 -->
 - **前提**：B0-五笔。照 TBL-11 记住「汪小明」；等 30 分钟以上（或在 JVM 里拨钟），再逐字打「鲸」「园」（q g y i 选「鲸」、l f q v）停一下，点提示条记住「鲸园」。
 - **操作**：**⋯ → 清掉最近 → 最近 10 分钟**，确认；点 q g l f、i i j e 看候选。再在密码框里逐字打几个字停一下。
-- **预期**：qglf 里没有「鲸园」（这段时间记住的删了），iije 里还有「汪小明」。密码框里不给出。备份带着记住的词，恢复后回来。
-- **JVM**：ime-core `ClearRecentTableWordsTest.theWordsATableRememberedMeanwhileGoAndOlderOnesStay`（清掉最近 10 分钟后只剩之前记住的，重放记录也一样，之后做的备份恢复到别的手机也一样）、`TableWordLearningTest`（不记录的输入框不给）、`BackupMergeTest`（`TableWordRow` 合并取较早的日子）；设备上不跑。
+- **预期**：qglf 里没有「鲸园」（这段时间记住的删了），iije 里还有「汪小明」。密码框里不给出。备份带着记住的词，恢复后回来。只删点「记住」记下的词：这段时间里带进码表的词（旧版留下的、导入的）留着（只在 JVM 上断言）。
+- **JVM**：ime-core `ClearRecentTableWordsTest.theWordsATableRememberedMeanwhileGoAndOlderOnesStay`（清掉最近 10 分钟后只剩之前记住的，重放记录也一样，之后做的备份恢复到别的手机也一样）、`ClearRecentTableWordsTest.aTablesWordTakenInMeanwhileStays`（同一段时间里带进来、不是点记住记下的码表词不删）、`TableWordLearningTest`（不记录的输入框不给）、`BackupMergeTest`（`TableWordRow` 合并取较早的日子）；设备上不跑。
 
 ## 备份与恢复（学到的）
 
@@ -230,6 +230,12 @@
 - **操作**：**用户数据 → 从备份恢复** 旧手机的文件；看 **通用输入 → 网址和邮箱**；再到 **学习备份** 点「退回恢复前」再看。
 - **预期**：恢复后两个地址都在，li@qq.com 在前，@gmail.com 是 3 次；退回后只有 li@qq.com。其余设置是文件里的。
 - **JVM**：`BackupUatTest.aSettingsBackupsAddressesMergeWithThePhones`（文件带着学习备份时设置里的地址留手机的，引擎启动时合并文件里的，退回恢复前回到手机的）；设备上不跑。
+
+### PR-73 [P1] 恢复 0.4 的备份：九键拼音从列表去掉，和直接升级一样
+- **前提**：要测的这一版，重置过；手机里有一个 0.4.x 导出的用户数据 `.zip`，导出前在 0.4 里加了九键拼音并拖到最上面（列表：九键拼音、拼音、英文）。没有现成的文件（`uat/fixtures/upgrade/v0.4.0` 的 `backup.zip` 里没有九键拼音），手工做：在模拟器上装 v0.4.0 的正式包（`gh release download v0.4.0 -p '*text-arm64*'`），**输入法 → 添加** 九键拼音并拖到最上面，**备份与恢复 → 备份全部**，把 zip 拉出来；再装要测的这一版、重置，把 zip 放进「下载」。
+- **操作**：**备份与恢复 → 从备份恢复**，选这个文件并确认；应用重启后看 **输入法** 列表和 **输入法 → 拼音 → 键盘**。
+- **预期**：恢复成功；列表是拼音、英文，没有九键拼音（和从 0.4 直接升级到这一版一样，见 docs/pinyin.md 九键一节）；拼音的 **键盘** 照备份里的（0.4 没有这项，是全键盘），要用九键自己选「九键」。
+- **JVM**：`KotlinHostTest.aZeroFourBackupsNineKeysPinyinIsDroppedFromTheList`（恢复带 `engine-t9` 的 0.4 profile 后重启，列表是拼音、英文，拼音的键盘不变）；设备上不跑。
 
 ### PR-50 [P2] 恢复备份时手机空间不够：停下提示，什么都不改
 - **前提**：B0-设置，加词「澜境花园」，**备份与恢复 → 备份全部** 存到"下载"；然后以 root 用一个大文件把 `/data` 填满（模拟器上 `adb root` 后 `adb shell fallocate -l <剩余大小> /data/local/tmp/fill`，剩余大小看 `adb shell df /data`）。
@@ -349,8 +355,8 @@
 ### PR-70 [P1] 恢复时收藏和手机上的合并
 - **前提**：B0，复制「公园」并收藏，放上标为敏感的「mima1234」并收藏；**备份全部**；再复制「散步」并收藏。
 - **操作**：**不重置**，从这份备份恢复，看确认框；恢复后看收藏页和最近页；再恢复一次。再拿一份 0.6.2 的备份（置顶了「钉」）恢复。
-- **预期**：确认框写着「剪贴板收藏和手机上的合并，手机上的收藏都留着」；收藏页「公园」「散步」「mima1234」都在，「公园」只一条，再恢复一次不多；最近页照备份；0.6.2 备份里置顶的「钉」也在收藏里。
-- **JVM**：`BackupFavoritesTest.aRestoreReplaces最近AndMergesTheFavouritesThePhonesSensitiveOnesKept`、`BackupFavoritesTest.theFavouritesNotKeptFailTheRestoreBeforeAnythingIsReplaced`、`BackupFavoritesTest.anOlderBackupsPinIsAFavouriteBesideThePhones`（按 0.6.2 的表写入置顶的一行当夹具）、`BackupFavoritesTest.aRestoreNotYetOpenedKeepsItsPhonesFavouritesThroughTheNext`、`BackupFavoritesTest.theFavouritesKeptAtARestoreNeverGoInABackupNorComeFromOne`、`ClipboardFavoritesTest.theFavouritesKeptAtARestoreAreMergedAtTheNextOpen`、`ClipboardFavoritesTest.aKeptFileNeverReadableIsDroppedNotTriedAtEveryStart`；设备上手动，发版时跑。
+- **预期**：确认框写着「剪贴板收藏和手机上的合并，手机上的收藏都留着」；收藏页「公园」「散步」「mima1234」都在，「公园」只一条，再恢复一次不多；最近页照备份；0.6.2 备份里置顶的「钉」也在收藏里。手机上的剪贴板库一时打不开（读写出错、被占用、空间满了、没有权限）时恢复失败、什么都不改；库文件坏了的照样恢复（只在 JVM 上断言）。
+- **JVM**：`BackupFavoritesTest.aRestoreReplaces最近AndMergesTheFavouritesThePhonesSensitiveOnesKept`、`BackupFavoritesTest.theFavouritesNotKeptFailTheRestoreBeforeAnythingIsReplaced`、`BackupFavoritesTest.aLibraryUnopenableForNowFailsTheRestoreBeforeAnythingIsReplaced`（手机上的库一时打不开：恢复失败，什么都不改）、`BackupFavoritesTest.aCorruptLibraryIsRestoredOver`（库文件坏了：照样恢复）、`BackupFavoritesTest.anOlderBackupsPinIsAFavouriteBesideThePhones`（按 0.6.2 的表写入置顶的一行当夹具）、`BackupFavoritesTest.aRestoreNotYetOpenedKeepsItsPhonesFavouritesThroughTheNext`、`BackupFavoritesTest.theFavouritesKeptAtARestoreNeverGoInABackupNorComeFromOne`、`ClipboardFavoritesTest.theFavouritesKeptAtARestoreAreMergedAtTheNextOpen`、`ClipboardFavoritesTest.aKeptFileNeverReadableIsDroppedNotTriedAtEveryStart`；设备上手动，发版时跑。
 
 ### PR-71 [P2] 0.6.3 的备份恢复到 0.6.2
 - **前提**：这一版里收藏两条，最近有几条；**备份全部**。

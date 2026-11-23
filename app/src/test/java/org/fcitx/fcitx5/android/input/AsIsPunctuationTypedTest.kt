@@ -209,7 +209,7 @@ class AsIsPunctuationTypedTest {
         host.until("the pair gone", { shown() }) { shown() == "|" }
         typeLetters("ni")
         h.longPress(comma()!!, pick = "(")
-        host.until("你() typed", { "${shown()} host.preedit [${fcitx.inputPanelCached.preedit}]" }) { shown() == "你(|)" }
+        host.until("你() typed", { "${shown()} preedit [${host.preedit}]" }) { shown() == "你(|)" }
         h.tap(h.keyWithId(R.id.button_backspace)!!)
         host.until("the pair gone", { shown() }) { shown() == "你|" }
     }

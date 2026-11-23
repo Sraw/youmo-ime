@@ -9,6 +9,7 @@ import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
 import org.fcitx.fcitx5.android.engine.data.ReadingSource
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.handwriting.InkReading
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord
 import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
@@ -279,6 +280,20 @@ class EnginesVoiceEditsTest : EnginesFixture() {
 
     @Test
     @Uat("VO-59")
+    fun `总是换 marked on the word list while asked, 记住 still done`() {
+        Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
+            assertTrue(e.addWord("攻势", "gong shi"))
+            e.context(PINYIN, "", said = true)
+            val ask = e.retyped(said = "推导这个公式", keys = "gongshi", word = "攻势")!!
+            assertEquals(true, ask.always)
+            e.learning(null, LearningOp.VoiceAlways("攻势", true))
+            assertTrue(e.voiceRemember(ask))
+            assertEquals(listOf("攻势" to true), e.userWords(UserWord.Kind.ADDED).map { it.text to it.voiceAlways })
+        }
+    }
+
+    @Test
+    @Uat("VO-59")
     fun `总是换 goes with a deleted word and comes back with its undo, on the word list and from a candidate`() {
         fun marked(delete: Engines.() -> LearningResult) = Engines(::load, MemoryFiles(), warmUps = inPlace).use { e ->
             assertTrue(e.addWord("攻势", "gong shi"))
@@ -327,6 +342,31 @@ class EnginesVoiceEditsTest : EnginesFixture() {
             e.userWords(UserWord.Kind.LEARNED).map { "${it.text}:${it.count}" }
         }
         assertRows(*(0..3).map { n -> "typed $n more: learned as never 记住'd" to { assertEquals(learned(false, n), learned(true, n)) } }.toTypedArray())
+    }
+
+    @Test
+    fun `a word a table remembered is not asked about, yet voice keeps it as the user's own`() {
+        // Engines over a record holding [text] remembered by 五笔
+        fun remembering(text: String, test: (Engines) -> Unit) {
+            val dir = MemoryFiles().also { olderPhrases(it, "ttpp" to text) }
+            Engines(::load, dir, warmUps = inPlace).use { e ->
+                assertTrue(e.userWords(UserWord.Kind.LEARNED).any { it.text == text && it.table.isNotEmpty() })
+                e.context(PINYIN, "", said = true)
+                test(e)
+            }
+        }
+        assertRows(
+            "one character typed again into it: only the hint, as for a word not the user's" to {
+                remembering("徐婧") { e ->
+                    val ask = e.retyped(n = 1, keys = "jing", word = "婧")
+                    assertEquals(true, ask?.hint)
+                    assertEquals("", ask?.word)
+                }
+            },
+            "it heard and corrected: voice would keep it, so nothing is asked" to {
+                remembering("徐静") { e -> assertNull(e.retyped()) }
+            },
+        )
     }
 
     @Test

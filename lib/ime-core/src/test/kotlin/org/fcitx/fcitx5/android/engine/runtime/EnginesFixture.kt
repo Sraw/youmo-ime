@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.runtime
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.CodeTable
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.english.EnglishDataBuilder
 import org.fcitx.fcitx5.android.engine.english.EnglishText
 import org.fcitx.fcitx5.android.engine.learn.LearnLog
@@ -154,8 +155,6 @@ internal fun records(dir: UserFiles): List<LearnRecord> {
     LearnRecords.FORMAT.read(dir.file(LearnLog.FILE).read()) { type, input -> reader.decode(type, input)?.let { records += it } }
     return records
 }
-
-internal fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
 internal fun Engines.type(im: String, keys: String) = keys.map { onEvent(im, EngineEvent.CHAR, it.code) }.last()
 

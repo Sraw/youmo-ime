@@ -9,13 +9,13 @@ import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneLayouts
 import org.fcitx.fcitx5.android.input.theme.KeyName
 import org.fcitx.fcitx5.android.input.theme.KeyNames
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
 import org.fcitx.fcitx5.android.scene.layout.Include
 import org.fcitx.fcitx5.android.scene.layout.Key
 import org.fcitx.fcitx5.android.scene.layout.Row
 import org.fcitx.fcitx5.android.scene.layout.Slot
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
@@ -46,14 +46,21 @@ class ThemeKeyNamesTest {
     // with [slots] its slots' too (nine's side column, a place of the format)
     private fun ids(id: String, slots: Boolean = false): List<String> {
         val layout = SceneLayouts.of(context, id) ?: error("no layout $id")
-        val rows = layout.layout.parts.flatMap { p -> if (p is Row) listOf(p) else layout.fragments.getValue((p as Include).src).rows }
+        val rows = layout.layout.parts.flatMap { p ->
+            when (p) {
+                is Row -> listOf(p)
+                is Include -> layout.fragments.getValue(p.src).rows
+            }
+        }
         return rows.flatMap { r -> r.cells.mapNotNull { (it as? Key)?.id ?: (it as? Slot)?.id?.takeIf { slots } } }
     }
 
     @Test
     fun everyKeyHasItsBoardsName() {
-        for ((board, layouts) in boards) for (id in layouts) for (key in ids(id)) {
-            assertTrue("$board/$key is not a name of the format", KeyNames.isKnown(KeyName(board, key)))
+        for ((board, layouts) in boards) for (id in layouts) {
+            // a theme's keys (k14/r1c1) are picked by the layout's id, not its file's name
+            assertEquals(id, board, SceneLayouts.of(context, id)!!.layout.id)
+            for (key in ids(id)) assertTrue("$board/$key is not a name of the format", KeyNames.isKnown(KeyName(board, key)))
         }
     }
 
@@ -64,8 +71,10 @@ class ThemeKeyNamesTest {
         for (id in boards.values.flatten()) {
             val layout = SceneLayouts.of(context, id) ?: error("no layout $id")
             val keys = layout.layout.parts.flatMap { p ->
-                if (p is Row) p.cells.map { it to (it.condition ?: p.condition) }
-                else (p as Include).let { inc -> layout.fragments.getValue(inc.src).rows.flatMap { r -> r.cells.map { it to (it.condition ?: r.condition ?: inc.condition) } } }
+                when (p) {
+                    is Row -> p.cells.map { it to (it.condition ?: p.condition) }
+                    is Include -> layout.fragments.getValue(p.src).rows.flatMap { r -> r.cells.map { it to (it.condition ?: r.condition ?: p.condition) } }
+                }
             }.filter { it.first is Key }
             for ((key, n) in keys.groupingBy { it.first.id }.eachCount()) if (n > 1) {
                 assertTrue("$id: $key twice, not each under a condition", keys.filter { it.first.id == key }.all { it.second != null })

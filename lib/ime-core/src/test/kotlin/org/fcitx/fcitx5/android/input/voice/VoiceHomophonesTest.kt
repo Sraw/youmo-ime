@@ -109,6 +109,8 @@ class VoiceHomophonesTest {
             row("of overlapping ones (徐静, 静公) the first from the start", h, "徐静公", "徐婧公"),
             row("next to digits and letters", h, "3徐静OK", "3徐婧OK"),
             row("a single character is no stretch", h, "a徐", "a徐"),
+            row("a word a table remembered is never put in: its code is no reading", listOf(learned("徐婧", 9f).copy(table = "wbx")), "徐静", "徐静"),
+            row("yet it is the user's own word, never replaced", listOf(added("徐婧"), learned("徐静", 9f).copy(table = "wbx")), "徐静来了", "徐静来了"),
         )
     }
 
@@ -206,6 +208,13 @@ class VoiceHomophonesTest {
                 val text = List(20) { "徐静" }.joinToString("，")
                 assertEquals(text, replaced(h, text, logProbs = count))
                 assertEquals(VoiceHomophones.MAX_CHOICES + 1, scored.last())
+            },
+            "20 apart, the model liking 徐婧 everywhere, the earlier the better: one place goes in, the 17th to 20th never tried" to {
+                val text = List(20) { "徐静" }.joinToString("，")
+                val tried = ArrayList<String>()
+                val likes = { texts: List<String> -> tried += texts; FloatArray(texts.size) { i -> texts[i].split("，").withIndex().sumOf { (at, w) -> if (w == "徐婧") 40.0 - at else 0.0 }.toFloat() } }
+                assertEquals(listOf("徐婧") + List(19) { "徐静" }, replaced(h, text, logProbs = likes).split("，"))
+                for (place in 16 until 20) assertTrue("place ${place + 1} tried", tried.none { it.split("，")[place] == "徐婧" })
             },
             "3 apart: 3 alone, 3 pairs, all three" to {
                 assertEquals("徐静，和瑞，徐静", replaced(h, "徐静，和瑞，徐静", logProbs = count))

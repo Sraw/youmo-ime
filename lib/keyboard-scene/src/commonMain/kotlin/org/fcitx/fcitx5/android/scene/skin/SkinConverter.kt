@@ -59,6 +59,13 @@ object SkinConverter {
     private fun sogouDiy(names: Set<String>): Boolean =
         "phoneTheme.ini" in names && names.any { SOGOU_DIY.matches(it) } && names.none { it.endsWith("phoneSkin.ini") }
 
+    // Rboard's packs: each theme a `<name>.zip` beside its `<name>` picture at the top; a skin's own pictures may be zipped too
+    private fun rboard(names: Set<String>): Boolean =
+        names.any { '/' !in it && it.endsWith(".zip") && it.removeSuffix(".zip") in names } && READERS.none { it.first(names) }
+
+    // a 仓 skin's sources, which a Trime theme's repository may keep in `jsonnet/` too
+    private fun cang(names: Set<String>): Boolean = names.any { it.startsWith("jsonnet/") || "/jsonnet/" in it } && !TrimeSkin.isTheme(names)
+
     /**
      * The [SkinFormat] of a format told apart and not converted, by [fileName], the one file's name in it and [names]
      * only; checked before the readers, as some of these hold files a reader would take (a 仓 skin's YAML).
@@ -70,9 +77,8 @@ object SkinConverter {
         return when {
             "sxi" in ext || ("skin.json" in leaves && has { it.endsWith("/res/skin.proto") }) -> SkinFormat.SHOUXIN
             "metadata.json" in leaves && has { it.substringAfterLast('/').let { n -> n.startsWith("style_sheet") && n.endsWith(".css") } } -> SkinFormat.GBOARD
-            // Rboard's packs: each theme a `<name>.zip` beside its `<name>` picture
-            "pack" in ext || has { it.endsWith(".zip") && it.removeSuffix(".zip") in names } -> SkinFormat.GBOARD
-            "cskin" in ext || has { it.startsWith("jsonnet/") || "/jsonnet/" in it } -> SkinFormat.CANG
+            "pack" in ext || rboard(names) -> SkinFormat.GBOARD
+            "cskin" in ext || cang(names) -> SkinFormat.CANG
             "apk" in ext || ("AndroidManifest.xml" in names && "resources.arsc" in names) -> SkinFormat.APK
             sogouDiy(names) -> SkinFormat.SOGOU_DIY
             else -> null

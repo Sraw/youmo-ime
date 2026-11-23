@@ -32,7 +32,6 @@ import org.fcitx.fcitx5.android.input.layout.RenamedKeys
 import org.fcitx.fcitx5.android.input.layout.ThemeLayoutSwitch
 import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.fcitx.fcitx5.android.scene.layout.KeyData
-import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.PackLayouts
 import org.fcitx.fcitx5.android.scene.theme.Meta
 import org.fcitx.fcitx5.android.utils.appContext
@@ -317,7 +316,7 @@ object ThemeLayoutsToList {
                     .getOrNull().orEmpty().map { pack to it }
             }
             // one lacking what 0.6.0 refused it for (it drew the app's): listed, not switched in, with no confirmation to tell it
-            val read = if (!switch) emptyList() else made.filter { (_, l) -> l.done.problems.none { it.key == "lacks" && it.args.firstOrNull() in LayoutCheck.LACKS_REFUSED_060 } }.mapNotNull { (pack, l) ->
+            val read = if (!switch) emptyList() else made.filter { (_, l) -> !l.done.refusedBy060 }.mapNotNull { (pack, l) ->
                 CustomKeyboards.choice(l.done.id)?.let { ThemeLayoutSwitch.Made(pack.file, l.board, it) to l }
             }
             Timber.i("theme packs' layouts listed: %d in %d ms (try %d)", made.size, (System.nanoTime() - began) / NANOS_A_MS, tries + 1)

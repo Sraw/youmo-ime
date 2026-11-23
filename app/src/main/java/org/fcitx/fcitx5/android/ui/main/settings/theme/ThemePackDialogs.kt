@@ -82,7 +82,10 @@ object ThemePackDialogs {
         }
         if (staged.warnings.isNotEmpty()) out += ctx.getString(R.string.theme_pack_warnings) + "\n" + staged.warnings.joinToString("\n") { "· $it" }
         if (pack.notes.isNotEmpty()) {
-            out += ctx.getString(R.string.theme_pack_skin_notes) + "\n" + pack.notes.entries.joinToString("\n") { (note, args) -> "· " + skinNote(ctx, note, args) }
+            // each board's layout parsed once, though several notes name it
+            val names = HashMap<String, String>()
+            val name = { id: String -> names.getOrPut(id) { builtInName(id) ?: id } }
+            out += ctx.getString(R.string.theme_pack_skin_notes) + "\n" + pack.notes.entries.joinToString("\n") { (note, args) -> "· " + skinNote(ctx, note, args, name) }
         }
         return out.joinToString("\n")
     }
@@ -92,21 +95,16 @@ object ThemePackDialogs {
         CustomLayouts.sources.layouts[id]?.let { (LayoutReader.layout(it) as? Parsed.Ok)?.value?.name }
 
     // a count the reader did not give is left unsaid
-    private fun skinNote(ctx: Context, note: SkinNote, args: List<String>): String {
+    private fun skinNote(ctx: Context, note: SkinNote, args: List<String>, name: (String) -> String): String {
         val count = args.firstOrNull()?.toIntOrNull()
+        val boards = { args.joinToString(listSeparator(ctx), transform = name) }
         return when (note) {
-            SkinNote.LAYOUT_SOME -> ctx.getString(
-                R.string.theme_pack_skin_note_layout_some,
-                args.joinToString(listSeparator(ctx)) { id -> builtInName(id) ?: id },
-            )
+            SkinNote.LAYOUT_SOME -> ctx.getString(R.string.theme_pack_skin_note_layout_some, boards())
             // one line each, as the caller marks the first
             SkinNote.LAYOUT_LACKS -> args.map { it.split('\t') }.joinToString("\n· ") { a ->
-                ctx.getString(R.string.theme_pack_skin_note_layout_lacks, builtInName(a[0]) ?: a[0], LayoutTexts.finding(ctx, LayoutCheck.Finding(0, "lacks", a.drop(1))))
+                ctx.getString(R.string.theme_pack_skin_note_layout_lacks, name(a[0]), LayoutTexts.finding(ctx, LayoutCheck.Finding(0, "lacks", a.drop(1))))
             }
-            SkinNote.LAYOUT_EXTRA -> ctx.getString(
-                R.string.theme_pack_skin_note_layout_extra,
-                args.joinToString(listSeparator(ctx)) { id -> builtInName(id) ?: id },
-            )
+            SkinNote.LAYOUT_EXTRA -> ctx.getString(R.string.theme_pack_skin_note_layout_extra, boards())
             SkinNote.TOOLBAR_ICONS -> count?.let { ctx.getString(R.string.theme_pack_skin_note_toolbar_icons_count, it) }
                 ?: ctx.getString(R.string.theme_pack_skin_note_toolbar_icons)
             SkinNote.INCLUDES -> count?.let { ctx.getString(R.string.theme_pack_skin_note_includes_count, it) }

@@ -8,6 +8,7 @@ import android.graphics.Color
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.data.theme.RasterPacks
 import org.fcitx.fcitx5.android.data.theme.ThemePackFiles
+import org.fcitx.fcitx5.android.scene.pet.PetLimits
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -62,6 +63,14 @@ class PetFilesTest {
         assertTrue(refused(pet(frames = 16), files("pet-idle.png" to RasterPacks.png(1024, 256, Color.RED, noise = true))).contains("over 512 KB"))
         assertTrue(refused(pet(sheet = "pet.webp"), files("pet.webp" to RasterPacks.animatedWebp())).contains("an animated WebP"))
         assertTrue(refused(pet(), files("pet-idle.png" to "not a png".encodeToByteArray())).contains("not a PNG or WebP"))
+    }
+
+    // the string takes the limits as numbers: given only what was wrong, it would throw instead of saying it
+    @Test
+    fun aRefusedSheetSaysTheLimits() {
+        val said = refused(pet(frames = 2, columns = 2), files("pet-idle.png" to RasterPacks.png(600, 40, Color.RED)))
+        val limits = "at most ${PetLimits.MAX_SHEET_BYTES / 1024} KB and ${PetLimits.MAX_SHEET_SIDE} px a side, frames at most ${PetLimits.MAX_FRAME_SIDE} px"
+        assertTrue(said, said.contains(limits) && said.contains("idle · pet-idle.png: frames of 300×40 px, over 256 px a side"))
     }
 
     @Test

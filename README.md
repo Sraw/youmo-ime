@@ -44,7 +44,7 @@
 - **生僻字屏蔽**：按《通用规范汉字表》分组，把不想看到的生僻字从所有中文候选、联想和语音结果里挡掉，可以整组挡，也可以一个个挑（默认关）。
 - **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
 - **剪贴板、工具栏、输入框**：剪贴板条目能切成一块块，点选或横着滑选后拼起来上屏，历史可以不限条数；工具栏的按钮和顺序自己定；数字、电话框直接出数字键盘，网址、邮箱框给常用后缀和打过的邮箱。
-- **主题、长按和滑动、编辑菜单**：在网页主题制作页做主题（渐变、动态背景、按键音、自己的图标），也能导入百度、搜狗、同文、FlorisBoard 的皮肤，带 12 个新内置主题；每个键的长按、上滑、下滑在一页里改，所有键盘通用；空格上滑出全选、复制、粘贴、撤销，退格上滑清除、下滑恢复，滑选能跨行选字。
+- **主题、长按和滑动、编辑菜单**：在网页主题制作页做主题（渐变、动态背景、按键音、自己的图标），也能导入百度、搜狗、讯飞、同文、FlorisBoard 的皮肤（网页制作页也能打开它们接着改），主题还能带一只跟着打字动的小宠物，带 12 个新内置主题；每个键的长按、上滑、下滑在一页里改，所有键盘通用；空格上滑出全选、复制、粘贴、撤销，退格上滑清除、下滑恢复，滑选能跨行选字。
 - **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；快速输入存自己的常用语，什么都没打时点一下上屏；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
 - **自己的键盘布局**：在网页布局编辑器里拖键、改宽、合并键，做成 17 键、AZERTY 之类的布局，导入后给拼音、双拼、英文、码表打字用，数字键盘、符号面板也能换。
 - **分体、单手、悬浮键盘，实体键盘**：竖屏、横屏各选普通、分体、悬浮或单手；悬浮键盘能拖动、调大小；折叠屏展开、平板竖拿按横屏排；接实体键盘时候选显示在光标旁。
@@ -120,7 +120,7 @@ English, and offline voice input once the voice pack is imported. It asks for no
 - **Rare characters held back**: in the groups of the Table of General Standard Chinese Characters, the rare characters you never want kept out of every Chinese candidate, prediction and voice result, a whole group or one by one (off by default).
 - **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).
 - **Clipboard, toolbar, fields**: a clipboard entry cut into pieces, picked by taps or a sideways swipe and typed joined, with history of any length; the toolbar's buttons and their order your own; number and phone fields open a number pad, URL and email fields offer suffixes and the addresses you typed.
-- **Themes, long press and swipes, an edit menu**: themes made on the web theme maker (gradients, animated backgrounds, key sounds, your own icons), skins imported from Baidu, Sogou, Trime and FlorisBoard, 12 new built-in themes; each key's long press and swipes edited on one page for every keyboard; swipe up on the space bar for select all, copy, paste and undo, up on backspace to clear, down to bring it back; 滑选 selects across lines.
+- **Themes, long press and swipes, an edit menu**: themes made on the web theme maker (gradients, animated backgrounds, key sounds, your own icons), skins imported from Baidu, Sogou, iFlytek, Trime and FlorisBoard (the web theme maker opens them too), a little pet in a theme that moves as you type, 12 new built-in themes; each key's long press and swipes edited on one page for every keyboard; swipe up on the space bar for select all, copy, paste and undo, up on backspace to clear, down to bring it back; 滑选 selects across lines.
 - **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; quick input keeps your own phrases, a tap types one when nothing is typed; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
 - **Your own keyboard layouts**: drag keys, change widths and merge keys in the web layout maker, for a 17-key or AZERTY board and the like, and import it to type pinyin, shuangpin, English or the tables on; the number pad and the symbols can be replaced too.
 - **Split, one-handed and floating keyboards, physical keyboards**: portrait and landscape each pick normal, split, floating or one-handed; the floating keyboard is dragged and resized; an unfolded foldable or a tablet upright is laid out as landscape; with a physical keyboard, candidates show by the cursor.

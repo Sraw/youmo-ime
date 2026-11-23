@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.scene.skin
 import org.fcitx.fcitx5.android.scene.layout.LayoutCheck
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.Parsed
+import org.fcitx.fcitx5.android.scene.Uat
 import org.fcitx.fcitx5.android.scene.skin.SkinAction.Letter
 import org.fcitx.fcitx5.android.scene.skin.SkinAction.Role
 import org.fcitx.fcitx5.android.scene.skin.SkinFixtures.convertWith
@@ -64,6 +65,7 @@ class SkinThemeFeaturesTest {
         // a state's icon only in its state, a bar's drawn as it is
         assertContains(x, """<style select="key[role=shift]:locked" icon-color="#336699"/>""")
         assertFalse("icon-shift-locked-p.png" in c.files.map { it.name })
+        assertTrue(c.lines("key[role=shift]:shifted:pressed icon").isEmpty())
         assertContains(x, """<icon name="emoji" src="icon-emoji.png"/>""")
         val emoji = c.files.first { it.name == "icon-emoji.png" } as SkinOutput.Image
         assertEquals(256, emoji.pixels.width)
@@ -71,6 +73,18 @@ class SkinThemeFeaturesTest {
         assertContains(x, """min-app="0.6.3"""")
         val t = read(c)
         assertNotNull(t.icons["enter-pressed"])
+    }
+
+    @Test
+    fun aShiftsPressedPictureIsOnlyTheUnshiftedOnes() {
+        val l = look()
+        l.icon("shift", face(64, 64, 8, white), gradient(64, 64, white, blue))
+        val c = convertWith(source(l))
+        assertContains(c.themeXml, """<style select="key[role=shift]:pressed icon" content="icon(shift-pressed)"/>""")
+        // `:pressed` selects a shifted or locked one too: those keep their own picture
+        assertContains(c.themeXml, """<style select="key[role=shift]:shifted:pressed icon" content="icon(shift-once)"/>""")
+        assertContains(c.themeXml, """<style select="key[role=shift]:locked:pressed icon" content="icon(shift-locked)"/>""")
+        read(c)
     }
 
     @Test
@@ -125,15 +139,41 @@ class SkinThemeFeaturesTest {
     }
 
     @Test
-    fun everyIconAndStickerFitsThePack() {
-        val l = look()
-        for (n in SkinIcons.NAMES) l.icon(n, gradient(256, 256, white, blue), gradient(256, 256, blue, white))
-        for (c in 'a'..'z') l.letterImage(c, gradient(256, 256, white, grey), gradient(256, 256, grey, white))
-        val c = convertWith(source(l))
-        assertTrue(c.files.size + 1 <= SkinTheme.MAX_PACK_ENTRIES, "${c.files.size}")
-        assertTrue(c.files.size <= SkinTheme.MAX_PACK_ENTRIES - 1)
-        assertTrue(c.themeXml.encodeToByteArray().size <= SkinTheme.MAX_THEME_XML_BYTES)
-        read(c)
+    @Uat("ST-217")
+    fun everyIconAndStickerFitsThePackWithOrWithoutKeyFaces() {
+        // why, whether 48 faces at the key side's cap (about 50 MB, so the icons and stickers no longer all fit) go in first
+        val rows = listOf(
+            "icons and stickers alone" to false,
+            "48 faces at MAX_KEY_SIDE first: they count against the pack too" to true,
+        )
+        assertRows(rows, { it.first }) { (why, faces) ->
+            val l = look()
+            if (faces) for ((i, ch) in ('a'..'x').withIndex()) {
+                val side = SkinTheme.MAX_KEY_SIDE
+                l.keys["qwerty/$ch"] = SkinKey(
+                    SkinFill.Image(gradient(side, side, white, 0xFF000000.toInt() or i), null),
+                    SkinFill.Image(gradient(side, side, grey, 0xFF000000.toInt() or (i shl 8)), null),
+                    0xFF000000.toInt(), null, icons = false,
+                )
+            }
+            for (n in SkinIcons.NAMES) l.icon(n, gradient(256, 256, white, blue), gradient(256, 256, blue, white))
+            for (c in 'a'..'z') l.letterImage(c, gradient(256, 256, white, grey), gradient(256, 256, grey, white))
+            val c = convertWith(source(l))
+            assertEquals(if (faces) 48 else 0, c.files.count { it.name.startsWith("l-qwerty-") }, why)
+            val bytes = c.files.sumOf {
+                when (it) {
+                    is SkinOutput.Bytes -> it.bytes.size.toLong()
+                    is SkinOutput.Image -> SkinTheme.pngBound(it.pixels.width, it.pixels.height).let { b -> if (it.shrink) minOf(b, it.maxBytes) else b }
+                }
+            }
+            assertTrue(bytes <= SkinTheme.MAX_PACK_BYTES - SkinTheme.MAX_THEME_XML_BYTES, "$why: $bytes")
+            // and theme.xml
+            assertTrue(c.files.size + 1 <= SkinTheme.MAX_PACK_ENTRIES, "$why: ${c.files.size}")
+            assertTrue(c.themeXml.encodeToByteArray().size <= SkinTheme.MAX_THEME_XML_BYTES, why)
+            // the ones left out told of, not the import refused
+            if (faces) assertTrue(SkinNote.KEY_ICONS in c.notes || SkinNote.TOOLBAR_ICONS in c.notes || SkinNote.LETTER_IMAGES in c.notes, "$why: ${c.notes}")
+            read(c)
+        }
     }
 
     @Test
@@ -192,8 +232,7 @@ class SkinThemeFeaturesTest {
         assertEquals(1, o.lines("key.enter").count { "icon-color" in it })
     }
 
-    // a PNG's most, as the converter counts it
-    private fun bound(w: Int, h: Int): Long = (4L * w * h + h).let { it + it / 1000 + 1024 }
+    private fun bound(w: Int, h: Int): Long = SkinTheme.pngBound(w, h)
 
     // the pack filled by a font but for [room] bytes: what is left out after it, in order
     private fun filled(room: Long, dark: Boolean = true): SkinConversion {
@@ -207,6 +246,7 @@ class SkinThemeFeaturesTest {
     }
 
     @Test
+    @Uat("ST-217")
     fun whatThePackHasNoRoomForIsLeftOutInItsOrderAndToldOf() {
         val none = filled(room = 0)
         assertTrue(none.files.none { it.name == SkinTheme.DARK_BOARD_FILE || it.name.startsWith("icon-") || it.name.startsWith("st-") })
@@ -265,12 +305,13 @@ class SkinThemeFeaturesTest {
         assertEquals(setOf("qwerty"), c.layouts.keys)
         assertEquals(listOf("nine"), c.notes[SkinNote.LAYOUT_SOME])
         assertNull(c.notes[SkinNote.LAYOUT_EXTRA])
+        assertNull(c.notes[SkinNote.LAYOUT_LACKS])
         // a row of the skin's own under the keys: left out and said so
         val tools = SkinLook(1080).apply { layouts += SkinBoard("qwerty", qwertyBoard().rows + listOf(listOf(SkinKeyBox(0.0, 600.0, 1080.0, 100.0, Role("emoji")))), 1080.0) }
         val withTools = convertWith(source(tools))
         assertEquals(setOf("qwerty"), withTools.layouts.keys)
         assertEquals(listOf("qwerty"), withTools.notes[SkinNote.LAYOUT_EXTRA])
-        assertNull(c.notes[SkinNote.LAYOUT_LACKS])
+        assertNull(withTools.notes[SkinNote.LAYOUT_LACKS])
         // one without ⇧: written, and what it lacks said with the board's id
         val noShift = qwertyBoard().rows.mapIndexed { i, r -> if (i == 2) r.filter { it.action != Role("shift") } else r }
         val lacking = convertWith(source(SkinLook(1080).apply { layouts += SkinBoard("qwerty", noShift, 1080.0) }))

@@ -152,6 +152,7 @@ class StickerCacheTest {
         fun label(s: Op.Sticker) = s.standIn.filterIsInstance<Op.Text>().single { it.part == Part.Label.xml }
         assertEquals((label(full).color.alpha * 0.4).toInt().toDouble(), label(faded).color.alpha.toDouble(), 1.0)
     }
+
     // what shows now is read first: past the budget it is a press not shown yet that goes unkept
     @Test
     fun overItsBudgetABoardKeepsWhatItShowsNow() {
@@ -205,5 +206,4 @@ class StickerCacheTest {
         assertTrue(h.keys().filterIsInstance<SceneShownKey>().any { it.node.role == "shift" })
         assertEquals(1, PackIcons.STICKERS.keptOf(PackIcons.of(theme).ahead.single { it.sticker }.file))
     }
-
 }

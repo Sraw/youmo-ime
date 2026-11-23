@@ -81,11 +81,12 @@ class SkinTheme(
         }
         main.font?.let { (file, bytes) -> add(SkinOutput.Bytes(fontName(file), bytes)) }
         val sounds = soundLines(main)
-        val pack = Budget(layouts.values.map { it.text.encodeToByteArray().size.toLong() })
         val styled = ArrayList<String>()
         for ((variant, look) in looks) {
             styled += styles(look, variant, scene = if (variant == first) "" else "@dark ", firstKeys = main.keys.keys, picture = variant == first && board != null)
         }
+        // made after the faces: the board, preview, font, sounds and faces are written whatever is left, the rest only in it
+        val pack = Budget(layouts.values.map { it.text.encodeToByteArray().size.toLong() }, files.values)
         // the dark picture after the faces, fonts and sounds the budget holds first
         val dark = if (looks.size == 2) (main.darkPicture?.let { darkOf(it, main.board) } ?: darkBoard) else null
         when (darkLines(dark, board, pack)) {
@@ -156,7 +157,7 @@ class SkinTheme(
     // written where the pack has room for it
     private fun darkPicture(dark: Pixels, pack: Budget): Boolean {
         val out = SkinOutput.Image(DARK_BOARD_FILE, dark, MAX_PICTURE_BYTES, shrink = true)
-        if (!pack.fits(out, files.values)) return false
+        if (!pack.take(out)) return false
         add(out)
         uses063 = true
         return true
@@ -194,22 +195,24 @@ class SkinTheme(
         return out
     }
 
-    /** The pack's limits (ime-core's ThemeAssetLimits) less what is written regardless: theme.xml and the layouts. */
-    private class Budget(layouts: List<Long>) {
-        private val entries = MAX_PACK_ENTRIES - 1 - layouts.size
-        private val bytes = MAX_PACK_BYTES - MAX_THEME_XML_BYTES - layouts.sum()
+    /** The pack's limits (ime-core's ThemeAssetLimits) less what is written regardless: theme.xml, the layouts and [written]. */
+    private class Budget(layouts: List<Long>, written: Collection<SkinOutput>) {
+        private var entries = MAX_PACK_ENTRIES - 1 - layouts.size - written.size
+        private var bytes = MAX_PACK_BYTES - MAX_THEME_XML_BYTES - layouts.sum() - written.sumOf(::bound)
 
-        fun fits(out: SkinOutput, written: Collection<SkinOutput>): Boolean =
-            written.size + 1 <= entries && written.sumOf(::bound) + bound(out) <= bytes
+        /** Whether [out] fits in what is left, and if so counted. */
+        fun take(out: SkinOutput): Boolean {
+            val b = bound(out)
+            if (entries < 1 || b > bytes) return false
+            entries--
+            bytes -= b
+            return true
+        }
 
-        // a PNG is at most its pixels stored as they are, and one halved till within its bytes at most those
+        // one halved till within its bytes is at most those
         private fun bound(o: SkinOutput): Long = when (o) {
             is SkinOutput.Bytes -> o.bytes.size.toLong()
-            is SkinOutput.Image -> {
-                val raw = 4L * o.pixels.width * o.pixels.height + o.pixels.height
-                val stored = raw + raw / PNG_OVERHEAD_PER + PNG_HEADERS
-                if (o.shrink) minOf(stored, o.maxBytes) else stored
-            }
+            is SkinOutput.Image -> pngBound(o.pixels.width, o.pixels.height).let { if (o.shrink) minOf(it, o.maxBytes) else it }
         }
     }
 
@@ -287,6 +290,8 @@ class SkinTheme(
             pm?.let { pressedStyles += style("$sel:pressed", "icon-color" to hex(it)) }
             val shown = returnAction(p.name)?.let { Values.RETURN_ICON + it } ?: "content"
             pressedStyles += style("$sel:pressed icon", shown to "icon(${p.name}-pressed)")
+            // `:pressed` selects a shifted or locked ⇧ too, which would flash the unshifted picture
+            if (p.name == "shift") SHIFTED.forEach { (state, icon) -> pressedStyles += style("$sel:$state:pressed icon", "content" to "icon($icon)") }
         } else if (mono != null) {
             pressedStyles += style("$sel:pressed", "icon-color" to hex((p.pressed as? SkinIcons.Pressed.Color)?.argb ?: mono))
         }
@@ -317,7 +322,7 @@ class SkinTheme(
         val taken = ArrayList<T>()
         for (t in items) {
             val o = out(t)
-            if (taken.size < max && pack.fits(o, files.values)) {
+            if (taken.size < max && pack.take(o)) {
                 add(o)
                 taken += t
             }
@@ -546,6 +551,7 @@ class SkinTheme(
         /** ThemeReader's, SVG and raster alike. */
         const val MAX_ICONS = 200
         const val MAX_STICKER_SIDE = 256
+        private val SHIFTED = listOf("shifted" to "shift-once", "locked" to "shift-locked")
         private const val PNG_OVERHEAD_PER = 1000
         private const val PNG_HEADERS = 1024L
         const val PREVIEW = "preview.png"
@@ -586,6 +592,12 @@ class SkinTheme(
 
         /** [s] with no control character and one space for each run of white space. */
         fun clean(s: String): String = s.filter { it >= ' ' && it != '\u007F' }.replace(SPACES, " ").trim()
+
+        /** A PNG's bytes at most: its pixels stored as they are (filter bytes too), with deflate's and the chunks' overhead. */
+        internal fun pngBound(width: Int, height: Int): Long {
+            val raw = 4L * width * height + height
+            return raw + raw / PNG_OVERHEAD_PER + PNG_HEADERS
+        }
 
         /**
          * A skin's name as its theme's: [clean], no `/` nor `\` (a theme's name names its folder), not led by a dot,

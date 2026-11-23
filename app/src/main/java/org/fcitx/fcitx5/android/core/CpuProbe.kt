@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.core
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.annotation.VisibleForTesting
 import org.fcitx.fcitx5.android.BuildConfig
@@ -25,6 +26,7 @@ import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
+import kotlin.concurrent.thread
 
 /** The CPU's raw facts, read under [root] (`/` on a device): no decision here, that is [DeviceProfile.of]'s. */
 class CpuProbe(private val root: File, private val native: CpuNative?, private val arm64: Boolean) {
@@ -65,6 +67,7 @@ class CpuProbe(private val root: File, private val native: CpuNative?, private v
 object ThisDevice {
     private const val PREFS = "device_profile"
     private const val ROBOLECTRIC = "robolectric"
+    private const val JVM = "JVM"
 
     /** What JVM tests get under Robolectric: nothing read, the medium level, never HostCore's default high. */
     val TEST_FACTS = CpuFacts(arm64 = false, hwcap = 0, hwcap2 = 0, cores = emptyList())
@@ -74,15 +77,44 @@ object ThisDevice {
 
     var profiles: DeviceProfiles
         get() = made ?: synchronized(this) { made ?: create(appContext).also { made = it } }
-        @VisibleForTesting set(value) {
+        // under the lock: a warm-up creating the profiles meanwhile would replace the test's
+        @VisibleForTesting set(value) = synchronized(this) {
             made = value
+            decided = false
         }
 
+    @Volatile
+    private var decided = false
+
     /** Decided on the caller's thread the first time: a few milliseconds, the SDOT trial included. */
-    val profile: DeviceProfile get() = profiles.get()
+    val profile: DeviceProfile get() = profiles.get().also { if (!decided) decided = true }
+
+    /**
+     * Decides [profile] on a thread of its own, so a settings page asking next need not probe and try on the main thread;
+     * none once decided (each rotation calls it).
+     */
+    fun warm(): Thread? {
+        if (decided) return null
+        return thread(name = "device-profile") {
+            runCatching { profile }.onFailure { Timber.w(it, "device profile not decided early") }
+        }
+    }
+
+    @VisibleForTesting
+    fun forget() = synchronized(this) {
+        made = null
+        decided = false
+    }
 
     @Volatile
     private var madeKernel: MatrixKernel? = null
+
+    @Volatile
+    private var usedKernel: String? = null
+
+    /** The int8 loop [kernel] runs (`JVM` without the library), for the about page: what the native side took once made. */
+    val kernelName: String
+        get() = usedKernel ?: if (native() == null) JVM else profile.kernel.name
 
     /** The engine's kernel: the profile's int8 loop, its stretches pinned to the big cores; [MatrixKernel.JVM] without the library. */
     var kernel: MatrixKernel
@@ -92,12 +124,17 @@ object ThisDevice {
         }
 
     private fun makeKernel(): MatrixKernel {
-        val native = native() ?: return MatrixKernel.JVM
+        val native = native() ?: return MatrixKernel.JVM.also { usedKernel = JVM }
         val profile = profile
         val used = NativeMatrixKernel.useKernel(kind(profile.kernel), profile.trial == SdotTrial.PASSED)
+        usedKernel = nameOf(used)
         Timber.d("kernel %d for %s, big cores 0x%x", used, profile.kernel, profile.bigMask)
         return pinned(NativeMatrixKernel, BigCorePin(checks(native), profile.bigMask, profile.possibleMask))
     }
+
+    /** [NativeMatrixKernel.useKernel]'s answer as the about page names it: a number it does not know shown as it is. */
+    @VisibleForTesting
+    fun nameOf(used: Int): String = Kernel.entries.firstOrNull { kind(it) == used }?.name ?: used.toString()
 
     fun kind(kernel: Kernel) = when (kernel) {
         Kernel.PORTABLE -> NativeMatrixKernel.PORTABLE
@@ -130,18 +167,10 @@ object ThisDevice {
         val native = native()
         val probe = CpuProbe(File("/"), native, Build.SUPPORTED_ABIS.firstOrNull() == "arm64-v8a")
         // device-protected: the same profile before the first unlock and after
-        val prefs = context.createDeviceProtectedStorageContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val store = object : ProfileStore {
-            override fun read(): Map<String, String> = prefs.all.mapNotNull { (k, v) -> (v as? String)?.let { k to it } }.toMap()
-
-            // commit, not apply: the SDOT trial's mark must be on disk before an instruction that may kill the process
-            override fun write(values: Map<String, String?>) {
-                prefs.edit().apply { values.forEach { (k, v) -> if (v == null) remove(k) else putString(k, v) } }.commit()
-            }
-        }
+        val store = PrefsProfileStore(context.createDeviceProtectedStorageContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE))
         // JVM tests: never the host's /sys and /proc, which differ from machine to machine
         if (Build.FINGERPRINT == ROBOLECTRIC) return DeviceProfiles(store, key(), { TEST_FACTS }, null)
-        return DeviceProfiles(store, key(), probe::facts, native?.let(::checks), probe::cpuset)
+        return DeviceProfiles(store, key(), probe::facts, native?.let(::checks), probe::cpuset, trialKey = Build.FINGERPRINT)
     }
 
     // an app or system update may bring another kernel or other rules; a debug build's commit, rules changed in development
@@ -155,4 +184,13 @@ object ThisDevice {
             else -> SdotResult.FAILED
         }
     }
+}
+
+/** [ProfileStore] on [prefs]: values not strings are not the profile's and read as absent. */
+class PrefsProfileStore(private val prefs: SharedPreferences) : ProfileStore {
+    override fun read(): Map<String, String> = prefs.all.mapNotNull { (k, v) -> (v as? String)?.let { k to it } }.toMap()
+
+    // commit, not apply: the SDOT trial's mark must be on disk before an instruction that may kill the process
+    override fun write(values: Map<String, String?>): Boolean =
+        prefs.edit().apply { values.forEach { (k, v) -> if (v == null) remove(k) else putString(k, v) } }.commit()
 }

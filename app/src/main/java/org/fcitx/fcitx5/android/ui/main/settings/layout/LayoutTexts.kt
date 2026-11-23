@@ -72,7 +72,8 @@ object LayoutTexts {
             // an app key and its board by the name its key page has
             "held", "held-letters" -> ctx.getString(STRINGS.getValue(f.key), a.getOrElse(0) { "" }, a.getOrNull(1)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
             "held-popups" -> ctx.getString(R.string.layout_finding_held_popups, a.getOrNull(0)?.let { spaced(ctx, appBoard(ctx, it)) } ?: "")
-            "pad-lacks", "lacks" -> lacks(ctx, f.key, a)
+            "pad-lacks" -> padLacks(ctx, a)
+            "lacks" -> lacks(ctx, a)
             "base" -> ctx.getString(R.string.layout_finding_base, appBoard(ctx, a.getOrElse(0) { "" }))
             "bottom-left" -> ctx.getString(R.string.layout_finding_bottom_left, a.getOrElse(0) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(sep) { role(ctx, it) })
             else -> string(f.key)?.let { ctx.getString(it, *Array(ARGS) { i -> a.getOrElse(i) { "" } }) }
@@ -80,14 +81,16 @@ object LayoutTexts {
         }
     }
 
-    // pad-lacks [pad, digits]; lacks [what, items, pads]: what the board does without it, pads named only where the others have it
-    private fun lacks(ctx: Context, key: String, a: List<String>): String {
+    // [pad, digits]; the full pad is every number field's, not one kind of field
+    private fun padLacks(ctx: Context, a: List<String>): String {
         val items = a.getOrElse(1) { "" }
-        if (key == "pad-lacks") {
-            // the full pad is every number field's, not one kind of field
-            return if (a.getOrNull(0) == "full") ctx.getString(R.string.layout_finding_full_lacks, items)
-            else ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", items)
-        }
+        return if (a.getOrNull(0) == "full") ctx.getString(R.string.layout_finding_full_lacks, items)
+        else ctx.getString(R.string.layout_finding_pad_lacks, a.getOrNull(0)?.let { pad(ctx, it) } ?: "", items)
+    }
+
+    // [what, items, pads]: what the board does without it, pads named only where the others have it
+    private fun lacks(ctx: Context, a: List<String>): String {
+        val items = a.getOrElse(1) { "" }
         val pads = a.getOrElse(2) { "" }.split(' ').filter { it.isNotEmpty() }.joinToString(ctx.getString(R.string.list_separator)) { pad(ctx, it) }
         if (a.getOrNull(0) == "pad-digits") {
             return if (pads.isEmpty()) ctx.getString(R.string.layout_lacks_pad_digits, items) else ctx.getString(R.string.layout_lacks_pad_digits_on, items, pads)
@@ -96,7 +99,7 @@ object LayoutTexts {
         return if (pads.isEmpty()) said else ctx.getString(R.string.layout_lacks_on_pads, said, pads)
     }
 
-    // the items (digits, letters) where the text names them
+    // the items (digits, letters) where the text names them; no handwriting slot: no base board has one to be lacked
     private val LACKS = mapOf(
         "backspace" to R.string.layout_lacks_backspace,
         "enter" to R.string.layout_lacks_enter,

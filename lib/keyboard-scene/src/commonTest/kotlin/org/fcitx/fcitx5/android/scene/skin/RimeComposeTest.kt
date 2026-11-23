@@ -299,6 +299,37 @@ class RimeComposeTest {
     }
 
     @Test
+    fun eachThemeFileTriedHasLimitsOfItsOwn() {
+        val wave = arrayOf("wave.trime.yaml" to TrimeFixtures.wave, "base.yaml" to TrimeFixtures.base)
+        // a larger file without colours first, its includes all but the YAML one may put together
+        val head = "name: Big\n" + (1..5).joinToString("\n") { "q$it: {__include: p$it:/k}" } + "\n" + "# padding\n".repeat(500)
+        val part = (TrimeSkin.MAX_COMPOSED_BYTES - head.length - 100) / 5
+        val parts = (1..5).map { "p$it.yaml" to "k: " + "x".repeat(part.toInt() - 4) + "\n" }.toTypedArray()
+        assertEquals("Wave", convert(files("big.trime.yaml" to head, *parts, *wave)).name)
+        // or one past the nodes' limit itself
+        val a = "a: &a [" + List(10) { "x" }.joinToString(", ") + "]\n"
+        val b = "b: &b [" + List(20) { "*a" }.joinToString(", ") + "]\n"
+        val c = "c: &c [" + List(20) { "*b" }.joinToString(", ") + "]\n"
+        val nodes = "name: Big\n$a$b$c" + "d: [" + List(50) { "*c" }.joinToString(", ") + "]\n" + "e: {__include: /a}\n" + "# padding\n".repeat(500)
+        assertEquals("Wave", convert(files("big.trime.yaml" to nodes, *wave)).name)
+        // the largest one broken and no other with colours: its own reason
+        val e = assertFailsWith<SkinError> { convert(files("big.trime.yaml" to nodes, "small.trime.yaml" to "name: s")) }
+        assertEquals(SkinError.Reason.BROKEN, e.reason)
+        assertTrue("nodes" in e.detail, e.detail)
+    }
+
+    @Test
+    fun aPatchsPathIsHeldToTheDepthOfAYamlRead() {
+        fun path(n: Int) = List(n) { "a" }.joinToString("/")
+        var v: Any? = compose("__patch: {'${path(SkinYaml.MAX_DEPTH)}': 1}").root
+        repeat(SkinYaml.MAX_DEPTH) { v = (v as Map<*, *>)["a"] }
+        assertEquals("1", v)
+        broken("__patch: {'${path(SkinYaml.MAX_DEPTH + 1)}': 1}")
+        // within the text's limit, half a million parts: no stack overflow
+        broken("__patch: {'${"a/".repeat(500_000)}b': 1}")
+    }
+
+    @Test
     fun theFirstLetterKeyboardIsTheLayout() {
         val skin = TrimeSkin(SkinFiles(files("wave.trime.yaml" to TrimeFixtures.wave, "base.yaml" to TrimeFixtures.base), SkinFixtures.Platform()))
         val board = skin.look(Variant.LIGHT).layouts.single()

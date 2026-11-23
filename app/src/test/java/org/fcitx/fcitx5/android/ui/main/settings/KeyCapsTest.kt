@@ -16,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
+import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneKeyCell
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.theme.Argb
@@ -72,6 +73,19 @@ class KeyCapsTest {
             side > 0 -> At.TopRight
             else -> At.TopLeft
         }
+    }
+
+    // a round per cap would let a page's raster icons evict each other within the icon budget
+    @Test
+    fun capsMadeInOneTurnShareAnIconRound() {
+        KeyCaps.endTurn()
+        val before = PackIcons.round
+        key()
+        key()
+        assertEquals(before + 1, PackIcons.round)
+        ShadowLooper.idleMainLooper()
+        key()
+        assertEquals(before + 2, PackIcons.round)
     }
 
     // a real down-up tap reaches the frame's click though the engine cell under it is a gesture view (once it opened no dialog)

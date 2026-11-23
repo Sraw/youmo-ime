@@ -376,6 +376,27 @@ class EngineBridgeTest {
         EngineState.syllablesState.value = EngineState.SyllableState()
     }
 
+    // a remembered word's 撤销 sent to its table after a switch: pinyin's bar, shown, stays as it was
+    @Test
+    fun anEventAsideLeavesTheShownSyllables() {
+        val shown = EngineState.SyllableState(InputMethodCatalog.PINYIN, true, listOf("ni", "mi"), 1)
+        EngineState.syllablesState.value = shown
+        try {
+            var called = false
+            bridge.aside(InputMethodCatalog.WUBI) {
+                called = true
+                Snapshot("", "", emptyList(), 0, false, false, handled = true, predicting = false)
+            }
+            assertTrue(called)
+            assertEquals(shown, EngineState.syllables.value)
+            // nor a failure there
+            assertThrows(IllegalStateException::class.java) { bridge.aside(InputMethodCatalog.WUBI) { error("a bug") } }
+            assertEquals(shown, EngineState.syllables.value)
+        } finally {
+            EngineState.syllablesState.value = EngineState.SyllableState()
+        }
+    }
+
     @Test
     fun eachInputMethodsAnswerTellsItsSyllablesAndAHandBackClearsThem() {
         fun typed(preedit: String, syllables: List<String>, id: Int = 0, handled: Boolean = true) = Snapshot(

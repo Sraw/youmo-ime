@@ -77,38 +77,59 @@ class WordListsTest {
     @Test
     @Uat("VO-59")
     fun voiceAlwaysIsKeptBesideTheAddedList() {
-        val dir = MemoryFiles()
-        val lists = WordLists(dir)
         val gongshi = entry("攻势", "gong", "shi")
-        lists.add(gongshi)
+        // each row its own files, 攻势 added (and marked): a row failing leaves the next one's state alone
+        fun fresh(marked: Boolean = false): Pair<MemoryFiles, WordLists> {
+            val dir = MemoryFiles()
+            val lists = WordLists(dir)
+            lists.add(gongshi)
+            if (marked) assertTrue(lists.setVoiceAlways("攻势", true))
+            return dir to lists
+        }
         val addedLine = "攻势 gong'shi\n"
         assertRows(
-            "only an added word is marked" to { assertFalse(lists.setVoiceAlways("徐婧", true)) },
+            "only an added word is marked" to { assertFalse(fresh().second.setVoiceAlways("徐婧", true)) },
             "marked, and read back so" to {
+                val (dir, lists) = fresh()
                 assertTrue(lists.setVoiceAlways("攻势", true))
                 assertEquals(setOf("攻势"), WordLists(dir).voiceAlways)
             },
             "the added list's own file as an older build reads it" to {
+                val (dir, _) = fresh(marked = true)
                 assertEquals(addedLine, String(dir.file(WordLists.ADDED).input().readBytes()))
             },
             "unmarked" to {
+                val (dir, lists) = fresh(marked = true)
                 assertTrue(lists.setVoiceAlways("攻势", false))
                 assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
             },
             "deleted with the word: added again it is not marked" to {
-                lists.setVoiceAlways("攻势", true)
+                val (dir, lists) = fresh(marked = true)
                 lists.remove(gongshi)
                 lists.add(gongshi)
                 assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
             },
+            // the word list's 编辑 adds the edited word, then removes the old
+            "only its reading edited: still marked" to {
+                val (dir, lists) = fresh(marked = true)
+                lists.add(entry("攻势", "gong", "si"))
+                lists.remove(gongshi)
+                assertEquals(setOf("攻势"), WordLists(dir).voiceAlways)
+            },
+            "its text edited: another word, not marked" to {
+                val (dir, lists) = fresh(marked = true)
+                lists.add(entry("功势", "gong", "shi"))
+                lists.remove(gongshi)
+                assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
+            },
             "全部清空 clears it" to {
-                lists.setVoiceAlways("攻势", true)
+                val (dir, lists) = fresh(marked = true)
                 lists.clear()
                 lists.add(gongshi)
                 assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)
             },
             "deleted by an older build, which keeps the mark's file: dropped at the next start, not back when added again" to {
-                lists.setVoiceAlways("攻势", true)
+                val (dir, _) = fresh(marked = true)
                 dir.file(WordLists.ADDED).write(ByteArray(0))
                 WordLists(dir).add(gongshi)
                 assertEquals(emptySet<String>(), WordLists(dir).voiceAlways)

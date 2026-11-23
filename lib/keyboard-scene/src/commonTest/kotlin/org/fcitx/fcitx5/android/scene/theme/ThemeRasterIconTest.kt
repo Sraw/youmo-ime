@@ -13,6 +13,7 @@ import org.fcitx.fcitx5.android.scene.Fixtures.warnings
 import org.fcitx.fcitx5.android.scene.Fixtures.withStyle
 import org.fcitx.fcitx5.android.scene.Op
 import org.fcitx.fcitx5.android.scene.Scene
+import org.fcitx.fcitx5.android.scene.Uat
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.engine.Paint
 import org.fcitx.fcitx5.android.scene.engine.Shift
@@ -57,6 +58,17 @@ class ThemeRasterIconTest {
         assertNull(RasterIcon.header(png(1, 0)))
         assertNull(RasterIcon.header(vp8(0, 0)))
         assertTrue(RasterIcon.iconProblem(png(-1, -1))!!.contains("not a PNG"))
+    }
+
+    @Test
+    @Uat("ST-216")
+    fun aPngWithAnAcTLChunkStillReadsDrawnByItsFirstFrame() {
+        // an APNG is a PNG whose acTL follows IHDR: a decoder that knows no APNG shows its default image, the first frame
+        val apng = png(16, 16) + be32(0) + be32(8) + "acTL".encodeToByteArray() + be32(2) + be32(0) + be32(0)
+        val h = RasterIcon.header(apng)
+        assertEquals(16 to 16, h?.width to h?.height)
+        assertFalse(h!!.animated)
+        assertNull(RasterIcon.iconProblem(apng))
     }
 
     @Test

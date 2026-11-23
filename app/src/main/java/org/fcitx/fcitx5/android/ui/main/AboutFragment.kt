@@ -61,7 +61,7 @@ class AboutFragment : PaddingPreferenceFragment() {
                 ) {
                     requireContext().openUrl("${Const.releasesUrl}/tag/${BuildConfig.ENGINE_DATA}")
                 }
-                addPreference(R.string.device_processor, deviceSummary(requireContext(), ThisDevice.profile), key = PROCESSOR_KEY)
+                addPreference(R.string.device_processor, deviceSummary(requireContext(), ThisDevice.profile, ThisDevice.kernelName), key = PROCESSOR_KEY)
             }
         }
     }
@@ -118,15 +118,15 @@ internal fun reasonText(context: Context, profile: DeviceProfile): String = when
 }
 
 /** 「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」, and why it is medium where cores were offline or unread, as the settings say. */
-internal fun deviceSummary(context: Context, profile: DeviceProfile): String {
+internal fun deviceSummary(context: Context, profile: DeviceProfile, kernel: String = profile.kernel.name): String {
     val level = levelText(context, profile.autoLevel)
     val dotprod = context.getString(if (profile.dotprod == Dotprod.NONE) R.string.device_no_dotprod else R.string.device_dotprod)
     val cores = profile.cores
     val line = when {
-        cores == 0 -> context.getString(R.string.device_processor_summary_unread, level, dotprod, profile.kernel.name)
-        profile.bigCores == 0 -> context.resources.getQuantityString(R.plurals.device_processor_summary, cores, level, cores, dotprod, profile.kernel.name)
+        cores == 0 -> context.getString(R.string.device_processor_summary_unread, level, dotprod, kernel)
+        profile.bigCores == 0 -> context.resources.getQuantityString(R.plurals.device_processor_summary, cores, level, cores, dotprod, kernel)
         else -> context.resources.getQuantityString(
-            R.plurals.device_processor_summary_big, cores, level, cores, profile.bigCores, dotprod, profile.kernel.name,
+            R.plurals.device_processor_summary_big, cores, level, cores, profile.bigCores, dotprod, kernel,
         )
     }
     return when (profile.reason) {

@@ -54,6 +54,9 @@
     return stylesOf.list.slice();
   }
 
+  /** The sticker files [xml]'s styles name (`none` is none), sorted. */
+  const stickers = (xml) => [...new Set(styles(xml).flatMap((s) => s.attrs.filter((a) => a[0] === 'sticker' && a[1] !== 'none').map((a) => a[1])))].sort();
+
   function splice(xml, start, end, text) {
     if (text === '') {
       const before = xml.slice(0, start).replace(/[ \t]*$/, '');
@@ -502,7 +505,7 @@
   }
 
   root.YoumoForm = {
-    uncommented, unescape, escape, attrsOf, styles, elements, valueOf, setProp, setProps, insert, sameSelect, sceneInsets, LIMITS, clamp,
+    uncommented, unescape, escape, attrsOf, styles, stickers, elements, valueOf, setProp, setProps, insert, sameSelect, sceneInsets, LIMITS, clamp,
     COLOR_GROUPS, colors, setColor, variants, withDark, hexOf, parseHex,
     picture, setPicture, cropRect, isNamed, sounds, setSound, removeSound,
     fillText, parseFill, shadowText, parseShadow, borderText, parseBorder, parseInset, insetText, parseRadius, radiusText,

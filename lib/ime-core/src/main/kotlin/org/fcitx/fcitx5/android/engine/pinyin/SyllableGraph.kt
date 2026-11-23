@@ -165,7 +165,7 @@ class SyllableGraph internal constructor(
     // a whole syllable or letter as typed: no lone key, no slip
     private fun asTyped(e: Int) = edgeKind[e].let { it == Kind.SYLLABLE || it == Kind.LETTER } && !readsOtherwise(e)
 
-    /** The first position whose edges or input differ from [other]'s: what is read before it is the same in both (PinyinDecoder.buildLattice keeps those words, PinyinSession.Shows their readings). */
+    /** The first position whose edges or input differ from [other]'s: what is read before it is the same in both (LatticeBuilder.build keeps those words, PinyinSession.Shows their readings). */
     fun sameUntil(other: SyllableGraph): Int {
         val ends = minOf(end, other.end)
         var at = 0

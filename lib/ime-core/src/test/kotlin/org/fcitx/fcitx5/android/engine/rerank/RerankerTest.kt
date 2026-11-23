@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.LockSupport
-import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.abs
 import kotlin.math.ln
 
@@ -81,6 +80,18 @@ class RerankerTest {
         }
     }
 
+    // the JVM kernel, each thread that multiplies the batched way recorded in [working]
+    private fun recording(working: MutableList<Thread>) = object : MatrixKernel {
+        override fun times(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
+            MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+
+        @Suppress("LongParameterList")
+        override fun timesManyQ8(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+            working += Thread.currentThread()
+            super.timesManyQ8(q, scales, rows, columns, x, m, y)
+        }
+    }
+
     private fun handle(read: () -> SentencePicker?) = object : LargeHandle {
         override fun get() = read()
 
@@ -140,21 +151,26 @@ class RerankerTest {
     @Test
     fun withNoLargeModelAGatePicksAsTheSmallOneAlone() {
         val medium = Reranker(model)
+        var asked = 0
         val gates = listOf(
             GatedPicker(Reranker(model), handle { null }, GatedPicker.MARGIN, GatedPicker.SUB, disagreeing = false),
             GatedPicker(Reranker(model), handle { null }, GatedPicker.NINE_MARGIN, GatedPicker.NINE_SUB, disagreeing = true),
-            GatedPicker(Reranker(model), handle { null }, Float.POSITIVE_INFINITY, 5, disagreeing = false),
+            GatedPicker(Reranker(model), handle { asked++; null }, Float.POSITIVE_INFINITY, 5, disagreeing = false),
         )
         for ((context, readings) in keys(2)) {
             val expected = medium.pick(context, readings, priors)
             for (g in gates) assertEquals("'$context' $readings", expected, g.pick(context, readings, priors))
         }
-        assertTrue(gates.last().escalations > 0)
+        // the gate went to the large model, which could not be read: no key counts as escalated
+        assertTrue(asked > 0)
+        assertEquals(0L, gates.last().escalations)
     }
 
+    // contract: the gates measured for 高档 and stated in specs/engine.md (Rank); a retune changes both together
     @Test
     fun theGatesThresholdsAreTheMeasuredOnes() {
         assertEquals(0x3f98fb50, GatedPicker.MARGIN.toRawBits())
+        assertEquals(2, GatedPicker.SUB)
         assertEquals(0x3dc54800, GatedPicker.NINE_MARGIN.toRawBits())
         assertEquals(Reranker.LIMIT, GatedPicker.NINE_SUB)
     }
@@ -163,16 +179,7 @@ class RerankerTest {
     @Test
     fun aCommitsContextIsReadAheadElsewhereAndPicksTheSame() {
         val working = java.util.Collections.synchronizedList(ArrayList<Thread>())
-        val kernel = object : MatrixKernel {
-            override fun times(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) =
-                MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
-
-            @Suppress("LongParameterList")
-            override fun timesManyQ8(q: java.nio.ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
-                working += Thread.currentThread()
-                super.timesManyQ8(q, scales, rows, columns, x, m, y)
-            }
-        }
+        val kernel = recording(working)
         val queued = ArrayList<Runnable>()
         val ahead = Reranker(TinyModel(window = 32).load(kernel = kernel), ahead = { queued += it })
         for (context in listOf("天天的我好你", "我你好", "的你")) {
@@ -189,6 +196,20 @@ class RerankerTest {
         working.clear()
         queued.removeAt(0).run()
         assertTrue(working.isEmpty())
+    }
+
+    /** A read ahead stopped before it runs reads nothing; the next pick reads the context itself, to the same pick. */
+    @Test
+    fun aStoppedReadAheadReadsNothing() {
+        val working = java.util.Collections.synchronizedList(ArrayList<Thread>())
+        val kernel = recording(working)
+        val queued = ArrayList<Runnable>()
+        val ahead = Reranker(TinyModel(window = 32).load(kernel = kernel), ahead = { queued += it })
+        ahead.prewarm("天天的我好你")
+        ahead.stopReading()
+        queued.removeAt(0).run()
+        assertTrue("the stopped read went on", working.isEmpty())
+        assertEquals(Reranker(model).pick("天天的我好你", readings, priors), ahead.pick("天天的我好你", readings, priors))
     }
 
     /** A key while the context is being read elsewhere waits for that read and uses it: no read of its own, the scores to the bit. */
@@ -230,8 +251,8 @@ class RerankerTest {
         try {
             assertTrue(reading.await(1, TimeUnit.MINUTES))
             keyThread.start()
-            // parked on the reranker's lock, or through without waiting
-            fun onTheLock() = LockSupport.getBlocker(keyThread)?.javaClass?.enclosingClass == ReentrantLock::class.java
+            // parked waiting for the read (on the reranker's lock), or through without waiting
+            fun onTheLock() = LockSupport.getBlocker(keyThread) != null
             val deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(1)
             while (!key.isDone && !onTheLock() && System.nanoTime() < deadline) Thread.sleep(1)
             assertFalse("the key did not wait for the read", key.isDone)

@@ -120,7 +120,7 @@ class GridExpandedCandidateWindow :
         interpolator = Motion.Curve.Exit.interpolator
     }
 
-    final override fun onCreateView(): View {
+    override fun onCreateView(): View {
         adapter.bar = barLook
         candidateLayout = ExpandedCandidateLayout(context, theme, barLook).apply {
             recyclerView.apply {

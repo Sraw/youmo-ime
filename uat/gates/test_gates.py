@@ -101,7 +101,7 @@ class FileChecksTest(unittest.TestCase):
                 res = phase.file_checks(self.FakeDevice({phase.DATA: data, phase.EXTERNAL: ext}, moved=False), old=old)
                 self.assertEqual(failed, [r["item"].split()[0] for r in res if not r["ok"]])
 
-    def test_the_old_copies_are_checked_only_after_a_fixture(self):
+    def test_a_fixtures_tars_and_the_old_external_copies(self):
         with tempfile.TemporaryDirectory() as tmp:
             for v, tars in (("with", ("data", "external", "de")), ("without", ("data", "external"))):
                 os.makedirs(os.path.join(tmp, v))
@@ -203,7 +203,7 @@ class TypedChecksTest(unittest.TestCase):
 
 class NotCheckedTest(unittest.TestCase):
     """ok None: an item the fixture could not exercise; neither a failure nor a silent pass"""
-    ITEMS = [{"item": "a", "ok": True, "got": "x"}, {"item": "b", "ok": None, "got": "no de.tar"}]
+    ITEMS = [{"item": "a", "ok": True, "got": "x"}, {"item": "b", "ok": None, "got": "the fixture has none"}]
 
     def gate(self, tmp, items):
         g = object.__new__(gates.Gate)
@@ -233,9 +233,9 @@ class NotCheckedTest(unittest.TestCase):
 
     def test_the_verdict_and_its_row(self):
         for why, items, passed, row in (
-            ("not checked is no failure, but it is shown", self.ITEMS, True, "| s | PASS | NOT CHECKED b: no de.tar |"),
+            ("not checked is no failure, but it is shown", self.ITEMS, True, "| s | PASS | NOT CHECKED b: the fixture has none |"),
             ("a false item still fails beside it", self.ITEMS + [{"item": "c", "ok": False, "got": "left"}], False,
-             "| s | FAIL | c: left; NOT CHECKED b: no de.tar |"),
+             "| s | FAIL | c: left; NOT CHECKED b: the fixture has none |"),
         ):
             with self.subTest(why):
                 verdict, text = self.report(items)

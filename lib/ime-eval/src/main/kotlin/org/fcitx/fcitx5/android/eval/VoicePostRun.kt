@@ -233,7 +233,8 @@ internal object VoicePostRun {
                 }
                 VoiceChoice.putIn(homophones, s.raw, text, putIn)
                 if (text != s.raw) put++
-                if (text.isNotBlank()) before = text
+                // as VoiceChoice.Talk.kept: a stretch of spaces is the next one's before too
+                if (text.isNotEmpty()) before = text
                 VoicePost.Stretch(text)
             }
         }

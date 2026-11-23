@@ -134,6 +134,9 @@ internal class EngineAssets(
         // the failed task already told, so a model that does not read is reported once
         private var told: FutureTask<Reranker>? = null
 
+        // the task already handed to a background executor: each high-level session asks again
+        private var preloaded: FutureTask<Reranker>? = null
+
         // [ahead] where the reranker is first made: what reads a commit's context ahead
         private fun task(limit: Int, ahead: Executor?): FutureTask<Reranker> {
             task?.let { made ->
@@ -159,12 +162,23 @@ internal class EngineAssets(
 
         /** Starts reading on [executor], so the first key that needs the model need not wait for all of it; [ahead] as [handle]'s. */
         fun preload(limit: Int, executor: Executor, ahead: Executor? = executor) {
-            executor.execute(task(limit, ahead))
+            val task = task(limit, ahead)
+            if (task === preloaded) return
+            preloaded = task
+            executor.execute(task)
         }
 
         fun drop() {
             task?.cancel(false)
             task = null
+            // a done read ahead holds its model: kept, a lowered level would keep the memory it lowers for
+            preloaded = null
+        }
+
+        /** [Reranker.stopReading] where the model was read; none is read for it. */
+        fun stopReading() {
+            val made = task?.takeIf { it.isDone && !it.isCancelled } ?: return
+            runCatching { made.get() }.getOrNull()?.stopReading()
         }
 
         private inner class Handle(private val task: FutureTask<Reranker>) : LargeHandle {
@@ -190,6 +204,12 @@ internal class EngineAssets(
 
     val sentenceModel = ModelFile(SENTENCE_MODEL)
     val largeModel = ModelFile(LARGE_MODEL)
+
+    /** The sentence models' reads ahead given up: the engine is closing. */
+    fun stopReading() {
+        sentenceModel.stopReading()
+        largeModel.stopReading()
+    }
 
     /** Where the matrix work runs: the kernel's cores, or anywhere. */
     val pin: CorePin get() = kernel?.pin ?: CorePin.NONE

@@ -249,6 +249,15 @@ RUNS_HERE = {"voice": lambda d, kinds: d.voice,
              "release": lambda d, kinds: "scripted" in kinds and BUILD == "release"}
 # what a case in the .md with no script is registered as: tally reports each
 NO_SCRIPT = "block:没有脚本"
+# what a case with a **JVM** line and no script is registered as when no test carries its @Uat: tally reports each
+NO_UAT_TEST = "jvm:没有 @Uat 测试"
+# a **JVM** line saying there is no JVM test: 「暂无」「没有」「无」 as a word of its own (「无障碍…」 names tests)
+NO_JVM = re.compile(r"(暂无|没有|无)([（(。；;，,：:\s]|$)")
+
+
+def jvm_line(line):
+    """whether [line] of a uat/*.md is a **JVM** line naming JVM tests"""
+    return line.startswith("- **JVM**") and not NO_JVM.match(line.split("：", 1)[-1])
 
 
 CASES = {}
@@ -342,8 +351,8 @@ def parse_md(path):
             out[cur][1] = line.split("：", 1)[-1].strip()
         elif cur and line.startswith("- **预期**"):
             out[cur][2] = line.split("：", 1)[-1].strip()
-        elif cur and line.startswith("- **JVM**") and not line.split("：", 1)[-1].startswith("暂无"):
-            out[cur][3] = True   # 「暂无」: no JVM test yet
+        elif cur and jvm_line(line):
+            out[cur][3] = True
     return out
 
 
@@ -3109,7 +3118,7 @@ def jvm_needs(cid):
     if not _JVM_FOUND:
         _JVM_FOUND.update(uat_tests(JVM_ROOTS))
     tests = [f"{cls.rsplit('.', 1)[-1]}.{method}" for cls, method in _JVM_FOUND.get(cid, [])]
-    return "jvm:" + ("、".join(tests) or "没有 @Uat 测试")
+    return "jvm:" + "、".join(tests) if tests else NO_UAT_TEST
 
 
 UAT_RE = re.compile(r'@Uat\(([^)]*)\)\s*(?:@\w+(?:\([^)]*\))?\s*)*fun\s+(?:`([^`\n]+)`|(\w+))\s*\(')
@@ -3272,8 +3281,8 @@ def place(needs):
 def tally(cases, priority, jvm_line):
     """(counts, problems) for the README: cases {id: needs}, priority {id: "P0"…}, jvm_line {ids with a
     **JVM** line in their .md}. smoke = still on the device but asserted on the JVM too. A needs=jvm case
-    without the .md line, a case missing from the .md, or one in the .md with no script (NO_SCRIPT) is a
-    problem: the two would tell different stories"""
+    without the .md line, a case missing from the .md, one in the .md with no script (NO_SCRIPT) or one
+    whose **JVM** line no @Uat test backs (NO_UAT_TEST) is a problem: the two would tell different stories"""
     n = {k: 0 for k in ("device", *ELSEWHERE, "smoke")}
     prios, problems = {}, []
     for cid, needs in sorted(cases.items()):
@@ -3285,6 +3294,8 @@ def tally(cases, priority, jvm_line):
             problems.append(f"{cid}: needs=jvm but no **JVM** line in its .md")
         if needs == NO_SCRIPT:
             problems.append(f"{cid}: in the .md but no script (register it, needs= where it runs)")
+        if needs == NO_UAT_TEST:
+            problems.append(f"{cid}: a **JVM** line but no test carries its @Uat (tag one, or a script)")
         if cid not in priority:
             problems.append(f"{cid}: has a script but no case in the .md")
         else:
@@ -3292,6 +3303,38 @@ def tally(cases, priority, jvm_line):
     n["total"] = len(cases)
     n["prios"] = dict(sorted(prios.items()))
     return n, problems
+
+
+JVM_NAME_RE = re.compile(r"`(?:[A-Z]\w*\.)*[A-Z]\w*Test\.([^`]+)`")
+
+
+def test_functions(repo):
+    """the names of the functions in every test source set under [repo] (test, androidTest, jvmTest, uatTest …)"""
+    out = set()
+    for dp, dirs, files in os.walk(repo):
+        dirs[:] = [d for d in dirs if d not in ("build", "node_modules", ".git", ".gradle")]
+        if not re.search(r"/src/\w*[Tt]est\w*(/|$)", dp):
+            continue
+        for f in files:
+            if f.endswith(".kt"):
+                text = open(os.path.join(dp, f), encoding="utf-8").read()
+                out.update(m.group(1) or m.group(2) for m in re.finditer(r"fun\s+(?:`([^`\n]+)`|(\w+))\s*\(", text))
+    return out
+
+
+def jvm_name_problems(lines, functions):
+    """the `Class.method` names of the **JVM** lines [lines] {id: line} that are no test in [functions]: the
+    line is the only list of a case's tests that is not its @Uat, so a test renamed or deleted must show;
+    a name ending in … is a prefix"""
+    out = []
+    for cid, line in sorted(lines.items()):
+        for name in JVM_NAME_RE.findall(line):
+            if "." in name and re.match(r"[A-Z]\w*\.", name):
+                name = name.rsplit(".", 1)[-1]   # Outer.Inner.method
+            found = any(f.startswith(name[:-1]) for f in functions) if name.endswith("…") else name in functions
+            if not found:
+                out.append(f"{cid}: its **JVM** line names {name}, which is no test")
+    return out
 
 
 def counts_line(n):
@@ -3305,7 +3348,7 @@ def counts_line(n):
 def cmd_counts(a):
     """the README's counts from the scripts' needs= and the .md files' **JVM** lines; 1 when the README says otherwise"""
     load_scripts()
-    priority, jvm_line = {}, set()
+    priority, lines = {}, {}
     for f in sorted(os.listdir(UAT)):
         if not re.match(r"\d\d-.*\.md$", f):
             continue
@@ -3315,10 +3358,10 @@ def cmd_counts(a):
             if m:
                 cur = m.group(1)
                 priority[cur] = m.group(2)
-            elif cur and line.startswith("- **JVM**") and not line.split("：", 1)[-1].startswith("暂无"):
-                # 「暂无」 says there is no JVM test yet: not asserted on the JVM
-                jvm_line.add(cur)
-    n, problems = tally({c.id: c.needs for c in CASES.values()}, priority, jvm_line)
+            elif cur and jvm_line(line):
+                lines[cur] = lines.get(cur, "") + line
+    n, problems = tally({c.id: c.needs for c in CASES.values()}, priority, set(lines))
+    problems += jvm_name_problems(lines, test_functions(REPO))
     line = counts_line(n)
     print(line)
     for p in problems:

@@ -664,7 +664,8 @@
     if (f) await openBytes(f);
   }
 
-  // the browser's image codec for a skin's pictures: RGBA as drawn, not premultiplied; null where it has none
+  // the browser's image codec for a skin's pictures, null where it has none; a 2D canvas keeps premultiplied pixels, so a
+  // nearly transparent one's colour is rounded where the app's decoder keeps it exact
   const skinIo = typeof DecompressionStream === 'function' && typeof OffscreenCanvas === 'function' && globalThis.crypto && crypto.subtle ? {
     async decode(bytes) {
       const bmp = await createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });

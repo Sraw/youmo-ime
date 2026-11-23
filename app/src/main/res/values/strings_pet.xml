@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="exception_theme_pet">A sheet of the theme\'s pet is not taken (PNG or WebP, still, at most 512 KB and 2048 px a side, frames at most 256 px and evenly cut): %1$s</string>
+    <string name="exception_theme_pet">A sheet of the theme\'s pet is not taken (PNG or WebP, still, at most %2$d KB and %3$d px a side, frames at most %4$d px and evenly cut): %1$s</string>
 </resources>

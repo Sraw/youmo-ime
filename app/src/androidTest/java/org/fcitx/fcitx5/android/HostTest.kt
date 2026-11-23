@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.host.PunctuationTable
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert
+import org.junit.Assume
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Rule
@@ -59,14 +60,20 @@ class HostTest {
 
         fun allowed(status: File) = status.readLines().firstOrNull { it.startsWith("Cpus_allowed_list:") }?.substringAfter(':')?.trim()
 
+        /** The core [pinnedToTheLastCore] pins to; null where it could not (no native library, or a core past a mask's 64 bits). */
+        var bigCore: Int? = null
+
         // the emulator's cores are all alike (no big ones, no pinning): the cpuset's last core stands in, so pins happen
-        private fun pinnedToTheLastCore(): MatrixKernel {
-            val native = NativeMatrixKernel.loaded as CpuNative
-            val big = 1L shl CpuFacts.cpuList(allowed(File("/proc/self/status")).orEmpty()).last()
-            val possible = CpuFacts.cpuList(File("/sys/devices/system/cpu/possible").readText()).fold(0L) { mask, cpu -> mask or (1L shl cpu) }
+        private fun pinnedToTheLastCore(): MatrixKernel? {
+            val native = NativeMatrixKernel.loaded as? CpuNative ?: return null
+            val last = CpuFacts.cpuList(allowed(File("/proc/self/status")).orEmpty()).lastOrNull()?.takeIf { it < Long.SIZE_BITS } ?: return null
+            val big = 1L shl last
+            val possible = CpuFacts.cpuList(File("/sys/devices/system/cpu/possible").readText())
+                .fold(0L) { mask, cpu -> if (cpu < Long.SIZE_BITS) mask or (1L shl cpu) else mask }
             val counting = object : Affinity {
                 override fun set(mask: Long) = native.affinitySet(mask).also { if (mask == big && it == 0L) pins.incrementAndGet() }
             }
+            bigCore = last
             return ThisDevice.pinned(NativeMatrixKernel, BigCorePin(counting, big, possible))
         }
 
@@ -74,7 +81,7 @@ class HostTest {
         @JvmStatic
         fun setup() {
             kernelBefore = ThisDevice.kernel
-            ThisDevice.kernel = pinnedToTheLastCore()
+            pinnedToTheLastCore()?.let { ThisDevice.kernel = it }
             harness.start {
                 // prediction on: a commit then followed by none says learning is off
                 predictionBefore = imOptions(InputMethodCatalog.PINYIN)?.get(EngineSettings.PREDICTION).orEmpty()
@@ -188,6 +195,8 @@ class HostTest {
     // a thread left on the big cores would keep them so for whatever it runs next (engine-phrases, host-config, ...)
     @Test
     fun noThreadKeepsTheBigCoresAfterASentence(): Unit = runBlocking {
+        val big = bigCore
+        Assume.assumeTrue("no native library or no core to pin to", big != null)
         fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN))
         pins.set(0)
         sendString("nihaoshijie")
@@ -195,13 +204,16 @@ class HostTest {
         fcitx.reset()
         awaitQuiet()
         Assert.assertTrue("no stretch was pinned: nothing tested", pins.get() > 0)
-        val process = allowed(File("/proc/self/status"))
+        val pinned = listOf(checkNotNull(big))
+        val process = allowed(File("/proc/self/status")).orEmpty()
+        Assume.assumeTrue("the process itself is on the pinned core alone", CpuFacts.cpuList(process) != pinned)
+        // the pinned mask itself, not any mask unlike the process's: Android may put a single thread in another cpuset
         val kept = File("/proc/self/task").listFiles().orEmpty().mapNotNull { task ->
             val mask = runCatching { allowed(File(task, "status")) }.getOrNull() ?: return@mapNotNull null
             val name = runCatching { File(task, "comm").readText().trim() }.getOrDefault(task.name)
-            "$name=$mask".takeIf { mask != process }
+            "$name=$mask".takeIf { CpuFacts.cpuList(mask) == pinned }
         }
-        Assert.assertEquals("threads not on the process's cpuset $process", emptyList<String>(), kept)
+        Assert.assertEquals("threads left on the pinned core $big", emptyList<String>(), kept)
     }
 
     /** The long press sends the letter past the BMP (Keyboard.letterKey), which fcitx must pass whole: m then 4 is mi, never ni. */

@@ -90,7 +90,7 @@ data class DeviceProfile(
                 else -> Dotprod.NONE
             }
             val bigMask = bigMask(cores)
-            val big = cores.filter { bigMask == 0L || bigMask and (1L shl it.id) != 0L }.mapNotNull { it.midr }
+            val big = cores.filter { bigMask == 0L || it.id < Long.SIZE_BITS && bigMask and (1L shl it.id) != 0L }.mapNotNull { it.midr }
             val (level, reason) = level(hwcap2 and HWCAP2_I8MM != 0L, big, read, complete, dotprod)
             val kernel = when {
                 !facts.arm64 -> Kernel.PORTABLE

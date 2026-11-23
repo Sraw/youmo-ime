@@ -314,8 +314,8 @@ case("PY-120", needs="jvm:EnginesStrokeLookupChainTest.withoutAKeyPassedOnWhatWa
 def py121(d):
     """the readings are drawn, not in the bar's accessibility: the machine finds the rare characters of
     chun in the expanded list, the shots show their toneless chun (none in zhuyin) and each row's
-    characters on one line; and the floating window's emoji and word in English beside candidates read
-   """
+    characters on one line; and the floating window's emoji and word in English as tall as the candidates
+    with readings, their bottoms aligned"""
     rare = ("䏝", "䏰", "䄝")
     d.goto("通用输入")
     choose(d, "候选词注音", "拼音")
@@ -408,9 +408,9 @@ def py122(d):
 
 @case("PY-124", base="B0", visual=True)
 def py124(d):
-    """the reading line over the menu, the word card it opens, a character's card and the way back
-   ; the views' children are hidden from accessibility, so each step is found by
-    its description, as TalkBack reads it"""
+    """the reading line over the menu, the word card it opens, a character's card and the way back;
+    the views' children are hidden from accessibility, so each step is found by its description, as
+    TalkBack reads it"""
     d.open_page("text")
     d.type("yinhang")
     menu = d.long_pick("银行")
@@ -547,7 +547,7 @@ def latin_mix(d, tap, wodeiphone, iphone, sentence):
     p = d.preedit()
     d.shot("ime", f"wo de iphone：编码行「{p}」，首选「{first(c)}」")
     check(first(c) == "我的iPhone", f"首选 {c[:3]}")
-    check("iphone" in p.lower() and "iphone" in p, f"编码行「{p}」里英文那段应是小写 iphone")
+    check("iphone" in p, f"编码行「{p}」里英文那段应是小写 iphone")
     d.pick("我的iPhone")
     t = d.field_text()
     check(t == "我的iPhone", f"框里「{t}」")

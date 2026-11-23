@@ -167,7 +167,8 @@ internal class LearningFacade(
     // the user's acts on what was learned
     private val control = LearningControl(::learnLog, learnClock, legacy = ::retired, copies = { userDir?.let(::keptAside).orEmpty() }, onError = onError)
 
-    // a table's old log only with a clear of everything or once read into the record: before, its phrases are the user's still
+    // a table's 0.4 log only with a clear of everything or once read into the record: no build since 0.6.3 reads it,
+    // but 0.6.2 reinstalled still would
     private fun retired(all: Boolean): List<LogFile> {
         val dir = userDir ?: return legacyFiles
         val tableLogs = if (all || dir.file(Engines.TABLE_LOGS_READ).taken()) TABLES.keys.map { dir.file(it.removePrefix("engine-") + ".user") } else emptyList()

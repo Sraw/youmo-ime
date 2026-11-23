@@ -139,13 +139,19 @@ abstract class ClipboardAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val entry = getItem(position) ?: return
+        val root = holder.entryUi.root
+        holder.a11yActions.forEach { ViewCompat.removeAccessibilityAction(root, it) }
+        holder.a11yActions.clear()
+        // a placeholder (a page not loaded yet) bound over a recycled card: its text and actions would be the card's last entry's
+        val entry = getItem(position) ?: return run {
+            holder.entryUi.setEntry("", masked = false)
+            root.setOnClickListener(null)
+            root.setOnLongClickListener(null)
+        }
         val masked = entry.sensitive && maskSensitive
         val actions = ClipboardPages.actions(page, entry.sensitive, masked, first = position == 0)
         with(holder.entryUi) {
             setEntry(excerptText(entry.text, masked), masked)
-            holder.a11yActions.forEach { ViewCompat.removeAccessibilityAction(root, it) }
-            holder.a11yActions.clear()
             // in TalkBack's actions menu without the long press
             actions.filter { it in A11Y_ACTIONS }.forEach { action ->
                 holder.a11yActions += ViewCompat.addAccessibilityAction(root, ctx.getString(label(action))) { _, _ ->

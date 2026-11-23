@@ -45,7 +45,8 @@ object SkinZip {
         val files = entries.keys.filterNot { it.startsWith("__MACOSX/") || it.substringAfterLast('/').startsWith("._") }
         val inner = files.singleOrNull { it.substringAfterLast('.', "").lowercase() in INNER }
         // the ZIP a skin itself: a reader takes it, or it has an extension's own file
-        val own = files.any { it.substringAfterLast('/') == "extension.json" } || SkinConverter.READERS.any { it.first(files.toSet()) }
+        val names = files.toSet()
+        val own = files.any { it.substringAfterLast('/') == "extension.json" } || SkinConverter.READERS.any { it.first(names) }
         // a Sogou container in it is opened by the converter, as one alone is
         if (inner == null || own || SogouContainer.isContainer(entries.getValue(inner))) return entries
         // the inner one unpacked within what the outer's files left of the one budget: both are held at once

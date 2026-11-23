@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -158,6 +159,7 @@ class BackupFavoritesTest {
 
     // the phone's sensitive ones are in no backup: not kept, they would be gone with its database
     @Test
+    @Uat("PR-70")
     fun theFavouritesNotKeptFailTheRestoreBeforeAnythingIsReplaced() = runTest {
         val backup = install("backup")
         clips(backup, ClipboardEntry(text = "备份的", favorite = true, timestamp = 100L))
@@ -180,7 +182,52 @@ class BackupFavoritesTest {
         )
     }
 
+    // a library that opens again later holds the phone's favourites, the sensitive ones in no backup
     @Test
+    @Uat("PR-70")
+    fun aLibraryUnopenableForNowFailsTheRestoreBeforeAnythingIsReplaced() = runTest {
+        val backup = install("backup")
+        clips(backup, ClipboardEntry(text = "备份的", favorite = true, timestamp = 100L))
+        File(backup.sharedPrefs.apply { mkdirs() }, "mine.xml").writeText("backup's")
+        val phone = install("phone")
+        clips(phone, ClipboardEntry(text = "mima1234", favorite = true, sensitive = true, timestamp = 4000L))
+        val prefs = File(phone.sharedPrefs.apply { mkdirs() }, "mine.xml").apply { writeText("phone's") }
+        // as a permission or SELinux denial leaves it: there, and not opened
+        val db = File(phone.dataBases, "clbdb")
+        assumeTrue("an unreadable file (not as root)", db.setReadable(false) && !db.canRead())
+        val result = try {
+            UserDataManager.import(exported(backup), phone)
+        } finally {
+            db.setReadable(true)
+        }
+        val favorites = Room.databaseBuilder(appContext, ClipboardDatabase::class.java, db.path).build()
+            .run { try { pageOf(clipboardDao().favoriteEntries()) } finally { close() } }
+        assertRows(
+            "the restore fails" to { assertTrue(result.isFailure) },
+            "the phone's clipboard as it was" to { assertEquals(listOf("mima1234"), favorites) },
+            "its settings too" to { assertEquals("phone's", prefs.readText()) },
+            "nothing kept to merge" to { assertFalse(favoritesToMerge(phone.dataBases).exists()) },
+        )
+    }
+
+    // never opened, it holds nothing to keep: no restore is refused for it
+    @Test
+    @Uat("PR-70")
+    fun aCorruptLibraryIsRestoredOver() = runTest {
+        val backup = install("backup")
+        clips(backup, ClipboardEntry(text = "备份的", favorite = true, timestamp = 100L))
+        val phone = install("phone")
+        File(phone.dataBases.apply { mkdirs() }, "clbdb").writeText("not a database, ".repeat(64))
+        val result = UserDataManager.import(exported(backup), phone)
+        val favorites = if (result.isSuccess) opened(phone).first else emptyList()
+        assertRows(
+            "the restore goes on" to { assertTrue(result.exceptionOrNull()?.stackTraceToString(), result.isSuccess) },
+            "the backup's favourites in" to { assertEquals(listOf("备份的"), favorites) },
+        )
+    }
+
+    @Test
+    @Uat("PR-70")
     fun theFavouritesKeptAtARestoreNeverGoInABackupNorComeFromOne() {
         val old = install("old")
         File(old.dataBases.apply { mkdirs() }, "favorites-to-merge.json").writeText("[]")
@@ -201,6 +248,7 @@ class BackupFavoritesTest {
     }
 
     @Test
+    @Uat("PR-70")
     fun aRestoreNotYetOpenedKeepsItsPhonesFavouritesThroughTheNext() = runTest {
         val phone = install("phone")
         clips(phone, ClipboardEntry(text = "第一次的", favorite = true, timestamp = 5000L))

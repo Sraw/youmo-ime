@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.UserDataManager
 import org.fcitx.fcitx5.android.until
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.data.prefs.PinyinKeyboard
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationManager
 import org.fcitx.fcitx5.android.data.punctuation.PunctuationMapEntry
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -26,6 +27,7 @@ import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
 import org.fcitx.fcitx5.android.engine.runtime.ModelLevel
+import org.fcitx.fcitx5.android.engine.session.Action
 import org.fcitx.fcitx5.android.host.ConfigHome
 import org.fcitx.fcitx5.android.host.EngineOptions
 import org.fcitx.fcitx5.android.host.HostEvent
@@ -458,6 +460,33 @@ class KotlinHostTest {
         assertEquals(0, fcitx.candidatesCached.candidates.size)
     }
 
+    // a remembered word's 撤销 goes to the table it was remembered in, set aside if another input method is shown since
+    private fun undoneAfter(switched: Boolean, then: (Action.Unremember) -> Unit) = runBlocking {
+        fcitx.setEnabledIme(arrayOf(InputMethodCatalog.PINYIN, InputMethodCatalog.WUBI))
+        fcitx.activate(1, "org.example")
+        fcitx.focus(true)
+        fcitx.activateIme(InputMethodCatalog.WUBI)
+        assertEquals(InputMethodCatalog.WUBI, fcitx.inputMethodEntryCached.uniqueName)
+        fcitx.rememberWord(1, 0, "汪小明")
+        if (switched) fcitx.activateIme(InputMethodCatalog.PINYIN)
+        engine.payloads.clear()
+        fcitx.unrememberWord("汪小明", "iije")
+        then(Action.Unremember("汪小明", "iije"))
+    }
+
+    @Test
+    fun theUndoOfAWordRememberedInTheTableShownGoesToIt() = undoneAfter(switched = false) { undo ->
+        assertEquals(emptyList<Pair<String, Action?>>(), engine.asides.toList())
+        assertEquals(undo, engine.payloads.last())
+        assertEquals(InputMethodCatalog.WUBI, engine.ims.last())
+    }
+
+    @Test
+    fun theUndoOfAWordRememberedBeforeASwitchGoesAsideToItsTable() = undoneAfter(switched = true) { undo ->
+        assertEquals(listOf(InputMethodCatalog.WUBI to undo), engine.asides.toList())
+        assertFalse("pinyin, shown, is not sent it", undo in engine.payloads)
+    }
+
     @Test
     fun aPageSentDropsTheCachedListAndAListThePage() = runBlocking {
         fcitx.activate(1, "org.example")
@@ -515,6 +544,43 @@ class KotlinHostTest {
         fcitx.save()
         restore("external/config/config" to "")
         assertEquals("7", pageSize())
+    }
+
+    // a 0.4 backup's 九键拼音 is dropped as an upgrade from 0.4 drops it; pinyin keeps the board chosen here
+    @Test
+    @Uat("PR-73")
+    fun aZeroFourBackupsNineKeysPinyinIsDroppedFromTheList() = runBlocking {
+        val keyboard = AppPrefs.getInstance().keyboard.pinyinKeyboard
+        keyboard.setValue(PinyinKeyboard.Full)
+        // 0.4's profile with 九键拼音 first, then 拼音 and English
+        val zeroFourProfile = """
+            [Groups/0]
+            Name=Default
+            Default Layout=us
+            DefaultIM=${InputMethodCatalog.T9}
+
+            [Groups/0/Items/0]
+            Name=${InputMethodCatalog.T9}
+
+            [Groups/0/Items/1]
+            Name=${InputMethodCatalog.PINYIN}
+
+            [Groups/0/Items/2]
+            Name=${InputMethodCatalog.ENGLISH}
+
+            [GroupOrder]
+            0=Default
+
+        """.trimIndent()
+        fcitx.stop()
+        val other = File(home.parentFile, "kotlin-host-restore").apply { deleteRecursively() }
+        val dirs = dirsUnder(other, external = home, config = File(home, "config"))
+        UserDataManager.import(backupZip("external/config/profile" to zeroFourProfile), dirs).getOrThrow()
+        other.deleteRecursively()
+        start()
+        idle()
+        assertEquals(listOf(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH), fcitx.enabledIme().map { it.uniqueName })
+        assertEquals(PinyinKeyboard.Full, keyboard.getValue())
     }
 
     // the theme packs' boards listed and chosen at the start (ThemeLayoutsToList): said once seen

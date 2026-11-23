@@ -64,6 +64,15 @@ class LatinWordsTest {
     }
 
     @Test
+    fun editingTheCustomKeyboardKeepsTheBuiltInKeyboardsTries() {
+        val before = NineKeyLetters.custom(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz", "a"))
+        val after = NineKeyLetters.custom(listOf("abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz", "b"))
+        val builtIn = listOf(NineKeyLetters.STANDARD, NineKeyLetters.G14, NineKeyLetters.G18)
+        for (keys in builtIn + before + after) latin.warmUp(keys)
+        for (keys in builtIn + after) assertTrue(keys.tag(), latin.keyTrieBuilt(keys))
+    }
+
+    @Test
     fun aKeyboardWithLettersOnSeveralKeysTypesEveryWordByItsFirstKeysTheTrieBounded() {
         val random = Random(1)
         val words = List(3000) { String(CharArray(8) { 'a' + random.nextInt(26) }) }.distinct()
@@ -79,6 +88,13 @@ class LatinWordsTest {
         assertEquals("not typed by their first keys", emptyList<String>(), byFirstKeys)
         // the other keys still type the words the bound leaves room for
         assertTrue(found(three.typings(words.sorted().first()).last()))
+        // a letter typed as itself stands for its first key: every word its keys type is still typed with one fixed
+        val lostWhenFixed = words.flatMap { w ->
+            three.typings(w).filter(::found).flatMap { t ->
+                w.indices.map { p -> t.substring(0, p) + w[p].uppercaseChar() + t.substring(p + 1) }.filterNot(::found)
+            }
+        }
+        assertEquals(emptyList<String>(), lostWhenFixed)
         // a keyboard with each letter on one key is far below it
         assertTrue(many.keyTrieSize(NineKeyLetters.STANDARD) < LatinWords.MAX_KEY_NODES / 2)
     }

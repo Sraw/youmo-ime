@@ -26,17 +26,21 @@ internal class VoiceEditsGlue(
     // the last talks' stretches as voice kept them, the latest last: a word judged on the stretch voice judged
     private val talks = ArrayDeque<List<String>>()
 
+    // as the field's last context said: a field that does not learn keeps none of what was said in it
+    private var fieldLearns = true
+
     val edits = VoiceEdits(object : VoiceEdits.Words {
         override fun readings(c: Char) = assets.voiceReadings(c)
 
         override fun mine(): VoiceEdits.Mine {
-            val all = words.userWords()
-            userWords = all
+            // voice is judged on all the words, as VoiceEngine reads them; a table's remembered words are not asked about
+            userWords = words.userWords()
             tables.clear()
-            fun of(kind: UserWord.Kind) = all.filter { it.kind == kind }.mapTo(HashSet()) { it.text }
+            val asked = userWords.filter { it.table.isEmpty() }
+            fun of(kind: UserWord.Kind) = asked.filter { it.kind == kind }.mapTo(HashSet()) { it.text }
             return VoiceEdits.Mine(
                 of(UserWord.Kind.ADDED), of(UserWord.Kind.LEARNED), of(UserWord.Kind.BLOCKED),
-                all.filter { it.voiceAlways }.mapTo(HashSet()) { it.text },
+                asked.filter { it.voiceAlways }.mapTo(HashSet()) { it.text },
             )
         }
 
@@ -67,8 +71,9 @@ internal class VoiceEditsGlue(
         }
     }, simplify)
 
-    /** A talk's stretches as voice kept them ([VoiceChoice.Talk.stretches]). */
+    /** A talk's stretches as voice kept them ([VoiceChoice.Talk.stretches]); none kept where the field does not learn. */
     fun stretches(texts: List<String>) {
+        if (!fieldLearns) return
         talks.addLast(texts.toList())
         while (talks.sumOf { t -> t.sumOf { it.length } } > MAX_STRETCHES) talks.removeFirst()
     }
@@ -93,6 +98,8 @@ internal class VoiceEditsGlue(
 
     /** As [Engines.context] has it. */
     fun context(before: String, learning: Boolean, cleared: Boolean, after: String?, selected: Boolean, said: Boolean) {
+        fieldLearns = learning
+        if (!learning) talks.clear()
         if (!edits.open) return releaseIfClosed()
         try {
             if (!learning) edits.clear() else edits.context(before, after, selected, said, cleared)
@@ -101,9 +108,10 @@ internal class VoiceEditsGlue(
         }
     }
 
-    /** Stops following voice text (another field, habits off), releasing what edits read. */
+    /** Stops following voice text (another field, habits off, learning cleared), releasing what edits read and what was said. */
     fun end() {
         edits.clear()
+        talks.clear()
         releaseIfClosed()
     }
 
@@ -123,8 +131,8 @@ internal class VoiceEditsGlue(
      */
     fun remember(ask: VoiceEdits.Ask): Boolean {
         if (!ask.added && !words.addWord(ask.word, ask.pinyin)) return false
-        // one added before and deleted while asked: nothing to mark
-        if (ask.always && !lexicon.setVoiceAlways(ask.word, true) && ask.added) return false
+        // one added before and deleted while asked: nothing to mark; one marked meanwhile on the word list is marked
+        if (ask.always && !lexicon.setVoiceAlways(ask.word, true) && ask.word !in lexicon.voiceAlways) return false
         ask.replaces?.let(lexicon::unAdd)
         edits.remembered(ask)
         return true
@@ -161,6 +169,8 @@ internal class VoiceEditsGlue(
             val bare = String(CharArray(kept.size) { text[kept[it]] })
             val place = kept.indexOf(at)
             if (place < 0) return null
+            // the place's length without marks too, as the stretches are searched
+            val n = kept.count { it >= at && it < at + length }
             var end = bare.length
             for (talk in talks.reversed()) {
                 for (k in talk.indices.reversed()) {
@@ -168,7 +178,7 @@ internal class VoiceEditsGlue(
                     val i = if (b.isEmpty() || end < b.length) -1 else bare.lastIndexOf(b, end - b.length)
                     if (i < 0) continue
                     end = i
-                    if (place >= i && place + length <= i + b.length) return Judged(b, place - i, talk.getOrNull(k - 1).orEmpty())
+                    if (place >= i && place + n <= i + b.length) return Judged(b, place - i, talk.getOrNull(k - 1).orEmpty())
                 }
             }
             return null

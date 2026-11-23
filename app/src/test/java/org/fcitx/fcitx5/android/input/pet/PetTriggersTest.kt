@@ -13,7 +13,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Only the kind of key pressed: a letter, ⌫, ⏎ or space; never voice, switching or selecting. */
+/** Only the kind of key pressed: a letter, ⌫, ⏎ or space; never voice, switching, selecting or the cursor moved. */
 class PetTriggersTest {
 
     private fun sym(s: Int) = KeyAction.SymAction(KeySym(s))
@@ -40,5 +40,10 @@ class PetTriggersTest {
             KeyAction.BeginSwipeSelectAction, KeyAction.SwipeSelectAction(2), KeyAction.EndSwipeSelectAction, KeyAction.MoveSelectionAction(1, 1),
             KeyAction.QuickPhraseAction, KeyAction.ShowInputMethodPickerAction, KeyAction.PickerSwitchAction(), KeyAction.SpaceLongPressAction(0),
         )) assertEquals(a.toString(), null, PetTriggers.of(a))
+        // a swipe on space moves the cursor by these, a step at a time
+        for (s in listOf(
+            FcitxKeyMapping.FcitxKey_Left, FcitxKeyMapping.FcitxKey_Right, FcitxKeyMapping.FcitxKey_Up, FcitxKeyMapping.FcitxKey_Down,
+            FcitxKeyMapping.FcitxKey_Home, FcitxKeyMapping.FcitxKey_End, FcitxKeyMapping.FcitxKey_Page_Up, FcitxKeyMapping.FcitxKey_Page_Down,
+        )) assertNull(Integer.toHexString(s), PetTriggers.of(sym(s)))
     }
 }

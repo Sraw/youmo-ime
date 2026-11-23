@@ -132,8 +132,8 @@ class BaiduBdaTest {
         val files = bda(blank = 10_000)
         val start = TimeSource.Monotonic.markNow()
         val look = BaiduBdaSkin(SkinFiles(files, platform)).look(Variant.LIGHT)
-        // each key's picture scanned anew: minutes
-        assertTrue(start.elapsedNow() < 5.seconds, "${start.elapsedNow()}")
+        // each key's picture scanned anew: minutes, so a loaded machine is far within this
+        assertTrue(start.elapsedNow() < 30.seconds, "${start.elapsedNow()}")
         assertEquals(plain + 1, platform.decoded)
         assertNotNull(look.icons["backspace"])
         assertEquals(BaiduFixtures.LETTER, look.keys.getValue("key").color)

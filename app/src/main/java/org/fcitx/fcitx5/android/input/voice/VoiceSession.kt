@@ -136,7 +136,7 @@ class VoiceSession(
         listener = (listening?.invoke(events, audio) ?: VoiceListener(
             events,
             hotwords = { VoiceEngine.userHotwords(fcitx, habits = AppPrefs.getInstance().internal.useHabits.getValue()) },
-            language = VoiceEngine.language(fcitx),
+            language = VoiceEngine.language(fcitx) { service.voiceKeepsStretches },
             audio = audio,
         )).also {
             it.load()

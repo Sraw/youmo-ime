@@ -353,7 +353,7 @@ test('the page saves from-maker-picture.theme, byte for byte', () => {
   let d = P.background.ops.setPicture(M.fromBuiltin(E, 'nord'), { type: 'png', src: px, cuts: { portrait: { bytes: px, type: 'png', rect: [0, 0, 4, 2] }, landscape: { bytes: px, type: 'png', rect: [0, 1, 4, 2] } } });
   d = P.background.ops.through(d, true);
   d = P.keys.ops.fill(d, 'key.letter', { kind: 'linear', angle: 90, stops: [['#ff0000', 0], ['#0000ff', 100]] });
-  d = P.text.ops.setIcon(d, 'backspace', enc('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 12l6-6h14v12H8z"/></svg>'));
+  d = P.text.ops.setIcon(d, L, 'backspace', enc('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2 12l6-6h14v12H8z"/></svg>'));
   assert.deepEqual(M.saveProblems(E, L, FORMAT, d), []);
   const made = M.save(L, d).bytes;
   if (process.env.UPDATE) writeFileSync(join(testdata, 'from-maker-picture.theme'), made);

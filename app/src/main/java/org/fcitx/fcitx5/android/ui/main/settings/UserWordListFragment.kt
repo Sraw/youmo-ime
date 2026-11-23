@@ -415,13 +415,7 @@ class UserWordListFragment : Fragment() {
 
     private fun act(word: UserWord) {
         val held = rare.heldIn(word.text)
-        val actions = buildList {
-            if (held.isNotEmpty()) add(if (held.size == 1) R.string.rare_allow_one else R.string.rare_allow_these)
-            if (source.canEdit(word)) add(R.string.edit)
-            if (source == EnglishWords && word.neverCorrected) add(R.string.english_restore_correction)
-            if (word.voiceAlways) add(R.string.voice_always_cancel)
-            add(source.removeLabel)
-        }
+        val actions = wordActions(source, word, held)
         AlertDialog.Builder(requireContext())
             .setTitle("${word.text}  ${word.pinyin}".trim())
             .setItems(actions.map { if (it == R.string.rare_allow_one) getString(it, held.first()) else getString(it) }.toTypedArray()) { _, which ->
@@ -727,6 +721,15 @@ internal object EnglishWords : WordSource(
 }
 
 private val SEARCH_IGNORED = Regex("[\\s']")
+
+/** A row's menu, as string ids in order; [held] the word's characters the rare-character filter holds back. */
+internal fun wordActions(source: WordSource, word: UserWord, held: List<String>): List<Int> = buildList {
+    if (held.isNotEmpty()) add(if (held.size == 1) R.string.rare_allow_one else R.string.rare_allow_these)
+    if (source.canEdit(word)) add(R.string.edit)
+    if (source == EnglishWords && word.neverCorrected) add(R.string.english_restore_correction)
+    if (word.voiceAlways) add(R.string.voice_always_cancel)
+    add(source.removeLabel)
+}
 
 internal fun searchKey(query: String): String = query.trim().lowercase().replace(SEARCH_IGNORED, "")
 

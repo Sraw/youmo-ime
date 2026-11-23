@@ -159,7 +159,11 @@ object UatEngines {
         return engines
     }
 
-    /** B0's settings, read from the host's fresh options so the replays cannot drift from the device; 双拼 is the baselines' 自然码. */
+    /**
+     * B0's settings, read from the host's fresh options so the replays cannot drift from the device's, at the high
+     * level (not 自动, which is lower on some phones, the 6T's medium among them: `DeviceProfile.of`); 双拼 is the
+     * baselines' 自然码.
+     */
     val BASELINE: EngineSettings
         get() = EngineOptions().toSettings(ModelLevel.HIGH).copy(shuangpin = EngineSettings.ZIRANMA)
 

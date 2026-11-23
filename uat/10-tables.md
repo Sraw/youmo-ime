@@ -111,6 +111,27 @@
 - **预期**：提示条「记住：汪小明 wcxm」。
 - **JVM**：`TablesUatTest.erbiOffersByItsRules`（真数据）+ ime-core `TableWordLearningTest.erbisSemicolonInACodeEndsNoRun`（`;` 编码键不打断）、`aTableWithNoRulesOffersNone`（仓颉不给）；设备上跑。
 
+### TBL-11g [P1] 打得长、删回去：只给知道开头的那一段
+<!-- learning: U-28 -->
+- **前提**：B0-五笔。空框。
+- **操作**：逐字连着打三遍「汪小明」（i g 空格、i h 空格、j e 空格，共九个字），不停，接着点 ⌫ 7 次，再点 j e 空格，手离开键等 2 秒，看框和键盘上方；清空框，再逐字打三遍「汪小明」，手离开键等 1 秒，看提示条（截图）。
+- **预期**：删回去以后框里是「汪小明」（不丢字、不多字，没有出错的提示），提示条不给「汪小明」：删掉的字越过了这一段记下的开头，只知道最后打的「小」「明」。打满九个字停下时提示条给「记住：汪小明 iije」，只给最后一段，不给九个字的整串，也不给四个字以上的。滑行输入开着时，从下一个字的首键滑出的一笔顶上前面点出的码，那个字照样算进这一段，⌫ 删掉滑出的那个字后接着打的仍接得上；滑出来的字结束这一段（只在 JVM 上断言）。
+- **JVM**：ime-core `TableWordLearningTest.aLongRunAndOneDeletedBackPastWhatIsKeptOfferTheirEnd`（四个字整段给、五个字超过整段上限不给、九个字给最后三个和两个、删回到两个字再打「明」只给知道的末尾两个）、`TableWordLearningTest.aGlidedCodeEndsTheRunATappedOneToppedByAGlideGoesOn`（滑行首键顶上的点按码算进这一段，滑出来的码结束这一段）、`TableWordLearningTest.aDeletedCharacterRetypedGoesOnTheRun`；设备上跑（打、删、看提示条）。
+
+### TBL-11h [P1] 记住后切到别的输入法再点撤销
+<!-- learning: U-28 -->
+- **前提**：B0-五笔。空框。
+- **操作**：照 TBL-11 记住「汪小明」；提示条「记住了『汪小明』：五笔 iije」还在时点地球键切到拼音，看提示条（截图），点提示条上的 **撤销**；再点地球键切回五笔，清空框，点 i i j e 看候选。
+- **预期**：切到拼音后提示条还在，带 **撤销**；点了以后框里仍是「汪小明」；回到五笔后 iije 的候选里没有「汪小明」（撤销送给记住它的五笔，不是当时显示的拼音）。没切换就撤销的，照旧送给五笔（TBL-11c）。
+- **JVM**：`KotlinHostTest.theUndoOfAWordRememberedBeforeASwitchGoesAsideToItsTable`（切到拼音后撤销，经 `aside` 送给五笔，不发给拼音）、`KotlinHostTest.theUndoOfAWordRememberedInTheTableShownGoesToIt`；设备上跑（切换后提示条、撤销、回五笔看候选）。
+
+### TBL-11i [P1] 开着空格上屏联想词：点记住、点撤销后空格取画成首选的联想词
+<!-- learning: U-28 -->
+- **前提**：B0-五笔，**通用输入** 里打开 **空格上屏联想词**。空框。
+- **操作**：照 TBL-11 点提示条记住「汪小明」，等 1 秒，看候选栏（截图），点空格，看框。清空框，点 q g y i 选「鲸」，点 l f q v（「园」），停一下，点提示条上的「鲸园 qglf」，再点 **撤销**，等 1 秒，看候选栏（截图），点空格，看框。
+- **预期**：点了「记住」以后、点了「撤销」以后，候选栏都是联想，第一个联想词画成首选的样子；空格上屏的就是画成首选的那个：框里是「汪小明」加它、「鲸园」加它，后面没有空格。
+- **JVM**：ime-core `TableWordLearningTest.theTapAndItsUndoKeepTheSpaceMarks`（点记住、点撤销后候选栏照样标出空格取第一个联想词）、`TableWordLearningTest.aTapAfterASelfCommitLeavesTheSpaceToTakeThePrediction`（最后一个字是自动上屏的（鲸园的「园」lfqv）也一样：点记住是一次点按，不是自动上屏）、`TableWordLearningTest.aSpaceTakesThePredictionShownOnlyWithTheSwitchOn`、`TableWordLearningTest.aStaleTapLeavesTheSpaceAfterATakenPredictionASpace`（空格取了联想词以后再点已过时的提示条、什么也没记住，下一个空格照样是空格；只在 JVM 上断言）；设备上跑。
+
 ### TBL-12 [P1] 拼音里的词不进码表的唯一码，自动上屏照旧
 <!-- learning: D8 -->
 <!-- learning: U-28 -->

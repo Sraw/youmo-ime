@@ -84,7 +84,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /**
          * Every key's long press the user set, of every keyboard ([org.fcitx.fcitx5.android.input.keys.KeyLists],
-         * `@2` first; 060-keys-unify §2, 060-row-unlock §1.2): 0.5's and the betas' [POPUP_OVERRIDES], [KEY_POPUPS] and [T9_SYMBOLS] moved here
+         * `@2` first; 060-keys-unify §2, 060-row-unlock §1.2): 0.5's [POPUP_OVERRIDES] and [T9_SYMBOLS] moved here
          * once ([dropRetired]), those kept as they were for a downgrade (§4.4), no longer settings of this version. A plain setting, never `hidden`: a backup's
          * would be reset after its import and the old ones migrated again (m2). 全部恢复默认 writes [KeyLists.HEADER], the
          * default, never removes it: the old ones would come back at the next start. Whether to migrate is read from what
@@ -789,9 +789,10 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
     /**
      * 0.5's long presses ([POPUP_OVERRIDES], [T9_SYMBOLS]; beta2's [KEY_POPUPS] no longer read) as [Internal.keyLists]
-     * (KeyListsMigration, 060-keys-unify §4.3), to `@1` then `@2` (060-row-unlock §5, its rows by the user's 按键字母):
-     * run while it is neither (never stored, a 0.5, beta or `@1` backup restored), once. A later version's (`@4`) left
-     * as it is. The old ones kept as they are, for a downgrade (§4.4).
+     * (KeyListsMigration, 060-keys-unify §4.3), through `@1` to `@2` (060-row-unlock §5, its rows by the user's 按键字母):
+     * run while it is neither `@2` nor later (never stored, a 0.5 or beta backup restored), once. A stored `@1` (a beta's) is not
+     * kept: rebuilt from 0.5's as if none were stored. A later version's (`@4`) left as it is. The old ones kept as
+     * they are, for a downgrade (§4.4).
      */
     private fun migrateKeyLists() {
         val sp = sharedPreferences

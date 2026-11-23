@@ -179,7 +179,8 @@ class PinyinSession(
     private var spacePicked = false
 
     override fun apply(action: Action): Snapshot {
-        val was = if (predicting) candidates.map { it.text } else null
+        // read only for 空格上屏联想词
+        val was = if (spacePicksPrediction && predicting) candidates.map { it.text } else null
         val at = uptime()
         val picks = action is Action.Key && action.char == ' ' && spacePicksNow() && at - predictionsAt >= SPACE_PICK_AFTER_MS
         val s = if (picks) {
@@ -192,7 +193,7 @@ class PinyinSession(
         // the field's report of the pick's commit is no new step: the next space is still a space
         if (action !is Action.Context) spacePicked = picks
         // each new round of predictions, a tapped one's next too: a space right after it is still a space
-        if (predicting && candidates.map { it.text } != was) predictionsAt = at
+        if (spacePicksPrediction && predicting && candidates.map { it.text } != was) predictionsAt = at
         return if (spacePicksPrediction && predicting) s.copy(spacePicks = if (spacePicksNow()) spaceTakes() else -1, spaceMarks = true) else s
     }
 

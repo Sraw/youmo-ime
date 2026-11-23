@@ -43,7 +43,9 @@ class TableWordOffers(
     private val given = HashSet<String>()
 
     fun followed(action: Action, s: Snapshot, verified: Boolean, composing: Boolean): Boolean {
-        if (action is Action.Key && action.glided) glided = true
+        val glide = action is Action.Key && action.glided
+        // a glided key starting the next code (顶字) commits a code it is no part of
+        val glidedCommit = glided || glide && !composing
         var wrote = false
         when {
             action is Action.Context -> if (action.started) newField() else end()
@@ -52,13 +54,13 @@ class TableWordOffers(
             action == Action.Backspace && !s.handled -> if (verified) deleted() else end()
             s.commit.isNotEmpty() -> {
                 wrote = true
-                if (glided) end() else committed(s.commit)
+                if (glidedCommit) end() else committed(s.commit)
             }
             else -> withdraw()
         }
         // the key itself went into the field after
         if (action is Action.Key && !s.handled) end()
-        if (!composing) glided = false
+        glided = composing && (glide || glided && s.commit.isEmpty())
         return wrote
     }
 
@@ -115,11 +117,12 @@ class TableWordOffers(
 
     private fun picks(): List<OfferedWord> {
         if (count < 2 || table.rules.isEmpty) return emptyList()
+        // none longer than [chars]: deleted back past what is kept, the run's start is unknown
         val lengths = buildList {
             if (count <= MAX_WHOLE) add(count)
             if (count >= 3) add(3)
             add(2)
-        }.distinct()
+        }.distinct().filter { it <= chars.size }
         val kept = chars.joinToString("")
         val starts = boundaries?.invoke(kept)?.toSet()
         return lengths.mapNotNull { n ->
@@ -143,7 +146,8 @@ class TableWordOffers(
     private fun keepsPrefixes(code: String): Boolean {
         for (n in 1 until code.length) {
             val prefix = code.substring(0, n)
-            val under = table.match(prefix, null)
+            // walked in place: 二笔's i alone leads to 19k entries, at every commit
+            val under = table.prefixRange(prefix)
             // the table's code entries only: 五笔拼音's pinyin spellings lead elsewhere
             val longer = under.any { table.codeLength(it) > n && !table.isPinyin(it) }
             if (options.noMatchAutoSelectLength != 0 && !longer) return false

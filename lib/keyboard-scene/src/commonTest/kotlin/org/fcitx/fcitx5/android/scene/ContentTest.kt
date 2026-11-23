@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.engine.TextMeasurer
 import org.fcitx.fcitx5.android.scene.engine.toInk
 import org.fcitx.fcitx5.android.scene.keys.DefaultMarks
+import org.fcitx.fcitx5.android.scene.layout.Layout
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
@@ -166,6 +167,21 @@ class ContentTest {
         assertTrue(up.height < 22.0 && up.height >= 22.0 * KeyMarkYield.MIN_MARK_SCALE - 0.01, "smaller, no more than the cap: ${up.height}")
         val sizes = s.keys.flatMap { k -> k.ops(false).filterIsInstance<Op.Icon>().filter { it.name in movingIcons && it.name != k.id } }.map { it.box.width }.toSet()
         assertEquals(setOf(up.width), sizes, "every shortcut icon the same size")
+    }
+
+    @Test
+    fun zhuyinsCompactTextScaleShrinksItsSymbolsOnlyWhenCompact() {
+        val text = testData("zhuyin.xml")
+        val attr = " compact-text-scale=\"0.9\""
+        assertTrue(attr in text, "zhuyin.xml's defaults")
+        val without = LayoutReader.layout(text.replace(attr, "")).ok()
+        // no marks: one a smaller symbol leaves room for would let its class yield less, and the size is the scale's alone
+        fun size(form: Env, layout: Layout) = texts(
+            SceneBuilder(Fixtures.materialLight, Forms.env("zhuyin", form.copy(marks = MarkSettings(upOn = false, downOn = false))), FakeMeasurer).build(layout, Forms.fragments).ok(),
+            "1",
+        ).first { it.text == "ㄅ" }.size
+        near(0.9 * size(Forms.compact, without), size(Forms.compact, Forms.layout("zhuyin")), "compact")
+        near(size(Forms.block, without), size(Forms.block, Forms.layout("zhuyin")), "not compact")
     }
 
     @Test

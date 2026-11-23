@@ -10,6 +10,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.phoneStorage
+import org.fcitx.fcitx5.android.input.theme.Area
+import org.fcitx.fcitx5.android.input.theme.NineSliceLayout
 import org.fcitx.fcitx5.android.scene.look.BarBase
 import org.fcitx.fcitx5.android.scene.look.BoardBase
 import org.fcitx.fcitx5.android.scene.look.Box
@@ -40,6 +42,7 @@ import java.util.zip.ZipOutputStream
 /**
  * contract: fixtures the page's node test reads: a 2.1 theme brought to 3.0 (migration.json, redone in JavaScript),
  * theme.json, and what this app and a pre-3.0 one export. Change them here and the page's test fails till it follows.
+ * The app's nine-slice edges are held to the ones CanvasPainterTest pins for the page's NineSliceCut.
  */
 @RunWith(RobolectricTestRunner::class)
 // the real application: the export goes through appContext
@@ -182,5 +185,18 @@ class ThemeMakerRulesTest {
         // pre-3.0: its two images and its 2.1 json
         val old = zip(listOf("old-cropped.png" to png(16, 24, -0x1000000), "old-src" to png(32, 48, -0x1000000), "old.json" to v21.encodeToByteArray()))
         ThemeMakerTestdata.check("from-app-2.1.theme", old)
+    }
+
+    // CanvasPainterTest's cases, box for box: no inset on a side keeps the target's edge, the others whole pixels, ties to even
+    @Test
+    fun nineSliceEdgesAreThePages() {
+        val cut = NineSliceLayout.of(40, 40, NineSlice("f", Insets(0, 8, 12, 0), 2), Area(3.5f, 7.25f, 96.5f, 60.75f), 2.6f)
+        assertEquals(
+            listOf(Area(3.5f, 7.25f, 81f, 18f), Area(81f, 7.25f, 96.5f, 18f), Area(3.5f, 18f, 81f, 60.75f), Area(81f, 18f, 96.5f, 60.75f)),
+            cut.map { it.dst },
+        )
+        val tie = NineSliceLayout.of(20, 20, NineSlice("f", Insets(4, 4, 4, 4), 2), Area(0.5f, 1.5f, 20.5f, 10.5f), 1f)
+        assertEquals(listOf(0.5f, 2f, 18f), tie.take(3).map { it.dst.left })
+        assertEquals(listOf(1.5f, 4f, 8f), listOf(tie[0], tie[3], tie[6]).map { it.dst.top })
     }
 }

@@ -175,6 +175,8 @@ class RimeCompose(private val files: (String) -> Any?) {
         for ((k, v) in edits) {
             if (k !is String) continue
             val path = bare(k).trimStart('/').split('/')
+            // each part is a level edited by recursion: none deeper than a YAML read is
+            if (path.size > SkinYaml.MAX_DEPTH) throw SkinError(SkinError.Reason.BROKEN, "a patch's path past ${SkinYaml.MAX_DEPTH} parts")
             t = edit(t, path, 0) { old -> if (k.endsWith(ADD)) add(old, v) else v }
         }
         return t
@@ -183,6 +185,7 @@ class RimeCompose(private val files: (String) -> Any?) {
     // [node] with what is at [path] (from [i]) set to [leaf] of it, copied on the way; unchanged where the path does not fit
     private fun edit(node: Any?, path: List<String>, i: Int, leaf: (Any?) -> Any?): Any? {
         if (i == path.size) return leaf(node)
+        tick()
         val seg = path[i]
         if (seg.isEmpty()) return edit(node, path, i + 1, leaf)
         if (seg.startsWith("@")) {

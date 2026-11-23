@@ -14,7 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A decoder going on from its last decode ([PinyinDecoder] collectOn) where a word only imported starts the input. */
+/** A decoder going on from its last decode (LatticeBuilder collectOn) where a word only imported starts the input. */
 class PinyinDecoderStartOnlyTest {
 
     private val data = pinyinDataOf(

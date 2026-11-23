@@ -12,26 +12,28 @@ import android.os.Build
 import androidx.core.os.ConfigurationCompat
 import androidx.core.os.LocaleListCompat
 import org.fcitx.fcitx5.android.utils.Locales
+import java.util.concurrent.atomic.AtomicReference
 
 /** An input method's window takes the display's configuration, the phone's language, even where Android 13 gives the app its own. */
-class AppLanguage(private val service: Context) {
+class ServiceLocaleResources(private val service: Context) {
 
-    /** Volatile, as is [localizedResources]: read off the main thread too, by a fcitx job's SubtypeManager.syncWith */
-    @Volatile
-    private var appLocales: LocaleListCompat? = null
+    private class Localized(val locales: LocaleListCompat?, val resources: Resources?)
 
-    @Volatile
-    private var localizedResources: Resources? = null
+    // one value for both, swapped whole: read off the main thread too, by a fcitx job's SubtypeManager.syncWith, a pick
+    // landing while that one builds must not have the old language's resources kept after it
+    private val localized = AtomicReference(Localized(null, null))
 
     private var localesReadWith: Pair<LocaleListCompat, LocaleListCompat>? = null
 
     fun resources(base: Resources): Resources {
-        val locales = appLocales
+        val now = localized.get()
+        val locales = now.locales
         if (locales == null || locales.isEmpty) return base
+        now.resources?.let { return it }
         // the locales alone over the base: the system keeps these resources up with any other change, for those that hold them
-        return localizedResources ?: service.createConfigurationContext(
-            Configuration().also { ConfigurationCompat.setLocales(it, locales) }
-        ).resources.also { localizedResources = it }
+        val made = service.createConfigurationContext(Configuration().also { ConfigurationCompat.setLocales(it, locales) }).resources
+        localized.compareAndSet(now, Localized(locales, made))
+        return made
     }
 
     fun pickedChanged(): Boolean {
@@ -43,9 +45,8 @@ class AppLanguage(private val service: Context) {
             localesReadWith = languages
         }
         val picked = Locales.picked(service)
-        if (picked == appLocales) return false
-        appLocales = picked
-        localizedResources = null
+        if (picked == localized.get().locales) return false
+        localized.set(Localized(picked, null))
         return true
     }
 }

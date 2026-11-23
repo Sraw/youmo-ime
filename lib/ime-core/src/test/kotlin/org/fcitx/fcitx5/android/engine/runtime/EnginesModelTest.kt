@@ -4,8 +4,10 @@
  */
 package org.fcitx.fcitx5.android.engine.runtime
 
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.rerank.MatrixKernel
 import org.fcitx.fcitx5.android.engine.rerank.TinyModel
 import org.fcitx.fcitx5.android.engine.session.Snapshot
@@ -68,6 +70,47 @@ class EnginesModelTest {
         assertEquals(0, calls)
         assertEquals(expected, Engines(::load, null, kernel = kernel).type(InputMethodCatalog.PINYIN, "nihao").candidates)
         assertTrue(calls > 0)
+    }
+
+    @Test
+    fun aReadAheadStillQueuedWhenTheEnginesCloseReadsNothing() {
+        // a window the context fits in, so the read ahead has tokens to read
+        model = TinyModel(window = 32).bytes()
+        large = TinyModel(window = 32, seed = 7).bytes()
+        // at [level], the reads a context queued, none of them reading once the engines closed
+        fun closed(level: ModelLevel): Int {
+            var calls = 0
+            val kernel = object : MatrixKernel {
+                // counted too: a read that threw would be caught off the fcitx thread and look like no read
+                override fun times(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, y: FloatArray) {
+                    calls++
+                    MatrixKernel.JVM.times(q, scales, rows, columns, x, y)
+                }
+
+                override fun timesManyQ8(q: ByteBuffer, scales: FloatArray, rows: Int, columns: Int, x: FloatArray, m: Int, y: FloatArray) {
+                    calls++
+                    MatrixKernel.JVM.timesManyQ8(q, scales, rows, columns, x, m, y)
+                }
+            }
+            val queued = ArrayList<Runnable>()
+            val engines = Engines(::load, null, kernel = kernel, warmUps = inPlace, contextReads = { queued += it })
+            engines.settings = EngineSettings(modelLevel = level)
+            // the keyboard made by a key, its preedit cleared: a context is not taken over one
+            engines.type(InputMethodCatalog.PINYIN, "ni")
+            engines.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+            engines.context(InputMethodCatalog.PINYIN, "天天的我好你")
+            assertTrue(queued.isNotEmpty())
+            val before = calls
+            engines.close()
+            queued.forEach(Runnable::run)
+            assertEquals(before, calls)
+            return queued.size
+        }
+        assertRows(
+            "medium: the small model's read" to { closed(ModelLevel.MEDIUM) },
+            // read ahead in place as the session is made: its model read, its read of the context queued too
+            "high: the large model's as well" to { assertTrue(closed(ModelLevel.HIGH) > closed(ModelLevel.MEDIUM)) },
+        )
     }
 
     @Test
@@ -174,7 +217,10 @@ class EnginesModelTest {
         large = null
         val high = Engines(::load, null, onError = { errors += it }, warmUps = inPlace)
         assertEquals(expected, inputs.map { (im, typed) -> high.type(im, typed).candidates })
-        assertTrue(errors.size <= 1)
-        assertTrue(errors.all { InputMethodCatalog.LARGE_MODEL in it.message.orEmpty() })
+        // a context prewarms the large model if read: asked for, whatever the gate did while typing; the preedit
+        // cleared first, as a context is not taken over one
+        high.onEvent(InputMethodCatalog.PINYIN, EngineEvent.RESET, 0)
+        high.context(InputMethodCatalog.PINYIN, "你")
+        assertEquals(1, errors.count { InputMethodCatalog.LARGE_MODEL in it.message.orEmpty() })
     }
 }

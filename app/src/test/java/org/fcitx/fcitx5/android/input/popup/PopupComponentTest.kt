@@ -9,7 +9,10 @@ import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.View
 import android.widget.FrameLayout
+import kotlinx.coroutines.test.TestScope
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.core.FakeHostConnection
+import org.fcitx.fcitx5.android.daemon.HostConnection
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.broadcast.PunctuationComponent
@@ -65,6 +68,8 @@ class PopupComponentTest {
         val theme: Theme = TestThemes.PixelDark
         scope += context.wrapToUniqueComponent()
         scope += theme.wrapToUniqueComponent()
+        val host: HostConnection = FakeHostConnection(TestScope())
+        scope += host.wrapToUniqueComponent()
         // off (no engine here): a symbol shown as it is
         scope += PunctuationComponent()
         scope += popup
@@ -181,6 +186,20 @@ class PopupComponentTest {
         } finally {
             Timber.uproot(tree)
         }
+    }
+
+    // told, so the swipe falls back to the globe's long press (KeySwipes) rather than nothing
+    @Test
+    fun aMenuTheEngineCannotMakeIsToldAsNotShown() {
+        var broken = false
+        popup.measuring = { real -> TextMeasurer { t, f, w, size -> if (broken) error("no font") else real.measure(t, f, w, size) } }
+        // the input methods' menu: cells of words, which the engine measures (the edit menu's are icons)
+        val shown = PopupAction.ShowInputMethodMenuAction(SCENE, key).also { send(it) }
+        assertTrue("a menu the engine makes", shown.outShown)
+        popup.dismissAll()
+        broken = true
+        val unmade = PopupAction.ShowInputMethodMenuAction(KeyRef.scene("w", 1), key).also { send(it) }
+        assertFalse(unmade.outShown)
     }
 
     // not left with the text before while a lift types the new one

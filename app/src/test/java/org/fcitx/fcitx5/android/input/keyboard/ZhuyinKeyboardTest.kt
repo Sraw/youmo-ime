@@ -58,6 +58,8 @@ class ZhuyinKeyboardTest {
         val nine = shortcuts(nine = true)
         assertEquals((1..11).map { "zy9/$it" }, nine.values.filter { it?.matches(Regex("zy9/[0-9]+")) == true }.sortedBy { it!!.substringAfter('/').toInt() })
         assertEquals("comma", nine["r4c4"])
+        // a row's first key is its tone, named for the tone rather than a numbered group
+        (1..4).forEach { assertEquals("zy9/tone-$it", nine["r${it}c1"]) }
     }
 
     @Test

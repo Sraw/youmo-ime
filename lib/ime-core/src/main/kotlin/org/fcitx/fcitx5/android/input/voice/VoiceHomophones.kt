@@ -227,7 +227,8 @@ class VoiceHomophones internal constructor(
             charReadings: (Char) -> IntArray?,
         ): VoiceHomophones {
             val mine = words.filter { it.kind == UserWord.Kind.ADDED || it.kind == UserWord.Kind.LEARNED }
-            val taking = mine.sortedWith(compareBy<UserWord> { it.kind != UserWord.Kind.ADDED }.thenByDescending { it.count }).asSequence()
+            // a table's remembered word is never put in (its code is no reading), yet is the user's own, never replaced
+            val taking = mine.filter { it.table.isEmpty() }.sortedWith(compareBy<UserWord> { it.kind != UserWord.Kind.ADDED }.thenByDescending { it.count }).asSequence()
                 .filter { it.kind == UserWord.Kind.ADDED || it.count > LEARNED_MIN }
                 .filter { w -> w.text.length >= 2 && w.text.all(::isHan) }
                 .distinctBy { it.text }

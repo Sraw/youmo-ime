@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.lattice
 
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.platform.jvm.JvmFile
 import org.fcitx.fcitx5.android.engine.user.DictionaryCompiler
 import org.fcitx.fcitx5.android.engine.user.DictionaryFile
@@ -95,7 +96,7 @@ class CoarseWordsTest {
             DictionaryFile.open(JvmFile(file)),
         )
         val coarse = CoarseWords.of({ -1 }, listOf("拟浩"))
-        val entry = { t: String -> UserModel.Entry(t, UserFixtures.syl("ni", "hao")) }
+        val entry = { t: String -> UserModel.Entry(t, syl("ni", "hao")) }
         val listed = user.known(entry("拟浩"))
         assertTrue(user.isMerged(listed))
         assertTrue(coarse.unasked(listed, user, data.vocabulary.size))

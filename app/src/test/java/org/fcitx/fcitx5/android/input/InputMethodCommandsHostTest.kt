@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.input
 
+import android.widget.TextView
 import java.io.File
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
@@ -12,6 +13,9 @@ import org.fcitx.fcitx5.android.core.InputMethodNames
 import org.fcitx.fcitx5.android.core.KotlinHost
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
+import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
+import org.fcitx.fcitx5.android.input.popup.PopupAction
+import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlot
 import org.fcitx.fcitx5.android.input.shortcut.SwipeSlots
@@ -25,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 
 /** 切输入法 and 选输入法 through a real [KotlinHost] on a scripted engine, as [KeyShortcutsHostTest] runs the edit ones. */
 @RunWith(RobolectricTestRunner::class)
@@ -181,6 +186,30 @@ class InputMethodCommandsHostTest {
         host.until("on English") { im == InputMethodCatalog.ENGLISH }
         host.synced()
         assertEquals(byGlobe, h.field.text.toString() to host.preedit)
+    }
+
+    // no menu made (no scene, no room for it): the swipe is the globe's long press, its picker, not nothing
+    @Test
+    @Uat("KB-114")
+    fun aMenuThatCannotOpenIsTheGlobesLongPress() {
+        chooseOnQ()
+        start()
+        enable(InputMethodCatalog.PINYIN, InputMethodCatalog.ENGLISH)
+        val board = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
+        val pops = board.popupActionListener
+        board.popupActionListener = PopupActionListener { if (it !is PopupAction.ShowInputMethodMenuAction) pops?.onPopupAction(it) }
+        menuHeld().up(h.at(h.key("q"), dy = -60f))
+        h.idle()
+        // the swipe's preview lingers a moment after the lift: no popup lists the input methods
+        val names = listOf(name(InputMethodCatalog.PINYIN), name(InputMethodCatalog.ENGLISH))
+        assertTrue(shown().toString(), shown().none { it in names })
+        // built on the host's thread, so waited for; by its title, as the input method's own window may be shown after it
+        val title = h.service.getString(R.string.choose_input_method)
+        fun picker() = ShadowDialog.getShownDialogs().firstOrNull { p ->
+            p.isShowing && p.window?.decorView?.let { d -> KeyboardHarness.all(d).filterIsInstance<TextView>().any { it.text.toString() == title } } == true
+        }
+        host.until("the picker shown") { picker() != null }
+        picker()?.dismiss()
     }
 
     // a swipe down opens it as well: going on down keeps the pick, back up onto the key cancels

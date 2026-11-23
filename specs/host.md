@@ -373,7 +373,7 @@ the gettext translations are gone, the host's own texts are app resources (`AppH
   `LearningApi`. Every call is `suspend` and runs on the host thread.
 - **The `EngineSide` seam.** `KotlinHost` owns its `EngineBridge` (`bridge`, made with it: one per
   host) and takes an `EngineSide`: the engine host, `data()` (fcitx's data directory and whether it is written, `HostConfigDir.settle(DATA)`), `config()` (the config's
-  directory and whether it is written, `HostConfigDir.settle`), `start()` and `close()`. The app
+  directory and whether it is written, `HostConfigDir.settle`), `start()` and `close()`, and `aside(im, …)`: an event for an input method not shown (a remembered word's 撤销 after a switch), which `EngineSide.App` sends through `EngineBridge.aside`, writing nothing of `EngineState`. The app
   passes none, and gets `EngineSide.App` over its bridge. The JVM tests pass `ScriptedEngine` (app
   test sources), so they need no JNI. What the keyboards watch of the engine (the syllables
   offered, English's word, the handwriting piece ended, the 双拼 scheme) is

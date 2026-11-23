@@ -62,7 +62,8 @@ class SentenceModel private constructor(
         internal var summed = false
     }
 
-    // [nextMany]'s and [logSums]'s working arrays, grown as needed, per thread (ime-eval shares a model)
+    // [nextMany]'s and [logSums]'s working arrays, per thread (ime-eval shares a model); nextMany's stay at the largest
+    // batch seen, a few MB at most, as cutting a batch into blocks would read each weight matrix once per block
     private class Work(config: Config) {
         val one = FloatArray(config.width)
         val oneQkv = FloatArray(3 * config.width)

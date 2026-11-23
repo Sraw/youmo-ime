@@ -12,6 +12,7 @@ import org.fcitx.fcitx5.android.scene.pet.PetLimits
 import org.fcitx.fcitx5.android.scene.pet.PetState
 import timber.log.Timber
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -50,9 +51,11 @@ class PetFrames private constructor(
         )
 
         @VisibleForTesting
-        @Volatile
-        var decodes = 0
-            private set
+        val decodes = AtomicInteger()
+
+        /** A sheet scaled to its frames' size; a test's to make it throw. */
+        @VisibleForTesting
+        internal var scale: (Bitmap, Int, Int) -> Bitmap = { b, w, h -> Bitmap.createScaledBitmap(b, w, h, true) }
 
         /**
          * What to decode of sheets of [sizes] (width, height) for a box of [boxPx]: each frame shrunk to fit it, never
@@ -101,33 +104,52 @@ class PetFrames private constructor(
             }
         }
 
+        // checked as the pack was imported: a file changed since is left out, its bounds read before any decode
+        private fun sizes(pet: Pet): Map<PetState.Name, IntArray> = pet.states.mapNotNull { (name, s) ->
+            val f = File(s.sheet)
+            val size = if (f.isFile && f.length() <= PetLimits.MAX_SHEET_BYTES) ThemeAssets.decoder.size(s.sheet) else null
+            val wrong = if (size == null) "unreadable" else PetLimits.check(s, size[0], size[1], f.length())
+            if (wrong != null) Timber.w("theme pet %s: %s", name.id, wrong)
+            size?.takeIf { wrong == null }?.let { name to it }
+        }.toMap()
+
+        // a sheet decoded at the largest power-of-two sample still at least the target, then scaled to it
+        private fun bitmap(sheet: String, size: IntArray, width: Int, height: Int): Bitmap? {
+            var sample = 1
+            while (size[0] / (sample * 2) >= width && size[1] / (sample * 2) >= height) sample *= 2
+            decodes.incrementAndGet()
+            val decoded = ThemeAssets.decoder.decode(sheet, sample) ?: return null
+            if (decoded.width == width && decoded.height == height) return decoded
+            var scaled: Bitmap? = null
+            try {
+                return scale(decoded, width, height).also { scaled = it }
+            } finally {
+                // where the scale threw too (an OOM): in no slot yet, the caller's finally would not let it go
+                if (scaled !== decoded) decoded.recycle()
+            }
+        }
+
         private fun decode(pet: Pet, boxPx: Int, budget: Long): PetFrames? {
-            // checked as the pack was imported: a file changed since is left out, its bounds read before any decode
-            val sizes = pet.states.mapNotNull { (name, s) ->
-                val f = File(s.sheet)
-                val size = if (f.isFile && f.length() <= PetLimits.MAX_SHEET_BYTES) ThemeAssets.decoder.size(s.sheet) else null
-                val wrong = if (size == null) "unreadable" else PetLimits.check(s, size[0], size[1], f.length())
-                if (wrong != null) Timber.w("theme pet %s: %s", name.id, wrong)
-                size?.takeIf { wrong == null }?.let { name to it }
-            }.toMap()
+            val sizes = sizes(pet)
             val plan = plan(pet, sizes, boxPx, budget) ?: return null
             if (plan.dropped.isNotEmpty()) Timber.i("theme pet: %s left out for memory or size", plan.dropped.joinToString { it.id })
             val sheets = arrayOfNulls<Sheet>(PetState.Name.entries.size)
-            for ((name, t) in plan.targets) {
-                val s = pet.states.getValue(name)
-                val size = sizes.getValue(name)
-                var sample = 1
-                while (size[0] / (sample * 2) >= t.width && size[1] / (sample * 2) >= t.height) sample *= 2
-                decodes++
-                val decoded = ThemeAssets.decoder.decode(s.sheet, sample) ?: continue
-                val b = if (decoded.width == t.width && decoded.height == t.height) decoded
-                else Bitmap.createScaledBitmap(decoded, t.width, t.height, true).also { if (it !== decoded) decoded.recycle() }
-                sheets[name.ordinal] = Sheet(b, t.width / s.columns, t.height / s.rows, s.columns)
+            var made: PetFrames? = null
+            try {
+                for ((name, t) in plan.targets) {
+                    val s = pet.states.getValue(name)
+                    val b = bitmap(s.sheet, sizes.getValue(name), t.width, t.height) ?: continue
+                    sheets[name.ordinal] = Sheet(b, t.width / s.columns, t.height / s.rows, s.columns)
+                }
+                if (sheets[PetState.Name.IDLE.ordinal] == null) return null
+                val kept = pet.states.filterKeys { sheets[it.ordinal] != null }
+                    .mapValues { (name, s) -> if (plan.still && name == PetState.Name.IDLE) s.copy(frames = 1) else s }
+                made = PetFrames(pet.copy(states = kept), sheets)
+                return made
+            } finally {
+                // idle unread or a scale that threw: the sheets decoded before go now, not up to the budget left to the GC
+                if (made == null) sheets.forEach { it?.bitmap?.recycle() }
             }
-            if (sheets[PetState.Name.IDLE.ordinal] == null) return null
-            val kept = pet.states.filterKeys { sheets[it.ordinal] != null }
-                .mapValues { (name, s) -> if (plan.still && name == PetState.Name.IDLE) s.copy(frames = 1) else s }
-            return PetFrames(pet.copy(states = kept), sheets)
         }
     }
 }

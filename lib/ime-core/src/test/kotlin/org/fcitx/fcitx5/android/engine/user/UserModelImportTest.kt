@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.engine.user
 
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.lattice.StartWords
 import org.fcitx.fcitx5.android.engine.learn.ImportedWords
 import org.fcitx.fcitx5.android.engine.learn.LearnRecord.ImportUndo
@@ -13,7 +14,6 @@ import org.fcitx.fcitx5.android.engine.learn.import
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.entry
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.inTrie
 import org.fcitx.fcitx5.android.engine.user.UserFixtures.model
-import org.fcitx.fcitx5.android.engine.user.UserFixtures.syl
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame

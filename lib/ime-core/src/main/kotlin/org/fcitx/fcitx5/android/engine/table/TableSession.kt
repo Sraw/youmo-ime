@@ -175,8 +175,8 @@ class TableSession(
     override fun apply(action: Action): Snapshot {
         spaceTaken = false
         when (action) {
-            is Action.Remember -> return offers.remember(action)
-            is Action.Unremember -> return offers.unremember(action)
+            is Action.Remember -> return spacePicks.marked(spacePicks.tapped { offers.remember(action) })
+            is Action.Unremember -> return spacePicks.marked(offers.unremember(action))
             is Action.OfferShown -> return spacePicks.marked(snapshot().copy(wordOffer = offers.words.also { it.shown(action.id) }.offer))
             else -> Unit
         }
@@ -238,7 +238,8 @@ class TableSession(
             return snapshot(commit = word.text).copy(deleteBefore = n, remembered = word)
         }
 
-        // the notice's 撤销: the word unsaved and its commit taken back, its text left
+        // the notice's 撤销: the word unsaved and its commit taken back, its text left; the characters' picks merged
+        // into it stay taken back, as replaying them would write the record anew for a few picks' order
         fun unremember(action: Action.Unremember): Snapshot {
             val r = saved.tapped?.takeIf { it.text == action.text && it.code == action.code }
             saved.forget(action.code, action.text)
@@ -269,7 +270,7 @@ class TableSession(
             !picked && committedItselfAt == null
 
         fun apply(action: Action): Snapshot {
-            val was = if (offering()) offeredTexts() else null
+            val was = shownTexts()
             val picksSpace = action is Action.Key && action.char == ' ' && takes()
             val at = now()
             val s = if (picksSpace && at - predictionsAt >= SPACE_PICK_AFTER_MS) {
@@ -280,12 +281,32 @@ class TableSession(
                 picked = false
                 acted(action)
             }
-            // each new round, a tapped prediction's next too: a space right after it is still a space
-            if (offering() && offeredTexts() != was) predictionsAt = at
+            newRound(was, at)
             return s
         }
 
-        // the bar draws as first what a space takes, none while it would type a space
+        // a tap off the bar (an offered word) that wrote is no space that took a prediction nor a self-commit, and may bring a round of its own
+        fun tapped(act: () -> Snapshot): Snapshot {
+            val was = shownTexts()
+            return act().also {
+                // a stale tap wrote nothing: a space just taken still leaves the next a space
+                if (it.commit.isNotEmpty()) {
+                    picked = false
+                    committedItselfAt = null
+                }
+                newRound(was, now())
+            }
+        }
+
+        // only a space pick reads when a round came: not worked out with the switch off
+        private fun shownTexts() = if (options.spacePicksPrediction && offering()) offeredTexts() else null
+
+        // each new round, a tapped prediction's next too: a space right after it is still a space
+        private fun newRound(was: List<String>?, at: Long) {
+            if (options.spacePicksPrediction && offering() && offeredTexts() != was) predictionsAt = at
+        }
+
+        // the bar draws as first what a space takes, none after a space just took one or a self-commit; the first 0.3 s are drawn too, a space then still a space
         fun marked(s: Snapshot): Snapshot {
             val shown = options.spacePicksPrediction && input.isEmpty() && predictions.offered.isNotEmpty()
             return if (shown) s.copy(spacePicks = if (takes()) selfEmoji.size else -1, spaceMarks = true) else s

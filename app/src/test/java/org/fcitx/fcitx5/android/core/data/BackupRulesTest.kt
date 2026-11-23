@@ -62,6 +62,6 @@ class BackupRulesTest {
     }
 
     companion object {
-        private val SYNCED = listOf("usr", "descriptor.json", "README.md")
+        private val SYNCED = listOf("usr", "descriptor.json", "README.md", "learn")
     }
 }

@@ -77,8 +77,9 @@ object KeyListsMigration {
     }
 
     /**
-     * `@1`'s [text] as `@2`'s, any other as it is, so it can run again and agree. 九键's digits' `set` is its row as
-     * the editor shows it, then its symbols not in it; first written as none `!`, the list's first `*`, else the item.
+     * [migrate]'s `@1` [text] as `@2`'s, any other as it is, so it can run again and agree: a first other than `*` is
+     * not read (a beta's stored `@1` loses it). 九键's digits' `set` is its row as the editor shows it, then its symbols
+     * not in it; first written as none `!`, the list's first `*`, else the item.
      */
     fun upgrade(text: String, nineLetters: Map<Char, String>): String {
         if (!KeyLists.isVersion1(text)) return text
@@ -100,6 +101,8 @@ object KeyListsMigration {
             d.first?.text in row -> d.first?.text?.takeIf { it in items }
             else -> symbols.firstOrNull()
         }
+        // off as the editor stores it, not an empty set that only KeyLists.parse reads as off
+        if (items.isEmpty()) return UserList.Off
         return UserList(off = false, items = items, first = KeyEdit.firstToStore(first, items))
     }
 

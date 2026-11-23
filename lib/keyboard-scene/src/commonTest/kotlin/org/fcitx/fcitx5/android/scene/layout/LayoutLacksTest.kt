@@ -10,6 +10,7 @@ import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.testData
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 // 18 + 13: past Groups.CUSTOM_MAX
@@ -163,5 +164,24 @@ class LayoutLacksTest {
             Triple("not laid out on a screen", "scene", { check(qwerty.replace("width=\"1.4\" label=\".com\"", "width=\"5\" label=\".com\"")) }),
         )
         assertRows(rows, { it.first }) { (_, key, made) -> assertTrue(key in made().errors.map { it.key }, made().errors.toString()) }
+    }
+
+    // contract: 0.6.0 has shipped, so what its judge refused a pack's board for lacking changes only on purpose
+    @Test
+    fun what060RefusedIsItsJudgesKinds() {
+        assertEquals(
+            setOf(
+                "backspace", "enter", "lang", "lang-no-space", "digits", "pad-digits",
+                "handwriting-pad", "nine-side", "handwriting-candidates", "symbol-categories", "symbol-grid",
+            ),
+            LayoutLacks.REFUSED_060,
+        )
+        val letters = LayoutCheck.Finding(0, "lacks", listOf("letters", "q"))
+        val rows = listOf(
+            Triple("a letters board's letter: its reader's error", "letters" to letters, true),
+            Triple("a grouped board's letter: not asked for", "grouped" to letters, false),
+            Triple("not a lack", "letters" to LayoutCheck.Finding(0, "blank", listOf("letters")), false),
+        )
+        assertRows(rows, { it.first }) { (_, made, refused) -> assertEquals(refused, LayoutCheck.refusedBy060(made.first, made.second)) }
     }
 }

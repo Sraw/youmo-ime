@@ -429,14 +429,14 @@
 ### TB-72 [P1] 取消收藏：可撤销；最近里没有同样的就放回最近
 - **前提**：B0，复制「公园」「北京」，两条都收藏，再在最近里删掉「北京」。
 - **操作**：点 **收藏** 标签，试着左右滑一条；长按「公园」选 **取消收藏**，点提示里的 **撤销**；长按「北京」选 **取消收藏**，看最近，再撤销。
-- **预期**：收藏页不能左右滑删除，没有垃圾桶；取消「公园」后它从收藏消失（最近里那份还在），提示「已取消收藏」，撤销回到原位；取消「北京」后它出现在最近第一条，提示「已取消收藏，放回「最近」」，撤销后回到收藏原位、最近里不再有它。
-- **JVM**：`ClipboardFavoritesUatTest.unfavouritingTakesTheCopyOrMovesTheOnlyOneTo最近AndIsUndone`、`ClipboardFavoritesTest.unfavouritingWithTheTextIn最近TakesTheCopyAndItsUndoBringsItBack`、`ClipboardFavoritesTest.unfavouritingOneWithNoCopyIn最近MovesItThereFirstAndItsUndoBackInPlace`、`ClipboardFavoritesTest.anUndoAfterTheSameTextWasFavouritedAgainMakesNoSecond`；设备上不跑。
+- **预期**：收藏页不能左右滑删除，没有垃圾桶；取消「公园」后它从收藏消失（最近里那份还在），提示「已取消收藏」，撤销回到原位；取消「北京」后它出现在最近第一条，提示「已取消收藏，放回「最近」」，撤销后回到收藏原位、最近里不再有它；中间又复制或粘贴过它时，撤销后最近里最新的那条留着，收藏也回到原位（只在 JVM 上断言）。
+- **JVM**：`ClipboardFavoritesUatTest.unfavouritingTakesTheCopyOrMovesTheOnlyOneTo最近AndIsUndone`、`ClipboardFavoritesTest.anUndoAfterTheMovedOneWasCopiedAgainLeavesTheCopyIn最近`、`ClipboardFavoritesTest.unfavouritingWithTheTextIn最近TakesTheCopyAndItsUndoBringsItBack`、`ClipboardFavoritesTest.unfavouritingOneWithNoCopyIn最近MovesItThereFirstAndItsUndoBackInPlace`、`ClipboardFavoritesTest.anUndoAfterTheSameTextWasFavouritedAgainMakesNoSecond`；设备上不跑。
 
 ### TB-73 [P1] 移到最前；重复收藏；收藏敏感的
 - **前提**：B0，复制「甲」「乙」并依次收藏；按 PR-08 的前提把标为敏感的「mima1234」放上剪贴板。
 - **操作**：在最近里再收藏一次「甲」；收藏显示成圆点的那条；点 **收藏** 标签，长按第一条和「甲」看菜单，选 **移到最前**。
-- **预期**：再收藏「甲」提示「已在收藏里」；收藏敏感的提示「已收藏（敏感内容不进备份）」，收藏页里它也是圆点；第一条的菜单没有 **移到最前**，圆点那条没有 **切词**、**存为快速输入**，收藏页的菜单没有 **删除**；「甲」移到最前。
-- **JVM**：`ClipboardFavoritesUatTest.movedFirstAlreadyThereAndASensitiveOneSaid`、`ClipboardFavoritesTest.aFavouriteIsACopyWithTheEntrysKindAndSensitivity`、`ClipboardPagesTest.theMenuGoesByPageAndWhatTheEntryIs`（ime-core）；设备上不跑。
+- **预期**：再收藏「甲」提示「已在收藏里」；收藏敏感的提示「已收藏（敏感内容不进备份）」，收藏页里它也是圆点；第一条的菜单没有 **移到最前**，圆点那条没有 **切词**、**存为快速输入**，收藏页的菜单没有 **删除**；「甲」移到最前。菜单（或读屏的操作）还开着时这条已被取消收藏，再选 **移到最前** 不会把它又收藏回来（只在 JVM 上断言）。
+- **JVM**：`ClipboardFavoritesUatTest.movedFirstAlreadyThereAndASensitiveOneSaid`、`ClipboardFavoritesTest.movingFirstOneUnfavouritedSinceMakesItNoFavouriteAgain`、`ClipboardFavoritesTest.aFavouriteIsACopyWithTheEntrysKindAndSensitivity`、`ClipboardPagesTest.theMenuGoesByPageAndWhatTheEntryIs`（ime-core）；设备上不跑。
 
 ### TB-74 [P1] 打开面板时在哪一页
 - **前提**：B0，关掉「粘贴后回到键盘」；复制「公园」并收藏。
@@ -448,10 +448,10 @@
 - **前提**：B0，复制「公园」并收藏；**剪贴板与表情** 里关掉「记录剪贴板历史」。
 - **操作**：看「粘贴后回到键盘」「隐藏敏感信息」能不能改；回测试页打开剪贴板面板，看最近页，点 **收藏** 标签，点「公园」。再清空剪贴板数据库（ST-196）看收藏页；打开记录，面板开着时在设置里把上限设为 0，回来看收藏页。上限改回 10，复制「北京」并收藏，在最近里删掉「北京」；关掉记录，在收藏页取消收藏「北京」，点 **撤销**。
 - **预期**：两个设置都能改；最近页是开启记录的提示；收藏页照常列出，点了粘贴；收藏空着、记录关着时写「还没有收藏」和打开记录那句；上限是 0 时写上限是 0 那句；记录关着时取消收藏「北京」提示「已取消收藏并删除：「最近」不保留」，它不进最近，撤销后回到收藏。
-- **JVM**：`ClipboardFavoritesUatTest.withTheHistoryOffTheFavouritesStillPaste`、`ClipboardFavoritesUatTest.withTheHistoryOffUnfavouritingTheOnlyCopyDeletesItSaidAndUndone`、`ClipboardFavoritesTest.unfavouritingTheOnlyCopyWithTheHistoryOffOrALimitOf0DeletesItAndItsUndoBringsItBack`、`ClipboardFavoritesUatTest.theEmptyFavouritesSayHowToGetOneWithTheHistoryOff`（图）、`ClipboardFavoritesUatTest.theEmptyFavouritesSayHowToGetOneWithALimitOf0`、`ClipboardFavoritesUatTest.theEmptyFavouritesHintFollowsALimitChangedWhileOpen`、`AppPrefsTest.withTheHistoryOffWhatAlsoRulesTheFavouritesStaysSettable`、`ClipboardPagesTest.eachPageShowsItsListItsEmptyHintOrTheHistoryPrompt`、`ClipboardPagesTest.theEmptyFavouritesSayHowToGetOne`（ime-core）；设备上不跑。
+- **JVM**：`ClipboardFavoritesUatTest.withTheHistoryOffTheFavouritesStillPaste`、`ClipboardFavoritesUatTest.withTheHistoryOffUnfavouritingTheOnlyCopyDeletesItSaidAndUndone`、`ClipboardFavoritesTest.unfavouritingTheOnlyCopyWithTheHistoryOffOrALimitOf0DeletesItAndItsUndoBringsItBack`、`ClipboardFavoritesUatTest.theEmptyFavouritesSayHowToGetOneWithTheHistoryOffOrALimitOf0`（图）、`ClipboardFavoritesUatTest.theEmptyFavouritesHintFollowsALimitChangedWhileOpen`、`AppPrefsTest.withTheHistoryOffWhatAlsoRulesTheFavouritesStaysSettable`、`ClipboardPagesTest.eachPageShowsItsListItsEmptyHintOrTheHistoryPrompt`、`ClipboardPagesTest.theEmptyFavouritesSayHowToGetOne`（ime-core）；设备上不跑。
 
 ### TB-76 [P1] 从 0.6.2 升级：置顶的在收藏里
 - **前提**：装 0.6.2，复制两条并置顶（一条用 PR-08 的前提放上标为敏感的）。
 - **操作**：覆盖安装这一版，打开剪贴板面板；关掉再开；点 **收藏** 标签，取消收藏那条不敏感的。
 - **预期**：键盘上方提示一次「置顶的条目移到了「收藏」」，再开不说；收藏页里是那两条，敏感的显示成圆点；取消收藏那条后它出现在最近第一条（0.6.2 的置顶最近里没有副本）。
-- **JVM**：`ClipboardFavoritesUatTest.anUpgradesPinsAreSaidMovedOnce`（有收藏时提示一次）、`ClipboardDatabaseMigrationTest`（库的版本不变，置顶的就是收藏）；要两个版本的包，设备上手动，发版时跑。
+- **JVM**：`ClipboardFavoritesUatTest.anUpgradesPinsAreSaidMovedOnce`（有收藏时提示一次，再开不说）、`ClipboardFavoritesUatTest.anInstallWithNoPinsIsNeverToldTheyMoved`（没有收藏不提示，之后收藏了也不提示）、`ClipboardFavoritesUatTest.anUpgradesPinsAreSaidMovedOnceCountedNotBefore`（收藏数从库文件数出来之前打开面板：不提示也不记下；数出来后的下一次打开提示）、`ClipboardDatabaseMigrationTest`（库的版本不变，置顶的就是收藏）；要两个版本的包，设备上手动，发版时跑。

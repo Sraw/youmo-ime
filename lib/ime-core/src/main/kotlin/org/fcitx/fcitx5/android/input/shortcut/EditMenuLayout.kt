@@ -19,8 +19,8 @@ object EditMenuLayout {
     /** A password's field gives nothing to copy or cut. */
     fun disabled(command: KeyCommand, password: Boolean): Boolean = password && command.readsField
 
-    /** [start]'s cell centred over [keyCenter], kept within [outerLeft]..[outerRight] where it fits. */
-    fun rowLeft(keyCenter: Int, cell: Int, outerLeft: Int, outerRight: Int, count: Int = CELLS.size, start: Int = START): Int {
+    /** A row of [count] cells, [start]'s centred over [keyCenter], kept within [outerLeft]..[outerRight] where it fits. */
+    fun rowLeft(keyCenter: Int, cell: Int, outerLeft: Int, outerRight: Int, count: Int, start: Int): Int {
         val width = cell * count
         val left = keyCenter - cell / 2 - cell * start
         // too narrow a window to fit: its left edge kept, the row's right end cut off
@@ -39,8 +39,8 @@ object EditMenuLayout {
         outerRight: Int,
         roomTop: Int,
         barMiddle: Int,
-        count: Int = CELLS.size,
-        start: Int = START,
+        count: Int,
+        start: Int,
     ): Spot {
         val across = notice.slide == UndoChipPlacement.Slide.Up || notice.slide == UndoChipPlacement.Slide.Down
         val left = if (across) rowLeft(keyCenter, cell, outerLeft, outerRight, count, start) else notice.left

@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.utils.LowMemory
 import org.fcitx.fcitx5.android.utils.appContext
 import timber.log.Timber
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.roundToInt
 import org.fcitx.fcitx5.android.data.theme.Theme as AppTheme
 import org.fcitx.fcitx5.android.scene.theme.Theme as SceneTheme
@@ -208,6 +209,10 @@ data class PackIcons(val files: Map<String, String>, val tinted: Set<String> = e
         // a board built anew: what it no longer draws may make room
         private var epoch = 0
 
+        /** The round the caches' kept icons are marked drawn in. */
+        @VisibleForTesting
+        internal val round: Int get() = epoch
+
         /** Null: as the phone is ([LowMemory]); tests set it. */
         @VisibleForTesting
         var lowMemory: Boolean? = null
@@ -298,9 +303,8 @@ internal class RasterCache(
     /** For tests: the bytes kept and the decodes made. */
     var bytes = 0L
         private set
-    @Volatile
-    var decodes = 0
-        private set
+    // counted on the decode threads, several at once
+    val decodes = AtomicInteger()
 
     /** Decoded to fit [decodeWidth] × [decodeHeight], drawn to fit [width] × [height]; till then another decode of it lent. */
     fun get(file: String, width: Int, height: Int, ready: () -> Unit, decodeWidth: Int = width, decodeHeight: Int = height): PackIcons.Raster? {
@@ -379,6 +383,8 @@ internal class RasterCache(
         read.natural?.let { natural[key.file] = it }
         val size = b.allocationByteCount.toLong()
         val now = epoch()
+        // an earlier board's not-kept marks tell get() nothing (it decodes those again), but lent() reads past them each draw
+        kept.values.removeAll { it.bitmap == null && it.drawn != now }
         val room = kept.entries.iterator()
         while (bytes + size > limit() && room.hasNext()) {
             val e = room.next().value
@@ -396,7 +402,7 @@ internal class RasterCache(
     }
 
     private fun decode(file: String, width: Int, height: Int): Decoded {
-        decodes++
+        decodes.incrementAndGet()
         val f = File(file)
         val length = f.length()
         val size = if (f.isFile && length <= maxBytes) ThemeAssets.decoder.size(file) else null

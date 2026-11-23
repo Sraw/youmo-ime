@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.engine.learn.control.LearningOp
 import org.fcitx.fcitx5.android.engine.pinyin.NineKeyLetters
 import org.fcitx.fcitx5.android.engine.pinyin.Touch
 import org.fcitx.fcitx5.android.engine.reading.CardReading
+import org.fcitx.fcitx5.android.engine.runtime.EngineEvent
 import org.fcitx.fcitx5.android.engine.runtime.Keyboard
 import org.fcitx.fcitx5.android.engine.runtime.OwnKeysTurn
 import org.fcitx.fcitx5.android.engine.runtime.UserWord
@@ -105,8 +106,17 @@ class KotlinHost(
         fun start()
         fun close()
 
+        /** An event for [im], not the one shown, at any time: nothing it answers is shown. */
+        fun aside(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?) {
+            host.event(im, event, arg, learning, payload)
+        }
+
         class App(private val bridge: EngineBridge) : EngineSide {
             override val host: EngineHost get() = bridge.host
+
+            override fun aside(im: String, event: Int, arg: Int, learning: Boolean, payload: Action?) =
+                bridge.aside(im) { bridge.engines.onEvent(im, event, arg, learning, payload) }
+
             override fun data(): HostConfig = bridge.data()
 
             override fun config(): HostConfig = HostConfigDir.settle()
@@ -287,9 +297,27 @@ class KotlinHost(
 
     override suspend fun offerInk(reading: InkReading, piece: Int) = onHost { inkKey(Action.Ink(piece, reading)) }
 
-    override suspend fun rememberWord(id: Int, index: Int, before: String) = onHost { sendVirtual(Keyboard.REMEMBER, Action.Remember(id, index, before)) }
+    // the table of the last offer tapped: its notice stays up across a switch, and pinyin or another table ignores its 撤销
+    private var rememberedIn: String? = null
 
-    override suspend fun unrememberWord(text: String, code: String) = onHost { sendVirtual(Keyboard.REMEMBER, Action.Unremember(text, code)) }
+    override suspend fun rememberWord(id: Int, index: Int, before: String) = onHost {
+        rememberedIn = inputMethodEntryCached.uniqueName
+        sendVirtual(Keyboard.REMEMBER, Action.Remember(id, index, before))
+    }
+
+    override suspend fun unrememberWord(text: String, code: String): Unit = onHost {
+        val undo = Action.Unremember(text, code)
+        val im = rememberedIn
+        if (im == null || im == inputMethodEntryCached.uniqueName) {
+            sendVirtual(Keyboard.REMEMBER, undo)
+        } else {
+            try {
+                engine.aside(im, EngineEvent.CHAR, Keyboard.REMEMBER, learning = true, payload = undo)
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                Timber.w(e, "a remembered word's undo in $im")
+            }
+        }
+    }
 
     override suspend fun offerShown(id: Int) = onHost { sendVirtual(Keyboard.REMEMBER, Action.OfferShown(id)) }
 

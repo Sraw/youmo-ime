@@ -15,6 +15,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.annotation.VisibleForTesting
 import androidx.core.view.ViewCompat
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -71,8 +72,7 @@ object KeyCaps {
     // outlined in the keyboard theme's accent, whatever the settings theme; dimmed fades only its words, as the key views do
     private fun sceneKey(ctx: Context, text: String, hint: String, marked: Boolean, dimmed: Boolean, selected: Boolean, shortcut: Shortcut?) =
         SceneKeyCell(ctx, ThemeManager.activeTheme).apply {
-            // no board is built here to let go of what an earlier page drew
-            PackIcons.newRound()
+            newRound()
             // the item acted on is outlined in the settings' own colour: keyboard styles draw no selected key outside a popup
             outline = when {
                 selected -> Argb(ctx.styledColor(android.R.attr.colorPrimary))
@@ -151,9 +151,22 @@ object KeyCaps {
 
     private const val ROWS = "rows"
 
+    private const val ROUND = "round"
+
+    // no board is built here to let go of what an earlier page drew; once a turn, as a round per cap let the page's caps evict each other
+    internal fun newRound() = thisTurn(ROUND) {
+        PackIcons.newRound()
+    }
+
     // once per main-looper turn for all caps (the upright screen is a binder call); dropped before any setting can change
     private var turn: HashMap<Any, Any?>? = null
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+    /** Ends the turn now: Robolectric drops the post that would between tests, leaving the last test's turn. */
+    @VisibleForTesting
+    internal fun endTurn() {
+        turn = null
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> thisTurn(key: Any, make: () -> T): T {

@@ -245,7 +245,9 @@ class SogouSkin(private val f: SkinFiles) : SkinSource {
             val own = f.names.filter { n ->
                 isFont(n) && !systemFont(n) && n.substringBeforeLast('/', "").substringAfterLast('/').lowercase() in FONT_FOLDERS
             }.sorted()
-            val at = named?.let { n -> file(n) ?: own.firstOrNull { it.substringAfterLast('/').equals(n, ignoreCase = true) } } ?: own.firstOrNull()
+            fun find(n: String) = file(n) ?: own.firstOrNull { it.substringAfterLast('/').equals(n, ignoreCase = true) }
+            // the letters' named and not there is told, never stood in for by another of the skin's (a symbols' font, say)
+            val at = if (letters != null) find(letters) else named?.let(::find) ?: own.firstOrNull()
             val bytes = at?.let(f::bytes)
             when {
                 at == null || bytes == null -> if (named != null) look.notes += SkinNote.FONT

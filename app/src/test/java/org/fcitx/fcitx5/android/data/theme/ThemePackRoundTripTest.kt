@@ -6,8 +6,8 @@ package org.fcitx.fcitx5.android.data.theme
 
 import android.graphics.Color
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.input.theme.ThemeAssetLimits
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -66,7 +66,7 @@ class ThemePackRoundTripTest {
         assertTrue(refused(rest(sticker = "moving.webp"), files("moving.webp" to RasterPacks.animatedWebp())).contains(STILL))
         assertTrue(refused(rest(sticker = "fake.png"), files("fake.png" to "not a png".encodeToByteArray())).contains(STILL))
         val dark = refused(rest(), files("d-p.png" to RasterPacks.png(80, 5000, Color.RED)))
-        assertEquals(false, dark == "taken")
+        assertTrue(dark, dark.contains("${ThemeAssetLimits.MAX_PICTURE_SIDE}"))
     }
 
     // a 0.6.2 pack's reserved sticker was never copied: taken without it, drawn as what it hides

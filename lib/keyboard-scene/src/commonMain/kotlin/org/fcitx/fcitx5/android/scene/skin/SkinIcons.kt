@@ -24,7 +24,7 @@ object SkinIcons {
         "F7" to "emoji",
     )
 
-    private val TOOLBAR_WORDS = listOf(
+    internal val TOOLBAR_WORDS = listOf(
         listOf("emoji", "face") to "emoji",
         listOf("keyboard") to "choose-keyboard",
         listOf("cursor", "edit") to "cursor-move",

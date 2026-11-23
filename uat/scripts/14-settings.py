@@ -4,7 +4,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import zipfile
@@ -488,6 +487,8 @@ def st101(d):
 
 # ICON_COLORS of SkinUatSamples: backspace, pressed backspace, shift, once, locked, enter
 SKIN_ICONS = [(0xE5, 0x39, 0x35), (0x8E, 0x24, 0xAA), (0x43, 0xA0, 0x47), (0x1E, 0x88, 0xE5), (0xFD, 0xD8, 0x35), (0x6D, 0x4C, 0x41)]
+# the unshifted Shift's pressed picture: never drawn on a Shift shifted or locked
+SKIN_SHIFT_PRESSED = (0x00, 0xAC, 0xC1)
 SKIN_FACES = {"letter": (0xFF, 0x99, 0x33), "function": (0x88, 0x99, 0xAA), "pressed": (0x44, 0x77, 0xFF)}
 SKIN_PANELS = {"": (0x20, 0x50, 0xA0), "light/": (0x20, 0x50, 0xA0), "dark/": (0x10, 0x10, 0x10)}
 
@@ -495,7 +496,7 @@ SKIN_PANELS = {"": (0x20, 0x50, 0xA0), "light/": (0x20, 0x50, 0xA0), "dark/": (0
 def baidu_skin_full(path, name, roots=("",), icons=False, press=False):
     """the Baidu skin of SkinUatSamples.baidu, in solid colours a screenshot can measure: letters orange, the
     function keys grey, a pressed key blue, the panel blue (black under dark/). [icons]: backspace (pressed another),
-    shift's three states and enter as colour pictures (SKIN_ICONS); [press]: backspace pressed shrinks to 90% in 255 ms
+    shift's three states (unshifted pressed another, SKIN_SHIFT_PRESSED) and enter as colour pictures (SKIN_ICONS); [press]: backspace pressed shrinks to 90% in 255 ms
     (backspace: a held letter's bubble would cover its face)"""
     import io
     from PIL import Image, ImageDraw
@@ -528,14 +529,15 @@ def baidu_skin_full(path, name, roots=("",), icons=False, press=False):
         more = {"F36": "", "F10": "", "F39": ""}
         tips = ""
         if icons:
-            atlas = Image.new("RGBA", (48 * len(SKIN_ICONS), 48), (0, 0, 0, 0))
-            for i, c in enumerate(SKIN_ICONS):
+            pictures = SKIN_ICONS + [SKIN_SHIFT_PRESSED]
+            atlas = Image.new("RGBA", (48 * len(pictures), 48), (0, 0, 0, 0))
+            for i, c in enumerate(pictures):
                 # two colours each, the left half its own: one colour alone would be taken as a tint
                 atlas.paste(face((255, 255, 255), 48, 48, 8), (48 * i, 0))
                 ImageDraw.Draw(atlas).rectangle((48 * i + 8, 8, 48 * i + 23, 39), fill=c + (255,))
             files[r + "res/icons.png"] = png(atlas)
-            files[r + "res/icons.til"] = "".join(f"[IMG{i + 1}]\nSOURCE_RECT={48 * i},0,48,48\n" for i in range(len(SKIN_ICONS)))
-            css += "[STYLE20]\nNM_IMG=icons,1\nHL_IMG=icons,2\n[STYLE21]\nNM_IMG=icons,3\n[STYLE22]\nNM_IMG=icons,4\n" \
+            files[r + "res/icons.til"] = "".join(f"[IMG{i + 1}]\nSOURCE_RECT={48 * i},0,48,48\n" for i in range(len(pictures)))
+            css += "[STYLE20]\nNM_IMG=icons,1\nHL_IMG=icons,2\n[STYLE21]\nNM_IMG=icons,3\nHL_IMG=icons,7\n[STYLE22]\nNM_IMG=icons,4\n" \
                    "[STYLE23]\nNM_IMG=icons,5\n[STYLE24]\nNM_IMG=icons,6\n"
             fore = {"F36": "20", "F10": "21", "F39": "24"}
             more["F10"] = "STAT_STYLE=S1_1|S2_2\n"
@@ -628,8 +630,15 @@ def st201(d):
     time.sleep(0.8)
     locked = near(d, "shift", yellow)
     d.shot("kb", "Shift 点两下：锁定的图")
-    d.tap(sh, 0.8)
+    # held past the long press it stays locked: the locked picture, not the unshifted one's pressed picture
+    d.touch(("down", sh[0], sh[1]))
+    try:
+        im = d.png()
+    finally:
+        d.touch(("up", sh[0], sh[1]))
+    held = (near(d, "shift", yellow, im), near(d, "shift", SKIN_SHIFT_PRESSED, im))
     check(once > 20 and locked > 20, f"Shift 单次、锁定不是各自的图（蓝 {once} 黄 {locked}）")
+    check(held[0] > 20 and held[1] < 5, f"锁定时按住 Shift 不是锁定那张图（黄 {held[0]} 按下图 {held[1]}）")
     d.open_page("search")
     search = near(d, "enter", brown)
     d.shot("kb", "搜索框里的回车：皮肤的「搜索」图不转，是自带的")
@@ -658,21 +667,24 @@ def st203(d):
     if r.returncode:
         raise Blocked(f"node 做不出样本：{r.stderr[-300:]}")
     asked = []
-    for src, name in (("warm.ssf", "uat-sogou-enc.ssf"), ("warm-plain.ssf", "uat-sogou.ssf")):
-        push_file(d, os.path.join(tmp, src), name)
-        import_theme(d, name.rsplit(".", 1)[0], confirm=False)
-        check(d.wait_text("导入主题", timeout=8, where="all", contains=True), f"选 {name} 没有弹出导入确认框")
-        texts = d.screen().texts("all")
-        # the dialog's own lines: the status bar's clock and notifications around it change
-        at = next(i for i, t in enumerate(texts) if t.startswith("导入主题"))
-        asked.append(texts[at:texts.index("导入", at) + 1])
-        d.shot("full", f"{name} 的确认框")
-        # the first left: imported, the second's dialog would say it replaces it
-        if len(asked) == 1:
-            d.back(after=1.0)
-        else:
-            d.tap_text("导入", where="all", scroll=False, after=3.0)
-    shutil.rmtree(tmp, ignore_errors=True)
+    try:
+        for src, name in (("warm.ssf", "uat-sogou-enc.ssf"), ("warm-plain.ssf", "uat-sogou.ssf")):
+            push_file(d, os.path.join(tmp, src), name)
+            import_theme(d, name.rsplit(".", 1)[0], confirm=False)
+            check(d.wait_text("导入主题", timeout=8, where="all", contains=True), f"选 {name} 没有弹出导入确认框")
+            texts = d.screen().texts("all")
+            # the dialog's own lines: the status bar's clock and notifications around it change
+            at = next(i for i, t in enumerate(texts) if t.startswith("导入主题"))
+            check("导入" in texts[at:], f"{name} 的确认框里没有「导入」按钮：{texts[at:at + 10]}")
+            asked.append(texts[at:texts.index("导入", at) + 1])
+            d.shot("full", f"{name} 的确认框")
+            # the first left: imported, the second's dialog would say it replaces it
+            if len(asked) == 1:
+                d.back(after=1.0)
+            else:
+                d.tap_text("导入", where="all", scroll=False, after=3.0)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     check(asked[0] == asked[1], f"加密的和明文的确认框不一样：{asked[0][:10]} / {asked[1][:10]}")
     check(not any("加密" in t for t in asked[0]), "确认框里出现了「加密」")
     appearance_tab(d, "主题")
@@ -758,18 +770,20 @@ def st39(d):
 def record_change(d, y0, y1, act):
     """screenrecord the band y0..y1 while act() runs; returns (in-between frames, frames): a change
     drawn at once has none, an animated one several"""
-    tmp = tempfile.mkdtemp(prefix="uat-rec-")
-    rec = subprocess.Popen(["adb", "-s", d.serial, "shell", "screenrecord", "--time-limit", "3",
-                            "/sdcard/uat-rec.mp4"])
-    time.sleep(1.0)
-    act()
-    rec.wait(timeout=20)
-    d.adb("pull", "/sdcard/uat-rec.mp4", os.path.join(tmp, "r.mp4"))
-    subprocess.run(["ffmpeg", "-loglevel", "quiet", "-i", os.path.join(tmp, "r.mp4"), "-fps_mode", "passthrough",
-                    "-vf", f"crop=1080:{y1 - y0}:0:{y0},scale=216:-1", os.path.join(tmp, "f%04d.png")])
     from PIL import Image, ImageChops
-    frames = [Image.open(os.path.join(tmp, f)).convert("L") for f in sorted(os.listdir(tmp)) if f.endswith(".png")]
-    shutil.rmtree(tmp, ignore_errors=True)
+    tmp = tempfile.mkdtemp(prefix="uat-rec-")
+    try:
+        rec = subprocess.Popen(["adb", "-s", d.serial, "shell", "screenrecord", "--time-limit", "3",
+                                "/sdcard/uat-rec.mp4"])
+        time.sleep(1.0)
+        act()
+        rec.wait(timeout=20)
+        d.adb("pull", "/sdcard/uat-rec.mp4", os.path.join(tmp, "r.mp4"))
+        subprocess.run(["ffmpeg", "-loglevel", "quiet", "-i", os.path.join(tmp, "r.mp4"), "-fps_mode", "passthrough",
+                        "-vf", f"crop=1080:{y1 - y0}:0:{y0},scale=216:-1", os.path.join(tmp, "f%04d.png")])
+        frames = [Image.open(os.path.join(tmp, f)).convert("L") for f in sorted(os.listdir(tmp)) if f.endswith(".png")]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     if len(frames) < 2:
         raise Blocked(f"录屏只有 {len(frames)} 帧")
 
@@ -2215,15 +2229,16 @@ def layout_card(d, name):
     appearance_tab(d, "布局")
     n = d.screen().find(text=name)
     # down the list, then back up: the tab comes back where it was left, possibly past the card; up from inside
-    # the list, as the page's keyboard preview over it (to y 982) does not scroll it
+    # the list, as the page's keyboard preview over it (to y 982) does not scroll it; slow drags, as a fling went
+    # past a card between two looks
     for frm, to in [((540, 1800), (540, 1200))] * 3 + [((540, 1300), (540, 1900))] * 6:
         if n:
             break
-        d.swipe(frm, to, 300, after=1.0)
+        d.swipe(frm, to, 1000, after=1.0)
         n = d.screen().find(text=name)
     # the line under it (用在：…) on screen too
     if n and n.c[1] > 1700:
-        d.swipe((540, 1800), (540, 1200), 300, after=1.0)
+        d.swipe((540, 1800), (540, 1200), 1000, after=1.0)
         n = d.screen().find(text=name)
     return n
 
@@ -2973,27 +2988,63 @@ console.log(m.version);
 @case("ST-215", base="B0-设置", mutates=True)
 def st215(d):
     """the device's half: the page's pack imported, the pet moves; the panel's preview is pet.test.mjs's"""
-    mn = sys.modules["uat_19_motion_notices"]
+    mn = script("19-motion-notices")
     repo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
     if not os.path.exists(os.path.join(repo, "lib", "keyboard-scene", "build", "youmo-engine", "youmo-engine.js")):
         raise Blocked("网页的引擎没构建：./gradlew :lib:keyboard-scene:youmoEngine")
     tmp = tempfile.mkdtemp()
-    sheets = []
-    for state, (frames, _) in (("idle", (4, 4)), ("typing", (6, 2))):
-        p = os.path.join(tmp, f"{state}.png")
-        with open(p, "wb") as f:
-            f.write(mn.pet_sheet(state, frames))
-        sheets.append(p)
-    out = os.path.join(tmp, "uat-web-pet.theme")
-    r = subprocess.run(["node", "-e", WEB_PET, repo, out, *sheets], capture_output=True, text=True, timeout=120)
-    if r.returncode:
-        raise Blocked(f"node 做不出主题：{r.stderr[-300:]}")
-    check(r.stdout.strip() == "0.6.3", f"网页存下的宠物主题 min-app 是 {r.stdout.strip()}，不是 0.6.3")
-    mn.delete_themes(d)
-    push_download(d, out, "uat-web-pet")
+    try:
+        sheets = []
+        for state, (frames, _) in (("idle", (4, 4)), ("typing", (6, 2))):
+            p = os.path.join(tmp, f"{state}.png")
+            with open(p, "wb") as f:
+                f.write(mn.pet_sheet(state, frames))
+            sheets.append(p)
+        out = os.path.join(tmp, "uat-web-pet.theme")
+        r = subprocess.run(["node", "-e", WEB_PET, repo, out, *sheets], capture_output=True, text=True, timeout=120)
+        if r.returncode:
+            raise Blocked(f"node 做不出主题：{r.stderr[-300:]}")
+        check(r.stdout.strip() == "0.6.3", f"网页存下的宠物主题 min-app 是 {r.stdout.strip()}，不是 0.6.3")
+        mn.delete_themes(d)
+        push_download(d, out, "uat-web-pet")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     mn.use_theme(d, "uat-web-pet")
     check(mn.pet_state(d) == "idle", f"网页做的宠物没出现：{mn.pet_state(d)}")
     d.type("q")
     check(mn.pet_state(d) == "typing", f"按字母宠物没动：{mn.pet_state(d)}")
-    shutil.rmtree(tmp, ignore_errors=True)
     mn.delete_themes(d)
+
+
+@case("ST-216", base="B0-设置", mutates=True)
+def st216(d):
+    import io
+    from PIL import Image
+    appearance_tab(d, "大小与样式")
+    d.switch("跟随系统深色模式", False)
+    mn = script("19-motion-notices")
+    red, blue = (230, 0, 0), (0, 0, 230)
+    apng = io.BytesIO()
+    Image.new("RGB", (48, 48), red).save(apng, "PNG", save_all=True, append_images=[Image.new("RGB", (48, 48), blue)],
+                                         duration=500, loop=0)
+    with zipfile.ZipFile(mn.THEME_XML) as z:
+        xml = z.read("theme.xml").decode()
+    xml = re.sub(r'(<theme [^>]*name=")[^"]*"', r'\g<1>uat-apng"', xml, count=1)
+    xml = re.sub(r"(<theme [^>]*>)", r'\1\n  <meta min-app="0.6.3"/>', xml, count=1)
+    xml = xml.replace("</theme>", '  <icon name="backspace" src="icon-backspace.png"/>\n</theme>')
+    p = os.path.join(tempfile.gettempdir(), f"uat-apng-{d.port}.theme")
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("theme.xml", xml)
+        z.writestr("icon-backspace.png", apng.getvalue())
+    mn.delete_themes(d)
+    push_download(d, p, "uat-apng")
+    os.remove(p)
+    mn.use_theme(d, "uat-apng")
+    first = (near(d, "bksp", red), near(d, "bksp", blue))
+    d.shot("kb", "APNG 的退格图标：第一帧（红）")
+    time.sleep(1.0)
+    later = (near(d, "bksp", red), near(d, "bksp", blue))
+    check(first[0] > 20 and first[1] < 5 and later[0] > 20 and later[1] < 5,
+          f"退格键上不是 APNG 的第一帧、一直不动（红 {first[0]}、{later[0]}，蓝 {first[1]}、{later[1]}）")
+    mn.delete_themes(d)
+    return f"退格键红 {first[0]}、{later[0]}，蓝 {first[1]}、{later[1]}"

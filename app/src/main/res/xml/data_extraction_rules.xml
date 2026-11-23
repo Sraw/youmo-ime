@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- device_root's usr/, descriptor.json and README.md are the 0.3.x native host's data, which an install
+<!-- device_root's usr/, learn/, descriptor.json and README.md are the 0.3.x native host's data, which an install
      upgraded from 0.3.x still has and nothing reads: excluded so a backup does not carry them. The clipboard history (databases/clbdb and its journals)
      stays on the phone, and the one made in device-protected storage (device_database) by a start
      before the first unlock: it holds clips marked sensitive, a password from a password manager say,
@@ -24,6 +24,9 @@
         <exclude
             domain="device_root"
             path="README.md" />
+        <exclude
+            domain="device_root"
+            path="learn" />
         <exclude
             domain="root"
             path="no_backup" />
@@ -68,6 +71,9 @@
         <exclude
             domain="device_root"
             path="README.md" />
+        <exclude
+            domain="device_root"
+            path="learn" />
         <exclude
             domain="root"
             path="no_backup" />

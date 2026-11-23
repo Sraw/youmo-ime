@@ -89,6 +89,28 @@ class CpuProbeTest {
         assertEquals(0L, probe.facts().hwcap)
     }
 
+    // a newer kernel's cpu_capacity: the big cores by it though every top frequency is alike; the native HWCAPs as given
+    @Test
+    fun capacitiesTellTheBigCoresAndTheNativeHwcapsAreKept() {
+        val root = tmp.root
+        root.put("sys/devices/system/cpu/possible", "0-7\n")
+        for (cpu in 0..7) {
+            val dir = "sys/devices/system/cpu/cpu$cpu"
+            root.put("$dir/cpu_capacity", if (cpu < 6) "400\n" else "1024\n")
+            root.put("$dir/cpufreq/cpuinfo_max_freq", "2000000\n")
+            root.put("$dir/regs/identification/midr_el1", "0x00000000410fd410\n")
+        }
+        val caps = longArrayOf(DeviceProfile.HWCAP_ASIMDDP, DeviceProfile.HWCAP2_I8MM)
+        val facts = CpuProbe(root, FakeNative(caps), arm64 = true).facts()
+        assertEquals(DeviceProfile.HWCAP_ASIMDDP, facts.hwcap)
+        assertEquals(DeviceProfile.HWCAP2_I8MM, facts.hwcap2)
+        assertEquals(List(6) { 400L } + List(2) { 1024L }, facts.cores.map(CoreFacts::capacity))
+        val profile = DeviceProfile.of(facts)
+        assertEquals(0xc0L, profile.bigMask)
+        assertEquals(Kernel.SDOT, profile.kernel)
+        assertEquals(LevelReason.I8MM, profile.reason)
+    }
+
     @Test
     fun theEnginesKernelForwardsEachCallAndCarriesThePin() {
         assertEquals(listOf(NativeMatrixKernel.PORTABLE, NativeMatrixKernel.MLAL, NativeMatrixKernel.SDOT), Kernel.entries.map(ThisDevice::kind))

@@ -381,6 +381,15 @@ class SettingsIndexTest {
         for ((dir, there) in arrays) assertEquals(dir, named, there)
     }
 
+    // the English keywords name the level's default, so "auto" finds the setting
+    @Test
+    fun autoFindsTheModelLevelInEnglish() {
+        val app = RuntimeEnvironment.getApplication()
+        val ctx = app.createConfigurationContext(Configuration(app.resources.configuration).apply { setLocale(Locale.forLanguageTag("en")) })
+        val found = SettingsSearch(SettingsIndex.build(ctx)).find("auto")
+        assertTrue(found.map { it.target }.toString(), found.any { it.target.key == EngineSettings.MODEL_LEVEL })
+    }
+
     private fun strokeFilterFindsFour(ctx: Context, query: String) {
         val found = SettingsSearch(SettingsIndex.build(ctx)).find(query)
         assertEquals(

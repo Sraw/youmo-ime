@@ -6,6 +6,9 @@ package org.fcitx.fcitx5.android.uat
 
 import android.graphics.Bitmap
 import org.fcitx.fcitx5.android.scene.skin.Pixels
+import org.fcitx.fcitx5.android.scene.skin.SkinAction
+import org.fcitx.fcitx5.android.scene.skin.SkinBoard
+import org.fcitx.fcitx5.android.scene.skin.SkinKeyBox
 import org.fcitx.fcitx5.android.scene.skin.SkinPlatform
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -252,6 +255,13 @@ internal object SkinUatSamples {
 
     private fun le(v: Int) = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(v).array()
 
+    /** [plain] in Sogou's container: AES-CBC with its public key, as Sogou's own skins are. */
+    fun sogouSeal(plain: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(hex(SkinPlatform.SOGOU_KEY), "AES"), IvParameterSpec(hex(SkinPlatform.SOGOU_IV)))
+        return "Skin".toByteArray() + byteArrayOf(2, 0, 0, 0) + cipher.doFinal(plain)
+    }
+
     /** ST-203: [files] in Sogou's container, sealed with its public key as Sogou's own skins are. */
     fun sogouSealed(files: Map<String, ByteArray>): ByteArray {
         val bodies = files.map { (name, data) -> le(2 * name.length) + name.toByteArray(Charsets.UTF_16LE) + le(data.size) + data }
@@ -259,9 +269,27 @@ internal object SkinUatSamples {
         val index = bodies.map { b -> at.also { at += b.size } }
         val payload = ByteArray(4) + le(4 * bodies.size) + index.fold(ByteArray(0)) { a, o -> a + le(o) } + bodies.fold(ByteArray(0)) { a, b -> a + b }
         val deflated = ByteArrayOutputStream().also { o -> DeflaterOutputStream(o).use { it.write(payload) } }.toByteArray()
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(hex(SkinPlatform.SOGOU_KEY), "AES"), IvParameterSpec(hex(SkinPlatform.SOGOU_IV)))
-        return "Skin".toByteArray() + byteArrayOf(2, 0, 0, 0) + cipher.doFinal(le(payload.size) + deflated)
+        return sogouSeal(le(payload.size) + deflated)
+    }
+
+    /** The app's 26 keys in its rows, at a skin's sizes, as a reader that finds them makes them. */
+    fun qwertyBoard(): SkinBoard {
+        fun row(y: Double, x0: Double, keys: List<Pair<SkinAction, Double>>): List<SkinKeyBox> {
+            var x = x0
+            return keys.map { (a, w) -> SkinKeyBox(x, y, w, 150.0, a).also { x += w } }
+        }
+        fun letters(s: String) = s.map { SkinAction.Letter(it) to 108.0 }
+        fun roles(vararg r: Pair<String, Double>) = r.map { SkinAction.Role(it.first) to it.second }
+        return SkinBoard(
+            "qwerty",
+            listOf(
+                row(0.0, 0.0, letters("qwertyuiop")),
+                row(150.0, 54.0, letters("asdfghjkl")),
+                row(300.0, 0.0, roles("shift" to 162.0) + letters("zxcvbnm") + roles("backspace" to 162.0)),
+                row(450.0, 0.0, roles("symbols" to 120.0, "numbers" to 120.0, "comma" to 100.0, "space" to 480.0, "period" to 100.0, "enter" to 160.0)),
+            ),
+            1080.0,
+        )
     }
 
     // protobuf as Baidu's `.bda` writes it
@@ -270,7 +298,8 @@ internal object SkinUatSamples {
 
         fun raw(v: Long) {
             var x = v
-            while (x >= 0x80) {
+            // unsigned: a negative one in ten bytes, as protobuf writes it
+            while (x and 0x7FL.inv() != 0L) {
                 out += ((x and 0x7F) or 0x80).toByte()
                 x = x ushr 7
             }
@@ -437,5 +466,5 @@ internal object SkinUatSamples {
     )
 
     /** A font of square a–z (web/theme-maker's test font, made by make-tiny-font.py). */
-    val font: ByteArray by lazy { File("../web/theme-maker/test/testdata/tiny.ttf").takeIf { it.isFile }?.readBytes() ?: File("web/theme-maker/test/testdata/tiny.ttf").readBytes() }
+    val font: ByteArray by lazy { File(System.getProperty("themeMaker.testdata") ?: "../web/theme-maker/test/testdata", "tiny.ttf").readBytes() }
 }

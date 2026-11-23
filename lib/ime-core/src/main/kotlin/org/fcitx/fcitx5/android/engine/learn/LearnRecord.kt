@@ -281,9 +281,16 @@ sealed class LearnRecord {
     /**
      * What an older build changed in its files since last converted (a downgrade, then this build again):
      * the user's words, tables' saved words and English word flags it [added] (where not kept already), and
-     * those it [removed]. Only [MineRow], [TableWordRow] and [EnWordRow] rows; counts are not carried.
+     * those it [removed]. Only [MineRow], [TableWordRow] and [EnWordRow] rows; counts are not carried. [remembered]:
+     * a word a table remembered at a tap (LearnLog.rememberTableWord), which 清掉最近 takes out; appended, an older
+     * build reads past it.
      */
-    data class Absorbed(override val minute: Int, val added: List<LearnRecord>, val removed: List<LearnRecord>) : LearnRecord()
+    data class Absorbed(
+        override val minute: Int,
+        val added: List<LearnRecord>,
+        val removed: List<LearnRecord>,
+        val remembered: Boolean = false,
+    ) : LearnRecord()
 
     // a snapshot's rows
 

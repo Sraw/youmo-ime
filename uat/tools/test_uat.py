@@ -586,14 +586,54 @@ class JvmTest(unittest.TestCase):
                          problems)
         self.assertIn("模拟器上跑 4 条（其中 1 条", uat.counts_line(n))
 
-    def test_a_case_in_the_md_without_a_script_is_a_problem(self):
-        _, problems = uat.tally({"HK-36": uat.NO_SCRIPT}, {"HK-36": "P1"}, set())
-        self.assertEqual(["HK-36: in the .md but no script (register it, needs= where it runs)"], problems)
+    def test_a_case_registered_as_what_it_lacks_is_a_problem(self):
+        for why, needs, jvm_lines, problem, jvm in (
+            ("in the .md without a script", uat.NO_SCRIPT, set(),
+             "HK-36: in the .md but no script (register it, needs= where it runs)", 0),
+            # counted as on the JVM without a word, it passed CI with no test at all
+            ("a **JVM** line no @Uat test backs", uat.NO_UAT_TEST, {"HK-36"},
+             "HK-36: a **JVM** line but no test carries its @Uat (tag one, or a script)", 1),
+        ):
+            with self.subTest(why):
+                n, problems = uat.tally({"HK-36": needs}, {"HK-36": "P1"}, jvm_lines)
+                self.assertEqual([problem], problems)
+                self.assertEqual(jvm, n["jvm"])
+
+    def test_a_jvm_line_is_one_whose_none_word_is_a_word_of_its_own(self):
+        for rest, names in (("暂无（要设备）", False), ("没有；设备上跑", False), ("无。", False), ("无", False),
+                            ("无障碍读的文字由 `XTest.y` 查", True), ("没有发出的键由 `XTest.y` 查", True),
+                            ("`XTest.y`", True)):
+            with self.subTest(rest):
+                self.assertEqual(names, uat.jvm_line(f"- **JVM**：{rest}\n"))
+
+    def test_counts_checks_the_names_of_each_jvm_line_of_a_case(self):
+        self.write("uat/99-x.md", "### XX-01 [P1] a\n- **JVM**：`KeysTest.gone`\n- **JVM**：`KeysTest.address`\n")
+        self.write("uat/README.md", "")
+        self.write("app/src/test/java/KeysTest.kt", "class KeysTest {\n    fun address() {}\n}\n")
+        out = io.StringIO()
+        with mock.patch.object(uat, "UAT", os.path.join(self.tmp.name, "uat")), mock.patch.object(uat, "REPO", self.tmp.name), \
+                mock.patch.object(uat, "load_scripts", lambda *a, **k: None), \
+                mock.patch.dict(uat.CASES, {"XX-01": SimpleNamespace(id="XX-01", needs="jvm:KeysTest.address")}, clear=True), \
+                contextlib.redirect_stdout(out):
+            uat.cmd_counts(SimpleNamespace())
+        self.assertIn("problem: XX-01: its **JVM** line names gone, which is no test", out.getvalue())
+
+    def test_a_jvm_line_naming_no_test_is_a_problem(self):
+        self.write("app/src/test/java/KeysTest.kt", "class KeysTest {\n    fun address() {}\n"
+                   "    fun `a long name, read whole`() {}\n    class Inner {\n        fun bar() = Unit\n    }\n}\n")
+        self.write("app/src/main/java/Keys.kt", "fun gone() {}\n")   # not a test
+        functions = uat.test_functions(self.tmp.name)
+        lines = {"KB-01": "- **JVM**：`KeysTest.address`、`KeysTest.a long name…`（图）、`KeysTest.Inner.bar`、`Keys.gone`",
+                 "KB-02": "- **JVM**：`KeysTest.gone`、ime-core `KeysTest`、`KeysTest.a short…`"}
+        self.assertEqual(["KB-02: its **JVM** line names gone, which is no test",
+                          "KB-02: its **JVM** line names a short…, which is no test"],
+                         uat.jvm_name_problems(lines, functions))
 
     def test_a_case_with_a_jvm_line_and_no_script_runs_on_the_jvm_by_its_uat_tests(self):
         self.write("uat/scripts/99-x.py", 'from uat import case\n\n\ncase("XX-03", needs="manual:x")(lambda d: None)\n')
         self.write("uat/99-x.md", "### XX-01 [P1] a\n- **JVM**：`KeysTest.address`\n\n### XX-02 [P1] b\n- **JVM**：暂无\n\n"
-                   "### XX-03 [P1] c\n\n### XX-04 [P2] d\n- **JVM**：`KeysTest.gone`\n")
+                   "### XX-03 [P1] c\n\n### XX-04 [P2] d\n- **JVM**：`KeysTest.gone`\n\n"
+                   "### XX-05 [P2] e\n- **JVM**：没有（要真设备）\n\n### XX-06 [P2] f\n- **JVM**：无。\n")
         self.write("src/KeysTest.kt", 'package org.x\n\nclass KeysTest {\n    @Uat("XX-01")\n    fun address() {}\n\n'
                    '    @Uat("XX-01")\n    fun bar() {}\n}\n')
         with mock.patch.object(uat, "UAT", os.path.join(self.tmp.name, "uat")), \
@@ -604,8 +644,9 @@ class JvmTest(unittest.TestCase):
                 needs = {cid: c.needs for cid, c in uat.CASES.items()}
             finally:
                 sys.modules.pop("uat_99_x", None)
+        # 「没有」「无」 say there is no JVM test, as 「暂无」 does
         self.assertEqual({"XX-01": "jvm:KeysTest.address、KeysTest.bar", "XX-02": uat.NO_SCRIPT, "XX-03": "manual:x",
-                          "XX-04": "jvm:没有 @Uat 测试"}, needs)
+                          "XX-04": uat.NO_UAT_TEST, "XX-05": uat.NO_SCRIPT, "XX-06": uat.NO_SCRIPT}, needs)
 
     def test_devices_are_emulator_console_ports_each_with_its_own_page_server(self):
         self.assertEqual(["5554", "5556", "5584"], [uat.emu_port(p) for p in ("5554", "5556", "5584")])

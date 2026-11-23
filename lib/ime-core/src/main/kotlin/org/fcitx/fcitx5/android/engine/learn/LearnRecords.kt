@@ -289,6 +289,8 @@ object LearnRecords {
                     // rows that name no kind
                     rows.forEach { writeByte(rowType(it).toInt()); rowFields(it) { error("an absorbed row names no kind: $it") } }
                 }
+                // only where set: every other one's bytes as before
+                if (r.remembered) writeBoolean(true)
             }
             else -> error("not one: $r")
         }
@@ -556,7 +558,7 @@ object LearnRecords {
                 IMPORT_BATCH -> ImportBatch(readInt(), readUTF(), readInt(), readInt())
                 IMPORTED -> Imported(readInt(), readInt(), readUTF(), readUTF())
                 IMPORT_UNDO -> ImportUndo(readInt())
-                ABSORBED -> Absorbed(readInt(), absorbed(input), absorbed(input))
+                ABSORBED -> Absorbed(readInt(), absorbed(input), absorbed(input), remembered = available() > 0 && readBoolean())
                 else -> laterEvent(type, input)
             }
         }

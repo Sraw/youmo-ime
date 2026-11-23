@@ -158,7 +158,8 @@ internal class HabitOrder(
         return words.filter { walk(graph, end, it, slips = false) != null && walk(graph, end, it, slips = false, toned = true) == null }.mapTo(HashSet()) { it.text }
     }
 
-    // [view] with [off] texts neither pinned, first nor used: ranked as the tone puts them, like any other word
+    // [view] with [off] texts neither pinned, first nor used: ranked as the tone puts them, like any other word. The
+    // rest need no cover: firstUse orders used words only, zhuyin has no spellings, and mineOrder/importOrder go by text
     private fun toned(off: Set<String>) = object : HabitRanker.View by view {
         override fun pinned(code: Code) = view.pinned(code)?.takeUnless { it.text in off }
         override fun first(code: Code, prev: String) = view.first(code, prev)?.takeUnless { it.text in off }

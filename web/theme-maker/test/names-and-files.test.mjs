@@ -96,7 +96,7 @@ test('whether a file is still named: as an attribute in either quote, or as a fu
 test('replacing an icon keeps a file a key image still names, and never writes over a file there is', () => {
   const xml = '<theme xmlns="https://youmo-ime/theme/4" name="t" version="4.0">\n  <icon name="shift" src="icon-shift.svg"/>\n  <style select="key" fill="image(icon-shift.svg, 1 1 1 1)"/>\n</theme>\n';
   const d = M.doc(xml, { 'icon-shift.svg': new Uint8Array([1]) });
-  const got = P.text.ops.setIcon(d, 'shift', new Uint8Array([2]));
+  const got = P.text.ops.setIcon(d, L, 'shift', new Uint8Array([2]));
   assert.deepEqual([...got.files['icon-shift.svg']], [1], 'the old file still named by image(): kept, not overwritten');
   assert.ok(Object.keys(got.files).includes('icon-shift-2.svg'), Object.keys(got.files).join());
 });

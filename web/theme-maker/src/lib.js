@@ -85,9 +85,13 @@
     return out;
   }
 
-  /** Past [max] bytes it stops and throws: a zip bomb is never whole in memory. */
-  async function inflateRaw(bytes, max, what) {
-    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  /**
+   * [bytes] inflated ([format]: 'deflate-raw' or 'deflate') a piece at a time: `{bytes}`; `{over: true}` once [over] of
+   * the count so far, never whole in memory; `{bad: true}` where the stream is bad, unless [whole] of the count (bytes
+   * after the stream's end: an Inflater stops at its end and never sees them).
+   */
+  async function boundedInflate(bytes, format, over, whole = () => false) {
+    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(format)).getReader();
     const parts = [];
     let n = 0;
     for (;;) {
@@ -95,23 +99,26 @@
       try {
         r = await reader.read();
       } catch (e) {
-        throw new ThemeError('not-theme', 'bad data in ' + what);
+        if (whole(n)) break;
+        return { bad: true };
       }
       if (r.done) break;
       n += r.value.length;
-      if (n > max) {
+      if (over(n)) {
         await reader.cancel().catch(() => {});
-        throw new ThemeError('not-theme', what + ' is more than its zip says');
+        return { over: true };
       }
       parts.push(r.value);
     }
-    const out = new Uint8Array(n);
-    let at = 0;
-    for (const p of parts) {
-      out.set(p, at);
-      at += p.length;
-    }
-    return out;
+    return { bytes: joined(parts, n) };
+  }
+
+  /** Past [max] bytes it stops and throws: a zip bomb is never whole in memory. */
+  async function inflateRaw(bytes, max, what) {
+    const r = await boundedInflate(bytes, 'deflate-raw', (n) => n > max);
+    if (r.bad) throw new ThemeError('not-theme', 'bad data in ' + what);
+    if (r.over) throw new ThemeError('not-theme', what + ' is more than its zip says');
+    return r.bytes;
   }
 
   /** By the central directory, so an entry with a data descriptor (as the app writes them) reads too. */
@@ -192,27 +199,10 @@
    * floor, it stops (UNPACKED_TOO_BIG); a stream bad or cut short is NOT_ZIP.
    */
   async function inflateSkin(raw, cap, packed, name, lim, size = -1) {
-    const reader = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
-    const parts = [];
-    let n = 0;
-    for (;;) {
-      let r;
-      try {
-        r = await reader.read();
-      } catch (e) {
-        // bytes after the stream's end: the app's Inflater stops at its end and never sees them
-        if (n === size) break;
-        throw new SkinError('NOT_ZIP', name);
-      }
-      if (r.done) break;
-      n += r.value.length;
-      if (n > cap || (n > lim.ratioFrom && n > packed * lim.ratio)) {
-        await reader.cancel().catch(() => {});
-        throw new SkinError('UNPACKED_TOO_BIG', name);
-      }
-      parts.push(r.value);
-    }
-    return joined(parts, n);
+    const r = await boundedInflate(raw, 'deflate-raw', (n) => n > cap || (n > lim.ratioFrom && n > packed * lim.ratio), (n) => n === size);
+    if (r.bad) throw new SkinError('NOT_ZIP', name);
+    if (r.over) throw new SkinError('UNPACKED_TOO_BIG', name);
+    return r.bytes;
   }
 
   const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
@@ -373,27 +363,8 @@
     if (raw > lim.ratioFrom && raw > lim.ratio * sealed) return null;
     // a wrong key's random length is no payload; a true one past what is left is too big
     if (raw > maxBytes) return plain.length >= 6 && (plain[4] & 0x0f) === 8 && ((plain[4] << 8) | plain[5]) % 31 === 0 ? 'too-big' : null;
-    const reader = new Blob([plain.subarray(4)]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
-    const parts = [];
-    let got = 0;
-    for (;;) {
-      let r;
-      try {
-        r = await reader.read();
-      } catch (e) {
-        // bytes after the stream's end, as above
-        if (got === raw) break;
-        return null;
-      }
-      if (r.done) break;
-      got += r.value.length;
-      if (got > raw) {
-        await reader.cancel().catch(() => {});
-        return null;
-      }
-      parts.push(r.value);
-    }
-    return got === raw ? joined(parts, got) : null;
+    const r = await boundedInflate(plain.subarray(4), 'deflate', (n) => n > raw, (n) => n === raw);
+    return r.bytes && r.bytes.length === raw ? r.bytes : null;
   }
 
   /** A PNG's or WebP's type, `size` ([w, h], null unread) and whether it moves, as the app's RasterIcon reads its header; null: neither. */

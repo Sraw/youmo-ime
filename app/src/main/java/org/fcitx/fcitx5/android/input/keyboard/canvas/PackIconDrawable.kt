@@ -36,8 +36,12 @@ class PackIconDrawable(
     private var alpha = OPAQUE.toInt()
     private val dst = RectF()
 
+    // an ImageView sets its own filter (null too) on any drawable it shows: a mask must not be cleared by that
+    private val mask =
+        if (icon is PackIcons.Raster && tintMask) PorterDuffColorFilter(tint.value or OPAQUE_RGB, PorterDuff.Mode.SRC_IN) else null
+
     init {
-        if (icon is PackIcons.Raster && tintMask) paint.colorFilter = PorterDuffColorFilter(tint.value or OPAQUE_RGB, PorterDuff.Mode.SRC_IN)
+        paint.colorFilter = mask
     }
 
     private fun raster(): Bitmap? {
@@ -86,7 +90,7 @@ class PackIconDrawable(
     }
 
     override fun setColorFilter(colorFilter: ColorFilter?) {
-        paint.colorFilter = colorFilter
+        paint.colorFilter = mask ?: colorFilter
     }
 
     @Deprecated("Deprecated in Java")

@@ -4,10 +4,13 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.os.PersistableBundle
 import android.view.View
 import android.widget.TextView
+import androidx.arch.core.executor.ArchTaskExecutor
+import androidx.arch.core.executor.DefaultTaskExecutor
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.paging.PagingSource
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -32,9 +35,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowPopupMenu
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /** The clipboard panel's 最近 and 收藏: a favourite a copy, each page its own. */
 @RunWith(RobolectricTestRunner::class)
@@ -303,7 +308,6 @@ class ClipboardFavoritesUatTest {
     }
 
     private fun favouritesEmptyHint(): String {
-        h.start()
         h.clipboard()
         open(R.string.clipboard_favorites)
         return h.texts(h.inputView).first { s(R.string.favorites_empty) in it }
@@ -311,22 +315,35 @@ class ClipboardFavoritesUatTest {
 
     @Test
     @Uat("TB-75")
-    fun theEmptyFavouritesSayHowToGetOneWithTheHistoryOff() {
-        prefs.set(AppPrefs.getInstance().clipboard.clipboardListening, false)
-        assertEquals("${s(R.string.favorites_empty)}\n${s(R.string.favorites_empty_history_off)}", favouritesEmptyHint())
-        h.capture("ClipboardFavoritesUatTest/favorites_empty")
-    }
-
-    @Test
-    @Uat("TB-75")
-    fun theEmptyFavouritesSayHowToGetOneWithALimitOf0() {
-        prefs.set(AppPrefs.getInstance().clipboard.clipboardHistoryLimit, 0)
-        assertEquals("${s(R.string.favorites_empty)}\n${s(R.string.favorites_empty_limit_zero)}", favouritesEmptyHint())
+    fun theEmptyFavouritesSayHowToGetOneWithTheHistoryOffOrALimitOf0() {
+        val listening = AppPrefs.getInstance().clipboard.clipboardListening
+        val limit = AppPrefs.getInstance().clipboard.clipboardHistoryLimit
+        val defaultLimit = limit.getValue()
+        h.start()
+        // each opened anew with its prefs set before, as a user comes to it
+        fun hintWith(on: Boolean, max: Int, shot: String? = null): String {
+            prefs.set(listening, on)
+            prefs.set(limit, max)
+            return favouritesEmptyHint().also {
+                shot?.let { h.capture(it) }
+                back()
+            }
+        }
+        assertRows(
+            "the history off: nothing comes into 最近 to make one from" to {
+                val historyOff = hintWith(on = false, max = defaultLimit, shot = "ClipboardFavoritesUatTest/favorites_empty")
+                assertEquals("${s(R.string.favorites_empty)}\n${s(R.string.favorites_empty_history_off)}", historyOff)
+            },
+            "a limit of 0: 最近 keeps none to make one from" to {
+                assertEquals("${s(R.string.favorites_empty)}\n${s(R.string.favorites_empty_limit_zero)}", hintWith(on = true, max = 0))
+            },
+        )
     }
 
     @Test
     @Uat("TB-75")
     fun theEmptyFavouritesHintFollowsALimitChangedWhileOpen() {
+        h.start()
         val before = favouritesEmptyHint()
         prefs.set(AppPrefs.getInstance().clipboard.clipboardHistoryLimit, 0)
         h.idle()
@@ -393,18 +410,87 @@ class ClipboardFavoritesUatTest {
         assertEquals("公园", h.field.text.toString())
     }
 
-    // a 0.6.2 install's pins are the favourites: said once, a fresh install told nothing
-    @Test
-    @Uat("TB-76")
-    fun anUpgradesPinsAreSaidMovedOnce() {
-        h.start()
-        h.copied("钉")
+    private val told get() = AppPrefs.getInstance().internal.clipboardPinsMovedTold
+
+    // from the keyboard; the last notice put away first, so one up still from before is not taken for this open's
+    private fun opensSayingPinsMoved(): Boolean {
+        h.notice()?.dismiss()
+        h.clipboard()
+        h.idle()
+        return s(R.string.clipboard_pins_moved) in h.noticeTexts()
+    }
+
+    private fun favouritedAsAnUpgradesPin(text: String) {
+        h.copied(text)
         runBlocking {
             ClipboardManager.coroutineContext.job.children.forEach { it.join() }
             ClipboardManager.favorite(ClipboardManager.lastEntry!!.id)
         }
+    }
+
+    // a 0.6.2 install's pins are the favourites: said once
+    @Test
+    @Uat("TB-76")
+    fun anUpgradesPinsAreSaidMovedOnce() {
+        h.start()
+        favouritedAsAnUpgradesPin("钉")
         h.clipboard("钉")
         said(R.string.clipboard_pins_moved)
-        assertTrue(AppPrefs.getInstance().internal.clipboardPinsMovedTold.getValue())
+        back()
+        val again = opensSayingPinsMoved()
+        assertRows(
+            "marked told" to { assertTrue(told.getValue()) },
+            "not said at the next open" to { assertFalse(again) },
+        )
+    }
+
+    // a fresh install has none: told nothing, nor once it makes one
+    @Test
+    @Uat("TB-76")
+    fun anInstallWithNoPinsIsNeverToldTheyMoved() {
+        h.start()
+        h.copied("公园")
+        val first = opensSayingPinsMoved()
+        h.waitFor("公园 listed") { h.entry("公园") != null }
+        menu("公园", R.string.clipboard_favorite)
+        said(R.string.clipboard_favorited)
+        back()
+        val afterOne = opensSayingPinsMoved()
+        assertRows(
+            "none at the first open" to { assertFalse(first) },
+            "nor once a favourite is made" to { assertFalse(afterOne) },
+        )
+    }
+
+    // a start counts the file after its open: a panel opened before would take an upgrade's pins for none
+    @SuppressLint("RestrictedApi")
+    @Test
+    @Uat("TB-76")
+    fun anUpgradesPinsAreSaidMovedOnceCountedNotBefore() {
+        h.start()
+        favouritedAsAnUpgradesPin("钉")
+        runBlocking { ClipboardManager.closeDatabase() }
+        // Room's answers held across a start, as its open's count is out
+        val held = ConcurrentLinkedQueue<Runnable>()
+        ArchTaskExecutor.getInstance().setDelegate(object : DefaultTaskExecutor() {
+            override fun executeOnDiskIO(runnable: Runnable) {
+                held += runnable
+            }
+        })
+        val early = try {
+            ClipboardManager.init(RuntimeEnvironment.getApplication())
+            opensSayingPinsMoved() to told.getValue()
+        } finally {
+            ArchTaskExecutor.getInstance().setDelegate(null)
+            generateSequence { held.poll() }.forEach(ArchTaskExecutor.getIOThreadExecutor()::execute)
+        }
+        runBlocking { ClipboardManager.coroutineContext.job.children.forEach { it.join() } }
+        back()
+        val counted = opensSayingPinsMoved()
+        assertRows(
+            "opened before the count: nothing said, nothing marked" to { assertEquals(false to false, early) },
+            "opened after: said" to { assertTrue(counted) },
+            "and marked" to { assertTrue(told.getValue()) },
+        )
     }
 }

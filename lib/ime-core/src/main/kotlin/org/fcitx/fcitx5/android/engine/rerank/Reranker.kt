@@ -7,6 +7,7 @@ package org.fcitx.fcitx5.android.engine.rerank
 import org.fcitx.fcitx5.android.core.CoreLog
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -50,6 +51,12 @@ class Reranker(
         asked.set(context)
         val ask = asks.incrementAndGet()
         ahead.execute { readAhead(context, ask) }
+    }
+
+    /** A read ahead under way or queued gives up, as for a newer context: the engine is closing. */
+    fun stopReading() {
+        asked.set(null)
+        asks.incrementAndGet()
     }
 
     @Suppress("TooGenericExceptionCaught")
@@ -126,9 +133,11 @@ class GatedPicker(
         require(sub >= 1 && !margin.isNaN()) { "sub $sub, margin $margin" }
     }
 
-    /** Keys the gate sent to [large], for the evaluation. */
-    var escalations = 0L
-        private set
+    // atomic: an evaluation may share one picker among threads
+    private val escalated = AtomicLong()
+
+    /** Keys [large] decided, for the evaluation: not those the gate sent it while its model could not be read. */
+    val escalations: Long get() = escalated.get()
 
     override fun prewarm(context: String) {
         small.prewarm(context)
@@ -143,8 +152,8 @@ class GatedPicker(
         var second = Float.NEGATIVE_INFINITY
         for (i in c.indices) if (i != top && c[i] > second) second = c[i]
         if (c[top] - second >= margin || disagreeing && top == 0) return top
-        escalations++
         val picker = large.get() ?: return top
+        escalated.incrementAndGet()
         val compared = c.indices.sortedWith(compareByDescending<Int> { c[it] }.thenBy { it }).take(sub).sorted()
         return compared[picker.pick(context, compared.map(readings::get), compared.map(scores::get))]
     }

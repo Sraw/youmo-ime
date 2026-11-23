@@ -79,7 +79,7 @@ class EngineEvalRunner {
             requireNotNull(ModelLevel.entries.firstOrNull { it.key.equals(key, ignoreCase = true) }) { "evalLevel $key: one of low, medium, high" }
         }
         // -e pin off: unpinned, to measure what the big cores bring
-        BigCorePin.enabled = args.getString("pin") != "off"
+        val pin = args.getString("pin") != "off"
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val testContext = InstrumentationRegistry.getInstrumentation().context
         val dir = checkNotNull(context.getExternalFilesDir("eval")) { "external storage unavailable" }
@@ -90,9 +90,11 @@ class EngineEvalRunner {
             val counted = writeHistory(File(context.filesDir, ENGINE_USER_DIR), lines)
             android.util.Log.i("EngineEvalRunner", "history $name: $counted words of ${lines.count { it.isNotBlank() }} lines")
         }
+        val pinBefore = BigCorePin.enabled
         val fcitx = KotlinHost(context)
         val scope = MainScope()
         try {
+            BigCorePin.enabled = pin
             runBlocking {
                 withTimeout(STARTUP_TIMEOUT_MS) {
                     // subscribe before start(): eventFlow has no replay (see HostTest.setup)
@@ -146,6 +148,8 @@ class EngineEvalRunner {
         } finally {
             fcitx.stop()
             scope.cancel()
+            // the process's flag: the instrumentation's later tests would run unpinned
+            BigCorePin.enabled = pinBefore
         }
     }
 

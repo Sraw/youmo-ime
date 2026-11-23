@@ -71,12 +71,17 @@ object SkinLayoutWriter {
     class Written(val text: String, val minApp: String, val dropped: Int, val lacks: List<LayoutCheck.Finding>)
 
     /** [board] as a pack's `layouts/<id>.xml`; null where it shares no row with the app's or the import would not take it. */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
     fun write(board: SkinBoard, sources: LayoutCheck.Sources): Written? {
         val finite = board.width.isFinite() && board.rows.all { r -> r.all { it.x.isFinite() && it.y.isFinite() && it.w.isFinite() && it.h.isFinite() } }
         if (board.id !in IDS || !(board.width > 0) || !finite) return null
-        // a reader's numbers past what was thought of: this board's layout left out, never the skin
-        // with the keys the skin draws apart joined, else without: one may be of a pad of its own
-        return runCatching { written(board, sources, joined = true) ?: written(board, sources, joined = false) }.getOrNull()
+        // a reader's numbers past what was thought of: this board's layout left out, never the skin (an Error is no such thing)
+        return try {
+            // with the keys the skin draws apart joined, else without: one may be of a pad of its own
+            written(board, sources, joined = true) ?: written(board, sources, joined = false)
+        } catch (e: RuntimeException) {
+            null
+        }
     }
 
     private fun written(board: SkinBoard, sources: LayoutCheck.Sources, joined: Boolean): Written? {
@@ -124,11 +129,14 @@ object SkinLayoutWriter {
         val features = LayoutCheck.minApp(made.withMeta(LayoutMeta(null, null, null, null, null)))
         val done = PackLayouts.convert(app.name, null, board.id, write(made, features), emptyMap(), sources, features) as? PackLayouts.Converted.Done ?: return null
         val lacks = done.problems.filter { it.key == "lacks" }
-        // one lacking keys is for an app that takes it, as the layout maker writes it
-        val minApp = LayoutCheck.FEATURES.getValue("lacks").takeIf { lacks.isNotEmpty() && ThemeReader.newer(it, features) } ?: features
+        val minApp = relaxed(features, done.problems)
         val extra = all.flatten().count { b -> placed.pairs.none { it === b } && drawnFor.elsewhere(b) }
         return Written(write(made, minApp), minApp, extra, lacks)
     }
+
+    // one lacking keys or blank somewhere is for an app that takes it, as LayoutCheck's report and the layout maker say
+    internal fun relaxed(features: String, problems: List<LayoutCheck.Finding>): String =
+        LayoutCheck.FEATURES.getValue("lacks").takeIf { v -> problems.any { it.key == "lacks" || it.key == "blank" } && ThemeReader.newer(v, features) } ?: features
 
     // a nine keys' 1 is drawn with its marks, as the skin's comma
     private fun exact(nine: Boolean): (ExpandedKey, SkinAction) -> Boolean = { k, a ->

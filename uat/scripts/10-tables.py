@@ -115,6 +115,91 @@ def tbl11c(d):
     return f"撤销后 iije {c[:3]}；删除提示 {deleted}；撤销后 qglf {again[:4]}"
 
 
+@case("TBL-11g", base="B0-五笔", mutates="learn", clean=True)
+def tbl11g(d):
+    d.step("删回去")
+    # no pause: an offer seen in the field would not be given again in the second part
+    d.type("ig ih je " * 3)
+    d.bksp(7)
+    d.type("je ")
+    d.expect_field("汪小明", msg="九个字删回两个再打「明」，框里「{got}」")
+    time.sleep(2.0)
+    s = d.screen()
+    whole = [t for t in s.texts(where="all") if t.startswith("汪小明 ")]
+    d.shot("full", "删回去以后：不给「汪小明」")
+    check(not whole, f"删回去以后提示条给了 {whole}")
+    d.step("九个字")
+    d.clear()
+    d.type("ig ih je " * 3)
+    d.expect_field("汪小明" * 3)
+    offered = offer(d, "汪小明 iije", "打满九个字停下：只给最后的「汪小明 iije」")
+    check(all(len(word(o)) <= 3 for o in offered), f"九个字给了 {offered}")
+    return f"删回去以后不给汪小明；九个字给出 {offered}"
+
+
+@case("TBL-11h", base="B0-五笔", mutates="learn", clean=True)
+def tbl11h(d):
+    wang_xiao_ming(d)
+    offer(d, "汪小明 iije", "给出「汪小明」")
+    remember(d, "汪小明 iije")
+    d.switch_im("拼音")
+    s = d.screen()
+    undo = s.find(text="撤销", where="all")
+    d.shot("full", "切到拼音后：记住了的提示条还在，带撤销")
+    check(undo is not None, f"切到拼音后提示条没有撤销：{s.texts(where='all')[:8]}")
+    d.tap(undo.c, 0.8)
+    d.expect_field("汪小明")
+    d.switch_im("五笔")
+    d.clear()
+    d.type("iije")
+    c = words(d.cands())
+    check("汪小明" not in c, f"切到拼音撤销后回五笔，iije 还有「汪小明」：{c[:6]}")
+    return f"切到拼音撤销，回五笔 iije {c[:3]}"
+
+
+@case("TBL-11i", base="B0-设置", mutates=True, clean=True, visual=True)
+def tbl11i(d):
+    add_im(d, "五笔")
+    d.open_settings()
+    d.goto("通用输入")
+    d.switch("空格上屏联想词", True)
+    on_page(d, "五笔")
+
+    def space_takes(before, note):
+        time.sleep(1.0)
+        shown = words(d.cands())
+        d.shot("kb", note)
+        if not shown:
+            raise Blocked(f"「{before}」后没有联想")
+        d.space()
+        want = before + shown[0]
+        d.expect_field(want, msg=f"空格后框里「{{got}}」，不是「{want}」（联想 {shown[:3]}）")
+        return want
+
+    d.step("记住以后")
+    wang_xiao_ming(d)
+    offer(d, "汪小明 iije", "给出「汪小明」")
+    remember(d, "汪小明 iije")
+    kept = space_takes("汪小明", "点了记住：第一个联想词画成首选的样子")
+    d.step("撤销以后")
+    d.clear()
+    d.type("qgyi")
+    d.cands(want="鲸")
+    d.pick("鲸")
+    d.type("lfqv")
+    if d.field_text() != "鲸园":
+        d.space()
+    d.expect_field("鲸园")
+    offer(d, "鲸园 qglf", "给出「鲸园 qglf」")
+    s = remember(d, "鲸园 qglf")
+    undo = s.find(text="撤销", where="all")
+    check(undo is not None, f"记住后的提示没有撤销：{s.texts(where='all')[:8]}")
+    d.tap(undo.c, 0.8)
+    d.expect_field("鲸园")
+    undone = space_takes("鲸园", "点了撤销：第一个联想词画成首选的样子")
+    return f"记住后空格「{kept}」，撤销后空格「{undone}」"
+
+
 @case("TBL-11d", base="B0-设置", mutates=True)
 def tbl11d(d):
     add_im(d, "五笔")

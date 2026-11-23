@@ -32,13 +32,14 @@ object PetReader {
     private fun pet(el: XmlElement, p: Problems): Pet {
         val a = Attributes(el, p)
         val place = a.oneOf("place", Pet.Place.entries.map { it.id })?.let { id -> Pet.Place.entries.first { it.id == id } } ?: Pet.Place.KEYBOARD
-        val align = a.oneOf("align", Pet.Align.entries.map { it.id })?.let { id -> Pet.Align.entries.first { it.id == id } }
+        var align = a.oneOf("align", Pet.Align.entries.map { it.id })?.let { id -> Pet.Align.entries.first { it.id == id } }
         val size = clamped(a, "size", PetLimits.MIN_SIZE_DP, PetLimits.MAX_SIZE_DP) ?: PetLimits.DEFAULT_SIZE_DP
         var x = clamped(a, "offset-x", -PetLimits.MAX_OFFSET_DP, PetLimits.MAX_OFFSET_DP) ?: 0.0
         var y = clamped(a, "offset-y", -PetLimits.MAX_OFFSET_DP, PetLimits.MAX_OFFSET_DP) ?: 0.0
         // the bar's end has no corner to count from, and its slot is the pet's width
         if (place == Pet.Place.BAR_END) {
             listOf("align", "offset-x", "offset-y").filter { a.string(it) != null }.forEach { a.warn("$it= does nothing at the bar's end") }
+            align = null
             x = 0.0
             y = 0.0
         }

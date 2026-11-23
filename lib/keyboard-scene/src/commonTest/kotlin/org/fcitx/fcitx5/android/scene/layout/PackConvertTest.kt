@@ -255,6 +255,19 @@ class PackConvertTest {
         assertEquals(listOf(listOf("letters", "q")), done(convert(noQ, id = "qwerty")).problems.filter { it.key == "lacks" }.map { it.args })
     }
 
+    // one 0.6.0 drew the app's for is not switched in at an upgrade or a 0.6.0 backup's restore: its letters board lacking a letter was its reader's error
+    @Test
+    fun whatLacking060RefusedTheBoardForIsMarked() {
+        val qwerty = testData("qwerty.xml")
+        fun drop(text: String, key: Regex) = text.replaceFirst(key, "").also { check(it != text) }
+        fun refused(text: String, id: String) = done(convert(text, id = id)).refusedBy060
+        assertFalse(refused(qwerty, "qwerty"), "the app's")
+        assertTrue(refused(drop(qwerty, Regex("<key id=\"q\"[^>]*>[\\s\\S]*?</key>")), "qwerty"), "a letters board lacking q")
+        assertTrue(refused(drop(qwerty, Regex("<key id=\"backspace\"[^>]*/>")), "qwerty"), "lacking ⌫")
+        assertFalse(refused(drop(qwerty, Regex("<key id=\"shift\"[^>]*/>")), "qwerty"), "lacking ⇧: 0.6.0 drew it")
+        assertFalse(refused(drop(testData("k14.xml"), Regex("<key [^>]*letters=\"qw\"[^>]*/>")), "k14"), "a grouped board lacking q w: 0.6.0 drew it")
+    }
+
     @Test
     fun theNameIsWithinTheLimitAndShowsNothingUnseen() {
         val long = done(convert(k17, theme = "一个名字非常非常非常非常非常长的主题‮"))

@@ -251,6 +251,63 @@ class TableWordLearningTest {
         assertEquals("汪小明", t.keys("je ").wordOffer?.words?.first()?.text)
     }
 
+    // past KEPT and MAX_WHOLE the run's end is offered; deleted back past what is kept, its start is unknown and only
+    // the end known is (a whole run there once threw)
+    @Test
+    fun aLongRunAndOneDeletedBackPastWhatIsKeptOfferTheirEnd() {
+        class Row(val why: String, val keys: String, val offered: List<String>?, val deletes: Int = 0, val then: String = "")
+        val nine = wangXiaoming.repeat(3)
+        assertRows(
+            listOf(
+                Row("four: whole (小明汪 ijig and 明汪 jeig lead nowhere)", "ig ih je ig ", listOf("汪小明汪")),
+                Row("five: past MAX_WHOLE, not whole (汪小 the table's, 明汪小 jiih leads nowhere)", "ig ih je ig ih ", null),
+                Row("nine: its last three and two", nine, listOf("汪小明", "小明")),
+                Row("nine deleted back to two, then 明: three typed, its last two known", nine, listOf("小明"), deletes = 7, then = "je "),
+            ),
+            { it.why },
+        ) { row ->
+            val t = session()
+            var s = t.keys(row.keys)
+            repeat(row.deletes) { assertFalse(t.apply(Backspace).handled) }
+            if (row.then.isNotEmpty()) s = t.keys(row.then)
+            assertEquals(row.offered, s.wordOffer?.words?.map { it.text })
+        }
+    }
+
+    // each key a while after the last, glided
+    private fun TableSession.glided(keys: String): Snapshot {
+        var last: Snapshot? = null
+        for (c in keys) {
+            clock += 1000
+            last = apply(Key(c, glided = true))
+            preedits[this] = last.preedit
+        }
+        return last!!
+    }
+
+    // a glide's commit ends the run, however the code it is in is committed; a tapped code topped by a glided key is no glide's
+    @Test
+    fun aGlidedCodeEndsTheRunATappedOneToppedByAGlideGoesOn() {
+        class Row(val why: String, val offered: List<String>?, val typed: TableSession.() -> Snapshot)
+        assertRows(
+            listOf(
+                Row("a tapped code topped by a glided key goes on the run", listOf("汪小明", "小明")) {
+                    keys("ig ih")
+                    assertEquals("小", glided("g").commit)
+                    // the glided g taken back: the run goes on with 明
+                    assertTrue(apply(Backspace).handled)
+                    keys("je ")
+                },
+                Row("a glided code committed by a space ends it", listOf("小明")) { glided("ig"); keys(" ih je ") },
+                Row("a code glided in part, committed by a space, ends it too", listOf("小明")) { glided("i"); keys("g ih je ") },
+                // 汪明's igje leads nowhere at igj: nothing but 小 before them would make a word offered
+                Row("a glided code topped by a tapped key ends it", null) { glided("ih"); keys("ig je ") },
+                Row("the same tapped: 小 goes on the run", listOf("小汪明")) { keys("ih ig je ") },
+            ),
+            { it.why },
+        ) { row -> assertEquals(row.offered, row.typed(session()).wordOffer?.words?.map { it.text }) }
+    }
+
     @Test
     @Uat("TBL-11")
     fun aLoneCodeTakesTheRememberedWordAndNothingElse() {
@@ -365,6 +422,73 @@ class TableWordLearningTest {
         assertEquals("山", next.commit)
         assertTrue(next.toString(), next.predicting && next.candidates != first)
         clock += 100
+        assertFalse(t.apply(Key(' ')).handled)
+    }
+
+    // the tap and its 撤销 leave the bar marking what a space takes, as any act does
+    @Test
+    fun theTapAndItsUndoKeepTheSpaceMarks() {
+        // 明 brings 山
+        val chain = PinyinDataBuilder().unigram("<unk>", -7f, 0f).unigram("明", -3f, -1f).unigram("山", -3f, 0f)
+            .bigram("明", "山", -0.2f, 0f)
+            .entry("明", intArrayOf(Syllables.id("ming"))).entry("山", intArrayOf(Syllables.id("shan")))
+            .build().toByteArray().let { PinyinData.load(ByteBuffer.wrap(it)) }
+        val t = TableSession(
+            wubi, TableOptions.WUBI.copy(spacePicksPrediction = true, orderByUse = false), saved = saved,
+            language = language(chain, Learner(chain)), now = { clock },
+        )
+        val offer = t.keys(wangXiaoming).wordOffer!!
+        clock += 1000
+        val tapped = t.apply(Remember(offer.id, 0, "汪小明"))
+        assertEquals("汪小明", tapped.commit)
+        assertTrue(tapped.toString(), tapped.predicting)
+        assertEquals(0 to true, tapped.spacePicks to tapped.spaceMarks)
+        clock += 1000
+        assertEquals(0 to true, t.apply(Unremember("汪小明", "iije")).let { it.spacePicks to it.spaceMarks })
+    }
+
+    // the run's last character committed itself (je): the tap that wrote the word comes after it, so a space takes again
+    @Test
+    fun aTapAfterASelfCommitLeavesTheSpaceToTakeThePrediction() {
+        val chain = PinyinDataBuilder().unigram("<unk>", -7f, 0f).unigram("明", -3f, -1f).unigram("山", -3f, 0f)
+            .bigram("明", "山", -0.2f, 0f)
+            .entry("明", intArrayOf(Syllables.id("ming"))).entry("山", intArrayOf(Syllables.id("shan")))
+            .build().toByteArray().let { PinyinData.load(ByteBuffer.wrap(it)) }
+        val t = TableSession(
+            wubi, TableOptions.WUBI.copy(spacePicksPrediction = true, orderByUse = false), saved = saved,
+            language = language(chain, Learner(chain)), now = { clock },
+        )
+        val offer = t.keys("ig ih je").wordOffer!!
+        clock += 1000
+        assertEquals(0 to true, t.apply(Remember(offer.id, 0, "汪小明")).let { it.spacePicks to it.spaceMarks })
+        clock += 1000
+        assertEquals(0 to true, t.apply(Unremember("汪小明", "iije")).let { it.spacePicks to it.spaceMarks })
+        clock += 1000
+        assertEquals("山", t.apply(Key(' ')).commit)
+    }
+
+    // a tap that writes nothing (its offer gone) is no act after the space that took a prediction: the next is a space
+    @Test
+    fun aStaleTapLeavesTheSpaceAfterATakenPredictionASpace() {
+        // 明 brings 山, 山 水
+        val chain = PinyinDataBuilder().unigram("<unk>", -7f, 0f).unigram("明", -3f, -1f).unigram("山", -3f, -1f).unigram("水", -3f, 0f)
+            .bigram("明", "山", -0.2f, 0f).bigram("山", "水", -0.2f, 0f)
+            .entry("明", intArrayOf(Syllables.id("ming"))).entry("山", intArrayOf(Syllables.id("shan"))).entry("水", intArrayOf(Syllables.id("shui")))
+            .build().toByteArray().let { PinyinData.load(ByteBuffer.wrap(it)) }
+        val t = TableSession(
+            wubi, TableOptions.WUBI.copy(spacePicksPrediction = true, orderByUse = false), saved = saved,
+            language = language(chain, Learner(chain)), now = { clock },
+        )
+        val offer = t.keys(wangXiaoming).wordOffer!!
+        clock += 1000
+        val space = t.apply(Key(' '))
+        assertEquals("山", space.commit)
+        assertTrue(space.toString(), space.predicting)
+        clock += 1000
+        val tap = t.apply(Remember(offer.id, 0, "汪小明山"))
+        assertEquals("", tap.commit)
+        assertEquals("nothing a space takes", -1, tap.spacePicks)
+        clock += 1000
         assertFalse(t.apply(Key(' ')).handled)
     }
 

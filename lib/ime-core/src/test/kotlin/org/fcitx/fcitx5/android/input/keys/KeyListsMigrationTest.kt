@@ -136,7 +136,7 @@ class KeyListsMigrationTest {
         assertEquals(a.text, "@1" + v1(a.text).serialize().removePrefix(KeyLists.HEADER))
     }
 
-    // 0.5.2's and beta1's stored settings (src/test/resources/keys-migration) to the lists expected; mutation cannot see them
+    // contract: 0.5.2's and beta1's stored settings (src/test/resources/keys-migration) to the lists expected; mutation cannot see them
     @Test
     fun theSamplesMigrate() {
         val versions = File("src/test/resources/keys-migration").listFiles(File::isDirectory)!!.sortedBy { it.name }
@@ -181,6 +181,9 @@ class KeyListsMigrationTest {
         // `@1`'s items are only the symbols above a row: a set of none is the row alone
         "a row's key with no symbols: its row alone" to {
             assertEquals(listOf("A", "B", "C", "2", "a", "b", "c"), upgraded("t9/2\tset\t*")[KeyId("t9/2")]?.items)
+        },
+        "a key of no row with no symbols: off" to {
+            assertEquals("@2\nfn/comma\toff", KeyListsMigration.upgrade("@1\nfn/comma\tset\t*", standard))
         },
         "over 16: the first 16 in list order, a row's first" to {
             val symbols = (1..32).map { "s$it" }

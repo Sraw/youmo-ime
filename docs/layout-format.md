@@ -120,7 +120,7 @@
 
 - 带值（只写名字不写值表示「有任何值」）：`ime`（`pinyin`、`shuangpin`、`english`、`table`……）、`scheme`（双拼方案）、`scheme-types`（双拼方案要的键，如 `semicolon`）、`table`、`table-extra`（码表要的额外键：`semicolon`、`star`）、`field`（`url`、`email`……）、`pad`（数字键盘的那几种：`full`、`phone`、`datetime`；以前的 `digits`、`signed`、`decimal`、`signed-decimal` 照样读，但不再有这几种，写着它们的键不显示，网页编辑器提示一句）、`action`。
 - `split-side=`（`left`、`right`）只在分体后的半边用，`on-split="split"` 的键盘里写它是错误。
-- 开关：`roots`、`compact`、`landscape`、`split`、`floating`、`one-handed`、`voice`、`hold-voice`、`lang-key`、`composing`、`looking-up`、`table-lookup`（当前码表把拼音反查放在查字键上：二笔、仓颉、自然码等有，五笔、五笔拼音没有，0.6.3 起认）、`shifted`、`caps-lock`。
+- 开关：`roots`（码表显示字根且没按 ⇧：按着 ⇧ 时字母键打字母本身，写 `when="roots"` 的键和变体这时不显示）、`compact`、`landscape`、`split`、`floating`、`one-handed`、`voice`、`hold-voice`、`lang-key`、`composing`、`looking-up`、`table-lookup`（当前码表把拼音反查放在查字键上：二笔、仓颉、自然码等有，五笔、五笔拼音没有，0.6.3 起认）、`shifted`、`caps-lock`。
 
 例：AZERTY 的 `;` 键 `when="ime=shuangpin scheme-types=semicolon, table-extra=semicolon"`；App 的数字键盘里只在完整的那种出现的 `=` 键 `when="pad=full"`；App 的全键盘左下角，码表里有反查时是「拼」键 `when="table table-lookup !looking-up"`，没有时是 ⇧ `when="!table !composing, table !table-lookup"`。
 

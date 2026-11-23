@@ -110,15 +110,15 @@
 
 ### MN-28 [P1] 宠物跟着按键换动作
 - **前提**：B0-设置，导入 `uat-pet.theme` 并选用，在「普通文本」框。
-- **操作**：依次按字母、退格、回车、空格，每下之后看宠物、等它播完；连按两个字母；点一下宠物盖住的那个键；不按键等 30 s；按一个键；切到表情面板再切回来；收起键盘再弹出。
-- **预期**：每一下宠物换成对应颜色的那组帧，播完回 idle；连按字母时 typing 接着播、不从头重播；点宠物盖住的键，打出的是那个键；30 s 后变成 sleep，按一个键醒来（先 wake 再 typing）；换到同一个 App 的另一个输入框时接着播，不藏起、不回 idle；表情面板上看不到宠物，回来、以及重新弹出后都是 idle 第一帧。
-- **JVM**：`PetUatTest.thePetChangesWithEachKindOfKey`（Robolectric 主线程 Looper 推时间，每个状态截一张）；设备上留作冒烟（四类键、睡着醒来、收起再弹出，看键盘右上角的颜色）。
+- **操作**：依次按字母、退格、回车、空格，每下之后看宠物、等它播完；打 n i h a o 空格，等宠物回到 idle，在空格上按住左右滑动移光标；连按两个字母；点一下宠物盖住的那个键；不按键等 30 s；按一个键；按一个字母后马上点同一页的另一个输入框；切到表情面板再切回来；收起键盘再弹出。
+- **预期**：每一下宠物换成对应颜色的那组帧，播完回 idle；在空格上滑动移光标时宠物停在 idle，不换成 typing 或 space（方向键也一样，只在 JVM 上断言）；连按字母时 typing 接着播、不从头重播；点宠物盖住的键，打出的是那个键；30 s 后变成 sleep，按一个键醒来（先 wake 再 typing）；换到同一个 App 的另一个输入框时接着播，不藏起、不回 idle；表情面板上看不到宠物，回来、以及重新弹出后都是 idle 第一帧。
+- **JVM**：`PetUatTest.thePetChangesWithEachKindOfKey`（Robolectric 主线程 Looper 推时间，每个状态截一张）、`PetTriggersTest.whatIsNoKey`（空格滑动发出的方向键、Home/End、PageUp/PageDown 不算按键）；设备上留作冒烟（四类键、空格上滑动、睡着醒来、收起再弹出，看键盘右上角的颜色）。
 
 ### MN-29 [P1] 「键盘动效」关掉时宠物不动
 - **前提**：同 MN-28。
-- **操作**：键盘开着时到设置里关掉 **键盘动效**，回来按这几类键、等 30 s；再打开，按一个字母。
-- **预期**：宠物马上停在 idle 第一帧、一直不动，按键也不变；再打开后按键又会动。
-- **JVM**：`PetUatTest.thePetStandsStillWithKeyboardMotionOff`；设备上不跑。
+- **操作**：键盘开着时到设置里关掉 **键盘动效**，回来按这几类键、等 30 s；再打开，按一个字母。再把系统的动画时长缩放关掉（开发者选项「动画程序时长缩放」，或 `adb shell settings put global animator_duration_scale 0`），按几个键；改回 1（`… animator_duration_scale 1`），按一个字母。
+- **预期**：宠物马上停在 idle 第一帧、一直不动，按键也不变；再打开后按键又会动。系统动画缩放关着时宠物也不动；改回 1 后按的第一个字母宠物就播 typing（系统不通知这项变了，按键时才发现），不只是回到 idle。
+- **JVM**：`PetUatTest.thePetStandsStillWithKeyboardMotionOff`、`PetViewTest.aKeyFindingMotionBackWithoutACallbackPlays`（系统动画缩放 0 时按键不动，改回 1 后的第一下就播）；设备上不跑（系统动画缩放那一段可以在模拟器上手工照做）。
 
 ### MN-30 [P2] 候选栏右端的宠物
 - **前提**：导入 `uat-pet-bar.theme`（`place="bar-end"`）并选用。

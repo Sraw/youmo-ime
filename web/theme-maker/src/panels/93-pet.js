@@ -11,6 +11,9 @@
   ];
   const NAMES = STATES.map((s) => s[0]);
   const RESTING = ['idle', 'sleep'];
+  // PetMachine's: asleep this long after the last key, a looping sleep this many rounds before it stops
+  const SLEEP_MS = 30000;
+  const SLEEP_ROUNDS = 3;
   const ALIGNS = [['top-end', '右上'], ['top-start', '左上'], ['bottom-end', '右下'], ['bottom-start', '左下']];
 
   const get = (attrs, k) => (attrs.find((a) => a[0] === k) || [])[1];
@@ -73,6 +76,57 @@
     return null;
   }
 
+  // the [frames, columns] a [w] × [h] sheet most likely holds: a row of square frames, a column of them, a grid of
+  // them, then one row of as few frames as fit
+  function guesses(w, h, lim) {
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    const g = gcd(w, h);
+    const out = [];
+    if (w % h === 0) out.push([Math.min(w / h, lim.frames), Math.min(w / h, lim.frames)]);
+    if (h % w === 0) out.push([h / w, 1]);
+    out.push([(w / g) * (h / g), w / g]);
+    for (let c = 1; c <= lim.frames; c++) {
+      if (w % c === 0 && w / c <= lim.frameSide) { out.push([c, c]); break; }
+    }
+    return out.filter(([f]) => f <= lim.frames);
+  }
+
+  /**
+   * What the keyboard shows [ms] after one key that plays [name], none after it (PetMachine's rules): `{state, frame,
+   * next}`, next the ms its frame next changes, null where it never does.
+   */
+  function showing(pet, lim, name, ms) {
+    const has = (x) => !!stateOf(pet, x);
+    const n = (x) => numbers(stateOf(pet, x), lim);
+    let state = has(name) ? name : 'idle';
+    let start = 0;
+    let held = false;
+    const sleepAt = () => (has('sleep') && state !== 'sleep' ? SLEEP_MS : Infinity);
+    const boundary = (k) => start + Math.ceil((k * 1000) / n(state).fps);
+    const end = () => {
+      const s = n(state);
+      if (held || state === 'idle') return Infinity;
+      if (state === 'sleep') return boundary(s.frames * (s.loop ? SLEEP_ROUNDS : 1));
+      return state === 'wake' || !s.loop ? boundary(s.frames) : Infinity;
+    };
+    for (;;) {
+      const e = end();
+      const asleep = sleepAt();
+      if (asleep <= ms && asleep <= e) {
+        [state, start, held] = ['sleep', asleep, false];
+        continue;
+      }
+      if (e > ms) break;
+      if (state === 'sleep') held = true;
+      else [state, start] = ['idle', e];
+    }
+    const s = n(state);
+    const k = Math.floor(((ms - start) * s.fps) / 1000);
+    const turns = !held && (s.frames > 1 || end() !== Infinity);
+    const next = Math.min(turns ? boundary(k + 1) : Infinity, sleepAt());
+    return { state, frame: held ? s.frames - 1 : k % s.frames, next: next === Infinity ? null : next };
+  }
+
   /**
    * The sheets of the pet the app reads, held to PetLimits as the app's import holds them (PetFiles): a file missing
    * or wrong refuses the pack. A <pet> the engine leaves out ([read]'s warning) the app copies nothing of, so no error.
@@ -100,19 +154,29 @@
     set(d, attr, value) {
       const pet = read(d.xml);
       if (!pet) return d;
-      return panels.next(d, write(d.xml, { attrs: put(pet.attrs, attr, value), states: pet.states }));
+      let attrs = put(pet.attrs, attr, value);
+      // the corner's: the reader warns of each at the bar's end, and the panel hides them there
+      if (attr === 'place' && value === 'bar-end') for (const k of ['align', 'offset-x', 'offset-y']) attrs = put(attrs, k, null);
+      return panels.next(d, write(d.xml, { attrs, states: pet.states }));
     },
 
     /** [d] with [name]'s [attr] (frames=, columns=, fps=, loop=) [value]; null: the default. */
     setState(d, name, attr, value) {
       const pet = read(d.xml);
       if (!stateOf(pet, name)) return d;
-      return panels.next(d, write(d.xml, { attrs: pet.attrs, states: pet.states.map((s) => (get(s, 'name') === name ? put(s, attr, value) : s)) }));
+      const set = (s) => {
+        const out = put(s, attr, value);
+        const frames = int(get(out, 'frames'), 1);
+        // the reader leaves out a pet whose columns are past its frames
+        return attr === 'frames' && int(get(out, 'columns'), frames) > frames ? put(out, 'columns', frames) : out;
+      };
+      return panels.next(d, write(d.xml, { attrs: pet.attrs, states: pet.states.map((s) => (get(s, 'name') === name ? set(s) : s)) }));
     },
 
     /**
      * [d] with the image [file] ([bytes]) [name]'s sheet, kept as `pet-<name>.<type>` (`-2`, `-3` where taken), a pet
-     * made where it has none; a new state of square frames in a row is told so. Throws why where the app refuses it.
+     * made where it has none; its frames and columns guessed from the sheet's size, a state's own kept where they
+     * still cut it into square frames or the sheet is the size of the one it replaces. Throws why where the app refuses it.
      */
     setSheet(d, L, lim, name, file, bytes) {
       const r = panels.raster(L, bytes);
@@ -125,15 +189,23 @@
       const kept = panels.fileName(files, 'pet-', name, r.type);
       const old = stateOf(pet, name);
       const [w, h] = r.size;
-      const frames = w % h === 0 ? Math.min(w / h, lim.frames) : 1;
-      const state = old ? put(old, 'sheet', kept) : put(put([['name', name], ['sheet', kept]], 'frames', frames), 'columns', frames);
-      const why = sheetProblem(L, lim, name, kept, bytes, state);
-      if (why) throw new Error(why);
+      const base = old ? put(old, 'sheet', kept) : [['name', name], ['sheet', kept]];
+      const counted = ([f, c]) => put(put(base, 'frames', f), 'columns', c);
+      const fits = (s) => !sheetProblem(L, lim, name, kept, bytes, s);
+      const square = (s) => { const n = numbers(s, lim); return w / n.columns === h / n.rows; };
+      const was = old && d.files[get(old, 'sheet')] && panels.raster(L, d.files[get(old, 'sheet')]);
+      const sameSize = !!(was && was.size && was.size[0] === w && was.size[1] === h);
+      const tries = (old && (square(base) || sameSize) ? [base] : []).concat(guesses(w, h, lim).map(counted), old ? [base] : []);
+      const state = tries.find(fits);
+      if (!state) {
+        const row = Math.min(w / h, lim.frames);
+        throw new Error(sheetProblem(L, lim, name, kept, bytes, old ? base : counted(w % h === 0 ? [row, row] : [1, 1])));
+      }
       files[kept] = bytes;
       const states = old ? pet.states.map((s) => (s === old ? state : s)) : pet.states.concat([state]);
       const xml = write(d.xml, { attrs: pet.attrs, states });
-      const was = old && get(old, 'sheet');
-      files = panels.without(files, was && !F.isNamed(xml, was) ? [was] : []);
+      const gone = old && get(old, 'sheet');
+      files = panels.without(files, gone && !F.isNamed(xml, gone) ? [gone] : []);
       return { xml, files, layouts: d.layouts };
     },
 
@@ -148,10 +220,14 @@
     },
   };
 
-  root.YoumoPet = { petProblems, numbers, sheetProblem };
-
-  // one playing at a time: a state's frames once (a looping one's three rounds), then idle's first frame again
+  // one playing at a time, as the keyboard plays it after one key of that kind; a newer play stops it
   let playing = null;
+  let run = 0;
+  const stop = () => {
+    run++;
+    if (playing) clearTimeout(playing);
+    playing = null;
+  };
   function draw(canvas, bmp, n, i) {
     const c = canvas.getContext('2d');
     const fw = bmp.width / n.columns;
@@ -164,41 +240,59 @@
     c.drawImage(bmp, (i % n.columns) * fw, Math.floor(i / n.columns) * fh, fw, fh, (canvas.width - fw * s) / 2, (canvas.height - fh * s) / 2, fw * s, fh * s);
   }
 
-  async function bitmap(L, lim, bytes) {
-    const r = panels.raster(L, bytes);
-    // the app's bounds before the browser decodes untrusted bytes
-    if (!r || !r.size || Math.max(...r.size) > lim.sheetSide) return null;
-    try { return await createImageBitmap(new Blob([bytes])); } catch (e) { return null; }
+  // a sheet decoded once while the document has it: a bytes object is never changed, only replaced
+  const decoded = new Map();
+  function bitmap(L, lim, bytes) {
+    if (!decoded.has(bytes)) {
+      const r = panels.raster(L, bytes);
+      // the app's bounds before the browser decodes untrusted bytes
+      const ok = r && r.size && Math.max(...r.size) <= lim.sheetSide;
+      decoded.set(bytes, ok ? createImageBitmap(new Blob([bytes])).catch(() => null) : Promise.resolve(null));
+    }
+    return decoded.get(bytes);
+  }
+  // the sheets [files] no longer has let go (up to 16 MB each decoded), a play drawing one stopped first
+  function release(files) {
+    const live = new Set(Object.values(files));
+    const gone = [...decoded.keys()].filter((bytes) => !live.has(bytes));
+    if (gone.length) stop();
+    for (const bytes of gone) {
+      decoded.get(bytes).then((b) => b && b.close());
+      decoded.delete(bytes);
+    }
   }
 
-  async function play(canvas, api, lim, pet, name) {
-    if (playing) clearTimeout(playing);
-    playing = null;
+  async function play(canvas, api, lim, name) {
+    stop();
+    const mine = run;
     const d = api.doc();
-    const idle = stateOf(pet, 'idle');
-    const s = stateOf(pet, name);
-    const [ib, sb] = await Promise.all([idle, s].map((x) => x && d.files[get(x, 'sheet')] ? bitmap(api.lib, lim, d.files[get(x, 'sheet')]) : null));
-    if (!sb) return;
-    const n = numbers(s, lim);
-    const total = n.frames * (n.loop ? 3 : 1);
-    let i = 0;
+    const pet = read(d.xml);
+    const sheets = {};
+    await Promise.all(NAMES.map(async (x) => {
+      const s = stateOf(pet, x);
+      const bytes = s && d.files[get(s, 'sheet')];
+      sheets[x] = bytes ? await bitmap(api.lib, lim, bytes) : null;
+    }));
+    if (mine !== run || !sheets[name]) return;
+    const t0 = Date.now();
     const step = () => {
-      if (i >= total) {
-        playing = null;
-        if (ib) draw(canvas, ib, numbers(idle, lim), 0);
-        return;
-      }
-      draw(canvas, sb, n, i % n.frames);
-      i++;
-      playing = setTimeout(step, 1000 / n.fps);
+      // the tab drawn anew: nothing shows this canvas
+      if (mine !== run || !canvas.isConnected) return;
+      const ms = Date.now() - t0;
+      const at = showing(pet, lim, name, ms);
+      if (sheets[at.state]) draw(canvas, sheets[at.state], numbers(stateOf(pet, at.state), lim), at.frame);
+      playing = at.next == null ? null : setTimeout(step, at.next - ms);
     };
     step();
   }
+
+  root.YoumoPet = { petProblems, numbers, sheetProblem, showing, play, stop, release };
 
   function render(el, api) {
     const { h, row, select, number } = panels.ui;
     const d = api.doc();
     const lim = api.limits().pet;
+    release(d.files);
     el.append(h('p', { className: 'muted', textContent: '主题可以带一只小宠物，待在键盘角上或候选栏右边：按字母、退格、回车、空格时各做一个小动作，30 秒不按会睡着。' +
       '每个动作一张图，帧从左到右、从上到下排，每帧一样大（PNG 或静态 WebP，单张不超过 ' + lim.sheetBytes / 1024 + ' KB、边长 ' + lim.sheetSide +
       ' px，每帧不超过 ' + lim.frameSide + ' px，所有帧合计不超过 ' + lim.totalFrames + ' 帧）。没给的动作就不动。App 里由「键盘动效」开关管：关着时只显示「平时」的第一帧。键盘预览上不画宠物。' }));
@@ -226,7 +320,8 @@
     const canvas = h('canvas', { width: 96, height: 96, className: 'pet-preview' });
     el.append(row('预览', canvas));
     const idle = stateOf(pet, 'idle');
-    if (idle) bitmap(api.lib, lim, d.files[get(idle, 'sheet')] || new Uint8Array(0)).then((b) => b && draw(canvas, b, numbers(idle, lim), 0));
+    const idleSheet = idle && d.files[get(idle, 'sheet')];
+    if (idleSheet) bitmap(api.lib, lim, idleSheet).then((b) => b && decoded.has(idleSheet) && draw(canvas, b, numbers(idle, lim), 0));
     const problems = petProblems(api.lib, lim, { warnings: [] }, d);
     for (const [name, label] of STATES) {
       const s = stateOf(pet, name);
@@ -235,7 +330,7 @@
       const status = !s ? '没有' : !d.files[file] ? file + '：缺少文件' : bad ? bad.message : file + '：' + numbers(s, lim).frames + ' 帧';
       el.append(row(label, h('span', { className: bad || (s && !d.files[file]) ? 'bad' : 'muted', textContent: status }),
         h('button', { type: 'button', textContent: '选帧图…', on: { click: () => pick(name) } }),
-        s ? h('button', { type: 'button', textContent: '播放', on: { click: () => play(canvas, api, lim, pet, name) } }) : null,
+        s ? h('button', { type: 'button', textContent: '播放', on: { click: () => play(canvas, api, lim, name) } }) : null,
         s ? h('button', { type: 'button', textContent: '去掉', on: { click: () => api.apply((x) => ops.remove(x, name)) } }) : null));
       if (!s) continue;
       const n = numbers(s, lim);

@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.ui.main.settings
 
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
@@ -46,4 +47,14 @@ class TableWordRowTest {
         "pinyin's learned word: edited as before" to { assertTrue(PinyinWords(UserWord.Kind.LEARNED).canEdit(pinyins)) },
         "a blocked word: never edited" to { assertFalse(PinyinWords(UserWord.Kind.BLOCKED).canEdit(pinyins)) },
     )
+
+    // the engine's VoiceAlways(on = false) is ime-core's; this is the row that offers it
+    @Test
+    fun aVoiceAlwaysWordSaysSoAndOffersToCancelIt() {
+        val added = PinyinWords(UserWord.Kind.ADDED)
+        val always = UserWord("媲美", "pi'mei", UserWord.Kind.ADDED, voiceAlways = true)
+        assertEquals("pi'mei · 语音总是换", added.detail(RuntimeEnvironment.getApplication().resources, always))
+        assertEquals(listOf(R.string.edit, R.string.voice_always_cancel, R.string.delete), wordActions(added, always, emptyList()))
+        assertEquals(listOf(R.string.edit, R.string.delete), wordActions(added, always.copy(voiceAlways = false), emptyList()))
+    }
 }

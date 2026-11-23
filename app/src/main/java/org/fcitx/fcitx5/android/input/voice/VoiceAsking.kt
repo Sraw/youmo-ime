@@ -22,12 +22,15 @@ class VoiceAsking(
     private val started: () -> Boolean,
 ) {
 
+    /** Whether the engine is given voice's text here, its talks' stretches too. */
+    val asks: Boolean get() = AppPrefs.getInstance().internal.voiceAskRemember.getValue() && !sensitive()
+
     // read before the cursor now that it is in; elsewhere the engine is not given voice's text at all
     fun tell(text: String) {
         val prefs = AppPrefs.getInstance().internal
-        val asks = prefs.voiceAskRemember.getValue() && !sensitive()
-        voiceAsk.told(asks)
-        if (!asks) {
+        val asking = asks
+        voiceAsk.told(asking)
+        if (!asking) {
             service.postFcitxJob { voiceEditsEnd() }
             return
         }

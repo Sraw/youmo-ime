@@ -28,6 +28,7 @@ import org.fcitx.fcitx5.android.scene.theme.ThemeReader
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -483,6 +484,27 @@ class SkinLayoutWriterTest {
             assertNull(SkinLayoutWriter.write(SkinBoard("qwerty", tall, across), appLayouts))
         }
         assertNull(SkinLayoutWriter.write(SkinBoard("qwerty", q.rows, Double.NaN), appLayouts))
+    }
+
+    @Test
+    fun aBugOfOursLeavesTheBoardOutAndAnErrorIsNotHidden() {
+        fun failing(e: Throwable) = LayoutCheck.Sources(
+            object : AbstractMap<String, String>() {
+                override val entries: Set<Map.Entry<String, String>> get() = throw e
+            },
+            emptyMap(),
+        )
+        assertNull(SkinLayoutWriter.write(qwerty(), failing(IllegalStateException())))
+        assertFailsWith<NotImplementedError> { SkinLayoutWriter.write(qwerty(), failing(NotImplementedError())) }
+    }
+
+    @Test
+    fun aBoardLackingKeysOrBlankSomewhereIsForTheAppThatTakesOne() {
+        val newer = LayoutCheck.FEATURES.getValue("lacks")
+        assertEquals(newer, SkinLayoutWriter.relaxed("0.6.0", listOf(LayoutCheck.Finding(1, "lacks", listOf("shift")))))
+        assertEquals(newer, SkinLayoutWriter.relaxed("0.6.0", listOf(LayoutCheck.Finding(1, "blank"))))
+        assertEquals("0.6.0", SkinLayoutWriter.relaxed("0.6.0", listOf(LayoutCheck.Finding(1, "other"))))
+        assertEquals("9.9.9", SkinLayoutWriter.relaxed("9.9.9", listOf(LayoutCheck.Finding(1, "blank"))))
     }
 
     private fun keys(l: Layout): List<Key> = l.parts.filterIsInstance<Row>().flatMap { it.cells.filterIsInstance<Key>() }

@@ -200,6 +200,35 @@ class ClipboardFavoritesTest {
         )
     }
 
+    // copied again in the undo's time: the copy is 最近's newest, not taken back into 收藏 with the undo
+    @Test
+    fun anUndoAfterTheMovedOneWasCopiedAgainLeavesTheCopyIn最近() = runBlocking {
+        copy("北京")
+        ClipboardManager.favorite(recentId("北京"))
+        recentId("北京").let { ClipboardManager.delete(it); ClipboardManager.purgeMarked(it) }
+        copy("今天")
+        val moved = ClipboardManager.unfavorite(favoriteId("北京"))!!
+        copy("北京")
+        ClipboardManager.undoUnfavorite(moved)
+        assertRows(
+            "the copy first in 最近" to { assertEquals(listOf("北京", "今天"), recent()) },
+            "the favourite back" to { assertEquals(listOf("北京"), favorites()) },
+        )
+    }
+
+    // TalkBack's action or a menu still up, picked after the card's entry was unfavourited
+    @Test
+    fun movingFirstOneUnfavouritedSinceMakesItNoFavouriteAgain() = runBlocking {
+        copy("北京")
+        ClipboardManager.favorite(recentId("北京"))
+        recentId("北京").let { ClipboardManager.delete(it); ClipboardManager.purgeMarked(it) }
+        copy("今天")
+        val id = favoriteId("北京")
+        ClipboardManager.unfavorite(id)
+        ClipboardManager.moveFavoriteFirst(id)
+        assertEquals(emptyList<String>() to listOf("北京", "今天"), favorites() to recent())
+    }
+
     @Test
     fun movedFirstPastedTrimmedOrClearedTheFavouritesStay() = runBlocking {
         for (w in listOf("甲", "乙", "丙")) copy(w)

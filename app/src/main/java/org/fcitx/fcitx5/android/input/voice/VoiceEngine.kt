@@ -28,6 +28,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.async
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.fcitx.fcitx5.android.daemon.HostConnection
@@ -213,9 +215,11 @@ object VoiceEngine {
     private val remembered = VoiceHotwords.Remembered()
     // a failed read is the awaiting listener's to log (its Deferred), not this scope's
     private val reading = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // apart from [reading]: waiting for the stretches is not waiting for a read of the words
+    private val handing = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Each answer in time or none: no boundaries (VoiceBlocking takes a text as having the word), no scores, none of the user's words put in. */
-    fun language(fcitx: HostConnection) = object : VoiceChoice.Language {
+    fun language(fcitx: HostConnection, keepsStretches: () -> Boolean) = object : VoiceChoice.Language {
         override suspend fun boundaries(texts: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { wordBoundaries(texts) } }.orEmpty()
 
@@ -225,9 +229,11 @@ object VoiceEngine {
         override suspend fun pick(homophones: VoiceHomophones, text: String, before: String, blocked: List<String>) =
             withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { voicePick(homophones, text, before, blocked) } }
 
-        // handed over, not waited for: the talk's own scope is cancelled as soon as its text is typed
+        // handed over, not waited for: the talk's own scope is cancelled as soon as its text is typed. Where nothing is
+        // asked the engine has no use for them and holds no spoken text
         override suspend fun stretches(texts: List<String>) {
-            reading.launch {
+            if (!keepsStretches()) return
+            handing.launch {
                 try {
                     withTimeoutOrNull(LANGUAGE_MS) { fcitx.runOnReady { voiceStretches(texts) } }
                 } catch (e: CancellationException) {
@@ -238,6 +244,10 @@ object VoiceEngine {
             }
         }
     }
+
+    /** Waits for the stretches handed over so far, so a test can tell none were from not yet. */
+    @VisibleForTesting
+    internal suspend fun stretchesHandedOver() = handing.coroutineContext.job.children.toList().joinAll()
 
     // the engine busy or starting: the text as heard, not a wait
     private const val LANGUAGE_MS = 1000L

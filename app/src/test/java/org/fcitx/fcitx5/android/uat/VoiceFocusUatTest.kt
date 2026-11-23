@@ -51,6 +51,7 @@ class VoiceFocusUatTest : VoiceTapUat() {
     fun theSwitchDecidesWhetherPlaybackIsPaused() {
         allowMicrophone()
         h.start()
+        assertTrue("on by default", AppPrefs.getInstance().keyboard.voicePausePlayback.getValue())
         // read as each talk begins
         talks(
             Row("on, as it is by default: the focus taken through the app's AudioManager", true),
@@ -73,10 +74,6 @@ class VoiceFocusUatTest : VoiceTapUat() {
             pref.setValue(was)
         }
     }
-
-    @Test
-    @Uat("VO-57")
-    fun onByDefault() = assertTrue(AppPrefs.getInstance().keyboard.voicePausePlayback.getValue())
 
     // a call ringing mid-talk: stopped with no tail (the ring), what was said typed; the lift after it types nothing again
     @Test

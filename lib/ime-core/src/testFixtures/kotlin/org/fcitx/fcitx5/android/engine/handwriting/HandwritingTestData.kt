@@ -6,15 +6,13 @@ package org.fcitx.fcitx5.android.engine.handwriting
 
 import org.fcitx.fcitx5.android.engine.data.PinyinData
 import org.fcitx.fcitx5.android.engine.data.PinyinDataBuilder
+import org.fcitx.fcitx5.android.engine.data.syl
 import org.fcitx.fcitx5.android.engine.lattice.CoarseWords
 import org.fcitx.fcitx5.android.engine.lattice.Predictor
 import org.fcitx.fcitx5.android.engine.lattice.UserWords
 import org.fcitx.fcitx5.android.engine.lattice.WordScorer
-import org.fcitx.fcitx5.android.engine.pinyin.Syllables
 import org.fcitx.fcitx5.android.engine.user.UserModel
 import java.nio.ByteBuffer
-
-private fun syl(vararg s: String) = s.map { Syllables.id(it) }.toIntArray()
 
 /** The handwriting tests' words, in testFixtures as bytes for ime-eval's tests too. */
 val handwritingDataBytes: ByteArray by lazy {

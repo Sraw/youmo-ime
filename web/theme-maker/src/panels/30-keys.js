@@ -66,19 +66,15 @@
       files[file] = bytes;
       return { xml: d.xml, files, layouts: d.layouts, file };
     },
-    /** The sticker files the theme's styles name (`none` is none). */
-    stickers: (xml) => [...new Set(F.styles(xml).flatMap((s) => s.attrs.filter((a) => a[0] === 'sticker' && a[1] !== 'none').map((a) => a[1])))].sort(),
+    stickers: F.stickers,
     /**
      * [d] with [bytes] ([name]) [select]'s sticker, `sticker-<name>`: refused (throws) where the app would (a PNG or a
      * still WebP, its long side and bytes in [lim]'s stickerSide, stickerBytes; at most lim.stickers files).
      */
     addSticker(d, L, lim, select, name, bytes) {
-      const r = panels.raster(L, bytes);
-      if (!r || !r.size) throw new Error(name + ' 不是 PNG 或 WebP');
-      if (r.animated) throw new Error(name + ' 是动态 WebP，贴纸只能是静态图');
-      if (Math.max(r.size[0], r.size[1]) > lim.stickerSide) throw new Error(name + ' 太大：最大 ' + lim.stickerSide + '×' + lim.stickerSide);
-      if (bytes.length > lim.stickerBytes) throw new Error(name + ' 超过 ' + lim.stickerBytes + ' 字节');
-      const file = panels.fileName(d.files, 'sticker-', name, r.type);
+      const why = root.YoumoMaker.rasterProblem(L, bytes, lim.stickerSide, lim.stickerBytes);
+      if (why) throw new Error(name + '：' + why);
+      const file = panels.fileName(d.files, 'sticker-', name, L.imageType(bytes));
       const files = panels.filesOf(d);
       files[file] = bytes;
       // counted after: the one it takes the place of may stay, named by another key

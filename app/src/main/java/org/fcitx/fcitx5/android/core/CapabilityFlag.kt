@@ -11,7 +11,10 @@ import org.fcitx.fcitx5.android.host.Capability
 import org.fcitx.fcitx5.android.input.FieldPolicy
 import splitties.bitflags.hasFlag
 
-/** fcitx's capability bits ([capabilityflags.h](https://github.com/fcitx/fcitx5/blob/5.1.1/src/lib/fcitx-utils/capabilityflags.h)); values from the host's [Capability]. */
+/**
+ * fcitx's capability bits ([capabilityflags.h](https://github.com/fcitx/fcitx5/blob/5.1.1/src/lib/fcitx-utils/capabilityflags.h)):
+ * those the host reads from its [Capability], the rest set here alone, which no host code looks at.
+ */
 enum class CapabilityFlag(bits: Long) {
     NoFlag(0L),
     Preedit(Capability.PREEDIT),
