@@ -25,11 +25,12 @@ class VoiceEngineTest {
     fun aRecordingIsRecognizedAsItStreamsBothTimes() {
         val texts = hear(VoiceHotwords.Words.NONE)
         assertTrue(texts.toString(), texts.isNotEmpty())
-        // the first syllable comes back 开饭, 开放 or 菜饭 as the chunk falls; accuracy is the eval sets' to measure
+        // the first syllable comes back 开饭, 开放 or 菜饭 as the chunk falls; accuracy is the eval sets' to measure.
+        // No polish here, and digits are only the polish model's to write: the numbers stay as heard
         val live = VoiceLive()
         texts.forEach(live::closed)
         val typed = live.finish().orEmpty()
-        assertEquals(typed, 2, Regex("早上9点至下午5点").findAll(typed).count())
+        assertEquals(typed, 2, Regex("早上九点至下午五点").findAll(typed).count())
     }
 
     @Test

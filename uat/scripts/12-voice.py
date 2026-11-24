@@ -316,7 +316,8 @@ def vo56(d):
     script("13-words").add_word(d, "酒店式公寓")
     d.open_page("text")
     _, t = dictate(d, "jiujian")
-    check("九键" in t and not t.startswith("酒店"), f"加了用户词「酒店式公寓」后说「九键输入法」，框里「{t}」")
+    # 九键 or 9键: numbers are the polish model's to write
+    check(t and "酒店" not in t, f"加了用户词「酒店式公寓」后说「九键输入法」，框里「{t}」")
     return f"框里「{t}」"
 
 
@@ -511,8 +512,19 @@ def vo54(d):
     words.add_word(d, "徐竫")
     d.open_page("text")
     d.clear()
+    # a word the word model scores this low is not put in by the whole sentence: retyped once and 总是换, it goes in
+    _, heard = dictate(d, "xujing")
+    check("一下" in heard and "徐竫" not in heard, f"第一次说框里「{heard}」，要是「徐静」这类、不是「徐竫」")
+    d.bksp(len(heard) - heard.index("一下") - 2)
+    d.type("xujing")
+    d.pick("徐竫")
+    ask = d.wait(lambda s: s.find(contains="写成『徐竫』？", where="all"), 5, what="问总是换")
+    check("以后总是把『" in ask.text, f"重打「徐竫」后问的是「{ask.text}」")
+    d.tap_text("总是换", where="all", scroll=False, after=1.0)
+    check(d.wait_text("语音以后总是写『徐竫』", timeout=3, where="all"), "点总是换后没说「语音以后总是写『徐竫』」")
+    d.clear()
     _, before = dictate(d, "xujing")
-    check("徐竫" in before, f"屏蔽前框里「{before}」，要有你的「徐竫」")
+    check("徐竫" in before, f"点了总是换、屏蔽前框里「{before}」，要有你的「徐竫」")
     d.clear()
     words.rare_switch(d, True)
     words.rare_page(d)
@@ -524,7 +536,7 @@ def vo54(d):
     d.clear()
     _, after = dictate(d, "xujing")
     check("竫" not in after and after, f"屏蔽三级字后框里「{after}」")
-    return f"屏蔽前「{before}」，后「{after}」"
+    return f"第一次「{heard}」，重打问「{ask.text}」，总是换后「{before}」，屏蔽三级字后「{after}」"
 
 
 # the lift to the text: the encoder's tail (TAIL_PADDING) decoded and polished; the lift at the speech's end

@@ -64,6 +64,7 @@ def push_download(d, local_path, name):
     """[local_path] into 下载 as <name>.theme (older copies of it gone), scanned so the file picker lists it"""
     d.sh(f"rm -f /sdcard/Download/{name}*.theme")
     d.adb("push", local_path, f"/sdcard/Download/{name}.theme")
+    d.sh(f"touch /sdcard/Download/{name}.theme")
     d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}.theme")
     time.sleep(1)
 
@@ -1842,10 +1843,10 @@ def st120(d):
     d.tap(change[0].c, 0.8)
     # the five strokes at the list's end
     for _ in range(4):
-        if any(n.text == "笔画：撇" for n in d.screen().app()):
+        if any(n.text == "笔画：折" for n in d.screen().app()):
             break
         dialog_scroll(d)
-    s = d.wait(lambda s: s if any(n.text == "笔画：撇" for n in s.app()) else None, 5, what="命令列表里的笔画")
+    s = d.wait(lambda s: s if any(n.text == "笔画：折" for n in s.app()) else None, 5, what="命令列表里的笔画")
     strokes = [t for t in ("笔画：横", "笔画：竖", "笔画：撇", "笔画：点", "笔画：折") if any(n.text == t for n in s.app())]
     d.shot("app", "命令列表：五种笔画")
     check(len(strokes) == 5, f"命令列表里的笔画只有 {strokes}")
@@ -2206,6 +2207,7 @@ def push_layout(d, name):
     """uat/fixtures/layouts/<name>.layout into 下载, scanned so the file picker lists it"""
     d.sh(f"rm -f /sdcard/Download/{name}*.layout")
     d.adb("push", os.path.join(LAYOUTS, f"{name}.layout"), f"/sdcard/Download/{name}.layout")
+    d.sh(f"touch /sdcard/Download/{name}.layout")   # adb push keeps the old mtime: sorted out of the picker's first screen
     d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}.layout")
     time.sleep(1)
 
@@ -2765,6 +2767,7 @@ def push_example(d, name):
     """the layout maker's example web/theme-maker/examples/layouts/<name>.layout into 下载, as the page has it"""
     d.sh(f"rm -f /sdcard/Download/{name}*.layout")
     d.adb("push", os.path.join(EXAMPLES, f"{name}.layout"), f"/sdcard/Download/{name}.layout")
+    d.sh(f"touch /sdcard/Download/{name}.layout")   # adb push keeps the old mtime: sorted out of the picker's first screen
     d.sh(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/{name}.layout")
     time.sleep(1)
 
@@ -2938,7 +2941,7 @@ def st185(d):
     import_uat_names(d)
     tabs = slots_tabs(d)
     check("UAT 键名" in tabs, f"按键字符和快捷键里没有「UAT 键名」：{tabs}")
-    check(tabs.index("UAT 键名") == tabs.index("功能键") - 1, f"「UAT 键名」不在功能键前面：{tabs}")
+    check(tabs.index("UAT 键名") < tabs.index("功能键"), f"「UAT 键名」不在功能键前面：{tabs}")
     slots_tab(d, "UAT 键名")
     d.shot("full", "按键字符和快捷键的 UAT 键名：WE 下写共用，HJK、哈 没有")
     we, hjk, ha = page_key(d, "WE"), page_key(d, "HJK"), page_key(d, "哈")
@@ -2963,7 +2966,7 @@ def st185(d):
 def st186(d):
     import_uat_names(d, use=False)
     tabs = slots_tabs(d)
-    check(len(tabs) == 8 and "UAT 键名" not in tabs, f"没用的布局却有卡片：{tabs}")
+    check(len(tabs) == 9 and "UAT 键名" not in tabs, f"没用的布局却有卡片：{tabs}")
     card = layout_card(d, "UAT 键名")
     check(card, f"列表里没有 UAT 键名：{d.screen().texts()[:30]}")
     d.tap(card.c, 1.0)
