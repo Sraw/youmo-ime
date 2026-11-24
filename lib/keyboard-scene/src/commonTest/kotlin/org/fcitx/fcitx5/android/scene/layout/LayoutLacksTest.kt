@@ -91,7 +91,7 @@ class LayoutLacksTest {
                 Lacking("number, no 5: by what it types", dropKey(number, "5"), listOf(listOf("pad-digits", "5")), listOf("full")),
                 Lacking(
                     "number, 返回 on the full pad only: the phone pad named",
-                    numberPads.replace("send=\"layout:Text\"/>", "send=\"layout:Text\" when=\"pad=full\"/>"),
+                    numberPads.replace("long-press=\"panel-lock\"/>", "long-press=\"panel-lock\" when=\"pad=full\"/>"),
                     listOf(listOf("back", "", "phone")),
                     listOf("phone"),
                 ),

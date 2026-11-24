@@ -8,7 +8,11 @@ import org.fcitx.fcitx5.android.scene.Fixtures.ok
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
+import org.fcitx.fcitx5.android.scene.look.LookDefaults
+import org.fcitx.fcitx5.android.scene.look.LookTheme
+import org.fcitx.fcitx5.android.scene.look.LookThemeTest
 import org.fcitx.fcitx5.android.scene.skin.assertRows
+import org.fcitx.fcitx5.android.scene.theme.Argb
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -89,16 +93,14 @@ class NumberPadsTest {
             assertEquals(n.top, b.top, eps, "$id's top on the nine keys' $there")
             assertEquals(n.bottom, b.bottom, eps, "$id's bottom on the nine keys' $there")
         }
-        // 返回 starts where 123 does, a little narrower so it and the lock fill 1's column; 0 and . in the digits' columns
+        // 返回 starts where 123 does and fills 1's column; 0 and . in the digits' columns
         val back = key(s, "back").bounds
         val numbers = key(nine, "numbers").bounds
         assertEquals(numbers.left, back.left, eps, "返回 starts where 123 does")
-        assertTrue(back.right > numbers.left + (numbers.right - numbers.left) * 0.8, "返回 covers most of 123")
         for ((id, above) in listOf("0" to "8", "back" to "1")) {
             assertEquals(key(s, above).bounds.left, key(s, id).bounds.left, eps, "$id's left under $above")
+            assertEquals(key(s, above).bounds.right, key(s, id).bounds.right, eps, "$id's right under $above")
         }
-        assertEquals(key(s, "8").bounds.right, key(s, "0").bounds.right, eps, "0's right under 8")
-        assertEquals(key(s, "1").bounds.right, key(s, "lock").bounds.right, eps, "the lock's right under 1")
         if (pad != "phone") assertEquals(key(s, "9").bounds.right, key(s, ".").bounds.right, eps, ". under 9")
     }
 
@@ -111,7 +113,7 @@ class NumberPadsTest {
         val s = scene("full", form)
         val nine = Forms.scene("nine", Forms.env("nine", Forms.all.getValue(form)))
         val bottom = s.keys.filter { it.bounds.top == key(s, "0").bounds.top }.sortedBy { it.bounds.left }.map { it.id }
-        assertEquals(listOf("symbols", "back", "lock", "0", ".", "enter"), bottom, "the bottom row, left to right")
+        assertEquals(listOf("symbols", "back", "0", ".", "enter"), bottom, "the bottom row, left to right")
         val sym = key(s, "symbols")
         val letters = key(nine, "symbols")
         assertEquals(letters.label, sym.label, "符's words")
@@ -203,7 +205,7 @@ class NumberPadsTest {
 
     // the marks are the scroll column's, left of 1 4 7 down the top three rows; = right of 9 on 123's pad alone; the lock on every pad
     @Test
-    fun theMarksAreAScrollColumnAndTheLockIsOnEveryPad() = assertRows(pads, { (pad, form, why) -> "$pad $form: $why" }) { (pad, form, _) ->
+    fun theMarksAreAScrollColumnAndHolding返回LocksOnEveryPad() = assertRows(pads, { (pad, form, why) -> "$pad $form: $why" }) { (pad, form, _) ->
         val s = scene(pad, form)
         val side = s.slots.single { it.kind == "scroll" }
         assertEquals("number", side.list)
@@ -212,8 +214,34 @@ class NumberPadsTest {
         assertEquals(key(s, "4").bounds.left, side.bounds.right, eps, "left of 4")
         assertEquals(pad == "full", s.keys.any { it.id == "=" }, "= on 123's pad alone")
         assertEquals(pad != "phone", s.keys.any { it.id == "." }, ". but on the dialler's")
-        assertEquals("panel-lock", key(s, "lock").actions["send"], "the lock")
+        assertEquals("panel-lock", key(s, "back").actions["long-press"], "held, 返回 locks")
+        assertTrue(s.keys.none { it.id == "lock" }, "no lock key of its own")
         for (id in listOf("+", "-", "*", "/", ",", "#", "(", ")", ":")) assertTrue(s.keys.none { it.id == id }, "$id is the column's")
+    }
+
+    // locked, 返回 is in the lock's state and a small lock sits in its top right corner, its words where they were
+    @Test
+    fun locked返回WearsALockInItsCorner() = assertRows(pads, { (pad, form, why) -> "$pad $form: $why" }) { (pad, form, _) ->
+        val e = Forms.env("number", Forms.all.getValue(form)).let { it.copy(input = it.input.copy(pad = pad)) }
+        val open = key(Forms.scene("number", e), "back")
+        val locked = key(Forms.scene("number", e.copy(states = mapOf("lock" to setOf(KeyState.Locked)))), "back")
+        assertTrue(KeyState.Locked !in open.states && KeyState.Locked in locked.states, "the lock's state on 返回")
+        fun badges(k: KeyNode) = k.ops(false).filterIsInstance<Op.Icon>().filter { it.name == "lock" }
+        assertTrue(badges(open).isEmpty(), "no lock while open")
+        val lock = badges(locked).single()
+        assertTrue(lock.box.centerX > locked.bounds.centerX && lock.box.centerY < locked.bounds.centerY, "in the top right corner: ${lock.box}")
+        assertTrue(lock.box.width < locked.bounds.height / 3, "small: ${lock.box}")
+        val words = { k: KeyNode -> k.ops(false).filterIsInstance<Op.Text>().map { it.x to it.baseline } }
+        assertEquals(words(open), words(locked), "返回's words not moved")
+    }
+
+    // the fixture's theme predates the rule: the app's own look draws the lock in the accent colour
+    @Test
+    fun theAppsLookTintsTheLockTheAccent() {
+        val look = LookDefaults.look(LookThemeTest.palette(LookThemeTest.themeFile("material-light.xml")))
+        val e = Forms.env("number", Forms.block).copy(states = mapOf("lock" to setOf(KeyState.Locked)))
+        val lock = key(Forms.scene("number", e, LookTheme.theme(look, "default", false)), "back").ops(false).filterIsInstance<Op.Icon>().single { it.name == "lock" }
+        assertEquals(Argb(look.palette.accentKeyBackgroundColor), lock.tint)
     }
 
     // where no view of the app's draws it (a card, the web): a command item its icon, whole and in proportion inside its

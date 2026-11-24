@@ -346,6 +346,7 @@
     <string name="a11y_key_shift">大小寫</string>
     <string name="a11y_state_shift_once">僅下一個字母大寫</string>
     <string name="a11y_state_caps_lock">大寫鎖定</string>
+    <string name="a11y_state_locked">已鎖定</string>
     <string name="a11y_key_backspace">退格</string>
     <string name="a11y_key_enter">Enter 鍵</string>
     <string name="a11y_key_action_go">前往</string>

@@ -202,7 +202,7 @@ key back kind=function role=back a11y="返回"
   shape rect(142.88,545.38,262.13,683.63 r=10.5,10.5,10.5,10.5)
   hit rect(135,527,270,702)
   anchor 202.5,614.5 up 0,-1
-  actions send="layout:Text"
+  actions long-press="panel-lock" send="layout:Text"
   text label="返回"
   normal
     shadow rect(142.88,545.38,262.13,686.25 r=10.5,10.5,10.5,10.5) blur=0 #ffc0c3c4

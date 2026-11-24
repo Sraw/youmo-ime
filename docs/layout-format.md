@@ -48,14 +48,14 @@
 
 ## 元素
 
-- **`<meta>`**（可选，写就写在最前面）：`author`、`version`、`license`、`description`（各 1–64 个字符，说明最多 200）和 `min-app`（需要的最低 App 版本，如 `0.6.1`；比手机上的 App 新时拒绝导入）。键盘布局页保存时自动算 `min-app`：用了 `<meta>`、`based-on`、`pads`、行中间的跨行键，或同一个 id 写了几处、只靠所在行的 `when=` 区分的，是 0.6.1；`based-on` 是必需的，所以存下来的文件至少是 0.6.1。缺了 App 那块键盘有的键（见下面「缺键的警告」），或有键在某种情况下什么都不显示的，是 0.6.3（0.6.3 以前的 App 不收）；条件里用了 `table-lookup` 的也是 0.6.3（以前的 App 不认这个开关，整块读不了），照 App 的全键盘做的都会用到它；动作里用了 `shortcut:switch_input_method`、`shortcut:choose_input_method`、`shortcut:select_to_start` 或 `shortcut:select_to_end` 的也是 0.6.3（以前的 App 不认这几个命令，键点了没反应）；有滑动列（`<slot kind="scroll">`）的，和数字键盘上有锁键（`send="panel-lock"`）的，也是 0.6.3。
+- **`<meta>`**（可选，写就写在最前面）：`author`、`version`、`license`、`description`（各 1–64 个字符，说明最多 200）和 `min-app`（需要的最低 App 版本，如 `0.6.1`；比手机上的 App 新时拒绝导入）。键盘布局页保存时自动算 `min-app`：用了 `<meta>`、`based-on`、`pads`、行中间的跨行键，或同一个 id 写了几处、只靠所在行的 `when=` 区分的，是 0.6.1；`based-on` 是必需的，所以存下来的文件至少是 0.6.1。缺了 App 那块键盘有的键（见下面「缺键的警告」），或有键在某种情况下什么都不显示的，是 0.6.3（0.6.3 以前的 App 不收）；条件里用了 `table-lookup` 的也是 0.6.3（以前的 App 不认这个开关，整块读不了），照 App 的全键盘做的都会用到它；动作里用了 `shortcut:switch_input_method`、`shortcut:choose_input_method`、`shortcut:select_to_start` 或 `shortcut:select_to_end` 的也是 0.6.3（以前的 App 不认这几个命令，键点了没反应）；有滑动列（`<slot kind="scroll">`）的，和数字键盘上有键做 `panel-lock`（点或长按，比如长按返回）的，也是 0.6.3。
 - **`<defaults>`**（可选，`<meta>` 之后第一个）：整块键的默认属性，写法同 `<key>` 的外观和动作属性。行里也可以有自己的 `<defaults>`。
 - **`<row>`**：一行。`height`（行高，相对值，默认 1）、`indent`、`end-indent`（两头留空，单位同宽度）、`when=`（满足时才有这一行）、`split="halves"`（分体时分成两半：这一行要有 9 或 10 个键，`split="after"` 的键和空位不算，否则按比例缩小，检查会给警告；分成两半时每个键都按一个字母宽排，不看 `width=`，9 个键时中间那个两边各放一个）或 `split="scale"`（默认：分体时整行按比例缩小）。里面是 `<key>`、`<gap>`、`<slot>`。
 - **`<key>`**：一个键，属性见下。里面可以有 `<variant when="…">`（满足条件时换掉几个属性，键不挪位置）、`<popup>`（长按列表：`<popup from="list">` 里放 `<item text="…"/>`，可选 `send=`）、`<menu>`（长按菜单：里面放 `<item label="…" do="动作"/>`）。
 - **`<gap>`**：空位，什么都不画，点了没反应。`width=`、`when=`。
 - **`<slot kind="…">`**：App 自己画的一块，`kind=` 必填：`nine-side`（九键左边的符号列）、`symbol-categories`、`symbol-grid`（符号面板的分类栏和符号格子）、`scroll`（滑动列，见下）。App 按 `kind=` 找位置，`id` 随便起。`width=`、`rows=`。没有某个位置时那一块不显示。
 - **滑动列 `<slot kind="scroll" list="…">`**：一列能上下（或左右）滑的符号，点一项打出它。里面的内容不写在布局里，由 App 按类别给，用户在「按键字符和快捷键」的「滑动列」里改：`list=` 必填，是 `nine`（九键）、`nine-english`（九键英文）、`number`（数字）、`phone`（电话）、`datetime`（日期时间）、`url`（网址）、`email`（邮箱）之一；在网址、邮箱、电话、日期时间输入框里，App 自动换成那个框的类别。`direction=`：`vertical`（默认，竖着滑）或 `horizontal`（横着滑）；`show=`：一屏显示几项，1–8，默认 4。只能放在 `letters`、`grouped`、`nine`、`number` 的键盘上，一块最多 2 列；不能放在 `split="halves"` 的行里（那种行要 9 或 10 个键，列不知道归哪一半），也不能放在片段里。`list=`、`direction=`、`show=` 只有滑动列能写，写在别的位置上是错误。没写 `look=`、`face=` 时按功能键的底画（等于 `look="function" face="keep"`），和九键左列一样。
-- **数字键盘的锁**：写一个 `role="lock"`、`send="panel-lock"` 的键就有锁（锁上后在同一个 App 里换框、收起再弹出都保持数字键盘，邮箱、网址、密码框除外，详见[键盘](keyboard.md#数字键盘)）。没写 `role="lock"` 的点了照样锁，但图标和读屏不跟着变，所以要带上。没有锁的数字键盘照样能用，不算缺键。
+- **数字键盘的锁**：App 的数字键盘是长按返回锁（返回键写 `long-press="panel-lock"`；锁上后在同一个 App 里换框、收起再弹出都保持数字键盘，邮箱、网址、密码框除外，详见[键盘](keyboard.md#数字键盘)）。长按做 `panel-lock` 的键，锁着时右上角自动画一把小锁，读屏说「已锁定」；`based-on="number"` 里 id 是 `back` 的返回键不写也带这个长按。也可以照旧写一个单独的锁键：`role="lock"`、`send="panel-lock"`，图标写 `{lock-icon}`（随锁换开、关）；没写 `role="lock"` 的点了照样锁，但图标和读屏不跟着变，所以要带上。没有锁的数字键盘照样能用，不算缺键。
 - **`<include src="grouped-bottom"/>`**：App 的 14/18 键底行。只能引用 App 自带的片段；App 以后改底行，这里跟着变。
 
 ## `<key>` 的属性

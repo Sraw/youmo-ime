@@ -462,7 +462,7 @@ def kb90(d):
     pairs = [(i, i) for i in ids[:-1]]
     moved = [f"{p}{pad.get(p, (None,))[0]}≠{nine[t][0]}" for p, t in pairs if pad.get(p, (None,))[0] != nine[t][0]]
     check(not moved, f"不在九键的位置：{moved}")
-    # 返回 starts where 123 was, a little narrower: it and the lock fill 1's column
+    # 返回 starts where 123 was and fills 1's column
     back, n123 = pad["back"][0], nine["numbers"][0]
     check(back[0] == n123[0] and back[1] == n123[1] and back[3] == n123[3] and back[2] > n123[0] + (n123[2] - n123[0]) * 0.8,
           f"返回 {back} 不是从 123 {n123} 的位置起")

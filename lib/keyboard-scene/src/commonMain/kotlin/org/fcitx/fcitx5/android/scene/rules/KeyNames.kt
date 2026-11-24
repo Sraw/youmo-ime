@@ -19,6 +19,9 @@ object KeyNames {
     /** The boards' names (`qwerty/q`'s first half). */
     val BOARDS: List<String> = listOf("qwerty", "zhuyin", "nine", "zhuyin-nine", "k14", "k18", "number", "symbols", "handwriting")
 
+    /** The action that locks a panel, tapped or held: a key holding it is drawn and read in the lock's state. */
+    const val PANEL_LOCK = "panel-lock"
+
     /** The board of a theme's single key that is a function key on every board (`*`/backspace). */
     const val ALL = "*"
 

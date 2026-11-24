@@ -31,6 +31,7 @@ import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.layout.OnSplit
 import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
+import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.SplitKeyboard
 import org.fcitx.fcitx5.android.scene.theme.Cascade
 import org.fcitx.fcitx5.android.scene.theme.Cascades
@@ -374,6 +375,8 @@ class SceneBuilder(
     private fun statesOf(key: ExpandedKey): Set<KeyState> = buildSet {
         env.states[key.key.id]?.let(::addAll)
         key.attrs.role?.let { env.states[it] }?.let(::addAll)
+        // a key held to lock (the number pad's 返回) is in the lock's state, for its look and its reading
+        if (key.attrs.actions["long-press"] == KeyNames.PANEL_LOCK) env.states["lock"]?.let(::addAll)
         if (key.attrs.role == "shift") {
             if (env.shift == Shift.Once) add(KeyState.Shifted)
             if (env.shift == Shift.Lock) add(KeyState.Locked)

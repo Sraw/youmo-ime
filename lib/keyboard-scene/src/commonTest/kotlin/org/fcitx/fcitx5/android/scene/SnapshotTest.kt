@@ -105,6 +105,7 @@ object Shots {
             Shot("k14-url", "k14", on("k14") { it.copy(input = it.input.copy(field = "url")) }),
             Shot("zhuyin-nine-composing", "zhuyin-nine", on("zhuyin-nine") { it.copy(input = it.input.copy(composing = true)) }),
             Shot("symbols-locked", "symbols", on("symbols") { it.copy(states = mapOf("lock" to setOf(KeyState.Locked))) }),
+            Shot("number-locked", "number", on("number") { it.copy(states = mapOf("lock" to setOf(KeyState.Locked))) }),
         ) + PADS.map { pad -> Shot("number-pad-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad)) }) } +
             // the columns' items as the app passes them: drawn, each pad's own list
             (listOf("full") + PADS).map { pad -> Shot("number-items-$pad", "number", on("number") { it.copy(input = it.input.copy(pad = pad), scrollItems = scrollDefaults) }) } +

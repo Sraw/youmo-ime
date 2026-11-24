@@ -12,7 +12,9 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputBinding
 import android.view.inputmethod.InputMethod
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import org.fcitx.fcitx5.android.FcitxApplication
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.data.theme.TestThemes
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
@@ -24,8 +26,10 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardStyle
 import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.picker.PickerGridView
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -71,7 +75,10 @@ class StickyNumbersUatTest {
 
     private fun assertLetters(where: String) = assertTrue("$where: ${h.texts()}", letters())
 
-    private fun lock() = h.tap(h.keyNamed("lock"))
+    // the lock is 返回 held
+    private fun lock() {
+        h.longPress(h.keyNamed("back"))
+    }
 
     private fun locked() = KeyboardHarness.find<NumberKeyboard>(h.board)?.locked == true
 
@@ -269,6 +276,7 @@ class StickyNumbersUatTest {
         tap123()
         lock()
         assertTrue("locked", locked())
+        assertNumbers("held, 返回 does not go back")
         h.hide()
         next()
         assertNumbers("hidden, then another field")
@@ -301,6 +309,28 @@ class StickyNumbersUatTest {
         assertTrue(locked())
         steps()
         assertLetters(where)
+    }
+
+    // TalkBack: 返回 said as ever, its hold worded as what it does, locked its state; the lock drawn in its corner
+    @Test
+    @Uat("PAN-42")
+    fun held返回IsSaidAndShown() {
+        h.start()
+        tap123()
+        fun said(): Pair<String?, String?> {
+            val c = KeyboardHarness.find<KeyboardCanvasView>(h.board)!!
+            val i = c.scene!!.keys.indexOfFirst { it.id == "back" }
+            val node = AccessibilityNodeInfoCompat.wrap(c.accessibilityNodeProvider!!.createAccessibilityNodeInfo(i)!!)
+            val hold = node.actionList.single { it.id == AccessibilityNodeInfoCompat.ACTION_LONG_CLICK }.label?.toString()
+            return hold to node.stateDescription?.toString()
+        }
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        assertEquals(app.getString(R.string.number_pad_lock) to null, said())
+        lock()
+        h.relayout()
+        assertEquals(app.getString(R.string.number_pad_unlock) to app.getString(R.string.a11y_state_locked), said())
+        val back = KeyboardHarness.find<KeyboardCanvasView>(h.board)!!.keyAt("back")!!
+        assertTrue(back.ops(false).any { it is org.fcitx.fcitx5.android.scene.Op.Icon && it.name == "lock" })
     }
 
     @Test

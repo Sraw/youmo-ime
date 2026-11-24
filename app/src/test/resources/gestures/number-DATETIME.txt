@@ -1,4 +1,4 @@
-keys [1, 2, 3, backspace, 4, 5, 6, space, 7, 8, 9, lock, 0, ., enter]
+keys [1, 2, 3, backspace, 4, 5, 6, space, 7, 8, 9, 0, ., enter]
 1 tap: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
 1 up: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
 1 down: [sendKey(sym=65457, states=536870928, code=0, up=false)] field 12 34|5,5
@@ -51,11 +51,6 @@ space long press: [] field 12 34|5,5
 9 down: [sendKey(sym=65465, states=536870928, code=0, up=false)] field 12 34|5,5
 9 long press: []
 9 long press: [sendKey(sym=65465, states=536870928, code=0, up=false)] field 12 34|5,5
-lock tap: [] field 12 34|5,5
-lock up: [] field 12 34|5,5
-lock down: [] field 12 34|5,5
-lock long press: []
-lock long press: [] field 12 34|5,5
 0 tap: [sendKey(sym=65456, states=536870928, code=0, up=false)] field 12 34|5,5
 0 up: [sendKey(sym=65456, states=536870928, code=0, up=false)] field 12 34|5,5
 0 down: [sendKey(sym=65456, states=536870928, code=0, up=false)] field 12 34|5,5

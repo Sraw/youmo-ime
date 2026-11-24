@@ -64,10 +64,13 @@ class BuiltInLayoutLintTest {
     @Test
     fun aFunctionKeyWritesNoLongPressNorSwipe() {
         // its list, slots and action long press by its name alone, the same on every keyboard (§5: KeyDefaults.function,
-        // FUNCTION_ACTIONS, SlotDefaults); an address key's own (a field's commit key, out of the keys' model)
+        // FUNCTION_ACTIONS, SlotDefaults); an address key's own (a field's commit key, out of the keys' model); the number
+        // pad's 返回 held locks (a panel's own way about, out of the keys' model too)
         val wrong = keys.filter { it.function }.flatMap { k ->
             val popup = "<popup>".takeIf { k.key.popup != null && !k.address }
-            listOfNotNull(popup) + k.all.flatMap { a -> listOf("long-press", "swipe-up").filter { it in a.actions } }.map { "${k.where}: $it" }
+            val locks = k.attrs.role == "back" && k.all.all { it.actions["long-press"] in setOf(null, "panel-lock") }
+            listOfNotNull(popup) + k.all.flatMap { a -> listOf("long-press", "swipe-up").filter { it in a.actions && !(locks && it == "long-press") } }
+                .map { "${k.where}: $it" }
         }
         assertEquals(emptyList(), wrong)
     }

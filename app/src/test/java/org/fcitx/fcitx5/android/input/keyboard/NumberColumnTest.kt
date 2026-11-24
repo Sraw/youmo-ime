@@ -270,20 +270,27 @@ class NumberColumnTest {
         assertNull(ScrollColumn.typed(ScrollDefaults.NUMBER, copy, english = false, marks = emptyMap(), password = true))
     }
 
+    // the lock is 返回 held: 返回 said as ever, locked it is in the lock's state with a lock drawn, the pad's own keys kept
     @Test
     @Uat("AX-24")
-    fun theLockIsDrawnAsThePanelsIsAndReadAsThePads() {
+    fun theLockIsShownOn返回AndThePadsKeysKept() {
         numbers()
         val board = KeyboardHarness.all(h.keyboard).filterIsInstance<NumberKeyboard>().first { h.shown(it) }
-        assertTrue(h.keys().mapNotNull { it.description }.toString(), h.keys().any { it.description == h.service.getString(R.string.number_pad_lock) })
+        fun back() = KeyboardHarness.find<KeyboardCanvasView>(board)!!.keyAt("back")!!
+        fun drawsALock() = back().ops(false).any { it is org.fcitx.fcitx5.android.scene.Op.Icon && it.name == "lock" }
+        val said = h.keyNamed("back").description
+        assertTrue(h.keys().none { it.id == "lock" })
+        assertTrue(!drawsALock())
         board.locked = true
         h.relayout()
-        assertTrue(h.keys().mapNotNull { it.description }.toString(), h.keys().any { it.description == h.service.getString(R.string.number_pad_unlock) })
+        assertTrue(back().states.toString(), org.fcitx.fcitx5.android.scene.KeyState.Locked in back().states)
+        assertTrue(drawsALock())
+        assertEquals(said, h.keyNamed("back").description)
         // its own keys' states kept: the digits still drawn
         assertTrue(h.texts().toString(), h.texts().containsAll((0..9).map { it.toString() }))
         board.locked = false
         h.relayout()
-        assertTrue(h.keys().any { it.description == h.service.getString(R.string.number_pad_lock) })
+        assertTrue(!drawsALock())
     }
 
     @Test

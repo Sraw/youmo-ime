@@ -216,7 +216,7 @@ class KeyboardCanvasView(
             var said: MutableList<Int>? = null
             var worded: MutableList<Int>? = null
             faces = s.keys.mapIndexed { i, k ->
-                val f = Faces(k, SceneA11y.state(k.role, k.states), SceneA11y.of(k, ::stringNamed).description)
+                val f = Faces(k, SceneA11y.state(k.role, k.states, k.actions["long-press"]), SceneA11y.of(k, ::stringNamed).description)
                 val was = old.getOrNull(i)?.takeIf { it.of(k) } ?: old.firstOrNull { it.of(k) }
                 if (was != null) {
                     f.down = was.down
@@ -743,7 +743,12 @@ class KeyboardCanvasView(
             node.isClickable = key != null
             node.isLongClickable = key?.longClickable == true
             if (node.isEnabled && node.isClickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
-            if (node.isEnabled && node.isLongClickable) node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK)
+            if (node.isEnabled && node.isLongClickable) {
+                node.addAction(
+                    said.longClick?.let { AccessibilityNodeInfoCompat.AccessibilityActionCompat(AccessibilityNodeInfoCompat.ACTION_LONG_CLICK, it) }
+                        ?: AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
+                )
+            }
             reading.node(virtualViewId, said.description, node)
         }
 
@@ -792,6 +797,7 @@ class KeyboardCanvasView(
             "a11y_key_emoji" to org.fcitx.fcitx5.android.R.string.a11y_key_emoji,
             SceneA11y.SHIFT_ONCE to org.fcitx.fcitx5.android.R.string.a11y_state_shift_once,
             SceneA11y.CAPS_LOCK to org.fcitx.fcitx5.android.R.string.a11y_state_caps_lock,
+            SceneA11y.LOCKED to org.fcitx.fcitx5.android.R.string.a11y_state_locked,
         )
     }
 }

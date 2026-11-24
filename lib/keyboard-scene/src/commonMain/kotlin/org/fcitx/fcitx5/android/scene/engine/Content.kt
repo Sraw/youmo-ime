@@ -6,6 +6,7 @@ package org.fcitx.fcitx5.android.scene.engine
 
 import org.fcitx.fcitx5.android.scene.Box
 import org.fcitx.fcitx5.android.scene.Icons
+import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.MarkFate
 import org.fcitx.fcitx5.android.scene.Shape
 import org.fcitx.fcitx5.android.scene.keys.KeyId
@@ -13,6 +14,7 @@ import org.fcitx.fcitx5.android.scene.layout.Text
 import org.fcitx.fcitx5.android.scene.rules.KeyMarkYield
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks.Slot
+import org.fcitx.fcitx5.android.scene.rules.KeyNames
 import org.fcitx.fcitx5.android.scene.rules.KeyTextScale
 import org.fcitx.fcitx5.android.scene.theme.Shown
 import org.fcitx.fcitx5.android.scene.theme.TextLook
@@ -70,7 +72,7 @@ class Content(
     fun of(key: ExpandedKey, cell: Box, content: Box, looks: Looks, face: FaceGeometry? = null, snap: Boolean = true, short: Map<Int, Int> = emptyMap()): KeyContent {
         val compactScale = if (env.compact) key.attrs.compactTextScale ?: 1.0 else 1.0
         val hidden = looks.label.hidden
-        val marks = marks(key, cell, content, looks, hidden, snap, short)
+        val marks = withLock(key, marks(key, cell, content, looks, hidden, snap, short), content, snap)
         val below = marks.firstOrNull { it.slot == Slot.Below }
         val shows = shows(key, looks)
         val measured = shows.label?.takeIf { it.isNotEmpty() }?.let { text ->
@@ -381,6 +383,24 @@ class Content(
         return MarkDrawn(drawn, slot, drop, drawn.ink.top)
     }
 
+    // a key held to lock (the number pad's 返回), locked: a small lock in a corner as a swipe's icon is, the label where it was
+    private fun withLock(key: ExpandedKey, marks: List<MarkDrawn>, content: Box, snap: Boolean): List<MarkDrawn> =
+        if (key.attrs.actions["long-press"] == KeyNames.PANEL_LOCK && KeyState.Locked in env.states["lock"].orEmpty()) {
+            marks + lockMark(marks, content, snap)
+        } else {
+            marks
+        }
+
+    private fun lockMark(marks: List<MarkDrawn>, content: Box, snap: Boolean): MarkDrawn {
+        val compact = env.compact
+        val slot = if (marks.none { it.slot == Slot.TopRight }) Slot.TopRight else Slot.TopLeft
+        val dp = (if (compact) SHORTCUT_ICON_COMPACT_DP else SHORTCUT_ICON_DP) * d
+        val h = (if (compact) SHORTCUT_SIDE_COMPACT_DP else SHORTCUT_SIDE_DP) * d
+        val v = (if (compact) SHORTCUT_EDGE_COMPACT_DP else SHORTCUT_EDGE_DP) * d
+        val drawn = Drawn.of(PlacedIcon(LOCK, slotBox(slot, dp, dp, content, h, v).let { if (snap) laidOut(it) else wholeSized(it) }, Part.Badge))
+        return MarkDrawn(drawn, slot, KeyMarkYield.DROP_SHORTCUT, drawn.ink.top)
+    }
+
     // as a view was laid out: its corner on the pixel it starts in, its size whole pixels
     private fun laidOut(b: Box): Box {
         val x = floor(b.left)
@@ -462,6 +482,7 @@ class Content(
         private const val SPACE = "space"
         private const val ENTER = "enter"
         private const val RETURN_ICON = "return-icon"
+        private const val LOCK = "lock"
 
         const val RETURN_TEXT_DP = 16.0
 

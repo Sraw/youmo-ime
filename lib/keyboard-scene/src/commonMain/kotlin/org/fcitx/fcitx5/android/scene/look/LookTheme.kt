@@ -148,6 +148,7 @@ object LookTheme {
         s.add(key.with(part = "shortcut"), "scale" to Value.Number(FULL))
         s.add(key.with(kind = "enter", part = "mark"), "color" to color("accentKeyText"))
         s.add(key.with(part = "badge"), "icon-color" to color("altKeyText"))
+        s.add(key.with(state = "locked", part = "badge"), "icon-color" to color("accentKey"))
         s.add(selector("*/reading").with(state = "on"), "color" to color("accentKey"), "icon-color" to color("accentKey"))
         s.add(key.with(FLAT), "fill" to TRANSPARENT, "shadow" to Value.OfShadow(Shadow.NONE), "radius" to radius(0))
         s.add(key.with(FLAT, "space"), "fill" to solid(SPACE_BAR), "shape" to Value.Word("bar"), "radius" to radius(FLAT_SPACE_RADIUS_DP))

@@ -51,6 +51,7 @@
   <style select="key shortcut" scale="100%"/>
   <style select="key.enter mark" color="@accentKeyText"/>
   <style select="key badge" icon-color="@altKeyText"/>
+  <style select="key:locked badge" icon-color="@accentKey"/>
   <style select="*/reading:on" color="@accentKey" icon-color="@accentKey"/>
   <style select="@flat key" fill="#00000000" radius="0" shadow="none"/>
   <style select="@flat key.space" fill="@spaceBar" shape="bar" radius="3dp"/>

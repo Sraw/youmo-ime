@@ -358,6 +358,7 @@
     <string name="a11y_key_shift">Shift</string>
     <string name="a11y_state_shift_once">On for one letter</string>
     <string name="a11y_state_caps_lock">Caps lock</string>
+    <string name="a11y_state_locked">Locked</string>
     <string name="a11y_key_backspace">Backspace</string>
     <string name="a11y_key_enter">Enter</string>
     <string name="a11y_key_action_go">Go</string>

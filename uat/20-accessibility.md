@@ -141,8 +141,8 @@
 - **预期**：每项读出它的字；`?` 的动作有「移到最前」「编辑这一列」「删除这一项」，第一项没有「移到最前」；动作做了和长按菜单一样，提示条带撤销。
 - **JVM**：`ScrollColumnMenuTest.talkBackDoesTheMenusThreeThings`（动作选了马上生效；命令项读命令名，「复制」读「复制」）、`.aSceneRemadeLeavesTalkBacksActionsAsTheyWere`；设备上从节点树读字和动作。TalkBack 本身真机上手工听一次：在 **滑动列** 的数字键盘那一类加命令「复制」，点 **123** 听它读「复制」，在 `+` 上用动作删除它。
 
-### AX-24 [P1] 读屏：数字键盘的锁
+### AX-24 [P1] 读屏：数字键盘的锁（长按返回）
 - **前提**：B0，开着 TalkBack。
-- **操作**：点 **123**，滑到 **锁**，双击；再打开符号面板，滑到它的锁。
-- **预期**：TalkBack 下数字键盘的锁读「锁定」，双击后读「解锁」；面板的锁照旧。
-- **JVM**：`NumberColumnTest.theLockIsDrawnAsThePanelsIsAndReadAsThePads`；TalkBack 本身真机上手工听一次。
+- **操作**：点 **123**，滑到 **返回**，双击并按住；再滑到 **返回**；再打开符号面板，滑到它的锁。
+- **预期**：TalkBack 下 返回 读「返回」，提示「双击并按住即可锁定」；锁上后读「返回，已锁定」，提示「……即可解锁」（Android 10 不读状态）；面板的锁照旧。
+- **JVM**：`StickyNumbersUatTest.held返回IsSaidAndShown`、`NumberColumnTest.theLockIsShownOn返回AndThePadsKeysKept`、ime-core `SceneA11yTest.theNumberPads返回SaysItsHoldAndItsLock`；TalkBack 本身真机上手工听一次。

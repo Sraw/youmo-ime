@@ -413,7 +413,7 @@ def _load_scripts(areas, files):
 
 class Node:
     __slots__ = ("text", "desc", "rid", "cls", "pkg", "b", "checked", "focused", "a11y", "selected",
-                 "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt", "actions")
+                 "clickable", "parent", "kids", "enabled", "scrollable", "wtype", "key", "alt", "actions", "hold", "state")
 
     def __init__(self, e, parent):
         # an empty field reports its hint as its text; fields.html's placeholder is zero-width spaces
@@ -437,6 +437,9 @@ class Node:
         self.alt = e.get("alt") or ""
         # custom accessibility actions by label (Dumper's), [] for none
         self.actions = [x for x in (e.get("actions") or "").split("|") if x]
+        # TalkBack's words for a hold and the node's state (Dumper's, the state from API 30), "" for none
+        self.hold = e.get("hold") or ""
+        self.state = e.get("state") or ""
         self.parent, self.kids = parent, []
 
     @property

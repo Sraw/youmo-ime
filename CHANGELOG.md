@@ -26,7 +26,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 数字键盘换成九键的样子：左边是一条能上下滑的符号列（`+ - * /` 一开始就看得到，往下滑是 `% , : ( ) #`），`=` 挪到 9 右边，0 在 8 下面、和上面的数字对齐，底排不再有 `,` 和 `=`。
 - 九键、数字键盘左边的滑动列能自己改：**按键字符和快捷键** 里多了一张 **滑动列** 卡片，九键、九键英文、数字键盘、电话、日期时间、网址、邮箱七类各改各的，能加字、加命令（画成图标）、删、拖动排序、恢复默认；电话、网址这类框里自动换成那一类。在键盘上长按列里的一项弹出菜单（和剪贴板长按的一样，图标加文字，松手后点一项才执行）：**移到最前**、**编辑这一列…**、**删除「。」**（写出要删的那一项）；删除和移到最前在键盘上方提示，3 秒内能撤销。
 - 自定义键盘布局、网页布局编辑器里能放横的或竖的滑动列（`<slot kind="scroll">`），内容用上面那七类；用了滑动列的布局要 0.6.3。
-- 在普通框里点 123 打开数字键盘后，键盘没收起时跳到同一个 App 的下一个文字框还是数字键盘（邮箱、网址、密码框除外）；数字键盘加了锁，锁上后收起再弹出也还是数字键盘，点 返回、在别的 App 的输入框里弹出键盘，或再点锁后收起键盘，才解开。
+- 在普通框里点 123 打开数字键盘后，键盘没收起时跳到同一个 App 的下一个文字框还是数字键盘（邮箱、网址、密码框除外）；数字键盘加了锁：长按 **返回** 锁住（返回 右上角出现一把小锁），锁上后收起再弹出也还是数字键盘，点 返回、在别的 App 的输入框里弹出键盘，或再长按 返回 后收起键盘，才解开。
 
 ### 小改动
 
@@ -72,7 +72,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The number pad looks like the nine keys now: a column of symbols on the left that scrolls (`+ - * /` in sight, `% , : ( ) #` further down), `=` right of 9, 0 under 8 and in line with the digits above, and no `,` or `=` on the bottom row.
 - The scroll column left of the nine keys and the number pad can be changed: **按键字符和快捷键** has a **滑动列** card, its seven categories (nine keys, nine keys English, number pad, phone, date and time, address, email) each your own, with texts and commands (drawn as icons) added, deleted, dragged and put back; a phone or address field switches to its own category. Long-press an item of the column on the keyboard for a menu like the clipboard's (icons and names, the menu staying when the finger lifts, an item run by a tap): **移到最前** (move to the front), **编辑这一列…** (the column's editor), **删除「。」** (naming the item it deletes); deleting and moving to the front are said above the keys with an undo for 3 seconds.
 - Custom keyboard layouts and the web layout maker can hold a scroll column, vertical or horizontal (`<slot kind="scroll">`), its items from the seven categories above; a layout with one needs 0.6.3.
-- 123 opened in a plain field stays on for the same app's next text field while the keyboard stays up (not an email, address or password field); the number pad has a lock that keeps it through hiding and showing the keyboard, let go by 返回, the keyboard shown in another app's field, or the lock tapped again and the keyboard hidden.
+- 123 opened in a plain field stays on for the same app's next text field while the keyboard stays up (not an email, address or password field); the number pad has a lock, long-press **返回** (a small lock shows in its corner), that keeps it through hiding and showing the keyboard, let go by tapping 返回, the keyboard shown in another app's field, or 返回 long-pressed again and the keyboard hidden.
 
 ### Smaller changes
 

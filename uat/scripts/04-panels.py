@@ -183,10 +183,10 @@ def column_tap(d, text, after=0.5):
 
 
 def board(d, s=None):
-    """which keyboard is up: 数字 (the pad, its lock), 字母 or what else"""
+    """which keyboard is up: 数字 (the pad: 返回 and 0), 字母 or what else"""
     s = s or d.screen()
     ids = {n.key for n in s.ime() if n.key}
-    if "lock" in ids and "0" in ids:
+    if "back" in ids and "0" in ids:
         return "数字"
     if "q" in ids or s.find(rid="button_lang", where="ime"):
         return "字母"
@@ -210,11 +210,19 @@ def wait_board(d, want, timeout=4):
 
 
 def lock_node(d, s=None):
+    """the pad's lock is 返回 held: its node, .hold what TalkBack says a hold does (锁定 / 解锁), .state 已锁定 when locked"""
     s = s or d.screen()
-    n = next((n for n in s.ime() if n.key == "lock"), None)
+    n = next((n for n in s.ime() if n.key == "back"), None)
     if not n:
-        raise Blocked(f"数字键盘上没有锁：{sorted({m.key for m in s.ime() if m.key})}")
+        raise Blocked(f"数字键盘上没有返回：{sorted({m.key for m in s.ime() if m.key})}")
     return n
+
+
+def hold_back(d, after=0.8):
+    """返回 held: the pad's lock toggled"""
+    d.hold(lock_node(d).c, 900)
+    time.sleep(after)
+    d._keys = None
 
 
 def key(d, name, after=0.6):
@@ -263,7 +271,7 @@ def pan36(d):
     d.clear()
     numbers(d)
     first = column_texts(d)
-    d.shot("kb", "数字键盘：左列 + - * /，9 右边 =，底排 符 返回 锁 0 . ↵")
+    d.shot("kb", "数字键盘：左列 + - * /，9 右边 =，底排 符 返回 0 . ↵")
     check(first[:4] == ["+", "-", "*", "/"], f"左列一开始是 {first}")
     column_scroll(d)
     d.shot("kb", "左列往下滑")
@@ -555,10 +563,10 @@ def pan41(d):
 
 
 def lock(d):
-    """the pad's lock tapped: said 解锁 after (locked)"""
-    key(d, "lock", after=0.8)
+    """返回 held: locked, its hold said 解锁 after"""
+    hold_back(d)
     n = lock_node(d)
-    check(n.desc == "解锁", f"点锁后锁读「{n.desc}」")
+    check(n.hold == "解锁", f"长按返回后，返回的长按读「{n.hold}」")
 
 
 @case("PAN-42", mutates=True, visual=True)
@@ -567,10 +575,10 @@ def pan42(d):
     testbed_page(d, "form")
     tb_field(d, "form_text")
     numbers(d)
-    check(lock_node(d).desc == "锁定", f"没锁时锁读「{lock_node(d).desc}」")
+    check(lock_node(d).hold == "锁定", f"没锁时返回的长按读「{lock_node(d).hold}」")
     d.shot("kb", "锁开着")
     lock(d)
-    d.shot("kb", "1. 点锁：锁上的样子，和符号面板的锁一样")
+    d.shot("kb", "1. 长按返回：返回右上角一把小锁")
     d.back()
     tb_field(d, "form_text2")
     seen.append(on(d, "2. 收起再点 form_text2", "数字"))
@@ -589,14 +597,14 @@ def pan42(d):
             tb_field(d, "form_text3")
             got = wait_board(d, "数字", timeout=8)
         seen.append(on(d, "4. 横屏", "数字", got))
-        check(lock_node(d).desc == "解锁", f"横屏后锁读「{lock_node(d).desc}」")
+        check(lock_node(d).hold == "解锁", f"横屏后返回的长按读「{lock_node(d).hold}」")
     finally:
         d.rotate(0)
     if not d.screen().find(rid="keyboard_view", where="ime"):
         tb_field(d, "form_text3")
     seen.append(on(d, "4. 转回", "数字"))
-    check(lock_node(d).desc == "解锁", f"转回后锁读「{lock_node(d).desc}」")
-    key(d, "lock", after=0.8)
+    check(lock_node(d).hold == "解锁", f"转回后返回的长按读「{lock_node(d).hold}」")
+    hold_back(d)
     d.back()
     d.step("5. 解锁、收起、点 form_text")
     tb_field(d, "form_text")
@@ -629,7 +637,7 @@ def pan42(d):
     time.sleep(1.0)
     tb_field(d, "form_text")
     seen.append(on(d, "8. 锁、收起、回桌面、回来点 form_text", "数字"))
-    check(lock_node(d).desc == "解锁", f"回桌面再回来锁读「{lock_node(d).desc}」")
+    check(lock_node(d).hold == "解锁", f"回桌面再回来返回的长按读「{lock_node(d).hold}」")
     d.back()
     d.step("9. 最近任务再返回")
     d.sh("input keyevent KEYCODE_APP_SWITCH")
@@ -651,7 +659,7 @@ def pan42(d):
     time.sleep(1.0)
     tb_field(d, "form_text")
     seen.append(on(d, "10. 收起、通知栏、点 form_text", "数字"))
-    check(lock_node(d).desc == "解锁", f"通知栏后锁读「{lock_node(d).desc}」")
+    check(lock_node(d).hold == "解锁", f"通知栏后返回的长按读「{lock_node(d).hold}」")
     key(d, "back")   # the lock outlives the case otherwise: the next one starts locked
     return "；".join(seen)
 
@@ -687,14 +695,14 @@ def pan43(d):
     ime(d, "返回", after=0.8)
     d._keys = None
     seen.append(on(d, "1. 符号面板返回", "数字"))
-    check(lock_node(d).desc == "解锁", f"符号面板返回后锁读「{lock_node(d).desc}」")
+    check(lock_node(d).hold == "解锁", f"符号面板返回后返回的长按读「{lock_node(d).hold}」")
     testbed_page(d, "behavior", fresh=False)
     tb_field(d, "terminal")
     seen.append(on(d, "2. terminal", "字母"))
     testbed_page(d, "form", fresh=False)
     tb_field(d, "form_text")
     seen.append(on(d, "2. 回 form_text", "数字"))
-    check(lock_node(d).desc == "解锁", f"经过 terminal 后锁读「{lock_node(d).desc}」")
+    check(lock_node(d).hold == "解锁", f"经过 terminal 后返回的长按读「{lock_node(d).hold}」")
     emoji_panel(d)
     ime(d, "返回", after=0.8)
     d._keys = None

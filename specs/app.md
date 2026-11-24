@@ -1080,8 +1080,11 @@ and is drawn nothing all the same, a theme pack's number.xml too (`NumberPadsTes
 Since 0.6.1 (user 2026-11-14, dev/design/061-layout-survey.md Q1-A, Q3-1) the pads are on the nine keys' frame,
 columns 16 / 22 / 22 / 22 / 18, and the bottom row's first two places are the letter boards': `符` first (the
 nine keys' key: `kind="function"`, its look and words), then the way back where the letters have 123 (`返回`,
-`label="{back}"`, `Texts.back` = `picker_back`, as the panels'); since 0.6.3 `符 16 | 返回 14 | 锁 10 | 0 30 | . 12 | ⏎ 18`,
-0's centre under 8, the phone's `.` a gap; 锁 is `role="lock" send="panel-lock"` (`StickyNumbers`, below). Going 123 from the nine keys moves none of 1–9, ⌫, Return, 符; 返回 sits on 123
+`label="{back}"`, `Texts.back` = `picker_back`, as the panels'); since 0.6.3 `符 16 | 返回 22 | 0 22 | . 22 | ⏎ 18`,
+返回 under 1, 0 under 8, `.` under 9 (the phone's a gap); the lock is 返回 held, `long-press="panel-lock"` (`StickyNumbers`,
+below): such a key takes the lock's states (`SceneBuilder.statesOf`), so locked it is `:locked`, draws a small lock in its
+top right corner (`Content.lockMark`, part `badge`, the look's `key:locked badge` in the accent) and is said 已锁定 with its
+long click worded 锁定 / 解锁 (`SceneA11y`). A user's pad with its own `role="lock"` key works as before. Going 123 from the nine keys moves none of 1–9, ⌫, Return, 符; 返回 sits on 123
 (`NumberPadsTest.everyPadSitsOnTheNineKeysFrame`). The symbol panel's row is the other way round (Q4-a):
 `返回 | 123 | 锁 | 空格 | ⌫ | ⏎`, its 123 the letters' (words, function face, no `a11y=`, read 123). The emoji's
 and emoticons' way back says `{back}` too (Q2; was ABC). A pack's own number.xml or symbols.xml keeps its own row.
@@ -1262,7 +1265,7 @@ so replacing the `InputView` (a turn, one-handed, floating, a theme) keeps it; n
   or another app's field let go of it;
 - `Locked`: the pad's lock (`panel-lock`, taken only while the current keyboard is `NumberKeyboard`; a letter
   layout's `panel-lock` locks nothing). Hiding and letter fields keep it (those fields show letters, the next plain
-  field the pad again); 返回, the lock again, or a field of another app let go of it.
+  field the pad again); 返回 tapped, 返回 held again, or a field of another app let go of it.
 
 Its rules:
 - The same field: the same `EditorInfo` object as the last start (`stickyInfo` in the service), or `restarting` with

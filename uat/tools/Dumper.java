@@ -3,6 +3,7 @@
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.app.UiAutomation;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -112,6 +113,11 @@ public class Dumper {
             if (a.getLabel() != null && a.getId() > 0xffff) acts.append(acts.length() > 0 ? "|" : "").append(a.getLabel());
         }
         if (acts.length() > 0) attr(sb, "actions", acts);
+        // what TalkBack says of a hold and of the node's state (the number pad's 返回: 锁定 / 解锁, 已锁定)
+        for (AccessibilityNodeInfo.AccessibilityAction a : n.getActionList()) {
+            if (a.getId() == AccessibilityNodeInfo.ACTION_LONG_CLICK && a.getLabel() != null) attr(sb, "hold", a.getLabel());
+        }
+        if (Build.VERSION.SDK_INT >= 30 && n.getStateDescription() != null) attr(sb, "state", n.getStateDescription());
         attr(sb, "bounds", "[" + b.left + "," + b.top + "][" + b.right + "," + b.bottom + "]");
         sb.append(">");
         for (int i = 0; i < n.getChildCount(); i++) {

@@ -318,7 +318,7 @@ test("the page made without --engine holds no engine; the page built holds the b
   const engine = blockOf(built(), 'youmo-engine');
   assert.equal(engine, engineText(), 'the page built has another engine');
   // no minifier without npm here: held just above its size so that it grows only on purpose; each raise's history is in git
-  assert.ok(Buffer.byteLength(engine) <= 2_147_500, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
+  assert.ok(Buffer.byteLength(engine) <= 2_149_000, 'the engine is ' + Buffer.byteLength(engine) + ' bytes');
   assert.match(engine, /globalThis\['youmo-engine'\] = factory\(/);
   const rest = (page) => page.replace(/<script id="youmo-engine">[\s\S]*?<\/script>/, '').replace(/script-src [^;]*;/, '');
   assert.equal(rest(built()), rest(html));

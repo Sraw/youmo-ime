@@ -9,6 +9,7 @@ import android.text.InputType
 import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -18,6 +19,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneBoard
+import org.fcitx.fcitx5.android.scene.Op
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -209,6 +211,26 @@ class CustomPanelTest {
         assertTrue(panel.indexOfChild(panel.grid) > panel.indexOfChild(panel.embeddedKeyboard))
     }
 
+    // a number layout of before 0.6.3, its own lock key beside 返回: tapped it locks, its icon and its words follow
+    @Test
+    @Uat("PAN-42")
+    fun aNumberLayoutsOwnLockKeyStillLocks() {
+        val mine = numbers { it.replace(OWN_BACK, OLD_BACK_AND_LOCK) }!!
+        assertTrue(mine.drawn)
+        prefs.numberKeyboardLayout.setValue(mine.id)
+        h.start(InputType.TYPE_CLASS_NUMBER)
+        val board = KeyboardHarness.find<NumberKeyboard>(h.inputView)!!
+        fun icons() = KeyboardHarness.find<KeyboardCanvasView>(board)!!.keyAt("lock")!!.ops(false).filterIsInstance<Op.Icon>().map { it.name }
+        assertEquals(listOf("lock-open"), icons())
+        assertEquals(context.getString(R.string.number_pad_lock), h.keyNamed("lock").description)
+        h.tap(h.keyNamed("lock"))
+        assertTrue(board.locked)
+        assertEquals(listOf("lock"), icons())
+        assertEquals(context.getString(R.string.number_pad_unlock), h.keyNamed("lock").description)
+        h.tap(h.keyNamed("lock"))
+        assertFalse(board.locked)
+    }
+
     // a board without the grid: the grid hidden, the keys below it drawn and tapped
     @Test
     fun aPanelWithoutTheGridHidesItAndItsKeysAreTapped() {
@@ -223,6 +245,13 @@ class CustomPanelTest {
         assertTrue(panel.side!!.isVisible)
         h.tap(h.key(back))
         assertTrue(h.keys().map { it.label }.toString(), "q" in h.keys().map { it.label })
+    }
+
+    private companion object {
+        const val OWN_BACK = """width="22" label="{back}" text-size="16" text-style="bold" send="layout:Text"
+         long-press="panel-lock"/>"""
+        const val OLD_BACK_AND_LOCK = """width="12" label="{back}" text-size="16" text-style="bold" send="layout:Text"/>
+    <key id="lock" role="lock" kind="function" width="10" icon="{lock-icon}" a11y="a11y_key_panel_lock" send="panel-lock"/>"""
     }
 
     private fun cellOf(panel: PickerLayout, slot: String): Rect {

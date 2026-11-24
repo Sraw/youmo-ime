@@ -162,7 +162,7 @@ abstract class BaseKeyboard(
             columns.update()
         }
 
-    /** A panel lock's state (`send="panel-lock"`): the symbol panel's, and the number pad's. */
+    /** A panel lock's state (`panel-lock`, tapped or held): the symbol panel's, and the number pad's (返回 held). */
     var locked = false
         set(value) {
             if (field == value) return
