@@ -33,38 +33,39 @@
 
 ### 特色
 
-- **整句拼音**：全拼和双拼（小鹤、微软、自然码），键盘可选全键盘、18 键、两个字母一个键的 14 键或九键（按 `64426` 就是"你好"），也能用注音九键、大千注音全键盘打；简拼、半截输入；点偏到相邻键时看点在键上的哪儿，自动纠正。
+- **整句拼音**：全拼和双拼（小鹤、微软、自然码），键盘可选全键盘、18 键、两个字母一个键的 14 键或九键（按 `64426` 就是"你好"），也能用注音九键、大千注音全键盘打；简拼、半截输入；中英混输（九键、14 键、18 键按英文字母所在的键也打得出）；点偏到相邻键时看点在键上的哪儿，自动纠正。
 - **笔画筛选**：打了拼音后在键盘上画一笔（横、竖、撇、点、折），只留第一个字这样起笔的候选，再画就按笔顺接着筛，不用翻页找字（默认关，和滑行输入二选一）。
-- **自己训练的模型**：拼音和英文的 n-gram 模型从网页统计而来；两个小型句子模型参考前文，给整句重新排序。
+- **自己训练的模型**：拼音和英文的 n-gram 模型从网页统计而来；两个小型句子模型参考前文，给整句重新排序，按手机处理器自动选用多少计算，候选在按键当时排好、不会停顿后跳动。
 - **新词**：近几年的新词（显眼包、破防、红温……）逐个校对后收进词库，每次发版更新。
 - **手写**：点工具栏的「手写」，直接在拼音、码表、注音键盘的字母上写字，再点一下关掉；一次写一个字，按整句理解，后写的字能改正前面认错的。
 - **字卡和词卡**：长按任何中文候选，菜单第一行是读音，点开看字卡（读音和例词、部首、笔顺）或词卡（整个词的拼音和注音、每个字的读音）。候选上可以标出拼音或注音（默认关）。
-- **码表**：五笔、仓颉、二笔、自然码、五笔拼音；重码按前文排，上屏后有联想；按偏的键接不上时看落点改读。
+- **码表**：五笔、仓颉、二笔、自然码、五笔拼音；重码按前文排，上屏后有联想；按偏的键接不上时看落点改读；逐字打出的词点一下就记住成词。
 - **英文键盘**：自动纠错（按偏的键看落点）、补全、预测下一个词。
 - **生僻字屏蔽**：按《通用规范汉字表》分组，把不想看到的生僻字从所有中文候选、联想和语音结果里挡掉，可以整组挡，也可以一个个挑（默认关）。
 - **滑行输入**：英文、拼音、九键、码表都能一笔划出一个词（默认关）。
-- **剪贴板、工具栏、输入框**：剪贴板条目能切成一块块，点选或横着滑选后拼起来上屏，历史可以不限条数；工具栏的按钮和顺序自己定；数字、电话框直接出数字键盘，网址、邮箱框给常用后缀和打过的邮箱。
+- **剪贴板、工具栏、输入框**：剪贴板条目能切成一块块，点选或横着滑选后拼起来上屏，历史可以不限条数，常用的收藏起来一直留着；工具栏的按钮和顺序自己定；数字、电话框直接出数字键盘，数字键盘和九键左边那列符号能自己改，网址、邮箱框给常用后缀和打过的邮箱。
 - **主题、长按和滑动、编辑菜单**：在网页主题制作页做主题（渐变、动态背景、按键音、自己的图标），也能导入百度、搜狗、讯飞、同文、FlorisBoard 的皮肤（网页制作页也能打开它们接着改），主题还能带一只跟着打字动的小宠物，带 12 个新内置主题；每个键的长按、上滑、下滑在一页里改，所有键盘通用；空格上滑出全选、复制、粘贴、撤销，退格上滑清除、下滑恢复，滑选能跨行选字。
 - **表情和小工具**：候选里给出对应的表情，表情面板按拼音搜索；快速输入存自己的常用语，什么都没打时点一下上屏；u 开头按部件拆字，算式后打 = 出结果，rq/sj/xq 出日期时间。
 - **自己的键盘布局**：在网页布局编辑器里拖键、改宽、合并键，做成 17 键、AZERTY 之类的布局，导入后给拼音、双拼、英文、码表打字用，数字键盘、符号面板也能换。
 - **分体、单手、悬浮键盘，实体键盘**：竖屏、横屏各选普通、分体、悬浮或单手；悬浮键盘能拖动、调大小；折叠屏展开、平板竖拿按横屏排；接实体键盘时候选显示在光标旁。
 - **边打边学**：记住你选的词和顺序，常用的排到前面；上屏过几次的整段话，打出开头就接着给出剩下的；能导入搜狗等输入法的词库；常用词能自己排到最前；长按候选可以删除、固定、屏蔽，做错了马上撤销；学到的东西自动备份，换手机能恢复。
-- **离线语音**（要导入语音包）：按住空格说话，或点麦克风说话，边说边出字，可以中英混说；自动去掉口头禅、加标点，数字按习惯写；带口音的普通话也能识别。说完马上松手也不丢最后一个字，小声说也听得出；语音写错的词改对以后问一句要不要记住。目前只支持普通话和英语，还不支持方言。
+- **离线语音**（要导入语音包）：按住空格说话，或点麦克风说话，边说边出字，可以中英混说；自动去掉口头禅、加标点，数字按习惯写；带口音的普通话也能识别。说完马上松手也不丢最后一个字，小声说也听得出；说话时暂停别的应用在放的音乐；你的同音词看整句换上，语音写错的词改对以后问一句要不要记住。目前只支持普通话和英语，还不支持方言。
 
 每项功能和设置的详细说明见[使用说明](docs/README.md)。
 
 ### 效果
 
-拼音首选正确率（%），2026-11-17 测，开着相邻键纠错（App 默认如此）：
+拼音首选正确率（%），2026-11-23 测，开着相邻键纠错（App 默认如此）：
 
 | | 主集 | 近期网页 | 聊天 | 对话 | 新词 |
 |---|---|---|---|---|---|
 | 只用 n-gram | 88.5 | 72.7 | 68.7 | 67.6 | 79.5 |
-| 加句子模型（App 默认） | 91.1 | 76.2 | 72.7 | 71.0 | 80.0 |
+| 加句子模型（中档） | 90.9 | 76.5 | 71.4 | 71.0 | 78.8 |
+| 加句子模型（高档） | 91.6 | 77.5 | 73.3 | 71.5 | 79.3 |
 
-九键打主集 88.8%。英文每 25 个键按错一个时，73.8% 的错词能自动改对。
+九键打主集 87.9%。英文每 25 个键按错一个时，73.8% 的错词能自动改对。
 
-新键盘在聊天集上（只算每个键序只有一种拼法的句子，所以和上表不能直接比）：14 键 61.3%，按左右半边点时 67.3%（点得偏一点）到 69.0%（点得准）；小鹤双拼 18 键 63.6%、14 键 50.9%、九键 30.9%；九键全拼 53.6%。各键盘留下的句子不完全相同。
+新键盘在聊天集上（只算每个键序只有一种拼法的句子，所以和上表不能直接比）：14 键 61.1%，按左右半边点时 66.2%（点得偏一点）到 67.7%（点得准）；小鹤双拼 18 键 63.6%、14 键 51.9%、九键 31.5%；九键全拼 53.9%。各键盘留下的句子不完全相同。
 
 ### 下载
 
@@ -109,38 +110,39 @@ English, and offline voice input once the voice pack is imported. It asks for no
 
 ### Features
 
-- **Whole-sentence pinyin**: full pinyin and shuangpin (小鹤, 微软, 自然码) on the full keyboard, 18 keys, 14 keys of two letters each or nine keys (`64426` is 你好), or with zhuyin on nine keys or the full Dachen keyboard; abbreviations, half-typed syllables; a key tapped off-centre is corrected by where the tap fell.
+- **Whole-sentence pinyin**: full pinyin and shuangpin (小鹤, 微软, 自然码) on the full keyboard, 18 keys, 14 keys of two letters each or nine keys (`64426` is 你好), or with zhuyin on nine keys or the full Dachen keyboard; abbreviations, half-typed syllables; Chinese and English mixed (on the nine, 14 and 18 keys too, by the keys of the English letters); a key tapped off-centre is corrected by where the tap fell.
 - **Stroke filter**: after the pinyin, draw a stroke on the keyboard (horizontal, vertical, left-falling, dot, turning) to keep only the candidates whose first character starts with it; more strokes narrow it down further, so no paging for a character (off by default; one or the other with glide typing).
-- **Models of its own**: pinyin and English n-gram models counted from web pages; two small sentence models reorder sentences by the text before.
+- **Models of its own**: pinyin and English n-gram models counted from web pages; two small sentence models reorder sentences by the text before, as much computing as the phone's processor suits picked on its own, the candidates ranked as a key is pressed and never jumping after a pause.
 - **New words**: the last few years' words, curated one by one, updated with every release.
 - **Handwriting**: tap the toolbar's handwriting button and write straight on the letters of the pinyin, table or zhuyin keyboard, tap it again to stop; one character at a time, read as a sentence, so a later character puts an earlier misread right.
 - **Character and word cards**: long-press any Chinese candidate and its menu opens with the reading; tap it for the character's card (readings and words, radical, stroke order) or the word's (the word in pinyin and zhuyin, each character's reading). Candidates can show their pinyin or zhuyin (off by default).
-- **Code tables**: Wubi, Cangjie, Erbi, Ziranma, Wubi-Pinyin; candidates ordered by the text before, next-word suggestions; a slipped key that leads nowhere read by where the tap fell.
+- **Code tables**: Wubi, Cangjie, Erbi, Ziranma, Wubi-Pinyin; candidates ordered by the text before, next-word suggestions; a slipped key that leads nowhere read by where the tap fell; a word typed a character at a time remembered with a tap.
 - **English keyboard**: autocorrection (a slipped key read by where the tap fell), completions, next-word predictions.
 - **Rare characters held back**: in the groups of the Table of General Standard Chinese Characters, the rare characters you never want kept out of every Chinese candidate, prediction and voice result, a whole group or one by one (off by default).
 - **Glide typing**: one stroke for a word in English, pinyin, nine keys and the code tables (off by default).
-- **Clipboard, toolbar, fields**: a clipboard entry cut into pieces, picked by taps or a sideways swipe and typed joined, with history of any length; the toolbar's buttons and their order your own; number and phone fields open a number pad, URL and email fields offer suffixes and the addresses you typed.
+- **Clipboard, toolbar, fields**: a clipboard entry cut into pieces, picked by taps or a sideways swipe and typed joined, with history of any length, favourites kept for good; the toolbar's buttons and their order your own; number and phone fields open a number pad, the symbol column of the number pad and the nine keys your own, URL and email fields offer suffixes and the addresses you typed.
 - **Themes, long press and swipes, an edit menu**: themes made on the web theme maker (gradients, animated backgrounds, key sounds, your own icons), skins imported from Baidu, Sogou, iFlytek, Trime and FlorisBoard (the web theme maker opens them too), a little pet in a theme that moves as you type, 12 new built-in themes; each key's long press and swipes edited on one page for every keyboard; swipe up on the space bar for select all, copy, paste and undo, up on backspace to clear, down to bring it back; 滑选 selects across lines.
 - **Emoji and small tools**: emoji among the candidates, the emoji panel searched by pinyin; quick input keeps your own phrases, a tap types one when nothing is typed; characters typed by their parts (u…), sums worked out after =, the date and time from rq/sj/xq.
 - **Your own keyboard layouts**: drag keys, change widths and merge keys in the web layout maker, for a 17-key or AZERTY board and the like, and import it to type pinyin, shuangpin, English or the tables on; the number pad and the symbols can be replaced too.
 - **Split, one-handed and floating keyboards, physical keyboards**: portrait and landscape each pick normal, split, floating or one-handed; the floating keyboard is dragged and resized; an unfolded foldable or a tablet upright is laid out as landscape; with a physical keyboard, candidates show by the cursor.
-- **Offline voice** (with the voice pack): hold the space bar or tap the microphone to talk, text appearing as you speak, Mandarin and English mixed; fillers dropped, punctuation added, numbers written as usual; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard; correct a word voice got wrong and it asks whether to remember it. No dialects yet.
+- **Offline voice** (with the voice pack): hold the space bar or tap the microphone to talk, text appearing as you speak, Mandarin and English mixed; fillers dropped, punctuation added, numbers written as usual; accented Mandarin understood too; letting go right after the last word keeps it, and quiet speech is heard; other apps' music paused while you talk; a word of yours written for its homophone where the sentence reads right; correct a word voice got wrong and it asks whether to remember it. No dialects yet.
 - **Learns as you type**: your words and the order you pick them in, the common ones first; a passage typed whole a few times is offered on as you type its start; imported dictionaries (Sogou and others); 常用词 put first by you; long-press a candidate to delete, pin or block it, with an undo; what it learned is backed up on its own and can be restored on a new phone.
 
 The [user's manual](docs/README.md) (in Chinese) covers every feature and setting.
 
 ### Accuracy
 
-Pinyin top-1 (%), measured 2026-11-17 with neighbouring-key correction on (the app's default):
+Pinyin top-1 (%), measured 2026-11-23 with neighbouring-key correction on (the app's default):
 
 | | Main | Recent web | Chat | Dialog | New words |
 |---|---|---|---|---|---|
 | n-gram alone | 88.5 | 72.7 | 68.7 | 67.6 | 79.5 |
-| with the sentence models (the app's default) | 91.1 | 76.2 | 72.7 | 71.0 | 80.0 |
+| with the small sentence model (the medium tier) | 90.9 | 76.5 | 71.4 | 71.0 | 78.8 |
+| with the sentence models (the high tier) | 91.6 | 77.5 | 73.3 | 71.5 | 79.3 |
 
-Nine keys, main set: 88.8%. English with one key in 25 slipping: 73.8% of slipped words corrected.
+Nine keys, main set: 87.9%. English with one key in 25 slipping: 73.8% of slipped words corrected.
 
-The new keyboards on the chat set (only sentences whose keys spell one reading, so not comparable with the table): 14 keys 61.3%, and 67.3% (taps a little off) to 69.0% (taps on target) when the tapped half of a key counts; 小鹤 shuangpin on 18 keys 63.6%, on 14 keys 50.9%, on nine keys 30.9%; nine-key pinyin 53.6%. Each keyboard keeps a slightly different set of sentences.
+The new keyboards on the chat set (only sentences whose keys spell one reading, so not comparable with the table): 14 keys 61.1%, and 66.2% (taps a little off) to 67.7% (taps on target) when the tapped half of a key counts; 小鹤 shuangpin on 18 keys 63.6%, on 14 keys 51.9%, on nine keys 31.5%; nine-key pinyin 53.9%. Each keyboard keeps a slightly different set of sentences.
 
 ### Download
 

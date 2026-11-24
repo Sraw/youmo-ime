@@ -8,7 +8,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 
 ---
 
-## 0.6.3（未发布）
+## 0.6.3（2026-11-24）
 
 ### 主要变化
 
@@ -17,10 +17,10 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 剪贴板加了 **收藏**：面板栏上分「最近」「收藏」两页，在最近里长按一条选 **收藏**，它就一直留着，不算进上限，清空最近也不影响；收藏里能 **取消收藏**（可撤销）、**移到最前**。以前置顶的条目升级后在收藏里。恢复备份时收藏和手机上的合并，手机上的收藏（包括敏感的）都留着。关掉「记录剪贴板历史」后收藏照样能用。
 - 九键、14 键、18 键的拼音也能中英混输了：按英文词每个字母所在的键，比如九键 `474663` 出 iPhone，`9633474663` 出「我的iPhone」，和全键盘一样由 **中英混输** 开关管，也打得出英文里学到的词。编码行上英文那段显示小写字母，按回车上屏的就是它（`iphone`）。
 - 语音把听到的换成你的同音词时看整句：说得通才换，不再一见到同音就换。加了「攻势」，「敌人的公式很猛」打成「敌人的攻势很猛」，「推导这个公式」照样是「公式」；手动加的词比打字学成的更容易换。语音在那儿不肯换、你删掉重打成你的词时，会问「以后总是把『公式』写成『攻势』？」（语音在那儿会换的，问「记住」），点 **总是换** 以后这个词不看整句、总是换；在 **用户词库 → 手动添加的词** 里点这个词选 **取消语音总是换** 可以取消。
-- 码表（五笔、二笔、五笔拼音等）逐字打出一个词后停一下，键盘上方的提示条给出「记住：汪小明 iije」，点了才记住，以后按组词规则的编码打得出；不点什么都不存，提示条在接着按键、换输入框、收起键盘时收起。记住的词在自动学到的词里带日期，长按选 **为什么排在这** 写着「你在五笔里记住的词」。码表里的 **忘掉学到的** 只忘掉这个编码下学到的顺序，不再连拼音里学到的一起忘掉。点错了可以在提示条上撤销，长按这个候选选 **删除**，或在 **用户词库 → 自动学到的词** 里删掉。每个码表的设置里有 **逐字打出后给出组词**，默认开。
+- 码表（五笔、二笔、五笔拼音等）逐字打出一个词后停一下，键盘上方的提示条给出「记住：汪小明 iije」，点了才记住，以后按组词规则的编码打得出；不点什么都不存，提示条在接着按键、换输入框、收起键盘时收起。记住的词在自动学到的词里带日期，长按选 **为什么排在这** 写着「你在五笔里记住的词」。码表里的 **忘掉学到的** 只忘掉这个编码下学到的顺序，不再连拼音里学到的一起忘掉；**清掉最近** 也删掉这段时间里记住的词。点错了可以在提示条上撤销，长按这个候选选 **删除**，或在 **用户词库 → 自动学到的词** 里删掉。每个码表的设置里有 **逐字打出后给出组词**，默认开。
 - 新开关 **空格上屏联想词**（**通用输入**，默认关）：开着时上屏后的联想第一个词画成首选的样子，按空格上屏它，不加空格。
 - 候选不再在停顿后跳动：同样的输入总给出同样的候选。
-- **性能档位** 新增「自动」并设为默认，按本机处理器定一次；原来没改过档位或选的是高档的，都会变成自动，想固定高档请重新选一次。
+- **性能档位** 新增「自动」并设为默认，按本机处理器定一次，选项上写着本机定成哪档；原来没改过档位或选的是高档的，都会变成自动，想固定高档请重新选一次。
 - 导入别的输入法的皮肤转得更全：百度皮肤的按键图标（彩色的图，按下时换的图或颜色）、画成图片的字母、字号和粗细、角标颜色、按下缩放、深色版的背景图，搜狗皮肤带的字体，都转过来。新支持加密的搜狗手机皮肤、讯飞的 `.it`、同文用 `__include`、`__patch` 写的主题，百度新引擎的 `.bda` 初步支持。皮肤里画的 26 键、九键、18 键、14 键可以勾上 **一起导入**，放进 **外观 → 布局**（默认不勾，用 App 自己的键位；放进去的要在那里 **用在…** 打开才能选）。网页制作页也能打开这些皮肤（**打开文件…** 或拖进页面），转成主题接着改。转出来的主题用到这些 0.6.3 才有的东西时最低版本是 0.6.3，没用到的照旧是 0.6.0，在 0.6.0–0.6.2 上也能导入。
 - 主题可以带一只小宠物，待在键盘角上或候选栏右边：按字母、退格、回车、空格时各做一个小动作，久不按会睡着。由「键盘动效」开关管。在网页制作页里可以给自己的主题加宠物。
 - 数字键盘换成九键的样子：左边是一条能上下滑的符号列（`+ - * /` 一开始就看得到，往下滑是 `% , : ( ) #`），`=` 挪到 9 右边，0 在 8 下面、和上面的数字对齐，底排不再有 `,` 和 `=`。
@@ -35,7 +35,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 添加词的拼音框下面说明：码表里也能打这个词，编码自动算。
 - 导入手心（`.sxi`）、Gboard、仓输入法（`.cskin`）、安装包（APK）里的主题和搜狗的自制皮肤时，说出是哪一种「暂不支持导入」，不再说只能导入主题文件；读不出来的搜狗皮肤提示「这个搜狗皮肤读不出来（文件可能不完整或是新的格式）」，不再说是加密的。
 - 主题的 **信息** 写出它需要的最低版本（需要 0.6.0 以后的版本时，如「主题格式 4.0，需要 0.6.3 或更新的版本」）。
-- 网页制作页：按键可以加 **贴纸**（画在键面上的图，可以顶替字），图标可以换成 PNG、WebP 的位图图标，背景可以给深色版另选一张图；保存时自动写上需要的最低版本，用了这些或宠物时是 0.6.3，旧版 App 导入时提示要更新，不会画坏。
+- 主题的按键可以加 **贴纸**（画在键面上的图，可以顶替字），图标可以用 PNG、WebP 的位图图标，深色版可以另有一张背景图，网页制作页里都能直接改；保存时自动写上需要的最低版本，用了这些或宠物时是 0.6.3，旧版 App 导入时提示要更新，不会画坏。
 - 0.4 及更早的版本不能再直接升级到这一版：先覆盖安装 0.6.2，弹出键盘打几个字、停一下，再装这一版。直接升级的话，码表里存的词等会丢掉，也没有提示。
 - 0.6.0 测试版里改过的长按和滑动不再带过来：回到从 0.5 带过来的设置，没有的用预设；测试版里清空过的列表也不再是关着的。0.6.0 正式版及以后改的照旧都在。
 - 网页上 0.6.0 之前的主题制作页（原来顶栏的 **旧版**）去掉了。它做的 3.0 主题 App 照样能导入，也能在现在的制作页用 **打开文件…** 打开接着改。
@@ -49,13 +49,15 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 关于页显示本机处理器和自动档在本机定成的档位（「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」）。
 - 手写高档不再在停笔后重排，和中档相同。
 - 数字键盘的运算符从键变成列里的项，字号和颜色跟着变；主题里给 `+`、`,` 这些运算键单独设的样子不再起作用。
-- 在音节条或九键左边的拼音选择栏点定的音节和声母、九键连按和滑行定下的字母、注音九键长按选的符号，照样按开着的模糊音读：开了 in ↔ ing 点 jing 也出「金」。九键上 u ↔ v 也在这些地方起作用。
 
 ### 修复
 
 - 手动加了叠字的词（「方方」），语音会把「芳芳」听成「方方方方」：叠字的热词接着自己又算了一次。现在只打一遍。
 - 下滑弹出的编辑菜单难用：手指滑出后再往下多走一点（约 4 dp）菜单就没了，往上滑回键上反而会执行。现在下滑弹出的菜单（编辑菜单、选输入法）和上滑的反过来：接着往下走多远都不取消，往上滑回键上才取消，左右挪法和上滑一样；上滑的照旧。
 - **已学条目** 里注音键盘上固定的词标成了「码表」，按键是空白：现在标「注音九键」「注音全键盘」，按键显示成注音符号（注音九键显示每个键上的那组符号），以前带着声调的显示声调符号。
+- 在音节条或九键左边的拼音选择栏点定的音节和声母、九键连按和滑行定下的字母、注音九键长按选的符号，不按开着的模糊音读：开了 in ↔ ing，点 jing 不出「金」。现在照样按模糊音读，九键上 u ↔ v 也在这些地方起作用。
+- 长按候选打开的词卡比弹窗高、上下滑过以后，点字的那几行、**上屏**、**复制**、返回都没反应。现在滑过也一点就开。
+- 上滑、下滑设成只有一个字的文字（比如九键 1 键上滑「1」、空格上滑「0」），键角画得比别的键角小、细。现在和长按首选的键角一样大、一样粗，窄的键上放不下时照旧画成原来的样子。
 
 ### Main changes
 
@@ -63,11 +65,11 @@ Each release lists its **main changes** (new features, large improvements), its 
 - 双拼 can show the keys pressed in the code row instead of the full pinyin: turn on **编码行显示双拼按键** in 双拼's settings (off by default) and 小鹤's `nihc` shows `ni hc`. On the full, 18, 14 and nine keys and with every scheme; on the 18, 14 and nine keys each key shows the letter it was read as (自然码's 6 4 4 5 on the nine keys shows `ni hk`), and Enter puts in those letters; the syllable bar and the nine keys' column show their syllables as keys too (自然码's sha as `ua`, the initial sh as `u`).
 - The clipboard has **Favorites**: its panel has two pages, Recent and Favorites. Long-press an entry in Recent and pick **Favorite** to keep it: it does not count against the limit and clearing Recent leaves it. In Favorites, **Remove from favorites** (undoable) and **Move to top**. Pinned entries are favorites after the upgrade. Restoring a backup merges the favorites with the phone's, every one on the phone kept, sensitive ones too. With clipboard history off the favorites still work.
 - 中英混输 on pinyin's nine, 14 and 18 keys: tap the keys of an English word's letters, as `474663` for iPhone or `9633474663` for 我的iPhone on the nine keys, under the same **中英混输** switch as the full keyboard, words learned in English included. The code row shows such a word in lower case, and Enter commits that (`iphone`).
-- Voice now looks at the whole sentence before writing one of your homophones for what it heard: it replaces only where the sentence reads right, not every time it hears a word read alike. With 攻势 added, 「敌人的公式很猛」 is written 「敌人的攻势很猛」 while 「推导这个公式」 keeps 公式; words added by hand go in more readily than words learned from typing. Typed again as your word where voice left it, it asks 「以后总是把『公式』写成『攻势』？」: tap **总是换** and voice always writes the word; tap it in **用户词库 → 手动添加的词** and choose **取消语音总是换** (Stop always writing it in voice) to stop.
-- In a table (Wubi, Erbi, Wubi-Pinyin and the others), a word typed a character at a time is offered on the notice strip above the keys after a pause, as 「记住：汪小明 iije」. It is remembered only when tapped, under the code its rules give, and nothing is kept otherwise; the strip goes at the next key, a field change or the keyboard closing. A remembered word shows its date in the learned words, and **为什么排在这** names it remembered. A table's **忘掉学到的** forgets the order under that code alone, no longer what pinyin learned. A mistaken tap is undone on the strip, or deleted by long-pressing the candidate (**删除**) or in **用户词库 → 自动学到的词**. Each table's settings have **逐字打出后给出组词**, on by default.
+- Voice now looks at the whole sentence before writing one of your homophones for what it heard: it replaces only where the sentence reads right, not every time it hears a word read alike. With 攻势 added, 「敌人的公式很猛」 is written 「敌人的攻势很猛」 while 「推导这个公式」 keeps 公式; words added by hand go in more readily than words learned from typing. Typed again as your word where voice left it, it asks 「以后总是把『公式』写成『攻势』？」 (where voice would write it, it asks to remember it, 「记住」): tap **总是换** and voice always writes the word; tap it in **用户词库 → 手动添加的词** and choose **取消语音总是换** (Stop always writing it in voice) to stop.
+- In a table (Wubi, Erbi, Wubi-Pinyin and the others), a word typed a character at a time is offered on the notice strip above the keys after a pause, as 「记住：汪小明 iije」. It is remembered only when tapped, under the code its rules give, and nothing is kept otherwise; the strip goes at the next key, a field change or the keyboard closing. A remembered word shows its date in the learned words, and **为什么排在这** names it remembered. A table's **忘掉学到的** forgets the order under that code alone, no longer what pinyin learned; **清掉最近** (clear recent) also deletes the words remembered in that time. A mistaken tap is undone on the strip, or deleted by long-pressing the candidate (**删除**) or in **用户词库 → 自动学到的词**. Each table's settings have **逐字打出后给出组词**, on by default.
 - A new switch, **空格上屏联想词** (**通用输入**, off by default): the first word predicted after a commit is drawn as the first choice and Space puts it in, with no space after it.
 - Candidates no longer jump after a pause: the same input always gives the same candidates.
-- **性能档位** has a new **自动** (auto), now the default, set once from this device's processor. Who never changed the level or chose high gets auto; to keep high, choose it again.
+- **性能档位** has a new **自动** (auto), now the default, set once from this device's processor, the choice saying which level it is here. Who never changed the level or chose high gets auto; to keep high, choose it again.
 - Other input methods' skins come over more fully: a Baidu skin's key icons (colour pictures, a pressed picture or colour), letters drawn as pictures, text size and weight, mark colour, press shrink and dark background, and a Sogou skin's font. New: encrypted Sogou phone skins, iFlytek's `.it`, Trime themes written with `__include` and `__patch`, and, as a first step, Baidu's new-engine `.bda`. A skin's 26, nine, 18 and 14 keys can come too as layouts in **外观 → 布局** with **一起导入** ticked (unticked by default: the app's own keys; to type on one, turn it on there with **Use for…**). The web theme maker opens these skins as well (**打开文件…** or a drop on the page) and turns them into a theme to go on editing. A converted theme needs 0.6.3 where it uses one of these 0.6.3 things, else still 0.6.0, and imports on 0.6.0–0.6.2.
 - A theme can carry a little pet, sitting in a corner of the keys or at the end of the candidate bar: it does a small move for letters, backspace, Return and space, and falls asleep when no key is pressed for a while. With 「键盘动效」 off it stands still. The web theme maker adds one to your own theme.
 - The number pad looks like the nine keys now: a column of symbols on the left that scrolls (`+ - * /` in sight, `% , : ( ) #` further down), `=` right of 9, 0 under 8 and in line with the digits above, and no `,` or `=` on the bottom row.
@@ -82,7 +84,7 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The pinyin field of the add-word dialog says that the tables type the word too, with its code worked out.
 - Importing a 手心 (`.sxi`), Gboard, 仓 (`.cskin`) or APK theme, or a Sogou DIY skin, says which it is and that it is not supported yet, no longer that only theme files import; a Sogou skin that cannot be read says 「这个搜狗皮肤读不出来（文件可能不完整或是新的格式）」 instead of calling it encrypted.
 - A theme's **信息** names the app version it needs where that is past 0.6.0 (「主题格式 4.0，需要 0.6.3 或更新的版本」).
-- The web theme maker: keys can have a **贴纸** (sticker, a picture on the face that can stand for the letter), icons can be PNG or WebP pictures, and the dark version can have a background picture of its own; saving writes the lowest app version needed, 0.6.3 with these or a pet, so an older app asks to be updated instead of drawing it wrong.
+- A theme's keys can have a **贴纸** (sticker, a picture on the face that can stand for the letter), its icons can be PNG or WebP pictures, and its dark version a background picture of its own, all edited on the web theme maker; saving writes the lowest app version needed, 0.6.3 with these or a pet, so an older app asks to be updated instead of drawing it wrong.
 - 0.4 and earlier no longer upgrade straight to this release: install 0.6.2 over it first, type a few characters on its keyboard and pause, then install this one. Upgraded directly, the phrases saved in the tables, among others, are lost without a word.
 - Long press and swipe lists edited in the 0.6.0 betas are no longer carried over: they go back to what 0.5 left, or else the presets, and a list emptied in a beta is no longer turned off. Edits from 0.6.0 on stay.
 - The theme maker of before 0.6.0 (**旧版** in the top bar) is gone. The 3.0 themes it made still import into the app, and the current maker's **打开文件…** opens them to go on editing.
@@ -96,13 +98,15 @@ Each release lists its **main changes** (new features, large improvements), its 
 - The about page shows this device's processor and the level Auto picks here (「中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL」).
 - Handwriting at the high level no longer reorders after the pen stops: it is the same as medium.
 - The number pad's operators are items of the column now, not keys, in its size and colour; a theme's own style for an operator key such as `+` or `,` no longer applies.
-- A syllable or initial picked in the syllable bar or the nine keys' pinyin column, letters typed by 连按 or a glide on the nine keys, and a symbol long-pressed on 注音九键 still read the fuzzy pairs on: with in ↔ ing, picking jing also gives 金. On the nine keys u ↔ v applies there too.
 
 ### Fixes
 
 - With a reduplicated word added (方方), voice wrote 芳芳 as 方方方方: the hotword counted again right after itself. It is written once now.
 - The edit menu a swipe down opened was hard to use: a few more dp down after it opened took it away, and sliding back up onto the key ran the cell instead. A menu a swipe down opens (the edit menu, 选输入法) now mirrors the swipe-up one: going on down never cancels it, back up onto the key does, and left and right pick as on a swipe up; the swipe-up menus are unchanged.
 - In **已学条目**, a word pinned on a zhuyin keyboard was labelled 「码表」 with blank keys: it now says 注音九键 or 注音全键盘 and shows its keys in zhuyin (each 注音九键 key as its group of symbols), an older code's tones as their marks.
+- A syllable or initial picked in the syllable bar or the nine keys' pinyin column, letters typed by 连按 or a glide on the nine keys, and a symbol long-pressed on 注音九键 did not read the fuzzy pairs on: with in ↔ ing, picking jing gave no 金. They read them now, and on the nine keys u ↔ v applies there too.
+- After scrolling a word card taller than its popup (long-press a candidate), its characters' rows, **上屏**, **复制** and back did nothing when tapped. They open at the first tap now.
+- A swipe set to a text of one character (1 up on the nine keys' 1, 0 up on the space bar) drew its corner smaller and thinner than the other corners. It is drawn as large and bold as a long-press first now, as before where a narrow key has no room.
 
 ---
 
