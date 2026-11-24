@@ -345,7 +345,7 @@ def t972(d):
     d.switch_im("英文")
     english = p.column_all(d)
     check(english == [",", ".", "?", "!", "'", "-", ":", ";", "@"], f"英文九键左列是 {english}")
-    p.hold_item(d, p.item_of(d, "@"), pick="删除这一项")
+    p.hold_item(d, p.item_of(d, "@"), pick=p.REMOVE)
     after = p.column_all(d)
     check("@" not in after, f"删了 @ 后英文左列 {after}")
     d.switch_im("拼音")

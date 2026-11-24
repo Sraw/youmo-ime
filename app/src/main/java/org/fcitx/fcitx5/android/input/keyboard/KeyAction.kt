@@ -99,9 +99,4 @@ sealed class KeyAction {
 
     /** Never None; run once what is typed is put in (KeyShortcutRunner). */
     data class ShortcutAction(val shortcut: KeyShortcut) : KeyAction()
-
-    /** A scroll list's item [index] changed from its long press menu; the keyboard's own, never typed. */
-    data class ScrollList(val list: String, val index: Int, val op: Op) : KeyAction() {
-        enum class Op { Remove, ToFront, Edit }
-    }
 }

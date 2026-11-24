@@ -198,8 +198,8 @@
 ### PAN-28 [P1] 数字键盘、符号面板的动作长按和别的键盘一样
 - **前提**：B0；快捷短语有至少一条。
 - **操作**：1. 点数字输入框，长按数字键盘的 `符`。2. 普通文本框打开符号面板，长按 `123`。3. 在字母键盘上长按空格，记下发生了什么；再到数字键盘上长按空格。4. 长按数字键盘左列的 `+`。
-- **预期**：1. 打开快捷短语。2. 打开 Unicode 输入。3. 两个键盘长按空格做的事相同。4. 弹出 删除这一项、移到最前、编辑这一列… 三项的菜单（运算符在列里，不再是键；菜单的细节见 KB-117），不打出 `+`。
-- **JVM**：app `PanelKeysUatTest.actionLongPressesEverywhere`、`.numberPadsSpaceHeldAsTheLetters`；第 4 步 `ScrollColumnMenuTest.aHeldItemShowsTheMenuAndMovesToTheFront`。
+- **预期**：1. 打开快捷短语。2. 打开 Unicode 输入。3. 两个键盘长按空格做的事相同。4. 弹出 移到最前、编辑这一列…、删除「+」 三项的菜单（运算符在列里，不再是键；菜单的细节见 KB-117），松手后菜单还在，不打出 `+`。
+- **JVM**：app `PanelKeysUatTest.actionLongPressesEverywhere`、`.numberPadsSpaceHeldAsTheLetters`；第 4 步 `ScrollColumnMenuTest.theNumberPadsColumnHasTheSameMenu`、`.aHeldItemsMenuStaysAfterTheLiftAndMovesToTheFrontUndone`。
 
 ### PAN-36 [P0] 数字键盘左列：先露出 + - * /，往下滑有别的
 - **前提**：B0。

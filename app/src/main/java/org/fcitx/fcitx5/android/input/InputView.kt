@@ -726,6 +726,7 @@ class InputView(
     fun finishInput(finishingInput: Boolean) {
         hold?.inputEnded(if (finishingInput) Hold.InputEnd.LEFT else Hold.InputEnd.HIDDEN)
         if (!finishingInput) keyboardWindow.keyboardHidden()
+        keyboardWindow.inputFinished()
         floatingController.inputEnded()
         broadcaster.onFinishInput()
     }
@@ -834,6 +835,8 @@ class InputView(
         ThemeManager.prefs.oneHandedSide.unregisterOnChangeListener(onStyleChangeListener)
         // a replaced view's windows are never detached: what they had going, the microphone above all, stops here
         broadcaster.onFinishInput()
+        // rotation and a theme change swap the view without finishInput; the menu would stay at the old spot
+        keyboardWindow.inputFinished()
         // clear DynamicScope, implies that InputView should not be attached again after detached.
         scope.clear()
         viewScope.cancel()

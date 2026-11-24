@@ -870,7 +870,9 @@
     <string name="long_press_none">長按這個鍵不彈出字元。</string>
     <string name="long_press_off">這個鍵的長按已關。新增字元就重新開啟。</string>
     <string name="long_press_newer">長按字元是新版本的應用程式設定的：原樣保留，這裡不能改。</string>
-    <string name="scroll_list_remove">刪除這一項</string>
+    <string name="scroll_list_remove">刪除「%1$s」</string>
+    <string name="scroll_list_removed">已刪除「%1$s」</string>
+    <string name="scroll_list_moved_to_front">已移到最前</string>
     <string name="scroll_list_to_front">移到最前</string>
     <string name="scroll_list_edit">編輯這一列…</string>
     <string name="a11y_scroll_list_remove">刪除這一項</string>

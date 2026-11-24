@@ -18,11 +18,11 @@ import android.view.ViewConfiguration
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.Keep
-import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.ViewCompat
@@ -43,16 +43,15 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.KeyboardCanvasView
 import org.fcitx.fcitx5.android.input.keyboard.canvas.PackIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneIcons
 import org.fcitx.fcitx5.android.input.keyboard.canvas.set
+import org.fcitx.fcitx5.android.input.keys.ScrollListMenu
 import org.fcitx.fcitx5.android.input.keys.ScrollListStore
-import org.fcitx.fcitx5.android.input.popup.PopupAction
-import org.fcitx.fcitx5.android.input.popup.PopupFocus
+import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.scene.KeyRef
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.input.shortcut.KeyShortcut
 import org.fcitx.fcitx5.android.scene.Scene
 import org.fcitx.fcitx5.android.scene.SlotNode
 import org.fcitx.fcitx5.android.scene.engine.Input
-import org.fcitx.fcitx5.android.scene.engine.Popups
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.keys.ScrollLists
@@ -60,6 +59,9 @@ import org.fcitx.fcitx5.android.scene.layout.Direction
 import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import org.fcitx.fcitx5.android.utils.AppUtil
+import org.fcitx.fcitx5.android.utils.DeviceUtil
+import org.fcitx.fcitx5.android.utils.item
+import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.leftOfParent
@@ -176,12 +178,7 @@ internal class ScrollColumn(
         return (at / itemSize).toInt().takeIf { it < shown.size } ?: -1
     }
 
-    /** Item [i]'s box in the view as scrolled now. */
-    fun itemBounds(i: Int, out: Rect) {
-        val child = items.getChildAt(i) ?: return out.setEmpty()
-        out.set(child.left, child.top, child.right, child.bottom)
-        out.offset(view.paddingLeft - view.scrollX, view.paddingTop - view.scrollY)
-    }
+    fun itemView(i: Int): View? = items.getChildAt(i)
 
     private val actionIds = HashMap<Int, List<Int>>()
     private val actionNames = HashMap<Int, List<String>>()
@@ -217,7 +214,11 @@ internal class ScrollColumn(
         foregroundGravity = Gravity.CENTER
         setTextColor(altColor)
         layoutParams = itemParams()
-        background = StateListDrawable().apply { addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(pressColor)) }
+        // activated: the item a menu is open on, its press gone with the finger
+        background = StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(pressColor))
+            addState(intArrayOf(android.R.attr.state_activated), ColorDrawable(pressColor))
+        }
         isClickable = true
         setOnClickListener {
             InputFeedbacks.hapticFeedback(this)
@@ -293,16 +294,14 @@ internal class ScrollColumn(
  * A keyboard's columns, one for each `scroll` and `nine-side` slot of its scene by place, placed in its layout pass.
  * A finger landing in one is that column's alone ([target]): it scrolls it, taps or long presses an item.
  */
-@Suppress("LongParameterList")
 internal class ScrollColumns(
     private val keyboard: BaseKeyboard,
     private val theme: Theme,
     private val canvas: () -> KeyboardCanvasView?,
     private val marks: () -> Map<String, String>,
     private val act: (KeyAction) -> Unit,
-    private val popup: (PopupAction) -> Unit,
-    private val focus: (KeyRef, Float, Float) -> Boolean,
-    private val trigger: (KeyRef) -> Boolean,
+    /** The notice above the keys, with its undo. */
+    private val say: (String, UndoChip.Undo) -> Unit,
 ) {
     private class Column(val kind: String, val view: ScrollColumn) {
         var slot: SlotNode? = null
@@ -368,6 +367,7 @@ internal class ScrollColumns(
             keyboard.removeView(columns.removeAt(columns.lastIndex).view.view)
         }
         columns.drop(slots.size).forEach { it.slot = null }
+        if (menuOn != null && menuOn !in columns) dismissMenu()
         // a scene remade for Shift or a key typed (English's nine keys, each key) reads the same: its items, menus and
         // TalkBack's names are not made again
         if (added || reading() != read) update()
@@ -435,13 +435,17 @@ internal class ScrollColumns(
                 composing = columnInput.composing,
             )
             c.items = (c.shown as? ScrollLists.Shown.Category)?.let { store[it.id] }.orEmpty()
+            if (menuOn === c && (c.shown != was || c.items != itemsWere)) dismissMenu()
             val sameItems = c.shown is ScrollLists.Shown.Category && c.shown == was && c.items == itemsWere
             c.view.refresh(anew = c.shown != was, typing = c.shown == ScrollLists.Shown.Syllables, sameItems = sameItems)
         }
     }
 
-    /** Another field: every column from its start. */
-    fun toStart() = columns.forEach { it.view.toStart() }
+    /** Another field: every column from its start, a menu open put away. */
+    fun toStart() {
+        dismissMenu()
+        columns.forEach { it.view.toStart() }
+    }
 
     private fun labels(c: Column): List<ScrollColumn.Label> = when (val s = c.shown) {
         ScrollLists.Shown.Syllables -> keyboard.columnSyllables().map { ScrollColumn.Label(it) }
@@ -457,35 +461,79 @@ internal class ScrollColumns(
     }
 
     // syllables are the typing's, no list's
-    private fun menu(c: Column, i: Int): Pair<List<KeyDef.Popup.Menu.Item>, Set<Int>>? {
+    private fun menuFor(c: Column, i: Int): ScrollListMenu? {
         val s = c.shown as? ScrollLists.Shown.Category ?: return null
-        if (i !in c.items.indices) return null
-        val items = OPS.mapIndexed { j, (op, _, icon) -> KeyDef.Popup.Menu.Item(opLabels[j], icon, KeyAction.ScrollList(s.id, i, op)) }
-        val disabled = if (readOnly) items.indices.toSet() else setOfNotNull(0.takeIf { c.items.size <= 1 }, 1.takeIf { i == 0 })
-        return items to disabled
+        return c.items.getOrNull(i)?.let { ScrollListMenu(s.id, i, it) }
     }
 
     // a newer version's lists are left as they are; before the first unlock a change would be lost to the
     // credential-encrypted copy synced over it
     private val readOnly: Boolean get() = store.newer || FcitxApplication.getInstance().isDirectBootMode
 
-    // read once: every item's menu and TalkBack names are made again on each refresh
-    private val opLabels by lazy(LazyThreadSafetyMode.NONE) { OPS.map { context.getString(it.label) } }
-    private val opNames by lazy(LazyThreadSafetyMode.NONE) { OPS.map { context.getString(A11Y.getValue(it.op)) } }
+    // read once: every item's TalkBack names are made again on each refresh
+    private val opNames by lazy(LazyThreadSafetyMode.NONE) { ScrollListMenu.Op.entries.associateWith { context.getString(A11Y.getValue(it)) } }
 
+    // the item at [i] when run, as the view it is on shows it now
     private fun actions(c: Column, i: Int): List<Pair<String, () -> Unit>> {
-        val (items, disabled) = menu(c, i) ?: return emptyList()
-        return items.indices.filter { it !in disabled }.map { j -> opNames[j] to { change(items[j].action as KeyAction.ScrollList) } }
+        val entries = menuFor(c, i)?.entries(store, readOnly) ?: return emptyList()
+        return entries.filter { it.enabled }.map { e -> opNames.getValue(e.op) to { menuFor(c, i)?.let { run(c, it, e.op) } ?: Unit } }
     }
 
-    /** The menu's pick: the list shown changed, or its card opened. */
-    fun change(a: KeyAction.ScrollList) {
-        if (readOnly) return
-        when (a.op) {
-            KeyAction.ScrollList.Op.Remove -> if (store[a.list].size > 1) pref.setValue(store.removed(a.list, a.index).serialize())
-            KeyAction.ScrollList.Op.ToFront -> if (a.index > 0) pref.setValue(store.toFront(a.list, a.index).serialize())
-            KeyAction.ScrollList.Op.Edit -> AppUtil.launchMainToScrollList(context, a.list)
+    // as the column shows it: a mark converted, a command by its name
+    private fun named(menu: ScrollListMenu): String =
+        ScrollColumn.label(context, menu.list, menu.item, keyboard.columnEnglish, marks()).let { it.said ?: it.text }
+
+    private fun run(c: Column, menu: ScrollListMenu, op: ScrollListMenu.Op) {
+        if (op == ScrollListMenu.Op.Edit) {
+            if (!readOnly) AppUtil.launchMainToScrollList(context, menu.list)
+            return
         }
+        val change = menu.change(store, (c.shown as? ScrollLists.Shown.Category)?.id, op, readOnly) ?: return
+        val said = when (op) {
+            ScrollListMenu.Op.Remove -> context.getString(R.string.scroll_list_removed, named(menu))
+            else -> context.getString(R.string.scroll_list_moved_to_front)
+        }
+        pref.setValue(change.store.serialize())
+        say(said, UndoChip.Undo({ change.undo.undone(store, readOnly)?.let { pref.setValue(it.serialize()) } }))
+    }
+
+    private var popupMenu: PopupMenu? = null
+    private var menuOn: Column? = null
+    private var menuAnchor: View? = null
+
+    fun dismissMenu() {
+        val open = popupMenu ?: return
+        closed()
+        open.dismiss()
+    }
+
+    private fun closed() {
+        menuAnchor?.isActivated = false
+        popupMenu = null
+        menuOn = null
+        menuAnchor = null
+    }
+
+    private fun open(c: Column, menu: ScrollListMenu, entries: List<ScrollListMenu.Entry>, anchor: View) {
+        val ctx = anchor.context
+        val popup = PopupMenu(ctx, anchor)
+        val tint = ctx.styledColor(android.R.attr.colorControlNormal)
+        for (e in entries) {
+            val label = when (e.op) {
+                ScrollListMenu.Op.ToFront -> ctx.getString(R.string.scroll_list_to_front)
+                ScrollListMenu.Op.Edit -> ctx.getString(R.string.scroll_list_edit)
+                ScrollListMenu.Op.Remove -> ctx.getString(R.string.scroll_list_remove, named(menu))
+            }
+            popup.menu.item(label, ICONS.getValue(e.op), tint) { run(c, menu, e.op) }.isEnabled = e.enabled
+        }
+        if (!DeviceUtil.isSamsungOneUI && !DeviceUtil.isFlyme) popup.setForceShowIcon(true)
+        dismissMenu()
+        popup.setOnDismissListener { if (it === popupMenu) closed() }
+        popupMenu = popup
+        menuOn = c
+        menuAnchor = anchor
+        anchor.isActivated = true
+        popup.show()
     }
 
     private fun hit(c: Column, x: Float, y: Float): Boolean {
@@ -523,22 +571,11 @@ internal class ScrollColumns(
         private var scrolled = 0
         private var item = -1
         private var pressed: ScrollItem? = null
+        // the menu stays after the finger lifts, picked by a tap: its moves and lift until then do nothing
         private var menuShown = false
-        private var lastX = 0f
-        private var menuX = 0f
-        private var movedOnMenu = false
-        private val cell = Rect()
         private val slop = ViewConfiguration.get(context).scaledTouchSlop
         private val longPress = Runnable { showMenu() }
         private var gone = false
-
-        private val menuCell = Popups.px(Popups.MENU_CELL_DP, context.resources.displayMetrics.density.toDouble()).toFloat()
-        private val menuLift = Popups.px(Popups.MENU_LIFT_DP, context.resources.displayMetrics.density.toDouble()).toFloat()
-
-        // the menu's first focus is the cell over the finger: a wobble there picks nothing, only going onto the
-        // menu's row or as far sideways as moves its focus does
-        private fun onMenu(x: Float, y: Float) =
-            y < cell.top - menuLift + menuCell || abs(x - menuX) > menuCell * PopupFocus.STEP * (0.5f + PopupFocus.HYSTERESIS)
 
         /** Another finger landed on the column. */
         fun crowded() {
@@ -549,11 +586,10 @@ internal class ScrollColumns(
         }
 
         override fun send(event: MotionEvent, action: Int, pointerIndex: Int) {
-            if (gone) return
+            if (gone || menuShown) return
             val v = column.view.view
             val x = event.getX(pointerIndex)
             val y = event.getY(pointerIndex)
-            lastX = x
             when (action) {
                 MotionEvent.ACTION_DOWN -> {
                     downTime = event.eventTime
@@ -562,22 +598,9 @@ internal class ScrollColumns(
                     scrolled = v.scrollX + v.scrollY
                     item = column.view.itemAt(x - v.left, y - v.top)
                     pressed = column.items.getOrNull(item)
-                    if (menu(column, item) != null) keyboard.postDelayed(longPress, AppPrefs.getInstance().keyboard.longPressDelay.getValue().toLong())
+                    if (menuFor(column, item) != null) keyboard.postDelayed(longPress, AppPrefs.getInstance().keyboard.longPressDelay.getValue().toLong())
                 }
-                MotionEvent.ACTION_MOVE -> if (menuShown) {
-                    if (onMenu(x, y)) movedOnMenu = true
-                    focus(ref, x - cell.left, y - cell.top)
-                    return
-                }
-                MotionEvent.ACTION_UP -> {
-                    keyboard.removeCallbacks(longPress)
-                    if (menuShown) {
-                        menuShown = false
-                        // only an item the finger went onto is picked
-                        if (movedOnMenu) trigger(ref) else popup(PopupAction.DismissAction(ref))
-                        return
-                    }
-                }
+                MotionEvent.ACTION_UP -> keyboard.removeCallbacks(longPress)
             }
             forward(event.eventTime, action, x - v.left, y - v.top)
             // held still: a drag stopped would pick the item it started on
@@ -596,47 +619,40 @@ internal class ScrollColumns(
 
         private fun showMenu() {
             // the list changed under the finger: the place held now has another item
-            if (column.items.getOrNull(item) != pressed) return
-            val (items, disabled) = menu(column, item) ?: return
-            val v = column.view.view
+            val held = pressed ?: return
+            if (column.items.getOrNull(item) != held) return
+            val menu = menuFor(column, item) ?: return
+            val entries = menu.entries(store, readOnly) ?: return
+            val anchor = column.view.itemView(item) ?: return
             forward(SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, 0f, 0f)
-            column.view.itemBounds(item, cell)
-            cell.offset(v.left, v.top)
-            val at = IntArray(2).also { keyboard.getLocationInWindow(it) }
-            val bounds = Rect(cell).apply { offset(at[0], at[1]) }
             InputFeedbacks.hapticFeedback(keyboard, longPress = true)
             menuShown = true
-            movedOnMenu = false
-            menuX = lastX
-            popup(PopupAction.ShowMenuAction(ref, KeyDef.Popup.Menu(items.toTypedArray()), bounds, disabled))
+            open(column, menu, entries, anchor)
         }
 
         override fun cancel() {
             keyboard.removeCallbacks(longPress)
             if (!menuShown) forward(SystemClock.uptimeMillis(), MotionEvent.ACTION_CANCEL, 0f, 0f)
-            menuShown = false
         }
     }
-
-    private data class Op(val op: KeyAction.ScrollList.Op, @StringRes val label: Int, @DrawableRes val icon: Int)
 
     companion object {
         private const val SCROLL = "scroll"
         private val KINDS = setOf(SCROLL, ScrollLists.NINE_SIDE)
 
-        /** The menu's key: a column's place, no key's. */
+        /** A finger's target: a column's place, no key's. */
         private const val REF = "scroll:"
 
-        private val OPS = listOf(
-            Op(KeyAction.ScrollList.Op.Remove, R.string.scroll_list_remove, R.drawable.ic_baseline_delete_24),
-            Op(KeyAction.ScrollList.Op.ToFront, R.string.scroll_list_to_front, R.drawable.ic_baseline_arrow_upward_24),
-            Op(KeyAction.ScrollList.Op.Edit, R.string.scroll_list_edit, R.drawable.ic_baseline_edit_24),
+        private val ICONS = mapOf(
+            ScrollListMenu.Op.ToFront to R.drawable.ic_baseline_arrow_upward_24,
+            ScrollListMenu.Op.Edit to R.drawable.ic_baseline_edit_24,
+            ScrollListMenu.Op.Remove to R.drawable.ic_baseline_delete_24,
         )
 
         private val A11Y = mapOf(
-            KeyAction.ScrollList.Op.Remove to R.string.a11y_scroll_list_remove,
-            KeyAction.ScrollList.Op.ToFront to R.string.a11y_scroll_list_to_front,
-            KeyAction.ScrollList.Op.Edit to R.string.a11y_scroll_list_edit,
+            ScrollListMenu.Op.ToFront to R.string.a11y_scroll_list_to_front,
+            ScrollListMenu.Op.Edit to R.string.a11y_scroll_list_edit,
+            ScrollListMenu.Op.Remove to R.string.a11y_scroll_list_remove,
         )
     }
 }

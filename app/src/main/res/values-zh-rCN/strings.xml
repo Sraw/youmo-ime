@@ -870,7 +870,9 @@
     <string name="long_press_none">长按这个键不弹出字符。</string>
     <string name="long_press_off">这个键的长按已关。添加字符就重新打开。</string>
     <string name="long_press_newer">长按字符是新版本的应用设置的：原样保留，这里不能改。</string>
-    <string name="scroll_list_remove">删除这一项</string>
+    <string name="scroll_list_remove">删除「%1$s」</string>
+    <string name="scroll_list_removed">已删除「%1$s」</string>
+    <string name="scroll_list_moved_to_front">已移到最前</string>
     <string name="scroll_list_to_front">移到最前</string>
     <string name="scroll_list_edit">编辑这一列…</string>
     <string name="a11y_scroll_list_remove">删除这一项</string>

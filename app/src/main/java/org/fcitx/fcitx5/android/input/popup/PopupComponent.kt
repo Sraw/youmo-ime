@@ -380,7 +380,7 @@ class PopupComponent :
         showPopupContainer(key, keyboardUi, "popup")
     }
 
-    private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect, disabled: Set<Int>) {
+    private fun showMenu(key: KeyRef, menu: KeyDef.Popup.Menu, bounds: Rect) {
         val scenes = scenesFor(key) ?: return
         val menuUi = PopupMenuUi(
             context,
@@ -391,7 +391,6 @@ class PopupComponent :
             menu.items,
             onFocusMoved = { InputFeedbacks.hapticFeedback(it) },
             scenes = scenes,
-            disabled = disabled,
         )
         if (menuUi.unmade) return
         showingEntryUi[key]?.let {
@@ -571,7 +570,7 @@ class PopupComponent :
                 is PopupAction.PreviewAction -> showPopup(key, content, bounds)
                 is PopupAction.PreviewUpdateAction -> updatePopup(key, content, words)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(key, keyboard, bounds)
-                is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds, disabled)
+                is PopupAction.ShowMenuAction -> showMenu(key, menu, bounds)
                 is PopupAction.ShowEditMenuAction -> outShown = showEditMenu(key, bounds, password, down)
                 is PopupAction.ShowInputMethodMenuAction -> outShown = showInputMethodMenu(key, bounds, down)
                 is PopupAction.TriggerAction -> outAction = triggerFocused(key)

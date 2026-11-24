@@ -41,6 +41,14 @@ class ScrollListStore private constructor(
         return ScrollListStore(t, newer = false)
     }
 
+    /** [all] as [id]'s stored items, hidden commands where they stand: an undo's; the default's is no setting. */
+    fun restored(id: String, all: List<ScrollItem>): ScrollListStore {
+        if (newer) return this
+        val t = LinkedHashMap(lists)
+        if (all.isEmpty() || all == ScrollDefaults.of(id)) t.remove(id) else t[id] = all
+        return ScrollListStore(t, newer = false)
+    }
+
     /** 恢复默认. */
     fun without(ids: Collection<String>): ScrollListStore = if (newer) this else ScrollListStore(lists.filterKeys { it !in ids }, newer = false)
 

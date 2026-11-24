@@ -43,6 +43,7 @@ import org.fcitx.fcitx5.android.input.keyboard.canvas.ScenePanels
 import org.fcitx.fcitx5.android.input.keyboard.canvas.SceneTouch
 import org.fcitx.fcitx5.android.input.keys.KeyResolver
 import org.fcitx.fcitx5.android.input.keys.KeyState
+import org.fcitx.fcitx5.android.input.learning.UndoChip
 import org.fcitx.fcitx5.android.input.popup.PopupAction
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.scene.KeyRef
@@ -80,9 +81,10 @@ abstract class BaseKeyboard(
 
     private val prefs = AppPrefs.getInstance()
 
-    internal val columns = ScrollColumns(
-        this, theme, { canvas }, { keysPunctuation }, { onAction(it) }, { onPopupAction(it) }, ::onPopupChangeFocus, { onPopupTrigger(it, false) },
-    )
+    /** The notice above the keys: the service's, set as the keyboard is shown. */
+    var say: (String, UndoChip.Undo) -> Unit = { _, _ -> }
+
+    internal val columns = ScrollColumns(this, theme, { canvas }, { keysPunctuation }, { onAction(it) }, { m, u -> say(m, u) })
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
 
@@ -760,7 +762,7 @@ abstract class BaseKeyboard(
         // ask popup keyboard whether there's a pending KeyAction
         onPopupAction(triggerAction)
         val action = triggerAction.outAction ?: return triggerAction.outConsumed
-        if (action is KeyAction.ScrollList) columns.change(action) else onAction(resolving.output(key.id, action), KeyActionListener.Source.Popup)
+        onAction(resolving.output(key.id, action), KeyActionListener.Source.Popup)
         onPopupAction(PopupAction.DismissAction(key))
         return true
     }
@@ -869,6 +871,7 @@ abstract class BaseKeyboard(
 
     open fun onDetach() {
         releaseAllTouchTargets()
+        columns.dismissMenu()
     }
 
 }

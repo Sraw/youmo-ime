@@ -1101,10 +1101,16 @@ commits a candidate first and no input method makes them full-width), the nine k
 in a password. Touches: `BaseKeyboard.findTouchTarget` asks the columns first and hands a finger landing in one to it
 alone, as its own target in the keyboard's per-finger dispatch (the keyboard intercepts as before: a child taking the
 finger would have the others cancelled); a second finger on a column does nothing and voids the first's tap (not its
-drag once the column has moved), one on a key types, a column's finger never glides. A press held `longPressDelay` without passing the touch slop or scrolling opens the item's menu
-(删除这一项 / 移到最前 / 编辑这一列…, `KeyAction.ScrollList`, each a TalkBack action too; picked by moving onto an item
-and lifting, the last item's delete, the first's 移到最前 and all three of a newer `scroll_lists` or before the first unlock disabled), written
-back through `ScrollListStore`; 编辑这一列… is `AppUtil.launchMainToScrollList`. Syllables have no menu.
+drag once the column has moved), one on a key types, a column's finger never glides. A press held `longPressDelay` without passing the touch slop or scrolling opens the item's menu, a system `PopupMenu`
+anchored on the item as the clipboard's (icons and names; 移到最前 / 编辑这一列… / 删除「x」 named as the column shows it,
+each a TalkBack action too): the finger's moves and lift after it do nothing, an item is run by a tap, the item stays
+`activated` (the pressed colour) while it is open. ime-core's `ScrollListMenu` decides: the first has no 移到最前, an only
+item no delete, all three faded for a newer `scroll_lists` or before the first unlock; a pick checks the column still shows
+that category with the item at that index, else does nothing. Delete and 移到最前 are written back through
+`ScrollListStore` and said on the notice bar with an undo (`ScrollListMenu.Undo`: the items before, put back only while the
+list is as the change left it). The menu closes on another field (`toStart`), the column's category or items changing
+(`update`), the keyboard detached or the input view finishing (`KeyboardWindow.inputFinished`); outside taps and back
+are the popup's own. 编辑这一列… is `AppUtil.launchMainToScrollList`. Syllables have no menu.
 Where a column sits: another field shows every column from its start, the keyboards kept for later too
 (`KeyboardWindow.onStartInput` → `toStart`); the same field keeps it. ime-core's `FieldTrack` tells which, the last
 start only (a field in between is a new start): the same EditorInfo, else the same app, view id, input type, field name

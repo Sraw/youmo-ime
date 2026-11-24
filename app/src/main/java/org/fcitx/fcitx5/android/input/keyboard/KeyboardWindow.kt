@@ -251,6 +251,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         currentKeyboard?.let {
             it.keyActionListener = keyActionListener
             it.popupActionListener = popupActionListener
+            it.say = { message, undo -> service.say(message, undo) }
             it.inPasswordField = service.inPasswordField
             (it as? T9Keyboard)?.noSuggestions = noSuggestions
             it.address = address
@@ -338,6 +339,9 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         sticky.hidden()
         syncLock()
     }
+
+    /** The keys put away, for now or for another field: a scroll column's menu with them. */
+    fun inputFinished() = keyboards[currentKeyboardName]?.columns?.dismissMenu()
 
     fun switchLayout(to: String, remember: Boolean = true) {
         val lastSymbol = lastSymbolType

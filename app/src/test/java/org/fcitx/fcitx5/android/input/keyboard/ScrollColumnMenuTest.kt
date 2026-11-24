@@ -4,7 +4,6 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-import android.graphics.Rect
 import android.text.InputType
 import android.view.ViewConfiguration
 import android.view.ViewGroup
@@ -22,11 +21,8 @@ import org.fcitx.fcitx5.android.core.directBoot
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
-import org.fcitx.fcitx5.android.input.keyboard.canvas.PopupSceneView
 import org.fcitx.fcitx5.android.input.keys.ScrollListStore
-import org.fcitx.fcitx5.android.input.popup.PopupFocus
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
-import org.fcitx.fcitx5.android.scene.KeyState
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.ui.main.MainActivity
@@ -42,6 +38,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowPopupMenu
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -75,77 +72,163 @@ class ScrollColumnMenuTest {
 
     private fun stored(id: String) = ScrollListStore.parse(pref.getValue())[id]
 
-    private data class Item(val label: String, val box: Rect, val disabled: Boolean)
+    private data class Item(val label: String, val disabled: Boolean)
 
-    private fun menu(): List<Item> = KeyboardHarness.all(h.inputView).filterIsInstance<PopupSceneView>().filter { h.shown(it) }.flatMap { v ->
-        val at = h.box(v)
-        v.scene?.keys.orEmpty().filter { it.kind == "menu" }.sortedBy { it.bounds.left }
-            .map { k -> Item(k.label ?: k.a11y, KeyboardHarness.sceneBox(v, at, k), KeyState.Disabled in k.states) }
-    }.toList()
+    // the latest system menu, if it is still up
+    private fun menu(): List<Item> = ShadowPopupMenu.getLatestPopupMenu()?.takeIf { shadowOf(it).isShowing }?.menu
+        ?.let { m -> (0 until m.size()).map { m.getItem(it) }.map { Item(it.title.toString(), !it.isEnabled) } }.orEmpty()
 
     private fun hold(item: TextView) {
         h.press(item)
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
     }
 
-    /** Held, slid onto [label] and lifted. */
+    /** Held, let go, then [label] tapped in the menu left open. */
     private fun pick(item: TextView, label: String) {
         hold(item)
-        val to = (menu().firstOrNull { it.label == label } ?: error("no $label in ${menu()}")).box
-        h.move(to.exactCenterX(), to.exactCenterY(), lift = true)
+        h.release()
+        h.menuPick(label)
     }
 
     private fun said(v: TextView) = AccessibilityNodeInfoCompat.wrap(v.createAccessibilityNodeInfo()).actionList.mapNotNull { it.label?.toString() }
 
     private val typed get() = h.api.calls.filter { it.startsWith("sendKey") || it.startsWith("commit") }
 
-    private val ops get() = listOf(s(R.string.scroll_list_remove), s(R.string.scroll_list_to_front), s(R.string.scroll_list_edit))
+    private fun remove(v: TextView) = s(R.string.scroll_list_remove).replace("%1\$s", v.text.toString())
+
+    private fun ops(v: TextView) = listOf(s(R.string.scroll_list_to_front), s(R.string.scroll_list_edit), remove(v))
+
+    private fun undo() {
+        val undo = KeyboardHarness.all(h.notice()!!.contentView).filterIsInstance<TextView>().last { it.text.toString() == s(R.string.learning_undo) }
+        assertTrue(undo.performClick())
+        h.idle()
+    }
+
+    private val nine get() = ScrollDefaults.of(ScrollDefaults.NINE)!!
 
     @Test
     @Uat("KB-117", "PAN-28")
-    fun aHeldItemShowsTheMenuAndMovesToTheFront() {
+    fun aHeldItemsMenuStaysAfterTheLiftAndMovesToTheFrontUndone() {
         start()
         val question = column()[2]
         hold(question)
-        val shown = menu()
-        assertEquals(ops, shown.map { it.label })
-        assertEquals(listOf(false, false, false), shown.map { it.disabled })
-        // over the item held
-        val box = h.box(question)
-        assertTrue("$shown over $box", shown.any { it.box.centerX() in box.left..box.right } && shown.all { it.box.bottom <= box.bottom + box.height() })
-        val to = shown[1].box
+        assertEquals(ops(question), menu().map { it.label })
+        assertEquals(listOf(false, false, false), menu().map { it.disabled })
+        assertTrue("held, its item shows it", question.isActivated)
         h.api.calls.clear()
-        h.move(to.exactCenterX(), to.exactCenterY(), lift = true)
+        h.release()
+        assertEquals("let go, still up", ops(question), menu().map { it.label })
+        assertEquals(nine, stored(ScrollDefaults.NINE))
+        h.menuPick(s(R.string.scroll_list_to_front))
         assertEquals(ScrollItem.Text("?"), stored(ScrollDefaults.NINE).first())
         assertEquals(emptyList<String>(), typed)
-        // first now: not moved again; lifted where it was held, nothing done
+        assertTrue(h.noticeTexts().toString(), h.noticeTexts().containsAll(listOf(s(R.string.scroll_list_moved_to_front), s(R.string.learning_undo))))
+        undo()
+        assertEquals(nine, stored(ScrollDefaults.NINE))
+        assertEquals("?", column()[2].text.toString())
+        // the first: no 移到最前
         hold(column()[0])
-        assertEquals(listOf(false, true, false), menu().map { it.disabled })
-        val before = pref.getValue()
         h.release()
-        assertEquals(before, pref.getValue())
-        assertEquals(emptyList<String>(), typed)
-        assertEquals(emptyList<Item>(), menu())
+        assertEquals(listOf(s(R.string.scroll_list_edit), remove(column()[0])), menu().map { it.label })
     }
 
     @Test
     @Uat("KB-117")
-    fun aWobbleUnderTheMenuPicksNothing() {
+    fun aFingerDriftingAfterTheMenuOpensPicksNothing() {
         start()
         val held = column()[2]
         val box = h.box(held)
-        val slop = ViewConfiguration.get(h.service).scaledTouchSlop
+        val dp = h.service.resources.displayMetrics.density
         hold(held)
-        assertEquals(ops, menu().map { it.label })
-        // past the slop, short of the menu's row and of the step that moves its focus
-        val step = menu()[0].box.width() * PopupFocus.STEP * (0.5f + PopupFocus.HYSTERESIS)
-        assertTrue("$slop $step", slop < step)
-        h.move(box.exactCenterX() + (slop + step) / 2, box.exactCenterY(), lift = true)
-        assertEquals(ScrollDefaults.of(ScrollDefaults.NINE), stored(ScrollDefaults.NINE))
+        h.api.calls.clear()
+        // up and aside as a hand settling does: once picked the old way
+        h.move(box.exactCenterX() + 21 * dp, box.exactCenterY() - 27 * dp, lift = true)
+        assertEquals(nine, stored(ScrollDefaults.NINE))
+        assertEquals(emptyList<String>(), typed)
+        assertEquals(ops(held), menu().map { it.label })
+    }
+
+    @Test
+    @Uat("KB-117")
+    fun removingSaysWhatAndIsUndoneWhereItWas() {
+        start()
+        val bang = column()[3]
+        val label = bang.text.toString()
+        pick(bang, remove(bang))
+        assertEquals(nine.filterIndexed { i, _ -> i != 3 }, stored(ScrollDefaults.NINE))
+        assertTrue(h.noticeTexts().toString(), s(R.string.scroll_list_removed).replace("%1\$s", label) in h.noticeTexts())
+        undo()
+        assertEquals(nine, stored(ScrollDefaults.NINE))
+        assertEquals(label, column()[3].text.toString())
+    }
+
+    @Test
+    @Uat("KB-117")
+    fun anUndoAfterTheListChangedElsewhereLeavesIt() {
+        start()
+        pick(column()[3], remove(column()[3]))
+        val elsewhere = ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Text("a"), ScrollItem.Text("b"))).serialize()
+        pref.setValue(elsewhere)
+        h.idle()
+        undo()
+        assertEquals(elsewhere, pref.getValue())
+    }
+
+    @Test
+    @Uat("KB-117")
+    fun aListChangedUnderAnOpenMenuClosesItAndItsPickDoesNothing() {
+        start()
+        hold(column()[2])
+        h.release()
+        val open = ShadowPopupMenu.getLatestPopupMenu()
+        val abc = ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Text("a"), ScrollItem.Text("b"), ScrollItem.Text("c"))).serialize()
+        pref.setValue(abc)
+        h.idle()
         assertEquals(emptyList<Item>(), menu())
-        // straight up onto the cell over the finger picks it
-        pick(column()[2], s(R.string.scroll_list_remove))
-        assertEquals(ScrollDefaults.of(ScrollDefaults.NINE)!!.filterIndexed { i, _ -> i != 2 }, stored(ScrollDefaults.NINE))
+        // its item tapped all the same (a tap on its way as it closed): the place now holds another item
+        val item = (0 until open.menu.size()).map(open.menu::getItem).first { it.title.toString() == s(R.string.scroll_list_to_front) }
+        item.javaClass.getMethod("invoke").invoke(item)
+        h.idle()
+        assertEquals(abc, pref.getValue())
+    }
+
+    @Test
+    @Uat("KB-117")
+    fun anotherFieldClosesTheMenu() {
+        start()
+        hold(column()[2])
+        h.release()
+        assertEquals(3, menu().size)
+        h.start(inputType = InputType.TYPE_CLASS_TEXT, fieldId = 7)
+        assertEquals(emptyList<Item>(), menu())
+        assertTrue(column().none { it.isActivated })
+    }
+
+    @Test
+    fun aRotationClosesTheMenu() {
+        start()
+        hold(column()[2])
+        h.release()
+        assertEquals(3, menu().size)
+        RuntimeEnvironment.setQualifiers("+land")
+        h.service.onConfigurationChanged(h.service.resources.configuration)
+        h.idle()
+        assertEquals(emptyList<Item>(), menu())
+    }
+
+    @Test
+    @Uat("PAN-28")
+    fun theNumberPadsColumnHasTheSameMenu() {
+        start()
+        h.tap(h.key("123"))
+        val minus = column()[1]
+        assertEquals("-", minus.text.toString())
+        h.api.calls.clear()
+        pick(minus, s(R.string.scroll_list_to_front))
+        assertEquals(ScrollItem.Text("-"), stored(ScrollDefaults.NUMBER).first())
+        assertEquals(emptyList<String>(), typed)
+        undo()
+        assertEquals(ScrollDefaults.of(ScrollDefaults.NUMBER), stored(ScrollDefaults.NUMBER))
     }
 
     private fun scroll() = KeyboardHarness.all(h.keyboard).filterIsInstance<ScrollView>().first { h.shown(it) }
@@ -176,24 +259,21 @@ class ScrollColumnMenuTest {
         assertEquals("，", column()[0].text.toString())
         assertEquals(at, scroll().scrollY)
         // the last one removed: as near the end as the shorter list goes
-        pick(column().last(), s(R.string.scroll_list_remove))
+        pick(column().last(), remove(column().last()))
         assertEquals(8, column().size)
         assertTrue(scroll().scrollY > 0)
     }
 
     @Test
     @Uat("KB-117")
-    fun removingIsGreyedOnTheLastItem() {
+    fun theOnlyItemHasNoRemove() {
         start()
-        pick(column()[3], s(R.string.scroll_list_remove))
-        assertEquals(ScrollDefaults.of(ScrollDefaults.NINE)!!.filterIndexed { i, _ -> i != 3 }, stored(ScrollDefaults.NINE))
-        assertEquals(8, column().size)
         pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Text("?"))).serialize())
         h.idle()
         assertEquals(1, column().size)
         hold(column()[0])
-        assertEquals(listOf(true, true, false), menu().map { it.disabled })
         h.release()
+        assertEquals(listOf(Item(s(R.string.scroll_list_edit), disabled = false)), menu())
     }
 
     @Test
@@ -201,7 +281,7 @@ class ScrollColumnMenuTest {
     fun anAddressFieldsListIsTheOneChanged() {
         start(inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         assertEquals(".com", column()[2].text.toString())
-        pick(column()[2], s(R.string.scroll_list_remove))
+        pick(column()[2], remove(column()[2]))
         assertTrue(stored(ScrollDefaults.URL).toString(), ScrollItem.Text(".com") !in stored(ScrollDefaults.URL))
         assertEquals(ScrollDefaults.of(ScrollDefaults.NINE), stored(ScrollDefaults.NINE))
         assertTrue(column().map { it.text.toString() }.toString(), column().none { it.text.toString() == ".com" })
@@ -252,8 +332,9 @@ class ScrollColumnMenuTest {
         pref.setValue(newer)
         h.idle()
         hold(column()[0])
-        assertEquals(listOf(true, true, true), menu().map { it.disabled })
         h.release()
+        assertEquals(ops(column()[0]), menu().map { it.label })
+        assertEquals(listOf(true, true, true), menu().map { it.disabled })
         assertEquals(newer, pref.getValue())
     }
 
@@ -265,11 +346,11 @@ class ScrollColumnMenuTest {
             start()
             val before = pref.getValue()
             hold(column()[2])
-            assertEquals(listOf(true, true, true), menu().map { it.disabled })
             h.release()
+            assertEquals(listOf(true, true, true), menu().map { it.disabled })
             assertEquals(emptyList<String>(), said(column()[2]))
-            val board = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().first { h.shown(it) }
-            board.columns.change(KeyAction.ScrollList(ScrollDefaults.NINE, 2, KeyAction.ScrollList.Op.Remove))
+            // a faded item run all the same
+            h.menuPick(remove(column()[2]))
             assertEquals(before, pref.getValue())
         } finally {
             directBoot(false)
@@ -298,7 +379,7 @@ class ScrollColumnMenuTest {
     fun theEnglishNineKeysListIsItsOwn() {
         start(im = KeyboardHarness.ENGLISH)
         assertEquals(listOf(",", ".", "?", "!"), column().take(4).map { it.text.toString() })
-        pick(column()[3], s(R.string.scroll_list_remove))
+        pick(column()[3], remove(column()[3]))
         assertTrue(ScrollItem.Text("!") !in stored(ScrollDefaults.NINE_ENGLISH))
         assertEquals(ScrollDefaults.of(ScrollDefaults.NINE), stored(ScrollDefaults.NINE))
     }
@@ -307,11 +388,11 @@ class ScrollColumnMenuTest {
     @Uat("AX-23")
     fun talkBackDoesTheMenusThreeThings() {
         start()
-        val a11y = listOf(s(R.string.a11y_scroll_list_remove), s(R.string.a11y_scroll_list_to_front), s(R.string.a11y_scroll_list_edit))
-        assertEquals(a11y - a11y[1], said(column()[0]))
+        val a11y = listOf(s(R.string.a11y_scroll_list_to_front), s(R.string.a11y_scroll_list_edit), s(R.string.a11y_scroll_list_remove))
+        assertEquals(a11y - a11y[0], said(column()[0]))
         assertEquals(a11y, said(column()[2]))
         val v = column()[2]
-        val toFront = AccessibilityNodeInfoCompat.wrap(v.createAccessibilityNodeInfo()).actionList.first { it.label == a11y[1] }
+        val toFront = AccessibilityNodeInfoCompat.wrap(v.createAccessibilityNodeInfo()).actionList.first { it.label == a11y[0] }
         assertTrue(v.performAccessibilityAction(toFront.id, null))
         h.idle()
         assertEquals(ScrollItem.Text("?"), stored(ScrollDefaults.NINE).first())

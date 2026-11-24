@@ -705,30 +705,33 @@ def pan43(d):
     return "；".join(seen)
 
 
-MENU = ("删除这一项", "移到最前", "编辑这一列…")
+MENU = ("移到最前", "编辑这一列…")
+REMOVE = "删除"
 
 
 def menu_nodes(s):
-    """the column's long press menu on screen: {its item's text: node}"""
-    return {n.text: n for n in s.nodes if n.text in MENU}
+    """the column's long press menu on screen: {its item's text: node}; removing is 删除「x」, named"""
+    return {n.text: n for n in s.nodes if n.text in MENU or n.text.startswith(REMOVE + "「") and n.text.endswith("」")}
+
+
+def menu_pick(menu, pick):
+    """[pick]'s node in [menu]: 删除 for the remove item whatever it names"""
+    return next((n for t, n in menu.items() if t == pick or pick == REMOVE and t.startswith(REMOVE + "「")), None)
 
 
 def hold_item(d, item, pick=None):
-    """[item] (a column node) held till its menu shows: the menu's nodes; [pick] one of them moved onto and let go there,
-    else let go where it went down"""
+    """[item] (a column node) held till its menu shows and let go there: the menu's nodes, the menu left open; [pick] (删除
+    for the remove item) tapped in it, the menu put away with back when it is not there"""
     x, y = item.c
-    d.touch(("down", x, y), ("sleep", 0.9))
-    try:
-        menu = menu_nodes(d.screen())
-    except BaseException:
-        d.touch(("up", x, y))
-        raise
-    if pick and pick in menu and menu[pick].enabled:
-        px, py = menu[pick].c
-        d.touch(*[("move", x + (px - x) * i // 6, y + (py - y) * i // 6) for i in range(1, 7)], ("sleep", 0.15), ("up", px, py))
-    else:
-        d.touch(("up", x, y))
-    time.sleep(0.8)
+    d.touch(("down", x, y), ("sleep", 0.9), ("up", x, y))
+    time.sleep(0.5)
+    menu = menu_nodes(d.screen())
+    if pick:
+        n = menu_pick(menu, pick)
+        if n and n.enabled:
+            d.tap(n.c, 0.8)
+        else:
+            d.back(0.5)
     return menu
 
 

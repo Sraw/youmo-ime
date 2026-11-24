@@ -898,7 +898,9 @@
     <string name="long_press_none">Holding this key offers nothing.</string>
     <string name="long_press_off">Holding this key offers nothing: its long press is turned off. Adding a character turns it on again.</string>
     <string name="long_press_newer">These long presses were set by a newer version of the app: they are kept as they are and cannot be edited here.</string>
-    <string name="scroll_list_remove">Remove this item</string>
+    <string name="scroll_list_remove">Remove “%1$s”</string>
+    <string name="scroll_list_removed">Removed “%1$s”</string>
+    <string name="scroll_list_moved_to_front">Moved to the front</string>
     <string name="scroll_list_to_front">Move to the front</string>
     <string name="scroll_list_edit">Edit this list…</string>
     <string name="a11y_scroll_list_remove">Remove this item</string>

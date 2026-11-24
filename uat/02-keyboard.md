@@ -690,24 +690,24 @@
 - **预期**：两次框里都是 `()`，光标在中间。
 - **JVM**：`AsIsPunctuationTypedTest.englishPairsTheBracketMarkedOrNot`；设备上不跑。
 
-### KB-117 [P1] 长按滑动列里的一项：删除、移到最前、编辑这一列
+### KB-117 [P1] 长按滑动列里的一项：弹出菜单，松手后点选，删除和移到最前能撤销
 - **前提**：B0-九键。
 - **操作**：
-  1. 长按九键左列的 `?`，手指移到 **移到最前** 上松开；
-  2. 长按左列的 `?`，不移动手指直接松开；
-  3. 长按 `~`，移到 **删除这一项** 松开；
+  1. 长按九键左列的 `?`，松开手指，看菜单；点 **移到最前**；在键盘上方的提示条上点 **撤销**；
+  2. 再长按 `?` 点 **移到最前**；长按（已在第一个的）`?`，松开，点菜单外面；
+  3. 长按 `～`，不松手往上挪约 27 dp、往右挪约 21 dp 再松开；然后点菜单里的 **删除「～」**，再点提示条的 **撤销**；
   4. 到网址框，长按左列的 `.com`，删掉它；回到普通框看九键左列；
   5. 长按左列任一项，选 **编辑这一列…**；
   6. 上下滑左列，滑到一半停住手指不动。
 - **预期**：
-  1. 菜单弹在 `?` 上，三项都有图标；松开后 `?` 马上在第一个，没打出字；
-  2. 已经在最前时 **移到最前** 是灰的；手指没移到菜单项上，松开什么都不做；
-  3. `~` 马上没了；
+  1. 菜单在 `?` 旁边弹出（系统的弹出菜单，和剪贴板长按的一样），三项都有图标和字：**移到最前**、**编辑这一列…**、**删除「？」**；`?` 显示按下的底色；松开后菜单还在，没打出字；点了 `?` 马上在第一个，提示条写「已移到最前」带 **撤销**，撤销后 `?` 回到原来的第三个；
+  2. 已经在第一个时菜单里没有 **移到最前**；点菜单外面菜单关掉，什么都不改、没打出字；
+  3. 松开时什么都没选，菜单还开着；删除后 `～` 马上没了，提示条写「已删除「～」」，撤销后 `～` 回到原来的位置；
   4. 网址框里删的是网址那一类，九键平常的左列不变；
   5. 打开 **按键 → 按键字符和快捷键** 的 **滑动列**，直接是「九键」的编辑框；
   6. 只滚动，不弹菜单。
-  - 一类只剩一项时 **删除这一项** 是灰的；拼音音节不能长按；长按一项后手指在原地小小抖一下松开，什么都不删（这三点只在 JVM 上查）。
-- **JVM**：`ScrollColumnMenuTest.aHeldItemShowsTheMenuAndMovesToTheFront`、`.removingIsGreyedOnTheLastItem`、`.anAddressFieldsListIsTheOneChanged`、`.editOpensTheListsCard`、`.aDragHeldStillShowsNoMenu`、`.syllablesAreNotHeld`、`.aWobbleUnderTheMenuPicksNothing`、`.beforeTheFirstUnlockTheListsAreNotChanged`（重启后第一次解锁前，锁屏上长按一项，菜单三项都是灰的；设备上不跑这一点）；设备上照跑。
+  - 一类只剩一项时菜单里没有删除；拼音音节不能长按；菜单开着时这一列被别处改了或换了输入框，菜单关掉，点它的项也什么都不做；撤销前这一列又被改过就不撤（这几点只在 JVM 上查）。
+- **JVM**：`ScrollColumnMenuTest.aHeldItemsMenuStaysAfterTheLiftAndMovesToTheFrontUndone`、`.aFingerDriftingAfterTheMenuOpensPicksNothing`、`.removingSaysWhatAndIsUndoneWhereItWas`、`.anUndoAfterTheListChangedElsewhereLeavesIt`、`.aListChangedUnderAnOpenMenuClosesItAndItsPickDoesNothing`、`.anotherFieldClosesTheMenu`、`.theOnlyItemHasNoRemove`、`.anAddressFieldsListIsTheOneChanged`、`.editOpensTheListsCard`、`.aDragHeldStillShowsNoMenu`、`.syllablesAreNotHeld`、`.beforeTheFirstUnlockTheListsAreNotChanged`（重启后第一次解锁前，锁屏上长按一项，菜单三项都在但是灰的；设备上不跑这一点）；ime-core `ScrollListMenuTest`（哪几项、核对下标和值、撤销）；设备上照跑。
 
 ### KB-118 [P1] 滑动列里的「选中至文首」：点一下从光标选到框的开头
 - **前提**：B0，**按键字符和快捷键 → 滑动列** 里给「数字键盘」那一类 **加命令…** 加上 **选中至文首**。
