@@ -13,11 +13,14 @@ import org.fcitx.fcitx5.android.Uat
 import org.fcitx.fcitx5.android.assertRows as assertNamedRows
 import org.fcitx.fcitx5.android.data.InputFeedbacks
 import org.fcitx.fcitx5.android.data.theme.ThemePrefs
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.input.bar.ToolbarConfig
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.OfferedLayouts
 import org.fcitx.fcitx5.android.input.keyboard.OneHanded
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayers
 import org.fcitx.fcitx5.android.input.keyboard.SwipeLayersChoice
@@ -157,6 +160,46 @@ class AppPrefsTest {
         assertFalse("the marker gone", marker.exists())
         assertEquals(KeyDrawing.StrokeFilter, prefs.keyboard.keyDrawing.getValue())
         assertFalse(sp.contains("glide_typing") || sp.contains("stroke_filter"))
+    }
+
+    // an upgrade, or a backup from before the key restored: each input method's current layout alone, written once
+    @Test
+    @Uat("ST-226", "ST-229")
+    fun theLayoutsOfferedAreEachInputMethodsCurrentOneTillAnyIsStored() {
+        sp.edit {
+            putString(AppPrefs.PINYIN_KEYBOARD, PinyinKeyboard.Custom.name)
+            putString(AppPrefs.PINYIN_KEYBOARD_LAYOUT, "t1a2-k18")
+            // English back on its own keys: the layout it once chose is not listed
+            putString(AppPrefs.ENGLISH_KEYBOARD_LAYOUT, "my-qwerty")
+            putString(AppPrefs.TABLE_KEYBOARD_LAYOUT, "my-qwerty")
+        }
+        val prefs = AppPrefs(sp)
+        // read in a direct boot (the copy has no key): derived, nothing written
+        assertEquals(listOf("t1a2-k18"), prefs.keyboard.offeredLayouts().of(InputMethodCatalog.PINYIN))
+        assertFalse(sp.contains(AppPrefs.KEYBOARD_LAYOUTS_OFFERED))
+        prefs.dropRetired()
+        assertEquals("@1\npinyin t1a2-k18\ntable my-qwerty", sp.getString(AppPrefs.KEYBOARD_LAYOUTS_OFFERED, null))
+        // what is stored is kept: none on, the current one listed all the same
+        sp.edit { putString(AppPrefs.KEYBOARD_LAYOUTS_OFFERED, OfferedLayouts.HEADER) }
+        AppPrefs(sp).dropRetired()
+        assertEquals(OfferedLayouts.HEADER, sp.getString(AppPrefs.KEYBOARD_LAYOUTS_OFFERED, null))
+    }
+
+    // where none is stored yet, the layout a choice replaces stays listed; a later version's is written over at the change
+    @Test
+    fun choosingALayoutTurnsItOnAndTheOneItReplacesStaysOn() {
+        sp.edit {
+            putString(AppPrefs.PINYIN_KEYBOARD, PinyinKeyboard.Custom.name)
+            putString(AppPrefs.PINYIN_KEYBOARD_LAYOUT, "t1a2-k18")
+            putString(AppPrefs.KEYBOARD_LAYOUTS_OFFERED, "@2\npinyin x")
+        }
+        val keyboard = AppPrefs(sp).keyboard
+        assertEquals(listOf("t1a2-k18"), keyboard.offeredLayouts().of(InputMethodCatalog.PINYIN))
+        keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.CUSTOM, "my-k14")
+        assertEquals("@1\npinyin t1a2-k18 my-k14", sp.getString(AppPrefs.KEYBOARD_LAYOUTS_OFFERED, null))
+        // a keyboard of the app's chosen: the group left as it is
+        keyboard.setImKeyboard(InputMethodCatalog.PINYIN, ImKeyboard.FULL)
+        assertEquals(listOf("t1a2-k18", "my-k14"), keyboard.offeredLayouts().of(InputMethodCatalog.PINYIN))
     }
 
     // keyboard choices are stored by constant name under fixed keys: a rename would reset everyone; an unknown value

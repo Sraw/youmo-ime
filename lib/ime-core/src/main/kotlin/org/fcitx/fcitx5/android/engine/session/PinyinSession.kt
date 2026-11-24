@@ -812,8 +812,9 @@ class PinyinSession(
             total = if (lastRead.moreWords) -1 else candidates.size,
             first = pager.from,
             actionable = candidates.isNotEmpty(),
-            // zhuyin's in symbols
-            syllables = nineKeys?.offered.orEmpty().map { keyed?.shownOffered(it) ?: it },
+            // zhuyin's in symbols, 双拼's as its keys where the code shows them
+            syllables = nineKeys?.offered.orEmpty().map { (if (keysShown) keyed?.keysOffered(it) else null) ?: keyed?.shownOffered(it) ?: it },
+            syllablesSaid = if (keysShown) nineKeys?.offered.orEmpty() else emptyList(),
             syllablesId = nineKeys?.id ?: 0,
             cursor = if (cursor >= input.length) -1 else lastRead.places.preeditAt(cursor),
         )

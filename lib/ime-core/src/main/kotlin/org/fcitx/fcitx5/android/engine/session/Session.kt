@@ -232,6 +232,7 @@ sealed class Action {
  * @property labels keys picking the candidates where not the digits (a table whose codes are digits)
  * @property syllables what the first untaken keys may be (nine keys), for [Action.Syllable]
  * @property syllablesId which list [syllables] is, below [Action.Syllable.IDS]
+ * @property syllablesSaid [syllables] as pinyin, for TalkBack, where they show as 双拼's keys; empty: as shown
  * @property cursor where in [preedit] the cursor is, in characters; -1 at its end
  * @property deleteBefore code points to delete before [commit]: English moves its added space after punctuation (`word .` as `word. `)
  * @property lookingUp [preedit] is a table's pinyin lookup: the host marks it (拼)
@@ -253,6 +254,7 @@ data class Snapshot(
     val labels: String = "",
     val syllables: List<String> = emptyList(),
     val syllablesId: Int = 0,
+    val syllablesSaid: List<String> = emptyList(),
     val deleteBefore: Int = 0,
     val cursor: Int = -1,
     val lookingUp: Boolean = false,

@@ -31,6 +31,9 @@ interface KeyedSegmenter : Segmenter {
     /** How a bar-offered syllable or initial shows: as is, or in zhuyin symbols (ㄋㄧ). */
     fun shownOffered(offered: String): String = offered
 
+    /** How a bar-offered syllable or initial shows as the keys that type it, as the code row shows it taken; null: as [shownOffered]. Only grouped 双拼 says. */
+    fun keysOffered(offered: String): String? = null
+
     /** The key a bar-offered initial is taken as: on zhuyin its symbol (ㄓ for zh), from which a final continues and which alone reads its whole syllable; null: taken as letters and a separator (简拼). */
     fun keyOf(offered: String): Char? = null
 

@@ -274,7 +274,10 @@
   - 第 5、6、7 步，最后都是字母键盘；
   - 第 8、9、10 步都是数字键盘，锁着：只有在别的 App 的框里弹出键盘才算换 App，桌面、最近任务、通知栏都不算（回桌面时系统把输入法绑到桌面，日志里有 `onBindInput`，锁也不解开）；
   - TalkBack 下 返回 仍读「返回」，长按的动作读「锁定」/「解锁」，锁着时状态读「已锁定」。
-- **JVM**：`StickyNumbersUatTest.theLockKeepsThroughHidingAndLetterFields`（长按返回锁上、不回字母）、`.held返回IsSaidAndShown`、`CustomPanelTest.aNumberLayoutsOwnLockKeyStillLocks`（自己布局里单独的锁键：点了锁上，图标换成锁上的，读「解锁」）；设备上跑。
+  - 小锁的颜色是主题的 `key:locked badge`（[主题格式](../docs/theme-format.md) 的部位 `badge`、状态 `:locked`），默认主题是强调色；主题把它写成别的颜色时小锁跟着变（默认是强调色只在 JVM 上查；改了色的主题在网页主题制作里做一个、锁上看一次）。
+  - （只在 JVM 上查）0.6.3 以前自己导入的数字键盘布局，返回旁边带单独的锁键（`role="lock"`）：点锁键照样锁上，锁键图标换成锁上的、读屏读「解锁」，再点解开。
+  - （只在 JVM 上查）自己的数字键盘布局里 返回 右上角已有角标（比如上滑的快捷图标）时，小锁画在左上角；两个上角都有角标时锁画在左上角，那个角标不画。
+- **JVM**：`StickyNumbersUatTest.theLockKeepsThroughHidingAndLetterFields`（长按返回锁上、不回字母）、`.held返回IsSaidAndShown`、`CustomPanelTest.aNumberLayoutsOwnLockKeyStillLocks`（自己布局里单独的锁键：点了锁上，图标换成锁上的，读「解锁」）；keyboard-scene `NumberPadsTest.locked返回WearsALockInItsCorner`（锁着时返回在 `:locked` 状态，右上角一把小锁，字不挪）、`.theAppsLookTintsTheLockTheAccent`（默认主题小锁是强调色）、`.theLockTakesTheTopCornerLeftFree`（右上角有角标时锁在左上角，两角都有时盖掉左上角那个；这三条不在 `uat.py jvm` 的结果里）；设备上跑。
 
 ### PAN-43 [P1] 锁着时：符号面板返回仍锁着，表情面板返回解开，终端框是字母
 - **前提**：B0；testbed `form` 页、`behavior` 页（页下面的 `terminal` 框，TYPE_NULL）。

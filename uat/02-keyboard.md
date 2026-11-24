@@ -616,7 +616,7 @@
 - **前提**：B0-九键。
 - **操作**：记下九键上 1–9、⌫、回车、**符**、**123** 的位置；点 **123**；再点 **返回**。
 - **预期**：数字键盘上 1–9、⌫（右上角）、回车、**符**（底排第一格，灰底、字同九键）都和九键上同一个位置、同样大小；九键左边那一列的位置，数字键盘上也是一列（运算符，上下滑），同样宽；**返回** 从刚才 **123** 的左边起，占 1 4 7 那一列（0.6.1，用户 2026-11-14，dev/design/061-layout-survey.md Q1-A、Q3-1；0.6.3 底排和数字对齐，用户 2026-11-23）；0 在 8 正下方、. 在 9 正下方，同宽。点 **返回** 回到九键，各键位置不变。
-- **JVM**：`T9UatTest.going123FromTheNineKeysMovesNoKey`（九键的 1–9、⌫、回车、符 和数字键盘的同名键位置相同，返回从 123 的左边起、盖住它大半，键上写「符」和「返回」，返回后九键不变）；keyboard-scene `NumberPadsTest.everyPadSitsOnTheNineKeysFrame`（七种数字键盘 × 各种形态都和九键同格子，0 在 8 正下方；不在 `uat.py jvm` 的结果里）；设备上比较两块键盘的键位。
+- **JVM**：`T9UatTest.going123FromTheNineKeysMovesNoKey`（九键的 1–9、⌫、回车、符 和数字键盘的同名键位置相同，返回从 123 的左边起、宽到和 1 的右边齐（盖住 123，占 1 4 7 那一列），键上写「符」和「返回」，返回后九键不变）；keyboard-scene `NumberPadsTest.everyPadSitsOnTheNineKeysFrame`（七种数字键盘 × 各种形态都和九键同格子，返回在 1、0 在 8 正下方，. 在 9 正下方（电话键盘那一格是空的）；不在 `uat.py jvm` 的结果里）；设备上比较两块键盘的键位，并查返回、0、. 和上面的 1、8、9 左右对齐。
 
 ### KB-91 [P1] 符号面板底排：返回、123、锁
 - **前提**：B0。
@@ -694,20 +694,26 @@
 - **前提**：B0-九键。
 - **操作**：
   1. 长按九键左列的 `?`，松开手指，看菜单；点 **移到最前**；在键盘上方的提示条上点 **撤销**；
-  2. 再长按 `?` 点 **移到最前**；长按（已在第一个的）`?`，松开，点菜单外面；
+  2. 再长按 `?` 点 **移到最前**；长按（已在第一个的）`?`，松开，点键盘上菜单外面的地方（3 6 9 那一列）；再长按 `?`，松开，点输入框（App 那边）；
   3. 长按 `～`，不松手往上挪约 27 dp、往右挪约 21 dp 再松开；然后点菜单里的 **删除「～」**，再点提示条的 **撤销**；
   4. 到网址框，长按左列的 `.com`，删掉它；回到普通框看九键左列；
-  5. 长按左列任一项，选 **编辑这一列…**；
-  6. 上下滑左列，滑到一半停住手指不动。
+  5. 长按左列任一项，选 **编辑这一列…**；在编辑框里点 **加命令…**，加「复制」，点 **确定**，回到普通框；
+  6. 上下滑左列，滑到一半停住手指不动；
+  7. 长按左列一项，松开，按返回；
+  8. 再长按一项，松开，按 Home 回桌面（键盘跟着收起）；回到测试页点框；
+  9. 长按左列的复制（第 5 步加的），点菜单里的 **删除「复制」**，等 4 秒不点。
 - **预期**：
-  1. 菜单在 `?` 旁边弹出（系统的弹出菜单，和剪贴板长按的一样），三项都有图标和字：**移到最前**、**编辑这一列…**、**删除「？」**；`?` 显示按下的底色；松开后菜单还在，没打出字；点了 `?` 马上在第一个，提示条写「已移到最前」带 **撤销**，撤销后 `?` 回到原来的第三个；
-  2. 已经在第一个时菜单里没有 **移到最前**；点菜单外面菜单关掉，什么都不改、没打出字；
+  1. 菜单在 `?` 旁边弹出（系统菜单的样子），三项都有图标和字：**移到最前**、**编辑这一列…**、**删除「？」**；`?` 显示按下的底色；松开后菜单还在，没打出字；点了 `?` 马上在第一个，提示条写「已移到最前」带 **撤销**，撤销后 `?` 回到原来的第三个；
+  2. 已经在第一个时菜单里没有 **移到最前**；点键盘上菜单外面，菜单关掉，这一下只关菜单：没打出字、没出编码和候选，左列不变；点输入框，菜单关掉，这一下照样点到框上（键盘还在，框里没多字）；
   3. 松开时什么都没选，菜单还开着；删除后 `～` 马上没了，提示条写「已删除「～」」，撤销后 `～` 回到原来的位置；
   4. 网址框里删的是网址那一类，九键平常的左列不变；
-  5. 打开 **按键 → 按键字符和快捷键** 的 **滑动列**，直接是「九键」的编辑框；
-  6. 只滚动，不弹菜单。
-  - 一类只剩一项时菜单里没有删除；拼音音节不能长按；菜单开着时这一列被别处改了或换了输入框，菜单关掉，点它的项也什么都不做；撤销前这一列又被改过就不撤（这几点只在 JVM 上查）。
-- **JVM**：`ScrollColumnMenuTest.aHeldItemsMenuStaysAfterTheLiftAndMovesToTheFrontUndone`、`.aFingerDriftingAfterTheMenuOpensPicksNothing`、`.removingSaysWhatAndIsUndoneWhereItWas`、`.anUndoAfterTheListChangedElsewhereLeavesIt`、`.aListChangedUnderAnOpenMenuClosesItAndItsPickDoesNothing`、`.anotherFieldClosesTheMenu`、`.theOnlyItemHasNoRemove`、`.anAddressFieldsListIsTheOneChanged`、`.editOpensTheListsCard`、`.aDragHeldStillShowsNoMenu`、`.syllablesAreNotHeld`、`.beforeTheFirstUnlockTheListsAreNotChanged`（重启后第一次解锁前，锁屏上长按一项，菜单三项都在但是灰的；设备上不跑这一点）；ime-core `ScrollListMenuTest`（哪几项、核对下标和值、撤销）；设备上照跑。
+  5. 打开 **按键 → 按键字符和快捷键** 的 **滑动列**，直接是「九键」的编辑框；确定后九键左列最后多了复制的图标；
+  6. 只滚动，不弹菜单；
+  7. 只关菜单，键盘还在（还是九键），没打出字，左列不变；
+  8. 回桌面后屏幕上没有菜单；回来点框，键盘弹出，没有菜单；
+  9. 菜单里写命令名：**删除「复制」**；删后提示条写「已删除「复制」」带 **撤销**，3 秒后提示条连同撤销一起没了，复制不回来。
+  - 一类只剩一项时菜单里没有删除；拼音音节不能长按；菜单开着时这一列被别处改了或换了输入框，菜单关掉，点它的项也什么都不做；撤销前这一列又被改过就不撤；菜单开着时转屏，菜单关掉（这几点只在 JVM 上查）。
+- **JVM**：`ScrollColumnMenuTest.aHeldItemsMenuStaysAfterTheLiftAndMovesToTheFrontUndone`、`.aFingerDriftingAfterTheMenuOpensPicksNothing`、`.removingSaysWhatAndIsUndoneWhereItWas`、`.anUndoAfterTheListChangedElsewhereLeavesIt`、`.aListChangedUnderAnOpenMenuClosesItAndItsPickDoesNothing`、`.theOnlyItemHasNoRemove`、`.anAddressFieldsListIsTheOneChanged`、`.editOpensTheListsCard`、`.aDragHeldStillShowsNoMenu`、`.syllablesAreNotHeld`、`.beforeTheFirstUnlockTheListsAreNotChanged`（重启后第一次解锁前，锁屏上长按一项，菜单三项都在但是灰的；设备上不跑这一点）、`.theMenuClosesWhen`（点键盘上菜单外面不打字、返回只关菜单不收键盘、换输入框、收起键盘、转屏，各一行）；ime-core `ScrollListMenuTest`（哪几项、核对下标和值、撤销）、`NoticeStateTest.howLongEachStays`（带撤销的提示条停 3 秒）；设备上照跑。
 
 ### KB-118 [P1] 滑动列里的「选中至文首」：点一下从光标选到框的开头
 - **前提**：B0，**按键字符和快捷键 → 滑动列** 里给「数字键盘」那一类 **加命令…** 加上 **选中至文首**。

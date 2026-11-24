@@ -386,11 +386,12 @@ class Content(
     // a key held to lock (the number pad's 返回), locked: a small lock in a corner as a swipe's icon is, the label where it was
     private fun withLock(key: ExpandedKey, marks: List<MarkDrawn>, content: Box, snap: Boolean): List<MarkDrawn> =
         if (key.attrs.actions["long-press"] == KeyNames.PANEL_LOCK && KeyState.Locked in env.states["lock"].orEmpty()) {
-            marks + lockMark(marks, content, snap)
+            lockMark(marks, content, snap).let { lock -> marks.filterNot { it.slot == lock.slot } + lock }
         } else {
             marks
         }
 
+    // top right where free, else top left, over a mark there: the lock is the key's state, a corner mark only a way
     private fun lockMark(marks: List<MarkDrawn>, content: Box, snap: Boolean): MarkDrawn {
         val compact = env.compact
         val slot = if (marks.none { it.slot == Slot.TopRight }) Slot.TopRight else Slot.TopLeft

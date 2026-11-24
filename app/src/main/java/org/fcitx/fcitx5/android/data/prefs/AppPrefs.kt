@@ -30,6 +30,7 @@ import org.fcitx.fcitx5.android.input.keyboard.PanelLayouts
 import org.fcitx.fcitx5.android.input.keyboard.KeyDrawing
 import org.fcitx.fcitx5.android.input.keyboard.StrokeLift
 import org.fcitx.fcitx5.android.input.keyboard.KeyMarkPosition
+import org.fcitx.fcitx5.android.input.keyboard.OfferedLayouts
 import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.input.keyboard.LetterCaseChoice
 import org.fcitx.fcitx5.android.input.keyboard.SpaceLongPressBehavior
@@ -330,6 +331,29 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         val tableKeyboardLayout = string(TABLE_KEYBOARD_LAYOUT, "")
 
         /**
+         * Which of the user's layouts each input method's keyboard choice lists ([OfferedLayouts]; "": never stored). Here, not in
+         * [Internal], so the copy a direct boot reads is synced with the rest; read as stored ([offeredLayouts]), never through this.
+         */
+        val keyboardLayoutsOffered = string(KEYBOARD_LAYOUTS_OFFERED, "")
+
+        // as stored, null where it is not (or is another type): getValue would write its default back
+        private fun storedOffered(): String? = runCatching { this@AppPrefs.sharedPreferences.getString(KEYBOARD_LAYOUTS_OFFERED, null) }.getOrNull()
+
+        /** Where none is stored (not migrated yet, a later version's): each input method's current one alone. */
+        fun offeredLayouts(chosen: ImKeyboards.Chosen = imKeyboards { null }): OfferedLayouts = OfferedLayouts.read(storedOffered(), chosen)
+
+        /** On the main thread alone: read, changed and written whole. */
+        fun setOfferedLayouts(offered: OfferedLayouts) {
+            val text = offered.serialize()
+            if (text != storedOffered()) keyboardLayoutsOffered.setValue(text)
+        }
+
+        /** Before any change is stored: at the first start of this version, and the first after an older backup's restore. */
+        fun migrateOfferedLayouts() {
+            if (storedOffered().isNullOrEmpty()) setOfferedLayouts(offeredLayouts())
+        }
+
+        /**
          * The number keyboard's and the symbol panel's layout of the user's, by its id ("": the app's), one for every input
          * method (061-custom-layout §7, §8, L5: 外观 → 布局). Left as they are where the file stops reading (the app's drawn
          * meanwhile); set back to the app's as it is deleted.
@@ -379,7 +403,13 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
 
         /** [im]'s keyboard set to [keyboard], one it offers (ImKeyboards.choices); [layout] the id of the user's layout where it is [ImKeyboard.CUSTOM]. */
         fun setImKeyboard(im: String, keyboard: ImKeyboard, layout: String? = null) {
-            if (keyboard == ImKeyboard.CUSTOM) layoutPref(ImKeyboards.slot(im)).setValue(requireNotNull(layout))
+            if (keyboard == ImKeyboard.CUSTOM) {
+                val slot = ImKeyboards.slot(im)
+                // read before the change: where none is stored yet, the one it replaces stays listed
+                val offered = offeredLayouts()
+                layoutPref(slot).setValue(requireNotNull(layout))
+                setOfferedLayouts(offered.with(slot, layout))
+            }
             when {
                 im == InputMethodCatalog.PINYIN -> pinyinKeyboard.setValue(PinyinKeyboard.of(keyboard))
                 im == InputMethodCatalog.SHUANGPIN -> shuangpinKeyboard.setValue(ShuangpinKeyboard.of(keyboard))
@@ -791,6 +821,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         offerHandwriting()
         settleMarkPositions()
         migrateKeyLists()
+        keyboard.migrateOfferedLayouts()
     }
 
     /** `key_lists` as stored, null where it is not (or is another type): read so, nothing written back. */
@@ -971,6 +1002,7 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
         const val TABLE_KEYBOARD_LAYOUT = "table_keyboard_layout"
         const val NUMBER_KEYBOARD_LAYOUT = "number_keyboard_layout"
         const val SYMBOLS_PANEL_LAYOUT = "symbols_panel_layout"
+        const val KEYBOARD_LAYOUTS_OFFERED = "keyboard_layouts_offered"
 
         // 0.4's: English on the nine keys while 九键's 中/英 had brought it there, gone with the key (I1)
         private const val ENGLISH_ON_NINE_KEYS = "english_on_nine_keys"

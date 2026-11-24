@@ -151,8 +151,8 @@
     </plurals>
     <string name="theme_pack_layouts_unused">Layouts not used (unreadable, missing keys the keyboard needs, or not one of the app\'s keyboards): %1$s</string>
     <plurals name="theme_pack_layouts_listed">
-        <item quantity="one">This theme brings %1$d layout: %2$s. Imported with it, it is in Look → Layouts.</item>
-        <item quantity="other">This theme brings %1$d layouts: %2$s. Imported with it, they are in Look → Layouts.</item>
+        <item quantity="one">This theme brings %1$d layout: %2$s. Imported with it, it is in Look → Layouts: tap it there, then Use for…, to type on it.</item>
+        <item quantity="other">This theme brings %1$d layouts: %2$s. Imported with it, they are in Look → Layouts: tap one there, then Use for…, to type on it.</item>
     </plurals>
     <string name="theme_pack_layouts_listed_commits">Actions in them typing text written in the layout: %1$d.</string>
     <string name="theme_pack_layouts_lacks">%1$s lacks keys (it works all the same in Look → Layouts):</string>
@@ -220,8 +220,8 @@
     <string name="theme_pack_skin_note_no_dark">A dark version (the skin has one look: the dark version uses its colours)</string>
     <string name="theme_pack_skin_note_includes_count">Settings taken from Trime\'s own files or from files not in the package (%1$d of them)</string>
     <plurals name="theme_pack_skin_layouts">
-        <item quantity="one">This skin brings %1$d keyboard: %2$s. Tick “Import its layouts too” to put it in Look → Layouts.</item>
-        <item quantity="other">This skin brings %1$d keyboards: %2$s. Tick “Import its layouts too” to put them in Look → Layouts.</item>
+        <item quantity="one">This skin brings %1$d keyboard: %2$s. Tick “Import its layouts too” to put it in Look → Layouts; tap it there, then Use for…, to type on it.</item>
+        <item quantity="other">This skin brings %1$d keyboards: %2$s. Tick “Import its layouts too” to put them in Look → Layouts; tap one there, then Use for…, to type on it.</item>
     </plurals>
     <string name="theme_pack_draw_failed">Theme %1$s failed to show last time: the default theme is used instead</string>
     <string name="theme_not_saved">The theme could not be saved: the phone\'s storage may be full</string>
@@ -1569,6 +1569,8 @@
     <string name="layout_import_commits">Keys of this layout typing text written into it (%1$d): %2$s</string>
     <string name="layout_import_commits_more">%1$s, and %2$d more</string>
     <string name="layout_imported">Imported %1$s</string>
+    <string name="layout_updated">Updated %1$s</string>
+    <string name="layout_updated_in_use">Updated %1$s: %2$s still use it</string>
     <string name="layout_used_for">Can be used for: %1$s</string>
     <string name="layout_for_ims">the %1$s keyboards</string>
     <string name="layout_for_pads">number keyboard: %1$s</string>

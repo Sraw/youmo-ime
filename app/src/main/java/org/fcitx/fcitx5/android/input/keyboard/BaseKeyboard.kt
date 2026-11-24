@@ -610,6 +610,9 @@ abstract class BaseKeyboard(
 
     internal open fun columnSyllables(): List<String> = emptyList()
 
+    /** [columnSyllables] as TalkBack reads them; empty: as shown. */
+    internal open fun columnSaid(): List<String> = emptyList()
+
     internal open fun pickSyllable(i: Int): KeyAction? = null
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {

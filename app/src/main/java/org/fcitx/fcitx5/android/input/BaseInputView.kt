@@ -634,6 +634,7 @@ abstract class BaseInputView(
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             swallowing = candidateActionMenu != null || ev.downTime <= candidateActionMenuClosed
             candidateActionMenu?.dismiss()
+            if (keyboardMenuTakes(ev.downTime)) swallowing = true
         }
         if (!swallowing) return super.dispatchTouchEvent(ev)
         if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) {
@@ -641,6 +642,9 @@ abstract class BaseInputView(
         }
         return true
     }
+
+    /** A menu of the keyboard's, unfocusable as the candidate menu is: closed by the touch gone down at [downTime], which then only closes it. */
+    protected open fun keyboardMenuTakes(downTime: Long): Boolean = false
 
     // a word offer waits for the keys to be let go of: timed from the last finger up
     private fun offerTouched(action: Int) {

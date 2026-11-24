@@ -55,7 +55,7 @@
 - **`<gap>`**：空位，什么都不画，点了没反应。`width=`、`when=`。
 - **`<slot kind="…">`**：App 自己画的一块，`kind=` 必填：`nine-side`（九键左边的符号列）、`symbol-categories`、`symbol-grid`（符号面板的分类栏和符号格子）、`scroll`（滑动列，见下）。App 按 `kind=` 找位置，`id` 随便起。`width=`、`rows=`。没有某个位置时那一块不显示。
 - **滑动列 `<slot kind="scroll" list="…">`**：一列能上下（或左右）滑的符号，点一项打出它。里面的内容不写在布局里，由 App 按类别给，用户在「按键字符和快捷键」的「滑动列」里改：`list=` 必填，是 `nine`（九键）、`nine-english`（九键英文）、`number`（数字）、`phone`（电话）、`datetime`（日期时间）、`url`（网址）、`email`（邮箱）之一；在网址、邮箱、电话、日期时间输入框里，App 自动换成那个框的类别。`direction=`：`vertical`（默认，竖着滑）或 `horizontal`（横着滑）；`show=`：一屏显示几项，1–8，默认 4。只能放在 `letters`、`grouped`、`nine`、`number` 的键盘上，一块最多 2 列；不能放在 `split="halves"` 的行里（那种行要 9 或 10 个键，列不知道归哪一半），也不能放在片段里。`list=`、`direction=`、`show=` 只有滑动列能写，写在别的位置上是错误。没写 `look=`、`face=` 时按功能键的底画（等于 `look="function" face="keep"`），和九键左列一样。
-- **数字键盘的锁**：App 的数字键盘是长按返回锁（返回键写 `long-press="panel-lock"`；锁上后在同一个 App 里换框、收起再弹出都保持数字键盘，邮箱、网址、密码框除外，详见[键盘](keyboard.md#数字键盘)）。长按做 `panel-lock` 的键，锁着时右上角自动画一把小锁，读屏说「已锁定」；`based-on="number"` 里 id 是 `back` 的返回键不写也带这个长按。也可以照旧写一个单独的锁键：`role="lock"`、`send="panel-lock"`，图标写 `{lock-icon}`（随锁换开、关）；没写 `role="lock"` 的点了照样锁，但图标和读屏不跟着变，所以要带上。没有锁的数字键盘照样能用，不算缺键。
+- **数字键盘的锁**：App 的数字键盘是长按返回锁（返回键写 `long-press="panel-lock"`；锁上后在同一个 App 里换框、收起再弹出都保持数字键盘，邮箱、网址、密码框除外，详见[键盘](keyboard.md#数字键盘)）。长按做 `panel-lock` 的键，锁着时自动画一把小锁：画在右上角，右上角已经有别的角标（比如上滑的快捷图标）时画在左上角，两个上角都有角标时锁画在左上角、那个角标不画，读屏说「已锁定」；`based-on="number"` 里 id 是 `back` 的返回键不写也带这个长按。也可以照旧写一个单独的锁键：`role="lock"`、`send="panel-lock"`，图标写 `{lock-icon}`（随锁换开、关）；没写 `role="lock"` 的点了照样锁，但图标和读屏不跟着变，所以要带上。没有锁的数字键盘照样能用，不算缺键。
 - **`<include src="grouped-bottom"/>`**：App 的 14/18 键底行。只能引用 App 自带的片段；App 以后改底行，这里跟着变。
 
 ## `<key>` 的属性

@@ -116,6 +116,11 @@ class T9ShuangpinKeyboardTest {
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("ni", "mi"), id = 1)
             looper.idle()
             assertEquals(listOf("ni", "mi"), column())
+            // 双拼's keys shown: TalkBack reads the pinyin
+            EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("ua", "u"), id = 3, said = listOf("sha", "sh"))
+            looper.idle()
+            assertEquals(listOf("ua", "u"), column())
+            assertEquals(listOf("sha", "sh"), (0..1).map { (items.getChildAt(it) as TextView).contentDescription?.toString() })
             EngineState.syllablesState.value = EngineState.SyllableState(InputMethodCatalog.PINYIN, composing = true, syllables = listOf("bu", "nu"), id = 2)
             looper.idle()
             assertEquals(T9Keyboard.labels(T9State()), column())

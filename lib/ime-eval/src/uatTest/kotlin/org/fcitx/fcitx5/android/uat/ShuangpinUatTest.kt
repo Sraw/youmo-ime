@@ -86,6 +86,28 @@ class ShuangpinUatTest {
         }
     }
 
+    // 编码行显示双拼按键 on: the syllable bar shows its syllables and initials as the code does (自然码 sha ua, sh u), and
+    // taking one reads as taking its pinyin did with the switch off
+    @Test
+    @Uat("SP-65")
+    fun theBarShowsTheKeysAsTheCodeDoesWhenSet() {
+        for (letters in GROUPED) {
+            val off = EngineReplay(im = InputMethodCatalog.SHUANGPIN)
+            off.typeOn(letters, "uani")
+            assertTrue("$letters off: ${off.panel.syllables}", off.panel.syllables.containsAll(listOf("sha", "sh")))
+            off.syllable("sha")
+            // replays share the engines: read before the next one starts
+            val offTook = off.candidates.take(10)
+            with(EngineReplay(settings(EngineSettings(shuangpinKeysShown = true)), im = InputMethodCatalog.SHUANGPIN)) {
+                typeOn(letters, "uani")
+                assertEquals("$letters", listOf("ua", "u"), listOf("sha", "sh").map { panel.syllables[panel.syllablesSaid.indexOf(it)] })
+                syllable("ua")
+                assertTrue("$letters $preedit", preedit.startsWith("ua"))
+                assertEquals("$letters", offTook, candidates.take(10))
+            }
+        }
+    }
+
     @Test
     @Uat("SP-07")
     fun aWordMadeInFullPinyinTypesInShuangpinItsOrderItsOwn() = with(EngineReplay()) {

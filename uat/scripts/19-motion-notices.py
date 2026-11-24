@@ -129,12 +129,12 @@ def delete_themes(d):
         s14.appearance_tab(d, "主题")
 
 
-def pet_state(d, im=None):
-    """which state's colour fills most of the keys' top-right corner (where a keyboard pet sits by default), or None"""
+def pet_state(d, im=None, among=PET_COLORS):
+    """which state's colour of [among] fills most of the keys' top-right corner (where a keyboard pet sits by default), or None"""
     x0, y0, x1, y1 = sys.modules["uat_14_settings"].kb_box(d)
     side = int(64 * d.dpx())
     px = list((im or d.png()).crop((x1 - side, y0, x1, y0 + side + int(60 * d.dpx()))).resize((40, 60)).getdata())
-    near = {s: sum(1 for p in px if sum(abs(a - b) for a, b in zip(p, c)) < 60) for s, c in PET_COLORS.items()}
+    near = {s: sum(1 for p in px if sum(abs(a - b) for a, b in zip(p, c)) < 60) for s, c in PET_COLORS.items() if s in among}
     best = max(near, key=near.get)
     return best if near[best] >= 60 else None
 
@@ -185,6 +185,42 @@ def mn28(d):
     check(not d.screen().find(rid="keyboard_view", where="ime"), "键盘没收起来")
     d.open_page("text")
     check(pet_state(d) == "idle", f"收起再弹出后不是 idle：{pet_state(d)}")
+    delete_themes(d)
+
+
+@case("MN-33", base="B0-设置", mutates=True, visual=True)
+def mn33(d):
+    """the system's dark mode on and off with the keyboard up: the pet still plays a key and falls asleep"""
+    delete_themes(d)
+    pet_theme(d, "uat-pet")
+    use_theme(d, "uat-pet")
+
+    # the dark version's keyboard is near sleep's dark grey: its corner is read for the other states only
+    awake = [s for s in PET_COLORS if s != "sleep"]
+
+    def plays(mode):
+        d.step(mode)
+        d.sh(f"cmd uimode night {mode}")
+        time.sleep(1.5)
+        d.open_page("text")
+        got = pet_state(d, among=awake)
+        check(got == "idle", f"night {mode} 之后宠物不是 idle：{got}")
+        d.type("q")
+        got = pet_state(d, among=awake)
+        d.shot("kb", f"night {mode} 后按字母")
+        check(got == "typing", f"night {mode} 之后按了字母，宠物是 {got}")
+
+    # up before each switch, as the system's hide-and-show of a shown keyboard is what stopped the pet
+    d.open_page("text")
+    try:
+        plays("yes")
+        plays("no")
+        d.step("sleep")
+        time.sleep(31)
+        check(pet_state(d) == "sleep", f"切回浅色后 30 s 不按键没睡着：{pet_state(d)}")
+    finally:
+        d.sh("cmd uimode night no")
+    d.clear()
     delete_themes(d)
 
 

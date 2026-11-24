@@ -124,7 +124,7 @@ class SceneA11yTest {
         }
         assertEquals(listOf("锁定", null), back(false).let { listOf(it.longClick, it.state) })
         assertEquals(listOf("解锁", "已锁定"), back(true).let { listOf(it.longClick, it.state) })
-        assertEquals("said as before", back(false).description, back(true).description)
+        assertEquals("still said 返回, locked or not", listOf("返回", "返回"), listOf(back(false).description, back(true).description))
         // a board with no words for the lock: the plain long click
         assertNull(SceneA11y.of(board("number.xml", SceneData.portrait.copy(input = Input(pad = "full"))).keys.first { it.id == "back" }) { null }.longClick)
         assertNull(scene().speech("space").longClick)

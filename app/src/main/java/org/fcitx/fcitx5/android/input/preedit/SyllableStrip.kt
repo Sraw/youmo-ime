@@ -121,10 +121,9 @@ class SyllableStrip(context: Context, private val theme: Theme) : HorizontalScro
             val view = items.getChildAt(i) as TextView
             view.isVisible = i < labels.size
             if (view.isVisible) {
-                if (view.text.toString() != labels[i]) {
-                    view.text = labels[i]
-                    view.contentDescription = context.getString(R.string.a11y_syllable, labels[i])
-                }
+                if (view.text.toString() != labels[i]) view.text = labels[i]
+                // 双拼's keys shown are read as the pinyin they stand for, which the same keys change with the scheme
+                view.contentDescription = context.getString(R.string.a11y_syllable, state.said.getOrNull(i) ?: labels[i])
             }
         }
         scrollTo(0, 0)

@@ -105,6 +105,7 @@ class CustomKeyboardTest {
         prefs.englishKeyboard.setValue(prefs.englishKeyboard.defaultValue)
         prefs.shuangpinKeyboard.setValue(prefs.shuangpinKeyboard.defaultValue)
         listOf(prefs.pinyinKeyboardLayout, prefs.shuangpinKeyboardLayout, prefs.englishKeyboardLayout, prefs.tableKeyboardLayout).forEach { it.setValue("") }
+        prefs.keyboardLayoutsOffered.setValue("")
     }
 
     private fun own(id: String, base: String = "qwerty", edit: (String) -> String = { it }): CustomChoice? {
@@ -265,6 +266,12 @@ class CustomKeyboardTest {
         assertEquals(ImKeyboards.Shown(ImKeyboards.Layout.TEXT), ImKeyboards.shown(InputMethodCatalog.PINYIN, chosen, EngineState.shuangpinScheme))
     }
 
+    private fun pinyinList(): ListPreference {
+        val ctx = PlaceholderStrings(context)
+        val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(InputMethodCatalog.PINYIN)!!, mutableMapOf(), {}, open = {})
+        return screen.findPreference(AppPrefs.PINYIN_KEYBOARD)!!
+    }
+
     @Test
     fun theKeyboardsListAndTheSettingsOfferItAndSayWhereItIsGone() {
         val mine = own("my-k18", base = "k18")!!
@@ -277,11 +284,6 @@ class CustomKeyboardTest {
         assertEquals(mine, shown.custom)
         // English cannot type on grouped keys
         assertTrue(KeyboardPicker(context) { InputMethodCatalog.ENGLISH }.offered()!!.first.none { it.layout != null })
-        fun pinyinList(): ListPreference {
-            val ctx = PlaceholderStrings(context)
-            val screen = InputMethodSettings.create(PreferenceManager(ctx), InputMethodSettings.of(InputMethodCatalog.PINYIN)!!, mutableMapOf(), {}, open = {})
-            return screen.findPreference(AppPrefs.PINYIN_KEYBOARD)!!
-        }
         val list = pinyinList()
         assertEquals("Custom:my-k18", list.entryValues.last())
         assertEquals("Custom:my-k18", list.value)
@@ -294,6 +296,23 @@ class CustomKeyboardTest {
         val after = pinyinList()
         assertEquals("Custom:my-k18", after.value)
         assertTrue(after.entries.last().toString(), after.entries.size == after.entryValues.size)
+    }
+
+    @Test
+    fun anImportedLayoutIsOfferedOnlyWhereTurnedOn() {
+        val mine = own("my-qwerty")!!
+        prefs.keyboardLayoutsOffered.setValue(OfferedLayouts.NONE.serialize())
+        fun listed(im: String) = KeyboardPicker(context) { im }.offered()!!.first.mapNotNull { it.layout?.id }
+        assertEquals(emptyList<String>(), listed(InputMethodCatalog.PINYIN))
+        assertFalse("not in the settings' list either", "Custom:${mine.id}" in pinyinList().entryValues)
+        prefs.setOfferedLayouts(prefs.offeredLayouts().with(InputMethodCatalog.PINYIN, mine.id))
+        assertEquals(listOf(mine.id), listed(InputMethodCatalog.PINYIN))
+        assertTrue("Custom:${mine.id}" in pinyinList().entryValues)
+        assertEquals("on for pinyin only", emptyList<String>(), listed(InputMethodCatalog.ENGLISH))
+        // choosing it is turning it on
+        prefs.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.CUSTOM, mine.id)
+        prefs.setImKeyboard(InputMethodCatalog.ENGLISH, ImKeyboard.FULL)
+        assertEquals(listOf(mine.id), listed(InputMethodCatalog.ENGLISH))
     }
 
     // a pref no layout may have (a backup's, edited by hand): its base drawn, nothing thrown (the fcitx thread asks too)
@@ -380,6 +399,9 @@ class CustomKeyboardTest {
         CustomKeyboards.awaitListed()
         CustomKeyboards.relist()
         CustomKeyboards.awaitListed()
+        prefs.setOfferedLayouts(OfferedLayouts.NONE)
+        assertFalse("listed but not turned on for the tables", picker.offers())
+        prefs.setOfferedLayouts(prefs.offeredLayouts().with(ImKeyboards.TABLE, "my-qwerty"))
         assertTrue(picker.offers())
         File(dir, "my-qwerty.xml").delete()
         assertTrue("as last listed", picker.offers())

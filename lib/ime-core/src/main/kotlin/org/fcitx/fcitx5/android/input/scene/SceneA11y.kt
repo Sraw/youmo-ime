@@ -63,7 +63,7 @@ object SceneA11y {
         else -> null
     }
 
-    // the lock key's words for what a tap does (锁定 / 解锁), its board's ([onOrOff]); none, the plain long click
+    // what holding a lock key does (锁定 / 解锁), in its board's words; none, the plain long click
     private fun longClick(key: KeyNode, string: (String) -> String?): String? =
         if (key.actions["long-press"] != KeyNames.PANEL_LOCK) null
         else string(LOCK_SAID + if (KeyState.Locked in key.states) "_on" else "_off")

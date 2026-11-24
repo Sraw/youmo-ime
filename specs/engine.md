@@ -773,7 +773,9 @@ setting either: it reads the codes.
   (`Builder.add(whole)`; not while an edit left the cursor inside it, nor once what is left of it
   shows letter for letter; Backspace right of it takes its last letter, as with the switch off), and `Action.Step` passes the places no preedit place is (`PreeditPlaces.shows`),
   so the cursor never stops inside the keys of what shows shorter than them; Enter on a grouped keyboard (`CommitRaw`, `restShown`) commits the letters shown. Chaizi
-  and the misreading hints stay off as `spell` keeps them; the bar and the nine keys' column list pinyin.
+  and the misreading hints stay off as `spell` keeps them. The bar and the nine keys' column show each offered one as the code shows
+  it taken (`KeyedSegmenter.keysOffered`: a syllable `keysShown`'s code, an initial its taught key; 自然码 sha `ua`, sh `u`),
+  `Snapshot.syllablesSaid` the pinyin for TalkBack (`SyllableStrip`, `ScrollColumn`'s `said`); a pick goes by index, as ever.
 - **Learning.** Kind `spk:<scheme>:<tag>` (`Kinds.shuangpinKeys`, the scheme as
   `EngineSettings.SCHEMES` names it, no colon in any), apart from `sp:<scheme>` and from each
   scheme's: the same keys read other syllables under another. `Kinds.isShuangpin` is true for

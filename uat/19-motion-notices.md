@@ -137,3 +137,9 @@
 - **操作**：开单手模式（靠左、靠右各一次），再开悬浮键盘拖到别处；再导入 `uat-pet-broken.theme` 并选用。
 - **预期**：单手、悬浮时宠物都在键盘区的右上角，不在侧边按钮那一列；`uat-pet-broken` 照常导入、能选用，没有宠物；主题列表的缩略图里都没有宠物。
 - **JVM**：`PetUatTest.thePetGoesWithTheBoardAndABrokenPetIsLeftOut`（单手靠左、靠右、悬浮各截一张，核宠物在键盘区的角上、在字母键的范围里；坏的那个导入成功、没有宠物）；设备上不跑。
+
+### MN-33 [P1] 切换系统深色模式后宠物照常动
+- **前提**：同 MN-28（`uat-pet.theme` 有浅色、深色两版；**跟随系统深色模式** 开着，新装默认）。
+- **操作**：键盘开着时把系统切到深色（`adb shell cmd uimode night yes`），回测试页点「普通文本」框，按一个字母；再切回浅色（`… night no`），按一个字母；不按键等 30 s。
+- **预期**：每次切换后键盘换成对应的那一版，宠物是 idle，按字母后播 typing；30 s 后睡着。
+- **JVM**：`PetUatTest.thePetStillPlaysAfterTheSystemsDarkModeSwitches`（切深色、浅色各一次，每次照系统那样收起再马上弹出键盘、窗口不离开，按键要播 typing，最后 30 s 睡着）；`InputViewShownTest`；设备上冒烟（深色版键盘的底色接近 sleep 的深灰，那一步只在其余几种颜色里认）。

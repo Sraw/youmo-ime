@@ -10,11 +10,17 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.data.layout.CustomKeyboards
 import org.fcitx.fcitx5.android.data.layout.CustomLayouts
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.data.theme.ThemePackFixture
+import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.input.KeyboardHarness
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardPicker
+import org.fcitx.fcitx5.android.input.keyboard.OfferedLayouts
 import org.fcitx.fcitx5.android.scene.skin.SkinFill
 import org.fcitx.fcitx5.android.scene.skin.SkinKey
 import org.fcitx.fcitx5.android.scene.skin.SkinLook
@@ -121,5 +127,31 @@ class ThemeImportLayoutsTest : ThemePackFixture() {
         box(dialog).isChecked = false
         take(dialog, "mint")
         assertTrue(File(packs, "mint/layouts/qwerty.xml").isFile)
+    }
+
+    // listed in 外观 → 布局 only: on for no input method, even under an id a backup left on without its file
+    @Test
+    @Uat("ST-227")
+    fun aPacksLayoutsTakenAreOnForNoInputMethod() {
+        ThemeFilesManager.versionName = "0.6.3"
+        val keyboard = AppPrefs.getInstance().keyboard
+        try {
+            keyboard.setOfferedLayouts(OfferedLayouts.NONE)
+            take(shown(themePack()), "mint")
+            var listed: String? = null
+            until("listed", step = st::idle) { CustomLayouts.list(CustomKeyboards.dir()).singleOrNull()?.id?.also { listed = it } != null }
+            val id = listed!!
+            CustomKeyboards.forget()
+            assertEquals(OfferedLayouts.NONE, keyboard.offeredLayouts())
+            assertTrue(KeyboardPicker(st.activity) { InputMethodCatalog.PINYIN }.offered()!!.first.none { it.layout != null })
+            // its file gone, its id left on: the pack imported again lists it anew, on nowhere
+            keyboard.setOfferedLayouts(OfferedLayouts.NONE.with(InputMethodCatalog.PINYIN, id))
+            assertTrue(CustomLayouts.delete(id, CustomKeyboards.dir()))
+            take(shown(themePack()), "mint")
+            until("turned off", step = st::idle) { keyboard.offeredLayouts() == OfferedLayouts.NONE }
+        } finally {
+            keyboard.keyboardLayoutsOffered.setValue("")
+            CustomKeyboards.forget()
+        }
     }
 }

@@ -210,7 +210,7 @@ take it from the board's brightness to its own (`PictureWindow.seeThroughDarken`
 pack is imported (`theme_pack_animated_still`). Elsewhere (the settings' preview, thumbnails, the voice glass, the
 floating code strip) it is still. `AnimatedPictureTest`.
 
-A theme's `<pet>` (063, `input/pet/`, docs/theme-pet.md): `PetHost` puts a `PetView` of its own box over a corner of the keys or at the bar's end (the bar given the room by a margin), told each key through `CommonKeyActionListener.pet` (`PetTriggers`); `PetFrames` decodes the sheets once off the main thread within 6 MB (3 MB on `LowMemory`), `PetMachine` (keyboard-scene) picks each frame, and it stands still with `KeyMotionSwitch` off, hidden over other windows and as input finishes (not between fields), and till the next start: a keys' window remade with the keyboard down (a setting changed) leaves it hidden. No `<pet>`, nothing made.
+A theme's `<pet>` (063, `input/pet/`, docs/theme-pet.md): `PetHost` puts a `PetView` of its own box over a corner of the keys or at the bar's end (the bar given the room by a margin), told each key through `CommonKeyActionListener.pet` (`PetTriggers`); `PetFrames` decodes the sheets once off the main thread within 6 MB (3 MB on `LowMemory`), `PetMachine` (keyboard-scene) picks each frame, and it stands still with `KeyMotionSwitch` off, hidden over other windows, with the keyboard (the window visibility told, pitfalls.md "A hidden keyboard is told GONE by hand") and as input finishes (not between fields), and till the next start: a keys' window remade with the keyboard down (a setting changed) leaves it hidden. No `<pet>`, nothing made.
 
 A theme's popups move too (060-render-p3 A2), asked of the engine (`SceneBuilder.popupMotion`, a `PopupMotion`):
 `appear` on `popup`, `preview` or `menu` (`fade`, `scale` from 60% or `rise` 12dp, each faded in, 0–250 ms, the
@@ -928,7 +928,7 @@ id or the first free `-2`, `-3`… (the user's own or changed, another pack's of
 them (`CustomLayouts.save`; none new past `MAX_LAYOUTS`) and records in `.converted` (`CustomLayoutFiles.record`: a
 line `#l7` that 0.6.1 always writes, `file@stamp` a pack, `=<id> <board> <digest> <file>` a layout written; each key's
 last line kept, the newest where full): the same pack again does nothing. Three ways: an import whose confirmation's
-「一起导入」 is ticked (`ThemeListFragment`, listed alone; unticked, `notListed` records it, so a restore does not list
+「一起导入」 is ticked (`ThemeListFragment`, listed alone and on for no input method; unticked, `notListed` records it, so a restore does not list
 it; fewer listed than the confirmation said, a toast); at `ThemeManager.init` once an install
 (`noBackupFilesDir/theme-layouts-listed`), every user pack; at the start after a restore of this app's backup, the packs it
 brought not in its own `.converted` (by file name: a restored pack's stamp is the copy's), recorded by `UserDataManager`
@@ -1083,7 +1083,8 @@ nine keys' key: `kind="function"`, its look and words), then the way back where 
 `label="{back}"`, `Texts.back` = `picker_back`, as the panels'); since 0.6.3 `符 16 | 返回 22 | 0 22 | . 22 | ⏎ 18`,
 返回 under 1, 0 under 8, `.` under 9 (the phone's a gap); the lock is 返回 held, `long-press="panel-lock"` (`StickyNumbers`,
 below): such a key takes the lock's states (`SceneBuilder.statesOf`), so locked it is `:locked`, draws a small lock in its
-top right corner (`Content.lockMark`, part `badge`, the look's `key:locked badge` in the accent) and is said 已锁定 with its
+top right corner, or its top left where another mark (a swipe's icon) has the top right; with both top corners
+taken it goes top left and that mark is not drawn (`Content.lockMark`, part `badge`, the look's `key:locked badge` in the accent) and is said 已锁定 with its
 long click worded 锁定 / 解锁 (`SceneA11y`). A user's pad with its own `role="lock"` key works as before. Going 123 from the nine keys moves none of 1–9, ⌫, Return, 符; 返回 sits on 123
 (`NumberPadsTest.everyPadSitsOnTheNineKeysFrame`). The symbol panel's row is the other way round (Q4-a):
 `返回 | 123 | 锁 | 空格 | ⌫ | ⏎`, its 123 the letters' (words, function face, no `a11y=`, read 123). The emoji's
@@ -1104,10 +1105,11 @@ commits a candidate first and no input method makes them full-width), the nine k
 in a password. Touches: `BaseKeyboard.findTouchTarget` asks the columns first and hands a finger landing in one to it
 alone, as its own target in the keyboard's per-finger dispatch (the keyboard intercepts as before: a child taking the
 finger would have the others cancelled); a second finger on a column does nothing and voids the first's tap (not its
-drag once the column has moved), one on a key types, a column's finger never glides. A press held `longPressDelay` without passing the touch slop or scrolling opens the item's menu, a system `PopupMenu`
-anchored on the item as the clipboard's (icons and names; 移到最前 / 编辑这一列… / 删除「x」 named as the column shows it,
+drag once the column has moved), one on a key types, a column's finger never glides. A press held `longPressDelay` without passing the touch slop or scrolling opens the item's menu, a non-focusable
+`ListPopupWindow` anchored on the item as the candidate menu's, drawn as a system menu (icons and names; 移到最前 / 编辑这一列… / 删除「x」 named as the column shows it,
 each a TalkBack action too): the finger's moves and lift after it do nothing, an item is run by a tap, the item stays
-`activated` (the pressed colour) while it is open. ime-core's `ScrollListMenu` decides: the first has no 移到最前, an only
+`activated` (the pressed colour) while it is open. Back only closes it (the keyboard stays), a tap elsewhere on the
+keyboard only closes it (types nothing), a tap on the app closes it and reaches the app too (`ScrollColumnMenuTest.theMenuClosesWhen`). ime-core's `ScrollListMenu` decides: the first has no 移到最前, an only
 item no delete, all three faded for a newer `scroll_lists` or before the first unlock; a pick checks the column still shows
 that category with the item at that index, else does nothing. Delete and 移到最前 are written back through
 `ScrollListStore` and said on the notice bar with an undo (`ScrollListMenu.Undo`: the items before, put back only while the
@@ -1346,8 +1348,19 @@ layout's own `based-on`, `CustomKeyboards.baseOf`: a board of its family, whatev
 takes the set; `groupedAs` asks `SceneGroups.letters`, the one rule). The
 picker's `offered()` and the settings' lists add the usable ones as `Custom:<id>` 「17 键（自定义）」, the chosen one
 that is not usable 「17 键（读不出，暂用 18 键）」 where its file is gone, does not read or is refused, 「17 键（这里用不了，暂用
-18 键）」 where it reads (`drawn`) but this input method cannot use it (`keyboard_custom_unusable`). 外观 → 布局: a card of the user's says `ImKeyboards.usedBy`
-(用在：…), tapped offers 用在… (`usableBy`, `ticked`: unticked back on its base), an import asks 现在就用在…,
+18 键）」 where it reads (`drawn`) but this input method cannot use it (`keyboard_custom_unusable`). Only the layouts
+turned on for a slot are among them (0.6.3, `dev/design/063-picker-opt-in.md`): ime-core `OfferedLayouts`, stored whole in
+`keyboard_layouts_offered` (Keyboard category, so the direct-boot copy has it) as `@1` then a line a slot (`pinyin id id…`;
+a later head or slot read as not stored or kept as written), `listed(im, chosen, all)` those on plus the current one,
+never hidden. Invariant: `setImKeyboard(…, CUSTOM, id)` (the one writer of the current one: the picker, the settings
+rows, 用在…, the 0.6.1 switch-in) turns `id` on for that slot; a keyboard of the app's chosen leaves the group as it is.
+Nothing stored ("", a key missing, a later head): each slot's current one alone (`migrate`), written by `dropRetired`
+(the first start of 0.6.3, the first after an older backup's restore); a direct boot reads it, writing nothing. A theme's
+boards (`ThemeListFragment.listLayouts`, `Put.NEW`) and a `.layout` new under its id are taken off every slot
+(`withoutAnywhere`: a restore may leave an id on whose file it could not bring); a delete too. 外观 → 布局: a card of
+the user's says `OfferedLayouts.usedBy` (用在：…, on and usable, or current), tapped offers 用在… (`afterTicks`: ticked
+anew on and used, left ticked as it is, unticked off and back on its base where in use), an import asks 现在就用在… of
+the slots it is not on yet, 先不用 changing nothing (`ask`), a replace saying 「已更新…，拼音 照常用它」,
 a delete puts each user on `afterDelete` (its base where it has it, else the full keyboard) and `forget`s the id.
 `CustomKeyboards.all()` lists the folder and reads each file new or changed since (parsed, checked, its thumbnail made;
 a stat each while unchanged): ⋯ and the settings ask it as they open, on the main thread, a known cost. An input start

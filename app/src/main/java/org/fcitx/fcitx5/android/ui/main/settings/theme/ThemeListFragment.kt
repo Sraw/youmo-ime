@@ -25,9 +25,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.layout.ThemeLayoutsToList
+import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeFilesManager
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
+import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
 import org.fcitx.fcitx5.android.input.theme.ThemeFileName
 import org.fcitx.fcitx5.android.ui.common.withLoadingDialog
 import org.fcitx.fcitx5.android.ui.main.settings.openInputStreamOrThrow
@@ -263,6 +265,9 @@ class ThemeListFragment : Fragment() {
         }
         // on the main thread, where the settings pages change them too
         made?.forEach { ThemeLayoutsToList.copySettings(it.done.renames) }
+        // a pack's boards are on for no input method till 用在…, even under an id a backup left on without its file
+        val prefs = AppPrefs.getInstance().keyboard
+        made?.filter { it.put == CustomLayoutFiles.Put.NEW }?.fold(prefs.offeredLayouts()) { o, l -> o.withoutAnywhere(l.done.id) }?.let(prefs::setOfferedLayouts)
         context?.let { ctx -> layoutsNotListedNotice(ctx, made, expected)?.let { ctx.toast(it, Toast.LENGTH_LONG) } }
     }
 

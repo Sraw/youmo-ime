@@ -15,7 +15,7 @@ enum class Dotprod { HWCAP, MIDR, NONE }
 /** The MIDR route's trial on each core: not needed, passed, to be tried again by the next process, or refused for good. */
 enum class SdotTrial { NONE, PASSED, PENDING, FAILED }
 
-/** Why [DeviceProfile.autoLevel] is what it is, for the settings and the about page. */
+/** Why [DeviceProfile.autoLevel] is what it is, kept with the profile; the about page words only OFFLINE and UNREAD: the rest would mean nothing to a user. */
 enum class LevelReason { I8MM, NEW_BIG_CORE, LITTLE_ONLY, OFFLINE, UNREAD, NO_DOTPROD, DOTPROD }
 
 /** What the device is decided to be, once per app and system version; [of] from the facts alone. */

@@ -191,9 +191,10 @@ def ax24(d):
     p.numbers(d)
     was = p.lock_node(d)
     p.hold_back(d)
+    check(p.board(d) == "数字", f"长按返回后不是数字键盘：{p.board(d)}")
     now = p.lock_node(d)
     p.hold_back(d)
-    # a node's state description is API 30's: Android 10 says none
+    # the Dumper reads the state through the framework's API 30 field: below it androidx keeps it in the node's extras, unread here
     locked = "已锁定" if int(d.sh("getprop ro.build.version.sdk").strip() or 0) >= 30 else ""
     check((was.desc, was.hold, was.state) == ("返回", "锁定", ""), f"返回读「{was.desc}」，长按读「{was.hold}」，状态「{was.state}」")
     check((now.desc, now.hold, now.state) == ("返回", "解锁", locked), f"长按后返回读「{now.desc}」，长按读「{now.hold}」，状态「{now.state}」")
@@ -201,4 +202,4 @@ def ax24(d):
     s = d.screen()
     panel = next((n.desc for n in s.ime() if n.desc in ("选完符号后停留", "选完符号后返回")), None)
     check(panel == "选完符号后停留", f"符号面板的锁读「{panel}」")
-    return f"数字键盘的锁「{was}」→「{now}」，符号面板的锁「{panel}」"
+    return f"返回的长按「{was.hold}」→「{now.hold}」，状态「{was.state}」→「{now.state}」，符号面板的锁「{panel}」"

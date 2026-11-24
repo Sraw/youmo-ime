@@ -963,6 +963,14 @@ case("ST-64", needs="release:要上一版（0.5.2）的包覆盖安装、它导�
 case("ST-195", needs="release:发版时手工跑：装 0.6.0 正式版并导入它的文字包 v1、语音包 v2（dev/old-apks/v0.6.0），覆盖安装这一版的发布包，两个包都还在、语音照常")(lambda d: None)
 
 
+case("ST-226", needs="release:发版时手工跑：0.6.2 正式版里主题 18 键给拼音、uat-qwerty 给英文选着，覆盖安装这一版，看各输入法的 ⋯ → 键盘 和卡片的「用在：」；"
+     "JVM 见 OfferedLayoutsTest.anUpgradeKeepsEachInputMethodsCurrentOneAlone、AppPrefsTest.theLayoutsOfferedAreEachInputMethodsCurrentOneTillAnyIsStored")(lambda d: None)
+
+
+case("ST-229", needs="release:发版时手工跑：恢复 0.6.2 做的备份和这一版做的备份，看各输入法的 ⋯ → 键盘；"
+     "JVM 见 AppPrefsTest.theLayoutsOfferedAreEachInputMethodsCurrentOneTillAnyIsStored、LayoutListFragmentTest.aFreshFileUnderAnIdLeftOnIsOnNowhere")(lambda d: None)
+
+
 def key_gaps(d):
     """(up and down, across) dp between the full keyboard's key faces: w over s, q beside w, read off the
     screen's pixels (a face's colour against the keyboard's between them; a key's 1 dp shadow counts as
@@ -1154,7 +1162,7 @@ def st72(d):
     d.step("导入")
     import_theme(d, "uat-layouts", confirm=False)
     # its 26, 18 and nine keys made layouts of the user's, the nine keys' lacking 0 told; k14 does not read; no keyboard stood for
-    for told in ("这个主题带 3 个布局：uat-layouts · 主题 26 键、uat-layouts · 主题 18 键、uat-layouts · 主题九键，导入后在 外观 → 布局 里。",
+    for told in ("这个主题带 3 个布局：uat-layouts · 主题 26 键、uat-layouts · 主题 18 键、uat-layouts · 主题九键，导入后在 外观 → 布局 里，要用时点它 → 用在…。",
                  "uat-layouts · 主题九键 缺键（在 外观 → 布局 里照样能用）：", "· 没有数字键 0",
                  "缺键盘必需的键，或不是已有的键盘）：k14"):
         check(d.wait_text(told, timeout=8, where="all", contains=True), f"确认框没写「{told}」：{d.screen().texts('all')[:10]}")
@@ -1163,6 +1171,13 @@ def st72(d):
     use_theme(d)
     d.step("不再顶替")
     check("你好" not in types_q(d), "用这个主题时 q 仍打出主题 26 键的「你好」")
+    d.step("没打开前不在键盘选项里")
+    gear(d, "拼音")
+    d.tap_text("键盘", after=1.0)
+    d.wait_text("注音全键盘", timeout=10, where="all")
+    before = d.screen().texts("all")
+    d.back(after=0.5)
+    check(not any("uat-layouts" in t for t in before), f"没用在… 打开，拼音的键盘选项里已有主题的布局：{before[:12]}")
     d.step("布局页")
     check(layout_card(d, "uat-layouts · 主题 18 键"), "布局页没有「uat-layouts · 主题 18 键」")
     check(layout_card(d, "uat-layouts · 主题九键"), "布局页没有缺 0 的「uat-layouts · 主题九键」")
@@ -1182,7 +1197,7 @@ def st72(d):
     d.back(after=0.5)
     check(not any("（主题：" in t for t in opts), f"键盘选项里还有「（主题：…）」：{opts[:12]}")
     check("uat-layouts · 主题 26 键（自定义）" in opts, f"键盘选项里没有「uat-layouts · 主题 26 键（自定义）」：{opts[:12]}")
-    return "确认框列出 3 个布局、九键缺 0 照样列并写出、k14 不用、勾着一起导入；主题不顶替；布局页三张卡片；用在拼音后 q 打出你好"
+    return "确认框列出 3 个布局、九键缺 0 照样列并写出、k14 不用、勾着一起导入；主题不顶替；打开前不在键盘选项里；布局页三张卡片；用在拼音后 q 打出你好"
 
 SOUNDS_ICONS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "theme-sounds-icons")
 
@@ -2000,7 +2015,14 @@ def st143(d):
     push_shift060_pack(d, "uat-shift060b")
     import_theme(d, "uat-shift060b", confirm=False)
     answer_pack(d)
-    pinyin_keyboard(d, "uat-shift060b · 旧 26 键（自定义）")
+    # a pack's boards are on for no input method till 用在… turns one on, which also switches to it
+    card = layout_card(d, "uat-shift060b · 旧 26 键")
+    check(card, "布局页没有「uat-shift060b · 旧 26 键」")
+    d.tap(card.c, 1.0)
+    d.tap_text("用在…", where="all", scroll=False, after=1.5)
+    d.wait_text("「uat-shift060b · 旧 26 键」用在", timeout=5, where="all")
+    d.tap_text("拼音", where="all", scroll=False, after=0.5)
+    d.tap_text("确定", where="all", scroll=False, after=2.0)
     ids = typing_xi(d)
     check("shift" in ids and not {"apostrophe", "分词"} & ids, f"之后导入的包的 26 键打 xi 时那格应是 ⇧：{sorted(ids)[:40]}")
     return "导入后是自带的分词；重启后拼音换成转出来的 26 键，打字时是分词（xi'an）；之后导入的那块仍是 ⇧"
@@ -2438,9 +2460,21 @@ def st161(d):
     return "导入时勾拼音：卡片写用在：拼音，拼音的 a 打出哈哈，拼音的键盘写 UAT 26 键（自定义）；英文不受影响"
 
 
+def pinyin_keyboards(d):
+    """the options of 输入法 → 拼音's 键盘, the list ⋯ → 键盘 shows too"""
+    gear(d, "拼音")
+    d.tap_text("键盘", after=1.0)
+    d.wait_text("注音全键盘", timeout=10, where="all")
+    opts = d.screen().texts("all")
+    d.back(after=0.5)
+    return opts
+
+
 @case("ST-162", base="B0-设置", mutates=True)
 def st162(d):
     import_uat_qwerty(d)
+    opts = pinyin_keyboards(d)
+    check("UAT 26 键（自定义）" not in opts, f"导入时点了先不用，拼音的键盘选项里却有 UAT 26 键：{opts[:12]}")
     card = layout_card(d, "UAT 26 键")
     check(card, "导入后列表里没有 UAT 26 键")
     # its own card's line only: the app's 数字 and 符号 cards say 用在：数字键盘 / 符号面板 and may be on screen
@@ -2458,6 +2492,8 @@ def st162(d):
     d.tap_text("确定", where="all", scroll=False, after=2.0)
     check(d.wait_text("用在：拼音、英文", timeout=5, where="all"), f"卡片下没写「用在：拼音、英文」：{d.screen().texts()[:20]}")
     check("哈哈" in types_haha(d), "拼音的 a 键没打出「哈哈」")
+    opts = pinyin_keyboards(d)
+    check("UAT 26 键（自定义）" in opts, f"用在拼音后拼音的键盘选项里没有 UAT 26 键：{opts[:12]}")
     d.step("再去掉拼音")
     card = layout_card(d, "UAT 26 键")
     d.tap(card.c, 1.0)

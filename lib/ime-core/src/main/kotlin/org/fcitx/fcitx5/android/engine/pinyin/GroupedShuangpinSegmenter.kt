@@ -139,6 +139,11 @@ class GroupedShuangpinSegmenter(
         return best.take(places.size)
     }
 
+    // what the code row shows once taken (an initial its taught key), so the bar and the row agree
+    override fun keysOffered(offered: String): String? =
+        if (offered in byInitial) scheme.initialKeys(offered).firstOrNull()?.toString()
+        else Syllables.id(offered).takeIf { it >= 0 }?.let { keysShown(offered, it) }
+
     override fun reads(c: Char) = letters.isCode(c)
 
     override fun isKey(c: Char) = letters.isCode(c)

@@ -50,6 +50,8 @@ class StrokeFilterTest {
         words: Map<String, List<String>>,
         private val partial: Map<String, String> = emptyMap(),
         private val deletes: Int = 0,
+        private val bar: List<String> = emptyList(),
+        private val said: List<String> = emptyList(),
     ) : Session {
         val words = words.toMutableMap()
         val actions = ArrayList<Action>()
@@ -104,7 +106,7 @@ class StrokeFilterTest {
 
         fun shown(commit: String = "") = Snapshot(
             commit, input, all().take(PAGE), 0, hasPreviousPage = false, hasNextPage = all().size > PAGE,
-            handled = true, predicting = false, total = all().size, actionable = true,
+            handled = true, predicting = false, total = all().size, actionable = true, syllables = bar, syllablesSaid = said,
         )
 
         override fun candidates(from: Int, count: Int): List<Choice> {
@@ -289,6 +291,17 @@ class StrokeFilterTest {
         q.words["yang"] = listOf("王") + yang
         assertEquals("羊", g.apply(Action.Pick(1)).commit)
         assertEquals(Action.Pick(5), q.actions.last())
+    }
+
+    // were it dropped, TalkBack would read 双拼's keys on the bar (ua) under the strokes, not their pinyin
+    @Test
+    fun theBarAndItsPinyinForTalkBackStayUnderTheStrokes() {
+        val p = FakePinyin(mapOf("yang" to yang), bar = listOf("yd", "y"), said = listOf("yang", "y"))
+        val f = StrokeFilter(p, { strokes }, pageSize = 3)
+        "yang".forEach { f.apply(Action.Key(it)) }
+        val s = f.apply(Action.Stroke('n'))
+        assertEquals(listOf("yd", "y"), s.syllables)
+        assertEquals(listOf("yang", "y"), s.syllablesSaid)
     }
 
     @Test

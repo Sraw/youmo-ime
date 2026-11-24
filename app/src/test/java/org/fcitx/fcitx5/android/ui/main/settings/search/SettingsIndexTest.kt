@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog
 import org.fcitx.fcitx5.android.engine.assertRows
 import org.fcitx.fcitx5.android.engine.runtime.EngineSettings
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
@@ -153,7 +154,7 @@ class SettingsIndexTest {
 
     @Test
     @Uat("ST-194")
-    fun theTablesKeyboardIsFoundWhileALayoutOfTheUsersHasItsKeys() {
+    fun theTablesKeyboardIsFoundWhileALayoutOfTheUsersOnForThemHasItsKeys() {
         val ctx = context()
         val dirWas = CustomKeyboards.dir
         val dir = File(folder.root, "layouts").apply { mkdirs() }
@@ -166,6 +167,9 @@ class SettingsIndexTest {
             File(dir, "my-qwerty.xml").writeText(qwerty.replaceFirst("id=\"qwerty\"", "id=\"my-qwerty\" based-on=\"qwerty\""))
             CustomKeyboards.forget("my-qwerty")
             assertTrue(CustomKeyboards.choice("my-qwerty")!!.tableExtras)
+            assertEquals("not turned on for the tables", emptyList<String>(), found())
+            val keyboard = AppPrefs.getInstance().keyboard
+            keyboard.setOfferedLayouts(keyboard.offeredLayouts().with(ImKeyboards.TABLE, "my-qwerty"))
             assertEquals("the tables' pages", InputMethodCatalog.TABLES.keys.sorted(), found())
             for (table in InputMethodCatalog.TABLES.keys) {
                 assertTrue(table, AppPrefs.TABLE_KEYBOARD_LAYOUT in keysOn(ctx, table))
@@ -175,6 +179,7 @@ class SettingsIndexTest {
             CustomKeyboards.forget("my-qwerty")
             assertEquals("gone", emptyList<String>(), found())
         } finally {
+            AppPrefs.getInstance().keyboard.keyboardLayoutsOffered.setValue("")
             forgetTheTestsLayouts(dirWas)
         }
     }

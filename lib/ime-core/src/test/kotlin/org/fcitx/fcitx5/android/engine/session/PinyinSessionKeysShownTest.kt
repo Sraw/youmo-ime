@@ -40,6 +40,7 @@ class PinyinSessionKeysShownTest {
         Triple("词", "ci", -3f),
         Triple("西", "xi", -2f),
         Triple("句", "ju", -3f),
+        Triple("杀", "sha", -2.5f),
     )
 
     private fun session(segmenter: Segmenter, keysShown: Boolean = true) =
@@ -83,6 +84,42 @@ class PinyinSessionKeysShownTest {
             s.type("x", NineKeyLetters.NINE_SP)
             assertEquals("x;", s.apply(Key(NineKeyLetters.NINE_SP_SEMICOLON)).preedit)
         },
+    )
+
+    // the bar as the code: each offered one as it shows once taken, its pinyin for TalkBack; taking one reads as with the switch off
+    @Test
+    @Uat("SP-65")
+    fun theBarShowsTheKeysTheCodeShowsAndTakesAsBefore() = assertRows(
+        *groupedBoards.flatMap { (name, letters) ->
+            fun bar(scheme: ShuangpinScheme, keys: String, keysShown: Boolean = true) = grouped(letters, scheme, keysShown).type(keys, letters)
+            listOf(
+                "$name 自然码 uani: sha ua, sh u" to {
+                    val s = bar(ZIRANMA, "uani")
+                    assertEquals(bar(ZIRANMA, "uani", keysShown = false).syllables, s.syllablesSaid)
+                    assertEquals(listOf("ua", "u"), listOf("sha", "sh").map { s.syllables[s.syllablesSaid.indexOf(it)] })
+                },
+                "$name 小鹤 xkni: xing xk, x x" to {
+                    val s = bar(XIAOHE, "xkni")
+                    assertEquals(listOf("xk", "x"), listOf("xing", "x").map { s.syllables[s.syllablesSaid.indexOf(it)] })
+                },
+                "$name off: pinyin, nothing said apart" to {
+                    val s = bar(ZIRANMA, "uani", keysShown = false)
+                    assertTrue(s.syllables.toString(), "sha" in s.syllables && "sh" in s.syllables)
+                    assertEquals(emptyList<String>(), s.syllablesSaid)
+                },
+                "$name ua taken: as sha taken with the switch off, the code its keys" to {
+                    val on = grouped(letters)
+                    val took = on.type("uani", letters).let { on.apply(Action.Syllable(it.syllables.indexOf("ua"))) }
+                    val off = grouped(letters, keysShown = false)
+                    val offTook = off.type("uani", letters).let { off.apply(Action.Syllable(it.syllables.indexOf("sha"))) }
+                    assertEquals(offTook.candidates, took.candidates)
+                    assertEquals("杀你", took.candidates[0])
+                    assertTrue(took.preedit, took.preedit.startsWith("ua"))
+                    assertEquals(emptyList<String>(), offTook.syllablesSaid)
+                    assertEquals(offTook.syllables, took.syllablesSaid)
+                },
+            )
+        }.toTypedArray(),
     )
 
     @Test
@@ -130,8 +167,8 @@ class PinyinSessionKeysShownTest {
             // vsgo with zhong taken off the bar (ni first when typed before it)
             fun taken(ni: Boolean = false): Session = grouped(letters).also { s ->
                 var shown = s.type(if (ni) "nivsgo" else "vsgo", letters)
-                if (ni) shown = s.apply(Action.Syllable(shown.syllables.indexOf("ni")))
-                s.apply(Action.Syllable(shown.syllables.indexOf("zhong")))
+                if (ni) shown = s.apply(Action.Syllable(shown.syllablesSaid.indexOf("ni")))
+                s.apply(Action.Syllable(shown.syllablesSaid.indexOf("zhong")))
             }
             fun Snapshot.before() = preedit.take(cursor.takeIf { it >= 0 } ?: preedit.length)
             listOf(
@@ -149,7 +186,7 @@ class PinyinSessionKeysShownTest {
                 "$name zh taken: a step back goes before it" to {
                     val s = grouped(letters)
                     val typed = s.type("vs", letters)
-                    s.apply(Action.Syllable(typed.syllables.indexOf("zh")))
+                    s.apply(Action.Syllable(typed.syllablesSaid.indexOf("zh")))
                     assertEquals("", s.apply(Action.Step(-1)).before())
                 },
                 "$name zhong taken, a tap between v and s, then a key: zhong kept" to {
@@ -195,7 +232,7 @@ class PinyinSessionKeysShownTest {
         "18 键 zhong taken, Backspace at the end" to {
             val s = grouped(NineKeyLetters.G18)
             val typed = s.type("vsgo", NineKeyLetters.G18)
-            s.apply(Action.Syllable(typed.syllables.indexOf("zhong")))
+            s.apply(Action.Syllable(typed.syllablesSaid.indexOf("zhong")))
             assertEquals("vs go", s.apply(Action.Backspace).preedit)
         },
     )
@@ -216,20 +253,20 @@ class PinyinSessionKeysShownTest {
         "18 键 an initial taken" to {
             val s = grouped(NineKeyLetters.G18)
             val typed = s.type("ci", NineKeyLetters.G18)
-            assertEquals("ci", s.apply(Action.Syllable(typed.syllables.indexOf("c"))).preedit)
+            assertEquals("ci", s.apply(Action.Syllable(typed.syllablesSaid.indexOf("c"))).preedit)
         },
         // zh taken off V: its key, 自然码 v
         "18 键 zh taken" to {
             val s = grouped(NineKeyLetters.G18)
             val typed = s.type("vs", NineKeyLetters.G18)
-            val zh = s.apply(Action.Syllable(typed.syllables.indexOf("zh")))
+            val zh = s.apply(Action.Syllable(typed.syllablesSaid.indexOf("zh")))
             assertEquals("vs", zh.preedit)
         },
         // a whole syllable taken: its code, then the rest's keys
         "18 键 zhong taken" to {
             val s = grouped(NineKeyLetters.G18)
             val typed = s.type("vsgo", NineKeyLetters.G18)
-            assertEquals("vs'go", s.apply(Action.Syllable(typed.syllables.indexOf("zhong"))).preedit)
+            assertEquals("vs'go", s.apply(Action.Syllable(typed.syllablesSaid.indexOf("zhong"))).preedit)
         },
         // fuzzy z ↔ zh: ZX UI read as zhi shows z i, the letters pressed: neither zhi's v nor the keys' first letters (zu)
         "14 键 fuzzy zhi off z" to {

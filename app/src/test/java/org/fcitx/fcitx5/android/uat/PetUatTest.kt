@@ -4,6 +4,7 @@
  */
 package org.fcitx.fcitx5.android.uat
 
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Rect
 import org.fcitx.fcitx5.android.FcitxApplication
@@ -20,6 +21,7 @@ import org.fcitx.fcitx5.android.input.pet.PetSheets
 import org.fcitx.fcitx5.android.input.pet.PetView
 import org.fcitx.fcitx5.android.scene.pet.PetMachine
 import org.fcitx.fcitx5.android.scene.pet.PetState.Name
+import org.fcitx.fcitx5.android.utils.appContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -160,6 +162,42 @@ class PetUatTest {
         h.idle()
         h.tap(h.key("q"))
         assertEquals(Name.TYPING, state)
+    }
+
+    @Test
+    @Uat("MN-33")
+    fun thePetStillPlaysAfterTheSystemsDarkModeSwitches() {
+        val theme = theme()
+        // as the theme list picks one with 跟随系统深色模式 on: both slots, each showing the system's version
+        prefs.set(ThemeManager.prefs.followSystemDayNightTheme, true)
+        prefs.set(ThemeManager.prefs.lightModeTheme, theme)
+        prefs.set(ThemeManager.prefs.darkModeTheme, theme)
+        start(theme)
+        try {
+            for (on in listOf(true, false)) {
+                val config = Configuration(appContext.resources.configuration).apply {
+                    uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                        (if (on) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO)
+                }
+                FcitxApplication.getInstance().onConfigurationChanged(config)
+                h.service.onConfigurationChanged(config)
+                // the app's screen remade for it: the keyboard hidden and shown again at once, its window never away
+                h.service.hideWindow()
+                h.service.showWindow(true)
+                h.idle()
+                assertEquals("night $on", Name.IDLE to 0, state to index)
+                h.tap(h.key("q"))
+                assertEquals("night $on: a key plays", Name.TYPING, state)
+                h.after(2500)
+            }
+            h.after(31_000)
+            assertEquals(Name.SLEEP, state)
+        } finally {
+            val day = Configuration(appContext.resources.configuration).apply {
+                uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or Configuration.UI_MODE_NIGHT_NO
+            }
+            FcitxApplication.getInstance().onConfigurationChanged(day)
+        }
     }
 
     @Test

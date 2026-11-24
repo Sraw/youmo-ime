@@ -734,6 +734,11 @@ class InputView(
     /** The keys gone from the user's view: hidden, or a hardware keyboard took over. */
     fun keyboardHidden() = keyboardWindow.keyboardHidden()
 
+    /** Back with a scroll column's menu up: true where it closed one. */
+    fun dismissMenu(): Boolean = keyboardWindow.inputFinished()
+
+    override fun keyboardMenuTakes(downTime: Long): Boolean = keyboardWindow.menuTakes(downTime)
+
     // the candidates too: a remade view mid-typing showed the code row over an empty bar till the next key
     override fun onStartHandleFcitxEvent() {
         fcitx.runImmediately {

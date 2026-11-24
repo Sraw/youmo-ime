@@ -288,6 +288,8 @@ class T9Keyboard(
 
     override fun columnSyllables(): List<String> = columnState.syllables
 
+    override fun columnSaid(): List<String> = columnState.said
+
     override fun pickSyllable(i: Int): KeyAction = syllable(columnState, i)
 
     override fun typingKeys(): List<Pair<Char, KeyRef>> =
@@ -372,7 +374,7 @@ class T9Keyboard(
                     // another input method answering: nothing typed on the nine keys (a filter would leave a switch's
                     // syllables shown)
                     EngineState.syllables
-                        .map { if (it.im == ownIm) T9State(it.composing, it.syllables, it.id) else T9State() }
+                        .map { if (it.im == ownIm) T9State(it.composing, it.syllables, it.id, it.said) else T9State() }
                         .collectLatest(::show)
                 }
             }

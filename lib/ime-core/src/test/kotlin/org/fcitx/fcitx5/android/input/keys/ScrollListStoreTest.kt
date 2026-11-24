@@ -107,7 +107,7 @@ class ScrollListStoreTest {
         val s = ScrollListStore.parse(text)
         assertTrue(s.newer)
         assertEquals(ScrollDefaults.of("number"), s["number"])
-        assertEquals(text, s.with("number", listOf<ScrollItem>(Text("1"))).removed("number", 0).toFront("number", 1).serialize())
+        assertEquals(text, s.with("number", listOf<ScrollItem>(Text("1"))).removed("number", 0).toFront("number", 1).restored("number", listOf(Text("1"))).serialize())
     }
 
     @Test

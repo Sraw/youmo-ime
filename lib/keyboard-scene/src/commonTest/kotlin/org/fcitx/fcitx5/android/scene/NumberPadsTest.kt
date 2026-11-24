@@ -5,12 +5,14 @@
 package org.fcitx.fcitx5.android.scene
 
 import org.fcitx.fcitx5.android.scene.Fixtures.ok
+import org.fcitx.fcitx5.android.scene.engine.MarkContent
 import org.fcitx.fcitx5.android.scene.engine.SceneBuilder
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
 import org.fcitx.fcitx5.android.scene.layout.LayoutReader
 import org.fcitx.fcitx5.android.scene.look.LookDefaults
 import org.fcitx.fcitx5.android.scene.look.LookTheme
 import org.fcitx.fcitx5.android.scene.look.LookThemeTest
+import org.fcitx.fcitx5.android.scene.rules.KeyMarks
 import org.fcitx.fcitx5.android.scene.skin.assertRows
 import org.fcitx.fcitx5.android.scene.theme.Argb
 import kotlin.test.Test
@@ -233,6 +235,30 @@ class NumberPadsTest {
         assertTrue(lock.box.width < locked.bounds.height / 3, "small: ${lock.box}")
         val words = { k: KeyNode -> k.ops(false).filterIsInstance<Op.Text>().map { it.x to it.baseline } }
         assertEquals(words(open), words(locked), "返回's words not moved")
+    }
+
+    // a user's 返回 with a way marked in a top corner: the lock in the other; in both, the lock over the top left's mark
+    @Test
+    fun theLockTakesTheTopCornerLeftFree() {
+        val layout = LayoutReader.layout(testData("number.xml").replace("""long-press="panel-lock"/>""", """long-press="panel-lock" shortcut="my/back"/>""")).ok()
+        assertRows(listOf(emptyList(), listOf("up"), listOf("up", "down")), { "marked ${it.ifEmpty { "nowhere" }}" }) { ways ->
+            val e = Forms.env("number", Forms.block).let {
+                it.copy(
+                    states = mapOf("lock" to setOf(KeyState.Locked)),
+                    marks = it.marks.copy(
+                        upAt = KeyMarks.At.TopRight, downAt = KeyMarks.At.TopLeft,
+                        shortcuts = it.marks.shortcuts + ways.associate { w -> "my/back:$w" to MarkContent.Icon("content-copy") },
+                    ),
+                )
+            }
+            val back = key(SceneBuilder(Fixtures.materialLight, e, FakeMeasurer).build(layout, Forms.fragments).ok(), "back")
+            val icons = back.ops(false).filterIsInstance<Op.Icon>()
+            val lock = icons.single { it.name == "lock" }
+            assertEquals(ways.isEmpty(), lock.box.centerX > back.bounds.centerX, "the lock right only where nothing is: ${lock.box}")
+            val marks = icons.filter { it.name == "content-copy" }
+            assertEquals(if (ways.isEmpty()) 0 else 1, marks.size, "the top right's mark kept, the top left's given up")
+            assertTrue(marks.all { it.box.centerX > back.bounds.centerX }, "kept at the top right: $marks")
+        }
     }
 
     // the fixture's theme predates the rule: the app's own look draws the lock in the accent colour

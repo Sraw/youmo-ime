@@ -287,6 +287,7 @@ class StrokeFilter(
             actionable = s.actionable,
             syllables = s.syllables,
             syllablesId = s.syllablesId,
+            syllablesSaid = s.syllablesSaid,
             cursor = s.cursor,
         )
     }

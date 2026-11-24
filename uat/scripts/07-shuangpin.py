@@ -125,7 +125,8 @@ def sp60(d):
     d.clear()
     # zhong taken shows as vs: a tap between v and s goes before it, so a key there leaves zhong whole
     grouped_keys(d, "v sd fg io")
-    d.syllable_tap("zhong")
+    # the bar shows zhong as its keys too (SP-65)
+    d.syllable_tap("vs")
     taken = d.preedit()
     spans, y = d.preedit_glyphs()
     d.tap(((spans[0][1] + spans[1][0]) // 2, y), 0.6)
@@ -153,6 +154,32 @@ def sp60(d):
     check(full == "ni hk", f"全键盘 nihk 的编码行是「{full}」")
     check(abbrev == "vs g", f"全键盘 vsg 的编码行是「{abbrev}」")
     return f"关「{off}」；18 键「{row}」，回车「{entered}」，点你「{rest}」，点定 zhong「{taken}」→「{tapped}」；全键盘「{full}」「{abbrev}」"
+
+
+@case("SP-65", base="B0-18键", mutates=True)
+def sp65(d):
+    keys_shown_on(d)
+    shown = {}
+    for board, keys in (("18 键", "u a bn io"), ("14 键", "ui as bn ui")):
+        if board == "14 键":
+            gear(d, "双拼")
+            choose(d, "键盘", "14 键")
+            d.open_page("text")
+            d.switch_im("双拼")
+        grouped_keys(d, keys)
+        row, bar = d.preedit(), d.syllables()
+        d.shot("kb", f"{board}自然码 ua ni，开了编码行显示双拼按键：编码行 ua ni，音节条 ua、u")
+        d.syllable_tap("ua")
+        taken, c = d.preedit(), d.cands()
+        d.clear()
+        shown[board] = (row, bar, taken, c)
+    for board, (row, bar, taken, c) in shown.items():
+        # the 14 keys may read BN UI as bu first, as SP-60's JVM case says
+        check(row == "ua ni" if board == "18 键" else row.startswith("ua "), f"{board} 的编码行是「{row}」")
+        check("ua" in bar and "u" in bar and "sha" not in bar and "sh" not in bar, f"{board} 的音节条 {bar}")
+        check(taken.startswith("ua"), f"{board} 点 ua 后编码行是「{taken}」")
+        check(any(x[0] in "杀沙傻啥莎纱鲨" for x in c[:8] if x), f"{board} 点 ua 后的候选 {c[:8]}")
+    return "；".join(f"{b}「{r}」音节条 {bar[:4]}，点 ua「{t}」{c[:3]}" for b, (r, bar, t, c) in shown.items())
 
 
 @case("SP-61", base="B0-18键", mutates=True)

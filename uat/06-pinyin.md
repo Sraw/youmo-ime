@@ -223,12 +223,6 @@
 - **预期**：勾着时前 30 个候选里有「自己」（长按选的 ㄓ 也读成 ㄗ）；取消勾选后没有。
 - **JVM**：`FuzzyUatTest.aZhuyinSymbolLongPressedReadsItsFuzzyPartner`（:lib:ime-eval:uatTest，真数据，按键盘长按发的符号码）、`T9SegmenterZhuyinTest.aTakenSyllableOrSymbolReadsTheFuzzyPairsOn`（ime-core）；设备上不跑。
 
-### PY-166 [P1] 词卡上下滑过以后，点字照样打开字卡
-- **前提**：B0，「普通文本」框。
-- **操作**：打 zhonghuarenmingongheguo，长按候选「中华人民共和国」，点读音行；在词卡的字行上往上滑到底，点「和」那一行；点「‹ 中华人民共和国」返回，往下滑到顶，点「华」那一行。
-- **预期**：两次都打开那个字的字卡（最上面「‹ 中华人民共和国」）；滑动停下后第一次点就打开，不用点两下。
-- **JVM**：app `WordCardScrollUatTest.aWordCardScrolledToItsEndStillOpensARowOnTheFirstTap`。
-
 ### PY-24 [P1] u 开头按笔画查字
 - **前提**：B0。
 - **操作**：点 u h s p。
@@ -425,7 +419,7 @@
 - **JVM**：ime-core `NineKeyLettersCustomTest.theBuiltInGroupsInAnotherOrderAreThatKeyboardAndItsRecord`（同样的码、同样的记录）、`KeyboardCustomTest.theBuiltInGroupsRearrangedAreTheBuiltInKeyboardOnEitherInputMethod`、`ImKeyboardsTest.aLayoutOfOnesOwnIsShownAsTheBuiltInOneItIsTypedAs`；app `GroupedKeyboardOwnGroupsTest.theEighteenKeysRearrangedAreDrawnAsWrittenAndTypedAsTheEighteenKeys`；设备上不跑（换位的样子由 SP-51 在设备上看）。
 
 ### PY-155 [P1] 打字时换成另一种分组的键盘：退格还改刚才打的，点新键盘的字母键时先上屏
-- **前提**：B0；导入了两个自己分组的布局（比如 17 键和另一种 17 键），拼音用其中一个。
+- **前提**：B0；导入了两个自己分组的布局（比如 17 键和另一种 17 键），两个都在 **外观 → 布局** 点它 → **用在…** 勾了 **拼音**（这样都在拼音的 ⋯ → 键盘 里），拼音用其中一个。
 - **操作**：在第一个键盘上打 nih（不选候选）；打字时从工具栏 **⋯ → 键盘** 换成另一个；先点一下退格，再点新键盘上的一个字母键。
 - **预期**：退格删的是刚才打的最后一个键（还在编码里，没有上屏）；点新键盘的字母键时，刚才打的先照回车的样子上屏，再从新键盘的这个键开始打。不会丢掉打了一半的拼音，也不会退格删掉已经上屏的字。
 - **JVM**：ime-core `OwnKeysTurnTest`（什么键等、什么键换）；app `OwnKeysTurnChainTest.anotherGroupingShownWhileTypingTakesOverAtItsFirstKey`（两个自己分组的键盘各自显示、点键，经真的 KotlinHost 到真引擎：退格、上屏、新键盘接着打）、`KotlinHostOwnKeysTest.otherGroupsWhileTypingCommitTheCodeAtTheirFirstCode`、`aBackspaceAfterOtherGroupsAreToldTakesFromTheCodeTyped`、`otherGroupsLeaveTheFieldsComposingTextAlone`、`EngineBridgeTest.theConfigReadAgainKeepsTheGroupsTypedOnTillTheOthersFirstCode`（换了还没打时改设置也不丢）；设备上不跑：要导入两个自己分组的布局再在 ⋯ → 键盘 里换，脚本没在 0.6.1 写，留到 0.6.1 之后。
@@ -819,6 +813,12 @@
 - **操作**：打 yinhang，长按候选「银行」，点读音行；点「行」那一行；点「‹ 银行」。录屏或盯着看换卡的那一下。竖屏做一遍，横屏再做一遍。
 - **预期**：点「行」，词卡在同一个弹窗里一帧换成字卡：不先消失、不变淡、不从候选那里缩小再长大；弹窗贴着候选栏的那条边不动（竖屏弹窗在候选栏上面，是下边；横屏在下面，是上边）、左右不变，只有另一条边随卡的高度变，不滑过去，也不压到候选栏上（卡比地方高时，菜单照旧能往下滑着看下面的项）。点「‹ 银行」换回词卡也一样。点读音行展开时照旧从候选那里长出来。字卡比词卡高、放不下而换到候选另一边时（悬浮键盘挪到中间偏下能见到），在新的那一边从候选重新长出来。Android 14 以下也不滑。
 - **JVM**：app `CandidateMenuUatTest.aCharacterOfTheWordAndBackStayInTheSameWindow`（同一个弹窗、宽度不变、只在展开时从候选长出来、没变淡没缩小、系统的挪动动画关着，SDK 29 也跑）；ime-core `CardNavTest.onlyOpeningTheLineGrowsTheWindowAnew`、`CardNavTest.aStepToTheCandidatesOtherSideGrowsTheWindowAnew`；设备上照跑（竖屏、横屏：弹窗的左右和贴候选栏的边，不压候选栏）；逐帧录屏见 `dev/design/061-wordcard-shots/`。
+
+### PY-166 [P1] 词卡上下滑过以后，点字照样打开字卡
+- **前提**：B0，「普通文本」框；词卡比弹窗能占的地方高、要滑着看（七个字的词卡一般放不下；放得下的屏幕上脚本记阻塞，靠 JVM 那条）。
+- **操作**：打 zhonghuarenmingongheguo，长按候选「中华人民共和国」，点读音行；在词卡的字行上往上滑到底，点「和」那一行；点「‹ 中华人民共和国」返回，（回来时词卡若在最上面，先往上滑到底）往下滑到顶，点「华」那一行。
+- **预期**：两次滑动字行都跟着动；两次都打开那个字的字卡（最上面「‹ 中华人民共和国」）；滑动停下后第一次点就打开，不用点两下。
+- **JVM**：app `WordCardScrollUatTest.aWordCardScrolledToItsEndStillOpensARowOnTheFirstTap`（查过词卡确实能滚）。
 
 ### PY-125 [P1] 多音字由词定读音：行业的行读 háng，行走的行读 xíng；字卡里那个读音排第一
 - **前提**：B0，「普通文本」框。

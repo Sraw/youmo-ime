@@ -198,12 +198,15 @@ class LayoutListFragment : Fragment() {
         val prefs = AppPrefs.getInstance().keyboard
         val panels = prefs.panelLayouts()
         val chosen = prefs.imKeyboards()
+        val offered = prefs.offeredLayouts(chosen)
+        val scheme = EngineState.shuangpinScheme
         val own = CustomLayouts.list(context = ctx).map { e ->
             val scene = e.layout?.let { scene(ctx, e.id, it, e.fragments) }
             val panel = PanelLayouts.listedUnder(e.family, e.id, panels)
             val used = panel != null && panels[panel] == e.id
             val unread = panel != null && used && PanelLayouts.unread(panel, e.id, CustomKeyboards.choice(e.id))
-            Item.Card(e.id, e.name, e, scene, e.cells, ImKeyboards.usedBy(chosen, e.id), panel, used, unread)
+            val usedBy = offered.usedBy(chosen, e.id, e.layout?.let { CustomKeyboards.choice(e.id) }, scheme)
+            Item.Card(e.id, e.name, e, scene, e.cells, usedBy, panel, used, unread)
         }
         // the app's: where none is chosen, or the chosen one is no card of it (file gone, another family now): said so
         fun builtIn(id: String): Item.Card? {
@@ -292,7 +295,8 @@ class LayoutListFragment : Fragment() {
         }
     }
 
-    private fun confirm(ctx: Context, text: String, ok: LayoutImport.Verdict.Ok, preview: SceneLayout?, back: Map<String, ImKeyboard>) {
+    @VisibleForTesting
+    internal fun confirm(ctx: Context, text: String, ok: LayoutImport.Verdict.Ok, preview: SceneLayout?, back: Map<String, ImKeyboard>) {
         val layout = ok.layout
         val name = LayoutTexts.shown(layout.name, layout.id)
         dialog(ctx, ctx.getString(R.string.layout_import_title, name), LayoutTexts.confirm(ctx, ok, goesBack(ctx, back)), preview)
@@ -303,8 +307,11 @@ class LayoutListFragment : Fragment() {
                             CustomLayouts.save(layout.id, text)
                             CustomKeyboards.choice(layout.id)
                         }
-                        ctx.toast(ctx.getString(R.string.layout_imported, name))
+                        val prefs = AppPrefs.getInstance().keyboard
+                        // a file new under an id a backup left on (its file not restored): asked anew like any other
+                        if (ok.replaces == null) prefs.setOfferedLayouts(prefs.offeredLayouts().withoutAnywhere(layout.id))
                         read?.let { sendBack(it) }
+                        ctx.toast(if (ok.replaces == null || read == null) ctx.getString(R.string.layout_imported, name) else updated(ctx, read, name))
                         reload()
                         // one: asked of it; more: ticked
                         read?.let { askUse(ctx, it, ask = true) }
@@ -323,6 +330,14 @@ class LayoutListFragment : Fragment() {
         ImKeyboards.afterReplace(prefs.imKeyboards(), read.id, read, EngineState.shuangpinScheme).forEach { (slot, k) ->
             prefs.setImKeyboard(ImKeyboards.imOf(slot), k)
         }
+    }
+
+    // only those still on it after [sendBack]: one sent back stays turned on, yet uses it no more
+    private fun updated(ctx: Context, read: CustomChoice, name: String): String {
+        val users = ImKeyboards.usedBy(AppPrefs.getInstance().keyboard.imKeyboards(), read.id)
+            .filter { ImKeyboards.usable(ImKeyboards.imOf(it), read, EngineState.shuangpinScheme) }
+        if (users.isEmpty()) return ctx.getString(R.string.layout_updated, name)
+        return ctx.getString(R.string.layout_updated_in_use, name, users.joinToString(ctx.getString(R.string.layout_list_separator)) { imName(ctx, it) })
     }
 
     // 「双拼换回 18 键」, as a delete says it; null for none
@@ -385,8 +400,9 @@ class LayoutListFragment : Fragment() {
         reload()
     }
 
-    /** Set on OK, an unticked one back on its base. [ask]: just imported, none ticked. */
-    private fun askUse(ctx: Context, layout: CustomChoice, ask: Boolean) {
+    /** Set on OK (OfferedLayouts.afterTicks). [ask]: just imported, asked only where it is not on yet, none ticked. */
+    @VisibleForTesting
+    internal fun askUse(ctx: Context, layout: CustomChoice, ask: Boolean) {
         PanelLayouts.Panel.of(layout.family)?.let { panel ->
             if (!ask || PanelLayouts.drawn(panel, layout) == null) return
             // already the panel's choice: said, not asked
@@ -402,19 +418,20 @@ class LayoutListFragment : Fragment() {
             return
         }
         val scheme = EngineState.shuangpinScheme
-        val slots = ImKeyboards.usableBy(layout, scheme)
+        val prefs = AppPrefs.getInstance().keyboard
+        val on = prefs.imKeyboards().let { prefs.offeredLayouts(it).usedBy(it, layout.id, layout, scheme) }
+        val usable = ImKeyboards.usableBy(layout, scheme)
+        val slots = if (ask) usable - on.toSet() else usable
         if (slots.isEmpty()) {
-            if (!ask) ctx.toast(ctx.getString(R.string.layout_use_none, layout.name))
+            if (usable.isEmpty() && !ask) ctx.toast(ctx.getString(R.string.layout_use_none, layout.name))
             return
         }
-        val prefs = AppPrefs.getInstance().keyboard
         val names = slots.map { imName(ctx, it) }
         fun done(ticked: List<String>) {
             val chosen = prefs.imKeyboards()
-            for (slot in slots) {
-                val k = ImKeyboards.ticked(chosen, slot, layout, slot in ticked, scheme) ?: continue
-                prefs.setImKeyboard(ImKeyboards.imOf(slot), k, layout.id)
-            }
+            val after = prefs.offeredLayouts(chosen).afterTicks(chosen, layout, scheme, slots, ticked, ask)
+            prefs.setOfferedLayouts(after.offered)
+            after.keyboards.forEach { (slot, k) -> prefs.setImKeyboard(ImKeyboards.imOf(slot), k, layout.id) }
             reload()
         }
         if (ask && slots.size == 1) {
@@ -425,8 +442,7 @@ class LayoutListFragment : Fragment() {
                 .show()
             return
         }
-        val used = ImKeyboards.usedBy(prefs.imKeyboards(), layout.id)
-        val checked = BooleanArray(slots.size) { !ask && slots[it] in used }
+        val checked = BooleanArray(slots.size) { !ask && slots[it] in on }
         AlertDialog.Builder(ctx)
             .setTitle(if (ask) ctx.getString(R.string.layout_use_now_many) else ctx.getString(R.string.layout_use_title, layout.name))
             .setMultiChoiceItems(names.toTypedArray(), checked) { _, i, on -> checked[i] = on }
@@ -510,6 +526,7 @@ class LayoutListFragment : Fragment() {
                             after[slot]?.let { prefs.setImKeyboard(ImKeyboards.imOf(slot), it) }
                         }
                         PanelLayouts.usedBy(prefs.panelLayouts(), entry.id).forEach { prefs.panelLayout(it).setValue("") }
+                        prefs.setOfferedLayouts(prefs.offeredLayouts().withoutAnywhere(entry.id))
                     }
                     (parentFragment as? ThemeFragment)?.previewLayout(null)
                     reload()

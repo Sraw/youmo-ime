@@ -614,24 +614,40 @@ def py160(d):
 @case("PY-166", base="B0")
 def py166(d):
     """a word card's rows scrolled, then a row tapped: its character's card (FB: after a scroll no row opened)"""
+    heads = ("中，", "华，", "人，", "民，", "共，", "和，", "国，")
+    rows = lambda s: {n.desc[:1]: n for n in s.nodes if n.desc.startswith(heads)}
+    back = "返回 中华人民共和国"
+
+    def drag(up):
+        """the card's rows dragged by their whole height: to their end ([up]) or their start"""
+        r = sorted(rows(d.screen()).values(), key=lambda n: n.c[1])
+        check(len(r) >= 2, f"词卡里没有字的行：{[n.desc for n in d.screen().nodes if n.desc][:12]}")
+        top, low = r[0].c, r[-1].c
+        d.swipe(low if up else top, top if up else low, 300, after=1.5)
+
+    def swipe(how, up):
+        """drag, Blocked when no row moved: the card fits, so the bug cannot show"""
+        was = rows(d.screen())
+        drag(up)
+        now = rows(d.screen())
+        if not any(c not in now or now[c].c[1] != n.c[1] for c, n in was.items()):
+            raise Blocked(f"{how}词卡没滚动（这台屏幕上七行放得下）：行 {sorted(was)}")
+        return now
+
     d.open_page("text")
     d.type("zhonghuarenmingongheguo")
     d.long_pick("中华人民共和国")
     line = d.screen().find(desc="中华人民共和国，zhōng huá rén mín gòng hé guó", where="all")
     check(line is not None, "没有读音行")
     d.tap(line.c, after=0.8)
-    s = d.screen()
-    rows = [n for n in s.nodes if n.desc.startswith(("中，", "华，", "人，", "民，", "共，", "和，", "国，"))]
-    check(len(rows) >= 2, f"词卡里没有字的行：{[n.desc for n in s.nodes if n.desc][:12]}")
-    top, low = rows[0], rows[-1]
-    for how, a, b in (("往上滑", low.c, top.c), ("往下滑", top.c, low.c)):
-        d.swipe(a, b, 300, after=1.5)
-        s = d.screen()
-        row = next((n for n in s.nodes if n.desc.startswith("和，")), None) or \
-            next((n for n in s.nodes if n.desc.startswith("华，")), None)
-        check(row is not None, f"{how}后词卡里找不到行")
+    for how, up, want in (("往上滑到底", True, "和"), ("往下滑到顶", False, "华")):
+        if not up:
+            # back from the char card the word card may be at its start again: to its end first, so the scroll down moves
+            drag(True)
+        row = swipe(how, up).get(want)
+        check(row is not None, f"{how}后词卡里没有「{want}」那一行")
         d.tap(row.c, after=0.8)
         s = d.screen()
-        check(s.find(desc="返回 中华人民共和国", where="all") is not None, f"{how}后点「{row.desc[:1]}」没打开字卡")
-        d.tap(s.find(desc="返回 中华人民共和国", where="all").c, after=0.8)
-    return "上滑、下滑后点字都打开字卡"
+        check(s.find(desc=back, where="all") is not None, f"{how}后点「{want}」没打开字卡")
+        d.tap(s.find(desc=back, where="all").c, after=0.8)
+    return "上滑到底点和、下滑到顶点华，都打开字卡（两次滑动都滚了）"

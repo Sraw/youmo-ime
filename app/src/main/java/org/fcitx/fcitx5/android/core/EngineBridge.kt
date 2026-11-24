@@ -441,7 +441,7 @@ class EngineBridge {
 
     private fun follow(im: String, s: Snapshot) {
         // every answer, not only while typing: the 14 keys handing back to 全拼 answer with none, which clears what they offered
-        EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId)
+        EngineState.syllablesState.value = EngineState.SyllableState(im, s.preedit.isNotEmpty(), s.syllables, s.syllablesId, s.syllablesSaid)
         if (im == InputMethodCatalog.ENGLISH) EngineState.englishTypingState.value = s.preedit.isNotEmpty() && !s.predicting
         // an answer not theirs is no reason to make them
         made?.let { e -> followed(im) { e } }

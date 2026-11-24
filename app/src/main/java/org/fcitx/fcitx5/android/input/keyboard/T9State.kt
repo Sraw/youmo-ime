@@ -3,4 +3,4 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
-data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList(), val id: Int = 0)
+data class T9State(val composing: Boolean = false, val syllables: List<String> = emptyList(), val id: Int = 0, val said: List<String> = emptyList())

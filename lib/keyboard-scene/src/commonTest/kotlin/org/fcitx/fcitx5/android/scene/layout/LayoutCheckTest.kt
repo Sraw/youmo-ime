@@ -156,7 +156,7 @@ class LayoutCheckTest {
     fun itsIdNameFamilyAndBaseAreItsOwn() {
         assertEquals(listOf("id-built-in", "based-on"), errors(testData("qwerty.xml")), "the app's board as it is")
         val bare = testData("number.xml")
-        assertEquals(listOf("id-built-in", "based-on"), errors(replaceKey(bare, "back", "<gap width=\"12\"/>")).distinct())
+        assertEquals(listOf("id-built-in", "based-on"), errors(replaceKey(bare, "back", "<gap width=\"22\"/>")).distinct())
         assertEquals(listOf("full"), check(bare).pads)
         assertEquals(listOf("id-length"), errors(qwerty.replace("id=\"my-qwerty\"", "id=\"${"a".repeat(33)}\"")))
         assertEquals(listOf("id-prefix"), errors(qwerty.replace("id=\"my-qwerty\"", "id=\"g18\"")))

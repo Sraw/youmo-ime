@@ -340,8 +340,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
         syncLock()
     }
 
-    /** The keys put away, for now or for another field: a scroll column's menu with them. */
-    fun inputFinished() = keyboards[currentKeyboardName]?.columns?.dismissMenu()
+    /** The keys put away, for now or for another field: a scroll column's menu with them. True where one was up. */
+    fun inputFinished(): Boolean = keyboards[currentKeyboardName]?.columns?.dismissMenu() == true
+
+    /** A touch going down where a scroll column's menu is up or just went: it only closes the menu. */
+    fun menuTakes(downTime: Long): Boolean = keyboards[currentKeyboardName]?.columns?.takes(downTime) == true
 
     fun switchLayout(to: String, remember: Boolean = true) {
         val lastSymbol = lastSymbolType

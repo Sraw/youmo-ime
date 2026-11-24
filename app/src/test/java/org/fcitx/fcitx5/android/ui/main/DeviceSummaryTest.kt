@@ -58,11 +58,9 @@ class DeviceSummaryTest {
         assertEquals("中档 · 无 dotprod · 内核 MLAL · 读不到处理器信息", deviceSummary(context, unread))
         // the kernel that runs, not the profile's, where the library did not load
         assertEquals("中档 · 8 核（4 大）· 无 dotprod · 内核 JVM", deviceSummary(context, DeviceProfile.of(sixT), "JVM"))
-        // possible read, no MIDR anywhere: unread, as the settings say, never all eight offline
+        // possible read, no MIDR anywhere: unread, never all eight offline
         val noMidr = sixT.copy(cores = sixT.cores.map { it.copy(midr = null) })
         assertEquals("中档 · 8 核（4 大）· 无 dotprod · 内核 MLAL · 读不到处理器信息", deviceSummary(context, DeviceProfile.of(noMidr)))
-        ThisDevice.profiles = DeviceProfiles(Store(), "", { noMidr }, null)
-        assertEquals("自动：根据 CPU 性能推荐（本机：中）", InputMethodSettings.modelLevelLabel(context, ModelChoice.AUTO.key))
     }
 
     @Test
@@ -88,5 +86,7 @@ class DeviceSummaryTest {
         ThisDevice.profiles = DeviceProfiles(Store(), "", { sixT }, null)
         assertEquals("自动：根据 CPU 性能推荐（本机：中）", InputMethodSettings.modelLevelLabel(context, ModelChoice.AUTO.key))
         assertEquals("高档：拿不准时用大模型复核，最准", InputMethodSettings.modelLevelLabel(context, ModelChoice.HIGH.key))
+        assertEquals("中档：每次按键按整句通顺程度重排", InputMethodSettings.modelLevelLabel(context, ModelChoice.MEDIUM.key))
+        assertEquals("低档：只按词频和搭配，最省电", InputMethodSettings.modelLevelLabel(context, ModelChoice.LOW.key))
     }
 }

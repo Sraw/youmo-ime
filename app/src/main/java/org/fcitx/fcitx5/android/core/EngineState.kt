@@ -26,6 +26,8 @@ object EngineState {
         val composing: Boolean = false,
         val syllables: List<String> = emptyList(),
         val id: Int = 0,
+        /** [syllables] as pinyin where they show as 双拼's keys, for TalkBack; empty: as shown. */
+        val said: List<String> = emptyList(),
     )
 
     @VisibleForTesting

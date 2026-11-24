@@ -15,20 +15,24 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.PopupMenu
+import android.widget.ListPopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.Keep
 import androidx.annotation.VisibleForTesting
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import kotlin.math.abs
+import kotlin.math.max
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.KeySym
@@ -59,8 +63,6 @@ import org.fcitx.fcitx5.android.scene.layout.Direction
 import org.fcitx.fcitx5.android.scene.layout.Slot
 import org.fcitx.fcitx5.android.scene.theme.SoundKey
 import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.DeviceUtil
-import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.styledColor
 import splitties.dimensions.dp
 import splitties.views.dsl.constraintlayout.lParams
@@ -178,6 +180,7 @@ internal class ScrollColumn(
         return (at / itemSize).toInt().takeIf { it < shown.size } ?: -1
     }
 
+    /** Item [i]'s view: each item is one child, in order. */
     fun itemView(i: Int): View? = items.getChildAt(i)
 
     private val actionIds = HashMap<Int, List<Int>>()
@@ -448,7 +451,7 @@ internal class ScrollColumns(
     }
 
     private fun labels(c: Column): List<ScrollColumn.Label> = when (val s = c.shown) {
-        ScrollLists.Shown.Syllables -> keyboard.columnSyllables().map { ScrollColumn.Label(it) }
+        ScrollLists.Shown.Syllables -> keyboard.columnSaid().let { said -> keyboard.columnSyllables().mapIndexed { i, it -> ScrollColumn.Label(it, said = said.getOrNull(i)) } }
         is ScrollLists.Shown.Category -> c.items.map { ScrollColumn.label(context, s.id, it, keyboard.columnEnglish, marks()) }
     }
 
@@ -497,43 +500,78 @@ internal class ScrollColumns(
         say(said, UndoChip.Undo({ change.undo.undone(store, readOnly)?.let { pref.setValue(it.serialize()) } }))
     }
 
-    private var popupMenu: PopupMenu? = null
+    private var popupMenu: ListPopupWindow? = null
     private var menuOn: Column? = null
     private var menuAnchor: View? = null
+    private var menuClosed = 0L
 
-    fun dismissMenu() {
-        val open = popupMenu ?: return
+    /** True where one was up. */
+    fun dismissMenu(): Boolean {
+        val open = popupMenu ?: return false
         closed()
         open.dismiss()
+        return true
     }
+
+    /** A touch going down closes the menu: true where it was up or went as the touch went down, the touch then only closing it. */
+    fun takes(downTime: Long): Boolean = dismissMenu() || downTime <= menuClosed
 
     private fun closed() {
         menuAnchor?.isActivated = false
         popupMenu = null
         menuOn = null
         menuAnchor = null
+        menuClosed = SystemClock.uptimeMillis()
     }
+
+    @VisibleForTesting
+    internal val shownMenu: ListPopupWindow? get() = popupMenu
 
     private fun open(c: Column, menu: ScrollListMenu, entries: List<ScrollListMenu.Entry>, anchor: View) {
         val ctx = anchor.context
-        val popup = PopupMenu(ctx, anchor)
         val tint = ctx.styledColor(android.R.attr.colorControlNormal)
-        for (e in entries) {
+        val rows = entries.map { e ->
             val label = when (e.op) {
                 ScrollListMenu.Op.ToFront -> ctx.getString(R.string.scroll_list_to_front)
                 ScrollListMenu.Op.Edit -> ctx.getString(R.string.scroll_list_edit)
                 ScrollListMenu.Op.Remove -> ctx.getString(R.string.scroll_list_remove, named(menu))
             }
-            popup.menu.item(label, ICONS.getValue(e.op), tint) { run(c, menu, e.op) }.isEnabled = e.enabled
+            label to ICONS.getValue(e.op)
         }
-        if (!DeviceUtil.isSamsungOneUI && !DeviceUtil.isFlyme) popup.setForceShowIcon(true)
+        val adapter = object : ArrayAdapter<String>(ctx, android.R.layout.simple_list_item_1, rows.map { it.first }) {
+            override fun areAllItemsEnabled() = false
+            override fun isEnabled(position: Int) = entries[position].enabled
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                (super.getView(position, convertView, parent) as TextView).apply {
+                    val icon = ContextCompat.getDrawable(ctx, rows[position].second)?.mutate()?.also { it.setTint(tint) }
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(icon, null, null, null)
+                    compoundDrawablePadding = ctx.dp(MENU_ICON_GAP_DP)
+                    isEnabled = entries[position].enabled
+                }
+        }
+        // not a PopupMenu: one takes the window focus from the editor, and some finish composing when they lose it
+        // (an English word is composed in the field); not focusable, its back and outside touches come to the keyboard
+        val popup = ListPopupWindow(ctx, null, android.R.attr.popupMenuStyle)
+        popup.isModal = false
+        popup.anchorView = anchor
+        popup.setAdapter(adapter)
+        popup.setContentWidth(max(widest(adapter, FrameLayout(ctx)), ctx.dp(MENU_MIN_WIDTH_DP)))
+        popup.setOnItemClickListener { _, _, position, _ ->
+            popup.dismiss()
+            run(c, menu, entries[position].op)
+        }
         dismissMenu()
-        popup.setOnDismissListener { if (it === popupMenu) closed() }
+        popup.setOnDismissListener { if (popup === popupMenu) closed() }
         popupMenu = popup
         menuOn = c
         menuAnchor = anchor
         anchor.isActivated = true
         popup.show()
+    }
+
+    private fun widest(adapter: ArrayAdapter<String>, parent: ViewGroup): Int {
+        val unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        return (0 until adapter.count).maxOf { i -> adapter.getView(i, null, parent).also { it.measure(unspecified, unspecified) }.measuredWidth }
     }
 
     private fun hit(c: Column, x: Float, y: Float): Boolean {
@@ -642,6 +680,11 @@ internal class ScrollColumns(
 
         /** A finger's target: a column's place, no key's. */
         private const val REF = "scroll:"
+
+        // the platform's popup menu row: its least width, the gap between icon and title
+        private const val MENU_MIN_WIDTH_DP = 196
+
+        private const val MENU_ICON_GAP_DP = 16
 
         private val ICONS = mapOf(
             ScrollListMenu.Op.ToFront to R.drawable.ic_baseline_arrow_upward_24,

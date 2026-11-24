@@ -24,6 +24,7 @@ import org.fcitx.fcitx5.android.engine.InputMethodCatalog.PINYIN
 import org.fcitx.fcitx5.android.engine.InputMethodCatalog.SHUANGPIN
 import org.fcitx.fcitx5.android.engine.pinyin.ShuangpinScheme
 import org.fcitx.fcitx5.android.input.keyboard.ImKeyboard
+import org.fcitx.fcitx5.android.input.keyboard.ImKeyboards
 import org.fcitx.fcitx5.android.input.keyboard.canvas.BuiltInLayouts
 import org.fcitx.fcitx5.android.input.keyboard.forgetTheTestsLayouts
 import org.fcitx.fcitx5.android.input.layout.CustomLayoutFiles
@@ -107,7 +108,7 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         keyboard.shuangpinKeyboard.setValue(keyboard.shuangpinKeyboard.defaultValue)
         keyboard.englishKeyboard.setValue(keyboard.englishKeyboard.defaultValue)
         listOf(keyboard.pinyinKeyboardLayout, keyboard.shuangpinKeyboardLayout, keyboard.englishKeyboardLayout, keyboard.tableKeyboardLayout,
-            keyboard.numberKeyboardLayout, keyboard.symbolsPanelLayout).forEach { it.setValue("") }
+            keyboard.numberKeyboardLayout, keyboard.symbolsPanelLayout, keyboard.keyboardLayoutsOffered).forEach { it.setValue("") }
         prefs.internal.themeLayoutsUnseen.setValue("")
         prefs.setStoredKeyLists(null)
         // a switch's notice left in EngineNotices' static sets would be dropped or said with another class's
@@ -150,6 +151,11 @@ class ThemeLayoutsToListTest : ThemePackFixture() {
         assertEquals(ImKeyboard.KEYS18 to null, chosen(SHUANGPIN))
         // the tables drew the 26 keys too
         assertEquals(ids.getValue("mint · 主题 26 键"), keyboard.tableKeyboardLayout.getValue())
+        // those switched in are listed in the keyboard choice; one only listed is not
+        val offered = keyboard.offeredLayouts()
+        assertEquals(listOf(k17id), offered.of(PINYIN))
+        assertEquals(emptyList<String>(), offered.of(SHUANGPIN))
+        assertTrue(ImKeyboards.SLOTS.none { ids.getValue("other · 另一个") in offered.of(it) })
         // told once, the pack in use's, in the boards' order
         val told = prefs.internal.themeLayoutsUnseen.getValue()
         assertEquals(appContext.getString(R.string.theme_layouts_in_use, "mint", "主题 26 键, 17 键", "English, Wubi and other tables, Pinyin"), told)

@@ -31,6 +31,36 @@ class GroupedShuangpinSegmenterTest {
         }
     }
 
+    // the bar with 编码行显示双拼按键: what the code row shows once taken, so a syllable its scheme code, an initial its key
+    @Test
+    fun aBarOfferedSyllableOrInitialShowsAsTheKeysTheCodeShowsTaken() = assertRows(
+        "自然码 sha" to { assertEquals("ua", GroupedShuangpinSegmenter(ZIRANMA, G14).keysOffered("sha")) },
+        "自然码 sh" to { assertEquals("u", GroupedShuangpinSegmenter(ZIRANMA, G14).keysOffered("sh")) },
+        "自然码 zh, ch" to { assertEquals(listOf("v", "i"), listOf("zh", "ch").map { GroupedShuangpinSegmenter(ZIRANMA, G18).keysOffered(it) }) },
+        "自然码 c, a plain initial" to { assertEquals("c", GroupedShuangpinSegmenter(ZIRANMA, G18).keysOffered("c")) },
+        "自然码 jing" to { assertEquals("jy", GroupedShuangpinSegmenter(ZIRANMA, NINE_SP).keysOffered("jing")) },
+        "小鹤 jing, zhong" to { assertEquals(listOf("jk", "vs"), listOf("jing", "zhong").map { GroupedShuangpinSegmenter(XIAOHE, G18).keysOffered(it) }) },
+        "自然码 ang, zero initial" to { assertEquals("ah", GroupedShuangpinSegmenter(ZIRANMA, G18).keysOffered("ang")) },
+        "小鹤 an, as it teaches" to { assertEquals("an", GroupedShuangpinSegmenter(XIAOHE, G18).keysOffered("an")) },
+        "微软 xing" to { assertEquals("x;", GroupedShuangpinSegmenter(MICROSOFT, G18).keysOffered("xing")) },
+        "neither" to { assertEquals(null, GroupedShuangpinSegmenter(ZIRANMA, G18).keysOffered("xyz")) },
+        "every scheme, every keyboard: each syllable its taught code, each initial a key taking it" to {
+            for ((name, scheme) in EngineSettings.SCHEMES) {
+                for (letters in listOf(G18, G14, NINE_SP)) {
+                    val segmenter = GroupedShuangpinSegmenter(scheme, letters)
+                    // m, n: initials too, offered as such
+                    val typed = (0 until Syllables.count).filter { Syllables.spelling(it) !in SpellingIndex.INITIALS }
+                        .mapNotNull { id -> scheme.encode(id)?.takeIf { code -> code.all { letters.isCode(letters.key(it)) } }?.let { id to it } }
+                    for ((id, code) in typed) assertEquals("$name ${Syllables.spelling(id)}", code, segmenter.keysOffered(Syllables.spelling(id)))
+                    for (initial in SpellingIndex.INITIALS) {
+                        val key = segmenter.keysOffered(initial) ?: continue
+                        assertTrue("$name $initial $key", initial in scheme.initialsOn(key.single()))
+                    }
+                }
+            }
+        },
+    )
+
     @Test
     fun everySyllableTypedInEverySchemeReadsBackOnBothKeyboards() {
         for ((name, scheme) in EngineSettings.SCHEMES) {

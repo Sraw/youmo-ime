@@ -462,15 +462,17 @@ def kb90(d):
     pairs = [(i, i) for i in ids[:-1]]
     moved = [f"{p}{pad.get(p, (None,))[0]}≠{nine[t][0]}" for p, t in pairs if pad.get(p, (None,))[0] != nine[t][0]]
     check(not moved, f"不在九键的位置：{moved}")
-    # 返回 starts where 123 was and fills 1's column
+    # 返回 starts where 123 was and fills 1's column; 0 under 8, . under 9 (a pixel of rounding between rows)
     back, n123 = pad["back"][0], nine["numbers"][0]
-    check(back[0] == n123[0] and back[1] == n123[1] and back[3] == n123[3] and back[2] > n123[0] + (n123[2] - n123[0]) * 0.8,
-          f"返回 {back} 不是从 123 {n123} 的位置起")
+    check(back[0] == n123[0] and back[1] == n123[1] and back[3] == n123[3], f"返回 {back} 不是从 123 {n123} 的位置起")
+    under = [(k, a) for k, a in (("back", "1"), ("0", "8"), (".", "9"))
+             if k not in pad or abs(pad[k][0][0] - pad[a][0][0]) > 2 or abs(pad[k][0][2] - pad[a][0][2]) > 2]
+    check(not under, f"底排没对齐上面的数字：{[(k, pad.get(k, (None,))[0], a, pad[a][0]) for k, a in under]}")
     check(pad["symbols"][1] == "符" and pad["back"][1] == "返回", f"符、返回 写的是「{pad['symbols'][1]}」「{pad['back'][1]}」")
     tap_key(d, "back")
     again = board_keys(d)
     check(all(again.get(i, (None,))[0] == nine[i][0] for i in ids), "返回 后九键的键挪了")
-    return "1–9、⌫、回车、符 原位，返回 从 123 的位置起；返回 后九键不变"
+    return "1–9、⌫、回车、符 原位，返回 从 123 的位置起、占 1 那一列，0 对 8、. 对 9；返回 后九键不变"
 
 
 @case("KB-91", visual=True)
@@ -906,7 +908,7 @@ def kb116(d):
 
 @case("KB-117", base="B0-九键", mutates=True, visual=True)
 def kb117(d):
-    p = script("04-panels")
+    p, st = script("04-panels"), script("14-settings")
     d.open_page("text")
     d.clear()
     before = p.column_texts(d)
@@ -932,10 +934,22 @@ def kb117(d):
     q = p.item_of(d, "？", "?")
     # a key away from the menu: the tap only puts the menu away
     kb = d.screen().find(rid="keyboard_view", where="ime")
+    shown, bar = p.column_texts(d), d.candidates()
     menu = p.hold_item(d, q)
     check("移到最前" not in menu and "编辑这一列…" in menu, f"已在最前，菜单 {sorted(menu)}")
     d.tap((kb.b[2] - (kb.b[2] - kb.b[0]) // 3, (kb.b[1] + kb.b[3]) // 2), 0.8)
     check(not p.menu_nodes(d.screen()) and not (d.field_text() or ""), f"点菜单外面后：菜单 {sorted(p.menu_nodes(d.screen()))}，框里「{d.field_text()}」")
+    # the tap lands on the 3 6 9 keys: leaked through it would start a pinyin, not commit
+    check(not d.preedit() and d.candidates() == bar and p.column_texts(d) == shown,
+          f"点菜单外面后：编码「{d.preedit()}」，候选 {d.candidates()[:4]}，左列 {p.column_texts(d)}（之前 {shown}）")
+    # the menu takes no focus: a tap on the app closes it and goes on to the field
+    menu = p.hold_item(d, p.item_of(d, "？", "?"))
+    f = d.field()
+    check(menu and f, f"再长按 ? 后：菜单 {sorted(menu)}，焦点框 {f}")
+    d.tap(f.c, 0.8)
+    s = d.screen()
+    check(not p.menu_nodes(s) and s.find(rid="keyboard_view", where="ime") and not (d.field_text(s) or ""),
+          f"点框后：菜单 {sorted(p.menu_nodes(s))}，键盘在 {bool(s.find(rid='keyboard_view', where='ime'))}，框里「{d.field_text(s)}」")
     held = p.column_all(d)
     t = p.item_of(d, "～", "~")
     x, y = t.c
@@ -968,8 +982,17 @@ def kb117(d):
     d.shot("app", "5. 编辑这一列…：滑动列卡片上九键的编辑框")
     s = d.screen()
     check(s.find(text="九键") or s.find(contains="九键"), f"编辑框不是九键的：{s.texts()[:12]}")
-    d.back()
+    # a command for step 9: its menu and notice name it
+    d.tap_text("加命令…", where="all", scroll=False, after=0.8)
+    for _ in range(4):
+        if d.screen().find(text="复制", where="all"):
+            break
+        st.dialog_scroll(d)
+    d.tap_text("复制", where="all", scroll=False, after=0.8)
+    st.dialog_ok(d)
     d.open_page("text")
+    added = p.column_all(d)
+    check(added[-1:] == ["复制"], f"加了复制后九键左列最后不是复制：{added}")
     v = p.column_node(d)
     x0, y0, x1, y1 = v.b
     cx = (x0 + x1) // 2
@@ -978,7 +1001,36 @@ def kb117(d):
     d.touch(("up", cx, y1 - 20 - (y1 - y0) * 5 // 12))
     time.sleep(0.5)
     check(not held and not p.menu_nodes(d.screen()), f"滑到一半停住弹了菜单：{sorted(held)}")
-    return f"移到最前后 {now[:3]}、撤销；漂移松开不选；删 ~ 撤销；网址删 .com 后 {urls}；编辑框九键；滑停不弹"
+    d.step("7. 菜单开着按返回")
+    shown = p.column_texts(d)
+    menu = p.hold_item(d, p.column(d)[0][1])
+    check(menu, "长按第一项没弹出菜单")
+    d.back(0.8)
+    s = d.screen()
+    check(not p.menu_nodes(s) and s.find(rid="keyboard_view", where="ime") and not (d.field_text(s) or ""),
+          f"按返回后：菜单 {sorted(p.menu_nodes(s))}，键盘在 {bool(s.find(rid='keyboard_view', where='ime'))}，框里「{d.field_text(s)}」")
+    check(p.column_texts(d) == shown, f"按返回后左列 {p.column_texts(d)}（之前 {shown}）")
+    d.step("8. 菜单开着回桌面")
+    menu = p.hold_item(d, p.column(d)[0][1])
+    check(menu, "长按第一项没弹出菜单")
+    d.sh("input keyevent KEYCODE_HOME")
+    time.sleep(1.5)
+    s = d.screen()
+    check(not p.menu_nodes(s), f"回桌面后还有菜单 {sorted(p.menu_nodes(s))}")
+    d.open_page("text")
+    s = d.screen()
+    check(not p.menu_nodes(s), f"回来点框后还有菜单 {sorted(p.menu_nodes(s))}")
+    d.step("9. 删掉第 5 步加的复制，等 4 秒")
+    menu = p.hold_item(d, p.item_of(d, "复制"))
+    remove = p.menu_pick(menu, p.REMOVE)
+    check(remove and remove.text == "删除「复制」", f"复制的菜单是 {sorted(menu)}")
+    d.tap(remove.c, 0.8)
+    check(d.screen().find(contains="已删除「复制」", where="all"), "没有提示「已删除「复制」」")
+    time.sleep(4.0)
+    check(not d.screen().find(text="撤销", where="all"), "4 秒后提示条的撤销还在")
+    left = p.column_all(d)
+    check("复制" not in left, f"删了复制后左列还有：{left}")
+    return f"移到最前后 {now[:3]}、撤销；漂移松开不选；删 ~ 撤销；网址删 .com 后 {urls}；编辑框九键；滑停不弹；返回、回桌面关菜单；删除「复制」3 秒后不能撤销"
 
 
 @case("KB-118", mutates=True, visual=True)

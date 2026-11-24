@@ -1139,8 +1139,17 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastKnownConfig = newConfig
     }
 
+    private val inputViewShown = InputViewShown()
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        inputViewShown.hidden()
+    }
+
     override fun onWindowShown() {
         super.onWindowShown()
+        // hideWindow tells the view GONE by hand and showWindow nothing back: the pet stopped for good
+        inputView?.let { if (inputViewShown.shown(it.windowVisibility == View.VISIBLE)) it.dispatchWindowVisibilityChanged(View.VISIBLE) }
         highlightColor =
             styledColorOrDefault(android.R.attr.colorAccent, DefaultHighlightColor).alpha(0.4f)
         InputFeedbacks.syncSystemPrefs()
@@ -1255,9 +1264,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         // Shift+Delete forgets the highlighted candidate: taken while one is highlighted, since the engine's
-        // answer comes too late for the key
+        // answer comes too late for the key. Back closes a scroll column's menu, which takes no focus to hear it
         val forgets = keyTaken.down(keyCode, repeat = event.repeatCount > 0) {
-            keyCode == KeyEvent.KEYCODE_FORWARD_DEL && event.isShiftPressed && candidatesView?.forgetHighlighted() == true
+            keyCode == KeyEvent.KEYCODE_FORWARD_DEL && event.isShiftPressed && candidatesView?.forgetHighlighted() == true ||
+                keyCode == KeyEvent.KEYCODE_BACK && inputView?.dismissMenu() == true
         }
         // told even when taken: else letting go of Shift soon after would switch 中/英
         val taken = hardwareKeyboard.down(

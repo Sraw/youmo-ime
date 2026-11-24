@@ -565,6 +565,8 @@ def pan41(d):
 def lock(d):
     """返回 held: locked, its hold said 解锁 after"""
     hold_back(d)
+    # a hold that also went back is the case failing, not blocked: lock_node finds no 返回 on the letters
+    check(board(d) == "数字", f"长按返回后不是数字键盘：{board(d)}")
     n = lock_node(d)
     check(n.hold == "解锁", f"长按返回后，返回的长按读「{n.hold}」")
 
@@ -729,7 +731,7 @@ def menu_pick(menu, pick):
 
 def hold_item(d, item, pick=None):
     """[item] (a column node) held till its menu shows and let go there: the menu's nodes, the menu left open; [pick] (删除
-    for the remove item) tapped in it, the menu put away with back when it is not there"""
+    for the remove item) tapped in it, the menu put away with back when it is up without it"""
     x, y = item.c
     d.touch(("down", x, y), ("sleep", 0.9), ("up", x, y))
     time.sleep(0.5)
@@ -738,7 +740,8 @@ def hold_item(d, item, pick=None):
         n = menu_pick(menu, pick)
         if n and n.enabled:
             d.tap(n.c, 0.8)
-        else:
+        elif menu:
+            # with no menu up a back would hide the keyboard
             d.back(0.5)
     return menu
 

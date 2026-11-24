@@ -4,9 +4,12 @@
  */
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.os.SystemClock
 import android.text.InputType
+import android.view.KeyEvent
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.widget.ListPopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
@@ -15,6 +18,7 @@ import androidx.core.view.isVisible
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.Uat
+import org.fcitx.fcitx5.android.assertRows
 import org.fcitx.fcitx5.android.core.EngineState
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.directBoot
@@ -25,11 +29,13 @@ import org.fcitx.fcitx5.android.input.keys.ScrollListStore
 import org.fcitx.fcitx5.android.input.shortcut.KeyCommand
 import org.fcitx.fcitx5.android.scene.keys.ScrollDefaults
 import org.fcitx.fcitx5.android.scene.keys.ScrollItem
+import org.fcitx.fcitx5.android.uat.HideRecordingShadow
 import org.fcitx.fcitx5.android.ui.main.MainActivity
 import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.parcelable
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,11 +44,10 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowPopupMenu
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi")
+@Config(application = FcitxApplication::class, qualifiers = "w393dp-h851dp-port-440dpi", shadows = [HideRecordingShadow::class])
 class ScrollColumnMenuTest {
 
     private var harness: KeyboardHarness? = null
@@ -74,20 +79,32 @@ class ScrollColumnMenuTest {
 
     private data class Item(val label: String, val disabled: Boolean)
 
-    // the latest system menu, if it is still up
-    private fun menu(): List<Item> = ShadowPopupMenu.getLatestPopupMenu()?.takeIf { shadowOf(it).isShowing }?.menu
-        ?.let { m -> (0 until m.size()).map { m.getItem(it) }.map { Item(it.title.toString(), !it.isEnabled) } }.orEmpty()
+    private fun shownMenu(): ListPopupWindow? = KeyboardHarness.all(h.keyboard).filterIsInstance<BaseKeyboard>().firstOrNull { h.shown(it) }
+        ?.columns?.shownMenu?.takeIf { it.isShowing }
+
+    // the column's menu, if it is still up
+    private fun menu(): List<Item> = shownMenu()?.listView?.adapter
+        ?.let { a -> (0 until a.count).map { Item(a.getItem(it).toString(), !a.isEnabled(it)) } }.orEmpty()
 
     private fun hold(item: TextView) {
         h.press(item)
         h.after(AppPrefs.getInstance().keyboard.longPressDelay.getValue() + 100L)
+        if (shownMenu() != null) h.menuUp()
+    }
+
+    /** As a tap on [label]'s row of the menu up. */
+    private fun menuPick(label: String) {
+        val open = shownMenu() ?: error("no menu")
+        assertTrue("$label in ${menu()}", open.performItemClick(menu().indexOfFirst { it.label == label }))
+        h.idle()
+        h.relayout()
     }
 
     /** Held, let go, then [label] tapped in the menu left open. */
     private fun pick(item: TextView, label: String) {
         hold(item)
         h.release()
-        h.menuPick(label)
+        menuPick(label)
     }
 
     private fun said(v: TextView) = AccessibilityNodeInfoCompat.wrap(v.createAccessibilityNodeInfo()).actionList.mapNotNull { it.label?.toString() }
@@ -119,7 +136,7 @@ class ScrollColumnMenuTest {
         h.release()
         assertEquals("let go, still up", ops(question), menu().map { it.label })
         assertEquals(nine, stored(ScrollDefaults.NINE))
-        h.menuPick(s(R.string.scroll_list_to_front))
+        menuPick(s(R.string.scroll_list_to_front))
         assertEquals(ScrollItem.Text("?"), stored(ScrollDefaults.NINE).first())
         assertEquals(emptyList<String>(), typed)
         assertTrue(h.noticeTexts().toString(), h.noticeTexts().containsAll(listOf(s(R.string.scroll_list_moved_to_front), s(R.string.learning_undo))))
@@ -141,7 +158,7 @@ class ScrollColumnMenuTest {
         val dp = h.service.resources.displayMetrics.density
         hold(held)
         h.api.calls.clear()
-        // up and aside as a hand settling does: once picked the old way
+        // up and aside as a hand settling does after the menu opens, then lifted: no row picked
         h.move(box.exactCenterX() + 21 * dp, box.exactCenterY() - 27 * dp, lift = true)
         assertEquals(nine, stored(ScrollDefaults.NINE))
         assertEquals(emptyList<String>(), typed)
@@ -180,41 +197,84 @@ class ScrollColumnMenuTest {
         start()
         hold(column()[2])
         h.release()
-        val open = ShadowPopupMenu.getLatestPopupMenu()
+        val list = shownMenu()!!.listView!!
+        val toFront = menu().indexOfFirst { it.label == s(R.string.scroll_list_to_front) }
         val abc = ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Text("a"), ScrollItem.Text("b"), ScrollItem.Text("c"))).serialize()
         pref.setValue(abc)
         h.idle()
         assertEquals(emptyList<Item>(), menu())
-        // its item tapped all the same (a tap on its way as it closed): the place now holds another item
-        val item = (0 until open.menu.size()).map(open.menu::getItem).first { it.title.toString() == s(R.string.scroll_list_to_front) }
-        item.javaClass.getMethod("invoke").invoke(item)
+        // its row tapped all the same (a click posted as it closed): the place now holds another item
+        list.onItemClickListener!!.onItemClick(list, null, toFront, toFront.toLong())
         h.idle()
         assertEquals(abc, pref.getValue())
     }
 
-    @Test
-    @Uat("KB-117")
-    fun anotherFieldClosesTheMenu() {
-        start()
-        hold(column()[2])
-        h.release()
-        assertEquals(3, menu().size)
-        h.start(inputType = InputType.TYPE_CLASS_TEXT, fieldId = 7)
-        assertEquals(emptyList<Item>(), menu())
-        assertTrue(column().none { it.isActivated })
+    /** Held and let go, then [how]: the menu gone and nothing typed. */
+    private fun closes(how: () -> Unit) {
+        // finally: a row that fails leaves no harness, menu, list or landscape to the rows after it
+        try {
+            start()
+            hold(column()[2])
+            h.release()
+            val open = shownMenu()!!
+            h.api.calls.clear()
+            how()
+            assertTrue("still up: ${menu()}", !open.isShowing)
+            assertEquals(emptyList<String>(), typed)
+        } finally {
+            close()
+            harness = null
+            RuntimeEnvironment.setQualifiers("+port")
+        }
+    }
+
+    /** Whether the service took back's down and its up; dispatched with a state, so InputMethodService's own back (tracked from down to up) works. */
+    private fun pressBack(): Pair<Boolean, Boolean> {
+        val state = KeyEvent.DispatcherState()
+        val down = KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK, 0)
+        val taken = down.dispatch(h.service, state, h.service) to KeyEvent.changeAction(down, KeyEvent.ACTION_UP).dispatch(h.service, state, h.service)
+        h.idle()
+        return taken
     }
 
     @Test
-    fun aRotationClosesTheMenu() {
-        start()
-        hold(column()[2])
-        h.release()
-        assertEquals(3, menu().size)
-        RuntimeEnvironment.setQualifiers("+land")
-        h.service.onConfigurationChanged(h.service.resources.configuration)
-        h.idle()
-        assertEquals(emptyList<Item>(), menu())
-    }
+    @Uat("KB-117")
+    fun theMenuClosesWhen() = assertRows(
+        "a tap outside it, which only closes it (no item typed)" to {
+            closes {
+                // a focusable menu takes the window focus from the editor, and some editors then finish composing (an English word)
+                assertFalse("takes no focus", shownMenu()!!.isModal)
+                h.press(column()[0])
+                h.release()
+                assertTrue(column().none { it.isActivated })
+            }
+        },
+        "back, taken down and up so the keyboard is kept; with no menu up, back is the system's" to {
+            closes {
+                HideRecordingShadow.hides.clear()
+                assertTrue("shown before", h.service.isInputViewShown)
+                assertEquals(true to true, pressBack())
+                assertEquals(emptyList<Int>(), HideRecordingShadow.hides)
+                assertTrue("kept", h.service.isInputViewShown)
+                assertTrue(column().isNotEmpty() && column().none { it.isActivated })
+                assertFalse("no menu left, so back is the system's", h.inputView.dismissMenu())
+            }
+        },
+        "another field" to {
+            closes {
+                h.start(inputType = InputType.TYPE_CLASS_TEXT, fieldId = 7)
+                assertTrue(column().none { it.isActivated })
+            }
+        },
+        "the keyboard hidden" to { closes { h.hide() } },
+        "a rotation, the view swapped" to {
+            closes {
+                RuntimeEnvironment.setQualifiers("+land")
+                h.service.onConfigurationChanged(h.service.resources.configuration)
+                h.idle()
+            }
+        },
+    )
 
     @Test
     @Uat("PAN-28")
@@ -350,7 +410,7 @@ class ScrollColumnMenuTest {
             assertEquals(listOf(true, true, true), menu().map { it.disabled })
             assertEquals(emptyList<String>(), said(column()[2]))
             // a faded item run all the same
-            h.menuPick(remove(column()[2]))
+            menuPick(remove(column()[2]))
             assertEquals(before, pref.getValue())
         } finally {
             directBoot(false)
@@ -396,6 +456,9 @@ class ScrollColumnMenuTest {
         assertTrue(v.performAccessibilityAction(toFront.id, null))
         h.idle()
         assertEquals(ScrollItem.Text("?"), stored(ScrollDefaults.NINE).first())
+        assertTrue(h.noticeTexts().toString(), h.noticeTexts().containsAll(listOf(s(R.string.scroll_list_moved_to_front), s(R.string.learning_undo))))
+        undo()
+        assertEquals(nine, stored(ScrollDefaults.NINE))
         // a command read by its name
         pref.setValue(ScrollListStore.Empty.with(ScrollDefaults.NINE, listOf(ScrollItem.Command("copy"), ScrollItem.Text("?"))).serialize())
         h.idle()

@@ -32,17 +32,12 @@ class ScrollListStore private constructor(
     fun isSet(id: String): Boolean = id in lists
 
     /** [items] as [id]'s shown ones, the commands not offered kept after them; none, or the default's, is no setting unless those are kept. */
-    fun with(id: String, items: List<ScrollItem>): ScrollListStore {
-        if (newer) return this
-        val shown = cleaned(items)
-        val all = cleaned(shown + stored(id).filterNot(::offered))
-        val t = LinkedHashMap(lists)
-        if (all.isEmpty() || all == ScrollDefaults.of(id)) t.remove(id) else t[id] = all
-        return ScrollListStore(t, newer = false)
-    }
+    fun with(id: String, items: List<ScrollItem>): ScrollListStore = put(id, cleaned(cleaned(items) + stored(id).filterNot(::offered)))
 
     /** [all] as [id]'s stored items, hidden commands where they stand: an undo's; the default's is no setting. */
-    fun restored(id: String, all: List<ScrollItem>): ScrollListStore {
+    fun restored(id: String, all: List<ScrollItem>): ScrollListStore = put(id, all)
+
+    private fun put(id: String, all: List<ScrollItem>): ScrollListStore {
         if (newer) return this
         val t = LinkedHashMap(lists)
         if (all.isEmpty() || all == ScrollDefaults.of(id)) t.remove(id) else t[id] = all

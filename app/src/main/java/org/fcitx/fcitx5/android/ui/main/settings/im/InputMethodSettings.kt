@@ -730,11 +730,12 @@ object InputMethodSettings {
 
     private class CustomEntries(val entries: List<Pair<String, String>>, val chosen: String?)
 
-    /** The chosen one too where not among them, said with what is drawn instead: 「17 键（读不出，暂用 18 键）」. */
+    /** Those turned on for [im] (用在…), and the chosen one where not among them, said with what is drawn instead: 「17 键（读不出，暂用 18 键）」. */
     private fun customEntries(context: Context, im: String, scheme: ShuangpinScheme): CustomEntries {
-        val usable = ImKeyboards.customs(im, scheme, CustomKeyboards.all())
+        val prefs = AppPrefs.getInstance().keyboard
+        val chosen = prefs.imKeyboards()
+        val usable = ImKeyboards.customs(im, scheme, prefs.offeredLayouts(chosen).listed(im, chosen, CustomKeyboards.all()))
         val entries = usable.map { CUSTOM_VALUE + it.id to KeyboardLabels.custom(context, it) }.toMutableList()
-        val chosen = AppPrefs.getInstance().keyboard.imKeyboards()
         val id = chosen.layoutOf(im) ?: return CustomEntries(entries, null)
         if (usable.none { it.id == id }) {
             val layout = chosen.customOf(im)

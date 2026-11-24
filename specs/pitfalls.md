@@ -245,6 +245,15 @@ pause apart, sends a refused one again after a pause, and stops (predicting noth
 pauses are spent. Waiting on a read instead blocks the main thread as long as the editor lays the
 text out, up to 2 s a read.
 
+### A hidden keyboard is told GONE by hand
+
+From Android 11 `InputMethodService.hideWindow` calls `dispatchWindowVisibilityChanged(GONE)` on the input view
+and leaves the window alone; `showWindow` tells nothing back. The view hears VISIBLE again only from the window
+itself, when it really went away in between. The app's screen remade (the system's dark mode switched)
+hides and shows the keyboard at once with the window staying, and a view that stops on GONE (the theme's pet)
+stayed stopped till the process died. `FcitxInputMethodService.onWindowShown` tells VISIBLE where the window
+stayed since `onWindowHidden` (`InputViewShown`). `View.getWindowVisibility()` reads the window, not this.
+
 ### Direct boot
 
 Before the first unlock there is no credential-protected storage: `EngineBridge.userDir()` is null,

@@ -111,7 +111,7 @@ class PinyinSessionShuangpinKeysTest {
             words, GroupedShuangpinSegmenter(ShuangpinScheme.ZIRANMA, NineKeyLetters.G18, setOf(Fuzzy.IN_ING)), spell = true, keysShown = true, prediction = false,
         )
         val typed = session.type("jy")
-        val jing = session.apply(Action.Syllable(typed.syllables.indexOf("jing")))
+        val jing = session.apply(Action.Syllable(typed.syllables.indexOf("jy")))
         assertEquals("金", jing.candidates[0])
         assertEquals("jy", jing.preedit)
     }

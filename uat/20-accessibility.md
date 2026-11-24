@@ -139,10 +139,10 @@
 - **前提**：B0-九键，开着 TalkBack。
 - **操作**：逐个滑过九键左列；在第一项和 `?` 上打开动作菜单（TalkBack 的「操作」）。
 - **预期**：每项读出它的字；`?` 的动作有「移到最前」「编辑这一列」「删除这一项」，第一项没有「移到最前」；动作做了和长按菜单一样，提示条带撤销。
-- **JVM**：`ScrollColumnMenuTest.talkBackDoesTheMenusThreeThings`（动作选了马上生效；命令项读命令名，「复制」读「复制」）、`.aSceneRemadeLeavesTalkBacksActionsAsTheyWere`；设备上从节点树读字和动作。TalkBack 本身真机上手工听一次：在 **滑动列** 的数字键盘那一类加命令「复制」，点 **123** 听它读「复制」，在 `+` 上用动作删除它。
+- **JVM**：`ScrollColumnMenuTest.talkBackDoesTheMenusThreeThings`（动作选了马上生效，提示条写「已移到最前」带撤销，点撤销放回原处；命令项读命令名，「复制」读「复制」）、`.aSceneRemadeLeavesTalkBacksActionsAsTheyWere`；设备上从节点树读字和动作。TalkBack 本身真机上手工听一次：在 **滑动列** 的数字键盘那一类加命令「复制」，点 **123** 听它读「复制」，在 `+` 上用动作删除它。
 
 ### AX-24 [P1] 读屏：数字键盘的锁（长按返回）
 - **前提**：B0，开着 TalkBack。
 - **操作**：点 **123**，滑到 **返回**，双击并按住；再滑到 **返回**；再打开符号面板，滑到它的锁。
-- **预期**：TalkBack 下 返回 读「返回」，提示「双击并按住即可锁定」；锁上后读「返回，已锁定」，提示「……即可解锁」（Android 10 不读状态）；面板的锁照旧。
+- **预期**：TalkBack 下 返回 读「返回」，提示「双击并按住即可锁定」；锁上后读「返回，已锁定」，提示「……即可解锁」；面板的锁照旧。状态「已锁定」用的是 Android 11（API 30）起的系统字段，Android 10 上 androidx 把它存进节点的附加数据，只有经 androidx 读节点的读屏（比如新版 TalkBack）念得出，有 Android 10 的机器时手工听一次；设备脚本在 Android 10 上不查状态（读节点的工具只读系统字段）。
 - **JVM**：`StickyNumbersUatTest.held返回IsSaidAndShown`、`NumberColumnTest.theLockIsShownOn返回AndThePadsKeysKept`、ime-core `SceneA11yTest.theNumberPads返回SaysItsHoldAndItsLock`；TalkBack 本身真机上手工听一次。

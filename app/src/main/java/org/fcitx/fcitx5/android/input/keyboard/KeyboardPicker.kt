@@ -25,12 +25,13 @@ class KeyboardPicker(private val context: Context, private val im: () -> String)
     fun offered(): Pair<List<Offered>, Offered>? {
         val name = im()
         val scheme = EngineState.shuangpinScheme
+        val prefs = AppPrefs.getInstance().keyboard
+        val chosen = prefs.imKeyboards()
         // listed now, a file or two read where changed
-        val all = CustomKeyboards.all()
+        val all = prefs.offeredLayouts(chosen).listed(name, chosen, CustomKeyboards.all())
         if (ImKeyboards.choices(name, scheme).isEmpty() && !(InputMethodCatalog.hasTableKeys(name) && ImKeyboards.offers(name, scheme, all))) return null
         val customs = ImKeyboards.customs(name, scheme, all)
         val builtIn = ImKeyboards.choices(name, scheme).ifEmpty { listOf(ImKeyboard.FULL) }
-        val chosen = AppPrefs.getInstance().keyboard.imKeyboards()
         val custom = chosen.customOf(name)
         val current = when (val k = ImKeyboards.effective(name, chosen.of(name), scheme, custom)) {
             ImKeyboard.CUSTOM -> Offered(k, custom)
@@ -43,8 +44,11 @@ class KeyboardPicker(private val context: Context, private val im: () -> String)
     fun offers(): Boolean {
         val name = im()
         val scheme = EngineState.shuangpinScheme
-        return ImKeyboards.choices(name, scheme).isNotEmpty() ||
-            (InputMethodCatalog.hasTableKeys(name) && ImKeyboards.offers(name, scheme, CustomKeyboards.listed()))
+        if (ImKeyboards.choices(name, scheme).isNotEmpty()) return true
+        if (!InputMethodCatalog.hasTableKeys(name)) return false
+        val prefs = AppPrefs.getInstance().keyboard
+        val chosen = prefs.imKeyboards { null }
+        return ImKeyboards.offers(name, scheme, prefs.offeredLayouts(chosen).listed(name, chosen, CustomKeyboards.listed()))
     }
 
     /** Null where the input method has no choice. The caller dismisses it. */

@@ -139,6 +139,19 @@ class SyllableStripTest {
         assertEquals(Button::class.java.name, info.className)
     }
 
+    // 双拼's keys shown (ua for sha): TalkBack reads the pinyin they stand for
+    @Test
+    fun talkBackReadsShuangpinKeysShownAsTheirPinyin() {
+        val strip = SyllableStrip(context, TestThemes.PixelDark)
+        strip.show(EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("ua", "u"), id = 1, said = listOf("sha", "sh")))
+        assertEquals(listOf("ua", "u"), (0..1).map { strip.item(it).text.toString() })
+        assertEquals(listOf("sha", "sh").map { context.getString(R.string.a11y_syllable, it) }, (0..1).map { strip.item(it).contentDescription })
+        // the same keys under another scheme (hk: 自然码's hao, 小鹤's huai) read anew
+        strip.show(EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("hk"), id = 2, said = listOf("hao")))
+        strip.show(EngineState.SyllableState(InputMethodCatalog.SHUANGPIN, composing = true, syllables = listOf("hk"), id = 2, said = listOf("huai")))
+        assertEquals(context.getString(R.string.a11y_syllable, "huai"), strip.item(0).contentDescription)
+    }
+
     @Test
     fun aSyllableIsATouchWide() {
         val strip = SyllableStrip(context, TestThemes.PixelDark)

@@ -659,12 +659,17 @@ class KeyboardHarness(
         val item = (0 until menu.size()).map(menu::getItem).firstOrNull { it.title.toString() == title }
             ?: error("no $title in ${(0 until menu.size()).map { menu.getItem(it).title }}")
         // a tap puts the menu away first: the notice it leads to is the popup up next
-        shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow?.let { menus += it }
+        menuUp()
         ShadowPopupMenu.getLatestPopupMenu().dismiss()
         // MenuItemImpl's own, what its view's tap calls
         item.javaClass.getMethod("invoke").invoke(item)
         idle()
         relayout()
+    }
+
+    /** The popup up last is a menu, never taken for a notice. */
+    fun menuUp() {
+        shadowOf(RuntimeEnvironment.getApplication()).latestPopupWindow?.let { menus += it }
     }
 
     fun notice(): PopupWindow? {
